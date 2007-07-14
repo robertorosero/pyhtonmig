@@ -697,6 +697,13 @@ class GrammarTests(unittest.TestCase):
             def meth2(self, arg): pass
             def meth3(self, a1, a2): pass
 
+        # decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE
+        # decorators: decorator+
+        # decorated: decorators (classdef | funcdef)
+        def class_decorator(x): return x
+        @class_decorator
+        class G: pass
+
     def testListcomps(self):
         # list comprehension tests
         nums = [1, 2, 3, 4, 5]
