@@ -4,11 +4,6 @@
 PyDoc_STRVAR(pickle_module_documentation,
 "C implementation and optimization of the Python pickle module.");
 
-#ifndef Py_eval_input
-#include <graminit.h>
-#define Py_eval_input eval_input
-#endif /* Py_eval_input */
-
 #define WRITE_BUF_SIZE 256
 
 /* Bump this when new opcodes are added to the pickle protocol. */
@@ -97,7 +92,6 @@ static PyObject *PickleError;
 static PyObject *PicklingError;
 static PyObject *UnpickleableError;
 static PyObject *UnpicklingError;
-static PyObject *BadPickleGet;
 
 /* As the name says, an empty tuple. */
 static PyObject *empty_tuple;
@@ -2380,12 +2374,22 @@ Pickler_dump(PicklerObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(Pickler_dump_doc,
+"dump(obj) -> None. Write a pickled representation of obj to the open file.");
+
+PyDoc_STRVAR(Pickler_clear_memo_doc,
+"clear_memo() -> None. Clears the pickler's \"memo\"."
+"\n"
+"The memo is the data structure that remembers which objects the\n"
+"pickler has already seen, so that shared or recursive objects are\n"
+"pickled by reference and not by value.  This method is useful when\n"
+"re-using picklers.");
+
 static struct PyMethodDef Pickler_methods[] = {
     {"dump", (PyCFunction) Pickler_dump, METH_VARARGS,
-     PyDoc_STR("dump(object) -> None.\n\n"
-               "Write an object in pickle format to the object's pickle stream")},
+     Pickler_dump_doc},
     {"clear_memo", (PyCFunction) Pickle_clear_memo, METH_NOARGS,
-     PyDoc_STR("clear_memo() -> None. Clear the picklers memo.")},
+     Pickler_clear_memo_doc},
     {NULL, NULL}                /* sentinel */
 };
 
@@ -2404,9 +2408,8 @@ Pickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (proto < 0)
         proto = HIGHEST_PROTOCOL;
     if (proto > HIGHEST_PROTOCOL) {
-        PyErr_Format(PyExc_ValueError, "pickle protocol %d asked for; "
-                     "the highest available protocol is %d",
-                     proto, HIGHEST_PROTOCOL);
+        PyErr_Format(PyExc_ValueError, "pickle protocol must be <= %d",
+                     HIGHEST_PROTOCOL);
         return NULL;
     }
 
@@ -2589,7 +2592,7 @@ Pickler_get_error(PicklerObject *p)
 }
 
 static PyMemberDef Pickler_members[] = {
-    {"binary", T_INT, offsetof(PicklerObject, bin)},
+    {"bin", T_INT, offsetof(PicklerObject, bin)},
     {"fast", T_INT, offsetof(PicklerObject, fast)},
     {NULL}
 };
@@ -3520,7 +3523,6 @@ load_pop(UnpicklerObject *self)
     return 0;
 }
 
-
 static int
 load_pop_mark(UnpicklerObject *self)
 {
@@ -3533,7 +3535,6 @@ load_pop_mark(UnpicklerObject *self)
 
     return 0;
 }
-
 
 static int
 load_dup(UnpicklerObject *self)
@@ -3549,67 +3550,60 @@ load_dup(UnpicklerObject *self)
     return 0;
 }
 
-
 static int
 load_get(UnpicklerObject *self)
 {
-    PyObject *py_str = 0, *value = 0;
+    PyObject *py_key, *value;
     int len;
     char *s;
-    int rc;
 
     if ((len = self->readline_func(self, &s)) < 0)
         return -1;
     if (len < 2)
         return bad_readline();
 
-    if (!(py_str = PyString_FromStringAndSize(s, len - 1)))
+    py_key = PyString_FromStringAndSize(s, len - 1);
+    if (!py_key)
         return -1;
 
-    value = PyDict_GetItem(self->memo, py_str);
+    value = PyDict_GetItem(self->memo, py_key);
     if (!value) {
-        PyErr_SetObject(BadPickleGet, py_str);
-        rc = -1;
+        PyErr_SetObject(PyExc_KeyError, py_key);
+        Py_DECREF(py_key);
+        return -1;
     }
-    else {
+
         PDATA_APPEND(self->stack, value, -1);
-        rc = 0;
+    Py_DECREF(py_key);
+    return 0;
     }
-
-    Py_DECREF(py_str);
-    return rc;
-}
-
 
 static int
 load_binget(UnpicklerObject *self)
 {
-    PyObject *py_key = 0, *value = 0;
+    PyObject *py_key, *value;
     unsigned char key;
     char *s;
-    int rc;
 
     if (self->read_func(self, &s, 1) < 0)
         return -1;
 
     key = (unsigned char) s[0];
-    if (!(py_key = PyInt_FromLong((long) key)))
+    py_key = PyInt_FromLong((long)key);
+    if (!py_key)
         return -1;
 
     value = PyDict_GetItem(self->memo, py_key);
     if (!value) {
-        PyErr_SetObject(BadPickleGet, py_key);
-        rc = -1;
-    }
-    else {
-        PDATA_APPEND(self->stack, value, -1);
-        rc = 0;
+        PyErr_SetObject(PyExc_KeyError, py_key);
+        Py_DECREF(py_key);
+        return -1;
     }
 
+    PDATA_APPEND(self->stack, value, -1);
     Py_DECREF(py_key);
-    return rc;
+    return 0;
 }
-
 
 static int
 load_long_binget(UnpicklerObject *self)
@@ -3618,7 +3612,6 @@ load_long_binget(UnpicklerObject *self)
     unsigned char c;
     char *s;
     long key;
-    int rc;
 
     if (self->read_func(self, &s, 4) < 0)
         return -1;
@@ -3637,16 +3630,13 @@ load_long_binget(UnpicklerObject *self)
 
     value = PyDict_GetItem(self->memo, py_key);
     if (!value) {
-        PyErr_SetObject(BadPickleGet, py_key);
-        rc = -1;
-    }
-    else {
-        PDATA_APPEND(self->stack, value, -1);
-        rc = 0;
+        Py_DECREF(py_key);
+        PyErr_SetObject(PyExc_KeyError, py_key);
     }
 
+    PDATA_APPEND(self->stack, value, -1);
     Py_DECREF(py_key);
-    return rc;
+    return 0;
 }
 
 /* Push an object from the extension registry (EXT[124]).  nbytes is
@@ -4771,10 +4761,6 @@ init_stuff(PyObject *module_dict)
                                                PickleError, NULL)))
         return -1;
 
-    if (!(BadPickleGet = PyErr_NewException("pickle.BadPickleGet",
-                                            UnpicklingError, NULL)))
-        return -1;
-
     if (PyDict_SetItemString(module_dict, "PickleError", PickleError) < 0)
         return -1;
 
@@ -4787,9 +4773,6 @@ init_stuff(PyObject *module_dict)
 
     if (PyDict_SetItemString(module_dict, "UnpickleableError",
                              UnpickleableError) < 0)
-        return -1;
-
-    if (PyDict_SetItemString(module_dict, "BadPickleGet", BadPickleGet) < 0)
         return -1;
 
     return 0;
