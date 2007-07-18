@@ -13,71 +13,77 @@ PyDoc_STRVAR(pickle_module_documentation,
  * Pickle opcodes.  These must be kept in synch with pickle.py.  Extensive
  * docs are in pickletools.py.
  */
-#define MARK        '('
-#define STOP        '.'
-#define POP         '0'
-#define POP_MARK    '1'
-#define DUP         '2'
-#define FLOAT       'F'
-#define BINFLOAT    'G'
-#define INT         'I'
-#define BININT      'J'
-#define BININT1     'K'
-#define LONG        'L'
-#define BININT2     'M'
-#define NONE        'N'
-#define PERSID      'P'
-#define BINPERSID   'Q'
-#define REDUCE      'R'
-#define STRING      'S'
-#define BINSTRING   'T'
-#define SHORT_BINSTRING 'U'
-#define UNICODE     'V'
-#define BINUNICODE  'X'
-#define APPEND      'a'
-#define BUILD       'b'
-#define GLOBAL      'c'
-#define DICT        'd'
-#define EMPTY_DICT  '}'
-#define APPENDS     'e'
-#define GET         'g'
-#define BINGET      'h'
-#define INST        'i'
-#define LONG_BINGET 'j'
-#define LIST        'l'
-#define EMPTY_LIST  ']'
-#define OBJ         'o'
-#define PUT         'p'
-#define BINPUT      'q'
-#define LONG_BINPUT 'r'
-#define SETITEM     's'
-#define TUPLE       't'
-#define EMPTY_TUPLE ')'
-#define SETITEMS    'u'
+enum opcodes {
+    MARK            = '(',
+    STOP            = '.',
+    POP             = '0',
+    POP_MARK        = '1',
+    DUP             = '2',
+    FLOAT           = 'F',
+    BINFLOAT        = 'G',
+    INT             = 'I',
+    BININT          = 'J',
+    BININT1         = 'K',
+    LONG            = 'L',
+    BININT2         = 'M',
+    NONE            = 'N',
+    PERSID          = 'P',
+    BINPERSID       = 'Q',
+    REDUCE          = 'R',
+    STRING          = 'S',
+    BINSTRING       = 'T',
+    SHORT_BINSTRING = 'U',
+    UNICODE         = 'V',
+    BINUNICODE      = 'X',
+    APPEND          = 'a',
+    BUILD           = 'b',
+    GLOBAL          = 'c',
+    DICT            = 'd',
+    EMPTY_DICT      = '}',
+    APPENDS         = 'e',
+    GET             = 'g',
+    BINGET          = 'h',
+    INST            = 'i',
+    LONG_BINGET     = 'j',
+    LIST            = 'l',
+    EMPTY_LIST      = ']',
+    OBJ             = 'o',
+    PUT             = 'p',
+    BINPUT          = 'q',
+    LONG_BINPUT     = 'r',
+    SETITEM         = 's',
+    TUPLE           = 't',
+    EMPTY_TUPLE     = ')',
+    SETITEMS        = 'u'
+};
 
 /* Protocol 2. */
-#define PROTO    '\x80'         /* identify pickle protocol */
-#define NEWOBJ   '\x81'         /* build object by applying cls.__new__ to argtuple */
-#define EXT1     '\x82'         /* push object from extension registry; 1-byte index */
-#define EXT2     '\x83'         /* ditto, but 2-byte index */
-#define EXT4     '\x84'         /* ditto, but 4-byte index */
-#define TUPLE1   '\x85'         /* build 1-tuple from stack top */
-#define TUPLE2   '\x86'         /* build 2-tuple from two topmost stack items */
-#define TUPLE3   '\x87'         /* build 3-tuple from three topmost stack items */
-#define NEWTRUE  '\x88'         /* push True */
-#define NEWFALSE '\x89'         /* push False */
-#define LONG1    '\x8a'         /* push long from < 256 bytes */
-#define LONG4    '\x8b'         /* push really big long */
+enum {
+    PROTO = '\x80', /* identify pickle protocol */
+    NEWOBJ,         /* build object by applying cls.__new__ to argtuple */
+    EXT1,           /* push object from extension registry; 1-byte index */
+    EXT2,           /* ditto but 2-byte index */
+    EXT4,           /* ditto but 4-byte index */
+    TUPLE1,         /* build 1-tuple from stack top */
+    TUPLE2,         /* build 2-tuple from two topmost stack items */
+    TUPLE3,         /* build 3-tuple from three topmost stack items */
+    NEWTRUE,        /* push True */
+    NEWFALSE,       /* push False */
+    LONG1,          /* push long from < 256 bytes */
+    LONG4,          /* push really big long */
+};
 
-/* There aren't opcodes -- they're ways to pickle bools before protocol 2,
+/* These aren't opcodes -- they're ways to pickle bools before protocol 2
  * so that unpicklers written before bools were introduced unpickle them
  * as ints, but unpicklers after can recognize that bools were intended.
  * Note that protocol 2 added direct ways to pickle bools.
  */
 #undef TRUE
-#define TRUE        "I01\n"
+#define TRUE  "I01\n"
 #undef FALSE
-#define FALSE       "I00\n"
+#define FALSE "I00\n"
+
+static const char MARKv = MARK;
 
 /* Keep in synch with pickle.Pickler._BATCHSIZE.  This is how many elements
  * batch_list/dict() pumps out before doing APPENDS/SETITEMS.  Nothing will
@@ -86,11 +92,8 @@ PyDoc_STRVAR(pickle_module_documentation,
  */
 #define BATCHSIZE 1000
 
-static char MARKv = MARK;
-
 static PyObject *PickleError;
 static PyObject *PicklingError;
-static PyObject *UnpickleableError;
 static PyObject *UnpicklingError;
 
 /* As the name says, an empty tuple. */
@@ -116,9 +119,7 @@ static PyObject *two_tuple;
 
 static PyObject \
     *__class___str,
-    *__getinitargs___str,
     *__dict___str,
-    *__getstate___str,
     *__setstate___str,
     *__name___str,
     *__reduce___str,
@@ -128,7 +129,6 @@ static PyObject \
     *read_str,
     *readline_str,
     *__main___str,
-    *copy_reg_str,
     *dispatch_table_str;
 
 /*************************************************************************
@@ -2276,7 +2276,8 @@ save(PicklerObject *self, PyObject *args, int pers_save)
                 t = PyObject_Call(__reduce__, empty_tuple, NULL);
             }
             else {
-                PyErr_SetObject(UnpickleableError, args);
+                pickle_ErrFormat(PicklingError, "Can't pickle '%s' object: %r",
+                                 "sO", type->tp_name, args);
                 goto finally;
             }
         }
@@ -2583,14 +2584,6 @@ Pickler_set_memo(PicklerObject *p, PyObject *v)
     return 0;
 }
 
-static PyObject *
-Pickler_get_error(PicklerObject *p)
-{
-    /* why is this an attribute on the Pickler? */
-    Py_INCREF(PicklingError);
-    return PicklingError;
-}
-
 static PyMemberDef Pickler_members[] = {
     {"bin", T_INT, offsetof(PicklerObject, bin)},
     {"fast", T_INT, offsetof(PicklerObject, fast)},
@@ -2602,7 +2595,6 @@ static PyGetSetDef Pickler_getsets[] = {
      (setter) Pickler_set_pers_func},
     {"inst_persistent_id", NULL, (setter) Pickler_set_inst_pers_func},
     {"memo", (getter) Pickler_get_memo, (setter) Pickler_set_memo},
-    {"PicklingError", (getter) Pickler_get_error, NULL},
     {NULL}
 };
 
@@ -4665,9 +4657,7 @@ init_stuff(PyObject *module_dict)
         return -1;
 
     INIT_STR(__class__);
-    INIT_STR(__getinitargs__);
     INIT_STR(__dict__);
-    INIT_STR(__getstate__);
     INIT_STR(__setstate__);
     INIT_STR(__name__);
     INIT_STR(__main__);
@@ -4677,7 +4667,6 @@ init_stuff(PyObject *module_dict)
     INIT_STR(append);
     INIT_STR(read);
     INIT_STR(readline);
-    INIT_STR(copy_reg);
     INIT_STR(dispatch_table);
 
     if (!(copy_reg = PyImport_ImportModule("copy_reg")))
@@ -4725,7 +4714,7 @@ init_stuff(PyObject *module_dict)
     if (!(t = PyDict_New()))
         return -1;
     if (!(r = PyRun_String("def __str__(self):\n"
-                           "  return self.args and ('%s' % self.args[0]) or '(what)'\n",
+                           "  return self.args and ('%s' % self.args[0]) or ''\n",
                            Py_file_input, module_dict, t)))
         return -1;
     Py_DECREF(r);
@@ -4745,16 +4734,11 @@ init_stuff(PyObject *module_dict)
         return -1;
     if (!(r = PyRun_String("def __str__(self):\n"
                            "  a=self.args\n"
-                           "  a=a and type(a[0]) or '(what)'\n"
+                           "  a=a and type(a[0]) or ''\n"
                            "  return 'Cannot pickle %s objects' % a\n",
                            Py_file_input, module_dict, t)))
         return -1;
     Py_DECREF(r);
-
-    if (!(UnpickleableError = PyErr_NewException("pickle.UnpickleableError",
-                                                 PicklingError, t)))
-        return -1;
-
     Py_DECREF(t);
 
     if (!(UnpicklingError = PyErr_NewException("pickle.UnpicklingError",
@@ -4771,34 +4755,21 @@ init_stuff(PyObject *module_dict)
                              UnpicklingError) < 0)
         return -1;
 
-    if (PyDict_SetItemString(module_dict, "UnpickleableError",
-                             UnpickleableError) < 0)
-        return -1;
-
     return 0;
 }
 
 PyMODINIT_FUNC
 init_pickle(void)
 {
-    PyObject *m, *d, *di, *v, *k;
+    PyObject *m, *d, *v;
     Py_ssize_t i;
-    char *rev = "1.71";         /* XXX when does this change? */
+    char *rev = "$Revision$";
     PyObject *format_version;
     PyObject *compatible_formats;
 
     Pickler_Type.ob_type = &PyType_Type;
     Unpickler_Type.ob_type = &PyType_Type;
     PdataType.ob_type = &PyType_Type;
-
-    /* Initialize some pieces. We need to do this before module creation,
-     * so we're forced to use a temporary dictionary. :(
-     */
-    di = PyDict_New();
-    if (!di)
-        return;
-    if (init_stuff(di) < 0)
-        return;
 
     /* Create the module and add the functions */
     m = Py_InitModule3("_pickle", NULL, pickle_module_documentation);
@@ -4814,14 +4785,8 @@ init_pickle(void)
     PyDict_SetItemString(d, "__version__", v);
     Py_XDECREF(v);
 
-    /* Copy data from di. Waaa. */
-    for (i = 0; PyDict_Next(di, &i, &k, &v);) {
-        if (PyObject_SetItem(d, k, v) < 0) {
-            Py_DECREF(di);
-            return;
-        }
-    }
-    Py_DECREF(di);
+    if (init_stuff(d) < 0)
+        return;
 
     i = PyModule_AddIntConstant(m, "HIGHEST_PROTOCOL", HIGHEST_PROTOCOL);
     if (i < 0)
