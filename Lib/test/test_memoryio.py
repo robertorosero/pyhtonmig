@@ -147,6 +147,8 @@ class MemoryTestMixin:
         memio = self.ioclass(buf)
 
         self.assertEqual(memio.getvalue(), buf)
+        memio.read()
+        self.assertEqual(memio.getvalue(), buf)
         memio = self.ioclass(buf * 1000)
         self.assertEqual(memio.getvalue()[-3:], "890")
         memio.close()
@@ -169,13 +171,21 @@ class MemoryTestMixin:
         buf = self.buftype("1234567890")
         memio = self.ioclass(buf)
 
-        self.assertEqual(0, memio.tell())
+        self.assertEqual(memio.tell(), 0)
         memio.seek(5)
-        self.assertEqual(5, memio.tell())
+        self.assertEqual(memio.tell(), 5)
         memio.seek(10000)
-        self.assertEqual(10000, memio.tell())
+        self.assertEqual(memio.tell(), 10000)
         memio.close()
         self.assertRaises(ValueError, memio.tell)
+
+    def test_flush(self):
+        buf = self.buftype("1234567890")
+        memio = self.ioclass(buf)
+
+        self.assertEqual(memio.flush(), None)
+        memio.close()
+        self.assertRaises(ValueError, memio.flush)
 
     def test_flags(self):
         memio = self.ioclass()
@@ -191,6 +201,15 @@ class MemoryTestMixin:
         self.assertEqual(memio.seekable(), True)
         self.assertRaises(ValueError, memio.isatty)
         self.assertEqual(memio.closed, True)
+
+    def test_subclassing(self):
+        buf = self.buftype("1234567890")
+        def test():
+            class MemIO(self.ioclass):
+                pass
+            m = MemIO(buf)
+            return m.getvalue()
+        self.assertEqual(test(), buf)
 
 
 class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
@@ -219,6 +238,14 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(b, b"")
         memio.close()
         self.assertRaises(ValueError, memio.readinto, b)
+
+    def test_overseek(self):
+        buf = self.buftype("1234567890")
+        memio = self.ioclass()
+
+        memio.seek(2)
+        memio.write(buf)
+        self.assertEqual(memio.getvalue(), '\0\0' + buf)
 
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
