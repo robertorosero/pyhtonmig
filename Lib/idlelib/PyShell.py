@@ -676,7 +676,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
 
     def checklinecache(self):
         c = linecache.cache
-        for key in c.keys():
+        for key in list(c.keys()):
             if key[:1] + key[-1:] != "<>":
                 del c[key]
 
