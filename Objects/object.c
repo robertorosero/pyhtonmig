@@ -214,7 +214,7 @@ PyObject_Init(PyObject *op, PyTypeObject *tp)
 	if (op == NULL)
 		return PyErr_NoMemory();
 	/* Any changes should be reflected in PyObject_INIT (objimpl.h) */
-	op->ob_type = tp;
+	Py_Type(op) = tp;
 	_Py_NewReference(op);
 	return op;
 }
@@ -226,7 +226,7 @@ PyObject_InitVar(PyVarObject *op, PyTypeObject *tp, Py_ssize_t size)
 		return (PyVarObject *) PyErr_NoMemory();
 	/* Any changes should be reflected in PyObject_INIT_VAR */
 	op->ob_size = size;
-	op->ob_type = tp;
+	Py_Type(op) = tp;
 	_Py_NewReference((PyObject *)op);
 	return op;
 }
@@ -279,7 +279,7 @@ internal_print(PyObject *op, FILE *fp, int flags, int nesting)
 			   universally available */
 			fprintf(fp, "<refcnt %ld at %p>",
 				(long)op->ob_refcnt, op);
-		else if (op->ob_type->tp_print == NULL) {
+		else if (Py_Type(op)->tp_print == NULL) {
 			PyObject *s;
 			if (flags & Py_PRINT_RAW)
 				s = PyObject_Str(op);
@@ -294,7 +294,7 @@ internal_print(PyObject *op, FILE *fp, int flags, int nesting)
 			Py_XDECREF(s);
 		}
 		else
-			ret = (*op->ob_type->tp_print)(op, fp, flags);
+			ret = (*Py_Type(op)->tp_print)(op, fp, flags);
 	}
 	if (ret == 0) {
 		if (ferror(fp)) {
@@ -334,7 +334,7 @@ _PyObject_Dump(PyObject* op)
 			"type    : %s\n"
 			"refcount: %ld\n"
 			"address : %p\n",
-			op->ob_type==NULL ? "NULL" : op->ob_type->tp_name,
+			Py_Type(op)==NULL ? "NULL" : Py_Type(op)->tp_name,
 			(long)op->ob_refcnt,
 			op);
 	}
@@ -353,12 +353,12 @@ PyObject_Repr(PyObject *v)
 #endif
 	if (v == NULL)
 		return PyString_FromString("<NULL>");
-	else if (v->ob_type->tp_repr == NULL)
+	else if (Py_Type(v)->tp_repr == NULL)
 		return PyString_FromFormat("<%s object at %p>",
-					   v->ob_type->tp_name, v);
+					   Py_Type(v)->tp_name, v);
 	else {
 		PyObject *res;
-		res = (*v->ob_type->tp_repr)(v);
+		res = (*Py_Type(v)->tp_repr)(v);
 		if (res == NULL)
 			return NULL;
 #ifdef Py_USING_UNICODE
@@ -375,7 +375,7 @@ PyObject_Repr(PyObject *v)
 		if (!PyString_Check(res)) {
 			PyErr_Format(PyExc_TypeError,
 				     "__repr__ returned non-string (type %.200s)",
-				     res->ob_type->tp_name);
+				     Py_Type(res)->tp_name);
 			Py_DECREF(res);
 			return NULL;
 		}
@@ -400,10 +400,10 @@ _PyObject_Str(PyObject *v)
 		return v;
 	}
 #endif
-	if (v->ob_type->tp_str == NULL)
+	if (Py_Type(v)->tp_str == NULL)
 		return PyObject_Repr(v);
 
-	res = (*v->ob_type->tp_str)(v);
+	res = (*Py_Type(v)->tp_str)(v);
 	if (res == NULL)
 		return NULL;
 	type_ok = PyString_Check(res);
@@ -413,7 +413,7 @@ _PyObject_Str(PyObject *v)
 	if (!type_ok) {
 		PyErr_Format(PyExc_TypeError,
 			     "__str__ returned non-string (type %.200s)",
-			     res->ob_type->tp_name);
+			     Py_Type(res)->tp_name);
 		Py_DECREF(res);
 		return NULL;
 	}
@@ -487,8 +487,8 @@ PyObject_Unicode(PyObject *v)
 			res = v;
 		}
 		else {
-			if (v->ob_type->tp_str != NULL)
-				res = (*v->ob_type->tp_str)(v);
+			if (Py_Type(v)->tp_str != NULL)
+				res = (*Py_Type(v)->tp_str)(v);
 			else
 				res = PyObject_Repr(v);
 		}
@@ -851,8 +851,8 @@ PyObject_GetAttrString(PyObject *v, const char *name)
 {
 	PyObject *w, *res;
 
-	if (v->ob_type->tp_getattr != NULL)
-		return (*v->ob_type->tp_getattr)(v, (char*)name);
+	if (Py_Type(v)->tp_getattr != NULL)
+		return (*Py_Type(v)->tp_getattr)(v, (char*)name);
 	w = PyString_InternFromString(name);
 	if (w == NULL)
 		return NULL;
@@ -879,8 +879,8 @@ PyObject_SetAttrString(PyObject *v, const char *name, PyObject *w)
 	PyObject *s;
 	int res;
 
-	if (v->ob_type->tp_setattr != NULL)
-		return (*v->ob_type->tp_setattr)(v, (char*)name, w);
+	if (Py_Type(v)->tp_setattr != NULL)
+		return (*Py_Type(v)->tp_setattr)(v, (char*)name, w);
 	s = PyString_InternFromString(name);
 	if (s == NULL)
 		return -1;
@@ -892,7 +892,7 @@ PyObject_SetAttrString(PyObject *v, const char *name, PyObject *w)
 PyObject *
 PyObject_GetAttr(PyObject *v, PyObject *name)
 {
-	PyTypeObject *tp = v->ob_type;
+	PyTypeObject *tp = Py_Type(v);
 
 	if (!PyString_Check(name)) {
 #ifdef Py_USING_UNICODE
@@ -909,7 +909,7 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
 		{
 			PyErr_Format(PyExc_TypeError,
 				     "attribute name must be string, not '%.200s'",
-				     name->ob_type->tp_name);
+				     Py_Type(name)->tp_name);
 			return NULL;
 		}
 	}
@@ -938,7 +938,7 @@ PyObject_HasAttr(PyObject *v, PyObject *name)
 int
 PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 {
-	PyTypeObject *tp = v->ob_type;
+	PyTypeObject *tp = Py_Type(v);
 	int err;
 
 	if (!PyString_Check(name)){
@@ -956,7 +956,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 		{
 			PyErr_Format(PyExc_TypeError,
 				     "attribute name must be string, not '%.200s'",
-				     name->ob_type->tp_name);
+				     Py_Type(name)->tp_name);
 			return -1;
 		}
 	}
@@ -998,7 +998,7 @@ PyObject **
 _PyObject_GetDictPtr(PyObject *obj)
 {
 	Py_ssize_t dictoffset;
-	PyTypeObject *tp = obj->ob_type;
+	PyTypeObject *tp = Py_Type(obj);
 
 	dictoffset = tp->tp_dictoffset;
 	if (dictoffset == 0)
@@ -1031,7 +1031,7 @@ PyObject_SelfIter(PyObject *obj)
 PyObject *
 PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
-	PyTypeObject *tp = obj->ob_type;
+	PyTypeObject *tp = Py_Type(obj);
 	PyObject *descr = NULL;
 	PyObject *res = NULL;
 	descrgetfunc f;
@@ -1053,7 +1053,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 		{
 			PyErr_Format(PyExc_TypeError,
 				     "attribute name must be string, not '%.200s'",
-				     name->ob_type->tp_name);
+				     Py_Type(name)->tp_name);
 			return NULL;
 		}
 	}
@@ -1128,7 +1128,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	}
 
 	if (f != NULL) {
-		res = f(descr, obj, (PyObject *)obj->ob_type);
+		res = f(descr, obj, (PyObject *)Py_Type(obj));
 		Py_DECREF(descr);
 		goto done;
 	}
@@ -1150,7 +1150,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 int
 PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 {
-	PyTypeObject *tp = obj->ob_type;
+	PyTypeObject *tp = Py_Type(obj);
 	PyObject *descr;
 	descrsetfunc f;
 	PyObject **dictptr;
@@ -1171,7 +1171,7 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 		{
 			PyErr_Format(PyExc_TypeError,
 				     "attribute name must be string, not '%.200s'",
-				     name->ob_type->tp_name);
+				     Py_Type(name)->tp_name);
 			return -1;
 		}
 	}
@@ -1363,7 +1363,7 @@ _dir_locals(void)
 	if (!PyList_Check(names)) {
 		PyErr_Format(PyExc_TypeError,
 			"dir(): expected keys() of locals to be a list, "
-			"not '%.200s'", names->ob_type->tp_name);
+			"not '%.200s'", Py_Type(names)->tp_name);
 		Py_DECREF(names);
 		return NULL;
 	}
@@ -1491,7 +1491,7 @@ _dir_object(PyObject *obj)
 		if (!PyList_Check(result)) {
 			PyErr_Format(PyExc_TypeError,
 				     "__dir__() must return a list, not %.200s",
-				     result->ob_type->tp_name);
+				     Py_Type(result)->tp_name);
 			Py_DECREF(result);
 			result = NULL;
 		}
@@ -1553,8 +1553,7 @@ none_dealloc(PyObject* ignore)
 
 
 static PyTypeObject PyNone_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"NoneType",
 	0,
 	0,
@@ -1571,7 +1570,8 @@ static PyTypeObject PyNone_Type = {
 };
 
 PyObject _Py_NoneStruct = {
-	PyObject_HEAD_INIT(&PyNone_Type)
+  _PyObject_EXTRA_INIT
+  1, &PyNone_Type
 };
 
 /* NotImplemented is an object that can be used to signal that an
@@ -1584,8 +1584,7 @@ NotImplemented_repr(PyObject *op)
 }
 
 static PyTypeObject PyNotImplemented_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"NotImplementedType",
 	0,
 	0,
@@ -1602,7 +1601,8 @@ static PyTypeObject PyNotImplemented_Type = {
 };
 
 PyObject _Py_NotImplementedStruct = {
-	PyObject_HEAD_INIT(&PyNotImplemented_Type)
+	_PyObject_EXTRA_INIT
+	1, &PyNotImplemented_Type
 };
 
 void
@@ -1679,7 +1679,7 @@ _Py_ForgetReference(register PyObject *op)
 void
 _Py_Dealloc(PyObject *op)
 {
-	destructor dealloc = op->ob_type->tp_dealloc;
+	destructor dealloc = Py_Type(op)->tp_dealloc;
 	_Py_ForgetReference(op);
 	(*dealloc)(op);
 }
@@ -1710,7 +1710,7 @@ _Py_PrintReferenceAddresses(FILE *fp)
 	fprintf(fp, "Remaining object addresses:\n");
 	for (op = refchain._ob_next; op != &refchain; op = op->_ob_next)
 		fprintf(fp, "%p [%" PY_FORMAT_SIZE_T "d] %s\n", op,
-			op->ob_refcnt, op->ob_type->tp_name);
+			op->ob_refcnt, Py_Type(op)->tp_name);
 }
 
 PyObject *
@@ -1728,7 +1728,7 @@ _Py_GetObjects(PyObject *self, PyObject *args)
 		return NULL;
 	for (i = 0; (n == 0 || i < n) && op != &refchain; i++) {
 		while (op == self || op == args || op == res || op == t ||
-		       (t != NULL && op->ob_type != (PyTypeObject *) t)) {
+		       (t != NULL && Py_Type(op) != (PyTypeObject *) t)) {
 			op = op->_ob_next;
 			if (op == &refchain)
 				return res;
@@ -1871,7 +1871,7 @@ _PyTrash_destroy_chain(void)
 {
 	while (_PyTrash_delete_later) {
 		PyObject *op = _PyTrash_delete_later;
-		destructor dealloc = op->ob_type->tp_dealloc;
+		destructor dealloc = Py_Type(op)->tp_dealloc;
 
 		_PyTrash_delete_later =
 			(PyObject*) _Py_AS_GC(op)->gc.gc_prev;
