@@ -303,8 +303,7 @@ static PyMethodDef range_methods[] = {
 };
 
 PyTypeObject PyRange_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/* Number of items for varobject */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"range",		/* Name of this type */
 	sizeof(rangeobject),	/* Basic object size */
 	0,			/* Item size for varobject */
@@ -399,8 +398,7 @@ static PyMethodDef rangeiter_methods[] = {
 };
 
 PyTypeObject Pyrangeiter_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,                                      /* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"rangeiterator",                        /* tp_name */
 	sizeof(rangeiterobject),                /* tp_basicsize */
 	0,                                      /* tp_itemsize */
@@ -551,8 +549,7 @@ longrangeiter_next(longrangeiterobject *r)
 }
 
 static PyTypeObject Pylongrangeiter_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,                                      /* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"rangeiterator",                        /* tp_name */
 	sizeof(longrangeiterobject),            /* tp_basicsize */
 	0,                                      /* tp_itemsize */

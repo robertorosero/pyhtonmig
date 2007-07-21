@@ -859,8 +859,7 @@ static PyMethodDef PyTclObject_methods[] = {
 };
 
 static PyTypeObject PyTclObject_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"_tkinter.Tcl_Obj",		/*tp_name*/
 	sizeof(PyTclObject),	/*tp_basicsize*/
 	0,			/*tp_itemsize*/

@@ -8151,8 +8151,7 @@ static PyMethodDef unicodeiter_methods[] = {
 };
 
 PyTypeObject PyUnicodeIter_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"unicodeiterator",			/* tp_name */
 	sizeof(unicodeiterobject),		/* tp_basicsize */
 	0,					/* tp_itemsize */

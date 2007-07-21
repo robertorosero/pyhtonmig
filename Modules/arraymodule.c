@@ -1259,20 +1259,20 @@ array_tofile(arrayobject *self, PyObject *f)
 {
 	FILE *fp;
 
-        if (self->ob_size == 0)
+        if (Py_Size(self) == 0)
 		goto done;
 
 	fp = PyFile_AsFile(f);
 	if (fp != NULL) {
 		if (fwrite(self->ob_item, self->ob_descr->itemsize,
-			   self->ob_size, fp) != (size_t)self->ob_size) {
+			   Py_Size(self), fp) != (size_t)Py_Size(self)) {
 			PyErr_SetFromErrno(PyExc_IOError);
 			clearerr(fp);
 			return NULL;
 		}
 	}
 	else {
-		Py_ssize_t nbytes = self->ob_size * self->ob_descr->itemsize;
+		Py_ssize_t nbytes = Py_Size(self) * self->ob_descr->itemsize;
 		/* Write 64K blocks at a time */
 		/* XXX Make the block size settable */
 		int BLOCKSIZE = 64*1024;
@@ -2151,7 +2151,7 @@ initarray(void)
 
 	if (PyType_Ready(&Arraytype) < 0)
             return;
-	PyArrayIter_Type.ob_type = &PyType_Type;
+	Py_Type(&PyArrayIter_Type) = &PyType_Type;
 	m = Py_InitModule3("array", a_methods, module_doc);
 	if (m == NULL)
 		return;

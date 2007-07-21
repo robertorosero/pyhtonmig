@@ -75,17 +75,14 @@ whose size is determined when the object is allocated.
 #endif
 
 /* PyObject_HEAD defines the initial segment of every PyObject. */
-#define PyObject_HEAD			\
-	_PyObject_HEAD_EXTRA		\
-	Py_ssize_t ob_refcnt;		\
-	struct _typeobject *ob_type;
+#define PyObject_HEAD		        PyObject ob_base;
 
 #define PyObject_HEAD_INIT(type)	\
-	_PyObject_EXTRA_INIT		\
-	1, type,
+	{ _PyObject_EXTRA_INIT		\
+	1, type },
 
 #define PyVarObject_HEAD_INIT(type, size)	\
-	PyObject_HEAD_INIT(type) size,
+	{ PyObject_HEAD_INIT(type) size },
 
 /* PyObject_VAR_HEAD defines the initial segment of all variable-size
  * container objects.  These end with a declaration of an array with 1
@@ -93,9 +90,7 @@ whose size is determined when the object is allocated.
  * has room for ob_size elements.  Note that ob_size is an element count,
  * not necessarily a byte count.
  */
-#define PyObject_VAR_HEAD		\
-	PyObject_HEAD			\
-	Py_ssize_t ob_size; /* Number of items in variable part */
+#define PyObject_VAR_HEAD      PyVarObject ob_base;
 #define Py_INVALID_SIZE (Py_ssize_t)-1
 
 /* Nothing is actually declared to be a PyObject, but every pointer to
@@ -104,11 +99,14 @@ whose size is determined when the object is allocated.
  * in addition, be cast to PyVarObject*.
  */
 typedef struct _object {
-	PyObject_HEAD
+	_PyObject_HEAD_EXTRA
+	Py_ssize_t ob_refcnt;
+	struct _typeobject *ob_type;
 } PyObject;
 
 typedef struct {
-	PyObject_VAR_HEAD
+	PyObject ob_base;
+	Py_ssize_t ob_size; /* Number of items in variable part */
 } PyVarObject;
 
 #define Py_Refcnt(ob)		(((PyObject*)(ob))->ob_refcnt)

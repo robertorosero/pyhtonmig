@@ -30,7 +30,7 @@ PyAPI_DATA(PyTypeObject) PyBytes_Type;
 
 /* Type check macros */
 #define PyBytes_Check(self) PyObject_TypeCheck(self, &PyBytes_Type)
-#define PyBytes_CheckExact(self) ((self)->ob_type == &PyBytes_Type)
+#define PyBytes_CheckExact(self) (Py_Type(self) == &PyBytes_Type)
 
 /* Direct API functions */
 PyAPI_FUNC(PyObject *) PyBytes_FromObject(PyObject *);
@@ -42,7 +42,7 @@ PyAPI_FUNC(int) PyBytes_Resize(PyObject *, Py_ssize_t);
 
 /* Macros, trading safety for speed */
 #define PyBytes_AS_STRING(self) (((PyBytesObject *)(self))->ob_bytes)
-#define PyBytes_GET_SIZE(self)  (((PyBytesObject *)(self))->ob_size)
+#define PyBytes_GET_SIZE(self)  Py_Size(self)
 
 #ifdef __cplusplus
 }

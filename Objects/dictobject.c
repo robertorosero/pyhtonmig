@@ -2570,8 +2570,7 @@ static PyMethodDef dictkeys_methods[] = {
 };
 
 PyTypeObject PyDictKeys_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"dict_keys",				/* tp_name */
 	sizeof(dictviewobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -2655,8 +2654,7 @@ static PyMethodDef dictitems_methods[] = {
 };
 
 PyTypeObject PyDictItems_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"dict_items",				/* tp_name */
 	sizeof(dictviewobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -2721,8 +2719,7 @@ static PyMethodDef dictvalues_methods[] = {
 };
 
 PyTypeObject PyDictValues_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"dict_values",				/* tp_name */
 	sizeof(dictviewobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */

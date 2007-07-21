@@ -5369,8 +5369,7 @@ DBSequence_getattr(DBSequenceObject* self, char *name)
 #endif
 
 static PyTypeObject DB_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,                  /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DB",               /*tp_name*/
     sizeof(DBObject),   /*tp_basicsize*/
     0,                  /*tp_itemsize*/
@@ -5402,8 +5401,7 @@ static PyTypeObject DB_Type = {
 
 
 static PyTypeObject DBCursor_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,                  /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DBCursor",         /*tp_name*/
     sizeof(DBCursorObject),  /*tp_basicsize*/
     0,                  /*tp_itemsize*/
@@ -5435,8 +5433,7 @@ static PyTypeObject DBCursor_Type = {
 
 
 static PyTypeObject DBEnv_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,          /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DBEnv",            /*tp_name*/
     sizeof(DBEnvObject),    /*tp_basicsize*/
     0,          /*tp_itemsize*/
@@ -5467,8 +5464,7 @@ static PyTypeObject DBEnv_Type = {
 };
 
 static PyTypeObject DBTxn_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,          /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DBTxn",    /*tp_name*/
     sizeof(DBTxnObject),  /*tp_basicsize*/
     0,          /*tp_itemsize*/
@@ -5500,8 +5496,7 @@ static PyTypeObject DBTxn_Type = {
 
 
 static PyTypeObject DBLock_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,          /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DBLock",   /*tp_name*/
     sizeof(DBLockObject),  /*tp_basicsize*/
     0,          /*tp_itemsize*/
@@ -5533,8 +5528,7 @@ static PyTypeObject DBLock_Type = {
 
 #if (DBVER >= 43)
 static PyTypeObject DBSequence_Type = {
-    PyObject_HEAD_INIT(NULL)
-    0,          /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "DBSequence",                   /*tp_name*/
     sizeof(DBSequenceObject),       /*tp_basicsize*/
     0,          /*tp_itemsize*/

@@ -5110,8 +5110,7 @@ static PyMethodDef striter_methods[] = {
 };
 
 PyTypeObject PyStringIter_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"striterator",				/* tp_name */
 	sizeof(striterobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */

@@ -422,9 +422,9 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			return obj;
 		/* If the returned object is not an instance of type,
 		   it won't be initialized. */
-		if (!PyType_IsSubtype(obj->ob_type, type))
+		if (!PyType_IsSubtype(Py_Type(obj), type))
 			return obj;
-		type = obj->ob_type;
+		type = Py_Type(obj);
 		if (type->tp_init != NULL &&
 		    type->tp_init(obj, args, kwds) < 0) {
 			Py_DECREF(obj);
@@ -1432,7 +1432,7 @@ raise_dict_descr_error(PyObject *obj)
 {
 	PyErr_Format(PyExc_TypeError,
 		     "this __dict__ descriptor does not support "
-		     "'%.200s' objects", obj->ob_type->tp_name);
+		     "'%.200s' objects", Py_Type(obj)->tp_name);
 }
 
 static PyObject *
@@ -1442,7 +1442,7 @@ subtype_dict(PyObject *obj, void *context)
 	PyObject *dict;
 	PyTypeObject *base;
 
-	base = get_builtin_base_with_dict(obj->ob_type);
+	base = get_builtin_base_with_dict(Py_Type(obj));
 	if (base != NULL) {
 		descrgetfunc func;
 		PyObject *descr = get_dict_descriptor(base);
@@ -1450,12 +1450,12 @@ subtype_dict(PyObject *obj, void *context)
 			raise_dict_descr_error(obj);
 			return NULL;
 		}
-		func = descr->ob_type->tp_descr_get;
+		func = Py_Type(descr)->tp_descr_get;
 		if (func == NULL) {
 			raise_dict_descr_error(obj);
 			return NULL;
 		}
-		return func(descr, obj, (PyObject *)(obj->ob_type));
+		return func(descr, obj, (PyObject *)(Py_Type(obj)));
 	}
 
 	dictptr = _PyObject_GetDictPtr(obj);
@@ -1478,7 +1478,7 @@ subtype_setdict(PyObject *obj, PyObject *value, void *context)
 	PyObject *dict;
 	PyTypeObject *base;
 
-	base = get_builtin_base_with_dict(obj->ob_type);
+	base = get_builtin_base_with_dict(Py_Type(obj));
 	if (base != NULL) {
 		descrsetfunc func;
 		PyObject *descr = get_dict_descriptor(base);
@@ -1486,7 +1486,7 @@ subtype_setdict(PyObject *obj, PyObject *value, void *context)
 			raise_dict_descr_error(obj);
 			return -1;
 		}
-		func = descr->ob_type->tp_descr_set;
+		func = Py_Type(descr)->tp_descr_set;
 		if (func == NULL) {
 			raise_dict_descr_error(obj);
 			return -1;
@@ -1707,7 +1707,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	winner = metatype;
 	for (i = 0; i < nbases; i++) {
 		tmp = PyTuple_GET_ITEM(bases, i);
-		tmptype = tmp->ob_type;
+		tmptype = Py_Type(tmp);
 		if (PyType_IsSubtype(winner, tmptype))
 			continue;
 		if (PyType_IsSubtype(tmptype, winner)) {
@@ -3669,7 +3669,7 @@ wrap_binaryfunc_r(PyObject *self, PyObject *args, void *wrapped)
 	if (!check_num_args(args, 1))
 		return NULL;
 	other = PyTuple_GET_ITEM(args, 0);
-	if (!PyType_IsSubtype(other->ob_type, self->ob_type)) {
+	if (!PyType_IsSubtype(Py_Type(other), Py_Type(self))) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
@@ -4524,7 +4524,7 @@ slot_nb_bool(PyObject *self)
 				PyErr_Format(PyExc_TypeError,
 					 "__bool__ should return "
 					 "bool, returned %s",
-					 temp->ob_type->tp_name);
+					 Py_Type(temp)->tp_name);
 				result = -1;
 			}
 			Py_DECREF(temp);
@@ -4682,7 +4682,7 @@ slot_tp_hash(PyObject *self)
 
 	if (func == NULL) {
 		PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
-			     self->ob_type->tp_name);
+			     Py_Type(self)->tp_name);
 		return -1;
         }
 
@@ -5922,7 +5922,7 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 				if (!PyType_Check(type)) {
 				    PyErr_Format(PyExc_SystemError,
 				      "super(): __class__ is not a type (%s)",
-				      type->ob_type->tp_name);
+				      Py_Type(type)->tp_name);
 				    return -1;
 				}
 				break;

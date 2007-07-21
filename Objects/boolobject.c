@@ -187,11 +187,11 @@ PyTypeObject PyBool_Type = {
 
 /* Named Zero for link-level compatibility */
 struct _longobject _Py_FalseStruct = {
-	PyObject_HEAD_INIT(&PyBool_Type)
-	0, { 0 }
+	PyVarObject_HEAD_INIT(&PyBool_Type, 0)
+	{ 0 }
 };
 
 struct _longobject _Py_TrueStruct = {
-	PyObject_HEAD_INIT(&PyBool_Type)
-	1, { 1 }
+	PyVarObject_HEAD_INIT(&PyBool_Type, 1)
+	{ 1 }
 };

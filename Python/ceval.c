@@ -3149,7 +3149,7 @@ unpack_iterable(PyObject *v, int argcnt, int argcntafter, PyObject **sp)
 		*--sp = PyList_GET_ITEM(l, ll - j);
 	}
 	/* Resize the list. */
-	((PyListObject *)l)->ob_size = ll - argcntafter;
+	Py_Size(l) = ll - argcntafter;
 	Py_DECREF(it);
 	return 1;
 

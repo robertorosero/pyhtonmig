@@ -273,7 +273,7 @@ fileio_dealloc(PyFileIOObject *self)
 			Py_DECREF(closeresult);
 	}
 
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 static PyObject *
@@ -704,8 +704,7 @@ static PyGetSetDef fileio_getsetlist[] = {
 };
 
 PyTypeObject PyFileIO_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"FileIO",
 	sizeof(PyFileIOObject),
 	0,

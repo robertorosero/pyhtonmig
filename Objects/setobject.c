@@ -578,21 +578,21 @@ set_tp_print(PySetObject *so, FILE *fp, int flags)
 	if (status != 0) {
 		if (status < 0)
 			return status;
-		fprintf(fp, "%s(...)", so->ob_type->tp_name);
+		fprintf(fp, "%s(...)", Py_Type(so)->tp_name);
 		return 0;
 	}        
 
 	if (!so->used) {
 		Py_ReprLeave((PyObject*)so);
-		fprintf(fp, "%s()", so->ob_type->tp_name);
+		fprintf(fp, "%s()", Py_Type(so)->tp_name);
 		return 0;
 	}
 
-	if (so->ob_type == &PySet_Type) {
+	if (Py_Type(so) == &PySet_Type) {
 		literalform = 1;
 		fprintf(fp, "{");
 	} else
-		fprintf(fp, "%s([", so->ob_type->tp_name);
+		fprintf(fp, "%s([", Py_Type(so)->tp_name);
 	while (set_next(so, &pos, &entry)) {
 		fputs(emit, fp);
 		emit = separator;
@@ -618,13 +618,13 @@ set_repr(PySetObject *so)
 	if (status != 0) {
 		if (status < 0)
 			return NULL;
-		return PyString_FromFormat("%s(...)", so->ob_type->tp_name);
+		return PyString_FromFormat("%s(...)", Py_Type(so)->tp_name);
 	}
 
 	/* shortcut for the empty set */
 	if (!so->used) {
 		Py_ReprLeave((PyObject*)so);
-		return PyString_FromFormat("%s()", so->ob_type->tp_name);
+		return PyString_FromFormat("%s()", Py_Type(so)->tp_name);
 	}
 
 	keys = PySequence_List((PyObject *)so);
@@ -635,13 +635,13 @@ set_repr(PySetObject *so)
 	if (listrepr == NULL)
 		goto done;
 
-	if (so->ob_type == &PySet_Type) {
+	if (Py_Type(so) == &PySet_Type) {
 		char *s = PyString_AS_STRING(listrepr);
 		s += 1;
 		s[strlen(s)-1] = 0;
 		result = PyString_FromFormat("{%s}", s);
 	} else {
-		result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
+		result = PyString_FromFormat("%s(%s)", Py_Type(so)->tp_name,
 			 	PyString_AS_STRING(listrepr));
 	}
 	Py_DECREF(listrepr);
