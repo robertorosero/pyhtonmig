@@ -193,8 +193,7 @@ def format_exception_only(etype, value):
                 # only three spaces to account for offset1 == pos 0
                 lines.append('   %s^\n' % ''.join(caretspace))
             value = msg
-
-    lines.append(_format_final_exc_line(stype, value))
+    lines.append("%s: %s" % (stype, str(msg)))
     return lines
 
 def _format_final_exc_line(etype, value):
