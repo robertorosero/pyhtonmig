@@ -221,7 +221,7 @@ Pdata_grow(Pdata *self)
         goto nomemory;
     if ((int) (size_t) bigger != bigger)
         goto nomemory;
-    nbytes = (size_t) bigger *sizeof(PyObject *);
+    nbytes = (size_t) bigger * sizeof(PyObject *);
     if (nbytes / sizeof(PyObject *) != (size_t) bigger)
         goto nomemory;
     tmp = realloc(self->data, nbytes);
@@ -702,7 +702,7 @@ get(PicklerObject *self, PyObject * id)
 static int
 put(PicklerObject *self, PyObject *ob)
 {
-    if (ob->ob_refcnt < 2 || self->fast)
+    if (self->fast)
         return 0;
 
     return put2(self, ob);
