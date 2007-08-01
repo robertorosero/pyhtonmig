@@ -475,6 +475,12 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 This is the equivalent of the Python statement: del o[key].
        */
 
+	/* old buffer API
+	   FIXME:  usage of these should all be replaced in Python itself
+	   but for backwards compatibility we will implement them. 
+	   Their usage without a corresponding "unlock" mechansim
+	   may create issues (but they would already be there). */
+
      PyAPI_FUNC(int) PyObject_AsCharBuffer(PyObject *obj,
 					   const char **buffer,
 					   Py_ssize_t *buffer_len);
@@ -526,6 +532,110 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	  set in case no error occurrs. Otherwise, -1 is returned and
 	  an exception set.
        */
+
+	/* new buffer API */
+	
+     PyAPI_FUNC(int) PyObject_CheckBuffer(PyObject *obj);
+
+	/* Return 1 if the getbuffer function is available, otherwise 
+	   return 0 */
+
+     PyAPI_FUNC(int) PyObject_GetBuffer(PyObject *obj, PyBuffer *view, 
+					int flags);
+
+	/* This is a C-API version of the getbuffer function call.  It checks
+       	   to make sure object has the required function pointer and issues the
+	   call.  Returns -1 and raises an error on failure and returns 0 on 
+	   success
+        */
+
+     PyAPI_FUNC(int) PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view);
+
+	/* C-API version of the releasebuffer function call.  It checks
+	   to make sure the object has the required function pointer and
+	   issues the call.  Returns 0 on success and -1 (with an error
+	   raised) on failure.  This function always succeeds (as a NO-OP)
+	   if there is no releasebuffer function for the object so that
+	   it can always be called when the consumer is done with the buffer
+        */
+
+     PyAPI_FUNC(int) PyBuffer_SizeFromFormat(const char *);
+		
+	/* Return the implied itemsize of the data-format area from a 
+	   struct-style description */
+    
+     PyAPI_FUNC(int) PyObject_GetContiguous(PyObject *obj, void **buf, 
+					    Py_ssize_t *len, char **format,
+					    char fortran);
+
+	/* Return a contiguous chunk of memory representing the buffer
+	   from an object.  If a copy is made then return 1 (the
+	   return variable should be checked so the memory can be
+	   freed if needed after the caller is done with it).  If no
+	   copy was needed return 0.  If an error occurred in probing
+	   the buffer interface then return -1.
+	   
+	   The contiguous chunck of memory is pointed to by *buf and
+	   the length of that memory is *len.  The format of that
+	   memory is returned in struct-string syntax in *format.
+
+           If the object is multi-dimensional and if fortran is 'F',
+           the first dimension of the underlying array will vary the
+           fastest in the buffer.  If fortran is 'C', then the last
+           dimension will vary the fastest (C-style contiguous).  If
+           fortran is 'A', then it does not matter and you will get
+           whatever the object decides is more efficient.  
+
+	   If a copy is made, then the memory *must be freed* by
+	   calling PyMem_Free when the user of this sub-routine is
+	   done with the memory
+        */
+	
+     PyAPI_FUNC(int) PyObject_CopyToObject(PyObject *obj, void *buf, 
+    					   Py_ssize_t len, char fortran);
+
+	/* Copy len bytes of data from the contiguous chunk of memory
+	   pointed to by buf into the buffer exported by obj.  Return
+	   0 on success and return -1 and raise a PyBuffer_Error on
+	   error (i.e. the object does not have a buffer interface or
+	   it is not working).
+
+	   If fortran is 'F', then if the object is multi-dimensional,
+	   then the data will be copied into the array in
+	   Fortran-style (first dimension varies the fastest).  If
+	   fortran is 'C', then the data will be copied into the array
+	   in C-style (last dimension varies the fastest).  If fortran
+	   is 'A', then it does not matter and the copy will be made
+	   in whatever way is more efficient.
+
+        */
+
+     PyAPI_FUNC(int) PyBuffer_IsContiguous(PyBuffer *view, char fortran);
+
+     PyAPI_FUNC(int) PyBuffer_IsAligned(PyBuffer *view);
+
+     PyAPI_FUNC(int) PyBuffer_FillContiguousStrides(int *ndims, 
+	  					    Py_ssize_t *shape, 
+	                                            int itemsize,
+						    Py_ssize_t *strides,
+	     					    char fortran);
+
+       	/*  Fill the strides array with byte-strides of a contiguous
+            (Fortran-style if fortran is 'F' or C-style otherwise)
+            array of the given shape with the given number of bytes
+            per element.
+        */
+
+     PyAPI_FUNC(int) PyBuffer_FillInfo(PyBuffer *view, void *buf,
+		             	       Py_ssize_t len, int readonly,
+				       int flags);
+
+        /* Fills in a buffer-info structure correctly for an exporter
+           that can only share a contiguous chunk of memory of
+           "unsigned bytes" of the given length. Returns 0 on success
+           and -1 (with raising an error) on error.
+         */
+
 
 /* Iterators */
 
