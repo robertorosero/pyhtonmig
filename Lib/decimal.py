@@ -706,7 +706,8 @@ class Decimal(object):
     def __cmp__(self, other, context=None):
         other = _convert_other(other)
         if other is NotImplemented:
-            return other
+            # Never return NotImplemented
+            return 1
 
         if self._is_special or other._is_special:
             ans = self._check_nans(other, context)

@@ -858,6 +858,10 @@ class DecimalUsabilityTest(unittest.TestCase):
         a.sort()
         self.assertEqual(a, b)
 
+        # with None
+        self.assertFalse(Decimal(1) < None)
+        self.assertTrue(Decimal(1) > None)
+
     def test_copy_and_deepcopy_methods(self):
         d = Decimal('43.24')
         c = copy.copy(d)
