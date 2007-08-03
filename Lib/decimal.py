@@ -2398,6 +2398,13 @@ class Decimal(object):
 
     def is_subnormal(self, context=None):
         """Returns 1 if self is subnormal, otherwise returns 0."""
+        if context is None:
+            context = getcontext()
+
+        r = self._exp + len(self._int)
+        if r <= context.Emin:
+            return Decimal(1)
+        return Decimal(0)
 
     def is_zero(self, context=None):
         """Returns 1 if self is a zero, otherwise returns 0."""
@@ -2667,6 +2674,32 @@ class Decimal(object):
           +Normal
           +Infinity
         """
+        if self.is_snan():
+            return "sNaN"
+        if self.is_qnan():
+            return "NaN"
+        inf = self._isinfinity()
+        if inf == 1:
+            return "+Infinity"
+        if inf == -1:
+            return "-Infinity"
+        if self.is_zero():
+            if self._sign:
+                return "-Zero"
+            else:
+                return "+Zero"
+        if context is None:
+            context = getcontext()
+        if self.is_subnormal(context=context):
+            if self._sign:
+                return "-Subnormal"
+            else:
+                return "+Subnormal"
+        # just a normal, regular, boring number, :)
+        if self._sign:
+            return "-Normal"
+        else:
+            return "+Normal"
 
     def radix(self, context=None):
         """Just returns 10, as this is Decimal, :)"""
