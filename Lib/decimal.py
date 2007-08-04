@@ -2322,6 +2322,66 @@ class Decimal(object):
         value. Note that a total ordering is defined for all possible abstract
         representations.
         """
+        # if one is negative and the other is positive, it's easy
+        if self._sign and not other._sign:
+            return Decimal(-1)
+        if not self._sign and other._sign:
+            return Decimal(1)
+        sign = self._sign
+
+        # let's handle both NaN types
+        self_nan = self._isnan()
+        other_nan = other._isnan()
+        if self_nan or other_nan:
+            if self_nan == other_nan:
+                if self._int < other._int:
+                    if sign:
+                        return Decimal(1)
+                    else:
+                        return Decimal(-1)
+                if self._int > other._int:
+                    if sign:
+                        return Decimal(-1)
+                    else:
+                        return Decimal(1)
+                return Decimal(0)
+
+            if sign:
+                if self_nan == 1:
+                    return Decimal(-1)
+                if other_nan == 1:
+                    return Decimal(1)
+                if self_nan == 2:
+                    return Decimal(-1)
+                if other_nan == 2:
+                    return Decimal(1)
+            else:
+                if self_nan == 1:
+                    return Decimal(1)
+                if other_nan == 1:
+                    return Decimal(-1)
+                if self_nan == 2:
+                    return Decimal(1)
+                if other_nan == 2:
+                    return Decimal(-1)
+
+        if self < other:
+            return Decimal(-1)
+        if self > other:
+            return Decimal(1)
+
+        if self._exp < other._exp:
+            if sign:
+                return Decimal(1)
+            else:
+                return Decimal(-1)
+        if self._exp > other._exp:
+            if sign:
+                return Decimal(-1)
+            else:
+                return Decimal(1)
+        return Decimal(0)
+
 
     def compare_total_mag (self, other, context=None):
         """Compares self to other using abstract repr., ignoring sign.
