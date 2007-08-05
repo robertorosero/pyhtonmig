@@ -2383,13 +2383,16 @@ class Decimal(object):
         return Decimal(0)
 
 
-    def compare_total_mag (self, other, context=None):
+    def compare_total_mag(self, other):
         """Compares self to other using abstract repr., ignoring sign.
 
         Like compare_total, but with operand's sign ignored and assumed to be 0.
         """
+        s = self.copy_abs()
+        o = other.copy_abs()
+        return s.compare_total(o)
 
-    def copy_abs(self, context=None):
+    def copy_abs(self):
         """Returns a copy with the sign set to 0. """
         return Decimal((0, self._int, self._exp))
 
@@ -3187,12 +3190,12 @@ class Context(object):
         """
         return a.compare_total(b, context=self)
 
-    def compare_total_mag (self, a, b):
+    def compare_total_mag(self, a, b):
         """Compares two operands using their abstract representation ignoring sign.
 
         Like compare_total, but with operand's sign ignored and assumed to be 0.
         """
-        return a.compare_total_mag (b, context=self)
+        return a.compare_total_mag(b)
 
     def copy_abs(self, a):
         """Returns a copy of the operand with the sign set to 0.
@@ -3202,7 +3205,7 @@ class Context(object):
         >>> ExtendedContext.copy_abs(Decimal('-100'))
         Decimal("100")
         """
-        return a.copy_abs(context=self)
+        return a.copy_abs()
 
     def copy_decimal(self, a):
         """Returns a copy of the decimal objet.
