@@ -1773,11 +1773,11 @@ static PyMethodDef file_methods[] = {
 #define OFF(x) offsetof(PyFileObject, x)
 
 static PyMemberDef file_memberlist[] = {
-	{"mode",	T_OBJECT,	OFF(f_mode),	RO,
+	{"mode",	T_OBJECT,	OFF(f_mode),	READONLY,
 	 "file mode ('r', 'U', 'w', 'a', possibly with 'b' or '+' added)"},
-	{"name",	T_OBJECT,	OFF(f_name),	RO,
+	{"name",	T_OBJECT,	OFF(f_name),	READONLY,
 	 "file name"},
-	{"encoding",	T_OBJECT,	OFF(f_encoding),	RO,
+	{"encoding",	T_OBJECT,	OFF(f_encoding),	READONLY,
 	 "file encoding"},
 	/* getattr(f, "closed") is implemented without this table */
 	{NULL}	/* Sentinel */
