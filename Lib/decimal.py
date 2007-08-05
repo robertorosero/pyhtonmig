@@ -3751,32 +3751,35 @@ class Context(object):
           +Normal
           +Infinity
 
-        >>> ExtendedContext.number_class(Decimal('Infinity'))
-        "+Infinity"
-        >>> ExtendedContext.number_class(Decimal('1E-10'))
-        "+Normal"
-        >>> ExtendedContext.number_class(Decimal('2.50'))
-        "+Normal"
-        >>> ExtendedContext.number_class(Decimal('0.1E-999'))
-        "+Subnormal"
-        >>> ExtendedContext.number_class(Decimal('0'))
-        "+Zero"
-        >>> ExtendedContext.number_class(Decimal('-0'))
-        "-Zero"
-        >>> ExtendedContext.number_class(Decimal('-0.1E-999'))
-        "-Subnormal"
-        >>> ExtendedContext.number_class(Decimal('-1E-10'))
-        "-Normal"
-        >>> ExtendedContext.number_class(Decimal('-2.50'))
-        "-Normal"
-        >>> ExtendedContext.number_class(Decimal('-Infinity'))
-        "-Infinity"
-        >>> ExtendedContext.number_class(Decimal('NaN'))
-        "NaN"
-        >>> ExtendedContext.number_class(Decimal('-NaN'))
-        "NaN"
-        >>> ExtendedContext.number_class(Decimal('sNaN'))
-        "sNaN"
+        >>> c = Context(ExtendedContext)
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.number_class(Decimal('Infinity'))
+        '+Infinity'
+        >>> c.number_class(Decimal('1E-10'))
+        '+Normal'
+        >>> c.number_class(Decimal('2.50'))
+        '+Normal'
+        >>> c.number_class(Decimal('0.1E-999'))
+        '+Subnormal'
+        >>> c.number_class(Decimal('0'))
+        '+Zero'
+        >>> c.number_class(Decimal('-0'))
+        '-Zero'
+        >>> c.number_class(Decimal('-0.1E-999'))
+        '-Subnormal'
+        >>> c.number_class(Decimal('-1E-10'))
+        '-Normal'
+        >>> c.number_class(Decimal('-2.50'))
+        '-Normal'
+        >>> c.number_class(Decimal('-Infinity'))
+        '-Infinity'
+        >>> c.number_class(Decimal('NaN'))
+        'NaN'
+        >>> c.number_class(Decimal('-NaN'))
+        'NaN'
+        >>> c.number_class(Decimal('sNaN'))
+        'sNaN'
         """
         return a.number_class(context=self)
 
