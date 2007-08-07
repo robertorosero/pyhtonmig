@@ -2304,7 +2304,7 @@ class Decimal(object):
         """Returns the same Decimal object.
 
         As we do not have different encodings for the same number, the
-        received object already is in it's canonical form.
+        received object already is in its canonical form.
         """
         return self
 
@@ -3171,7 +3171,7 @@ class Context(object):
         """Returns the same Decimal object.
 
         As we do not have different encodings for the same number, the
-        received object already is in it's canonical form.
+        received object already is in its canonical form.
 
         >>> ExtendedContext.canonical(Decimal('2.50'))
         Decimal("2.50")
@@ -3275,7 +3275,7 @@ class Context(object):
         return a.copy_negate(context=self)
 
     def copy_sign(self, a, b):
-        """Copys the second operand's sign to the first one.
+        """Copies the second operand's sign to the first one.
 
         In detail, it returns a copy of the first operand with the sign
         equal to the sign of the second operand.
