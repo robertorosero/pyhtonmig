@@ -534,8 +534,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 
 	/* new buffer API */
-	
-     PyAPI_FUNC(int) PyObject_CheckBuffer(PyObject *obj);
+
+#define PyObject_CheckBuffer(obj) \
+        (((obj)->tp_as_buffer != NULL) &&  \
+         ((obj)->tp_as_buffer->bf_getbuffer != NULL))
 
 	/* Return 1 if the getbuffer function is available, otherwise 
 	   return 0 */
@@ -549,14 +551,23 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	   success
         */
 
+
      PyAPI_FUNC(int) PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view);
 
-	/* C-API version of the releasebuffer function call.  It checks
-	   to make sure the object has the required function pointer and
-	   issues the call.  Returns 0 on success and -1 (with an error
-	   raised) on failure.  This function always succeeds (as a NO-OP)
-	   if there is no releasebuffer function for the object so that
-	   it can always be called when the consumer is done with the buffer
+
+	/* C-API version of the releasebuffer function call.  It
+	   checks to make sure the object has the required function
+	   pointer and issues the call.  The obj must have the buffer
+	   interface or this function will cause a segfault (i.e. it
+	   is assumed to be called only after a corresponding
+	   getbuffer which already verified the existence of the
+	   tp_as_buffer pointer).
+           
+           Returns 0 on success and -1 (with an error raised) on
+           failure.  This function always succeeds (as a NO-OP) if
+           there is no releasebuffer function for the object so that
+           it can always be called when the consumer is done with the
+           buffer
         */
 
      PyAPI_FUNC(int) PyBuffer_SizeFromFormat(const char *);
@@ -610,14 +621,18 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
         */
 
+     PyAPI_FUNC(int) PyObject_CopyData(PyObject *dest, PyObject *src);
+        
+        /* Copy the data from the src buffer to the buffer of destination
+         */
+
      PyAPI_FUNC(int) PyBuffer_IsContiguous(PyBuffer *view, char fortran);
 
-     PyAPI_FUNC(int) PyBuffer_IsAligned(PyBuffer *view);
 
-     PyAPI_FUNC(int) PyBuffer_FillContiguousStrides(int *ndims, 
+     PyAPI_FUNC(void) PyBuffer_FillContiguousStrides(int *ndims, 
 	  					    Py_ssize_t *shape, 
-	                                            int itemsize,
 						    Py_ssize_t *strides,
+	                                            int itemsize,
 	     					    char fortran);
 
        	/*  Fill the strides array with byte-strides of a contiguous

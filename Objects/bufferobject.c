@@ -152,10 +152,8 @@ PyBuffer_FromObject(PyObject *base, Py_ssize_t offset, Py_ssize_t size)
 	PyBufferProcs *pb = base->ob_type->tp_as_buffer;
 
 	if ( pb == NULL ||
-	     pb->bf_getreadbuffer == NULL ||
-	     pb->bf_getsegcount == NULL )
-	{
-		PyErr_SetString(PyExc_TypeError, "buffer object expected");
+	     pb->bf_getbuffer == NULL) {
+                PyErr_SetString(PyExc_TypeError, "buffer object expected");
 		return NULL;
 	}
 
@@ -168,9 +166,7 @@ PyBuffer_FromReadWriteObject(PyObject *base, Py_ssize_t offset, Py_ssize_t size)
 	PyBufferProcs *pb = base->ob_type->tp_as_buffer;
 
 	if ( pb == NULL ||
-	     pb->bf_getwritebuffer == NULL ||
-	     pb->bf_getsegcount == NULL )
-	{
+	     pb->bf_getbuffer == NULL) {
 		PyErr_SetString(PyExc_TypeError, "buffer object expected");
 		return NULL;
 	}
@@ -629,69 +625,6 @@ buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObje
 
 /* Buffer methods */
 
-static Py_ssize_t
-buffer_getreadbuf(PyBufferObject *self, Py_ssize_t idx, void **pp)
-{
-	Py_ssize_t size;
-	if ( idx != 0 ) {
-		PyErr_SetString(PyExc_SystemError,
-				"accessing non-existent buffer segment");
-		return -1;
-	}
-	if (!get_buf(self, pp, &size, READ_BUFFER))
-		return -1;
-	return size;
-}
-
-static Py_ssize_t
-buffer_getwritebuf(PyBufferObject *self, Py_ssize_t idx, void **pp)
-{
-	Py_ssize_t size;
-
-	if ( self->b_readonly )
-	{
-		PyErr_SetString(PyExc_TypeError, "buffer is read-only");
-		return -1;
-	}
-
-	if ( idx != 0 ) {
-		PyErr_SetString(PyExc_SystemError,
-				"accessing non-existent buffer segment");
-		return -1;
-	}
-	if (!get_buf(self, pp, &size, WRITE_BUFFER))
-		return -1;
-	return size;
-}
-
-static Py_ssize_t
-buffer_getsegcount(PyBufferObject *self, Py_ssize_t *lenp)
-{
-	void *ptr;
-	Py_ssize_t size;
-	if (!get_buf(self, &ptr, &size, ANY_BUFFER))
-		return -1;
-	if (lenp)
-		*lenp = size;
-	return 1;
-}
-
-static Py_ssize_t
-buffer_getcharbuf(PyBufferObject *self, Py_ssize_t idx, const char **pp)
-{
-	void *ptr;
-	Py_ssize_t size;
-	if ( idx != 0 ) {
-		PyErr_SetString(PyExc_SystemError,
-				"accessing non-existent buffer segment");
-		return -1;
-	}
-	if (!get_buf(self, &ptr, &size, CHAR_BUFFER))
-		return -1;
-	*pp = (const char *)ptr;
-	return size;
-}
-
 static PySequenceMethods buffer_as_sequence = {
 	(lenfunc)buffer_length, /*sq_length*/
 	(binaryfunc)buffer_concat, /*sq_concat*/
@@ -703,10 +636,8 @@ static PySequenceMethods buffer_as_sequence = {
 };
 
 static PyBufferProcs buffer_as_buffer = {
-	(readbufferproc)buffer_getreadbuf,
-	(writebufferproc)buffer_getwritebuf,
-	(segcountproc)buffer_getsegcount,
-	(charbufferproc)buffer_getcharbuf,
+	(getbufferproc)buffer_getbuf,
+        (releasebufferproc)buffer_releasebuf,
 };
 
 PyTypeObject PyBuffer_Type = {
