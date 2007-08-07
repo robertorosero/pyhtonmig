@@ -217,8 +217,8 @@ PyObject_DelItemString(PyObject *o, char *key)
 
 int
 PyObject_AsCharBuffer(PyObject *obj,
-			  const char **buffer,
-			  Py_ssize_t *buffer_len)
+                      const char **buffer,
+                      Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
 	char *pp;
@@ -230,7 +230,7 @@ PyObject_AsCharBuffer(PyObject *obj,
 		return -1;
 	}
 	pb = obj->ob_type->tp_as_buffer;
-	if (pb == NULL || pb->bf_getbuffer == NULL) {
+	if (pb == NULL || pb->bf_getbuffer == NULL)
 		PyErr_SetString(PyExc_TypeError,
 				"expected an object with the buffer interface");
 		return -1;
@@ -340,14 +340,13 @@ PyObject_GetBuffer(PyObject *obj, PyBuffer *view, int flags)
          return (*(obj->tp_as_buffer->bf_getbuffer))(obj, view, flags);
 }
 
-int 
+void
 PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view)
 {
         if (obj->tp_as_buffer != NULL && 
             obj->tp_as_buffer->bf_releasebuffer != NULL) {
-                return (*(obj->tp_as_buffer->bf_releasebuffer))(obj, view);
+                (*(obj->tp_as_buffer->bf_releasebuffer))(obj, view);
         }
-        return 0;            
 }
 
 
@@ -608,7 +607,7 @@ PyObject_GetContiguous(PyObject *obj, void **buf, Py_ssize_t *len,
                         return -1;
                 }                 
         }
-        if (PyObject_ReleaseBuffer(obj, &view) < 0) return -1;
+        PyObject_ReleaseBuffer(obj, &view);
         return 1;
 }
 
@@ -642,7 +641,8 @@ PyObject_CopyToObject(PyObject *obj, void *buf, Py_ssize_t len,
         if (PyBuffer_IsContiguous(&view, fort)) {
                 /* simplest copy is all that is needed */
                 memcpy(view.buf, buf, len);
-                return PyObject_ReleaseBuffer(obj, &view);
+                PyObject_ReleaseBuffer(obj, &view);
+                return 0;
         }
 
         /* Otherwise a more elaborate scheme is needed */
@@ -676,7 +676,8 @@ PyObject_CopyToObject(PyObject *obj, void *buf, Py_ssize_t len,
         }
                 
         PyMem_Free(indices);
-        return PyObject_ReleaseBuffer(obj, &view);
+        PyObject_ReleaseBuffer(obj, &view);
+        return 0;
 }
 
 
@@ -719,9 +720,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src) {
              PyBuffer_IsContiguous(&src_dest, 'F'))) {
                 /* simplest copy is all that is needed */
                 memcpy(view_dest.buf, view_src.buf, view_src.len);
-                if (PyObject_ReleaseBuffer(dest, &view_dest) < 0 ||
-                    PyObject_ReleaseBuffer(src, &view_src) < 0)
-                        return -1;
+                PyObject_ReleaseBuffer(dest, &view_dest);
+                PyObject_ReleaseBuffer(src, &view_src);
                 return 0;
         }
 
@@ -750,9 +750,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src) {
                 src += itemsize;
         }                
         PyMem_Free(indices);
-        if (PyObject_ReleaseBuffer(dest, &view_dest) < 0 || 
-            PyObject_ReleaseBuffer(src, &view_src) < 0)
-                return -1;
+        PyObject_ReleaseBuffer(dest, &view_dest);
+        PyObject_ReleaseBuffer(src, &view_src);
         return 0;
 }
 

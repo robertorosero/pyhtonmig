@@ -156,7 +156,7 @@ struct bufferinfo {
 } PyBuffer;
 
 typedef int (*getbufferproc)(PyObject *, PyBuffer *, int);
-typedef int (*releasebufferproc)(PyObject *, PyBuffer *);
+typedef void (*releasebufferproc)(PyObject *, PyBuffer *);
 
         /* Flags for getting buffers */
 #define PyBUF_SIMPLE 0
@@ -265,6 +265,7 @@ typedef struct {
 typedef struct {
      getbufferproc bf_getbuffer;
      releasebufferproc bf_releasebuffer;
+     inquiry bf_multisegment;
 } PyBufferProcs;
 
 typedef void (*freefunc)(void *);

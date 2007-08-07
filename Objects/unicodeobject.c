@@ -7788,56 +7788,16 @@ static PyMappingMethods unicode_as_mapping = {
     (objobjargproc)0,			/* mp_ass_subscript */
 };
 
-static Py_ssize_t
-unicode_buffer_getreadbuf(PyUnicodeObject *self,
-			  Py_ssize_t index,
-			  const void **ptr)
-{
-    if (index != 0) {
-        PyErr_SetString(PyExc_SystemError,
-			"accessing non-existent unicode segment");
-        return -1;
-    }
-    *ptr = (void *) self->str;
-    return PyUnicode_GET_DATA_SIZE(self);
-}
-
-static Py_ssize_t
-unicode_buffer_getwritebuf(PyUnicodeObject *self, Py_ssize_t index,
-			   const void **ptr)
-{
-    PyErr_SetString(PyExc_TypeError,
-		    "cannot use unicode as modifiable buffer");
-    return -1;
-}
 
 static int
-unicode_buffer_getsegcount(PyUnicodeObject *self,
-			   Py_ssize_t *lenp)
+unicode_buffer_getbuffer(PyUnicodeObject *self, PyBuffer *view, int flags)
 {
-    if (lenp)
-        *lenp = PyUnicode_GET_DATA_SIZE(self);
-    return 1;
+    int res;
+    
+    return PyBuffer_FillInfo(view, (void *)self->str, PyUnicode_GET_DATA_SIZE(self),
+                             1, flags);
 }
 
-static Py_ssize_t
-unicode_buffer_getcharbuf(PyUnicodeObject *self,
-			  Py_ssize_t index,
-			  const void **ptr)
-{
-    PyObject *str;
-
-    if (index != 0) {
-        PyErr_SetString(PyExc_SystemError,
-			"accessing non-existent unicode segment");
-        return -1;
-    }
-    str = _PyUnicode_AsDefaultEncodedString((PyObject *)self, NULL);
-    if (str == NULL)
-	return -1;
-    *ptr = (void *) PyString_AS_STRING(str);
-    return PyString_GET_SIZE(str);
-}
 
 /* Helpers for PyUnicode_Format() */
 
@@ -8533,10 +8493,8 @@ PyObject *PyUnicode_Format(PyObject *format,
 }
 
 static PyBufferProcs unicode_as_buffer = {
-    (readbufferproc) unicode_buffer_getreadbuf,
-    (writebufferproc) unicode_buffer_getwritebuf,
-    (segcountproc) unicode_buffer_getsegcount,
-    (charbufferproc) unicode_buffer_getcharbuf,
+    (getbufferproc) unicode_buffer_getbuffer,
+    NULL,
 };
 
 static PyObject *
