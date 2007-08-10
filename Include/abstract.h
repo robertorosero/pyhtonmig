@@ -536,8 +536,8 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	/* new buffer API */
 
 #define PyObject_CheckBuffer(obj) \
-        (((obj)->tp_as_buffer != NULL) &&  \
-         ((obj)->tp_as_buffer->bf_getbuffer != NULL))
+        (((obj)->ob_type->tp_as_buffer != NULL) &&  \
+         ((obj)->ob_type->tp_as_buffer->bf_getbuffer != NULL))
 
 	/* Return 1 if the getbuffer function is available, otherwise 
 	   return 0 */
@@ -552,7 +552,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
         */
 
 
-     PyAPI_FUNC(int) PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view);
+     PyAPI_FUNC(void) PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view);
 
 
 	/* C-API version of the releasebuffer function call.  It
@@ -570,40 +570,25 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
            buffer
         */
 
+     PyAPI_FUNC(void *) PyBuffer_GetPointer(PyBuffer *view, Py_ssize_t *indices);
+        
+        /* Get the memory area pointed to by the indices for the buffer given. 
+           Note that view->ndim is the assumed size of indices 
+        */
+
      PyAPI_FUNC(int) PyBuffer_SizeFromFormat(const char *);
 		
 	/* Return the implied itemsize of the data-format area from a 
 	   struct-style description */
     
-     PyAPI_FUNC(int) PyObject_GetContiguous(PyObject *obj, void **buf, 
-					    Py_ssize_t *len, char **format,
-					    char fortran);
 
-	/* Return a contiguous chunk of memory representing the buffer
-	   from an object.  If a copy is made then return 1 (the
-	   return variable should be checked so the memory can be
-	   freed if needed after the caller is done with it).  If no
-	   copy was needed return 0.  If an error occurred in probing
-	   the buffer interface then return -1.
-	   
-	   The contiguous chunck of memory is pointed to by *buf and
-	   the length of that memory is *len.  The format of that
-	   memory is returned in struct-string syntax in *format.
-
-           If the object is multi-dimensional and if fortran is 'F',
-           the first dimension of the underlying array will vary the
-           fastest in the buffer.  If fortran is 'C', then the last
-           dimension will vary the fastest (C-style contiguous).  If
-           fortran is 'A', then it does not matter and you will get
-           whatever the object decides is more efficient.  
-
-	   If a copy is made, then the memory *must be freed* by
-	   calling PyMem_Free when the user of this sub-routine is
-	   done with the memory
-        */
 	
-     PyAPI_FUNC(int) PyObject_CopyToObject(PyObject *obj, void *buf, 
-    					   Py_ssize_t len, char fortran);
+     PyAPI_FUNC(int) PyBuffer_ToContiguous(void *buf, PyBuffer *view,
+    					   Py_ssize_t len, char fort);
+
+     PyAPI_FUNC(int) PyBuffer_FromContiguous(PyBuffer *view, void *buf, 
+    					     Py_ssize_t len, char fort);
+
 
 	/* Copy len bytes of data from the contiguous chunk of memory
 	   pointed to by buf into the buffer exported by obj.  Return
@@ -629,11 +614,11 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
      PyAPI_FUNC(int) PyBuffer_IsContiguous(PyBuffer *view, char fortran);
 
 
-     PyAPI_FUNC(void) PyBuffer_FillContiguousStrides(int *ndims, 
+     PyAPI_FUNC(void) PyBuffer_FillContiguousStrides(int ndims, 
 	  					    Py_ssize_t *shape, 
 						    Py_ssize_t *strides,
 	                                            int itemsize,
-	     					    char fortran);
+	     					    char fort);
 
        	/*  Fill the strides array with byte-strides of a contiguous
             (Fortran-style if fortran is 'F' or C-style otherwise)

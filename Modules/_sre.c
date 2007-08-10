@@ -1672,6 +1672,7 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
     Py_ssize_t size, bytes;
     int charsize;
     void* ptr;
+    PyBuffer view;
 
 #if defined(HAVE_UNICODE)
     if (PyUnicode_Check(string)) {
@@ -1686,14 +1687,16 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
 
     /* get pointer to string buffer */
     buffer = Py_Type(string)->tp_as_buffer;
-    if (!buffer || !buffer->bf_getreadbuffer || !buffer->bf_getsegcount ||
-        buffer->bf_getsegcount(string, NULL) != 1) {
-        PyErr_SetString(PyExc_TypeError, "expected string or buffer");
-        return NULL;
+    if (!buffer || !buffer->bf_getbuffer || 
+        (*buffer->bf_getbuffer)(string, &view, PyBUF_SIMPLE) !=0) {
+            PyErr_SetString(PyExc_TypeError, "expected string or buffer");
+            return NULL;
     }
 
+
     /* determine buffer size */
-    bytes = buffer->bf_getreadbuffer(string, 0, &ptr);
+    bytes = view.len;
+    ptr = view.buf;
     if (bytes < 0) {
         PyErr_SetString(PyExc_TypeError, "buffer has negative size");
         return NULL;

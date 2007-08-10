@@ -142,11 +142,11 @@ typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 
 
 /* buffer interface */
-struct bufferinfo {
+typedef struct bufferinfo {
 	void *buf;         
         Py_ssize_t len;
         int readonly;
-        const char *format;
+        char *format;
         int ndim;
         Py_ssize_t *shape;
         Py_ssize_t *strides;
@@ -186,6 +186,10 @@ typedef void (*releasebufferproc)(PyObject *, PyBuffer *);
 #define PyBUF_FULL_RO (PyBUF_ALW_INDIRECT | PyBUF_REQ_FORMAT)
 #define PyBUF_FULL_LCK (PyBUF_ALW_INDIRECT | PyBUF_REQ_LOCKDATA | PyBUF_REQ_FORMAT)
 
+
+#define PyBUF_READ  0x100
+#define PyBUF_WRITE 0x200
+#define PyBUF_SHADOW 0x400
 
 /* End buffer interface */
 

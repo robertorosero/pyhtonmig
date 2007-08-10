@@ -53,6 +53,10 @@ static int
 bytes_getbuffer(PyBytesObject *obj, PyBuffer *view, int flags)
 {        
         int ret;
+        if (view == NULL) {
+                obj->ob_exports++;
+                return 0;
+        }
         ret = PyBuffer_FillInfo(view, obj->ob_bytes, Py_Size(obj), 0, flags);
         if (ret >= 0) {
                 obj->ob_exports++;
@@ -785,16 +789,26 @@ bytes_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
         return 0;
     }
     
-    /* XXX -> Use the modern buffer interface */
-    if (PyObject_CheckReadBuffer(arg)) {
-        const void *bytes;
+    /* Use the modern buffer interface */
+    if (PyObject_CheckBuffer(arg)) {
         Py_ssize_t size;
-        if (PyObject_AsReadBuffer(arg, &bytes, &size) < 0)
+        PyBuffer view;
+        if (PyObject_GetBuffer(arg, &view, PyBUF_FULL) < 0)
             return -1;
-        if (PyBytes_Resize((PyObject *)self, size) < 0)
-            return -1;
-        memcpy(self->ob_bytes, bytes, size);
+        if (view.readonly == 1) {
+                PyErr_SetString(PyExc_BufferError,
+                                "Cannot create a mutable bytes object");
+                goto fail;
+        }
+        size = view.len;
+        if (PyBytes_Resize((PyObject *)self, size) < 0) goto fail;
+        if (PyBuffer_ToContiguous(self->ob_bytes, &view, size, 'C') < 0)
+                goto fail;
+        PyObject_ReleaseBuffer(arg, &view);
         return 0;
+    fail:
+        PyObject_ReleaseBuffer(arg, &view);
+        return -1;
     }
 
     /* XXX Optimize this if the arguments is a list, tuple */
@@ -923,7 +937,7 @@ static PyObject *
 bytes_richcompare(PyObject *self, PyObject *other, int op)
 {
     Py_ssize_t self_size, other_size;
-    void *self_bytes, *other_bytes;
+    PyBuffer self_bytes, other_bytes;
     PyObject *res;
     Py_ssize_t minsize;
     int cmp;
@@ -952,7 +966,7 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
         if (other_size < minsize)
             minsize = other_size;
 
-        cmp = memcmp(self_bytes, other_bytes, minsize);
+        cmp = memcmp(self_bytes.buf, other_bytes.buf, minsize);
         /* In ISO C, memcmp() guarantees to use unsigned bytes! */
 
         if (cmp == 0) {
@@ -984,25 +998,6 @@ bytes_dealloc(PyBytesObject *self)
         PyMem_Free(self->ob_bytes);
     }
     Py_Type(self)->tp_free((PyObject *)self);
-}
-
-static Py_ssize_t
-bytes_getbuffer(PyBytesObject *self, PyBuffer *view, int flags)
-{
-        PyBuffer_FillInfo(view, ptr,
-        if (self->ob_bytes == NULL) {
-        }
-        
-    if (index != 0) {
-        PyErr_SetString(PyExc_SystemError,
-                        "accessing non-existent bytes segment");
-        return -1;
-    }
-    if (self->ob_bytes == NULL)
-        *ptr = "";
-    else
-        *ptr = self->ob_bytes;
-    return Py_Size(self);
 }
 
 

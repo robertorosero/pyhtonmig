@@ -221,8 +221,6 @@ PyObject_AsCharBuffer(PyObject *obj,
                       Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
-	char *pp;
-	Py_ssize_t len;
         PyBuffer view;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
@@ -230,18 +228,17 @@ PyObject_AsCharBuffer(PyObject *obj,
 		return -1;
 	}
 	pb = obj->ob_type->tp_as_buffer;
-	if (pb == NULL || pb->bf_getbuffer == NULL)
+	if (pb == NULL || pb->bf_getbuffer == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"expected an object with the buffer interface");
 		return -1;
-	}
+        }
         if ((*pb->bf_getbuffer)(obj, &view, PyBUF_SIMPLE)) return -1;
 
 	*buffer = view.buf;
 	*buffer_len = view.len;
-        if (pb->bf_releasebuffer != NULL ||
-            ((*pb->bf_releasebuffer)(obj, &view) != 0)) {
-                return -1;
+        if (pb->bf_releasebuffer != NULL) {
+                (*pb->bf_releasebuffer)(obj, &view);
         }
 	return 0;
 }
@@ -258,11 +255,8 @@ PyObject_CheckReadBuffer(PyObject *obj)
                 PyErr_Clear();
                 return 0;
         }
-        if (*pb->bf_releasebuffer != NULL ||
-            ((*pb->bf_releasebuffer)(obj, NULL) != 0)) {
-                PyErr_Clear();
-                return 0;
-        }
+        if (*pb->bf_releasebuffer != NULL)
+                (*pb->bf_releasebuffer)(obj, NULL);
 	return 1;
 }
 
@@ -271,7 +265,6 @@ int PyObject_AsReadBuffer(PyObject *obj,
 			  Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
-	Py_ssize_t len;
         PyBuffer view;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
@@ -280,7 +273,7 @@ int PyObject_AsReadBuffer(PyObject *obj,
 	}
 	pb = obj->ob_type->tp_as_buffer;
 	if (pb == NULL ||
-            pb->bf_getbuffer == NULL)
+            pb->bf_getbuffer == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"expected an object with a buffer interface");
 		return -1;
@@ -290,10 +283,8 @@ int PyObject_AsReadBuffer(PyObject *obj,
 
 	*buffer = view.buf;
 	*buffer_len = view.len;
-        if (pb->bf_releasebuffer != NULL ||
-            ((*pb->bf_releasebuffer)(obj, &view) != 0)) {
-                return -1;
-        }
+        if (pb->bf_releasebuffer != NULL)
+                (*pb->bf_releasebuffer)(obj, &view);
 	return 0;
 }
 
@@ -302,7 +293,6 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 			   Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
-	Py_ssize_t len;
         PyBuffer view;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
@@ -312,7 +302,7 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 	pb = obj->ob_type->tp_as_buffer;
 	if (pb == NULL ||
             pb->bf_getbuffer == NULL ||
-            ((*pb->bf_getbuffer)(obj, &view, PyBUF_REQ_WRITEABLE) != 0))
+            ((*pb->bf_getbuffer)(obj, &view, PyBUF_REQ_WRITEABLE) != 0)) {
 		PyErr_SetString(PyExc_TypeError, 
                                 "expected an object with a writeable buffer interface");
 		return -1;
@@ -320,10 +310,8 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 
 	*buffer = view.buf;
 	*buffer_len = view.len;
-        if (pb->bf_releasebuffer != NULL ||
-            ((*pb->bf_releasebuffer)(obj, &view) != 0)) {
-                return -1;
-        }
+        if (pb->bf_releasebuffer != NULL)
+                (*pb->bf_releasebuffer)(obj, &view);
 	return 0;
 }
 
@@ -332,37 +320,37 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 int
 PyObject_GetBuffer(PyObject *obj, PyBuffer *view, int flags)
 {
-        if !PyObject_CheckBuffer(obj) {
+        if (!PyObject_CheckBuffer(obj)) {
                 PyErr_SetString(PyExc_TypeError,
                                 "object does not have the buffer interface");
                 return -1;
         }
-         return (*(obj->tp_as_buffer->bf_getbuffer))(obj, view, flags);
+         return (*(obj->ob_type->tp_as_buffer->bf_getbuffer))(obj, view, flags);
 }
 
 void
 PyObject_ReleaseBuffer(PyObject *obj, PyBuffer *view)
 {
-        if (obj->tp_as_buffer != NULL && 
-            obj->tp_as_buffer->bf_releasebuffer != NULL) {
-                (*(obj->tp_as_buffer->bf_releasebuffer))(obj, view);
+        if (obj->ob_type->tp_as_buffer != NULL && 
+            obj->ob_type->tp_as_buffer->bf_releasebuffer != NULL) {
+                (*(obj->ob_type->tp_as_buffer->bf_releasebuffer))(obj, view);
         }
 }
 
 
 static int
-_IsFortranContiguous(PyBuffer *view);
+_IsFortranContiguous(PyBuffer *view)
 {
         Py_ssize_t sd, dim;
         int i;
         
-        if (view->nd == 0) return 1;
-        if (view->strides == NULL) return (view->nd == 1);
+        if (view->ndim == 0) return 1;
+        if (view->strides == NULL) return (view->ndim == 1);
 
         sd = view->itemsize;
-        if (view->nd == 1) return (view->shape[0] == 1 ||
+        if (view->ndim == 1) return (view->shape[0] == 1 ||
                                    sd == view->strides[0]);
-        for (i=0; i<view->nd; i++) {
+        for (i=0; i<view->ndim; i++) {
                 dim = view->shape[i];
                 if (dim == 0) return 1;
                 if (view->strides[i] != sd) return 0;
@@ -372,18 +360,18 @@ _IsFortranContiguous(PyBuffer *view);
 }
 
 static int
-_IsCContiguous(PyBuffer *view);
+_IsCContiguous(PyBuffer *view)
 {
         Py_ssize_t sd, dim;
         int i;
         
-        if (view->nd == 0) return 1;
+        if (view->ndim == 0) return 1;
         if (view->strides == NULL) return 1;
 
         sd = view->itemsize;
-        if (view->nd == 1) return (view->shape[0] == 1 ||
+        if (view->ndim == 1) return (view->shape[0] == 1 ||
                                    sd == view->strides[0]);
-        for (i=view->nd-1; i>=0; i--) {
+        for (i=view->ndim-1; i>=0; i--) {
                 dim = view->shape[i];
                 if (dim == 0) return 1;
                 if (view->strides[i] != sd) return 0;
@@ -407,66 +395,24 @@ PyBuffer_IsContiguous(PyBuffer *view, char fort)
         return 0;
 }
 
-static void
-_strided_copy_nd(char *dest, char *src, int nd, Py_ssize_t *shape,
-                 Py_ssize_t *strides, int itemsize, char fort)
-{
-        int k;
-        Py_ssize_t outstride;
-        char *ptr;
 
-        if (nd==0) {
-                memcpy(dest, src, itemsize);
-        }
-        else if (nd == 1) {
-                for (k = 0; k<shape[0]; k++) {
-                        memcpy(dest, src, itemsize);
-                        dest += itemsize;
-                        src += strides[0];
+void* 
+PyBuffer_GetPointer(PyBuffer *view, Py_ssize_t *indices)
+{
+        char* pointer;
+        int i;
+        pointer = (char *)view->buf;
+        for (i = 0; i < view->ndim; i++) {
+                pointer += view->strides[i]*indices[i];
+                if ((view->suboffsets != NULL) && (view->suboffsets[i] >= 0)) {
+                        pointer = *((char**)pointer) + view->suboffsets[i];
                 }
         }
-        else {
-                if (fort == 'F') {
-                        /* Copy first dimension first, 
-                           second dimension second, etc...
-                           Set up the recursive loop backwards so that final
-                           dimension is actually copied last. 
-                        */
-                        outstride = itemsize;
-                        for (k=1; k<nd-1;k++) {
-                                outstride *= shape[k];
-                        }
-                        for (k=0; k<shape[nd-1]; k++) {
-                                _strided_copy_nd(dest, src, nd-1, shape, 
-                                                 strides, suboffsets, itemsize, fort);
-                                dest += outstride;
-                                src += strides[nd-1];
-                        }
-                }
-                
-                else {
-                        /* Copy last dimension first,
-                           second-to-last dimension second, etc.
-                           Set up the recursion so that the
-                           first dimension is copied last
-                        */
-                        outstride = itemsize;
-                        for (k=1; k < nd; k++) {
-                                outstride *= shape[k];
-                        }
-                        for (k=0; k<shape[0]; k++) {
-                                _strided_copy_nd(dest, src, nd-1, shape+1,
-                                                 strides+1, suboffsets+1, itemsize, 
-                                                 fort);
-                                dest += outstride;
-                                src += strides[0];
-                        }
-                }
-        }
-        return;
+        return (void*)pointer;
 }
 
-static void 
+
+void 
 _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 {
         int k;
@@ -482,7 +428,7 @@ _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
         }
 }
 
-static void 
+void 
 _add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 {
         int k;
@@ -498,169 +444,90 @@ _add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape)
         }
 }
 
-static void* 
-get_item_pointer(PyBuffer *view, Py_ssize_t *indices)
+  /* view is not checked for consistency in either of these.  It is
+     assumed that the size of the buffer is view->len in 
+     view->len / view->itemsize elements.
+  */
+
+int 
+PyBuffer_ToContiguous(void *buf, PyBuffer *view, Py_ssize_t len, char fort)
 {
-        char* pointer;
-        int i;
-        pointer = (char *)view->buf;
-        for (i = 0; i < view->ndim; i++) {
-                pointer += view->strides[i]*indices[i];
-                if ((view->suboffsets != NULL) && (view->suboffsets[i] >= 0)) {
-                        pointer = *((char**)pointer) + view->suboffsets[i];
-                }
-        }
-        return (void*)pointer;
-}
-
-
-static int
-_indirect_copy_nd(char *dest, PyBuffer *view, char fort)
-{
-        Py_ssize_t *indices;
-        int k;
-        Py_ssize_t elements;
-        char *ptr;
-        void (*func)(int, Py_ssize_t *, Py_ssize_t *);
-        
-        
-        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*view->ndim);
-        if (indices == NULL) {
-                PyErr_NoMemory();
-                return -1;
-        }
-        for (k=0; k<view->ndim;k++) {
-                indices[k] = 0;
-        }
-        
-        elements = 1;
-        for (k=0; k<view->ndim; k++) {
-                elements *= view->shape[k];
-        }
-        if (fort == 'F') {
-                func = _add_one_to_index_F;
-        }
-        else {
-                func = _add_one_to_index_C;
-        }
-        while (elements--) {
-                func(view->ndim, indices, view->shape);
-                ptr = get_item_pointer(view, indices);
-                memcpy(dest, ptr, view->itemsize);
-                dest += itemsize;
-        }
-                
-        PyMem_Free(indices);
-        return 0;
-}
-
-/* Get a the data from an object as a contiguous chunk of memory even
-   if it means copying it into a separate memory area.
-  
-   Make sure PyMem_Free is called on *buf if a copy is made.
- */
-int
-PyObject_GetContiguous(PyObject *obj, void **buf, Py_ssize_t *len,
-                       char **format, int writeable, char fort)
-{
-        PyBuffer view;
-        getbufferproc func;
-        int flags;
-
-        if !PyObject_CheckBuffer(obj) {
-                PyErr_SetString(PyExc_TypeError,
-                                "object does not have the buffer interface");
-                return -1;
-        }
-        func = obj->tp_as_buffer->bf_getbuffer;
-        
-        flags = (writeable ? PyBUF_FULL : PyBUF_FULL_RO);
-        if (PyObject_GetBuffer(obj, &view, flags) != 0) return -1;
-        
-        *len = view.len;
-        *format = view.format;
-        if (PyBuffer_IsContiguous(&view, fort)) {
-                /* no copy needed */
-                *buf = view.buf;
-                PyObject_ReleaseBuffer(obj, &view);
-                return -1;
-        }
-        /* otherwise a copy is needed */
-        *buf = PyMem_Malloc(*len);        
-        if (*buf == NULL) {
-                PyObject_ReleaseBuffer(obj, &view);
-                return -1;
-        }
-        /* different copying strategy depending on whether
-           or not any pointer de-referencing is needed
-        */
-        /* strided or in-direct copy */
-        if (suboffsets==NULL) {
-                _strided_copy_nd(*buf, view.buf, view.ndim,
-                                 view.shape, view.strides, 
-                                 view.itemsize, fort);
-        }
-        else {
-                if (_indirect_copy_nd(*buf, &view, fort) < 0) {
-                        PyMem_Free(*buf);
-                        PyObject_ReleaseBuffer(obj, &view);
-                        return -1;
-                }                 
-        }
-        PyObject_ReleaseBuffer(obj, &view);
-        return 1;
-}
-
-int
-PyObject_CopyToObject(PyObject *obj, void *buf, Py_ssize_t len,
-                      char fort);
-{
-        PyBuffer view;
-        getbufferproc func;
         int k;
         void (*addone)(int, Py_ssize_t *, Py_ssize_t *);
         Py_ssize_t *indices, elements;
-        char *src;
+        char *dest, *ptr;
 
-        if !PyObject_CheckBuffer(obj) {
-                PyErr_SetString(PyExc_TypeError,
-                                "object does not have the buffer interface");
-                return -1;
+        if (len > view->len) {
+                len = view->len;
         }
-        func = obj->tp_as_buffer->bf_getbuffer;
         
-        if (PyObject_GetBuffer(obj, &view, PyBUF_FULL) != 0) return -1;
-
-        if (len > view.len) {
-                PyErr_SetString(PyExc_BufferError, 
-                                "object is too small to receive data");
-                PyObject_ReleaseBuffer(obj, &view);
-                return -1;
-        }
-
-        if (PyBuffer_IsContiguous(&view, fort)) {
+        if (PyBuffer_IsContiguous(view, fort)) {
                 /* simplest copy is all that is needed */
-                memcpy(view.buf, buf, len);
-                PyObject_ReleaseBuffer(obj, &view);
+                memcpy(buf, view->buf, len);
                 return 0;
         }
 
         /* Otherwise a more elaborate scheme is needed */
         
-        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*view->ndim);
+        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*(view->ndim));
         if (indices == NULL) {
                 PyErr_NoMemory();
-                PyObject_ReleaseBuffer(obj, &view);
                 return -1;
         }
         for (k=0; k<view->ndim;k++) {
                 indices[k] = 0;
         }
         
-        elements = 1;
-        for (k=0; k<view->ndim; k++) {
-                elements *= view->shape[k];
+        if (fort == 'F') {
+                addone = _add_one_to_index_F;
         }
+        else {
+                addone = _add_one_to_index_C;
+        }
+        dest = buf;
+        /* XXX : This is not going to be the fastest code in the world
+                 several optimizations are possible. 
+         */
+        elements = len / view->itemsize;
+        while (elements--) {
+                addone(view->ndim, indices, view->shape);
+                ptr = PyBuffer_GetPointer(view, indices);
+                memcpy(dest, ptr, view->itemsize);
+                dest += view->itemsize;
+        }                
+        PyMem_Free(indices);
+        return 0;
+}
+
+int
+PyBuffer_FromContiguous(PyBuffer *view, void *buf, Py_ssize_t len, char fort)
+{
+        int k;
+        void (*addone)(int, Py_ssize_t *, Py_ssize_t *);
+        Py_ssize_t *indices, elements;
+        char *src, *ptr;
+
+        if (len > view->len) {
+                len = view->len;
+        }
+
+        if (PyBuffer_IsContiguous(view, fort)) {
+                /* simplest copy is all that is needed */
+                memcpy(view->buf, buf, len);
+                return 0;
+        }
+
+        /* Otherwise a more elaborate scheme is needed */
+        
+        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*(view->ndim));
+        if (indices == NULL) {
+                PyErr_NoMemory();
+                return -1;
+        }
+        for (k=0; k<view->ndim;k++) {
+                indices[k] = 0;
+        }
+        
         if (fort == 'F') {
                 addone = _add_one_to_index_F;
         }
@@ -668,42 +535,41 @@ PyObject_CopyToObject(PyObject *obj, void *buf, Py_ssize_t len,
                 addone = _add_one_to_index_C;
         }
         src = buf;
+        /* XXX : This is not going to be the fastest code in the world
+                 several optimizations are possible. 
+         */
+        elements = len / view->itemsize;
         while (elements--) {
                 addone(view->ndim, indices, view->shape);
-                ptr = get_item_pointer(view, indices);
+                ptr = PyBuffer_GetPointer(view, indices);
                 memcpy(ptr, src, view->itemsize);
-                src += itemsize;
+                src += view->itemsize;
         }
                 
         PyMem_Free(indices);
-        PyObject_ReleaseBuffer(obj, &view);
         return 0;
 }
 
-
-int PyObject_CopyData(PyObject *dest, PyObject *src) {
-
+int PyObject_CopyData(PyObject *dest, PyObject *src) 
+{
         PyBuffer view_dest, view_src;
         getbufferproc func;
         int k;
         Py_ssize_t *indices, elements;
         char *dptr, *sptr;
 
-        if !PyObject_CheckBuffer(dest) {
+        if (!PyObject_CheckBuffer(dest) ||
+            !PyObject_CheckBuffer(src)) {
                 PyErr_SetString(PyExc_TypeError,
-                                "destination does not have the buffer interface");
-                return -1;
-        }
-        if !PyObject_CheckBuffer(src) {
-                PyErr_SetString(PyExc_TypeError,
-                                "source does not have the buffer interface");
+                                "both destination and source must have the "\
+                                "buffer interface");
                 return -1;
         }
 
-        func = dest->tp_as_buffer->bf_getbuffer;        
+        func = Py_Type(dest)->tp_as_buffer->bf_getbuffer;        
         if (PyObject_GetBuffer(dest, &view_dest, PyBUF_FULL) != 0) return -1;
 
-        func = src->tp_as_buffer->bf_getbuffer;
+        func = Py_Type(src)->tp_as_buffer->bf_getbuffer;
         if (PyObject_GetBuffer(src, &view_src, PyBUF_FULL_RO) != 0) return -1;
 
         if (view_dest.len < view_src.len) {
@@ -715,9 +581,9 @@ int PyObject_CopyData(PyObject *dest, PyObject *src) {
         }
 
         if ((PyBuffer_IsContiguous(&view_dest, 'C') && 
-             PyBuffer_IsContiguous(&src_dest, 'C')) ||
+             PyBuffer_IsContiguous(&view_src, 'C')) ||
             (PyBuffer_IsContiguous(&view_dest, 'F') && 
-             PyBuffer_IsContiguous(&src_dest, 'F'))) {
+             PyBuffer_IsContiguous(&view_src, 'F'))) {
                 /* simplest copy is all that is needed */
                 memcpy(view_dest.buf, view_src.buf, view_src.len);
                 PyObject_ReleaseBuffer(dest, &view_dest);
@@ -727,27 +593,25 @@ int PyObject_CopyData(PyObject *dest, PyObject *src) {
 
         /* Otherwise a more elaborate copy scheme is needed */
         
-        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*view->ndim);
+        indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*view_src.ndim);
         if (indices == NULL) {
                 PyErr_NoMemory();
                 PyObject_ReleaseBuffer(dest, &view_dest);
                 PyObject_ReleaseBuffer(src, &view_src);
                 return -1;
         }
-        for (k=0; k<view->ndim;k++) {
+        for (k=0; k<view_src.ndim;k++) {
                 indices[k] = 0;
         }        
         elements = 1;
-        for (k=0; k<view->ndim; k++) {
-                elements *= view->shape[k];
+        for (k=0; k<view_src.ndim; k++) {
+                elements *= view_src.shape[k];
         }
-        src = buf;
         while (elements--) {
-                _add_one_to_index_C(view->ndim, indices, view->shape);
-                dptr = get_item_pointer(view_dest, indices);
-                sptr = get_item_pointer(view_src, indices);
-                memcpy(dptr, sptr, view->itemsize);
-                src += itemsize;
+                _add_one_to_index_C(view_src.ndim, indices, view_src.shape);
+                dptr = PyBuffer_GetPointer(&view_dest, indices);
+                sptr = PyBuffer_GetPointer(&view_src, indices);
+                memcpy(dptr, sptr, view_src.itemsize);
         }                
         PyMem_Free(indices);
         PyObject_ReleaseBuffer(dest, &view_dest);
@@ -755,8 +619,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src) {
         return 0;
 }
 
-static void
-PyBuffer_FillContiguousStrides(int *nd, Py_ssize_t *shape,
+void
+PyBuffer_FillContiguousStrides(int nd, Py_ssize_t *shape,
                                Py_ssize_t *strides, int itemsize,
                                char fort)
 {
@@ -779,12 +643,14 @@ PyBuffer_FillContiguousStrides(int *nd, Py_ssize_t *shape,
         return;
 }
 
-static int
+int
 PyBuffer_FillInfo(PyBuffer *view, void *buf, Py_ssize_t len,
               int readonly, int flags)
 {        
-        if ((flags & PyBUF_REQ_LOCKDATA) == PyBUF_REQ_LOCKDATA && readonly != -1) {
-                PyErr_SetString(PyExc_BufferError, "Cannot make this object read-only.");
+        if ((flags & PyBUF_REQ_LOCKDATA) == PyBUF_REQ_LOCKDATA && 
+            readonly != -1) {
+                PyErr_SetString(PyExc_BufferError, 
+                                "Cannot make this object read-only.");
                 return -1;
         }
         view->buf = buf;

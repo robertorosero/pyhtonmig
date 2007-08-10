@@ -1745,6 +1745,8 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
                                 "Cannot lock data");
                 return -1;
         }
+        if (view==NULL) goto finish;
+
         view->buf = (void *)self->ob_item;
         view->len = Py_Size(self)*self->ob_descr->itemsize;
         view->readonly = 0;
@@ -1768,6 +1770,8 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
         }
         else 
                 view->format = NULL;
+
+ finish:
         self->ob_exports++;
         return 0;
 }
