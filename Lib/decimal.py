@@ -1016,10 +1016,10 @@ class Decimal(object):
             sign = min(self._sign, other._sign)
             if negativezero:
                 sign = 1
-            if exp < context.Etiny():
-                exp = context.Etiny()
-                context._raise_error(Clamped)
-            return Decimal( (sign, (0,), exp))
+            ans = Decimal( (sign, (0,), exp))
+            if shouldround:
+                ans = ans._fix(context)
+            return ans
         if not self:
             exp = max(exp, other._exp - context.prec-1)
             ans = other._rescale(exp, watchexp=0, context=context)
@@ -2055,11 +2055,12 @@ class Decimal(object):
             digits = 1
         tmp = tmp._round(digits, rounding, context=context, forceExp=exp, fromQuantize=fromQuantize)
 
-        tmp_adjusted = tmp.adjusted()
-        if tmp and tmp_adjusted < context.Emin:
-            context._raise_error(Subnormal)
-        elif tmp and tmp_adjusted > context.Emax:
-            return context._raise_error(InvalidOperation, 'rescale(a, INF)')
+        if watchexp or fromQuantize:
+            tmp_adjusted = tmp.adjusted()
+            if tmp and tmp_adjusted < context.Emin:
+                context._raise_error(Subnormal)
+            elif tmp and tmp_adjusted > context.Emax:
+                return context._raise_error(InvalidOperation, 'rescale(a, INF)')
         return tmp
 
     def to_integral_value(self, rounding=None, context=None):
