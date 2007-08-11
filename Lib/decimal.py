@@ -3762,13 +3762,16 @@ class Context(object):
     def next_minus(self, a):
         """Returns the largest representable number smaller than a.
 
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
         >>> ExtendedContext.next_minus(Decimal('1'))
         Decimal("0.999999999")
-        >>> ExtendedContext.next_minus(Decimal('1E-1007'))
+        >>> c.next_minus(Decimal('1E-1007'))
         Decimal("0E-1007")
         >>> ExtendedContext.next_minus(Decimal('-1.00000003'))
         Decimal("-1.00000004")
-        >>> ExtendedContext.next_minus(Decimal('Infinity'))
+        >>> c.next_minus(Decimal('Infinity'))
         Decimal("9.99999999E+999")
         """
         return a.next_minus(context=self)
@@ -3776,13 +3779,16 @@ class Context(object):
     def next_plus(self, a):
         """Returns the smallest representable number larger than a.
 
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
         >>> ExtendedContext.next_plus(Decimal('1'))
         Decimal("1.00000001")
-        >>> ExtendedContext.next_plus(Decimal('-1E-1007'))
+        >>> c.next_plus(Decimal('-1E-1007'))
         Decimal("-0E-1007")
         >>> ExtendedContext.next_plus(Decimal('-1.00000003'))
         Decimal("-1.00000002")
-        >>> ExtendedContext.next_plus(Decimal('-Infinity'))
+        >>> c.next_plus(Decimal('-Infinity'))
         Decimal("-9.99999999E+999")
         """
         return a.next_plus(context=self)
