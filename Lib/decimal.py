@@ -1803,6 +1803,54 @@ class Decimal(object):
         else:
             return self._round_up(prec, expdiff, context)
 
+    def fma(self, other, third, context=None):
+        """Fused multiply-add.
+
+        Returns self*other+third with no rounding of the intermediate
+        product self*other.
+
+        self and other are multiplied together, with no rounding of
+        the result.  The third operand is then added to the result,
+        and a single final rounding is performed.
+        """
+
+        if context is None:
+            context = getcontext()
+
+        other = _convert_other(other)
+        if other is NotImplemented:
+            return other
+
+        third = _convert_other(third)
+        if third is NotImplemented:
+            return third
+
+        # deal correctly with NaNs:
+        self_is_nan = self._isnan()
+        other_is_nan = other._isnan()
+        third_is_nan = third._isnan()
+        if self_is_nan or other_is_nan or third_is_nan:
+            if self_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, self)
+            if other_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, other)
+            if third_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, third)
+            if self_is_nan:
+                return self
+            if other_is_nan:
+                return other
+            return third
+
+        context = context._shallow_copy()
+        rounding_decision = context._set_rounding_decision(NEVER_ROUND)
+        product = self.__mul__(other, context)
+        context._set_rounding_decision(rounding_decision)
+        return product.__add__(third, context)
+
     def __pow__(self, n, modulo=None, context=None):
         """Return self ** n (mod modulo)
 
@@ -3365,6 +3413,7 @@ class Context(object):
         >>> ExtendedContext.fma(Decimal('888565290'), Decimal('1557.96930'), Decimal('-86087.7578'))
         Decimal("1.38435736E+12")
         """
+        return a.fma(b, c, context=self)
 
     def is_canonical(self, a):
         """Returns 1 if the operand is canonical; otherwise returns 0.
