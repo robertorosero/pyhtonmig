@@ -151,7 +151,7 @@ typedef struct bufferinfo {
         Py_ssize_t *shape;
         Py_ssize_t *strides;
         Py_ssize_t *suboffsets;
-        int itemsize;
+        Py_ssize_t itemsize;
         void *internal;
 } PyBuffer;
 
