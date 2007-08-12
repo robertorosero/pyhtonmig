@@ -7792,9 +7792,19 @@ static PyMappingMethods unicode_as_mapping = {
 static int
 unicode_buffer_getbuffer(PyUnicodeObject *self, PyBuffer *view, int flags)
 {
-    
-    return PyBuffer_FillInfo(view, (void *)self->str, PyUnicode_GET_DATA_SIZE(self),
-                             1, flags);
+
+    if (flags & PyBUF_CHARACTER) {
+        PyObject *str;
+        
+        str = _PyUnicode_AsDefaultEncodedString((PyObject *)self, NULL);
+        if (str == NULL) return -1;
+        return PyBuffer_FillInfo(view, (void *)PyString_AS_STRING(str),
+                                 PyString_GET_SIZE(str), 1, flags);
+    }
+    else {
+        return PyBuffer_FillInfo(view, (void *)self->str, 
+                                 PyUnicode_GET_DATA_SIZE(self), 1, flags);
+    }
 }
 
 

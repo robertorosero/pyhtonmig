@@ -1420,7 +1420,7 @@ array_fromunicode(arrayobject *self, PyObject *args)
 
         if (!PyArg_ParseTuple(args, "u#:fromunicode", &ustr, &n))
 		return NULL;
-	if (self->ob_descr->typecode != PyARR_UNI) {
+	if (self->ob_descr->typecode != PyArr_UNI) {
 		PyErr_SetString(PyExc_ValueError,
 			"fromunicode() may only be called on "
 			"unicode type arrays");
@@ -1776,7 +1776,7 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
         return 0;
 }
 
-static int
+static void
 array_buffer_relbuf(arrayobject *self, PyBuffer *view)
 {
         free(view->format);
@@ -1925,7 +1925,7 @@ is a single character.  The following type codes are defined:\n\
     'H'         unsigned integer   2 \n\
     'i'         signed integer     2 \n\
     'I'         unsigned integer   2 \n\
-    'w'         unicode character  4
+    'w'         unicode character  4 \n\
     'l'         signed integer     4 \n\
     'L'         unsigned integer   4 \n\
     'f'         floating point     4 \n\

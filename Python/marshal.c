@@ -377,6 +377,8 @@ w_object(PyObject *v, WFILE *p)
 		}
 		w_long((long)n, p);
 		w_string(s, (int)n, p);
+                if (pb->bf_releasebuffer != NULL)
+                        (*pb->bf_releasebuffer)(v, &view);
 	}
 	else {
 		w_byte(TYPE_UNKNOWN, p);

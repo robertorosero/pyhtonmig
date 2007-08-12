@@ -215,6 +215,9 @@ PyObject_DelItemString(PyObject *o, char *key)
 	return ret;
 }
 
+/* We release the buffer right after use of this function which could
+   cause issues later on.  Don't use these functions in new code. 
+ */
 int
 PyObject_AsCharBuffer(PyObject *obj,
                       const char **buffer,
@@ -233,13 +236,12 @@ PyObject_AsCharBuffer(PyObject *obj,
 				"expected an object with the buffer interface");
 		return -1;
         }
-        if ((*pb->bf_getbuffer)(obj, &view, PyBUF_SIMPLE)) return -1;
+        if ((*pb->bf_getbuffer)(obj, &view, PyBUF_CHARACTER)) return -1;
 
 	*buffer = view.buf;
 	*buffer_len = view.len;
-        if (pb->bf_releasebuffer != NULL) {
+        if (pb->bf_releasebuffer != NULL)
                 (*pb->bf_releasebuffer)(obj, &view);
-        }
 	return 0;
 }
 
@@ -325,7 +327,7 @@ PyObject_GetBuffer(PyObject *obj, PyBuffer *view, int flags)
                                 "object does not have the buffer interface");
                 return -1;
         }
-         return (*(obj->ob_type->tp_as_buffer->bf_getbuffer))(obj, view, flags);
+        return (*(obj->ob_type->tp_as_buffer->bf_getbuffer))(obj, view, flags);
 }
 
 void
@@ -553,7 +555,6 @@ PyBuffer_FromContiguous(PyBuffer *view, void *buf, Py_ssize_t len, char fort)
 int PyObject_CopyData(PyObject *dest, PyObject *src) 
 {
         PyBuffer view_dest, view_src;
-        getbufferproc func;
         int k;
         Py_ssize_t *indices, elements;
         char *dptr, *sptr;
@@ -566,11 +567,11 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
                 return -1;
         }
 
-        func = Py_Type(dest)->tp_as_buffer->bf_getbuffer;        
         if (PyObject_GetBuffer(dest, &view_dest, PyBUF_FULL) != 0) return -1;
-
-        func = Py_Type(src)->tp_as_buffer->bf_getbuffer;
-        if (PyObject_GetBuffer(src, &view_src, PyBUF_FULL_RO) != 0) return -1;
+        if (PyObject_GetBuffer(src, &view_src, PyBUF_FULL_RO) != 0) {
+                PyObject_ReleaseBuffer(dest, &view_dest);
+                return -1;
+        }
 
         if (view_dest.len < view_src.len) {
                 PyErr_SetString(PyExc_BufferError, 
@@ -647,30 +648,36 @@ int
 PyBuffer_FillInfo(PyBuffer *view, void *buf, Py_ssize_t len,
               int readonly, int flags)
 {        
-        if ((flags & PyBUF_REQ_LOCKDATA) == PyBUF_REQ_LOCKDATA && 
+        if (view == NULL) return 0;
+        if (((flags & PyBUF_REQ_LOCKDATA) == PyBUF_REQ_LOCKDATA) && 
             readonly != -1) {
                 PyErr_SetString(PyExc_BufferError, 
                                 "Cannot make this object read-only.");
                 return -1;
         }
+        if (((flags & PyBUF_REQ_WRITEABLE) == PyBUF_REQ_WRITEABLE) &&
+            readonly == 1) {
+                PyErr_SetString(PyExc_BufferError,
+                                "Object is not writeable.");
+                return -1;
+        }
+        
         view->buf = buf;
         view->len = len;
         view->readonly = readonly;
+        view->itemsize = 1;
         view->format = NULL;
         if ((flags & PyBUF_REQ_FORMAT) == PyBUF_REQ_FORMAT) 
                 view->format = "B";
         view->ndim = 1;
+        view->shape = NULL;
         if ((flags & PyBUF_ALW_ND) == PyBUF_ALW_ND)
                 view->shape = &(view->len);
-        else
-                view->shape = NULL;
-        view->itemsize = 1;
+        view->strides = NULL;
         if ((flags & PyBUF_ALW_STRIDES) == PyBUF_ALW_STRIDES)
                 view->strides = &(view->itemsize);
-        else
-                view->strides = NULL;
         view->suboffsets = NULL;
-        view->internal = NULL;        
+        view->internal = NULL;
         return 0;
 }
 

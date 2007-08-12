@@ -146,12 +146,14 @@ typedef struct bufferinfo {
 	void *buf;         
         Py_ssize_t len;
         int readonly;
+        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can
+                                 be the strides array for the most
+                                 common case */
         char *format;
         int ndim;
         Py_ssize_t *shape;
         Py_ssize_t *strides;
         Py_ssize_t *suboffsets;
-        Py_ssize_t itemsize;
         void *internal;
 } PyBuffer;
 
@@ -160,14 +162,15 @@ typedef void (*releasebufferproc)(PyObject *, PyBuffer *);
 
         /* Flags for getting buffers */
 #define PyBUF_SIMPLE 0
-#define PyBUF_REQ_WRITEABLE 0x0001
-#define PyBUF_REQ_LOCKDATA 0x0002
-#define PyBUF_REQ_FORMAT 0x0004
-#define PyBUF_ALW_ND 0x0008
-#define PyBUF_ALW_STRIDES (0x0010 | PyBUF_ALW_ND)
-#define PyBUF_REQ_C_CONTIGUOUS (0x0020 | PyBUF_ALW_STRIDES)
-#define PyBUF_REQ_F_CONTIGUOUS (0x0040 | PyBUF_ALW_STRIDES)
-#define PyBUF_REQ_ANY_CONTIGUOUS (0x0080 | PyBUF_ALW_STRIDES)
+#define PyBUF_CHARACTER 1
+#define PyBUF_REQ_WRITEABLE 0x0002
+#define PyBUF_REQ_LOCKDATA 0x0004
+#define PyBUF_REQ_FORMAT 0x0008
+#define PyBUF_ALW_ND 0x0010
+#define PyBUF_ALW_STRIDES (0x0020 | PyBUF_ALW_ND)
+#define PyBUF_REQ_C_CONTIGUOUS (0x0040 | PyBUF_ALW_STRIDES)
+#define PyBUF_REQ_F_CONTIGUOUS (0x0080 | PyBUF_ALW_STRIDES)
+#define PyBUF_REQ_ANY_CONTIGUOUS (0x0100 | PyBUF_ALW_STRIDES)
 #define PyBUF_ALW_INDIRECT (0x0200 | PyBUF_ALW_STRIDES)
 
 #define PyBUF_CONTIG (PyBUF_ALW_ND | PyBUF_REQ_WRITEABLE)

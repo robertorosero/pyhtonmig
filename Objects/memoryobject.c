@@ -206,10 +206,8 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
         if (mem == NULL) return NULL;
 
         view = &PyMemoryView(mem);
+        flags = PyBUF_FULL_RO;
         switch(buffertype) {
-        case PyBUF_READ:
-                flags = PyBUF_FULL_RO;
-                break;
         case PyBUF_WRITE:
                 flags = PyBUF_FULL;
                 break;

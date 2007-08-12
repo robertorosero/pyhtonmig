@@ -337,7 +337,7 @@ buffer_hash(PyBufferObject *self)
         if (!(view.readonly)) {
                 PyErr_SetString(PyExc_TypeError,
                                 "writable buffers are not hashable");
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
 		return -1;
 	}
                 
@@ -350,7 +350,7 @@ buffer_hash(PyBufferObject *self)
 	if (x == -1)
 		x = -2;
 	self->b_hash = x;
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
 	return x;
 }
 
@@ -363,7 +363,7 @@ buffer_str(PyBufferObject *self)
 	if (!get_buf(self, &view))
 		return NULL;
 	res = PyString_FromStringAndSize((const char *)view.buf, view.len);
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
         return res;
 }
 
@@ -376,7 +376,7 @@ buffer_length(PyBufferObject *self)
 
 	if (!get_buf(self, &view))
 		return -1;
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
 	return view.len;
 }
 
@@ -401,19 +401,19 @@ buffer_concat(PyBufferObject *self, PyObject *other)
 	/* optimize special case */
         /* XXX bad idea type-wise */
 	if ( view.len == 0 ) {
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
                 Py_INCREF(other);
                 return other;
 	}
 
-        if (PyObject_GetBuffer((PyObject *)self, &view2, PyBUF_SIMPLE) < 0) {
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+        if (PyObject_GetBuffer((PyObject *)other, &view2, PyBUF_SIMPLE) < 0) {
+                PyObject_ReleaseBuffer(self->b_base, &view);
                 return NULL;
         }
 
  	ob = PyBytes_FromStringAndSize(NULL, view.len+view2.len);
 	if ( ob == NULL ) {
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
                 PyObject_ReleaseBuffer(other, &view2);
 		return NULL;
         }
@@ -421,7 +421,7 @@ buffer_concat(PyBufferObject *self, PyObject *other)
  	memcpy(p, view.buf, view.len);
  	memcpy(p + view.len, view2.buf, view2.len);
 
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
         PyObject_ReleaseBuffer(other, &view2);
         return ob;
 }
@@ -448,7 +448,7 @@ buffer_repeat(PyBufferObject *self, Py_ssize_t count)
 	    p += view.len;
 	}
 
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
 	return ob;
 }
 
@@ -465,7 +465,7 @@ buffer_item(PyBufferObject *self, Py_ssize_t idx)
 		return NULL;
 	}
 	ob = PyBytes_FromStringAndSize((char *)view.buf + idx, 1);
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
         return ob;
 }
 
@@ -486,7 +486,7 @@ buffer_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right)
 		right = left;
 	ob = PyBytes_FromStringAndSize((char *)view.buf + left,
                                        right - left);
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
         return ob;
 }
 
@@ -502,11 +502,12 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	if ( self->b_readonly || view.readonly ) {
 		PyErr_SetString(PyExc_TypeError,
 				"buffer is read-only");
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
 		return -1;
 	}
 
 	if (idx < 0 || idx >= view.len) {
+                PyObject_ReleaseBuffer(self->b_base, &view);
 		PyErr_SetString(PyExc_IndexError,
 				"buffer assignment index out of range");
 		return -1;
@@ -516,16 +517,16 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	if ( pb == NULL ||
 	     pb->bf_getbuffer == NULL) {
 		PyErr_BadArgument();
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
 		return -1;
 	}
         
         if (PyObject_GetBuffer(other, &view2, PyBUF_SIMPLE) < 0) {
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
                 return -1;
         }
 	if ( view.len != 1 ) {
-                PyObject_ReleaseBuffer((PyObject *)self, &view);
+                PyObject_ReleaseBuffer(self->b_base, &view);
                 PyObject_ReleaseBuffer(other, &view2);
 		PyErr_SetString(PyExc_TypeError,
 				"right operand must be a single byte");
@@ -533,7 +534,7 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	}
 
 	((char *)(view.buf))[idx] = *((char *)(view2.buf));
-        PyObject_ReleaseBuffer((PyObject *)self, &view);
+        PyObject_ReleaseBuffer(self->b_base, &view);
         PyObject_ReleaseBuffer(other, &view2);
 	return 0;
 }
@@ -558,12 +559,12 @@ buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObje
 	if ( self->b_readonly || v1.readonly) {
 		PyErr_SetString(PyExc_TypeError,
 				"buffer is read-only");
-                PyObject_ReleaseBuffer((PyObject *)self, &v1);
+                PyObject_ReleaseBuffer(self->b_base, &v1);
 		return -1;
 	}
 
         if ((*pb->bf_getbuffer)(other, &v2, PyBUF_SIMPLE) < 0) {
-                PyObject_ReleaseBuffer((PyObject *)self, &v1);
+                PyObject_ReleaseBuffer(self->b_base, &v1);
                 return -1;
         }
 
@@ -581,13 +582,15 @@ buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObje
 		PyErr_SetString(
 			PyExc_TypeError,
 			"right operand length must match slice length");
+                PyObject_ReleaseBuffer(self->b_base, &v1);
+                PyObject_ReleaseBuffer(other, &v2);
 		return -1;
 	}
 
 	if ( slice_len )
 	    memcpy((char *)v1.buf + left, v2.buf, slice_len);
 
-        PyObject_ReleaseBuffer((PyObject *)self, &v1);        
+        PyObject_ReleaseBuffer(self->b_base, &v1);
         PyObject_ReleaseBuffer(other, &v2);        
 	return 0;
 }

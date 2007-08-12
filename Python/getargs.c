@@ -1179,15 +1179,21 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		void **p = va_arg(*p_va, void **);
 		PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
 		int count;
+                int temp=-1;
                 PyBuffer view;
 			
 		if (pb == NULL || 
-		    pb->bf_getbuffer == NULL)
-			return converterr("read-write buffer", arg, msgbuf, bufsize);
-		if ((*pb->bf_getbuffer)(arg, &view, PyBUF_SIMPLE) != 0 || 
-                    view.readonly == 1)
+		    pb->bf_getbuffer == NULL ||
+                    ((temp = (*pb->bf_getbuffer)(arg, &view, 
+                                                 PyBUF_SIMPLE)) != 0) ||
+                    view.readonly == 1) {
+                        if (temp==0 && pb->bf_releasebuffer != NULL) {
+                                (*pb->bf_releasebuffer)(arg, &view);
+                        }
 			return converterr("single-segment read-write buffer", 
 					  arg, msgbuf, bufsize);
+                }
+                        
                 if ((count = view.len) < 0)
 			return converterr("(unspecified)", arg, msgbuf, bufsize);
                 *p = view.buf;
@@ -1196,7 +1202,8 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 			STORE_SIZE(count);
 			format++;
 		}
-                /* XXX : Buffer not released (warn about that)!*/
+                if (pb->bf_releasebuffer != NULL)
+                        (*pb->bf_releasebuffer)(arg, &view);
 		break;
 	}
 		
@@ -1221,6 +1228,10 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 
                 count = view.len;
                 *p = view.buf;
+                /* XXX : shouldn't really release buffer, but it should be O.K.
+                */
+                if (pb->bf_releasebuffer != NULL) 
+                        (*pb->bf_releasebuffer)(arg, &view);
 		if (count < 0)
 			return converterr("(unspecified)", arg, msgbuf, bufsize);
 		{
@@ -1246,6 +1257,7 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 	Py_ssize_t count;
         PyBuffer view;
 
+        *p = NULL;
 	if (pb == NULL ||
 	    pb->bf_getbuffer == NULL) {
 		*errmsg = "string or read-only buffer";
@@ -1258,6 +1270,8 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 	}
         count = view.len;
         *p = view.buf;
+        if (pb->bf_releasebuffer != NULL)
+                (*pb->bf_releasebuffer)(arg, &view);
 	return count;
 }
 

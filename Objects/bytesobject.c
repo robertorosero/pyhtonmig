@@ -173,6 +173,9 @@ PyBytes_Resize(PyObject *self, Py_ssize_t size)
     }
 
     if (((PyBytesObject *)self)->ob_exports > 0) {
+            /*
+            fprintf(stderr, "%d: %s", ((PyBytesObject *)self)->ob_exports, ((PyBytesObject *)self)->ob_bytes);
+            */
             PyErr_SetString(PyExc_BufferError,
                             "Existing exports of data: object cannot be re-sized");
             return -1;
@@ -272,6 +275,7 @@ bytes_iconcat(PyBytesObject *self, PyObject *other)
             return NULL;
     }
     memcpy(self->ob_bytes + mysize, vo.buf, vo.len);
+    PyObject_ReleaseBuffer(other, &vo);
     Py_INCREF(self);
     return (PyObject *)self;
 }
@@ -953,6 +957,7 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
 
     other_size = _getbuffer(other, &other_bytes);
     if (other_size < 0) {
+        PyObject_ReleaseBuffer(self, &self_bytes);
         Py_INCREF(Py_NotImplemented);
         return Py_NotImplemented;
     }
@@ -987,6 +992,8 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
     }
 
     res = cmp ? Py_True : Py_False;
+    PyObject_ReleaseBuffer(self, &self_bytes);
+    PyObject_ReleaseBuffer(other, &other_bytes);    
     Py_INCREF(res);
     return res;
 }
