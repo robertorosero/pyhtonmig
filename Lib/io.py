@@ -580,7 +580,7 @@ class _BufferedIOMixin(BufferedIOBase):
         return self.raw.isatty()
 
 
-class BytesIO(BufferedIOBase):
+class _BytesIO(BufferedIOBase):
 
     """Buffered I/O implementation using an in-memory bytes buffer."""
 
@@ -651,6 +651,12 @@ class BytesIO(BufferedIOBase):
 
     def seekable(self):
         return True
+
+# Use the faster implementation of BytesIO if available
+try:
+    from _bytesio import BytesIO
+except ImportError:
+    BytesIO = _BytesIO
 
 
 class BufferedReader(_BufferedIOMixin):
@@ -1243,14 +1249,14 @@ class TextIOWrapper(TextIOBase):
             return line[:nextpos]
 
 
-class StringIO(TextIOWrapper):
+class _StringIO(TextIOWrapper):
 
     # XXX This is really slow, but fully functional
 
     def __init__(self, initial_value="", encoding="utf-8", newline=None):
-        super(StringIO, self).__init__(BytesIO(),
-                                       encoding=encoding,
-                                       newline=newline)
+        super(_StringIO, self).__init__(BytesIO(),
+                                        encoding=encoding,
+                                        newline=newline)
         if initial_value:
             if not isinstance(initial_value, basestring):
                 initial_value = str(initial_value)
@@ -1260,3 +1266,9 @@ class StringIO(TextIOWrapper):
     def getvalue(self):
         self.flush()
         return self.buffer.getvalue().decode(self._encoding)
+
+# Use the faster implementation of StringIO if available
+try:
+    from _stringio import StringIO
+except ImportError:
+    StringIO = _StringIO

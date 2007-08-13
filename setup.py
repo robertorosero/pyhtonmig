@@ -457,6 +457,10 @@ class PyBuildExt(build_ext):
         # Helper module for various ascii-encoders
         exts.append( Extension('binascii', ['binascii.c']) )
 
+        # Accelerator modules for io.BytesIO and io.StringIO
+        exts.append( Extension('_bytesio', ['_bytesiomodule.c']) )
+        exts.append( Extension('_stringio', ['_stringiomodule.c']) )
+
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )
 
