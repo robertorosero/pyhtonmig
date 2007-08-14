@@ -2457,8 +2457,107 @@ class Decimal(object):
         """Returns self with the sign of other."""
         return Decimal((other._sign, self._int, self._exp))
 
+    def _checkMath(self, context):
+        """Imitation of decNumber's decCheckMath.
+
+        This is to adjust all the possible to original
+        behaviour in order to pass some tests.
+        """
+
+        DEC_MAX_MATH = 999999
+        if (context.prec > DEC_MAX_MATH or
+            context.Emax > DEC_MAX_MATH or
+            -context.Emin > DEC_MAX_MATH):
+            return context._raise_error(InvalidContext)
+
+        if self._is_special:
+            return
+
+        if (len(self._int) > DEC_MAX_MATH or
+            self._exp + len(self._int) > DEC_MAX_MATH+1 or
+            self._exp + len(self._int) < 2*(1-DEC_MAX_MATH)) and self:
+            return context._raise_error(InvalidOperation,
+                        "operand outside bounds for mathematical functions")
+
     def exp(self, context=None):
         """Returns e ** self."""
+
+        if context is None:
+            context = getcontext()
+
+        # check context and operand
+        ans = self._checkMath(context)
+        if ans:
+            return ans
+
+        # exp(NaN) = NaN
+        ans = self._check_nans(context=context)
+        if ans:
+            return ans
+
+        # exp(-Infinity) = 0
+        if self._isinfinity() == -1:
+            return Decimal((0, (0,), 0))
+
+        # exp(0) = 1
+        if not self:
+            return Decimal((0, (1,), 0))
+
+        # exp(Infinity) = Infinity
+        if self._isinfinity() == 1:
+            return Decimal(self)
+
+        # the result is now guaranteed to be inexact (the true
+        # mathematical result is transcendental). There's no need to
+        # raise Rounded and Inexact here---they'll always be raised as
+        # a result of the call to _fix.
+        p = context.prec
+        adj = self.adjusted()
+
+        # we only need to do any computation for quite a small range
+        # of adjusted exponents---for example, -29 <= adj <= 10 for
+        # the default context.  For smaller exponent the result is
+        # indistinguishable from 1 at the given precision, while for
+        # larger exponent the result either overflows or underflows.
+        if self._sign == 0 and adj > len(str((context.Emax+1)*3)):
+            # overflow
+            ans = Decimal((0, (1,), context.Emax+1))
+        elif self._sign == 1 and adj > len(str((-context.Etiny()+1)*3)):
+            # underflow to 0
+            ans = Decimal((0, (1,), context.Etiny()-1))
+        elif self._sign == 0 and adj < -p:
+            # p+1 digits; final round will raise correct flags
+            ans = Decimal((0, (1,) + (0,)*(p-1) + (1,), -p))
+        elif self._sign == 1 and adj < -p-1:
+            # p+1 digits; final round will raise correct flags
+            ans = Decimal((0, (9,)*(p+1), -p-1))
+        # general case
+        else:
+            op = _WorkRep(self)
+            c, e = op.int, op.exp
+            if op.sign == 1:
+                c = -c
+
+            # compute correctly rounded result: increase precision by
+            # 3 digits at a time until we get an unambiguously
+            # roundable result
+            extra = 3
+            while True:
+                coeff, exp = _dexp(c, e, p+extra)
+                if coeff % (5*10**(len(str(coeff))-p-1)):
+                    break
+                extra += 3
+
+            ans = Decimal((0, map(int, str(coeff)), exp))
+
+        # at this stage, ans should round correctly with *any*
+        # rounding mode, not just with ROUND_HALF_EVEN
+        context = context._shallow_copy()
+        rounding = context._set_rounding(ROUND_HALF_EVEN)
+        ans = ans._fix(context)
+        context.rounding = rounding
+
+        return ans
 
     def is_canonical(self, context=None):
         """Returns 1 if self is canonical; otherwise returns 0."""
@@ -3324,18 +3423,21 @@ class Context(object):
     def exp(self, a):
         """Returns e ** a.
 
-        >>> ExtendedContext.exp(Decimal('-Infinity'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.exp(Decimal('-Infinity'))
         Decimal("0")
-        >>> ExtendedContext.exp(Decimal('-1'))
+        >>> c.exp(Decimal('-1'))
         Decimal("0.367879441")
-        >>> ExtendedContext.exp(Decimal('0'))
+        >>> c.exp(Decimal('0'))
         Decimal("1")
-        >>> ExtendedContext.exp(Decimal('1'))
+        >>> c.exp(Decimal('1'))
         Decimal("2.71828183")
-        >>> ExtendedContext.exp(Decimal('0.693147181'))
+        >>> c.exp(Decimal('0.693147181'))
         Decimal("2.00000000")
-        >>> ExtendedContext.exp(Decimal('+Infinity'))
-        Decimal("Inf")
+        >>> c.exp(Decimal('+Infinity'))
+        Decimal("Infinity")
         """
         return a.exp(context=self)
 
@@ -4284,6 +4386,262 @@ def _adjust_coefficients(op1, op2):
         adjust -= 1
 
     return op1, op2, adjust
+
+
+##### Integer arithmetic functions used by ln, log10, exp and __pow__ #####
+
+# This function from Tim Peters was taken from here:
+# http://mail.python.org/pipermail/python-list/1999-July/007758.html
+# The correction being in the function definition is for speed, and
+# the whole function is not resolved with math.log because of avoiding
+# the use of floats.
+def _nbits(n, correction = {
+        '0': 4, '1': 3, '2': 2, '3': 2,
+        '4': 1, '5': 1, '6': 1, '7': 1,
+        '8': 0, '9': 0, 'a': 0, 'b': 0,
+        'c': 0, 'd': 0, 'e': 0, 'f': 0}):
+    """Number of bits in binary representation of the positive integer n,
+    or 0 if n == 0.
+    """
+    if n < 0:
+        raise ValueError("The argument to _nbits should be nonnegative.")
+    hex_n = "%x" % n
+    return 4*len(hex_n) - correction[hex_n[0]]
+
+def _sqrt_nearest(n, a):
+    """Closest integer to the square root of the positive integer n.  a is
+    an initial approximation to the square root.  Any positive integer
+    will do for a, but the closer a is to the square root of n the
+    faster convergence will be.
+
+    """
+    if n <= 0 or a <= 0:
+        raise ValueError("Both arguments to _sqrt_nearest should be positive.")
+
+    b=0
+    while a != b:
+        b, a = a, a--n//a>>1
+    return a
+
+def _rshift_nearest(x, shift):
+    """Given an integer x and a nonnegative integer shift, return closest
+    integer to x / 2**shift; use round-to-even in case of a tie.
+
+    """
+    b, q = 1 << shift, x >> shift
+    return q + (((x & (b-1))<<1) + (q&1) > b)
+
+def _div_nearest(a, b):
+    """Closest integer to a/b, a and b positive integers; rounds to even
+    in the case of a tie.
+
+    """
+    q, r = divmod(a, b)
+    return q + ((r<<1) + (q&1) > b)
+
+def _ilog(x, M, L = 8):
+    """Integer approximation to M*log(x/M), with absolute error boundable
+    in terms only of x/M.
+
+    Given positive integers x and M, return an integer approximation to
+    M * log(x/M).  For L = 8 and 0.1 <= x/M <= 10 the difference
+    between the approximation and the exact result is at most 22.  For
+    L = 8 and 1.0 <= x/M <= 10.0 the difference is at most 15.  In
+    both cases these are upper bounds on the error; it will usually be
+    much smaller."""
+
+    # The basic algorithm is the following: let log1p be the function
+    # log1p(x) = log(1+x).  Then log(x/M) = log1p((x-M)/M).  We use
+    # the reduction
+    #
+    #    log1p(y) = 2*log1p(y/(1+sqrt(1+y)))
+    #
+    # repeatedly until the argument to log1p is small (< 2**-L in
+    # absolute value).  For small y we can use the Taylor series
+    # expansion
+    #
+    #    log1p(y) ~ y - y**2/2 + y**3/3 - ... - (-y)**T/T
+    #
+    # truncating at T such that y**T is small enough.  The whole
+    # computation is carried out in a form of fixed-point arithmetic,
+    # with a real number z being represented by an integer
+    # approximation to z*M.  To avoid loss of precision, the y below
+    # is actually an integer approximation to 2**R*y*M, where R is the
+    # number of reductions performed so far.
+
+    y = x-M
+    # argument reduction; R = number of reductions performed
+    R = 0
+    while (R <= L and abs(y) << L-R >= M or
+           R > L and abs(y) >> R-L >= M):
+        y = _div_nearest(M*y << 1,
+                         M + _sqrt_nearest(M*(M+_rshift_nearest(y, R)), M))
+        R += 1
+
+    # Taylor series with T terms
+    T = -int(-10*len(str(M))//(3*L))
+    yshift = _rshift_nearest(y, R)
+    w = _div_nearest(M, T)
+    for k in xrange(T-1, 0, -1):
+        w = _div_nearest(M, k) - _div_nearest(yshift*w, M)
+
+    return _div_nearest(w*y, M)
+
+def _dlog10(c, e, p):
+    """Given integers c, e and p with c > 0, p >= 0, compute an integer
+    approximation to 10**p * log10(c*10**e), with an absolute error of
+    at most 1.  Assumes that c*10**e is not exactly 1."""
+
+    # increase precision by 2; compensate for this by dividing
+    # final result by 100
+    p += 2
+
+    # write c*10**e as d*10**f with either:
+    #   f >= 0 and 1 <= d <= 10, or
+    #   f <= 0 and 0.1 <= d <= 1.
+    # Thus for c*10**e close to 1, f = 0
+    l = len(str(c))
+    f = e+l - (e+l >= 1)
+
+    if p > 0:
+        M = 10**p
+        k = e+p-f
+        if k >= 0:
+            c *= 10**k
+        else:
+            c = _div_nearest(c, 10**-k)
+
+        log_d = _ilog(c, M) # error < 5 + 22 = 27
+        log_10 = _ilog(10*M, M) # error < 15
+        log_d = _div_nearest(log_d*M, log_10)
+        log_tenpower = f*M # exact
+    else:
+        log_d = 0  # error < 2.31
+        log_tenpower = div_nearest(f, 10**-p) # error < 0.5
+
+    return _div_nearest(log_tenpower+log_d, 100)
+
+def _dlog(c, e, p):
+    """Given integers c, e and p with c > 0, compute an integer
+    approximation to 10**p * log(c*10**e), with an absolute error of
+    at most 1.  Assumes that c*10**e is not exactly 1."""
+
+    # Increase precision by 2. The precision increase is compensated
+    # for at the end with a division by 100.
+    p += 2
+
+    # rewrite c*10**e as d*10**f with either f >= 0 and 1 <= d <= 10,
+    # or f <= 0 and 0.1 <= d <= 1.  Then we can compute 10**p * log(c*10**e)
+    # as 10**p * log(d) + 10**p*f * log(10).
+    l = len(str(c))
+    f = e+l - (e+l >= 1)
+
+    # compute approximation to 10**p*log(d), with error < 27
+    if p > 0:
+        k = e+p-f
+        if k >= 0:
+            c *= 10**k
+        else:
+            c = _div_nearest(c, 10**-k)  # error of <= 0.5 in c
+
+        # _ilog magnifies existing error in c by a factor of at most 10
+        log_d = _ilog(c, 10**p) # error < 5 + 22 = 27
+    else:
+        # p <= 0: just approximate the whole thing by 0; error < 2.31
+        log_d = 0
+
+    # compute approximation to 10**p*f*log(10), with error < 17
+    if f:
+        sign_f = [-1, 1][f > 0]
+        if p >= 0:
+            M = 10**p * abs(f)
+        else:
+            M = _div_nearest(abs(f), 10**-p) # M = 10**p*|f|, error <= 0.5
+
+        if M:
+            f_log_ten = sign_f*_ilog(10*M, M)   # M*log(10), error <= 1.2 + 15 < 17
+        else:
+            f_log_ten = 0
+    else:
+        f_log_ten = 0
+
+    # error in sum < 17+27 = 44; error after division < 0.44 + 0.5 < 1
+    return _div_nearest(f_log_ten + log_d, 100)
+
+def _iexp(x, M, L=8):
+    """Given integers x and M, M > 0, such that x/M is small in absolute
+    value, compute an integer approximation to M*exp(x/M).  For 0 <=
+    x/M <= 2.4, the absolute error in the result is bounded by 60 (and
+    is usually much smaller)."""
+
+    # Algorithm: to compute exp(z) for a real number z, first divide z
+    # by a suitable power R of 2 so that |z/2**R| < 2**-L.  Then
+    # compute expm1(z/2**R) = exp(z/2**R) - 1 using the usual Taylor
+    # series
+    #
+    #     expm1(x) = x + x**2/2! + x**3/3! + ...
+    #
+    # Now use the identity
+    #
+    #     expm1(2x) = expm1(x)*(expm1(x)+2)
+    #
+    # R times to compute the sequence expm1(z/2**R),
+    # expm1(z/2**(R-1)), ... , exp(z/2), exp(z).
+
+    # Find R such that x/2**R/M <= 2**-L
+    R = _nbits((x<<L)//M)
+
+    # Taylor series.  (2**L)**T > M
+    T = -int(-10*len(str(M))//(3*L))
+    y = _div_nearest(x, T)
+    Mshift = M<<R
+    for i in xrange(T-1, 0, -1):
+        y = _div_nearest(x*(Mshift + y), Mshift * i)
+
+    # Expansion
+    for k in xrange(R-1, -1, -1):
+        Mshift = M<<(k+2)
+        y = _div_nearest(y*(y+Mshift), Mshift)
+
+    return M+y
+
+def _dexp(c, e, p):
+    """Compute an approximation to exp(c*10**e), with p decimal places of
+    precision.
+
+    Returns d, f such that:
+
+      10**(p-1) <= d <= 10**p, and
+      (d-1)*10**f < exp(c*10**e) < (d+1)*10**f
+
+    In other words, d*10**f is an approximation to exp(c*10**e) with p
+    digits of precision, and with an error in d of at most 1.  This is
+    almost, but not quite, the same as the error being < 1ulp: when d
+    = 10**(p-1) the error could be up to 10 ulp."""
+
+    # we'll call iexp with M = 10**(p+2), giving p+3 digits of precision
+    p += 2
+
+    # compute log10 with extra precision = adjusted exponent of c*10**e
+    extra = max(0, e + len(str(c)) - 1)
+    q = p + extra
+    log10 = _dlog(10, 0, q)  # error <= 1
+
+    # compute quotient c*10**e/(log10/10**q) = c*10**(e+q)/log10,
+    # rounding down
+    shift = e+q
+    if shift >= 0:
+        cshift = c*10**shift
+    else:
+        cshift = c//10**-shift
+    quot, rem = divmod(cshift, log10)
+
+    # reduce remainder back to original precision
+    rem = _div_nearest(rem, 10**extra)
+
+    # error in result of _iexp < 120;  error after division < 0.62
+    return _div_nearest(_iexp(rem, 10**p), 1000), quot - p + 3
+
 
 ##### Helper Functions ####################################################
 
