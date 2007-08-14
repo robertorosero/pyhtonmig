@@ -415,8 +415,7 @@ static PyObject *
 bytesio_writelines(BytesIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
-    const char *bytes;
-    Py_ssize_t len;
+    PyObject *ret;
 
     if (self->buf == NULL)
         return err_closed();
@@ -426,17 +425,11 @@ bytesio_writelines(BytesIOObject *self, PyObject *v)
         return NULL;
 
     while ((item = PyIter_Next(it)) != NULL) {
-        if (PyObject_AsCharBuffer(item, &bytes, &len) < 0) {
-            Py_DECREF(it);
-            Py_DECREF(item);
+        ret = bytesio_write(self, item);
+        if (ret == NULL)
             return NULL;
-        }
+        Py_DECREF(ret);
         Py_DECREF(item);
-
-        if (write_bytes(self, bytes, len) == -1) {
-            Py_DECREF(it);
-            return NULL;
-        }
     }
     Py_DECREF(it);
 

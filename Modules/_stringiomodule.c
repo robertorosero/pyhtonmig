@@ -363,30 +363,36 @@ stringio_seek(StringIOObject *self, PyObject *args)
 }
 
 static PyObject *
-stringio_write(StringIOObject *self, PyObject *args)
+stringio_write(StringIOObject *self, PyObject *obj)
 {
-    const Py_UNICODE *ustr;
-    Py_ssize_t len, n;
+    const Py_UNICODE *str;
+    Py_ssize_t size, n;
 
     if (self->buf == NULL)
         return err_closed();
 
-    if (!PyArg_ParseTuple(args,
-                  "u#;write() may only be called on"
-                  " unicode strings", &ustr, &n))
+    if (PyUnicode_Check(obj)) {
+        str = PyUnicode_AsUnicode(obj);
+        size = PyUnicode_GetSize(obj);
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "expected a string, got %s instead",
+                     Py_Type(obj)->tp_name);
+        return NULL;
+    }
+
+    n = write_str(self, str, size);
+    if (n == -1)
         return NULL;
 
-    len = write_str(self, ustr, n);
-    if (len == -1)
-        return NULL;
-
-    return PyInt_FromSsize_t(len);
+    return PyInt_FromSsize_t(n);
 }
 
 static PyObject *
 stringio_writelines(StringIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
+    PyObject *ret;
 
     if (self->buf == NULL)
         return err_closed();
@@ -396,22 +402,11 @@ stringio_writelines(StringIOObject *self, PyObject *v)
         return NULL;
 
     while ((item = PyIter_Next(it)) != NULL) {
-        Py_ssize_t n;
-        Py_UNICODE *ustr;
-        if ((ustr = PyUnicode_AsUnicode(item)) == NULL) {
-            PyErr_SetString(PyExc_TypeError,
-                    "Need a list of unicode objects");
-            Py_DECREF(it);
-            Py_DECREF(item);
+        ret = stringio_write(self, item);
+        if (ret == NULL)
             return NULL;
-        }
-        n = PyUnicode_GetSize(item);
+        Py_DECREF(ret);
         Py_DECREF(item);
-
-        if (write_str(self, ustr, n) == -1) {
-            Py_DECREF(it);
-            return NULL;
-        }
     }
     Py_DECREF(it);
 
@@ -593,7 +588,7 @@ static struct PyMethodDef StringIO_methods[] = {
      StringIO_close_doc},
     {"seek",       (PyCFunction) stringio_seek, METH_VARARGS,
      StringIO_seek_doc},
-    {"write",      (PyCFunction) stringio_write, METH_VARARGS,
+    {"write",      (PyCFunction) stringio_write, METH_O,
      StringIO_write_doc},
     {"writelines", (PyCFunction) stringio_writelines, METH_O,
      StringIO_writelines_doc},
