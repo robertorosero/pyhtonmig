@@ -53,11 +53,16 @@ static int
 bytes_getbuffer(PyBytesObject *obj, PyBuffer *view, int flags)
 {        
         int ret;
+        void *ptr;
         if (view == NULL) {
                 obj->ob_exports++;
                 return 0;
         }
-        ret = PyBuffer_FillInfo(view, obj->ob_bytes, Py_Size(obj), 0, flags);
+        if (obj->ob_bytes == NULL) 
+                ptr = "";
+        else
+                ptr = obj->ob_bytes;
+        ret = PyBuffer_FillInfo(view, ptr, Py_Size(obj), 0, flags);
         if (ret >= 0) {
                 obj->ob_exports++;
         }
@@ -2019,9 +2024,11 @@ static PyObject *
 bytes_replace(PyBytesObject *self, PyObject *args)
 {
     Py_ssize_t count = -1;
-    PyObject *from, *to;
+    PyObject *from, *to, *res;
     const char *from_s, *to_s;
     Py_ssize_t from_len, to_len;
+    int relfrom=0, relto=0;
+    PyBuffer vfrom, vto;
 
     if (!PyArg_ParseTuple(args, "OO|n:replace", &from, &to, &count))
         return NULL;
@@ -2030,21 +2037,38 @@ bytes_replace(PyBytesObject *self, PyObject *args)
         from_s = PyBytes_AS_STRING(from);
         from_len = PyBytes_GET_SIZE(from);
     }
-    /* XXX -> use the modern buffer interface */
-    else if (PyObject_AsCharBuffer(from, &from_s, &from_len))
-        return NULL;
+    else {
+            if (PyObject_GetBuffer(from, &vfrom, PyBUF_CHARACTER) < 0) 
+                    return NULL;
+            from_s = vfrom.buf;
+            from_len = vfrom.len;
+            relfrom = 1;
+    }
 
     if (PyBytes_Check(to)) {
         to_s = PyBytes_AS_STRING(to);
         to_len = PyBytes_GET_SIZE(to);
     }
-    /* XXX -> use the modern buffer interface */
-    else if (PyObject_AsCharBuffer(to, &to_s, &to_len))
-        return NULL;
+    else {
+            if (PyObject_GetBuffer(to, &vto, PyBUF_CHARACTER) < 0) {
+                    if (relfrom)
+                            PyObject_ReleaseBuffer(from, &vfrom);
+                    return NULL;
+            }
+            to_s = vto.buf;
+            to_len = vto.len;
+            relto = 1;
+    }
 
-    return (PyObject *)replace((PyBytesObject *) self,
-                               from_s, from_len,
-                               to_s, to_len, count);
+    res = (PyObject *)replace((PyBytesObject *) self,
+                              from_s, from_len,
+                              to_s, to_len, count);
+
+    if (relfrom)
+            PyObject_ReleaseBuffer(from, &vfrom);
+    if (relto)
+            PyObject_ReleaseBuffer(to, &vto);
+    return res;
 }
 
 

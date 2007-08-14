@@ -16,7 +16,7 @@ typedef struct {
 
 
 static int
-get_buf(PyBufferObject *self, PyBuffer *view)
+get_buf(PyBufferObject *self, PyBuffer *view, int flags)
 {
 	if (self->b_base == NULL) {
 		view->buf = self->b_ptr;
@@ -25,7 +25,7 @@ get_buf(PyBufferObject *self, PyBuffer *view)
 	else {
 		Py_ssize_t count, offset;
 		PyBufferProcs *bp = self->b_base->ob_type->tp_as_buffer;
-                if ((*bp->bf_getbuffer)(self->b_base, view, PyBUF_SIMPLE) < 0) return 0;
+                if ((*bp->bf_getbuffer)(self->b_base, view, flags) < 0) return 0;
                 count = view->len;
 		/* apply constraints to the start/end */
 		if (self->b_offset > count)
@@ -48,7 +48,7 @@ static int
 buffer_getbuf(PyBufferObject *self, PyBuffer *view, int flags)
 {
         if (view == NULL) return 0;
-        if (!get_buf(self, view))
+        if (!get_buf(self, view, flags))
                 return -1;
         return PyBuffer_FillInfo(view, view->buf, view->len, view->readonly, flags);
 }
@@ -226,12 +226,12 @@ buffer_dealloc(PyBufferObject *self)
 }
 
 static int
-get_bufx(PyObject *obj, PyBuffer *view)
+get_bufx(PyObject *obj, PyBuffer *view, int flags)
 {
 	PyBufferProcs *bp;
 
 	if (PyBuffer_Check(obj)) {
-		if (!get_buf((PyBufferObject *)obj, view)) {
+		if (!get_buf((PyBufferObject *)obj, view, flags)) {
 			PyErr_Clear();
 			return 0;
 		}
@@ -256,9 +256,9 @@ buffer_richcompare(PyObject *self, PyObject *other, int op)
         PyBuffer v1, v2;
 
 	ok = 1;
-	if (!get_bufx(self, &v1))
+	if (!get_bufx(self, &v1, PyBUF_SIMPLE))
 		ok = 0;
-	if (!get_bufx(other, &v2)) {
+	if (!get_bufx(other, &v2, PyBUF_SIMPLE)) {
                 if (ok) PyObject_ReleaseBuffer(self, &v1);
 		ok = 0;
         }
@@ -322,16 +322,7 @@ buffer_hash(PyBufferObject *self)
 	if ( self->b_hash != -1 )
 		return self->b_hash;
 
-	/* XXX potential bugs here, a readonly buffer does not imply that the
-	 * underlying memory is immutable.  b_readonly is a necessary but not
-	 * sufficient condition for a buffer to be hashable.  Perhaps it would
-	 * be better to only allow hashing if the underlying object is known to
-	 * be immutable (e.g. PyString_Check() is true).  Another idea would
-	 * be to call tp_hash on the underlying object and see if it raises
-	 * an error. */
-	if ( !self->b_readonly )
-
-	if (!get_buf(self, &view))
+        if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return -1;
         if (!(view.readonly)) {
                 PyErr_SetString(PyExc_TypeError,
@@ -359,7 +350,7 @@ buffer_str(PyBufferObject *self)
         PyBuffer view;
         PyObject *res;
 
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return NULL;
 	res = PyString_FromStringAndSize((const char *)view.buf, view.len);
         PyObject_ReleaseBuffer(self->b_base, &view);
@@ -373,7 +364,7 @@ buffer_length(PyBufferObject *self)
 {
         PyBuffer view;
 
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return -1;
         PyObject_ReleaseBuffer(self->b_base, &view);
 	return view.len;
@@ -394,7 +385,7 @@ buffer_concat(PyBufferObject *self, PyObject *other)
 		return NULL;
 	}
 
- 	if (!get_buf(self, &view))
+ 	if (!get_buf(self, &view, PyBUF_SIMPLE))
  		return NULL;
  
 	/* optimize special case */
@@ -434,7 +425,7 @@ buffer_repeat(PyBufferObject *self, Py_ssize_t count)
 
 	if ( count < 0 )
 		count = 0;
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return NULL;
 	ob = PyBytes_FromStringAndSize(NULL, view.len * count);
 	if ( ob == NULL )
@@ -457,7 +448,7 @@ buffer_item(PyBufferObject *self, Py_ssize_t idx)
         PyBuffer view;
         PyObject *ob;
 
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return NULL;
 	if ( idx < 0 || idx >= view.len ) {
 		PyErr_SetString(PyExc_IndexError, "buffer index out of range");
@@ -473,7 +464,7 @@ buffer_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right)
 {
         PyObject *ob;
         PyBuffer view;
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return NULL;
 	if ( left < 0 )
 		left = 0;
@@ -495,7 +486,7 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	PyBufferProcs *pb;
         PyBuffer view, view2;
 
-	if (!get_buf(self, &view))
+	if (!get_buf(self, &view, PyBUF_SIMPLE))
 		return -1;
         
 	if ( self->b_readonly || view.readonly ) {
@@ -552,7 +543,7 @@ buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObje
 		PyErr_BadArgument();
 		return -1;
 	}
-	if (!get_buf(self, &v1))
+	if (!get_buf(self, &v1, PyBUF_SIMPLE))
                 return -1;
 
 	if ( self->b_readonly || v1.readonly) {

@@ -1675,6 +1675,7 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
     PyBuffer view;
 
     /* get pointer to string buffer */
+    view.len = -1;
     buffer = Py_Type(string)->tp_as_buffer;
     if (!buffer || !buffer->bf_getbuffer || 
         (*buffer->bf_getbuffer)(string, &view, PyBUF_SIMPLE) < 0) {
@@ -1713,6 +1714,10 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
     *p_length = size;
     *p_charsize = charsize;
 
+    if (ptr == NULL) {
+            PyErr_SetString(PyExc_ValueError, 
+                            "Buffer is NULL");
+    }
     return ptr;
 }
 
