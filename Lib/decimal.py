@@ -2625,8 +2625,85 @@ class Decimal(object):
         else:
             return Decimal(1)
 
+    def _ln_exp_bound(self):
+        """Compute a lower bound for the adjusted exponent of self.ln().
+        In other words, compute r such that self.ln() >= 10**r.  Assumes
+        that self is finite and positive and that self != 1.
+        """
+
+        # for 0.1 <= x <= 10 we use the inequalities 1-1/x <= ln(x) <= x-1
+        adj = self._exp + len(self._int) - 1
+        if adj >= 1:
+            # argument >= 10; we use 23/10 = 2.3 as a lower bound for ln(10)
+            return len(str(adj*23//10)) - 1
+        if adj <= -2:
+            # argument <= 0.1
+            return len(str((-1-adj)*23//10)) - 1
+        op = _WorkRep(self)
+        c, e = op.int, op.exp
+        if adj == 0:
+            # 1 < self < 10
+            num = str(c-10**-e)
+            den = str(c)
+            return len(num) - len(den) - (num < den)
+        # adj == -1, 0.1 <= self < 1
+        return e + len(str(10**-e - c)) - 1
+
+
     def ln(self, context=None):
         """Returns the natural (base e) logarithm of self."""
+
+        if context is None:
+            context = getcontext()
+
+        # check context and operand
+        ans = self._checkMath(context)
+        if ans:
+            return ans
+
+        # ln(NaN) = NaN
+        ans = self._check_nans(context=context)
+        if ans:
+            return ans
+
+        # ln(0.0) == -Infinity
+        if not self:
+            return negInf
+
+        # ln(Infinity) = Infinity
+        if self._isinfinity() == 1:
+            return Inf
+
+        # ln(1.0) == 0.0
+        if self == Decimal(1):
+            return Decimal((0, (0,), 0))
+
+        # ln(negative) raises InvalidOperation
+        if self._sign == 1:
+            return context._raise_error(InvalidOperation,
+                                        'ln of a negative value')
+
+        # result is irrational, so necessarily inexact
+        op = _WorkRep(self)
+        c, e = op.int, op.exp
+        p = context.prec
+
+        # correctly rounded result: repeatedly increase precision by 3
+        # until we get an unambiguously roundable result
+        places = p - self._ln_exp_bound() + 2 # at least p+3 places
+        while True:
+            coeff = _dlog(c, e, places)
+            # assert len(str(abs(coeff)))-p >= 1
+            if coeff % (5*10**(len(str(abs(coeff)))-p-1)):
+                break
+            places += 3
+        ans = Decimal((int(coeff<0), map(int, str(abs(coeff))), -places))
+
+        context = context._shallow_copy()
+        rounding = context._set_rounding(ROUND_HALF_EVEN)
+        ans = ans._fix(context)
+        context.rounding = rounding
+        return ans
 
     def log10(self, context=None):
         """Returns the base 10 logarithm of self."""
@@ -3590,16 +3667,19 @@ class Context(object):
     def ln(self, a):
         """Returns the natural (base e) logarithm of the operand.
 
-        >>> ExtendedContext.ln(Decimal('0'))
-        Decimal("-Inf")
-        >>> ExtendedContext.ln(Decimal('1.000'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.ln(Decimal('0'))
+        Decimal("-Infinity")
+        >>> c.ln(Decimal('1.000'))
         Decimal("0")
-        >>> ExtendedContext.ln(Decimal('2.71828183'))
+        >>> c.ln(Decimal('2.71828183'))
         Decimal("1.00000000")
-        >>> ExtendedContext.ln(Decimal('10'))
+        >>> c.ln(Decimal('10'))
         Decimal("2.30258509")
-        >>> ExtendedContext.ln(Decimal('+Infinity'))
-        Decimal("Inf")
+        >>> c.ln(Decimal('+Infinity'))
+        Decimal("Infinity")
         """
         return a.ln(context=self)
 
