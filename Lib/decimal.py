@@ -2705,8 +2705,91 @@ class Decimal(object):
         context.rounding = rounding
         return ans
 
+    def _log10_exp_bound(self):
+        """Compute a lower bound for the adjusted exponent of self.log10().
+        In other words, find r such that self.log10() >= 10**r.
+        Assumes that self is finite and positive and that self != 1.
+        """
+
+        # For x >= 10 or x < 0.1 we only need a bound on the integer
+        # part of log10(self), and this comes directly from the
+        # exponent of x.  For 0.1 <= x <= 10 we use the inequalities
+        # 1-1/x <= log(x) <= x-1. If x > 1 we have |log10(x)| >
+        # (1-1/x)/2.31 > 0.  If x < 1 then |log10(x)| > (1-x)/2.31 > 0
+
+        adj = self._exp + len(self._int) - 1
+        if adj >= 1:
+            # self >= 10
+            return len(str(adj))-1
+        if adj <= -2:
+            # self < 0.1
+            return len(str(-1-adj))-1
+        op = _WorkRep(self)
+        c, e = op.int, op.exp
+        if adj == 0:
+            # 1 < self < 10
+            num = str(c-10**-e)
+            den = str(231*c)
+            return len(num) - len(den) - (num < den) + 2
+        # adj == -1, 0.1 <= self < 1
+        num = str(10**-e-c)
+        return len(num) + e - (num < "231") - 1
+
     def log10(self, context=None):
         """Returns the base 10 logarithm of self."""
+
+        if context is None:
+            context = getcontext()
+
+        # check context and operand
+        ans = self._checkMath(context)
+        if ans:
+            return ans
+
+        # log10(NaN) = NaN
+        ans = self._check_nans(context=context)
+        if ans:
+            return ans
+
+        # log10(0.0) == -Infinity
+        if not self:
+            return negInf
+
+        # log10(Infinity) = Infinity
+        if self._isinfinity() == 1:
+            return Inf
+
+        # log10(negative or -Infinity) raises InvalidOperation
+        if self._sign == 1:
+            return context._raise_error(InvalidOperation,
+                                        'log10 of a negative value')
+
+        # log10(10**n) = n
+        if self._int[0] == 1 and self._int[1:] == (0,)*(len(self._int) - 1):
+            # answer may need rounding
+            ans = Decimal(self._exp + len(self._int) - 1)
+        else:
+            # result is irrational, so necessarily inexact
+            op = _WorkRep(self)
+            c, e = op.int, op.exp
+            p = context.prec
+
+            # correctly rounded result: repeatedly increase precision
+            # until result is unambiguously roundable
+            places = p-self._log10_exp_bound()+2
+            while True:
+                coeff = _dlog10(c, e, places)
+                # assert len(str(abs(coeff)))-p >= 1
+                if coeff % (5*10**(len(str(abs(coeff)))-p-1)):
+                    break
+                places += 3
+            ans = Decimal((int(coeff<0), map(int, str(abs(coeff))), -places))
+
+        context = context._shallow_copy()
+        rounding = context._set_rounding(ROUND_HALF_EVEN)
+        ans = ans._fix(context)
+        context.rounding = rounding
+        return ans
 
     def logb(self, context=None):
         """ Returns the exponent of the magnitude of self's MSD.
@@ -3686,20 +3769,23 @@ class Context(object):
     def log10(self, a):
         """Returns the base 10 logarithm of the operand.
 
-        >>> ExtendedContext.log10(Decimal('0'))
-        Decimal("-In")
-        >>> ExtendedContext.log10(Decimal('0.001'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.log10(Decimal('0'))
+        Decimal("-Infinity")
+        >>> c.log10(Decimal('0.001'))
         Decimal("-3")
-        >>> ExtendedContext.log10(Decimal('1.000'))
+        >>> c.log10(Decimal('1.000'))
         Decimal("0")
-        >>> ExtendedContext.log10(Decimal('2'))
+        >>> c.log10(Decimal('2'))
         Decimal("0.301029996")
-        >>> ExtendedContext.log10(Decimal('10'))
+        >>> c.log10(Decimal('10'))
         Decimal("1")
-        >>> ExtendedContext.log10(Decimal('70'))
+        >>> c.log10(Decimal('70'))
         Decimal("1.84509804")
-        >>> ExtendedContext.log10(Decimal('+Infinity'))
-        Decimal("Inf")
+        >>> c.log10(Decimal('+Infinity'))
+        Decimal("Infinity")
         """
         return a.log10(context=self)
 
