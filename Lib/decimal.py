@@ -1782,7 +1782,7 @@ class Decimal(object):
         tmp = Decimal( (self._sign, self._int[:prec], self._exp - expdiff) )
         for digit in self._int[prec:]:
             if digit != 0:
-                tmp = tmp._increment(round=1, context=context)
+                tmp = tmp._increment(round=0, context=context)
                 if len(tmp._int) > prec:
                     return Decimal( (tmp._sign, tmp._int[:-1], tmp._exp + 1))
                 else:
@@ -2098,10 +2098,11 @@ class Decimal(object):
         tmp = Decimal(self)
 
         if digits < 0:
-            tmp._exp = -digits + tmp._exp
-            tmp._int = (0,1)
-            digits = 1
-        tmp = tmp._round(digits, rounding, context=context, forceExp=exp, fromQuantize=fromQuantize)
+            tmp._exp = exp - 1
+            tmp._int = (1,)
+            digits = 0
+        tmp = tmp._round(digits, rounding, context=context, forceExp=exp,
+                                                fromQuantize=fromQuantize)
 
         if watchexp or fromQuantize:
             tmp_adjusted = tmp.adjusted()
@@ -2710,105 +2711,44 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        ans = self._check_nans(self, context)
+        ans = self._check_nans(context=context)
         if ans:
             return ans
 
-        minime = context.Emin-context.prec+1
-        if self._isinfinity() == 1:
-            return Decimal((0, (9,)*context.prec, context.Emax-context.prec+1))
         if self._isinfinity() == -1:
-            return self
-
-        if self._exp < minime:
-            newself = Decimal((self._sign, self._int, minime))
-            if newself._sign == 1:
-                return newself
-        else:
-            newself = Decimal(self)
-
-        if not newself:
-            return Decimal((1, (1,), minime))
-
-        expdif = context.prec - len(newself._int)
-        if expdif < 0:
-            # negative difference
-            resto = newself._int[context.prec:]
-            if resto != (0,)*(-expdif):
-                # the rest is not all zeroes
-                d = newself._round_floor(context.prec, expdif, context)
-                return d
-            # negative expdif, but all zeroes
-            d = Decimal((newself._sign, newself._int[:expdif], newself._exp-expdif))
-        else:
-            # positive expdif
-            if  newself._exp-expdif < minime:
-                expdif = newself._exp - minime
-            d = Decimal((newself._sign, newself._int+(0,)*expdif, newself._exp-expdif))
-        dif = Decimal((0, (0,)*(len(d._int)-1)+(1,), d._exp))
-        d = d - dif
-
-        digdif = context.prec - len(d._int)
-        if digdif > 0 and d._exp-digdif > context.Emin:
-            d = Decimal((d._sign, d._int + (9,)*digdif, d._exp-digdif))
-        if d.adjusted() > context.Emax:
             return negInf
-        return d
+        if self._isinfinity() == 1:
+            return Decimal((0, (9,)*context.prec, context.Etop()))
+
+        context = context.copy()
+        context._set_rounding(ROUND_FLOOR)
+        context._ignore_all_flags()
+        new_self = self._fix(context)
+        if new_self != self:
+            return new_self
+        return self.__sub__(Decimal((0, (1,), context.Etiny()-1)), context)
 
     def next_plus(self, context=None):
         """Returns the smallest representable number larger than itself."""
         if context is None:
             context = getcontext()
 
-        ans = self._check_nans(self, context)
+        ans = self._check_nans(context=context)
         if ans:
             return ans
 
         if self._isinfinity() == 1:
-            return self
-        if self._isinfinity() == -1:
-            return Decimal((1, (9,)*context.prec, context.Emax-context.prec+1))
-
-        minime = context.Emin-context.prec+1
-        if self._exp < minime:
-            newself = Decimal((self._sign, self._int, minime))
-            if newself._sign == 0:
-                return newself
-        else:
-            newself = Decimal(self)
-
-        if not newself:
-            return Decimal((0, (1,), minime))
-        expdif = context.prec - len(newself._int)
-
-        if expdif < 0:
-            resto = newself._int[context.prec:]
-            if resto != (0,)*(-expdif):
-                # the rest is not all zeroes
-                d = newself._round_ceiling(context.prec, expdif, context)
-                return d
-            # negative expdif, but all zeroes
-            d = Decimal((newself._sign, newself._int[:expdif], newself._exp-expdif))
-        else:
-            # positive expdif
-            if newself._exp-expdif < minime:
-                expdif = newself._exp - minime
-            d = Decimal((newself._sign, newself._int+(0,)*expdif, newself._exp-expdif))
-
-        dif = Decimal((0, (0,)*(len(d._int)-1)+(1,), d._exp))
-        d = d + dif
-        if not d:
-            # restablish previos sign
-            d._sign = newself._sign
-            return d
-
-        digdif = context.prec - len(d._int)
-        if digdif > 0 and d._exp-digdif > context.Emin:
-            d = Decimal((d._sign, d._int + (9,)*digdif, d._exp-digdif))
-        if d.adjusted() > context.Emax:
             return Inf
-        return d
+        if self._isinfinity() == -1:
+            return Decimal((1, (9,)*context.prec, context.Etop()))
 
+        context = context.copy()
+        context._set_rounding(ROUND_CEILING)
+        context._ignore_all_flags()
+        new_self = self._fix(context)
+        if new_self != self:
+            return new_self
+        return self.__add__(Decimal((0, (1,), context.Etiny()-1)), context)
 
     def next_toward(self, other, context=None):
         """Returns the number closest to itself, in direction towards other.
