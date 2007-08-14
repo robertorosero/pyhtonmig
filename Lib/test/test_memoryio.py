@@ -196,7 +196,7 @@ class MemoryTestMixin:
         self.assertEqual(memio.isatty(), False)
         self.assertEqual(memio.closed, False)
         memio.close()
-        self.assertEqual(memio.writable(), True)
+        self.assertEqual(memio.writable(), True) # closed
         self.assertEqual(memio.readable(), True)
         self.assertEqual(memio.seekable(), True)
         self.assertRaises(ValueError, memio.isatty)
@@ -210,6 +210,16 @@ class MemoryTestMixin:
             m = MemIO(buf)
             return m.getvalue()
         self.assertEqual(test(), buf)
+
+    def test_widechar(self):
+        buf = self.buftype("\U0002030a\U00020347")
+        memio = self.ioclass(buf)
+
+        self.assertEqual(memio.getvalue(), buf)
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), buf)
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), buf + buf)
 
 
 class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
@@ -246,6 +256,16 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         memio.seek(2)
         memio.write(buf)
         self.assertEqual(memio.getvalue(), self.buftype('\0\0') + buf)
+
+    def test_unicode(self):
+        buf = "1234567890"
+        memio = self.ioclass(buf)
+
+        self.assertEqual(memio.getvalue(), self.buftype(buf))
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), self.buftype(buf))
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), self.buftype(buf + buf))
 
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):

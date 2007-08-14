@@ -395,16 +395,22 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytesio_write(BytesIOObject *self, PyObject *obj)
 {
-    const void *bytes;
+    const char *bytes;
     Py_ssize_t size, len;
 
     if (self->buf == NULL)
         return err_closed();
 
-    if (PyObject_AsReadBuffer(obj, &bytes, &size) < 0)
-        return NULL;
+    if (PyUnicode_Check(obj)) {
+        bytes = PyUnicode_AsString(obj);
+        size = strlen(bytes);
+    }
+    else {
+        if (PyObject_AsReadBuffer(obj, (void *)&bytes, &size) < 0)
+            return NULL;
+    }
 
-    len = write_bytes(self, (const char *)bytes, size);
+    len = write_bytes(self, bytes, size);
     if (len == -1)
         return NULL;
 
@@ -466,12 +472,12 @@ static PyObject *
 BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     BytesIOObject *self;
-    const char *initvalue = NULL;
-    Py_ssize_t size = 0;
+    PyObject *initvalue = NULL, *ret;
+    enum { INIT_BUFSIZE = 1 };
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    if (!PyArg_ParseTuple(args, "|s#ss:BytesIO", &initvalue, &size))
+    if (!PyArg_ParseTuple(args, "|O:BytesIO", &initvalue))
         return NULL;
 
     self = (BytesIOObject *)type->tp_alloc(type, 0);
@@ -479,24 +485,20 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->buf = PyMem_New(char, size + 1);
+    self->buf = PyMem_New(char, INIT_BUFSIZE);
 
     /* These variables need to be initialized before attempting to write
        anything to the object. */
     self->pos = 0;
     self->string_size = 0;
-    self->buf_size = size + 1;
+    self->buf_size = INIT_BUFSIZE;
 
-    if (size > 0) {
-        if (write_bytes(self, initvalue, size) == -1) {
-            Py_DECREF(self);            
+    if (initvalue) {
+        ret = bytesio_write(self, initvalue);
+        if (ret == NULL)
             return NULL;
-        }
+        Py_DECREF(ret);
         self->pos = 0;
-    }
-    if (self->buf == NULL) {
-        Py_DECREF(self);
-        return PyErr_NoMemory();
     }
 
     return (PyObject *)self;
