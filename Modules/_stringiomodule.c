@@ -443,12 +443,12 @@ static PyObject *
 StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     StringIOObject *self;
-    const Py_UNICODE *buf;
-    Py_ssize_t size = 0;
+    PyObject *initvalue = NULL, *ret;
+    enum { INIT_BUFSIZE = 1 };
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    if (!PyArg_ParseTuple(args, "|u#s:StringIO", &buf, &size))
+    if (!PyArg_ParseTuple(args, "|O:StringIO", &initvalue))
         return NULL;
 
     self = (StringIOObject *)type->tp_alloc(type, 0);
@@ -456,24 +456,20 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->buf = PyMem_New(Py_UNICODE, size + 1);
+    self->buf = PyMem_New(Py_UNICODE, INIT_BUFSIZE);
 
     /* These variables need to be initialized before attempting to write
        anything to the object. */
     self->pos = 0;
     self->string_size = 0;
-    self->buf_size = size + 1;
+    self->buf_size = INIT_BUFSIZE;
 
-    if (size > 0) {
-        if (write_str(self, buf, size) == -1) {
-            Py_DECREF(self);
+    if (initvalue) {
+        ret = stringio_write(self, initvalue);
+        if (ret == NULL)
             return NULL;
-        }
+        Py_DECREF(ret);
         self->pos = 0;
-    }
-    if (self->buf == NULL) {
-        Py_DECREF(self);
-        return PyErr_NoMemory();
     }
 
     return (PyObject *)self;
