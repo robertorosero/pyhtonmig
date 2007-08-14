@@ -42,10 +42,10 @@ static PyTypeObject Arraytype;
 
 #ifdef Py_UNICODE_WIDE
 #define PyArr_UNI 'w'
-static const char *PyArr_UNISTR = "w";
+/*static const char *PyArr_UNISTR = "w"; */
 #else
 #define PyArr_UNI 'u'
-static const char *PyArr_UNISTR = "u";
+/*static const char *PyArr_UNISTR = "u"; */
 #endif
 
 #define array_Check(op) PyObject_TypeCheck(op, &Arraytype)
@@ -1735,7 +1735,6 @@ static PyMappingMethods array_as_mapping = {
 	(objobjargproc)array_ass_subscr
 };
 
-static const void *emptybuf = "";
 
 static int
 array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
@@ -1748,28 +1747,26 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
         if (view==NULL) goto finish;
 
         view->buf = (void *)self->ob_item;
-        view->len = Py_Size(self)*self->ob_descr->itemsize;
+        view->len = (Py_Size(self)) * self->ob_descr->itemsize;
         view->readonly = 0;
         view->ndim = 1;
         view->itemsize = self->ob_descr->itemsize;
         view->suboffsets = NULL;
-        view->internal = NULL;
+        view->shape = NULL;
         if ((flags & PyBUF_ALW_ND)==PyBUF_ALW_ND) {
-                view->shape = &(Py_Size(self));
+                view->shape = &((Py_Size(self)));
         }
-        else 
-                view->shape = NULL;
+        view->strides = NULL;
         if ((flags & PyBUF_ALW_STRIDES)==PyBUF_ALW_STRIDES)
                 view->strides = &(view->itemsize);
-        else
-                view->strides = NULL;               
+        view->format = NULL;
+        view->internal = NULL;
         if ((flags & PyBUF_REQ_FORMAT) == PyBUF_REQ_FORMAT) {
-                view->format = malloc(2);
-                view->format[0] = (char)self->ob_descr->typecode;
+                view->internal = malloc(3);
+                view->format = view->internal;
+                view->format[0] = (char)(self->ob_descr->typecode);
                 view->format[1] = '\0';
         }
-        else 
-                view->format = NULL;
 
  finish:
         self->ob_exports++;
@@ -1779,7 +1776,7 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
 static void
 array_buffer_relbuf(arrayobject *self, PyBuffer *view)
 {
-        free(view->format);
+        free(view->internal);
         self->ob_exports--;
 }
 

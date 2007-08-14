@@ -79,7 +79,9 @@ _getbuffer(PyObject *obj, PyBuffer *view)
         PyUnicode_Check(obj) ||
         buffer->bf_getbuffer == NULL) return -1;
 
-    return buffer->bf_getbuffer(obj, view, PyBUF_SIMPLE);
+    if (buffer->bf_getbuffer(obj, view, PyBUF_SIMPLE) < 0)
+            return -1;
+    return view->len;
 }
 
 /* Direct API functions */

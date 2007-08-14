@@ -1674,55 +1674,41 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
     void* ptr;
     PyBuffer view;
 
-#if defined(HAVE_UNICODE)
-    if (PyUnicode_Check(string)) {
-        /* unicode strings doesn't always support the buffer interface */
-        ptr = (void*) PyUnicode_AS_DATA(string);
-        bytes = PyUnicode_GET_DATA_SIZE(string);
-        size = PyUnicode_GET_SIZE(string);
-        charsize = sizeof(Py_UNICODE);
-
-    } else {
-#endif
-
     /* get pointer to string buffer */
     buffer = Py_Type(string)->tp_as_buffer;
     if (!buffer || !buffer->bf_getbuffer || 
-        (*buffer->bf_getbuffer)(string, &view, PyBUF_SIMPLE) !=0) {
+        (*buffer->bf_getbuffer)(string, &view, PyBUF_SIMPLE) < 0) {
             PyErr_SetString(PyExc_TypeError, "expected string or buffer");
             return NULL;
     }
 
-
     /* determine buffer size */
     bytes = view.len;
     ptr = view.buf;
+
+    /* Release the buffer immediately --- possibly dangerous
+       but doing something else would require some re-factoring
+    */
+    PyObject_ReleaseBuffer(string, &view);
+
     if (bytes < 0) {
         PyErr_SetString(PyExc_TypeError, "buffer has negative size");
         return NULL;
     }
 
     /* determine character size */
-#if PY_VERSION_HEX >= 0x01060000
     size = PyObject_Size(string);
-#else
-    size = PyObject_Length(string);
-#endif
 
     if (PyString_Check(string) || bytes == size)
         charsize = 1;
 #if defined(HAVE_UNICODE)
-    else if (bytes == (Py_ssize_t) (size * sizeof(Py_UNICODE)))
+    else if (bytes == (Py_ssize_t) (size * sizeof(Py_UNICODE))) 
         charsize = sizeof(Py_UNICODE);
 #endif
     else {
         PyErr_SetString(PyExc_TypeError, "buffer size mismatch");
         return NULL;
     }
-
-#if defined(HAVE_UNICODE)
-    }
-#endif
 
     *p_length = size;
     *p_charsize = charsize;
@@ -1789,6 +1775,7 @@ state_init(SRE_STATE* state, PatternObject* pattern, PyObject* string,
 LOCAL(void)
 state_fini(SRE_STATE* state)
 {
+    
     Py_XDECREF(state->string);
     data_stack_dealloc(state);
 }

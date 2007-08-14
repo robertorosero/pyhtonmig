@@ -25,21 +25,20 @@ get_buf(PyBufferObject *self, PyBuffer *view)
 	else {
 		Py_ssize_t count, offset;
 		PyBufferProcs *bp = self->b_base->ob_type->tp_as_buffer;
-                PyBuffer view;
-                if ((*bp->bf_getbuffer)(self->b_base, &view, PyBUF_SIMPLE) < 0) return 0;
-                count = view.len;
+                if ((*bp->bf_getbuffer)(self->b_base, view, PyBUF_SIMPLE) < 0) return 0;
+                count = view->len;
 		/* apply constraints to the start/end */
 		if (self->b_offset > count)
 			offset = count;
 		else
 			offset = self->b_offset;
-                view.buf = (char*)view.buf + offset;
+                view->buf = (char*)view->buf + offset;
 		if (self->b_size == Py_END_OF_BUFFER)
-			view.len = count;
+			view->len = count;
 		else
-			view.len = self->b_size;
-		if (offset + view.len > count)
-			view.len = count - offset;
+			view->len = self->b_size;
+		if (offset + view->len > count)
+			view->len = count - offset;
 	}
 	return 1;
 }
