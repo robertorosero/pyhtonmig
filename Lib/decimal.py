@@ -2112,6 +2112,26 @@ class Decimal(object):
                 return context._raise_error(InvalidOperation, 'rescale(a, INF)')
         return tmp
 
+    def to_integral_exact(self, rounding=None, context=None):
+        """Rounds to a nearby integer.
+
+        If no rounding mode is specified, take the rounding mode from
+        the context.  This method raises the Rounded and Inexact flags
+        when appropriate.
+
+        See also: to_integral_value, which does exactly the same as
+        this method except that it doesn't raise Inexact or Rounded.
+        """
+        if self._is_special:
+            ans = self._check_nans(context=context)
+            if ans:
+                return ans
+        if self._exp >= 0:
+            return self
+        if context is None:
+            context = getcontext()
+        return self._rescale(0, rounding, context=context)
+
     def to_integral_value(self, rounding=None, context=None):
         """Rounds to the nearest integer, without raising inexact, rounded."""
         if self._is_special:
@@ -2799,6 +2819,26 @@ class Decimal(object):
         to a single digit while maintaining the value of that digit and
         without limiting the resulting exponent).
         """
+        # logb(NaN) = NaN
+        ans = self._check_nans(context=context)
+        if ans:
+            return ans
+
+        if context is None:
+            context = getcontext()
+
+        # logb(+/-Inf) = +Inf
+        if self._isinfinity():
+            return Inf
+
+        # logb(0) = -Inf, DivisionByZero
+        if not self:
+            return context._raise_error(DivisionByZero, 'logb(0)', -1)
+
+        # otherwise, simply return the adjusted exponent of self, as a
+        # Decimal.  Note that no attempt is made to fit the result
+        # into the current context.
+        return Decimal(self.adjusted())
 
     def _islogical(self):
         """Return 1 is self is a logical operand.
@@ -3804,7 +3844,7 @@ class Context(object):
         >>> ExtendedContext.logb(Decimal('0.03'))
         Decimal("-2")
         >>> ExtendedContext.logb(Decimal('0'))
-        Decimal("-Inf")
+        Decimal("-Infinity")
         """
         return a.logb(context=self)
 
@@ -4428,6 +4468,7 @@ class Context(object):
         >>> ExtendedContext.to_integral_exact(Decimal('-Inf'))
         Decimal("-Infinity")
         """
+        return a.to_integral_exact(context=self)
 
     def to_integral_value(self, a):
         """Rounds to an integer.
