@@ -628,7 +628,7 @@ class Decimal(object):
             except ValueError:
                 self._is_special = True
                 return context._raise_error(ConversionSyntax,
-                                                "non parseable string")
+                                   "Invalid literal for Decimal: %r" % value)
             return self
 
         raise TypeError("Cannot convert %r to Decimal" % value)
