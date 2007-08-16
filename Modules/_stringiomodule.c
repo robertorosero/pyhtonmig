@@ -463,7 +463,7 @@ PyDoc_STRVAR(StringIO_truncate_doc,
 "Returns the new size.");
 
 PyDoc_STRVAR(StringIO_close_doc,
-"close() -> None. Does nothing.");
+"close() -> None.  Does nothing.");
 
 PyDoc_STRVAR(StringIO_seek_doc,
 "seek(pos, whence=0) -> int.  Change stream position.\n"

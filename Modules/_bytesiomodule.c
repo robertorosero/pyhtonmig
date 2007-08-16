@@ -501,7 +501,7 @@ PyDoc_STRVAR(BytesIO_truncate_doc,
 "Returns the new size.");
 
 PyDoc_STRVAR(BytesIO_close_doc,
-"close() -> None. Does nothing.");
+"close() -> None.  Does nothing.");
 
 PyDoc_STRVAR(BytesIO_seek_doc,
 "seek(pos, whence=0) -> int.  Change stream position.\n"
