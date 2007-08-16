@@ -1562,7 +1562,6 @@ Create a docstring that we want to debug:
 
 Create some fake stdin input, to feed to the debugger:
 
-    >>> import tempfile
     >>> real_stdin = sys.stdin
     >>> sys.stdin = _FakeInput(['next', 'print(x)', 'continue'])
 
@@ -2405,7 +2404,7 @@ def test_main():
     from test import test_doctest
     test_support.run_doctest(test_doctest, verbosity=True)
 
-import trace, sys, re, StringIO
+import trace, sys, re, io
 def test_coverage(coverdir):
     tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,],
                          trace=0, count=1)

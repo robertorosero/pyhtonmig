@@ -34,6 +34,7 @@ COMMENT     '# NEWLINE'   (3, 17) (3, 26)
 NEWLINE     '\\n'          (3, 26) (3, 27)
 DEDENT      ''            (4, 0) (4, 0)
 
+' # Emacs hint
 
 There will be a bunch more tests of specific source patterns.
 
@@ -79,7 +80,10 @@ if (x  # The comments need to go in the right place
 
 """
 
+# ' Emacs hint
+
 import os, glob, random, time, sys
+import re
 from io import StringIO
 from test.test_support import (verbose, findfile, is_resource_enabled,
                                TestFailed)
@@ -94,8 +98,18 @@ _PRINT_WORKING_MSG_INTERVAL = 5 * 60
 # and tokenized again from the latter.  The test fails if the second
 # tokenization doesn't match the first.
 def test_roundtrip(f):
-    ## print 'Testing:', f
-    fobj = open(f)
+    ## print('Testing:', f)
+    # Get the encoding first
+    fobj = open(f, encoding="latin-1")
+    first2lines = fobj.readline() + fobj.readline()
+    fobj.close()
+    m = re.search(r"coding:\s*(\S+)", first2lines)
+    if m:
+        encoding = m.group(1)
+        ## print("    coding:", encoding)
+    else:
+        encoding = "utf-8"
+    fobj = open(f, encoding=encoding)
     try:
         fulltok = list(generate_tokens(fobj.readline))
     finally:

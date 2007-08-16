@@ -7,7 +7,7 @@ from wsgiref import util
 from wsgiref.validate import validator
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, demo_app
 from wsgiref.simple_server import make_server
-from StringIO import StringIO
+from io import StringIO, BytesIO, BufferedReader
 from SocketServer import BaseServer
 import re, sys
 
@@ -47,13 +47,15 @@ def hello_app(environ,start_response):
     ])
     return ["Hello, world!"]
 
-def run_amock(app=hello_app, data="GET / HTTP/1.0\n\n"):
+def run_amock(app=hello_app, data=b"GET / HTTP/1.0\n\n"):
     server = make_server("", 80, app, MockServer, MockHandler)
-    inp, out, err, olderr = StringIO(data), StringIO(), StringIO(), sys.stderr
-    sys.stderr = err
+    inp = BufferedReader(BytesIO(data))
+    out = StringIO()
+    olderr = sys.stderr
+    err = sys.stderr = StringIO()
 
     try:
-        server.finish_request((inp,out), ("127.0.0.1",8888))
+        server.finish_request((inp, out), ("127.0.0.1",8888))
     finally:
         sys.stderr = olderr
 

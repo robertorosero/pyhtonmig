@@ -75,11 +75,9 @@ class CloseSocketTest(unittest.TestCase):
         # delve deep into response to fetch socket._socketobject
         response = urllib2.urlopen("http://www.python.org/")
         abused_fileobject = response.fp
-        self.assert_(abused_fileobject.__class__ is socket._fileobject)
-        httpresponse = abused_fileobject._sock
+        httpresponse = abused_fileobject.raw
         self.assert_(httpresponse.__class__ is httplib.HTTPResponse)
         fileobject = httpresponse.fp
-        self.assert_(fileobject.__class__ is socket._fileobject)
 
         self.assert_(not fileobject.closed)
         response.close()
@@ -270,45 +268,47 @@ class OtherNetworkTests(unittest.TestCase):
 class TimeoutTest(unittest.TestCase):
     def test_http_basic(self):
         u = urllib2.urlopen("http://www.python.org")
-        self.assertTrue(u.fp._sock.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.raw.fp._sock.gettimeout() is None)
 
     def test_http_NoneWithdefault(self):
         prev = socket.getdefaulttimeout()
         socket.setdefaulttimeout(60)
         try:
             u = urllib2.urlopen("http://www.python.org", timeout=None)
-            self.assertEqual(u.fp._sock.fp._sock.gettimeout(), 60)
+            self.assertTrue(u.fp.raw.fp._sock.gettimeout(), 60)
         finally:
             socket.setdefaulttimeout(prev)
 
     def test_http_Value(self):
         u = urllib2.urlopen("http://www.python.org", timeout=120)
-        self.assertEqual(u.fp._sock.fp._sock.gettimeout(), 120)
+        self.assertEqual(u.fp.raw.fp._sock.gettimeout(), 120)
 
     def test_http_NoneNodefault(self):
         u = urllib2.urlopen("http://www.python.org", timeout=None)
-        self.assertTrue(u.fp._sock.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.raw.fp._sock.gettimeout() is None)
 
     def test_ftp_basic(self):
         u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/")
-        self.assertTrue(u.fp.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.fp.raw._sock.gettimeout() is None)
 
     def test_ftp_NoneWithdefault(self):
         prev = socket.getdefaulttimeout()
         socket.setdefaulttimeout(60)
         try:
-            u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=None)
-            self.assertEqual(u.fp.fp._sock.gettimeout(), 60)
+            u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/",
+                                timeout=None)
+            self.assertEqual(u.fp.fp.raw._sock.gettimeout(), 60)
         finally:
             socket.setdefaulttimeout(prev)
 
     def test_ftp_NoneNodefault(self):
-        u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=None)
-        self.assertTrue(u.fp.fp._sock.gettimeout() is None)
+        u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/",
+                            timeout=None)
+        self.assertTrue(u.fp.fp.raw._sock.gettimeout() is None)
 
     def test_ftp_Value(self):
         u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=60)
-        self.assertEqual(u.fp.fp._sock.gettimeout(), 60)
+        self.assertEqual(u.fp.fp.raw._sock.gettimeout(), 60)
 
 
 def test_main():
