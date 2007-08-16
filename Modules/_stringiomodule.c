@@ -246,8 +246,8 @@ stringio_truncate(StringIOObject *self, PyObject *args)
         return NULL;
 
     if (size < 0) {
-        errno = EINVAL;
-        PyErr_SetFromErrno(PyExc_ValueError);
+        /* XXX: Give a better error message. */
+        PyErr_SetString(PyExc_ValueError, "invalid position value");
         return NULL;
     }
 
@@ -460,7 +460,7 @@ PyDoc_STRVAR(StringIO_truncate_doc,
 "truncate([size]) -> int.  Truncate the file to at most size bytes.\n"
 "\n"
 "Size defaults to the current file position, as returned by tell().\n"
-"Returns the new size.");
+"Returns the new size.  Imply an absolute seek to the position size.");
 
 PyDoc_STRVAR(StringIO_close_doc,
 "close() -> None.  Does nothing.");
