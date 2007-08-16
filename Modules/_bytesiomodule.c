@@ -12,15 +12,9 @@ typedef struct {
 } BytesIOObject;
 
 
-static PyObject *
-err_closed(void)
-{
-    PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
-    return NULL;
-}
-
 /* Internal routine to get a line from the buffer of a BytesIO
-   object. Returns the number of bytes read. */
+   object. Returns the length between the current position to the
+   next newline character. */
 static Py_ssize_t
 get_line(BytesIOObject *self, char **output)
 {
@@ -101,17 +95,10 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
     return len;
 }
 
-
 static PyObject *
 bytesio_get_closed(BytesIOObject *self)
 {
-    PyObject *result = Py_False;
-
-    if (self->buf == NULL)
-        result = Py_True;
-
-    Py_INCREF(result);
-    return result;
+    Py_RETURN_FALSE;
 }
 
 /* Generic getter for the writable, readable and seekable properties */
@@ -124,18 +111,12 @@ generic_true(BytesIOObject *self)
 static PyObject *
 bytesio_flush(BytesIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     Py_RETURN_NONE;
 }
 
 static PyObject *
 bytesio_getvalue(BytesIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     return PyBytes_FromStringAndSize(self->buf, self->string_size);
 }
 
@@ -145,11 +126,6 @@ bytesio_setvalue(BytesIOObject *self, PyObject *value)
 {
     const char *bytes;
     Py_ssize_t len;
-
-    if (self->buf == NULL) {
-        err_closed();
-        return -1;
-    }
 
     self->pos = 0;
     self->string_size = 0;
@@ -173,18 +149,12 @@ bytesio_setvalue(BytesIOObject *self, PyObject *value)
 static PyObject *
 bytesio_isatty(BytesIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     Py_RETURN_FALSE;
 }
 
 static PyObject *
 bytesio_tell(BytesIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     return PyInt_FromSsize_t(self->pos);
 }
 
@@ -193,9 +163,6 @@ bytesio_read(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t len, n = -1;
     char *output;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "|n:read", &n))
         return NULL;
@@ -226,9 +193,6 @@ bytesio_readline(BytesIOObject *self, PyObject *args)
     Py_ssize_t n, size = -1;
     char *output;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (!PyArg_ParseTuple(args, "|i:readline", &size))
         return NULL;
 
@@ -249,9 +213,6 @@ bytesio_readlines(BytesIOObject *self, PyObject *args)
     Py_ssize_t n, size = 0, len = 0;
     PyObject *result, *line;
     char *output;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "|i:readlines", &size))
         return NULL;
@@ -286,9 +247,6 @@ bytesio_readinto(BytesIOObject *self, PyObject *buffer)
     void *raw_buffer;
     Py_ssize_t len;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
         return NULL;
 
@@ -310,9 +268,6 @@ bytesio_truncate(BytesIOObject *self, PyObject *args)
 
     /* Truncate to current position if no argument is passed. */
     size = self->pos;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "|n:truncate", &size))
         return NULL;
@@ -336,9 +291,6 @@ bytesio_iternext(BytesIOObject *self)
     char *next;
     Py_ssize_t n;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     n = get_line(self, &next);
 
     if (!next || n == 0)
@@ -352,9 +304,6 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t newpos, prevpos;
     int mode = 0;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
@@ -398,9 +347,6 @@ bytesio_write(BytesIOObject *self, PyObject *obj)
     const char *bytes;
     Py_ssize_t size, len;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (PyUnicode_Check(obj)) {
         bytes = PyUnicode_AsString(obj);
         size = strlen(bytes);
@@ -422,9 +368,6 @@ bytesio_writelines(BytesIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
     PyObject *ret;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     it = PyObject_GetIter(v);
     if (it == NULL)
@@ -449,13 +392,6 @@ bytesio_writelines(BytesIOObject *self, PyObject *v)
 static PyObject *
 bytesio_close(BytesIOObject *self)
 {
-    if (self->buf != NULL) {
-        PyMem_Del(self->buf);
-        self->buf = NULL;
-    }
-
-    self->pos = self->string_size = self->buf_size = 0;
-
     Py_RETURN_NONE;
 }
 
@@ -565,7 +501,7 @@ PyDoc_STRVAR(BytesIO_truncate_doc,
 "Returns the new size.");
 
 PyDoc_STRVAR(BytesIO_close_doc,
-"close() -> None.  Close the file and release the resources held.");
+"close() -> None. Does nothing.");
 
 PyDoc_STRVAR(BytesIO_seek_doc,
 "seek(pos, whence=0) -> int.  Change stream position.\n"
