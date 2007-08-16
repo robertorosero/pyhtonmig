@@ -12,13 +12,6 @@ typedef struct {
 } StringIOObject;
 
 
-static PyObject *
-err_closed(void)
-{
-    PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
-    return NULL;
-}
-
 /* Internal routine to get a line from the buffer of a StringIO
    object. Returns the length between the current position to the
    next newline character. */
@@ -101,17 +94,11 @@ write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
     return len;
 }
 
-
 static PyObject *
 stringio_get_closed(StringIOObject *self)
 {
-    PyObject *result = Py_False;
-
-    if (self->buf == NULL)
-        result = Py_True;
-
-    Py_INCREF(result);
-    return result;
+    /* close() does nothing, so the object can't be closed */
+    Py_RETURN_FALSE;
 }
 
 /* Generic getter for the writable, readable and seekable properties */
@@ -124,18 +111,12 @@ generic_true(StringIOObject *self)
 static PyObject *
 stringio_flush(StringIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     Py_RETURN_NONE;
 }
 
 static PyObject *
 stringio_getvalue(StringIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     return PyUnicode_FromUnicode(self->buf, self->string_size);
 }
 
@@ -143,11 +124,6 @@ stringio_getvalue(StringIOObject *self)
 static int
 stringio_setvalue(StringIOObject *self, PyObject *value)
 {
-    if (self->buf == NULL) {
-        err_closed();
-        return -1;
-    }
-
     self->pos = 0;
     self->string_size = 0;
 
@@ -172,18 +148,12 @@ stringio_setvalue(StringIOObject *self, PyObject *value)
 static PyObject *
 stringio_isatty(StringIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     Py_RETURN_FALSE;
 }
 
 static PyObject *
 stringio_tell(StringIOObject *self)
 {
-    if (self->buf == NULL)
-        return err_closed();
-
     return PyInt_FromSsize_t(self->pos);
 }
 
@@ -192,9 +162,6 @@ stringio_read(StringIOObject *self, PyObject *args)
 {
     Py_ssize_t len, n = -1;
     Py_UNICODE *output;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "|n:read", &n))
         return NULL;
@@ -219,9 +186,6 @@ stringio_readline(StringIOObject *self, PyObject *args)
     Py_ssize_t n, size = -1;
     Py_UNICODE *output;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (!PyArg_ParseTuple(args, "|i:readline", &size))
         return NULL;
 
@@ -242,9 +206,6 @@ stringio_readlines(StringIOObject *self, PyObject *args)
     Py_ssize_t n, size = 0, len = 0;
     PyObject *result, *line;
     Py_UNICODE *output;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "|i:readlines", &size))
         return NULL;
@@ -281,9 +242,6 @@ stringio_truncate(StringIOObject *self, PyObject *args)
     /* Truncate to current position if no argument is passed. */
     size = self->pos;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (!PyArg_ParseTuple(args, "|n:truncate", &size))
         return NULL;
 
@@ -306,9 +264,6 @@ stringio_iternext(StringIOObject *self)
     Py_UNICODE *next;
     Py_ssize_t n;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     n = get_line(self, &next);
 
     if (!next || n == 0)
@@ -322,9 +277,6 @@ stringio_seek(StringIOObject *self, PyObject *args)
 {
     Py_ssize_t newpos, prevpos;
     int mode = 0;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
@@ -368,9 +320,6 @@ stringio_write(StringIOObject *self, PyObject *obj)
     const Py_UNICODE *str;
     Py_ssize_t size, n;
 
-    if (self->buf == NULL)
-        return err_closed();
-
     if (PyUnicode_Check(obj)) {
         str = PyUnicode_AsUnicode(obj);
         size = PyUnicode_GetSize(obj);
@@ -393,9 +342,6 @@ stringio_writelines(StringIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
     PyObject *ret;
-
-    if (self->buf == NULL)
-        return err_closed();
 
     it = PyObject_GetIter(v);
     if (it == NULL)
@@ -420,13 +366,6 @@ stringio_writelines(StringIOObject *self, PyObject *v)
 static PyObject *
 stringio_close(StringIOObject *self)
 {
-    if (self->buf != NULL) {
-        PyMem_Del(self->buf);
-        self->buf = NULL;
-    }
-
-    self->pos = self->string_size = self->buf_size = 0;
-
     Py_RETURN_NONE;
 }
 
@@ -524,7 +463,7 @@ PyDoc_STRVAR(StringIO_truncate_doc,
 "Returns the new size.");
 
 PyDoc_STRVAR(StringIO_close_doc,
-"close() -> None.  Close the file and release the resources held.");
+"close() -> None. Does nothing.");
 
 PyDoc_STRVAR(StringIO_seek_doc,
 "seek(pos, whence=0) -> int.  Change stream position.\n"

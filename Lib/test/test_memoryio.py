@@ -40,8 +40,6 @@ class MemoryTestMixin:
         self.write_ops(memio)
         memio = self.ioclass()
         self.write_ops(memio)
-        memio.close()
-        self.assertRaises(ValueError, memio.write, buf)
 
     def test_writelines(self):
         buf = self.buftype("1234567890")
@@ -49,8 +47,6 @@ class MemoryTestMixin:
 
         memio.writelines([buf] * 100)
         self.assertEqual(memio.getvalue(), buf * 100)
-        memio.close()
-        self.assertRaises(ValueError, memio.writelines, buf)
 
     def test_writelines_error(self):
         memio = self.ioclass()
@@ -73,8 +69,6 @@ class MemoryTestMixin:
         memio.write(buf)
         self.assertEqual(memio.getvalue(), buf[:4] + buf)
         self.assertRaises(ValueError, memio.truncate, -1)
-        memio.close()
-        self.assertRaises(ValueError, memio.truncate)
 
     def test_init(self):
         buf = self.buftype("1234567890")
@@ -92,8 +86,6 @@ class MemoryTestMixin:
         self.assertEqual(memio.read(), buf)
         self.assertEqual(memio.read(), self.EOF)
         self.assertEqual(memio.tell(), 10)
-        memio.close()
-        self.assertRaises(ValueError, memio.read)
 
     def test_readline(self):
         buf = self.buftype("1234567890\n")
@@ -106,8 +98,6 @@ class MemoryTestMixin:
         self.assertEqual(memio.readline(5), buf[:5])
         self.assertEqual(memio.readline(5), buf[5:10])
         self.assertEqual(memio.readline(5), buf[10:15])
-        memio.close()
-        self.assertRaises(ValueError, memio.readline)
 
     def test_readlines(self):
         buf = self.buftype("1234567890\n")
@@ -118,8 +108,6 @@ class MemoryTestMixin:
         self.assertEqual(memio.readlines(), [buf[5:]] + [buf] * 9)
         memio.seek(0)
         self.assertEqual(memio.readlines(15), [buf] * 2)
-        memio.close()
-        self.assertRaises(ValueError, memio.readlines)
 
     def test_iterator(self):
         buf = self.buftype("1234567890\n")
@@ -139,8 +127,6 @@ class MemoryTestMixin:
             self.assertEqual(line, buf)
             i += 1
         self.assertEqual(i, 10)
-        memio.close()
-        self.assertRaises(ValueError, memio.__next__)
 
     def test_getvalue(self):
         buf = self.buftype("1234567890")
@@ -151,8 +137,6 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf)
         memio = self.ioclass(buf * 1000)
         self.assertEqual(memio.getvalue()[-3:], self.buftype("890"))
-        memio.close()
-        self.assertRaises(ValueError, memio.getvalue)
 
     def test_seek(self):
         buf = self.buftype("1234567890")
@@ -164,8 +148,6 @@ class MemoryTestMixin:
 
         memio.seek(3)
         self.assertEqual(buf[3:], memio.read())
-        memio.close()
-        self.assertRaises(ValueError, memio.seek, 3)
 
     def test_tell(self):
         buf = self.buftype("1234567890")
@@ -176,16 +158,12 @@ class MemoryTestMixin:
         self.assertEqual(memio.tell(), 5)
         memio.seek(10000)
         self.assertEqual(memio.tell(), 10000)
-        memio.close()
-        self.assertRaises(ValueError, memio.tell)
 
     def test_flush(self):
         buf = self.buftype("1234567890")
         memio = self.ioclass(buf)
 
         self.assertEqual(memio.flush(), None)
-        memio.close()
-        self.assertRaises(ValueError, memio.flush)
 
     def test_flags(self):
         memio = self.ioclass()
@@ -195,12 +173,6 @@ class MemoryTestMixin:
         self.assertEqual(memio.seekable(), True)
         self.assertEqual(memio.isatty(), False)
         self.assertEqual(memio.closed, False)
-        memio.close()
-        self.assertEqual(memio.writable(), True) # closed
-        self.assertEqual(memio.readable(), True)
-        self.assertEqual(memio.seekable(), True)
-        self.assertRaises(ValueError, memio.isatty)
-        self.assertEqual(memio.closed, True)
 
     def test_subclassing(self):
         buf = self.buftype("1234567890")
@@ -220,6 +192,31 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf)
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.getvalue(), buf + buf)
+
+    def test_close(self):
+        buf = self.buftype("1234567890")
+        memio = self.ioclass(buf)
+
+        # close() does nothing.
+        memio.close()
+        self.assertEqual(memio.getvalue(), buf)
+
+        # Just check if methods are still functioning.
+        memio.write(buf)
+        memio.truncate(len(buf))
+        memio.seek(2)
+        memio.flush()
+        memio.tell()
+        memio.read()
+        memio.writelines([buf + self.buftype("\n")] * 5)
+        memio.readline()
+        memio.readlines()
+
+        self.assertEqual(memio.writable(), True)
+        self.assertEqual(memio.readable(), True)
+        self.assertEqual(memio.seekable(), True)
+        self.assertEqual(memio.isatty(), False)
+        self.assertEqual(memio.closed, False)
 
 
 class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
