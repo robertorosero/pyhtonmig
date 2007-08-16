@@ -17,29 +17,24 @@ except ImportError:
 
 class MemoryTestMixin:
 
-    def write_ops(self, f):
-        t = self.buftype
+    def write_ops(self, f, t):
         self.assertEqual(f.write(t("blah.")), 5)
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(t("Hello.")), 6)
         self.assertEqual(f.tell(), 6)
-        self.assertEqual(f.seek(-1, 1), 5)
+        self.assertEqual(f.seek(5), 5)
         self.assertEqual(f.tell(), 5)
         self.assertEqual(f.write(t(" world\n\n\n")), 9)
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(t("h")), 1)
-        self.assertEqual(f.seek(-1, 2), 13)
-        self.assertEqual(f.tell(), 13)
-        self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 12)
 
     def test_write(self):
         buf = self.buftype("hello world\n")
         memio = self.ioclass(buf)
 
-        self.write_ops(memio)
+        self.write_ops(memio, self.buftype)
         memio = self.ioclass()
-        self.write_ops(memio)
+        self.write_ops(memio, self.buftype)
         memio.close()
         memio.write(buf)
 
@@ -166,9 +161,12 @@ class MemoryTestMixin:
         memio.read(5)
         memio.seek(0)
         self.assertEqual(buf, memio.read())
-
         memio.seek(3)
         self.assertEqual(buf[3:], memio.read())
+        memio.seek(-3, 1)
+        self.assertEqual(buf[-3:], memio.read())
+        memio.seek(-3, 2)
+        self.assertEqual(buf[-3:], memio.read())
         memio.close()
         memio.seek(0)
 
@@ -271,12 +269,24 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.getvalue(), self.buftype(buf))
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.getvalue(), self.buftype(buf + buf))
+        self.write_ops(self.ioclass(), str)
 
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     buftype = str
     ioclass = io._StringIO
     EOF = ""
+
+    def test_str8(self):
+        buf = str8("1234567890")
+        memio = self.ioclass(buf)
+
+        self.assertEqual(memio.getvalue(), self.buftype(buf))
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), self.buftype(buf))
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.getvalue(), self.buftype(buf + buf))
+        self.write_ops(self.ioclass(), str8)
 
 if has_c_implementation:
     class CBytesIOTest(PyBytesIOTest):
