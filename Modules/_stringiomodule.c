@@ -45,8 +45,8 @@ get_line(StringIOObject *self, Py_UNICODE **output)
 }
 
 /* Internal routine for changing the size of the buffer of StringIO
-   objects. Returns the new buffer size, or -1 on error. */
-static Py_ssize_t
+   objects. Returns 0 on success, -1 otherwise. */
+static int
 resize_buffer(StringIOObject *self, Py_ssize_t new_size)
 {
     /* Here we doing some direct memory manipulation for speed and to keep the
@@ -59,13 +59,11 @@ resize_buffer(StringIOObject *self, Py_ssize_t new_size)
 
         PyMem_Resize(self->buf, Py_UNICODE, self->buf_size);
         if (self->buf == NULL) {
-            PyErr_SetString(PyExc_MemoryError, "Out of memory");
-            PyMem_Del(self->buf);
-            self->buf_size = self->pos = 0;
+            PyErr_NoMemory();
             return -1;
         }
     }
-    return self->buf_size;
+    return 0;
 }
 
 /* Internal routine for writing a string of bytes to the buffer of a StringIO
@@ -407,6 +405,10 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->buf = PyMem_New(Py_UNICODE, INIT_BUFSIZE);
+    if (self->buf == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
 
     /* These variables need to be initialized before attempting to write
        anything to the object. */
