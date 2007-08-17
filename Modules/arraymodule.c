@@ -1740,7 +1740,7 @@ static PyMappingMethods array_as_mapping = {
 static int
 array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
 {
-        if ((flags & PyBUF_REQ_LOCKDATA)) {
+        if ((flags & PyBUF_LOCKDATA)) {
                 PyErr_SetString(PyExc_BufferError,
                                 "Cannot lock data");
                 return -1;
@@ -1754,15 +1754,15 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
         view->itemsize = self->ob_descr->itemsize;
         view->suboffsets = NULL;
         view->shape = NULL;
-        if ((flags & PyBUF_ALW_ND)==PyBUF_ALW_ND) {
+        if ((flags & PyBUF_ND)==PyBUF_ND) {
                 view->shape = &((Py_Size(self)));
         }
         view->strides = NULL;
-        if ((flags & PyBUF_ALW_STRIDES)==PyBUF_ALW_STRIDES)
+        if ((flags & PyBUF_STRIDES)==PyBUF_STRIDES)
                 view->strides = &(view->itemsize);
         view->format = NULL;
         view->internal = NULL;
-        if ((flags & PyBUF_REQ_FORMAT) == PyBUF_REQ_FORMAT) {
+        if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT) {
                 view->internal = malloc(3);
                 view->format = view->internal;
                 view->format[0] = (char)(self->ob_descr->typecode);

@@ -304,7 +304,7 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 	pb = obj->ob_type->tp_as_buffer;
 	if (pb == NULL ||
             pb->bf_getbuffer == NULL ||
-            ((*pb->bf_getbuffer)(obj, &view, PyBUF_REQ_WRITEABLE) != 0)) {
+            ((*pb->bf_getbuffer)(obj, &view, PyBUF_WRITEABLE) != 0)) {
 		PyErr_SetString(PyExc_TypeError, 
                                 "expected an object with a writeable buffer interface");
 		return -1;
@@ -649,13 +649,13 @@ PyBuffer_FillInfo(PyBuffer *view, void *buf, Py_ssize_t len,
               int readonly, int flags)
 {        
         if (view == NULL) return 0;
-        if (((flags & PyBUF_REQ_LOCKDATA) == PyBUF_REQ_LOCKDATA) && 
+        if (((flags & PyBUF_LOCKDATA) == PyBUF_LOCKDATA) && 
             readonly != -1) {
                 PyErr_SetString(PyExc_BufferError, 
                                 "Cannot make this object read-only.");
                 return -1;
         }
-        if (((flags & PyBUF_REQ_WRITEABLE) == PyBUF_REQ_WRITEABLE) &&
+        if (((flags & PyBUF_WRITEABLE) == PyBUF_WRITEABLE) &&
             readonly == 1) {
                 PyErr_SetString(PyExc_BufferError,
                                 "Object is not writeable.");
@@ -667,14 +667,14 @@ PyBuffer_FillInfo(PyBuffer *view, void *buf, Py_ssize_t len,
         view->readonly = readonly;
         view->itemsize = 1;
         view->format = NULL;
-        if ((flags & PyBUF_REQ_FORMAT) == PyBUF_REQ_FORMAT) 
+        if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT) 
                 view->format = "B";
         view->ndim = 1;
         view->shape = NULL;
-        if ((flags & PyBUF_ALW_ND) == PyBUF_ALW_ND)
+        if ((flags & PyBUF_ND) == PyBUF_ND)
                 view->shape = &(view->len);
         view->strides = NULL;
-        if ((flags & PyBUF_ALW_STRIDES) == PyBUF_ALW_STRIDES)
+        if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES)
                 view->strides = &(view->itemsize);
         view->suboffsets = NULL;
         view->internal = NULL;
