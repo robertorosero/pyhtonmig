@@ -1276,6 +1276,7 @@ array_tofile(arrayobject *self, PyObject *f)
 		Py_DECREF(bytes);
 		if (res == NULL)
 			return NULL;
+		Py_DECREF(res); /* drop write result */
 	}
 
   done:

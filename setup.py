@@ -269,7 +269,7 @@ class PyBuildExt(build_ext):
 
     def get_platform(self):
         # Get value of sys.platform
-        for platform in ['cygwin', 'beos', 'darwin', 'atheos', 'osf1']:
+        for platform in ['cygwin', 'darwin', 'atheos', 'osf1']:
             if sys.platform.startswith(platform):
                 return platform
         return sys.platform
@@ -364,7 +364,7 @@ class PyBuildExt(build_ext):
 
         # Check for MacOS X, which doesn't need libm.a at all
         math_libs = ['m']
-        if platform in ['darwin', 'beos', 'mac']:
+        if platform in ['darwin', 'mac']:
             math_libs = []
 
         # XXX Omitted modules: gl, pure, dl, SGI-specific modules
@@ -592,17 +592,20 @@ class PyBuildExt(build_ext):
             if openssl_ver:
                 break
 
-        #print 'openssl_ver = 0x%08x' % openssl_ver
+        #print('openssl_ver = 0x%08x' % openssl_ver)
 
-        if (ssl_incs is not None and
-            ssl_libs is not None and
-            openssl_ver >= 0x00907000):
-            # The _hashlib module wraps optimized implementations
-            # of hash functions from the OpenSSL library.
-            exts.append( Extension('_hashlib', ['_hashopenssl.c'],
-                                   include_dirs = ssl_incs,
-                                   library_dirs = ssl_libs,
-                                   libraries = ['ssl', 'crypto']) )
+        if ssl_incs is not None and ssl_libs is not None:
+            if openssl_ver >= 0x00907000:
+                # The _hashlib module wraps optimized implementations
+                # of hash functions from the OpenSSL library.
+                exts.append( Extension('_hashlib', ['_hashopenssl.c'],
+                                       include_dirs = ssl_incs,
+                                       library_dirs = ssl_libs,
+                                       libraries = ['ssl', 'crypto']) )
+            else:
+                print("warning: openssl 0x%08x is too old for _hashlib" %
+                      openssl_ver)
+                missing.append('_hashlib')
         else:
             missing.append('_hashlib')
 
@@ -1369,7 +1372,12 @@ class PyBuildExt(build_ext):
                     return False
 
             fficonfig = {}
-            execfile(ffi_configfile, globals(), fficonfig)
+            fp = open(ffi_configfile)
+            try:
+                script = fp.read()
+            finally:
+                fp.close()
+            exec(script, globals(), fficonfig)
             ffi_srcdir = os.path.join(fficonfig['ffi_srcdir'], 'src')
 
             # Add .S (preprocessed assembly) to C compiler source extensions.

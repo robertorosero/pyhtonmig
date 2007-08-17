@@ -92,7 +92,6 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 	path = NULL;
 	prefix = NULL;
 	for (;;) {
-#ifndef RISCOS
 		struct stat statbuf;
 		int rv;
 
@@ -104,15 +103,6 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 				path = buf;
 			break;
 		}
-#else
-		if (object_exists(buf)) {
-			/* it exists */
-			if (isfile(buf))
-				/* it's a file */
-				path = buf;
-			break;
-		}
-#endif
 		/* back up one path element */
 		p = strrchr(buf, SEP);
 		if (prefix != NULL)
@@ -862,8 +852,9 @@ get_data(char *archive, PyObject *toc_entry)
 	buf[data_size] = '\0';
 
 	if (compress == 0) {  /* data is not compressed */
-		raw_data = PyBytes_FromStringAndSize(buf, data_size);
-		return raw_data;
+		data = PyBytes_FromStringAndSize(buf, data_size);
+		Py_DECREF(raw_data);
+		return data;
 	}
 
 	/* Decompress with zlib */

@@ -261,11 +261,6 @@ typedef Py_intptr_t	Py_ssize_t;
 #define HAVE_FSTAT
 #endif
 
-#ifdef RISCOS
-#include <sys/types.h>
-#include "unixstuff.h"
-#endif
-
 #ifdef HAVE_SYS_STAT_H
 #if defined(PYOS_OS2) && defined(PYCC_GCC)
 #include <sys/types.h>
@@ -505,12 +500,6 @@ in platform-specific #ifdefs.
 extern int gethostname(char *, int);
 #endif
 
-#ifdef __BEOS__
-/* Unchecked */
-/* It's in the libs, but not the headers... - [cjh] */
-int shutdown(int, int);
-#endif
-
 #ifdef HAVE__GETPTY
 #include <sys/types.h>		/* we need to import mode_t */
 extern char * _getpty(int *, int, mode_t, int);
@@ -582,10 +571,10 @@ extern double hypot(double, double);
 /*
   All windows ports, except cygwin, are handled in PC/pyconfig.h.
 
-  BeOS and cygwin are the only other autoconf platform requiring special
-  linkage handling and both of these use __declspec().
+  Cygwin is the only other autoconf platform requiring special
+  linkage handling and it uses __declspec().
 */
-#if defined(__CYGWIN__) || defined(__BEOS__)
+#if defined(__CYGWIN__)
 #	define HAVE_DECLSPEC_DLL
 #endif
 
@@ -596,7 +585,7 @@ extern double hypot(double, double);
 #			define PyAPI_FUNC(RTYPE) __declspec(dllexport) RTYPE
 #			define PyAPI_DATA(RTYPE) extern __declspec(dllexport) RTYPE
 			/* module init functions inside the core need no external linkage */
-			/* except for Cygwin to handle embedding (FIXME: BeOS too?) */
+			/* except for Cygwin to handle embedding */
 #			if defined(__CYGWIN__)
 #				define PyMODINIT_FUNC __declspec(dllexport) void
 #			else /* __CYGWIN__ */
@@ -677,8 +666,7 @@ extern double hypot(double, double);
  * Hide GCC attributes from compilers that don't support them.
  */
 #if (!defined(__GNUC__) || __GNUC__ < 2 || \
-     (__GNUC__ == 2 && __GNUC_MINOR__ < 7) ) && \
-    !defined(RISCOS)
+     (__GNUC__ == 2 && __GNUC_MINOR__ < 7) )
 #define Py_GCC_ATTRIBUTE(x)
 #else
 #define Py_GCC_ATTRIBUTE(x) __attribute__(x)

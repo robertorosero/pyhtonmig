@@ -34,6 +34,7 @@ import os
 import sys
 import codecs
 import _fileio
+import io
 import warnings
 
 # XXX Shouldn't we use st_blksize whenever we can?
@@ -971,8 +972,18 @@ class TextIOWrapper(TextIOBase):
         if newline not in (None, "\n", "\r\n"):
             raise ValueError("illegal newline value: %r" % (newline,))
         if encoding is None:
-            # XXX This is questionable
-            encoding = sys.getfilesystemencoding() or "latin-1"
+            try:
+                encoding = os.device_encoding(buffer.fileno())
+            except (AttributeError, io.UnsupportedOperation):
+                pass
+            if encoding is None:
+                try:
+                    import locale
+                except ImportError:
+                    # Importing locale may fail if Python is being built
+                    encoding = "ascii"
+                else:
+                    encoding = locale.getpreferredencoding()
 
         self.buffer = buffer
         self._encoding = encoding

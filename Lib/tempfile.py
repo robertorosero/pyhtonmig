@@ -159,9 +159,6 @@ def _candidate_tempdir_list():
             dirlist.append(dirname)
         except _Folder.error:
             pass
-    elif _os.name == 'riscos':
-        dirname = _os.getenv('Wimp$ScrapDir')
-        if dirname: dirlist.append(dirname)
     elif _os.name == 'nt':
         dirlist.extend([ r'c:\temp', r'c:\tmp', r'\temp', r'\tmp' ])
     else:
@@ -197,8 +194,8 @@ def _get_default_tempdir():
             filename = _os.path.join(dir, name)
             try:
                 fd = _os.open(filename, flags, 0o600)
-                fp = _io.open(fd, 'w')
-                fp.write('blat')
+                fp = _io.open(fd, 'wb')
+                fp.write(b'blat')
                 fp.close()
                 _os.unlink(filename)
                 del fp, fd

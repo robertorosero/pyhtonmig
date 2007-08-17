@@ -7,7 +7,7 @@ class TestImport(unittest.TestCase):
     def __init__(self, *args, **kw):
         self.package_name = 'PACKAGE_'
         while self.package_name in sys.modules:
-            self.package_name += random.choose(string.letters)
+            self.package_name += random.choose(string.ascii_letters)
         self.module_name = self.package_name + '.foo'
         unittest.TestCase.__init__(self, *args, **kw)
 
@@ -22,8 +22,8 @@ class TestImport(unittest.TestCase):
         self.package_dir = os.path.join(self.test_dir,
                                         self.package_name)
         os.mkdir(self.package_dir)
-        open(os.path.join(self.package_dir, '__init__'+os.extsep+'py'), 'w')
-        self.module_path = os.path.join(self.package_dir, 'foo'+os.extsep+'py')
+        open(os.path.join(self.package_dir, '__init__.py'), 'w')
+        self.module_path = os.path.join(self.package_dir, 'foo.py')
 
     def tearDown(self):
         for file in os.listdir(self.package_dir):
@@ -58,7 +58,7 @@ class TestImport(unittest.TestCase):
         # ...make up a variable name that isn't bound in __builtins__
         var = 'a'
         while var in dir(__builtins__):
-            var += random.choose(string.letters)
+            var += random.choose(string.ascii_letters)
 
         # ...make a module that just contains that
         self.rewrite_file(var)

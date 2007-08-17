@@ -296,7 +296,9 @@ class ModifiedColorDelegator(ColorDelegator):
             "stdout": idleConf.GetHighlight(theme, "stdout"),
             "stderr": idleConf.GetHighlight(theme, "stderr"),
             "console": idleConf.GetHighlight(theme, "console"),
-            None: idleConf.GetHighlight(theme, "normal"),
+            ### KBK 10Aug07: None tag doesn't seem to serve a purpose and
+            ### breaks in py3k.  Comment out for now.
+            #None: idleConf.GetHighlight(theme, "normal"),
         })
 
 class ModifiedUndoDelegator(UndoDelegator):
@@ -584,14 +586,16 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.more = 0
         self.save_warnings_filters = warnings.filters[:]
         warnings.filterwarnings(action="error", category=SyntaxWarning)
-        if isinstance(source, types.UnicodeType):
-            from . import IOBinding
-            try:
-                source = source.encode(IOBinding.encoding)
-            except UnicodeError:
-                self.tkconsole.resetoutput()
-                self.write("Unsupported characters in input\n")
-                return
+        # at the moment, InteractiveInterpreter expects str
+        assert isinstance(source, str)
+        #if isinstance(source, str):
+        #    from . import IOBinding
+        #    try:
+        #        source = source.encode(IOBinding.encoding)
+        #    except UnicodeError:
+        #        self.tkconsole.resetoutput()
+        #        self.write("Unsupported characters in input\n")
+        #        return
         try:
             # InteractiveInterpreter.runsource() calls its runcode() method,
             # which is overridden (see below)
@@ -823,7 +827,7 @@ class PyShell(OutputWindow):
         self.console = PseudoFile(self, "console", IOBinding.encoding)
         if not use_subprocess:
             sys.stdout = self.stdout
-            sys.stderr = self.stderr
+###            sys.stderr = self.stderr # Don't redirect exceptions, pyshell NG
             sys.stdin = self
         #
         self.history = self.History(self.text)
@@ -959,6 +963,7 @@ class PyShell(OutputWindow):
     """
 
     def begin(self):
+        self.text.mark_set("iomark", "insert")
         self.resetoutput()
         if use_subprocess:
             nosub = ''
@@ -1211,7 +1216,8 @@ class PyShell(OutputWindow):
             OutputWindow.write(self, s, tags, "iomark")
             self.text.mark_gravity("iomark", "left")
         except:
-            pass
+            raise ###pass  # ### 11Aug07 KBK if we are expecting exceptions
+                           # let's find out what they are and be specific.
         if self.canceled:
             self.canceled = 0
             if not use_subprocess:
@@ -1227,8 +1233,9 @@ class PseudoFile(object):
     def write(self, s):
         self.shell.write(s, self.tags)
 
-    def writelines(self, l):
-        map(self.write, l)
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
 
     def flush(self):
         pass

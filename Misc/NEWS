@@ -26,6 +26,8 @@ TO DO
 Core and Builtins
 -----------------
 
+- PEP 3131: Support non-ASCII identifiers.
+
 - PEP 3120: Change default encoding to UTF-8.
 
 - PEP 3123: Use proper C inheritance for PyObject.
@@ -74,6 +76,8 @@ Core and Builtins
 - The dir() function has been extended to call the __dir__() method on
   its argument, if it exists. If not, it will work like before. This allows
   customizing the output of dir() in the presence of a __getattr__().
+
+- Removed support for __members__ and __methods__.
 
 - Removed indexing/slicing on BaseException.
 
@@ -150,7 +154,7 @@ Core and Builtins
   backticks (ie, `x`), <>
 
 - Removed these Python builtins:
-  apply(), callable(), coerce(), file(), reduce(), reload()
+  apply(), callable(), coerce(), execfile(), file(), reduce(), reload()
 
 - Removed these Python methods:
   {}.has_key
@@ -200,13 +204,16 @@ Library
 - Remove obsolete functions:
   * commands.getstatus(), os.popen*,
 
-- Remove functions in the string module that are also string methods.
+- Remove functions in the string module that are also string methods;
+  Remove string.{letters, lowercase, uppercase}.
 
 - Remove support for long obsolete platforms: plat-aix3, plat-irix5.
 
 - Remove xmlrpclib.SlowParser.  It was based on xmllib.
 
 - Patch #1680961: atexit has been reimplemented in C.
+
+- Add new codecs for UTF-32, UTF-32-LE and UTF-32-BE.
 
 
 Build
@@ -219,7 +226,7 @@ C API
   __coerce__, __div__, __idiv__, __rdiv__
 
 - Removed these C APIs:
-  PyNumber_Coerce(), PyNumber_CoerceEx() 
+  PyNumber_Coerce(), PyNumber_CoerceEx(), PyMember_Get, PyMember_Set
 
 - Removed these C slots/fields:
   nb_divide, nb_inplace_divide
@@ -229,7 +236,8 @@ C API
 
 - Removed these typedefs:
   intargfunc, intintargfunc, intobjargproc, intintobjargproc,
-  getreadbufferproc, getwritebufferproc, getsegcountproc, getcharbufferproc
+  getreadbufferproc, getwritebufferproc, getsegcountproc, getcharbufferproc,
+  memberlist
 
 
 Tests

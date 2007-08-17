@@ -227,7 +227,8 @@ int unicode_resize(register PyUnicodeObject *unicode,
 }
 
 /* We allocate one more byte to make sure the string is
-   Ux0000 terminated -- XXX is this needed ?
+   Ux0000 terminated; some code (e.g. new_identifier)
+   relies on that.
 
    XXX This allocator could further be enhanced by assuring that the
        free list never reduces its size below 1.
@@ -1188,14 +1189,9 @@ PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
         return v;
     if (errors != NULL)
         Py_FatalError("non-NULL encoding in _PyUnicode_AsDefaultEncodedString");
-    if (errors == NULL) {
-        b = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
-                                 PyUnicode_GET_SIZE(unicode),
-                                 NULL);
-    }
-    else {
-        b = PyUnicode_AsEncodedString(unicode, NULL, errors);
-    }
+    b = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
+                             PyUnicode_GET_SIZE(unicode),
+                             NULL);
     if (!b)
         return NULL;
     v = PyString_FromStringAndSize(PyBytes_AsString(b),
@@ -1323,6 +1319,9 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
     *input = PyBytes_AS_STRING(inputobj);
     insize = PyBytes_GET_SIZE(inputobj);
     *inend = *input + insize;
+    /* we can DECREF safely, as the exception has another reference,
+       so the object won't go away. */
+    Py_DECREF(inputobj);
 
     if (newpos<0)
 	newpos = insize+newpos;
@@ -1991,6 +1990,272 @@ PyObject *PyUnicode_AsUTF8String(PyObject *unicode)
     return PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
 				PyUnicode_GET_SIZE(unicode),
 				NULL);
+}
+
+/* --- UTF-32 Codec ------------------------------------------------------- */
+
+PyObject *
+PyUnicode_DecodeUTF32(const char *s,
+		      Py_ssize_t size,
+		      const char *errors,
+		      int *byteorder)
+{
+    return PyUnicode_DecodeUTF32Stateful(s, size, errors, byteorder, NULL);
+}
+
+PyObject *
+PyUnicode_DecodeUTF32Stateful(const char *s,
+			      Py_ssize_t size,
+			      const char *errors,
+			      int *byteorder,
+			      Py_ssize_t *consumed)
+{
+    const char *starts = s;
+    Py_ssize_t startinpos;
+    Py_ssize_t endinpos;
+    Py_ssize_t outpos;
+    PyUnicodeObject *unicode;
+    Py_UNICODE *p;
+#ifndef Py_UNICODE_WIDE
+    int i, pairs;
+#else
+    const int pairs = 0;
+#endif
+    const unsigned char *q, *e;
+    int bo = 0;       /* assume native ordering by default */
+    const char *errmsg = "";
+    /* Offsets from q for retrieving bytes in the right order. */
+#ifdef BYTEORDER_IS_LITTLE_ENDIAN
+    int iorder[] = {0, 1, 2, 3};
+#else
+    int iorder[] = {3, 2, 1, 0};
+#endif
+    PyObject *errorHandler = NULL;
+    PyObject *exc = NULL;
+    /* On narrow builds we split characters outside the BMP into two
+       codepoints => count how much extra space we need. */
+#ifndef Py_UNICODE_WIDE
+    for (i = pairs = 0; i < size/4; i++)
+	if (((Py_UCS4 *)s)[i] >= 0x10000)
+	    pairs++;
+#endif
+
+    /* This might be one to much, because of a BOM */
+    unicode = _PyUnicode_New((size+3)/4+pairs);
+    if (!unicode)
+        return NULL;
+    if (size == 0)
+        return (PyObject *)unicode;
+
+    /* Unpack UTF-32 encoded data */
+    p = unicode->str;
+    q = (unsigned char *)s;
+    e = q + size;
+
+    if (byteorder)
+        bo = *byteorder;
+
+    /* Check for BOM marks (U+FEFF) in the input and adjust current
+       byte order setting accordingly. In native mode, the leading BOM
+       mark is skipped, in all other modes, it is copied to the output
+       stream as-is (giving a ZWNBSP character). */
+    if (bo == 0) {
+        if (size >= 4) {
+            const Py_UCS4 bom = (q[iorder[3]] << 24) | (q[iorder[2]] << 16) |
+                                (q[iorder[1]] << 8) | q[iorder[0]];
+#ifdef BYTEORDER_IS_LITTLE_ENDIAN
+	    if (bom == 0x0000FEFF) {
+		q += 4;
+		bo = -1;
+	    }
+	    else if (bom == 0xFFFE0000) {
+		q += 4;
+		bo = 1;
+	    }
+#else
+	    if (bom == 0x0000FEFF) {
+		q += 4;
+		bo = 1;
+	    }
+	    else if (bom == 0xFFFE0000) {
+		q += 4;
+		bo = -1;
+	    }
+#endif
+	}
+    }
+
+    if (bo == -1) {
+        /* force LE */
+        iorder[0] = 0;
+        iorder[1] = 1;
+        iorder[2] = 2;
+        iorder[3] = 3;
+    }
+    else if (bo == 1) {
+        /* force BE */
+        iorder[0] = 3;
+        iorder[1] = 2;
+        iorder[2] = 1;
+        iorder[3] = 0;
+    }
+
+    while (q < e) {
+	Py_UCS4 ch;
+	/* remaining bytes at the end? (size should be divisible by 4) */
+	if (e-q<4) {
+	    if (consumed)
+		break;
+	    errmsg = "truncated data";
+	    startinpos = ((const char *)q)-starts;
+	    endinpos = ((const char *)e)-starts;
+	    goto utf32Error;
+	    /* The remaining input chars are ignored if the callback
+	       chooses to skip the input */
+	}
+	ch = (q[iorder[3]] << 24) | (q[iorder[2]] << 16) |
+	     (q[iorder[1]] << 8) | q[iorder[0]];
+
+	if (ch >= 0x110000)
+	{
+	    errmsg = "codepoint not in range(0x110000)";
+	    startinpos = ((const char *)q)-starts;
+	    endinpos = startinpos+4;
+	    goto utf32Error;
+	}
+#ifndef Py_UNICODE_WIDE
+	if (ch >= 0x10000)
+	{
+	    *p++ = 0xD800 | ((ch-0x10000) >> 10);
+	    *p++ = 0xDC00 | ((ch-0x10000) & 0x3FF);
+	}
+	else
+#endif
+	    *p++ = ch;
+	q += 4;
+	continue;
+    utf32Error:
+	outpos = p-PyUnicode_AS_UNICODE(unicode);
+	if (unicode_decode_call_errorhandler(
+	         errors, &errorHandler,
+	         "utf32", errmsg,
+	         &starts, (const char **)&e, &startinpos, &endinpos, &exc, (const char **)&q,
+	         (PyObject **)&unicode, &outpos, &p))
+	    goto onError;
+    }
+
+    if (byteorder)
+        *byteorder = bo;
+
+    if (consumed)
+	*consumed = (const char *)q-starts;
+
+    /* Adjust length */
+    if (_PyUnicode_Resize(&unicode, p - unicode->str) < 0)
+        goto onError;
+
+    Py_XDECREF(errorHandler);
+    Py_XDECREF(exc);
+    return (PyObject *)unicode;
+
+onError:
+    Py_DECREF(unicode);
+    Py_XDECREF(errorHandler);
+    Py_XDECREF(exc);
+    return NULL;
+}
+
+PyObject *
+PyUnicode_EncodeUTF32(const Py_UNICODE *s,
+		      Py_ssize_t size,
+		      const char *errors,
+		      int byteorder)
+{
+    PyObject *v;
+    unsigned char *p;
+#ifndef Py_UNICODE_WIDE
+    int i, pairs;
+#else
+    const int pairs = 0;
+#endif
+    /* Offsets from p for storing byte pairs in the right order. */
+#ifdef BYTEORDER_IS_LITTLE_ENDIAN
+    int iorder[] = {0, 1, 2, 3};
+#else
+    int iorder[] = {3, 2, 1, 0};
+#endif
+
+#define STORECHAR(CH)                       \
+    do {                                    \
+        p[iorder[3]] = ((CH) >> 24) & 0xff; \
+        p[iorder[2]] = ((CH) >> 16) & 0xff; \
+        p[iorder[1]] = ((CH) >> 8) & 0xff;  \
+        p[iorder[0]] = (CH) & 0xff;         \
+        p += 4;                             \
+    } while(0)
+
+    /* In narrow builds we can output surrogate pairs as one codepoint,
+       so we need less space. */
+#ifndef Py_UNICODE_WIDE
+    for (i = pairs = 0; i < size-1; i++)
+	if (0xD800 <= s[i] && s[i] <= 0xDBFF &&
+	    0xDC00 <= s[i+1] && s[i+1] <= 0xDFFF)
+	    pairs++;
+#endif
+    v = PyBytes_FromStringAndSize(NULL,
+		  4 * (size - pairs + (byteorder == 0)));
+    if (v == NULL)
+        return NULL;
+
+    p = (unsigned char *)PyBytes_AS_STRING(v);
+    if (byteorder == 0)
+	STORECHAR(0xFEFF);
+    if (size == 0)
+        return v;
+
+    if (byteorder == -1) {
+        /* force LE */
+        iorder[0] = 0;
+        iorder[1] = 1;
+        iorder[2] = 2;
+        iorder[3] = 3;
+    }
+    else if (byteorder == 1) {
+        /* force BE */
+        iorder[0] = 3;
+        iorder[1] = 2;
+        iorder[2] = 1;
+        iorder[3] = 0;
+    }
+
+    while (size-- > 0) {
+	Py_UCS4 ch = *s++;
+#ifndef Py_UNICODE_WIDE
+	if (0xD800 <= ch && ch <= 0xDBFF && size > 0) {
+	    Py_UCS4 ch2 = *s;
+	    if (0xDC00 <= ch2 && ch2 <= 0xDFFF) {
+		ch = (((ch & 0x3FF)<<10) | (ch2 & 0x3FF)) + 0x10000;
+		s++;
+		size--;
+	    }
+	}
+#endif
+        STORECHAR(ch);
+    }
+    return v;
+#undef STORECHAR
+}
+
+PyObject *PyUnicode_AsUTF32String(PyObject *unicode)
+{
+    if (!PyUnicode_Check(unicode)) {
+        PyErr_BadArgument();
+        return NULL;
+    }
+    return PyUnicode_EncodeUTF32(PyUnicode_AS_UNICODE(unicode),
+				 PyUnicode_GET_SIZE(unicode),
+				 NULL,
+				 0);
 }
 
 /* --- UTF-16 Codec ------------------------------------------------------- */
@@ -5987,15 +6252,16 @@ PyObject *PyUnicode_RichCompare(PyObject *left,
     if (!PyErr_ExceptionMatches(PyExc_UnicodeDecodeError))
         return NULL;
     PyErr_Clear();
-    if (PyErr_Warn(PyExc_UnicodeWarning, 
-                   (op == Py_EQ) ? 
-                   "Unicode equal comparison "
-                   "failed to convert both arguments to Unicode - "
-                   "interpreting them as being unequal" :
-                   "Unicode unequal comparison "
-                   "failed to convert both arguments to Unicode - "
-                   "interpreting them as being unequal"
-                   ) < 0)
+    if (PyErr_WarnEx(PyExc_UnicodeWarning, 
+                     (op == Py_EQ) ? 
+                     "Unicode equal comparison "
+                     "failed to convert both arguments to Unicode - "
+                     "interpreting them as being unequal"
+                     :
+                     "Unicode unequal comparison "
+                     "failed to convert both arguments to Unicode - "
+                     "interpreting them as being unequal",
+                     1) < 0)
         return NULL;
     result = (op == Py_NE);
     return PyBool_FromLong(result);
@@ -6670,6 +6936,47 @@ unicode_isnumeric(PyUnicodeObject *self)
 	    return PyBool_FromLong(0);
     }
     return PyBool_FromLong(1);
+}
+
+int
+PyUnicode_IsIdentifier(PyObject *self)
+{
+    register const Py_UNICODE *p = PyUnicode_AS_UNICODE((PyUnicodeObject*)self);
+    register const Py_UNICODE *e;
+
+    /* Special case for empty strings */
+    if (PyUnicode_GET_SIZE(self) == 0)
+	return 0;
+
+    /* PEP 3131 says that the first character must be in
+       XID_Start and subsequent characters in XID_Continue,
+       and for the ASCII range, the 2.x rules apply (i.e
+       start with letters and underscore, continue with 
+       letters, digits, underscore). However, given the current
+       definition of XID_Start and XID_Continue, it is sufficient
+       to check just for these, except that _ must be allowed
+       as starting an identifier.  */
+    if (!_PyUnicode_IsXidStart(*p) && *p != 0x5F /* LOW LINE */)
+        return 0;
+
+    e = p + PyUnicode_GET_SIZE(self);
+    for (p++; p < e; p++) {
+	if (!_PyUnicode_IsXidContinue(*p))
+	    return 0;
+    }
+    return 1;
+}
+
+PyDoc_STRVAR(isidentifier__doc__,
+"S.isidentifier() -> bool\n\
+\n\
+Return True if S is a valid identifier according\n\
+to the language definition.");
+
+static PyObject*
+unicode_isidentifier(PyObject *self)
+{
+    return PyBool_FromLong(PyUnicode_IsIdentifier(self));
 }
 
 PyDoc_STRVAR(join__doc__,
@@ -7707,6 +8014,7 @@ static PyMethodDef unicode_methods[] = {
     {"isnumeric", (PyCFunction) unicode_isnumeric, METH_NOARGS, isnumeric__doc__},
     {"isalpha", (PyCFunction) unicode_isalpha, METH_NOARGS, isalpha__doc__},
     {"isalnum", (PyCFunction) unicode_isalnum, METH_NOARGS, isalnum__doc__},
+    {"isidentifier", (PyCFunction) unicode_isidentifier, METH_NOARGS, isidentifier__doc__},
     {"zfill", (PyCFunction) unicode_zfill, METH_VARARGS, zfill__doc__},
 #if 0
     {"capwords", (PyCFunction) unicode_capwords, METH_NOARGS, capwords__doc__},

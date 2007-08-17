@@ -177,7 +177,7 @@ PyFile_WriteString(const char *s, PyObject *f)
 		return -1;
 	}
 	else if (!PyErr_Occurred()) {
-		PyObject *v = PyString_FromString(s);
+		PyObject *v = PyUnicode_FromString(s);
 		int err;
 		if (v == NULL)
 			return -1;
@@ -317,7 +317,7 @@ Py_UniversalNewlineFgets(char *buf, int n, FILE *stream, PyObject *fobj)
 		** will cause a pause if we're reading from an
 		** interactive stream, but that is very unlikely
 		** unless we're doing something silly like
-		** execfile("/dev/tty").
+		** exec(open("/dev/tty").read()).
 		*/
 		c = GETC(stream);
 		if ( c != '\n' )

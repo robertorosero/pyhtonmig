@@ -15,6 +15,7 @@ Command line options:
 -g: generate   -- write the output file for a test instead of comparing it
 -x: exclude    -- arguments are tests to *exclude*
 -s: single     -- run only a single test (see below)
+-S: start      -- start running all the tests with the specified one first
 -r: random     -- randomize test execution order
 -f: fromfile   -- read names of tests to run from a file (see below)
 -l: findleaks  -- if GC is available detect tests that leak memory
@@ -47,6 +48,12 @@ file /tmp/pynexttest is read to find the next test to run.  If this
 file is missing, the first test_*.py file in testdir or on the command
 line is used.  (actually tempfile.gettempdir() is used instead of
 /tmp).
+
+-S is used to continue running tests after an aborted run.  It will
+maintain the order a standard run (ie, this assumes -r is not used).
+This is useful after the tests have prematurely stopped for some external
+reason and you want to start running from where you left off rather
+than starting from the beginning.
 
 -f reads the names of tests from the file given as f's argument, one
 or more test names per line.  Whitespace is ignored.  Blank lines and
@@ -177,7 +184,8 @@ def usage(code, msg=''):
 def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
-         runleaks=False, huntrleaks=False, verbose2=False, debug=False):
+         runleaks=False, huntrleaks=False, verbose2=False, debug=False,
+         start=None):
     """Execute a test suite.
 
     This also parses command-line options and modifies its behavior
@@ -202,13 +210,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
 
     test_support.record_original_stdout(sys.stdout)
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'dhvgqxsrf:lu:t:TD:NLR:wM:',
+        opts, args = getopt.getopt(sys.argv[1:], 'dhvgqxsS:rf:lu:t:TD:NLR:wM:',
                                    ['help', 'verbose', 'quiet', 'generate',
                                     'exclude', 'single', 'random', 'fromfile',
                                     'findleaks', 'use=', 'threshold=', 'trace',
                                     'coverdir=', 'nocoverdir', 'runleaks',
                                     'huntrleaks=', 'verbose2', 'memlimit=',
-                                    'debug',
+                                    'debug', 'start='
                                     ])
     except getopt.error as msg:
         usage(2, msg)
@@ -232,6 +240,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             generate = True
         elif o in ('-x', '--exclude'):
             exclude = True
+        elif o in ('-S', '--start'):
+            start = a
         elif o in ('-s', '--single'):
             single = True
         elif o in ('-r', '--randomize'):
@@ -345,6 +355,12 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
     tests = tests or args or findtests(testdir, stdtests, nottests)
     if single:
         tests = tests[:1]
+    # Remove all the tests that precede start if it's set.
+    if start:
+        try:
+            del tests[:tests.index(start)]
+        except ValueError:
+            print("Couldn't find starting test (%s), using all tests" % start)
     if randomize:
         random.shuffle(tests)
     if trace:
@@ -493,7 +509,7 @@ def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
     names = os.listdir(testdir)
     tests = []
     for name in names:
-        if name[:5] == "test_" and name[-3:] == os.extsep+"py":
+        if name[:5] == "test_" and name[-3:] == ".py":
             modname = name[:-3]
             if modname not in stdtests and modname not in nottests:
                 tests.append(modname)
@@ -682,6 +698,7 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
         rc = sys.gettotalrefcount()
         run_the_test()
         sys.stderr.write('.')
+        sys.stderr.flush()
         dash_R_cleanup(fs, ps, pic)
         if i >= nwarmup:
             deltas.append(sys.gettotalrefcount() - rc - 2)
@@ -782,7 +799,7 @@ def findtestdir():
     return testdir
 
 def removepy(name):
-    if name.endswith(os.extsep + "py"):
+    if name.endswith(".py"):
         name = name[:-3]
     return name
 
@@ -924,33 +941,6 @@ _expectations = {
         test_pyexpat
         test_queue
         test_sax
-        test_sundry
-        test_thread
-        test_threaded_import
-        test_threadedtempfile
-        test_threading
-        """,
-    'riscos':
-        """
-        test_asynchat
-        test_atexit
-        test_bsddb
-        test_bsddb3
-        test_commands
-        test_crypt
-        test_dbm
-        test_dl
-        test_fcntl
-        test_fork1
-        test_gdbm
-        test_grp
-        test_largefile
-        test_locale
-        test_mmap
-        test_openpty
-        test_poll
-        test_pty
-        test_pwd
         test_sundry
         test_thread
         test_threaded_import

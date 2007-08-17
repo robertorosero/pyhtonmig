@@ -47,8 +47,27 @@ static PyObject *parsestrplus(struct compiling *, const node *n,
 #define COMP_SETCOMP  2
 
 static identifier
-new_identifier(const char* n, PyArena *arena) {
+new_identifier(const char* n, PyArena *arena)
+{
     PyObject* id = PyUnicode_DecodeUTF8(n, strlen(n), NULL);
+    Py_UNICODE *u = PyUnicode_AS_UNICODE(id);
+    /* Check whether there are non-ASCII characters in the
+       identifier; if so, normalize to NFKC. */
+    for (; *u; u++) {
+	if (*u >= 128) {
+	    PyObject *m = PyImport_ImportModule("unicodedata");
+	    PyObject *id2;
+	    if (!m)
+		return NULL;
+	    id2 = PyObject_CallMethod(m, "normalize", "sO", "NFKC", id);
+	    Py_DECREF(m);
+	    if (!id2)
+		return NULL;
+	    Py_DECREF(id);
+	    id = id2;
+	    break;
+	}
+    }
     PyUnicode_InternInPlace(&id);
     PyArena_AddPyObject(arena, id);
     return id;
@@ -3112,7 +3131,6 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
     return v;
 }
 
-#ifdef Py_USING_UNICODE
 static PyObject *
 decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 {
@@ -3175,7 +3193,6 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
     Py_XDECREF(u);
     return v;
 }
-#endif
 
 /* s is a Python string literal, including the bracketing quote characters,
  * and r &/or u prefixes (if any), and embedded escape sequences (if any).

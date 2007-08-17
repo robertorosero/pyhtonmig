@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright (C) 1997, 2002, 2003 Martin von Loewis
+Copyright (C) 1997, 2002, 2003, 2007 Martin von Loewis
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose and without fee is hereby granted,
@@ -39,10 +39,6 @@ This software comes with no warranty. Use at your own risk.
 #if defined(MS_WINDOWS)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#endif
-
-#ifdef RISCOS
-char *strdup(const char *);
 #endif
 
 PyDoc_STRVAR(locale__doc__, "Support for POSIX locales.");
@@ -93,63 +89,6 @@ copy_grouping(char* s)
     return result;
 }
 
-static void
-fixup_ulcase(void)
-{
-    PyObject *mods, *string, *ulo;
-    unsigned char ul[256];
-    int n, c;
-
-    /* find the string module */
-    mods = PyImport_GetModuleDict();
-    if (!mods)
-        return;
-    string = PyDict_GetItemString(mods, "string");
-    if (string)
-        string = PyModule_GetDict(string);
-    if (!string)
-        return;
-
-    /* create uppercase map string */
-    n = 0;
-    for (c = 0; c < 256; c++) {
-        if (isupper(c))
-            ul[n++] = c;
-    }
-    ulo = PyString_FromStringAndSize((const char *)ul, n);
-    if (!ulo)
-        return;
-    if (string)
-        PyDict_SetItemString(string, "uppercase", ulo);
-    Py_DECREF(ulo);
-
-    /* create lowercase string */
-    n = 0;
-    for (c = 0; c < 256; c++) {
-        if (islower(c))
-            ul[n++] = c;
-    }
-    ulo = PyString_FromStringAndSize((const char *)ul, n);
-    if (!ulo)
-        return;
-    if (string)
-        PyDict_SetItemString(string, "lowercase", ulo);
-    Py_DECREF(ulo);
-
-    /* create letters string */
-    n = 0;
-    for (c = 0; c < 256; c++) {
-        if (isalpha(c))
-            ul[n++] = c;
-    }
-    ulo = PyString_FromStringAndSize((const char *)ul, n);
-    if (!ulo)
-        return;
-    if (string)
-        PyDict_SetItemString(string, "letters", ulo);
-    Py_DECREF(ulo);
-}
-
 static PyObject*
 PyLocale_setlocale(PyObject* self, PyObject* args)
 {
@@ -171,11 +110,6 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
         result_object = PyString_FromString(result);
         if (!result_object)
             return NULL;
-        /* record changes to LC_CTYPE */
-        if (category == LC_CTYPE || category == LC_ALL)
-            fixup_ulcase();
-        /* things that got wrong up to here are ignored */
-        PyErr_Clear();
     } else {
         /* get locale */
         result = setlocale(category, NULL);
@@ -562,7 +496,8 @@ PyLocale_nl_langinfo(PyObject* self, PyObject* args)
             /* Check NULL as a workaround for GNU libc's returning NULL
                instead of an empty string for nl_langinfo(ERA).  */
             const char *result = nl_langinfo(item);
-            return PyString_FromString(result != NULL ? result : "");
+            /* XXX may have to convert this to wcs first. */
+            return PyUnicode_FromString(result != NULL ? result : "");
         }
     PyErr_SetString(PyExc_ValueError, "unsupported langinfo constant");
     return NULL;

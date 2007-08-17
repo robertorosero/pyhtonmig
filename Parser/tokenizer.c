@@ -21,13 +21,15 @@
 #define is_potential_identifier_start(c) (\
                           (c >= 'a' && c <= 'z')\
 		       || (c >= 'A' && c <= 'Z')\
-		       || c == '_')
+		       || c == '_'\
+		       || (c >= 128))
 
 #define is_potential_identifier_char(c) (\
                           (c >= 'a' && c <= 'z')\
 		       || (c >= 'A' && c <= 'Z')\
 		       || (c >= '0' && c <= '9')\
-		       || c == '_')
+		       || c == '_'\
+		       || (c >= 128))
 
 extern char *PyOS_Readline(FILE *, FILE *, char *);
 /* Return malloc'ed string including trailing \n;
@@ -369,6 +371,7 @@ fp_readl(char *s, int size, struct tok_state *tok)
 	PyObject* bufobj = tok->decoding_buffer;
 	const char *buf;
 	Py_ssize_t buflen;
+	int allocated = 0;
 
 	/* Ask for one less byte so we can terminate it */
 	assert(size > 0);
@@ -377,21 +380,34 @@ fp_readl(char *s, int size, struct tok_state *tok)
 	if (bufobj == NULL) {
 		bufobj = PyObject_CallObject(tok->decoding_readline, NULL);
 		if (bufobj == NULL)
-			return error_ret(tok);
+			goto error;
+		allocated = 1;
 	}
-        if (PyObject_AsCharBuffer(bufobj, &buf, &buflen) < 0)
-		return error_ret(tok);
+        if (PyObject_AsCharBuffer(bufobj, &buf, &buflen) < 0) {
+		goto error;
+	}
 	if (buflen > size) {
+		Py_XDECREF(tok->decoding_buffer);
 		tok->decoding_buffer = PyBytes_FromStringAndSize(buf+size,
 								 buflen-size);
 		if (tok->decoding_buffer == NULL)
-			return error_ret(tok);
+			goto error;
 		buflen = size;
 	}
 	memcpy(s, buf, buflen);
 	s[buflen] = '\0';
-	if (buflen == 0) return NULL; /* EOF */
+	if (buflen == 0) /* EOF */
+		s = NULL;
+	if (allocated) {
+		Py_DECREF(bufobj);
+	}
 	return s;
+
+error:
+	if (allocated) {
+		Py_XDECREF(bufobj);
+	}
+	return error_ret(tok);
 }
 
 /* Set the readline function for TOK to a StreamReader's
@@ -408,7 +424,6 @@ static int
 fp_setreadl(struct tok_state *tok, const char* enc)
 {
 	PyObject *readline = NULL, *stream = NULL, *io = NULL;
-	int ok = 0;
 
 	io = PyImport_ImportModule("io");
 	if (io == NULL)
@@ -419,17 +434,14 @@ fp_setreadl(struct tok_state *tok, const char* enc)
 	if (stream == NULL)
 		goto cleanup;
 
+	Py_XDECREF(tok->decoding_readline);
 	readline = PyObject_GetAttrString(stream, "readline");
-	if (readline == NULL)
-		goto cleanup;
-
 	tok->decoding_readline = readline;
-	ok = 1;
 
   cleanup:
 	Py_XDECREF(stream);
 	Py_XDECREF(io);
-	return ok;
+	return readline != NULL;
 }
 
 /* Fetch the next byte from TOK. */
@@ -632,7 +644,7 @@ decode_str(const char *str, struct tok_state *tok)
 				"unknown encoding: %s", tok->enc);
 			return error_ret(tok);
 		}
-		str = PyString_AsString(utf8);
+		str = PyBytes_AsString(utf8);
 	}
 	assert(tok->decoding_buffer == NULL);
 	tok->decoding_buffer = utf8; /* CAUTION */
@@ -1060,6 +1072,19 @@ indenterror(struct tok_state *tok)
 	return 0;
 }
 
+#ifdef PGEN
+#define verify_identifier(s,e) 1
+#else
+/* Verify that the identifier follows PEP 3131. */
+static int
+verify_identifier(char *start, char *end)
+{
+	PyObject *s = PyUnicode_DecodeUTF8(start, end-start, NULL);
+	int result = PyUnicode_IsIdentifier(s);
+	Py_DECREF(s);
+	return result;
+}
+#endif
 
 /* Get next token, after space stripping etc. */
 
@@ -1067,7 +1092,7 @@ static int
 tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 {
 	register int c;
-	int blankline;
+	int blankline, nonascii;
 
 	*p_start = *p_end = NULL;
   nextline:
@@ -1185,6 +1210,7 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 	}
 
 	/* Identifier (most frequent token!) */
+	nonascii = 0;
 	if (is_potential_identifier_start(c)) {
 		/* Process r"", u"" and ur"" */
 		switch (c) {
@@ -1204,9 +1230,16 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 			break;
 		}
 		while (is_potential_identifier_char(c)) {
+			if (c >= 128)
+				nonascii = 1;
 			c = tok_nextc(tok);
 		}
 		tok_backup(tok, c);
+		if (nonascii && 
+		    !verify_identifier(tok->start, tok->cur)) {
+			tok->done = E_IDENTIFIER;
+			return ERRORTOKEN;
+		}
 		*p_start = tok->start;
 		*p_end = tok->cur;
 		return NAME;
