@@ -46,8 +46,8 @@ get_line(BytesIOObject *self, char **output)
 }
 
 /* Internal routine for changing the size of the buffer of BytesIO
-   objects. Returns the new buffer size, or -1 on error. */
-static Py_ssize_t
+   objects. Returns 0 on success, -1 otherwise. */
+static int
 resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
 {
     /* Here we doing some direct memory manipulation for speed and to keep the
@@ -60,13 +60,11 @@ resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
 
         PyMem_Resize(self->buf, char, self->buf_size);
         if (self->buf == NULL) {
-            PyErr_SetString(PyExc_MemoryError, "Out of memory");
-            PyMem_Del(self->buf);
-            self->buf_size = self->pos = 0;
+            PyErr_NoMemory();
             return -1;
         }
     }
-    return self->buf_size;
+    return 0;
 }
 
 /* Internal routine for writing a string of bytes to the buffer of a BytesIO
@@ -132,14 +130,14 @@ bytesio_setvalue(BytesIOObject *self, PyObject *value)
 
     if (value == NULL)
         return 0;
-    
+
     if (PyObject_AsCharBuffer(value, &bytes, &len) == -1)
         return -1;
 
     if (write_bytes(self, bytes, len) < 0) {
         return -1;  /* out of memory */
     }
-    /* Reset the position back to beginning-of-file, since 
+    /* Reset the position back to beginning-of-file, since
        write_bytes changed it. */
     self->pos = 0;
 
@@ -175,6 +173,7 @@ bytesio_read(BytesIOObject *self, PyObject *args)
             n = 0;
     }
 
+    assert(self->buf != NULL);
     output = self->buf + self->pos;
     self->pos += n;
 
@@ -183,7 +182,7 @@ bytesio_read(BytesIOObject *self, PyObject *args)
 
 static PyObject *
 bytesio_read1(BytesIOObject *self, PyObject *n)
-{   
+{
     return bytesio_read(self, Py_BuildValue("(O)", n));
 }
 
@@ -422,6 +421,10 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->buf = PyMem_New(char, INIT_BUFSIZE);
+    if (self->buf == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
 
     /* These variables need to be initialized before attempting to write
        anything to the object. */
@@ -539,7 +542,7 @@ static struct PyMethodDef BytesIO_methods[] = {
      generic_true_doc},
     {"seekable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
-    {"writable",   (PyCFunction)generic_true, METH_NOARGS, 
+    {"writable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
     {"flush",      (PyCFunction)bytesio_flush, METH_NOARGS,
      BytesIO_flush_doc},
