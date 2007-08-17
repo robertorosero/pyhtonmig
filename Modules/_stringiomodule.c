@@ -138,7 +138,7 @@ stringio_setvalue(StringIOObject *self, PyObject *value)
                    PyUnicode_GetSize(value))) < 0) {
         return -1;  /* out of memory */
     }
-    /* Reset the position back to beginning-of-file, since 
+    /* Reset the position back to beginning-of-file, since
        write_str changed it. */
     self->pos = 0;
 
@@ -174,6 +174,7 @@ stringio_read(StringIOObject *self, PyObject *args)
             n = 0;
     }
 
+    assert(self->buf != NULL);
     output = self->buf + self->pos;
     self->pos += n;
 
@@ -186,7 +187,7 @@ stringio_readline(StringIOObject *self, PyObject *args)
     Py_ssize_t n, size = -1;
     Py_UNICODE *output;
 
-    if (!PyArg_ParseTuple(args, "|i:readline", &size))
+    if (!PyArg_ParseTuple(args, "|n:readline", &size))
         return NULL;
 
     n = get_line(self, &output);
@@ -207,7 +208,7 @@ stringio_readlines(StringIOObject *self, PyObject *args)
     PyObject *result, *line;
     Py_UNICODE *output;
 
-    if (!PyArg_ParseTuple(args, "|i:readlines", &size))
+    if (!PyArg_ParseTuple(args, "|n:readlines", &size))
         return NULL;
 
     result = PyList_New(0);
@@ -319,18 +320,28 @@ stringio_write(StringIOObject *self, PyObject *obj)
 {
     const Py_UNICODE *str;
     Py_ssize_t size, n;
+    PyObject *ustr = NULL;
 
     if (PyUnicode_Check(obj)) {
         str = PyUnicode_AsUnicode(obj);
         size = PyUnicode_GetSize(obj);
     }
+    /* Temporary condition for str8 objects. */
+    else if (PyString_Check(obj)) {
+        ustr = PyObject_Unicode(obj);
+        if (ustr == NULL)
+            return NULL;
+        str = PyUnicode_AsUnicode(ustr);
+        size = PyUnicode_GetSize(ustr);
+    }
     else {
-        PyErr_Format(PyExc_TypeError, "expected a string, got %s instead",
+        PyErr_Format(PyExc_TypeError, "string argument expected, got %s",
                      Py_Type(obj)->tp_name);
         return NULL;
     }
 
     n = write_str(self, str, size);
+    Py_XDECREF(ustr);
     if (n == -1)
         return NULL;
 
@@ -501,7 +512,7 @@ static struct PyMethodDef StringIO_methods[] = {
      generic_true_doc},
     {"seekable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
-    {"writable",   (PyCFunction)generic_true, METH_NOARGS, 
+    {"writable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
     {"flush",      (PyCFunction)stringio_flush, METH_NOARGS,
      StringIO_flush_doc},
