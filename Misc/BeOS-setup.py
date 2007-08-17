@@ -230,10 +230,6 @@ class PyBuildExt(build_ext):
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )
 
-        # cStringIO and cPickle
-        exts.append( Extension('cStringIO', ['cStringIO.c']) )
-        exts.append( Extension('cPickle', ['cPickle.c']) )
-
         # Memory-mapped files (also works on Win32).
         exts.append( Extension('mmap', ['mmapmodule.c']) )
 
@@ -444,15 +440,6 @@ class PyBuildExt(build_ext):
             exts.append( Extension('pyexpat', ['pyexpat.c'],
                                    define_macros = expat_defs,
                                    libraries = ['expat']) )
-
-        # Platform-specific libraries
-        if platform == 'linux2':
-            # Linux-specific modules
-            exts.append( Extension('linuxaudiodev', ['linuxaudiodev.c']) )
-
-        if platform == 'sunos5':
-            # SunOS specific modules
-            exts.append( Extension('sunaudiodev', ['sunaudiodev.c']) )
 
         self.extensions.extend(exts)
 

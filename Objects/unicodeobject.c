@@ -427,7 +427,9 @@ PyObject *PyUnicode_FromStringAndSize(const char *u, Py_ssize_t size)
 {
     PyUnicodeObject *unicode;
     /* If the Unicode data is known at construction time, we can apply
-       some optimizations which share commonly used objects. */
+       some optimizations which share commonly used objects.
+       Also, this means the input must be UTF-8, so fall back to the
+       UTF-8 decoder at the end. */
     if (u != NULL) {
 
 	/* Optimization for empty strings */
@@ -436,8 +438,9 @@ PyObject *PyUnicode_FromStringAndSize(const char *u, Py_ssize_t size)
 	    return (PyObject *)unicode_empty;
 	}
 
-	/* Single characters are shared when using this constructor */
-	if (size == 1) {
+	/* Single characters are shared when using this constructor.
+           Restrict to ASCII, since the input must be UTF-8. */
+	if (size == 1 && Py_CHARMASK(*u) < 128) {
 	    unicode = unicode_latin1[Py_CHARMASK(*u)];
 	    if (!unicode) {
 		unicode = _PyUnicode_New(1);
@@ -449,20 +452,13 @@ PyObject *PyUnicode_FromStringAndSize(const char *u, Py_ssize_t size)
 	    Py_INCREF(unicode);
 	    return (PyObject *)unicode;
 	}
+
+        return PyUnicode_DecodeUTF8(u, size, NULL);
     }
 
     unicode = _PyUnicode_New(size);
     if (!unicode)
         return NULL;
-
-    /* Copy the Unicode data into the new object */
-    if (u != NULL) {
-        Py_UNICODE *p = unicode->str;
-        while (size--)
-            *p++ = Py_CHARMASK(*u++);
-        /* Don't need to write trailing 0 because
-           that's already done by _PyUnicode_New */
-    }
 
     return (PyObject *)unicode;
 }
@@ -1269,7 +1265,7 @@ int PyUnicode_SetDefaultEncoding(const char *encoding)
 static
 int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler,
                  const char *encoding, const char *reason,
-                 const char *input, Py_ssize_t insize, Py_ssize_t *startinpos, Py_ssize_t *endinpos, PyObject **exceptionObject, const char **inptr,
+                 const char **input, const char **inend, Py_ssize_t *startinpos, Py_ssize_t *endinpos, PyObject **exceptionObject, const char **inptr,
                  PyObject **output, Py_ssize_t *outpos, Py_UNICODE **outptr)
 {
     static char *argparse = "O!n;decoding error handler must return (unicode, int) tuple";
@@ -1277,9 +1273,11 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
     PyObject *restuple = NULL;
     PyObject *repunicode = NULL;
     Py_ssize_t outsize = PyUnicode_GET_SIZE(*output);
+    Py_ssize_t insize;
     Py_ssize_t requiredsize;
     Py_ssize_t newpos;
     Py_UNICODE *repptr;
+    PyObject *inputobj = NULL;
     Py_ssize_t repsize;
     int res = -1;
 
@@ -1291,7 +1289,7 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
 
     if (*exceptionObject == NULL) {
     	*exceptionObject = PyUnicodeDecodeError_Create(
-	    encoding, input, insize, *startinpos, *endinpos, reason);
+	    encoding, *input, *inend-*input, *startinpos, *endinpos, reason);
 	if (*exceptionObject == NULL)
 	   goto onError;
     }
@@ -1313,6 +1311,19 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
     }
     if (!PyArg_ParseTuple(restuple, argparse, &PyUnicode_Type, &repunicode, &newpos))
 	goto onError;
+
+    /* Copy back the bytes variables, which might have been modified by the
+       callback */
+    inputobj = PyUnicodeDecodeError_GetObject(*exceptionObject);
+    if (!inputobj)
+        goto onError;
+    if (!PyBytes_Check(inputobj)) {
+	PyErr_Format(PyExc_TypeError, "exception attribute object must be bytes");
+    }
+    *input = PyBytes_AS_STRING(inputobj);
+    insize = PyBytes_GET_SIZE(inputobj);
+    *inend = *input + insize;
+
     if (newpos<0)
 	newpos = insize+newpos;
     if (newpos<0 || newpos>insize) {
@@ -1335,10 +1346,11 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
 	*outptr = PyUnicode_AS_UNICODE(*output) + *outpos;
     }
     *endinpos = newpos;
-    *inptr = input + newpos;
+    *inptr = *input + newpos;
     Py_UNICODE_COPY(*outptr, repptr, repsize);
     *outptr += repsize;
     *outpos += repsize;
+
     /* we made it! */
     res = 0;
 
@@ -1503,7 +1515,7 @@ PyObject *PyUnicode_DecodeUTF7(const char *s,
         else if (SPECIAL(ch,0,0)) {
             errmsg = "unexpected special character";
             s++;
-	        goto utf7Error;
+            goto utf7Error;
         }
         else {
             *p++ = ch;
@@ -1516,7 +1528,7 @@ PyObject *PyUnicode_DecodeUTF7(const char *s,
         if (unicode_decode_call_errorhandler(
              errors, &errorHandler,
              "utf7", errmsg,
-             starts, size, &startinpos, &endinpos, &exc, &s,
+             &starts, &e, &startinpos, &endinpos, &exc, &s,
              (PyObject **)&unicode, &outpos, &p))
         goto onError;
     }
@@ -1527,7 +1539,7 @@ PyObject *PyUnicode_DecodeUTF7(const char *s,
         if (unicode_decode_call_errorhandler(
              errors, &errorHandler,
              "utf7", "unterminated shift sequence",
-             starts, size, &startinpos, &endinpos, &exc, &s,
+             &starts, &e, &startinpos, &endinpos, &exc, &s,
              (PyObject **)&unicode, &outpos, &p))
             goto onError;
         if (s < e)
@@ -1848,7 +1860,7 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
     if (unicode_decode_call_errorhandler(
 	     errors, &errorHandler,
 	     "utf8", errmsg,
-	     starts, size, &startinpos, &endinpos, &exc, &s,
+	     &starts, &e, &startinpos, &endinpos, &exc, &s,
 	     (PyObject **)&unicode, &outpos, &p))
 	goto onError;
     }
@@ -2132,7 +2144,7 @@ PyUnicode_DecodeUTF16Stateful(const char *s,
 	if (unicode_decode_call_errorhandler(
 	         errors, &errorHandler,
 	         "utf16", errmsg,
-	         starts, size, &startinpos, &endinpos, &exc, (const char **)&q,
+	         &starts, (const char **)&e, &startinpos, &endinpos, &exc, (const char **)&q,
 	         (PyObject **)&unicode, &outpos, &p))
 	    goto onError;
     }
@@ -2342,7 +2354,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
                 if (unicode_decode_call_errorhandler(
                     errors, &errorHandler,
                     "unicodeescape", "end of string in escape sequence",
-                    starts, size, &startinpos, &endinpos, &exc, &s,
+                    &starts, &end, &startinpos, &endinpos, &exc, &s,
                     (PyObject **)&v, &outpos, &p))
                     goto onError;
                 goto nextByte;
@@ -2354,7 +2366,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
                     if (unicode_decode_call_errorhandler(
                         errors, &errorHandler,
                         "unicodeescape", message,
-                        starts, size, &startinpos, &endinpos, &exc, &s,
+                        &starts, &end, &startinpos, &endinpos, &exc, &s,
                         (PyObject **)&v, &outpos, &p))
                         goto onError;
                     goto nextByte;
@@ -2393,7 +2405,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
                 if (unicode_decode_call_errorhandler(
                     errors, &errorHandler,
                     "unicodeescape", "illegal Unicode character",
-                    starts, size, &startinpos, &endinpos, &exc, &s,
+                    &starts, &end, &startinpos, &endinpos, &exc, &s,
                     (PyObject **)&v, &outpos, &p))
                     goto onError;
             }
@@ -2435,7 +2447,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
             if (unicode_decode_call_errorhandler(
                 errors, &errorHandler,
                 "unicodeescape", message,
-                starts, size, &startinpos, &endinpos, &exc, &s,
+                &starts, &end, &startinpos, &endinpos, &exc, &s,
                 (PyObject **)&v, &outpos, &p))
                 goto onError;
             break;
@@ -2449,7 +2461,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
                 if (unicode_decode_call_errorhandler(
                     errors, &errorHandler,
                     "unicodeescape", message,
-                    starts, size, &startinpos, &endinpos, &exc, &s,
+                    &starts, &end, &startinpos, &endinpos, &exc, &s,
                     (PyObject **)&v, &outpos, &p))
                     goto onError;
             }
@@ -2728,7 +2740,7 @@ PyObject *PyUnicode_DecodeRawUnicodeEscape(const char *s,
 		if (unicode_decode_call_errorhandler(
 		    errors, &errorHandler,
 		    "rawunicodeescape", "truncated \\uXXXX",
-		    starts, size, &startinpos, &endinpos, &exc, &s,
+		    &starts, &end, &startinpos, &endinpos, &exc, &s,
 		    (PyObject **)&v, &outpos, &p))
 		    goto onError;
 		goto nextByte;
@@ -2746,7 +2758,7 @@ PyObject *PyUnicode_DecodeRawUnicodeEscape(const char *s,
             if (unicode_decode_call_errorhandler(
                     errors, &errorHandler,
                     "rawunicodeescape", "\\Uxxxxxxxx out of range",
-		    starts, size, &startinpos, &endinpos, &exc, &s,
+		    &starts, &end, &startinpos, &endinpos, &exc, &s,
 		    (PyObject **)&v, &outpos, &p))
 		    goto onError;
         }
@@ -2897,7 +2909,7 @@ PyObject *_PyUnicode_DecodeUnicodeInternal(const char *s,
             if (unicode_decode_call_errorhandler(
                     errors, &errorHandler,
                     "unicode_internal", reason,
-                    starts, size, &startinpos, &endinpos, &exc, &s,
+                    &starts, &end, &startinpos, &endinpos, &exc, &s,
                     (PyObject **)&v, &outpos, &p)) {
                 goto onError;
             }
@@ -3277,7 +3289,7 @@ PyObject *PyUnicode_DecodeASCII(const char *s,
 	    if (unicode_decode_call_errorhandler(
 		 errors, &errorHandler,
 		 "ascii", "ordinal not in range(128)",
-		 starts, size, &startinpos, &endinpos, &exc, &s,
+		 &starts, &e, &startinpos, &endinpos, &exc, &s,
 		 (PyObject **)&v, &outpos, &p))
 		goto onError;
 	}
@@ -3578,7 +3590,7 @@ PyObject *PyUnicode_DecodeCharmap(const char *s,
 		if (unicode_decode_call_errorhandler(
 		     errors, &errorHandler,
 		     "charmap", "character maps to <undefined>",
-		     starts, size, &startinpos, &endinpos, &exc, &s,
+		     &starts, &e, &startinpos, &endinpos, &exc, &s,
 		     (PyObject **)&v, &outpos, &p)) {
 		    goto onError;
 		}
@@ -3628,7 +3640,7 @@ PyObject *PyUnicode_DecodeCharmap(const char *s,
 		if (unicode_decode_call_errorhandler(
 		     errors, &errorHandler,
 		     "charmap", "character maps to <undefined>",
-		     starts, size, &startinpos, &endinpos, &exc, &s,
+		     &starts, &e, &startinpos, &endinpos, &exc, &s,
 		     (PyObject **)&v, &outpos, &p)) {
 		    Py_DECREF(x);
 		    goto onError;
@@ -6283,7 +6295,7 @@ PyDoc_STRVAR(find__doc__,
 "S.find(sub [,start [,end]]) -> int\n\
 \n\
 Return the lowest index in S where substring sub is found,\n\
-such that sub is contained within s[start,end].  Optional\n\
+such that sub is contained within s[start:end].  Optional\n\
 arguments start and end are interpreted as in slice notation.\n\
 \n\
 Return -1 on failure.");
@@ -7137,7 +7149,7 @@ PyDoc_STRVAR(rfind__doc__,
 "S.rfind(sub [,start [,end]]) -> int\n\
 \n\
 Return the highest index in S where substring sub is found,\n\
-such that sub is contained within s[start,end].  Optional\n\
+such that sub is contained within s[start:end].  Optional\n\
 arguments start and end are interpreted as in slice notation.\n\
 \n\
 Return -1 on failure.");
@@ -8561,9 +8573,9 @@ unicode_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyDoc_STRVAR(unicode_doc,
-"unicode(string [, encoding[, errors]]) -> object\n\
+"str(string [, encoding[, errors]]) -> object\n\
 \n\
-Create a new Unicode object from the given encoded string.\n\
+Create a new string object from the given encoded string.\n\
 encoding defaults to the current default string encoding.\n\
 errors can be 'strict', 'replace' or 'ignore' and defaults to 'strict'.");
 

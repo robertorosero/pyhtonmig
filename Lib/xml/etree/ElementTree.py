@@ -625,25 +625,26 @@ class ElementTree:
     # Writes the element tree to a file, as XML.
     #
     # @param file A file name, or a file object opened for writing.
-    # @param encoding Optional output encoding (default is US-ASCII).
+    # @param encoding Optional output encoding (default is None)
 
-    def write(self, file, encoding="us-ascii"):
+    def write(self, file, encoding=None):
         assert self._root is not None
         if not hasattr(file, "write"):
-            file = open(file, "wb")
-        if not encoding:
-            encoding = "us-ascii"
-        elif encoding != "utf-8" and encoding != "us-ascii":
-            file.write("<?xml version='1.0' encoding='%s'?>\n" % encoding)
+            if encoding:
+                file = open(file, "wb")
+            else:
+                file = open(file, "w")
+        if encoding and encoding != "utf-8":
+            file.write(_encode("<?xml version='1.0' encoding='%s'?>\n" % encoding, encoding))
         self._write(file, self._root, encoding, {})
 
     def _write(self, file, node, encoding, namespaces):
         # write XML to file
         tag = node.tag
         if tag is Comment:
-            file.write("<!-- %s -->" % _escape_cdata(node.text, encoding))
+            file.write(_encode("<!-- %s -->" % _escape_cdata(node.text), encoding))
         elif tag is ProcessingInstruction:
-            file.write("<?%s?>" % _escape_cdata(node.text, encoding))
+            file.write(_encode("<?%s?>" % _escape_cdata(node.text), encoding))
         else:
             items = list(node.items())
             xmlns_items = [] # new namespaces in this scope
@@ -653,7 +654,7 @@ class ElementTree:
                     if xmlns: xmlns_items.append(xmlns)
             except TypeError:
                 _raise_serialization_error(tag)
-            file.write("<" + _encode(tag, encoding))
+            file.write(_encode("<" + tag, encoding))
             if items or xmlns_items:
                 items.sort() # lexical order
                 for k, v in items:
@@ -669,24 +670,22 @@ class ElementTree:
                             if xmlns: xmlns_items.append(xmlns)
                     except TypeError:
                         _raise_serialization_error(v)
-                    file.write(" %s=\"%s\"" % (_encode(k, encoding),
-                                               _escape_attrib(v, encoding)))
+                    file.write(_encode(" %s=\"%s\"" % (k, _escape_attrib(v)), encoding))
                 for k, v in xmlns_items:
-                    file.write(" %s=\"%s\"" % (_encode(k, encoding),
-                                               _escape_attrib(v, encoding)))
+                    file.write(_encode(" %s=\"%s\"" % (k, _escape_attrib(v)), encoding))
             if node.text or len(node):
-                file.write(">")
+                file.write(_encode(">", encoding))
                 if node.text:
-                    file.write(_escape_cdata(node.text, encoding))
+                    file.write(_encode(_escape_cdata(node.text), encoding))
                 for n in node:
                     self._write(file, n, encoding, namespaces)
-                file.write("</" + _encode(tag, encoding) + ">")
+                file.write(_encode("</" + tag + ">", encoding))
             else:
-                file.write(" />")
+                file.write(_encode(" />", encoding))
             for k, v in xmlns_items:
                 del namespaces[v]
         if node.tail:
-            file.write(_escape_cdata(node.tail, encoding))
+            file.write(_encode(_escape_cdata(node.tail), encoding))
 
 # --------------------------------------------------------------------
 # helpers
@@ -722,15 +721,12 @@ def dump(elem):
         sys.stdout.write("\n")
 
 def _encode(s, encoding):
-    try:
+    if encoding:
         return s.encode(encoding)
-    except AttributeError:
-        return s # 1.5.2: assume the string uses the right encoding
+    else:
+        return s
 
-if sys.version[:3] == "1.5":
-    _escape = re.compile(r"[&<>\"\x80-\xff]+") # 1.5.2
-else:
-    _escape = re.compile(eval(r'u"[&<>\"\u0080-\uffff]+"'))
+_escape = re.compile(r"[&<>\"\u0080-\uffff]+")
 
 _escape_map = {
     "&": "&amp;",
@@ -772,14 +768,9 @@ def _encode_entity(text, pattern=_escape):
 # the following functions assume an ascii-compatible encoding
 # (or "utf-16")
 
-def _escape_cdata(text, encoding=None):
+def _escape_cdata(text):
     # escape character data
     try:
-        if encoding:
-            try:
-                text = _encode(text, encoding)
-            except UnicodeError:
-                return _encode_entity(text)
         text = text.replace("&", "&amp;")
         text = text.replace("<", "&lt;")
         text = text.replace(">", "&gt;")
@@ -787,14 +778,9 @@ def _escape_cdata(text, encoding=None):
     except (TypeError, AttributeError):
         _raise_serialization_error(text)
 
-def _escape_attrib(text, encoding=None):
+def _escape_attrib(text):
     # escape attribute value
     try:
-        if encoding:
-            try:
-                text = _encode(text, encoding)
-            except UnicodeError:
-                return _encode_entity(text)
         text = text.replace("&", "&amp;")
         text = text.replace("'", "&apos;") # FIXME: overkill
         text = text.replace("\"", "&quot;")
@@ -969,10 +955,11 @@ fromstring = XML
 
 ##
 # Generates a string representation of an XML element, including all
-# subelements.
+# subelements.  If encoding is None, the return type is a string;
+# otherwise it is a bytes array.
 #
 # @param element An Element instance.
-# @return An encoded string containing the XML data.
+# @return An (optionally) encoded string containing the XML data.
 # @defreturn string
 
 def tostring(element, encoding=None):
@@ -982,7 +969,10 @@ def tostring(element, encoding=None):
     file = dummy()
     file.write = data.append
     ElementTree(element).write(file, encoding)
-    return "".join(data)
+    if encoding:
+        return b"".join(data)
+    else:
+        return "".join(data)
 
 ##
 # Generic element structure builder.  This builder converts a sequence
@@ -1114,19 +1104,10 @@ class XMLTreeBuilder:
             parser.StartElementHandler = self._start_list
         except AttributeError:
             pass
-        encoding = None
-        if not parser.returns_unicode:
-            encoding = "utf-8"
+        encoding = "utf-8"
         # target.xml(encoding, None)
         self._doctype = None
         self.entity = {}
-
-    def _fixtext(self, text):
-        # convert text string to ascii, if possible
-        try:
-            return _encode(text, "ascii")
-        except UnicodeError:
-            return text
 
     def _fixname(self, key):
         # expand qname, and convert name string to ascii, if possible
@@ -1136,7 +1117,7 @@ class XMLTreeBuilder:
             name = key
             if "}" in name:
                 name = "{" + name
-            self._names[key] = name = self._fixtext(name)
+            self._names[key] = name
         return name
 
     def _start(self, tag, attrib_in):
@@ -1144,7 +1125,7 @@ class XMLTreeBuilder:
         tag = fixname(tag)
         attrib = {}
         for key, value in attrib_in.items():
-            attrib[fixname(key)] = self._fixtext(value)
+            attrib[fixname(key)] = value
         return self._target.start(tag, attrib)
 
     def _start_list(self, tag, attrib_in):
@@ -1153,11 +1134,11 @@ class XMLTreeBuilder:
         attrib = {}
         if attrib_in:
             for i in range(0, len(attrib_in), 2):
-                attrib[fixname(attrib_in[i])] = self._fixtext(attrib_in[i+1])
+                attrib[fixname(attrib_in[i])] = attrib_in[i+1]
         return self._target.start(tag, attrib)
 
     def _data(self, text):
-        return self._target.data(self._fixtext(text))
+        return self._target.data(text)
 
     def _end(self, tag):
         return self._target.end(self._fixname(tag))

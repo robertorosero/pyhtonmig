@@ -205,7 +205,7 @@ format_double(char *buf, size_t buflen, double ob_fval, int precision)
 {
 	register char *cp;
 	char format[32];
-	/* Subroutine for float_repr, float_str, float_print and others.
+	/* Subroutine for float_repr, float_str, and others.
 	   We want float numbers to be recognizable as such,
 	   i.e., they should contain a decimal point or an exponent.
 	   However, %g may print the number as an integer;
@@ -285,17 +285,6 @@ convert_to_double(PyObject **v, double *dbl)
 
 #define PREC_REPR	17
 #define PREC_STR	12
-
-/* ARGSUSED */
-static int
-float_print(PyFloatObject *v, FILE *fp, int flags)
-{
-	char buf[100];
-	format_float(buf, sizeof(buf), v,
-		     (flags & Py_PRINT_RAW) ? PREC_STR : PREC_REPR);
-	fputs(buf, fp);
-	return 0;
-}
 
 static PyObject *
 float_repr(PyFloatObject *v)
@@ -742,17 +731,6 @@ float_neg(PyFloatObject *v)
 }
 
 static PyObject *
-float_pos(PyFloatObject *v)
-{
-	if (PyFloat_CheckExact(v)) {
-		Py_INCREF(v);
-		return (PyObject *)v;
-	}
-	else
-		return PyFloat_FromDouble(v->ob_fval);
-}
-
-static PyObject *
 float_abs(PyFloatObject *v)
 {
 	return PyFloat_FromDouble(fabs(v->ob_fval));
@@ -989,13 +967,33 @@ PyDoc_STRVAR(float_setformat_doc,
 "Overrides the automatic determination of C-level floating point type.\n"
 "This affects how floats are converted to and from binary strings.");
 
+static PyObject *
+float_getzero(PyObject *v, void *closure)
+{
+	return PyFloat_FromDouble(0.0);
+}
+
 static PyMethodDef float_methods[] = {
+  	{"conjugate",	(PyCFunction)float_float,	METH_NOARGS,
+	 "Returns self, the complex conjugate of any float."},
 	{"__getnewargs__",	(PyCFunction)float_getnewargs,	METH_NOARGS},
 	{"__getformat__",	(PyCFunction)float_getformat,	
 	 METH_O|METH_CLASS,		float_getformat_doc},
 	{"__setformat__",	(PyCFunction)float_setformat,	
 	 METH_VARARGS|METH_CLASS,	float_setformat_doc},
 	{NULL,		NULL}		/* sentinel */
+};
+
+static PyGetSetDef float_getset[] = {
+    {"real", 
+     (getter)float_float, (setter)NULL,
+     "the real part of a complex number",
+     NULL},
+    {"imag", 
+     (getter)float_getzero, (setter)NULL,
+     "the imaginary part of a complex number",
+     NULL},
+    {NULL}  /* Sentinel */
 };
 
 PyDoc_STRVAR(float_doc,
@@ -1012,7 +1010,7 @@ static PyNumberMethods float_as_number = {
 	float_divmod, 	/*nb_divmod*/
 	float_pow, 	/*nb_power*/
 	(unaryfunc)float_neg, /*nb_negative*/
-	(unaryfunc)float_pos, /*nb_positive*/
+	(unaryfunc)float_float, /*nb_positive*/
 	(unaryfunc)float_abs, /*nb_absolute*/
 	(inquiry)float_bool, /*nb_bool*/
 	0,		/*nb_invert*/
@@ -1049,7 +1047,7 @@ PyTypeObject PyFloat_Type = {
 	sizeof(PyFloatObject),
 	0,
 	(destructor)float_dealloc,		/* tp_dealloc */
-	(printfunc)float_print, 		/* tp_print */
+	0,			 		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,			 		/* tp_compare */
@@ -1073,7 +1071,7 @@ PyTypeObject PyFloat_Type = {
 	0,					/* tp_iternext */
 	float_methods,				/* tp_methods */
 	0,					/* tp_members */
-	0,					/* tp_getset */
+	float_getset,				/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */

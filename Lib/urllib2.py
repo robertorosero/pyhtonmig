@@ -679,7 +679,7 @@ class ProxyHandler(BaseHandler):
             proxy_type = orig_type
         if user and password:
             user_pass = '%s:%s' % (unquote(user), unquote(password))
-            creds = base64.b64encode(user_pass).strip()
+            creds = str(base64.b64encode(user_pass)).strip()
             req.add_header('Proxy-authorization', 'Basic ' + creds)
         hostport = unquote(hostport)
         req.set_proxy(hostport, proxy_type)
@@ -802,7 +802,7 @@ class AbstractBasicAuthHandler:
         user, pw = self.passwd.find_user_password(realm, host)
         if pw is not None:
             raw = "%s:%s" % (user, pw)
-            auth = 'Basic %s' % base64.b64encode(raw).strip()
+            auth = 'Basic %s' % str(base64.b64encode(raw)).strip()
             if req.headers.get(self.auth_header, None) == auth:
                 return None
             req.add_header(self.auth_header, auth)
@@ -1072,6 +1072,10 @@ class AbstractHTTPHandler(BaseHandler):
         # Pick apart the HTTPResponse object to get the addinfourl
         # object initialized properly.
 
+        # XXX Should an HTTPResponse object really be passed to
+        # BufferedReader?  If so, we should change httplib to support
+        # this use directly.
+
         # Add some fake methods to the reader to satisfy BufferedReader.
         r.readable = lambda: True
         r.writable = r.seekable = lambda: False
@@ -1283,7 +1287,6 @@ class FTPHandler(BaseHandler):
 
     def connect_ftp(self, user, passwd, host, port, dirs, timeout):
         fw = ftpwrapper(user, passwd, host, port, dirs, timeout)
-##        fw.ftp.set_debuglevel(1)
         return fw
 
 class CacheFTPHandler(FTPHandler):

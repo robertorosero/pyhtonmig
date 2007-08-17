@@ -303,6 +303,8 @@ class IOBase:
 
         Returns False if we don't know.
         """
+        if self.closed:
+            raise ValueError("isatty() on closed file")
         return False
 
     ### Readline[s] and writelines ###
@@ -440,58 +442,6 @@ class FileIO(_fileio._FileIO, RawIOBase):
     @property
     def mode(self):
         return self._mode
-
-
-class SocketIO(RawIOBase):
-
-    """Raw I/O implementation for stream sockets."""
-
-    # XXX More docs
-
-    def __init__(self, sock, mode):
-        assert mode in ("r", "w", "rw")
-        RawIOBase.__init__(self)
-        self._sock = sock
-        self._mode = mode
-
-    def readinto(self, b):
-        return self._sock.recv_into(b)
-
-    def read(self, n: int = None) -> bytes:
-        """read(n: int) -> bytes.  Read and return up to n bytes.
-
-        Returns an empty bytes array on EOF, or None if the object is
-        set not to block and has no data to read.
-        """
-        if n is None:
-            n = -1
-        if n >= 0:
-            return RawIOBase.read(self, n)
-        # Support reading until the end.
-        # XXX Why doesn't RawIOBase support this?
-        data = b""
-        while True:
-            more = RawIOBase.read(self, DEFAULT_BUFFER_SIZE)
-            if not more:
-                break
-            data += more
-        return data
-
-    def write(self, b):
-        return self._sock.send(b)
-
-    def close(self):
-        if not self.closed:
-            RawIOBase.close(self)
-
-    def readable(self):
-        return "r" in self._mode
-
-    def writable(self):
-        return "w" in self._mode
-
-    def fileno(self):
-        return self._sock.fileno()
 
 
 class BufferedIOBase(IOBase):
@@ -1286,11 +1236,16 @@ class StringIO(TextIOWrapper):
 
     # XXX This is really slow, but fully functional
 
-    def __init__(self, initial_value=""):
-        super(StringIO, self).__init__(BytesIO(), "utf-8")
+    def __init__(self, initial_value="", encoding="utf-8", newline=None):
+        super(StringIO, self).__init__(BytesIO(),
+                                       encoding=encoding,
+                                       newline=newline)
         if initial_value:
+            if not isinstance(initial_value, basestring):
+                initial_value = str(initial_value)
             self.write(initial_value)
             self.seek(0)
 
     def getvalue(self):
-        return self.buffer.getvalue().decode("utf-8")
+        self.flush()
+        return self.buffer.getvalue().decode(self._encoding)

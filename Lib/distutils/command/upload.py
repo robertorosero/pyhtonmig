@@ -14,13 +14,12 @@ import ConfigParser
 import httplib
 import base64
 import urlparse
-import cStringIO as StringIO
 
 class upload(Command):
 
     description = "upload binary package to PyPI"
 
-    DEFAULT_REPOSITORY = 'http://www.python.org/pypi'
+    DEFAULT_REPOSITORY = 'http://pypi.python.org/pypi'
 
     user_options = [
         ('repository=', 'r',
@@ -135,7 +134,7 @@ class upload(Command):
         boundary = '--------------GHSKFJDLGDS7543FJKLFHRE75642756743254'
         sep_boundary = '\n--' + boundary
         end_boundary = sep_boundary + '--'
-        body = StringIO.StringIO()
+        body = io.StringIO()
         for key, value in data.items():
             # handle multiple entries for the same name
             if type(value) != type([]):

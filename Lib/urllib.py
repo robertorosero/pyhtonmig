@@ -81,11 +81,13 @@ def urlopen(url, data=None, proxies=None):
         return opener.open(url)
     else:
         return opener.open(url, data)
+
 def urlretrieve(url, filename=None, reporthook=None, data=None):
     global _urlopener
     if not _urlopener:
         _urlopener = FancyURLopener()
     return _urlopener.retrieve(url, filename, reporthook, data)
+
 def urlcleanup():
     if _urlopener:
         _urlopener.cleanup()
@@ -310,37 +312,44 @@ class URLopener:
             auth = base64.b64encode(user_passwd).strip()
         else:
             auth = None
-        h = httplib.HTTP(host)
+        http_conn = httplib.HTTPConnection(host)
+        # XXX We should fix urllib so that it works with HTTP/1.1.
+        http_conn._http_vsn = 10
+        http_conn._http_vsn_str = "HTTP/1.0"
+
+        headers = {}
+        if proxy_auth:
+            headers["Proxy-Authorization"] = "Basic %s" % proxy_auth
+        if auth:
+            headers["Authorization"] =  "Basic %s" % auth
+        if realhost:
+            headers["Host"] = realhost
+        for header, value in self.addheaders:
+            headers[header] = value
+
         if data is not None:
-            h.putrequest('POST', selector)
-            h.putheader('Content-Type', 'application/x-www-form-urlencoded')
-            h.putheader('Content-Length', '%d' % len(data))
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+            http_conn.request("POST", selector, data, headers)
         else:
-            h.putrequest('GET', selector)
-        if proxy_auth: h.putheader('Proxy-Authorization', 'Basic %s' % proxy_auth)
-        if auth: h.putheader('Authorization', 'Basic %s' % auth)
-        if realhost: h.putheader('Host', realhost)
-        for args in self.addheaders: h.putheader(*args)
-        h.endheaders()
-        if data is not None:
-            h.send(data)
-        errcode, errmsg, headers = h.getreply()
-        fp = h.getfile()
-        if errcode == -1:
-            if fp: fp.close()
+            http_conn.request("GET", selector, headers=headers)
+
+        try:
+            response = http_conn.getresponse()
+        except httplib.BadStatusLine:
             # something went wrong with the HTTP status line
-            raise IOError, ('http protocol error', 0,
-                            'got a bad status line', None)
-        if errcode == 200:
-            return addinfourl(fp, headers, "http:" + url)
+            raise IOError('http protocol error', 0,
+                          'got a bad status line', None)
+
+        if response.status == 200:
+            return addinfourl(response.fp, response.msg, "http:" + url)
         else:
-            if data is None:
-                return self.http_error(url, fp, errcode, errmsg, headers)
-            else:
-                return self.http_error(url, fp, errcode, errmsg, headers, data)
+            return self.http_error(
+                url, response.fp,
+                response.status, response.reason, response.msg, data)
 
     def http_error(self, url, fp, errcode, errmsg, headers, data=None):
         """Handle http errors.
+
         Derived class can override this, or provide specific handlers
         named http_error_DDD where DDD is the 3-digit error code."""
         # First check if there's a specific handler for this error
@@ -872,6 +881,8 @@ class ftpwrapper:
 class addbase:
     """Base class for addinfo and addclosehook."""
 
+    # XXX Add a method to expose the timeout on the underlying socket?
+
     def __init__(self, fp):
         self.fp = fp
         self.read = self.fp.read
@@ -1133,7 +1144,23 @@ def unquote_plus(s):
 always_safe = ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'
                'abcdefghijklmnopqrstuvwxyz'
                '0123456789' '_.-')
-_safemaps = {}
+_safe_quoters= {}
+
+class Quoter:
+    def __init__(self, safe):
+        self.cache = {}
+        self.safe = safe + always_safe
+
+    def __call__(self, c):
+        try:
+            return self.cache[c]
+        except KeyError:
+            if ord(c) < 256:
+                res = (c in self.safe) and c or ('%%%02X' % ord(c))
+                self.cache[c] = res
+                return res
+            else:
+                return "".join(['%%%02X' % i for i in c.encode("utf-8")])
 
 def quote(s, safe = '/'):
     """quote('abc def') -> 'abc%20def'
@@ -1158,15 +1185,11 @@ def quote(s, safe = '/'):
     """
     cachekey = (safe, always_safe)
     try:
-        safe_map = _safemaps[cachekey]
+        quoter = _safe_quoters[cachekey]
     except KeyError:
-        safe += always_safe
-        safe_map = {}
-        for i in range(256):
-            c = chr(i)
-            safe_map[c] = (c in safe) and c or ('%%%02X' % i)
-        _safemaps[cachekey] = safe_map
-    res = map(safe_map.__getitem__, s)
+        quoter = Quoter(safe)
+        _safe_quoters[cachekey] = quoter
+    res = map(quoter, s)
     return ''.join(res)
 
 def quote_plus(s, safe = ''):

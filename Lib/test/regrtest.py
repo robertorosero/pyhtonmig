@@ -125,7 +125,7 @@ import getopt
 import random
 import warnings
 import re
-import StringIO
+import io
 import traceback
 
 # I see no other way to suppress these warnings;
@@ -537,7 +537,7 @@ def runtest_inner(test, generate, verbose, quiet,
     if verbose:
         cfp = None
     else:
-        cfp = StringIO.StringIO()  # XXX Should use io.StringIO()
+        cfp = io.StringIO()  # XXX Should use io.StringIO()
 
     try:
         save_stdout = sys.stdout
@@ -1106,8 +1106,6 @@ class _ExpectedSkips:
             self.expected = set(s.split())
 
             # expected to be skipped on every platform, even Linux
-            self.expected.add('test_linuxaudiodev')
-
             if not os.path.supports_unicode_filenames:
                 self.expected.add('test_pep277')
 
@@ -1134,7 +1132,6 @@ class _ExpectedSkips:
                     self.expected.add(skip)
 
             if sys.platform != 'sunos5':
-                self.expected.add('test_sunaudiodev')
                 self.expected.add('test_nis')
 
             self.valid = True

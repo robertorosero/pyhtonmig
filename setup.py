@@ -460,9 +460,6 @@ class PyBuildExt(build_ext):
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )
 
-        # cStringIO
-        exts.append( Extension('cStringIO', ['cStringIO.c']) )
-
         # Memory-mapped files (also works on Win32).
         if platform not in ['atheos', 'mac']:
             exts.append( Extension('mmap', ['mmapmodule.c']) )
@@ -1074,23 +1071,11 @@ class PyBuildExt(build_ext):
         exts.append(Extension('_fileio', ['_fileio.c']))
 
         # Platform-specific libraries
-        if platform == 'linux2':
-            # Linux-specific modules
-            exts.append( Extension('linuxaudiodev', ['linuxaudiodev.c']) )
-        else:
-            missing.append('linuxaudiodev')
-
         if platform in ('linux2', 'freebsd4', 'freebsd5', 'freebsd6',
                         'freebsd7'):
             exts.append( Extension('ossaudiodev', ['ossaudiodev.c']) )
         else:
             missing.append('ossaudiodev')
-
-        if platform == 'sunos5':
-            # SunOS specific modules
-            exts.append( Extension('sunaudiodev', ['sunaudiodev.c']) )
-        else:
-            missing.append('sunaudiodev')
 
         if platform == 'darwin' and ("--disable-toolbox-glue" not in
                 sysconfig.get_config_var("CONFIG_ARGS")):

@@ -145,12 +145,10 @@ typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 typedef struct bufferinfo {
 	void *buf;         
         Py_ssize_t len;
+        Py_ssize_t itemsize;  
         int readonly;
-        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can
-                                 be the strides array for the most
-                                 common case */
+        int ndim 
         char *format;
-        int ndim;
         Py_ssize_t *shape;
         Py_ssize_t *strides;
         Py_ssize_t *suboffsets;

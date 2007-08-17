@@ -1579,7 +1579,8 @@ valid_identifier(PyObject *s)
 	if (n == 0)
 		n = 1;
 	for (i = 0; i < n; i++, p++) {
-		if (i > 255 || (!(i == 0 ? isalpha(*p) : isalnum(*p)) && *p != '_')) {
+		if (*p > 127 ||
+		    (!(i == 0 ? isalpha(*p) : isalnum(*p)) && *p != '_')) {
 			PyErr_SetString(PyExc_TypeError,
 					"__slots__ must be identifiers");
 			return 0;
@@ -2200,11 +2201,21 @@ type_subclasses(PyTypeObject *type, PyObject *args_ignored)
 	return list;
 }
 
+static PyObject *
+type_prepare(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	return PyDict_New();
+}
+
 static PyMethodDef type_methods[] = {
 	{"mro", (PyCFunction)mro_external, METH_NOARGS,
 	 PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
 	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
 	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
+        {"__prepare__", (PyCFunction)type_prepare,
+	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
+         PyDoc_STR("__prepare__() -> dict\n"
+                   "used to create the namespace for the class statement")},
 	{0}
 };
 
@@ -3247,7 +3258,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	basebase = base->tp_base;
 
 	COPYSLOT(tp_dealloc);
-	COPYSLOT(tp_print);
 	if (type->tp_getattr == NULL && type->tp_getattro == NULL) {
 		type->tp_getattr = base->tp_getattr;
 		type->tp_getattro = base->tp_getattro;
@@ -5199,10 +5209,8 @@ static slotdef slotdefs[] = {
 
 	TPSLOT("__str__", tp_str, slot_tp_str, wrap_unaryfunc,
 	       "x.__str__() <==> str(x)"),
-	TPSLOT("__str__", tp_print, NULL, NULL, ""),
 	TPSLOT("__repr__", tp_repr, slot_tp_repr, wrap_unaryfunc,
 	       "x.__repr__() <==> repr(x)"),
-	TPSLOT("__repr__", tp_print, NULL, NULL, ""),
 	TPSLOT("__cmp__", tp_compare, _PyObject_SlotCompare, wrap_cmpfunc,
 	       "x.__cmp__(y) <==> cmp(x,y)"),
 	TPSLOT("__hash__", tp_hash, slot_tp_hash, wrap_hashfunc,

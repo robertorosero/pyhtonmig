@@ -203,7 +203,8 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
         c.c_encoding = STR(n);
         n = CHILD(n, 0);
     } else {
-        c.c_encoding = NULL;
+	/* PEP 3120 */
+        c.c_encoding = "utf-8";
     }
     c.c_arena = arena;
 
@@ -3111,6 +3112,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
     return v;
 }
 
+#ifdef Py_USING_UNICODE
 static PyObject *
 decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 {
@@ -3173,6 +3175,7 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
     Py_XDECREF(u);
     return v;
 }
+#endif
 
 /* s is a Python string literal, including the bracketing quote characters,
  * and r &/or u prefixes (if any), and embedded escape sequences (if any).

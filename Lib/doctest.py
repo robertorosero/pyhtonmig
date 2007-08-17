@@ -98,7 +98,7 @@ import __future__
 import sys, traceback, inspect, linecache, os, re
 import unittest, difflib, pdb, tempfile
 import warnings
-from StringIO import StringIO
+from io import StringIO
 
 # There are 4 basic classes:
 #  - Example: a <source, want> pair, plus an intra-docstring line number.
@@ -209,7 +209,7 @@ def _load_testfile(filename, package, module_relative):
         filename = _module_relative_path(package, filename)
         if hasattr(package, '__loader__'):
             if hasattr(package.__loader__, 'get_data'):
-                return package.__loader__.get_data(filename), filename
+                return package.__loader__.get_data(filename).decode('utf-8'), filename
     return open(filename, encoding="utf-8").read(), filename
 
 def _indent(s, indent=4):

@@ -565,56 +565,14 @@ set_dealloc(PySetObject *so)
 	Py_TRASHCAN_SAFE_END(so)
 }
 
-static int
-set_tp_print(PySetObject *so, FILE *fp, int flags)
-{
-	setentry *entry;
-	Py_ssize_t pos=0;
-	char *emit = "";	/* No separator emitted on first pass */
-	char *separator = ", ";
-	int literalform = 0;
-	int status = Py_ReprEnter((PyObject*)so);
-
-	if (status != 0) {
-		if (status < 0)
-			return status;
-		fprintf(fp, "%s(...)", Py_Type(so)->tp_name);
-		return 0;
-	}        
-
-	if (!so->used) {
-		Py_ReprLeave((PyObject*)so);
-		fprintf(fp, "%s()", Py_Type(so)->tp_name);
-		return 0;
-	}
-
-	if (Py_Type(so) == &PySet_Type) {
-		literalform = 1;
-		fprintf(fp, "{");
-	} else
-		fprintf(fp, "%s([", Py_Type(so)->tp_name);
-	while (set_next(so, &pos, &entry)) {
-		fputs(emit, fp);
-		emit = separator;
-		if (PyObject_Print(entry->key, fp, 0) != 0) {
-			Py_ReprLeave((PyObject*)so);
-			return -1;
-		}
-	}
-	if (literalform)
-		fputs("}", fp);
-	else
-		fputs("])", fp);
-	Py_ReprLeave((PyObject*)so);
-	return 0;
-}
-
 static PyObject *
 set_repr(PySetObject *so)
 {
 	PyObject *keys, *result=NULL;
 	Py_UNICODE *u;
 	int status = Py_ReprEnter((PyObject*)so);
+	PyObject *listrepr;
+	Py_ssize_t newsize;
 
 	if (status != 0) {
 		if (status < 0)
@@ -632,30 +590,30 @@ set_repr(PySetObject *so)
 	if (keys == NULL)
 		goto done;
 
-	if (Py_Type(so) != &PySet_Type) {
-		result = PyUnicode_FromFormat("%s(%R)", Py_Type(so)->tp_name, keys);
+	listrepr = PyObject_Repr(keys);
+	Py_DECREF(keys);
+	if (listrepr == NULL) {
 		Py_DECREF(keys);
+		goto done;
 	}
-	else {
-		PyObject *listrepr = PyObject_Repr(keys);
-		Py_ssize_t newsize;
-		Py_DECREF(keys);
-		if (listrepr == NULL) {
-			Py_DECREF(keys);
-			goto done;
-		}
-		newsize = PyUnicode_GET_SIZE(listrepr);
-		result = PyUnicode_FromUnicode(NULL, newsize);
-		if (result) {
-			u = PyUnicode_AS_UNICODE(result);
-			*u++ = '{';
-			/* Omit the brackets from the listrepr */
-			Py_UNICODE_COPY(u, PyUnicode_AS_UNICODE(listrepr)+1,
-			                   PyUnicode_GET_SIZE(listrepr)-2);
-			u += newsize-2;
-			*u++ = '}';
-		}
-		Py_DECREF(listrepr);
+	newsize = PyUnicode_GET_SIZE(listrepr);
+	result = PyUnicode_FromUnicode(NULL, newsize);
+	if (result) {
+		u = PyUnicode_AS_UNICODE(result);
+		*u++ = '{';
+		/* Omit the brackets from the listrepr */
+		Py_UNICODE_COPY(u, PyUnicode_AS_UNICODE(listrepr)+1,
+				   PyUnicode_GET_SIZE(listrepr)-2);
+		u += newsize-2;
+		*u++ = '}';
+	}
+	Py_DECREF(listrepr);
+	if (Py_Type(so) != &PySet_Type) {
+		PyObject *tmp = PyUnicode_FromFormat("%s(%U)",
+						     Py_Type(so)->tp_name,
+						     result);
+		Py_DECREF(result);
+		result = tmp;
 	}
 done:
 	Py_ReprLeave((PyObject*)so);
@@ -1957,7 +1915,7 @@ PyTypeObject PySet_Type = {
 	0,				/* tp_itemsize */
 	/* methods */
 	(destructor)set_dealloc,	/* tp_dealloc */
-	(printfunc)set_tp_print,	/* tp_print */
+	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
 	set_nocmp,			/* tp_compare */
@@ -2050,7 +2008,7 @@ PyTypeObject PyFrozenSet_Type = {
 	0,				/* tp_itemsize */
 	/* methods */
 	(destructor)set_dealloc,	/* tp_dealloc */
-	(printfunc)set_tp_print,	/* tp_print */
+	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
 	set_nocmp,			/* tp_compare */
