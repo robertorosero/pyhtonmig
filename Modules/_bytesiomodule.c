@@ -183,7 +183,14 @@ bytesio_read(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytesio_read1(BytesIOObject *self, PyObject *n)
 {
-    return bytesio_read(self, Py_BuildValue("(O)", n));
+    PyObject *arg, *res;
+
+    arg = Py_BuildValue("(O)", n);
+    if (arg == NULL)
+        return NULL;
+    res  = bytesio_read(self, arg);
+    Py_DECREF(arg);
+    return res;
 }
 
 static PyObject *
