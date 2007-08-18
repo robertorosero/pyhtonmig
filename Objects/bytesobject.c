@@ -804,13 +804,8 @@ bytes_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
     if (PyObject_CheckBuffer(arg)) {
         Py_ssize_t size;
         PyBuffer view;
-        if (PyObject_GetBuffer(arg, &view, PyBUF_FULL) < 0)
+        if (PyObject_GetBuffer(arg, &view, PyBUF_FULL_RO) < 0)
             return -1;
-        if (view.readonly == 1) {
-                PyErr_SetString(PyExc_BufferError,
-                                "Cannot create a mutable bytes object");
-                goto fail;
-        }
         size = view.len;
         if (PyBytes_Resize((PyObject *)self, size) < 0) goto fail;
         if (PyBuffer_ToContiguous(self->ob_bytes, &view, size, 'C') < 0)

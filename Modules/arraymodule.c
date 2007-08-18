@@ -1736,10 +1736,17 @@ static PyMappingMethods array_as_mapping = {
 	(objobjargproc)array_ass_subscr
 };
 
+static const void *emptybuf = "";
+
 
 static int
 array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
 {
+        if ((flags & PyBUF_CHARACTER)) {
+                PyErr_SetString(PyExc_TypeError,
+                                "Cannot be a character buffer");
+                return -1;
+        }
         if ((flags & PyBUF_LOCKDATA)) {
                 PyErr_SetString(PyExc_BufferError,
                                 "Cannot lock data");
@@ -1748,6 +1755,8 @@ array_buffer_getbuf(arrayobject *self, PyBuffer *view, int flags)
         if (view==NULL) goto finish;
 
         view->buf = (void *)self->ob_item;
+        if (view->buf == NULL)
+                view->buf = (void *)emptybuf;
         view->len = (Py_Size(self)) * self->ob_descr->itemsize;
         view->readonly = 0;
         view->ndim = 1;

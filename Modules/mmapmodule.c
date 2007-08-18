@@ -877,6 +877,7 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 	m_obj->data = NULL;
 	m_obj->size = (size_t) map_size;
 	m_obj->pos = (size_t) 0;
+	m_obj->exports = 0;
 	if (fd == -1) {
 		m_obj->fd = -1;
 		/* Assume the caller wants to map anonymous memory.
@@ -1046,6 +1047,7 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 	/* set the initial position */
 	m_obj->pos = (size_t) 0;
 
+	m_obj->exports = 0;
 	/* set the tag name */
 	if (tagname != NULL && *tagname != '\0') {
 		m_obj->tagname = PyMem_Malloc(strlen(tagname)+1);
