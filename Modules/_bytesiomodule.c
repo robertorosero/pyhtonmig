@@ -185,7 +185,7 @@ bytesio_read1(BytesIOObject *self, PyObject *n)
 {
     PyObject *arg, *res;
 
-    arg = Py_BuildValue("(O)", n);
+    arg = PyTuple_Pack(1, n);
     if (arg == NULL)
         return NULL;
     res  = bytesio_read(self, arg);
