@@ -70,7 +70,7 @@ be of the form stab:run:fname where 'stab' is the number of times the
 test is run to let gettotalrefcount settle down, 'run' is the number
 of times further it is run and 'fname' is the name of the file the
 reports are written to.  These parameters all have defaults (5, 4 and
-"reflog.txt" respectively), so the minimal invocation is '-R ::'.
+"reflog.txt" respectively), and the minimal invocation is '-R :'.
 
 -M runs tests that require an exorbitant amount of memory. These tests
 typically try to ascertain containers keep working when containing more than
@@ -175,16 +175,16 @@ RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb',
                   'decimal', 'compiler', 'subprocess', 'urlfetch')
 
 
-def usage(code, msg=''):
-    print(__doc__)
-    if msg: print(msg)
-    sys.exit(code)
+def usage(msg):
+    print(msg, file=sys.stderr)
+    print("Use --help for usage", file=sys.stderr)
+    sys.exit(2)
 
 
 def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
-         runleaks=False, huntrleaks=False, verbose2=False, debug=False,
+         runleaks=False, huntrleaks=None, verbose2=False, debug=False,
          start=None):
     """Execute a test suite.
 
@@ -219,14 +219,15 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
                                     'debug', 'start='
                                     ])
     except getopt.error as msg:
-        usage(2, msg)
+        usage(msg)
 
     # Defaults
     if use_resources is None:
         use_resources = []
     for o, a in opts:
         if o in ('-h', '--help'):
-            usage(0)
+            print(__doc__)
+            return
         elif o in ('-v', '--verbose'):
             verbose += 1
         elif o in ('-w', '--verbose2'):
@@ -263,19 +264,19 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             coverdir = None
         elif o in ('-R', '--huntrleaks'):
             huntrleaks = a.split(':')
-            if len(huntrleaks) != 3:
+            if len(huntrleaks) not in (2, 3):
                 print(a, huntrleaks)
-                usage(2, '-R takes three colon-separated arguments')
-            if len(huntrleaks[0]) == 0:
+                usage('-R takes 2 or 3 colon-separated arguments')
+            if not huntrleaks[0]:
                 huntrleaks[0] = 5
             else:
                 huntrleaks[0] = int(huntrleaks[0])
-            if len(huntrleaks[1]) == 0:
+            if not huntrleaks[1]:
                 huntrleaks[1] = 4
             else:
                 huntrleaks[1] = int(huntrleaks[1])
-            if len(huntrleaks[2]) == 0:
-                huntrleaks[2] = "reflog.txt"
+            if len(huntrleaks) == 2 or not huntrleaks[2]:
+                huntrleaks[2:] = ["reflog.txt"]
         elif o in ('-M', '--memlimit'):
             test_support.set_memlimit(a)
         elif o in ('-u', '--use'):
@@ -289,16 +290,16 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
                     remove = True
                     r = r[1:]
                 if r not in RESOURCE_NAMES:
-                    usage(1, 'Invalid -u/--use option: ' + a)
+                    usage('Invalid -u/--use option: ' + a)
                 if remove:
                     if r in use_resources:
                         use_resources.remove(r)
                 elif r not in use_resources:
                     use_resources.append(r)
     if generate and verbose:
-        usage(2, "-g and -v don't go together!")
+        usage("-g and -v don't go together!")
     if single and fromfile:
-        usage(2, "-s and -f don't go together!")
+        usage("-s and -f don't go together!")
 
     good = []
     bad = []
@@ -517,7 +518,7 @@ def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
     return stdtests + tests
 
 def runtest(test, generate, verbose, quiet, testdir=None,
-            huntrleaks=False, debug=False):
+            huntrleaks=None, debug=False):
     """Run a single test.
 
     test -- the name of the test
@@ -544,7 +545,7 @@ def runtest(test, generate, verbose, quiet, testdir=None,
         cleanup_test_droppings(test, verbose)
 
 def runtest_inner(test, generate, verbose, quiet,
-                     testdir=None, huntrleaks=False, debug=False):
+                     testdir=None, huntrleaks=None, debug=False):
     test_support.unload(test)
     if not testdir:
         testdir = findtestdir()
@@ -669,7 +670,7 @@ def cleanup_test_droppings(testname, verbose):
 
 def dash_R(the_module, test, indirect_test, huntrleaks):
     # This code is hackish and inelegant, but it seems to do the job.
-    import copy_reg
+    import copy_reg, _abcoll
 
     if not hasattr(sys, 'gettotalrefcount'):
         raise Exception("Tracking reference leaks requires a debug build "
@@ -679,6 +680,9 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
     fs = warnings.filters[:]
     ps = copy_reg.dispatch_table.copy()
     pic = sys.path_importer_cache.copy()
+    abcs = {obj: obj._ABCMeta__registry.copy()
+            for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]
+            for obj in abc.__subclasses__() + [abc]}
 
     if indirect_test:
         def run_the_test():
@@ -693,13 +697,13 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
     repcount = nwarmup + ntracked
     print("beginning", repcount, "repetitions", file=sys.stderr)
     print(("1234567890"*(repcount//10 + 1))[:repcount], file=sys.stderr)
-    dash_R_cleanup(fs, ps, pic)
+    dash_R_cleanup(fs, ps, pic, abcs)
     for i in range(repcount):
         rc = sys.gettotalrefcount()
         run_the_test()
         sys.stderr.write('.')
         sys.stderr.flush()
-        dash_R_cleanup(fs, ps, pic)
+        dash_R_cleanup(fs, ps, pic, abcs)
         if i >= nwarmup:
             deltas.append(sys.gettotalrefcount() - rc - 2)
     print(file=sys.stderr)
@@ -710,7 +714,7 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
         print(msg, file=refrep)
         refrep.close()
 
-def dash_R_cleanup(fs, ps, pic):
+def dash_R_cleanup(fs, ps, pic, abcs):
     import gc, copy_reg
     import _strptime, linecache, dircache
     import urlparse, urllib, urllib2, mimetypes, doctest
@@ -724,10 +728,10 @@ def dash_R_cleanup(fs, ps, pic):
     sys.path_importer_cache.clear()
     sys.path_importer_cache.update(pic)
 
-    # Clear ABC registries.
+    # Clear ABC registries, restoring previously saved ABC registries.
     for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
         for obj in abc.__subclasses__() + [abc]:
-            obj._ABCMeta__registry.clear()
+            obj._ABCMeta__registry = abcs.get(obj, {}).copy()
             obj._ABCMeta__cache.clear()
             obj._ABCMeta__negative_cache.clear()
 
