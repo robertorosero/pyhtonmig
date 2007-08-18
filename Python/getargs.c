@@ -1222,7 +1222,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				"string or read-only character buffer",
 				arg, msgbuf, bufsize);
 
-		if ((*pb->bf_getbuffer)(arg, &view, PyBUF_SIMPLE) != 0) 
+		if ((*pb->bf_getbuffer)(arg, &view, PyBUF_CHARACTER) != 0) 
 			return converterr("string or single-segment read-only buffer",
                                           arg, msgbuf, bufsize);
 
@@ -1257,6 +1257,7 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 	Py_ssize_t count;
         PyBuffer view;
 
+        *errmsg = NULL;
         *p = NULL;
 	if (pb == NULL ||
 	    pb->bf_getbuffer == NULL) {
