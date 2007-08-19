@@ -118,31 +118,6 @@ stringio_getvalue(StringIOObject *self)
     return PyUnicode_FromUnicode(self->buf, self->string_size);
 }
 
-/* Not exposed as a method of StringIO. */
-static int
-stringio_setvalue(StringIOObject *self, PyObject *value)
-{
-    self->pos = 0;
-    self->string_size = 0;
-
-    if (value == NULL)
-        return 0;
-
-    if (!PyUnicode_Check(value)) {
-        PyErr_SetString(PyExc_TypeError, "need a unicode object");
-        return -1;
-    }
-    if ((write_str(self, PyUnicode_AsUnicode(value),
-                   PyUnicode_GetSize(value))) < 0) {
-        return -1;  /* out of memory */
-    }
-    /* Reset the position back to beginning-of-file, since
-       write_str changed it. */
-    self->pos = 0;
-
-    return 0;
-}
-
 static PyObject *
 stringio_isatty(StringIOObject *self)
 {
@@ -557,8 +532,6 @@ PyDoc_STRVAR(generic_true_doc, "Always True.");
 static PyGetSetDef StringIO_getsetlist[] = {
     {"closed", (getter)stringio_get_closed, NULL,
      "True if the file is closed"},
-    {"_buffer", (getter)stringio_getvalue, (setter)stringio_setvalue,
-     NULL},
     {0},            /* sentinel */
 };
 

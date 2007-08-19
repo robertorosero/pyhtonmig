@@ -118,32 +118,6 @@ bytesio_getvalue(BytesIOObject *self)
     return PyBytes_FromStringAndSize(self->buf, self->string_size);
 }
 
-/* Not exposed as a method of BytesIO. */
-static int
-bytesio_setvalue(BytesIOObject *self, PyObject *value)
-{
-    const char *bytes;
-    Py_ssize_t len;
-
-    self->pos = 0;
-    self->string_size = 0;
-
-    if (value == NULL)
-        return 0;
-
-    if (PyObject_AsCharBuffer(value, &bytes, &len) == -1)
-        return -1;
-
-    if (write_bytes(self, bytes, len) < 0) {
-        return -1;  /* out of memory */
-    }
-    /* Reset the position back to beginning-of-file, since
-       write_bytes changed it. */
-    self->pos = 0;
-
-    return 0;
-}
-
 static PyObject *
 bytesio_isatty(BytesIOObject *self)
 {
@@ -594,8 +568,6 @@ PyDoc_STRVAR(generic_true_doc, "Always True.");
 static PyGetSetDef BytesIO_getsetlist[] = {
     {"closed",  (getter)bytesio_get_closed, NULL,
      "True if the file is closed."},
-    {"_buffer", (getter)bytesio_getvalue, (setter)bytesio_setvalue,
-     NULL},
     {0},            /* sentinel */
 };
 
