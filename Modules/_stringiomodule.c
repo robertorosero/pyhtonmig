@@ -158,35 +158,63 @@ stringio_tell(StringIOObject *self)
 static PyObject *
 stringio_read(StringIOObject *self, PyObject *args)
 {
-    Py_ssize_t len, n = -1;
+    Py_ssize_t size, n;
     Py_UNICODE *output;
+    PyObject *arg = Py_None;
 
-    if (!PyArg_ParseTuple(args, "|n:read", &n))
+    if (!PyArg_UnpackTuple(args, "read", 0, 1, &arg))
         return NULL;
 
-    /* adjust for invalid sizes */
-    len = self->string_size - self->pos;
-    if (n < 0 || n > len) {
-        n = len;
-        if (n < 0)
-            n = 0;
+    if (PyInt_Check(arg)) {
+        size = PyInt_AsSsize_t(arg);
+    }
+    else if (arg == Py_None) {
+        /* Read until EOF is reached, by default. */
+        size = -1;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got %s",
+                     Py_Type(arg)->tp_name);
+        return NULL;
+    }
+
+    /* adjust invalid sizes */
+    n = self->string_size - self->pos;
+    if (size < 0 || size > n) {
+        size = n;
+        if (size < 0)
+            size = 0;
     }
 
     assert(self->buf != NULL);
     output = self->buf + self->pos;
-    self->pos += n;
+    self->pos += size;
 
-    return PyUnicode_FromUnicode(output, n);
+    return PyUnicode_FromUnicode(output, size);
 }
 
 static PyObject *
 stringio_readline(StringIOObject *self, PyObject *args)
 {
-    Py_ssize_t n, size = -1;
+    Py_ssize_t size, n;
     Py_UNICODE *output;
+    PyObject *arg = Py_None;
 
-    if (!PyArg_ParseTuple(args, "|n:readline", &size))
+    if (!PyArg_UnpackTuple(args, "readline", 0, 1, &arg))
         return NULL;
+
+    if (PyInt_Check(arg)) {
+        size = PyInt_AsSsize_t(arg);
+    }
+    else if (arg == Py_None) {
+        /* No size limit, by default. */
+        size = -1;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got %s",
+                     Py_Type(arg)->tp_name);
+        return NULL;
+    }
 
     n = get_line(self, &output);
 
@@ -202,12 +230,26 @@ stringio_readline(StringIOObject *self, PyObject *args)
 static PyObject *
 stringio_readlines(StringIOObject *self, PyObject *args)
 {
-    Py_ssize_t n, size = 0, len = 0;
+    Py_ssize_t maxsize, size, n;
     PyObject *result, *line;
     Py_UNICODE *output;
+    PyObject *arg = Py_None;
 
-    if (!PyArg_ParseTuple(args, "|n:readlines", &size))
+    if (!PyArg_UnpackTuple(args, "readlines", 0, 1, &arg))
         return NULL;
+
+    if (PyInt_Check(arg)) {
+        maxsize = PyInt_AsSsize_t(arg);
+    }
+    else if (arg == Py_None) {
+        /* No size limit, by default. */
+        maxsize = -1;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got %s",
+                     Py_Type(arg)->tp_name);
+        return NULL;
+    }
 
     result = PyList_New(0);
     if (!result)
@@ -222,8 +264,8 @@ stringio_readlines(StringIOObject *self, PyObject *args)
             goto on_error;
         }
         Py_DECREF(line);
-        len += n;
-        if (size > 0 && len >= size)
+        size += n;
+        if (maxsize > 0 && size >= maxsize)
             break;
     }
     return result;
@@ -237,12 +279,23 @@ static PyObject *
 stringio_truncate(StringIOObject *self, PyObject *args)
 {
     Py_ssize_t size;
+    PyObject *arg = Py_None;
 
-    /* Truncate to current position if no argument is passed. */
-    size = self->pos;
-
-    if (!PyArg_ParseTuple(args, "|n:truncate", &size))
+    if (!PyArg_UnpackTuple(args, "truncate", 0, 1, &arg))
         return NULL;
+
+    if (PyInt_Check(arg)) {
+        size = PyInt_AsSsize_t(arg);
+    }
+    else if (arg == Py_None) {
+        /* Truncate to current position if no argument is passed. */
+        size = self->pos;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got %s",
+                     Py_Type(arg)->tp_name);
+        return NULL;
+    }
 
     if (size < 0) {
         /* XXX: Give a better error message. */
@@ -416,7 +469,7 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->string_size = 0;
     self->buf_size = INIT_BUFSIZE;
 
-    if (initvalue) {
+    if (initvalue && initvalue != Py_None) {
         ret = stringio_write(self, initvalue);
         if (ret == NULL)
             return NULL;
@@ -456,7 +509,7 @@ PyDoc_STRVAR(StringIO_readline_doc,
 "readline([size]) -> next line from the file, as a string.\n"
 "\n"
 "Retain newline.  A non-negative size argument limits the maximum\n"
-"number of bytes to return (an incomplete line may be returned then).\n"
+"number of characters to return (an incomplete line may be returned then).\n"
 "Return an empty string at EOF.\n");
 
 PyDoc_STRVAR(StringIO_readlines_doc,
