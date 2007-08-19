@@ -225,6 +225,13 @@ class MemoryTestMixin:
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.getvalue(), buf + buf)
 
+    def test_none_arg(self):
+        memio = self.ioclass(None)
+
+        self.assertEqual(memio.read(None), self.EOF)
+        self.assertEqual(memio.readline(None), self.EOF)
+        self.assertEqual(memio.truncate(None), 0)
+
 
 class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
     buftype = bytes
@@ -271,13 +278,6 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.getvalue(), self.buftype(buf + buf))
         self.write_ops(self.ioclass(), str)
-
-    def test_none_arg(self):
-        memio = self.ioclass(None)
-
-        self.assertEqual(memio.read(None), self.EOF)
-        self.assertEqual(memio.readline(None), self.EOF)
-        self.assertEqual(memio.truncate(None), 0)
 
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
