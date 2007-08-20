@@ -1539,6 +1539,11 @@ SimpleExtendsException(PyExc_Exception, ReferenceError,
  */
 SimpleExtendsException(PyExc_Exception, MemoryError, "Out of memory.");
 
+/*
+ *    BufferError extends Exception
+ */
+SimpleExtendsException(PyExc_Exception, BufferError, "Buffer error.");
+
 
 /* Warning category docstrings */
 
@@ -1689,6 +1694,7 @@ _PyExc_Init(void)
     PRE_INIT(ZeroDivisionError)
     PRE_INIT(SystemError)
     PRE_INIT(ReferenceError)
+    PRE_INIT(BufferError)
     PRE_INIT(MemoryError)
     PRE_INIT(Warning)
     PRE_INIT(UserWarning)
@@ -1748,6 +1754,7 @@ _PyExc_Init(void)
     POST_INIT(ZeroDivisionError)
     POST_INIT(SystemError)
     POST_INIT(ReferenceError)
+    POST_INIT(BufferError)
     POST_INIT(MemoryError)
     POST_INIT(Warning)
     POST_INIT(UserWarning)

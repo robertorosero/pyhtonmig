@@ -26,6 +26,8 @@ TO DO
 Core and Builtins
 -----------------
 
+- PEP 3131: Support non-ASCII identifiers.
+
 - PEP 3120: Change default encoding to UTF-8.
 
 - PEP 3123: Use proper C inheritance for PyObject.
@@ -202,13 +204,16 @@ Library
 - Remove obsolete functions:
   * commands.getstatus(), os.popen*,
 
-- Remove functions in the string module that are also string methods.
+- Remove functions in the string module that are also string methods;
+  Remove string.{letters, lowercase, uppercase}.
 
 - Remove support for long obsolete platforms: plat-aix3, plat-irix5.
 
 - Remove xmlrpclib.SlowParser.  It was based on xmllib.
 
 - Patch #1680961: atexit has been reimplemented in C.
+
+- Add new codecs for UTF-32, UTF-32-LE and UTF-32-BE.
 
 
 Build
@@ -227,7 +232,7 @@ C API
   nb_divide, nb_inplace_divide
 
 - Removed these macros:
-  staticforward, statichere, PyArg_GetInt, PyArg_NoArgs
+  staticforward, statichere, PyArg_GetInt, PyArg_NoArgs, _PyObject_Del
 
 - Removed these typedefs:
   intargfunc, intintargfunc, intobjargproc, intintobjargproc,

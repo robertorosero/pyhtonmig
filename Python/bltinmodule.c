@@ -8,10 +8,6 @@
 
 #include <ctype.h>
 
-#ifdef RISCOS
-#include "unixstuff.h"
-#endif
-
 /* The default encoding used by the platform file system APIs
    Can remain NULL for all platforms that don't have such a concept
 */
@@ -1708,6 +1704,7 @@ _PyBuiltin_Init(void)
 	SETBUILTIN("basestring",	&PyBaseString_Type);
 	SETBUILTIN("bool",		&PyBool_Type);
 	SETBUILTIN("buffer",		&PyBuffer_Type);
+        SETBUILTIN("memoryview",        &PyMemoryView_Type);
 	SETBUILTIN("bytes",		&PyBytes_Type);
 	SETBUILTIN("classmethod",	&PyClassMethod_Type);
 #ifndef WITHOUT_COMPLEX

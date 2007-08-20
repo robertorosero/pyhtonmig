@@ -167,7 +167,7 @@ def addsitedir(sitedir, known_paths=None):
         return
     names.sort()
     for name in names:
-        if name.endswith(os.extsep + "pth"):
+        if name.endswith(".pth"):
             addpackage(sitedir, name, known_paths)
     if reset:
         known_paths = None
@@ -180,7 +180,7 @@ def addsitepackages(known_paths):
         prefixes.append(sys.exec_prefix)
     for prefix in prefixes:
         if prefix:
-            if sys.platform in ('os2emx', 'riscos'):
+            if sys.platform == 'os2emx':
                 sitedirs = [os.path.join(prefix, "Lib", "site-packages")]
             elif os.sep == '/':
                 sitedirs = [os.path.join(prefix,

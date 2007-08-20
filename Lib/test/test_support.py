@@ -70,11 +70,11 @@ def forget(modname):
     deleting any .pyc and .pyo files.'''
     unload(modname)
     for dirname in sys.path:
-        unlink(os.path.join(dirname, modname + os.extsep + 'pyc'))
+        unlink(os.path.join(dirname, modname + '.pyc'))
         # Deleting the .pyo file cannot be within the 'try' for the .pyc since
         # the chance exists that there is no .pyc (and thus the 'try' statement
         # is exited) but there is a .pyo file.
-        unlink(os.path.join(dirname, modname + os.extsep + 'pyo'))
+        unlink(os.path.join(dirname, modname + '.pyo'))
 
 def is_resource_enabled(resource):
     """Test whether a resource is enabled.  Known resources are set by
@@ -142,8 +142,6 @@ is_jython = sys.platform.startswith('java')
 if os.name == 'java':
     # Jython disallows @ in module names
     TESTFN = '$test'
-elif os.name == 'riscos':
-    TESTFN = 'testfile'
 else:
     TESTFN = '@test'
 
@@ -261,14 +259,6 @@ def open_urlresource(url):
     fn, _ = urllib.urlretrieve(url, filename)
     return open(fn)
 
-@contextlib.contextmanager
-def guard_warnings_filter():
-    """Guard the warnings filter from being permanently changed."""
-    original_filters = warnings.filters[:]
-    try:
-        yield
-    finally:
-        warnings.filters = original_filters
 
 class WarningMessage(object):
     "Holds the result of the latest showwarning() call"
@@ -292,7 +282,7 @@ def catch_warning():
 
     Use like this:
 
-        with catch_warning as w:
+        with catch_warning() as w:
             warnings.warn("foo")
             assert str(w.message) == "foo"
     """

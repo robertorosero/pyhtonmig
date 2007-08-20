@@ -300,6 +300,7 @@ OBJECT_OBJS=	\
 		Objects/listobject.o \
 		Objects/longobject.o \
 		Objects/dictobject.o \
+		Objects/memoryobject.o \
 		Objects/methodobject.o \
 		Objects/moduleobject.o \
 		Objects/object.o \
@@ -533,6 +534,7 @@ PYTHON_HEADERS= \
 		Include/iterobject.h \
 		Include/listobject.h \
 		Include/longobject.h \
+		Include/memoryobject.h \
 		Include/methodobject.h \
 		Include/modsupport.h \
 		Include/moduleobject.h \
@@ -875,17 +877,6 @@ libainstall:	all
 		echo; echo "See Misc/AIX-NOTES for details.";	\
 	else true; \
 	fi
-	@case "$(MACHDEP)" in beos*) \
-		echo; echo "Installing support files for building shared extension modules on BeOS:"; \
-		$(INSTALL_DATA) Misc/BeOS-NOTES $(DESTDIR)$(LIBPL)/README;	\
-		echo; echo "$(LIBPL)/README";			\
-		$(INSTALL_SCRIPT) Modules/ar_beos $(DESTDIR)$(LIBPL)/ar_beos; \
-		echo "$(LIBPL)/ar_beos";			\
-		$(INSTALL_SCRIPT) Modules/ld_so_beos $(DESTDIR)$(LIBPL)/ld_so_beos; \
-		echo "$(LIBPL)/ld_so_beos";			\
-		echo; echo "See Misc/BeOS-NOTES for details.";	\
-		;; \
-	esac
 
 # Install the dynamically loadable modules
 # This goes into $(exec_prefix)

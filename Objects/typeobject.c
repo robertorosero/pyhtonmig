@@ -3251,10 +3251,8 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		basebase = base->tp_base;
 		if (basebase->tp_as_buffer == NULL)
 			basebase = NULL;
-		COPYBUF(bf_getreadbuffer);
-		COPYBUF(bf_getwritebuffer);
-		COPYBUF(bf_getsegcount);
-		COPYBUF(bf_getcharbuffer);
+		COPYBUF(bf_getbuffer);
+		COPYBUF(bf_releasebuffer);
 	}
 
 	basebase = base->tp_base;
@@ -3304,7 +3302,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		}
 		else if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) &&
 			 type->tp_free == NULL &&
-			 base->tp_free == _PyObject_Del) {
+			 base->tp_free == PyObject_Free) {
 			/* A bit of magic to plug in the correct default
 			 * tp_free function when a derived class adds gc,
 			 * didn't define tp_free, and the base uses the
