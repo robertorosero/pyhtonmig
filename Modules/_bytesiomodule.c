@@ -48,22 +48,29 @@ get_line(BytesIOObject *self, char **output)
 /* Internal routine for changing the size of the buffer of BytesIO
    objects. Returns 0 on success, -1 otherwise. */
 static int
-resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
+resize_buffer(BytesIOObject *self, Py_ssize_t size)
 {
-    /* Here we doing some direct memory manipulation for speed and to keep the
-       implementation of this module relatively simple. */
+    Py_ssize_t alloc = self->buf_size;
 
-    if (new_size >= self->buf_size) {
-        /* Allocate memory to the nearest 16K chunk. You shouldn't see any
-           significant performance gain (or lost) by changing this value. */
-        self->buf_size = (new_size + 16383) & ~16383;
-
-        PyMem_Resize(self->buf, char, self->buf_size);
-        if (self->buf == NULL) {
-            PyErr_NoMemory();
-            return -1;
-        }
+    if (size < alloc) {
+        /* Within allocated size; quick exit */
+        return 0;
     }
+    else if (size <= alloc * 1.125) {
+        /* Moderate upsize; overallocate similar to list_resize() */
+        alloc = size + (size >> 3) + (size < 9 ? 3 : 6);
+    }
+    else {
+        /* Major upsize; resize up to exact size */
+        alloc = size + 1;
+    }
+
+    PyMem_Resize(self->buf, char, alloc);
+    if (self->buf == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    self->buf_size = alloc;
     return 0;
 }
 
