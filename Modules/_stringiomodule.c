@@ -51,7 +51,11 @@ resize_buffer(StringIOObject *self, Py_ssize_t size)
 {
     Py_ssize_t alloc = self->buf_size;
 
-    if (size < alloc) {
+    if (size < alloc / 2) {
+        /* Major downsize; resize down to exact size */
+        alloc = size + 1;
+    }
+    else if (size < alloc) {
         /* Within allocated size; quick exit */
         return 0;
     }
@@ -285,8 +289,11 @@ stringio_truncate(StringIOObject *self, PyObject *args)
         return NULL;
     }
 
-    if (self->string_size > size)
+    if (size < self->string_size) {
         self->string_size = size;
+        if (resize_buffer(self, size) < 0)
+            return NULL;
+    }
     self->pos = self->string_size;
 
     return PyInt_FromSsize_t(self->string_size);
