@@ -252,6 +252,7 @@ bytesio_readlines(BytesIOObject *self, PyObject *args)
         return NULL;
     }
 
+    size = 0;
     result = PyList_New(0);
     if (!result)
         return NULL;
