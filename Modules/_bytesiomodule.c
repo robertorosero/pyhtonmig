@@ -367,8 +367,10 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
     if (newpos < 0)
         newpos = 0;
 
-    if (resize_buffer(self, newpos) < 0)
-        return NULL;  /* out of memory */
+    if (newpos >= self->string_size) {
+        if (resize_buffer(self, newpos + 1) < 0)
+            return NULL;  /* out of memory */
+    }
 
     prevpos = self->pos;
     self->pos = newpos;
