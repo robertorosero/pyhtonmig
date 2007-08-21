@@ -352,15 +352,15 @@ bytesio_iternext(BytesIOObject *self)
 static PyObject *
 bytesio_seek(BytesIOObject *self, PyObject *args)
 {
-    Py_ssize_t newpos, prevpos;
+    Py_ssize_t pos;
     int mode = 0;
 
-    if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
+    if (!PyArg_ParseTuple(args, "n|i:seek", &pos, &mode))
         return NULL;
 
-    if (newpos < 0 && mode == 0) {
+    if (pos < 0 && mode == 0) {
         PyErr_Format(PyExc_ValueError,
-                     "Negative seek value %zd", newpos);
+                     "Negative seek value %zd", pos);
         return NULL;
     }
 
@@ -368,10 +368,10 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
        mode 1: offset relative to current position.
        mode 2: offset relative the end of the string. */
     if (mode == 1) {
-        newpos += self->pos;
+        pos += self->pos;
     }
     else if (mode == 2) {
-        newpos += self->string_size;
+        pos += self->string_size;
     }
     else if (mode != 0) {
         PyErr_Format(PyExc_ValueError,
@@ -379,22 +379,19 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
         return NULL;
     }
 
-    if (newpos < 0)
-        newpos = 0;
+    if (pos < 0)
+        pos = 0;
 
-    if (newpos >= self->string_size) {
-        if (resize_buffer(self, newpos + 1) < 0)
+    if (pos >= self->string_size) {
+        if (resize_buffer(self, pos + 1) < 0)
             return NULL;  /* out of memory */
     }
+    self->pos = pos;
 
-    prevpos = self->pos;
-    self->pos = newpos;
-
-    /* Pad with zeros the buffer region larger than the string size and
-       not previously padded with zeros. */
-    while (newpos >= self->string_size && newpos >= prevpos) {
-        self->buf[newpos] = 0;
-        newpos--;
+    /* Pad with zeros the buffer region larger than the string size. */
+    if (self->pos > self->string_size) {
+        memset(self->buf + self->string_size, '\0',
+               (self->pos - self->string_size) * sizeof(char));
     }
 
     return PyInt_FromSsize_t(self->pos);

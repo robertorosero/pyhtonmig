@@ -317,10 +317,10 @@ stringio_iternext(StringIOObject *self)
 static PyObject *
 stringio_seek(StringIOObject *self, PyObject *args)
 {
-    Py_ssize_t newpos, prevpos;
+    Py_ssize_t pos;
     int mode = 0;
 
-    if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
+    if (!PyArg_ParseTuple(args, "n|i:seek", &pos, &mode))
         return NULL;
 
     if (mode != 0 && mode != 1 && mode != 2) {
@@ -328,13 +328,13 @@ stringio_seek(StringIOObject *self, PyObject *args)
                      "Invalid whence (%i, should be 0, 1 or 2)", mode);
         return NULL;
     }
-    else if (newpos < 0 && mode == 0) {
+    else if (pos < 0 && mode == 0) {
         PyErr_Format(PyExc_ValueError,
-                     "Negative seek position %zd", newpos);
+                     "Negative seek position %zd", pos);
         return NULL;
     }
-    else if (mode != 0 && newpos != 0) {
-        PyErr_SetString(PyExc_IOError, 
+    else if (mode != 0 && pos != 0) {
+        PyErr_SetString(PyExc_IOError,
                         "Can't do nonzero cur-relative seeks");
         return NULL;
     }
@@ -343,25 +343,22 @@ stringio_seek(StringIOObject *self, PyObject *args)
        mode 1: no change to current position.
        mode 2: change position to end of file. */
     if (mode == 1) {
-        newpos = self->pos;
+        pos = self->pos;
     }
     else if (mode == 2) {
-        newpos = self->string_size;
+        pos = self->string_size;
     }
 
-    if (newpos > self->string_size) {
-        if (resize_buffer(self, newpos + 1) < 0)
+    if (pos > self->string_size) {
+        if (resize_buffer(self, pos + 1) < 0)
             return NULL;  /* out of memory */
     }
+    self->pos = pos;
 
-    prevpos = self->pos;
-    self->pos = newpos;
-
-    /* Pad with zeros the buffer region larger than the string size and
-       not previously padded with zeros. */
-    while (newpos >= self->string_size && newpos >= prevpos) {
-        self->buf[newpos] = 0;
-        newpos--;
+    /* Pad with zeros the buffer region larger than the string size. */
+    if (self->pos > self->string_size) {
+        memset(self->buf + self->string_size, '\0',
+               (self->pos - self->string_size) * sizeof(Py_UNICODE));
     }
 
     return PyInt_FromSsize_t(self->pos);
