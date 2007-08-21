@@ -94,7 +94,7 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.seek(-1, 2), 13)
         self.assertEqual(f.tell(), 13)
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 13)
+        self.assertEqual(f.tell(), 12)
 
     def read_ops(self, f, buffered=False):
         data = f.read(5)
@@ -136,7 +136,7 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.tell(), self.LARGE + 2)
         self.assertEqual(f.seek(0, 2), self.LARGE + 2)
         self.assertEqual(f.truncate(self.LARGE + 1), self.LARGE + 1)
-        self.assertEqual(f.tell(), self.LARGE + 2)
+        self.assertEqual(f.tell(), self.LARGE + 1)
         self.assertEqual(f.seek(0, 2), self.LARGE + 1)
         self.assertEqual(f.seek(-1, 2), self.LARGE)
         self.assertEqual(f.read(2), b"x")
@@ -180,14 +180,6 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.readline(4), b"zzy\n")
         self.assertEqual(f.readline(), b"foo")
         f.close()
-
-    def test_raw_bytes_io(self):
-        f = io.BytesIO()
-        self.write_ops(f)
-        data = f.getvalue()
-        self.assertEqual(data, b"hello world\n")
-        f = io.BytesIO(data)
-        self.read_ops(f, True)
 
     def test_large_file_ops(self):
         # On Windows and Mac OSX this test comsumes large resources; It takes
@@ -258,62 +250,6 @@ class IOTest(unittest.TestCase):
         f = io.open(test_support.TESTFN, "wb")
         self.assertEqual(f.write(a), n)
         f.close()
-
-
-class MemorySeekTestMixin:
-
-    def testInit(self):
-        buf = self.buftype("1234567890")
-        bytesIo = self.ioclass(buf)
-
-    def testRead(self):
-        buf = self.buftype("1234567890")
-        bytesIo = self.ioclass(buf)
-
-        self.assertEquals(buf[:1], bytesIo.read(1))
-        self.assertEquals(buf[1:5], bytesIo.read(4))
-        self.assertEquals(buf[5:], bytesIo.read(900))
-        self.assertEquals(self.EOF, bytesIo.read())
-
-    def testReadNoArgs(self):
-        buf = self.buftype("1234567890")
-        bytesIo = self.ioclass(buf)
-
-        self.assertEquals(buf, bytesIo.read())
-        self.assertEquals(self.EOF, bytesIo.read())
-
-    def testSeek(self):
-        buf = self.buftype("1234567890")
-        bytesIo = self.ioclass(buf)
-
-        bytesIo.read(5)
-        bytesIo.seek(0)
-        self.assertEquals(buf, bytesIo.read())
-
-        bytesIo.seek(3)
-        self.assertEquals(buf[3:], bytesIo.read())
-
-    def testTell(self):
-        buf = self.buftype("1234567890")
-        bytesIo = self.ioclass(buf)
-
-        self.assertEquals(0, bytesIo.tell())
-        bytesIo.seek(5)
-        self.assertEquals(5, bytesIo.tell())
-        bytesIo.seek(10000)
-        self.assertEquals(10000, bytesIo.tell())
-
-
-class BytesIOTest(MemorySeekTestMixin, unittest.TestCase):
-    buftype = bytes
-    ioclass = io.BytesIO
-    EOF = b""
-
-
-class StringIOTest(MemorySeekTestMixin, unittest.TestCase):
-    buftype = str
-    ioclass = io.StringIO
-    EOF = ""
 
 
 class BufferedReaderTest(unittest.TestCase):
@@ -739,8 +675,7 @@ class TextIOWrapperTest(unittest.TestCase):
 # XXX Tests for open()
 
 def test_main():
-    test_support.run_unittest(IOTest, BytesIOTest, StringIOTest,
-                              BufferedReaderTest,
+    test_support.run_unittest(IOTest, BufferedReaderTest,
                               BufferedWriterTest, BufferedRWPairTest,
                               BufferedRandomTest, TextIOWrapperTest)
 
