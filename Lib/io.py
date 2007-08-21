@@ -364,7 +364,7 @@ class IOBase:
         return line
 
     def readlines(self, hint=None):
-        if hint is None:
+        if hint is None or hint <= 0:
             return list(self)
         n = 0
         lines = []
@@ -451,6 +451,11 @@ class FileIO(_fileio._FileIO, RawIOBase):
     def close(self):
         _fileio._FileIO.close(self)
         RawIOBase.close(self)
+
+    def truncate(self, pos=None):
+        if pos is not None:
+            _fileio._FileIO.seek(self, pos)
+        return _fileio._FileIO.truncate(self)
 
     @property
     def name(self):
@@ -604,10 +609,15 @@ class _BytesIO(BufferedIOBase):
 
     def __init__(self, initial_bytes=None):
         buffer = b""
-        if initial_bytes is not None:
+        if isinstance(initial_bytes, str):
+            buffer += bytes(initial_bytes)
+        elif initial_bytes is not None:
             buffer += initial_bytes
         self._buffer = buffer
         self._pos = 0
+
+    def close(self):
+        pass
 
     def getvalue(self):
         return self._buffer
@@ -617,6 +627,8 @@ class _BytesIO(BufferedIOBase):
             n = -1
         if n < 0:
             n = len(self._buffer)
+        if len(self._buffer) <= self._pos:
+            return self._buffer[:0]
         newpos = min(len(self._buffer), self._pos + n)
         b = self._buffer[self._pos : newpos]
         self._pos = newpos
@@ -626,9 +638,9 @@ class _BytesIO(BufferedIOBase):
         return self.read(n)
 
     def write(self, b):
-        if self.closed:
-            raise ValueError("write to closed file")
         n = len(b)
+        if n == 0:
+            return 0
         newpos = self._pos + n
         if newpos > len(self._buffer):
             # Inserts null bytes between the current end of the file
@@ -641,13 +653,16 @@ class _BytesIO(BufferedIOBase):
 
     def seek(self, pos, whence=0):
         if whence == 0:
-            self._pos = max(0, pos)
+            if pos < 0:
+                raise ValueError("Negative seek position %r" % (pos,))
+            self._pos = pos
         elif whence == 1:
             self._pos = max(0, self._pos + pos)
         elif whence == 2:
             self._pos = max(0, len(self._buffer) + pos)
         else:
-            raise IOError("invalid whence value")
+            raise ValueError("Invalid whence (%r, should be 0, 1 or 2)" %
+                             (whence,))
         return self._pos
 
     def tell(self):
@@ -656,8 +671,10 @@ class _BytesIO(BufferedIOBase):
     def truncate(self, pos=None):
         if pos is None:
             pos = self._pos
+        elif pos < 0:
+            raise ValueError("invalid position value")
         del self._buffer[pos:]
-        return pos
+        return self.seek(pos)
 
     def readable(self):
         return True
@@ -1066,6 +1083,15 @@ class TextIOWrapper(TextIOBase):
     def isatty(self):
         return self.buffer.isatty()
 
+    def writable(self):
+        return self.buffer.writable()
+
+    def readable(self):
+        return self.buffer.readable()
+
+    def seekable(self):
+        return self.buffer.seekable()
+
     def write(self, s: str):
         if self.closed:
             raise ValueError("write to closed file")
@@ -1221,7 +1247,7 @@ class TextIOWrapper(TextIOBase):
         if limit is not None:
             # XXX Hack to support limit argument, for backwards compatibility
             line = self.readline()
-            if len(line) <= limit:
+            if len(line) <= limit or limit < 0:
                 return line
             line, self._pending = line[:limit], line[limit:] + self._pending
             return line
