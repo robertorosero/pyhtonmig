@@ -36,6 +36,10 @@ class MockHandler(WSGIRequestHandler):
     def finish(self):
         pass
 
+class MockFile(StringIO):
+    closed = False
+    def close(self):
+        self.closed = True
 
 
 
@@ -209,7 +213,7 @@ class UtilityTests(TestCase):
     def checkFW(self,text,size,match):
 
         def make_it(text=text,size=size):
-            return util.FileWrapper(StringIO(text),size)
+            return util.FileWrapper(MockFile(text),size)
 
         compare_generic_iter(make_it,match)
 
