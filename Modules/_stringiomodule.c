@@ -51,7 +51,7 @@ resize_buffer(StringIOObject *self, Py_ssize_t size)
 {
     Py_ssize_t alloc = self->buf_size;
 
-    if (size < alloc / 2) {
+    if (self->string_size < alloc / 2) {
         /* Major downsize; resize down to exact size */
         alloc = size + 1;
     }
@@ -323,12 +323,17 @@ stringio_seek(StringIOObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
 
-    if (newpos < 0 && mode == 0) {
+    if (mode != 0 && mode != 1 && mode != 2) {
+        PyErr_Format(PyExc_ValueError,
+                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
+        return NULL;
+    }
+    else if (newpos < 0 && mode == 0) {
         PyErr_Format(PyExc_ValueError,
                      "Negative seek position %zd", newpos);
         return NULL;
     }
-    if (mode != 0 && newpos != 0) {
+    else if (mode != 0 && newpos != 0) {
         PyErr_SetString(PyExc_IOError, 
                         "Can't do nonzero cur-relative seeks");
         return NULL;
@@ -342,11 +347,6 @@ stringio_seek(StringIOObject *self, PyObject *args)
     }
     else if (mode == 2) {
         newpos = self->string_size;
-    }
-    else if (mode != 0) {
-        PyErr_Format(PyExc_ValueError,
-                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
-        return NULL;
     }
 
     if (newpos > self->string_size) {
@@ -447,16 +447,11 @@ static PyObject *
 StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     StringIOObject *self;
-    PyObject *initvalue = NULL, *ret;
     enum { INIT_BUFSIZE = 1 };
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    if (!PyArg_ParseTuple(args, "|O:StringIO", &initvalue))
-        return NULL;
-
     self = (StringIOObject *)type->tp_alloc(type, 0);
-
     if (self == NULL)
         return NULL;
 
@@ -466,23 +461,30 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    /* These variables need to be initialized before attempting to write
-       anything to the object. */
     self->pos = 0;
     self->string_size = 0;
     self->buf_size = INIT_BUFSIZE;
 
-    if (initvalue && initvalue != Py_None) {
-        ret = stringio_write(self, initvalue);
-        if (ret == NULL)
-            return NULL;
-        Py_DECREF(ret);
-        self->pos = 0;
-    }
-
     return (PyObject *)self;
 }
 
+static int
+StringIO_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *initvalue = NULL, *ret;
+
+    if (!PyArg_ParseTuple(args, "|O:StringIO", &initvalue))
+        return -1;
+
+    if (initvalue && initvalue != Py_None) {
+        ret = stringio_write((StringIOObject *)self, initvalue);
+        if (ret == NULL)
+            return -1;
+        Py_DECREF(ret);
+        ((StringIOObject *)self)->pos = 0;
+    }
+    return 0;
+}
 
 PyDoc_STRVAR(StringIO_doc,
 "StringIO([buffer]) -> Return a StringIO stream for reading and writing.");
@@ -634,7 +636,7 @@ static PyTypeObject StringIO_Type = {
     0,                                         /*tp_descr_get*/
     0,                                         /*tp_descr_set*/
     0,                                         /*tp_dictoffset*/
-    0,                                         /*tp_init*/
+    StringIO_init,                             /*tp_init*/
     0,                                         /*tp_alloc*/
     StringIO_new,                              /*tp_new*/
 };

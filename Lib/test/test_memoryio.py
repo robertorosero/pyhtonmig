@@ -27,14 +27,18 @@ class MemoryTestMixin:
         self.assertEqual(f.write(t(" world\n\n\n")), 9)
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(t("h")), 1)
+        self.assertEqual(f.truncate(12), 12)
+        self.assertEqual(f.tell(), 12)
 
     def test_write(self):
         buf = self.buftype("hello world\n")
         memio = self.ioclass(buf)
 
         self.write_ops(memio, self.buftype)
+        self.assertEqual(memio.getvalue(), buf)
         memio = self.ioclass()
         self.write_ops(memio, self.buftype)
+        self.assertEqual(memio.getvalue(), buf)
         memio.close()
         memio.write(buf)
 
@@ -239,12 +243,19 @@ class MemoryTestMixin:
 
     def test_subclassing(self):
         buf = self.buftype("1234567890")
-        def test():
+        def test1():
             class MemIO(self.ioclass):
                 pass
             m = MemIO(buf)
             return m.getvalue()
-        self.assertEqual(test(), buf)
+        def test2():
+            class MemIO(self.ioclass):
+                def __init__(me, a, b):
+                    self.ioclass.__init__(me, a)
+            m = MemIO(buf, None)
+            return m.getvalue()
+        self.assertEqual(test1(), buf)
+        self.assertEqual(test2(), buf)
 
     def test_widechar(self):
         buf = self.buftype("\U0002030a\U00020347")

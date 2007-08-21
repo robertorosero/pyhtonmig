@@ -52,7 +52,7 @@ resize_buffer(BytesIOObject *self, Py_ssize_t size)
 {
     Py_ssize_t alloc = self->buf_size;
 
-    if (size < alloc / 2) {
+     if (self->string_size < alloc / 2) {
         /* Major downsize; resize down to exact size */
         alloc = size + 1;
     }
@@ -469,16 +469,11 @@ static PyObject *
 BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     BytesIOObject *self;
-    PyObject *initvalue = NULL, *ret;
     enum { INIT_BUFSIZE = 1 };
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    if (!PyArg_ParseTuple(args, "|O:BytesIO", &initvalue))
-        return NULL;
-
     self = (BytesIOObject *)type->tp_alloc(type, 0);
-
     if (self == NULL)
         return NULL;
 
@@ -488,21 +483,29 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    /* These variables need to be initialized before attempting to write
-       anything to the object. */
     self->pos = 0;
     self->string_size = 0;
     self->buf_size = INIT_BUFSIZE;
 
-    if (initvalue && initvalue != Py_None) {
-        ret = bytesio_write(self, initvalue);
-        if (ret == NULL)
-            return NULL;
-        Py_DECREF(ret);
-        self->pos = 0;
-    }
-
     return (PyObject *)self;
+}
+
+static int
+BytesIO_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *initvalue = NULL, *ret;
+
+    if (!PyArg_ParseTuple(args, "|O:BytesIO", &initvalue))
+        return -1;
+
+    if (initvalue && initvalue != Py_None) {
+        ret = bytesio_write((BytesIOObject *)self, initvalue);
+        if (ret == NULL)
+            return -1;
+        Py_DECREF(ret);
+        ((BytesIOObject *)self)->pos = 0;
+    }
+    return 0;
 }
 
 
@@ -672,7 +675,7 @@ static PyTypeObject BytesIO_Type = {
     0,                                         /*tp_descr_get*/
     0,                                         /*tp_descr_set*/
     0,                                         /*tp_dictoffset*/
-    0,                                         /*tp_init*/
+    BytesIO_init,                              /*tp_init*/
     0,                                         /*tp_alloc*/
     BytesIO_new,                               /*tp_new*/
 };
