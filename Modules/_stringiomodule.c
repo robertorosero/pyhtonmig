@@ -328,9 +328,10 @@ stringio_seek(StringIOObject *self, PyObject *args)
                      "Negative seek position %zd", newpos);
         return NULL;
     }
-    if (newpos != 0 && mode != 0) {
+    if (mode != 0 && newpos != 0) {
         PyErr_SetString(PyExc_IOError, 
                         "Can't do nonzero cur-relative seeks");
+        return NULL;
     }
 
     /* mode 0: offset relative to beginning of the string.
