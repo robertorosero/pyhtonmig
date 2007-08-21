@@ -337,6 +337,15 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.getvalue(), self.buftype(buf + buf))
         self.write_ops(self.ioclass(), str)
 
+    def test_bytes_array(self):
+        buf = b"1234567890"
+        import array
+        a = array.array('b', list(buf))
+        memio = self.ioclass(a)
+        self.assertEqual(memio.getvalue(), buf)
+        self.assertEqual(memio.write(a), 10)
+        self.assertEqual(memio.getvalue(), buf)
+
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     buftype = str
