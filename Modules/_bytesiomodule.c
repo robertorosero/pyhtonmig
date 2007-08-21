@@ -320,8 +320,8 @@ bytesio_truncate(BytesIOObject *self, PyObject *args)
     }
 
     if (size < 0) {
-        /* XXX: Give a better error message. */
-        PyErr_SetString(PyExc_ValueError, "invalid position value");
+        PyErr_Format(PyExc_ValueError,
+                     "Negative size value %zd", size);
         return NULL;
     }
 
@@ -358,6 +358,12 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
 
+    if (newpos < 0 && mode == 0) {
+        PyErr_Format(PyExc_ValueError,
+                     "Negative seek value %zd", newpos);
+        return NULL;
+    }
+
     /* mode 0: offset relative to beginning of the string.
        mode 1: offset relative to current position.
        mode 2: offset relative the end of the string. */
@@ -368,7 +374,8 @@ bytesio_seek(BytesIOObject *self, PyObject *args)
         newpos += self->string_size;
     }
     else if (mode != 0) {
-        PyErr_SetString(PyExc_IOError, "invalid whence value");
+        PyErr_Format(PyExc_ValueError,
+                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
         return NULL;
     }
 
@@ -397,7 +404,7 @@ static PyObject *
 bytesio_write(BytesIOObject *self, PyObject *obj)
 {
     const char *bytes;
-    Py_ssize_t size, len;
+    Py_ssize_t size, n = 0;
 
     if (PyUnicode_Check(obj)) {
         bytes = PyUnicode_AsString(obj);
@@ -408,11 +415,13 @@ bytesio_write(BytesIOObject *self, PyObject *obj)
             return NULL;
     }
 
-    len = write_bytes(self, bytes, size);
-    if (len == -1)
+    if (size != 0)
+        n = write_bytes(self, bytes, size);
+
+    if (n == -1)
         return NULL;
 
-    return PyInt_FromSsize_t(len);
+    return PyInt_FromSsize_t(n);
 }
 
 static PyObject *
@@ -564,8 +573,8 @@ PyDoc_STRVAR(BytesIO_seek_doc,
 "\n"
 "Seek to byte offset pos relative to position indicated by whence:\n"
 "     0  Start of stream (the default).  pos should be >= 0;\n"
-"     1  Current position - whence may be negative;\n"
-"     2  End of stream - whence usually negative.\n"
+"     1  Current position - pos may be negative;\n"
+"     2  End of stream - pos usually negative.\n"
 "Returns the new absolute position.");
 
 PyDoc_STRVAR(BytesIO_write_doc,

@@ -285,8 +285,8 @@ stringio_truncate(StringIOObject *self, PyObject *args)
     }
 
     if (size < 0) {
-        /* XXX: Give a better error message. */
-        PyErr_SetString(PyExc_ValueError, "invalid position value");
+        PyErr_Format(PyExc_ValueError,
+                     "Negative size value %zd", size);
         return NULL;
     }
 
@@ -323,24 +323,32 @@ stringio_seek(StringIOObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
 
+    if (newpos < 0 && mode == 0) {
+        PyErr_Format(PyExc_ValueError,
+                     "Negative seek position %zd", newpos);
+        return NULL;
+    }
+    if (newpos != 0 && mode != 0) {
+        PyErr_SetString(PyExc_IOError, 
+                        "Can't do nonzero cur-relative seeks");
+    }
+
     /* mode 0: offset relative to beginning of the string.
-       mode 1: offset relative to current position.
-       mode 2: offset relative the end of the string. */
+       mode 1: no change to current position.
+       mode 2: change position to end of file. */
     if (mode == 1) {
-        newpos += self->pos;
+        newpos = self->pos;
     }
     else if (mode == 2) {
-        newpos += self->string_size;
+        newpos = self->string_size;
     }
     else if (mode != 0) {
-        PyErr_SetString(PyExc_IOError, "invalid whence value");
+        PyErr_Format(PyExc_ValueError,
+                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
         return NULL;
     }
 
-    if (newpos < 0)
-        newpos = 0;
-
-    if (newpos >= self->string_size) {
+    if (newpos > self->string_size) {
         if (resize_buffer(self, newpos + 1) < 0)
             return NULL;  /* out of memory */
     }
@@ -362,7 +370,7 @@ static PyObject *
 stringio_write(StringIOObject *self, PyObject *obj)
 {
     const Py_UNICODE *str;
-    Py_ssize_t size, n;
+    Py_ssize_t size, n = 0;
     PyObject *ustr = NULL;
 
     if (PyUnicode_Check(obj)) {
@@ -383,7 +391,9 @@ stringio_write(StringIOObject *self, PyObject *obj)
         return NULL;
     }
 
-    n = write_str(self, str, size);
+    if (size != 0)
+        n = write_str(self, str, size);
+
     Py_XDECREF(ustr);
     if (n == -1)
         return NULL;
@@ -528,8 +538,8 @@ PyDoc_STRVAR(StringIO_seek_doc,
 "\n"
 "Seek to byte offset pos relative to position indicated by whence:\n"
 "     0  Start of stream (the default).  pos should be >= 0;\n"
-"     1  Current position - whence may be negative;\n"
-"     2  End of stream - whence usually negative.\n"
+"     1  Current position - pos must be 0;\n"
+"     2  End of stream - pos must be 0.\n"
 "Returns the new absolute position.");
 
 PyDoc_STRVAR(StringIO_write_doc,
