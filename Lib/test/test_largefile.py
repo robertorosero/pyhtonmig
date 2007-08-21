@@ -152,7 +152,7 @@ if hasattr(f, 'truncate'):
         newsize -= 1
         f.seek(42)
         f.truncate(newsize)
-        expect(f.tell(), 42)        # else pointer moved
+        expect(f.tell(), newsize)   # pointer moved
         f.seek(0, 2)
         expect(f.tell(), newsize)   # else wasn't truncated
 
@@ -161,7 +161,8 @@ if hasattr(f, 'truncate'):
         # cut it waaaaay back
         f.seek(0)
         f.truncate(1)
-        expect(f.tell(), 0)         # else pointer moved
+        expect(f.tell(), 1)         # pointer moved
+        f.seek(0)
         expect(len(f.read()), 1)    # else wasn't truncated
 
     finally:
