@@ -1029,10 +1029,10 @@ class Decimal(object):
         if op1.sign != op2.sign:
             # Equal and opposite
             if op1.int == op2.int:
-                if exp < context.Etiny():
-                    exp = context.Etiny()
-                    context._raise_error(Clamped)
-                return Decimal((negativezero, (0,), exp))
+                ans = Decimal((negativezero, (0,), exp))
+                if shouldround:
+                    ans = ans._fix(context)
+                return ans
             if op1.int < op2.int:
                 op1, op2 = op2, op1
                 # OK, now abs(op1) > abs(op2)
@@ -4927,39 +4927,28 @@ def _normalize(op1, op2, shouldround = 0, prec = 0):
 
     Done during addition.
     """
-    # Yes, the exponent is a long, but the difference between exponents
-    # must be an int-- otherwise you'd get a big memory problem.
-    numdigits = int(op1.exp - op2.exp)
-    if numdigits < 0:
-        numdigits = -numdigits
+    if op1.exp < op2.exp:
         tmp = op2
         other = op1
     else:
         tmp = op1
         other = op2
 
-
-    if shouldround and numdigits > prec + 1:
-        # Big difference in exponents - check the adjusted exponents
+    # Let exp = min(tmp.exp - 1, tmp.adjusted() - precision - 1).
+    # Then adding 10**exp to tmp has the same effect (after rounding)
+    # as adding any positive quantity smaller than 10**exp; similarly
+    # for subtraction.  So if other is smaller than 10**exp we replace
+    # it with 10**exp.  This avoids tmp.exp - other.exp getting too large.
+    if shouldround:
         tmp_len = len(str(tmp.int))
         other_len = len(str(other.int))
-        if numdigits > (other_len + prec + 1 - tmp_len):
-            # If the difference in adjusted exps is > prec+1, we know
-            # other is insignificant, so might as well put a 1 after the
-            # precision (since this is only for addition).  Also stops
-            # use of massive longs.
-
-            extend = prec + 2 - tmp_len
-            if extend <= 0:
-                extend = 1
-            tmp.int *= 10 ** extend
-            tmp.exp -= extend
+        exp = tmp.exp + min(-1, tmp_len - prec - 2)
+        if other_len + other.exp - 1 < exp:
             other.int = 1
-            other.exp = tmp.exp
-            return op1, op2
+            other.exp = exp
 
-    tmp.int *= 10 ** numdigits
-    tmp.exp -= numdigits
+    tmp.int *= 10 ** (tmp.exp - other.exp)
+    tmp.exp = other.exp
     return op1, op2
 
 def _adjust_coefficients(op1, op2):

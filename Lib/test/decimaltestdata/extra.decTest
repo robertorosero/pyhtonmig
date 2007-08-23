@@ -103,6 +103,30 @@ extr1002 add 0E+1000 0E+1000 -> 0E+994 Clamped
 clamp: 0
 extr1003 add 0E+1000 0E-1005 -> 0E-1004 Clamped
 extr1004 add 0E-1006 0 -> 0E-1004 Clamped
+extr1005 add 1E+1000 -1E+1000 -> 0E+999 Clamped
+extr1006 add -3.1E+1004 3.1E+1004 -> 0E+999 Clamped
+clamp: 1
+extr1007 add 1E+998 -1E+998 -> 0E+994 Clamped
+clamp: 0
+extr1008 add 2E-1005 -2E-1005 -> 0E-1004 Clamped
+extr1009 add -3.1E-1005 3.1E-1005 -> 0E-1004 Clamped
+
+precision: 3
+extr1010 add 99949.9 0.200000 -> 1.00E+5 Inexact Rounded
+extr1011 add 99949.9 0.100000 -> 1.00E+5 Inexact Rounded
+extr1012 add 99849.9 0.200000 -> 9.99E+4 Inexact Rounded
+extr1013 add 99849.9 0.100000 -> 9.98E+4 Inexact Rounded
+extr1014 add 1.0149 0.00011 -> 1.02 Inexact Rounded
+extr1015 add 1.0149 0.00010 -> 1.02 Inexact Rounded
+extr1016 add 1.0149 0.00009 -> 1.01 Inexact Rounded
+extr1017 add 1.0049 0.00011 -> 1.01 Inexact Rounded
+extr1018 add 1.0049 0.00010 -> 1.00 Inexact Rounded
+extr1019 add 1.0049 0.00009 -> 1.00 Inexact Rounded
+rounding: down
+extr1020 add 99999.9 0.200000 -> 1.00E+5 Inexact Rounded
+extr1021 add 99999.8 0.200000 -> 1.00E+5 Rounded
+extr1022 add 99999.7 0.200000 -> 9.99E+4 Inexact Rounded
+rounding: half_even
 
 -- a bug in _rescale caused the following to fail in Python 2.5.1
 maxexponent: 999
