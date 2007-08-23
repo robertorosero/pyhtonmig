@@ -2923,6 +2923,16 @@ class Decimal(object):
 
     def is_normal(self, context=None):
         """Returns 1 if self is a normal number, otherwise returns 0."""
+        if self._is_special:
+            return Decimal(0)
+        if not self:
+            return Decimal(0)
+        if context is None:
+            context = getcontext()
+        if context.Emin <= self.adjusted() <= context.Emax:
+            return Decimal(1)
+        else:
+            return Decimal(0)
 
     def is_qnan(self, context=None):
         """Returns 1 if self is a quiet NaN, otherwise returns 0."""
@@ -2944,6 +2954,10 @@ class Decimal(object):
 
     def is_subnormal(self, context=None):
         """Returns 1 if self is subnormal, otherwise returns 0."""
+        if self._is_special:
+            return Decimal(0)
+        if not self:
+            return Decimal(0)
         if context is None:
             context = getcontext()
 
@@ -4056,15 +4070,18 @@ class Context(object):
     def is_normal(self, a):
         """Returns 1 if the operand is a normal number, otherwise returns 0.
 
-        >>> ExtendedContext.is_normal(Decimal('2.50'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.is_normal(Decimal('2.50'))
         Decimal("1")
-        >>> ExtendedContext.is_normal(Decimal('0.1E-999'))
+        >>> c.is_normal(Decimal('0.1E-999'))
         Decimal("0")
-        >>> ExtendedContext.is_normal(Decimal('0.00'))
+        >>> c.is_normal(Decimal('0.00'))
         Decimal("0")
-        >>> ExtendedContext.is_normal(Decimal('-Inf'))
+        >>> c.is_normal(Decimal('-Inf'))
         Decimal("0")
-        >>> ExtendedContext.is_normal(Decimal('NaN'))
+        >>> c.is_normal(Decimal('NaN'))
         Decimal("0")
         """
         return a.is_normal(context=self)
@@ -4108,15 +4125,18 @@ class Context(object):
     def is_subnormal(self, a):
         """Returns 1 if the operand is subnormal, otherwise returns 0.
 
-        >>> ExtendedContext.is_subnormal(Decimal('2.50'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.is_subnormal(Decimal('2.50'))
         Decimal("0")
-        >>> ExtendedContext.is_subnormal(Decimal('0.1E-999'))
+        >>> c.is_subnormal(Decimal('0.1E-999'))
         Decimal("1")
-        >>> ExtendedContext.is_subnormal(Decimal('0.00'))
+        >>> c.is_subnormal(Decimal('0.00'))
         Decimal("0")
-        >>> ExtendedContext.is_subnormal(Decimal('-Inf'))
+        >>> c.is_subnormal(Decimal('-Inf'))
         Decimal("0")
-        >>> ExtendedContext.is_subnormal(Decimal('NaN'))
+        >>> c.is_subnormal(Decimal('NaN'))
         Decimal("0")
         """
         return a.is_subnormal(context=self)
