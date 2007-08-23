@@ -1851,153 +1851,492 @@ class Decimal(object):
         context._set_rounding_decision(rounding_decision)
         return product.__add__(third, context)
 
-    def __pow__(self, n, modulo=None, context=None):
-        """Return self ** n (mod modulo)
+    def _power_modulo(self, other, modulo, context=None):
+        """Three argument version of __pow__"""
 
-        If modulo is None (default), don't take it mod modulo.
-        """
-        n = _convert_other(n)
-        if n is NotImplemented:
-            return n
+        # if can't convert other and modulo to Decimal, raise
+        # TypeError; there's no point returning NotImplemented (no
+        # equivalent of __rpow__ for three argument pow)
+        other = _convert_other(other)
+        if other is NotImplemented:
+            raise TypeError("The second argument to pow should be " +
+                            "an integer or an instance of Decimal.  Got " +
+                            str(other))
+
+        modulo = _convert_other(modulo)
+        if modulo is NotImplemented:
+            raise TypeError("The third argument to pow should be " +
+                            "an integer or an instance of Decimal.  Got " +
+                            str(modulo))
 
         if context is None:
             context = getcontext()
-        if n._exp == 0 and n._sign == 0 and len(n._int) > context.prec:
-            return context._raise_error(InvalidContext)
 
-#        # FIXME: this block code was against the new handling of Infinities
-#        # I think we could remove them safely, do not know what the "n.adjusted()>8"
-#        # actually means, so I won't be sure until all the tests passes ok.
-#        #         . Facundo
-#        if self._is_special or n._is_special:# or n.adjusted() > 8:
-#            # Because the spot << doesn't work with really big exponents
-#            if n._isinfinity() or n.adjusted() > 8:
-#                return context._raise_error(InvalidOperation, 'x ** INF')
+        # deal with NaNs: if there are any sNaNs then first one wins,
+        # (i.e. behaviour for NaNs is identical to that of fma)
+        self_is_nan = self._isnan()
+        other_is_nan = other._isnan()
+        modulo_is_nan = modulo._isnan()
+        if self_is_nan or other_is_nan or modulo_is_nan:
+            if self_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, self)
+            if other_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, other)
+            if modulo_is_nan == 2:
+                return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, modulo)
+            if self_is_nan:
+                return self
+            if other_is_nan:
+                return other
+            return modulo
 
-        ans = self._check_nans(n, context)
+        # check inputs: we apply same restrictions as Python's pow()
+        if not (self._isinteger() and
+                other._isinteger() and
+                modulo._isinteger()):
+            return context._raise_error(InvalidOperation,
+                                        'pow() 3rd argument not allowed '
+                                        'unless all arguments are integers')
+        if other < 0:
+            return context._raise_error(InvalidOperation,
+                                        'pow() 2nd argument cannot be '
+                                        'negative when 3rd argument specified')
+        if not modulo:
+            return context._raise_error(InvalidOperation,
+                                        'pow() 3rd argument cannot be 0')
+
+        # additional restriction for decimal: the modulus must be less
+        # than 10**prec in absolute value
+        if modulo.adjusted() >= context.prec:
+            return context._raise_error(InvalidOperation,
+                                        'insufficient precision: pow() 3rd '
+                                        'argument must not have more than '
+                                        'precision digits')
+
+        # define 0**0 == NaN, for consistency with two-argument pow
+        # (even though it hurts!)
+        if not other and not self:
+            return context._raise_error(InvalidOperation,
+                                        'at least one of pow() 1st argument '
+                                        'and 2nd argument must be nonzero ;'
+                                        '0**0 is not defined')
+
+        # compute sign of result
+        if other._iseven():
+            sign = 0
+        else:
+            sign = self._sign
+
+        # convert modulo to a Python integer, and self and other to
+        # Decimal integers (i.e. force their exponents to be >= 0)
+        modulo = abs(int(modulo))
+        base = _WorkRep(self.to_integral_value())
+        exponent = _WorkRep(other.to_integral_value())
+
+        # compute result using integer pow()
+        base = (base.int % modulo * pow(10, base.exp, modulo)) % modulo
+        for i in xrange(exponent.exp):
+            base = pow(base, 10, modulo)
+        base = pow(base, exponent.int, modulo)
+
+        return Decimal((sign, map(int, str(base)), 0))
+
+    def _power_exact(self, other, p):
+        """Attempt to compute self**other exactly.
+
+        Given Decimals self and other and an integer p, attempt to
+        compute an exact result for the power self**other, with p
+        digits of precision.  Return None if self**other is not
+        exactly representable in p digits.
+
+        Assumes that elimination of special cases has already been
+        performed: self and other must both be nonspecial; self must
+        be positive and not numerically equal to 1; other must be
+        nonzero.  For efficiency, other._exp should not be too large,
+        so that 10**abs(other._exp) is a feasible calculation."""
+
+        # In the comments below, we write x for the value of self and
+        # y for the value of other.  Write x = xc*10**xe and y =
+        # yc*10**ye.
+
+        # The main purpose of this method is to identify the *failure*
+        # of x**y to be exactly representable with as little effort as
+        # possible.  So we look for cheap and easy tests that
+        # eliminate the possibility of x**y being exact.  Only if all
+        # these tests are passed do we go on to actually compute x**y.
+
+        # Here's the main idea.  First normalize both x and y.  We
+        # express y as a rational m/n, with m and n relatively prime
+        # and n>0.  Then for x**y to be exactly representable (at
+        # *any* precision), xc must be the nth power of a positive
+        # integer and xe must be divisible by n.  If m is negative
+        # then additionally xc must be a power of either 2 or 5, hence
+        # a power of 2**n or 5**n.
+        #
+        # There's a limit to how small |y| can be: if y=m/n as above
+        # then:
+        #
+        #  (1) if xc != 1 then for the result to be representable we
+        #      need xc**(1/n) >= 2, and hence also xc**|y| >= 2.  So
+        #      if |y| <= 1/nbits(xc) then xc < 2**nbits(xc) <=
+        #      2**(1/|y|), hence xc**|y| < 2 and the result is not
+        #      representable.
+        #
+        #  (2) if xe != 0, |xe|*(1/n) >= 1, so |xe|*|y| >= 1.  Hence if
+        #      |y| < 1/|xe| then the result is not representable.
+        #
+        # Note that since x is not equal to 1, at least one of (1) and
+        # (2) must apply.  Now |y| < 1/nbits(xc) iff |yc|*nbits(xc) <
+        # 10**-ye iff len(str(|yc|*nbits(xc)) <= -ye.
+        #
+        # There's also a limit to how large y can be, at least if it's
+        # positive: the normalized result will have coefficient xc**y,
+        # so if it's representable then xc**y < 10**p, and y <
+        # p/log10(xc).  Hence if y*log10(xc) >= p then the result is
+        # not exactly representable.
+
+        # if len(str(abs(yc*xe)) <= -ye then abs(yc*xe) < 10**-ye,
+        # so |y| < 1/xe and the result is not representable.
+        # Similarly, len(str(abs(yc)*xc_bits)) <= -ye implies |y|
+        # < 1/nbits(xc).
+
+        x = _WorkRep(self)
+        xc, xe = x.int, x.exp
+        while xc % 10 == 0:
+            xc //= 10
+            xe += 1
+
+        y = _WorkRep(other)
+        yc, ye = y.int, y.exp
+        while yc % 10 == 0:
+            yc //= 10
+            ye += 1
+
+        # case where xc == 1: result is 10**(xe*y), with xe*y
+        # required to be an integer
+        if xc == 1:
+            if ye >= 0:
+                exponent = xe*yc*10**ye
+            else:
+                exponent, remainder = divmod(xe*yc, 10**-ye)
+                if remainder:
+                    return None
+            if y.sign == 1:
+                exponent = -exponent
+            # if other is a nonnegative integer, use ideal exponent
+            if other._isinteger() and other._sign == 0:
+                ideal_exponent = self._exp*int(other)
+                zeros = min(exponent-ideal_exponent, p-1)
+            else:
+                zeros = 0
+            return Decimal((0, (1,) + (0,)*zeros, exponent-zeros))
+
+        # case where y is negative: xc must be either a power
+        # of 2 or a power of 5.
+        if y.sign == 1:
+            last_digit = xc % 10
+            if last_digit in (2,4,6,8):
+                # quick test for power of 2
+                if xc & -xc != xc:
+                    return None
+                # now xc is a power of 2; e is its exponent
+                e = _nbits(xc)-1
+                # find e*y and xe*y; both must be integers
+                if ye >= 0:
+                    y_as_int = yc*10**ye
+                    e = e*y_as_int
+                    xe = xe*y_as_int
+                else:
+                    ten_pow = 10**-ye
+                    e, remainder = divmod(e*yc, ten_pow)
+                    if remainder:
+                        return None
+                    xe, remainder = divmod(xe*yc, ten_pow)
+                    if remainder:
+                        return None
+
+                if e*65 >= p*93: # 93/65 > log(10)/log(5)
+                    return None
+                xc = 5**e
+
+            elif last_digit == 5:
+                # e >= log_5(xc) if xc is a power of 5; we have
+                # equality all the way up to xc=5**2658
+                e = _nbits(xc)*28//65
+                xc, remainder = divmod(5**e, xc)
+                if remainder:
+                    return None
+                while xc % 5 == 0:
+                    xc //= 5
+                    e -= 1
+                if ye >= 0:
+                    y_as_integer = yc*10**ye
+                    e = e*y_as_integer
+                    xe = xe*y_as_integer
+                else:
+                    ten_pow = 10**-ye
+                    e, remainder = divmod(e*yc, ten_pow)
+                    if remainder:
+                        return None
+                    xe, remainder = divmod(xe*yc, ten_pow)
+                    if remainder:
+                        return None
+                if e*3 >= p*10: # 10/3 > log(10)/log(2)
+                    return None
+                xc = 2**e
+            else:
+                return None
+
+            if xc >= 10**p:
+                return None
+            xe = -e-xe
+            return Decimal((0, map(int, str(xc)), xe))
+
+        # now y is positive; find m and n such that y = m/n
+        if ye >= 0:
+            m, n = yc*10**ye, 1
+        else:
+            if xe != 0 and len(str(abs(yc*xe))) <= -ye:
+                return None
+            xc_bits = _nbits(xc)
+            if xc != 1 and len(str(abs(yc)*xc_bits)) <= -ye:
+                return None
+            m, n = yc, 10**(-ye)
+            while m % 2 == n % 2 == 0:
+                m //= 2
+                n //= 2
+            while m % 5 == n % 5 == 0:
+                m //= 5
+                n //= 5
+
+        # compute nth root of xc*10**xe
+        if n > 1:
+            # if 1 < xc < 2**n then xc isn't an nth power
+            if xc != 1 and xc_bits <= n:
+                return None
+
+            xe, rem = divmod(xe, n)
+            if rem != 0:
+                return None
+
+            # compute nth root of xc using Newton's method
+            a = 1 << -(-_nbits(xc)//n) # initial estimate
+            while True:
+                q, r = divmod(xc, a**(n-1))
+                if a <= q:
+                    break
+                else:
+                    a = (a*(n-1) + q)//n
+            if not (a == q and r == 0):
+                return None
+            xc = a
+
+        # now xc*10**xe is the nth root of the original xc*10**xe
+        # compute mth power of xc*10**xe
+
+        # if m > p*100//_log10_lb(xc) then m > p/log10(xc), hence xc**m >
+        # 10**p and the result is not representable.
+        if xc > 1 and m > p*100//_log10_lb(xc):
+            return None
+        xc = xc**m
+        xe *= m
+        if xc > 10**p:
+            return None
+
+        # by this point the result *is* exactly representable
+        # adjust the exponent to get as close as possible to the ideal
+        # exponent, if necessary
+        str_xc = str(xc)
+        if other._isinteger() and other._sign == 0:
+            ideal_exponent = self._exp*int(other)
+            zeros = min(xe-ideal_exponent, p-len(str_xc))
+        else:
+            zeros = 0
+        return Decimal((0, map(int, str_xc)+[0,]*zeros, xe-zeros))
+
+    def __pow__(self, other, modulo=None, context=None):
+        """Return self ** other [ % modulo].
+
+        With two arguments, compute self**other.
+
+        With three arguments, compute (self**other) % modulo.  For the
+        three argument form, the following restrictions on the
+        arguments hold:
+
+         - all three arguments must be integral
+         - other must be nonnegative
+         - either self or other (or both) must be nonzero
+         - modulo must be nonzero and must have at most p digits,
+           where p is the context precision.
+
+        If any of these restrictions is violated the InvalidOperation
+        flag is raised.
+
+        The result of pow(self, other, modulo) is identical to the
+        result that would be obtained by computing (self**other) %
+        modulo with unbounded precision, but is computed more
+        efficiently.  It is always exact.
+        """
+
+        if modulo is not None:
+            return self._power_modulo(other, modulo, context)
+
+        other = _convert_other(other)
+        if other is NotImplemented:
+            return other
+
+        if context is None:
+            context = getcontext()
+
+        # either argument is a NaN => result is NaN
+        ans = self._check_nans(other, context)
         if ans:
             return ans
 
-        if not n:
-            if self:
-                return Decimal(1)  # something ** 0
-            else:
+        # 0**0 = NaN (!), x**0 = 1 for nonzero x (including +/-Infinity)
+        if not other:
+            if not self:
                 return context._raise_error(InvalidOperation, '0 ** 0')
-
-        if not self:
-            if n._sign == 0:
-                zero = Decimal(0)
-                if n._iseven():
-                    return zero
-                zero._sign = self._sign
-                return zero
-            # n is negative
-            if self._sign == 0:
-                return Inf
-            # also self is negative
-            if n._iseven():
-                return Inf
             else:
-                return negInf
+                return Decimal((0, (1,), 0))
 
-        self_inf = self._isinfinity()
-        n_inf = n._isinfinity()
+        # result has sign 1 iff self._sign is 1 and other is an odd integer
+        result_sign = 0
+        if self._sign == 1:
+            if other._isinteger():
+                if not other._iseven():
+                    result_sign = 1
+            else:
+                # -ve**noninteger = NaN
+                # (-0)**noninteger = 0**noninteger
+                if self:
+                    return context._raise_error(InvalidOperation,
+                        'x ** y with x negative and y not an integer')
+            # negate self, without doing any unwanted rounding
+            self = Decimal((0, self._int, self._exp))
+
+        # 0**(+ve or Inf)= 0; 0**(-ve or -Inf) = Infinity
+        if not self:
+            if other._sign == 0:
+                return Decimal((result_sign, (0,), 0))
+            else:
+                return Infsign[result_sign]
+
+        # Inf**(+ve or Inf) = Inf; Inf**(-ve or -Inf) = 0
+        if self._isinfinity():
+            if other._sign == 0:
+                return Infsign[result_sign]
+            else:
+                return Decimal((result_sign, (0,), 0))
+
+        # 1**other = 1, but the choice of exponent and the flags
+        # depend on the exponent of self, and on whether other is a
+        # positive integer, a negative integer, or neither
         if self == Decimal(1):
-            if n_inf:
+            if other._isinteger():
+                # exp = max(self._exp*max(int(other), 0),
+                # 1-context.prec) but evaluating int(other) directly
+                # is dangerous until we know other is small (other
+                # could be 1e999999999)
+                if other._sign == 1:
+                    multiplier = 0
+                elif other > Decimal(context.prec):
+                    multiplier = context.prec
+                else:
+                    multiplier = int(other)
+
+                exp = self._exp * multiplier
+                if exp < 1-context.prec:
+                    exp = 1-context.prec
+                    context._raise_error(Rounded)
+            else:
                 context._raise_error(Inexact)
                 context._raise_error(Rounded)
-                digits = (1,)+(0,)*(context.prec-1)
-                return Decimal((0, digits, -context.prec+1))
-            return Decimal(1)
+                exp = 1-context.prec
 
-        if self_inf == -1 and n_inf:
-            return context._raise_error(InvalidOperation, '-Inf ** +-Inf')
+            return Decimal((result_sign, (1,)+(0,)*-exp, exp))
 
-        if self_inf:
-            if modulo:
-                return context._raise_error(InvalidOperation, 'INF % x')
-            if not n:
-                return Decimal(1)
-        if self_inf == 1:
-            if n._sign == 1:
-                return Decimal(0)
-            return Inf
-        if self_inf == -1:
-            if abs(n) < 1:
-                return context._raise_error(InvalidOperation, '-INF ** -1<n<1')
-            if n._sign == 0:
-                if n._iseven():
-                    return Inf
-                else:
-                    return negInf
-            if n._iseven():
-                return Decimal(0)
+        # compute adjusted exponent of self
+        self_adj = self.adjusted()
+
+        # self ** infinity is infinity if self > 1, 0 if self < 1
+        # self ** -infinity is infinity if self < 1, 0 if self > 1
+        if other._isinfinity():
+            if (other._sign == 0) == (self_adj < 0):
+                return Decimal((result_sign, (0,), 0))
             else:
-                return Decimal((1, (0,), 0))
+                return Infsign[result_sign]
 
-        if n_inf and self._sign == 1:
-            return context._raise_error(InvalidOperation, '-num ** Inf')
-        if n_inf == 1:
-            if self < 1:
-                return Decimal(0)
-            else:
-                return Inf
-        if n_inf == -1:
-            if self > 1:
-                return Decimal(0)
-            else:
-                return Inf
+        # from here on, the result always goes through the call
+        # to _fix at the end of this function.
+        ans = None
 
-        sign = self._sign and not n._iseven()
-        n = int(n)
-        # With ludicrously large exponent, just raise an overflow
-        # and return inf.
-        if not modulo and n > 0 and \
-           (self._exp + len(self._int) - 1) * n > context.Emax and self:
+        # crude test to catch cases of extreme overflow/underflow.  If
+        # log10(self)*other >= 10**bound and bound >= len(str(Emax))
+        # then 10**bound >= 10**len(str(Emax)) >= Emax+1 and hence
+        # self**other >= 10**(Emax+1), so overflow occurs.  The test
+        # for underflow is similar.
+        bound = self._log10_exp_bound() + other.adjusted()
+        if (self_adj >= 0) == (other._sign == 0):
+            # self > 1 and other +ve, or self < 1 and other -ve
+            # possibility of overflow
+            if bound >= len(str(context.Emax)):
+                ans = Decimal((result_sign, (1,), context.Emax+1))
+        else:
+            # self > 1 and other -ve, or self < 1 and other +ve
+            # possibility of underflow to 0
+            Etiny = context.Etiny()
+            if bound >= len(str(-Etiny)):
+                ans = Decimal((result_sign, (1,), Etiny-1))
 
-            tmp = Decimal('inf')
-            tmp._sign = sign
-            context._raise_error(Rounded)
+        # try for an exact result with precision +1
+        if ans is None:
+            ans = self._power_exact(other, context.prec + 1)
+            if ans is not None and result_sign == 1:
+                ans = Decimal((1, ans._int, ans._exp))
+
+        # usual case: inexact result, x**y computed directly as exp(y*log(x))
+        if ans is None:
+            p = context.prec
+            x = _WorkRep(self)
+            xc, xe = x.int, x.exp
+            y = _WorkRep(other)
+            yc, ye = y.int, y.exp
+            if y.sign == 1:
+                yc = -yc
+
+            # compute correctly rounded result:  start with precision +3,
+            # then increase precision until result is unambiguously roundable
+            extra = 3
+            while True:
+                coeff, exp = _dpower(xc, xe, yc, ye, p+extra)
+                if coeff % (5*10**(len(str(coeff))-p-1)):
+                    break
+                extra += 3
+
+            ans = Decimal((result_sign, map(int, str(coeff)), exp))
+
+        # the specification says that for non-integer other we need to
+        # raise Inexact, even when the result is actually exact.  In
+        # the same way, we need to raise Underflow here if the result
+        # is subnormal.  (The call to _fix will take care of raising
+        # Rounded and Subnormal, as usual.)
+        if not other._isinteger():
             context._raise_error(Inexact)
-            context._raise_error(Overflow, 'Big power', sign)
-            return tmp
+            # pad with zeros up to length context.prec+1 if necessary
+            if len(ans._int) <= context.prec:
+                expdiff = context.prec+1 - len(ans._int)
+                ans = Decimal((ans._sign, ans._int+(0,)*expdiff, ans._exp-expdiff))
+            if ans.adjusted() < context.Emin:
+                context._raise_error(Underflow)
 
-        elength = len(str(abs(n)))
-        firstprec = context.prec
-
-        if not modulo and firstprec + elength + 1 > DefaultContext.Emax:
-            return context._raise_error(Overflow, 'Too much precision.', sign)
-
-        mul = Decimal(self)
-        val = Decimal(1)
-        context = context._shallow_copy()
-        context.prec = firstprec + elength + 1
-        if n < 0:
-            # n is a long now, not Decimal instance
-            n = -n
-            mul = Decimal(1).__div__(mul, context=context)
-
-        spot = 1
-        while spot <= n:
-            spot <<= 1
-
-        spot >>= 1
-        # spot is the highest power of 2 less than n
-        while spot:
-            val = val.__mul__(val, context=context)
-            if val._isinfinity():
-                val = Infsign[sign]
-                break
-            if spot & n:
-                val = val.__mul__(mul, context=context)
-            if modulo is not None:
-                val = val.__mod__(modulo, context=context)
-            spot >>= 1
-        context.prec = firstprec
-
-        if context._rounding_decision == ALWAYS_ROUND:
-            return val._fix(context)
-        return val
+        # unlike exp, ln and log10, the power function respects the
+        # rounding mode; no need to use ROUND_HALF_EVEN here
+        ans = ans._fix(context)
+        return ans
 
     def __rpow__(self, other, context=None):
         """Swaps self/other and returns __pow__."""
@@ -2351,6 +2690,8 @@ class Decimal(object):
 
     def _isinteger(self):
         """Returns whether self is an integer"""
+        if self._is_special:
+            return False
         if self._exp >= 0:
             return True
         rest = self._int[self._exp:]
@@ -2358,7 +2699,7 @@ class Decimal(object):
 
     def _iseven(self):
         """Returns 1 if self is even.  Assumes self is an integer."""
-        if self._exp > 0:
+        if not self or self._exp > 0:
             return 1
         return self._int[-1+self._exp] & 1 == 0
 
@@ -2477,38 +2818,11 @@ class Decimal(object):
         """Returns self with the sign of other."""
         return Decimal((other._sign, self._int, self._exp))
 
-    def _checkMath(self, context):
-        """Imitation of decNumber's decCheckMath.
-
-        This is to adjust all the possible to original
-        behaviour in order to pass some tests.
-        """
-
-        DEC_MAX_MATH = 999999
-        if (context.prec > DEC_MAX_MATH or
-            context.Emax > DEC_MAX_MATH or
-            -context.Emin > DEC_MAX_MATH):
-            return context._raise_error(InvalidContext)
-
-        if self._is_special:
-            return
-
-        if (len(self._int) > DEC_MAX_MATH or
-            self._exp + len(self._int) > DEC_MAX_MATH+1 or
-            self._exp + len(self._int) < 2*(1-DEC_MAX_MATH)) and self:
-            return context._raise_error(InvalidOperation,
-                        "operand outside bounds for mathematical functions")
-
     def exp(self, context=None):
         """Returns e ** self."""
 
         if context is None:
             context = getcontext()
-
-        # check context and operand
-        ans = self._checkMath(context)
-        if ans:
-            return ans
 
         # exp(NaN) = NaN
         ans = self._check_nans(context=context)
@@ -2676,11 +2990,6 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        # check context and operand
-        ans = self._checkMath(context)
-        if ans:
-            return ans
-
         # ln(NaN) = NaN
         ans = self._check_nans(context=context)
         if ans:
@@ -2760,11 +3069,6 @@ class Decimal(object):
 
         if context is None:
             context = getcontext()
-
-        # check context and operand
-        ans = self._checkMath(context)
-        if ans:
-            return ans
 
         # log10(NaN) = NaN
         ans = self._check_nans(context=context)
@@ -4151,49 +4455,69 @@ class Context(object):
     def power(self, a, b, modulo=None):
         """Raises a to the power of b, to modulo if given.
 
-        The right-hand operand must be a whole number whose integer part (after
-        any exponent has been applied) has no more than 9 digits and whose
-        fractional part (if any) is all zeros before any rounding.  The operand
-        may be positive, negative, or zero; if negative, the absolute value of
-        the power is used, and the left-hand operand is inverted (divided into
-        1) before use.
+        With two arguments, compute a**b.  If a is negative then b
+        must be integral.  The result will be inexact unless b is
+        integral and the result is finite and can be expressed exactly
+        in 'precision' digits.
 
-        If the increased precision needed for the intermediate calculations
-        exceeds the capabilities of the implementation then an Invalid
-        operation condition is raised.
+        With three arguments, compute (a**b) % modulo.  For the
+        three argument form, the following restrictions on the
+        arguments hold:
 
-        If, when raising to a negative power, an underflow occurs during the
-        division into 1, the operation is not halted at that point but
-        continues.
+         - all three arguments must be integral
+         - b must be nonnegative
+         - at least one of a or b must be nonzero
+         - modulo must be nonzero and have at most 'precision' digits
 
-        >>> ExtendedContext.power(Decimal('2'), Decimal('3'))
+        The result of pow(a, b, modulo) is identical to the result
+        that would be obtained by computing (a**b) % modulo with
+        unbounded precision, but is computed more efficiently.  It is
+        always exact.
+
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.power(Decimal('2'), Decimal('3'))
         Decimal("8")
-        >>> ExtendedContext.power(Decimal('2'), Decimal('-3'))
+        >>> c.power(Decimal('-2'), Decimal('3'))
+        Decimal("-8")
+        >>> c.power(Decimal('2'), Decimal('-3'))
         Decimal("0.125")
-        >>> ExtendedContext.power(Decimal('1.7'), Decimal('8'))
+        >>> c.power(Decimal('1.7'), Decimal('8'))
         Decimal("69.7575744")
-        >>> ExtendedContext.power(Decimal('Infinity'), Decimal('-2'))
+        >>> c.power(Decimal('10'), Decimal('0.301029996'))
+        Decimal("2.00000000")
+        >>> c.power(Decimal('Infinity'), Decimal('-1'))
         Decimal("0")
-        >>> ExtendedContext.power(Decimal('Infinity'), Decimal('-1'))
-        Decimal("0")
-        >>> ExtendedContext.power(Decimal('Infinity'), Decimal('0'))
+        >>> c.power(Decimal('Infinity'), Decimal('0'))
         Decimal("1")
-        >>> ExtendedContext.power(Decimal('Infinity'), Decimal('1'))
+        >>> c.power(Decimal('Infinity'), Decimal('1'))
         Decimal("Infinity")
-        >>> ExtendedContext.power(Decimal('Infinity'), Decimal('2'))
-        Decimal("Infinity")
-        >>> ExtendedContext.power(Decimal('-Infinity'), Decimal('-2'))
-        Decimal("0")
-        >>> ExtendedContext.power(Decimal('-Infinity'), Decimal('-1'))
+        >>> c.power(Decimal('-Infinity'), Decimal('-1'))
         Decimal("-0")
-        >>> ExtendedContext.power(Decimal('-Infinity'), Decimal('0'))
+        >>> c.power(Decimal('-Infinity'), Decimal('0'))
         Decimal("1")
-        >>> ExtendedContext.power(Decimal('-Infinity'), Decimal('1'))
+        >>> c.power(Decimal('-Infinity'), Decimal('1'))
         Decimal("-Infinity")
-        >>> ExtendedContext.power(Decimal('-Infinity'), Decimal('2'))
+        >>> c.power(Decimal('-Infinity'), Decimal('2'))
         Decimal("Infinity")
-        >>> ExtendedContext.power(Decimal('0'), Decimal('0'))
+        >>> c.power(Decimal('0'), Decimal('0'))
         Decimal("NaN")
+
+        >>> c.power(Decimal('3'), Decimal('7'), Decimal('16'))
+        Decimal("11")
+        >>> c.power(Decimal('-3'), Decimal('7'), Decimal('16'))
+        Decimal("-11")
+        >>> c.power(Decimal('-3'), Decimal('8'), Decimal('16'))
+        Decimal("1")
+        >>> c.power(Decimal('3'), Decimal('7'), Decimal('-16'))
+        Decimal("11")
+        >>> c.power(Decimal('23E12345'), Decimal('67E189'), Decimal('123456789'))
+        Decimal("11729830")
+        >>> c.power(Decimal('-0'), Decimal('17'), Decimal('1729'))
+        Decimal("-0")
+        >>> c.power(Decimal('-23'), Decimal('0'), Decimal('65537'))
+        Decimal("1")
         """
         return a.__pow__(b, modulo, context=self)
 
@@ -4849,6 +5173,56 @@ def _dexp(c, e, p):
     # error in result of _iexp < 120;  error after division < 0.62
     return _div_nearest(_iexp(rem, 10**p), 1000), quot - p + 3
 
+def _dpower(xc, xe, yc, ye, p):
+    """Given integers xc, xe, yc and ye representing Decimals x = xc*10**xe and
+    y = yc*10**ye, compute x**y.  Returns a pair of integers (c, e) such that:
+
+      10**(p-1) <= c <= 10**p, and
+      (c-1)*10**e < x**y < (c+1)*10**e
+
+    in other words, c*10**e is an approximation to x**y with p digits
+    of precision, and with an error in c of at most 1.  (This is
+    almost, but not quite, the same as the error being < 1ulp: when c
+    == 10**(p-1) we can only guarantee error < 10ulp.)
+
+    We assume that: x is positive and not equal to 1, and y is nonzero.
+    """
+
+    # Find b such that 10**(b-1) <= |y| <= 10**b
+    b = len(str(abs(yc))) + ye
+
+    # log(x) = lxc*10**(-p-b-1), to p+b+1 places after the decimal point
+    lxc = _dlog(xc, xe, p+b+1)
+
+    # compute product y*log(x) = yc*lxc*10**(-p-b-1+ye) = pc*10**(-p-1)
+    shift = ye-b
+    if shift >= 0:
+        pc = lxc*yc*10**shift
+    else:
+        pc = _div_nearest(lxc*yc, 10**-shift)
+
+    if pc == 0:
+        # we prefer a result that isn't exactly 1; this makes it
+        # easier to compute a correctly rounded result in __pow__
+        if ((len(str(xc)) + xe >= 1) == (yc > 0)): # if x**y > 1:
+            coeff, exp = 10**(p-1)+1, 1-p
+        else:
+            coeff, exp = 10**p-1, -p
+    else:
+        coeff, exp = _dexp(pc, -(p+1), p+1)
+        coeff = _div_nearest(coeff, 10)
+        exp += 1
+
+    return coeff, exp
+
+def _log10_lb(c, correction = {
+        '1': 100, '2': 70, '3': 53, '4': 40, '5': 31,
+        '6': 23, '7': 16, '8': 10, '9': 5}):
+    """Compute a lower bound for 100*log10(c) for a positive integer c."""
+    if c <= 0:
+        raise ValueError("The argument to _log10_lb should be nonnegative.")
+    str_c = str(c)
+    return 100*len(str_c) - correction[str_c[0]]
 
 ##### Helper Functions ####################################################
 

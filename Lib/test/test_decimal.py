@@ -126,6 +126,28 @@ nameAdapter = {'toeng':'to_eng_string',
                'nexttoward':'next_toward',
               }
 
+# For some operations (currently exp, ln, log10, power), the decNumber
+# reference implementation imposes additional restrictions on the
+# context and operands.  These restrictions are not part of the
+# specification; however, the effect of these restrictions does show
+# up in some of the testcases.  We skip testcases that violate these
+# restrictions, since Decimal behaves differently from decNumber for
+# these testcases so these testcases would otherwise fail.
+
+decNumberRestricted = ('power', 'ln', 'log10', 'exp')
+DEC_MAX_MATH = 999999
+def outside_decNumber_bounds(v, context):
+    if (context.prec > DEC_MAX_MATH or
+        context.Emax > DEC_MAX_MATH or
+        -context.Emin > DEC_MAX_MATH):
+        return True
+    if not v._is_special and v and (
+        len(v._int) > DEC_MAX_MATH or
+        v.adjusted() > DEC_MAX_MATH or
+        v.adjusted() < 1-2*DEC_MAX_MATH):
+        return True
+    return False
+
 class DecimalTest(unittest.TestCase):
     """Class which tests the Decimal class against the test cases.
 
@@ -267,6 +289,22 @@ class DecimalTest(unittest.TestCase):
             vals.append(v)
 
         ans = FixQuotes(ans)
+
+        # skip tests that are related to bounds imposed in the decNumber
+        # reference implementation
+        if fname in decNumberRestricted:
+            if fname == 'power':
+                if not (vals[1]._isinteger() and
+                        -1999999997 <= vals[1] <= 999999999):
+                    if outside_decNumber_bounds(vals[0], self.context) or \
+                            outside_decNumber_bounds(vals[1], self.context):
+                        #print "Skipping test %s" % s
+                        return
+            else:
+                if outside_decNumber_bounds(vals[0], self.context):
+                    #print "Skipping test %s" % s
+                    return
+
 
         if EXTENDEDERRORTEST and fname not in ('to_sci_string', 'to_eng_string'):
             for error in theirexceptions:
