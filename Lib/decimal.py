@@ -3354,12 +3354,54 @@ class Decimal(object):
         return self.__add__(Decimal((0, (1,), context.Etiny()-1)), context)
 
     def next_toward(self, other, context=None):
-        """Returns the number closest to itself, in direction towards other.
+        """Returns the number closest to self, in the direction towards other.
 
-        The result is the closest to self representable number (but not
-        self) that is in the direction towards other, unless the both have
-        the same value.
+        The result is the closest representable number to self
+        (excluding self) that is in the direction towards other,
+        unless both have the same value.  If the two operands are
+        numerically equal, then the result is a copy of self with the
+        sign set to be the same as the sign of other.
         """
+        other = _convert_other(other)
+        if other is NotImplemented:
+            raise TypeError("The second argument to next_toward should be " +
+                            "an integer or an instance of Decimal.  Got " +
+                            str(other))
+
+        if context is None:
+            context = getcontext()
+
+        ans = self._check_nans(other, context)
+        if ans:
+            return ans
+
+        comparison = self.__cmp__(other)
+        if comparison == 0:
+            return Decimal((other._sign, self._int, self._exp))
+
+        if comparison == -1:
+            ans = self.next_plus(context)
+        else: # comparison == 1
+            ans = self.next_minus(context)
+
+        # decide which flags to raise using value of ans
+        if ans._isinfinity():
+            context._raise_error(Overflow,
+                                 'Infinite result from next_toward',
+                                 ans._sign)
+            context._raise_error(Rounded)
+            context._raise_error(Inexact)
+        elif ans.adjusted() < context.Emin:
+            context._raise_error(Underflow)
+            context._raise_error(Subnormal)
+            context._raise_error(Rounded)
+            context._raise_error(Inexact)
+            # if precision == 1 then we don't raise Clamped for a
+            # result 0E-Etiny.
+            if not ans:
+                context._raise_error(Clamped)
+
+        return ans
 
     def number_class(self, context=None):
         """Returns an indication of the class of self.
@@ -4353,19 +4395,22 @@ class Context(object):
         towards the second operand, unless the operands have the same
         value.
 
-        >>> ExtendedContext.next_toward(Decimal('1'), Decimal('2'))
+        >>> c = ExtendedContext.copy()
+        >>> c.Emin = -999
+        >>> c.Emax = 999
+        >>> c.next_toward(Decimal('1'), Decimal('2'))
         Decimal("1.00000001")
-        >>> ExtendedContext.next_toward(Decimal('-1E-1007'), Decimal('1'))
+        >>> c.next_toward(Decimal('-1E-1007'), Decimal('1'))
         Decimal("-0E-1007")
-        >>> ExtendedContext.next_toward(Decimal('-1.00000003'), Decimal('0'))
+        >>> c.next_toward(Decimal('-1.00000003'), Decimal('0'))
         Decimal("-1.00000002")
-        >>> ExtendedContext.next_toward(Decimal('1'), Decimal('0'))
+        >>> c.next_toward(Decimal('1'), Decimal('0'))
         Decimal("0.999999999")
-        >>> ExtendedContext.next_toward(Decimal('1E-1007'), Decimal('-100'))
+        >>> c.next_toward(Decimal('1E-1007'), Decimal('-100'))
         Decimal("0E-1007")
-        >>> ExtendedContext.next_toward(Decimal('-1.00000003'), Decimal('-10'))
+        >>> c.next_toward(Decimal('-1.00000003'), Decimal('-10'))
         Decimal("-1.00000004")
-        >>> ExtendedContext.next_toward(Decimal('0.00'), Decimal('-0.0000'))
+        >>> c.next_toward(Decimal('0.00'), Decimal('-0.0000'))
         Decimal("-0.00")
         """
         return a.next_toward(b, context=self)
