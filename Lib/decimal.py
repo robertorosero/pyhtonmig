@@ -213,9 +213,10 @@ class InvalidOperation(DecimalException):
     def handle(self, context, *args):
         if args:
             if args[0] == 1:  # sNaN, must drop 's' but keep diagnostics
-                return Decimal( (args[1]._sign, args[1]._int, 'n') )
+                ans = Decimal((args[1]._sign, args[1]._int, 'n'))
+                return ans._fix_nan(context)
             elif args[0] == 2:
-                return Decimal( (args[1], args[2], 'P') )
+                return Decimal( (args[1], args[2], 'n') )
         return NaN
 
 
@@ -573,7 +574,7 @@ class Decimal(object):
                                 "composed of non negative integer elements.")
             self._sign = value[0]
             self._int  = tuple(value[1])
-            if value[2] in ('F','n','N', 'P'):
+            if value[2] in ('F','n','N'):
                 self._exp = value[2]
                 self._is_special = True
             else:
@@ -603,19 +604,6 @@ class Decimal(object):
             if _isnan(value):
                 sig, sign, diag = _isnan(value)
                 self._is_special = True
-                if len(diag) > context.prec:  # Diagnostic info too long
-                    # sig=1, qNaN -> ConversionSyntax
-                    # sig=2, sNaN -> InvalidOperation
-                    digits = tuple(int(x) for x in diag[-context.prec:])
-                    if sig == 1:
-                        self._exp = 'P'  # qNaN
-                        self._sign = sign
-                        self._int = digits
-                        return self
-
-                    return context._raise_error(InvalidOperation,
-                                                'diagnostic info too long',
-                                                2, sign, digits)
                 if sig == 1:
                     self._exp = 'n'  # qNaN
                 else:  # sig == 2
@@ -642,7 +630,7 @@ class Decimal(object):
         """
         if self._is_special:
             exp = self._exp
-            if exp == 'n' or exp == 'P':
+            if exp == 'n':
                 return 1
             elif exp == 'N':
                 return 2
@@ -688,9 +676,9 @@ class Decimal(object):
                 return context._raise_error(InvalidOperation, 'sNaN',
                                         1, other)
             if self_is_nan:
-                return self
+                return self._fix_nan(context)
 
-            return other
+            return other._fix_nan(context)
         return 0
 
     def __nonzero__(self):
@@ -1536,6 +1524,17 @@ class Decimal(object):
         """
         return long(self.__int__())
 
+    def _fix_nan(self, context):
+        """Decapitate the payload of a NaN to fit the context"""
+        payload = self._int
+        if len(payload) > context.prec:
+            pos = -context.prec
+            while payload[pos] == 0 and pos < -1:
+                pos += 1
+            payload = payload[pos:]
+            return Decimal((self._sign, payload, self._exp))
+        return self
+
     def _fix(self, context):
         """Round if it is necessary to keep self within prec precision.
 
@@ -1546,7 +1545,10 @@ class Decimal(object):
         context - context used.
         """
         if self._is_special:
-            return self
+            if self._isnan():
+                return self._fix_nan(context)
+            else:
+                return self
         if context is None:
             context = getcontext()
         prec = context.prec
@@ -2601,8 +2603,6 @@ class Decimal(object):
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
             # number is always returned
-            if other._exp == 'P':
-                return other
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
@@ -3781,6 +3781,9 @@ class Context(object):
     def create_decimal(self, num='0'):
         """Creates a new Decimal instance but using self as context."""
         d = Decimal(num, context=self)
+        if d._isnan() and len(d._int) > self.prec:
+            return self._raise_error(ConversionSyntax,
+                                     "diagnostic info too long in NaN")
         return d._fix(self)
 
     # Methods
@@ -4826,8 +4829,6 @@ class Context(object):
 
         The operation is not affected by the context.
         """
-        if a._exp == 'P':
-            a = self._raise_error(ConversionSyntax)
         return a.__str__(context=self)
 
     def to_integral_exact(self, a):
