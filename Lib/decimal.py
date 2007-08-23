@@ -2725,8 +2725,11 @@ class Decimal(object):
         It's pretty much like compare(), but all NaNs signal, with signaling
         NaNs taking precedence over quiet NaNs.
         """
+        if self._isnan() or other._isnan():
+            return context._raise_error(InvalidOperation)
+        return self.compare(other, context=context)
 
-    def compare_total(self, other, context=None):
+    def compare_total(self, other):
         """Compares self to other using the abstract representations.
 
         This is not like the standard compare, which use their numerical
@@ -2807,14 +2810,14 @@ class Decimal(object):
         """Returns a copy with the sign set to 0. """
         return Decimal((0, self._int, self._exp))
 
-    def copy_negate(self, context=None):
+    def copy_negate(self):
         """Returns a copy with the sign inverted."""
         if self._sign:
             return Decimal((0, self._int, self._exp))
         else:
             return Decimal((1, self._int, self._exp))
 
-    def copy_sign(self, other, context=None):
+    def copy_sign(self, other):
         """Returns self with the sign of other."""
         return Decimal((other._sign, self._int, self._exp))
 
@@ -2893,11 +2896,11 @@ class Decimal(object):
 
         return ans
 
-    def is_canonical(self, context=None):
+    def is_canonical(self):
         """Returns 1 if self is canonical; otherwise returns 0."""
         return Decimal(1)
 
-    def is_finite(self, context=None):
+    def is_finite(self):
         """Returns 1 if self is finite, otherwise returns 0.
 
         For it to be finite, it must be neither infinite nor a NaN.
@@ -2907,14 +2910,14 @@ class Decimal(object):
         else:
             return Decimal(1)
 
-    def is_infinite(self, context=None):
+    def is_infinite(self):
         """Returns 1 if self is an Infinite, otherwise returns 0."""
         if self._isinfinity():
             return Decimal(1)
         else:
             return Decimal(0)
 
-    def is_nan(self, context=None):
+    def is_nan(self):
         """Returns 1 if self is qNaN or sNaN, otherwise returns 0."""
         if self._isnan():
             return Decimal(1)
@@ -2934,18 +2937,18 @@ class Decimal(object):
         else:
             return Decimal(0)
 
-    def is_qnan(self, context=None):
+    def is_qnan(self):
         """Returns 1 if self is a quiet NaN, otherwise returns 0."""
         if self._isnan() == 1:
             return Decimal(1)
         else:
             return Decimal(0)
 
-    def is_signed(self, context=None):
+    def is_signed(self):
         """Returns 1 if self is negative, otherwise returns 0."""
         return Decimal(self._sign)
 
-    def is_snan(self, context=None):
+    def is_snan(self):
         """Returns 1 if self is a signaling NaN, otherwise returns 0."""
         if self._isnan() == 2:
             return Decimal(1)
@@ -2966,7 +2969,7 @@ class Decimal(object):
             return Decimal(1)
         return Decimal(0)
 
-    def is_zero(self, context=None):
+    def is_zero(self):
         """Returns 1 if self is a zero, otherwise returns 0."""
         if self:
             return Decimal(0)
@@ -3459,7 +3462,7 @@ class Decimal(object):
         else:
             return "+Normal"
 
-    def radix(self, context=None):
+    def radix(self):
         """Just returns 10, as this is Decimal, :)"""
         return Decimal(10)
 
@@ -3863,6 +3866,26 @@ class Context(object):
 
         It's pretty much like compare(), but all NaNs signal, with signaling
         NaNs taking precedence over quiet NaNs.
+
+        >>> c = ExtendedContext
+        >>> c.compare_signal(Decimal('2.1'), Decimal('3'))
+        Decimal("-1")
+        >>> c.compare_signal(Decimal('2.1'), Decimal('2.1'))
+        Decimal("0")
+        >>> c.flags[InvalidOperation] = 0
+        >>> print c.flags[InvalidOperation]
+        0
+        >>> c.compare_signal(Decimal('NaN'), Decimal('2.1'))
+        Decimal("NaN")
+        >>> print c.flags[InvalidOperation]
+        1
+        >>> c.flags[InvalidOperation] = 0
+        >>> print c.flags[InvalidOperation]
+        0
+        >>> c.compare_signal(Decimal('sNaN'), Decimal('2.1'))
+        Decimal("NaN")
+        >>> print c.flags[InvalidOperation]
+        1
         """
         return a.compare_signal(b, context=self)
 
@@ -3886,7 +3909,7 @@ class Context(object):
         >>> ExtendedContext.compare_total(Decimal('12.3'),  Decimal('NaN'))
         Decimal("-1")
         """
-        return a.compare_total(b, context=self)
+        return a.compare_total(b)
 
     def compare_total_mag(self, a, b):
         """Compares two operands using their abstract representation ignoring sign.
@@ -3923,7 +3946,7 @@ class Context(object):
         >>> ExtendedContext.copy_negate(Decimal('-101.5'))
         Decimal("101.5")
         """
-        return a.copy_negate(context=self)
+        return a.copy_negate()
 
     def copy_sign(self, a, b):
         """Copies the second operand's sign to the first one.
@@ -3940,7 +3963,7 @@ class Context(object):
         >>> ExtendedContext.copy_sign(Decimal('-1.50'), Decimal('-7.33'))
         Decimal("-1.50")
         """
-        return a.copy_sign(b, context=self)
+        return a.copy_sign(b)
 
     def divide(self, a, b):
         """Decimal division in a specified context.
@@ -4044,7 +4067,7 @@ class Context(object):
         >>> ExtendedContext.is_finite(Decimal('NaN'))
         Decimal("0")
         """
-        return a.is_finite(context=self)
+        return a.is_finite()
 
     def is_infinite(self, a):
         """Returns 1 if the operand is an Infinite, otherwise returns 0.
@@ -4056,7 +4079,7 @@ class Context(object):
         >>> ExtendedContext.is_infinite(Decimal('NaN'))
         Decimal("0")
         """
-        return a.is_infinite(context=self)
+        return a.is_infinite()
 
     def is_nan(self, a):
         """Returns 1 if the operand is qNaN or sNaN, otherwise returns 0.
@@ -4068,7 +4091,7 @@ class Context(object):
         >>> ExtendedContext.is_nan(Decimal('-sNaN'))
         Decimal("1")
         """
-        return a.is_nan(context=self)
+        return a.is_nan()
 
     def is_normal(self, a):
         """Returns 1 if the operand is a normal number, otherwise returns 0.
@@ -4099,7 +4122,7 @@ class Context(object):
         >>> ExtendedContext.is_qnan(Decimal('sNaN'))
         Decimal("0")
         """
-        return a.is_qnan(context=self)
+        return a.is_qnan()
 
     def is_signed(self, a):
         """Returns 1 if the operand is negative, otherwise returns 0.
@@ -4111,7 +4134,7 @@ class Context(object):
         >>> ExtendedContext.is_signed(Decimal('-0'))
         Decimal("1")
         """
-        return a.is_signed(context=self)
+        return a.is_signed()
 
     def is_snan(self, a):
         """Returns 1 if the operand is a signaling NaN, otherwise returns 0.
@@ -4123,7 +4146,7 @@ class Context(object):
         >>> ExtendedContext.is_snan(Decimal('sNaN'))
         Decimal("1")
         """
-        return a.is_snan(context=self)
+        return a.is_snan()
 
     def is_subnormal(self, a):
         """Returns 1 if the operand is subnormal, otherwise returns 0.
@@ -4154,7 +4177,7 @@ class Context(object):
         >>> ExtendedContext.is_zero(Decimal('-0E+2'))
         Decimal("1")
         """
-        return a.is_zero(context=self)
+        return a.is_zero()
 
     def ln(self, a):
         """Returns the natural (base e) logarithm of the operand.
