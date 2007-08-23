@@ -1437,9 +1437,9 @@ class Decimal(object):
         rounding = context._set_rounding_decision(NEVER_ROUND)
 
         if other._sign:
-            comparison = other.__div__(Decimal(-2), context=context)
+            comparison = other.__div__(Dec_n2, context=context)
         else:
-            comparison = other.__div__(Decimal(2), context=context)
+            comparison = other.__div__(Dec_p2, context=context)
 
         context._set_rounding_decision(rounding)
         context._regard_flags(*flags)
@@ -1471,7 +1471,7 @@ class Decimal(object):
         if r > comparison or decrease and r == comparison:
             r._sign, comparison._sign = s1, s2
             context.prec += 1
-            numbsquant = len(side.__add__(Decimal(1), context=context)._int)
+            numbsquant = len(side.__add__(Dec_p1, context=context)._int)
             if numbsquant >= context.prec:
                 context.prec -= 1
                 return context._raise_error(DivisionImpossible)[1]
@@ -2203,7 +2203,7 @@ class Decimal(object):
             if not self:
                 return context._raise_error(InvalidOperation, '0 ** 0')
             else:
-                return Decimal((0, (1,), 0))
+                return Dec_p1
 
         # result has sign 1 iff self._sign is 1 and other is an odd integer
         result_sign = 0
@@ -2237,7 +2237,7 @@ class Decimal(object):
         # 1**other = 1, but the choice of exponent and the flags
         # depend on the exponent of self, and on whether other is a
         # positive integer, a negative integer, or neither
-        if self == Decimal(1):
+        if self == Dec_p1:
             if other._isinteger():
                 # exp = max(self._exp*max(int(other), 0),
                 # 1-context.prec) but evaluating int(other) directly
@@ -2245,7 +2245,7 @@ class Decimal(object):
                 # could be 1e999999999)
                 if other._sign == 1:
                     multiplier = 0
-                elif other > Decimal(context.prec):
+                elif other > context.prec:
                     multiplier = context.prec
                 else:
                     multiplier = int(other)
@@ -2738,9 +2738,9 @@ class Decimal(object):
         """
         # if one is negative and the other is positive, it's easy
         if self._sign and not other._sign:
-            return Decimal(-1)
+            return Dec_n1
         if not self._sign and other._sign:
-            return Decimal(1)
+            return Dec_p1
         sign = self._sign
 
         # let's handle both NaN types
@@ -2750,51 +2750,51 @@ class Decimal(object):
             if self_nan == other_nan:
                 if self._int < other._int:
                     if sign:
-                        return Decimal(1)
+                        return Dec_p1
                     else:
-                        return Decimal(-1)
+                        return Dec_n1
                 if self._int > other._int:
                     if sign:
-                        return Decimal(-1)
+                        return Dec_n1
                     else:
-                        return Decimal(1)
-                return Decimal(0)
+                        return Dec_p1
+                return Dec_0
 
             if sign:
                 if self_nan == 1:
-                    return Decimal(-1)
+                    return Dec_n1
                 if other_nan == 1:
-                    return Decimal(1)
+                    return Dec_p1
                 if self_nan == 2:
-                    return Decimal(-1)
+                    return Dec_n1
                 if other_nan == 2:
-                    return Decimal(1)
+                    return Dec_p1
             else:
                 if self_nan == 1:
-                    return Decimal(1)
+                    return Dec_p1
                 if other_nan == 1:
-                    return Decimal(-1)
+                    return Dec_n1
                 if self_nan == 2:
-                    return Decimal(1)
+                    return Dec_p1
                 if other_nan == 2:
-                    return Decimal(-1)
+                    return Dec_n1
 
         if self < other:
-            return Decimal(-1)
+            return Dec_n1
         if self > other:
-            return Decimal(1)
+            return Dec_p1
 
         if self._exp < other._exp:
             if sign:
-                return Decimal(1)
+                return Dec_p1
             else:
-                return Decimal(-1)
+                return Dec_n1
         if self._exp > other._exp:
             if sign:
-                return Decimal(-1)
+                return Dec_n1
             else:
-                return Decimal(1)
-        return Decimal(0)
+                return Dec_p1
+        return Dec_0
 
 
     def compare_total_mag(self, other):
@@ -2834,11 +2834,11 @@ class Decimal(object):
 
         # exp(-Infinity) = 0
         if self._isinfinity() == -1:
-            return Decimal((0, (0,), 0))
+            return Dec_0
 
         # exp(0) = 1
         if not self:
-            return Decimal((0, (1,), 0))
+            return Dec_p1
 
         # exp(Infinity) = Infinity
         if self._isinfinity() == 1:
@@ -2898,7 +2898,7 @@ class Decimal(object):
 
     def is_canonical(self):
         """Returns 1 if self is canonical; otherwise returns 0."""
-        return Decimal(1)
+        return Dec_p1
 
     def is_finite(self):
         """Returns 1 if self is finite, otherwise returns 0.
@@ -2906,43 +2906,43 @@ class Decimal(object):
         For it to be finite, it must be neither infinite nor a NaN.
         """
         if self._is_special:
-            return Decimal(0)
+            return Dec_0
         else:
-            return Decimal(1)
+            return Dec_p1
 
     def is_infinite(self):
         """Returns 1 if self is an Infinite, otherwise returns 0."""
         if self._isinfinity():
-            return Decimal(1)
+            return Dec_p1
         else:
-            return Decimal(0)
+            return Dec_0
 
     def is_nan(self):
         """Returns 1 if self is qNaN or sNaN, otherwise returns 0."""
         if self._isnan():
-            return Decimal(1)
+            return Dec_p1
         else:
-            return Decimal(0)
+            return Dec_0
 
     def is_normal(self, context=None):
         """Returns 1 if self is a normal number, otherwise returns 0."""
         if self._is_special:
-            return Decimal(0)
+            return Dec_0
         if not self:
-            return Decimal(0)
+            return Dec_0
         if context is None:
             context = getcontext()
         if context.Emin <= self.adjusted() <= context.Emax:
-            return Decimal(1)
+            return Dec_p1
         else:
-            return Decimal(0)
+            return Dec_0
 
     def is_qnan(self):
         """Returns 1 if self is a quiet NaN, otherwise returns 0."""
         if self._isnan() == 1:
-            return Decimal(1)
+            return Dec_p1
         else:
-            return Decimal(0)
+            return Dec_0
 
     def is_signed(self):
         """Returns 1 if self is negative, otherwise returns 0."""
@@ -2951,30 +2951,30 @@ class Decimal(object):
     def is_snan(self):
         """Returns 1 if self is a signaling NaN, otherwise returns 0."""
         if self._isnan() == 2:
-            return Decimal(1)
+            return Dec_p1
         else:
-            return Decimal(0)
+            return Dec_0
 
     def is_subnormal(self, context=None):
         """Returns 1 if self is subnormal, otherwise returns 0."""
         if self._is_special:
-            return Decimal(0)
+            return Dec_0
         if not self:
-            return Decimal(0)
+            return Dec_0
         if context is None:
             context = getcontext()
 
         r = self._exp + len(self._int)
         if r <= context.Emin:
-            return Decimal(1)
-        return Decimal(0)
+            return Dec_p1
+        return Dec_0
 
     def is_zero(self):
         """Returns 1 if self is a zero, otherwise returns 0."""
         if self:
-            return Decimal(0)
+            return Dec_0
         else:
-            return Decimal(1)
+            return Dec_p1
 
     def _ln_exp_bound(self):
         """Compute a lower bound for the adjusted exponent of self.ln().
@@ -3021,8 +3021,8 @@ class Decimal(object):
             return Inf
 
         # ln(1.0) == 0.0
-        if self == Decimal(1):
-            return Decimal((0, (0,), 0))
+        if self == Dec_p1:
+            return Dec_0
 
         # ln(negative) raises InvalidOperation
         if self._sign == 1:
@@ -4049,7 +4049,7 @@ class Context(object):
         >>> ExtendedContext.is_canonical(Decimal('2.50'))
         Decimal("1")
         """
-        return Decimal(1)
+        return Dec_p1
 
     def is_finite(self, a):
         """Returns 1 if the operand is finite, otherwise returns 0.
@@ -5400,11 +5400,16 @@ ExtendedContext = Context(
 # Reusable defaults
 Inf = Decimal('Inf')
 negInf = Decimal('-Inf')
+NaN = Decimal('NaN')
+Dec_0 = Decimal(0)
+Dec_p1 = Decimal(1)
+Dec_n1 = Decimal(-1)
+Dec_p2 = Decimal(2)
+Dec_n2 = Decimal(-2)
 
 # Infsign[sign] is infinity w/ that sign
 Infsign = (Inf, negInf)
 
-NaN = Decimal('NaN')
 
 ##### crud for parsing strings #############################################
 import re
