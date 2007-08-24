@@ -2612,7 +2612,6 @@ class Decimal(object):
                     return other
                 return self._check_nans(other, context)
 
-        ans = self
         c = self.__cmp__(other)
         if c == 0:
             # If both operands are finite and equal in numerical value
@@ -2622,16 +2621,13 @@ class Decimal(object):
             # positive sign and min returns the operand with the negative sign
             #
             # If the signs are the same then the exponent is used to select
-            # the result.
-            if self._sign != other._sign:
-                if self._sign:
-                    ans = other
-            elif self._exp < other._exp and not self._sign:
-                ans = other
-            elif self._exp > other._exp and self._sign:
-                ans = other
-        elif c == -1:
+            # the result.  This is exactly the ordering used in compare_total.
+            c = self.compare_total(other)
+
+        if c == -1:
             ans = other
+        else:
+            ans = self
 
         if context is None:
             context = getcontext()
@@ -2661,25 +2657,13 @@ class Decimal(object):
                     return other
                 return self._check_nans(other, context)
 
-        ans = self
         c = self.__cmp__(other)
         if c == 0:
-            # If both operands are finite and equal in numerical value
-            # then an ordering is applied:
-            #
-            # If the signs differ then max returns the operand with the
-            # positive sign and min returns the operand with the negative sign
-            #
-            # If the signs are the same then the exponent is used to select
-            # the result.
-            if self._sign != other._sign:
-                if other._sign:
-                    ans = other
-            elif self._exp > other._exp and not self._sign:
-                ans = other
-            elif self._exp < other._exp and self._sign:
-                ans = other
-        elif c == 1:
+            c = self.compare_total(other)
+
+        if c == -1:
+            ans = self
+        else:
             ans = other
 
         if context is None:
@@ -3262,69 +3246,69 @@ class Decimal(object):
 
     def max_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
+        other = _convert_other(other)
+        if other is NotImplemented:
+            return other
+
+        if self._is_special or other._is_special:
+            # If one operand is a quiet NaN and the other is number, then the
+            # number is always returned
+            sn = self._isnan()
+            on = other._isnan()
+            if sn or on:
+                if on == 1 and sn != 2:
+                    return self
+                if sn == 1 and on != 2:
+                    return other
+                return self._check_nans(other, context)
+
+        c = self.copy_abs().__cmp__(other.copy_abs())
+        if c == 0:
+            c = self.compare_total(other)
+
+        if c == -1:
+            ans = other
+        else:
+            ans = self
+
         if context is None:
             context = getcontext()
-        if self._isnan() == 2:
-            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, self)
-        if other._isnan() == 2:
-            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, other)
-        abs_self = abs(self)
-        abs_other = abs(other)
-        if abs_self == abs_other:
-            if self._sign == other._sign:
-                if self._sign == 0:
-                    if self._exp >= other._exp:
-                        return self
-                    else:
-                        return other
-                else:
-                    if self._exp < other._exp:
-                        return self
-                    else:
-                        return other
-            elif self._sign == 0:
-                return self
-            else:
-                return other
-        ans = abs_self.max(abs_other)
-        if abs_self is ans:
-            d = self._fix(context)
-        else:
-            d = other._fix(context)
-        return d
+        if context._rounding_decision == ALWAYS_ROUND:
+            return ans._fix(context)
+        return ans
 
     def min_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
+        other = _convert_other(other)
+        if other is NotImplemented:
+            return other
+
+        if self._is_special or other._is_special:
+            # If one operand is a quiet NaN and the other is number, then the
+            # number is always returned
+            sn = self._isnan()
+            on = other._isnan()
+            if sn or on:
+                if on == 1 and sn != 2:
+                    return self
+                if sn == 1 and on != 2:
+                    return other
+                return self._check_nans(other, context)
+
+        c = self.copy_abs().__cmp__(other.copy_abs())
+        if c == 0:
+            c = self.compare_total(other)
+
+        if c == -1:
+            ans = self
+        else:
+            ans = other
+
         if context is None:
             context = getcontext()
-        if self._isnan() == 2:
-            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, self)
-        if other._isnan() == 2:
-            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, other)
-        abs_self = abs(self)
-        abs_other = abs(other)
-        if abs_self == abs_other:
-            if self._sign == other._sign:
-                if self._sign == 0:
-                    if self._exp >= other._exp:
-                        return other
-                    else:
-                        return self
-                else:
-                    if self._exp < other._exp:
-                        return other
-                    else:
-                        return self
-            elif self._sign == 0:
-                return other
-            else:
-                return self
-        ans = abs_self.min(abs_other)
-        if abs_self is ans:
-            d = self._fix(context)
-        else:
-            d = other._fix(context)
-        return d
+        if context._rounding_decision == ALWAYS_ROUND:
+            return ans._fix(context)
+        return ans
 
     def next_minus(self, context=None):
         """Returns the largest representable number smaller than itself."""
