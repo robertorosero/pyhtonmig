@@ -691,22 +691,28 @@ class Decimal(object):
             return 1
         return sum(self._int) != 0
 
-    def __cmp__(self, other, context=None):
+    def __cmp__(self, other):
         other = _convert_other(other)
         if other is NotImplemented:
             # Never return NotImplemented
             return 1
 
         if self._is_special or other._is_special:
-            ans = self._check_nans(other, context)
-            if ans:
+            # check for nans, without raising on a signaling nan
+            if self._isnan() or other._isnan():
                 return 1  # Comparison involving NaN's always reports self > other
 
             # INF = INF
             return cmp(self._isinfinity(), other._isinfinity())
 
-        if not self and not other:
-            return 0  # If both 0, sign comparison isn't certain.
+        # check for zeros;  note that cmp(0, -0) should return 0
+        if not self:
+            if not other:
+                return 0
+            else:
+                return -((-1)**other._sign)
+        if not other:
+            return (-1)**self._sign
 
         # If different signs, neg one is less
         if other._sign < self._sign:
@@ -716,34 +722,14 @@ class Decimal(object):
 
         self_adjusted = self.adjusted()
         other_adjusted = other.adjusted()
-        if self_adjusted == other_adjusted and \
-           self._int + (0,)*(self._exp - other._exp) == \
-           other._int + (0,)*(other._exp - self._exp):
-            return 0  # equal, except in precision. ([0]*(-x) = [])
-        elif self_adjusted > other_adjusted and self._int[0] != 0:
+        if self_adjusted == other_adjusted:
+            self_padded = self._int + (0,)*(self._exp - other._exp)
+            other_padded = other._int + (0,)*(other._exp - self._exp)
+            return cmp(self_padded, other_padded) * (-1)**self._sign
+        elif self_adjusted > other_adjusted:
             return (-1)**self._sign
-        elif self_adjusted < other_adjusted and other._int[0] != 0:
+        else: # self_adjusted < other_adjusted
             return -((-1)**self._sign)
-
-        # Need to round, so make sure we have a valid context
-        if context is None:
-            context = getcontext()
-
-        context = context._shallow_copy()
-        rounding = context._set_rounding(ROUND_UP)  # round away from 0
-
-        flags = context._ignore_all_flags()
-        res = self.__sub__(other, context=context)
-
-        context._regard_flags(*flags)
-
-        context.rounding = rounding
-
-        if not res:
-            return 0
-        elif res._sign:
-            return -1
-        return 1
 
     def __eq__(self, other):
         if not isinstance(other, (Decimal, int, long)):
@@ -774,7 +760,7 @@ class Decimal(object):
             if ans:
                 return ans
 
-        return Decimal(self.__cmp__(other, context))
+        return Decimal(self.__cmp__(other))
 
     def __hash__(self):
         """x.__hash__() <==> hash(x)"""
