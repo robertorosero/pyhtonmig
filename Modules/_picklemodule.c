@@ -864,6 +864,7 @@ save_long(PicklerObject *self, PyObject *args)
             goto finally;
         }
         nbits = _PyLong_NumBits(args);
+        /* XXX Shouldn't it be sizeof(size_t), instead? */
         if (nbits == (size_t) - 1 && PyErr_Occurred())
             goto finally;
         /* How many bytes do we need?  There are nbits >> 3 full
@@ -886,11 +887,11 @@ save_long(PicklerObject *self, PyObject *args)
                             "to pickle");
             goto finally;
         }
-        repr = PyString_FromStringAndSize(NULL, (int) nbytes);
+        repr = PyString_FromStringAndSize(NULL, (int)nbytes);
         if (repr == NULL)
             goto finally;
-        pdata = (unsigned char *) PyString_AS_STRING(repr);
-        i = _PyLong_AsByteArray((PyLongObject *) args,
+        pdata = (unsigned char *)PyString_AS_STRING(repr);
+        i = _PyLong_AsByteArray((PyLongObject *)args,
                                 pdata, nbytes,
                                 1 /* little endian */ , 1 /* signed */ );
         if (i < 0)
@@ -910,7 +911,7 @@ save_long(PicklerObject *self, PyObject *args)
         }
         else {
             c_str[0] = LONG4;
-            size = (int) nbytes;
+            size = (int)nbytes;
             for (i = 1; i < 5; i++) {
                 c_str[i] = (char)(size & 0xff);
                 size >>= 8;
@@ -1938,7 +1939,7 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *ob)
 }
 
 static int
-save(PicklerObject *self, PyObject *args, int pers_save)
+save(PicklerObject *self, PyObject *obj, int pers_save)
 {
     PyTypeObject *type;
     PyObject *py_ob_id = 0, *__reduce__ = 0, *t = 0;
@@ -1958,146 +1959,98 @@ save(PicklerObject *self, PyObject *args, int pers_save)
         PyErr_Clear();
 
     if (!pers_save && pers_func) {
-        if ((tmp = save_pers(self, args, pers_func)) != 0) {
+        if ((tmp = save_pers(self, obj, pers_func)) != 0) {
             res = tmp;
             goto finally;
         }
     }
 
-    if (args == Py_None) {
-        res = save_none(self, args);
+    type = Py_Type(obj);
+
+    if (obj == Py_None) {
+        res = save_none(self, obj);
+        goto finally;
+    }
+    else if (obj == Py_False || obj == Py_True) {
+        res = save_bool(self, obj);
+        goto finally;
+    }
+    else  if (type == &PyLong_Type) {
+        res = save_long(self, obj);
+        goto finally;
+    }
+    else if (type == &PyFloat_Type) {
+        res = save_float(self, obj);
+        goto finally;
+    }
+    else if (type == &PyTuple_Type && PyTuple_Size(obj) == 0) {
+        res = save_tuple(self, obj);
+        goto finally;
+        }
+    else if ((type == &PyString_Type) && (PyString_GET_SIZE(obj) < 2)) {
+        res = save_string(self, obj, 0);
+        goto finally;
+    }
+    else if ((type == &PyUnicode_Type) && (PyUnicode_GetSize(obj) < 2)) {
+        res = save_unicode(self, obj, 0);
         goto finally;
     }
 
-    type = args->ob_type;
-
-    switch (type->tp_name[0]) {
-    case 'b':
-        if (args == Py_False || args == Py_True) {
-            res = save_bool(self, args);
-            goto finally;
-        }
-        break;
-    case 'i':
-        if (type == &PyLong_Type) {
-            res = save_long(self, args);
-            goto finally;
-        }
-        break;
-
-    case 'f':
-        if (type == &PyFloat_Type) {
-            res = save_float(self, args);
-            goto finally;
-        }
-        break;
-
-    case 't':
-        if (type == &PyTuple_Type && PyTuple_Size(args) == 0) {
-            res = save_tuple(self, args);
-            goto finally;
-        }
-        break;
-
-    case 's':
-        if ((type == &PyString_Type) && (PyString_GET_SIZE(args) < 2)) {
-            res = save_string(self, args, 0);
-            goto finally;
-        }
-
-#ifdef Py_USING_UNICODE
-    case 'u':
-        if ((type == &PyUnicode_Type) && (PyString_GET_SIZE(args) < 2)) {
-            res = save_unicode(self, args, 0);
-            goto finally;
-        }
-#endif
-    }
-
-    if (args->ob_refcnt > 1) {
-        if (!(py_ob_id = PyLong_FromVoidPtr(args)))
+    if (Py_Refcnt(obj) > 1) {
+        if (!(py_ob_id = PyLong_FromVoidPtr(obj)))
             goto finally;
 
         if (PyDict_GetItem(self->memo, py_ob_id)) {
             if (get(self, py_ob_id) < 0)
                 goto finally;
-
             res = 0;
             goto finally;
         }
     }
 
-    switch (type->tp_name[0]) {
-    case 's':
-        if (type == &PyString_Type) {
-            res = save_string(self, args, 1);
-            goto finally;
-        }
-        break;
-
-#ifdef Py_USING_UNICODE
-    case 'u':
-        if (type == &PyUnicode_Type) {
-            res = save_unicode(self, args, 1);
-            goto finally;
-        }
-        break;
-#endif
-
-    case 't':
-        if (type == &PyTuple_Type) {
-            res = save_tuple(self, args);
-            goto finally;
-        }
-        if (type == &PyType_Type) {
-            res = save_global(self, args, NULL);
-            goto finally;
-        }
-        break;
-
-    case 'l':
-        if (type == &PyList_Type) {
-            res = save_list(self, args);
-            goto finally;
-        }
-        break;
-
-    case 'd':
-        if (type == &PyDict_Type) {
-            res = save_dict(self, args);
-            goto finally;
-        }
-        break;
-
-    case 'i':
-        break;
-
-    case 'c':
-        break;
-
-    case 'f':
-        if (type == &PyFunction_Type) {
-            res = save_global(self, args, NULL);
-            if (res && PyErr_ExceptionMatches(PickleError)) {
-                /* fall back to reduce */
-                PyErr_Clear();
-                break;
-            }
-            goto finally;
-        }
-        break;
-
-    case 'b':
-        if (type == &PyCFunction_Type) {
-            res = save_global(self, args, NULL);
-            goto finally;
-        }
-    }
-
-    if (PyType_IsSubtype(type, &PyType_Type)) {
-        res = save_global(self, args, NULL);
+    if (type == &PyString_Type) {
+        res = save_string(self, obj, 1);
         goto finally;
     }
+    else if (type == &PyUnicode_Type) {
+        res = save_unicode(self, obj, 1);
+        goto finally;
+    }
+    else if (type == &PyTuple_Type) {
+        res = save_tuple(self, obj);
+        goto finally;
+    }
+    else if (type == &PyType_Type) {
+        res = save_global(self, obj, NULL);
+        goto finally;
+    }
+    else if (type == &PyList_Type) {
+        res = save_list(self, obj);
+        goto finally;
+    }
+    else if (type == &PyDict_Type) {
+        res = save_dict(self, obj);
+        goto finally;
+    }
+    else if (type == &PyFunction_Type) {
+        res = save_global(self, obj, NULL);
+        if (res && PyErr_ExceptionMatches(PickleError)) {
+            /* fall back to reduce */
+            PyErr_Clear();
+        }
+        else {
+            goto finally;
+        }
+    }
+    else if (type == &PyCFunction_Type) {
+        res = save_global(self, obj, NULL);
+        goto finally;
+    }
+    else if (PyType_IsSubtype(type, &PyType_Type)) {
+        res = save_global(self, obj, NULL);
+        goto finally;
+    }
+
 
     /* Get a reduction callable, and call it.  This may come from
      * copy_reg.dispatch_table, the object's __reduce_ex__ method,
@@ -2106,8 +2059,8 @@ save(PicklerObject *self, PyObject *args, int pers_save)
     __reduce__ = PyDict_GetItem(dispatch_table, (PyObject *) type);
     if (__reduce__ != NULL) {
         Py_INCREF(__reduce__);
-        Py_INCREF(args);
-        ARG_TUP(self, args);
+        Py_INCREF(obj);
+        ARG_TUP(self, obj);
         if (self->arg) {
             t = PyObject_Call(__reduce__, self->arg, NULL);
             FREE_ARG_TUP(self);
@@ -2115,7 +2068,7 @@ save(PicklerObject *self, PyObject *args, int pers_save)
     }
     else {
         /* Check for a __reduce_ex__ method. */
-        __reduce__ = PyObject_GetAttr(args, __reduce_ex__);
+        __reduce__ = PyObject_GetAttr(obj, __reduce_ex__);
         if (__reduce__ != NULL) {
             t = PyInt_FromLong(self->proto);
             if (t != NULL) {
@@ -2133,13 +2086,13 @@ save(PicklerObject *self, PyObject *args, int pers_save)
             else
                 goto finally;
             /* Check for a __reduce__ method. */
-            __reduce__ = PyObject_GetAttr(args, __reduce__);
+            __reduce__ = PyObject_GetAttr(obj, __reduce__);
             if (__reduce__ != NULL) {
                 t = PyObject_Call(__reduce__, empty_tuple, NULL);
             }
             else {
                 pickle_ErrFormat(PicklingError, "Can't pickle '%s' object: %r",
-                                 "sO", type->tp_name, args);
+                                 "sO", type->tp_name, obj);
                 goto finally;
             }
         }
@@ -2149,7 +2102,7 @@ save(PicklerObject *self, PyObject *args, int pers_save)
         goto finally;
 
     if (PyString_Check(t)) {
-        res = save_global(self, args, t);
+        res = save_global(self, obj, t);
         goto finally;
     }
 
@@ -2175,7 +2128,7 @@ save(PicklerObject *self, PyObject *args, int pers_save)
         goto finally;
     }
 
-    res = save_reduce(self, t, args);
+    res = save_reduce(self, t, obj);
 
   finally:
     self->nesting--;
