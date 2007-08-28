@@ -3492,7 +3492,7 @@ class Decimal(object):
             return self
 
         d = Decimal((self._sign, self._int, self._exp + int(other)))
-        d = d._fixexponents(context)
+        d = d._fix(context)
         return d
 
     def shift(self, other, context=None):

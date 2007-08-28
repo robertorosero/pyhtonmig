@@ -135,6 +135,18 @@ precision: 6
 extr1100 add 0E+1000 1E+1000 -> Infinity Overflow Inexact Rounded
 extr1101 remainder 1E+1000 2E+1000 -> Infinity Overflow Inexact Rounded
 
+-- tests for scaleb in case where input precision > context precision.
+-- Result should be rounded.  (This isn't totally clear from the
+-- specification, but the treatment of underflow in the testcases
+-- suggests that rounding should occur in general.  Furthermore, it's
+-- the way that the reference implementation behaves.)
+maxexponent: 999
+minexponent: -999
+precision: 3
+extr1200 scaleb 1234 1 -> 1.23E+4 Inexact Rounded
+extr1201 scaleb 5678 0 -> 5.68E+3 Inexact Rounded
+extr1202 scaleb -9105 -1 -> -910 Inexact Rounded
+
 ------------------------------------------------------------------------
 -- The following tests (pwmx0 through pwmx440) are for the            --
 -- three-argument version of power:                                   --
