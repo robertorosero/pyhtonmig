@@ -21,6 +21,23 @@ def encodedtextwrapped(mode, filename):
     return (bytes("begin %03o %s\n" % (mode, filename), "ascii") +
             encodedtext + b"\n \nend\n")
 
+
+class FakeFileIO(io.TextIOWrapper):
+
+    def __init__(self, initial_value=""):
+        super(FakeFileIO, self).__init__(BytesIO(),
+                                         encoding="utf-8")
+        if initial_value:
+            if not isinstance(initial_value, basestring):
+                initial_value = str(initial_value)
+            self.write(initial_value)
+            self.seek(0)
+
+    def getvalue(self):
+        self.flush()
+        return self.buffer.getvalue().decode(self._encoding)
+
+
 class UUTest(unittest.TestCase):
 
     def test_encode(self):
@@ -76,15 +93,15 @@ class UUStdIOTest(unittest.TestCase):
         sys.stdout = self.stdout
 
     def test_encode(self):
-        sys.stdin = io.StringIO(plaintext.decode("ascii"))
-        sys.stdout = io.StringIO()
+        sys.stdin = FakeFileIO(plaintext.decode("ascii"))
+        sys.stdout = FakeFileIO()
         uu.encode("-", "-", "t1", 0o666)
         self.assertEqual(sys.stdout.getvalue(),
                          encodedtextwrapped(0o666, "t1").decode("ascii"))
 
     def test_decode(self):
-        sys.stdin = io.StringIO(encodedtextwrapped(0o666, "t1").decode("ascii"))
-        sys.stdout = io.StringIO()
+        sys.stdin = FakeFileIO(encodedtextwrapped(0o666, "t1").decode("ascii"))
+        sys.stdout = FakeFileIO()
         uu.decode("-", "-")
         stdout = sys.stdout
         sys.stdout = self.stdout
