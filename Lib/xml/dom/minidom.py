@@ -48,8 +48,7 @@ class Node(xml.dom.Node):
     def toprettyxml(self, indent="\t", newl="\n", encoding=None):
         # indent = the indentation string to prepend, per level
         # newl = the newline string to append
-        use_encoding = "utf-8" if encoding is None else encoding
-        writer = io.StringIO(encoding=use_encoding)
+        writer = io.StringIO()
         if self.nodeType == Node.DOCUMENT_NODE:
             # Can pass encoding only to document, to put it into XML header
             self.writexml(writer, "", indent, newl, encoding)
@@ -58,7 +57,7 @@ class Node(xml.dom.Node):
         if encoding is None:
             return writer.getvalue()
         else:
-            return writer.buffer.getvalue()
+            return writer.getvalue().encode(encoding)
 
     def hasChildNodes(self):
         if self.childNodes:
