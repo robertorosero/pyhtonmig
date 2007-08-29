@@ -458,8 +458,11 @@ class PyBuildExt(build_ext):
         exts.append( Extension('binascii', ['binascii.c']) )
 
         # Accelerator modules for io.BytesIO and io.StringIO
-        exts.append( Extension('_bytesio', ['_bytesiomodule.c']) )
-        exts.append( Extension('_stringio', ['_stringiomodule.c']) )
+        exts.append( Extension('_bytesio', ['_bytesio.c']) )
+        exts.append( Extension('_stringio', ['_stringio.c']) )
+
+        # Accelerator module for pickle
+        exts.append( Extension('_pickle', ['_picklemodule.c']) )
 
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )

@@ -1,25 +1,22 @@
 #include "Python.h"
 
-PyDoc_STRVAR(module_doc,
-"A fast implementation of StringIO.");
-
 typedef struct {
     PyObject_HEAD
-    Py_UNICODE *buf;
+    char *buf;
     Py_ssize_t pos;
     Py_ssize_t string_size;
     Py_ssize_t buf_size;
-} StringIOObject;
+} BytesIOObject;
 
 
-/* Internal routine to get a line from the buffer of a StringIO
+/* Internal routine to get a line from the buffer of a BytesIO
    object. Returns the length between the current position to the
    next newline character. */
 static Py_ssize_t
-get_line(StringIOObject *self, Py_UNICODE **output)
+get_line(BytesIOObject *self, char **output)
 {
-    Py_UNICODE *n;
-    const Py_UNICODE *str_end;
+    char *n;
+    const char *str_end;
     Py_ssize_t len;
 
     assert(self->buf != NULL);
@@ -34,6 +31,7 @@ get_line(StringIOObject *self, Py_UNICODE **output)
     if (n < str_end)
         n++;
 
+    /* Get the length from the current position to the end of the line. */
     len = n - (self->buf + self->pos);
     *output = self->buf + self->pos;
 
@@ -44,14 +42,14 @@ get_line(StringIOObject *self, Py_UNICODE **output)
     return len;
 }
 
-/* Internal routine for changing the size of the buffer of StringIO
+/* Internal routine for changing the size of the buffer of BytesIO
    objects. Returns 0 on success, -1 otherwise. */
 static int
-resize_buffer(StringIOObject *self, Py_ssize_t size)
+resize_buffer(BytesIOObject *self, Py_ssize_t size)
 {
     Py_ssize_t alloc = self->buf_size;
 
-    if (self->string_size < alloc / 2) {
+     if (self->string_size < alloc / 2) {
         /* Major downsize; resize down to exact size */
         alloc = size + 1;
     }
@@ -68,7 +66,7 @@ resize_buffer(StringIOObject *self, Py_ssize_t size)
         alloc = size + 1;
     }
 
-    PyMem_Resize(self->buf, Py_UNICODE, alloc);
+    PyMem_Resize(self->buf, char, alloc);
     if (self->buf == NULL) {
         PyErr_NoMemory();
         return -1;
@@ -77,19 +75,19 @@ resize_buffer(StringIOObject *self, Py_ssize_t size)
     return 0;
 }
 
-/* Internal routine for writing a string of bytes to the buffer of a StringIO
+/* Internal routine for writing a string of bytes to the buffer of a BytesIO
    object. Returns the number of bytes wrote, or -1 on error. */
 static Py_ssize_t
-write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
+write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
 {
     assert(self->buf != NULL);
 
     if (resize_buffer(self, self->pos + len) < 0)
         return -1;  /* out of memory */
 
-    /* Copy the data to the internal buffer, overwriting some of the
-       existing data if self->pos < self->string_size. */
-    memcpy(self->buf + self->pos, ustr, len * sizeof(Py_UNICODE));
+    /* Copy the data to the internal buffer, overwriting some of the existing
+       data if self->pos < self->string_size. */
+    memcpy(self->buf + self->pos, bytes, len);
 
     assert(self->pos + len < PY_SSIZE_T_MAX);
     self->pos += len;
@@ -104,48 +102,47 @@ write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
 }
 
 static PyObject *
-stringio_get_closed(StringIOObject *self)
+bytesio_get_closed(BytesIOObject *self)
 {
-    /* close() does nothing, so the object can't be closed */
     Py_RETURN_FALSE;
 }
 
 /* Generic getter for the writable, readable and seekable properties */
 static PyObject *
-generic_true(StringIOObject *self)
+generic_true(BytesIOObject *self)
 {
     Py_RETURN_TRUE;
 }
 
 static PyObject *
-stringio_flush(StringIOObject *self)
+bytesio_flush(BytesIOObject *self)
 {
     Py_RETURN_NONE;
 }
 
 static PyObject *
-stringio_getvalue(StringIOObject *self)
+bytesio_getvalue(BytesIOObject *self)
 {
-    return PyUnicode_FromUnicode(self->buf, self->string_size);
+    return PyBytes_FromStringAndSize(self->buf, self->string_size);
 }
 
 static PyObject *
-stringio_isatty(StringIOObject *self)
+bytesio_isatty(BytesIOObject *self)
 {
     Py_RETURN_FALSE;
 }
 
 static PyObject *
-stringio_tell(StringIOObject *self)
+bytesio_tell(BytesIOObject *self)
 {
     return PyInt_FromSsize_t(self->pos);
 }
 
 static PyObject *
-stringio_read(StringIOObject *self, PyObject *args)
+bytesio_read(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t size, n;
-    Py_UNICODE *output;
+    char *output;
     PyObject *arg = Py_None;
 
     if (!PyArg_UnpackTuple(args, "read", 0, 1, &arg))
@@ -176,14 +173,29 @@ stringio_read(StringIOObject *self, PyObject *args)
     output = self->buf + self->pos;
     self->pos += size;
 
-    return PyUnicode_FromUnicode(output, size);
+    return PyBytes_FromStringAndSize(output, size);
 }
 
 static PyObject *
-stringio_readline(StringIOObject *self, PyObject *args)
+bytesio_read1(BytesIOObject *self, PyObject *n)
+{
+    PyObject *arg, *res;
+
+    /* XXX: What should happen if n is Py_None? */
+
+    arg = PyTuple_Pack(1, n);
+    if (arg == NULL)
+        return NULL;
+    res  = bytesio_read(self, arg);
+    Py_DECREF(arg);
+    return res;
+}
+
+static PyObject *
+bytesio_readline(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t size, n;
-    Py_UNICODE *output;
+    char *output;
     PyObject *arg = Py_None;
 
     if (!PyArg_UnpackTuple(args, "readline", 0, 1, &arg))
@@ -210,17 +222,17 @@ stringio_readline(StringIOObject *self, PyObject *args)
         self->pos -= size;
     }
 
-    return PyUnicode_FromUnicode(output, n);
+    return PyBytes_FromStringAndSize(output, n);
 }
 
 static PyObject *
-stringio_readlines(StringIOObject *self, PyObject *args)
+bytesio_readlines(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t maxsize, size, n;
     PyObject *result, *line;
-    Py_UNICODE *output;
+    char *output;
     PyObject *arg = Py_None;
-
+    
     if (!PyArg_UnpackTuple(args, "readlines", 0, 1, &arg))
         return NULL;
 
@@ -243,7 +255,7 @@ stringio_readlines(StringIOObject *self, PyObject *args)
         return NULL;
 
     while ((n = get_line(self, &output)) != 0) {
-        line = PyUnicode_FromUnicode(output, n);
+        line = PyBytes_FromStringAndSize(output, n);
         if (!line)
             goto on_error;
         if (PyList_Append(result, line) == -1) {
@@ -263,7 +275,27 @@ stringio_readlines(StringIOObject *self, PyObject *args)
 }
 
 static PyObject *
-stringio_truncate(StringIOObject *self, PyObject *args)
+bytesio_readinto(BytesIOObject *self, PyObject *buffer)
+{
+    void *raw_buffer;
+    Py_ssize_t len;
+
+    if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
+        return NULL;
+
+    if (self->pos + len > self->string_size)
+        len = self->string_size - self->pos;
+
+    memcpy(raw_buffer, self->buf + self->pos, len);
+    assert(self->pos + len < PY_SSIZE_T_MAX);
+    assert(len >= 0);
+    self->pos += len;
+
+    return PyInt_FromSsize_t(len);
+}
+
+static PyObject *
+bytesio_truncate(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t size;
     PyObject *arg = Py_None;
@@ -301,9 +333,9 @@ stringio_truncate(StringIOObject *self, PyObject *args)
 }
 
 static PyObject *
-stringio_iternext(StringIOObject *self)
+bytesio_iternext(BytesIOObject *self)
 {
-    Py_UNICODE *next;
+    char *next;
     Py_ssize_t n;
 
     n = get_line(self, &next);
@@ -311,11 +343,11 @@ stringio_iternext(StringIOObject *self)
     if (!next || n == 0)
         return NULL;
 
-    return PyUnicode_FromUnicode(next, n);
+    return PyBytes_FromStringAndSize(next, n);
 }
 
 static PyObject *
-stringio_seek(StringIOObject *self, PyObject *args)
+bytesio_seek(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t pos;
     int mode = 0;
@@ -323,33 +355,31 @@ stringio_seek(StringIOObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "n|i:seek", &pos, &mode))
         return NULL;
 
-    if (mode != 0 && mode != 1 && mode != 2) {
+    if (pos < 0 && mode == 0) {
         PyErr_Format(PyExc_ValueError,
-                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
-        return NULL;
-    }
-    else if (pos < 0 && mode == 0) {
-        PyErr_Format(PyExc_ValueError,
-                     "Negative seek position %zd", pos);
-        return NULL;
-    }
-    else if (mode != 0 && pos != 0) {
-        PyErr_SetString(PyExc_IOError,
-                        "Can't do nonzero cur-relative seeks");
+                     "Negative seek value %zd", pos);
         return NULL;
     }
 
     /* mode 0: offset relative to beginning of the string.
-       mode 1: no change to current position.
-       mode 2: change position to end of file. */
+       mode 1: offset relative to current position.
+       mode 2: offset relative the end of the string. */
     if (mode == 1) {
-        pos = self->pos;
+        pos += self->pos;
     }
     else if (mode == 2) {
-        pos = self->string_size;
+        pos += self->string_size;
+    }
+    else if (mode != 0) {
+        PyErr_Format(PyExc_ValueError,
+                     "Invalid whence (%i, should be 0, 1 or 2)", mode);
+        return NULL;
     }
 
-    if (pos > self->string_size) {
+    if (pos < 0)
+        pos = 0;
+
+    if (pos >= self->string_size) {
         if (resize_buffer(self, pos + 1) < 0)
             return NULL;  /* out of memory */
     }
@@ -358,41 +388,30 @@ stringio_seek(StringIOObject *self, PyObject *args)
     /* Pad with zeros the buffer region larger than the string size. */
     if (self->pos > self->string_size) {
         memset(self->buf + self->string_size, '\0',
-               (self->pos - self->string_size) * sizeof(Py_UNICODE));
+               (self->pos - self->string_size) * sizeof(char));
     }
 
     return PyInt_FromSsize_t(self->pos);
 }
 
 static PyObject *
-stringio_write(StringIOObject *self, PyObject *obj)
+bytesio_write(BytesIOObject *self, PyObject *obj)
 {
-    const Py_UNICODE *str;
+    const char *bytes;
     Py_ssize_t size, n = 0;
-    PyObject *ustr = NULL;
 
     if (PyUnicode_Check(obj)) {
-        str = PyUnicode_AsUnicode(obj);
-        size = PyUnicode_GetSize(obj);
-    }
-    /* Temporary condition for str8 objects. */
-    else if (PyString_Check(obj)) {
-        ustr = PyObject_Unicode(obj);
-        if (ustr == NULL)
-            return NULL;
-        str = PyUnicode_AsUnicode(ustr);
-        size = PyUnicode_GetSize(ustr);
+        bytes = PyUnicode_AsString(obj);
+        size = strlen(bytes);
     }
     else {
-        PyErr_Format(PyExc_TypeError, "string argument expected, got %s",
-                     Py_Type(obj)->tp_name);
-        return NULL;
+        if (PyObject_AsReadBuffer(obj, (void *)&bytes, &size) < 0)
+            return NULL;
     }
 
     if (size != 0)
-        n = write_str(self, str, size);
+        n = write_bytes(self, bytes, size);
 
-    Py_XDECREF(ustr);
     if (n == -1)
         return NULL;
 
@@ -400,7 +419,7 @@ stringio_write(StringIOObject *self, PyObject *obj)
 }
 
 static PyObject *
-stringio_writelines(StringIOObject *self, PyObject *v)
+bytesio_writelines(BytesIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
     PyObject *ret;
@@ -410,7 +429,7 @@ stringio_writelines(StringIOObject *self, PyObject *v)
         return NULL;
 
     while ((item = PyIter_Next(it)) != NULL) {
-        ret = stringio_write(self, item);
+        ret = bytesio_write(self, item);
         if (ret == NULL)
             return NULL;
         Py_DECREF(ret);
@@ -426,13 +445,13 @@ stringio_writelines(StringIOObject *self, PyObject *v)
 }
 
 static PyObject *
-stringio_close(StringIOObject *self)
+bytesio_close(BytesIOObject *self)
 {
     Py_RETURN_NONE;
 }
 
 static void
-StringIO_dealloc(StringIOObject *self)
+BytesIO_dealloc(BytesIOObject *self)
 {
     if (self->buf != NULL)
         PyMem_Del(self->buf);
@@ -441,18 +460,18 @@ StringIO_dealloc(StringIOObject *self)
 }
 
 static PyObject *
-StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    StringIOObject *self;
+    BytesIOObject *self;
     enum { INIT_BUFSIZE = 1 };
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    self = (StringIOObject *)type->tp_alloc(type, 0);
+    self = (BytesIOObject *)type->tp_alloc(type, 0);
     if (self == NULL)
         return NULL;
 
-    self->buf = PyMem_New(Py_UNICODE, INIT_BUFSIZE);
+    self->buf = PyMem_New(char, INIT_BUFSIZE);
     if (self->buf == NULL) {
         PyErr_NoMemory();
         return NULL;
@@ -466,88 +485,101 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
-StringIO_init(PyObject *self, PyObject *args, PyObject *kwds)
+BytesIO_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *initvalue = NULL, *ret;
 
-    if (!PyArg_ParseTuple(args, "|O:StringIO", &initvalue))
+    if (!PyArg_ParseTuple(args, "|O:BytesIO", &initvalue))
         return -1;
 
     if (initvalue && initvalue != Py_None) {
-        ret = stringio_write((StringIOObject *)self, initvalue);
+        ret = bytesio_write((BytesIOObject *)self, initvalue);
         if (ret == NULL)
             return -1;
         Py_DECREF(ret);
-        ((StringIOObject *)self)->pos = 0;
+        ((BytesIOObject *)self)->pos = 0;
     }
     return 0;
 }
 
-PyDoc_STRVAR(StringIO_doc,
-"StringIO([buffer]) -> Return a StringIO stream for reading and writing.");
 
-PyDoc_STRVAR(StringIO_flush_doc,
+PyDoc_STRVAR(BytesIO_doc,
+"BytesIO([buffer]) -> Return a BytesIO stream for reading and writing.");
+
+PyDoc_STRVAR(BytesIO_flush_doc,
 "flush() -> None.  Does nothing.");
 
-PyDoc_STRVAR(StringIO_getval_doc,
+PyDoc_STRVAR(BytesIO_getval_doc,
 "getvalue() -> string.\n"
 "\n"
-"Retrieve the entire contents of the StringIO object. Raise an\n"
+"Retrieve the entire contents of the BytesIO object. Raise an\n"
 "exception if the object is closed.");
 
-PyDoc_STRVAR(StringIO_isatty_doc,
+PyDoc_STRVAR(BytesIO_isatty_doc,
 "isatty() -> False.\n"
 "\n"
-"Always returns False since StringIO objects are not connected\n"
+"Always returns False since BytesIO objects are not connected\n"
 "to a tty-like device.");
 
-PyDoc_STRVAR(StringIO_read_doc,
+PyDoc_STRVAR(BytesIO_read_doc,
 "read([size]) -> read at most size bytes, returned as a string.\n"
+"\n"
+"If the size argument is negative, read until EOF is reached.\n"
+"Return an empty string at EOF.");
+
+PyDoc_STRVAR(BytesIO_read1_doc,
+"read(size) -> read at most size bytes, returned as a string.\n"
 "\n"
 "If the size argument is negative or omitted, read until EOF is reached.\n"
 "Return an empty string at EOF.");
 
-PyDoc_STRVAR(StringIO_readline_doc,
+PyDoc_STRVAR(BytesIO_readline_doc,
 "readline([size]) -> next line from the file, as a string.\n"
 "\n"
 "Retain newline.  A non-negative size argument limits the maximum\n"
-"number of characters to return (an incomplete line may be returned then).\n"
+"number of bytes to return (an incomplete line may be returned then).\n"
 "Return an empty string at EOF.\n");
 
-PyDoc_STRVAR(StringIO_readlines_doc,
+PyDoc_STRVAR(BytesIO_readlines_doc,
 "readlines([size]) -> list of strings, each a line from the file.\n"
 "\n"
 "Call readline() repeatedly and return a list of the lines so read.\n"
 "The optional size argument, if given, is an approximate bound on the\n"
 "total number of bytes in the lines returned.\n");
 
-PyDoc_STRVAR(StringIO_tell_doc,
+PyDoc_STRVAR(BytesIO_readinto_doc,
+"readinto(bytes) -> int.  Read up to len(b) bytes into b.\n"
+"\n"
+"Returns number of bytes read (0 for EOF), or None if the object\n"
+"is set not to block as has no data to read.");
+
+PyDoc_STRVAR(BytesIO_tell_doc,
 "tell() -> current file position, an integer\n");
 
-PyDoc_STRVAR(StringIO_truncate_doc,
+PyDoc_STRVAR(BytesIO_truncate_doc,
 "truncate([size]) -> int.  Truncate the file to at most size bytes.\n"
 "\n"
 "Size defaults to the current file position, as returned by tell().\n"
 "Returns the new size.  Imply an absolute seek to the position size.");
 
-PyDoc_STRVAR(StringIO_close_doc,
+PyDoc_STRVAR(BytesIO_close_doc,
 "close() -> None.  Does nothing.");
 
-PyDoc_STRVAR(StringIO_seek_doc,
+PyDoc_STRVAR(BytesIO_seek_doc,
 "seek(pos, whence=0) -> int.  Change stream position.\n"
 "\n"
 "Seek to byte offset pos relative to position indicated by whence:\n"
 "     0  Start of stream (the default).  pos should be >= 0;\n"
-"     1  Current position - pos must be 0;\n"
-"     2  End of stream - pos must be 0.\n"
+"     1  Current position - pos may be negative;\n"
+"     2  End of stream - pos usually negative.\n"
 "Returns the new absolute position.");
 
-PyDoc_STRVAR(StringIO_write_doc,
+PyDoc_STRVAR(BytesIO_write_doc,
 "write(str) -> int.  Write string str to file.\n"
 "\n"
-"Return the number of characters written.");
+"Return the number of bytes written.");
 
-PyDoc_STRVAR(StringIO_writelines_doc,
+PyDoc_STRVAR(BytesIO_writelines_doc,
 "writelines(sequence_of_strings) -> None.  Write the strings to the file.\n"
 "\n"
 "Note that newlines are not added.  The sequence can be any iterable object\n"
@@ -556,53 +588,57 @@ PyDoc_STRVAR(StringIO_writelines_doc,
 PyDoc_STRVAR(generic_true_doc, "Always True.");
 
 
-static PyGetSetDef StringIO_getsetlist[] = {
-    {"closed", (getter)stringio_get_closed, NULL,
-     "True if the file is closed"},
+static PyGetSetDef BytesIO_getsetlist[] = {
+    {"closed",  (getter)bytesio_get_closed, NULL,
+     "True if the file is closed."},
     {0},            /* sentinel */
 };
 
-static struct PyMethodDef StringIO_methods[] = {
+static struct PyMethodDef BytesIO_methods[] = {
     {"readable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
     {"seekable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
     {"writable",   (PyCFunction)generic_true, METH_NOARGS,
      generic_true_doc},
-    {"flush",      (PyCFunction)stringio_flush, METH_NOARGS,
-     StringIO_flush_doc},
-    {"getvalue",   (PyCFunction)stringio_getvalue, METH_VARARGS,
-     StringIO_getval_doc},
-    {"isatty",     (PyCFunction)stringio_isatty, METH_NOARGS,
-     StringIO_isatty_doc},
-    {"read",       (PyCFunction)stringio_read, METH_VARARGS,
-     StringIO_read_doc},
-    {"readline",   (PyCFunction)stringio_readline, METH_VARARGS,
-     StringIO_readline_doc},
-    {"readlines",  (PyCFunction)stringio_readlines, METH_VARARGS,
-     StringIO_readlines_doc},
-    {"tell",       (PyCFunction)stringio_tell, METH_NOARGS,
-     StringIO_tell_doc},
-    {"truncate",   (PyCFunction)stringio_truncate, METH_VARARGS,
-     StringIO_truncate_doc},
-    {"close",      (PyCFunction)stringio_close, METH_NOARGS,
-     StringIO_close_doc},
-    {"seek",       (PyCFunction)stringio_seek, METH_VARARGS,
-     StringIO_seek_doc},
-    {"write",      (PyCFunction)stringio_write, METH_O,
-     StringIO_write_doc},
-    {"writelines", (PyCFunction)stringio_writelines, METH_O,
-     StringIO_writelines_doc},
+    {"flush",      (PyCFunction)bytesio_flush, METH_NOARGS,
+     BytesIO_flush_doc},
+    {"getvalue",   (PyCFunction)bytesio_getvalue, METH_VARARGS,
+     BytesIO_getval_doc},
+    {"isatty",     (PyCFunction)bytesio_isatty, METH_NOARGS,
+     BytesIO_isatty_doc},
+    {"read",       (PyCFunction)bytesio_read, METH_VARARGS,
+     BytesIO_read_doc},
+    {"read1",      (PyCFunction)bytesio_read1, METH_O,
+     BytesIO_read1_doc},
+    {"readline",   (PyCFunction)bytesio_readline, METH_VARARGS,
+     BytesIO_readline_doc},
+    {"readlines",  (PyCFunction)bytesio_readlines, METH_VARARGS,
+     BytesIO_readlines_doc},
+    {"readinto",   (PyCFunction)bytesio_readinto, METH_O,
+     BytesIO_readinto_doc},
+    {"tell",       (PyCFunction)bytesio_tell, METH_NOARGS,
+     BytesIO_tell_doc},
+    {"truncate",   (PyCFunction)bytesio_truncate, METH_VARARGS,
+     BytesIO_truncate_doc},
+    {"close",      (PyCFunction)bytesio_close, METH_NOARGS,
+     BytesIO_close_doc},
+    {"seek",       (PyCFunction)bytesio_seek, METH_VARARGS,
+     BytesIO_seek_doc},
+    {"write",      (PyCFunction)bytesio_write, METH_O,
+     BytesIO_write_doc},
+    {"writelines", (PyCFunction)bytesio_writelines, METH_O,
+     BytesIO_writelines_doc},
     {NULL, NULL}        /* sentinel */
 };
 
 
-static PyTypeObject StringIO_Type = {
+static PyTypeObject BytesIO_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_stringio.StringIO",                      /*tp_name*/
-    sizeof(StringIOObject),                    /*tp_basicsize*/
+    "_bytesio.BytesIO",                        /*tp_name*/
+    sizeof(BytesIOObject),                     /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
-    (destructor)StringIO_dealloc,              /*tp_dealloc*/
+    (destructor)BytesIO_dealloc,               /*tp_dealloc*/
     0,                                         /*tp_print*/
     0,                                         /*tp_getattr*/
     0,                                         /*tp_setattr*/
@@ -618,36 +654,37 @@ static PyTypeObject StringIO_Type = {
     0,                                         /*tp_setattro*/
     0,                                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
-    StringIO_doc,                              /*tp_doc*/
+    BytesIO_doc,                               /*tp_doc*/
     0,                                         /*tp_traverse*/
     0,                                         /*tp_clear*/
     0,                                         /*tp_richcompare*/
     0,                                         /*tp_weaklistoffset*/
     PyObject_SelfIter,                         /*tp_iter*/
-    (iternextfunc)stringio_iternext,           /*tp_iternext*/
-    StringIO_methods,                          /*tp_methods*/
+    (iternextfunc)bytesio_iternext,            /*tp_iternext*/
+    BytesIO_methods,                           /*tp_methods*/
     0,                                         /*tp_members*/
-    StringIO_getsetlist,                       /*tp_getset*/
+    BytesIO_getsetlist,                        /*tp_getset*/
     0,                                         /*tp_base*/
     0,                                         /*tp_dict*/
     0,                                         /*tp_descr_get*/
     0,                                         /*tp_descr_set*/
     0,                                         /*tp_dictoffset*/
-    StringIO_init,                             /*tp_init*/
+    BytesIO_init,                              /*tp_init*/
     0,                                         /*tp_alloc*/
-    StringIO_new,                              /*tp_new*/
+    BytesIO_new,                               /*tp_new*/
 };
 
 PyMODINIT_FUNC
-init_stringio(void)
+init_bytesio(void)
 {
     PyObject *m;
 
-    if (PyType_Ready(&StringIO_Type) < 0)
+    if (PyType_Ready(&BytesIO_Type) < 0)
         return;
-    m = Py_InitModule3("_stringio", NULL, module_doc);
+    m = Py_InitModule3("_bytesio", NULL, 
+                       "A fast implementation of BytesIO.");
     if (m == NULL)
         return;
-    Py_INCREF(&StringIO_Type);
-    PyModule_AddObject(m, "StringIO", (PyObject *)&StringIO_Type);
+    Py_INCREF(&BytesIO_Type);
+    PyModule_AddObject(m, "BytesIO", (PyObject *)&BytesIO_Type);
 }
