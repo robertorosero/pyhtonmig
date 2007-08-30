@@ -95,7 +95,8 @@ RoundingDict = {'ceiling' : ROUND_CEILING, #Maps test-case names to roundings.
                 'half_down' : ROUND_HALF_DOWN,
                 'half_even' : ROUND_HALF_EVEN,
                 'half_up' : ROUND_HALF_UP,
-                'up' : ROUND_UP}
+                'up' : ROUND_UP,
+                '05up' : ROUND_05UP}
 
 # Name adapter to be able to change the Decimal and Context
 # interface without changing the test files from Cowlishaw

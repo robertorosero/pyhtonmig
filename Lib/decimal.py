@@ -128,7 +128,7 @@ __all__ = [
 
     # Constants for use in setting up contexts
     'ROUND_DOWN', 'ROUND_HALF_UP', 'ROUND_HALF_EVEN', 'ROUND_CEILING',
-    'ROUND_FLOOR', 'ROUND_UP', 'ROUND_HALF_DOWN',
+    'ROUND_FLOOR', 'ROUND_UP', 'ROUND_HALF_DOWN', 'ROUND_05UP',
 
     # Functions for manipulating contexts
     'setcontext', 'getcontext', 'localcontext'
@@ -144,6 +144,7 @@ ROUND_CEILING = 'ROUND_CEILING'
 ROUND_FLOOR = 'ROUND_FLOOR'
 ROUND_UP = 'ROUND_UP'
 ROUND_HALF_DOWN = 'ROUND_HALF_DOWN'
+ROUND_05UP = 'ROUND_05UP'
 
 # Rounding decision (not part of the public API)
 NEVER_ROUND = 'NEVER_ROUND'    # Round in division (non-divmod), sqrt ONLY
@@ -348,7 +349,8 @@ class Overflow(Inexact, Rounded):
 
     def handle(self, context, sign, *args):
         if context.rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN,
-                                     ROUND_HALF_DOWN, ROUND_UP):
+                                ROUND_HALF_DOWN, ROUND_UP,
+                                ROUND_05UP):
             return Infsign[sign]
         if sign == 0:
             if context.rounding == ROUND_CEILING:
@@ -1200,6 +1202,8 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
+        shouldround = context._rounding_decision == ALWAYS_ROUND
+
         sign = self._sign ^ other._sign
 
         if self._is_special or other._is_special:
@@ -1231,7 +1235,10 @@ class Decimal(object):
 
             if other._isinfinity():
                 if divmod:
-                    return (Decimal((sign, (0,), 0)), Decimal(self))
+                    otherside = Decimal(self)
+                    if shouldround and (divmod == 1 or divmod == 3):
+                        otherside = otherside._fix(context)
+                    return (Decimal((sign, (0,), 0)), otherside)
                 context._raise_error(Clamped, 'Division by infinity')
                 return Decimal((sign, (0,), context.Etiny()))
 
@@ -1243,17 +1250,14 @@ class Decimal(object):
 
         if not self:
             if divmod:
-                otherside = Decimal(self)
-                otherside._exp = min(self._exp, other._exp)
+                otherside = Decimal((self._sign, (0,), min(self._exp, other._exp)))
+                if shouldround and (divmod == 1 or divmod == 3):
+                    otherside = otherside._fix(context)
                 return (Decimal((sign, (0,), 0)),  otherside)
             exp = self._exp - other._exp
-            if exp < context.Etiny():
-                exp = context.Etiny()
-                context._raise_error(Clamped, '0e-x / y')
-            if exp > context.Emax:
-                exp = context.Emax
-                context._raise_error(Clamped, '0e+x / y')
-            return Decimal( (sign, (0,), exp) )
+            ans = Decimal((sign, (0,), exp))
+            ans = ans._fix(context)
+            return ans
 
         if not other:
             if divmod:
@@ -1262,7 +1266,6 @@ class Decimal(object):
             return context._raise_error(DivisionByZero, 'x / 0', sign)
 
         # OK, so neither = 0, INF or NaN
-        shouldround = context._rounding_decision == ALWAYS_ROUND
 
         # If we're dividing into ints, and self < other, stop.
         # self.__abs__(0) does not round.
@@ -1301,7 +1304,7 @@ class Decimal(object):
                 exp = min(self._exp, other._exp)
                 otherside = otherside._rescale(exp, context=context, watchexp=0)
                 context._regard_flags(*frozen)
-                if shouldround:
+                if shouldround and (divmod == 1 or divmod == 3):
                     otherside = otherside._fix(context)
                 return (Decimal(res), otherside)
 
@@ -1324,21 +1327,6 @@ class Decimal(object):
             adjust += 1
             op1.int *= 10
             op1.exp -= 1
-
-            if res.exp == 0 and divmod and op2.int > op1.int:
-                # Solves an error in precision.  Same as a previous block.
-
-                if res.int >= prec_limit and shouldround:
-                    return context._raise_error(DivisionImpossible)
-                otherside = Decimal(op1)
-                frozen = context._ignore_all_flags()
-
-                exp = min(self._exp, other._exp)
-                otherside = otherside._rescale(exp, context=context)
-
-                context._regard_flags(*frozen)
-
-                return (Decimal(res), otherside)
 
         ans = Decimal(res)
         if shouldround:
@@ -1513,9 +1501,13 @@ class Decimal(object):
     def _fix_nan(self, context):
         """Decapitate the payload of a NaN to fit the context"""
         payload = self._int
-        if len(payload) > context.prec:
-            pos = -context.prec
-            while payload[pos] == 0 and pos < -1:
+
+        # maximum length of payload is precision if _clamp=0,
+        # precision-1 if _clamp=1.
+        max_payload_len = context.prec - context._clamp
+        if len(payload) > max_payload_len:
+            pos = len(payload)-max_payload_len
+            while pos < len(payload) and payload[pos] == 0:
                 pos += 1
             payload = payload[pos:]
             return Decimal((self._sign, payload, self._exp))
@@ -1790,6 +1782,13 @@ class Decimal(object):
             return self._round_down(prec, expdiff, context)
         else:
             return self._round_up(prec, expdiff, context)
+
+    def _round_05up(self, prec, expdiff, context):
+        """Round down unless digit prec-1 is 0 or 5."""
+        if self._int[prec-1] in (0, 5):
+            return self._round_up(prec, expdiff, context)
+        else:
+            return self._round_down(prec, expdiff, context)
 
     def fma(self, other, third, context=None):
         """Fused multiply-add.
@@ -3754,7 +3753,7 @@ class Context(object):
     def create_decimal(self, num='0'):
         """Creates a new Decimal instance but using self as context."""
         d = Decimal(num, context=self)
-        if d._isnan() and len(d._int) > self.prec:
+        if d._isnan() and len(d._int) > self.prec - self._clamp:
             return self._raise_error(ConversionSyntax,
                                      "diagnostic info too long in NaN")
         return d._fix(self)
