@@ -124,6 +124,7 @@ nameAdapter = {'toeng':'to_eng_string',
                'nextminus':'next_minus',
                'nextplus':'next_plus',
                'nexttoward':'next_toward',
+               'trim':'normalize',
               }
 
 # For some operations (currently exp, ln, log10, power), the decNumber

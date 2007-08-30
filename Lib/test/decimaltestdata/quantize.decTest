@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.53
+version: 2.55
 
 -- Most of the tests here assume a "regular pattern", where the
 -- sign and coefficient are +1.
@@ -897,6 +897,36 @@ quax1048 quantize  4294967294     0 ->  4294967294
 quax1049 quantize  4294967295     0 ->  4294967295
 quax1050 quantize  4294967296     0 ->  4294967296
 quax1051 quantize  4294967297     0 ->  4294967297
+-- and powers of ten for same
+quax1101 quantize  5000000000     0 ->  5000000000
+quax1102 quantize  4000000000     0 ->  4000000000
+quax1103 quantize  2000000000     0 ->  2000000000
+quax1104 quantize  1000000000     0 ->  1000000000
+quax1105 quantize  0100000000     0 ->  100000000
+quax1106 quantize  0010000000     0 ->  10000000
+quax1107 quantize  0001000000     0 ->  1000000
+quax1108 quantize  0000100000     0 ->  100000
+quax1109 quantize  0000010000     0 ->  10000
+quax1110 quantize  0000001000     0 ->  1000
+quax1111 quantize  0000000100     0 ->  100
+quax1112 quantize  0000000010     0 ->  10
+quax1113 quantize  0000000001     0 ->  1
+quax1114 quantize  0000000000     0 ->  0
+-- and powers of ten for same
+quax1121 quantize -5000000000     0 -> -5000000000
+quax1122 quantize -4000000000     0 -> -4000000000
+quax1123 quantize -2000000000     0 -> -2000000000
+quax1124 quantize -1000000000     0 -> -1000000000
+quax1125 quantize -0100000000     0 -> -100000000
+quax1126 quantize -0010000000     0 -> -10000000
+quax1127 quantize -0001000000     0 -> -1000000
+quax1128 quantize -0000100000     0 -> -100000
+quax1129 quantize -0000010000     0 -> -10000
+quax1130 quantize -0000001000     0 -> -1000
+quax1131 quantize -0000000100     0 -> -100
+quax1132 quantize -0000000010     0 -> -10
+quax1133 quantize -0000000001     0 -> -1
+quax1134 quantize -0000000000     0 -> -0
 
 -- Some miscellany
 precision:   34

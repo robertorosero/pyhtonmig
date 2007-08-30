@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.53
+version: 2.55
 
 precision:   9
 rounding:    half_up
@@ -570,7 +570,7 @@ minExponent: -393
 rounding:     down
 addx561 add 1e-398 9.000000000000000E+384 -> 9.000000000000000E+384 Inexact Rounded
 addx562 add      0 9.000000000000000E+384 -> 9.000000000000000E+384 Rounded
--- and using decimal64 bounds...
+-- and using decimal64 bounds (see also ddadd.decTest)
 precision:    16
 maxExponent: +384
 minExponent: -383
@@ -1583,7 +1583,7 @@ addx1707  subtract 130E-2  1E0    -> 0.30
 addx1708  subtract 1E2     1E4    -> -9.9E+3
 
 ------------------------------------------------------------------------
--- Same as above, using decimal64default parameters                   --
+-- Same as above, using decimal64 default parameters                  --
 ------------------------------------------------------------------------
 precision:   16
 rounding:    half_even

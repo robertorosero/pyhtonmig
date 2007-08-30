@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.53
+version: 2.55
 
 -- core tests (using Extended: 1) --------------------------------------
 dectest: base
@@ -53,13 +53,13 @@ dectest: multiply
 dectest: nextminus
 dectest: nextplus
 dectest: nexttoward
-dectest: normalize
 dectest: or
 dectest: plus
 dectest: power
 dectest: powersqrt
 dectest: quantize
 dectest: randoms
+dectest: reduce               -- [was called normalize]
 dectest: remainder
 dectest: remaindernear
 dectest: rescale              -- [obsolete]
@@ -75,11 +75,12 @@ dectest: tointegralx
 dectest: trim
 dectest: xor
 
--- The next are for the Strawman 4d concrete representations
-dectest: decimal32
-dectest: decimal64
-dectest: decimal128
-
+-- The next are for the Strawman 4d concrete representations and
+-- tests at those sizes [including dsEncode, ddEncode, and dqEncode,
+-- which replace decimal32, decimal64, and decimal128]
+dectest: decSingle
+dectest: decDouble
+dectest: decQuad
 
 -- General 31->33-digit boundary tests
 dectest: randombound32

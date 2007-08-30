@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.53
+version: 2.55
 
 -- This set of tests tests the extended specification 'round-to-integral
 -- value' operation (from IEEE 854, later modified in 754r).
@@ -239,3 +239,17 @@ intxx273 tointegralx    -55.7   -> -56   Inexact Rounded
 intxx274 tointegralx    -56.7   -> -57   Inexact Rounded
 intxx275 tointegralx    -57.7   -> -58   Inexact Rounded
 
+-- Int and uInt32 edge values for testing conversions
+precision: 16
+intxx300 tointegralx -2147483646  -> -2147483646
+intxx301 tointegralx -2147483647  -> -2147483647
+intxx302 tointegralx -2147483648  -> -2147483648
+intxx303 tointegralx -2147483649  -> -2147483649
+intxx304 tointegralx  2147483646  ->  2147483646
+intxx305 tointegralx  2147483647  ->  2147483647
+intxx306 tointegralx  2147483648  ->  2147483648
+intxx307 tointegralx  2147483649  ->  2147483649
+intxx308 tointegralx  4294967294  ->  4294967294
+intxx309 tointegralx  4294967295  ->  4294967295
+intxx310 tointegralx  4294967296  ->  4294967296
+intxx311 tointegralx  4294967297  ->  4294967297
