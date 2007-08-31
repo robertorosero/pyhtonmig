@@ -1639,20 +1639,16 @@ class Decimal(object):
         else:
             temp = Decimal(self)
 
-        numdigits = len(temp._int)
-
-#        # See if we need to extend precision
-        expdiff = prec - numdigits
+        # See if we need to extend precision
+        expdiff = prec - len(temp._int)
 
         # not allowing subnormal for quantize
         if fromQuantize and (forceExp - context.Emax) > context.prec:
-            context._raise_error(InvalidOperation, "Quantize doesn't allow subnormal")
-            return NaN
+            return context._raise_error(InvalidOperation, "Quantize doesn't allow subnormal")
 
         if expdiff >= 0:
             if fromQuantize and len(temp._int)+expdiff > context.prec:
-                context._raise_error(InvalidOperation, 'Beyond guarded precision')
-                return NaN
+                return context._raise_error(InvalidOperation, 'Beyond guarded precision')
             tmp = list(temp._int)
             tmp.extend([0] * expdiff)
             ans =  Decimal( (temp._sign, tmp, temp._exp - expdiff))
@@ -1670,42 +1666,24 @@ class Decimal(object):
         this_function = getattr(temp, self._pick_rounding_function[rounding])
 
         # Now we've got the rounding function
-        origprec = context.prec
-        if prec != context.prec:
-            context = context._shallow_copy()
-            context.prec = prec
         ans = this_function(prec, expdiff, context)
 
         if forceExp is not None:
             exp = forceExp
             if fromQuantize and not (context.Emin <= exp <= context.Emax):
                 if (context.Emin <= ans._exp) and ans._int == (0,):
-                    context._raise_error(InvalidOperation)
-                    return NaN
+                    return context._raise_error(InvalidOperation)
+
+            newdiff = ans._exp - exp
+            if newdiff >= 0:
+                ans._int = ans._int + tuple([0]*newdiff)
+            else:
+                ans._int = (0,)
+            ans._exp = exp
 
             if context.Emin < exp < context.Emax:
-                newdiff = ans._exp - exp
-                if newdiff >= 0:
-                    ans._int = ans._int + tuple([0]*newdiff)
-                else:
-                    ans._int = (0,)
-                ans._exp = exp
-            else:
-                if not context.flags[Underflow]:
-                    newdiff = ans._exp - exp
-                    if newdiff >= 0:
-                        ans._int = ans._int + tuple([0]*newdiff)
-                    else:
-                        ans._int = (0,)
-
-                ans._exp = exp
-                context._raise_error(Rounded)
-                context._raise_error(Inexact, 'Changed in rounding')
-                return ans
-
-            if len(ans._int) > origprec:
-                context._raise_error(InvalidOperation, 'Beyond guarded precision')
-                return NaN
+                if len(ans._int) > context.prec:
+                    return context._raise_error(InvalidOperation, 'Beyond guarded precision')
 
         context._raise_error(Rounded)
         context._raise_error(Inexact, 'Changed in rounding')
