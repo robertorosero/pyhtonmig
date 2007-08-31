@@ -70,6 +70,7 @@ do
 	     echo
 	     $PYTHON -E Lib/test/regrtest.py $FLAGS $T 2>OUT/$T.out
 	     ;;
+         test_largefile) echo " SKIPPED (always)"; echo $T >>SKIPPED; continue;;
          *)  $PYTHON -E Lib/test/regrtest.py $FLAGS $T >OUT/$T.out 2>&1;;
          esac
     then
