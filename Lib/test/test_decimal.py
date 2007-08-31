@@ -110,6 +110,7 @@ nameAdapter = {'toeng':'to_eng_string',
                'squareroot':'sqrt',
                'apply':'_apply',
                'class':'number_class',
+               'comparesig':'compare_signal',
                'comparetotal':'compare_total',
                'comparetotmag':'compare_total_mag',
                'copyabs':'copy_abs',
@@ -125,7 +126,7 @@ nameAdapter = {'toeng':'to_eng_string',
                'nextminus':'next_minus',
                'nextplus':'next_plus',
                'nexttoward':'next_toward',
-               'trim':'normalize',
+               'reduce':'normalize',
               }
 
 # For some operations (currently exp, ln, log10, power), the decNumber

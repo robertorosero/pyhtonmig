@@ -2335,6 +2335,9 @@ class Decimal(object):
     def normalize(self, context=None):
         """Normalize- strip trailing 0s, change anything equal to 0 to 0e0"""
 
+        if context is None:
+            context = getcontext()
+
         if self._is_special:
             ans = self._check_nans(context=context)
             if ans:
@@ -2346,9 +2349,10 @@ class Decimal(object):
 
         if not dup:
             return Decimal( (dup._sign, (0,), 0) )
+        exp_max = [context.Emax, context.Etop()][context._clamp]
         end = len(dup._int)
         exp = dup._exp
-        while dup._int[end-1] == 0:
+        while dup._int[end-1] == 0 and exp < exp_max:
             exp += 1
             end -= 1
         return Decimal( (dup._sign, dup._int[:end], exp) )
@@ -2359,6 +2363,8 @@ class Decimal(object):
 
         Similar to self._rescale(exp._exp) but with error checking.
         """
+        if context is None:
+            context = getcontext()
         if self._is_special or exp._is_special:
             ans = self._check_nans(exp, context)
             if ans:
@@ -2367,11 +2373,12 @@ class Decimal(object):
             if exp._isinfinity() or self._isinfinity():
                 if exp._isinfinity() and self._isinfinity():
                     return self  # if both are inf, it is OK
-                if context is None:
-                    context = getcontext()
                 return context._raise_error(InvalidOperation,
                                         'quantize with one INF')
-        return self._rescale(exp._exp, rounding, context, watchexp=0, fromQuantize=True)
+        ans = self._rescale(exp._exp, rounding, context, watchexp=0, fromQuantize=True)
+        # call to fix takes care of any necessary folddown
+        ans = ans._fix(context)
+        return ans
 
     def same_quantum(self, other):
         """Test whether self and other have the same exponent.
@@ -2694,8 +2701,23 @@ class Decimal(object):
         It's pretty much like compare(), but all NaNs signal, with signaling
         NaNs taking precedence over quiet NaNs.
         """
-        if self._isnan() or other._isnan():
-            return context._raise_error(InvalidOperation)
+        if context is None:
+            context = getcontext()
+
+        self_is_nan = self._isnan()
+        other_is_nan = other._isnan()
+        if self_is_nan == 2:
+            return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, self)
+        if other_is_nan == 2:
+            return context._raise_error(InvalidOperation, 'sNaN',
+                                        1, other)
+        if self_is_nan:
+            return context._raise_error(InvalidOperation, 'NaN in compare_signal',
+                                        1, self)
+        if other_is_nan:
+            return context._raise_error(InvalidOperation, 'NaN in compare_signal',
+                                        1, other)
         return self.compare(other, context=context)
 
     def compare_total(self, other):
