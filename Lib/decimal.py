@@ -2110,7 +2110,7 @@ class Decimal(object):
                 return None
 
             # compute nth root of xc using Newton's method
-            a = 1 << -(-_nbits(xc)//n) # initial estimate
+            a = 1L << -(-_nbits(xc)//n) # initial estimate
             while True:
                 q, r = divmod(xc, a**(n-1))
                 if a <= q:
@@ -5028,8 +5028,8 @@ def _rshift_nearest(x, shift):
     integer to x / 2**shift; use round-to-even in case of a tie.
 
     """
-    b, q = 1 << shift, x >> shift
-    return q + (((x & (b-1))<<1) + (q&1) > b)
+    b, q = 1L << shift, x >> shift
+    return q + (2*(x & (b-1)) + (q&1) > b)
 
 def _div_nearest(a, b):
     """Closest integer to a/b, a and b positive integers; rounds to even
@@ -5037,7 +5037,7 @@ def _div_nearest(a, b):
 
     """
     q, r = divmod(a, b)
-    return q + ((r<<1) + (q&1) > b)
+    return q + (2*r + (q&1) > b)
 
 def _ilog(x, M, L = 8):
     """Integer approximation to M*log(x/M), with absolute error boundable
@@ -5072,9 +5072,9 @@ def _ilog(x, M, L = 8):
     y = x-M
     # argument reduction; R = number of reductions performed
     R = 0
-    while (R <= L and abs(y) << L-R >= M or
+    while (R <= L and long(abs(y)) << L-R >= M or
            R > L and abs(y) >> R-L >= M):
-        y = _div_nearest(M*y << 1,
+        y = _div_nearest(long(M*y) << 1,
                          M + _sqrt_nearest(M*(M+_rshift_nearest(y, R)), M))
         R += 1
 
@@ -5189,18 +5189,18 @@ def _iexp(x, M, L=8):
     # expm1(z/2**(R-1)), ... , exp(z/2), exp(z).
 
     # Find R such that x/2**R/M <= 2**-L
-    R = _nbits((x<<L)//M)
+    R = _nbits((long(x)<<L)//M)
 
     # Taylor series.  (2**L)**T > M
     T = -int(-10*len(str(M))//(3*L))
     y = _div_nearest(x, T)
-    Mshift = M<<R
+    Mshift = long(M)<<R
     for i in xrange(T-1, 0, -1):
         y = _div_nearest(x*(Mshift + y), Mshift * i)
 
     # Expansion
     for k in xrange(R-1, -1, -1):
-        Mshift = M<<(k+2)
+        Mshift = long(M)<<(k+2)
         y = _div_nearest(y*(y+Mshift), Mshift)
 
     return M+y
