@@ -998,13 +998,13 @@ class Decimal(object):
             return ans
         if not self:
             exp = max(exp, other._exp - context.prec-1)
-            ans = other._rescale(exp, watchexp=0, context=context)
+            ans = other._rescale(exp, context.rounding)
             if shouldround:
                 ans = ans._fix(context)
             return ans
         if not other:
             exp = max(exp, self._exp - context.prec-1)
-            ans = self._rescale(exp, watchexp=0, context=context)
+            ans = self._rescale(exp, context.rounding)
             if shouldround:
                 ans = ans._fix(context)
             return ans
@@ -1079,23 +1079,17 @@ class Decimal(object):
         tmp._sign = 1 - tmp._sign
         return other.__add__(tmp, context=context)
 
-    def _increment(self, round=1, context=None):
+    def _increment(self):
         """Special case of add, adding 1eExponent
 
         Since it is common, (rounding, for example) this adds
         (sign)*one E self._exp to the number more efficiently than add.
 
+        Assumes that self is nonspecial.
+
         For example:
         Decimal('5.624e10')._increment() == Decimal('5.625e10')
         """
-        if self._is_special:
-            ans = self._check_nans(context=context)
-            if ans:
-                return ans
-
-            # Must be infinite, and incrementing makes no difference
-            return Decimal(self)
-
         L = list(self._int)
         L[-1] += 1
         spot = len(L)-1
@@ -1106,13 +1100,7 @@ class Decimal(object):
                 break
             L[spot-1] += 1
             spot -= 1
-        ans = Decimal((self._sign, L, self._exp))
-
-        if context is None:
-            context = getcontext()
-        if round and context._rounding_decision == ALWAYS_ROUND:
-            ans = ans._fix(context)
-        return ans
+        return Decimal((self._sign, L, self._exp))
 
     def __mul__(self, other, context=None):
         """Return self * other.
@@ -1273,7 +1261,7 @@ class Decimal(object):
 
             if divmod == 1 or divmod == 3:
                 exp = min(self._exp, other._exp)
-                ans2 = self._rescale(exp, context=context, watchexp=0)
+                ans2 = self._rescale(exp, context.rounding)
                 if shouldround:
                     ans2 = ans2._fix(context)
                 return (Decimal( (sign, (0,), 0) ),
@@ -1299,11 +1287,8 @@ class Decimal(object):
                 if res.int >= prec_limit and shouldround:
                     return context._raise_error(DivisionImpossible)
                 otherside = Decimal(op1)
-                frozen = context._ignore_all_flags()
-
                 exp = min(self._exp, other._exp)
-                otherside = otherside._rescale(exp, context=context, watchexp=0)
-                context._regard_flags(*frozen)
+                otherside = otherside._rescale(exp, context.rounding)
                 if shouldround and (divmod == 1 or divmod == 3):
                     otherside = otherside._fix(context)
                 return (Decimal(res), otherside)
@@ -1522,251 +1507,140 @@ class Decimal(object):
         self - Decimal instance
         context - context used.
         """
+
+        if context is None:
+            context = getcontext()
+
         if self._is_special:
             if self._isnan():
+                # decapitate payload if necessary
                 return self._fix_nan(context)
             else:
+                # self is +/-Infinity; return unaltered
                 return self
-        if context is None:
-            context = getcontext()
-        prec = context.prec
-        ans = self._fixexponents(context)
-        if len(ans._int) > prec:
-            ans = ans._round(prec, context=context)
-            ans = ans._fixexponents(context)
-        return ans
 
-    def _fixexponents(self, context):
-        """Fix the exponents and return a copy with the exponent in bounds.
-        Only call if known to not be a special value.
-        """
-
-        ans = self
-        # deal with zeros first
-        if not ans:
-            Etiny = context.Etiny()
-            if ans._exp < Etiny:
-                ans = Decimal(self)
-                ans._exp = Etiny
+        # if self is zero then exponent should be between Etiny and
+        # Emax if _clamp==0, and between Etiny and Etop if _clamp==1.
+        Etiny = context.Etiny()
+        Etop = context.Etop()
+        if not self:
+            exp_max = [context.Emax, Etop][context._clamp]
+            new_exp = min(max(self._exp, Etiny), exp_max)
+            if new_exp != self._exp:
                 context._raise_error(Clamped)
+                return Decimal((self._sign, (0,), new_exp))
             else:
-                if context._clamp:
-                    exp_max = context.Etop()
-                else:
-                    exp_max = context.Emax
-                if ans._exp > exp_max:
-                    ans = Decimal(self)
-                    ans._exp = exp_max
-                    context._raise_error(Clamped)
-            return ans
+                return self
 
-        # self is nonzero; if adjusted exponent is > Emax, overflow
-        ans_adjusted = ans.adjusted()
-        if ans_adjusted > context.Emax:
+        # exp_min is the smallest allowable exponent of the result,
+        # equal to max(self.adjusted()-context.prec+1, Etiny)
+        exp_min = len(self._int) + self._exp - context.prec
+        if exp_min > Etop:
+            # overflow: exp_min > Etop iff self.adjusted() > Emax
             context._raise_error(Inexact)
             context._raise_error(Rounded)
-            c = context._raise_error(Overflow, 'above Emax', ans._sign)
-            return c
-
-        # Now check for subnormal results, and for the need to fold
-        # down.  These two conditions are *not* mutually
-        # exclusive---when the precision is large and Emin and Emax
-        # are small it's quite possible to have Emin > Etop.
-        # (Actually, the specification requires Emin and Emax to be at
-        # least 5*precision, so this shouldn't happen, but it never
-        # hurts to be careful.)
-        if context._clamp:
-            Etop = context.Etop()
-            if ans._exp > Etop:
-                context._raise_error(Clamped)
-                ans = ans._rescale(Etop, context=context)
-
-        if ans_adjusted < context.Emin:
+            return context._raise_error(Overflow, 'above Emax', self._sign)
+        self_is_subnormal = exp_min < Etiny
+        if self_is_subnormal:
             context._raise_error(Subnormal)
-            Etiny = context.Etiny()
-            if ans._exp < Etiny:
-                ans_before_rescale = ans
-                ans = ans._rescale(Etiny, context=context)
-                if ans != ans_before_rescale:
+            exp_min = Etiny
+
+        # round if self has too many digits
+        if self._exp < exp_min:
+            context._raise_error(Rounded)
+            ans = self._rescale(exp_min, context.rounding)
+            if ans != self:
+                context._raise_error(Inexact)
+                if self_is_subnormal:
                     context._raise_error(Underflow)
                     if not ans:
+                        # raise Clamped on underflow to 0
                         context._raise_error(Clamped)
-
-        return ans
-
-    def _round(self, prec=None, rounding=None, context=None, forceExp=None, fromQuantize=False):
-        """Returns a rounded version of self.
-
-        You can specify the precision or rounding method.  Otherwise, the
-        context determines it.
-        """
-
-        if self._is_special:
-            ans = self._check_nans(context=context)
-            if ans:
-                return ans
-
-            if self._isinfinity():
-                return Decimal(self)
-
-        if context is None:
-            context = getcontext()
-
-        if rounding is None:
-            rounding = context.rounding
-        if prec is None:
-            prec = context.prec
-
-        if not self:
-            if prec <= 0:
-                dig = (0,)
-                exp = len(self._int) - prec + self._exp
-            else:
-                dig = (0,) * prec
-                exp = len(self._int) + self._exp - prec
-            ans = Decimal((self._sign, dig, exp))
-            context._raise_error(Rounded)
+                elif len(ans._int) == context.prec+1:
+                    # we get here only if rescaling rounds the
+                    # cofficient up to exactly 10**context.prec
+                    if ans._exp < Etop:
+                        ans = Decimal((ans._sign, ans._int[:-1], ans._exp+1))
+                    else:
+                        # Inexact and Rounded have already been raised
+                        ans = context._raise_error(Overflow, 'above Emax',
+                                                   self._sign)
             return ans
 
-        if prec == 0:
-            temp = Decimal(self)
-            temp._int = (0,)+temp._int
-            prec = 1
-        elif prec < 0:
-            exp = self._exp + len(self._int) - prec - 1
-            temp = Decimal( (self._sign, (0, 1), exp))
-            prec = 1
-        else:
-            temp = Decimal(self)
+        # fold down if _clamp == 1 and self has too few digits
+        if context._clamp == 1 and self._exp > Etop:
+            context._raise_error(Clamped)
+            self_padded = self._int + (0,)*(self._exp - Etop)
+            return Decimal((self._sign, self_padded, Etop))
 
-        # See if we need to extend precision
-        expdiff = prec - len(temp._int)
-
-        # not allowing subnormal for quantize
-        if fromQuantize and (forceExp - context.Emax) > context.prec:
-            return context._raise_error(InvalidOperation, "Quantize doesn't allow subnormal")
-
-        if expdiff >= 0:
-            if fromQuantize and len(temp._int)+expdiff > context.prec:
-                return context._raise_error(InvalidOperation, 'Beyond guarded precision')
-            tmp = list(temp._int)
-            tmp.extend([0] * expdiff)
-            ans =  Decimal( (temp._sign, tmp, temp._exp - expdiff))
-            return ans
-
-        # OK, but maybe all the lost digits are 0.
-        lostdigits = self._int[expdiff:]
-        if lostdigits == (0,) * len(lostdigits):
-            ans = Decimal( (temp._sign, temp._int[:prec], temp._exp - expdiff))
-            # Rounded, but not Inexact
-            context._raise_error(Rounded)
-            return ans
-
-        # Okay, let's round and lose data, let's get the correct rounding function
-        this_function = getattr(temp, self._pick_rounding_function[rounding])
-
-        # Now we've got the rounding function
-        ans = this_function(prec, expdiff, context)
-
-        if forceExp is not None:
-            exp = forceExp
-            if fromQuantize and not (context.Emin <= exp <= context.Emax):
-                if (context.Emin <= ans._exp) and ans._int == (0,):
-                    return context._raise_error(InvalidOperation)
-
-            newdiff = ans._exp - exp
-            if newdiff >= 0:
-                ans._int = ans._int + tuple([0]*newdiff)
-            else:
-                ans._int = (0,)
-            ans._exp = exp
-
-            if context.Emin < exp < context.Emax:
-                if len(ans._int) > context.prec:
-                    return context._raise_error(InvalidOperation, 'Beyond guarded precision')
-
-        context._raise_error(Rounded)
-        context._raise_error(Inexact, 'Changed in rounding')
-        return ans
+        # here self was representable to begin with; return unchanged
+        return self
 
     _pick_rounding_function = {}
 
-    def _round_down(self, prec, expdiff, context):
+    # for each of the rounding functions below:
+    #   self is a finite, nonzero Decimal
+    #   prec is an integer satisfying 0 <= prec < len(self._int)
+    # the rounded result will have exponent self._exp + len(self._int) - prec;
+
+    def _round_down(self, prec):
         """Also known as round-towards-0, truncate."""
-        return Decimal( (self._sign, self._int[:prec], self._exp - expdiff) )
+        newexp = self._exp + len(self._int) - prec
+        return Decimal((self._sign, self._int[:prec] or (0,), newexp))
 
-    def _round_half_up(self, prec, expdiff, context, tmp = None):
-        """Rounds 5 up (away from 0)"""
-
-        if tmp is None:
-            tmp = Decimal( (self._sign,self._int[:prec], self._exp - expdiff))
-        if self._int[prec] >= 5:
-            tmp = tmp._increment(round=0, context=context)
-            if len(tmp._int) > prec:
-                return Decimal( (tmp._sign, tmp._int[:-1], tmp._exp + 1))
-        return tmp
-
-    def _round_half_even(self, prec, expdiff, context):
-        """Round 5 to even, rest to nearest."""
-
-        tmp = Decimal( (self._sign, self._int[:prec], self._exp - expdiff))
-        half = (self._int[prec] == 5)
-        if half:
-            for digit in self._int[prec+1:]:
-                if digit != 0:
-                    half = 0
-                    break
-        if half:
-            if self._int[prec-1] & 1 == 0:
-                return tmp
-        return self._round_half_up(prec, expdiff, context, tmp)
-
-    def _round_half_down(self, prec, expdiff, context):
-        """Round 5 down"""
-
-        tmp = Decimal( (self._sign, self._int[:prec], self._exp - expdiff))
-        half = (self._int[prec] == 5)
-        if half:
-            for digit in self._int[prec+1:]:
-                if digit != 0:
-                    half = 0
-                    break
-        if half:
-            return tmp
-        return self._round_half_up(prec, expdiff, context, tmp)
-
-    def _round_up(self, prec, expdiff, context):
+    def _round_up(self, prec):
         """Rounds away from 0."""
-        tmp = Decimal( (self._sign, self._int[:prec], self._exp - expdiff) )
+        newexp = self._exp + len(self._int) - prec
+        tmp = Decimal((self._sign, self._int[:prec] or (0,), newexp))
         for digit in self._int[prec:]:
             if digit != 0:
-                tmp = tmp._increment(round=0, context=context)
-                if len(tmp._int) > prec:
-                    return Decimal( (tmp._sign, tmp._int[:-1], tmp._exp + 1))
-                else:
-                    return tmp
+                return tmp._increment()
         return tmp
 
-    def _round_ceiling(self, prec, expdiff, context):
+    def _round_half_up(self, prec):
+        """Rounds 5 up (away from 0)"""
+        if self._int[prec] >= 5:
+            return self._round_up(prec)
+        else:
+            return self._round_down(prec)
+
+    def _round_half_down(self, prec):
+        """Round 5 down"""
+        if self._int[prec] == 5:
+            for digit in self._int[prec+1:]:
+                if digit != 0:
+                    break
+            else:
+                return self._round_down(prec)
+        return self._round_half_up(prec)
+
+    def _round_half_even(self, prec):
+        """Round 5 to even, rest to nearest."""
+        if prec and self._int[prec-1] & 1:
+            return self._round_half_up(prec)
+        else:
+            return self._round_half_down(prec)
+
+    def _round_ceiling(self, prec):
         """Rounds up (not away from 0 if negative.)"""
         if self._sign:
-            return self._round_down(prec, expdiff, context)
+            return self._round_down(prec)
         else:
-            return self._round_up(prec, expdiff, context)
+            return self._round_up(prec)
 
-    def _round_floor(self, prec, expdiff, context):
+    def _round_floor(self, prec):
         """Rounds down (not towards 0 if negative)"""
         if not self._sign:
-            return self._round_down(prec, expdiff, context)
+            return self._round_down(prec)
         else:
-            return self._round_up(prec, expdiff, context)
+            return self._round_up(prec)
 
-    def _round_05up(self, prec, expdiff, context):
+    def _round_05up(self, prec):
         """Round down unless digit prec-1 is 0 or 5."""
-        if self._int[prec-1] in (0, 5):
-            return self._round_up(prec, expdiff, context)
+        if prec == 0 or self._int[prec-1] in (0, 5):
+            return self._round_up(prec)
         else:
-            return self._round_down(prec, expdiff, context)
+            return self._round_down(prec)
 
     def fma(self, other, third, context=None):
         """Fused multiply-add.
@@ -2336,13 +2210,16 @@ class Decimal(object):
         return Decimal( (dup._sign, dup._int[:end], exp) )
 
 
-    def quantize(self, exp, rounding=None, context=None, watchexp=1):
+    def quantize(self, exp, rounding=None, context=None):
         """Quantize self so its exponent is the same as that of exp.
 
         Similar to self._rescale(exp._exp) but with error checking.
         """
         if context is None:
             context = getcontext()
+        if rounding is None:
+            rounding = context.rounding
+
         if self._is_special or exp._is_special:
             ans = self._check_nans(exp, context)
             if ans:
@@ -2353,7 +2230,40 @@ class Decimal(object):
                     return self  # if both are inf, it is OK
                 return context._raise_error(InvalidOperation,
                                         'quantize with one INF')
-        ans = self._rescale(exp._exp, rounding, context, watchexp=0, fromQuantize=True)
+
+        # exp._exp should be between Etiny and Emax
+        if not (context.Etiny() <= exp._exp <= context.Emax):
+            return context._raise_error(InvalidOperation,
+                   'target exponent out of bounds in quantize')
+
+        if not self:
+            ans = Decimal((self._sign, (0,), exp._exp))
+            return ans._fix(context)
+
+        self_adjusted = self.adjusted()
+        if self_adjusted > context.Emax:
+            return context._raise_error(InvalidOperation,
+                                        'exponent of quantize result too large for current context')
+        if self_adjusted - exp._exp + 1 > context.prec:
+            return context._raise_error(InvalidOperation,
+                                        'quantize result has too many digits for current context')
+
+        ans = self._rescale(exp._exp, rounding)
+        if ans.adjusted() > context.Emax:
+            return context._raise_error(InvalidOperation,
+                                        'exponent of quantize result too large for current context')
+        if len(ans._int) > context.prec:
+            return context._raise_error(InvalidOperation,
+                                        'quantize result has too many digits for current context')
+
+        # raise appropriate flags
+        if ans._exp > self._exp:
+            context._raise_error(Rounded)
+            if ans != self:
+                context._raise_error(Inexact)
+        if ans and ans.adjusted() < context.Emin:
+            context._raise_error(Subnormal)
+
         # call to fix takes care of any necessary folddown
         ans = ans._fix(context)
         return ans
@@ -2370,58 +2280,34 @@ class Decimal(object):
                 return self._isinfinity() and other._isinfinity() and True
         return self._exp == other._exp
 
-    def _rescale(self, exp, rounding=None, context=None, watchexp=1, fromQuantize=False):
-        """Rescales so that the exponent is exp.
+    def _rescale(self, exp, rounding):
+        """Rescale self so that the exponent is exp, either by padding with zeros
+        or by truncating digits, using the given rounding mode.
+
+        Specials are returned without change.  This operation is
+        quiet: it raises no flags, and uses no information from the
+        context.
 
         exp = exp to scale to (an integer)
-        rounding = rounding version
-        watchexp: if set (default) an error is returned if exp is greater
-        than Emax or less than Etiny.
+        rounding = rounding mode
         """
-        if context is None:
-            context = getcontext()
-
         if self._is_special:
-            if self._isinfinity():
-                return context._raise_error(InvalidOperation, 'rescale with an INF')
-
-            ans = self._check_nans(context=context)
-            if ans:
-                return ans
-
-        if fromQuantize and (context.Emax  < exp or context.Etiny() > exp):
-            return context._raise_error(InvalidOperation, 'rescale(a, INF)')
-        if fromQuantize and exp < context.Etiny():
-            return context._raise_error(InvalidOperation, '"rhs" must be no less than Etiny')
-
+            return self
         if not self:
-            ans = Decimal(self)
-            ans._int = (0,)
-            ans._exp = exp
-            return ans
+            return Decimal((self._sign, (0,), exp))
 
-        diff = self._exp - exp
-        digits = len(self._int) + diff
+        if self._exp >= exp:
+            # pad answer with zeros if necessary
+            return Decimal((self._sign, self._int + (0,)*(self._exp - exp), exp))
 
-        if watchexp and digits > context.prec:
-            return context._raise_error(InvalidOperation, 'Rescale > prec')
-
-        tmp = Decimal(self)
-
+        # too many digits; round and lose data.  If self.adjusted() <
+        # exp-1, replace self by 10**(exp-1) before rounding
+        digits = len(self._int) + self._exp - exp
         if digits < 0:
-            tmp._exp = exp - 1
-            tmp._int = (1,)
+            self = Decimal((self._sign, (1,), exp-1))
             digits = 0
-        tmp = tmp._round(digits, rounding, context=context, forceExp=exp,
-                                                fromQuantize=fromQuantize)
-
-        if watchexp or fromQuantize:
-            tmp_adjusted = tmp.adjusted()
-            if tmp and tmp_adjusted < context.Emin:
-                context._raise_error(Subnormal)
-            elif tmp and tmp_adjusted > context.Emax:
-                return context._raise_error(InvalidOperation, 'rescale(a, INF)')
-        return tmp
+        this_function = getattr(self, self._pick_rounding_function[rounding])
+        return this_function(digits)
 
     def to_integral_exact(self, rounding=None, context=None):
         """Rounds to a nearby integer.
@@ -2437,26 +2323,36 @@ class Decimal(object):
             ans = self._check_nans(context=context)
             if ans:
                 return ans
+            return self
         if self._exp >= 0:
             return self
+        if not self:
+            return Decimal((self._sign, (0,), 0))
         if context is None:
             context = getcontext()
-        return self._rescale(0, rounding, context=context)
+        if rounding is None:
+            rounding = context.rounding
+        context._raise_error(Rounded)
+        ans = self._rescale(0, rounding)
+        if ans != self:
+            context._raise_error(Inexact)
+        return ans
 
     def to_integral_value(self, rounding=None, context=None):
         """Rounds to the nearest integer, without raising inexact, rounded."""
+        if context is None:
+            context = getcontext()
+        if rounding is None:
+            rounding = context.rounding
         if self._is_special:
             ans = self._check_nans(context=context)
             if ans:
                 return ans
+            return self
         if self._exp >= 0:
             return self
-        if context is None:
-            context = getcontext()
-        flags = context._ignore_flags(Rounded, Inexact)
-        ans = self._rescale(0, rounding, context=context)
-        context._regard_flags(flags)
-        return ans
+        else:
+            return self._rescale(0, rounding)
 
     # the method name changed, but we provide also the old one, for compatibility
     to_integral = to_integral_value
