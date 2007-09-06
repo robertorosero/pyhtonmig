@@ -46,15 +46,37 @@ the setsockopt() and getsockopt() methods.
 import _socket
 from _socket import *
 
-_have_ssl = False
 try:
     import _ssl
-    from _ssl import *
-    _have_ssl = True
 except ImportError:
+    # no SSL support
     pass
+else:
+    def ssl(sock, keyfile=None, certfile=None):
+        # we do an internal import here because the ssl
+        # module imports the socket module
+        import ssl as _realssl
+        warnings.warn("socket.ssl() is deprecated.  Use ssl.sslsocket() instead.",
+                      DeprecationWarning, stacklevel=2)
+        return _realssl.sslwrap_simple(sock, keyfile, certfile)
 
-import os, sys
+    # we need to import the same constants we used to...
+    from _ssl import \
+         sslerror, \
+         RAND_add, \
+         RAND_egd, \
+         RAND_status, \
+         SSL_ERROR_ZERO_RETURN, \
+         SSL_ERROR_WANT_READ, \
+         SSL_ERROR_WANT_WRITE, \
+         SSL_ERROR_WANT_X509_LOOKUP, \
+         SSL_ERROR_SYSCALL, \
+         SSL_ERROR_SSL, \
+         SSL_ERROR_WANT_CONNECT, \
+         SSL_ERROR_EOF, \
+         SSL_ERROR_INVALID_ERROR_CODE
+
+import os, sys, warnings
 
 try:
     from errno import EBADF
@@ -63,16 +85,9 @@ except ImportError:
 
 __all__ = ["getfqdn"]
 __all__.extend(os._get_exports_list(_socket))
-if _have_ssl:
-    __all__.extend(os._get_exports_list(_ssl))
+
 
 _realsocket = socket
-if _have_ssl:
-    _realssl = ssl
-    def ssl(sock, keyfile=None, certfile=None):
-        if hasattr(sock, "_sock"):
-            sock = sock._sock
-        return _realssl(sock, keyfile, certfile)
 
 # WSA error codes
 if sys.platform.lower().startswith("win"):
@@ -144,6 +159,10 @@ class _closedsocket(object):
     send = recv = recv_into = sendto = recvfrom = recvfrom_into = _dummy
     __getattr__ = _dummy
 
+# Wrapper around platform socket objects. This implements
+# a platform-independent dup() functionality. The
+# implementation currently relies on reference counting
+# to close the underlying socket object.
 class _socketobject(object):
 
     __doc__ = _realsocket.__doc__

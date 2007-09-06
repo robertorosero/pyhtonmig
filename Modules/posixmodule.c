@@ -2593,7 +2593,7 @@ extract_time(PyObject *t, long* sec, long* usec)
 	long intval;
 	if (PyFloat_Check(t)) {
 		double tval = PyFloat_AsDouble(t);
-		PyObject *intobj = t->ob_type->tp_as_number->nb_int(t);
+		PyObject *intobj = Py_Type(t)->tp_as_number->nb_int(t);
 		if (!intobj)
 			return -1;
 		intval = PyInt_AsLong(intobj);
@@ -5783,7 +5783,10 @@ posix_readlink(PyObject *self, PyObject *args)
 		return NULL;
 #ifdef Py_USING_UNICODE
 	v = PySequence_GetItem(args, 0);
-	if (v == NULL) return NULL;
+	if (v == NULL) {
+		PyMem_Free(path);
+		return NULL;
+	}
 
 	if (PyUnicode_Check(v)) {
 		arg_is_unicode = 1;
@@ -5795,8 +5798,9 @@ posix_readlink(PyObject *self, PyObject *args)
 	n = readlink(path, buf, (int) sizeof buf);
 	Py_END_ALLOW_THREADS
 	if (n < 0)
-		return posix_error_with_filename(path);
+		return posix_error_with_allocated_filename(path);
 
+	PyMem_Free(path);
 	v = PyString_FromStringAndSize(buf, n);
 #ifdef Py_USING_UNICODE
 	if (arg_is_unicode) {
@@ -8070,6 +8074,8 @@ typedef BOOL (WINAPI *CRYPTGENRANDOM)(HCRYPTPROV hProv, DWORD dwLen,\
               BYTE *pbBuffer );
 
 static CRYPTGENRANDOM pCryptGenRandom = NULL;
+/* This handle is never explicitly released. Instead, the operating
+   system will release it when the process terminates. */
 static HCRYPTPROV hCryptProv = 0;
 
 static PyObject*

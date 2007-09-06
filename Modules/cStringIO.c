@@ -514,8 +514,7 @@ O_dealloc(Oobject *self) {
 PyDoc_STRVAR(Otype__doc__, "Simple type for output to strings.");
 
 static PyTypeObject Otype = {
-  PyObject_HEAD_INIT(NULL)
-  0,	       			/*ob_size*/
+  PyVarObject_HEAD_INIT(NULL, 0)
   "cStringIO.StringO",   	/*tp_name*/
   sizeof(Oobject),       	/*tp_basicsize*/
   0,	       			/*tp_itemsize*/
@@ -635,8 +634,7 @@ PyDoc_STRVAR(Itype__doc__,
 "Simple type for treating strings as input file streams");
 
 static PyTypeObject Itype = {
-  PyObject_HEAD_INIT(NULL)
-  0,					/*ob_size*/
+  PyVarObject_HEAD_INIT(NULL, 0)
   "cStringIO.StringI",			/*tp_name*/
   sizeof(Iobject),			/*tp_basicsize*/
   0,					/*tp_itemsize*/
@@ -675,8 +673,11 @@ newIobject(PyObject *s) {
   char *buf;
   Py_ssize_t size;
 
-  if (PyObject_AsCharBuffer(s, (const char **)&buf, &size) != 0)
-      return NULL;
+  if (PyObject_AsReadBuffer(s, (const void **)&buf, &size)) {
+    PyErr_Format(PyExc_TypeError, "expected read buffer, %.200s found",
+                 s->ob_type->tp_name);
+    return NULL;
+  }
 
   self = PyObject_New(Iobject, &Itype);
   if (!self) return NULL;
@@ -746,8 +747,8 @@ initcStringIO(void) {
   d = PyModule_GetDict(m);
   
   /* Export C API */
-  Itype.ob_type=&PyType_Type;
-  Otype.ob_type=&PyType_Type;
+  Py_Type(&Itype)=&PyType_Type;
+  Py_Type(&Otype)=&PyType_Type;
   if (PyType_Ready(&Otype) < 0) return;
   if (PyType_Ready(&Itype) < 0) return;
   PyDict_SetItemString(d,"cStringIO_CAPI",

@@ -1243,9 +1243,26 @@ ast_for_atom(struct compiling *c, const node *n)
                     c->c_arena);
     case STRING: {
         PyObject *str = parsestrplus(c, n);
-        if (!str)
+        if (!str) {
+            if (PyErr_ExceptionMatches(PyExc_UnicodeError)){
+                PyObject *type, *value, *tback, *errstr;
+                PyErr_Fetch(&type, &value, &tback);
+                errstr = ((PyUnicodeErrorObject *)value)->reason;
+                if (errstr) {
+                    char *s = "";
+                    char buf[128];
+                    s = PyString_AsString(errstr);
+                    PyOS_snprintf(buf, sizeof(buf), "(unicode error) %s", s);
+                    ast_error(n, buf);
+                } else {
+                    ast_error(n, "(unicode error) unknown error");
+                }
+                Py_DECREF(type);
+                Py_DECREF(value);
+                Py_XDECREF(tback);
+            }
             return NULL;
-
+        }
         PyArena_AddPyObject(c->c_arena, str);
         return Str(str, LINENO(n), n->n_col_offset, c->c_arena);
     }
@@ -3126,6 +3143,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 #endif
 }
 
+#ifdef Py_USING_UNICODE
 static PyObject *
 decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 {
@@ -3187,6 +3205,7 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
         Py_XDECREF(u);
         return v;
 }
+#endif
 
 /* s is a Python string literal, including the bracketing quote characters,
  * and r &/or u prefixes (if any), and embedded escape sequences (if any).

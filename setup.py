@@ -194,18 +194,21 @@ class PyBuildExt(build_ext):
             for e, f, g in zip(lst[::3], lst[1::3], lst[2::3]):
                 print "%-*s   %-*s   %-*s" % (longest, e, longest, f,
                                               longest, g)
-            print
 
         if missing:
             print
             print "Failed to find the necessary bits to build these modules:"
             print_three_column(missing)
+            print ("To find the necessary bits, look in setup.py in"
+                   " detect_modules() for the module's name.")
+            print
 
         if self.failed:
             failed = self.failed[:]
             print
             print "Failed to build these modules:"
             print_three_column(failed)
+            print
 
     def build_extension(self, ext):
 
@@ -299,7 +302,8 @@ class PyBuildExt(build_ext):
                 # strip out double-dashes first so that we don't end up with
                 # substituting "--Long" to "-Long" and thus lead to "ong" being
                 # used for a library directory.
-                env_val = re.sub(r'(^|\s+)-(-|(?!%s))' % arg_name[1], '', env_val)
+                env_val = re.sub(r'(^|\s+)-(-|(?!%s))' % arg_name[1],
+                                 ' ', env_val)
                 parser = optparse.OptionParser()
                 # Make sure that allowing args interspersed with options is
                 # allowed
@@ -631,7 +635,8 @@ class PyBuildExt(build_ext):
                                    include_dirs = ssl_incs,
                                    library_dirs = ssl_libs,
                                    libraries = ['ssl', 'crypto']) )
-            missing.extend(['_sha', '_md5'])
+            # these aren't strictly missing since they are unneeded.
+            #missing.extend(['_sha', '_md5'])
         else:
             # The _sha module implements the SHA1 hash algorithm.
             exts.append( Extension('_sha', ['shamodule.c']) )
@@ -648,6 +653,7 @@ class PyBuildExt(build_ext):
             exts.append( Extension('_sha256', ['sha256module.c']) )
             exts.append( Extension('_sha512', ['sha512module.c']) )
         else:
+            # these aren't strictly missing since they are unneeded.
             missing.extend(['_sha256', '_sha512'])
 
         # Modules that provide persistent dictionary-like semantics.  You will
@@ -657,14 +663,14 @@ class PyBuildExt(build_ext):
         # implementation independent wrapper for these; dumbdbm.py provides
         # similar functionality (but slower of course) implemented in Python.
 
-        # Sleepycat Berkeley DB interface.  http://www.sleepycat.com
+        # Sleepycat^WOracle Berkeley DB interface.  http://www.sleepycat.com
         #
-        # This requires the Sleepycat DB code. The supported versions
+        # This requires the Sleepycat^WOracle DB code. The supported versions
         # are set below.  Visit http://www.sleepycat.com/ to download
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 5)
+        max_db_ver = (4, 6)
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -682,7 +688,7 @@ class PyBuildExt(build_ext):
             '/sw/include/db3',
         ]
         # 4.x minor number specific paths
-        for x in (0,1,2,3,4,5):
+        for x in (0,1,2,3,4,5,6):
             db_inc_paths.append('/usr/include/db4%d' % x)
             db_inc_paths.append('/usr/include/db4.%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
@@ -707,7 +713,7 @@ class PyBuildExt(build_ext):
         for dn in inc_dirs:
             std_variants.append(os.path.join(dn, 'db3'))
             std_variants.append(os.path.join(dn, 'db4'))
-            for x in (0,1,2,3,4):
+            for x in (0,1,2,3,4,5,6):
                 std_variants.append(os.path.join(dn, "db4%d"%x))
                 std_variants.append(os.path.join(dn, "db4.%d"%x))
             for x in (2,3):
@@ -903,8 +909,13 @@ class PyBuildExt(build_ext):
         # accidentally building this module with a later version of the
         # underlying db library.  May BSD-ish Unixes incorporate db 1.85
         # symbols into libc and place the include file in /usr/include.
+        #
+        # If the better bsddb library can be built (db_incs is defined)
+        # we do not build this one.  Otherwise this build will pick up
+        # the more recent berkeleydb's db.h file first in the include path
+        # when attempting to compile and it will fail.
         f = "/usr/include/db.h"
-        if os.path.exists(f):
+        if os.path.exists(f) and not db_incs:
             data = open(f).read()
             m = re.search(r"#s*define\s+HASHVERSION\s+2\s*", data)
             if m is not None:

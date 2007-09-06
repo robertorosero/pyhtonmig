@@ -1,10 +1,10 @@
 """Do a minimal test of all the modules that aren't otherwise tested."""
 
-from test.test_support import guard_warnings_filter
+from test.test_support import catch_warning
 import sys
 import warnings
 
-with guard_warnings_filter():
+with catch_warning():
     warnings.filterwarnings('ignore', r".*posixfile",
                             DeprecationWarning)
     warnings.filterwarnings('ignore', r".*mimify", DeprecationWarning)
@@ -89,7 +89,6 @@ with guard_warnings_filter():
     import opcode
     import os2emxpath
     import pdb
-    import pipes
     import posixfile
     import pstats
     import py_compile

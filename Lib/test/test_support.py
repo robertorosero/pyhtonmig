@@ -271,14 +271,6 @@ def open_urlresource(url):
     fn, _ = urllib.urlretrieve(url, filename)
     return open(fn)
 
-@contextlib.contextmanager
-def guard_warnings_filter():
-    """Guard the warnings filter from being permanently changed."""
-    original_filters = warnings.filters[:]
-    try:
-        yield
-    finally:
-        warnings.filters = original_filters
 
 class WarningMessage(object):
     "Holds the result of the latest showwarning() call"
@@ -302,7 +294,7 @@ def catch_warning():
 
     Use like this:
 
-        with catch_warning as w:
+        with catch_warning() as w:
             warnings.warn("foo")
             assert str(w.message) == "foo"
     """
@@ -380,6 +372,22 @@ def transient_internet():
     socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
     ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
     return contextlib.nested(time_out, socket_peer_reset, ioerror_peer_reset)
+
+
+@contextlib.contextmanager
+def captured_stdout():
+    """Run the with statement body using a StringIO object as sys.stdout.
+    Example use::
+
+       with captured_stdout() as s:
+           print "hello"
+       assert s.getvalue() == "hello"
+    """
+    import StringIO
+    orig_stdout = sys.stdout
+    sys.stdout = StringIO.StringIO()
+    yield sys.stdout
+    sys.stdout = orig_stdout
 
 
 #=======================================================================

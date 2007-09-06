@@ -406,7 +406,7 @@ file_dealloc(PyFileObject *f)
 	Py_XDECREF(f->f_mode);
 	Py_XDECREF(f->f_encoding);
 	drop_readahead(f);
-	f->ob_type->tp_free((PyObject *)f);
+	Py_Type(f)->tp_free((PyObject *)f);
 }
 
 static PyObject *
@@ -2079,8 +2079,7 @@ using the built-in open() function."
 );
 
 PyTypeObject PyFile_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"file",
 	sizeof(PyFileObject),
 	0,

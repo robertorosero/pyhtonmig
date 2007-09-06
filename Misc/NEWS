@@ -12,6 +12,18 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Patch #1031213: Decode source line in SyntaxErrors back to its original source
+  encoding.
+
+- Py_ssize_t fields work in structmember when HAVE_LONG_LONG is not defined.
+
+- PEP 3123: Provide forward compatibility with Python 3.0, while keeping
+  backwards compatibility. Add Py_Refcnt, Py_Type, Py_Size, and
+  PyVarObject_HEAD_INIT.
+
+- Patch #1673759: add a missing overflow check when formatting floats
+  with %G.
+
 - Patch #1733960: Allow T_LONGLONG to accept ints.
 
 - T_PYSSIZET can now be used in PyMemberDef lists for Py_ssize_t members.
@@ -231,6 +243,42 @@ Core and builtins
 Library
 -------
 
+- Bug #1709599: Run test_1565150 only if the file system is NTFS.
+
+- When encountering a password-protected robots.txt file the RobotFileParser
+  no longer prompts interactively for a username and password (bug 813986).
+
+- TarFile.__init__() no longer fails if no name argument is passed and
+  the fileobj argument has no usable name attribute (e.g. StringIO).
+
+- The functools module now provides 'reduce', for forward compatibility
+  with Python 3000.
+
+- Server-side SSL support and cert verification added, by Bill Janssen.
+
+- socket.ssl deprecated; use new ssl module instead.
+
+- uuid creation is now threadsafe.
+
+- EUC-KR codec now handles the cheot-ga-keut composed make-up hangul
+  syllables.
+
+- GB18030 codec now can encode additional two-byte characters that
+  are missing in GBK.
+
+- Add new codecs for UTF-32, UTF-32-LE and UTF-32-BE.
+
+- Bug #1704793: Return UTF-16 pair if unicodedata.lookup cannot
+  represent the result in a single character.
+
+- Bug #978833: Close https sockets by releasing the _ssl object.
+
+- Change location of the package index to pypi.python.org/pypi
+
+- Bug #1701409: Fix a segfault in printing ctypes.c_char_p and
+  ctypes.c_wchar_p when they point to an invalid location.  As a
+  sideeffect the representation of these instances has changed.
+
 - tarfile.py: Added "exclude" keyword argument to TarFile.add().
 
 - Bug #1734723: Fix repr.Repr() so it doesn't ignore the maxtuple attribute.
@@ -416,6 +464,10 @@ Library
 - Patch #957003: Implement smtplib.LMTP.
 
 - Patch #1481079: add support for HTTP_REFERER to CGIHTTPServer.
+
+- Patch #1675424: Added tests for uncovered code in the zipfile module. 
+  The KeyError raised by Zipfile.getinfo for nonexistent names now has 
+  a descriptive message.
 
 - Bug #1115886: os.path.splitext('.cshrc') gives now ('.cshrc', '').
 
@@ -697,6 +749,12 @@ Library
 Extension Modules
 -----------------
 
+- Patch #1388440: Add set_completion_display_matches_hook and
+  get_completion_type to readline.
+
+- Bug #1649098: Avoid declaration of zero-sized array declaration in
+  structure.
+
 - Removed the rgbimg module; been deprecated since Python 2.5.
 
 - Bug #1721309: prevent bsddb module from freeing random memory.
@@ -752,10 +810,6 @@ Extension Modules
 
 - Patch #1576166: Support os.utime for directories on Windows NT+.
 
-- Bug #1548891: The cStringIO.StringIO() constructor now encodes unicode
-  arguments with the system default encoding just like the write()
-  method does, instead of converting it to a raw buffer.
-
 - Patch #1572724: fix typo ('=' instead of '==') in _msi.c.
 
 - Bug #1572832: fix a bug in ISO-2022 codecs which may cause segfault
@@ -790,16 +844,23 @@ Extension Modules
 - fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
   were transposed.
 
-- Added support for linking the bsddb module against BerkeleyDB 4.5.x.
+- Added support for linking the bsddb module against BerkeleyDB 4.5.x
+  and 4.6.x.
 
 - Bug #1633621: if curses.resizeterm() or curses.resize_term() is called,
   update _curses.LINES, _curses.COLS, curses.LINES and curses.COLS.
 
 - Fix an off-by-one bug in locale.strxfrm().
 
+- Fix libffi configure for hppa*-*-linux* | parisc*-*-linux*.
+
 
 Tests
 -----
+
+- Make test_runpy reentrant by fixing _check_module to clear out any module
+  being tested.  Was causing an error by __import__ doing a reload on the
+  second run and thus suppressing bytecode recreation.
 
 - Capture socket connection resets and timeouts in test_socket_ssl and
   test_urllib2net and raise test.test_support.ResourceDenied.
@@ -816,10 +877,6 @@ Tests
   context manager so that one can temporarily set or unset environment
   variables.
 
-- Added guard_warnings_filter to test.test_support.  It returns a context
-  manager that protects the 'warnings' module's filter from being mutated
-  once the context has been exited.
-
 - Added some tests for modulefinder.
 
 - Converted test_imp to use unittest.
@@ -834,6 +891,9 @@ Tests
 Tools
 -----
 
+- Tools/18n/pygettext.py was added to the list of scripts installed by
+  Tools/scripts/setup.py (tracker item 642309).
+
 - Added IronPython and Jython support to pybench (part of which
   was patch #1563844)
 
@@ -844,9 +904,11 @@ Tools
   platform.python_implementation(); this will now be saved
   in the benchmark pickle
 
-
 Documentation
 -------------
+
+- Bug #1637365: add subsection about "__name__ == __main__" to the
+  Python tutorial.
 
 - Patch #1698768: updated the "using Python on the Mac" intro.
 
@@ -898,6 +960,15 @@ Tools/Demos
 Build
 -----
 
+- Patch #786737: Allow building in a tree of symlinks pointing to
+  a readonly source.
+
+- Bug #1737210: Change Manufacturer of Windows installer to PSF.
+
+- Bug #1746880: Correctly install DLLs into system32 folder on Win64.
+
+- Define _BSD_SOURCE, to get access to POSIX extensions on OpenBSD 4.1+.
+
 - Stop supporting AtheOS and cause a build error in configure for the platform.
 
 - Bug #1655392: don't add -L/usr/lib/pythonX.Y/config to the LDFLAGS
@@ -928,6 +999,10 @@ Build
 
 - Fix the build of the library reference in info format.
 
+- Allow Emacs 22 for building the documentation in info format.
+
+- Makefile.pre.in(buildbottest): Run an optional script pybuildbot.identify
+  to include some information about the build environment.
 
 C API
 -----

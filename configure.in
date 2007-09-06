@@ -4,7 +4,7 @@ dnl Process this file with autoconf 2.0 or later to make a configure script.
 m4_define(PYTHON_VERSION, 2.6)
 
 AC_REVISION($Revision$)
-AC_PREREQ(2.59)
+AC_PREREQ(2.61)
 AC_INIT(python, PYTHON_VERSION, http://www.python.org/python-bugs)
 AC_CONFIG_SRCDIR([Include/object.h])
 AC_CONFIG_HEADER(pyconfig.h)
@@ -49,6 +49,10 @@ AC_DEFINE(_NETBSD_SOURCE, 1, [Define on NetBSD to activate all library features]
 # certain features on FreeBSD, so we need __BSD_VISIBLE to re-enable
 # them.
 AC_DEFINE(__BSD_VISIBLE, 1, [Define on FreeBSD to activate all library features])
+
+# OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
+# also defined. This can be overridden by defining _BSD_SOURCE
+AC_DEFINE(_BSD_SOURCE, 1, [Define on OpenBSD to activate all library features])
 
 # The later defininition of _XOPEN_SOURCE and _POSIX_C_SOURCE disables
 # u_int on Irix 5.3. Defining _BSD_TYPES brings it back.
@@ -1505,6 +1509,14 @@ then
 			cur_target=10.3
 		fi
 		CONFIGURE_MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET-${cur_target}}
+
+		# Make sure that MACOSX_DEPLOYMENT_TARGET is set in the 
+		# environment with a value that is the same as what we'll use
+		# in the Makefile to ensure that we'll get the same compiler
+		# environment during configure and build time.
+		MACOSX_DEPLOYMENT_TARGET="$CONFIGURE_MACOSX_DEPLOYMENT_TARGET"
+		export MACOSX_DEPLOYMENT_TARGET
+
 		EXPORT_MACOSX_DEPLOYMENT_TARGET=''
 		if test ${MACOSX_DEPLOYMENT_TARGET-${cur_target}} '>' 10.2
 		then
@@ -3125,6 +3137,11 @@ AC_CHECK_LIB(readline, rl_pre_input_hook,
 	AC_DEFINE(HAVE_RL_PRE_INPUT_HOOK, 1,
         [Define if you have readline 4.0]), , )
 
+# also in 4.0
+AC_CHECK_LIB(readline, rl_completion_display_matches_hook,
+	AC_DEFINE(HAVE_RL_COMPLETION_DISPLAY_MATCHES_HOOK, 1,
+        [Define if you have readline 4.0]), , )
+
 # check for readline 4.2
 AC_CHECK_LIB(readline, rl_completion_matches,
 	AC_DEFINE(HAVE_RL_COMPLETION_MATCHES, 1,
@@ -3477,4 +3494,16 @@ echo "creating Makefile"
 $SHELL $srcdir/Modules/makesetup -c $srcdir/Modules/config.c.in \
 			-s Modules Modules/Setup.config \
 			Modules/Setup.local Modules/Setup
+
+case $ac_sys_system in
+BeOS)
+        AC_MSG_WARN([
+
+  Support for BeOS is deprecated as of Python 2.6.
+  See PEP 11 for the gory details.
+  ])
+  ;;
+*) ;;
+esac
+
 mv config.c Modules
