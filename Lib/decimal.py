@@ -1368,81 +1368,78 @@ class Decimal(object):
         """
         Remainder nearest to 0-  abs(remainder-near) <= other/2
         """
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
-
-        if self._is_special or other._is_special:
-            ans = self._check_nans(other, context)
-            if ans:
-                return ans
-        if self and not other:
-            return context._raise_error(InvalidOperation, 'x % 0')
-
         if context is None:
             context = getcontext()
-        # If DivisionImpossible causes an error, do not leave Rounded/Inexact
-        # ignored in the calling function.
-        context = context._shallow_copy()
-        flags = context._ignore_flags(Rounded, Inexact)
-        # Keep DivisionImpossible flags
-        (side, r) = self.__divmod__(other, context=context)
 
-        if r._isnan():
-            context._regard_flags(*flags)
-            return r
+        other = _convert_other(other)
+        if other is NotImplemented:
+            raise TypeError("Unable to convert %s to Decimal" % other)
 
-        context = context._shallow_copy()
-        rounding = context._set_rounding_decision(NEVER_ROUND)
+        ans = self._check_nans(other, context)
+        if ans:
+            return ans
 
-        if other._sign:
-            comparison = other.__div__(Dec_n2, context=context)
-        else:
-            comparison = other.__div__(Dec_p2, context=context)
+        # self == +/-infinity -> InvalidOperation
+        if self._isinfinity():
+            return context._raise_error(InvalidOperation,
+                                        'remainder_near(infinity, x)')
 
-        context._set_rounding_decision(rounding)
-        context._regard_flags(*flags)
-
-        s1, s2 = r._sign, comparison._sign
-        r._sign, comparison._sign = 0, 0
-
-        if r < comparison:
-            r._sign, comparison._sign = s1, s2
-            # Get flags now
-            self.__divmod__(other, context=context)
-            return r._fix(context)
-        r._sign, comparison._sign = s1, s2
-
-        rounding = context._set_rounding_decision(NEVER_ROUND)
-
-        (side, r) = self.__divmod__(other, context=context)
-        context._set_rounding_decision(rounding)
-        if r._isnan():
-            return r
-
-        decrease = not side._iseven()
-        rounding = context._set_rounding_decision(NEVER_ROUND)
-        side = side.__abs__(context=context)
-        context._set_rounding_decision(rounding)
-
-        s1, s2 = r._sign, comparison._sign
-        r._sign, comparison._sign = 0, 0
-        if r > comparison or decrease and r == comparison:
-            r._sign, comparison._sign = s1, s2
-            context.prec += 1
-            numbsquant = len(side.__add__(Dec_p1, context=context)._int)
-            if numbsquant >= context.prec:
-                context.prec -= 1
-                return context._raise_error(DivisionImpossible)[1]
-            context.prec -= 1
-            if self._sign == other._sign:
-                r = r.__sub__(other, context=context)
+        # other == 0 -> either InvalidOperation or DivisionUndefined
+        if not other:
+            if self:
+                return context._raise_error(InvalidOperation,
+                                            'remainder_near(x, 0)')
             else:
-                r = r.__add__(other, context=context)
-        else:
-            r._sign, comparison._sign = s1, s2
+                return context._raise_error(DivisionUndefined,
+                                            'remainder_near(0, 0)')
 
-        return r._fix(context)
+        # other = +/-infinity -> remainder = self
+        if other._isinfinity():
+            ans = Decimal(self)
+            return ans._fix(context)
+
+        # self = 0 -> remainder = self, with ideal exponent
+        ideal_exponent = min(self._exp, other._exp)
+        if not self:
+            ans = Decimal((self._sign, (0,), ideal_exponent))
+            return ans._fix(context)
+
+        # catch most cases of large or small quotient
+        expdiff = self.adjusted() - other.adjusted()
+        if expdiff >= context.prec + 1:
+            # expdiff >= prec+1 => abs(self/other) > 10**prec
+            return context._raise_error(DivisionImpossible)[0]
+        if expdiff <= -2:
+            # expdiff <= -2 => abs(self/other) < 0.1
+            ans = self._rescale(ideal_exponent, context.rounding)
+            return ans._fix(context)
+
+        # adjust both arguments to have the same exponent, then divide
+        op1 = _WorkRep(self)
+        op2 = _WorkRep(other)
+        if op1.exp >= op2.exp:
+            op1.int *= 10**(op1.exp - op2.exp)
+        else:
+            op2.int *= 10**(op2.exp - op1.exp)
+        q, r = divmod(op1.int, op2.int)
+        # remainder is r*10**ideal_exponent; other is +/-op2.int *
+        # 10**ideal_exponent.   Apply correction to ensure that
+        # abs(remainder) <= abs(other)/2
+        if 2*r + (q&1) > op2.int:
+            r -= op2.int
+            q += 1
+
+        if q >= 10**context.prec:
+            return context._raise_error(DivisionImpossible)[0]
+
+        # result has same sign as self unless r is negative
+        sign = self._sign
+        if r < 0:
+            sign = 1-sign
+            r = -r
+
+        ans = Decimal((sign, map(int, str(r)), ideal_exponent))
+        return ans._fix(context)
 
     def __floordiv__(self, other, context=None):
         """self // other"""
