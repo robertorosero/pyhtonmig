@@ -690,7 +690,7 @@ class Decimal(object):
         1 if self != 0
         """
         if self._is_special:
-            return 1
+            return True
         return sum(self._int) != 0
 
     def __cmp__(self, other):
@@ -791,7 +791,7 @@ class Decimal(object):
         # Invariant:  eval(repr(d)) == d
         return 'Decimal("%s")' % str(self)
 
-    def __str__(self, eng = 0, context=None):
+    def __str__(self, eng=False, context=None):
         """Return string representation of the number in scientific notation.
 
         Captures all of the information in the underlying representation.
@@ -881,7 +881,7 @@ class Decimal(object):
 
         Same rules for when in exponential and when as a value as in __str__.
         """
-        return self.__str__(eng=1, context=context)
+        return self.__str__(eng=True, context=context)
 
     def __neg__(self, context=None):
         """Returns a copy with the sign switched.
@@ -2533,9 +2533,9 @@ class Decimal(object):
         return rest == (0,)*len(rest)
 
     def _iseven(self):
-        """Returns 1 if self is even.  Assumes self is an integer."""
+        """Returns True if self is even.  Assumes self is an integer."""
         if not self or self._exp > 0:
-            return 1
+            return True
         return self._int[-1+self._exp] & 1 == 0
 
     def adjusted(self):
@@ -3012,18 +3012,18 @@ class Decimal(object):
         return Decimal(self.adjusted())
 
     def _islogical(self):
-        """Return 1 is self is a logical operand.
+        """Return True if self is a logical operand.
 
         For being logical, it must be a finite numbers with a sign of 0,
         an exponent of 0, and a coefficient whose digits must all be
         either 0 or 1.
         """
         if self._sign != 0 or self._exp != 0:
-            return 0
+            return False
         for dig in self._int:
             if dig not in (0, 1):
-                return 0
-        return 1
+                return False
+        return True
 
     def _fill_logical(self, context, opa, opb):
         dif = context.prec - len(opa)
