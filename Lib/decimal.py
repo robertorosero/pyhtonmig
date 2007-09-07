@@ -895,17 +895,15 @@ class Decimal(object):
 
         if not self:
             # -Decimal('0') is Decimal('0'), not Decimal('-0')
-            sign = 0
-        elif self._sign:
-            sign = 0
+            ans = self.copy_sign(Dec_0)
         else:
-            sign = 1
+            ans = self.copy_negate()
 
         if context is None:
             context = getcontext()
         if context._rounding_decision == ALWAYS_ROUND:
-            return Decimal((sign, self._int, self._exp))._fix(context)
-        return Decimal( (sign, self._int, self._exp))
+            return ans._fix(context)
+        return ans
 
     def __pos__(self, context=None):
         """Returns a copy, unless it is a sNaN.
@@ -917,19 +915,16 @@ class Decimal(object):
             if ans:
                 return ans
 
-        sign = self._sign
         if not self:
             # + (-0) = 0
-            sign = 0
+            ans = self.copy_sign(Dec_0)
+        else:
+            ans = Decimal(self)
 
         if context is None:
             context = getcontext()
-
         if context._rounding_decision == ALWAYS_ROUND:
-            ans = self._fix(context)
-        else:
-            ans = Decimal(self)
-        ans._sign = sign
+            return ans._fix(context)
         return ans
 
     def __abs__(self, round=1, context=None):
@@ -1051,7 +1046,7 @@ class Decimal(object):
     __radd__ = __add__
 
     def __sub__(self, other, context=None):
-        """Return self + (-other)"""
+        """Return self - other"""
         other = _convert_other(other)
         if other is NotImplemented:
             return other
@@ -1061,23 +1056,16 @@ class Decimal(object):
             if ans:
                 return ans
 
-        # -Decimal(0) = Decimal(0), which we don't want since
-        # (-0 - 0 = -0 + (-0) = -0, but -0 + 0 = 0.)
-        # so we change the sign directly to a copy
-        tmp = Decimal(other)
-        tmp._sign = 1-tmp._sign
-
-        return self.__add__(tmp, context=context)
+        # self - other is computed as self + other.copy_negate()
+        return self.__add__(other.copy_negate(), context=context)
 
     def __rsub__(self, other, context=None):
-        """Return other + (-self)"""
+        """Return other - self"""
         other = _convert_other(other)
         if other is NotImplemented:
             return other
 
-        tmp = Decimal(self)
-        tmp._sign = 1 - tmp._sign
-        return other.__add__(tmp, context=context)
+        return other.__sub__(self, context=context)
 
     def _increment(self):
         """Special case of add, adding 1eExponent
