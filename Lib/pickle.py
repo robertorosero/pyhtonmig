@@ -1299,12 +1299,19 @@ def decode_long(data):
         n -= 1 << (nbytes * 8)
     return n
 
+# Use the accelerator module if available.
+# XXX: Don't overload bindly, for testing the reference Python implementation
+try:
+    from _pickle import *
+except ImportError:
+    pass
+
 # Shorthands
 
-def dump(obj, file, protocol=None):
+def dump(obj, file, protocol=2):
     Pickler(file, protocol).dump(obj)
 
-def dumps(obj, protocol=None):
+def dumps(obj, protocol=2):
     f = io.BytesIO()
     Pickler(f, protocol).dump(obj)
     res = f.getvalue()
