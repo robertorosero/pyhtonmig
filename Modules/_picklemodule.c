@@ -388,13 +388,13 @@ pickle_ErrFormat(PyObject *ErrType, char *stringformat, char *format, ...)
     va_end(va);
     if (format && !args)
         return NULL;
-    if (stringformat && !(retval = PyString_FromString(stringformat)))
+    if (stringformat && !(retval = PyUnicode_FromString(stringformat)))
         return NULL;
 
     if (retval) {
         if (args) {
             PyObject *v;
-            v = PyString_Format(retval, args);
+            v = PyUnicode_Format(retval, args);
             Py_DECREF(retval);
             Py_DECREF(args);
             if (!v)
@@ -463,12 +463,13 @@ write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
 static Py_ssize_t
 read_other(UnpicklerObject *self, char **s, Py_ssize_t n)
 {
-    PyObject *bytes, *str = 0;
-
-    if (!(bytes = PyInt_FromSsize_t(n)))
+    PyObject *len, *str = NULL;
+    
+    len = PyInt_FromSsize_t(n);
+    if (len == NULL)
         return -1;
 
-    ARG_TUP(self, bytes);
+    ARG_TUP(self, len);
     if (self->arg) {
         str = PyObject_Call(self->read, self->arg, NULL);
         FREE_ARG_TUP(self);
@@ -479,8 +480,11 @@ read_other(UnpicklerObject *self, char **s, Py_ssize_t n)
     Py_XDECREF(self->last_string);
     self->last_string = str;
 
-    if (!(*s = PyBytes_AsString(str)))
+    *s = PyBytes_AsString(str);
+    /* PyBytes_AsString returns NULL if given a zero-length bytes string. */
+    if (*s == NULL && PyBytes_Size(str) != 0)
         return -1;
+
     return n;
 }
 
