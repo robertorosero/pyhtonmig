@@ -4492,11 +4492,7 @@ init_stuff(PyObject *module_dict)
 PyMODINIT_FUNC
 init_pickle(void)
 {
-    PyObject *m, *d, *v;
-    Py_ssize_t i;
-    char *rev = "$Revision: 57481 $";
-    PyObject *format_version;
-    PyObject *compatible_formats;
+    PyObject *m, *d;
 
     if (PyType_Ready(&Unpickler_Type) < 0)
         return;
@@ -4513,31 +4509,6 @@ init_pickle(void)
     PyModule_AddObject(m, "Pickler", (PyObject *)&Pickler_Type);
     PyModule_AddObject(m, "Unpickler", (PyObject *)&Unpickler_Type);
 
-    /* Add some symbolic constants to the module */
     d = PyModule_GetDict(m);
-    v = PyString_FromString(rev);
-    PyDict_SetItemString(d, "__version__", v);
-    Py_XDECREF(v);
-
-    if (init_stuff(d) < 0)
-        return;
-
-    i = PyModule_AddIntConstant(m, "HIGHEST_PROTOCOL", HIGHEST_PROTOCOL);
-    if (i < 0)
-        return;
-
-    /* These are purely informational; no code uses them. */
-    /* File format version we write. */
-    format_version = PyString_FromString("2.0");
-    /* Format versions we can read. */
-    compatible_formats = Py_BuildValue("[sssss]",
-                                       "1.0",   /* Original protocol 0 */
-                                       "1.1",   /* Protocol 0 + INST */
-                                       "1.2",   /* Original protocol 1 */
-                                       "1.3",   /* Protocol 1 + BINFLOAT */
-                                       "2.0");  /* Original protocol 2 */
-    PyDict_SetItemString(d, "format_version", format_version);
-    PyDict_SetItemString(d, "compatible_formats", compatible_formats);
-    Py_XDECREF(format_version);
-    Py_XDECREF(compatible_formats);
+    init_stuff(d);
 }
