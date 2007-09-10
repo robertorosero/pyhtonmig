@@ -114,7 +114,7 @@ static PyObject *extension_cache;
 static PyObject *two_tuple;
 
 #define INIT_STR(S)                                 \
-    if (!(S = PyString_InternFromString(#S))) \
+    if (!(S = PyUnicode_InternFromString(#S))) \
         return -1;
 
 /* Static reference to commonly used self's methods. */
@@ -416,7 +416,7 @@ pickle_ErrFormat(PyObject *ErrType, char *stringformat, char *format, ...)
 static int
 write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
 {
-    PyObject *py_str, *result = NULL;
+    PyObject *bytes, *result = NULL;
     int n;
 
     if (_n > INT_MAX)
@@ -425,8 +425,8 @@ write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
     if (s == NULL) {
         if (!(self->buf_size))
             return 0;
-        py_str = PyString_FromStringAndSize(self->write_buf, self->buf_size);
-        if (!py_str)
+        bytes = PyBytes_FromStringAndSize(self->write_buf, self->buf_size);
+        if (!bytes)
             return -1;
     }
     else {
@@ -436,7 +436,7 @@ write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
         }
 
         if (n > WRITE_BUF_SIZE) {
-            if (!(py_str = PyString_FromStringAndSize(s, n)))
+            if (!(bytes = PyBytes_FromStringAndSize(s, n)))
                 return -1;
         }
         else {
@@ -447,7 +447,7 @@ write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
     }
 
     /* object with write method */
-    ARG_TUP(self, py_str);
+    ARG_TUP(self, bytes);
     if (self->arg) {
         result = PyObject_Call(self->write, self->arg, NULL);
         FREE_ARG_TUP(self);
@@ -479,7 +479,7 @@ read_other(UnpicklerObject *self, char **s, Py_ssize_t n)
     Py_XDECREF(self->last_string);
     self->last_string = str;
 
-    if (!(*s = PyString_AsString(str)))
+    if (!(*s = PyBytes_AsString(str)))
         return -1;
     return n;
 }
@@ -494,13 +494,13 @@ readline_other(UnpicklerObject *self, char **s)
         return -1;
     }
 
-    if ((str_size = PyString_Size(str)) < 0)
+    if ((str_size = PyBytes_Size(str)) < 0)
         return -1;
 
     Py_XDECREF(self->last_string);
     self->last_string = str;
 
-    if (!(*s = PyString_AsString(str)))
+    if (!(*s = PyBytes_AsString(str)))
         return -1;
 
     return str_size;
@@ -513,9 +513,9 @@ readline_other(UnpicklerObject *self, char **s)
 static char *
 pystrndup(const char *s, int n)
 {
-    char *r = (char *) malloc(n + 1);
+    char *r = (char *)malloc(n + 1);
     if (r == NULL)
-        return (char *) PyErr_NoMemory();
+        return (char *)PyErr_NoMemory();
     memcpy(r, s, n);
     r[n] = 0;
     return r;
@@ -661,6 +661,8 @@ whichmodule(PyObject *global, PyObject *global_name)
     else
         return NULL;
 
+    /* XXX: This seems only necessary for older Python versions without
+       the __module__ attribute. */
     if (!(modules_dict = PySys_GetObject("modules")))
         return NULL;
 
@@ -864,8 +866,7 @@ save_long(PicklerObject *self, PyObject *args)
             goto finally;
         }
         nbits = _PyLong_NumBits(args);
-        /* XXX Shouldn't it be sizeof(size_t), instead? */
-        if (nbits == (size_t) - 1 && PyErr_Occurred())
+        if (nbits == (size_t)-1 && PyErr_Occurred())
             goto finally;
         /* How many bytes do we need?  There are nbits >> 3 full
          * bytes of data, and nbits & 7 leftover bits.  If there
@@ -883,14 +884,14 @@ save_long(PicklerObject *self, PyObject *args)
          */
         nbytes = (nbits >> 3) + 1;
         if (nbytes > INT_MAX) {
-            PyErr_SetString(PyExc_OverflowError, "long too large "
-                            "to pickle");
+            PyErr_SetString(PyExc_OverflowError,
+                            "long too large to pickle");
             goto finally;
         }
-        repr = PyString_FromStringAndSize(NULL, (int)nbytes);
+        repr = PyUnicode_FromStringAndSize(NULL, (int)nbytes);
         if (repr == NULL)
             goto finally;
-        pdata = (unsigned char *)PyString_AS_STRING(repr);
+        pdata = (unsigned char *)PyUnicode_AsString(repr);
         i = _PyLong_AsByteArray((PyLongObject *)args,
                                 pdata, nbytes,
                                 1 /* little endian */ , 1 /* signed */ );
@@ -934,14 +935,14 @@ save_long(PicklerObject *self, PyObject *args)
     if (!(repr = PyObject_Repr(args)))
         goto finally;
 
-    if ((size = PyString_Size(repr)) < 0)
+    if ((size = PyUnicode_GetSize(repr)) < 0)
         goto finally;
 
     if (self->write_func(self, &l, 1) < 0)
         goto finally;
 
     if (self->write_func(self,
-                         PyString_AS_STRING((PyStringObject *)repr),
+                         PyUnicode_AsString(repr),
                          size) < 0)
         goto finally;
 
@@ -1067,13 +1068,13 @@ modified_EncodeRawUnicodeEscape(const Py_UNICODE *s, int size)
 
     static const char *hexdigit = "0123456789ABCDEF";
 
-    repr = PyString_FromStringAndSize(NULL, 6 * size);
+    repr = PyBytes_FromStringAndSize(NULL, 6 * size);
     if (repr == NULL)
         return NULL;
     if (size == 0)
         return repr;
 
-    p = q = PyString_AS_STRING(repr);
+    p = q = PyBytes_AsString(repr);
     while (size-- > 0) {
         Py_UNICODE ch = *s++;
         /* Map 16-bit characters to '\uxxxx' */
@@ -1090,7 +1091,7 @@ modified_EncodeRawUnicodeEscape(const Py_UNICODE *s, int size)
             *p++ = (char)ch;
     }
     *p = '\0';
-    _PyString_Resize(&repr, p - q);
+    PyBytes_Resize(repr, p - q);
     return repr;
 }
 
@@ -1107,15 +1108,14 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
         char *repr_str;
         static char string = UNICODE;
 
-        repr =
-            modified_EncodeRawUnicodeEscape(PyUnicode_AS_UNICODE(args),
-                                            PyUnicode_GET_SIZE(args));
+        repr = modified_EncodeRawUnicodeEscape(PyUnicode_AS_UNICODE(args),
+                                               PyUnicode_GET_SIZE(args));
         if (!repr)
             return -1;
 
-        if ((len = PyString_Size(repr)) < 0)
+        if ((len = PyBytes_Size(repr)) < 0)
             goto error;
-        repr_str = PyString_AS_STRING((PyStringObject *)repr);
+        repr_str = PyBytes_AsString(repr);
 
         if (self->write_func(self, &string, 1) < 0)
             goto error;
@@ -1135,7 +1135,7 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
         if (!(repr = PyUnicode_AsUTF8String(args)))
             return -1;
 
-        if ((size = PyString_Size(repr)) < 0)
+        if ((size = PyBytes_Size(repr)) < 0)
             goto error;
         if (size > INT_MAX)
             return -1;          /* string too large */
@@ -1148,7 +1148,7 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
         if (self->write_func(self, c_str, len) < 0)
             goto error;
 
-        if (self->write_func(self, PyString_AS_STRING(repr), size) < 0)
+        if (self->write_func(self, PyBytes_AsString(repr), size) < 0)
             goto error;
 
         Py_DECREF(repr);
@@ -1597,7 +1597,7 @@ save_dict(PicklerObject *self, PyObject *args)
 static int
 save_global(PicklerObject *self, PyObject *args, PyObject *name)
 {
-    PyObject *global_name = 0, *module = 0, *mod = 0, *klass = 0;
+    PyObject *global_name = NULL, *module = NULL, *mod = NULL, *klass = NULL;
     char *name_str, *module_str;
     int module_size, name_size, res = -1;
 
@@ -1615,12 +1615,12 @@ save_global(PicklerObject *self, PyObject *args, PyObject *name)
     if (!(module = whichmodule(args, global_name)))
         goto finally;
 
-    if ((module_size = PyString_Size(module)) < 0 ||
-        (name_size = PyString_Size(global_name)) < 0)
+    if ((module_size = PyUnicode_GetSize(module)) < 0 ||
+        (name_size = PyUnicode_GetSize(global_name)) < 0)
         goto finally;
 
-    module_str = PyString_AS_STRING((PyStringObject *) module);
-    name_str = PyString_AS_STRING((PyStringObject *) global_name);
+    module_str = PyUnicode_AsString(module);
+    name_str = PyUnicode_AsString(global_name);
 
     /* XXX This can be doing a relative import.  Clearly it shouldn't,
      * but I don't know how to stop it. :-( */
@@ -1735,7 +1735,7 @@ save_global(PicklerObject *self, PyObject *args, PyObject *name)
 static int
 save_pers(PicklerObject *self, PyObject *args, PyObject *f)
 {
-    PyObject *pid = 0;
+    PyObject *pid = NULL;
     int size, res = -1;
 
     static char persid = PERSID, binpersid = BINPERSID;
@@ -1751,7 +1751,7 @@ save_pers(PicklerObject *self, PyObject *args, PyObject *f)
 
     if (pid != Py_None) {
         if (!self->bin) {
-            if (!PyString_Check(pid)) {
+            if (!PyUnicode_Check(pid)) {
                 PyErr_SetString(PicklingError, "persistent id must be string");
                 goto finally;
             }
@@ -1759,12 +1759,10 @@ save_pers(PicklerObject *self, PyObject *args, PyObject *f)
             if (self->write_func(self, &persid, 1) < 0)
                 goto finally;
 
-            if ((size = PyString_Size(pid)) < 0)
+            if ((size = PyUnicode_GetSize(pid)) < 0)
                 goto finally;
 
-            if (self->write_func(self,
-                                 PyString_AS_STRING((PyStringObject *) pid),
-                                 size) < 0)
+            if (self->write_func(self, PyUnicode_AsString(pid), size) < 0)
                 goto finally;
 
             if (self->write_func(self, "\n", 1) < 0)
@@ -1839,8 +1837,8 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *ob)
             use_newobj = 0;
         }
         else {
-            use_newobj = PyString_Check(temp) &&
-                strcmp(PyString_AS_STRING(temp), "__newobj__") == 0;
+            use_newobj = PyUnicode_Check(temp) &&
+                strcmp(PyUnicode_AsString(temp), "__newobj__") == 0;
             Py_DECREF(temp);
         }
     }
@@ -1852,7 +1850,7 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *ob)
         /* Sanity checks. */
         n = PyTuple_Size(argtup);
         if (n < 1) {
-            PyErr_SetString(PicklingError, "__newobj__ arglist " "is empty");
+            PyErr_SetString(PicklingError, "__newobj__ arglist is empty");
             return -1;
         }
 
@@ -1942,7 +1940,7 @@ static int
 save(PicklerObject *self, PyObject *obj, int pers_save)
 {
     PyTypeObject *type;
-    PyObject *py_ob_id = 0, *__reduce__ = 0, *t = 0;
+    PyObject *py_ob_id = NULL, *__reduce__ = NULL, *t = NULL;
     PyObject *arg_tup;
     PyObject *pers_func = NULL;
     int res = -1;
@@ -2056,7 +2054,7 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
      * copy_reg.dispatch_table, the object's __reduce_ex__ method,
      * or the object's __reduce__ method.
      */
-    __reduce__ = PyDict_GetItem(dispatch_table, (PyObject *) type);
+    __reduce__ = PyDict_GetItem(dispatch_table, (PyObject *)type);
     if (__reduce__ != NULL) {
         Py_INCREF(__reduce__);
         Py_INCREF(obj);
@@ -3055,14 +3053,14 @@ load_inst(UnpicklerObject *self)
         return -1;
     if (len < 2)
         return bad_readline();
-    module_name = PyString_FromStringAndSize(s, len - 1);
+    module_name = PyUnicode_FromStringAndSize(s, len - 1);
     if (!module_name)
         return -1;
 
     if ((len = self->readline_func(self, &s)) >= 0) {
         if (len < 2)
             return bad_readline();
-        if ((class_name = PyString_FromStringAndSize(s, len - 1))) {
+        if ((class_name = PyUnicode_FromStringAndSize(s, len - 1))) {
             class = find_class(module_name, class_name, self->find_class);
             Py_DECREF(class_name);
         }
@@ -3146,7 +3144,7 @@ load_global(UnpicklerObject *self)
         return -1;
     if (len < 2)
         return bad_readline();
-    module_name = PyString_FromStringAndSize(s, len - 1);
+    module_name = PyUnicode_FromStringAndSize(s, len - 1);
     if (!module_name)
         return -1;
 
@@ -3155,7 +3153,7 @@ load_global(UnpicklerObject *self)
             Py_DECREF(module_name);
             return bad_readline();
         }
-        if ((class_name = PyString_FromStringAndSize(s, len - 1))) {
+        if ((class_name = PyUnicode_FromStringAndSize(s, len - 1))) {
             class = find_class(module_name, class_name, self->find_class);
             Py_DECREF(class_name);
         }
@@ -3438,8 +3436,8 @@ load_extension(UnpicklerObject *self, int nbytes)
      * confirm that pair is really a 2-tuple of strings.
      */
     if (!PyTuple_Check(pair) || PyTuple_Size(pair) != 2 ||
-        !PyString_Check(module_name = PyTuple_GET_ITEM(pair, 0)) ||
-        !PyString_Check(class_name = PyTuple_GET_ITEM(pair, 1))) {
+        !PyUnicode_Check(module_name = PyTuple_GET_ITEM(pair, 0)) ||
+        !PyUnicode_Check(class_name = PyTuple_GET_ITEM(pair, 1))) {
         Py_DECREF(py_code);
         PyErr_Format(PyExc_ValueError, "_inverted_registry[%ld] "
                      "isn't a 2-tuple of strings", code);
@@ -3540,7 +3538,7 @@ load_long_binput(UnpicklerObject *self)
 static int
 do_append(UnpicklerObject *self, int x)
 {
-    PyObject *value = 0, *list = 0, *append_method = 0;
+    PyObject *value = NULL, *list = NULL, *append_method = NULL;
     static PyObject *append = NULL;
     int len, i;
 
@@ -3899,7 +3897,6 @@ load(UnpicklerObject *self)
                 break;
             continue;
 
-#ifdef Py_USING_UNICODE
         case UNICODE:
             if (load_unicode(self) < 0)
                 break;
@@ -3909,7 +3906,6 @@ load(UnpicklerObject *self)
             if (load_binunicode(self) < 0)
                 break;
             continue;
-#endif
 
         case EMPTY_TUPLE:
             if (load_counted_tuple(self, 0) < 0)
@@ -4106,7 +4102,7 @@ load(UnpicklerObject *self)
 
         default:
             pickle_ErrFormat(UnpicklingError,
-                              "invalid load key, '%s'.", "c", s[0]);
+                             "invalid load key, '%s'.", "c", s[0]);
             return NULL;
         }
 
