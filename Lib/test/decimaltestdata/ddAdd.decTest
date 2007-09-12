@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 -- This set of tests are for decDoubles only; all arguments are
 -- representable in a decDouble
@@ -1131,6 +1131,8 @@ ddadd81106 add  .2451    12345678901234.00    ->  12345678901234.25  Inexact Rou
 ddadd81107 add  .2360    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81108 add  .2370    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81109 add  .2399    12345678901234.00    ->  12345678901234.24  Inexact Rounded
+ddadd81120 add  9999999999999999E+369  9E+369  ->  Infinity Overflow  Inexact Rounded
+ddadd81121 add -9999999999999999E+369 -9E+369 -> -Infinity Overflow  Inexact Rounded
 
 rounding: half_up
 ddadd81200 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1143,6 +1145,8 @@ ddadd81206 add  .2451    12345678901234.00    ->  12345678901234.25  Inexact Rou
 ddadd81207 add  .2360    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81208 add  .2370    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81209 add  .2399    12345678901234.00    ->  12345678901234.24  Inexact Rounded
+ddadd81220 add  9999999999999999E+369  9E+369 ->  Infinity Overflow  Inexact Rounded
+ddadd81221 add -9999999999999999E+369 -9E+369 -> -Infinity Overflow  Inexact Rounded
 
 rounding: half_down
 ddadd81300 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1155,6 +1159,8 @@ ddadd81306 add  .2451    12345678901234.00    ->  12345678901234.25  Inexact Rou
 ddadd81307 add  .2360    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81308 add  .2370    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81309 add  .2399    12345678901234.00    ->  12345678901234.24  Inexact Rounded
+ddadd81320 add  9999999999999999E+369  9E+369 ->  Infinity Overflow  Inexact Rounded
+ddadd81321 add -9999999999999999E+369 -9E+369 -> -Infinity Overflow  Inexact Rounded
 
 rounding: up
 ddadd81400 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1168,6 +1174,8 @@ ddadd81407 add  .2360    12345678901234.00    ->  12345678901234.24  Inexact Rou
 ddadd81408 add  .2370    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81409 add  .2399    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81411 add -.2399   -12345678901234.00    -> -12345678901234.24  Inexact Rounded
+ddadd81420 add  9999999999999999E+369  9E+369 ->  Infinity Overflow  Inexact Rounded
+ddadd81421 add -9999999999999999E+369 -9E+369 -> -Infinity Overflow  Inexact Rounded
 
 rounding: down
 ddadd81500 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1181,6 +1189,8 @@ ddadd81507 add  .2360    12345678901234.00    ->  12345678901234.23  Inexact Rou
 ddadd81508 add  .2370    12345678901234.00    ->  12345678901234.23  Inexact Rounded
 ddadd81509 add  .2399    12345678901234.00    ->  12345678901234.23  Inexact Rounded
 ddadd81511 add -.2399   -12345678901234.00    -> -12345678901234.23  Inexact Rounded
+ddadd81520 add  9999999999999999E+369  9E+369 ->  9.999999999999999E+384 Overflow  Inexact Rounded
+ddadd81521 add -9999999999999999E+369 -9E+369 -> -9.999999999999999E+384 Overflow  Inexact Rounded
 
 rounding: ceiling
 ddadd81600 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1194,6 +1204,8 @@ ddadd81607 add  .2360    12345678901234.00    ->  12345678901234.24  Inexact Rou
 ddadd81608 add  .2370    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81609 add  .2399    12345678901234.00    ->  12345678901234.24  Inexact Rounded
 ddadd81611 add -.2399   -12345678901234.00    -> -12345678901234.23  Inexact Rounded
+ddadd81620 add  9999999999999999E+369  9E+369 ->  Infinity Overflow  Inexact Rounded
+ddadd81621 add -9999999999999999E+369 -9E+369 -> -9.999999999999999E+384 Overflow  Inexact Rounded
 
 rounding: floor
 ddadd81700 add  .2300    12345678901234.00    ->  12345678901234.23  Rounded
@@ -1207,6 +1219,8 @@ ddadd81707 add  .2360    12345678901234.00    ->  12345678901234.23  Inexact Rou
 ddadd81708 add  .2370    12345678901234.00    ->  12345678901234.23  Inexact Rounded
 ddadd81709 add  .2399    12345678901234.00    ->  12345678901234.23  Inexact Rounded
 ddadd81711 add -.2399   -12345678901234.00    -> -12345678901234.24  Inexact Rounded
+ddadd81720 add  9999999999999999E+369  9E+369 ->  9.999999999999999E+384 Overflow  Inexact Rounded
+ddadd81721 add -9999999999999999E+369 -9E+369 -> -Infinity Overflow  Inexact Rounded
 
 rounding: 05up
 ddadd81800 add  .2000    12345678901234.00    ->  12345678901234.20  Rounded
@@ -1218,6 +1232,8 @@ ddadd81807 add  .2060    12345678901234.00    ->  12345678901234.21  Inexact Rou
 ddadd81808 add  .2070    12345678901234.00    ->  12345678901234.21  Inexact Rounded
 ddadd81809 add  .2099    12345678901234.00    ->  12345678901234.21  Inexact Rounded
 ddadd81811 add -.2099   -12345678901234.00    -> -12345678901234.21  Inexact Rounded
+ddadd81820 add  9999999999999999E+369  9E+369 ->  9.999999999999999E+384 Overflow  Inexact Rounded
+ddadd81821 add -9999999999999999E+369 -9E+369 -> -9.999999999999999E+384 Overflow  Inexact Rounded
 
 ddadd81900 add  .2100    12345678901234.00    ->  12345678901234.21  Rounded
 ddadd81901 add  .2101    12345678901234.00    ->  12345678901234.21  Inexact Rounded

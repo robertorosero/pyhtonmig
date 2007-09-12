@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 extended:    1
 precision:   9
@@ -107,6 +107,8 @@ fmax0804 fma -Inf   Inf   Inf    ->  NaN Invalid_operation
 fmax0805 fma -Inf   Inf  -Inf    -> -Infinity
 fmax0806 fma -Inf  -Inf   Inf    ->  Infinity
 fmax0807 fma -Inf  -Inf  -Inf    ->  NaN Invalid_operation
+fmax0808 fma -Inf   0       1    ->  NaN Invalid_operation
+fmax0809 fma -Inf   0     NaN    ->  NaN Invalid_operation
 
 -- Triple NaN propagation
 fmax0900 fma  NaN2  NaN3  NaN5   ->  NaN2

@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 extended:    1
 clamp:       1
@@ -366,6 +366,18 @@ dqrmn443 remaindernear 100E-6175 20E-6176  ->   0E-6176
 dqrmn444 remaindernear 100E-6175 21E-6176  ->  -8E-6176 Subnormal
 dqrmn445 remaindernear 100E-6175 30E-6176  -> 1.0E-6175 Subnormal
 
+-- zero signs
+dqrmn650 remaindernear  1  1 ->  0
+dqrmn651 remaindernear -1  1 -> -0
+dqrmn652 remaindernear  1 -1 ->  0
+dqrmn653 remaindernear -1 -1 -> -0
+dqrmn654 remaindernear  0  1 ->  0
+dqrmn655 remaindernear -0  1 -> -0
+dqrmn656 remaindernear  0 -1 ->  0
+dqrmn657 remaindernear -0 -1 -> -0
+dqrmn658 remaindernear  0.00  1  ->  0.00
+dqrmn659 remaindernear -0.00  1  -> -0.00
+
 -- Specials
 dqrmn680 remaindernear  Inf  -Inf   ->  NaN Invalid_operation
 dqrmn681 remaindernear  Inf  -1000  ->  NaN Invalid_operation
@@ -596,6 +608,9 @@ dqrmn1055 remaindernear  1e-277  1e+311 ->  1E-277
 dqrmn1056 remaindernear  1e-277 -1e+311 ->  1E-277
 dqrmn1057 remaindernear -1e-277  1e+311 -> -1E-277
 dqrmn1058 remaindernear -1e-277 -1e+311 -> -1E-277
+
+-- Gyuris example
+dqrmn1070 remainder 8.336804418094040989630006819881709E-6143 8.336804418094040989630006819889000E-6143 -> 8.336804418094040989630006819881709E-6143
 
 -- Null tests
 dqrmn1000 remaindernear 10  # -> NaN Invalid_operation

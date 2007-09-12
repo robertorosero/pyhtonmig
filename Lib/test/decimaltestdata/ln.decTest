@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 extended:    1
 precision:   16
@@ -476,9 +476,10 @@ precision:   19
 lnx114  ln 0.9999999100000040500 -> -8.999999999999987850E-8              Inexact Rounded
 precision:   18
 lnx115  ln 0.999999910000004050 -> -8.99999999999998785E-8               Inexact Rounded
--- next is a > 0.5ulp case
+-- next may be a > 0.5ulp case; a more precise answer is:
+--                                -8.99999999999998784999918E-8
 precision:   17
-lnx116  ln 0.99999991000000405 -> -8.9999999999999879E-8               Inexact Rounded
+lnx116  ln 0.99999991000000405 -> -8.9999999999999878E-8               Inexact Rounded
 precision:   16
 lnx117  ln 0.9999999100000040 -> -9.000000004999988E-8               Inexact Rounded
 precision:   15
@@ -545,7 +546,9 @@ precision:   15
 maxExponent: 999
 minExponent: -999
 lnx731  ln 9.99999999999999E+999 -> 2302.58509299405       Inexact Rounded
-lnx732  ln 9.99999999999266E+999 -> 2302.58509299405       Inexact Rounded
+-- next may be a > 0.5ulp case; a more precise answer is:
+--                                  2302.58509299404495001799145442
+lnx732  ln 9.99999999999266E+999 -> 2302.58509299404       Inexact Rounded
 lnx733  ln 9.99999999999265E+999 -> 2302.58509299404       Inexact Rounded
 lnx734  ln 9.99999999999264E+999 -> 2302.58509299404       Inexact Rounded
 

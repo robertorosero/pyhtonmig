@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 precision:   16
 maxExponent: 384
@@ -365,6 +365,18 @@ ddrmn442 remaindernear 100E-397 11E-398  ->  -1E-398 Subnormal
 ddrmn443 remaindernear 100E-397 20E-398  ->   0E-398
 ddrmn444 remaindernear 100E-397 21E-398  ->  -8E-398 Subnormal
 ddrmn445 remaindernear 100E-397 30E-398  -> 1.0E-397 Subnormal
+
+-- zero signs
+ddrmn650 remaindernear  1  1 ->  0
+ddrmn651 remaindernear -1  1 -> -0
+ddrmn652 remaindernear  1 -1 ->  0
+ddrmn653 remaindernear -1 -1 -> -0
+ddrmn654 remaindernear  0  1 ->  0
+ddrmn655 remaindernear -0  1 -> -0
+ddrmn656 remaindernear  0 -1 ->  0
+ddrmn657 remaindernear -0 -1 -> -0
+ddrmn658 remaindernear  0.00  1  ->  0.00
+ddrmn659 remaindernear -0.00  1  -> -0.00
 
 -- Specials
 ddrmn680 remaindernear  Inf  -Inf   ->  NaN Invalid_operation

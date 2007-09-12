@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.55
+version: 2.56
 
 extended:    1
 clamp:       1
@@ -1561,6 +1561,9 @@ dqadd371603 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371611 fma  1  -11      11    ->  0
 dqadd371612 fma  1   11     -11    ->  0
+-- overflow
+dqadd371613 fma  9E6144 10   1     ->  Infinity Overflow Inexact Rounded
+dqadd371614 fma -9E6144 10   1     -> -Infinity Overflow Inexact Rounded
 
 rounding:    half_down
 -- exact zeros from zeros
@@ -1571,6 +1574,9 @@ dqadd371623 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371631 fma  1  -11      11    ->  0
 dqadd371632 fma  1   11     -11    ->  0
+-- overflow
+dqadd371633 fma  9E6144 10   1     ->  Infinity Overflow Inexact Rounded
+dqadd371634 fma -9E6144 10   1     -> -Infinity Overflow Inexact Rounded
 
 rounding:    half_even
 -- exact zeros from zeros
@@ -1581,6 +1587,9 @@ dqadd371643 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371651 fma  1  -11      11    ->  0
 dqadd371652 fma  1   11     -11    ->  0
+-- overflow
+dqadd371653 fma  9E6144 10   1     ->  Infinity Overflow Inexact Rounded
+dqadd371654 fma -9E6144 10   1     -> -Infinity Overflow Inexact Rounded
 
 rounding:    up
 -- exact zeros from zeros
@@ -1591,6 +1600,9 @@ dqadd371663 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371671 fma  1  -11      11    ->  0
 dqadd371672 fma  1   11     -11    ->  0
+-- overflow
+dqadd371673 fma  9E6144 10   1     ->  Infinity Overflow Inexact Rounded
+dqadd371674 fma -9E6144 10   1     -> -Infinity Overflow Inexact Rounded
 
 rounding:    down
 -- exact zeros from zeros
@@ -1601,6 +1613,9 @@ dqadd371683 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371691 fma  1  -11      11    ->  0
 dqadd371692 fma  1   11     -11    ->  0
+-- overflow
+dqadd371693 fma  9E6144 10   1     ->  9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
+dqadd371694 fma -9E6144 10   1     -> -9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
 
 rounding:    ceiling
 -- exact zeros from zeros
@@ -1611,6 +1626,9 @@ dqadd371703 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371711 fma  1  -11      11    ->  0
 dqadd371712 fma  1   11     -11    ->  0
+-- overflow
+dqadd371713 fma  9E6144 10   1     ->  Infinity Overflow Inexact Rounded
+dqadd371714 fma -9E6144 10   1     -> -9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
 
 -- and the extra-special ugly case; unusual minuses marked by -- *
 rounding:    floor
@@ -1622,16 +1640,32 @@ dqadd371723 fma  1  -0       -0E-19  -> -0E-19
 -- exact zeros from non-zeros
 dqadd371731 fma  1  -11      11    ->  -0                -- *
 dqadd371732 fma  1   11     -11    ->  -0                -- *
+-- overflow
+dqadd371733 fma  9E6144 10   1     ->  9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
+dqadd371734 fma -9E6144 10   1     -> -Infinity Overflow Inexact Rounded
+
+rounding:    05up
+-- exact zeros from zeros
+dqadd371740 fma  1   0        0E-19  ->  0E-19
+dqadd371741 fma  1  -0        0E-19  ->  0E-19
+dqadd371742 fma  1   0       -0E-19  ->  0E-19
+dqadd371743 fma  1  -0       -0E-19  -> -0E-19
+-- exact zeros from non-zeros
+dqadd371751 fma  1  -11      11    ->  0
+dqadd371752 fma  1   11     -11    ->  0
+-- overflow
+dqadd371753 fma  9E6144 10   1     ->  9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
+dqadd371754 fma -9E6144 10   1     -> -9.999999999999999999999999999999999E+6144 Overflow Inexact Rounded
 
 -- Examples from SQL proposal (Krishna Kulkarni)
-dqadd371741 fma  1  130E-2    120E-2    -> 2.50
-dqadd371742 fma  1  130E-2    12E-1     -> 2.50
-dqadd371743 fma  1  130E-2    1E0       -> 2.30
-dqadd371744 fma  1  1E2       1E4       -> 1.01E+4
-dqadd371745 fma  1  130E-2   -120E-2 -> 0.10
-dqadd371746 fma  1  130E-2   -12E-1  -> 0.10
-dqadd371747 fma  1  130E-2   -1E0    -> 0.30
-dqadd371748 fma  1  1E2      -1E4    -> -9.9E+3
+dqadd371761 fma  1  130E-2    120E-2    -> 2.50
+dqadd371762 fma  1  130E-2    12E-1     -> 2.50
+dqadd371763 fma  1  130E-2    1E0       -> 2.30
+dqadd371764 fma  1  1E2       1E4       -> 1.01E+4
+dqadd371765 fma  1  130E-2   -120E-2 -> 0.10
+dqadd371766 fma  1  130E-2   -12E-1  -> 0.10
+dqadd371767 fma  1  130E-2   -1E0    -> 0.30
+dqadd371768 fma  1  1E2      -1E4    -> -9.9E+3
 
 -- Gappy coefficients; check residue handling even with full coefficient gap
 rounding: half_even
