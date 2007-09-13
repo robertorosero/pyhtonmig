@@ -349,8 +349,7 @@ class Overflow(Inexact, Rounded):
 
     def handle(self, context, sign, *args):
         if context.rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN,
-                                ROUND_HALF_DOWN, ROUND_UP,
-                                ROUND_05UP):
+                                ROUND_HALF_DOWN, ROUND_UP):
             return Infsign[sign]
         if sign == 0:
             if context.rounding == ROUND_CEILING:
