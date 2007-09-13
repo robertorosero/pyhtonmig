@@ -147,6 +147,13 @@ extr1200 scaleb 1234 1 -> 1.23E+4 Inexact Rounded
 extr1201 scaleb 5678 0 -> 5.68E+3 Inexact Rounded
 extr1202 scaleb -9105 -1 -> -910 Inexact Rounded
 
+-- Invalid operation from 0 * infinity in fma
+-- takes precedence over a third-argument sNaN
+extr1300 fma 0 Inf sNaN123 -> NaN Invalid_operation
+extr1301 fma Inf 0 sNaN456 -> NaN Invalid_operation
+extr1302 fma 0E123 -Inf sNaN789 -> NaN Invalid_operation
+extr1302 fma -Inf 0E-456 sNaN148 -> NaN Invalid_operation
+
 ------------------------------------------------------------------------
 -- The following tests (pwmx0 through pwmx440) are for the            --
 -- three-argument version of power:                                   --

@@ -752,9 +752,7 @@ class Decimal(object):
         NaN => one is NaN
         Like __cmp__, but returns Decimal instances.
         """
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        other = _convert_other(other, raiseit=True)
 
         # Compare(NaN, NaN) = NaN
         if (self._is_special or other and other._is_special):
@@ -1359,9 +1357,7 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        other = _convert_other(other)
-        if other is NotImplemented:
-            raise TypeError("Unable to convert %s to Decimal" % other)
+        other = _convert_other(other, raiseit=True)
 
         ans = self._check_nans(other, context)
         if ans:
@@ -1638,42 +1634,25 @@ class Decimal(object):
         and a single final rounding is performed.
         """
 
+        other = _convert_other(other, raiseit=True)
+        third = _convert_other(third, raiseit=True)
+
         if context is None:
             context = getcontext()
 
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        # do self*other in fresh context with no traps and no rounding
+        mul_context = Context(traps=[], flags=[],
+                              _rounding_decision=NEVER_ROUND)
+        product = self.__mul__(other, mul_context)
 
-        third = _convert_other(third)
-        if third is NotImplemented:
-            return third
+        if mul_context.flags[InvalidOperation]:
+            # reraise in current context
+            return context._raise_error(InvalidOperation,
+                                        'invalid multiplication in fma',
+                                        1, product)
 
-        # deal correctly with NaNs:
-        self_is_nan = self._isnan()
-        other_is_nan = other._isnan()
-        third_is_nan = third._isnan()
-        if self_is_nan or other_is_nan or third_is_nan:
-            if self_is_nan == 2:
-                return context._raise_error(InvalidOperation, 'sNaN',
-                                        1, self)
-            if other_is_nan == 2:
-                return context._raise_error(InvalidOperation, 'sNaN',
-                                        1, other)
-            if third_is_nan == 2:
-                return context._raise_error(InvalidOperation, 'sNaN',
-                                        1, third)
-            if self_is_nan:
-                return self
-            if other_is_nan:
-                return other
-            return third
-
-        context = context._shallow_copy()
-        rounding_decision = context._set_rounding_decision(NEVER_ROUND)
-        product = self.__mul__(other, context)
-        context._set_rounding_decision(rounding_decision)
-        return product.__add__(third, context)
+        ans = product.__add__(third, context)
+        return ans
 
     def _power_modulo(self, other, modulo, context=None):
         """Three argument version of __pow__"""
@@ -1681,17 +1660,8 @@ class Decimal(object):
         # if can't convert other and modulo to Decimal, raise
         # TypeError; there's no point returning NotImplemented (no
         # equivalent of __rpow__ for three argument pow)
-        other = _convert_other(other)
-        if other is NotImplemented:
-            raise TypeError("The second argument to pow should be " +
-                            "an integer or an instance of Decimal.  Got " +
-                            str(other))
-
-        modulo = _convert_other(modulo)
-        if modulo is NotImplemented:
-            raise TypeError("The third argument to pow should be " +
-                            "an integer or an instance of Decimal.  Got " +
-                            str(modulo))
+        other = _convert_other(other, raiseit=True)
+        modulo = _convert_other(modulo, raiseit=True)
 
         if context is None:
             context = getcontext()
@@ -2447,9 +2417,7 @@ class Decimal(object):
         Like max(self, other) except if one is not a number, returns
         NaN (and signals if one is sNaN).  Also rounds.
         """
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        other = _convert_other(other, raiseit=True)
 
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
@@ -2492,9 +2460,7 @@ class Decimal(object):
         Like min(self, other) except if one is not a number, returns
         NaN (and signals if one is sNaN).  Also rounds.
         """
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        other = _convert_other(other, raiseit=True)
 
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
@@ -3112,9 +3078,7 @@ class Decimal(object):
 
     def max_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        other = _convert_other(other, raiseit=True)
 
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
@@ -3145,9 +3109,7 @@ class Decimal(object):
 
     def min_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
-        other = _convert_other(other)
-        if other is NotImplemented:
-            return other
+        other = _convert_other(other, raiseit=True)
 
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
@@ -3229,11 +3191,7 @@ class Decimal(object):
         numerically equal, then the result is a copy of self with the
         sign set to be the same as the sign of other.
         """
-        other = _convert_other(other)
-        if other is NotImplemented:
-            raise TypeError("The second argument to next_toward should be " +
-                            "an integer or an instance of Decimal.  Got " +
-                            str(other))
+        other = _convert_other(other, raiseit=True)
 
         if context is None:
             context = getcontext()
@@ -5154,7 +5112,7 @@ def _log10_lb(c, correction = {
 
 ##### Helper Functions ####################################################
 
-def _convert_other(other):
+def _convert_other(other, raiseit=False):
     """Convert other to Decimal.
 
     Verifies that it's ok to use in an implicit construction.
@@ -5163,6 +5121,8 @@ def _convert_other(other):
         return other
     if isinstance(other, (int, long)):
         return Decimal(other)
+    if raiseit:
+        raise TypeError("Unable to convert %s to Decimal" % other)
     return NotImplemented
 
 _infinity_map = {
