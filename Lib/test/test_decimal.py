@@ -65,12 +65,7 @@ skip_expected = not os.path.isdir(directory)
 # Slower, since it runs some things several times.
 EXTENDEDERRORTEST = False
 
-# These are the decimal functions where is allowed to have an error of
-# 1 in the last position
-F1ULP = ('exp', 'ln', 'log10', 'power')
-
 #Map the test cases' error names to the actual errors
-
 ErrorNames = {'clamped' : Clamped,
               'conversion_syntax' : InvalidOperation,
               'division_by_zero' : DivisionByZero,
@@ -340,23 +335,7 @@ class DecimalTest(unittest.TestCase):
         myexceptions.sort()
         theirexceptions.sort()
 
-        if result != ans and fname in F1ULP and Inexact in theirexceptions:
-            # For transcendental functions we're allowed an error of
-            # up to 1ulp in an inexact result, so either ans+1ulp or
-            # ans-1ulp (but never both) may also be an acceptable
-            # result.  Unfortunately there's no way of telling which
-            # one of these two numbers is the one that's within 1ulp,
-            # so we have to compare with both.
-            # We need specifically to support this, as in the Cowlishaw's
-            # files are tests that try not for the exact result, but
-            # with the error considered.
-            ans_as_decimal = Decimal(ans)
-            ans_plus_1ulp = str(ans_as_decimal.next_plus(self.context))
-            ans_minus_1ulp = str(ans_as_decimal.next_minus(self.context))
-            self.assert_(result in (ans_plus_1ulp, ans_minus_1ulp),
-                         'Incorrect answer for ' + s + ' -- got ' + result)
-        else:
-            self.assertEqual(result, ans,
+        self.assertEqual(result, ans,
                          'Incorrect answer for ' + s + ' -- got ' + result)
         self.assertEqual(myexceptions, theirexceptions,
               'Incorrect flags set in ' + s + ' -- got ' + str(myexceptions))
