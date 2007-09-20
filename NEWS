@@ -1,0 +1,2 @@
+* Have Modules/getpath.c use _importlib.py instead of os.py when searching for
+  Python's stdlib directory.

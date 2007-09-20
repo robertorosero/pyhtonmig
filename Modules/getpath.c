@@ -51,7 +51,7 @@
  * Modules/Setup.  If the landmark is found, we're done.
  *
  * For the remaining steps, the prefix landmark will always be
- * lib/python$VERSION/os.py and the exec_prefix will always be
+ * lib/python$VERSION/_importlib.py and the exec_prefix will always be
  * lib/python$VERSION/lib-dynload, where $VERSION is Python's version
  * number as supplied by the Makefile.  Note that this means that no more
  * build directory checking is performed; if the first step did not find
@@ -122,7 +122,7 @@
 #endif
 
 #ifndef LANDMARK
-#define LANDMARK "os.py"
+#define LANDMARK "_importlib.py"
 #endif
 
 static char prefix[MAXPATHLEN+1];
