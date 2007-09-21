@@ -106,6 +106,7 @@ PyAPI_FUNC(int) Py_Main(int argc, char **argv);
 PyAPI_FUNC(char *) Py_GetProgramFullPath(void);
 PyAPI_FUNC(char *) Py_GetPrefix(void);
 PyAPI_FUNC(char *) Py_GetExecPrefix(void);
+PyAPI_FUNC(char *) Py_GetImportlibPath(void);
 PyAPI_FUNC(char *) Py_GetPath(void);
 
 /* In their own files */

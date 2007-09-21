@@ -1,2 +1,4 @@
+* Add Py_GetImportlibPath() as a way to get the path to _importlib.
+
 * Have Modules/getpath.c use _importlib.py instead of os.py when searching for
   Python's stdlib directory.

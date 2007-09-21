@@ -127,6 +127,7 @@
 
 static char prefix[MAXPATHLEN+1];
 static char exec_prefix[MAXPATHLEN+1];
+static char importlib_path[MAXPATHLEN+1];
 static char progpath[MAXPATHLEN+1];
 static char *module_search_path = NULL;
 static char lib_python[] = "lib/python" VERSION;
@@ -269,6 +270,10 @@ search_for_prefix(char *argv0_path, char *home)
             *delim = '\0';
         joinpath(prefix, lib_python);
         joinpath(prefix, LANDMARK);
+	if (ismodule(prefix))
+		strcpy(importlib_path, prefix);
+	else
+		importlib_path[0] = '\0';
         return 1;
     }
 
@@ -282,8 +287,10 @@ search_for_prefix(char *argv0_path, char *home)
         joinpath(prefix, vpath);
         joinpath(prefix, "Lib");
         joinpath(prefix, LANDMARK);
-        if (ismodule(prefix))
+        if (ismodule(prefix)) {	
+            strcpy(importlib_path, prefix);
             return -1;
+        }
     }
 
     /* Search from argv0_path, until root is found */
@@ -292,8 +299,10 @@ search_for_prefix(char *argv0_path, char *home)
         n = strlen(prefix);
         joinpath(prefix, lib_python);
         joinpath(prefix, LANDMARK);
-        if (ismodule(prefix))
+        if (ismodule(prefix)) {
+            strcpy(importlib_path, prefix);
             return 1;
+        }
         prefix[n] = '\0';
         reduce(prefix);
     } while (prefix[0]);
@@ -302,10 +311,13 @@ search_for_prefix(char *argv0_path, char *home)
     strncpy(prefix, PREFIX, MAXPATHLEN);
     joinpath(prefix, lib_python);
     joinpath(prefix, LANDMARK);
-    if (ismodule(prefix))
+    if (ismodule(prefix)) {
+        strcpy(importlib_path, prefix);
         return 1;
+    }
 
     /* Fail */
+    importlib_path[0] = '\0';
     return 0;
 }
 
@@ -677,6 +689,14 @@ Py_GetExecPrefix(void)
     if (!module_search_path)
         calculate_path();
     return exec_prefix;
+}
+
+char *
+Py_GetImportlibPath(void)
+{
+    if (!module_search_path)
+        calculate_path();
+    return importlib_path;
 }
 
 char *
