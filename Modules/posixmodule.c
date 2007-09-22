@@ -7239,25 +7239,12 @@ all_ins(PyObject *d)
 }
 
 
-#if (defined(_MSC_VER) || defined(__WATCOMC__) || defined(__BORLANDC__)) && !defined(__QNX__)
-#define INITFUNC initnt
-#define MODNAME "nt"
-
-#elif defined(PYOS_OS2)
-#define INITFUNC initos2
-#define MODNAME "os2"
-
-#else
-#define INITFUNC initposix
-#define MODNAME "posix"
-#endif
-
 PyMODINIT_FUNC
-INITFUNC(void)
+PyOS_INITFUNC(void)
 {
 	PyObject *m, *v;
 
-	m = Py_InitModule3(MODNAME,
+	m = Py_InitModule3(PyOS_MODNAME,
 			   posix_methods,
 			   posix__doc__);
 	if (m == NULL)
@@ -7285,7 +7272,7 @@ INITFUNC(void)
 #endif
 
 	if (!initialized) {
-		stat_result_desc.name = MODNAME ".stat_result";
+		stat_result_desc.name = PyOS_MODNAME ".stat_result";
 		stat_result_desc.fields[7].name = PyStructSequence_UnnamedField;
 		stat_result_desc.fields[8].name = PyStructSequence_UnnamedField;
 		stat_result_desc.fields[9].name = PyStructSequence_UnnamedField;
@@ -7293,7 +7280,7 @@ INITFUNC(void)
 		structseq_new = StatResultType.tp_new;
 		StatResultType.tp_new = statresult_new;
 
-		statvfs_result_desc.name = MODNAME ".statvfs_result";
+		statvfs_result_desc.name = PyOS_MODNAME ".statvfs_result";
 		PyStructSequence_InitType(&StatVFSResultType, &statvfs_result_desc);
 	}
 	Py_INCREF((PyObject*) &StatResultType);

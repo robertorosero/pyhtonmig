@@ -152,6 +152,21 @@ PyAPI_DATA(int) (*PyOS_InputHook)(void);
 PyAPI_DATA(char) *(*PyOS_ReadlineFunctionPointer)(FILE *, FILE *, char *);
 PyAPI_DATA(PyThreadState*) _PyOS_ReadlineTState;
 
+/* Name and init function for the platform-dependent os module */
+#if (defined(_MSC_VER) || defined(__WATCOMC__) || defined(__BORLANDC__)) && !defined(__QNX__)
+#define PyOS_INITFUNC initnt
+#define PyOS_MODNAME "nt"
+
+#elif defined(PYOS_OS2)
+#define PyOS_INITFUNC initos2
+#define PyOS_MODNAME "os2"
+
+#else
+#define PyOS_INITFUNC initposix
+#define PyOS_MODNAME "posix"
+#endif
+
+
 /* Stack size, in "pointers" (so we get extra safety margins
    on 64-bit platforms).  On a 32-bit platform, this translates
    to a 8k margin. */

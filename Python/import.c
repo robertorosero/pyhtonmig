@@ -107,6 +107,8 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 /* Forward declarations */
 static PyTypeObject NullImporterType;
 static PyCodeObject * parse_source_module(const char *, FILE *);
+static int init_builtin(char *);
+
 
 /* Initialize things */
 
@@ -528,11 +530,22 @@ _PyImport_Importlib(void)
     const char *importlib_path = Py_GetImportlibPath();
     FILE *fp = NULL;
     PyCodeObject *code_object = NULL;
-    PyObject *module = NULL;
+    PyObject *importlib = NULL;
+    PyObject *modules= NULL;
+    PyObject *builtin_module = NULL;
 
 
     if (importlib_path[0] == '\0')
         Py_FatalError("_importlib.py not found");
+
+    if (!init_builtin("sys"))
+	    Py_FatalError("initializiation of sys failed");
+    if (!init_builtin("imp"))
+	    Py_FatalError("initialization of imp failed");
+    if (!init_builtin("marshal"))
+	    Py_FatalError("initialization of marshal failed");
+    if (!init_builtin(PyOS_MODNAME))
+	    Py_FatalError("initializatino of _os failed");
 
     fp = fopen(importlib_path, "r");
     code_object = parse_source_module(importlib_path, fp);
@@ -541,12 +554,43 @@ _PyImport_Importlib(void)
     if (!code_object)
 	    Py_FatalError("unable to parse _importlib");
 
-    module = PyImport_ExecCodeModuleEx("_importlib", (PyObject *)code_object,
+    importlib = PyImport_ExecCodeModuleEx("_importlib", (PyObject *)code_object,
 					    (char *)importlib_path);
-    if (!module)
+    if (!importlib)
 	    Py_FatalError("could not initialize _importlib");
 
-    Py_DECREF(module);
+    modules = PyImport_GetModuleDict();
+
+    builtin_module = PyDict_GetItemString(modules, "sys");
+    if (!builtin_module)
+	    Py_FatalError("sys module lost");
+    Py_INCREF(builtin_module);
+    if (PyModule_AddObject(importlib, "sys", builtin_module) < 0)
+	    Py_FatalError("could not add sys to _importlib");
+
+    builtin_module = PyDict_GetItemString(modules, "imp");
+    if (!builtin_module)
+	    Py_FatalError("imp module lost");
+    Py_INCREF(builtin_module);
+    if (PyModule_AddObject(importlib, "imp", builtin_module) < 0)
+	    Py_FatalError("could not add imp to _importlib");
+
+    builtin_module = PyDict_GetItemString(modules, "marshal");
+    if (!builtin_module)
+	    Py_FatalError("mashal module lost");
+    Py_INCREF(builtin_module);
+    if (PyModule_AddObject(importlib, "marshal", builtin_module) < 0)
+	    Py_FatalError("could not add marshal to _importlib");
+
+    builtin_module = PyDict_GetItemString(modules, PyOS_MODNAME);
+    if (!builtin_module)
+	    Py_FatalError("_os module lost");
+    Py_INCREF(builtin_module);
+    if (PyModule_AddObject(importlib, "_os", builtin_module) < 0)
+	    Py_FatalError("could not add _os to _importlib");
+
+
+    Py_DECREF(importlib);
 }
 
 
@@ -1653,7 +1697,6 @@ find_init_module(char *buf)
 #endif /* HAVE_STAT */
 
 
-static int init_builtin(char *); /* Forward */
 
 /* Load an external module using the default search path and return
    its module object WITH INCREMENTED REFERENCE COUNT */
