@@ -237,6 +237,8 @@ Py_InitializeEx(int install_sigs)
 
 	_PyImportHooks_Init();
 
+	_PyImport_Importlib();
+
 	if (install_sigs)
 		initsigs(); /* Signal handling stuff, including initintr() */
 

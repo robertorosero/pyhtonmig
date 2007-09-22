@@ -104,7 +104,9 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 	{0, 0}
 };
 
-static PyTypeObject NullImporterType;	/* Forward reference */
+/* Forward declarations */
+static PyTypeObject NullImporterType;
+static PyCodeObject * parse_source_module(const char *, FILE *);
 
 /* Initialize things */
 
@@ -152,6 +154,7 @@ _PyImport_Init(void)
 		   code created in normal operation mode. */
 		pyc_magic = MAGIC + 1;
 	}
+
 }
 
 void
@@ -516,6 +519,34 @@ long
 PyImport_GetMagicNumber(void)
 {
 	return pyc_magic;
+}
+
+
+void
+_PyImport_Importlib(void)
+{
+    const char *importlib_path = Py_GetImportlibPath();
+    FILE *fp = NULL;
+    PyCodeObject *code_object = NULL;
+    PyObject *module = NULL;
+
+
+    if (importlib_path[0] == '\0')
+        Py_FatalError("_importlib.py not found");
+
+    fp = fopen(importlib_path, "r");
+    code_object = parse_source_module(importlib_path, fp);
+    fclose(fp);
+
+    if (!code_object)
+	    Py_FatalError("unable to parse _importlib");
+
+    module = PyImport_ExecCodeModuleEx("_importlib", (PyObject *)code_object,
+					    (char *)importlib_path);
+    if (!module)
+	    Py_FatalError("could not initialize _importlib");
+
+    Py_DECREF(module);
 }
 
 
