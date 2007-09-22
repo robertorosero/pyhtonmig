@@ -270,7 +270,7 @@ search_for_prefix(char *argv0_path, char *home)
             *delim = '\0';
         joinpath(prefix, lib_python);
         joinpath(prefix, LANDMARK);
-	if (ismodule(prefix))
+	if (isfile(prefix))
 		strcpy(importlib_path, prefix);
 	else
 		importlib_path[0] = '\0';
@@ -287,7 +287,7 @@ search_for_prefix(char *argv0_path, char *home)
         joinpath(prefix, vpath);
         joinpath(prefix, "Lib");
         joinpath(prefix, LANDMARK);
-        if (ismodule(prefix)) {	
+        if (isfile(prefix)) {	
             strcpy(importlib_path, prefix);
             return -1;
         }
@@ -299,7 +299,7 @@ search_for_prefix(char *argv0_path, char *home)
         n = strlen(prefix);
         joinpath(prefix, lib_python);
         joinpath(prefix, LANDMARK);
-        if (ismodule(prefix)) {
+        if (isfile(prefix)) {
             strcpy(importlib_path, prefix);
             return 1;
         }
@@ -311,7 +311,7 @@ search_for_prefix(char *argv0_path, char *home)
     strncpy(prefix, PREFIX, MAXPATHLEN);
     joinpath(prefix, lib_python);
     joinpath(prefix, LANDMARK);
-    if (ismodule(prefix)) {
+    if (isfile(prefix)) {
         strcpy(importlib_path, prefix);
         return 1;
     }
