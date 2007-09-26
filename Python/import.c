@@ -531,63 +531,57 @@ _PyImport_Importlib(void)
     FILE *fp = NULL;
     PyCodeObject *code_object = NULL;
     PyObject *importlib = NULL;
-    PyObject *modules= NULL;
-    PyObject *builtin_module = NULL;
+    const char *builtin_modules[] = {"sys", "imp", "marshal", "errno",
+				     PyOS_MODNAME, NULL};
+    unsigned int x;
+    PyObject *modules_dict = NULL;
+    PyObject *attr = NULL;
 
 
+    /* _importlib must have been found. */
     if (importlib_path[0] == '\0')
         Py_FatalError("_importlib.py not found");
 
-    if (!init_builtin("sys"))
-	    Py_FatalError("initializiation of sys failed");
-    if (!init_builtin("imp"))
-	    Py_FatalError("initialization of imp failed");
-    if (!init_builtin("marshal"))
-	    Py_FatalError("initialization of marshal failed");
-    if (!init_builtin(PyOS_MODNAME))
-	    Py_FatalError("initializatino of _os failed");
-
+    /* Parse the module. */
     fp = fopen(importlib_path, "r");
     code_object = parse_source_module(importlib_path, fp);
     fclose(fp);
-
     if (!code_object)
 	    Py_FatalError("unable to parse _importlib");
 
+    /* Create the module object. */
     importlib = PyImport_ExecCodeModuleEx("_importlib", (PyObject *)code_object,
 					    (char *)importlib_path);
     if (!importlib)
 	    Py_FatalError("could not initialize _importlib");
 
-    modules = PyImport_GetModuleDict();
+    /* Get sys.modules so as to extract needed built-in modules. */
+    modules_dict = PyImport_GetModuleDict();
+    for (x = 0; builtin_modules[x] != NULL; x += 1) {
+	    PyObject *module;
+	    const char *name = builtin_modules[x];
 
-    builtin_module = PyDict_GetItemString(modules, "sys");
-    if (!builtin_module)
-	    Py_FatalError("sys module lost");
-    Py_INCREF(builtin_module);
-    if (PyModule_AddObject(importlib, "sys", builtin_module) < 0)
-	    Py_FatalError("could not add sys to _importlib");
+	    /* Initialize the built-in module. */
+	    if (!init_builtin((char *)name))
+		    Py_FatalError("initialization of a built-in module failed");
+	    /* Get the module from sys.modules. */
+	    module = PyDict_GetItemString(modules_dict, name);
+	    if (!module)
+		    Py_FatalError("built-in module lost");
+	    /* Add the module to _importlib's globals. */
+	    Py_INCREF(module);
+	    if (PyModule_AddObject(importlib,
+				    (strcmp(name, PyOS_MODNAME) ? name : "_os"),
+				    module))
+		    Py_FatalError("could not add built-in module to _importlib");
+    }
 
-    builtin_module = PyDict_GetItemString(modules, "imp");
-    if (!builtin_module)
-	    Py_FatalError("imp module lost");
-    Py_INCREF(builtin_module);
-    if (PyModule_AddObject(importlib, "imp", builtin_module) < 0)
-	    Py_FatalError("could not add imp to _importlib");
-
-    builtin_module = PyDict_GetItemString(modules, "marshal");
-    if (!builtin_module)
-	    Py_FatalError("mashal module lost");
-    Py_INCREF(builtin_module);
-    if (PyModule_AddObject(importlib, "marshal", builtin_module) < 0)
-	    Py_FatalError("could not add marshal to _importlib");
-
-    builtin_module = PyDict_GetItemString(modules, PyOS_MODNAME);
-    if (!builtin_module)
-	    Py_FatalError("_os module lost");
-    Py_INCREF(builtin_module);
-    if (PyModule_AddObject(importlib, "_os", builtin_module) < 0)
-	    Py_FatalError("could not add _os to _importlib");
+    /* Add SEP as path_sep to _importlib's globals. */
+    attr = PyString_FromFormat("%c", SEP);
+    if (!attr)
+	    Py_FatalError("could not create path_sep for _importlib");
+    if (PyModule_AddObject(importlib, "path_sep", attr) < 0)
+	    Py_FatalError("could not add path_sep to _importlib");
 
 
     Py_DECREF(importlib);
@@ -2624,6 +2618,27 @@ imp_get_suffixes(PyObject *self, PyObject *noargs)
 }
 
 static PyObject *
+imp_case_ok(PyObject *self, PyObject *args)
+{
+	const char *path;
+	Py_ssize_t trimmed_path_len;
+	const char *module_name;
+	Py_ssize_t module_name_len;
+	int ret;
+
+	if (!PyArg_ParseTuple(args, "sns#:imp._case_ok", &path, &trimmed_path_len,
+				&module_name, &module_name_len))
+		return NULL;
+
+	ret = case_ok((char *)path, trimmed_path_len, module_name_len, (char *)module_name);
+
+	if (PyErr_Occurred())
+		return NULL;
+
+	return PyBool_FromLong(ret);
+}
+
+static PyObject *
 call_find_module(char *name, PyObject *path)
 {
 	extern int fclose(FILE *);
@@ -2929,6 +2944,7 @@ static PyMethodDef imp_methods[] = {
 	{"find_module",	 imp_find_module,  METH_VARARGS, doc_find_module},
 	{"get_magic",	 imp_get_magic,	   METH_NOARGS,  doc_get_magic},
 	{"get_suffixes", imp_get_suffixes, METH_NOARGS,  doc_get_suffixes},
+	{"_case_ok", imp_case_ok, METH_VARARGS},
 	{"load_module",	 imp_load_module,  METH_VARARGS, doc_load_module},
 	{"new_module",	 imp_new_module,   METH_VARARGS, doc_new_module},
 	{"lock_held",	 imp_lock_held,	   METH_NOARGS,  doc_lock_held},

@@ -1,6 +1,9 @@
+* Add _case_ok() to imp.
+
 * Add _PyImport_Importlib() to import _importlib.  This also involves importing
-  sys, imp, marshal and _os (which can be either nt, os2, or posix; reason why
-  PyOS_MODNAME and PyOS_INITFUNC have been added).
+  errno, sys, imp, marshal and _os (which can be either nt, os2, or posix;
+  reason why PyOS_MODNAME and PyOS_INITFUNC have been added).  Also inject SEP
+  as path_sep into _importlib.
 
 * Add Py_GetImportlibPath() as a way to get the path to _importlib.
 
