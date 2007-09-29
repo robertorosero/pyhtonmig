@@ -740,7 +740,7 @@ CharArray_set_raw(CDataObject *self, PyObject *value)
 	char *ptr;
 	Py_ssize_t size;
         int rel = 0;
-        PyBuffer view;
+        Py_buffer view;
 
 	if (PyBuffer_Check(value)) {
                 if (PyObject_GetBuffer(value, &view, PyBUF_SIMPLE) < 0)
@@ -2083,7 +2083,7 @@ static PyMemberDef CData_members[] = {
 	{ NULL },
 };
 
-static int CData_GetBuffer(PyObject *_self, PyBuffer *view, int flags)
+static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 {
 	CDataObject *self = (CDataObject *)_self;
         return PyBuffer_FillInfo(view, self->b_ptr, self->b_size, 0, flags);
@@ -3830,48 +3830,6 @@ Array_ass_item(PyObject *_self, Py_ssize_t index, PyObject *value)
 
 	return CData_set((PyObject *)self, stgdict->proto, stgdict->setfunc, value,
 			 index, size, ptr);
-}
-
-static int
-Array_ass_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *value)
-{
-	CDataObject *self = (CDataObject *)_self;
-	Py_ssize_t i, len;
-
-	if (value == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"Array does not support item deletion");
-		return -1;
-	}
-
-	if (ilow < 0)
-		ilow = 0;
-	else if (ilow > self->b_length)
-		ilow = self->b_length;
-	if (ihigh < 0)
-		ihigh = 0;
-	if (ihigh < ilow)
-		ihigh = ilow;
-	else if (ihigh > self->b_length)
-		ihigh = self->b_length;
-
-	len = PySequence_Length(value);
-	if (len != ihigh - ilow) {
-		PyErr_SetString(PyExc_ValueError,
-				"Can only assign sequence of same size");
-		return -1;
-	}
-	for (i = 0; i < len; i++) {
-		PyObject *item = PySequence_GetItem(value, i);
-		int result;
-		if (item == NULL)
-			return -1;
-		result = Array_ass_item(_self, i+ilow, item);
-		Py_DECREF(item);
-		if (result == -1)
-			return -1;
-	}
-	return 0;
 }
 
 static int

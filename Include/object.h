@@ -133,7 +133,6 @@ typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
 typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
 typedef int (*inquiry)(PyObject *);
 typedef Py_ssize_t (*lenfunc)(PyObject *);
-typedef int (*coercion)(PyObject **, PyObject **);
 typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 typedef PyObject *(*ssizessizeargfunc)(PyObject *, Py_ssize_t, Py_ssize_t);
 typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
@@ -154,10 +153,10 @@ typedef struct bufferinfo {
         Py_ssize_t *strides;
         Py_ssize_t *suboffsets;
         void *internal;
-} PyBuffer;
+} Py_buffer;
 
-typedef int (*getbufferproc)(PyObject *, PyBuffer *, int);
-typedef void (*releasebufferproc)(PyObject *, PyBuffer *);
+typedef int (*getbufferproc)(PyObject *, Py_buffer *, int);
+typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
 
         /* Flags for getting buffers */
 #define PyBUF_SIMPLE 0
@@ -222,7 +221,7 @@ typedef struct {
 	binaryfunc nb_and;
 	binaryfunc nb_xor;
 	binaryfunc nb_or;
-	coercion nb_coerce;
+	int nb_reserved; /* unused, used to be nb_coerce */
 	unaryfunc nb_int;
 	unaryfunc nb_long;
 	unaryfunc nb_float;

@@ -430,7 +430,7 @@ static PyNumberMethods PyHKEY_NumberMethods =
 	PyHKEY_binaryFailureFunc,	/* nb_and */
 	PyHKEY_binaryFailureFunc,	/* nb_xor */
 	PyHKEY_binaryFailureFunc,	/* nb_or */
-	NULL,				/* nb_coerce */
+	0,				/* nb_reserved */
 	PyHKEY_intFunc,			/* nb_int */
 	PyHKEY_unaryFailureFunc,	/* nb_long */
 	PyHKEY_unaryFailureFunc,	/* nb_float */
@@ -773,7 +773,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
 			if (value == Py_None)
 				*retDataSize = 0;
 			else {
-				PyBuffer view;
+				Py_buffer view;
 
 				if (!PyObject_CheckBuffer(value)) {
 					PyErr_Format(PyExc_TypeError,
