@@ -1230,11 +1230,76 @@ marshal_loads(PyObject *self, PyObject *args)
 	return result;
 }
 
+static PyObject *
+marshal_r_long(PyObject *self, PyObject *obj)
+{
+	RFILE rf;
+	PyObject *bytes;
+	long long_result;
+	PyObject *obj_result = NULL;  /* Almost always used as return value. */
+
+	/* Get a bytes object. */
+	bytes = PyBytes_FromObject(obj);
+	if (!bytes)
+		return NULL;
+
+	/* Make sure it is the right length. */
+	if (PyBytes_Size(bytes) != 4) {
+		PyErr_SetString(PyExc_ValueError,
+				"Expected bytes of length 4");
+		goto exit;
+	}
+
+	/* Set the RFILE to not be used as an fp. */
+	rf.fp = NULL;
+	/* Use the bytes object as a 'char *' directly.  */
+	rf.ptr = PyBytes_AS_STRING(bytes);
+	rf.end = rf.ptr + 4;
+
+	long_result = r_long(&rf);
+
+	obj_result = PyInt_FromLong(long_result);
+
+  exit:
+	Py_DECREF(bytes);
+	return obj_result;
+}
+
+static PyObject *
+marshal_w_long(PyObject *self, PyObject *obj)
+{
+	WFILE wf;
+	PyObject *bytes = NULL;
+	long value;
+
+	/* Get the long value of the argument. */
+	value = PyInt_AsLong(obj);
+	if ((value == -1) && PyErr_Occurred())
+		return NULL;
+
+	/* Create a bytes object. */
+	bytes = PyBytes_FromStringAndSize("0000", 4);
+	if (!bytes)
+		return NULL;
+
+	/* Write the long value into the bytes object. */
+	wf.fp = NULL;
+	wf.ptr = PyBytes_AS_STRING(bytes);
+	wf.end = wf.ptr + 4;
+
+	w_long(value, &wf);
+
+	return bytes;
+}
+
+
 static PyMethodDef marshal_methods[] = {
 	{"dump",	marshal_dump,	METH_VARARGS},
 	{"load",	marshal_load,	METH_O},
 	{"dumps",	marshal_dumps,	METH_VARARGS},
 	{"loads",	marshal_loads,	METH_VARARGS},
+	{"_r_long",	marshal_r_long, METH_O},
+	{"_w_long",	marshal_w_long, METH_O},
 	{NULL,		NULL}		/* sentinel */
 };
 

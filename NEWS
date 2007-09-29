@@ -1,3 +1,5 @@
+* Add _r_long() and _w_long() to marshal.
+
 * Add _case_ok() to imp.
 
 * Add _PyImport_Importlib() to import _importlib.  This also involves importing
