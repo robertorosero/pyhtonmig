@@ -218,7 +218,7 @@ Numeric Types --- :class:`int`, :class:`float`, :class:`complex`
 
 There are three distinct numeric types: :dfn:`integers`, :dfn:`floating point
 numbers`, and :dfn:`complex numbers`.  In addition, Booleans are a subtype of
-plain integers.  Integers have unlimited precision.  loating point numbers are
+plain integers.  Integers have unlimited precision.  Floating point numbers are
 implemented using :ctype:`double` in C.  All bets on their precision are off
 unless you happen to know the machine you are working with.
 
@@ -233,7 +233,7 @@ Complex numbers have a real and imaginary part, which are each implemented using
    pair: complex number; literals
    pair: hexadecimal; literals
    pair: octal; literals
-   pair: binary: literals
+   pair: binary; literals
 
 Numbers are created by numeric literals or as the result of built-in functions
 and operators.  Unadorned integer literals (including hex, octal and binary
@@ -263,7 +263,7 @@ numeric operations have a higher priority than comparison operations):
 
 +---------------------+---------------------------------+-------+--------------------+
 | Operation           | Result                          | Notes | Full documentation |
-+==================== +=================================+=======+====================|
++=====================+=================================+=======+====================+
 | ``x + y``           | sum of *x* and *y*              |       |                    |
 +---------------------+---------------------------------+-------+--------------------+
 | ``x - y``           | difference of *x* and *y*       |       |                    |
