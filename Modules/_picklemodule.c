@@ -787,12 +787,68 @@ save_bool(PicklerObject *self, PyObject *args)
 }
 
 static int
+save_int(PicklerObject *self, long l)
+{
+    char c_str[32];
+    int len = 0;
+
+    if (!self->bin
+#if SIZEOF_LONG > 4
+        || l > 0x7fffffffL || l < -0x80000000L
+#endif
+        ) {
+        /* Text-mode pickle, or long too big to fit in the 4-byte
+         * signed BININT format:  store as a string.
+         */
+        c_str[0] = LONG;        /* use LONG for consistence with pickle.py */
+        PyOS_snprintf(c_str + 1, sizeof(c_str) - 1, "%ld\n", l);
+        if (self->write_func(self, c_str, strlen(c_str)) < 0)
+            return -1;
+    }
+    else {
+        /* Binary pickle and l fits in a signed 4-byte int. */
+        c_str[1] = (int)(l & 0xff);
+        c_str[2] = (int)((l >> 8) & 0xff);
+        c_str[3] = (int)((l >> 16) & 0xff);
+        c_str[4] = (int)((l >> 24) & 0xff);
+
+        if ((c_str[4] == 0) && (c_str[3] == 0)) {
+            if (c_str[2] == 0) {
+                c_str[0] = BININT1;
+                len = 2;
+            }
+            else {
+                c_str[0] = BININT2;
+                len = 3;
+            }
+        }
+        else {
+            c_str[0] = BININT;
+            len = 5;
+        }
+
+        if (self->write_func(self, c_str, len) < 0)
+            return -1;
+    }
+
+    return 0;
+}
+
+static int
 save_long(PicklerObject *self, PyObject *args)
 {
     Py_ssize_t size;
     int res = -1;
     PyObject *repr = NULL;
+    long val = PyInt_AsLong(args);
     static char l = LONG;
+
+    if (val == -1 && PyErr_Occurred()) {
+        /* out of range for int pickling */
+        PyErr_Clear();
+    }
+    else
+        return save_int(self, val);
 
     if (self->proto >= 2) {
         /* Linear-time pickling. */
