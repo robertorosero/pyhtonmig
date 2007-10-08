@@ -992,14 +992,13 @@ static int
 save_string(PicklerObject *self, PyObject *args, int doput)
 {
     int size, len;
-    PyObject *repr = 0;
+    PyObject *repr = NULL;
 
     if ((size = PyString_Size(args)) < 0)
         return -1;
 
     if (!self->bin) {
         char *repr_str;
-
         static char string = STRING;
 
         if (!(repr = PyObject_Repr(args)))
@@ -1012,7 +1011,10 @@ save_string(PicklerObject *self, PyObject *args, int doput)
         if (self->write_func(self, &string, 1) < 0)
             goto error;
 
-        if (self->write_func(self, repr_str, len) < 0)
+        /* +1 to skip the repr string prefix.
+           XXX Perhaps adding the quotes around the string manually would be
+           XXX better, and less likely to break? */
+        if (self->write_func(self, repr_str + 1, len - 1) < 0)
             goto error;
 
         if (self->write_func(self, "\n", 1) < 0)
