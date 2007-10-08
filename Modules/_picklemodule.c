@@ -4402,7 +4402,7 @@ static PyTypeObject Unpickler_Type = {
 static int
 init_stuff(PyObject *module_dict)
 {
-    PyObject *copy_reg, *t, *r;
+    PyObject *copy_reg;
 
     INIT_STR(__class__);
     INIT_STR(__dict__);
@@ -4416,8 +4416,6 @@ init_stuff(PyObject *module_dict)
     if (!copy_reg)
         return -1;
 
-    /* This is special because we want to use a different
-     * one in restricted mode. */
     dispatch_table = PyObject_GetAttrString(copy_reg, "dispatch_table");
     if (!dispatch_table)
         return -1;
@@ -4449,20 +4447,9 @@ init_stuff(PyObject *module_dict)
      */
     PyObject_GC_UnTrack(two_tuple);
 
-    if (!(t = PyDict_New()))
-        return -1;
-    if (!(r = PyRun_String(
-              "def __str__(self):\n"
-              "   return self.args and ('%s' % self.args[0]) or ''\n",
-              Py_file_input, module_dict, t)))
-        return -1;
-    Py_DECREF(r);
-
-    PickleError = PyErr_NewException("pickle.PickleError", NULL, t);
+    PickleError = PyErr_NewException("pickle.PickleError", NULL, NULL);
     if (!PickleError)
         return -1;
-
-    Py_DECREF(t);
 
     PicklingError = PyErr_NewException("pickle.PicklingError",
                                        PickleError, NULL);
