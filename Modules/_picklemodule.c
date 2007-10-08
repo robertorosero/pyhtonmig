@@ -659,8 +659,9 @@ whichmodule(PyObject *global, PyObject *global_name)
 
     module = PyObject_GetAttrString(global, "__module__");
 
-    /* In some cases (e.g., C functions), __module__ can be None. If it is so, 
-       then search sys.modules for the module of global.  */
+    /* In some rare cases (e.g., random.getrandbits), __module__ can be
+       None. If it is so, then search sys.modules for the module of
+       global.  */
     if (module == Py_None)
         goto search;
 
