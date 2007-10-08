@@ -1060,7 +1060,6 @@ save_string(PicklerObject *self, PyObject *args, int doput)
     return -1;
 }
 
-#ifdef Py_USING_UNICODE
 /* A copy of PyUnicode_EncodeRawUnicodeEscape() that also translates
    backslash and newline characters to \uXXXX escapes. */
 static PyObject *
@@ -1168,7 +1167,6 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
     Py_XDECREF(repr);
     return -1;
 }
-#endif
 
 /* A helper for save_tuple.  Push the len elements in tuple t on the stack. */
 static int
@@ -1924,7 +1922,6 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *ob)
         else if (put(self, ob) < 0)
             return -1;
     }
-
 
     if (listitems && batch_list(self, listitems) < 0)
         return -1;
@@ -2763,8 +2760,8 @@ load_binfloat(UnpicklerObject *self)
 static int
 load_string(UnpicklerObject *self)
 {
-    PyObject *str = 0;
-    int len, res = -1;
+    PyObject *str = NULL, *ustr = NULL;
+    int len;
     char *s, *p;
 
     if ((len = self->readline_func(self, &s)) < 0)
@@ -2773,7 +2770,6 @@ load_string(UnpicklerObject *self)
         return bad_readline();
     if (!(s = pystrndup(s, len)))
         return -1;
-
 
     /* Strip outermost quotes */
     while (s[len - 1] <= ' ')
@@ -2788,27 +2784,32 @@ load_string(UnpicklerObject *self)
         p = s + 1;
         len -= 2;
     }
-    else
-        goto insecure;
+    else {
+        free(s);
+        PyErr_SetString(PyExc_ValueError, "insecure string pickle");
+        return -1;
+    }
 
+    /* Use the PyString API to decode the string, since that is what is used
+       to encode, and then coerce the result to Unicode. */
     str = PyString_DecodeEscape(p, len, NULL, 0, NULL);
     free(s);
-    if (str) {
-        PDATA_PUSH(self->stack, str, -1);
-        res = 0;
-    }
-    return res;
+    if (str == NULL)
+        return -1;
 
-  insecure:
-    free(s);
-    PyErr_SetString(PyExc_ValueError, "insecure string pickle");
-    return -1;
+    ustr = PyObject_Unicode(str);
+    Py_DECREF(str);
+    if (ustr == NULL)
+        return -1;
+
+    PDATA_PUSH(self->stack, ustr, -1);
+    return 0;
 }
 
 static int
 load_binstring(UnpicklerObject *self)
 {
-    PyObject *py_string = 0;
+    PyObject *str;
     long l;
     char *s;
 
@@ -2820,41 +2821,42 @@ load_binstring(UnpicklerObject *self)
     if (self->read_func(self, &s, l) < 0)
         return -1;
 
-    if (!(py_string = PyString_FromStringAndSize(s, l)))
+    str = PyUnicode_FromStringAndSize(s, l);
+    if (str == NULL)
         return -1;
 
-    PDATA_PUSH(self->stack, py_string, -1);
+    PDATA_PUSH(self->stack, str, -1);
     return 0;
 }
 
 static int
 load_short_binstring(UnpicklerObject *self)
 {
-    PyObject *py_string = 0;
+    PyObject *str;
     unsigned char l;
     char *s;
 
     if (self->read_func(self, &s, 1) < 0)
         return -1;
 
-    l = (unsigned char) s[0];
+    l = (unsigned char)s[0];
 
     if (self->read_func(self, &s, l) < 0)
         return -1;
 
-    if (!(py_string = PyString_FromStringAndSize(s, l)))
+    str = PyUnicode_FromStringAndSize(s, l);
+    if (str == NULL)
         return -1;
 
-    PDATA_PUSH(self->stack, py_string, -1);
+    PDATA_PUSH(self->stack, str, -1);
     return 0;
 }
 
-#ifdef Py_USING_UNICODE
 static int
 load_unicode(UnpicklerObject *self)
 {
-    PyObject *str = 0;
-    int len, res = -1;
+    PyObject *str;
+    int len;
     char *s;
 
     if ((len = self->readline_func(self, &s)) < 0)
@@ -2862,19 +2864,14 @@ load_unicode(UnpicklerObject *self)
     if (len < 1)
         return bad_readline();
 
-    if (!(str = PyUnicode_DecodeRawUnicodeEscape(s, len - 1, NULL)))
-        goto finally;
+    str = PyUnicode_DecodeRawUnicodeEscape(s, len - 1, NULL);
+    if (str == NULL)
+        return -1;
 
     PDATA_PUSH(self->stack, str, -1);
     return 0;
-
-  finally:
-    return res;
 }
-#endif
 
-
-#ifdef Py_USING_UNICODE
 static int
 load_binunicode(UnpicklerObject *self)
 {
@@ -2896,8 +2893,6 @@ load_binunicode(UnpicklerObject *self)
     PDATA_PUSH(self->stack, unicode, -1);
     return 0;
 }
-#endif
-
 
 static int
 load_tuple(UnpicklerObject *self)
