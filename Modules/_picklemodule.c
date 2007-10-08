@@ -948,9 +948,9 @@ save_string(PicklerObject *self, PyObject *args, int doput)
         if (!(repr = PyObject_Repr(args)))
             return -1;
 
-        if ((len = PyString_Size(repr)) < 0)
+        if ((len = PyUnicode_GetSize(repr)) < 0)
             goto error;
-        repr_str = PyString_AS_STRING((PyStringObject *)repr);
+        repr_str = PyUnicode_AsString(repr);
 
         if (self->write_func(self, &string, 1) < 0)
             goto error;
@@ -988,7 +988,7 @@ save_string(PicklerObject *self, PyObject *args, int doput)
             return -1;
 
         if (self->write_func(self,
-                             PyString_AS_STRING((PyStringObject *)args),
+                             PyString_AS_STRING(args),
                              size) < 0)
             return -1;
     }
