@@ -658,21 +658,25 @@ whichmodule(PyObject *global, PyObject *global_name)
     PyObject *module = 0, *modules_dict = 0, *global_name_attr = 0, *name = 0;
 
     module = PyObject_GetAttrString(global, "__module__");
+
+    /* In some cases (e.g., C functions), __module__ can be None. If it is so, 
+       then search sys.modules for the module of global.  */
+    if (module == Py_None)
+        goto search;
+
     if (module)
         return module;
     if (PyErr_ExceptionMatches(PyExc_AttributeError))
         PyErr_Clear();
     else
         return NULL;
-
-    /* XXX: This seems only necessary for older Python versions without
-       the __module__ attribute. */
+    
+  search:
     if (!(modules_dict = PySys_GetObject("modules")))
         return NULL;
 
     i = 0;
     while ((j = PyDict_Next(modules_dict, &i, &name, &module))) {
-
         if (PyObject_Compare(name, __main__) == 0)
             continue;
 
@@ -691,14 +695,10 @@ whichmodule(PyObject *global, PyObject *global_name)
         }
 
         Py_DECREF(global_name_attr);
-
         break;
     }
 
-    /* The following implements the rule in pickle.py added in 1.5
-     * that used __main__ if no module is found.  I don't actually
-     * like this rule. jlf
-     */
+    /* If no module is found, use __main__. */
     if (!j) {
         j = 1;
         name = __main__;
