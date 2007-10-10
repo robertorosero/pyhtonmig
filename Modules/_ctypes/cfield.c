@@ -1001,6 +1001,7 @@ D_set(void *ptr, PyObject *value, Py_ssize_t size)
 			     value->ob_type->tp_name);
 		return NULL;
 	}
+	fprintf(stderr, "D_set(%p, %f)\n", ptr, (float)x);
 	memcpy(ptr, &x, sizeof(long double));
 	_RET(value);
 }
@@ -1010,6 +1011,7 @@ D_get(void *ptr, Py_ssize_t size)
 {
 	long double val;
 	memcpy(&val, ptr, sizeof(long double));
+	fprintf(stderr, "D_get(%p) -> %f\n", ptr, (float)val);
 	return PyFloat_FromDouble(val);
 }
 
