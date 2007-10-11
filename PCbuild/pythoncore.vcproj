@@ -380,9 +380,6 @@
 			RelativePath="..\Modules\_heapqmodule.c">
 		</File>
 		<File
-			RelativePath="..\Modules\_hotshot.c">
-		</File>
-		<File
 			RelativePath="..\Modules\_localemodule.c">
 		</File>
 		<File
@@ -441,9 +438,6 @@
 		</File>
 		<File
 			RelativePath="..\Objects\boolobject.c">
-		</File>
-		<File
-			RelativePath="..\Objects\bufferobject.c">
 		</File>
 		<File
 			RelativePath="..\Objects\bytesobject.c">

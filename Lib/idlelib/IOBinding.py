@@ -242,7 +242,7 @@ class IOBinding:
 
     eol = r"(\r\n)|\n|\r"  # \r\n (Windows), \n (UNIX), or \r (Mac)
     eol_re = re.compile(eol)
-    eol_convention = os.linesep # Default
+    eol_convention = os.linesep  # default
 
     def loadfile(self, filename):
         try:
@@ -389,9 +389,10 @@ class IOBinding:
 
     def writefile(self, filename):
         self.fixlastline()
-        chars = self.encode(self.text.get("1.0", "end-1c"))
+        text = self.text.get("1.0", "end-1c")
         if self.eol_convention != "\n":
-            chars = chars.replace("\n", self.eol_convention)
+            text = text.replace("\n", self.eol_convention)
+        chars = self.encode(self.text.get("1.0", "end-1c"))
         try:
             f = open(filename, "wb")
             f.write(chars)
