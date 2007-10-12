@@ -237,12 +237,12 @@ Py_InitializeEx(int install_sigs)
 
 	_PyImportHooks_Init();
 
-	_PyImport_Importlib();
-
 	if (install_sigs)
 		initsigs(); /* Signal handling stuff, including initintr() */
 
 	initmain(); /* Module __main__ */
+
+	_PyImport_Importlib(interp->builtins, interp->modules);
 	if (!Py_NoSiteFlag)
 		initsite(); /* Module site */
 

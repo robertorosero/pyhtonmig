@@ -525,7 +525,7 @@ PyImport_GetMagicNumber(void)
 
 
 void
-_PyImport_Importlib(void)
+_PyImport_Importlib(PyObject *builtins, PyObject *modules)
 {
     const char *importlib_path = Py_GetImportlibPath();
     FILE *fp = NULL;
@@ -536,6 +536,7 @@ _PyImport_Importlib(void)
     unsigned int x;
     PyObject *modules_dict = NULL;
     PyObject *attr = NULL;
+    PyObject *obj = NULL;
 
 
     /* _importlib must have been found. */
@@ -556,22 +557,26 @@ _PyImport_Importlib(void)
 	    Py_FatalError("could not initialize _importlib");
 
     /* Get sys.modules so as to extract needed built-in modules. */
-    modules_dict = PyImport_GetModuleDict();
     for (x = 0; builtin_modules[x] != NULL; x += 1) {
 	    PyObject *module;
 	    const char *name = builtin_modules[x];
 
-	    /* Initialize the built-in module. */
-	    if (!init_builtin((char *)name))
-		    Py_FatalError("initialization of a built-in module failed");
-	    /* Get the module from sys.modules. */
-	    module = PyDict_GetItemString(modules_dict, name);
-	    if (!module)
+	    /* See if sys.modules already has the module to avoid a re-init. */
+	    module = PyDict_GetItemString(modules, name);
+	    if (module == NULL) {
+		    /* Initialize the built-in module. */
+		    if (!init_builtin((char *)name))
+			    Py_FatalError("initialization of a built-in "
+					    "module failed");
+		    /* Get the module from sys.modules. */
+		    module = PyDict_GetItemString(modules, name);
+	    }
+	    if (module == NULL)
 		    Py_FatalError("built-in module lost");
 	    /* Add the module to _importlib's globals. */
 	    Py_INCREF(module);
 	    if (PyModule_AddObject(importlib,
-				    (strcmp(name, PyOS_MODNAME) ? name : "_os"),
+				    (strcmp(name, PyOS_MODNAME) != 0 ? name : "_os"),
 				    module))
 		    Py_FatalError("could not add built-in module to _importlib");
     }
@@ -583,7 +588,25 @@ _PyImport_Importlib(void)
     if (PyModule_AddObject(importlib, "path_sep", attr) < 0)
 	    Py_FatalError("could not add path_sep to _importlib");
 
+    /* Store away old __import__. */
+    obj = PyDict_GetItemString(builtins, "__import__");
+    if (obj == NULL || PyErr_Occurred())
+	    Py_FatalError("error getting old __import__");
+    if (PyDict_SetItemString(builtins, "__old_import__", obj))
+	    Py_FatalError("unable to store away old __import__");
 
+    /* Create an instance of Import and set __import__ to it. */
+    modules_dict = PyModule_GetDict(importlib);
+    attr = PyDict_GetItemString(modules_dict, "Import");
+    if (attr == NULL || PyErr_Occurred())
+	    Py_FatalError("couldn't get _importlib.Import");
+    obj = PyObject_CallObject(attr, NULL);
+    if (obj == NULL)
+	    Py_FatalError("unable to instantiate _importlib.Import");
+    if (PyDict_SetItemString(builtins, "__import__", obj))
+		    Py_FatalError("could not set new __import__");
+
+    Py_DECREF(obj);
     Py_DECREF(importlib);
 }
 

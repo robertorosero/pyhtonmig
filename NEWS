@@ -1,3 +1,5 @@
+* Store old __import__ into __old_import__ and use importlib.
+
 * Add _r_long() and _w_long() to marshal.
 
 * Add _case_ok() to imp.

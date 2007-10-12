@@ -123,7 +123,7 @@ PyAPI_FUNC(const char *) Py_SubversionShortBranch(void);
 PyAPI_FUNC(PyObject *) _PyBuiltin_Init(void);
 PyAPI_FUNC(PyObject *) _PySys_Init(void);
 PyAPI_FUNC(void) _PyImport_Init(void);
-PyAPI_FUNC(void) _PyImport_Importlib(void);
+PyAPI_FUNC(void) _PyImport_Importlib(PyObject *, PyObject *);
 PyAPI_FUNC(void) _PyExc_Init(void);
 PyAPI_FUNC(void) _PyImportHooks_Init(void);
 PyAPI_FUNC(int) _PyFrame_Init(void);
