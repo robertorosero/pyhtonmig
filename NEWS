@@ -1,6 +1,8 @@
 * Store old __import__ into __old_import__ and use importlib.  Required
   introducing a somewhat fake file object that uses posix and file descriptors
   as open() is defined in site.py which obviously has not been imported yet.
+  The faked file objects read all text in as ASCII since any codecs usage
+  requires the codecs package to be imported.
 
 * Add _r_long() and _w_long() to marshal.
 
