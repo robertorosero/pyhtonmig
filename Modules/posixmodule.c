@@ -2135,10 +2135,12 @@ posix_listdir(PyObject *self, PyObject *args)
     FILEFINDBUF3   ep;
     APIRET rc;
 
-    if (!PyArg_ParseTuple(args, "t#:listdir", &name, &len))
+    if (!PyArg_ParseTuple(args, "et#:listdir", 
+                          Py_FileSystemDefaultEncoding, &name, &len))
         return NULL;
     if (len >= MAX_PATH) {
-		PyErr_SetString(PyExc_ValueError, "path too long");
+        PyMem_Free(name);
+        PyErr_SetString(PyExc_ValueError, "path too long");
         return NULL;
     }
     strcpy(namebuf, name);
@@ -2149,8 +2151,10 @@ posix_listdir(PyObject *self, PyObject *args)
         namebuf[len++] = SEP;
     strcpy(namebuf + len, "*.*");
 
-	if ((d = PyList_New(0)) == NULL)
+    if ((d = PyList_New(0)) == NULL) {
+        PyMem_Free(name);
         return NULL;
+    }
 
     rc = DosFindFirst(namebuf,         /* Wildcard Pattern to Match */
                       &hdir,           /* Handle to Use While Search Directory */
@@ -2161,7 +2165,7 @@ posix_listdir(PyObject *self, PyObject *args)
 
     if (rc != NO_ERROR) {
         errno = ENOENT;
-        return posix_error_with_filename(name);
+        return posix_error_with_allocated_filename(name);
     }
 
     if (srchcnt > 0) { /* If Directory is NOT Totally Empty, */
@@ -2191,6 +2195,7 @@ posix_listdir(PyObject *self, PyObject *args)
         } while (DosFindNext(hdir, &ep, sizeof(ep), &srchcnt) == NO_ERROR && srchcnt > 0);
     }
 
+    PyMem_Free(name);
     return d;
 #else
 
@@ -5365,7 +5370,7 @@ posix_tempnam(PyObject *self, PyObject *args)
 #endif
     if (name == NULL)
         return PyErr_NoMemory();
-    result = PyString_FromString(name);
+    result = PyUnicode_DecodeFSDefault(name);
     free(name);
     return result;
 }
@@ -5423,7 +5428,7 @@ posix_tmpnam(PyObject *self, PyObject *noargs)
 	Py_XDECREF(err);
 	return NULL;
     }
-    return PyString_FromString(buffer);
+    return PyUnicode_DecodeFSDefault(buffer);
 }
 #endif
 

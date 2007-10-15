@@ -117,7 +117,11 @@ static PyUnicodeObject *unicode_latin1[256];
 
 /* Default encoding to use and assume when NULL is passed as encoding
    parameter; it is fixed to "utf-8".  Always use the
-   PyUnicode_GetDefaultEncoding() API to access this global. */
+   PyUnicode_GetDefaultEncoding() API to access this global.
+
+   Don't forget to alter Py_FileSystemDefaultEncoding() if you change the
+   hard coded default!
+*/
 static const char unicode_default_encoding[] = "utf-8";
 
 Py_UNICODE
@@ -1229,6 +1233,35 @@ PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
     Py_DECREF(b);
     ((PyUnicodeObject *)unicode)->defenc = v;
     return v;
+}
+
+PyObject*
+PyUnicode_DecodeFSDefault(const char *s)
+{
+    Py_ssize_t size = (Py_ssize_t)strlen(s);
+
+    /* During the early bootstrapping process, Py_FileSystemDefaultEncoding
+       can be undefined. If it is case, decode using UTF-8. The following assumes
+       that Py_FileSystemDefaultEncoding is set to a built-in encoding during the
+       bootstrapping process where the codecs aren't ready yet.
+    */
+    if (Py_FileSystemDefaultEncoding) {
+#if defined(MS_WINDOWS) && defined(HAVE_USABLE_WCHAR_T)
+        if (strcmp(Py_FileSystemDefaultEncoding, "mbcs")) {
+            return PyUnicode_DecodeMBCS(s, size, "replace");
+        }
+#elif defined(__APPLE__)
+        if (strcmp(Py_FileSystemDefaultEncoding, "utf-8")) {
+            return PyUnicode_DecodeUTF8(s, size, "replace");
+        }
+#endif
+        return PyUnicode_Decode(s, size,
+                                Py_FileSystemDefaultEncoding,
+                                "replace");
+    }
+    else {
+        return PyUnicode_DecodeUTF8(s, size, "replace");
+    }
 }
 
 char*
@@ -8113,19 +8146,6 @@ static PyMappingMethods unicode_as_mapping = {
 };
 
 
-static int
-unicode_buffer_getbuffer(PyUnicodeObject *self, Py_buffer *view, int flags)
-{
-
-    if (flags & PyBUF_CHARACTER) {
-        PyErr_SetString(PyExc_SystemError, "can't use str as char buffer");
-        return -1;
-    }
-    return PyBuffer_FillInfo(view, (void *)self->str,
-                             PyUnicode_GET_DATA_SIZE(self), 1, flags);
-}
-
-
 /* Helpers for PyUnicode_Format() */
 
 static PyObject *
@@ -8819,11 +8839,6 @@ PyObject *PyUnicode_Format(PyObject *format,
     return NULL;
 }
 
-static PyBufferProcs unicode_as_buffer = {
-    (getbufferproc) unicode_buffer_getbuffer,
-    NULL,
-};
-
 static PyObject *
 unicode_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
@@ -8907,7 +8922,7 @@ PyTypeObject PyUnicode_Type = {
     (reprfunc) unicode_str,	 	/* tp_str */
     PyObject_GenericGetAttr, 		/* tp_getattro */
     0,			 		/* tp_setattro */
-    &unicode_as_buffer,			/* tp_as_buffer */
+    0, 					/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | 
         Py_TPFLAGS_UNICODE_SUBCLASS,	/* tp_flags */
     unicode_doc,			/* tp_doc */
