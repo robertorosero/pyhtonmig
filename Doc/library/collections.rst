@@ -51,7 +51,7 @@ ordered dictionaries.
 
    .. versionadded:: 2.4
 
-   If *maxlen* is not specified or is *-1*, deques may grow to an
+   If *maxlen* is not specified or is *None*, deques may grow to an
    arbitrary length.  Otherwise, the deque is bounded to the specified maximum
    length.  Once a bounded length deque is full, when new items are added, a
    corresponding number of items are discarded from the opposite end.  Bounded
@@ -365,9 +365,13 @@ they add the ability to access fields by name instead of position index.
 
    The *fieldnames* are a single string with each fieldname separated by whitespace
    and/or commas (for example 'x y' or 'x, y').  Alternatively, the *fieldnames*
-   can be specified as a list of strings (such as ['x', 'y']).  Any valid
-   Python identifier may be used for a fieldname except for names starting and 
-   ending with double underscores.
+   can be specified as a list of strings (such as ['x', 'y']).
+
+   Any valid Python identifier may be used for a fieldname except for names
+   starting and ending with double underscores.  Valid identifiers consist of
+   letters, digits, and underscores but do not start with a digit and cannot be
+   a :mod:`keyword` such as *class*, *for*, *return*, *global*, *pass*, *print*,
+   or *raise*.
 
    If *verbose* is true, will print the class definition.
 

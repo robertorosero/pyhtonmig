@@ -495,8 +495,8 @@ figure out the consequences of a name conflict with an attribute of
 :class:`Base2`.  The depth-first rule makes no differences between direct and
 inherited attributes of :class:`Base1`.)
 
-For new-style classes, the method resolution order changes dynamically to
-support cooperative calls to :func:`super`.  This approach is known in some
+For :term:`new-style class`\es, the method resolution order changes dynamically
+to support cooperative calls to :func:`super`.  This approach is known in some
 other multiple-inheritance languages as call-next-method and is more powerful
 than the super call found in single-inheritance languages.
 
@@ -711,12 +711,12 @@ returns an object with a :meth:`next` method.  If the class defines
 Generators
 ==========
 
-Generators are a simple and powerful tool for creating iterators.  They are
-written like regular functions but use the :keyword:`yield` statement whenever
-they want to return data.  Each time :meth:`next` is called, the generator
-resumes where it left-off (it remembers all the data values and which statement
-was last executed).  An example shows that generators can be trivially easy to
-create::
+:term:`Generator`\s are a simple and powerful tool for creating iterators.  They
+are written like regular functions but use the :keyword:`yield` statement
+whenever they want to return data.  Each time :meth:`next` is called, the
+generator resumes where it left-off (it remembers all the data values and which
+statement was last executed).  An example shows that generators can be trivially
+easy to create::
 
    def reverse(data):
        for index in range(len(data)-1, -1, -1):

@@ -113,8 +113,9 @@ between conformable Python objects and XML on the wire.
       The *use_datetime* flag was added.
 
    .. versionchanged:: 2.6
-      Instances of new-style classes can be passed in if they have an *__dict__*
-      attribute and don't have a base class that is marshalled in a special way.
+      Instances of :term:`new-style class`\es can be passed in if they have an
+      *__dict__* attribute and don't have a base class that is marshalled in a
+      special way.
 
 
 .. seealso::
@@ -325,7 +326,8 @@ encapsulate multiple calls to a remote server into a single request.
    return ``None``, and only store the call name and parameters in the
    :class:`MultiCall` object. Calling the object itself causes all stored calls to
    be transmitted as a single ``system.multicall`` request. The result of this call
-   is a generator; iterating over this generator yields the individual results.
+   is a :term:`generator`; iterating over this generator yields the individual
+   results.
 
 A usage example of this class is ::
 

@@ -43,7 +43,7 @@ available.  They are listed here in alphabetical order.
    top-level package (the name up till the first dot) is returned, *not* the
    module named by *name*.  However, when a non-empty *fromlist* argument is
    given, the module named by *name* is returned.  This is done for
-   compatibility with the bytecode generated for the different kinds of import
+   compatibility with the :term:`bytecode` generated for the different kinds of import
    statement; when using ``import spam.ham.eggs``, the top-level package
    :mod:`spam` must be placed in the importing namespace, but when using ``from
    spam.ham import eggs``, the ``spam.ham`` subpackage must be used to find the
@@ -322,7 +322,7 @@ available.  They are listed here in alphabetical order.
 
 .. function:: enumerate(iterable)
 
-   Return an enumerate object. *iterable* must be a sequence, an iterator, or some
+   Return an enumerate object. *iterable* must be a sequence, an :term:`iterator`, or some
    other object which supports iteration.  The :meth:`next` method of the iterator
    returned by :func:`enumerate` returns a tuple containing a count (from zero) and
    the corresponding value obtained from iterating over *iterable*.
@@ -350,7 +350,7 @@ available.  They are listed here in alphabetical order.
 
    The *expression* argument is parsed and evaluated as a Python expression
    (technically speaking, a condition list) using the *globals* and *locals*
-   dictionaries as global and local name space.  If the *globals* dictionary is
+   dictionaries as global and local namespace.  If the *globals* dictionary is
    present and lacks '__builtins__', the current globals are copied into *globals*
    before *expression* is parsed.  This means that *expression* normally has full
    access to the standard :mod:`__builtin__` module and restricted environments are
@@ -420,7 +420,7 @@ available.  They are listed here in alphabetical order.
 
    Construct a list from those elements of *iterable* for which *function* returns
    true.  *iterable* may be either a sequence, a container which supports
-   iteration, or an iterator,  If *iterable* is a string or a tuple, the result
+   iteration, or an iterator.  If *iterable* is a string or a tuple, the result
    also has that type; otherwise it is always a list.  If *function* is ``None``,
    the identity function is assumed, that is, all elements of *iterable* that are
    false are removed.
@@ -590,7 +590,7 @@ available.  They are listed here in alphabetical order.
 
 .. function:: iter(o[, sentinel])
 
-   Return an iterator object.  The first argument is interpreted very differently
+   Return an :term:`iterator` object.  The first argument is interpreted very differently
    depending on the presence of the second argument. Without a second argument, *o*
    must be a collection object which supports the iteration protocol (the
    :meth:`__iter__` method), or it must support the sequence protocol (the
@@ -808,8 +808,8 @@ available.  They are listed here in alphabetical order.
 
 .. function:: property([fget[, fset[, fdel[, doc]]]])
 
-   Return a property attribute for new-style classes (classes that derive from
-   :class:`object`).
+   Return a property attribute for :term:`new-style class`\es (classes that
+   derive from :class:`object`).
 
    *fget* is a function for getting an attribute value, likewise *fset* is a
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
@@ -973,9 +973,9 @@ available.  They are listed here in alphabetical order.
 
 .. function:: reversed(seq)
 
-   Return a reverse iterator.  *seq* must be an object which supports the sequence
-   protocol (the :meth:`__len__` method and the :meth:`__getitem__` method with
-   integer arguments starting at ``0``).
+   Return a reverse :term:`iterator`.  *seq* must be an object which supports
+   the sequence protocol (the :meth:`__len__` method and the :meth:`__getitem__`
+   method with integer arguments starting at ``0``).
 
    .. versionadded:: 2.4
 
@@ -1112,8 +1112,8 @@ available.  They are listed here in alphabetical order.
    Return the superclass of *type*.  If the second argument is omitted the super
    object returned is unbound.  If the second argument is an object,
    ``isinstance(obj, type)`` must be true.  If the second argument is a type,
-   ``issubclass(type2, type)`` must be true. :func:`super` only works for new-style
-   classes.
+   ``issubclass(type2, type)`` must be true. :func:`super` only works for
+   :term:`new-style class`\es.
 
    A typical use for calling a cooperative superclass method is::
 
@@ -1292,12 +1292,11 @@ bypass these functions without concerns about missing something important.
    present, it must be a dictionary whose keys are strings.  It specifies keyword
    arguments to be added to the end of the argument list. Calling :func:`apply` is
    different from just calling ``function(args)``, since in that case there is
-   always exactly one argument.  The use of :func:`apply` is equivalent to
-   ``function(*args, **keywords)``. Use of :func:`apply` is not necessary since the
-   "extended call syntax," as used in the last example, is completely equivalent.
+   always exactly one argument.  The use of :func:`apply` is exactly equivalent to
+   ``function(*args, **keywords)``.
 
    .. deprecated:: 2.3
-      Use the extended call syntax instead, as described above.
+      Use the extended call syntax with ``*args`` and ``**keywords`` instead.
 
 
 .. function:: buffer(object[, offset[, size]])

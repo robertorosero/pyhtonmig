@@ -479,10 +479,10 @@ Implementations that do not obey this property are deemed broken.  (This
 constraint was added in Python 2.3; in Python 2.2, various iterators are broken
 according to this rule.)
 
-Python's generators provide a convenient way to implement the iterator protocol.
-If a container object's :meth:`__iter__` method is implemented as a generator,
-it will automatically return an iterator object (technically, a generator
-object) supplying the :meth:`__iter__` and :meth:`next` methods.
+Python's :term:`generator`\s provide a convenient way to implement the iterator
+protocol.  If a container object's :meth:`__iter__` method is implemented as a
+generator, it will automatically return an iterator object (technically, a
+generator object) supplying the :meth:`__iter__` and :meth:`next` methods.
 
 
 .. _typesseq:
@@ -1899,8 +1899,7 @@ Files have the following methods:
 .. method:: file.fileno()
 
    .. index::
-      single: file descriptor
-      single: descriptor, file
+      pair: file; descriptor
       module: fcntl
 
    Return the integer "file descriptor" that is used by the underlying
@@ -2160,7 +2159,7 @@ to be provided for a context manager object to define a runtime context:
 
 .. method:: contextmanager.__exit__(exc_type, exc_val, exc_tb)
 
-   Exit the runtime context and return a Boolean flag indicating if any expection
+   Exit the runtime context and return a Boolean flag indicating if any exception
    that occurred should be suppressed. If an exception occurred while executing the
    body of the :keyword:`with` statement, the arguments contain the exception type,
    value and traceback information. Otherwise, all three arguments are ``None``.
@@ -2184,7 +2183,7 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's generators and the ``contextlib.contextfactory`` decorator provide a
+Python's :term:`generator`\s and the ``contextlib.contextfactory`` decorator provide a
 convenient way to implement these protocols.  If a generator function is
 decorated with the ``contextlib.contextfactory`` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and

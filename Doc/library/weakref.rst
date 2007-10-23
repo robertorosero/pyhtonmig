@@ -50,9 +50,9 @@ benefit of advanced uses.
 
 Not all objects can be weakly referenced; those objects which can include class
 instances, functions written in Python (but not in C), methods (both bound and
-unbound), sets, frozensets, file objects, generators, type objects, DBcursor
-objects from the :mod:`bsddb` module, sockets, arrays, deques, and regular
-expression pattern objects.
+unbound), sets, frozensets, file objects, :term:`generator`\s, type objects,
+:class:`DBcursor` objects from the :mod:`bsddb` module, sockets, arrays, deques,
+and regular expression pattern objects.
 
 .. versionchanged:: 2.4
    Added support for files, sockets, arrays, and patterns.
@@ -150,7 +150,7 @@ than needed.
 
 .. method:: WeakKeyDictionary.iterkeyrefs()
 
-   Return an iterator that yields the weak references to the keys.
+   Return an :term:`iterator` that yields the weak references to the keys.
 
    .. versionadded:: 2.5
 
@@ -182,7 +182,7 @@ methods of :class:`WeakKeyDictionary` objects.
 
 .. method:: WeakValueDictionary.itervaluerefs()
 
-   Return an iterator that yields the weak references to the values.
+   Return an :term:`iterator` that yields the weak references to the values.
 
    .. versionadded:: 2.5
 
