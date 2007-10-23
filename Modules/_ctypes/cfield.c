@@ -993,7 +993,7 @@ static PyObject *
 D_set(void *ptr, PyObject *value, Py_ssize_t size)
 {
 	long double x;
-	int i;
+
 	x = PyFloat_AsDouble(value);
 	if (x == -1 && PyErr_Occurred()) {
 		PyErr_Format(PyExc_TypeError,
@@ -1002,10 +1002,6 @@ D_set(void *ptr, PyObject *value, Py_ssize_t size)
 		return NULL;
 	}
 	memcpy(ptr, &x, sizeof(long double));
-	fprintf(stderr, "D_set(%p, %f) (", ptr, (float)x);
-	for (i = 0; i < sizeof(long double); ++i)
-		fprintf(stderr, "%02x ", ((char *)ptr)[i] & 0xFF);
-	fprintf(stderr, ")\n");
 	_RET(value);
 }
 
@@ -1013,12 +1009,7 @@ static PyObject *
 D_get(void *ptr, Py_ssize_t size)
 {
 	long double val;
-	int i;
 	memcpy(&val, ptr, sizeof(long double));
-	fprintf(stderr, "D_get(%p) %f  (", ptr, (float)val);
-	for (i = 0; i < sizeof(long double); ++i)
-		fprintf(stderr, "%02x ", ((char *)ptr)[i] & 0xFF);
-	fprintf(stderr, ")\n");
 	return PyFloat_FromDouble(val);
 }
 

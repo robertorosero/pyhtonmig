@@ -1,5 +1,4 @@
 import unittest
-import sys
 from ctypes import *
 import _ctypes_test
 
@@ -79,14 +78,8 @@ class Callbacks(unittest.TestCase):
         self.check_type(c_double, -3.14)
 
     def test_longdouble(self):
-        print >> sys.stderr, "First Test Start"
         self.check_type(c_longdouble, 3.14)
-        print  >> sys.stderr, "First Test Done"
-        print >> sys.stderr
-
-        print  >> sys.stderr, "Second Test Start"
-        self.check_type(c_longdouble, 2.78)
-        print  >> sys.stderr, "Second Test Done"
+        self.check_type(c_longdouble, -3.14)
 
     def test_char(self):
         self.check_type(c_char, "x")
