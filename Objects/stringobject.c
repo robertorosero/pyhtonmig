@@ -351,153 +351,6 @@ PyString_FromFormat(const char *format, ...)
 	return ret;
 }
 
-
-PyObject *PyString_Decode(const char *s,
-			  Py_ssize_t size,
-			  const char *encoding,
-			  const char *errors)
-{
-    PyObject *v, *str;
-
-    str = PyString_FromStringAndSize(s, size);
-    if (str == NULL)
-	return NULL;
-    v = PyString_AsDecodedString(str, encoding, errors);
-    Py_DECREF(str);
-    return v;
-}
-
-PyObject *PyString_AsDecodedObject(PyObject *str,
-				   const char *encoding,
-				   const char *errors)
-{
-    PyObject *v;
-
-    if (!PyString_Check(str)) {
-        PyErr_BadArgument();
-        goto onError;
-    }
-
-    if (encoding == NULL) {
-	encoding = PyUnicode_GetDefaultEncoding();
-    }
-
-    /* Decode via the codec registry */
-    v = PyCodec_Decode(str, encoding, errors);
-    if (v == NULL)
-        goto onError;
-
-    return v;
-
- onError:
-    return NULL;
-}
-
-PyObject *PyString_AsDecodedString(PyObject *str,
-				   const char *encoding,
-				   const char *errors)
-{
-    PyObject *v;
-
-    v = PyString_AsDecodedObject(str, encoding, errors);
-    if (v == NULL)
-        goto onError;
-
-    /* Convert Unicode to a string using the default encoding */
-    if (PyUnicode_Check(v)) {
-	PyObject *temp = v;
-	v = PyUnicode_AsEncodedString(v, NULL, NULL);
-	Py_DECREF(temp);
-	if (v == NULL)
-	    goto onError;
-    }
-    if (!PyString_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "decoder did not return a string object (type=%.400s)",
-                     Py_Type(v)->tp_name);
-        Py_DECREF(v);
-        goto onError;
-    }
-
-    return v;
-
- onError:
-    return NULL;
-}
-
-PyObject *PyString_Encode(const char *s,
-			  Py_ssize_t size,
-			  const char *encoding,
-			  const char *errors)
-{
-    PyObject *v, *str;
-
-    str = PyString_FromStringAndSize(s, size);
-    if (str == NULL)
-	return NULL;
-    v = PyString_AsEncodedString(str, encoding, errors);
-    Py_DECREF(str);
-    return v;
-}
-
-PyObject *PyString_AsEncodedObject(PyObject *str,
-				   const char *encoding,
-				   const char *errors)
-{
-    PyObject *v;
-
-    if (!PyString_Check(str)) {
-        PyErr_BadArgument();
-        goto onError;
-    }
-
-    if (encoding == NULL) {
-	encoding = PyUnicode_GetDefaultEncoding();
-    }
-
-    /* Encode via the codec registry */
-    v = PyCodec_Encode(str, encoding, errors);
-    if (v == NULL)
-        goto onError;
-
-    return v;
-
- onError:
-    return NULL;
-}
-
-PyObject *PyString_AsEncodedString(PyObject *str,
-				   const char *encoding,
-				   const char *errors)
-{
-    PyObject *v;
-
-    v = PyString_AsEncodedObject(str, encoding, errors);
-    if (v == NULL)
-        goto onError;
-
-    /* Convert Unicode to a string using the default encoding */
-    if (PyUnicode_Check(v)) {
-	PyObject *temp = v;
-	v = PyUnicode_AsEncodedString(v, NULL, NULL);
-	Py_DECREF(temp);
-	if (v == NULL)
-	    goto onError;
-    }
-    if (!PyString_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "encoder did not return a string object (type=%.400s)",
-                     Py_Type(v)->tp_name);
-        Py_DECREF(v);
-        goto onError;
-    }
-
-    return v;
-
- onError:
-    return NULL;
-}
-
 static void
 string_dealloc(PyObject *op)
 {
@@ -577,7 +430,7 @@ PyObject *PyString_DecodeEscape(const char *s,
 			continue;
 		}
 		s++;
-                if (s==end) {
+		if (s==end) {
 			PyErr_SetString(PyExc_ValueError,
 					"Trailing \\ in string");
 			goto failed;
@@ -665,8 +518,8 @@ PyObject *PyString_DecodeEscape(const char *s,
 static Py_ssize_t
 string_getsize(register PyObject *op)
 {
-    	char *s;
-    	Py_ssize_t len;
+	char *s;
+	Py_ssize_t len;
 	if (PyString_AsStringAndSize(op, &s, &len))
 		return -1;
 	return len;
@@ -675,8 +528,8 @@ string_getsize(register PyObject *op)
 static /*const*/ char *
 string_getbuffer(register PyObject *op)
 {
-    	char *s;
-    	Py_ssize_t len;
+	char *s;
+	Py_ssize_t len;
 	if (PyString_AsStringAndSize(op, &s, &len))
 		return NULL;
 	return s;
@@ -876,7 +729,7 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 	if (!PyString_Check(bb)) {
 		if (PyUnicode_Check(bb))
 		    return PyUnicode_Concat((PyObject *)a, bb);
-                if (PyBytes_Check(bb))
+		if (PyBytes_Check(bb))
 			return PyBytes_Concat((PyObject *)a, bb);
 		PyErr_Format(PyExc_TypeError,
 			     "cannot concatenate 'str8' and '%.200s' objects",
@@ -1053,9 +906,9 @@ _PyString_Eq(PyObject *o1, PyObject *o2)
 {
 	PyStringObject *a = (PyStringObject*) o1;
 	PyStringObject *b = (PyStringObject*) o2;
-        return Py_Size(a) == Py_Size(b)
-          && *a->ob_sval == *b->ob_sval
-          && memcmp(a->ob_sval, b->ob_sval, Py_Size(a)) == 0;
+	return Py_Size(a) == Py_Size(b)
+		&& *a->ob_sval == *b->ob_sval
+		&& memcmp(a->ob_sval, b->ob_sval, Py_Size(a)) == 0;
 }
 
 static long
@@ -1088,12 +941,12 @@ string_subscript(PyStringObject* self, PyObject* item)
 			return NULL;
 		if (i < 0)
 			i += PyString_GET_SIZE(self);
-                if (i < 0 || i >= PyString_GET_SIZE(self)) {
+		if (i < 0 || i >= PyString_GET_SIZE(self)) {
 			PyErr_SetString(PyExc_IndexError,
 					"string index out of range");
 			return NULL;
-                }
-                return PyInt_FromLong((unsigned char)self->ob_sval[i]);
+		}
+		return PyInt_FromLong((unsigned char)self->ob_sval[i]);
 	}
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength, cur, i;
@@ -1149,7 +1002,7 @@ string_subscript(PyStringObject* self, PyObject* item)
 static int
 string_buffer_getbuffer(PyStringObject *self, Py_buffer *view, int flags)
 {
-        return PyBuffer_FillInfo(view, (void *)self->ob_sval, Py_Size(self), 0, flags);
+	return PyBuffer_FillInfo(view, (void *)self->ob_sval, Py_Size(self), 0, flags);
 }
 
 static PySequenceMethods string_as_sequence = {
@@ -1171,7 +1024,7 @@ static PyMappingMethods string_as_mapping = {
 
 static PyBufferProcs string_as_buffer = {
 	(getbufferproc)string_buffer_getbuffer,
-        NULL,
+	NULL,
 };
 
 
@@ -2888,27 +2741,14 @@ able to handle UnicodeDecodeErrors.");
 static PyObject *
 string_decode(PyStringObject *self, PyObject *args)
 {
-    char *encoding = NULL;
-    char *errors = NULL;
-    PyObject *v;
+	char *encoding = NULL;
+	char *errors = NULL;
 
-    if (!PyArg_ParseTuple(args, "|ss:decode", &encoding, &errors))
-        return NULL;
-    v = PyString_AsDecodedObject((PyObject *)self, encoding, errors);
-    if (v == NULL)
-        goto onError;
-    if (!PyString_Check(v) && !PyUnicode_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "decoder did not return a string/unicode object "
-                     "(type=%.400s)",
-                     Py_Type(v)->tp_name);
-        Py_DECREF(v);
-        return NULL;
-    }
-    return v;
-
- onError:
-    return NULL;
+	if (!PyArg_ParseTuple(args, "|ss:decode", &encoding, &errors))
+		return NULL;
+	if (encoding == NULL)
+		encoding = PyUnicode_GetDefaultEncoding();
+	return PyCodec_Decode(self, encoding, errors);
 }
 
 
@@ -2922,17 +2762,17 @@ str8.fromhex('10 1112') -> s'\\x10\\x11\\x12'.");
 static int
 hex_digit_to_int(Py_UNICODE c)
 {
-    if (c >= 128)
-        return -1;
-    if (ISDIGIT(c))
-        return c - '0';
-    else {
-        if (ISUPPER(c))
-            c = TOLOWER(c);
-        if (c >= 'a' && c <= 'f')
-            return c - 'a' + 10;
-    }
-    return -1;
+	if (c >= 128)
+		return -1;
+	if (ISDIGIT(c))
+		return c - '0';
+	else {
+		if (ISUPPER(c))
+			c = TOLOWER(c);
+		if (c >= 'a' && c <= 'f')
+			return c - 'a' + 10;
+	}
+	return -1;
 }
 
 static PyObject *
@@ -3392,7 +3232,7 @@ getnextarg(PyObject *args, Py_ssize_t arglen, Py_ssize_t *p_argidx)
 
 Py_LOCAL_INLINE(int)
 formatfloat(char *buf, size_t buflen, int flags,
-            int prec, int type, PyObject *v)
+	    int prec, int type, PyObject *v)
 {
 	/* fmt = '%#.' + `prec` + `type`
 	   worst case length = 3 + 10 (len of INT_MAX) + 1 = 14 (use 20)*/
@@ -3425,7 +3265,7 @@ formatfloat(char *buf, size_t buflen, int flags,
 
 	*/
 	if (((type == 'g' || type == 'G') &&
-              buflen <= (size_t)10 + (size_t)prec) ||
+             buflen <= (size_t)10 + (size_t)prec) ||
 	    (type == 'f' && buflen <= (size_t)53 + (size_t)prec)) {
 		PyErr_SetString(PyExc_OverflowError,
 			"formatted float is too long (precision too large?)");
@@ -3434,7 +3274,7 @@ formatfloat(char *buf, size_t buflen, int flags,
 	PyOS_snprintf(fmt, sizeof(fmt), "%%%s.%d%c",
 		      (flags&F_ALT) ? "#" : "",
 		      prec, type);
-        PyOS_ascii_formatd(buf, buflen, fmt, x);
+	PyOS_ascii_formatd(buf, buflen, fmt, x);
 	return (int)strlen(buf);
 }
 
@@ -3534,7 +3374,7 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 	    (type == 'o' || type == 'x' || type == 'X'))) {
 		assert(buf[sign] == '0');
 		assert(buf[sign+1] == 'x' || buf[sign+1] == 'X' ||
-                       buf[sign+1] == 'o');
+		       buf[sign+1] == 'o');
 		numnondigits -= 2;
 		buf += 2;
 		len -= 2;
@@ -3582,7 +3422,7 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 
 Py_LOCAL_INLINE(int)
 formatint(char *buf, size_t buflen, int flags,
-          int prec, int type, PyObject *v)
+	  int prec, int type, PyObject *v)
 {
 	/* fmt = '%#.' + `prec` + 'l' + `type`
 	   worst case length = 3 + 19 (worst len of INT_MAX on 64-bit machine)
@@ -4065,18 +3905,20 @@ PyString_Format(PyObject *format, PyObject *args)
 				--rescnt;
 				*res++ = ' ';
 			}
-                        if (dict && (argidx < arglen) && c != '%') {
-                                PyErr_SetString(PyExc_TypeError,
-                                           "not all arguments converted during string formatting");
-                                Py_XDECREF(temp);
-                                goto error;
-                        }
+			if (dict && (argidx < arglen) && c != '%') {
+				PyErr_SetString(PyExc_TypeError,
+						"not all arguments converted "
+						"during string formatting");
+				Py_XDECREF(temp);
+				goto error;
+			}
 			Py_XDECREF(temp);
 		} /* '%' */
 	} /* until end */
 	if (argidx < arglen && !dict) {
 		PyErr_SetString(PyExc_TypeError,
-				"not all arguments converted during string formatting");
+				"not all arguments converted "
+				"during string formatting");
 		goto error;
 	}
 	if (args_owned) {
