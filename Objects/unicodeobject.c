@@ -8225,12 +8225,6 @@ getnextarg(PyObject *args, Py_ssize_t arglen, Py_ssize_t *p_argidx)
     return NULL;
 }
 
-#define F_LJUST (1<<0)
-#define F_SIGN	(1<<1)
-#define F_BLANK (1<<2)
-#define F_ALT	(1<<3)
-#define F_ZERO	(1<<4)
-
 static Py_ssize_t
 strtounicode(Py_UNICODE *buffer, const char *charbuffer)
 {

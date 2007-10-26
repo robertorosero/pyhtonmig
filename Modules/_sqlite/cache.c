@@ -246,7 +246,7 @@ PyObject* pysqlite_cache_display(pysqlite_Cache* self, PyObject* args)
             Py_DECREF(fmt_args);
             return NULL;
         }
-        display_str = PyString_Format(template, fmt_args);
+        display_str = PyUnicode_Format(template, fmt_args);
         Py_DECREF(template);
         Py_DECREF(fmt_args);
         if (!display_str) {
