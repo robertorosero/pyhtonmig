@@ -119,8 +119,8 @@ static int import_all_from(PyObject *, PyObject *);
 static void set_exc_info(PyThreadState *, PyObject *, PyObject *, PyObject *);
 static void reset_exc_info(PyThreadState *);
 static void format_exc_check_arg(PyObject *, const char *, PyObject *);
-static PyObject * string_concatenate(PyObject *, PyObject *,
-				    PyFrameObject *, unsigned char *);
+static PyObject * unicode_concatenate(PyObject *, PyObject *,
+                                      PyFrameObject *, unsigned char *);
 
 #define NAME_ERROR_MSG \
 	"name '%.200s' is not defined"
@@ -1127,10 +1127,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					goto slow_add;
 				x = PyInt_FromLong(i);
 			}
-			else if (PyString_CheckExact(v) &&
-				 PyString_CheckExact(w)) {
-				x = string_concatenate(v, w, f, next_instr);
-				/* string_concatenate consumed the ref to v */
+			else if (PyUnicode_CheckExact(v) &&
+				 PyUnicode_CheckExact(w)) {
+				x = unicode_concatenate(v, w, f, next_instr);
+				/* unicode_concatenate consumed the ref to v */
 				goto skip_decref_vx;
 			}
 			else {
@@ -1328,10 +1328,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					goto slow_iadd;
 				x = PyInt_FromLong(i);
 			}
-			else if (PyString_CheckExact(v) &&
-				 PyString_CheckExact(w)) {
-				x = string_concatenate(v, w, f, next_instr);
-				/* string_concatenate consumed the ref to v */
+			else if (PyUnicode_CheckExact(v) &&
+				 PyUnicode_CheckExact(w)) {
+				x = unicode_concatenate(v, w, f, next_instr);
+				/* unicode_concatenate consumed the ref to v */
 				goto skip_decref_v;
 			}
 			else {
@@ -3961,13 +3961,13 @@ format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
 }
 
 static PyObject *
-string_concatenate(PyObject *v, PyObject *w,
+unicode_concatenate(PyObject *v, PyObject *w,
 		   PyFrameObject *f, unsigned char *next_instr)
 {
 	/* This function implements 'variable += expr' when both arguments
-	   are strings. */
-	Py_ssize_t v_len = PyString_GET_SIZE(v);
-	Py_ssize_t w_len = PyString_GET_SIZE(w);
+	   are (Unicode) strings. */
+	Py_ssize_t v_len = PyUnicode_GET_SIZE(v);
+	Py_ssize_t w_len = PyUnicode_GET_SIZE(w);
 	Py_ssize_t new_len = v_len + w_len;
 	if (new_len < 0) {
 		PyErr_SetString(PyExc_OverflowError,
@@ -4016,12 +4016,12 @@ string_concatenate(PyObject *v, PyObject *w,
 		}
 	}
 
-	if (v->ob_refcnt == 1 && !PyString_CHECK_INTERNED(v)) {
+	if (v->ob_refcnt == 1 && !PyUnicode_CHECK_INTERNED(v)) {
 		/* Now we own the last reference to 'v', so we can resize it
 		 * in-place.
 		 */
-		if (_PyString_Resize(&v, new_len) != 0) {
-			/* XXX if _PyString_Resize() fails, 'v' has been
+		if (PyUnicode_Resize(&v, new_len) != 0) {
+			/* XXX if PyUnicode_Resize() fails, 'v' has been
 			 * deallocated so it cannot be put back into
 			 * 'variable'.  The MemoryError is raised when there
 			 * is no value in 'variable', which might (very
@@ -4030,14 +4030,15 @@ string_concatenate(PyObject *v, PyObject *w,
 			return NULL;
 		}
 		/* copy 'w' into the newly allocated area of 'v' */
-		memcpy(PyString_AS_STRING(v) + v_len,
-		       PyString_AS_STRING(w), w_len);
+		memcpy(PyUnicode_AS_UNICODE(v) + v_len,
+		       PyUnicode_AS_UNICODE(w), w_len*sizeof(Py_UNICODE));
 		return v;
 	}
 	else {
 		/* When in-place resizing is not an option. */
-		PyString_Concat(&v, w);
-		return v;
+		w = PyUnicode_Concat(v, w);
+                Py_DECREF(v);
+		return w;
 	}
 }
 
