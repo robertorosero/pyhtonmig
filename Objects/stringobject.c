@@ -13,16 +13,6 @@ int null_strings, one_strings;
 static PyStringObject *characters[UCHAR_MAX + 1];
 static PyStringObject *nullstring;
 
-/* This dictionary holds all interned strings.  Note that references to
-   strings in this dictionary are *not* counted in the string's ob_refcnt.
-   When the interned string reaches a refcnt of 0 the string deallocation
-   function will delete the reference from this dictionary.
-
-   Another way to look at this is that to say that the actual reference
-   count of a string is:  s->ob_refcnt + (s->ob_sstate?2:0)
-*/
-static PyObject *interned;
-
 /*
    For both PyString_FromString() and PyString_FromStringAndSize(), the
    parameter `size' denotes number of characters to allocate, not counting any
@@ -77,21 +67,14 @@ PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sstate = SSTATE_NOT_INTERNED;
 	if (str != NULL)
 		Py_MEMCPY(op->ob_sval, str, size);
 	op->ob_sval[size] = '\0';
 	/* share short strings */
 	if (size == 0) {
-		PyObject *t = (PyObject *)op;
-		PyString_InternInPlace(&t);
-		op = (PyStringObject *)t;
 		nullstring = op;
 		Py_INCREF(op);
 	} else if (size == 1 && str != NULL) {
-		PyObject *t = (PyObject *)op;
-		PyString_InternInPlace(&t);
-		op = (PyStringObject *)t;
 		characters[*str & UCHAR_MAX] = op;
 		Py_INCREF(op);
 	}
@@ -132,19 +115,12 @@ PyString_FromString(const char *str)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sstate = SSTATE_NOT_INTERNED;
 	Py_MEMCPY(op->ob_sval, str, size+1);
 	/* share short strings */
 	if (size == 0) {
-		PyObject *t = (PyObject *)op;
-		PyString_InternInPlace(&t);
-		op = (PyStringObject *)t;
 		nullstring = op;
 		Py_INCREF(op);
 	} else if (size == 1) {
-		PyObject *t = (PyObject *)op;
-		PyString_InternInPlace(&t);
-		op = (PyStringObject *)t;
 		characters[*str & UCHAR_MAX] = op;
 		Py_INCREF(op);
 	}
@@ -354,24 +330,6 @@ PyString_FromFormat(const char *format, ...)
 static void
 string_dealloc(PyObject *op)
 {
-	switch (PyString_CHECK_INTERNED(op)) {
-		case SSTATE_NOT_INTERNED:
-			break;
-
-		case SSTATE_INTERNED_MORTAL:
-			/* revive dead object temporarily for DelItem */
-			Py_Refcnt(op) = 3;
-			if (PyDict_DelItem(interned, op) != 0)
-				Py_FatalError(
-					"deletion of interned string failed");
-			break;
-
-		case SSTATE_INTERNED_IMMORTAL:
-			Py_FatalError("Immortal interned string died.");
-
-		default:
-			Py_FatalError("Inconsistent interned string state.");
-	}
 	Py_Type(op)->tp_free(op);
 }
 
@@ -760,7 +718,6 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sstate = SSTATE_NOT_INTERNED;
 	Py_MEMCPY(op->ob_sval, a->ob_sval, Py_Size(a));
 	Py_MEMCPY(op->ob_sval + Py_Size(a), b->ob_sval, Py_Size(b));
 	op->ob_sval[size] = '\0';
@@ -803,7 +760,6 @@ string_repeat(register PyStringObject *a, register Py_ssize_t n)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sstate = SSTATE_NOT_INTERNED;
 	op->ob_sval[size] = '\0';
 	if (Py_Size(a) == 1 && n > 0) {
 		memset(op->ob_sval, a->ob_sval[0] , n);
@@ -3053,10 +3009,10 @@ str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	n = PyString_GET_SIZE(tmp);
 	pnew = type->tp_alloc(type, n);
 	if (pnew != NULL) {
-		Py_MEMCPY(PyString_AS_STRING(pnew), PyString_AS_STRING(tmp), n+1);
+		Py_MEMCPY(PyString_AS_STRING(pnew),
+			  PyString_AS_STRING(tmp), n+1);
 		((PyStringObject *)pnew)->ob_shash =
 			((PyStringObject *)tmp)->ob_shash;
-		((PyStringObject *)pnew)->ob_sstate = SSTATE_NOT_INTERNED;
 	}
 	Py_DECREF(tmp);
 	return pnew;
@@ -3157,8 +3113,7 @@ _PyString_Resize(PyObject **pv, Py_ssize_t newsize)
 	register PyObject *v;
 	register PyStringObject *sv;
 	v = *pv;
-	if (!PyString_Check(v) || Py_Refcnt(v) != 1 || newsize < 0 ||
-	    PyString_CHECK_INTERNED(v)) {
+	if (!PyString_Check(v) || Py_Refcnt(v) != 1 || newsize < 0) {
 		*pv = 0;
 		Py_DECREF(v);
 		PyErr_BadInternalCall();
@@ -3326,65 +3281,6 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 }
 
 void
-PyString_InternInPlace(PyObject **p)
-{
-	register PyStringObject *s = (PyStringObject *)(*p);
-	PyObject *t;
-	if (s == NULL || !PyString_Check(s))
-		Py_FatalError("PyString_InternInPlace: strings only please!");
-	/* If it's a string subclass, we don't really know what putting
-	   it in the interned dict might do. */
-	if (!PyString_CheckExact(s))
-		return;
-	if (PyString_CHECK_INTERNED(s))
-		return;
-	if (interned == NULL) {
-		interned = PyDict_New();
-		if (interned == NULL) {
-			PyErr_Clear(); /* Don't leave an exception */
-			return;
-		}
-	}
-	t = PyDict_GetItem(interned, (PyObject *)s);
-	if (t) {
-		Py_INCREF(t);
-		Py_DECREF(*p);
-		*p = t;
-		return;
-	}
-
-	if (PyDict_SetItem(interned, (PyObject *)s, (PyObject *)s) < 0) {
-		PyErr_Clear();
-		return;
-	}
-	/* The two references in interned are not counted by refcnt.
-	   The string deallocator will take care of this */
-	Py_Refcnt(s) -= 2;
-	PyString_CHECK_INTERNED(s) = SSTATE_INTERNED_MORTAL;
-}
-
-void
-PyString_InternImmortal(PyObject **p)
-{
-	PyString_InternInPlace(p);
-	if (PyString_CHECK_INTERNED(*p) != SSTATE_INTERNED_IMMORTAL) {
-		PyString_CHECK_INTERNED(*p) = SSTATE_INTERNED_IMMORTAL;
-		Py_INCREF(*p);
-	}
-}
-
-
-PyObject *
-PyString_InternFromString(const char *cp)
-{
-	PyObject *s = PyString_FromString(cp);
-	if (s == NULL)
-		return NULL;
-	PyString_InternInPlace(&s);
-	return s;
-}
-
-void
 PyString_Fini(void)
 {
 	int i;
@@ -3395,58 +3291,6 @@ PyString_Fini(void)
 	Py_XDECREF(nullstring);
 	nullstring = NULL;
 }
-
-void _Py_ReleaseInternedStrings(void)
-{
-	PyObject *keys;
-	PyStringObject *s;
-	Py_ssize_t i, n;
-	Py_ssize_t immortal_size = 0, mortal_size = 0;
-
-	if (interned == NULL || !PyDict_Check(interned))
-		return;
-	keys = PyDict_Keys(interned);
-	if (keys == NULL || !PyList_Check(keys)) {
-		PyErr_Clear();
-		return;
-	}
-
-	/* Since _Py_ReleaseInternedStrings() is intended to help a leak
-	   detector, interned strings are not forcibly deallocated; rather, we
-	   give them their stolen references back, and then clear and DECREF
-	   the interned dict. */
-
-	n = PyList_GET_SIZE(keys);
-	fprintf(stderr, "releasing %" PY_FORMAT_SIZE_T "d interned strings\n",
-		n);
-	for (i = 0; i < n; i++) {
-		s = (PyStringObject *) PyList_GET_ITEM(keys, i);
-		switch (s->ob_sstate) {
-		case SSTATE_NOT_INTERNED:
-			/* XXX Shouldn't happen */
-			break;
-		case SSTATE_INTERNED_IMMORTAL:
-			Py_Refcnt(s) += 1;
-			immortal_size += Py_Size(s);
-			break;
-		case SSTATE_INTERNED_MORTAL:
-			Py_Refcnt(s) += 2;
-			mortal_size += Py_Size(s);
-			break;
-		default:
-			Py_FatalError("Inconsistent interned string state.");
-		}
-		s->ob_sstate = SSTATE_NOT_INTERNED;
-	}
-	fprintf(stderr, "total size of all interned strings: "
-			"%" PY_FORMAT_SIZE_T "d/%" PY_FORMAT_SIZE_T "d "
-			"mortal/immortal\n", mortal_size, immortal_size);
-	Py_DECREF(keys);
-	PyDict_Clear(interned);
-	Py_DECREF(interned);
-	interned = NULL;
-}
-
 
 /*********************** Str Iterator ****************************/
 

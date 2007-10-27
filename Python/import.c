@@ -76,9 +76,10 @@ extern time_t PyOS_GetLastModificationTime(char *, FILE *);
 		      3060 (PEP 3115 metaclass syntax)
 		      3070 (PEP 3109 raise changes)
 		      3080 (PEP 3137 make __file__ and __name__ unicode)
+		      3090 (kill str8 interning)
 .
 */
-#define MAGIC (3080 | ((long)'\r'<<16) | ((long)'\n'<<24))
+#define MAGIC (3090 | ((long)'\r'<<16) | ((long)'\n'<<24))
 
 /* Magic word as global; note that _PyImport_Init() can change the
    value of this global to accommodate for alterations of how the

@@ -25,26 +25,18 @@ functions should be applied to nil objects.
 */
 
 /* Caching the hash (ob_shash) saves recalculation of a string's hash value.
-   Interning strings (ob_sstate) tries to ensure that only one string
-   object with a given value exists, so equality tests can be one pointer
-   comparison.  This is generally restricted to strings that "look like"
-   Python identifiers, although the sys.intern() function can be used to force
-   interning of any string.
-   Together, these sped the interpreter by up to 20%. */
+   This significantly speeds up dict lookups. */
 
 typedef struct {
     PyObject_VAR_HEAD
     long ob_shash;
-    int ob_sstate;
+    int ob_placeholder;  /* XXX If I remove this things break?!?! */
     char ob_sval[1];
 
     /* Invariants:
      *     ob_sval contains space for 'ob_size+1' elements.
      *     ob_sval[ob_size] == 0.
      *     ob_shash is the hash of the string or -1 if not computed yet.
-     *     ob_sstate != 0 iff the string object is in stringobject.c's
-     *       'interned' dictionary; in this case the two references
-     *       from 'interned' to this object are *not counted* in ob_refcnt.
      */
 } PyStringObject;
 
@@ -73,14 +65,6 @@ PyAPI_FUNC(PyObject *) _PyString_FormatLong(PyObject*, int, int,
 PyAPI_FUNC(PyObject *) PyString_DecodeEscape(const char *, Py_ssize_t,
 						   const char *, Py_ssize_t,
 						   const char *);
-
-PyAPI_FUNC(void) PyString_InternInPlace(PyObject **);
-PyAPI_FUNC(void) PyString_InternImmortal(PyObject **);
-PyAPI_FUNC(PyObject *) PyString_InternFromString(const char *);
-PyAPI_FUNC(void) _Py_ReleaseInternedStrings(void);
-
-/* Use only if you know it's a string */
-#define PyString_CHECK_INTERNED(op) (((PyStringObject *)(op))->ob_sstate)
 
 /* Macro, trading safety for speed */
 #define PyString_AS_STRING(op) (assert(PyString_Check(op)), \
