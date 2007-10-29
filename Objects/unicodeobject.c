@@ -2671,6 +2671,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
         startinpos = s-starts;
         /* \ - Escapes */
         s++;
+        assert (s < end); /* If this fails, the parser let through garbage */
         switch (*s++) {
 
         /* \x escapes */
@@ -2690,9 +2691,9 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
         case '0': case '1': case '2': case '3':
         case '4': case '5': case '6': case '7':
             x = s[-1] - '0';
-            if ('0' <= *s && *s <= '7') {
+            if (s < end && '0' <= *s && *s <= '7') {
                 x = (x<<3) + *s++ - '0';
-                if ('0' <= *s && *s <= '7')
+                if (s < end && '0' <= *s && *s <= '7')
                     x = (x<<3) + *s++ - '0';
             }
             *p++ = x;

@@ -30,7 +30,6 @@ functions should be applied to nil objects.
 typedef struct {
     PyObject_VAR_HEAD
     long ob_shash;
-    int ob_placeholder;  /* XXX If I remove this things break?!?! */
     char ob_sval[1];
 
     /* Invariants:
