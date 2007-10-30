@@ -1518,8 +1518,9 @@ class PyBuildExt(build_ext):
                              sources=['_ctypes/_ctypes_test.c'])
         self.extensions.extend([ext, ext_test])
 
-        if not '--with-system-ffi' in sysconfig.get_config_var("CONFIG_ARGS"):
-            return
+## Use system ffi if one is found.
+##        if not '--with-system-ffi' in sysconfig.get_config_var("CONFIG_ARGS"):
+##            return
 
         ffi_inc = find_file('ffi.h', [], inc_dirs)
         if ffi_inc is not None:
