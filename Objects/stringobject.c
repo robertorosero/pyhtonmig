@@ -2909,6 +2909,26 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
+	/* Is it an int? */
+	size = PyNumber_AsSsize_t(x, PyExc_ValueError);
+	if (size == -1 && PyErr_Occurred()) {
+		PyErr_Clear();
+	}
+	else {
+		if (size < 0) {
+			PyErr_SetString(PyExc_ValueError, "negative count");
+			return NULL;
+		}
+		new = PyString_FromStringAndSize(NULL, size);
+		if (new == NULL) {
+			return NULL;
+		}
+		if (size > 0) {
+			memset(((PyStringObject*)new)->ob_sval, 0, size);
+		}
+		return new;
+	}
+
 	/* Use the modern buffer interface */
 	if (PyObject_CheckBuffer(x)) {
 		Py_buffer view;

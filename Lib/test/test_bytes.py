@@ -50,6 +50,15 @@ class BytesTest(unittest.TestCase):
         self.assertRaises(ValueError, bytes, [C(-1)])
         self.assertRaises(ValueError, bytes, [C(256)])
 
+    def test_from_ssize(self):
+        self.assertEqual(bytes(0), b'')
+        self.assertEqual(bytes(1), b'\x00')
+        self.assertEqual(bytes(5), b'\x00\x00\x00\x00\x00')
+        self.assertRaises(ValueError, bytes, -1)
+
+        self.assertEqual(bytes('0', 'ascii'), b'0')
+        self.assertEqual(bytes(b'0'), b'0')
+
     def test_constructor_type_errors(self):
         self.assertRaises(TypeError, bytes, 0.0)
         class C:
