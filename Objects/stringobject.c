@@ -6,6 +6,24 @@
 
 #include "bytes_methods.h"
 
+static Py_ssize_t
+_getbuffer(PyObject *obj, Py_buffer *view)
+{
+    PyBufferProcs *buffer = Py_Type(obj)->tp_as_buffer;
+
+    if (buffer == NULL || buffer->bf_getbuffer == NULL)
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "Type %.100s doesn't support the buffer API",
+                     Py_Type(obj)->tp_name);
+        return -1;
+    }
+
+    if (buffer->bf_getbuffer(obj, view, PyBUF_SIMPLE) < 0)
+            return -1;
+    return view->len;
+}
+
 #ifdef COUNT_ALLOCS
 int null_strings, one_strings;
 #endif
@@ -450,8 +468,8 @@ PyObject *PyString_DecodeEscape(const char *s,
 				/* do nothing */;
 			else {
 				PyErr_Format(PyExc_ValueError,
-					     "decoding error; "
-					     "unknown error handling code: %.400s",
+					     "decoding error; unknown "
+					     "error handling code: %.400s",
 					     errors);
 				goto failed;
 			}
@@ -564,7 +582,7 @@ PyString_AsStringAndSize(register PyObject *obj,
 #define STRINGLIB_LEN PyString_GET_SIZE
 #define STRINGLIB_NEW PyString_FromStringAndSize
 #define STRINGLIB_STR PyString_AS_STRING
-#define STRINGLIB_WANT_CONTAINS_OBJ 1
+/* #define STRINGLIB_WANT_CONTAINS_OBJ 1 */
 
 #define STRINGLIB_EMPTY nullstring
 #define STRINGLIB_CHECK_EXACT PyString_CheckExact
@@ -584,12 +602,12 @@ PyString_Repr(PyObject *obj, int smartquotes)
 {
 	static const char *hexdigits = "0123456789abcdef";
 	register PyStringObject* op = (PyStringObject*) obj;
-	Py_ssize_t length = PyString_GET_SIZE(op);
-	size_t newsize = 3 + 4 * Py_Size(op);
+	Py_ssize_t length = Py_Size(op);
+	size_t newsize = 3 + 4 * length;
 	PyObject *v;
-	if (newsize > PY_SSIZE_T_MAX || newsize / 4 != Py_Size(op)) {
+	if (newsize > PY_SSIZE_T_MAX || (newsize-3) / 4 != length) {
 		PyErr_SetString(PyExc_OverflowError,
-			"string is too large to make repr");
+			"bytes object is too large to make repr");
 	}
 	v = PyUnicode_FromUnicode(NULL, newsize);
 	if (v == NULL) {
@@ -601,14 +619,14 @@ PyString_Repr(PyObject *obj, int smartquotes)
 		register Py_UNICODE *p = PyUnicode_AS_UNICODE(v);
 		int quote;
 
-		/* figure out which quote to use; single is preferred */
+		/* Figure out which quote to use; single is preferred */
 		quote = '\'';
 		if (smartquotes) {
 			char *test, *start;
 			start = PyString_AS_STRING(op);
 			for (test = start; test < start+length; ++test) {
 				if (*test == '"') {
-					quote = '\''; /* switch back to single quote */
+					quote = '\''; /* back to single */
 					goto decided;
 				}
 				else if (*test == '\'')
@@ -618,8 +636,8 @@ PyString_Repr(PyObject *obj, int smartquotes)
 			;
 		}
 
-		*p++ = 's', *p++ = quote;
-		for (i = 0; i < Py_Size(op); i++) {
+		*p++ = 'b', *p++ = quote;
+		for (i = 0; i < length; i++) {
 			/* There's at least enough room for a hex escape
 			   and a closing quote. */
 			assert(newsize - (p - PyUnicode_AS_UNICODE(v)) >= 5);
@@ -658,71 +676,59 @@ string_repr(PyObject *op)
 	return PyString_Repr(op, 1);
 }
 
-static PyObject *
-string_str(PyObject *s)
-{
-	assert(PyString_Check(s));
-	if (PyString_CheckExact(s)) {
-		Py_INCREF(s);
-		return s;
-	}
-	else {
-		/* Subtype -- return genuine string with the same value. */
-		PyStringObject *t = (PyStringObject *) s;
-		return PyString_FromStringAndSize(t->ob_sval, Py_Size(t));
-	}
-}
-
 static Py_ssize_t
 string_length(PyStringObject *a)
 {
 	return Py_Size(a);
 }
 
+/* This is also used by PyString_Concat() */
 static PyObject *
-string_concat(register PyStringObject *a, register PyObject *bb)
+string_concat(PyObject *a, PyObject *b)
 {
-	register Py_ssize_t size;
-	register PyStringObject *op;
-	if (!PyString_Check(bb)) {
-		if (PyUnicode_Check(bb))
-		    return PyUnicode_Concat((PyObject *)a, bb);
-		if (PyBytes_Check(bb))
-			return PyBytes_Concat((PyObject *)a, bb);
-		PyErr_Format(PyExc_TypeError,
-			     "cannot concatenate 'str8' and '%.200s' objects",
-			     Py_Type(bb)->tp_name);
-		return NULL;
-	}
-#define b ((PyStringObject *)bb)
-	/* Optimize cases with empty left or right operand */
-	if ((Py_Size(a) == 0 || Py_Size(b) == 0) &&
-	    PyString_CheckExact(a) && PyString_CheckExact(b)) {
-		if (Py_Size(a) == 0) {
-			Py_INCREF(bb);
-			return bb;
-		}
-		Py_INCREF(a);
-		return (PyObject *)a;
-	}
-	size = Py_Size(a) + Py_Size(b);
-	if (size < 0) {
-		PyErr_SetString(PyExc_OverflowError,
-				"strings are too large to concat");
-		return NULL;
+	Py_ssize_t size;
+	Py_buffer va, vb;
+	PyObject *result = NULL;
+
+	va.len = -1;
+	vb.len = -1;
+	if (_getbuffer(a, &va) < 0  ||
+	    _getbuffer(b, &vb) < 0) {
+		PyErr_Format(PyExc_TypeError, "can't concat %.100s to %.100s",
+			     Py_Type(a)->tp_name, Py_Type(b)->tp_name);
+		goto done;
 	}
 
-	/* Inline PyObject_NewVar */
-	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
-	if (op == NULL)
-		return PyErr_NoMemory();
-	PyObject_INIT_VAR(op, &PyString_Type, size);
-	op->ob_shash = -1;
-	Py_MEMCPY(op->ob_sval, a->ob_sval, Py_Size(a));
-	Py_MEMCPY(op->ob_sval + Py_Size(a), b->ob_sval, Py_Size(b));
-	op->ob_sval[size] = '\0';
-	return (PyObject *) op;
-#undef b
+	/* Optimize end cases */
+	if (va.len == 0 && PyString_CheckExact(b)) {
+		result = b;
+		Py_INCREF(result);
+		goto done;
+	}
+	if (vb.len == 0 && PyString_CheckExact(a)) {
+		result = a;
+		Py_INCREF(result);
+		goto done;
+	}
+
+	size = va.len + vb.len;
+	if (size < 0) {
+		PyErr_NoMemory();
+		goto done;
+	}
+
+	result = PyString_FromStringAndSize(NULL, size);
+	if (result != NULL) {
+		memcpy(PyString_AS_STRING(result), va.buf, va.len);
+		memcpy(PyString_AS_STRING(result) + va.len, vb.buf, vb.len);
+	}
+
+  done:
+	if (va.len != -1)
+		PyObject_ReleaseBuffer(a, &va);
+	if (vb.len != -1)
+		PyObject_ReleaseBuffer(b, &vb);
+	return result;
 }
 
 static PyObject *
@@ -779,20 +785,26 @@ string_repeat(register PyStringObject *a, register Py_ssize_t n)
 }
 
 static int
-string_contains(PyObject *str_obj, PyObject *sub_obj)
+string_contains(PyObject *self, PyObject *arg)
 {
-	if (!PyString_CheckExact(sub_obj)) {
-		if (PyUnicode_Check(sub_obj))
-			return PyUnicode_Contains(str_obj, sub_obj);
-		if (!PyString_Check(sub_obj)) {
-			PyErr_Format(PyExc_TypeError,
-			    "'in <string>' requires string as left operand, "
-			    "not %.200s", Py_Type(sub_obj)->tp_name);
-			return -1;
-		}
-	}
+    Py_ssize_t ival = PyNumber_AsSsize_t(arg, PyExc_ValueError);
+    if (ival == -1 && PyErr_Occurred()) {
+        Py_buffer varg;
+        int pos;
+        PyErr_Clear();
+        if (_getbuffer(arg, &varg) < 0)
+            return -1;
+        pos = stringlib_find(PyString_AS_STRING(self), Py_Size(self),
+                             varg.buf, varg.len, 0);
+        PyObject_ReleaseBuffer(arg, &varg);
+        return pos >= 0;
+    }
+    if (ival < 0 || ival >= 256) {
+        PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
+        return -1;
+    }
 
-	return stringlib_contains_obj(str_obj, sub_obj);
+    return memchr(PyString_AS_STRING(self), ival, Py_Size(self)) != NULL;
 }
 
 static PyObject*
@@ -958,7 +970,8 @@ string_subscript(PyStringObject* self, PyObject* item)
 static int
 string_buffer_getbuffer(PyStringObject *self, Py_buffer *view, int flags)
 {
-	return PyBuffer_FillInfo(view, (void *)self->ob_sval, Py_Size(self), 0, flags);
+	return PyBuffer_FillInfo(view, (void *)self->ob_sval, Py_Size(self),
+				 0, flags);
 }
 
 static PySequenceMethods string_as_sequence = {
@@ -1119,6 +1132,7 @@ string_split(PyStringObject *self, PyObject *args)
 	Py_ssize_t len = PyString_GET_SIZE(self), n, i, j;
 	Py_ssize_t maxsplit = -1, count=0;
 	const char *s = PyString_AS_STRING(self), *sub;
+	Py_buffer vsub;
 	PyObject *list, *str, *subobj = Py_None;
 #ifdef USE_FAST
 	Py_ssize_t pos;
@@ -1130,25 +1144,27 @@ string_split(PyStringObject *self, PyObject *args)
 		maxsplit = PY_SSIZE_T_MAX;
 	if (subobj == Py_None)
 		return split_whitespace(s, len, maxsplit);
-	if (PyString_Check(subobj)) {
-		sub = PyString_AS_STRING(subobj);
-		n = PyString_GET_SIZE(subobj);
-	}
-	else if (PyUnicode_Check(subobj))
-		return PyUnicode_Split((PyObject *)self, subobj, maxsplit);
-	else if (PyObject_AsCharBuffer(subobj, &sub, &n))
+	if (_getbuffer(subobj, &vsub) < 0)
 		return NULL;
+	sub = vsub.buf;
+	n = vsub.len;
 
 	if (n == 0) {
 		PyErr_SetString(PyExc_ValueError, "empty separator");
+		PyObject_ReleaseBuffer(subobj, &vsub);
 		return NULL;
 	}
-	else if (n == 1)
-		return split_char(s, len, sub[0], maxsplit);
+	else if (n == 1) {
+		char ch = sub[0];
+		PyObject_ReleaseBuffer(subobj, &vsub);
+		return split_char(s, len, ch, maxsplit);
+	}
 
 	list = PyList_New(PREALLOC_SIZE(maxsplit));
-	if (list == NULL)
+	if (list == NULL) {
+		PyObject_ReleaseBuffer(subobj, &vsub);
 		return NULL;
+	}
 
 #ifdef USE_FAST
 	i = j = 0;
@@ -1174,10 +1190,12 @@ string_split(PyStringObject *self, PyObject *args)
 #endif
 	SPLIT_ADD(s, i, len);
 	FIX_PREALLOC_SIZE(list);
+	PyObject_ReleaseBuffer(subobj, &vsub);
 	return list;
 
  onError:
 	Py_DECREF(list);
+	PyObject_ReleaseBuffer(subobj, &vsub);
 	return NULL;
 }
 
@@ -1259,8 +1277,8 @@ rsplit_whitespace(const char *s, Py_ssize_t len, Py_ssize_t maxsplit)
 		SPLIT_ADD(s, i + 1, j + 1);
 	}
 	if (i >= 0) {
-		/* Only occurs when maxsplit was reached */
-		/* Skip any remaining whitespace and copy to beginning of string */
+		/* Only occurs when maxsplit was reached.  Skip any remaining
+		   whitespace and copy to beginning of string. */
 		RSKIP_SPACE(s, i);
 		if (i >= 0)
 			SPLIT_ADD(s, 0, i + 1);
@@ -1323,6 +1341,7 @@ string_rsplit(PyStringObject *self, PyObject *args)
 	Py_ssize_t len = PyString_GET_SIZE(self), n, i, j;
 	Py_ssize_t maxsplit = -1, count=0;
 	const char *s = PyString_AS_STRING(self), *sub;
+	Py_buffer vsub;
 	PyObject *list, *str, *subobj = Py_None;
 
 	if (!PyArg_ParseTuple(args, "|On:rsplit", &subobj, &maxsplit))
@@ -1331,25 +1350,27 @@ string_rsplit(PyStringObject *self, PyObject *args)
 		maxsplit = PY_SSIZE_T_MAX;
 	if (subobj == Py_None)
 		return rsplit_whitespace(s, len, maxsplit);
-	if (PyString_Check(subobj)) {
-		sub = PyString_AS_STRING(subobj);
-		n = PyString_GET_SIZE(subobj);
-	}
-	else if (PyUnicode_Check(subobj))
-		return PyUnicode_RSplit((PyObject *)self, subobj, maxsplit);
-	else if (PyObject_AsCharBuffer(subobj, &sub, &n))
+	if (_getbuffer(subobj, &vsub) < 0)
 		return NULL;
+	sub = vsub.buf;
+	n = vsub.len;
 
 	if (n == 0) {
 		PyErr_SetString(PyExc_ValueError, "empty separator");
+		PyObject_ReleaseBuffer(subobj, &vsub);
 		return NULL;
 	}
-	else if (n == 1)
-		return rsplit_char(s, len, sub[0], maxsplit);
+	else if (n == 1) {
+		char ch = sub[0];
+		PyObject_ReleaseBuffer(subobj, &vsub);
+		return rsplit_char(s, len, ch, maxsplit);
+	}
 
 	list = PyList_New(PREALLOC_SIZE(maxsplit));
-	if (list == NULL)
+	if (list == NULL) {
+		PyObject_ReleaseBuffer(subobj, &vsub);
 		return NULL;
+	}
 
 	j = len;
 	i = j - n;
@@ -1368,10 +1389,12 @@ string_rsplit(PyStringObject *self, PyObject *args)
 	FIX_PREALLOC_SIZE(list);
 	if (PyList_Reverse(list) < 0)
 		goto onError;
+	PyObject_ReleaseBuffer(subobj, &vsub);
 	return list;
 
 onError:
 	Py_DECREF(list);
+	PyObject_ReleaseBuffer(subobj, &vsub);
 	return NULL;
 }
 
@@ -1450,7 +1473,7 @@ string_join(PyStringObject *self, PyObject *orig)
 			sz += seplen;
 		if (sz < old_sz || sz > PY_SSIZE_T_MAX) {
 			PyErr_SetString(PyExc_OverflowError,
-				"join() result is too long for a Python string");
+			    "join() result is too long for a Python string");
 			Py_DECREF(seq);
 			return NULL;
 		}
@@ -1619,11 +1642,17 @@ string_rindex(PyStringObject *self, PyObject *args)
 Py_LOCAL_INLINE(PyObject *)
 do_xstrip(PyStringObject *self, int striptype, PyObject *sepobj)
 {
+	Py_buffer vsep;
 	char *s = PyString_AS_STRING(self);
 	Py_ssize_t len = PyString_GET_SIZE(self);
-	char *sep = PyString_AS_STRING(sepobj);
-	Py_ssize_t seplen = PyString_GET_SIZE(sepobj);
+	char *sep;
+	Py_ssize_t seplen;
 	Py_ssize_t i, j;
+
+	if (_getbuffer(sepobj, &vsep) < 0)
+		return NULL;
+	sep = vsep.buf;
+	seplen = vsep.len;
 
 	i = 0;
 	if (striptype != RIGHTSTRIP) {
@@ -1639,6 +1668,8 @@ do_xstrip(PyStringObject *self, int striptype, PyObject *sepobj)
 		} while (j >= i && memchr(sep, Py_CHARMASK(s[j]), seplen));
 		j++;
 	}
+
+	PyObject_ReleaseBuffer(sepobj, &vsep);
 
 	if (i == 0 && j == len && PyString_CheckExact(self)) {
 		Py_INCREF(self);
@@ -1688,24 +1719,8 @@ do_argstrip(PyStringObject *self, int striptype, PyObject *args)
 		return NULL;
 
 	if (sep != NULL && sep != Py_None) {
-		if (PyString_Check(sep))
-			return do_xstrip(self, striptype, sep);
-		else if (PyUnicode_Check(sep)) {
-			PyObject *uniself = PyUnicode_FromObject((PyObject *)self);
-			PyObject *res;
-			if (uniself==NULL)
-				return NULL;
-			res = _PyUnicode_XStrip((PyUnicodeObject *)uniself,
-				striptype, sep);
-			Py_DECREF(uniself);
-			return res;
-		}
-		PyErr_Format(PyExc_TypeError,
-			     "%s arg must be None or string",
-			     STRIPNAME(striptype));
-		return NULL;
+		return do_xstrip(self, striptype, sep);
 	}
-
 	return do_strip(self, striptype);
 }
 
@@ -1996,7 +2011,7 @@ findstring(const char *target, Py_ssize_t target_len,
 				return end;
 	} else {
 		for (; start <= end; start++)
-			if (Py_STRING_MATCH(target, start, pattern, pattern_len))
+			if (Py_STRING_MATCH(target, start,pattern,pattern_len))
 				return start;
 	}
 	return -1;
@@ -2034,14 +2049,15 @@ countstring(const char *target, Py_ssize_t target_len,
 	end -= pattern_len;
 	if (direction < 0) {
 		for (; (end >= start); end--)
-			if (Py_STRING_MATCH(target, end, pattern, pattern_len)) {
+			if (Py_STRING_MATCH(target, end,pattern,pattern_len)) {
 				count++;
 				if (--maxcount <= 0) break;
 				end -= pattern_len-1;
 			}
 	} else {
 		for (; (start <= end); start++)
-			if (Py_STRING_MATCH(target, start, pattern, pattern_len)) {
+			if (Py_STRING_MATCH(target, start,
+					    pattern, pattern_len)) {
 				count++;
 				if (--maxcount <= 0)
 					break;
@@ -2331,12 +2347,14 @@ replace_single_character(PyStringObject *self,
 	/*   result_len = self_len + count * (to_len-1)  */
 	product = count * (to_len-1);
 	if (product / (to_len-1) != count) {
-		PyErr_SetString(PyExc_OverflowError, "replace string is too long");
+		PyErr_SetString(PyExc_OverflowError,
+				"replace string is too long");
 		return NULL;
 	}
 	result_len = self_len + product;
 	if (result_len < 0) {
-		PyErr_SetString(PyExc_OverflowError, "replace string is too long");
+		PyErr_SetString(PyExc_OverflowError,
+				"replace string is too long");
 		return NULL;
 	}
 
@@ -2399,12 +2417,14 @@ replace_substring(PyStringObject *self,
 	/*    result_len = self_len + count * (to_len-from_len) */
 	product = count * (to_len-from_len);
 	if (product / (to_len-from_len) != count) {
-		PyErr_SetString(PyExc_OverflowError, "replace string is too long");
+		PyErr_SetString(PyExc_OverflowError,
+				"replace string is too long");
 		return NULL;
 	}
 	result_len = self_len + product;
 	if (result_len < 0) {
-		PyErr_SetString(PyExc_OverflowError, "replace string is too long");
+		PyErr_SetString(PyExc_OverflowError,
+				"replace string is too long");
 		return NULL;
 	}
 
@@ -2484,7 +2504,8 @@ replace(PyStringObject *self,
 			return replace_delete_single_character(
 				self, from_s[0], maxcount);
 		} else {
-			return replace_delete_substring(self, from_s, from_len, maxcount);
+			return replace_delete_substring(self, from_s,
+							from_len, maxcount);
 		}
 	}
 
@@ -2499,7 +2520,8 @@ replace(PyStringObject *self,
 				maxcount);
 		} else {
 			return replace_substring_in_place(
-				self, from_s, from_len, to_s, to_len, maxcount);
+				self, from_s, from_len, to_s, to_len,
+				maxcount);
 		}
 	}
 
@@ -2509,7 +2531,8 @@ replace(PyStringObject *self,
 						to_s, to_len, maxcount);
 	} else {
 		/* len('from')>=2, len('to')>=1 */
-		return replace_substring(self, from_s, from_len, to_s, to_len, maxcount);
+		return replace_substring(self, from_s, from_len, to_s, to_len,
+					 maxcount);
 	}
 }
 
@@ -2709,11 +2732,11 @@ string_decode(PyObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(fromhex_doc,
-"str8.fromhex(string) -> str8\n\
+"bytes.fromhex(string) -> bytes\n\
 \n\
-Create a str8 object from a string of hexadecimal numbers.\n\
+Create a bytes object from a string of hexadecimal numbers.\n\
 Spaces between two numbers are accepted. Example:\n\
-str8.fromhex('10 1112') -> s'\\x10\\x11\\x12'.");
+bytes.fromhex('10 1112') -> s'\\x10\\x11\\x12'.");
 
 static int
 hex_digit_to_int(Py_UNICODE c)
@@ -2771,7 +2794,7 @@ string_fromhex(PyObject *cls, PyObject *args)
 	return newstring;
 
   error:
-	Py_DECREF(newstring);
+	Py_XDECREF(newstring);
 	return NULL;
 }
 
@@ -2858,7 +2881,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	if (type != &PyString_Type)
 		return str_subtype_new(type, args, kwds);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss:str8", kwlist, &x,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss:bytes", kwlist, &x,
 					 &encoding, &errors))
 		return NULL;
 	if (x == NULL) {
@@ -2885,7 +2908,8 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		   at the moment */
 		if (PyBytes_Check(new)) {
 			PyObject *str;
-			str = PyString_FromString(PyBytes_AsString(new));
+			str = PyString_FromStringAndSize(
+				PyBytes_AS_STRING(new), Py_Size(new));
 			Py_DECREF(new);
 			if (!str)
 				return NULL;
@@ -2893,7 +2917,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		}
 		if (!PyString_Check(new)) {
 			PyErr_Format(PyExc_TypeError,
-				     "encoder did not return a str8 "
+				     "encoder did not return a bytes "
 				     "object (type=%.400s)",
 				     Py_Type(new)->tp_name);
 			Py_DECREF(new);
@@ -2905,7 +2929,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	/* If it's not unicode, there can't be encoding or errors */
 	if (encoding != NULL || errors != NULL) {
 		PyErr_SetString(PyExc_TypeError,
-				"encoding or errors without a string argument");
+			"encoding or errors without a string argument");
 		return NULL;
 	}
 
@@ -2949,8 +2973,8 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	/* For the iterator version, create a string object and resize as needed. */
-	/* XXX(gb): is 64 a good value? also, optimize this if length is known */
+	/* For iterator version, create a string object and resize as needed */
+	/* XXX(gb): is 64 a good value? also, optimize if length is known */
 	size = 64;
 	new = PyString_FromStringAndSize(NULL, size);
 	if (new == NULL)
@@ -2974,9 +2998,9 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		item = iternext(it);
 		if (item == NULL) {
 			if (PyErr_Occurred()) {
-				if (!PyErr_ExceptionMatches(PyExc_StopIteration))
-					goto error;
-				PyErr_Clear();
+			    if (!PyErr_ExceptionMatches(PyExc_StopIteration))
+				    goto error;
+			    PyErr_Clear();
 			}
 			break;
 		}
@@ -3039,7 +3063,7 @@ str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyDoc_STRVAR(string_doc,
-"str(object) -> string\n\
+"bytes(object) -> string\n\
 \n\
 Return a nice string representation of the object.\n\
 If the argument is a string, the return value is the same object.");
@@ -3048,7 +3072,7 @@ static PyObject *str_iter(PyObject *seq);
 
 PyTypeObject PyString_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
-	"str8",
+	"bytes",
 	sizeof(PyStringObject),
 	sizeof(char),
  	string_dealloc, 			/* tp_dealloc */
@@ -3062,7 +3086,7 @@ PyTypeObject PyString_Type = {
 	&string_as_mapping,			/* tp_as_mapping */
 	(hashfunc)string_hash, 			/* tp_hash */
 	0,					/* tp_call */
-	string_str,				/* tp_str */
+	string_repr,				/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */
@@ -3093,14 +3117,15 @@ void
 PyString_Concat(register PyObject **pv, register PyObject *w)
 {
 	register PyObject *v;
+	assert(pv != NULL);
 	if (*pv == NULL)
 		return;
-	if (w == NULL || !PyString_Check(*pv)) {
+	if (w == NULL) {
 		Py_DECREF(*pv);
 		*pv = NULL;
 		return;
 	}
-	v = string_concat((PyStringObject *) *pv, w);
+	v = string_concat(*pv, w);
 	Py_DECREF(*pv);
 	*pv = v;
 }

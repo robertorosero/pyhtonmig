@@ -1564,8 +1564,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				break;
 			}
 			PyErr_Format(PyExc_SystemError,
-				     "no locals found when storing %s",
-				     PyObject_REPR(w));
+				     "no locals found when storing %R", w);
 			break;
 
 		case DELETE_NAME:
@@ -1578,8 +1577,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				break;
 			}
 			PyErr_Format(PyExc_SystemError,
-				     "no locals when deleting %s",
-				     PyObject_REPR(w));
+				     "no locals when deleting %R", w);
 			break;
 
 		PREDICTED_WITH_ARG(UNPACK_SEQUENCE);
@@ -1668,8 +1666,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			w = GETITEM(names, oparg);
 			if ((v = f->f_locals) == NULL) {
 				PyErr_Format(PyExc_SystemError,
-					     "no locals when loading %s",
-					     PyObject_REPR(w));
+					     "no locals when loading %R", w);
 				break;
 			}
 			if (PyDict_CheckExact(v)) {
@@ -1851,19 +1848,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		case BUILD_MAP:
 			x = PyDict_New();
-			PUSH(x);
-			if (x != NULL) continue;
-			break;
-		
-		case MAKE_BYTES:
-			w = POP();
-			if (PyString_Check(w))
-				x = PyBytes_FromStringAndSize(
-					PyString_AS_STRING(w),
-					PyString_GET_SIZE(w));
-			else
-				x = NULL;
-			Py_DECREF(w);
 			PUSH(x);
 			if (x != NULL) continue;
 			break;

@@ -558,10 +558,10 @@ class CommonTest(BaseTest):
         a = self.type2test('DNSSEC')
         b = self.type2test('')
         for c in a:
-            # Special case for the str8, since indexing returns a integer
-            # XXX Maybe it would be a good idea to seperate str8's tests...
-            if self.type2test == str8:
-                c = chr(c)
+##             # Special case for the str8, since indexing returns a integer
+##             # XXX Maybe it would be a good idea to seperate str8's tests...
+##             if self.type2test == str8:
+##                 c = chr(c)
             b += c
             hash(b)
         self.assertEqual(hash(a), hash(b))
@@ -1147,16 +1147,16 @@ class MixinStrUnicodeTest:
             s2 = "".join([s1])
             self.assert_(s1 is s2)
 
-        elif t is str8:
-            s1 = subclass("abcd")
-            s2 = "".join([s1])
-            self.assert_(s1 is not s2)
-            self.assert_(type(s2) is str) # promotes!
+##         elif t is str8:
+##             s1 = subclass("abcd")
+##             s2 = "".join([s1])
+##             self.assert_(s1 is not s2)
+##             self.assert_(type(s2) is str) # promotes!
 
-            s1 = t("abcd")
-            s2 = "".join([s1])
-            self.assert_(s1 is not s2)
-            self.assert_(type(s2) is str) # promotes!
+##             s1 = t("abcd")
+##             s2 = "".join([s1])
+##             self.assert_(s1 is not s2)
+##             self.assert_(type(s2) is str) # promotes!
 
         else:
             self.fail("unexpected type for MixinStrUnicodeTest %r" % t)

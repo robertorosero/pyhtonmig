@@ -11,10 +11,14 @@ dis(pickle, out=None, memo=None, indentlevel=4)
 '''
 
 import codecs
+import pickle
+import re
 
 __all__ = ['dis',
            'genops',
           ]
+
+bytes_types = pickle.bytes_types
 
 # Other ideas:
 #
@@ -744,14 +748,14 @@ pyfloat = StackObject(
               doc="A Python float object.")
 
 pystring = StackObject(
-               name='str',
-               obtype=str,
-               doc="A Python string object.")
+               name='bytes',
+               obtype=bytes,
+               doc="A Python bytes object.")
 
 pyunicode = StackObject(
-                name='unicode',
+                name='str',
                 obtype=str,
-                doc="A Python Unicode string object.")
+                doc="A Python string object.")
 
 pynone = StackObject(
              name="None",
@@ -1735,7 +1739,6 @@ for d in opcodes:
 del d
 
 def assure_pickle_consistency(verbose=False):
-    import pickle, re
 
     copy = code2op.copy()
     for name in pickle.__all__:
@@ -1803,7 +1806,7 @@ def genops(pickle):
     to query its current position) pos is None.
     """
 
-    if isinstance(pickle, bytes):
+    if isinstance(pickle, bytes_types):
         import io
         pickle = io.BytesIO(pickle)
 

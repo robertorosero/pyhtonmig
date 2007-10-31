@@ -998,7 +998,10 @@ PyObject *PyUnicode_FromObject(register PyObject *obj)
 	return PyUnicode_FromUnicode(PyUnicode_AS_UNICODE(obj),
 				     PyUnicode_GET_SIZE(obj));
     }
-    return PyUnicode_FromEncodedObject(obj, NULL, "strict");
+    PyErr_Format(PyExc_TypeError,
+                 "Can't convert '%.100s' object to str implicitly",
+                 Py_Type(obj)->tp_name);
+    return NULL;
 }
 
 PyObject *PyUnicode_FromEncodedObject(register PyObject *obj,
@@ -6391,9 +6394,6 @@ PyObject *PyUnicode_Concat(PyObject *left,
 			   PyObject *right)
 {
     PyUnicodeObject *u = NULL, *v = NULL, *w;
-
-    if (PyBytes_Check(left) || PyBytes_Check(right))
-        return PyBytes_Concat(left, right);
 
     /* Coerce the two arguments */
     u = (PyUnicodeObject *)PyUnicode_FromObject(left);

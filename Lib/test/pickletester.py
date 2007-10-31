@@ -5,6 +5,8 @@ import copy_reg
 
 from test.test_support import TestFailed, TESTFN, run_with_locale
 
+from pickle import bytes_types
+
 # Tests that try a number of pickle protocols should have a
 #     for proto in protocols:
 # kind of outer loop.
@@ -393,11 +395,14 @@ class AbstractPickleTests(unittest.TestCase):
             got = self.loads(s)
             self.assertEqual(expected, got)
 
-    def test_load_from_canned_string(self):
-        expected = self._testdata
-        for canned in DATA0, DATA1, DATA2:
-            got = self.loads(canned)
-            self.assertEqual(expected, got)
+    def test_load_from_data0(self):
+        self.assertEqual(self._testdata, self.loads(DATA0))
+
+    def test_load_from_data1(self):
+        self.assertEqual(self._testdata, self.loads(DATA1))
+
+    def test_load_from_data2(self):
+        self.assertEqual(self._testdata, self.loads(DATA2))
 
     # There are gratuitous differences between pickles produced by
     # pickle and cPickle, largely because cPickle starts PUT indices at
@@ -762,7 +767,7 @@ class AbstractPickleTests(unittest.TestCase):
         x = dict.fromkeys(range(n))
         for proto in protocols:
             s = self.dumps(x, proto)
-            assert isinstance(s, bytes)
+            assert isinstance(s, bytes_types)
             y = self.loads(s)
             self.assertEqual(x, y)
             num_setitems = count_opcode(pickle.SETITEMS, s)

@@ -743,6 +743,7 @@ initstdio(void)
 	PySys_SetObject("stdout", std);
 	Py_DECREF(std);
 
+#if 1 /* Disable this if you have trouble debugging bootstrap stuff */
 	/* Set sys.stderr, replaces the preliminary stderr */
 	if (!(std = PyFile_FromFd(fileno(stderr), "<stderr>", "w", -1,
 				  NULL, "\n", 0))) {
@@ -751,6 +752,7 @@ initstdio(void)
         PySys_SetObject("__stderr__", std);
 	PySys_SetObject("stderr", std);
 	Py_DECREF(std);
+#endif
 
         if (0) {
   error:
@@ -1339,7 +1341,7 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 	PyArena *arena = PyArena_New();
 	if (arena == NULL)
 		return NULL;
-	
+
 	mod = PyParser_ASTFromString(str, "<string>", start, flags, arena);
 	if (mod != NULL)
 		ret = run_mod(mod, "<string>", globals, locals, flags, arena);
@@ -1356,7 +1358,7 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 	PyArena *arena = PyArena_New();
 	if (arena == NULL)
 		return NULL;
-	
+
 	mod = PyParser_ASTFromFile(fp, filename, NULL, start, 0, 0,
 				   flags, NULL, arena);
 	if (closeit)
@@ -1705,7 +1707,7 @@ void _Py_PyAtExit(void (*func)(void))
 static void
 call_py_exitfuncs(void)
 {
-	if (pyexitfunc == NULL) 
+	if (pyexitfunc == NULL)
 		return;
 
 	(*pyexitfunc)();

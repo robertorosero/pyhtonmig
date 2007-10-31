@@ -1762,11 +1762,11 @@ class _ProxyFile:
 
     def read(self, size=None):
         """Read bytes."""
-        return str(self._read(size, self._file.read))
+        return self._read(size, self._file.read)
 
     def readline(self, size=None):
         """Read a line."""
-        return str(self._read(size, self._file.readline))
+        return self._read(size, self._file.readline)
 
     def readlines(self, sizehint=None):
         """Read multiple lines."""

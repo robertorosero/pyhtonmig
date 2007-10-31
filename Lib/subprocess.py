@@ -1046,8 +1046,7 @@ class Popen(object):
             if self.stdin:
                 if isinstance(input, str): # Unicode
                     input = input.encode("utf-8") # XXX What else?
-                if not isinstance(input, (bytes, str8)):
-                    input = bytes(input)
+                input = bytes(input)
             read_set = []
             write_set = []
             stdout = None # Return
