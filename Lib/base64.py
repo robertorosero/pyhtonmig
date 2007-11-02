@@ -28,9 +28,9 @@ __all__ = [
 
 
 def _translate(s, altchars):
-    if not isinstance(s, bytes):
+    if not isinstance(s, (bytes, buffer)):
         raise TypeError("expected bytes, not %s" % s.__class__.__name__)
-    translation = bytes(range(256))
+    translation = buffer(range(256))
     for k, v in altchars.items():
         translation[ord(k)] = v[0]
     return s.translate(translation)
