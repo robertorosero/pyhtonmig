@@ -962,6 +962,7 @@ PyMarshal_ReadLongFromFile(FILE *fp)
 	RFILE rf;
 	rf.fp = fp;
 	rf.strings = NULL;
+	rf.ptr = rf.end = NULL;
 	return r_long(&rf);
 }
 
@@ -1035,6 +1036,7 @@ PyMarshal_ReadObjectFromFile(FILE *fp)
 	rf.fp = fp;
 	rf.strings = PyList_New(0);
 	rf.depth = 0;
+	rf.ptr = rf.end = NULL;
 	result = r_object(&rf);
 	Py_DECREF(rf.strings);
 	return result;
