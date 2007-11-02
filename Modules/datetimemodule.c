@@ -3194,7 +3194,7 @@ time_strftime(PyDateTime_Time *self, PyObject *args, PyObject *kw)
 	PyObject *tuple;
 	static char *keywords[] = {"format", NULL};
 
-	if (! PyArg_ParseTupleAndKeywords(args, kw, "S:strftime", keywords,
+	if (! PyArg_ParseTupleAndKeywords(args, kw, "U:strftime", keywords,
 					  &format))
 		return NULL;
 
