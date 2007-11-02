@@ -234,6 +234,7 @@ Py_InitializeEx(int install_sigs)
 	if (pstderr == NULL)
 		Py_FatalError("Py_Initialize: can't set preliminary stderr");
 	PySys_SetObject("stderr", pstderr);
+	PySys_SetObject("__stderr__", pstderr);
 
 	_PyImport_Init();
 
