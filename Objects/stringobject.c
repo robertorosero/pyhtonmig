@@ -1,5 +1,8 @@
 /* String object implementation */
 
+/* XXX This is now called 'bytes' as far as the user is concerned.
+   Many docstrings and error messages need to be cleaned up. */
+
 #define PY_SSIZE_T_CLEAN
 
 #include "Python.h"
@@ -1410,7 +1413,7 @@ Return a string which is the concatenation of the strings in the\n\
 sequence.  The separator between elements is S.");
 
 static PyObject *
-string_join(PyStringObject *self, PyObject *orig)
+string_join(PyObject *self, PyObject *orig)
 {
 	char *sep = PyString_AS_STRING(self);
 	const Py_ssize_t seplen = PyString_GET_SIZE(self);
@@ -1433,7 +1436,7 @@ string_join(PyStringObject *self, PyObject *orig)
 	}
 	if (seqlen == 1) {
 		item = PySequence_Fast_GET_ITEM(seq, 0);
-		if (PyString_CheckExact(item) || PyUnicode_CheckExact(item)) {
+		if (PyString_CheckExact(item)) {
 			Py_INCREF(item);
 			Py_DECREF(seq);
 			return item;
@@ -1443,32 +1446,21 @@ string_join(PyStringObject *self, PyObject *orig)
 	/* There are at least two things to join, or else we have a subclass
 	 * of the builtin types in the sequence.
 	 * Do a pre-pass to figure out the total amount of space we'll
-	 * need (sz), see whether any argument is absurd, and defer to
-	 * the Unicode join if appropriate.
+	 * need (sz), and see whether all argument are bytes.
 	 */
+	/* XXX Shouldn't we use _getbuffer() on these items instead? */
 	for (i = 0; i < seqlen; i++) {
 		const size_t old_sz = sz;
 		item = PySequence_Fast_GET_ITEM(seq, i);
-		if (!PyString_Check(item)){
-			if (PyUnicode_Check(item)) {
-				/* Defer to Unicode join.
-				 * CAUTION:  There's no gurantee that the
-				 * original sequence can be iterated over
-				 * again, so we must pass seq here.
-				 */
-				PyObject *result;
-				result = PyUnicode_Join((PyObject *)self, seq);
-				Py_DECREF(seq);
-				return result;
-			}
+		if (!PyString_Check(item) && !PyBytes_Check(item)) {
 			PyErr_Format(PyExc_TypeError,
-				     "sequence item %zd: expected string,"
+				     "sequence item %zd: expected bytes,"
 				     " %.80s found",
 				     i, Py_Type(item)->tp_name);
 			Py_DECREF(seq);
 			return NULL;
 		}
-		sz += PyString_GET_SIZE(item);
+		sz += Py_Size(item);
 		if (i != 0)
 			sz += seplen;
 		if (sz < old_sz || sz > PY_SSIZE_T_MAX) {
@@ -1487,17 +1479,24 @@ string_join(PyStringObject *self, PyObject *orig)
 	}
 
 	/* Catenate everything. */
+	/* I'm not worried about a PyBytes item growing because there's
+	   nowhere in this function where we release the GIL. */
 	p = PyString_AS_STRING(res);
 	for (i = 0; i < seqlen; ++i) {
 		size_t n;
-		item = PySequence_Fast_GET_ITEM(seq, i);
-		n = PyString_GET_SIZE(item);
-		Py_MEMCPY(p, PyString_AS_STRING(item), n);
-		p += n;
-		if (i < seqlen - 1) {
+                char *q;
+		if (i) {
 			Py_MEMCPY(p, sep, seplen);
 			p += seplen;
 		}
+		item = PySequence_Fast_GET_ITEM(seq, i);
+		n = Py_Size(item);
+                if (PyString_Check(item))
+			q = PyString_AS_STRING(item);
+		else
+			q = PyBytes_AS_STRING(item);
+		Py_MEMCPY(p, q, n);
+		p += n;
 	}
 
 	Py_DECREF(seq);
@@ -1509,7 +1508,7 @@ _PyString_Join(PyObject *sep, PyObject *x)
 {
 	assert(sep != NULL && PyString_Check(sep));
 	assert(x != NULL);
-	return string_join((PyStringObject *)sep, x);
+	return string_join(sep, x);
 }
 
 Py_LOCAL_INLINE(void)

@@ -2800,9 +2800,10 @@ bytes_join(PyBytesObject *self, PyObject *it)
     items = PySequence_Fast_ITEMS(seq);
 
     /* Compute the total size, and check that they are all bytes */
+    /* XXX Shouldn't we use _getbuffer() on these items instead? */
     for (i = 0; i < n; i++) {
         PyObject *obj = items[i];
-        if (!PyBytes_Check(obj)) {
+        if (!PyBytes_Check(obj) && !PyString_Check(obj)) {
             PyErr_Format(PyExc_TypeError,
                          "can only join an iterable of bytes "
                          "(item %ld has type '%.100s')",
@@ -2812,7 +2813,7 @@ bytes_join(PyBytesObject *self, PyObject *it)
         }
         if (i > 0)
             totalsize += mysize;
-        totalsize += PyBytes_GET_SIZE(obj);
+        totalsize += Py_Size(obj);
         if (totalsize < 0) {
             PyErr_NoMemory();
             goto error;
@@ -2826,12 +2827,17 @@ bytes_join(PyBytesObject *self, PyObject *it)
     dest = PyBytes_AS_STRING(result);
     for (i = 0; i < n; i++) {
         PyObject *obj = items[i];
-        Py_ssize_t size = PyBytes_GET_SIZE(obj);
-        if (i > 0) {
+        Py_ssize_t size = Py_Size(obj);
+        char *buf;
+        if (PyBytes_Check(obj))
+           buf = PyBytes_AS_STRING(obj);
+        else
+           buf = PyString_AS_STRING(obj);
+        if (i) {
             memcpy(dest, self->ob_bytes, mysize);
             dest += mysize;
         }
-        memcpy(dest, PyBytes_AS_STRING(obj), size);
+        memcpy(dest, buf, size);
         dest += size;
     }
 
