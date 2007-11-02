@@ -18,7 +18,7 @@ def segregate(str):
         else:
             extended.add(c)
     extended = sorted(extended)
-    return base, extended
+    return bytes(base), extended
 
 def selective_len(str, max):
     """Return the length of str, considering only characters below max."""
@@ -84,7 +84,7 @@ def generate_generalized_integer(N, bias):
         t = T(j, bias)
         if N < t:
             result.append(digits[N])
-            return result
+            return bytes(result)
         result.append(digits[t + ((N - t) % (36 - t))])
         N = (N - t) // (36 - t)
         j += 1
@@ -113,7 +113,7 @@ def generate_integers(baselen, deltas):
         s = generate_generalized_integer(delta, bias)
         result.extend(s)
         bias = adapt(delta, points==0, baselen+points+1)
-    return result
+    return bytes(result)
 
 def punycode_encode(text):
     base, extended = segregate(text)

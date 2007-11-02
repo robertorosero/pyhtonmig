@@ -992,14 +992,14 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('abc', 'a', 'join', ('abc',))
         self.checkequal('z', 'a', 'join', UserList(['z']))
         self.checkequal('a.b.c', '.', 'join', ['a', 'b', 'c'])
-        self.checkequal('a.b.3', '.', 'join', ['a', 'b', 3])
+        self.assertRaises(TypeError, '.'.join, ['a', 'b', 3])
         for i in [5, 25, 125]:
             self.checkequal(((('a' * i) + '-') * i)[:-1], '-', 'join',
                  ['a' * i] * i)
             self.checkequal(((('a' * i) + '-') * i)[:-1], '-', 'join',
                  ('a' * i,) * i)
 
-        self.checkequal(str(BadSeq1()), ' ', 'join', BadSeq1())
+        #self.checkequal(str(BadSeq1()), ' ', 'join', BadSeq1())
         self.checkequal('a b c', ' ', 'join', BadSeq2())
 
         self.checkraises(TypeError, ' ', 'join')

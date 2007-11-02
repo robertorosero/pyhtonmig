@@ -151,7 +151,7 @@ class Codec(codecs.Codec):
             raise UnicodeError("unsupported error handling "+errors)
 
         if not input:
-            return buffer(), 0
+            return b'', 0
 
         result = buffer()
         labels = dots.split(input)
@@ -165,7 +165,7 @@ class Codec(codecs.Codec):
                 # Join with U+002E
                 result.extend(b'.')
             result.extend(ToASCII(label))
-        return result+trailing_dot, len(input)
+        return bytes(result+trailing_dot), len(input)
 
     def decode(self, input, errors='strict'):
 
@@ -228,7 +228,7 @@ class IncrementalEncoder(codecs.BufferedIncrementalEncoder):
 
         result += trailing_dot
         size += len(trailing_dot)
-        return (result, size)
+        return (bytes(result), size)
 
 class IncrementalDecoder(codecs.BufferedIncrementalDecoder):
     def _buffer_decode(self, input, errors, final):
