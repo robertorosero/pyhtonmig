@@ -3477,7 +3477,7 @@ long_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			string = PyString_AS_STRING(x);
 		if (strlen(string) != size) {
 			/* We only see this if there's a null byte in x,
-			   x is a str8 or a bytes, *and* a base is given. */
+			   x is a bytes or buffer, *and* a base is given. */
 			PyErr_Format(PyExc_ValueError,
 			    "invalid literal for int() with base %d: %R",
 			    base, x);
