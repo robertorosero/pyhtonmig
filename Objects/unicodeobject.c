@@ -5470,20 +5470,14 @@ PyUnicode_Join(PyObject *separator, PyObject *seq)
 
 	item = PySequence_Fast_GET_ITEM(fseq, i);
 	/* Convert item to Unicode. */
-	if (!PyString_Check(item) && !PyUnicode_Check(item))
-	{
-		if (PyBytes_Check(item))
-		{
-			PyErr_Format(PyExc_TypeError,
-                            "sequence item %d: join() will not operate on "
-                            "bytes objects", i);
-			goto onError;
-		}
-		item = PyObject_Unicode(item);
+	if (!PyUnicode_Check(item)) {
+	    PyErr_Format(PyExc_TypeError,
+			 "sequence item %zd: expected str instance,"
+			 " %.80s found",
+			 i, Py_Type(item)->tp_name);
+	    goto onError;
 	}
-	else
-		item = PyUnicode_FromObject(item);
-
+	item = PyUnicode_FromObject(item);
 	if (item == NULL)
 	    goto onError;
 	/* We own a reference to item from here on. */
