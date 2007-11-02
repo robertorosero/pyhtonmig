@@ -786,16 +786,15 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		break;
 	}
 
-	case 's': {/* string */
+	/* XXX WAAAAH!  's', 'y', 'z', 'u', 'Z', 'e', 'w', 't' codes all
+	   need to be cleaned up! */
+
+	case 's': {/* text string */
 		if (*format == '#') {
 			void **p = (void **)va_arg(*p_va, char **);
 			FETCH_SIZE;
 
-			if (PyString_Check(arg)) {
-				*p = PyString_AS_STRING(arg);
-				STORE_SIZE(PyString_GET_SIZE(arg));
-			}
-			else if (PyUnicode_Check(arg)) {
+			if (PyUnicode_Check(arg)) {
 				uarg = UNICODE_DEFAULT_ENCODING(arg);
 				if (uarg == NULL)
 					return converterr(CONV_UNICODE,
@@ -804,6 +803,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				STORE_SIZE(PyString_GET_SIZE(uarg));
 			}
 			else { /* any buffer-like object */
+				/* XXX Really? */
 				char *buf;
 				Py_ssize_t count = convertbuffer(arg, p, &buf);
 				if (count < 0)
@@ -814,9 +814,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		} else {
 			char **p = va_arg(*p_va, char **);
 
-			if (PyString_Check(arg))
-				*p = PyString_AS_STRING(arg);
-			else if (PyUnicode_Check(arg)) {
+			if (PyUnicode_Check(arg)) {
 				uarg = UNICODE_DEFAULT_ENCODING(arg);
 				if (uarg == NULL)
 					return converterr(CONV_UNICODE,
@@ -832,33 +830,21 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		break;
 	}
 
-	case 'y': {/* bytes */
+	case 'y': {/* any buffer-like object, but not PyUnicode */
+		void **p = (void **)va_arg(*p_va, char **);
+		char *buf;
+		Py_ssize_t count = convertbuffer(arg, p, &buf);
+		if (count < 0)
+			return converterr(buf, arg, msgbuf, bufsize);
 		if (*format == '#') {
-			void **p = (void **)va_arg(*p_va, char **);
 			FETCH_SIZE;
-
-			if (PyBytes_Check(arg)) {
-				*p = PyBytes_AS_STRING(arg);
-				STORE_SIZE(PyBytes_GET_SIZE(arg));
-			}
-			else
-				return converterr("bytes", arg, msgbuf, bufsize);
+			STORE_SIZE(count);
 			format++;
-		} else {
-			char **p = va_arg(*p_va, char **);
-
-			if (PyBytes_Check(arg))
-				*p = PyBytes_AS_STRING(arg);
-			else
-				return converterr("bytes", arg, msgbuf, bufsize);
-			if ((Py_ssize_t)strlen(*p) != PyBytes_Size(arg))
-				return converterr("bytes without null bytes",
-						  arg, msgbuf, bufsize);
 		}
 		break;
 	}
 
-	case 'z': {/* string, may be NULL (None) */
+	case 'z': {/* like 's' or 's#', but None is okay, stored as NULL */
 		if (*format == '#') { /* any buffer-like object */
 			void **p = (void **)va_arg(*p_va, char **);
 			FETCH_SIZE;
@@ -866,10 +852,6 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 			if (arg == Py_None) {
 				*p = 0;
 				STORE_SIZE(0);
-			}
-			else if (PyString_Check(arg)) {
-				*p = PyString_AS_STRING(arg);
-				STORE_SIZE(PyString_GET_SIZE(arg));
 			}
 			else if (PyUnicode_Check(arg)) {
 				uarg = UNICODE_DEFAULT_ENCODING(arg);
@@ -880,6 +862,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				STORE_SIZE(PyString_GET_SIZE(uarg));
 			}
 			else { /* any buffer-like object */
+				/* XXX Really? */
 				char *buf;
 				Py_ssize_t count = convertbuffer(arg, p, &buf);
 				if (count < 0)
@@ -907,10 +890,12 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 			if (*format == '#') {
 				FETCH_SIZE;
 				assert(0); /* XXX redundant with if-case */
-				if (arg == Py_None)
-					*q = 0;
-				else
-					*q = PyString_Size(arg);
+				if (arg == Py_None) {
+					STORE_SIZE(0);
+				}
+				else {
+					STORE_SIZE(PyString_Size(arg));
+				}
 				format++;
 			}
 			else if (*p != NULL &&
