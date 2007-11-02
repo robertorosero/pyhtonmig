@@ -810,6 +810,16 @@ string_contains(PyObject *self, PyObject *arg)
     return memchr(PyString_AS_STRING(self), ival, Py_Size(self)) != NULL;
 }
 
+static PyObject *
+string_item(PyStringObject *a, register Py_ssize_t i)
+{
+	if (i < 0 || i >= Py_Size(a)) {
+		PyErr_SetString(PyExc_IndexError, "string index out of range");
+		return NULL;
+	}
+	return PyInt_FromLong((unsigned char)a->ob_sval[i]);
+}
+
 static PyObject*
 string_richcompare(PyStringObject *a, PyStringObject *b, int op)
 {
@@ -981,7 +991,7 @@ static PySequenceMethods string_as_sequence = {
 	(lenfunc)string_length, /*sq_length*/
 	(binaryfunc)string_concat, /*sq_concat*/
 	(ssizeargfunc)string_repeat, /*sq_repeat*/
-	0,		/*sq_item*/
+	(ssizeargfunc)string_item, /*sq_item*/
 	0,		/*sq_slice*/
 	0,		/*sq_ass_item*/
 	0,		/*sq_ass_slice*/
