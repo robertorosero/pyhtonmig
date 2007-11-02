@@ -204,7 +204,7 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	int firstlineno;
 	PyObject *lnotab;
 
-	if (!PyArg_ParseTuple(args, "iiiiiSO!O!O!SSiS|O!O!:code",
+	if (!PyArg_ParseTuple(args, "iiiiiSO!O!O!UUiS|O!O!:code",
 			      &argcount, &kwonlyargcount,
 				  &nlocals, &stacksize, &flags,
 			      &code,
