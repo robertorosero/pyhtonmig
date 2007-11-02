@@ -96,7 +96,7 @@ simple_err(struct.pack, 'iii', 3)
 simple_err(struct.pack, 'i', 3, 3, 3)
 simple_err(struct.pack, 'i', 'foo')
 simple_err(struct.pack, 'P', 'foo')
-simple_err(struct.unpack, 'd', 'flap')
+simple_err(struct.unpack, 'd', b'flap')
 s = struct.pack('ii', 1, 2)
 simple_err(struct.unpack, 'iii', s)
 simple_err(struct.unpack, 'i', s)
@@ -560,7 +560,7 @@ def test_unpack_from():
     test_string = b'abcd01234'
     fmt = '4s'
     s = struct.Struct(fmt)
-    for cls in (str, buffer, bytes):
+    for cls in (buffer, bytes):
         if verbose:
             print("test_unpack_from using", cls.__name__)
         data = cls(test_string)
@@ -575,7 +575,7 @@ def test_unpack_from():
             vereq(s.unpack_from(data, i), (bytes_data[i:i+4],))
         for i in range(6, len(test_string) + 1):
             simple_err(s.unpack_from, data, i)
-    for cls in (str, buffer, bytes):
+    for cls in (buffer, bytes):
         data = cls(test_string)
         vereq(struct.unpack_from(fmt, data), (b'abcd',))
         vereq(struct.unpack_from(fmt, data, 2), (b'cd01',))
