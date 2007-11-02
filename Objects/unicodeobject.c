@@ -1409,11 +1409,11 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
     inputobj = PyUnicodeDecodeError_GetObject(*exceptionObject);
     if (!inputobj)
         goto onError;
-    if (!PyBytes_Check(inputobj)) {
+    if (!PyString_Check(inputobj)) {
 	PyErr_Format(PyExc_TypeError, "exception attribute object must be bytes");
     }
-    *input = PyBytes_AS_STRING(inputobj);
-    insize = PyBytes_GET_SIZE(inputobj);
+    *input = PyString_AS_STRING(inputobj);
+    insize = PyString_GET_SIZE(inputobj);
     *inend = *input + insize;
     /* we can DECREF safely, as the exception has another reference,
        so the object won't go away. */
