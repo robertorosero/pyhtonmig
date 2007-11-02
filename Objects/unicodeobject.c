@@ -1222,12 +1222,13 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
     v = PyCodec_Encode(unicode, encoding, errors);
     if (v == NULL)
         goto onError;
-    if (!PyBytes_Check(v)) {
-        if (PyString_Check(v)) {
-            /* Old codec, turn it into bytes */
-            PyObject *b = PyBytes_FromObject(v);
+    if (!PyString_Check(v)) {
+        if (PyBytes_Check(v)) {
+            /* Turn it into PyString */
+            PyObject *s = PyString_FromStringAndSize(
+                    PyBytes_AS_STRING(v), Py_Size(v));
             Py_DECREF(v);
-            return b;
+            return s;
         }
         PyErr_Format(PyExc_TypeError,
                      "encoder did not return a bytes object "
@@ -1248,19 +1249,15 @@ PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
 					    const char *errors)
 {
     PyObject *v = ((PyUnicodeObject *)unicode)->defenc;
-    PyObject *b;
     if (v)
         return v;
     if (errors != NULL)
         Py_FatalError("non-NULL encoding in _PyUnicode_AsDefaultEncodedString");
-    b = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
+    v = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
                              PyUnicode_GET_SIZE(unicode),
                              NULL);
-    if (!b)
+    if (!v)
         return NULL;
-    v = PyString_FromStringAndSize(PyBytes_AsString(b),
-                                   PyBytes_Size(b));
-    Py_DECREF(b);
     ((PyUnicodeObject *)unicode)->defenc = v;
     return v;
 }
@@ -1673,7 +1670,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
                    int encodeWhiteSpace,
                    const char *errors)
 {
-    PyObject *v;
+    PyObject *v, *result;
     /* It might be possible to tighten this worst case */
     Py_ssize_t cbAllocated = 5 * size;
     int inShift = 0;
@@ -1684,7 +1681,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
     char * start;
 
     if (size == 0)
-	return PyBytes_FromStringAndSize(NULL, 0);
+	return PyString_FromStringAndSize(NULL, 0);
 
     v = PyBytes_FromStringAndSize(NULL, cbAllocated);
     if (v == NULL)
@@ -1756,11 +1753,9 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
         *out++ = '-';
     }
 
-    if (PyBytes_Resize(v, out - start)) {
-        Py_DECREF(v);
-        return NULL;
-    }
-    return v;
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(v), out - start);
+    Py_DECREF(v);
+    return result;
 }
 
 #undef SPECIAL
@@ -2000,11 +1995,11 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
 {
 #define MAX_SHORT_UNICHARS 300  /* largest size we'll do on the stack */
 
-    Py_ssize_t i;           /* index into s of next input byte */
-    PyObject *v;        /* result string object */
-    char *p;            /* next free byte in output buffer */
-    Py_ssize_t nallocated;  /* number of result bytes allocated */
-    Py_ssize_t nneeded;        /* number of result bytes needed */
+    Py_ssize_t i;                /* index into s of next input byte */
+    PyObject *v, *result;        /* result string object */
+    char *p;                     /* next free byte in output buffer */
+    Py_ssize_t nallocated;      /* number of result bytes allocated */
+    Py_ssize_t nneeded;            /* number of result bytes needed */
     char stackbuf[MAX_SHORT_UNICHARS * 4];
 
     assert(s != NULL);
@@ -2075,15 +2070,16 @@ encodeUCS4:
         /* This was stack allocated. */
         nneeded = p - stackbuf;
         assert(nneeded <= nallocated);
-        v = PyBytes_FromStringAndSize(stackbuf, nneeded);
+        result = PyString_FromStringAndSize(stackbuf, nneeded);
     }
     else {
     	/* Cut back to size actually needed. */
         nneeded = p - PyBytes_AS_STRING(v);
         assert(nneeded <= nallocated);
-        PyBytes_Resize(v, nneeded);
+        result = PyString_FromStringAndSize(PyBytes_AS_STRING(v), nneeded);
+        Py_DECREF(v);
     }
-    return v;
+    return result;
 
 #undef MAX_SHORT_UNICHARS
 }
@@ -2278,7 +2274,7 @@ PyUnicode_EncodeUTF32(const Py_UNICODE *s,
 		      const char *errors,
 		      int byteorder)
 {
-    PyObject *v;
+    PyObject *v, *result;
     unsigned char *p;
 #ifndef Py_UNICODE_WIDE
     int i, pairs;
@@ -2318,7 +2314,7 @@ PyUnicode_EncodeUTF32(const Py_UNICODE *s,
     if (byteorder == 0)
 	STORECHAR(0xFEFF);
     if (size == 0)
-        return v;
+        goto done;
 
     if (byteorder == -1) {
         /* force LE */
@@ -2349,7 +2345,11 @@ PyUnicode_EncodeUTF32(const Py_UNICODE *s,
 #endif
         STORECHAR(ch);
     }
-    return v;
+
+  done:
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(v), Py_Size(v));
+    Py_DECREF(v);
+    return result;
 #undef STORECHAR
 }
 
@@ -2548,7 +2548,7 @@ PyUnicode_EncodeUTF16(const Py_UNICODE *s,
 		      const char *errors,
 		      int byteorder)
 {
-    PyObject *v;
+    PyObject *v, *result;
     unsigned char *p;
 #ifdef Py_UNICODE_WIDE
     int i, pairs;
@@ -2583,7 +2583,7 @@ PyUnicode_EncodeUTF16(const Py_UNICODE *s,
     if (byteorder == 0)
 	STORECHAR(0xFEFF);
     if (size == 0)
-        return v;
+        goto done;
 
     if (byteorder == -1) {
         /* force LE */
@@ -2609,7 +2609,11 @@ PyUnicode_EncodeUTF16(const Py_UNICODE *s,
         if (ch2)
             STORECHAR(ch2);
     }
-    return v;
+
+  done:
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(v), Py_Size(v));
+    Py_DECREF(v);
+    return result;
 #undef STORECHAR
 }
 
@@ -2899,7 +2903,7 @@ static const char *hexdigits = "0123456789abcdef";
 PyObject *PyUnicode_EncodeUnicodeEscape(const Py_UNICODE *s,
 					Py_ssize_t size)
 {
-    PyObject *repr;
+    PyObject *repr, *result;
     char *p;
 
     /* XXX(nnorwitz): rather than over-allocating, it would be
@@ -3022,12 +3026,10 @@ PyObject *PyUnicode_EncodeUnicodeEscape(const Py_UNICODE *s,
             *p++ = (char) ch;
     }
 
-    *p = '\0';
-    if (PyBytes_Resize(repr, p - PyBytes_AS_STRING(repr))) {
-        Py_DECREF(repr);
-        return NULL;
-    }
-    return repr;
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(repr),
+                                        p - PyBytes_AS_STRING(repr));
+    Py_DECREF(repr);
+    return result;
 }
 
 PyObject *PyUnicode_AsUnicodeEscapeString(PyObject *unicode)
@@ -3158,7 +3160,7 @@ PyObject *PyUnicode_DecodeRawUnicodeEscape(const char *s,
 PyObject *PyUnicode_EncodeRawUnicodeEscape(const Py_UNICODE *s,
 					   Py_ssize_t size)
 {
-    PyObject *repr;
+    PyObject *repr, *result;
     char *p;
     char *q;
 
@@ -3170,7 +3172,7 @@ PyObject *PyUnicode_EncodeRawUnicodeEscape(const Py_UNICODE *s,
     if (repr == NULL)
         return NULL;
     if (size == 0)
-	return repr;
+        goto done;
 
     p = q = PyBytes_AS_STRING(repr);
     while (size-- > 0) {
@@ -3204,12 +3206,12 @@ PyObject *PyUnicode_EncodeRawUnicodeEscape(const Py_UNICODE *s,
 	else
             *p++ = (char) ch;
     }
-    *p = '\0';
-    if (PyBytes_Resize(repr, p - q)) {
-        Py_DECREF(repr);
-        return NULL;
-    }
-    return repr;
+    size = p - q;
+
+  done:
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(repr), size);
+    Py_DECREF(repr);
+    return result;
 }
 
 PyObject *PyUnicode_AsRawUnicodeEscapeString(PyObject *unicode)
@@ -3444,23 +3446,23 @@ static PyObject *unicode_encode_ucs1(const Py_UNICODE *p,
     /* pointer into the output */
     char *str;
     /* current output position */
-    Py_ssize_t respos = 0;
     Py_ssize_t ressize;
     const char *encoding = (limit == 256) ? "latin-1" : "ascii";
     const char *reason = (limit == 256) ? "ordinal not in range(256)" : "ordinal not in range(128)";
     PyObject *errorHandler = NULL;
     PyObject *exc = NULL;
+    PyObject *result = NULL;
     /* the following variable is used for caching string comparisons
      * -1=not initialized, 0=unknown, 1=strict, 2=replace, 3=ignore, 4=xmlcharrefreplace */
     int known_errorHandler = -1;
 
     /* allocate enough for a simple encoding without
        replacements, if we need more, we'll resize */
+    if (size == 0)
+        return PyString_FromStringAndSize(NULL, 0);
     res = PyBytes_FromStringAndSize(NULL, size);
     if (res == NULL)
-        goto onError;
-    if (size == 0)
-	return res;
+        return NULL;
     str = PyBytes_AS_STRING(res);
     ressize = size;
 
@@ -3588,20 +3590,13 @@ static PyObject *unicode_encode_ucs1(const Py_UNICODE *p,
 	    }
 	}
     }
-    /* Resize if we allocated to much */
-    respos = str - PyBytes_AS_STRING(res);
-    if (respos<ressize)
-       /* If this falls res will be NULL */
-	PyBytes_Resize(res, respos);
+    result = PyString_FromStringAndSize(PyBytes_AS_STRING(res),
+                                        str - PyBytes_AS_STRING(res));
+  onError:
+    Py_DECREF(res);
     Py_XDECREF(errorHandler);
     Py_XDECREF(exc);
-    return res;
-
-    onError:
-    Py_XDECREF(res);
-    Py_XDECREF(errorHandler);
-    Py_XDECREF(exc);
-    return NULL;
+    return result;
 }
 
 PyObject *PyUnicode_EncodeLatin1(const Py_UNICODE *p,
@@ -6511,7 +6506,7 @@ unicode_encode(PyUnicodeObject *self, PyObject *args)
     v = PyUnicode_AsEncodedObject((PyObject *)self, encoding, errors);
     if (v == NULL)
         goto onError;
-    if (!PyBytes_Check(v)) {
+    if (!PyString_Check(v)) {
         PyErr_Format(PyExc_TypeError,
                      "encoder did not return a bytes object "
                      "(type=%.400s)",

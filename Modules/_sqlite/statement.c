@@ -109,11 +109,9 @@ int pysqlite_statement_bind_parameter(pysqlite_Statement* self, int pos, PyObjec
         string = PyString_AsString(parameter);
         rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
     } else if PyUnicode_Check(parameter) {
-        stringval = PyUnicode_AsUTF8String(parameter);
-        string = PyBytes_AsString(stringval);
+        string = PyUnicode_AsUTF8String(parameter);
 
         rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
-        Py_DECREF(stringval);
     } else if (PyObject_CheckBuffer(parameter)) {
         if (PyObject_AsCharBuffer(parameter, &buffer, &buflen) == 0) {
             rc = sqlite3_bind_blob(self->st, pos, buffer, buflen, SQLITE_TRANSIENT);

@@ -796,7 +796,7 @@ CharArray_set_value(CDataObject *self, PyObject *value)
 		return -1;
 	} else
 		Py_INCREF(value);
-	size = PyBytes_GET_SIZE(value);
+	size = PyString_GET_SIZE(value);
 	if (size > self->b_size) {
 		PyErr_SetString(PyExc_ValueError,
 				"string too long");
@@ -804,7 +804,7 @@ CharArray_set_value(CDataObject *self, PyObject *value)
 		return -1;
 	}
 
-	ptr = PyBytes_AS_STRING(value);
+	ptr = PyString_AS_STRING(value);
 	memcpy(self->b_ptr, ptr, size);
 	if (size < self->b_size)
 		self->b_ptr[size] = '\0';

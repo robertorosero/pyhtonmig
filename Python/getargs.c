@@ -1008,14 +1008,14 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 			if (s == NULL)
 				return converterr("(encoding failed)",
 						  arg, msgbuf, bufsize);
-			if (!PyBytes_Check(s)) {
+			if (!PyString_Check(s)) {
 				Py_DECREF(s);
 				return converterr(
 					"(encoder failed to return bytes)",
 					arg, msgbuf, bufsize);
 			}
-			size = PyBytes_GET_SIZE(s);
-			ptr = PyBytes_AS_STRING(s);
+			size = PyString_GET_SIZE(s);
+			ptr = PyString_AS_STRING(s);
 			if (ptr == NULL)
 				ptr = "";
 		}

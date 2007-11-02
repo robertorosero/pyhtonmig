@@ -743,7 +743,7 @@ initstdio(void)
 	PySys_SetObject("stdout", std);
 	Py_DECREF(std);
 
-#if 1 /* Disable this if you have trouble debugging bootstrap stuff */
+#if 0 /* Disable this if you have trouble debugging bootstrap stuff */
 	/* Set sys.stderr, replaces the preliminary stderr */
 	if (!(std = PyFile_FromFd(fileno(stderr), "<stderr>", "w", -1,
 				  NULL, "\n", 0))) {

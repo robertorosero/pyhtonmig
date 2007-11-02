@@ -2213,14 +2213,14 @@ ensure_fromlist(PyObject *mod, PyObject *fromlist, char *buf, Py_ssize_t buflen,
 							      PyUnicode_GetSize(item),
 							      NULL);
 			} else {
-				item8 = PyUnicode_AsEncodedString(item, 
-				Py_FileSystemDefaultEncoding, NULL);
+				item8 = PyUnicode_AsEncodedString(item,
+					Py_FileSystemDefaultEncoding, NULL);
 			}
 			if (!item8) {
 				PyErr_SetString(PyExc_ValueError, "Cannot encode path item");
 				return 0;
 			}
-			subname = PyBytes_AsString(item8);
+			subname = PyString_AS_STRING(item8);
 			if (buflen + strlen(subname) >= MAXPATHLEN) {
 				PyErr_SetString(PyExc_ValueError,
 						"Module name too long");

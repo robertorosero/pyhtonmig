@@ -249,14 +249,14 @@ w_object(PyObject *v, WFILE *p)
 			return;
 		}
 		w_byte(TYPE_UNICODE, p);
-		n = PyBytes_GET_SIZE(utf8);
+		n = PyString_GET_SIZE(utf8);
 		if (n > INT_MAX) {
 			p->depth--;
 			p->error = 1;
 			return;
 		}
 		w_long((long)n, p);
-		w_string(PyBytes_AS_STRING(utf8), (int)n, p);
+		w_string(PyString_AS_STRING(utf8), (int)n, p);
 		Py_DECREF(utf8);
 	}
 	else if (PyTuple_Check(v)) {

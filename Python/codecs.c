@@ -333,18 +333,18 @@ PyObject *PyCodec_Encode(PyObject *object,
     args = args_tuple(object, errors);
     if (args == NULL)
 	goto onError;
-    
+
     result = PyEval_CallObject(encoder,args);
     if (result == NULL)
 	goto onError;
 
-    if (!PyTuple_Check(result) || 
+    if (!PyTuple_Check(result) ||
 	PyTuple_GET_SIZE(result) != 2) {
 	PyErr_SetString(PyExc_TypeError,
 			"encoder must return a tuple (object,integer)");
 	goto onError;
     }
-    v = PyTuple_GET_ITEM(result,0);
+    v = PyTuple_GET_ITEM(result, 0);
     Py_INCREF(v);
     /* We don't check or use the second (integer) entry. */
 
@@ -352,7 +352,7 @@ PyObject *PyCodec_Encode(PyObject *object,
     Py_DECREF(encoder);
     Py_DECREF(result);
     return v;
-	
+
  onError:
     Py_XDECREF(result);
     Py_XDECREF(args);
