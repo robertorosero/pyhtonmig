@@ -1287,13 +1287,16 @@ _db_associateCallback(DB* db, const DBT* priKey, const DBT* priData,
         else if (PyInt_Check(result)) {
             retval = PyInt_AsLong(result);
         }
-        else if (PyBytes_Check(result)) {
+        else if (PyBytes_Check(result) || PyString_Check(result)) {
             char* data;
             Py_ssize_t size;
 
             CLEAR_DBT(*secKey);
-            size = PyBytes_Size(result);
-            data = PyBytes_AsString(result);
+            size = Py_Size(result);
+            if (PyBytes_Check(result))
+                data = PyBytes_AS_STRING(result);
+            else
+                data = PyString_AS_STRING(result);
             secKey->flags = DB_DBT_APPMALLOC;   /* DB will free */
             secKey->data = malloc(size);        /* TODO, check this */
 	    if (secKey->data) {
