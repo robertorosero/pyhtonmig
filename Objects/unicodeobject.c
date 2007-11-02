@@ -1223,13 +1223,6 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
     if (v == NULL)
         goto onError;
     if (!PyString_Check(v)) {
-        if (PyBytes_Check(v)) {
-            /* Turn it into PyString */
-            PyObject *s = PyString_FromStringAndSize(
-                    PyBytes_AS_STRING(v), Py_Size(v));
-            Py_DECREF(v);
-            return s;
-        }
         PyErr_Format(PyExc_TypeError,
                      "encoder did not return a bytes object "
                      "(type=%.400s, encoding=%.20s, errors=%.20s)",
