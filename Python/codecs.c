@@ -334,7 +334,7 @@ PyObject *PyCodec_Encode(PyObject *object,
     if (args == NULL)
 	goto onError;
 
-    result = PyEval_CallObject(encoder,args);
+    result = PyEval_CallObject(encoder, args);
     if (result == NULL)
 	goto onError;
 
@@ -345,8 +345,17 @@ PyObject *PyCodec_Encode(PyObject *object,
 	goto onError;
     }
     v = PyTuple_GET_ITEM(result, 0);
-    if (PyBytes_Check(v))
+    if (PyBytes_Check(v)) {
+        char msg[100];
+        PyOS_snprintf(msg, sizeof(msg),
+                      "encoder %s returned buffer instead of bytes",
+                      encoding);
+        if (PyErr_WarnEx(PyExc_RuntimeWarning, msg, 1) < 0) {
+            v = NULL;
+            goto onError;
+        }
         v = PyString_FromStringAndSize(PyBytes_AS_STRING(v), Py_Size(v));
+    }
     else if (PyString_Check(v))
         Py_INCREF(v);
     else {
