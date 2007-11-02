@@ -12,6 +12,8 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- optimize the performance of builtin.sum().
+
 - Fix warnings found by the new version of the Coverity checker.
 
 - The enumerate() builtin function is no longer bounded to sequences smaller
@@ -272,11 +274,17 @@ Core and builtins
 Library
 -------
 
+- IN module for FreeBSD 8 is added and preexisting FreeBSD 6 and 7
+  files are updated.
+
+- Issues #1181, #1287: unsetenv() is now called when the os.environ.pop()
+  and os.environ.clear() methods are used.
+
 - ctypes will now work correctly on 32-bit systems when Python is
   configured with --with-system-ffi.
 
 - Patch #1203: ctypes now does work on OS X when Python is built with
-  --disable-toolbox-glue
+  --disable-toolbox-glue.
 
 - collections.deque() now supports a "maxlen" argument.
 
@@ -550,7 +558,7 @@ Library
 
 - Added heapq.merge() for merging sorted input streams.
 
-- Added collections.named_tuple() for assigning field names to tuples.
+- Added collections.namedtuple() for assigning field names to tuples.
 
 - Added itertools.izip_longest().
 
@@ -811,10 +819,6 @@ Extension Modules
 - Bug #1233: fix bsddb.dbshelve.DBShelf append method to work as
   intended for RECNO databases.
 
-- Fix bsddb.dbtables: Don't randomly corrupt newly inserted rows by
-  picking a rowid string with null bytes in it.  Such rows could not
-  later be deleted, modified or individually selected.
-
 - Bug #1686475: Support stat'ing open files on Windows again.
 
 - Patch #1185447: binascii.b2a_qp() now correctly quotes binary characters
@@ -909,6 +913,8 @@ Extension Modules
 - Fix an off-by-one bug in locale.strxfrm().
 
 - Fix libffi configure for hppa*-*-linux* | parisc*-*-linux*.
+
+- Build using system ffi library on arm*-linux*.
 
 
 Tests
