@@ -202,9 +202,11 @@ class UnicodeTest(
         self.checkequalnofix('one@two!three!', 'one!two!three!', 'replace', '!', '@', 1)
         self.assertRaises(TypeError, 'replace'.replace, "r", 42)
 
-    def test_str8_comparison(self):
-        self.assertEqual('abc' == str8(b'abc'), False)
-        self.assertEqual('abc' != str8(b'abc'), True)
+    def test_bytes_comparison(self):
+        self.assertEqual('abc' == b'abc', False)
+        self.assertEqual('abc' != b'abc', True)
+        self.assertEqual('abc' == buffer(b'abc'), False)
+        self.assertEqual('abc' != buffer(b'abc'), True)
 
     def test_comparison(self):
         # Comparisons:
