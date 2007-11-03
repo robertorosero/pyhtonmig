@@ -860,8 +860,12 @@ class HTTPConnection:
         if self.__state != _CS_REQ_STARTED:
             raise CannotSendHeader()
 
-        header = '%s: %s' % (header, value)
-        self._output(header.encode('ascii'))
+        if hasattr(header, 'encode'):
+            header = header.encode('ascii')
+        if hasattr(value, 'encode'):
+            value = value.encode('ascii')
+        header = header + b': ' + value
+        self._output(header)
 
     def endheaders(self):
         """Indicate that the last header line has been sent to the server."""
