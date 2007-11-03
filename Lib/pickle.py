@@ -938,7 +938,7 @@ class Unpickler:
 
     def load_short_binstring(self):
         len = ord(self.read(1))
-        self.append(self.read(len))
+        self.append(bytes(self.read(len)))
     dispatch[SHORT_BINSTRING[0]] = load_short_binstring
 
     def load_tuple(self):
