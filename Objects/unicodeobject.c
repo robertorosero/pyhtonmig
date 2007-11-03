@@ -3835,20 +3835,20 @@ static int encode_mbcs(PyObject **repr,
 
     if (*repr == NULL) {
 	/* Create string object */
-	*repr = PyBytes_FromStringAndSize(NULL, mbcssize);
+	*repr = PyString_FromStringAndSize(NULL, mbcssize);
 	if (*repr == NULL)
 	    return -1;
     }
     else {
 	/* Extend string object */
-	n = PyBytes_Size(*repr);
-	if (PyBytes_Resize(*repr, n + mbcssize) < 0)
+	n = PyString_Size(*repr);
+	if (_PyString_Resize(repr, n + mbcssize) < 0)
 	    return -1;
     }
 
     /* Do the conversion */
     if (size > 0) {
-	char *s = PyBytes_AS_STRING(*repr) + n;
+	char *s = PyString_AS_STRING(*repr) + n;
 	if (0 == WideCharToMultiByte(CP_ACP, 0, p, size, s, mbcssize, NULL, NULL)) {
 	    PyErr_SetFromWindowsErrWithFilename(0, NULL);
 	    return -1;
