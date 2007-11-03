@@ -1084,7 +1084,7 @@ bytes_find(PyBytesObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(count__doc__,
-"B.count(sub[, start[, end]]) -> int\n\
+"B.count(sub [,start [,end]]) -> int\n\
 \n\
 Return the number of non-overlapping occurrences of subsection sub in\n\
 bytes B[start:end].  Optional arguments start and end are interpreted\n\
@@ -1243,7 +1243,7 @@ done:
 
 
 PyDoc_STRVAR(startswith__doc__,
-"B.startswith(prefix[, start[, end]]) -> bool\n\
+"B.startswith(prefix [,start [,end]]) -> bool\n\
 \n\
 Return True if B starts with the specified prefix, False otherwise.\n\
 With optional start, test B beginning at that position.\n\
@@ -1283,7 +1283,7 @@ bytes_startswith(PyBytesObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(endswith__doc__,
-"B.endswith(suffix[, start[, end]]) -> bool\n\
+"B.endswith(suffix [,start [,end]]) -> bool\n\
 \n\
 Return True if B ends with the specified suffix, False otherwise.\n\
 With optional start, test B beginning at that position.\n\
@@ -1324,12 +1324,12 @@ bytes_endswith(PyBytesObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(translate__doc__,
-"B.translate(table [,deletechars]) -> bytes\n\
+"B.translate(table[, deletechars]) -> buffer\n\
 \n\
-Return a copy of the bytes B, where all characters occurring\n\
-in the optional argument deletechars are removed, and the\n\
-remaining characters have been mapped through the given\n\
-translation table, which must be a bytes of length 256.");
+Return a copy of B, where all characters occurring in the\n\
+optional argument deletechars are removed, and the remaining\n\
+characters have been mapped through the given translation\n\
+table, which must be a bytes object of length 256.");
 
 static PyObject *
 bytes_translate(PyBytesObject *self, PyObject *args)
@@ -2022,7 +2022,7 @@ replace(PyBytesObject *self,
 
 
 PyDoc_STRVAR(replace__doc__,
-"B.replace (old, new[, count]) -> bytes\n\
+"B.replace(old, new[, count]) -> bytes\n\
 \n\
 Return a copy of B with all occurrences of subsection\n\
 old replaced by new.  If the optional argument count is\n\
@@ -2172,10 +2172,10 @@ split_whitespace(const char *s, Py_ssize_t len, Py_ssize_t maxcount)
 }
 
 PyDoc_STRVAR(split__doc__,
-"B.split([sep [, maxsplit]]) -> list of buffer\n\
+"B.split([sep[, maxsplit]]) -> list of buffer\n\
 \n\
-Return a list of the buffer in the string B, using sep as the delimiter.\n\
-If sep is not given, B is split on ASCII whitespace charcters\n\
+Return a list of the sections in B, using sep as the delimiter.\n\
+If sep is not given, B is split on ASCII whitespace characters\n\
 (space, tab, return, newline, formfeed, vertical tab).\n\
 If maxsplit is given, at most maxsplit splits are done.");
 
@@ -2281,9 +2281,10 @@ bytes_partition(PyBytesObject *self, PyObject *sep_obj)
 PyDoc_STRVAR(rpartition__doc__,
 "B.rpartition(sep) -> (tail, sep, head)\n\
 \n\
-Searches for the separator sep in B, starting at the end of B, and returns\n\
-the part before it, the separator itself, and the part after it.  If the\n\
-separator is not found, returns two empty buffer and B.");
+Searches for the separator sep in B, starting at the end of B,\n\
+and returns the part before it, the separator itself, and the\n\
+part after it.  If the separator is not found, returns two empty\n\
+buffer objects and B.");
 
 static PyObject *
 bytes_rpartition(PyBytesObject *self, PyObject *sep_obj)
@@ -2380,7 +2381,7 @@ rsplit_whitespace(const char *s, Py_ssize_t len, Py_ssize_t maxcount)
 }
 
 PyDoc_STRVAR(rsplit__doc__,
-"B.rsplit(sep [,maxsplit]) -> list of buffer\n\
+"B.rsplit(sep[, maxsplit]) -> list of buffer\n\
 \n\
 Return a list of the sections in B, using sep as the delimiter,\n\
 starting at the end of B and working to the front.\n\
@@ -2742,12 +2743,12 @@ bytes_rstrip(PyBytesObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(decode_doc,
-"B.decode([encoding[,errors]]) -> unicode obect.\n\
+"B.decode([encoding[, errors]]) -> unicode object.\n\
 \n\
 Decodes B using the codec registered for encoding. encoding defaults\n\
 to the default encoding. errors may be given to set a different error\n\
-handling scheme. Default is 'strict' meaning that encoding errors raise\n\
-a UnicodeDecodeError. Other possible values are 'ignore' and 'replace'\n\
+handling scheme.  Default is 'strict' meaning that encoding errors raise\n\
+a UnicodeDecodeError.  Other possible values are 'ignore' and 'replace'\n\
 as well as any other name registerd with codecs.register_error that is\n\
 able to handle UnicodeDecodeErrors.");
 
@@ -2778,8 +2779,7 @@ bytes_alloc(PyBytesObject *self)
 PyDoc_STRVAR(join_doc,
 "B.join(iterable_of_bytes) -> bytes\n\
 \n\
-Concatenates any number of bytes objects, with B in between each pair.\n\
-Example: b'.'.join([b'ab', b'pq', b'rs']) -> b'ab.pq.rs'.");
+Concatenates any number of buffer objects, with B in between each pair.");
 
 static PyObject *
 bytes_join(PyBytesObject *self, PyObject *it)
@@ -2855,8 +2855,8 @@ PyDoc_STRVAR(fromhex_doc,
 "buffer.fromhex(string) -> buffer\n\
 \n\
 Create a buffer object from a string of hexadecimal numbers.\n\
-Spaces between two numbers are accepted. Example:\n\
-buffer.fromhex('10 1112') -> buffer(b'\\x10\\x11\\x12').");
+Spaces between two numbers are accepted.\n\
+Example: buffer.fromhex('B9 01EF') -> buffer(b'\\xb9\\x01\\xef').");
 
 static int
 hex_digit_to_int(Py_UNICODE c)
@@ -3021,9 +3021,21 @@ bytes_methods[] = {
 };
 
 PyDoc_STRVAR(bytes_doc,
-"buffer([iterable]) -> new array of bytes.\n\
+"buffer(iterable_of_ints) -> buffer.\n\
+buffer(string, encoding[, errors]) -> buffer.\n\
+buffer(bytes_or_buffer) -> mutable copy of bytes_or_buffer.\n\
+buffer(memory_view) -> buffer.\n\
 \n\
-If an argument is given it must be an iterable yielding ints in range(256).");
+Construct an mutable buffer object from:\n\
+  - an iterable yielding integers in range(256)\n\
+  - a text string encoded using the specified encoding\n\
+  - a bytes or a buffer object\n\
+  - any object implementing the buffer API.\n\
+\n\
+buffer(int) -> buffer.\n\
+\n\
+Construct a zero-initialized buffer of the given length.");
+
 
 static PyObject *bytes_iter(PyObject *seq);
 

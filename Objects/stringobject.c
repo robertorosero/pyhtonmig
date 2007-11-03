@@ -1132,12 +1132,12 @@ split_char(const char *s, Py_ssize_t len, char ch, Py_ssize_t maxcount)
 }
 
 PyDoc_STRVAR(split__doc__,
-"S.split([sep [,maxsplit]]) -> list of strings\n\
+"B.split([sep[, maxsplit]]) -> list of bytes\n\
 \n\
-Return a list of the words in the string S, using sep as the\n\
-delimiter string.  If maxsplit is given, at most maxsplit\n\
-splits are done. If sep is not specified or is None, any\n\
-whitespace string is a separator.");
+Return a list of the sections in B, using sep as the delimiter.\n\
+If sep is not given, B is split on ASCII whitespace characters\n\
+(space, tab, return, newline, formfeed, vertical tab).\n\
+If maxsplit is given, at most maxsplit splits are done.");
 
 static PyObject *
 string_split(PyStringObject *self, PyObject *args)
@@ -1213,11 +1213,11 @@ string_split(PyStringObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(partition__doc__,
-"S.partition(sep) -> (head, sep, tail)\n\
+"B.partition(sep) -> (head, sep, tail)\n\
 \n\
-Searches for the separator sep in S, and returns the part before it,\n\
+Searches for the separator sep in B, and returns the part before it,\n\
 the separator itself, and the part after it.  If the separator is not\n\
-found, returns S and two empty strings.");
+found, returns B and two empty bytes objects.");
 
 static PyObject *
 string_partition(PyStringObject *self, PyObject *sep_obj)
@@ -1242,11 +1242,12 @@ string_partition(PyStringObject *self, PyObject *sep_obj)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-"S.rpartition(sep) -> (tail, sep, head)\n\
+"B.rpartition(sep) -> (tail, sep, head)\n\
 \n\
-Searches for the separator sep in S, starting at the end of S, and returns\n\
-the part before it, the separator itself, and the part after it.  If the\n\
-separator is not found, returns two empty strings and S.");
+Searches for the separator sep in B, starting at the end of B,\n\
+and returns the part before it, the separator itself, and the\n\
+part after it.  If the separator is not found, returns two empty\n\
+bytes objects and B.");
 
 static PyObject *
 string_rpartition(PyStringObject *self, PyObject *sep_obj)
@@ -1340,13 +1341,14 @@ rsplit_char(const char *s, Py_ssize_t len, char ch, Py_ssize_t maxcount)
 }
 
 PyDoc_STRVAR(rsplit__doc__,
-"S.rsplit([sep [,maxsplit]]) -> list of strings\n\
+"B.rsplit([sep[, maxsplit]]) -> list of strings\n\
 \n\
-Return a list of the words in the string S, using sep as the\n\
-delimiter string, starting at the end of the string and working\n\
-to the front.  If maxsplit is given, at most maxsplit splits are\n\
-done. If sep is not specified or is None, any whitespace string\n\
-is a separator.");
+Return a list of the sections in B, using sep as the delimiter,\n\
+starting at the end of B and working to the front.\n\
+If sep is not given, B is split on ASCII whitespace characters\n\
+(space, tab, return, newline, formfeed, vertical tab).\n\
+If maxsplit is given, at most maxsplit splits are done.");
+
 
 static PyObject *
 string_rsplit(PyStringObject *self, PyObject *args)
@@ -1417,10 +1419,10 @@ onError:
 
 
 PyDoc_STRVAR(join__doc__,
-"S.join(sequence) -> string\n\
+"B.join(iterable_of_bytes) -> bytes\n\
 \n\
-Return a string which is the concatenation of the strings in the\n\
-sequence.  The separator between elements is S.");
+Concatenates any number of bytes objects, with B in between each pair.\n\
+Example: b'.'.join([b'ab', b'pq', b'rs']) -> b'ab.pq.rs'.");
 
 static PyObject *
 string_join(PyObject *self, PyObject *orig)
@@ -1571,7 +1573,7 @@ string_find_internal(PyStringObject *self, PyObject *args, int dir)
 
 
 PyDoc_STRVAR(find__doc__,
-"S.find(sub [,start [,end]]) -> int\n\
+"B.find(sub [,start [,end]]) -> int\n\
 \n\
 Return the lowest index in S where substring sub is found,\n\
 such that sub is contained within s[start:end].  Optional\n\
@@ -1590,9 +1592,9 @@ string_find(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(index__doc__,
-"S.index(sub [,start [,end]]) -> int\n\
+"B.index(sub [,start [,end]]) -> int\n\
 \n\
-Like S.find() but raise ValueError when the substring is not found.");
+Like B.find() but raise ValueError when the substring is not found.");
 
 static PyObject *
 string_index(PyStringObject *self, PyObject *args)
@@ -1610,9 +1612,9 @@ string_index(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(rfind__doc__,
-"S.rfind(sub [,start [,end]]) -> int\n\
+"B.rfind(sub [,start [,end]]) -> int\n\
 \n\
-Return the highest index in S where substring sub is found,\n\
+Return the highest index in B where substring sub is found,\n\
 such that sub is contained within s[start:end].  Optional\n\
 arguments start and end are interpreted as in slice notation.\n\
 \n\
@@ -1629,9 +1631,9 @@ string_rfind(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(rindex__doc__,
-"S.rindex(sub [,start [,end]]) -> int\n\
+"B.rindex(sub [,start [,end]]) -> int\n\
 \n\
-Like S.rfind() but raise ValueError when the substring is not found.");
+Like B.rfind() but raise ValueError when the substring is not found.");
 
 static PyObject *
 string_rindex(PyStringObject *self, PyObject *args)
@@ -1735,13 +1737,10 @@ do_argstrip(PyStringObject *self, int striptype, PyObject *args)
 
 
 PyDoc_STRVAR(strip__doc__,
-"S.strip([chars]) -> string\n\
+"B.strip([bytes]) -> bytes\n\
 \n\
-Return a copy of the string S with leading and trailing\n\
-whitespace removed.\n\
-If chars is given and not None, remove characters in chars instead.\n\
-If chars is unicode, S will be converted to unicode before stripping");
-
+Strip leading and trailing bytes contained in the argument.\n\
+If the argument is omitted, strip trailing ASCII whitespace.");
 static PyObject *
 string_strip(PyStringObject *self, PyObject *args)
 {
@@ -1753,12 +1752,10 @@ string_strip(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(lstrip__doc__,
-"S.lstrip([chars]) -> string\n\
+"B.lstrip([bytes]) -> bytes\n\
 \n\
-Return a copy of the string S with leading whitespace removed.\n\
-If chars is given and not None, remove characters in chars instead.\n\
-If chars is unicode, S will be converted to unicode before stripping");
-
+Strip leading bytes contained in the argument.\n\
+If the argument is omitted, strip leading ASCII whitespace.");
 static PyObject *
 string_lstrip(PyStringObject *self, PyObject *args)
 {
@@ -1770,12 +1767,10 @@ string_lstrip(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(rstrip__doc__,
-"S.rstrip([chars]) -> string\n\
+"B.rstrip([bytes]) -> bytes\n\
 \n\
-Return a copy of the string S with trailing whitespace removed.\n\
-If chars is given and not None, remove characters in chars instead.\n\
-If chars is unicode, S will be converted to unicode before stripping");
-
+Strip trailing bytes contained in the argument.\n\
+If the argument is omitted, strip trailing ASCII whitespace.");
 static PyObject *
 string_rstrip(PyStringObject *self, PyObject *args)
 {
@@ -1787,7 +1782,7 @@ string_rstrip(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(count__doc__,
-"S.count(sub[, start[, end]]) -> int\n\
+"B.count(sub [,start [,end]]) -> int\n\
 \n\
 Return the number of non-overlapping occurrences of substring sub in\n\
 string S[start:end].  Optional arguments start and end are interpreted\n\
@@ -1829,12 +1824,12 @@ string_count(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(translate__doc__,
-"S.translate(table [,deletechars]) -> string\n\
+"B.translate(table[, deletechars]) -> bytes\n\
 \n\
-Return a copy of the string S, where all characters occurring\n\
-in the optional argument deletechars are removed, and the\n\
-remaining characters have been mapped through the given\n\
-translation table, which must be a string of length 256.");
+Return a copy of B, where all characters occurring in the\n\
+optional argument deletechars are removed, and the remaining\n\
+characters have been mapped through the given translation\n\
+table, which must be a bytes object of length 256.");
 
 static PyObject *
 string_translate(PyStringObject *self, PyObject *args)
@@ -2546,9 +2541,9 @@ replace(PyStringObject *self,
 }
 
 PyDoc_STRVAR(replace__doc__,
-"S.replace (old, new[, count]) -> string\n\
+"B.replace(old, new[, count]) -> bytes\n\
 \n\
-Return a copy of string S with all occurrences of substring\n\
+Return a copy of B with all occurrences of subsection\n\
 old replaced by new.  If the optional argument count is\n\
 given, only the first count occurrences are replaced.");
 
@@ -2635,11 +2630,11 @@ _string_tailmatch(PyStringObject *self, PyObject *substr, Py_ssize_t start,
 
 
 PyDoc_STRVAR(startswith__doc__,
-"S.startswith(prefix[, start[, end]]) -> bool\n\
+"B.startswith(prefix [,start [,end]]) -> bool\n\
 \n\
-Return True if S starts with the specified prefix, False otherwise.\n\
-With optional start, test S beginning at that position.\n\
-With optional end, stop comparing S at that position.\n\
+Return True if B starts with the specified prefix, False otherwise.\n\
+With optional start, test B beginning at that position.\n\
+With optional end, stop comparing B at that position.\n\
 prefix can also be a tuple of strings to try.");
 
 static PyObject *
@@ -2676,11 +2671,11 @@ string_startswith(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(endswith__doc__,
-"S.endswith(suffix[, start[, end]]) -> bool\n\
+"B.endswith(suffix [,start [,end]]) -> bool\n\
 \n\
-Return True if S ends with the specified suffix, False otherwise.\n\
-With optional start, test S beginning at that position.\n\
-With optional end, stop comparing S at that position.\n\
+Return True if B ends with the specified suffix, False otherwise.\n\
+With optional start, test B beginning at that position.\n\
+With optional end, stop comparing B at that position.\n\
 suffix can also be a tuple of strings to try.");
 
 static PyObject *
@@ -2717,12 +2712,12 @@ string_endswith(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(decode__doc__,
-"S.decode([encoding[,errors]]) -> object\n\
+"B.decode([encoding[, errors]]) -> object\n\
 \n\
 Decodes S using the codec registered for encoding. encoding defaults\n\
 to the default encoding. errors may be given to set a different error\n\
-handling scheme. Default is 'strict' meaning that encoding errors raise\n\
-a UnicodeDecodeError. Other possible values are 'ignore' and 'replace'\n\
+handling scheme.  Default is 'strict' meaning that encoding errors raise\n\
+a UnicodeDecodeError.  Other possible values are 'ignore' and 'replace'\n\
 as well as any other name registerd with codecs.register_error that is\n\
 able to handle UnicodeDecodeErrors.");
 
@@ -2744,8 +2739,8 @@ PyDoc_STRVAR(fromhex_doc,
 "bytes.fromhex(string) -> bytes\n\
 \n\
 Create a bytes object from a string of hexadecimal numbers.\n\
-Spaces between two numbers are accepted. Example:\n\
-bytes.fromhex('10 1112') -> s'\\x10\\x11\\x12'.");
+Spaces between two numbers are accepted.\n\
+Example: bytes.fromhex('B9 01EF') -> b'\\xb9\\x01\\xef'.");
 
 static int
 hex_digit_to_int(Py_UNICODE c)
@@ -2886,7 +2881,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	const char *errors = NULL;
 	PyObject *new = NULL;
 	Py_ssize_t i, size;
-	static char *kwlist[] = {"object", "encoding", "errors", 0};
+	static char *kwlist[] = {"source", "encoding", "errors", 0};
 
 	if (type != &PyString_Type)
 		return str_subtype_new(type, args, kwds);
@@ -3072,10 +3067,16 @@ str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyDoc_STRVAR(string_doc,
-"bytes(object) -> string\n\
+"bytes(iterable_of_ints) -> bytes.\n\
+bytes(string, encoding[, errors]) -> bytes\n\
+bytes(bytes_or_buffer) -> immutable copy of bytes_or_buffer.\n\
+bytes(memory_view) -> bytes.\n\
 \n\
-Return a nice string representation of the object.\n\
-If the argument is a string, the return value is the same object.");
+Construct an immutable array of bytes from:\n\
+  - an iterable yielding integers in range(256)\n\
+  - a text string encoded using the specified encoding\n\
+  - a bytes or a buffer object\n\
+  - any object implementing the buffer API.");
 
 static PyObject *str_iter(PyObject *seq);
 
