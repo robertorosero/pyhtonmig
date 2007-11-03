@@ -24,7 +24,8 @@ else:
 # shutdown time.  That frustrates tests trying to check stderr produced
 # from a spawned Python process.
 def remove_stderr_debug_decorations(stderr):
-    return re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
+    return re.sub("\[\d+ refs\]\r?\n?$", "", stderr.decode()).encode()
+    #return re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
 
 class ProcessTestCase(unittest.TestCase):
     def setUp(self):
