@@ -1989,7 +1989,7 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
 #define MAX_SHORT_UNICHARS 300  /* largest size we'll do on the stack */
 
     Py_ssize_t i;                /* index into s of next input byte */
-    PyObject *v, *result;        /* result string object */
+    PyObject *result;            /* result string object */
     char *p;                     /* next free byte in output buffer */
     Py_ssize_t nallocated;      /* number of result bytes allocated */
     Py_ssize_t nneeded;            /* number of result bytes needed */
@@ -2004,7 +2004,7 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
          * turns out we need.
          */
         nallocated = Py_SAFE_DOWNCAST(sizeof(stackbuf), size_t, int);
-        v = NULL;   /* will allocate after we're done */
+        result = NULL;   /* will allocate after we're done */
         p = stackbuf;
     }
     else {
@@ -2012,10 +2012,10 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
         nallocated = size * 4;
         if (nallocated / 4 != size)  /* overflow! */
             return PyErr_NoMemory();
-        v = PyBytes_FromStringAndSize(NULL, nallocated);
-        if (v == NULL)
+        result = PyString_FromStringAndSize(NULL, nallocated);
+        if (result == NULL)
             return NULL;
-        p = PyBytes_AS_STRING(v);
+        p = PyString_AS_STRING(result);
     }
 
     for (i = 0; i < size;) {
@@ -2059,7 +2059,7 @@ encodeUCS4:
         }
     }
 
-    if (v == NULL) {
+    if (result == NULL) {
         /* This was stack allocated. */
         nneeded = p - stackbuf;
         assert(nneeded <= nallocated);
@@ -2067,10 +2067,9 @@ encodeUCS4:
     }
     else {
     	/* Cut back to size actually needed. */
-        nneeded = p - PyBytes_AS_STRING(v);
+        nneeded = p - PyString_AS_STRING(result);
         assert(nneeded <= nallocated);
-        result = PyString_FromStringAndSize(PyBytes_AS_STRING(v), nneeded);
-        Py_DECREF(v);
+        _PyString_Resize(&result, nneeded);
     }
     return result;
 
