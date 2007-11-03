@@ -1587,7 +1587,7 @@ s_unpack_from(PyObject *self, PyObject *args, PyObject *kwds)
 			soself->s_size);
 		return NULL;
 	}
-	result = s_unpack_internal(soself, vbuf.buf + offset);
+	result = s_unpack_internal(soself, (char*)vbuf.buf + offset);
 	PyObject_ReleaseBuffer(input, &vbuf);
 	return result;
 }

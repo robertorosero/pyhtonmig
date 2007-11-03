@@ -1482,7 +1482,6 @@ UnicodeDecodeError_str(PyObject *self)
     PyUnicodeErrorObject *uself = (PyUnicodeErrorObject *)self;
 
     if (uself->end==uself->start+1) {
-        assert(PyString_Check(((PyUnicodeErrorObject *)self)->object));
         int byte = (int)(PyString_AS_STRING(((PyUnicodeErrorObject *)self)->object)[uself->start]&0xff);
         return PyUnicode_FromFormat(
             "'%U' codec can't decode byte 0x%02x in position %zd: %U",
