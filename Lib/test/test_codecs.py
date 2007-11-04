@@ -1265,7 +1265,9 @@ class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
                 encodedresult = b""
                 for c in s:
                     writer.write(c)
-                    encodedresult += q.read()
+                    chunk = q.read()
+                    self.assert_(type(chunk) is bytes, type(chunk))
+                    encodedresult += chunk
                 q = Queue(b"")
                 reader = codecs.getreader(encoding)(q)
                 decodedresult = ""
