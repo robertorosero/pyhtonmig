@@ -2385,7 +2385,7 @@ PyImport_ReloadModule(PyObject *m)
 		subname = name;
 	else {
 		PyObject *parentname, *parent;
-		parentname = PyString_FromStringAndSize(name, (subname-name));
+		parentname = PyUnicode_FromStringAndSize(name, (subname-name));
 		if (parentname == NULL) {
 			imp_modules_reloading_clear();
 			return NULL;
@@ -2394,7 +2394,7 @@ PyImport_ReloadModule(PyObject *m)
 		if (parent == NULL) {
 			PyErr_Format(PyExc_ImportError,
 			    "reload(): parent %.200s not in sys.modules",
-			    PyString_AS_STRING(parentname));
+			     PyUnicode_AsString(parentname));
 			Py_DECREF(parentname);
 			imp_modules_reloading_clear();
 			return NULL;
