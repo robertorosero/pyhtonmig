@@ -105,11 +105,8 @@ int pysqlite_statement_bind_parameter(pysqlite_Statement* self, int pos, PyObjec
 #endif
     } else if (PyFloat_Check(parameter)) {
         rc = sqlite3_bind_double(self->st, pos, PyFloat_AsDouble(parameter));
-    } else if PyString_Check(parameter) {
-        string = PyString_AsString(parameter);
-        rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
     } else if PyUnicode_Check(parameter) {
-        string = PyUnicode_AsUTF8String(parameter);
+        string = PyUnicode_AsString(parameter);
 
         rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
     } else if (PyObject_CheckBuffer(parameter)) {

@@ -241,7 +241,7 @@ PyObject* pysqlite_cache_display(pysqlite_Cache* self, PyObject* args)
         if (!fmt_args) {
             return NULL;
         }
-        template = PyString_FromString("%s <- %s ->%s\n");
+        template = PyUnicode_FromString("%s <- %s ->%s\n");
         if (!template) {
             Py_DECREF(fmt_args);
             return NULL;
