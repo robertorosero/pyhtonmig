@@ -1544,6 +1544,7 @@ s_unpack(PyObject *self, PyObject *input)
 		PyErr_Format(StructError,
 			     "unpack requires a bytes argument of length %zd",
 			     soself->s_size);
+                PyObject_ReleaseBuffer(input, &vbuf);
 		return NULL;
 	}
 	result = s_unpack_internal(soself, vbuf.buf);
@@ -1585,6 +1586,7 @@ s_unpack_from(PyObject *self, PyObject *args, PyObject *kwds)
 		PyErr_Format(StructError,
 			"unpack_from requires a buffer of at least %zd bytes",
 			soself->s_size);
+                PyObject_ReleaseBuffer(input, &vbuf);
 		return NULL;
 	}
 	result = s_unpack_internal(soself, (char*)vbuf.buf + offset);
