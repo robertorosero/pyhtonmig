@@ -827,6 +827,7 @@ class HTTPConnection:
                     if self.port == HTTP_PORT:
                         self.putheader('Host', host_enc)
                     else:
+                        host_enc = host_enc.decode("ascii")
                         self.putheader('Host', "%s:%s" % (host_enc, self.port))
 
             # note: we are assuming that clients will not attempt to set these
