@@ -311,7 +311,7 @@ def read_stringnl(f, decode=True, stripquotes=True):
             raise ValueError("no string quotes around %r" % data)
 
     if decode:
-        data = str(codecs.escape_decode(data)[0])
+        data = codecs.escape_decode(data)[0].decode("ascii")
     return data
 
 stringnl = ArgumentDescriptor(
@@ -325,7 +325,7 @@ stringnl = ArgumentDescriptor(
                    """)
 
 def read_stringnl_noescape(f):
-    return read_stringnl(f, decode=False, stripquotes=False)
+    return read_stringnl(f, stripquotes=False)
 
 stringnl_noescape = ArgumentDescriptor(
                         name='stringnl_noescape',
@@ -1981,7 +1981,7 @@ class _Example:
 
 _dis_test = r"""
 >>> import pickle
->>> x = [1, 2, (3, 4), {str8(b'abc'): "def"}]
+>>> x = [1, 2, (3, 4), {bytes(b'abc'): "def"}]
 >>> pkl = pickle.dumps(x, 0)
 >>> dis(pkl)
     0: (    MARK
