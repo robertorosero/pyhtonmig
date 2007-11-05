@@ -213,7 +213,6 @@ escape_encode(PyObject *self,
 		}
 		*p = '\0';
 		if (_PyString_Resize(&v, (p - PyString_AS_STRING(v)))) {
-			Py_DECREF(v);
 			return NULL;
 		}
 	}
