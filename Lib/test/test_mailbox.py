@@ -170,9 +170,9 @@ class TestMailbox(TestBase):
         key1 = self._box.add(_sample_message)
         data0 = self._box.get_file(key0).read()
         data1 = self._box.get_file(key1).read()
-        self.assertEqual(data0.decode().replace(os.linesep, '\n'),
+        self.assertEqual(data0.replace(os.linesep, '\n'),
                          self._template % 0)
-        self.assertEqual(data1.decode().replace(os.linesep, '\n'),
+        self.assertEqual(data1.replace(os.linesep, '\n'),
                          _sample_message)
 
     def test_iterkeys(self):

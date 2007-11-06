@@ -333,7 +333,7 @@ class Maildir(Mailbox):
 
     def get_file(self, key):
         """Return a file-like representation or raise a KeyError."""
-        f = open(os.path.join(self._path, self._lookup(key)), 'rb')
+        f = open(os.path.join(self._path, self._lookup(key)), 'r')
         return _ProxyFile(f)
 
     def iterkeys(self):
@@ -936,7 +936,7 @@ class MH(Mailbox):
     def get_file(self, key):
         """Return a file-like representation or raise a KeyError."""
         try:
-            f = open(os.path.join(self._path, str(key)), 'rb')
+            f = open(os.path.join(self._path, str(key)), 'r')
         except IOError as e:
             if e.errno == errno.ENOENT:
                 raise KeyError('No message with key: %s' % key)
