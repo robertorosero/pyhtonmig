@@ -1266,7 +1266,9 @@ class TextIOWrapper(TextIOBase):
         return line
 
     def readline(self, limit=None):
-        if limit is not None:
+        if limit is None:
+            limit = -1
+        if limit >= 0:
             # XXX Hack to support limit argument, for backwards compatibility
             line = self.readline()
             if len(line) <= limit:
