@@ -407,9 +407,9 @@ module for more information.
 
 .. exception:: BytesWarning
 
-   Base class for warnings related to bytes and buffer.
+   Base class for warnings related to :class:`bytes` and :class:`buffer`.
+
 
 The class hierarchy for built-in exceptions is:
-
 
 .. literalinclude:: ../../Lib/test/exception_hierarchy.txt

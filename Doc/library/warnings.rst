@@ -81,7 +81,7 @@ following warnings category classes are currently defined:
 |                                  | Unicode.                                      |
 +----------------------------------+-----------------------------------------------+
 | :exc:`BytesWarning`              | Base category for warnings related to         |
-|                                  | bytes and buffer.                             |
+|                                  | :class:`bytes` and :class:`buffer`.           |
 +----------------------------------+-----------------------------------------------+
 
 
