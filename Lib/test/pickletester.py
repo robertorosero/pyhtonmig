@@ -1007,8 +1007,8 @@ if __name__ == "__main__":
     # Print some stuff that can be used to rewrite DATA{0,1,2}
     from pickletools import dis
     x = create_data()
-    pickles = [pickle.dumps(x, 0), pickle.dumps(x, 1), pickle.dumps(x, 2)]
-    for i, p in enumerate(pickles):
+    for i in range(3):
+        p = pickle.dumps(x, i)
         print("DATA{0} = (".format(i))
         for j in range(0, len(p), 20):
             b = bytes(p[j:j+20])
