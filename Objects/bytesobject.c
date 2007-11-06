@@ -917,6 +917,17 @@ bytes_repr(PyBytesObject *self)
 }
 
 static PyObject *
+bytes_str(PyObject *op)
+{
+	if (Py_BytesWarningFlag) {
+		if (PyErr_WarnEx(PyExc_BytesWarning,
+				 "str() on a buffer instance", 1))
+			return NULL;
+	}
+	return bytes_repr((PyBytesObject*)op);
+}
+
+static PyObject *
 bytes_richcompare(PyObject *self, PyObject *other, int op)
 {
     Py_ssize_t self_size, other_size;
@@ -930,6 +941,12 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
        error, even if the comparison is for equality. */
     if (PyObject_IsInstance(self, (PyObject*)&PyUnicode_Type) ||
         PyObject_IsInstance(other, (PyObject*)&PyUnicode_Type)) {
+        if (Py_BytesWarningFlag && op == Py_EQ) {
+            if (PyErr_WarnEx(PyExc_BytesWarning,
+                            "Comparsion between buffer and string", 1))
+                return NULL;
+        }
+
         Py_INCREF(Py_NotImplemented);
         return Py_NotImplemented;
     }
@@ -3082,7 +3099,7 @@ PyTypeObject PyBytes_Type = {
     &bytes_as_mapping,                  /* tp_as_mapping */
     0,                                  /* tp_hash */
     0,                                  /* tp_call */
-    (reprfunc)bytes_repr,               /* tp_str */
+    bytes_str,                          /* tp_str */
     PyObject_GenericGetAttr,            /* tp_getattro */
     0,                                  /* tp_setattro */
     &bytes_as_buffer,                   /* tp_as_buffer */

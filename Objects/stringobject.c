@@ -679,6 +679,17 @@ string_repr(PyObject *op)
 	return PyString_Repr(op, 1);
 }
 
+static PyObject *
+string_str(PyObject *op)
+{
+	if (Py_BytesWarningFlag) {
+		if (PyErr_WarnEx(PyExc_BytesWarning,
+				 "str() on a bytes instance", 1))
+			return NULL;
+	}
+	return string_repr(op);
+}
+
 static Py_ssize_t
 string_length(PyStringObject *a)
 {
@@ -830,6 +841,15 @@ string_richcompare(PyStringObject *a, PyStringObject *b, int op)
 
 	/* Make sure both arguments are strings. */
 	if (!(PyString_Check(a) && PyString_Check(b))) {
+		if (Py_BytesWarningFlag && (op == Py_EQ) &&
+		    (PyObject_IsInstance((PyObject*)a,
+					 (PyObject*)&PyUnicode_Type) ||
+		    PyObject_IsInstance((PyObject*)b,
+					 (PyObject*)&PyUnicode_Type))) {
+			if (PyErr_WarnEx(PyExc_BytesWarning,
+				    "Comparsion between bytes and string", 1))
+				return NULL;
+		}
 		result = Py_NotImplemented;
 		goto out;
 	}
@@ -3074,13 +3094,13 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
-	string_repr, 				/* tp_repr */
+	(reprfunc)string_repr, 			/* tp_repr */
 	0,					/* tp_as_number */
 	&string_as_sequence,			/* tp_as_sequence */
 	&string_as_mapping,			/* tp_as_mapping */
 	(hashfunc)string_hash, 			/* tp_hash */
 	0,					/* tp_call */
-	string_repr,				/* tp_str */
+	string_str,				/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */

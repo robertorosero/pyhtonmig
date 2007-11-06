@@ -12,12 +12,19 @@ import copy
 import pickle
 import tempfile
 import unittest
+import warnings
 import test.test_support
 import test.string_tests
 import test.buffer_tests
 
 
 class BytesTest(unittest.TestCase):
+
+    def setUp(self):
+        self.warning_filters = warnings.filters[:]
+
+    def tearDown(self):
+        warnings.filters = self.warning_filters
 
     def test_basics(self):
         b = buffer()
@@ -87,6 +94,7 @@ class BytesTest(unittest.TestCase):
         self.assertRaises(ValueError, buffer, [10**100])
 
     def test_repr_str(self):
+        warnings.simplefilter('ignore', BytesWarning)
         for f in str, repr:
             self.assertEqual(f(buffer()), "buffer(b'')")
             self.assertEqual(f(buffer([0])), "buffer(b'\\x00')")
@@ -149,6 +157,8 @@ class BytesTest(unittest.TestCase):
         self.assertEqual(bytes(b"abc") < b"ab", False)
         self.assertEqual(bytes(b"abc") <= b"ab", False)
 
+    def test_compare_to_str(self):
+        warnings.simplefilter('ignore', BytesWarning)
         # Byte comparisons with unicode should always fail!
         # Test this for all expected byte orders and Unicode character sizes
         self.assertEqual(b"\0a\0b\0c" == "abc", False)
@@ -371,6 +381,7 @@ class BytesTest(unittest.TestCase):
         self.assertEqual(b, buffer(sample))
 
     def test_to_str(self):
+        warnings.simplefilter('ignore', BytesWarning)
         self.assertEqual(str(b''), "b''")
         self.assertEqual(str(b'x'), "b'x'")
         self.assertEqual(str(b'\x80'), "b'\\x80'")

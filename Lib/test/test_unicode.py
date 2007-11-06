@@ -6,7 +6,11 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
 
 """#"
-import unittest, sys, struct, codecs, new
+import codecs
+import struct
+import sys
+import unittest
+import warnings
 from test import test_support, string_tests
 
 # Error handling (bad decoder return)
@@ -33,6 +37,12 @@ class UnicodeTest(
     string_tests.MixinStrUnicodeTest,
     ):
     type2test = str
+
+    def setUp(self):
+        self.warning_filters = warnings.filters[:]
+
+    def tearDown(self):
+        warnings.filters = self.warning_filters
 
     def checkequalnofix(self, result, object, methodname, *args):
         method = getattr(object, methodname)
@@ -205,6 +215,7 @@ class UnicodeTest(
         self.assertRaises(TypeError, 'replace'.replace, "r", 42)
 
     def test_bytes_comparison(self):
+        warnings.simplefilter('ignore', BytesWarning)
         self.assertEqual('abc' == b'abc', False)
         self.assertEqual('abc' != b'abc', True)
         self.assertEqual('abc' == buffer(b'abc'), False)

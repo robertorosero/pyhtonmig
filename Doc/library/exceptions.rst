@@ -405,6 +405,10 @@ module for more information.
 
    Base class for warnings related to Unicode.
 
+.. exception:: BytesWarning
+
+   Base class for warnings related to bytes and buffer.
+
 The class hierarchy for built-in exceptions is:
 
 
