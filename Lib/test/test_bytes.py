@@ -749,6 +749,28 @@ class BytesTest(unittest.TestCase):
         self.assertEqual([ord(b[i:i+1]) for i in range(len(b))],
                          [0, 65, 127, 128, 255])
 
+    def test_partition_buffer_doesnt_share_nullstring(self):
+        a, b, c = buffer(b"x").partition(b"y")
+        self.assertEqual(b, b"")
+        self.assertEqual(c, b"")
+        self.assert_(b is not c)
+        b += b"!"
+        self.assertEqual(c, b"")
+        a, b, c = buffer(b"x").partition(b"y")
+        self.assertEqual(b, b"")
+        self.assertEqual(c, b"")
+        # Same for rpartition
+        b, c, a = buffer(b"x").rpartition(b"y")
+        self.assertEqual(b, b"")
+        self.assertEqual(c, b"")
+        self.assert_(b is not c)
+        b += b"!"
+        self.assertEqual(c, b"")
+        c, b, a = buffer(b"x").rpartition(b"y")
+        self.assertEqual(b, b"")
+        self.assertEqual(c, b"")
+
+
     # Optimizations:
     # __iter__? (optimization)
     # __reversed__? (optimization)

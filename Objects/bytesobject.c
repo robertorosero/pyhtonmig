@@ -2251,6 +2251,31 @@ bytes_split(PyBytesObject *self, PyObject *args)
     return NULL;
 }
 
+/* stringlib's partition shares nullbytes in some cases.
+   undo this, we don't want the nullbytes to be shared. */
+static PyObject *
+make_nullbytes_unique(PyObject *result)
+{
+    if (result != NULL) {
+        int i;
+        assert(PyTuple_Check(result));
+        assert(PyTuple_GET_SIZE(result) == 3);
+        for (i = 0; i < 3; i++) {
+            if (PyTuple_GET_ITEM(result, i) == (PyObject *)nullbytes) {
+                PyObject *new = PyBytes_FromStringAndSize(NULL, 0);
+                if (new == NULL) {
+                    Py_DECREF(result);
+                    result = NULL;
+                    break;
+                }
+                Py_DECREF(nullbytes);
+                PyTuple_SET_ITEM(result, i, new);
+            }
+        }
+    }
+    return result;
+}
+
 PyDoc_STRVAR(partition__doc__,
 "B.partition(sep) -> (head, sep, tail)\n\
 \n\
@@ -2275,7 +2300,7 @@ bytes_partition(PyBytesObject *self, PyObject *sep_obj)
             );
 
     Py_DECREF(bytesep);
-    return result;
+    return make_nullbytes_unique(result);
 }
 
 PyDoc_STRVAR(rpartition__doc__,
@@ -2303,7 +2328,7 @@ bytes_rpartition(PyBytesObject *self, PyObject *sep_obj)
             );
 
     Py_DECREF(bytesep);
-    return result;
+    return make_nullbytes_unique(result);
 }
 
 Py_LOCAL_INLINE(PyObject *)
