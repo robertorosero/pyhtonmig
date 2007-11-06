@@ -662,7 +662,7 @@ class BytesIO(BufferedIOBase):
         self._pos = 0
 
     def getvalue(self):
-        return self._buffer
+        return bytes(self._buffer)
 
     def read(self, n=None):
         if n is None:
@@ -672,7 +672,7 @@ class BytesIO(BufferedIOBase):
         newpos = min(len(self._buffer), self._pos + n)
         b = self._buffer[self._pos : newpos]
         self._pos = newpos
-        return b
+        return bytes(b)
 
     def read1(self, n):
         return self.read(n)
