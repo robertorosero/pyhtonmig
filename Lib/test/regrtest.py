@@ -360,9 +360,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
 
     # Strip .py extensions.
     if args:
-        args = map(removepy, args)
+        args = list(map(removepy, args))
     if tests:
-        tests = map(removepy, tests)
+        tests = list(map(removepy, tests))
 
     stdtests = STDTESTS[:]
     nottests = NOTTESTS.copy()
