@@ -414,11 +414,6 @@ class IntTester:
                 for badobject in "a string", 3+42j, randrange:
                     any_err(struct.pack, direction + code, badobject)
 
-# Warm the character cache
-s = bytes(range(256))
-for i in range(256):
-    s[i:i+1]
-
 for args in [("bB", 1),
              ("hH", 2),
              ("iI", 4),

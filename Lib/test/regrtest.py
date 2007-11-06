@@ -278,6 +278,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
                 huntrleaks[1] = int(huntrleaks[1])
             if len(huntrleaks) == 2 or not huntrleaks[2]:
                 huntrleaks[2:] = ["reflog.txt"]
+            # Avoid false positives due to the character cache in
+            # stringobject.c filling slowly with random data
+            warm_char_cache()
         elif o in ('-M', '--memlimit'):
             test_support.set_memlimit(a)
         elif o in ('-u', '--use'):
@@ -767,6 +770,11 @@ def dash_R_cleanup(fs, ps, pic, abcs):
 
     # Collect cyclic trash.
     gc.collect()
+
+def warm_char_cache():
+    s = bytes(range(256))
+    for i in range(256):
+        s[i:i+1]
 
 def reportdiff(expected, output):
     import difflib
