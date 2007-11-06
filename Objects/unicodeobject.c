@@ -1222,16 +1222,7 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
     v = PyCodec_Encode(unicode, encoding, errors);
     if (v == NULL)
         goto onError;
-    if (!PyString_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "encoder did not return a bytes object "
-                     "(type=%.400s, encoding=%.20s, errors=%.20s)",
-                     v->ob_type->tp_name,
-                     encoding ? encoding : "NULL",
-                     errors ? errors : "NULL");
-        Py_DECREF(v);
-        goto onError;
-    }
+    assert(PyString_Check(v));
     return v;
 
  onError:

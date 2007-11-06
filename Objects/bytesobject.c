@@ -724,13 +724,7 @@ bytes_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
         encoded = PyCodec_Encode(arg, encoding, errors);
         if (encoded == NULL)
             return -1;
-        if (!PyString_Check(encoded)) {
-            PyErr_Format(PyExc_TypeError,
-                "encoder did not return a bytes object (type=%.400s)",
-                Py_Type(encoded)->tp_name);
-            Py_DECREF(encoded);
-            return -1;
-        }
+        assert(PyString_Check(encoded));
         new = bytes_iconcat(self, encoded);
         Py_DECREF(encoded);
         if (new == NULL)

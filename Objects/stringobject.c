@@ -2908,25 +2908,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		new = PyCodec_Encode(x, encoding, errors);
 		if (new == NULL)
 			return NULL;
-		/* XXX(gb): must accept bytes here since codecs output bytes
-		   at the moment */
-		if (PyBytes_Check(new)) {
-			PyObject *str;
-			str = PyString_FromStringAndSize(
-				PyBytes_AS_STRING(new), Py_Size(new));
-			Py_DECREF(new);
-			if (!str)
-				return NULL;
-			return str;
-		}
-		if (!PyString_Check(new)) {
-			PyErr_Format(PyExc_TypeError,
-				     "encoder did not return a bytes "
-				     "object (type=%.400s)",
-				     Py_Type(new)->tp_name);
-			Py_DECREF(new);
-			return NULL;
-		}
+		assert(PyString_Check(new));
 		return new;
 	}
 
@@ -2979,6 +2961,8 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	/* For iterator version, create a string object and resize as needed */
 	/* XXX(gb): is 64 a good value? also, optimize if length is known */
+	/* XXX(guido): perhaps use Pysequence_Fast() -- I can't imagine the
+	   input being a truly long iterator. */
 	size = 64;
 	new = PyString_FromStringAndSize(NULL, size);
 	if (new == NULL)
@@ -3037,7 +3021,7 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return new;
 
   error:
-	/* Error handling when it != NULL */
+	/* Error handling when new != NULL */
 	Py_XDECREF(it);
 	Py_DECREF(new);
 	return NULL;
