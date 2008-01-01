@@ -1273,10 +1273,10 @@ find_module(char *fullname, char *subname, PyObject *path, char *buf,
 			if (v == NULL)
 				return NULL;
 		}
-		if (!PyString_Check(v))
+		if (!PyBytes_Check(v))
 			continue;
-		base = PyString_AS_STRING(v);
-		size = PyString_GET_SIZE(v);
+		base = PyBytes_AS_STRING(v);
+		size = PyBytes_GET_SIZE(v);
 		len = size;
 		if (len + 2 + namelen + MAXSUFFIXSIZE >= buflen) {
 			continue; /* Too long */
@@ -2294,7 +2294,7 @@ ensure_fromlist(PyObject *mod, PyObject *fromlist, char *buf, Py_ssize_t buflen,
 				PyErr_SetString(PyExc_ValueError, "Cannot encode path item");
 				return 0;
 			}
-			subname = PyString_AS_STRING(item8);
+			subname = PyBytes_AS_STRING(item8);
 			if (buflen + strlen(subname) >= MAXPATHLEN) {
 				PyErr_SetString(PyExc_ValueError,
 						"Module name too long");

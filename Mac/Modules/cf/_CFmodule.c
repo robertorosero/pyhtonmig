@@ -1322,10 +1322,10 @@ int CFDataRefObj_Convert(PyObject *v, CFDataRef *p_itself)
 {
 
 	if (v == Py_None) { *p_itself = NULL; return 1; }
-	if (PyString_Check(v)) {
+	if (PyBytes_Check(v)) {
 	    char *cStr;
 	    Py_ssize_t cLen;
-	    if( PyString_AsStringAndSize(v, &cStr, &cLen) < 0 ) return 0;
+	    if( PyBytes_AsStringAndSize(v, &cStr, &cLen) < 0 ) return 0;
 	    *p_itself = CFDataCreate((CFAllocatorRef)NULL, (unsigned char *)cStr, cLen);
 	    return 1;
 	}
@@ -1400,7 +1400,7 @@ static PyObject *CFDataRefObj_CFDataGetData(CFDataRefObject *_self, PyObject *_a
 	int size = CFDataGetLength(_self->ob_itself);
 	char *data = (char *)CFDataGetBytePtr(_self->ob_itself);
 
-	_res = (PyObject *)PyString_FromStringAndSize(data, size);
+	_res = (PyObject *)PyBytes_FromStringAndSize(data, size);
 	return _res;
 
 }
@@ -1816,7 +1816,7 @@ int CFStringRefObj_Convert(PyObject *v, CFStringRef *p_itself)
 {
 
 	if (v == Py_None) { *p_itself = NULL; return 1; }
-	if (PyString_Check(v)) {
+	if (PyBytes_Check(v)) {
 	    char *cStr;
 	    if (!PyArg_Parse(v, "es", "ascii", &cStr))
 	        return 0;
@@ -2337,7 +2337,7 @@ static PyObject *CFStringRefObj_CFStringGetString(CFStringRefObject *_self, PyOb
 
 	if( data == NULL ) return PyErr_NoMemory();
 	if ( CFStringGetCString(_self->ob_itself, data, size, 0) ) {
-	        _res = (PyObject *)PyString_FromString(data);
+	        _res = (PyObject *)PyBytes_FromString(data);
 	} else {
 	        PyErr_SetString(PyExc_RuntimeError, "CFStringGetCString could not fit the string");
 	        _res = NULL;

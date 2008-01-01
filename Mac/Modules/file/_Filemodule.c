@@ -913,7 +913,7 @@ static PyObject *Alias_get_data(AliasObject *self, void *closure)
 
 	                    size = GetHandleSize((Handle)self->ob_itself);
 	                    HLock((Handle)self->ob_itself);
-	                    rv = PyString_FromStringAndSize(*(Handle)self->ob_itself, size);
+	                    rv = PyBytes_FromStringAndSize(*(Handle)self->ob_itself, size);
 	                    HUnlock((Handle)self->ob_itself);
 	                    return rv;
 	            
@@ -1369,7 +1369,7 @@ static PyMethodDef FSSpec_methods[] = {
 
 static PyObject *FSSpec_get_data(FSSpecObject *self, void *closure)
 {
-	return PyString_FromStringAndSize((char *)&self->ob_itself, sizeof(self->ob_itself));
+	return PyBytes_FromStringAndSize((char *)&self->ob_itself, sizeof(self->ob_itself));
 }
 
 #define FSSpec_set_data NULL
@@ -1921,7 +1921,7 @@ static PyMethodDef FSRef_methods[] = {
 
 static PyObject *FSRef_get_data(FSRefObject *self, void *closure)
 {
-	return PyString_FromStringAndSize((char *)&self->ob_itself, sizeof(self->ob_itself));
+	return PyBytes_FromStringAndSize((char *)&self->ob_itself, sizeof(self->ob_itself));
 }
 
 #define FSRef_set_data NULL
@@ -3033,7 +3033,7 @@ static PyObject *File_pathname(PyObject *_self, PyObject *_args)
 
 	if (!PyArg_ParseTuple(_args, "O", &obj))
 	        return NULL;
-	if (PyString_Check(obj) || PyUnicode_Check(obj))
+	if (PyBytes_Check(obj) || PyUnicode_Check(obj))
 		return PyUnicode_FromObject(obj);
 	_res = PyObject_CallMethod(obj, "as_pathname", NULL);
 	return _res;
@@ -3192,7 +3192,7 @@ PyMac_GetFSRef(PyObject *v, FSRef *fsr)
         }
 
         /* On OSX we now try a pathname */
-        if ( PyString_Check(v) || PyUnicode_Check(v)) {
+        if ( PyBytes_Check(v) || PyUnicode_Check(v)) {
                 unsigned char *path = NULL;
                 if (!PyArg_Parse(v, "et", Py_FileSystemDefaultEncoding, &path))
                         return 0;

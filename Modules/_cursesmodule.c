@@ -203,9 +203,9 @@ PyCurses_ConvertToChtype(PyObject *obj, chtype *ch)
     *ch = (chtype) PyLong_AsLongAndOverflow(obj, &overflow);
     if (overflow)
       return 0;
-  } else if(PyString_Check(obj) 
-	    && (PyString_Size(obj) == 1)) {
-    *ch = (chtype) *PyString_AsString(obj);
+  } else if(PyBytes_Check(obj) 
+	    && (PyBytes_Size(obj) == 1)) {
+    *ch = (chtype) *PyBytes_AsString(obj);
   } else if (PyUnicode_Check(obj) && PyUnicode_GetSize(obj) == 1) {
     *ch = (chtype) *PyUnicode_AS_UNICODE(obj);
   } else {
@@ -906,7 +906,7 @@ PyCursesWindow_GetStr(PyCursesWindowObject *self, PyObject *args)
   }
   if (rtn2 == ERR)
     rtn[0] = 0;
-  return PyString_FromString(rtn);
+  return PyBytes_FromString(rtn);
 }
 
 static PyObject *
@@ -1052,7 +1052,7 @@ PyCursesWindow_InStr(PyCursesWindowObject *self, PyObject *args)
   }
   if (rtn2 == ERR)
     rtn[0] = 0;
-  return PyString_FromString(rtn);
+  return PyBytes_FromString(rtn);
 }
 
 static PyObject *
@@ -1723,7 +1723,7 @@ PyCurses_EraseChar(PyObject *self)
 
   ch = erasechar();
 
-  return PyString_FromStringAndSize(&ch, 1);
+  return PyBytes_FromStringAndSize(&ch, 1);
 }
 
 static PyObject *
@@ -1801,7 +1801,7 @@ PyCurses_GetWin(PyCursesWindowObject *self, PyObject *stream)
     remove(fn);
     return NULL;
   }
-  if (!PyString_Check(data)) {
+  if (!PyBytes_Check(data)) {
     PyErr_Format(PyExc_TypeError,
                  "f.read() returned %.100s instead of bytes",
                  data->ob_type->tp_name);
@@ -1810,7 +1810,7 @@ PyCurses_GetWin(PyCursesWindowObject *self, PyObject *stream)
     remove(fn);
     return NULL;
   }
-  fwrite(PyString_AS_STRING(data), 1, PyString_GET_SIZE(data), fp);
+  fwrite(PyBytes_AS_STRING(data), 1, PyBytes_GET_SIZE(data), fp);
   Py_DECREF(data);
   fseek(fp, 0, 0);
   win = getwin(fp);
@@ -2107,7 +2107,7 @@ PyCurses_KeyName(PyObject *self, PyObject *args)
   }
   knp = keyname(ch);
 
-  return PyString_FromString((knp == NULL) ? "" : (char *)knp);
+  return PyBytes_FromString((knp == NULL) ? "" : (char *)knp);
 }
 #endif
 
@@ -2118,7 +2118,7 @@ PyCurses_KillChar(PyObject *self)
 
   ch = killchar();  
 
-  return PyString_FromStringAndSize(&ch, 1);  
+  return PyBytes_FromStringAndSize(&ch, 1);  
 }  
 
 static PyObject *
@@ -2489,7 +2489,7 @@ PyCurses_tigetstr(PyObject *self, PyObject *args)
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
-	return PyString_FromString( capname );
+	return PyBytes_FromString( capname );
 }
 
 static PyObject *
@@ -2513,7 +2513,7 @@ PyCurses_tparm(PyObject *self, PyObject *args)
   		return NULL;
 	}
 
-	return PyString_FromString(result);
+	return PyBytes_FromString(result);
 }
 
 static PyObject *
@@ -2543,7 +2543,7 @@ PyCurses_UnCtrl(PyObject *self, PyObject *args)
     return NULL;
   }
 
-  return PyString_FromString(unctrl(ch));
+  return PyBytes_FromString(unctrl(ch));
 }
 
 static PyObject *
@@ -2738,7 +2738,7 @@ init_curses(void)
 	PyDict_SetItemString(d, "error", PyCursesError);
 
 	/* Make the version available */
-	v = PyString_FromString(PyCursesVersion);
+	v = PyBytes_FromString(PyCursesVersion);
 	PyDict_SetItemString(d, "version", v);
 	PyDict_SetItemString(d, "__version__", v);
 	Py_DECREF(v);

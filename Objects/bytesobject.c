@@ -724,7 +724,7 @@ bytearray_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
         encoded = PyCodec_Encode(arg, encoding, errors);
         if (encoded == NULL)
             return -1;
-        assert(PyString_Check(encoded));
+        assert(PyBytes_Check(encoded));
         new = bytearray_iconcat(self, encoded);
         Py_DECREF(encoded);
         if (new == NULL)
@@ -2881,7 +2881,7 @@ bytearray_join(PyBytesObject *self, PyObject *it)
     /* XXX Shouldn't we use _getbuffer() on these items instead? */
     for (i = 0; i < n; i++) {
         PyObject *obj = items[i];
-        if (!PyByteArray_Check(obj) && !PyString_Check(obj)) {
+        if (!PyByteArray_Check(obj) && !PyBytes_Check(obj)) {
             PyErr_Format(PyExc_TypeError,
                          "can only join an iterable of bytes "
                          "(item %ld has type '%.100s')",
@@ -2910,7 +2910,7 @@ bytearray_join(PyBytesObject *self, PyObject *it)
         if (PyByteArray_Check(obj))
            buf = PyByteArray_AS_STRING(obj);
         else
-           buf = PyString_AS_STRING(obj);
+           buf = PyBytes_AS_STRING(obj);
         if (i) {
             memcpy(dest, self->ob_bytes, mysize);
             dest += mysize;

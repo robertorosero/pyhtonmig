@@ -687,9 +687,9 @@ mmap_subscript(mmap_object *self, PyObject *item)
 		}
 
 		if (slicelen <= 0)
-			return PyString_FromStringAndSize("", 0);
+			return PyBytes_FromStringAndSize("", 0);
 		else if (step == 1)
-			return PyString_FromStringAndSize(self->data + start,
+			return PyBytes_FromStringAndSize(self->data + start,
 							  slicelen);
 		else {
 			char *result_buf = (char *)PyMem_Malloc(slicelen);
@@ -702,7 +702,7 @@ mmap_subscript(mmap_object *self, PyObject *item)
 			     cur += step, i++) {
 			     	result_buf[i] = self->data[cur];
 			}
-			result = PyString_FromStringAndSize(result_buf,
+			result = PyBytes_FromStringAndSize(result_buf,
 							    slicelen);
 			PyMem_Free(result_buf);
 			return result;

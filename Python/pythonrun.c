@@ -494,7 +494,7 @@ Py_Finalize(void)
 	PyTuple_Fini();
 	PyList_Fini();
 	PySet_Fini();
-	PyString_Fini();
+	PyBytes_Fini();
 	PyByteArray_Fini();
 	PyLong_Fini();
 	PyFloat_Fini();
@@ -1103,7 +1103,7 @@ parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
 		goto finally;
 	if (v == Py_None)
 		*filename = NULL;
-	else if (! (*filename = PyString_AsString(v)))
+	else if (! (*filename = PyBytes_AsString(v)))
 		goto finally;
 
 	Py_DECREF(v);

@@ -335,8 +335,8 @@ WaitForMainloop(TkappObject* self)
 static char *
 AsString(PyObject *value, PyObject *tmp)
 {
-	if (PyString_Check(value))
-		return PyString_AsString(value);
+	if (PyBytes_Check(value))
+		return PyBytes_AsString(value);
 	else if (PyUnicode_Check(value)) {
 		PyObject *v = PyUnicode_AsUTF8String(value);
 		if (v == NULL)
@@ -346,7 +346,7 @@ AsString(PyObject *value, PyObject *tmp)
 			return NULL;
 		}
 		Py_DECREF(v);
-		return PyString_AsString(v);
+		return PyBytes_AsString(v);
 	}
 	else {
 		PyObject *v = PyObject_Str(value);
@@ -357,7 +357,7 @@ AsString(PyObject *value, PyObject *tmp)
 			return NULL;
 		}
 		Py_DECREF(v);
-		return PyString_AsString(v);
+		return PyBytes_AsString(v);
 	}
 }
 
@@ -528,10 +528,10 @@ SplitObj(PyObject *arg)
 			return result;
 		/* Fall through, returning arg. */
 	}
-	else if (PyString_Check(arg)) {
+	else if (PyBytes_Check(arg)) {
 		int argc;
 		char **argv;
-		char *list = PyString_AsString(arg);
+		char *list = PyBytes_AsString(arg);
 
 		if (Tcl_SplitList((Tcl_Interp *)NULL, list, &argc, &argv) != TCL_OK) {
 			Py_INCREF(arg);
@@ -539,7 +539,7 @@ SplitObj(PyObject *arg)
 		}
 		Tcl_Free(FREECAST argv);
 		if (argc > 1)
-			return Split(PyString_AsString(arg));
+			return Split(PyBytes_AsString(arg));
 		/* Fall through, returning arg. */
 	}
 	Py_INCREF(arg);
@@ -866,9 +866,9 @@ AsObj(PyObject *value)
 	long longVal;
 	int overflow;
 
-	if (PyString_Check(value))
-		return Tcl_NewStringObj(PyString_AS_STRING(value),
-					PyString_GET_SIZE(value));
+	if (PyBytes_Check(value))
+		return Tcl_NewStringObj(PyBytes_AS_STRING(value),
+					PyBytes_GET_SIZE(value));
 	else if (PyBool_Check(value))
 		return Tcl_NewBooleanObj(PyObject_IsTrue(value));
 	else if (PyLong_CheckExact(value) &&
@@ -959,7 +959,7 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 	if (value->typePtr == app->ByteArrayType) {
 		int size;
 		char *data = (char*)Tcl_GetByteArrayFromObj(value, &size);
-		return PyString_FromStringAndSize(data, size);
+		return PyBytes_FromStringAndSize(data, size);
 	}
 
 	if (value->typePtr == app->DoubleType) {
@@ -1417,8 +1417,8 @@ static int
 varname_converter(PyObject *in, void *_out)
 {
 	char **out = (char**)_out;
-	if (PyString_Check(in)) {
-		*out = PyString_AsString(in);
+	if (PyBytes_Check(in)) {
+		*out = PyBytes_AsString(in);
 		return 1;
 	}
         if (PyUnicode_Check(in)) {

@@ -1237,9 +1237,9 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
 	 * is expensive, don't unless they're actually used.
 	 */
 	totalnew = flen + 1;	/* realistic if no %z/%Z */
-	newfmt = PyString_FromStringAndSize(NULL, totalnew);
+	newfmt = PyBytes_FromStringAndSize(NULL, totalnew);
 	if (newfmt == NULL) goto Done;
-	pnew = PyString_AsString(newfmt);
+	pnew = PyBytes_AsString(newfmt);
 	usednew = 0;
 
 	while ((ch = *pin++) != '\0') {
@@ -1259,7 +1259,7 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
 				/* format utcoffset */
 				char buf[100];
 				PyObject *tzinfo = get_tzinfo_member(object);
-				zreplacement = PyString_FromStringAndSize("", 0);
+				zreplacement = PyBytes_FromStringAndSize("", 0);
 				if (zreplacement == NULL) goto Done;
 				if (tzinfo != Py_None && tzinfo != NULL) {
 					assert(tzinfoarg != NULL);
@@ -1271,15 +1271,15 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
 						goto Done;
 					Py_DECREF(zreplacement);
 					zreplacement =
-					  PyString_FromStringAndSize(buf,
+					  PyBytes_FromStringAndSize(buf,
 								   strlen(buf));
 					if (zreplacement == NULL)
 						goto Done;
 				}
 			}
 			assert(zreplacement != NULL);
-			ptoappend = PyString_AS_STRING(zreplacement);
-			ntoappend = PyString_GET_SIZE(zreplacement);
+			ptoappend = PyBytes_AS_STRING(zreplacement);
+			ntoappend = PyBytes_GET_SIZE(zreplacement);
 		}
 		else if (ch == 'Z') {
 			/* format tzname */
@@ -1314,10 +1314,10 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
  				PyErr_NoMemory();
  				goto Done;
  			}
- 			if (_PyString_Resize(&newfmt, bigger) < 0)
+ 			if (_PyBytes_Resize(&newfmt, bigger) < 0)
  				goto Done;
  			totalnew = bigger;
- 			pnew = PyString_AsString(newfmt) + usednew;
+ 			pnew = PyBytes_AsString(newfmt) + usednew;
  		}
 		memcpy(pnew, ptoappend, ntoappend);
 		pnew += ntoappend;
@@ -1325,14 +1325,14 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
 		assert(usednew <= totalnew);
 	}  /* end while() */
 
-	if (_PyString_Resize(&newfmt, usednew) < 0)
+	if (_PyBytes_Resize(&newfmt, usednew) < 0)
 		goto Done;
 	{
 		PyObject *format;
 		PyObject *time = PyImport_ImportModule("time");
 		if (time == NULL)
 			goto Done;
-		format = PyUnicode_FromString(PyString_AS_STRING(newfmt));
+		format = PyUnicode_FromString(PyBytes_AS_STRING(newfmt));
 		if (format != NULL) {
 			result = PyObject_CallMethod(time, "strftime", "OO",
 						     format, timetuple);
@@ -2186,15 +2186,15 @@ date_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 
 	/* Check for invocation from pickle with __getstate__ state */
 	if (PyTuple_GET_SIZE(args) == 1 &&
-	    PyString_Check(state = PyTuple_GET_ITEM(args, 0)) &&
-	    PyString_GET_SIZE(state) == _PyDateTime_DATE_DATASIZE &&
-	    MONTH_IS_SANE(PyString_AS_STRING(state)[2]))
+	    PyBytes_Check(state = PyTuple_GET_ITEM(args, 0)) &&
+	    PyBytes_GET_SIZE(state) == _PyDateTime_DATE_DATASIZE &&
+	    MONTH_IS_SANE(PyBytes_AS_STRING(state)[2]))
 	{
 	    	PyDateTime_Date *me;
 
 		me = (PyDateTime_Date *) (type->tp_alloc(type, 0));
 		if (me != NULL) {
-			char *pdata = PyString_AS_STRING(state);
+			char *pdata = PyBytes_AS_STRING(state);
 			memcpy(me->data, pdata, _PyDateTime_DATE_DATASIZE);
 			me->hashcode = -1;
 		}
@@ -2582,7 +2582,7 @@ static PyObject *
 date_getstate(PyDateTime_Date *self)
 {
 	PyObject* field;
-	field = PyString_FromStringAndSize((char*)self->data,
+	field = PyBytes_FromStringAndSize((char*)self->data,
 					   _PyDateTime_DATE_DATASIZE);
 	return Py_BuildValue("(N)", field);
 }
@@ -3035,9 +3035,9 @@ time_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	/* Check for invocation from pickle with __getstate__ state */
 	if (PyTuple_GET_SIZE(args) >= 1 &&
 	    PyTuple_GET_SIZE(args) <= 2 &&
-	    PyString_Check(state = PyTuple_GET_ITEM(args, 0)) &&
-	    PyString_GET_SIZE(state) == _PyDateTime_TIME_DATASIZE &&
-	    ((unsigned char) (PyString_AS_STRING(state)[0])) < 24)
+	    PyBytes_Check(state = PyTuple_GET_ITEM(args, 0)) &&
+	    PyBytes_GET_SIZE(state) == _PyDateTime_TIME_DATASIZE &&
+	    ((unsigned char) (PyBytes_AS_STRING(state)[0])) < 24)
 	{
 		PyDateTime_Time *me;
 		char aware;
@@ -3053,7 +3053,7 @@ time_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 		aware = (char)(tzinfo != Py_None);
 		me = (PyDateTime_Time *) (type->tp_alloc(type, aware));
 		if (me != NULL) {
-			char *pdata = PyString_AS_STRING(state);
+			char *pdata = PyBytes_AS_STRING(state);
 
 			memcpy(me->data, pdata, _PyDateTime_TIME_DATASIZE);
 			me->hashcode = -1;
@@ -3385,7 +3385,7 @@ time_getstate(PyDateTime_Time *self)
 	PyObject *basestate;
 	PyObject *result = NULL;
 
-	basestate =  PyString_FromStringAndSize((char *)self->data,
+	basestate =  PyBytes_FromStringAndSize((char *)self->data,
 						_PyDateTime_TIME_DATASIZE);
 	if (basestate != NULL) {
 		if (! HASTZINFO(self) || self->tzinfo == Py_None)
@@ -3569,9 +3569,9 @@ datetime_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	/* Check for invocation from pickle with __getstate__ state */
 	if (PyTuple_GET_SIZE(args) >= 1 &&
 	    PyTuple_GET_SIZE(args) <= 2 &&
-	    PyString_Check(state = PyTuple_GET_ITEM(args, 0)) &&
-	    PyString_GET_SIZE(state) == _PyDateTime_DATETIME_DATASIZE &&
-	    MONTH_IS_SANE(PyString_AS_STRING(state)[2]))
+	    PyBytes_Check(state = PyTuple_GET_ITEM(args, 0)) &&
+	    PyBytes_GET_SIZE(state) == _PyDateTime_DATETIME_DATASIZE &&
+	    MONTH_IS_SANE(PyBytes_AS_STRING(state)[2]))
 	{
 		PyDateTime_DateTime *me;
 		char aware;
@@ -3587,7 +3587,7 @@ datetime_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 		aware = (char)(tzinfo != Py_None);
 		me = (PyDateTime_DateTime *) (type->tp_alloc(type , aware));
 		if (me != NULL) {
-			char *pdata = PyString_AS_STRING(state);
+			char *pdata = PyBytes_AS_STRING(state);
 
 			memcpy(me->data, pdata, _PyDateTime_DATETIME_DATASIZE);
 			me->hashcode = -1;
@@ -4435,7 +4435,7 @@ datetime_getstate(PyDateTime_DateTime *self)
 	PyObject *basestate;
 	PyObject *result = NULL;
 
-	basestate = PyString_FromStringAndSize((char *)self->data,
+	basestate = PyBytes_FromStringAndSize((char *)self->data,
 					       _PyDateTime_DATETIME_DATASIZE);
 	if (basestate != NULL) {
 		if (! HASTZINFO(self) || self->tzinfo == Py_None)

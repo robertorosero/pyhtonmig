@@ -142,7 +142,7 @@ msvcrt_getch(PyObject *self, PyObject *args)
 	ch = _getch();
 	Py_END_ALLOW_THREADS
 	s[0] = ch;
-	return PyString_FromStringAndSize(s, 1);
+	return PyBytes_FromStringAndSize(s, 1);
 }
 
 static PyObject *
@@ -174,7 +174,7 @@ msvcrt_getche(PyObject *self, PyObject *args)
 	ch = _getche();
 	Py_END_ALLOW_THREADS
 	s[0] = ch;
-	return PyString_FromStringAndSize(s, 1);
+	return PyBytes_FromStringAndSize(s, 1);
 }
 
 static PyObject *

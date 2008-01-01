@@ -3155,7 +3155,7 @@ inherit_special(PyTypeObject *type, PyTypeObject *base)
 		type->tp_flags |= Py_TPFLAGS_TYPE_SUBCLASS;
 	else if (PyType_IsSubtype(base, &PyLong_Type))
 		type->tp_flags |= Py_TPFLAGS_LONG_SUBCLASS;
-	else if (PyType_IsSubtype(base, &PyString_Type))
+	else if (PyType_IsSubtype(base, &PyBytes_Type))
 		type->tp_flags |= Py_TPFLAGS_STRING_SUBCLASS;
 	else if (PyType_IsSubtype(base, &PyUnicode_Type))
 		type->tp_flags |= Py_TPFLAGS_UNICODE_SUBCLASS;

@@ -1631,7 +1631,7 @@ member in the :ctype:`PyTypeObject` structure should be *NULL*.  Otherwise, the
 
    The third slot is :attr:`bf_getsegcount`, with type :ctype:`getsegcountproc`.
    This slot must not be *NULL* and is used to inform the caller how many segments
-   the object contains.  Simple objects such as :ctype:`PyString_Type` and
+   the object contains.  Simple objects such as :ctype:`PyBytes_Type` and
    :ctype:`PyBuffer_Type` objects contain a single segment.
 
    .. index:: single: PyType_HasFeature()

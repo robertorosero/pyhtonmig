@@ -52,7 +52,7 @@ PyMac_StrError(int err)
 		buf[0] = '\0';
 	}
 	else {
-		char *input = PyString_AsString(rv);
+		char *input = PyBytes_AsString(rv);
 		if (!input) {
 			PyErr_Clear();
 			buf[0] = '\0';
@@ -124,7 +124,7 @@ PyMac_GetFullPathname(FSSpec *fss, char *path, int len)
 	if (!rv)
 		goto error;
 
-	input = PyString_AsString(rv);
+	input = PyBytes_AsString(rv);
 	if (!input)
 		goto error;
 
@@ -166,9 +166,9 @@ PyMac_GetOSType(PyObject *v, OSType *pr)
 		if (v == NULL)
 			return 0;
 	}
-	if (PyString_Check(v)) {
-		str = PyString_AS_STRING(v);
-		len = PyString_GET_SIZE(v);
+	if (PyBytes_Check(v)) {
+		str = PyBytes_AS_STRING(v);
+		len = PyBytes_GET_SIZE(v);
 	}
 	else if (PyByteArray_Check(v)) {
 		str = PyByteArray_AS_STRING(v);
@@ -194,7 +194,7 @@ PyObject *
 PyMac_BuildOSType(OSType t)
 {
 	uint32_t tmp = htonl((uint32_t)t);
-	return PyString_FromStringAndSize((char *)&tmp, 4);
+	return PyBytes_FromStringAndSize((char *)&tmp, 4);
 }
 
 /* Convert an NumVersion value to a 4-element tuple */
@@ -217,9 +217,9 @@ PyMac_GetStr255(PyObject *v, Str255 pbuf)
 		if (v == NULL)
 			return 0;
 	}
-	if (PyString_Check(v)) {
-		ptr = PyString_AS_STRING(v);
-		len = PyString_GET_SIZE(v);
+	if (PyBytes_Check(v)) {
+		ptr = PyBytes_AS_STRING(v);
+		len = PyBytes_GET_SIZE(v);
 	}
 	else if (PyByteArray_Check(v)) {
 		ptr = PyByteArray_AS_STRING(v);
@@ -243,7 +243,7 @@ PyMac_BuildStr255(Str255 s)
 		PyErr_SetString(PyExc_SystemError, "Str255 pointer is NULL");
 		return NULL;
 	}
-	return PyString_FromStringAndSize((char *)&s[1], (int)s[0]);
+	return PyBytes_FromStringAndSize((char *)&s[1], (int)s[0]);
 }
 
 PyObject *
@@ -253,7 +253,7 @@ PyMac_BuildOptStr255(Str255 s)
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
-	return PyString_FromStringAndSize((char *)&s[1], (int)s[0]);
+	return PyBytes_FromStringAndSize((char *)&s[1], (int)s[0]);
 }
 
 

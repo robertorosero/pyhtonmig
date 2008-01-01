@@ -1171,7 +1171,7 @@ _db_associateCallback(DB* db, const DBT* priKey, const DBT* priData,
         else if (PyLong_Check(result)) {
             retval = PyLong_AsLong(result);
         }
-        else if (PyByteArray_Check(result) || PyString_Check(result)) {
+        else if (PyByteArray_Check(result) || PyBytes_Check(result)) {
             char* data;
             Py_ssize_t size;
 
@@ -1180,7 +1180,7 @@ _db_associateCallback(DB* db, const DBT* priKey, const DBT* priData,
             if (PyByteArray_Check(result))
                 data = PyByteArray_AS_STRING(result);
             else
-                data = PyString_AS_STRING(result);
+                data = PyBytes_AS_STRING(result);
             secKey->flags = DB_DBT_APPMALLOC;   /* DB will free */
             secKey->data = malloc(size);        /* TODO, check this */
 	    if (secKey->data) {
@@ -1520,7 +1520,7 @@ DB_get(DBObject* self, PyObject* args, PyObject* kwargs)
             retval = Py_BuildValue("y#y#", key.data, key.size, data.data,
                                    data.size);
         else /* return just the data */
-            retval = PyString_FromStringAndSize((char*)data.data, data.size);
+            retval = PyBytes_FromStringAndSize((char*)data.data, data.size);
         free_dbt(&data);
     }
     FREE_DBT_VIEW(key, keyobj, key_buf_view);
@@ -1590,13 +1590,13 @@ DB_pget(DBObject* self, PyObject* args, PyObject* kwargs)
     else if (!err) {
         PyObject *pkeyObj;
         PyObject *dataObj;
-        dataObj = PyString_FromStringAndSize(data.data, data.size);
+        dataObj = PyBytes_FromStringAndSize(data.data, data.size);
 
         if (self->primaryDBType == DB_RECNO ||
             self->primaryDBType == DB_QUEUE)
             pkeyObj = PyLong_FromLong(*(int *)pkey.data);
         else
-            pkeyObj = PyString_FromStringAndSize(pkey.data, pkey.size);
+            pkeyObj = PyBytes_FromStringAndSize(pkey.data, pkey.size);
 
         if (flags & DB_SET_RECNO) /* return key , pkey and data */
         {
@@ -1605,7 +1605,7 @@ DB_pget(DBObject* self, PyObject* args, PyObject* kwargs)
             if (type == DB_RECNO || type == DB_QUEUE)
                 keyObj = PyLong_FromLong(*(int *)key.data);
             else
-                keyObj = PyString_FromStringAndSize(key.data, key.size);
+                keyObj = PyBytes_FromStringAndSize(key.data, key.size);
 #if (PY_VERSION_HEX >= 0x02040000)
             retval = PyTuple_Pack(3, keyObj, pkeyObj, dataObj);
 #else
@@ -1733,7 +1733,7 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
         /* XXX(nnorwitz): can we do: retval = dataobj; Py_INCREF(retval); */
         /* XXX(gps) I think not: buffer API input vs. bytes object output. */
         /* XXX(guido) But what if the input is PyString? */
-        retval = PyString_FromStringAndSize((char*)data.data, data.size);
+        retval = PyBytes_FromStringAndSize((char*)data.data, data.size);
 
         /* Even though the flags require DB_DBT_MALLOC, data is not always
            allocated.  4.4: allocated, 4.5: *not* allocated. :-( */
@@ -2777,7 +2777,7 @@ PyObject* DB_subscript(DBObject* self, PyObject* keyobj)
         retval = NULL;
     }
     else {
-        retval = PyString_FromStringAndSize((char*)data.data, data.size);
+        retval = PyBytes_FromStringAndSize((char*)data.data, data.size);
         free_dbt(&data);
     }
 
@@ -2932,7 +2932,7 @@ _DB_make_list(DBObject* self, DB_TXN* txn, int type)
             case DB_BTREE:
             case DB_HASH:
             default:
-                item = PyString_FromStringAndSize((char*)key.data, key.size);
+                item = PyBytes_FromStringAndSize((char*)key.data, key.size);
                 break;
             case DB_RECNO:
             case DB_QUEUE:
@@ -2942,7 +2942,7 @@ _DB_make_list(DBObject* self, DB_TXN* txn, int type)
             break;
 
         case _VALUES_LIST:
-            item = PyString_FromStringAndSize((char*)data.data, data.size);
+            item = PyBytes_FromStringAndSize((char*)data.data, data.size);
             break;
 
         case _ITEMS_LIST:
@@ -3290,13 +3290,13 @@ DBC_pget(DBCursorObject* self, PyObject* args, PyObject *kwargs)
     else {
         PyObject *pkeyObj;
         PyObject *dataObj;
-        dataObj = PyString_FromStringAndSize(data.data, data.size);
+        dataObj = PyBytes_FromStringAndSize(data.data, data.size);
 
         if (self->mydb->primaryDBType == DB_RECNO ||
             self->mydb->primaryDBType == DB_QUEUE)
             pkeyObj = PyLong_FromLong(*(int *)pkey.data);
         else
-            pkeyObj = PyString_FromStringAndSize(pkey.data, pkey.size);
+            pkeyObj = PyBytes_FromStringAndSize(pkey.data, pkey.size);
 
         if (key.data && key.size) /* return key, pkey and data */
         {
@@ -3305,7 +3305,7 @@ DBC_pget(DBCursorObject* self, PyObject* args, PyObject *kwargs)
             if (type == DB_RECNO || type == DB_QUEUE)
                 keyObj = PyLong_FromLong(*(int *)key.data);
             else
-                keyObj = PyString_FromStringAndSize(key.data, key.size);
+                keyObj = PyBytes_FromStringAndSize(key.data, key.size);
             retval = PyTuple_Pack(3, keyObj, pkeyObj, dataObj);
             Py_DECREF(keyObj);
         }
@@ -4913,7 +4913,7 @@ DBSequence_get_key(DBSequenceObject* self, PyObject* args)
     MYDB_END_ALLOW_THREADS
 
     if (!err)
-        retval = PyString_FromStringAndSize(key.data, key.size);
+        retval = PyBytes_FromStringAndSize(key.data, key.size);
 
     free_dbt(&key);
     RETURN_IF_ERR();

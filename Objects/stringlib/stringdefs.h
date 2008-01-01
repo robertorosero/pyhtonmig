@@ -13,11 +13,11 @@
 #define STRINGLIB_ISDECIMAL(x)   ((x >= '0') && (x <= '9'))
 #define STRINGLIB_TODECIMAL(x)   (STRINGLIB_ISDECIMAL(x) ? (x - '0') : -1)
 #define STRINGLIB_FILL           memset
-#define STRINGLIB_STR            PyString_AS_STRING
-#define STRINGLIB_LEN            PyString_GET_SIZE
-#define STRINGLIB_NEW            PyString_FromStringAndSize
-#define STRINGLIB_RESIZE         _PyString_Resize
-#define STRINGLIB_CHECK          PyString_Check
+#define STRINGLIB_STR            PyBytes_AS_STRING
+#define STRINGLIB_LEN            PyBytes_GET_SIZE
+#define STRINGLIB_NEW            PyBytes_FromStringAndSize
+#define STRINGLIB_RESIZE         _PyBytes_Resize
+#define STRINGLIB_CHECK          PyBytes_Check
 #define STRINGLIB_CMP            memcmp
 #define STRINGLIB_TOSTR          PyObject_Str
 

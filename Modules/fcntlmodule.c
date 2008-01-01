@@ -55,7 +55,7 @@ fcntl_fcntl(PyObject *self, PyObject *args)
 			PyErr_SetFromErrno(PyExc_IOError);
 			return NULL;
 		}
-		return PyString_FromStringAndSize(buf, len);
+		return PyBytes_FromStringAndSize(buf, len);
 	}
 
 	PyErr_Clear();
@@ -155,7 +155,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			return PyLong_FromLong(ret);
 		}
 		else {
-			return PyString_FromStringAndSize(buf, len);
+			return PyBytes_FromStringAndSize(buf, len);
 		}
 	}
 
@@ -176,7 +176,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			PyErr_SetFromErrno(PyExc_IOError);
 			return NULL;
 		}
-		return PyString_FromStringAndSize(buf, len);
+		return PyBytes_FromStringAndSize(buf, len);
 	}
 
 	PyErr_Clear();

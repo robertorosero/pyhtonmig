@@ -39,47 +39,47 @@ typedef struct {
      */
 } PyStringObject;
 
-PyAPI_DATA(PyTypeObject) PyString_Type;
+PyAPI_DATA(PyTypeObject) PyBytes_Type;
 PyAPI_DATA(PyTypeObject) PyStringIter_Type;
 
-#define PyString_Check(op) \
+#define PyBytes_Check(op) \
                  PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_STRING_SUBCLASS)
-#define PyString_CheckExact(op) (Py_TYPE(op) == &PyString_Type)
+#define PyBytes_CheckExact(op) (Py_TYPE(op) == &PyBytes_Type)
 
-PyAPI_FUNC(PyObject *) PyString_FromStringAndSize(const char *, Py_ssize_t);
-PyAPI_FUNC(PyObject *) PyString_FromString(const char *);
-PyAPI_FUNC(PyObject *) PyString_FromFormatV(const char*, va_list)
+PyAPI_FUNC(PyObject *) PyBytes_FromStringAndSize(const char *, Py_ssize_t);
+PyAPI_FUNC(PyObject *) PyBytes_FromString(const char *);
+PyAPI_FUNC(PyObject *) PyBytes_FromFormatV(const char*, va_list)
 				Py_GCC_ATTRIBUTE((format(printf, 1, 0)));
-PyAPI_FUNC(PyObject *) PyString_FromFormat(const char*, ...)
+PyAPI_FUNC(PyObject *) PyBytes_FromFormat(const char*, ...)
 				Py_GCC_ATTRIBUTE((format(printf, 1, 2)));
-PyAPI_FUNC(Py_ssize_t) PyString_Size(PyObject *);
-PyAPI_FUNC(char *) PyString_AsString(PyObject *);
-PyAPI_FUNC(PyObject *) PyString_Repr(PyObject *, int);
-PyAPI_FUNC(void) PyString_Concat(PyObject **, PyObject *);
-PyAPI_FUNC(void) PyString_ConcatAndDel(PyObject **, PyObject *);
-PyAPI_FUNC(int) _PyString_Resize(PyObject **, Py_ssize_t);
-PyAPI_FUNC(PyObject *) PyString_Format(PyObject *, PyObject *);
-PyAPI_FUNC(PyObject *) _PyString_FormatLong(PyObject*, int, int,
+PyAPI_FUNC(Py_ssize_t) PyBytes_Size(PyObject *);
+PyAPI_FUNC(char *) PyBytes_AsString(PyObject *);
+PyAPI_FUNC(PyObject *) PyBytes_Repr(PyObject *, int);
+PyAPI_FUNC(void) PyBytes_Concat(PyObject **, PyObject *);
+PyAPI_FUNC(void) PyBytes_ConcatAndDel(PyObject **, PyObject *);
+PyAPI_FUNC(int) _PyBytes_Resize(PyObject **, Py_ssize_t);
+PyAPI_FUNC(PyObject *) PyBytes_Format(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) _PyBytes_FormatLong(PyObject*, int, int,
 						  int, char**, int*);
-PyAPI_FUNC(PyObject *) PyString_DecodeEscape(const char *, Py_ssize_t,
+PyAPI_FUNC(PyObject *) PyBytes_DecodeEscape(const char *, Py_ssize_t,
 						   const char *, Py_ssize_t,
 						   const char *);
 
 /* Macro, trading safety for speed */
-#define PyString_AS_STRING(op) (assert(PyString_Check(op)), \
+#define PyBytes_AS_STRING(op) (assert(PyBytes_Check(op)), \
                                 (((PyStringObject *)(op))->ob_sval))
-#define PyString_GET_SIZE(op)  (assert(PyString_Check(op)),Py_SIZE(op))
+#define PyBytes_GET_SIZE(op)  (assert(PyBytes_Check(op)),Py_SIZE(op))
 
-/* _PyString_Join(sep, x) is like sep.join(x).  sep must be PyStringObject*,
+/* _PyBytes_Join(sep, x) is like sep.join(x).  sep must be PyStringObject*,
    x must be an iterable object. */
-PyAPI_FUNC(PyObject *) _PyString_Join(PyObject *sep, PyObject *x);
+PyAPI_FUNC(PyObject *) _PyBytes_Join(PyObject *sep, PyObject *x);
 
 /* Provides access to the internal data buffer and size of a string
    object or the default encoded version of an Unicode object. Passing
    NULL as *len parameter will force the string buffer to be
    0-terminated (passing a string with embedded NULL characters will
    cause an exception).  */
-PyAPI_FUNC(int) PyString_AsStringAndSize(
+PyAPI_FUNC(int) PyBytes_AsStringAndSize(
     register PyObject *obj,	/* string or Unicode object */
     register char **s,		/* pointer to buffer variable */
     register Py_ssize_t *len	/* pointer to length variable or NULL

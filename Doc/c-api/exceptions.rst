@@ -142,7 +142,7 @@ in various ways.  There is a separate error indicator for each thread.
    containing format codes, similar to :cfunc:`printf`. The ``width.precision``
    before a format code is parsed, but the width part is ignored.
 
-   .. % This should be exactly the same as the table in PyString_FromFormat.
+   .. % This should be exactly the same as the table in PyBytes_FromFormat.
    .. % One should just refer to the other.
    .. % The descriptions for %zd and %zu are wrong, but the truth is complicated
    .. % because not all compilers support the %z width modifier -- we fake it

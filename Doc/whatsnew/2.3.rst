@@ -1901,7 +1901,7 @@ Changes to Python's build process and to the C API include:
   long long`.
 
 * A new function, :cfunc:`PyObject_DelItemString(mapping, char \*key)` was added
-  as shorthand for ``PyObject_DelItem(mapping, PyString_New(key))``.
+  as shorthand for ``PyObject_DelItem(mapping, PyBytes_New(key))``.
 
 * File objects now manage their internal string buffer differently, increasing
   it exponentially when needed.  This results in the benchmark tests in
