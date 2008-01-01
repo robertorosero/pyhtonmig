@@ -28,24 +28,24 @@ typedef struct {
 } PyBytesObject;
 
 /* Type object */
-PyAPI_DATA(PyTypeObject) PyBytes_Type;
+PyAPI_DATA(PyTypeObject) PyByteArray_Type;
 PyAPI_DATA(PyTypeObject) PyBytesIter_Type;
 
 /* Type check macros */
-#define PyBytes_Check(self) PyObject_TypeCheck(self, &PyBytes_Type)
-#define PyBytes_CheckExact(self) (Py_TYPE(self) == &PyBytes_Type)
+#define PyByteArray_Check(self) PyObject_TypeCheck(self, &PyByteArray_Type)
+#define PyByteArray_CheckExact(self) (Py_TYPE(self) == &PyByteArray_Type)
 
 /* Direct API functions */
-PyAPI_FUNC(PyObject *) PyBytes_FromObject(PyObject *);
-PyAPI_FUNC(PyObject *) PyBytes_Concat(PyObject *, PyObject *);
-PyAPI_FUNC(PyObject *) PyBytes_FromStringAndSize(const char *, Py_ssize_t);
-PyAPI_FUNC(Py_ssize_t) PyBytes_Size(PyObject *);
-PyAPI_FUNC(char *) PyBytes_AsString(PyObject *);
-PyAPI_FUNC(int) PyBytes_Resize(PyObject *, Py_ssize_t);
+PyAPI_FUNC(PyObject *) PyByteArray_FromObject(PyObject *);
+PyAPI_FUNC(PyObject *) PyByteArray_Concat(PyObject *, PyObject *);
+PyAPI_FUNC(PyObject *) PyByteArray_FromStringAndSize(const char *, Py_ssize_t);
+PyAPI_FUNC(Py_ssize_t) PyByteArray_Size(PyObject *);
+PyAPI_FUNC(char *) PyByteArray_AsString(PyObject *);
+PyAPI_FUNC(int) PyByteArray_Resize(PyObject *, Py_ssize_t);
 
 /* Macros, trading safety for speed */
-#define PyBytes_AS_STRING(self) (assert(PyBytes_Check(self)),((PyBytesObject *)(self))->ob_bytes)
-#define PyBytes_GET_SIZE(self)  (assert(PyBytes_Check(self)),Py_SIZE(self))
+#define PyByteArray_AS_STRING(self) (assert(PyByteArray_Check(self)),((PyBytesObject *)(self))->ob_bytes)
+#define PyByteArray_GET_SIZE(self)  (assert(PyByteArray_Check(self)),Py_SIZE(self))
 
 #ifdef __cplusplus
 }

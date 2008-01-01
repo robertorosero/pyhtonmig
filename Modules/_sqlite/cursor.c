@@ -367,8 +367,8 @@ PyObject* _pysqlite_fetch_one_row(pysqlite_Cursor* self)
                     }
                 } else if (self->connection->text_factory == (PyObject*)&PyString_Type) {
                     converted = PyString_FromString(val_str);
-                } else if (self->connection->text_factory == (PyObject*)&PyBytes_Type) {
-                    converted = PyBytes_FromStringAndSize(val_str, strlen(val_str));
+                } else if (self->connection->text_factory == (PyObject*)&PyByteArray_Type) {
+                    converted = PyByteArray_FromStringAndSize(val_str, strlen(val_str));
                 } else {
                     converted = PyObject_CallFunction(self->connection->text_factory, "y", val_str);
                 }

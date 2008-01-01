@@ -870,7 +870,7 @@ Reg2Py(BYTE *retDataBuf, DWORD retDataSize, DWORD typ)
 				obData = Py_None;
 			}
 			else
-				obData = PyBytes_FromStringAndSize(
+				obData = PyByteArray_FromStringAndSize(
 					     (char *)retDataBuf, retDataSize);
 			break;
 	}

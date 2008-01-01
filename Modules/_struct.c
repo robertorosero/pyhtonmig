@@ -1629,7 +1629,7 @@ s_pack_internal(PyStructObject *soself, PyObject *args, int offset, char* buf)
 					return -1;
 			}
 			isstring = PyString_Check(v);
-			if (!isstring && !PyBytes_Check(v)) {
+			if (!isstring && !PyByteArray_Check(v)) {
 				PyErr_SetString(StructError,
 						"argument for 's' must be a string");
 				return -1;
@@ -1639,8 +1639,8 @@ s_pack_internal(PyStructObject *soself, PyObject *args, int offset, char* buf)
 				p = PyString_AS_STRING(v);
 			}
 			else {
-				n = PyBytes_GET_SIZE(v);
-				p = PyBytes_AS_STRING(v);
+				n = PyByteArray_GET_SIZE(v);
+				p = PyByteArray_AS_STRING(v);
 			}
 			if (n > code->size)
 				n = code->size;
@@ -1655,7 +1655,7 @@ s_pack_internal(PyStructObject *soself, PyObject *args, int offset, char* buf)
 					return -1;
 			}
 			isstring = PyString_Check(v);
-			if (!isstring && !PyBytes_Check(v)) {
+			if (!isstring && !PyByteArray_Check(v)) {
 				PyErr_SetString(StructError,
 						"argument for 'p' must be a string");
 				return -1;
@@ -1665,8 +1665,8 @@ s_pack_internal(PyStructObject *soself, PyObject *args, int offset, char* buf)
 				p = PyString_AS_STRING(v);
 			}
 			else {
-				n = PyBytes_GET_SIZE(v);
-				p = PyBytes_AS_STRING(v);
+				n = PyByteArray_GET_SIZE(v);
+				p = PyByteArray_AS_STRING(v);
 			}
 			if (n > (code->size - 1))
 				n = code->size - 1;

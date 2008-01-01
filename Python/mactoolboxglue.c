@@ -170,9 +170,9 @@ PyMac_GetOSType(PyObject *v, OSType *pr)
 		str = PyString_AS_STRING(v);
 		len = PyString_GET_SIZE(v);
 	}
-	else if (PyBytes_Check(v)) {
-		str = PyBytes_AS_STRING(v);
-		len = PyBytes_GET_SIZE(v);
+	else if (PyByteArray_Check(v)) {
+		str = PyByteArray_AS_STRING(v);
+		len = PyByteArray_GET_SIZE(v);
 	}
 	else {
 		PyErr_SetString(PyExc_TypeError,
@@ -221,9 +221,9 @@ PyMac_GetStr255(PyObject *v, Str255 pbuf)
 		ptr = PyString_AS_STRING(v);
 		len = PyString_GET_SIZE(v);
 	}
-	else if (PyBytes_Check(v)) {
-		ptr = PyBytes_AS_STRING(v);
-		len = PyBytes_GET_SIZE(v);
+	else if (PyByteArray_Check(v)) {
+		ptr = PyByteArray_AS_STRING(v);
+		len = PyByteArray_GET_SIZE(v);
 	}
 	if (len > 255) {
 		PyErr_SetString(PyExc_TypeError,

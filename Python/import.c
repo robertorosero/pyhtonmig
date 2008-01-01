@@ -2599,7 +2599,7 @@ imp_get_magic(PyObject *self, PyObject *noargs)
 	buf[2] = (char) ((pyc_magic >> 16) & 0xff);
 	buf[3] = (char) ((pyc_magic >> 24) & 0xff);
 
-	return PyBytes_FromStringAndSize(buf, 4);
+	return PyByteArray_FromStringAndSize(buf, 4);
 }
 
 static PyObject *

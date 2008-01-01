@@ -406,17 +406,17 @@ fp_readl(char *s, int size, struct tok_state *tok)
 	}
 	else
 	{
-		buf = PyBytes_AsString(bufobj);
+		buf = PyByteArray_AsString(bufobj);
 		if (buf == NULL) {
 			goto error;
 		}
-		buflen = PyBytes_GET_SIZE(bufobj);
+		buflen = PyByteArray_GET_SIZE(bufobj);
 	}
 
 	Py_XDECREF(tok->decoding_buffer);
 	if (buflen > size) {
 		/* Too many chars, the rest goes into tok->decoding_buffer */
-		tok->decoding_buffer = PyBytes_FromStringAndSize(buf+size,
+		tok->decoding_buffer = PyByteArray_FromStringAndSize(buf+size,
 								 buflen-size);
 		if (tok->decoding_buffer == NULL)
 			goto error;
