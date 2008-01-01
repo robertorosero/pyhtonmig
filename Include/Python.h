@@ -64,7 +64,7 @@
 
 #include "pydebug.h"
 
-#include "bytesobject.h"
+#include "bytearrayobject.h"
 #include "unicodeobject.h"
 #include "longobject.h"
 #include "longintrepr.h"
