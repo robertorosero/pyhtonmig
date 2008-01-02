@@ -4,7 +4,7 @@
 #include "Python.h"
 
 static int
-memory_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
+memoryview_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
 {
         if (view != NULL)
 		*view = self->view;
@@ -15,13 +15,13 @@ memory_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
 }
 
 static void
-memory_releasebuf(PyMemoryViewObject *self, Py_buffer *view)
+memoryview_releasebuf(PyMemoryViewObject *self, Py_buffer *view)
 {
 	if (self->base != NULL)
 		PyObject_ReleaseBuffer(self->base, NULL);
 }
 
-PyDoc_STRVAR(memory_doc,
+PyDoc_STRVAR(memoryview_doc,
 "memoryview(object)\n\
 \n\
 Create a new memoryview object which references the given object.");
@@ -67,7 +67,7 @@ PyMemoryView_FromObject(PyObject *base)
 }
 
 static PyObject *
-memory_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
+memoryview_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
 {
 	PyObject *obj;
 	static char *kwlist[] = {"object", 0};
@@ -295,13 +295,13 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
 
 
 static PyObject *
-memory_format_get(PyMemoryViewObject *self)
+memoryview_format_get(PyMemoryViewObject *self)
 {
         return PyUnicode_FromString(self->view.format);
 }
 
 static PyObject *
-memory_itemsize_get(PyMemoryViewObject *self)
+memoryview_itemsize_get(PyMemoryViewObject *self)
 {
         return PyLong_FromSsize_t(self->view.itemsize);
 }
@@ -331,62 +331,62 @@ _IntTupleFromSsizet(int len, Py_ssize_t *vals)
 }
 
 static PyObject *
-memory_shape_get(PyMemoryViewObject *self)
+memoryview_shape_get(PyMemoryViewObject *self)
 {
         return _IntTupleFromSsizet(self->view.ndim, self->view.shape);
 }
 
 static PyObject *
-memory_strides_get(PyMemoryViewObject *self)
+memoryview_strides_get(PyMemoryViewObject *self)
 {
         return _IntTupleFromSsizet(self->view.ndim, self->view.strides);
 }
 
 static PyObject *
-memory_suboffsets_get(PyMemoryViewObject *self)
+memoryview_suboffsets_get(PyMemoryViewObject *self)
 {
         return _IntTupleFromSsizet(self->view.ndim, self->view.suboffsets);
 }
 
 static PyObject *
-memory_size_get(PyMemoryViewObject *self)
+memoryview_size_get(PyMemoryViewObject *self)
 {
         return PyLong_FromSsize_t(self->view.len);
 }
 
 static PyObject *
-memory_readonly_get(PyMemoryViewObject *self)
+memoryview_readonly_get(PyMemoryViewObject *self)
 {
         return PyBool_FromLong(self->view.readonly);
 }
 
 static PyObject *
-memory_ndim_get(PyMemoryViewObject *self)
+memoryview_ndim_get(PyMemoryViewObject *self)
 {
         return PyLong_FromLong(self->view.ndim);
 }
 
-static PyGetSetDef memory_getsetlist[] ={
-        {"format",	(getter)memory_format_get,	NULL, NULL},
-        {"itemsize",	(getter)memory_itemsize_get,	NULL, NULL},
-        {"shape",	(getter)memory_shape_get,	NULL, NULL},
-        {"strides",	(getter)memory_strides_get,	NULL, NULL},
-        {"suboffsets",	(getter)memory_suboffsets_get,	NULL, NULL},
-        {"size",	(getter)memory_size_get,	NULL, NULL},
-        {"readonly",	(getter)memory_readonly_get,	NULL, NULL},
-        {"ndim",	(getter)memory_ndim_get,	NULL, NULL},
+static PyGetSetDef memoryview_getsetlist[] ={
+        {"format",	(getter)memoryview_format_get,	NULL, NULL},
+        {"itemsize",	(getter)memoryview_itemsize_get,	NULL, NULL},
+        {"shape",	(getter)memoryview_shape_get,	NULL, NULL},
+        {"strides",	(getter)memoryview_strides_get,	NULL, NULL},
+        {"suboffsets",	(getter)memoryview_suboffsets_get,	NULL, NULL},
+        {"size",	(getter)memoryview_size_get,	NULL, NULL},
+        {"readonly",	(getter)memoryview_readonly_get,	NULL, NULL},
+        {"ndim",	(getter)memoryview_ndim_get,	NULL, NULL},
         {NULL, NULL, NULL, NULL},
 };
 
 
 static PyObject *
-memory_tobytes(PyMemoryViewObject *mem, PyObject *noargs)
+memoryview_tobytes(PyMemoryViewObject *mem, PyObject *noargs)
 {
         return PyByteArray_FromObject((PyObject *)mem);
 }
 
 static PyObject *
-memory_tolist(PyMemoryViewObject *mem, PyObject *noargs)
+memoryview_tolist(PyMemoryViewObject *mem, PyObject *noargs)
 {
 	/* This should construct a (nested) list of unpacked objects
 	   possibly using the struct module.
@@ -397,15 +397,15 @@ memory_tolist(PyMemoryViewObject *mem, PyObject *noargs)
 
 
 
-static PyMethodDef memory_methods[] = {
-        {"tobytes", (PyCFunction)memory_tobytes, METH_NOARGS, NULL},
-        {"tolist", (PyCFunction)memory_tolist, METH_NOARGS, NULL},
+static PyMethodDef memoryview_methods[] = {
+        {"tobytes", (PyCFunction)memoryview_tobytes, METH_NOARGS, NULL},
+        {"tolist", (PyCFunction)memoryview_tolist, METH_NOARGS, NULL},
         {NULL,          NULL}           /* sentinel */
 };
 
 
 static void
-memory_dealloc(PyMemoryViewObject *self)
+memoryview_dealloc(PyMemoryViewObject *self)
 {
         if (self->base != NULL) {
             if (PyTuple_Check(self->base)) {
@@ -436,14 +436,14 @@ memory_dealloc(PyMemoryViewObject *self)
 }
 
 static PyObject *
-memory_repr(PyMemoryViewObject *self)
+memoryview_repr(PyMemoryViewObject *self)
 {
 	return PyUnicode_FromFormat("<memory at %p>", self);
 }
 
 
 static PyObject *
-memory_str(PyMemoryViewObject *self)
+memoryview_str(PyMemoryViewObject *self)
 {
         Py_buffer view;
         PyObject *res;
@@ -460,7 +460,7 @@ memory_str(PyMemoryViewObject *self)
 /* Sequence methods */
 
 static Py_ssize_t
-memory_length(PyMemoryViewObject *self)
+memoryview_length(PyMemoryViewObject *self)
 {
         Py_buffer view;
 
@@ -479,7 +479,7 @@ memory_length(PyMemoryViewObject *self)
 	   not with anything else.
  */
 static PyObject *
-memory_subscript(PyMemoryViewObject *self, PyObject *key)
+memoryview_subscript(PyMemoryViewObject *self, PyObject *key)
 {
 	Py_buffer *view;
 	view = &(self->view);
@@ -543,24 +543,24 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
 
 /* Need to support assigning memory if we can */
 static int
-memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
+memoryview_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
 {
         return 0;
 }
 
 /* As mapping */
-static PyMappingMethods memory_as_mapping = {
-	(lenfunc)memory_length, /*mp_length*/
-	(binaryfunc)memory_subscript, /*mp_subscript*/
-	(objobjargproc)memory_ass_sub, /*mp_ass_subscript*/
+static PyMappingMethods memoryview_as_mapping = {
+	(lenfunc)memoryview_length, /*mp_length*/
+	(binaryfunc)memoryview_subscript, /*mp_subscript*/
+	(objobjargproc)memoryview_ass_sub, /*mp_ass_subscript*/
 };
 
 
 /* Buffer methods */
 
-static PyBufferProcs memory_as_buffer = {
-	(getbufferproc)memory_getbuf,         /* bf_getbuffer */
-        (releasebufferproc)memory_releasebuf, /* bf_releasebuffer */
+static PyBufferProcs memoryview_as_buffer = {
+	(getbufferproc)memoryview_getbuf,         /* bf_getbuffer */
+        (releasebufferproc)memoryview_releasebuf, /* bf_releasebuffer */
 };
 
 
@@ -569,32 +569,32 @@ PyTypeObject PyMemoryView_Type = {
 	"memoryview",
 	sizeof(PyMemoryViewObject),
 	0,
-	(destructor)memory_dealloc, 		/* tp_dealloc */
+	(destructor)memoryview_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
-	(reprfunc)memory_repr,			/* tp_repr */
+	(reprfunc)memoryview_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,			                /* tp_as_sequence */
-	&memory_as_mapping,	    	        /* tp_as_mapping */
+	&memoryview_as_mapping,	    	        /* tp_as_mapping */
 	0,		                        /* tp_hash */
 	0,					/* tp_call */
-	(reprfunc)memory_str,			/* tp_str */
+	(reprfunc)memoryview_str,			/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
-	&memory_as_buffer,			/* tp_as_buffer */
+	&memoryview_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	memory_doc,				/* tp_doc */
+	memoryview_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	0,		                	/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
-	memory_methods,	   		        /* tp_methods */
+	memoryview_methods,	   		        /* tp_methods */
 	0,	      		                /* tp_members */
-	memory_getsetlist,  		        /* tp_getset */
+	memoryview_getsetlist,  		        /* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
@@ -602,5 +602,5 @@ PyTypeObject PyMemoryView_Type = {
 	0,					/* tp_dictoffset */
 	0,					/* tp_init */
 	0,					/* tp_alloc */
-	memory_new,				/* tp_new */
+	memoryview_new,				/* tp_new */
 };
