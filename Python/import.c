@@ -260,6 +260,14 @@ static PyThread_type_lock import_lock = 0;
 static long import_lock_thread = -1;
 static int import_lock_level = 0;
 
+#define UNLOCK_IMPORT do {					\
+		if (unlock_import() < 0) {			\
+			PyErr_SetString(PyExc_RuntimeError,	\
+				"not holding the import lock");	\
+			return NULL;				\
+		}					\
+	} while(0)
+
 static void
 lock_import(void)
 {
@@ -317,6 +325,7 @@ _PyImport_ReInitLock(void)
 
 #define lock_import()
 #define unlock_import() 0
+#define UNLOCK_IMPORT
 
 #endif
 
@@ -344,11 +353,7 @@ static PyObject *
 imp_release_lock(PyObject *self, PyObject *noargs)
 {
 #ifdef WITH_THREAD
-	if (unlock_import() < 0) {
-		PyErr_SetString(PyExc_RuntimeError,
-				"not holding the import lock");
-		return NULL;
-	}
+    	UNLOCK_IMPORT;
 #endif
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -657,6 +662,8 @@ PyImport_GetPostImportHooks(void)
 
 /* Notify that a module as been loaded
  * Must be called with the import hook acquired
+ * The function *STEALS* a reference to module when an error occurs, otherwise
+ * it returns the module.
  */
 PyObject *
 PyImport_NotifyModuleLoaded(PyObject *module)
@@ -752,6 +759,57 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 	}
 }
 
+/* notify by name
+ * notify_byname("a.b.c") calls PyImport_NotifyModuleLoaded() for "a", "a.b"
+ * and "a.b.c". The modules are taken from sys.modules. If a module can't be
+ * retrieved an exception is raised otherwise the module 'modname' is returned
+ */
+static PyObject *
+notify_byname(const char *modname)
+{
+	PyObject *modules, *mod = NULL;
+	int status = -1;
+	const char *pmodname = modname;
+	char name[MAXPATHLEN+1];
+	Py_ssize_t pos;
+
+	modules = PyImport_GetModuleDict();
+	if (modules == NULL) {
+		goto error;
+	}
+	for (; *pmodname != '\0'; pmodname++) {
+		if (*pmodname != '.')
+			continue;
+		pos = pmodname - modname;
+		if (pos == 0) {
+			PyErr_SetString(PyExc_ValueError,
+				"module name can't starts with a dot.");
+			return NULL;
+		}
+		strncpy(name, modname, pos);
+		name[pos] = '\0';
+		mod = PyDict_GetItemString(modules, name);
+		Py_INCREF(mod);
+		mod = PyImport_NotifyModuleLoaded(mod);
+		if (mod == NULL) {
+			goto error;
+		}
+		Py_DECREF(mod);
+	}
+	mod = PyDict_GetItemString(modules, modname);
+	Py_INCREF(mod);
+	mod = PyImport_NotifyModuleLoaded(mod);
+
+	status = 0;
+    error:
+	if (status == 0) {
+		return mod;
+	}
+	else {
+		return NULL;
+	}
+}
+
 /* register a new hook for a module
    PyImport_RegisterPostImportHook acquires the global import look
  */
@@ -831,12 +889,8 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 	Py_XDECREF(hooks);
 	Py_XDECREF(mod_name);
 	if (locked) {
-		if (unlock_import() < 0) {
-			PyErr_SetString(PyExc_RuntimeError,
-					"not holding the import lock");
-			return NULL;
-		}
-	}
+		UNLOCK_IMPORT;
+        }
 	if (status < 0) {
 		return NULL;
 	}
@@ -2287,12 +2341,7 @@ PyImport_ImportModuleLevel(char *name, PyObject *globals, PyObject *locals,
 	lock_import();
 	result = import_module_level(name, globals, locals, fromlist, level);
 	/* result = PyImport_NotifyModuleLoaded(result); */
-	if (unlock_import() < 0) {
-		Py_XDECREF(result);
-		PyErr_SetString(PyExc_RuntimeError,
-				"not holding the import lock");
-		return NULL;
-	}
+	UNLOCK_IMPORT;
 	return result;
 }
 
@@ -3218,18 +3267,19 @@ static PyObject *
 imp_notify_module_loaded(PyObject *self, PyObject *args)
 {
 	PyObject *mod, *o;
+	char *name;
+
+        if (PyArg_ParseTuple(args, "s:notify_module_loaded", &name)) {
+		return notify_byname(name);
+	}
 
         if (!PyArg_ParseTuple(args, "O:notify_module_loaded", &mod))
-                return NULL;
+		return NULL;
 
 	Py_INCREF(mod);
 	lock_import();
 	o = PyImport_NotifyModuleLoaded(mod);
-	if (unlock_import() < 0) {
-		PyErr_SetString(PyExc_RuntimeError,
-				"not holding the import lock");
-		return NULL;
-	}
+	UNLOCK_IMPORT;
 	return o;
 }
 

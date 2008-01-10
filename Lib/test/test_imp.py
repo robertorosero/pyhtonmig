@@ -115,10 +115,12 @@ class PostImportHookTests(unittest.TestCase):
     def setUp(self):
         self.sys_pih = sys.post_import_hooks.copy()
         self.module_names = set(sys.modules)
+        self.sys_path = list(sys.path)
         self.tmpdir = None
 
     def tearDown(self):
         sys.post_import_hooks = self.sys_pih
+        sys.path = self.sys_path
         for name in list(sys.modules):
             if name not in self.module_names:
                 del sys.modules[name]
@@ -216,6 +218,25 @@ class PostImportHookTests(unittest.TestCase):
         self.assertEqual(callback.names,
                          ["pih_test", "pih_test.a", "pih_test.a.b"])
 
+    def test_notifyloaded_byname(self):
+        callback = CallBack()
+
+        imp.register_post_import_hook(callback, "pih_test")
+        imp.register_post_import_hook(callback, "pih_test.a")
+        imp.register_post_import_hook(callback, "pih_test.a.b")
+        self.assertEqual(callback.names, [])
+
+        for name in ("pih_test", "pih_test.a", "pih_test.a.b"):
+            mod = imp.new_module(name)
+            sys.modules[name] = mod
+        self.assertEqual(callback.names, [])
+
+        mod2 = imp.notify_module_loaded("pih_test.a.b")
+        self.failUnless(mod is mod2, (mod, mod2))
+        self.assertEqual(mod.__name__,  "pih_test.a.b")
+
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
 
 def test_main():
     test_support.run_unittest(
