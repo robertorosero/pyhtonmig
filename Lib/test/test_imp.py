@@ -111,8 +111,7 @@ class PostImportHookTests(unittest.TestCase):
         self.assert_("sys" in callback.mods, callback.mods)
         self.assert_(callback.mods["sys"] is sys, callback.mods)
         self.failIf("telnetlib" in callback.mods, callback.mods)
-        regc = sys.post_import_hooks.get("sys", False)
-        self.assert_(regc is False, regc)
+        self.assertEqual(sys.post_import_hooks["sys"], None)
 
     def test_register_callback_new(self):
         callback = CallBack()
@@ -129,11 +128,15 @@ class PostImportHookTests(unittest.TestCase):
         import telnetlib
         self.assert_("telnetlib" in callback.mods, callback.mods)
         self.assert_(callback.mods["telnetlib"] is telnetlib, callback.mods)
+        self.assertEqual(sys.post_import_hooks["telnetlib"], None)
 
     def test_post_import_notify(self):
         imp.notify_module_loaded(sys)
         self.failUnlessRaises(TypeError, imp.notify_module_loaded, None)
         self.failUnlessRaises(TypeError, imp.notify_module_loaded, object())
+        # Should this fail?
+        mod = imp.new_module("post_import_test_module")
+        imp.notify_module_loaded(mod)
 
 
 def test_main():
