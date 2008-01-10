@@ -1,7 +1,10 @@
+import os
 import imp
 import sys
 import thread
 import unittest
+import shutil
+import tempfile
 from test import test_support
 
 
@@ -69,24 +72,49 @@ class ImportTests(unittest.TestCase):
         ## import sys
         ## self.assertRaises(ImportError, reload, sys)
 
+# from test_pkg
+def mkhier(descr):
+    root = tempfile.mkdtemp()
+    sys.path.insert(0, root)
+    if not os.path.isdir(root):
+        os.mkdir(root)
+    for name, contents in descr:
+        comps = name.split()
+        fullname = root
+        for c in comps:
+            fullname = os.path.join(fullname, c)
+        if contents is None:
+            os.mkdir(fullname)
+        else:
+            with open(fullname+".py", "w") as f:
+                f.write(contents)
+                if contents and contents[-1] != '\n':
+                    f.write('\n')
+    return root
+
 class CallBack:
     def __init__(self):
         self.mods = {}
+        self.names = []
 
     def __call__(self, mod):
         self.mods[mod.__name__] = mod
+        self.names.append(mod.__name__)
 
 class PostImportHookTests(unittest.TestCase):
 
     def setUp(self):
-        if "telnetlib" in sys.modules:
-            del sys.modules["telnetlib"]
-        self.pihr = sys.post_import_hooks.copy()
+        self.sys_pih = sys.post_import_hooks.copy()
+        self.module_names = set(sys.modules)
+        self.tmpdir = None
 
     def tearDown(self):
-        if "telnetlib" in sys.modules:
-            del sys.modules["telnetlib"]
-        sys.post_import_hooks = self.pihr
+        sys.post_import_hooks = self.sys_pih
+        for name in list(sys.modules):
+            if name not in self.module_names:
+                del sys.modules[name]
+        if self.tmpdir:
+            shutil.rmtree(self.tmpdir)
 
     def test_registry(self):
         reg = sys.post_import_hooks
@@ -99,9 +127,10 @@ class PostImportHookTests(unittest.TestCase):
         sys.post_import_hooks = {}
         imp.register_post_import_hook(lambda mod: None, "sys")
 
-        sys.post_import_hooks["telnetlib"] = lambda mod: None
-        self.assertRaises(TypeError, __import__, "telnetlib")
-        sys.post_import_hooks = self.pihr
+        self.tmpdir = mkhier([("pih_test_module", "example = 23")])
+        sys.post_import_hooks["pih_test_module"] = lambda mod: None
+        self.assertRaises(TypeError, __import__, "pih_test_module")
+        sys.post_import_hooks = self.sys_pih
 
     def test_register_callback_existing(self):
         callback = CallBack()
@@ -110,25 +139,28 @@ class PostImportHookTests(unittest.TestCase):
         # sys is already loaded and the callback is fired immediately
         self.assert_("sys" in callback.mods, callback.mods)
         self.assert_(callback.mods["sys"] is sys, callback.mods)
-        self.failIf("telnetlib" in callback.mods, callback.mods)
+        self.failIf("pih_test_module" in callback.mods, callback.mods)
         self.assertEqual(sys.post_import_hooks["sys"], None)
 
     def test_register_callback_new(self):
-        callback = CallBack()
-        # an arbitrary module
-        if "telnetlib" in sys.modules:
-            del sys.modules["telnetlib"]
-        imp.register_post_import_hook(callback, "telnetlib")
+        self.tmpdir = mkhier([("pih_test_module", "example = 23")])
+        self.assert_("pih_test_module" not in sys.post_import_hooks)
+        self.assert_("pih_test_module" not in sys.modules)
 
-        regc = sys.post_import_hooks.get("telnetlib")
-        self.assert_(regc is not None, regc)
+        callback = CallBack()
+        imp.register_post_import_hook(callback, "pih_test_module")
+
+        regc = sys.post_import_hooks.get("pih_test_module")
+        self.assertNotEqual(regc, None, (regc, callback.mods))
         self.assert_(isinstance(regc, list), regc)
         self.assert_(callback in regc, regc)
 
-        import telnetlib
-        self.assert_("telnetlib" in callback.mods, callback.mods)
-        self.assert_(callback.mods["telnetlib"] is telnetlib, callback.mods)
-        self.assertEqual(sys.post_import_hooks["telnetlib"], None)
+        import pih_test_module
+        self.assertEqual(pih_test_module.example, 23)
+        self.assert_("pih_test_module" in callback.mods, callback.mods)
+        self.assert_(callback.mods["pih_test_module"] is pih_test_module,
+                     callback.mods)
+        self.assertEqual(sys.post_import_hooks["pih_test_module"], None)
 
     def test_post_import_notify(self):
         imp.notify_module_loaded(sys)
@@ -137,6 +169,34 @@ class PostImportHookTests(unittest.TestCase):
         # Should this fail?
         mod = imp.new_module("post_import_test_module")
         imp.notify_module_loaded(mod)
+
+    def test_hook_hirarchie(self):
+        hier = [
+            ("pih_test", None),
+            ("pih_test __init__", "package = 0"),
+            ("pih_test a", None),
+            ("pih_test a __init__", "package = 1"),
+            ("pih_test a b", None),
+            ("pih_test a b __init__", "package = 2"),
+        ]
+        self.tmpdir = mkhier(hier)
+        callback = CallBack()
+        imp.register_post_import_hook(callback, "pih_test")
+        imp.register_post_import_hook(callback, "pih_test.a")
+        imp.register_post_import_hook(callback, "pih_test.a.b")
+
+        import pih_test
+        self.assertEqual(callback.names, ["pih_test"])
+        import pih_test.a
+        self.assertEqual(callback.names, ["pih_test", "pih_test.a"])
+        from pih_test import a
+        self.assertEqual(callback.names, ["pih_test", "pih_test.a"])
+        import pih_test.a.b
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
+        from pih_test.a import b
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
 
 
 def test_main():

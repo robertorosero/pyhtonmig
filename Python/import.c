@@ -706,9 +706,11 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 		goto error;
 	}
 
-	if ((hooks = PyDict_GetItem(registry, mod_name)) == NULL) {
+	hooks = PyDict_GetItem(registry, mod_name);
+	if (hooks == NULL || hooks == Py_None) {
 		/* Either no hooks are defined or they are already fired */
-		PyErr_Clear();
+		if (hooks == NULL)
+			PyErr_Clear();
 		goto end;
 	}
 	Py_INCREF(hooks);
