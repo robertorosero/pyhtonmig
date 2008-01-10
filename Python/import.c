@@ -163,7 +163,7 @@ _PyImport_Init(void)
 void
 _PyImportHooks_Init(void)
 {
-	PyObject *v, *path_hooks = NULL, *zimpimport;
+	PyObject *v, *path_hooks = NULL, *zimpimport, *pihr;
 	int err = 0;
 
 	/* adding sys.path_hooks and sys.path_importer_cache, setting up
@@ -198,6 +198,14 @@ _PyImportHooks_Init(void)
 		Py_FatalError("initializing sys.meta_path, sys.path_hooks, "
 			      "path_importer_cache, or NullImporter failed"
 			      );
+	}
+
+	pihr = PyDict_New();
+	if (pihr == NULL ||
+            PySys_SetObject("post_import_hooks", pihr) != 0) {
+		PyErr_Print();
+		Py_FatalError("initialization of post import hook registry "
+			      "failed");
 	}
 
 	zimpimport = PyImport_ImportModule("zipimport");
@@ -371,6 +379,7 @@ static char* sys_deletes[] = {
 	"path", "argv", "ps1", "ps2",
 	"last_type", "last_value", "last_traceback",
 	"path_hooks", "path_importer_cache", "meta_path",
+	"post_import_hooks",
 	NULL
 };
 
@@ -623,6 +632,214 @@ _RemoveModule(const char *name)
 	if (PyDict_DelItemString(modules, name) < 0)
 		Py_FatalError("import:  deleting existing key in"
 			      "sys.modules failed");
+}
+
+/* post import hook API */
+PyObject *
+PyImport_GetPostImportHooks(void)
+{
+	PyObject *pihr;
+
+	pihr = PySys_GetObject("post_import_hooks");
+	/* This should only happen during initialization */
+	if (pihr == NULL) {
+		PyErr_Clear();
+		return NULL;
+	}
+
+	if (!PyDict_Check(pihr)) {
+		PyErr_SetString(PyExc_TypeError,
+				"post import registry is not a dict");
+		return NULL;
+	}
+	return pihr;
+}
+
+PyObject *
+PyImport_NotifyModuleLoaded(PyObject *module)
+{
+	static PyObject *name = NULL;
+	PyObject *mod_name = NULL, *registry = NULL, *o;
+	PyObject *hooks = NULL, *hook, *it = NULL;
+	int status = -1;
+
+	if (name == NULL) {
+		name = PyUnicode_InternFromString("__name__");
+		if (name == NULL) {
+			return NULL;
+		}
+	}
+
+	if (module == NULL) {
+		return NULL;
+	}
+
+	/* Should I allow all kinds of objects ? */
+	if (!PyModule_Check(module)) {
+		PyErr_Format(PyExc_TypeError,
+			     "A module object was expected, got '%.200s'",
+			     Py_TYPE(module)->tp_name);
+		goto error;
+	}
+
+	/* XXX check if module is in sys.modules ? */
+	registry = PyImport_GetPostImportHooks();
+	if (registry == NULL) {
+		/* warn about invalid registry? */
+		PyErr_Clear();
+		return module;
+	}
+
+	mod_name = PyObject_GetAttr(module, name);
+	if (mod_name == NULL) {
+		goto error;
+	}
+	if (!PyUnicode_Check(mod_name)) {
+		PyObject *repr;
+		char *name;
+
+		repr = PyObject_Repr(module);
+		name = repr ? PyUnicode_AsString(repr) : "<unknown>";
+		PyErr_Format(PyExc_TypeError,
+			     "Module __name__ attribute of '%.200s' is not "
+			     "string", name);
+		Py_XDECREF(repr);
+		goto error;
+	}
+
+	hooks = PyDict_GetItem(registry, mod_name);
+	if (hooks == NULL) {
+		/* Either no hooks are defined or they are already fired */
+		PyErr_Clear();
+		goto end;
+	}
+	if (!PyList_Check(hooks)) {
+		PyErr_Format(PyExc_TypeError,
+			     "expected None or list of hooks, got '%.200s'",
+			     Py_TYPE(hooks)->tp_name);
+		goto error;
+	}
+
+	/* fire hooks */
+	it = PyObject_GetIter(hooks);
+	if (it == NULL) {
+		goto error;
+	}
+	while ((hook = PyIter_Next(it)) != NULL) {
+		o = PyObject_CallFunctionObjArgs(hook, module, NULL);
+		Py_DECREF(hook);
+		if (o == NULL) {
+			goto error;
+		}
+		Py_DECREF(o);
+	}
+
+	/* Mark hooks as fired */
+	if (PyDict_DelItem(registry, mod_name) < 0) {
+		goto error;
+	}
+
+    end:
+	status = 0;
+    error:
+	Py_XDECREF(mod_name);
+	Py_XDECREF(it);
+	if (status < 0) {
+		Py_XDECREF(module);
+		return NULL;
+	}
+	else {
+		return module;
+	}
+}
+
+PyObject *
+PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
+{
+	PyObject *registry = NULL, *hooks = NULL;
+	int status = -1, locked = 0;
+
+	if (!PyCallable_Check(callable)) {
+		PyErr_SetString(PyExc_TypeError, "expected callable");
+		goto error;
+	}
+	if (!PyUnicode_Check(mod_name)) {
+		PyErr_SetString(PyExc_TypeError, "expected string");
+		goto error;
+	}
+
+	registry = PyImport_GetPostImportHooks();
+	if (registry == NULL) {
+		goto error;
+	}
+
+	lock_import();
+	locked = 1;
+
+	hooks = PyDict_GetItem(registry, mod_name);
+	/* module may be already loaded, get the module object from sys */
+	if (hooks == NULL) {
+		PyObject *o, *modules;
+		PyObject *module = NULL;
+
+		modules = PyImport_GetModuleDict();
+		if (modules == NULL) {
+			goto error;
+		}
+		module = PyDict_GetItem(modules, mod_name);
+		if (module != NULL) {
+			/* module is already loaded, fire hook immediately */
+			o = PyObject_CallFunctionObjArgs(callable, module, NULL);
+			if (o == NULL) {
+				goto error;
+			}
+			Py_DECREF(o);
+			goto end;
+		}
+	}
+	/* no hook registered so far */
+	if (hooks == NULL) {
+		PyErr_Clear();
+		hooks = PyList_New(0);
+		if (hooks == NULL) {
+			goto error;
+		}
+		if (PyDict_SetItem(registry, mod_name, hooks) < 0) {
+			goto error;
+		}
+	}
+	else {
+		if (!PyList_Check(hooks)) {
+			PyErr_Format(PyExc_TypeError,
+				     "expected list of hooks, got '%.200s'",
+				     Py_TYPE(hooks)->tp_name);
+			goto error;
+		}
+	}
+	/* append a new callable */
+	if (PyList_Append(hooks, callable) < 0) {
+		goto error;
+	}
+
+    end:
+	status = 0;
+    error:
+	Py_XDECREF(callable);
+	Py_XDECREF(hooks);
+	Py_XDECREF(mod_name);
+	if (locked) {
+		if (unlock_import() < 0) {
+			PyErr_SetString(PyExc_RuntimeError,
+					"not holding the import lock");
+			return NULL;
+		}
+	}
+	if (status < 0) {
+		return NULL;
+	}
+	else {
+		Py_RETURN_NONE;
+	}
 }
 
 static PyObject * get_sourcefile(const char *file);
@@ -2066,6 +2283,7 @@ PyImport_ImportModuleLevel(char *name, PyObject *globals, PyObject *locals,
 	PyObject *result;
 	lock_import();
 	result = import_module_level(name, globals, locals, fromlist, level);
+	result = PyImport_NotifyModuleLoaded(result);
 	if (unlock_import() < 0) {
 		Py_XDECREF(result);
 		PyErr_SetString(PyExc_RuntimeError,
@@ -2979,6 +3197,31 @@ imp_new_module(PyObject *self, PyObject *args)
 }
 
 static PyObject *
+imp_register_post_import_hook(PyObject *self, PyObject *args)
+{
+	PyObject *callable, *mod_name;
+	
+	if (!PyArg_ParseTuple(args, "OO:register_post_import_hook",
+			      &callable, &mod_name))
+		return NULL;
+	Py_INCREF(callable);
+	Py_INCREF(mod_name);
+	return PyImport_RegisterPostImportHook(callable, mod_name);
+}
+
+static PyObject *
+imp_notify_module_loaded(PyObject *self, PyObject *args)
+{
+	PyObject *mod;
+
+        if (!PyArg_ParseTuple(args, "O:notify_module_loaded", &mod))
+                return NULL;
+
+	Py_INCREF(mod);
+	return PyImport_NotifyModuleLoaded(mod);
+}
+
+static PyObject *
 imp_reload(PyObject *self, PyObject *v)
 {
         return PyImport_ReloadModule(v);
@@ -3038,6 +3281,13 @@ PyDoc_STRVAR(doc_release_lock,
 Release the interpreter's import lock.\n\
 On platforms without threads, this function does nothing.");
 
+PyDoc_STRVAR(doc_register_post_import_hook,
+"register_post_import_hook(callable, module_name) -> None");
+
+PyDoc_STRVAR(doc_notify_module_loaded,
+"notify_module_loaded(module) -> module");
+
+
 static PyMethodDef imp_methods[] = {
 	{"find_module",	 imp_find_module,  METH_VARARGS, doc_find_module},
 	{"get_magic",	 imp_get_magic,	   METH_NOARGS,  doc_get_magic},
@@ -3047,6 +3297,10 @@ static PyMethodDef imp_methods[] = {
 	{"lock_held",	 imp_lock_held,	   METH_NOARGS,  doc_lock_held},
 	{"acquire_lock", imp_acquire_lock, METH_NOARGS,  doc_acquire_lock},
 	{"release_lock", imp_release_lock, METH_NOARGS,  doc_release_lock},
+	{"register_post_import_hook",	imp_register_post_import_hook,
+		METH_VARARGS, doc_register_post_import_hook},
+	{"notify_module_loaded", imp_notify_module_loaded, METH_VARARGS,
+		doc_notify_module_loaded},
 	{"reload",       imp_reload,       METH_O,       doc_reload},
 	/* The rest are obsolete */
 	{"get_frozen_object",	imp_get_frozen_object,	METH_VARARGS},

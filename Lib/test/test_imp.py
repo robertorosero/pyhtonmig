@@ -1,4 +1,5 @@
 import imp
+import sys
 import thread
 import unittest
 from test import test_support
@@ -68,12 +69,79 @@ class ImportTests(unittest.TestCase):
         ## import sys
         ## self.assertRaises(ImportError, reload, sys)
 
+class CallBack:
+    def __init__(self):
+        self.mods = {}
+
+    def __call__(self, mod):
+        self.mods[mod.__name__] = mod
+
+class PostImportHookTests(unittest.TestCase):
+
+    def setUp(self):
+        if "telnetlib" in sys.modules:
+            del sys.modules["telnetlib"]
+        self.pihr = sys.post_import_hooks.copy()
+
+    def tearDown(self):
+        if "telnetlib" in sys.modules:
+            del sys.modules["telnetlib"]
+        sys.post_import_hooks = self.pihr
+
+    def test_registry(self):
+        reg = sys.post_import_hooks
+        self.assert_(isinstance(reg, dict))
+
+    def test_invalid_registry(self):
+        sys.post_import_hooks = []
+        self.assertRaises(TypeError, imp.register_post_import_hook,
+                          lambda mod: None, "sys")
+        sys.post_import_hooks = {}
+        imp.register_post_import_hook(lambda mod: None, "sys")
+
+        sys.post_import_hooks["telnetlib"] = lambda mod: None
+        self.assertRaises(TypeError, __import__, "telnetlib")
+        sys.post_import_hooks = self.pihr
+
+    def test_register_callback_existing(self):
+        callback = CallBack()
+        imp.register_post_import_hook(callback, "sys")
+
+        # sys is already loaded and the callback is fired immediately
+        self.assert_("sys" in callback.mods, callback.mods)
+        self.assert_(callback.mods["sys"] is sys, callback.mods)
+        self.failIf("telnetlib" in callback.mods, callback.mods)
+        regc = sys.post_import_hooks.get("sys", False)
+        self.assert_(regc is False, regc)
+
+    def test_register_callback_new(self):
+        callback = CallBack()
+        # an arbitrary module
+        if "telnetlib" in sys.modules:
+            del sys.modules["telnetlib"]
+        imp.register_post_import_hook(callback, "telnetlib")
+
+        regc = sys.post_import_hooks.get("telnetlib")
+        self.assert_(regc is not None, regc)
+        self.assert_(isinstance(regc, list), regc)
+        self.assert_(callback in regc, regc)
+
+        import telnetlib
+        self.assert_("telnetlib" in callback.mods, callback.mods)
+        self.assert_(callback.mods["telnetlib"] is telnetlib, callback.mods)
+
+    def test_post_import_notify(self):
+        imp.notify_module_loaded(sys)
+        self.failUnlessRaises(TypeError, imp.notify_module_loaded, None)
+        self.failUnlessRaises(TypeError, imp.notify_module_loaded, object())
+
 
 def test_main():
     test_support.run_unittest(
-                LockTests,
-                ImportTests,
-            )
+        LockTests,
+        ImportTests,
+        PostImportHookTests,
+    )
 
 if __name__ == "__main__":
     test_main()

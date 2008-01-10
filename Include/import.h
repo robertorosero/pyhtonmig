@@ -35,6 +35,12 @@ PyAPI_FUNC(void) _PyImport_ReInitLock(void);
 PyAPI_FUNC(PyObject *)_PyImport_FindExtension(char *, char *);
 PyAPI_FUNC(PyObject *)_PyImport_FixupExtension(char *, char *);
 
+/* post import hook API */
+PyAPI_FUNC(PyObject *) PyImport_GetPostImportHooks(void);
+PyAPI_FUNC(PyObject *) PyImport_NotifyModuleLoaded(PyObject *module);
+PyAPI_FUNC(PyObject *) PyImport_RegisterPostImportHook(
+	PyObject *callable, PyObject *mod_name);
+
 struct _inittab {
     char *name;
     void (*initfunc)(void);
