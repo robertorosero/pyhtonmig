@@ -92,6 +92,15 @@ def mkhier(descr):
                     f.write('\n')
     return root
 
+hier = [
+    ("pih_test", None),
+    ("pih_test __init__", "package = 0"),
+    ("pih_test a", None),
+    ("pih_test a __init__", "package = 1"),
+    ("pih_test a b", None),
+    ("pih_test a b __init__", "package = 2"),
+]
+
 class CallBack:
     def __init__(self):
         self.mods = {}
@@ -171,14 +180,6 @@ class PostImportHookTests(unittest.TestCase):
         imp.notify_module_loaded(mod)
 
     def test_hook_hirarchie(self):
-        hier = [
-            ("pih_test", None),
-            ("pih_test __init__", "package = 0"),
-            ("pih_test a", None),
-            ("pih_test a __init__", "package = 1"),
-            ("pih_test a b", None),
-            ("pih_test a b __init__", "package = 2"),
-        ]
         self.tmpdir = mkhier(hier)
         callback = CallBack()
         imp.register_post_import_hook(callback, "pih_test")
@@ -195,6 +196,23 @@ class PostImportHookTests(unittest.TestCase):
         self.assertEqual(callback.names,
                          ["pih_test", "pih_test.a", "pih_test.a.b"])
         from pih_test.a import b
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
+
+    def test_hook_hirarchie_recursive(self):
+        self.tmpdir = mkhier(hier)
+        callback = CallBack()
+        imp.register_post_import_hook(callback, "pih_test")
+        imp.register_post_import_hook(callback, "pih_test.a")
+        imp.register_post_import_hook(callback, "pih_test.a.b")
+
+        import pih_test.a.b
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
+        import pih_test
+        self.assertEqual(callback.names,
+                         ["pih_test", "pih_test.a", "pih_test.a.b"])
+        import pih_test.a
         self.assertEqual(callback.names,
                          ["pih_test", "pih_test.a", "pih_test.a.b"])
 

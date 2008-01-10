@@ -2286,7 +2286,7 @@ PyImport_ImportModuleLevel(char *name, PyObject *globals, PyObject *locals,
 	PyObject *result;
 	lock_import();
 	result = import_module_level(name, globals, locals, fromlist, level);
-	result = PyImport_NotifyModuleLoaded(result);
+	/* result = PyImport_NotifyModuleLoaded(result); */
 	if (unlock_import() < 0) {
 		Py_XDECREF(result);
 		PyErr_SetString(PyExc_RuntimeError,
@@ -2697,6 +2697,8 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
 			Py_XDECREF(m);
 			m = NULL;
 		}
+		/* notify that the module was loaded */
+		m = PyImport_NotifyModuleLoaded(m);
 	}
 
 	return m;
