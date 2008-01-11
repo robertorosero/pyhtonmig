@@ -101,6 +101,26 @@ hier = [
     ("pih_test a b __init__", "package = 2"),
 ]
 
+mod_callback = """
+import imp
+
+def callback(mod):
+    imp.test_callbacks.append(("pih_test%s", mod.__name__))
+
+imp.register_post_import_hook(callback, "pih_test")
+imp.register_post_import_hook(callback, "pih_test.a")
+imp.register_post_import_hook(callback, "pih_test.a.b")
+"""
+
+hier_withregister = [
+    ("pih_test", None),
+    ("pih_test __init__", mod_callback % ''),
+    ("pih_test a", None),
+    ("pih_test a __init__", mod_callback % '.a'),
+    ("pih_test a b", None),
+    ("pih_test a b __init__", mod_callback % '.a.b'),
+]
+
 class CallBack:
     def __init__(self):
         self.mods = {}
@@ -116,11 +136,13 @@ class PostImportHookTests(unittest.TestCase):
         self.sys_pih = sys.post_import_hooks.copy()
         self.module_names = set(sys.modules)
         self.sys_path = list(sys.path)
+        imp.test_callbacks = []
         self.tmpdir = None
 
     def tearDown(self):
         sys.post_import_hooks = self.sys_pih
         sys.path = self.sys_path
+        del imp.test_callbacks
         for name in list(sys.modules):
             if name not in self.module_names:
                 del sys.modules[name]
@@ -217,6 +239,40 @@ class PostImportHookTests(unittest.TestCase):
         import pih_test.a
         self.assertEqual(callback.names,
                          ["pih_test", "pih_test.a", "pih_test.a.b"])
+
+    def test_hook_hirarchie(self):
+        self.tmpdir = mkhier(hier_withregister)
+
+        def callback(mod):
+            imp.test_callbacks.append(('', mod.__name__))
+
+        imp.register_post_import_hook(callback, "pih_test")
+        imp.register_post_import_hook(callback, "pih_test.a")
+        imp.register_post_import_hook(callback, "pih_test.a.b")
+
+        expected = []
+        self.assertEqual(imp.test_callbacks, expected)
+
+        import pih_test
+        expected.append(("", "pih_test"))
+        expected.append(("pih_test", "pih_test"))
+        self.assertEqual(imp.test_callbacks, expected)
+
+        import pih_test.a
+        expected.append(("pih_test.a", "pih_test"))
+        expected.append(("", "pih_test.a"))
+        expected.append(("pih_test", "pih_test.a"))
+        expected.append(("pih_test.a", "pih_test.a"))
+        self.assertEqual(imp.test_callbacks, expected)
+
+        import pih_test.a.b
+        expected.append(("pih_test.a.b", "pih_test"))
+        expected.append(("pih_test.a.b", "pih_test.a"))
+        expected.append(("", "pih_test.a.b"))
+        expected.append(("pih_test", "pih_test.a.b"))
+        expected.append(("pih_test.a", "pih_test.a.b"))
+        expected.append(("pih_test.a.b", "pih_test.a.b"))
+        self.assertEqual(imp.test_callbacks, expected)
 
     def test_notifyloaded_byname(self):
         callback = CallBack()

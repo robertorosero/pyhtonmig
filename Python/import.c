@@ -718,12 +718,9 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 		/* Either no hooks are defined or they are already fired */
 		if (hooks == NULL)
 			PyErr_Clear();
-		goto end;
+		goto success;
 	}
 	Py_INCREF(hooks);
-	if (PyDict_SetItem(registry, mod_name, Py_None) < 0) {
-		goto end;
-	}
 	if (!PyList_Check(hooks)) {
 		PyErr_Format(PyExc_TypeError,
 			     "expected None or list of hooks, got '%.200s'",
@@ -739,13 +736,20 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 		o = PyObject_CallFunctionObjArgs(hook, module, NULL);
 		Py_DECREF(hook);
 		if (o == NULL) {
-			goto error;
+			goto removehooks;
 		}
 		Py_DECREF(o);
 	}
+	if (PyErr_Occurred()) {
+		return NULL;
+	}
 
-    end:
+    success:
 	status = 0;
+    removehooks:
+	if (PyDict_SetItem(registry, mod_name, Py_None) < 0) {
+		status = -1;
+	}
     error:
 	Py_XDECREF(mod_name);
 	Py_XDECREF(it);
@@ -838,6 +842,7 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 	locked = 1;
 
 	hooks = PyDict_GetItem(registry, mod_name);
+	Py_XINCREF(hooks);
 	/* module may be already loaded, get the module object from sys */
 	if (hooks == NULL || hooks == Py_None) {
 		PyObject *module = NULL;
@@ -856,7 +861,7 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 			if (o == NULL) {
 				goto error;
 			}
-			goto end;
+			goto success;
 		}
 		else {
 			/* no hook has been registered so far */
@@ -882,7 +887,7 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 		goto error;
 	}
 
-    end:
+    success:
 	status = 0;
     error:
 	Py_XDECREF(callable);
