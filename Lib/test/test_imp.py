@@ -105,20 +105,29 @@ mod_callback = """
 import imp
 
 def callback(mod):
-    imp.test_callbacks.append(("pih_test%s", mod.__name__))
+    info = ("pih_test%(info)s", mod.__name__)
+    imp.test_callbacks.append(info)
+
+def callback_added(mod):
+    info = ("ADDED in pih_test%(info)s", mod.__name__)
+    imp.test_callbacks.append(info)
+
+def callback_add(mod):
+    callback(mod)
+    imp.register_post_import_hook(callback_added, "pih_test.a")
 
 imp.register_post_import_hook(callback, "pih_test")
-imp.register_post_import_hook(callback, "pih_test.a")
+imp.register_post_import_hook(callback_add, "pih_test.a")
 imp.register_post_import_hook(callback, "pih_test.a.b")
 """
 
 hier_withregister = [
     ("pih_test", None),
-    ("pih_test __init__", mod_callback % ''),
+    ("pih_test __init__", mod_callback % {'info':''}),
     ("pih_test a", None),
-    ("pih_test a __init__", mod_callback % '.a'),
+    ("pih_test a __init__", mod_callback % {'info':'.a'}),
     ("pih_test a b", None),
-    ("pih_test a b __init__", mod_callback % '.a.b'),
+    ("pih_test a b __init__", mod_callback % {'info':'.a.b'}),
 ]
 
 class CallBack:
@@ -240,11 +249,12 @@ class PostImportHookTests(unittest.TestCase):
         self.assertEqual(callback.names,
                          ["pih_test", "pih_test.a", "pih_test.a.b"])
 
-    def test_hook_hirarchie(self):
+    def test_hook_hirarchie_withregister(self):
         self.tmpdir = mkhier(hier_withregister)
 
         def callback(mod):
-            imp.test_callbacks.append(('', mod.__name__))
+            info = ('', mod.__name__)
+            imp.test_callbacks.append(info)
 
         imp.register_post_import_hook(callback, "pih_test")
         imp.register_post_import_hook(callback, "pih_test.a")
@@ -263,11 +273,16 @@ class PostImportHookTests(unittest.TestCase):
         expected.append(("", "pih_test.a"))
         expected.append(("pih_test", "pih_test.a"))
         expected.append(("pih_test.a", "pih_test.a"))
+        # delayed
+        expected.append(("ADDED in pih_test", "pih_test.a"))
+        expected.append(("ADDED in pih_test.a", "pih_test.a"))
         self.assertEqual(imp.test_callbacks, expected)
 
         import pih_test.a.b
         expected.append(("pih_test.a.b", "pih_test"))
         expected.append(("pih_test.a.b", "pih_test.a"))
+        # This one is called immediately because pih_test.a is already laoded
+        expected.append(("ADDED in pih_test.a.b", "pih_test.a"))
         expected.append(("", "pih_test.a.b"))
         expected.append(("pih_test", "pih_test.a.b"))
         expected.append(("pih_test.a", "pih_test.a.b"))
