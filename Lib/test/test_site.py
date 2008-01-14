@@ -11,6 +11,7 @@ import os
 import sys
 import encodings
 import tempfile
+import subprocess
 # Need to make sure to not import 'site' if someone specified ``-S`` at the
 # command-line.  Detect this by just making sure 'site' has not been imported
 # already.
@@ -31,7 +32,7 @@ class HelperFunctionsTests(unittest.TestCase):
         """Save a copy of sys.path"""
         self.sys_path = sys.path[:]
 
-    def tearDown(self):
+
         """Restore sys.path"""
         sys.path = self.sys_path
 
@@ -90,6 +91,16 @@ class HelperFunctionsTests(unittest.TestCase):
             self.pth_file_tests(pth_file)
         finally:
             pth_file.cleanup()
+
+    def test_s_option(self):
+        usersite = site.USER_SITE
+        self.assert_(usersite in sys.path)
+        cmd = [sys.executable, "-c",
+               "\"import sys; sys.exit('%s' in sys.path)\"" % usersite
+              ]
+        p = subprocess.Popen(cmd)
+        self.assertEqual(p.wait(), 0)
+
 
 class PthFile(object):
     """Helper class for handling testing of .pth files"""

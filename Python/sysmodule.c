@@ -979,6 +979,12 @@ svnversion_init(void)
 		return;
 
 	python = strstr(headurl, "/python/");
+	if (python) {
+		br_start = python + 8;
+	}
+	else if ((python = strstr(headurl, "/sandbox/")) != NULL) {
+		br_start = python + 9;
+	}
 	if (!python)
 		Py_FatalError("subversion keywords missing");
 
@@ -1006,8 +1012,10 @@ svnversion_init(void)
 		shortbranch[len] = '\0';
 	}
 	else {
-		Py_FatalError("bad HeadURL");
-		return;
+		/* Py_FatalError("bad HeadURL"); 
+		return; */
+		*branch = '\0';
+		*shortbranch = '\0';
 	}
 
 
@@ -1063,7 +1071,7 @@ static PyStructSequence_Field flags_fields[] = {
 	{"interactive",		"-i"},
 	{"optimize",		"-O or -OO"},
 	{"dont_write_bytecode",	"-B"},
-	/* {"no_user_site",	"-s"}, */
+	{"no_user_site",	"-s"},
 	{"no_site",		"-S"},
 	{"ingnore_environment",	"-E"},
 	{"tabcheck",		"-t or -tt"},
@@ -1082,9 +1090,9 @@ static PyStructSequence_Desc flags_desc = {
 	flags__doc__,	/* doc */
 	flags_fields,	/* fields */
 #ifdef RISCOS
-	14
+	15
 #else
-	13
+	14
 #endif
 };
 
@@ -1109,7 +1117,7 @@ make_flags(void)
 	SetFlag(Py_InteractiveFlag);
 	SetFlag(Py_OptimizeFlag);
 	SetFlag(Py_DontWriteBytecodeFlag);
-	/* SetFlag(Py_NoUserSiteDirectory); */
+	SetFlag(Py_NoUserSiteDirectory);
 	SetFlag(Py_NoSiteFlag);
 	SetFlag(Py_IgnoreEnvironmentFlag);
 	SetFlag(Py_TabcheckFlag);

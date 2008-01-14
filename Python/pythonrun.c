@@ -81,6 +81,7 @@ int Py_IgnoreEnvironmentFlag; /* e.g. PYTHONPATH, PYTHONHOME */
   on the command line, and is used in 2.2 by ceval.c to make all "/" divisions
   true divisions (which they will be in 2.3). */
 int _Py_QnewFlag = 0;
+int Py_NoUserSiteDirectory = 0; /* for -s and site.py */
 
 /* Reference to 'warnings' module, to avoid importing it
    on the fly when the import lock may be held.  See 683658/771097
