@@ -425,6 +425,9 @@ class install (Command):
             return
 
         if self.user:
+            if self.install_userbase is None:
+                raise DistutilsPlatformError(
+                    "User base directory is not specified")
             self.install_base = self.install_platbase = self.install_userbase
             self.select_scheme("unix_user")
         elif self.home is not None:
@@ -453,6 +456,9 @@ class install (Command):
     def finalize_other (self):          # Windows and Mac OS for now
 
         if self.user:
+            if self.install_userbase is None:
+                raise DistutilsPlatformError(
+                    "User base directory is not specified")
             self.install_base = self.install_platbase = self.install_userbase
             self.select_scheme(os.name + "_user")
         elif self.home is not None:

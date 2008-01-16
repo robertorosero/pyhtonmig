@@ -95,11 +95,21 @@ class HelperFunctionsTests(unittest.TestCase):
     def test_s_option(self):
         usersite = site.USER_SITE
         self.assert_(usersite in sys.path)
-        cmd = [sys.executable, "-c",
-               "\"import sys; sys.exit('%s' in sys.path)\"" % usersite
-              ]
-        p = subprocess.Popen(cmd)
-        self.assertEqual(p.wait(), 0)
+
+        rc = subprocess.call([sys.executable, '-c', 
+            'import sys; sys.exit("%s" in sys.path)' % usersite])
+        self.assertEqual(rc, 1)
+
+        rc = subprocess.call([sys.executable, '-s', '-c',
+            'import sys; sys.exit("%s" in sys.path)' % usersite])
+        self.assertEqual(rc, 0)
+
+        env = os.environ.copy()
+        env["PYTHONNOUSERSITE"] = "1"
+        rc = subprocess.call([sys.executable, '-c',
+            'import sys; sys.exit("%s" in sys.path)' % usersite],
+            env=env)
+        self.assertEqual(rc, 0)
 
 
 class PthFile(object):
