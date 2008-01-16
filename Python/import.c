@@ -111,13 +111,14 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 	{0, 0}
 };
 
+#if 0
 /* Queue for the post import hook system */
 static PyObject *register_queue = NULL;
 static int notification_in_progress = 0;
 
-static PyObject *notify_byname(const char *);
 static int queue_registration(PyObject *, PyObject *);
 static int process_registration_queue(void);
+#endif
 
 
 /* Initialize things */
@@ -250,7 +251,7 @@ void
 _PyImport_Fini(void)
 {
 	Py_CLEAR(extensions);
-	Py_CLEAR(register_queue);
+	/* Py_CLEAR(register_queue); */
 	PyMem_DEL(_PyImport_Filetab);
 	_PyImport_Filetab = NULL;
 }
@@ -677,7 +678,7 @@ PyImport_GetPostImportHooks(void)
  * it returns the module.
  */
 PyObject *
-PyImport_NotifyModuleLoaded(PyObject *module)
+PyImport_NotifyLoadedByModule(PyObject *module)
 {
 	static PyObject *name = NULL;
 	PyObject *mod_name = NULL, *registry = NULL, *o;
@@ -694,6 +695,7 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 	if (module == NULL) {
 		return NULL;
 	}
+	
 	/* Should I allow all kinds of objects? */
 	if (!PyModule_Check(module)) {
 		PyErr_Format(PyExc_TypeError,
@@ -743,8 +745,8 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 	if ((it = PyObject_GetIter(hooks)) == NULL) {
 		goto error;
 	}
-	
-	notification_in_progress = 1;
+	//notification_in_progress = 1;
+	PyModule_SetNotified(module, 1);
 	while ((hook = PyIter_Next(it)) != NULL) {
 		o = PyObject_CallFunctionObjArgs(hook, module, NULL);
 		Py_DECREF(hook);
@@ -763,11 +765,13 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 	if (PyDict_SetItem(registry, mod_name, Py_None) < 0) {
 		status = -1;
 	}
+#if 0
 	notification_in_progress = 0;
 	/* register queued hooks */
 	if (process_registration_queue()) {
 		goto removehooks;
 	}
+#endif
     error:
 	Py_XDECREF(mod_name);
 	Py_XDECREF(it);
@@ -781,17 +785,22 @@ PyImport_NotifyModuleLoaded(PyObject *module)
 	}
 }
 
-/* notify by name
- * notify_byname("a.b.c") calls PyImport_NotifyModuleLoaded() for "a", "a.b"
- * and "a.b.c". The modules are taken from sys.modules. If a module can't be
- * retrieved an exception is raised otherwise the module 'modname' is returned
+/* PyImport_NotifyLoadedByName(modname)
+ *
+ * PyImport_NotifyLoadedByName("a.b.c") calls PyImport_NotifyModuleLoaded()
+ * the modules for "a", "a.b" and "a.b.c". The modules are taken from
+ * sys.modules. If a module can't be retrieved, an exception is raised
+ * otherwise the module 'modname' is returned. The hook calls always start
+ * with the prime parent module.
+ * The caller of PyImport_NotifyLoadedByName() must hold the import lock!
+ * It returns a BORROWED reference.
  */
-static PyObject *
-notify_byname(const char *modname)
+PyObject *
+PyImport_NotifyLoadedByName(const char *modname)
 {
 	PyObject *modules, *mod = NULL;
 	int status = -1;
-	const char *pmodname = modname;
+	const char *pmodname = modname, *dot;
 	char name[MAXPATHLEN+1];
 	Py_ssize_t pos;
 
@@ -799,31 +808,41 @@ notify_byname(const char *modname)
 	if (modules == NULL) {
 		goto error;
 	}
-	for (; *pmodname != '\0'; pmodname++) {
-		if (*pmodname != '.')
-			continue;
-		pos = pmodname - modname;
-		if (pos == 0) {
-			PyErr_SetString(PyExc_ValueError,
-				"module name can't starts with a dot.");
-			return NULL;
-		}
+
+	//fprintf(stderr, "%s\n", modname);
+	if ((dot = strrchr(modname, '.')) != NULL) {
+		pos = dot-modname;
 		strncpy(name, modname, pos);
 		name[pos] = '\0';
-		mod = PyDict_GetItemString(modules, name);
-		Py_INCREF(mod);
-		mod = PyImport_NotifyModuleLoaded(mod);
-		if (mod == NULL) {
+		//fprintf(stderr, "%s (%s at %d)\n", name, modname, pos);
+		if ((mod = PyDict_GetItemString(modules, name)) == NULL) {
+			PyErr_Format(PyExc_KeyError,
+				"Module '%.200s' is not in sys.modules",
+				modname
+				);
 			goto error;
 		}
-		Py_DECREF(mod);
+		if (PyModule_GetNotified(mod)) { // ERRCHECK
+			return mod;
+		}
+		PyModule_SetNotified(mod, 1); // ERRCHECK
+		mod = PyImport_NotifyLoadedByName(name);
 	}
-	mod = PyDict_GetItemString(modules, modname);
+	if ((mod = PyDict_GetItemString(modules, modname)) == NULL) {
+		PyErr_Format(PyExc_KeyError,
+			"Module '%.200s' is not in sys.modules",
+			modname
+			);
+		goto error;
+	}
+
 	Py_INCREF(mod);
-	mod = PyImport_NotifyModuleLoaded(mod);
+	mod = PyImport_NotifyLoadedByModule(mod);
+	Py_XDECREF(mod);
 
 	status = 0;
     error:
+	/*notification_in_progress = 0;*/
 	if (status == 0) {
 		return mod;
 	}
@@ -833,7 +852,7 @@ notify_byname(const char *modname)
 }
 
 /* register a new hook for a module
-   PyImport_RegisterPostImportHook acquires the global import look
+ * PyImport_RegisterPostImportHook acquires the global import look
  */
 PyObject *
 PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
@@ -850,12 +869,14 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 		goto error;
 	}
 
+#if 0
 	if (notification_in_progress) {
 		if (queue_registration(callable, mod_name) != 0) {
 			return NULL;
 		}
 		Py_RETURN_NONE;
 	}
+#endif
 
 	registry = PyImport_GetPostImportHooks();
 	modules = PyImport_GetModuleDict();
@@ -930,6 +951,7 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 	}
 }
 
+#if 0
 static int
 queue_registration(PyObject *callable, PyObject *mod_name)
 {
@@ -1005,7 +1027,7 @@ process_registration_queue(void)
 	Py_XDECREF(tup);
 	return rc;
 }
-
+#endif
 /* end of post import hook */
 
 static PyObject * get_sourcefile(const char *file);
@@ -2450,7 +2472,6 @@ PyImport_ImportModuleLevel(char *name, PyObject *globals, PyObject *locals,
 	PyObject *result;
 	lock_import();
 	result = import_module_level(name, globals, locals, fromlist, level);
-	/* result = PyImport_NotifyModuleLoaded(result); */
 	UNLOCK_IMPORT;
 	return result;
 }
@@ -2857,7 +2878,7 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
 			m = NULL;
 		}
 		/* notify that the module was loaded */
-		m = PyImport_NotifyModuleLoaded(m);
+		m = PyImport_NotifyLoadedByModule(m);
 	}
 
 	return m;
@@ -3376,20 +3397,46 @@ imp_register_post_import_hook(PyObject *self, PyObject *args)
 static PyObject *
 imp_notify_module_loaded(PyObject *self, PyObject *args)
 {
-	PyObject *mod, *o;
-	char *name;
+	PyObject *mod, *o, *modname = NULL;
+	const char *name;
 
         if (PyArg_ParseTuple(args, "s:notify_module_loaded", &name)) {
-		return notify_byname(name);
+		lock_import();
+		o = PyImport_NotifyLoadedByName(name);
+		Py_XINCREF(o);
+		UNLOCK_IMPORT;
+		return o;
 	}
 
+	PyErr_Clear();
         if (!PyArg_ParseTuple(args, "O:notify_module_loaded", &mod))
 		return NULL;
 
-	Py_INCREF(mod);
+	if (PyModule_Check(mod)) {
+		if ((name = PyModule_GetName(mod)) == NULL) {
+			return NULL;
+		}
+	}
+	else {
+		if ((modname = PyObject_GetAttrString(mod, "__name__"))
+		     == NULL) {
+			PyErr_Format(PyExc_TypeError,
+				"A module instance or object with a __name__ "
+				"attribute was expected, got '%.200s'.",
+				Py_TYPE(mod)->tp_name
+				);
+			return NULL;
+		}
+		if ((name = PyUnicode_AsString(modname)) == NULL) {
+			Py_DECREF(modname);
+			return NULL;
+		}
+	}
 	lock_import();
-	o = PyImport_NotifyModuleLoaded(mod);
+	o = PyImport_NotifyLoadedByName(name);
+	Py_XINCREF(o);
 	UNLOCK_IMPORT;
+	Py_XDECREF(modname);
 	return o;
 }
 

@@ -37,7 +37,8 @@ PyAPI_FUNC(PyObject *)_PyImport_FixupExtension(char *, char *);
 
 /* post import hook API */
 PyAPI_FUNC(PyObject *) PyImport_GetPostImportHooks(void);
-PyAPI_FUNC(PyObject *) PyImport_NotifyModuleLoaded(PyObject *module);
+PyAPI_FUNC(PyObject *) PyImport_NotifyLoadedByModule(PyObject *module);
+PyAPI_FUNC(PyObject *) PyImport_NotifyLoadedByName(const char *modname);
 PyAPI_FUNC(PyObject *) PyImport_RegisterPostImportHook(
 	PyObject *callable, PyObject *mod_name);
 

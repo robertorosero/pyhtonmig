@@ -4,13 +4,12 @@
 #include "Python.h"
 #include "structmember.h"
 
-typedef struct {
-	PyObject_HEAD
-	PyObject *md_dict;
-} PyModuleObject;
+#define IS_NOTIFIED "__notified__"
 
 static PyMemberDef module_members[] = {
 	{"__dict__", T_OBJECT, offsetof(PyModuleObject, md_dict), READONLY},
+	{IS_NOTIFIED, T_INT, offsetof(PyModuleObject, md_notified),
+	 READONLY},
 	{0}
 };
 
@@ -34,6 +33,7 @@ PyModule_New(const char *name)
 		goto fail;
 	Py_DECREF(nameobj);
 	PyObject_GC_Track(m);
+	m->md_notified = 0;
 	return (PyObject *)m;
 
  fail:
@@ -94,6 +94,42 @@ PyModule_GetFilename(PyObject *m)
 		return NULL;
 	}
 	return PyUnicode_AsString(fileobj);
+}
+
+int
+PyModule_GetNotified(PyObject *m)
+{
+	PyObject *o;
+	int status;
+	
+	if (PyModule_Check(m)) {
+		return PyModule_NOTIFIED(m);
+	}
+	o = PyObject_GetAttrString(m, IS_NOTIFIED);
+	if (o == NULL) {
+		if (!PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			return -1;
+		}
+		PyErr_Clear();
+		return 0;
+	}
+	status = PyObject_IsTrue(o);
+	Py_DECREF(o);
+	return status;
+}
+
+int
+PyModule_SetNotified(PyObject *m, int status)
+{
+	PyObject *o;
+	
+	if (PyModule_Check(m)) {
+		PyModule_NOTIFIED(m) = status;
+		return 0;
+	}
+	o = status > 0 ? Py_True : Py_False;
+	Py_INCREF(o);
+	return PyObject_SetAttrString(m, IS_NOTIFIED, o);
 }
 
 void

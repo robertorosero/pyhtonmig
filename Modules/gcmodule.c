@@ -269,6 +269,11 @@ visit_decref(PyObject *op, void *data)
 		 * generation being collected, which can be recognized
 		 * because only they have positive gc_refs.
 		 */
+#ifdef Py_DEBUG
+		if (gc->gc.gc_refs == 0)
+			_PyObject_Dump(op);
+#endif
+
 		assert(gc->gc.gc_refs != 0); /* else refcount was too small */
 		if (gc->gc.gc_refs > 0)
 			gc->gc.gc_refs--;
