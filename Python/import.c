@@ -111,16 +111,6 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 	{0, 0}
 };
 
-#if 0
-/* Queue for the post import hook system */
-static PyObject *register_queue = NULL;
-static int notification_in_progress = 0;
-
-static int queue_registration(PyObject *, PyObject *);
-static int process_registration_queue(void);
-#endif
-
-
 /* Initialize things */
 
 void
@@ -251,7 +241,6 @@ void
 _PyImport_Fini(void)
 {
 	Py_CLEAR(extensions);
-	/* Py_CLEAR(register_queue); */
 	PyMem_DEL(_PyImport_Filetab);
 	_PyImport_Filetab = NULL;
 }
@@ -745,7 +734,6 @@ PyImport_NotifyLoadedByModule(PyObject *module)
 	if ((it = PyObject_GetIter(hooks)) == NULL) {
 		goto error;
 	}
-	//notification_in_progress = 1;
 	PyModule_SetNotified(module, 1);
 	while ((hook = PyIter_Next(it)) != NULL) {
 		o = PyObject_CallFunctionObjArgs(hook, module, NULL);
@@ -765,13 +753,6 @@ PyImport_NotifyLoadedByModule(PyObject *module)
 	if (PyDict_SetItem(registry, mod_name, Py_None) < 0) {
 		status = -1;
 	}
-#if 0
-	notification_in_progress = 0;
-	/* register queued hooks */
-	if (process_registration_queue()) {
-		goto removehooks;
-	}
-#endif
     error:
 	Py_XDECREF(mod_name);
 	Py_XDECREF(it);
@@ -800,21 +781,19 @@ PyImport_NotifyLoadedByName(const char *modname)
 {
 	PyObject *modules, *mod = NULL;
 	int status = -1;
-	const char *pmodname = modname, *dot;
+	const char *dot;
 	char name[MAXPATHLEN+1];
-	Py_ssize_t pos;
+	int pos, rc;
 
 	modules = PyImport_GetModuleDict();
 	if (modules == NULL) {
 		goto error;
 	}
 
-	//fprintf(stderr, "%s\n", modname);
 	if ((dot = strrchr(modname, '.')) != NULL) {
 		pos = dot-modname;
 		strncpy(name, modname, pos);
 		name[pos] = '\0';
-		//fprintf(stderr, "%s (%s at %d)\n", name, modname, pos);
 		if ((mod = PyDict_GetItemString(modules, name)) == NULL) {
 			PyErr_Format(PyExc_KeyError,
 				"Module '%.200s' is not in sys.modules",
@@ -822,10 +801,15 @@ PyImport_NotifyLoadedByName(const char *modname)
 				);
 			goto error;
 		}
-		if (PyModule_GetNotified(mod)) { // ERRCHECK
+		if ((rc = PyModule_GetNotified(mod)) == -1) {
+			goto error;
+		}
+		if (rc) {
 			return mod;
 		}
-		PyModule_SetNotified(mod, 1); // ERRCHECK
+		if (PyModule_SetNotified(mod, 1) == -1) {
+			goto error;
+		}
 		mod = PyImport_NotifyLoadedByName(name);
 	}
 	if ((mod = PyDict_GetItemString(modules, modname)) == NULL) {
@@ -842,7 +826,6 @@ PyImport_NotifyLoadedByName(const char *modname)
 
 	status = 0;
     error:
-	/*notification_in_progress = 0;*/
 	if (status == 0) {
 		return mod;
 	}
@@ -868,15 +851,6 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 		PyErr_SetString(PyExc_TypeError, "expected string");
 		goto error;
 	}
-
-#if 0
-	if (notification_in_progress) {
-		if (queue_registration(callable, mod_name) != 0) {
-			return NULL;
-		}
-		Py_RETURN_NONE;
-	}
-#endif
 
 	registry = PyImport_GetPostImportHooks();
 	modules = PyImport_GetModuleDict();
@@ -951,83 +925,6 @@ PyImport_RegisterPostImportHook(PyObject *callable, PyObject *mod_name)
 	}
 }
 
-#if 0
-static int
-queue_registration(PyObject *callable, PyObject *mod_name)
-{
-	
-	PyObject *tup;
-
-	if (register_queue == NULL) {
-		register_queue = PyList_New(0);
-		if (register_queue == NULL)
-			return -1;
-	}
-	assert(notification_in_progress);
-	tup = PyTuple_New(2);
-	if (tup == NULL) {
-		return -1;
-	}
-	Py_INCREF(callable);
-	Py_INCREF(mod_name);
-	PyTuple_SetItem(tup, 0, callable);
-	PyTuple_SetItem(tup, 1, mod_name);
-	if (PyList_Append(register_queue, tup)) {
-		Py_DECREF(tup);
-		return -1;
-	}
-	Py_DECREF(tup);
-	return 0;
-}
-
-static int
-process_registration_queue(void)
-{
-	PyObject *modules;
-	PyObject *mod_name, *hook, *module, *o;
-	PyObject *it = NULL, *tup = NULL;
-	int rc = -1;
-
-	if (notification_in_progress)
-		return 0;
-
-	if (register_queue == NULL || PyList_Size(register_queue) == 0) {
-		return 0;
-	}
-
-	if ((modules = PyImport_GetModuleDict()) == NULL) {
-		goto error;
-	}
-
-	while (Py_SIZE(register_queue)) {
-		tup = PyObject_CallMethod(register_queue, "pop", "i", 0);
-		if ((hook = PyTuple_GetItem(tup, 0)) == NULL) {
-			goto error;
-		}
-		if ((mod_name = PyTuple_GetItem(tup, 1)) == NULL) {
-			goto error;
-		}
-		if ((module = PyDict_GetItem(modules, mod_name)) == NULL) {
-			goto error;
-		}
-		o = PyImport_RegisterPostImportHook(hook, mod_name);
-		if (o == NULL) {
-			goto error;
-		}
-		Py_DECREF(o);
-		Py_CLEAR(tup);
-	}
-	if (PyErr_Occurred()) {
-		goto error;
-	}
-
-	rc = 0;
-    error:
-	Py_XDECREF(it);
-	Py_XDECREF(tup);
-	return rc;
-}
-#endif
 /* end of post import hook */
 
 static PyObject * get_sourcefile(const char *file);
