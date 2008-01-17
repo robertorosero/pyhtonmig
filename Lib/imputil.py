@@ -19,9 +19,25 @@ import builtins
 import struct
 import marshal
 
-__all__ = ["ImportManager","Importer","BuiltinImporter"]
+__all__ = ["ImportManager","Importer","BuiltinImporter", "when_imported"]
 
 _ModuleType = type(sys)         ### doesn't work in JPython...
+
+def when_imported(name):
+    """When imported decorator for callbacks
+
+    @when_imported('name')
+    def callback(module):
+        do_something_with_module(module)
+
+    The callback is called with the module object as argument when the module
+    is loaded. If the module is already loaded the callback is called
+    immediately.
+    """
+    def register(hook):
+        imp.register_post_import_hook(hook, name)
+    return register
+
 
 class ImportManager:
     "Manage the import process."

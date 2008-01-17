@@ -1,18 +1,12 @@
 import os
 import imp
+from imputil import when_imported
 import sys
 import thread
 import unittest
 import shutil
 import tempfile
 from test import test_support
-
-
-def when_imported(name):
-    def register(hook):
-        imp.register_post_import_hook(hook, name)
-    return register
-
 
 class LockTests(unittest.TestCase):
 

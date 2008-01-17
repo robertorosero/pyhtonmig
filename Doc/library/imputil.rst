@@ -14,6 +14,17 @@ This module provides a very handy and useful mechanism for custom
 approach to custom :keyword:`import` functions.
 
 
+.. function:: when_imported(name)
+
+   When imported decorator for post import hooks. The *when_imported*
+   decorator provides a convenient way to register a post import 
+   callback for a module::
+
+      @when_imported('name')
+      def callback(module):
+          do_something_with_module(module)
+
+
 .. class:: ImportManager([fs_imp])
 
    Manage the import process.
