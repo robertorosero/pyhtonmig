@@ -111,6 +111,13 @@ class HelperFunctionsTests(unittest.TestCase):
             env=env)
         self.assertEqual(rc, 0)
 
+        env = os.environ.copy()
+        env["PYTHONUSERBASE"] = "/tmp"
+        rc = subprocess.call([sys.executable, '-c',
+            'import sys, user; sys.exit(user.USER_BASE.startswith("tmp"))'],
+            env=env)
+        self.assertEqual(rc, 1)
+
 
 class PthFile(object):
     """Helper class for handling testing of .pth files"""

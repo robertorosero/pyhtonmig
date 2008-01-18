@@ -190,7 +190,7 @@ def check_enableusersite():
     """Check if user site directory is safe for inclusion
 
     The functions tests for the command line flag (including environment var),
-    process uid equal to effective uid.
+    process uid/gid equal to effective uid/gid.
 
     None: Disabled for security reasons
     False: Disabled by user (command line option)
@@ -202,6 +202,10 @@ def check_enableusersite():
     if hasattr(os, "getuid") and hasattr(os, "geteuid"):
         # check process uid == effective uid
         if os.geteuid() != os.getuid():
+            return None
+    if hasattr(os, "getgid") and hasattr(os, "getegid"):
+        # check process gid == effective gid
+        if os.getegid() != os.getgid():
             return None
 
     return True
@@ -219,6 +223,8 @@ def addusersitepackages(known_paths):
     configuration data.
     """
     global USER_BASE, USER_SITE
+    env_base = os.environ.get("PYTHONUSERBASE", None)
+
     def joinuser(*args):
         return os.path.expanduser(os.path.join(*args))
 
@@ -226,21 +232,17 @@ def addusersitepackages(known_paths):
     #    # Don't know what to put here
     #    USER_BASE = ''
     #    USER_SITE = ''
-    if sys.platform == "darwin":
-        USER_BASE = joinuser("~", "Library", "Python")
-        USER_SITE = os.path.join(USER_BASE, sys.version[:3],
-                                 "site-packages")
-    elif os.name == "nt":
+    if os.name == "nt":
         base = os.environ.get("APPDATA") or "~"
-        USER_BASE = joinuser(base, "Python")
+        USER_BASE = env_base if env_base else joinuser(base, "Python")
         USER_SITE = os.path.join(USER_BASE,
                                  "Python" + sys.version[0] + sys.version[2],
                                  "site-packages")
     else:
-        USER_BASE = joinuser("~", ".local")
-        USER_SITE =  os.path.join(USER_BASE, "lib",
-                                  "python" + sys.version[:3],
-                                  "site-packages")
+        USER_BASE = env_base if env_base else joinuser("~", ".local")
+        USER_SITE = os.path.join(USER_BASE, "lib",
+                                 "python" + sys.version[:3],
+                                 "site-packages")
 
     if os.path.isdir(USER_SITE):
         addsitedir(USER_SITE, known_paths)
@@ -268,15 +270,15 @@ def addsitepackages(known_paths):
             sitedirs.append(prefix)
             sitedirs.append(os.path.join(prefix, "lib", "site-packages"))
 
-        #if sys.platform == "darwin":
-        #    # for framework builds *only* we add the standard Apple
-        #    # locations. Currently only per-user, but /Library and
-        #    # /Network/Library could be added too
-        #    if 'Python.framework' in prefix:
-        #        sitedirs.append(
-        #            os.path.expanduser(
-        #                os.path.join("~", "Library", "Python",
-        #                             sys.version[:3], "site-packages")))
+        if sys.platform == "darwin":
+            # for framework builds *only* we add the standard Apple
+            # locations. Currently only per-user, but /Library and
+            # /Network/Library could be added too
+            if 'Python.framework' in prefix:
+                sitedirs.append(
+                    os.path.expanduser(
+                        os.path.join("~", "Library", "Python",
+                                     sys.version[:3], "site-packages")))
 
     for sitedir in sitedirs:
         if os.path.isdir(sitedir):
