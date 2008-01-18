@@ -130,6 +130,46 @@ char *conversion_mode_errors = NULL;
 
 /******************************************************************/
 /*
+  Allocate a memory block for a pep3118 format string, copy prefix (if
+  non-null) and suffix into it.  Returns NULL on failure, with the error
+  indicator set.  If called with a suffix of NULL the error indicator must
+  already be set.
+ */
+static char *
+alloc_format_string(const char *prefix, const char *suffix)
+{
+	size_t len;
+	char *result;
+
+#if 1
+/* XXX fix later */
+	if (suffix == NULL) {
+		if (PyErr_Occurred())
+			return NULL;
+		/* use default format character if not set */
+		suffix = "B";
+	}
+#else
+	if (suffix == NULL) {
+		assert(PyErr_Occurred());
+		return NULL;
+	}
+#endif
+	len = strlen(suffix);
+	if (prefix)
+		len += strlen(prefix);
+	result = PyMem_Malloc(len + 1);
+	if (result == NULL)
+		return NULL;
+	if (prefix)
+		strcpy(result, prefix);
+	else
+		result[0] = '\0';
+	strcat(result, suffix);
+	return result;
+}
+
+/*
   StructType_Type - a meta type/class.  Creating a new class using this one as
   __metaclass__ will call the contructor StructUnionType_new.  It replaces the
   tp_dict member with a new instance of StgDict, and initializes the C
@@ -1556,6 +1596,12 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	stgdict->size = fmt->pffi_type->size;
 	stgdict->setfunc = fmt->setfunc;
 	stgdict->getfunc = fmt->getfunc;
+	stgdict->format = alloc_format_string(NULL, proto_str);
+	if (stgdict->format == NULL) {
+		Py_DECREF(result);
+		Py_DECREF((PyObject *)stgdict);
+		return NULL;
+	}
 
 	stgdict->paramfunc = SimpleType_paramfunc;
 /*
@@ -1616,11 +1662,14 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (type == &SimpleType_Type && fmt->setfunc_swapped && fmt->getfunc_swapped) {
 		PyObject *swapped = CreateSwappedType(type, args, kwds,
 						      proto, fmt);
+		StgDictObject *sw_dict;
 		if (swapped == NULL) {
 			Py_DECREF(result);
 			return NULL;
 		}
+		sw_dict = PyType_stgdict(swapped);
 #ifdef WORDS_BIGENDIAN
+		sw_dict->format = alloc_format_string("<", stgdict->format);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_le__", swapped);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_be__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_be__", (PyObject *)result);
@@ -1631,7 +1680,12 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		PyObject_SetAttrString(swapped, "__ctype_le__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_be__", swapped);
 #endif
+		sw_dict->format = alloc_format_string("<", stgdict->format);
 		Py_DECREF(swapped);
+		if (PyErr_Occurred()) {
+			Py_DECREF(result);
+			return NULL;
+		}
 	};
 
 	return (PyObject *)result;
@@ -4167,6 +4221,42 @@ Simple_repr(CDataObject *self)
 	return result;
 }
 
+static int Simple_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
+{
+	CDataObject *self = (CDataObject *)_self;
+	StgDictObject *dict = PyObject_stgdict(_self);
+
+	if (view == NULL) return 0;
+	if (((flags & PyBUF_LOCK) == PyBUF_LOCK)) {
+		PyErr_SetString(PyExc_BufferError,
+				"Cannot lock this object.");
+		return -1;
+	}
+
+	view->buf = self->b_ptr;
+	view->len = self->b_size;
+	view->readonly = 0;
+	view->itemsize = self->b_size;
+#if 1
+	/* XXX fix later */
+	/* use default format character if not set */
+	view->format = dict->format ? dict->format : "B";
+#else
+	view->format = dict->format;
+#endif
+	view->ndim = 0;
+	view->shape = NULL;
+	view->strides = NULL;
+	view->suboffsets = NULL;
+	view->internal = NULL;
+	return 0;
+}
+
+static PyBufferProcs Simple_as_buffer = {
+	Simple_GetBuffer,
+        NULL,
+};
+
 static PyTypeObject Simple_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"_ctypes._SimpleCData",
@@ -4186,7 +4276,7 @@ static PyTypeObject Simple_Type = {
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
-	&CData_as_buffer,			/* tp_as_buffer */
+	&Simple_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"XXX to be provided",			/* tp_doc */
 	(traverseproc)CData_traverse,		/* tp_traverse */
