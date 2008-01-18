@@ -114,7 +114,7 @@ class HelperFunctionsTests(unittest.TestCase):
         env = os.environ.copy()
         env["PYTHONUSERBASE"] = "/tmp"
         rc = subprocess.call([sys.executable, '-c',
-            'import sys, user; sys.exit(user.USER_BASE.startswith("tmp"))'],
+            'import sys, site; sys.exit(site.USER_BASE.startswith("/tmp"))'],
             env=env)
         self.assertEqual(rc, 1)
 
