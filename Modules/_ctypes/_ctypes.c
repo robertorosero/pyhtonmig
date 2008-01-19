@@ -635,6 +635,16 @@ PointerType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
+	if (proto) {
+		StgDictObject *itemdict = PyType_stgdict(proto);
+		assert(itemdict);
+		stgdict->format = alloc_format_string("&", itemdict->format);
+		if (stgdict->format == NULL) {
+			Py_DECREF((PyObject *)stgdict);
+			return NULL;
+		}
+	}
+
 	/* create the new instance (which is a class,
 	   since we are a metatype!) */
 	result = (PyTypeObject *)PyType_Type.tp_new(type, args, kwds);
@@ -4659,7 +4669,7 @@ PyTypeObject Pointer_Type = {
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
-	&CData_as_buffer,			/* tp_as_buffer */
+	&Simple_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"XXX to be provided",			/* tp_doc */
 	(traverseproc)CData_traverse,		/* tp_traverse */

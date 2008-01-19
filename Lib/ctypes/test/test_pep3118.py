@@ -47,5 +47,23 @@ class Test(unittest.TestCase):
             self.failUnlessEqual((v.size, v.itemsize),
                                  (struct_size, struct_size))
 
+    def test_pointertypes(self):
+        for fmt, typ in simple_types:
+            v = memoryview(POINTER(typ)())
+
+            # check the PEP3118 format string
+            self.failUnlessEqual(v.format, "&" + ENDIAN + fmt)
+
+            # shape and strides are None for integral types
+            self.failUnlessEqual((v.shape, v.strides),
+                                 (None, None))
+
+            # size and itemsize must be what struct.calcsize reports
+            # for pointers
+            struct_size = struct.calcsize("P")
+            self.failUnlessEqual((v.size, v.itemsize),
+                                 (struct_size, struct_size))
+
+
 if __name__ == "__main__":
     unittest.main()
