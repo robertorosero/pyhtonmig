@@ -1596,7 +1596,11 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	stgdict->size = fmt->pffi_type->size;
 	stgdict->setfunc = fmt->setfunc;
 	stgdict->getfunc = fmt->getfunc;
-	stgdict->format = alloc_format_string(NULL, proto_str);
+#ifdef WORDS_BIGENDIAN
+	stgdict->format = alloc_format_string(">", proto_str);
+#else
+	stgdict->format = alloc_format_string("<", proto_str);
+#endif
 	if (stgdict->format == NULL) {
 		Py_DECREF(result);
 		Py_DECREF((PyObject *)stgdict);
@@ -1669,18 +1673,20 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		}
 		sw_dict = PyType_stgdict(swapped);
 #ifdef WORDS_BIGENDIAN
-		sw_dict->format = alloc_format_string("<", stgdict->format);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_le__", swapped);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_be__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_be__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_le__", swapped);
+		/* We are creating the type for the OTHER endian */
+		sw_dict->format = alloc_format_string("<", stgdict->format);
 #else
 		PyObject_SetAttrString((PyObject *)result, "__ctype_be__", swapped);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_le__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_le__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_be__", swapped);
+		/* We are creating the type for the OTHER endian */
+		sw_dict->format = alloc_format_string(">", stgdict->format);
 #endif
-		sw_dict->format = alloc_format_string("<", stgdict->format);
 		Py_DECREF(swapped);
 		if (PyErr_Occurred()) {
 			Py_DECREF(result);
