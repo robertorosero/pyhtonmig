@@ -131,6 +131,15 @@ Power and logarithmic functions:
       *base* argument added.
 
 
+.. function:: log1p(x[, base])
+
+   Return the logarithm of *1+x* to the given *base*. If the *base* is not specified,
+   return the natural logarithm of *1+x* (that is, the logarithm to base *e*). The
+   result is calculated in a way which is accurate for *x* near zero.
+
+   .. versionadded:: 2.6
+
+
 .. function:: log10(x)
 
    Return the base-10 logarithm of *x*.
@@ -189,6 +198,13 @@ Trigonometric functions:
    Return the sine of *x* radians.
 
 
+.. function:: asinh(x)
+
+   Return the inverse hyperbolic sine of *x*, in radians.
+
+   .. versionadded:: 2.6
+
+
 .. function:: tan(x)
 
    Return the tangent of *x* radians.
@@ -213,6 +229,13 @@ Hyperbolic functions:
    Return the hyperbolic cosine of *x*.
 
 
+.. function:: acosh(x)
+
+   Return the inverse hyperbolic cosine of *x*, in radians.
+
+   .. versionadded:: 2.6
+
+
 .. function:: sinh(x)
 
    Return the hyperbolic sine of *x*.
@@ -221,6 +244,14 @@ Hyperbolic functions:
 .. function:: tanh(x)
 
    Return the hyperbolic tangent of *x*.
+
+
+.. function:: atanh(x)
+
+   Return the inverse hyperbolic tangent of *x*, in radians.
+
+   .. versionadded:: 2.6
+
 
 The module also defines two mathematical constants:
 
@@ -234,6 +265,7 @@ The module also defines two mathematical constants:
 
    The mathematical constant *e*.
 
+
 .. note::
 
    The :mod:`math` module consists mostly of thin wrappers around the platform C
@@ -246,6 +278,15 @@ The module also defines two mathematical constants:
    ``math.log(0)`` returns ``-Inf`` or raises :exc:`ValueError` or
    :exc:`OverflowError` isn't defined, and in cases where ``math.log(0)`` raises
    :exc:`OverflowError`, ``math.log(0L)`` may raise :exc:`ValueError` instead.
+
+   All functions return a quite *NaN* if at least one of the args is *NaN*.
+   Signaling *NaN*s raise an exception. The exception type still depends on the
+   platform and libm implementation. It's usually :exc:`ValueError` for *EDOM*
+   and :exc:`OverflowError` for errno *ERANGE*.
+
+   ..versionchanged:: 2.6
+      In earlier versions of Python the outcome of an operation with NaN as
+      input depended on platform and libm implementation.
 
 
 .. seealso::

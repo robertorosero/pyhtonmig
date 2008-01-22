@@ -4,9 +4,42 @@
 from test.test_support import run_unittest, verbose
 import unittest
 import math
+import os
+import sys
 
-seps='1e-05'
-eps = eval(seps)
+eps = 1E-05
+NAN = float('nan')
+INF = float('inf')
+NINF = float('-inf')
+
+# locate file with test values
+if __name__ == '__main__':
+    file = sys.argv[0]
+else:
+    file = __file__
+testdir = os.path.dirname(file) or os.curdir
+test_file = os.path.join(testdir, 'cmath.ctest')
+
+def parse_testfile(fname):
+    """Parse a file with test values
+
+    Empty lines or lines starting with -- are ignored
+    yields id, fn, arg_real, arg_imag, exp_real, exp_imag
+    """
+    with open(fname) as fp:
+        for line in fp:
+            # skip comment lines and blank lines
+            if line.startswith('--') or not line.strip():
+                continue
+
+            lhs, rhs = line.split('->')
+            id, fn, arg_real, arg_imag = lhs.split()
+            exp_real, exp_imag = rhs.split()
+
+            yield (id, fn,
+                   float(arg_real), float(arg_imag),
+                   float(exp_real), float(exp_imag)
+                  )
 
 class MathTests(unittest.TestCase):
 
@@ -28,18 +61,57 @@ class MathTests(unittest.TestCase):
         self.ftest('acos(-1)', math.acos(-1), math.pi)
         self.ftest('acos(0)', math.acos(0), math.pi/2)
         self.ftest('acos(1)', math.acos(1), 0)
+        self.assertRaises(ValueError, math.acos, INF)
+        self.assertRaises(ValueError, math.acos, NINF)
+        self.assert_(math.isnan(math.acos(NAN)))
+
+    def testAcosh(self):
+        self.assertRaises(TypeError, math.acosh)
+        self.ftest('acosh(1)', math.acosh(1), 0)
+        self.ftest('acosh(2)', math.acosh(2), 1.3169578969248168)
+        self.assertRaises(ValueError, math.acosh, 0)
+        self.assertRaises(ValueError, math.acosh, -1)
+        self.assertRaises(OverflowError, math.acosh, INF)
+        self.assertRaises(ValueError, math.acosh, NINF)
+        self.assert_(math.isnan(math.acosh(NAN)))
 
     def testAsin(self):
         self.assertRaises(TypeError, math.asin)
         self.ftest('asin(-1)', math.asin(-1), -math.pi/2)
         self.ftest('asin(0)', math.asin(0), 0)
         self.ftest('asin(1)', math.asin(1), math.pi/2)
+        self.assertRaises(ValueError, math.asin, INF)
+        self.assertRaises(ValueError, math.asin, NINF)
+        self.assert_(math.isnan(math.asin(NAN)))
+
+    def testAsinh(self):
+        self.assertRaises(TypeError, math.asinh)
+        self.ftest('asinh(0)', math.asinh(0), 0)
+        self.ftest('asinh(1)', math.asinh(1), 0.88137358701954305)
+        self.ftest('asinh(-1)', math.asinh(-1), -0.88137358701954305)
+        self.assertRaises(OverflowError, math.asinh, INF)
+        self.assertRaises(OverflowError, math.asinh, NINF)
+        self.assert_(math.isnan(math.asinh(NAN)))
 
     def testAtan(self):
         self.assertRaises(TypeError, math.atan)
         self.ftest('atan(-1)', math.atan(-1), -math.pi/4)
         self.ftest('atan(0)', math.atan(0), 0)
         self.ftest('atan(1)', math.atan(1), math.pi/4)
+        self.ftest('atan(inf)', math.atan(INF), math.pi/2)
+        self.ftest('atan(-inf)', math.atan(-INF), -math.pi/2)
+        self.assert_(math.isnan(math.atan(NAN)))
+
+    def testAtanh(self):
+        self.assertRaises(TypeError, math.atan)
+        self.ftest('atanh(0)', math.atanh(0), 0)
+        self.ftest('atanh(0.5)', math.atanh(0.5), 0.54930614433405489)
+        self.ftest('atanh(-0.5)', math.atanh(-0.5), -0.54930614433405489)
+        self.assertRaises(ValueError, math.atanh, 1)
+        self.assertRaises(ValueError, math.atanh, -1)
+        self.assertRaises(ValueError, math.atanh, INF)
+        self.assertRaises(ValueError, math.atanh, NINF)
+        self.assert_(math.isnan(math.atanh(NAN)))
 
     def testAtan2(self):
         self.assertRaises(TypeError, math.atan2)
@@ -61,6 +133,9 @@ class MathTests(unittest.TestCase):
         self.ftest('ceil(-0.5)', math.ceil(-0.5), 0)
         self.ftest('ceil(-1.0)', math.ceil(-1.0), -1)
         self.ftest('ceil(-1.5)', math.ceil(-1.5), -1)
+        self.assertRaises(OverflowError, math.ceil, INF)
+        self.assertRaises(OverflowError, math.ceil, NINF)
+        self.assert_(math.isnan(math.ceil(NAN)))
 
         class TestCeil(object):
             def __float__(self):
@@ -81,11 +156,17 @@ class MathTests(unittest.TestCase):
         self.ftest('cos(0)', math.cos(0), 1)
         self.ftest('cos(pi/2)', math.cos(math.pi/2), 0)
         self.ftest('cos(pi)', math.cos(math.pi), -1)
+        self.assertRaises(ValueError, math.cos, INF)
+        self.assertRaises(ValueError, math.cos, NINF)
+        self.assert_(math.isnan(math.cos(NAN)))
 
     def testCosh(self):
         self.assertRaises(TypeError, math.cosh)
         self.ftest('cosh(0)', math.cosh(0), 1)
         self.ftest('cosh(2)-2*cosh(1)**2', math.cosh(2)-2*math.cosh(1)**2, -1) # Thanks to Lambert
+        self.assertRaises(OverflowError, math.cosh, INF)
+        self.assertRaises(OverflowError, math.cosh, NINF)
+        self.assert_(math.isnan(math.cosh(NAN)))
 
     def testDegrees(self):
         self.assertRaises(TypeError, math.degrees)
@@ -98,6 +179,9 @@ class MathTests(unittest.TestCase):
         self.ftest('exp(-1)', math.exp(-1), 1/math.e)
         self.ftest('exp(0)', math.exp(0), 1)
         self.ftest('exp(1)', math.exp(1), math.e)
+        self.assertRaises(OverflowError, math.exp, INF)
+        self.ftest('exp(-INF)', math.exp(NINF), 0)
+        self.assert_(math.isnan(math.exp(NAN)))
 
     def testFabs(self):
         self.assertRaises(TypeError, math.fabs)
@@ -121,6 +205,9 @@ class MathTests(unittest.TestCase):
         # This fails on some platforms - so check it here
         self.ftest('floor(1.23e167)', math.floor(1.23e167), 1.23e167)
         self.ftest('floor(-1.23e167)', math.floor(-1.23e167), -1.23e167)
+        self.assertRaises(OverflowError, math.floor, INF)
+        self.assertRaises(OverflowError, math.floor, NINF)
+        self.assert_(math.isnan(math.floor(NAN)))
 
         class TestFloor(object):
             def __float__(self):
@@ -177,12 +264,28 @@ class MathTests(unittest.TestCase):
         self.ftest('log(32,2)', math.log(32,2), 5)
         self.ftest('log(10**40, 10)', math.log(10**40, 10), 40)
         self.ftest('log(10**40, 10**20)', math.log(10**40, 10**20), 2)
+        self.assertRaises(OverflowError, math.log, INF)
+        self.assertRaises(ValueError, math.log, NINF)
+        self.assert_(math.isnan(math.log(NAN)))
+
+    def testLog1p(self):
+        self.assertRaises(TypeError, math.log1p)
+        self.ftest('log1p(1/e -1)', math.log1p(1/math.e-1), -1)
+        self.ftest('log1p(0)', math.log1p(0), 0)
+        self.ftest('log1p(e-1)', math.log1p(math.e-1), 1)
+        self.ftest('log1p(1)', math.log1p(1), math.log(2))
+        self.assertRaises(OverflowError, math.log1p, INF)
+        self.assertRaises(ValueError, math.log1p, NINF)
+        self.assert_(math.isnan(math.log1p(NAN)))
 
     def testLog10(self):
         self.assertRaises(TypeError, math.log10)
         self.ftest('log10(0.1)', math.log10(0.1), -1)
         self.ftest('log10(1)', math.log10(1), 0)
         self.ftest('log10(10)', math.log10(10), 1)
+        self.assertRaises(OverflowError, math.log10, INF)
+        self.assertRaises(ValueError, math.log10, NINF)
+        self.assert_(math.isnan(math.log10(NAN)))
 
     def testModf(self):
         self.assertRaises(TypeError, math.modf)
@@ -201,6 +304,12 @@ class MathTests(unittest.TestCase):
         self.ftest('pow(1,0)', math.pow(1,0), 1)
         self.ftest('pow(2,1)', math.pow(2,1), 2)
         self.ftest('pow(2,-1)', math.pow(2,-1), 0.5)
+        self.assertRaises(OverflowError, math.pow, INF, 1)
+        self.assertRaises(ValueError, math.pow, 1, INF)
+        self.assertRaises(OverflowError, math.pow, NINF, 1)
+        self.assertRaises(ValueError, math.pow, 1, NINF)
+        self.assert_(math.isnan(math.pow(NAN, 1)))
+        self.assert_(math.isnan(math.pow(1, NAN)))
 
     def testRadians(self):
         self.assertRaises(TypeError, math.radians)
@@ -213,29 +322,44 @@ class MathTests(unittest.TestCase):
         self.ftest('sin(0)', math.sin(0), 0)
         self.ftest('sin(pi/2)', math.sin(math.pi/2), 1)
         self.ftest('sin(-pi/2)', math.sin(-math.pi/2), -1)
+        self.assertRaises(ValueError, math.sin, INF)
+        self.assertRaises(ValueError, math.sin, NINF)
+        self.assert_(math.isnan(math.sin(NAN)))
 
     def testSinh(self):
         self.assertRaises(TypeError, math.sinh)
         self.ftest('sinh(0)', math.sinh(0), 0)
         self.ftest('sinh(1)**2-cosh(1)**2', math.sinh(1)**2-math.cosh(1)**2, -1)
         self.ftest('sinh(1)+sinh(-1)', math.sinh(1)+math.sinh(-1), 0)
+        self.assertRaises(OverflowError, math.sinh, INF)
+        self.assertRaises(OverflowError, math.sinh, NINF)
+        self.assert_(math.isnan(math.sinh(NAN)))
 
     def testSqrt(self):
         self.assertRaises(TypeError, math.sqrt)
         self.ftest('sqrt(0)', math.sqrt(0), 0)
         self.ftest('sqrt(1)', math.sqrt(1), 1)
         self.ftest('sqrt(4)', math.sqrt(4), 2)
+        self.assertRaises(OverflowError, math.sqrt, INF)
+        self.assertRaises(ValueError, math.sqrt, NINF)
+        self.assert_(math.isnan(math.sqrt(NAN)))
 
     def testTan(self):
         self.assertRaises(TypeError, math.tan)
         self.ftest('tan(0)', math.tan(0), 0)
         self.ftest('tan(pi/4)', math.tan(math.pi/4), 1)
         self.ftest('tan(-pi/4)', math.tan(-math.pi/4), -1)
+        self.assertRaises(ValueError, math.tan, INF)
+        self.assertRaises(ValueError, math.tan, NINF)
+        self.assert_(math.isnan(math.tan(NAN)))
 
     def testTanh(self):
         self.assertRaises(TypeError, math.tanh)
         self.ftest('tanh(0)', math.tanh(0), 0)
         self.ftest('tanh(1)+tanh(-1)', math.tanh(1)+math.tanh(-1), 0)
+        self.ftest('tanh(inf)', math.tanh(INF), 1)
+        self.ftest('tanh(-inf)', math.tanh(NINF), -1)
+        self.assert_(math.isnan(math.tanh(NAN)))
 
     def testCopysign(self):
         self.assertEqual(math.copysign(1, 42), 1.0)
@@ -298,6 +422,16 @@ class MathTests(unittest.TestCase):
             else:
                 self.fail("sqrt(-1) didn't raise ValueError")
 
+    def test_testfile(self):
+        if not float.__getformat__("double").startswith("IEEE"):
+            return
+        for id, fn, ar, ai, er, ei in parse_testfile(test_file):
+            # Skip if either input or result is complex
+            if ai != 0. or ei != 0.:
+                continue
+            func = getattr(math, fn)
+            result = func(ar)
+            self.ftest("%s:%s(%r)" % (id, fn, ar), result, er)
 
 def test_main():
     run_unittest(MathTests)

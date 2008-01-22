@@ -14,6 +14,15 @@ method: these methods are used to convert the object to a complex or
 floating-point number, respectively, and the function is then applied to the
 result of the conversion.
 
+.. note::
+
+   On platforms with hardware and system-level support for signed
+   zeros, functions involving branch cuts are continuous on *both*
+   sides of the branch cut: the sign of the zero distinguishes one
+   side of the branch cut from the other.  On platforms that do not
+   support signed zeros the continuity is as specified below.
+
+
 The functions are:
 
 
@@ -37,30 +46,35 @@ The functions are:
 
 .. function:: asinh(x)
 
-   Return the hyperbolic arc sine of *x*. There are two branch cuts, extending
-   left from ``±1j`` to ``±∞j``, both continuous from above. These branch cuts
-   should be considered a bug to be corrected in a future release. The correct
-   branch cuts should extend along the imaginary axis, one from ``1j`` up to
-   ``∞j`` and continuous from the right, and one from ``-1j`` down to ``-∞j``
-   and continuous from the left.
+   Return the hyperbolic arc sine of *x*. There are two branch cuts:
+   One extends from ``1j`` along the imaginary axis to ``∞j``,
+   continuous from the right.  The other extends from ``-1j`` along
+   the imaginary axis to ``-∞j``, continuous from the left.
+
+   .. versionchanged:: 2.6
+      branch cuts moved to match those recommended by the C99 standard
 
 
 .. function:: atan(x)
 
    Return the arc tangent of *x*. There are two branch cuts: One extends from
-   ``1j`` along the imaginary axis to ``∞j``, continuous from the left. The
+   ``1j`` along the imaginary axis to ``∞j``, continuous from the right. The
    other extends from ``-1j`` along the imaginary axis to ``-∞j``, continuous
-   from the left. (This should probably be changed so the upper cut becomes
-   continuous from the other side.)
+   from the left.
+
+   .. versionchanged:: 2.6
+      direction of continuity of upper cut reversed
 
 
 .. function:: atanh(x)
 
    Return the hyperbolic arc tangent of *x*. There are two branch cuts: One
-   extends from ``1`` along the real axis to ``∞``, continuous from above. The
+   extends from ``1`` along the real axis to ``∞``, continuous from below. The
    other extends from ``-1`` along the real axis to ``-∞``, continuous from
-   above. (This should probably be changed so the right cut becomes continuous
-   from the other side.)
+   above.
+
+   .. versionchanged:: 2.6
+      direction of continuity of right cut reversed
 
 
 .. function:: cos(x)
@@ -153,4 +167,5 @@ cuts for numerical purposes, a good reference should be the following:
    Kahan, W:  Branch cuts for complex elementary functions; or, Much ado about
    nothing's sign bit.  In Iserles, A., and Powell, M. (eds.), The state of the art
    in numerical analysis. Clarendon Press (1987) pp165-211.
+
 

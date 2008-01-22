@@ -17,6 +17,11 @@ Core and builtins
 - Issue #1882: when compiling code from a string, encoding cookies in the
   second line of code were not always recognized correctly.
 
+- Issue #XXXX: Four new methods were added to the math and cmath modules:
+  acosh, asinh, atanh and log1p. Replacement implementations for platforms
+  without the four functions and copysign in libm were added to a new file
+  Python/pymath.c.
+
 - Issue #1679: "0x" was taken as a valid integer literal.
 
 - Issue #1865: Bytes as an alias for str and b"" as an alias "" were

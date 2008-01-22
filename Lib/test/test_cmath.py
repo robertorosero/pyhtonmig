@@ -1,5 +1,7 @@
 from test.test_support import run_unittest
+from test.test_math import parse_testfile, test_file
 import unittest
+import os, sys
 import cmath, math
 
 class CMathTests(unittest.TestCase):
@@ -12,24 +14,35 @@ class CMathTests(unittest.TestCase):
     test_functions.append(lambda x : cmath.log(x, 1729. + 0j))
     test_functions.append(lambda x : cmath.log(14.-27j, x))
 
-    def cAssertAlmostEqual(self, a, b, rel_eps = 1e-10, abs_eps = 1e-100):
-        """Check that two complex numbers are almost equal."""
-        # the two complex numbers are considered almost equal if
-        # either the relative error is <= rel_eps or the absolute error
-        # is tiny, <= abs_eps.
-        if a == b == 0:
-            return
-        absolute_error = abs(a-b)
-        relative_error = absolute_error/max(abs(a), abs(b))
-        if relative_error > rel_eps and absolute_error > abs_eps:
-            self.fail("%s and %s are not almost equal" % (a, b))
+    def setUp(self):
+        self.test_values = open(test_file)
+
+    def tearDown(self):
+        self.test_values.close()
+
+    def rAssertAlmostEqual(self, a, b, rel_eps = 2e-15, abs_eps = 5e-323):
+        """Check that two floating-point numbers are almost equal."""
+
+        # test passes if either the absolute error or the relative
+        # error is sufficiently small.  The defaults amount to an
+        # error of between 9 ulps and 19 ulps on an IEEE-754 compliant
+        # machine.
+
+        try:
+            absolute_error = abs(b-a)
+        except OverflowError:
+            pass
+        else:
+            if absolute_error <= max(abs_eps, rel_eps * abs(a)):
+                return
+        self.fail("%s and %s are not sufficiently close" % (repr(a), repr(b)))
 
     def test_constants(self):
         e_expected = 2.71828182845904523536
         pi_expected = 3.14159265358979323846
-        self.assertAlmostEqual(cmath.pi, pi_expected, 9,
+        self.rAssertAlmostEqual(cmath.pi, pi_expected, 9,
             "cmath.pi is %s; should be %s" % (cmath.pi, pi_expected))
-        self.assertAlmostEqual(cmath.e,  e_expected, 9,
+        self.rAssertAlmostEqual(cmath.e,  e_expected, 9,
             "cmath.e is %s; should be %s" % (cmath.e, e_expected))
 
     def test_user_object(self):
@@ -109,13 +122,13 @@ class CMathTests(unittest.TestCase):
 
         for f in self.test_functions:
             # usual usage
-            self.cAssertAlmostEqual(f(MyComplex(cx_arg)), f(cx_arg))
-            self.cAssertAlmostEqual(f(MyComplexOS(cx_arg)), f(cx_arg))
+            self.assertEqual(f(MyComplex(cx_arg)), f(cx_arg))
+            self.assertEqual(f(MyComplexOS(cx_arg)), f(cx_arg))
             # other combinations of __float__ and __complex__
-            self.cAssertAlmostEqual(f(FloatAndComplex()), f(cx_arg))
-            self.cAssertAlmostEqual(f(FloatAndComplexOS()), f(cx_arg))
-            self.cAssertAlmostEqual(f(JustFloat()), f(flt_arg))
-            self.cAssertAlmostEqual(f(JustFloatOS()), f(flt_arg))
+            self.assertEqual(f(FloatAndComplex()), f(cx_arg))
+            self.assertEqual(f(FloatAndComplexOS()), f(cx_arg))
+            self.assertEqual(f(JustFloat()), f(flt_arg))
+            self.assertEqual(f(JustFloatOS()), f(flt_arg))
             # TypeError should be raised for classes not providing
             # either __complex__ or __float__, even if they provide
             # __int__, __long__ or __index__.  An old-style class
@@ -138,7 +151,7 @@ class CMathTests(unittest.TestCase):
         # functions, by virtue of providing a __float__ method
         for f in self.test_functions:
             for arg in [2, 2L, 2.]:
-                self.cAssertAlmostEqual(f(arg), f(arg.__float__()))
+                self.assertEqual(f(arg), f(arg.__float__()))
 
         # but strings should give a TypeError
         for f in self.test_functions:
@@ -182,12 +195,34 @@ class CMathTests(unittest.TestCase):
             float_fn = getattr(math, fn)
             complex_fn = getattr(cmath, fn)
             for v in values:
-                self.cAssertAlmostEqual(float_fn(v), complex_fn(v))
+                z = complex_fn(v)
+                self.rAssertAlmostEqual(float_fn(v), z.real)
+                self.assertEqual(0., z.imag)
 
         # test two-argument version of log with various bases
         for base in [0.5, 2., 10.]:
             for v in positive:
-                self.cAssertAlmostEqual(cmath.log(v, base), math.log(v, base))
+                z = cmath.log(v, base)
+                self.rAssertAlmostEqual(math.log(v, base), z.real)
+                self.assertEqual(0., z.imag)
+
+    def test_specific_values(self):
+        if not float.__getformat__("double").startswith("IEEE"):
+            return
+        for id, fn, ar, ai, er, ei in parse_testfile(test_file):
+            arg = complex(ar, ai)
+            expected = complex(er, ei)
+            function = getattr(cmath, fn)
+            actual = function(arg)
+
+            if fn=='log':
+                # for the real part of the log function, we allow an
+                # absolute error of up to 2e-15.
+                self.rAssertAlmostEqual(expected.real, actual.real,
+                                        abs_eps = 2e-15)
+            else:
+                self.rAssertAlmostEqual(expected.real, actual.real)
+            self.rAssertAlmostEqual(expected.imag, actual.imag)
 
 def test_main():
     run_unittest(CMathTests)

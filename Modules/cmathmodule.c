@@ -4,30 +4,73 @@
 
 #include "Python.h"
 
-#ifndef M_PI
-#define M_PI (3.141592653589793239)
+/* we need DBL_MAX, DBL_MIN, DBL_EPSILON and DBL_MANT_DIG from float.h */
+/* We assume that FLT_RADIX is 2, not 10 or 16. */
+#include <float.h>
+
+#ifndef M_LN2
+#define M_LN2 (0.6931471805599453094) /* natural log of 2 */
 #endif
+
+#ifndef M_LN10
+#define M_LN10 (2.302585092994045684) /* natural log of 10 */
+#endif
+
+/*
+   CM_LARGE_DOUBLE is used to avoid spurious overflow in the sqrt, log,
+   inverse trig and inverse hyperbolic trig functions.  Its log is used in the
+   evaluation of exp, cos, cosh, sin, sinh, tan, and tanh to avoid unecessary
+   overflow.
+ */
+
+#define CM_LARGE_DOUBLE (DBL_MAX/4.)
+#define CM_SQRT_LARGE_DOUBLE (sqrt(CM_LARGE_DOUBLE))
+#define CM_LOG_LARGE_DOUBLE (log(CM_LARGE_DOUBLE))
+#define CM_SQRT_DBL_MIN (sqrt(DBL_MIN))
+
+/* CM_SCALE_UP defines the power of 2 to multiply by to turn a subnormal into
+   a normal; used in sqrt.  must be odd */
+#define CM_SCALE_UP 2*(DBL_MANT_DIG/2) + 1
+#define CM_SCALE_DOWN -(DBL_MANT_DIG/2 + 1)
+
+
+
+/* forward declarations */
+static Py_complex c_asinh(Py_complex);
+static Py_complex c_atanh(Py_complex);
+static Py_complex c_cosh(Py_complex);
+static Py_complex c_sinh(Py_complex);
+static Py_complex c_sqrt(Py_complex);
+static Py_complex c_tanh(Py_complex);
+static PyObject * math_error(void);
 
 /* First, the C functions that do the real work */
 
-/* constants */
-static Py_complex c_one = {1., 0.};
-static Py_complex c_half = {0.5, 0.};
-static Py_complex c_i = {0., 1.};
-static Py_complex c_halfi = {0., 0.5};
-
-/* forward declarations */
-static Py_complex c_log(Py_complex);
-static Py_complex c_prodi(Py_complex);
-static Py_complex c_sqrt(Py_complex);
-static PyObject * math_error(void);
-
-
 static Py_complex
-c_acos(Py_complex x)
+c_acos(Py_complex z)
 {
-	return c_neg(c_prodi(c_log(c_sum(x,c_prod(c_i,
-		    c_sqrt(c_diff(c_one,c_prod(x,x))))))));
+	Py_complex s1, s2, r;
+        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+		/* avoid unnecessary overflow for large arguments */
+		r.real = atan2(fabs(z.imag), z.real);
+		/* split into cases to make sure that the branch cut has the
+		   correct continuity on systems with unsigned zeros */
+		if (z.real < 0.) {
+			r.imag = -copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., z.imag);
+		} else {
+			r.imag = copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., -z.imag);
+		}
+	} else {
+		s1.real = 1.-z.real;
+		s1.imag = -z.imag;
+		s1 = c_sqrt(s1);
+		s2.real = 1.+z.real;
+		s2.imag = z.imag;
+		s2 = c_sqrt(s2);
+		r.real = 2.*atan2(s1.real, s2.real);
+		r.imag = asinh(s2.real*s1.imag - s2.imag*s1.real);
+	}
+	return r;
 }
 
 PyDoc_STRVAR(c_acos_doc,
@@ -37,13 +80,25 @@ PyDoc_STRVAR(c_acos_doc,
 
 
 static Py_complex
-c_acosh(Py_complex x)
+c_acosh(Py_complex z)
 {
-	Py_complex z;
-	z = c_sqrt(c_half);
-	z = c_log(c_prod(z, c_sum(c_sqrt(c_sum(x,c_one)),
-				  c_sqrt(c_diff(x,c_one)))));
-	return c_sum(z, z);
+	Py_complex s1, s2, r;
+
+        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+		/* avoid unnecessary overflow for large arguments */
+		r.real = log(hypot(z.real/2., z.imag/2.)) + M_LN2*2.;
+		r.imag = atan2(z.imag, z.real);
+	} else {
+		s1.real = z.real - 1.;
+		s1.imag = z.imag;
+		s1 = c_sqrt(s1);
+		s2.real = z.real + 1.;
+		s2.imag = z.imag;
+		s2 = c_sqrt(s2);
+		r.real = asinh(s1.real*s2.real + s1.imag*s2.imag);
+		r.imag = 2.*atan2(s1.imag, s2.real);
+	}
+	return r;
 }
 
 PyDoc_STRVAR(c_acosh_doc,
@@ -53,14 +108,16 @@ PyDoc_STRVAR(c_acosh_doc,
 
 
 static Py_complex
-c_asin(Py_complex x)
+c_asin(Py_complex z)
 {
-	/* -i * log[(sqrt(1-x**2) + i*x] */
-	const Py_complex squared = c_prod(x, x);
-	const Py_complex sqrt_1_minus_x_sq = c_sqrt(c_diff(c_one, squared));
-        return c_neg(c_prodi(c_log(
-        		c_sum(sqrt_1_minus_x_sq, c_prodi(x))
-		    )       )     );
+	/* asin(z) = -i asinh(iz) */
+	Py_complex s, r;
+	s.real = -z.imag;
+	s.imag = z.real;
+	s = c_asinh(s);
+	r.real = s.imag;
+	r.imag = -s.real;
+	return r;
 }
 
 PyDoc_STRVAR(c_asin_doc,
@@ -70,13 +127,28 @@ PyDoc_STRVAR(c_asin_doc,
 
 
 static Py_complex
-c_asinh(Py_complex x)
+c_asinh(Py_complex z)
 {
-	Py_complex z;
-	z = c_sqrt(c_half);
-	z = c_log(c_prod(z, c_sum(c_sqrt(c_sum(x, c_i)),
-				  c_sqrt(c_diff(x, c_i)))));
-	return c_sum(z, z);
+	Py_complex s1, s2, r;
+
+        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+		if (z.imag >= 0.) {
+			r.real = copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., z.real);
+		} else {
+			r.real = -copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., -z.real);
+		}
+		r.imag = atan2(z.imag, fabs(z.real));
+	} else {
+		s1.real = 1.+z.imag;
+		s1.imag = -z.real;
+		s1 = c_sqrt(s1);
+		s2.real = 1.-z.imag;
+		s2.imag = z.real;
+		s2 = c_sqrt(s2);
+		r.real = asinh(s1.real*s2.imag-s2.real*s1.imag);
+		r.imag = atan2(z.imag, s1.real*s2.real-s1.imag*s2.imag);
+	}
+	return r;
 }
 
 PyDoc_STRVAR(c_asinh_doc,
@@ -86,9 +158,16 @@ PyDoc_STRVAR(c_asinh_doc,
 
 
 static Py_complex
-c_atan(Py_complex x)
+c_atan(Py_complex z)
 {
-	return c_prod(c_halfi,c_log(c_quot(c_sum(c_i,x),c_diff(c_i,x))));
+	/* atan(z) = -i atanh(iz) */
+	Py_complex s, r;
+	s.real = -z.imag;
+	s.imag = z.real;
+	s = c_atanh(s);
+	r.real = s.imag;
+	r.imag = -s.real;
+	return r;
 }
 
 PyDoc_STRVAR(c_atan_doc,
@@ -98,9 +177,43 @@ PyDoc_STRVAR(c_atan_doc,
 
 
 static Py_complex
-c_atanh(Py_complex x)
+c_atanh(Py_complex z)
 {
-	return c_prod(c_half,c_log(c_quot(c_sum(c_one,x),c_diff(c_one,x))));
+	Py_complex r;
+	double ay, h;
+
+	/* Reduce to case where z.real >= 0., using atanh(z) = -atanh(-z). */
+	if (z.real < 0.) {
+		return c_neg(c_atanh(c_neg(z)));
+	}
+
+	ay = fabs(z.imag);
+	if (z.real > CM_SQRT_LARGE_DOUBLE || ay > CM_SQRT_LARGE_DOUBLE) {
+		/* 
+		   if abs(z) is large then we use the approximation
+		   atanh(z) ~ 1/z +/- i*pi/2 (+/- depending on the sign
+		   of z.imag)
+		*/
+		h = hypot(z.real/2., z.imag/2.);  /* safe from overflow */
+		r.real = z.real/4./h/h;
+		/* the two negations in the next line cancel each other out
+		   except when working with unsigned zeros: they're there to
+		   ensure that the branch cut has the correct continuity on
+		   systems that don't support signed zeros */
+		r.imag = -copysign(Py_MATH_PI/2., -z.imag);
+	} else if (z.real == 1. && ay < CM_SQRT_DBL_MIN) {
+		/* C99 standard says:  atanh(1+/-0.) should be inf +/- 0i */
+		r.real = -log(sqrt(ay)/sqrt(hypot(ay, 2.)));
+		if (ay == 0.) {
+			r.imag = z.imag;
+		} else {
+			r.imag = copysign(atan2(2., -ay)/2, z.imag);
+		}
+	} else {
+		r.real = log1p(4.*z.real/((1-z.real)*(1-z.real) + ay*ay))/4.;
+		r.imag = -atan2(-2.*z.imag, (1-z.real)*(1+z.real) - ay*ay)/2.;
+	}
+	return r;
 }
 
 PyDoc_STRVAR(c_atanh_doc,
@@ -110,11 +223,13 @@ PyDoc_STRVAR(c_atanh_doc,
 
 
 static Py_complex
-c_cos(Py_complex x)
+c_cos(Py_complex z)
 {
+	/* cos(z) = cosh(iz) */
 	Py_complex r;
-	r.real = cos(x.real)*cosh(x.imag);
-	r.imag = -sin(x.real)*sinh(x.imag);
+	r.real = -z.imag;
+	r.imag = z.real;
+	r = c_cosh(r);
 	return r;
 }
 
@@ -125,11 +240,21 @@ PyDoc_STRVAR(c_cos_doc,
 
 
 static Py_complex
-c_cosh(Py_complex x)
+c_cosh(Py_complex z)
 {
 	Py_complex r;
-	r.real = cos(x.imag)*cosh(x.real);
-	r.imag = sin(x.imag)*sinh(x.real);
+	double x_minus_one;
+
+	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
+		/* deal correctly with cases where cosh(z.real) overflows but
+		   cosh(z) does not. */
+		x_minus_one = z.real - copysign(1., z.real);
+		r.real = cos(z.imag) * cosh(x_minus_one) * Py_MATH_E;
+		r.imag = sin(z.imag) * sinh(x_minus_one) * Py_MATH_E;
+	} else {
+		r.real = cos(z.imag) * cosh(z.real);
+		r.imag = sin(z.imag) * sinh(z.real);
+	}
 	return r;
 }
 
@@ -140,12 +265,20 @@ PyDoc_STRVAR(c_cosh_doc,
 
 
 static Py_complex
-c_exp(Py_complex x)
+c_exp(Py_complex z)
 {
 	Py_complex r;
-	double l = exp(x.real);
-	r.real = l*cos(x.imag);
-	r.imag = l*sin(x.imag);
+	double l;
+
+	if (z.real > CM_LOG_LARGE_DOUBLE) {
+		l = exp(z.real-1.);
+		r.real = l*cos(z.imag)*Py_MATH_E;
+		r.imag = l*sin(z.imag)*Py_MATH_E;
+	} else {
+		l = exp(z.real);
+		r.real = l*cos(z.imag);
+		r.imag = l*sin(z.imag);
+	}
 	return r;
 }
 
@@ -156,23 +289,70 @@ PyDoc_STRVAR(c_exp_doc,
 
 
 static Py_complex
-c_log(Py_complex x)
+c_log(Py_complex z)
 {
+	/*
+	   The usual formula for the real part is log(hypot(z.real, z.imag)).
+	   There are four situations where this formula is potentially
+	   problematic:
+
+	   (1) the absolute value of z is subnormal.  Then hypot is subnormal,
+	   so has fewer than the usual number of bits of accuracy, hence may
+	   have large relative error.  This then gives a large absolute error
+	   in the log.  This can be solved by rescaling z by a suitable power
+	   of 2.
+
+	   (2) the absolute value of z is greater than DBL_MAX (e.g. when both
+	   z.real and z.imag are within a factor of 1/sqrt(2) of DBL_MAX)
+	   Again, rescaling solves this.
+
+	   (3) the absolute value of z is close to 1.  In this case it's
+	   difficult to achieve good accuracy, at least in part because a
+	   change of 1ulp in the real or imaginary part of z can result in a
+	   change of billions of ulps in the correctly rounded answer.
+
+	   (4) z = 0.  The simplest thing to do here is to call the
+	   floating-point log with an argument of 0, and let its behaviour
+	   (returning -infinity, signaling a floating-point exception, setting
+	   errno, or whatever) determine that of c_log.  So the usual formula
+	   is fine here.
+
+	 */
+
 	Py_complex r;
-	double l = hypot(x.real,x.imag);
-	r.imag = atan2(x.imag, x.real);
-	r.real = log(l);
+	double ax, ay, am, an, h;
+
+	ax = fabs(z.real);
+	ay = fabs(z.imag);
+
+	if (ax > CM_LARGE_DOUBLE || ay > CM_LARGE_DOUBLE) {
+		r.real = log(hypot(ax/2., ay/2.)) + M_LN2;
+	} else if (ax < DBL_MIN && ay < DBL_MIN && (ax > 0. || ay > 0.)) {
+		/* catch cases where hypot(ax, ay) is subnormal */
+		r.real = log(hypot(ldexp(ax, DBL_MANT_DIG), ldexp(ay, DBL_MANT_DIG))) - DBL_MANT_DIG*M_LN2;
+	} else {
+		h = hypot(ax, ay);
+		if (0.71 <= h && h <= 1.73) {
+			am = ax > ay ? ax : ay;  /* max(ax, ay) */
+			an = ax > ay ? ay : ax;  /* min(ax, ay) */
+			r.real = log1p((am-1)*(am+1)+an*an)/2.;
+		} else {
+			r.real = log(h);
+		}
+	}
+	r.imag = atan2(z.imag, z.real);
 	return r;
 }
 
 
 static Py_complex
-c_log10(Py_complex x)
+c_log10(Py_complex z)
 {
 	Py_complex r;
-	double l = hypot(x.real,x.imag);
-	r.imag = atan2(x.imag, x.real)/log(10.);
-	r.real = log10(l);
+
+	r = c_log(z);
+	r.real = r.real / M_LN10;
+	r.imag = r.imag / M_LN10;
 	return r;
 }
 
@@ -182,23 +362,16 @@ PyDoc_STRVAR(c_log10_doc,
 "Return the base-10 logarithm of x.");
 
 
-/* internal function not available from Python */
 static Py_complex
-c_prodi(Py_complex x)
+c_sin(Py_complex z)
 {
-	Py_complex r;
-	r.real = -x.imag;
-	r.imag = x.real;
-	return r;
-}
-
-
-static Py_complex
-c_sin(Py_complex x)
-{
-	Py_complex r;
-	r.real = sin(x.real) * cosh(x.imag);
-	r.imag = cos(x.real) * sinh(x.imag);
+	/* sin(z) = -i sin(iz) */
+	Py_complex s, r;
+	s.real = -z.imag;
+	s.imag = z.real;
+	s = c_sinh(s);
+	r.real = s.imag;
+	r.imag = -s.real;
 	return r;
 }
 
@@ -209,12 +382,21 @@ PyDoc_STRVAR(c_sin_doc,
 
 
 static Py_complex
-c_sinh(Py_complex x)
+c_sinh(Py_complex z)
 {
 	Py_complex r;
-	r.real = cos(x.imag) * sinh(x.real);
-	r.imag = sin(x.imag) * cosh(x.real);
+	double x_minus_one;
+
+	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
+		x_minus_one = z.real - copysign(1., z.real);
+		r.real = cos(z.imag) * sinh(x_minus_one) * Py_MATH_E;
+		r.imag = sin(z.imag) * cosh(x_minus_one) * Py_MATH_E;
+	} else {
+		r.real = cos(z.imag) * sinh(z.real);
+		r.imag = sin(z.imag) * cosh(z.real);
+	}
 	return r;
+
 }
 
 PyDoc_STRVAR(c_sinh_doc,
@@ -224,27 +406,64 @@ PyDoc_STRVAR(c_sinh_doc,
 
 
 static Py_complex
-c_sqrt(Py_complex x)
+c_sqrt(Py_complex z)
 {
+	/*
+	   Method: use symmetries to reduce to the case when x = z.real and y
+	   = z.imag are nonnegative.  Then the real part of the result is
+	   given by
+
+	     s = sqrt((x + hypot(x, y))/2)
+
+	   and the imaginary part is
+
+	     d = (y/2)/s
+
+	   If either x or y is very large then there's a risk of overflow in
+	   computation of the expression x + hypot(x, y).  We can avoid this
+	   by rewriting the formula for s as:
+
+	     s = 2*sqrt(x/8 + hypot(x/8, y/8))
+
+	   This costs us two extra multiplications/divisions, but avoids the
+	   overhead of checking for x and y large.
+
+	   If both x and y are subnormal then hypot(x, y) may also be
+	   subnormal, so will lack full precision.  We solve this by rescaling
+	   x and y by a sufficiently large power of 2 to ensure that x and y
+	   are normal.
+	*/
+
+
 	Py_complex r;
 	double s,d;
-	if (x.real == 0. && x.imag == 0.)
-		r = x;
-	else {
-		s = sqrt(0.5*(fabs(x.real) + hypot(x.real,x.imag)));
-		d = 0.5*x.imag/s;
-		if (x.real > 0.) {
-			r.real = s;
-			r.imag = d;
-		}
-		else if (x.imag >= 0.) {
-			r.real = d;
-			r.imag = s;
-		}
-		else {
-			r.real = -d;
-			r.imag = -s;
-		}
+	double ax, ay;
+
+	if (z.real == 0. && z.imag == 0.) {
+		r.real = 0.;
+		r.imag = z.imag;
+		return r;
+	}
+
+	ax = fabs(z.real);
+	ay = fabs(z.imag);
+
+	if (ax < DBL_MIN && ay < DBL_MIN && (ax > 0. || ay > 0.)) {
+		/* here we catch cases where hypot(ax, ay) is subnormal */
+		ax = ldexp(ax, CM_SCALE_UP);
+		s = ldexp(sqrt(ax + hypot(ax, ldexp(ay, CM_SCALE_UP))), CM_SCALE_DOWN);
+	} else {
+		ax /= 8.;
+		s = 2.*sqrt(ax + hypot(ax, ay/8.));
+	}
+        d = ay/(2.*s);
+
+	if (z.real >= 0.) {
+		r.real = s;
+		r.imag = copysign(d, z.imag);
+	} else {
+		r.real = d;
+		r.imag = copysign(s, z.imag);
 	}
 	return r;
 }
@@ -256,23 +475,15 @@ PyDoc_STRVAR(c_sqrt_doc,
 
 
 static Py_complex
-c_tan(Py_complex x)
+c_tan(Py_complex z)
 {
-	Py_complex r;
-	double sr,cr,shi,chi;
-	double rs,is,rc,ic;
-	double d;
-	sr = sin(x.real);
-	cr = cos(x.real);
-	shi = sinh(x.imag);
-	chi = cosh(x.imag);
-	rs = sr * chi;
-	is = cr * shi;
-	rc = cr * chi;
-	ic = -sr * shi;
-	d = rc*rc + ic * ic;
-	r.real = (rs*rc + is*ic) / d;
-	r.imag = (is*rc - rs*ic) / d;
+	/* tan(z) = -i tanh(iz) */
+	Py_complex s, r;
+	s.real = -z.imag;
+	s.imag = z.real;
+	s = c_tanh(s);
+	r.real = s.imag;
+	r.imag = -s.real;
 	return r;
 }
 
@@ -283,23 +494,35 @@ PyDoc_STRVAR(c_tan_doc,
 
 
 static Py_complex
-c_tanh(Py_complex x)
+c_tanh(Py_complex z)
 {
+	/* Formula:
+
+	   tanh(x+iy) = (tanh(x)(1+tan(y)^2) + i tan(y)(1-tanh(x))^2) /
+	   (1+tan(y)^2 tanh(x)^2)
+
+	   To avoid excessive roundoff error, 1-tanh(x)^2 is better computed
+	   as 1/cosh(x)^2.  When abs(x) is large, we approximate 1-tanh(x)^2
+	   by 4 exp(-2*x) instead, to avoid possible overflow in the
+	   computation of cosh(x).
+
+	*/
+
 	Py_complex r;
-	double si,ci,shr,chr;
-	double rs,is,rc,ic;
-	double d;
-	si = sin(x.imag);
-	ci = cos(x.imag);
-	shr = sinh(x.real);
-	chr = cosh(x.real);
-	rs = ci * shr;
-	is = si * chr;
-	rc = ci * chr;
-	ic = si * shr;
-	d = rc*rc + ic*ic;
-	r.real = (rs*rc + is*ic) / d;
-	r.imag = (is*rc - rs*ic) / d;
+	double tx, ty, cx, txty, denom;
+
+	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
+		r.real = copysign(1., z.real);
+                r.imag = 2.*sin(2.*z.imag)*exp(-2.*fabs(z.real));
+	} else {
+		tx = tanh(z.real);
+		ty = tan(z.imag);
+		cx = 1./cosh(z.real);
+		txty = tx*ty;
+		denom = 1. + txty*txty;
+		r.real = tx*(1.+ty*ty)/denom;
+		r.imag = ((ty/denom)*cx)*cx;
+	}
 	return r;
 }
 
@@ -323,9 +546,9 @@ cmath_log(PyObject *self, PyObject *args)
 	if (PyTuple_GET_SIZE(args) == 2)
 		x = c_quot(x, c_log(y));
 	PyFPE_END_PROTECT(x)
+	Py_ADJUST_ERANGE2(x.real, x.imag);
 	if (errno != 0)
 		return math_error();
-	Py_ADJUST_ERANGE2(x.real, x.imag);
 	return PyComplex_FromCComplex(x);
 }
 
@@ -421,6 +644,6 @@ initcmath(void)
 		return;
 
 	PyModule_AddObject(m, "pi",
-                           PyFloat_FromDouble(atan(1.0) * 4.0));
-	PyModule_AddObject(m, "e", PyFloat_FromDouble(exp(1.0)));
+                           PyFloat_FromDouble(Py_MATH_PI));
+	PyModule_AddObject(m, "e", PyFloat_FromDouble(Py_MATH_E));
 }

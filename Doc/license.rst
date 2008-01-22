@@ -645,3 +645,15 @@ The :mod:`xmlrpclib` module contains the following notice::
    ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
    OF THIS SOFTWARE.
 
+   
+Python/pymath.c
+---------------
+
+The :file:`Python/pymath.c` module contains the following notice::
+
+   Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ 
+   Developed at SunPro, a Sun Microsystems, Inc. business.
+   Permission to use, copy, modify, and distribute this
+   software is freely granted, provided that this notice 
+   is preserved.

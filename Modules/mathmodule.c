@@ -3,15 +3,6 @@
 #include "Python.h"
 #include "longintrepr.h" /* just for SHIFT */
 
-#ifndef _MSC_VER
-#ifndef __STDC__
-extern double fmod (double, double);
-extern double frexp (double, int *);
-extern double ldexp (double, int);
-extern double modf (double, double *);
-#endif /* __STDC__ */
-#endif /* _MSC_VER */
-
 /* Call is_error when errno != 0, and where x is the result libm
  * returned.  is_error will usually set up an exception and return
  * true (1), but may return false (0) without setting up an exception.
@@ -53,6 +44,10 @@ math_1(PyObject *arg, double (*func) (double))
 	double x = PyFloat_AsDouble(arg);
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
+#ifndef __GNUC__ /* Windows et al */
+	if (Py_IS_NAN(x))
+		return PyFloat_FromDouble(x+x);
+#endif
 	errno = 0;
 	PyFPE_START_PROTECT("in math_1", return 0)
 	x = (*func)(x);
@@ -75,6 +70,10 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
+#ifndef __GNUC__ /* Windows et al */
+	if (Py_IS_NAN(x) || Py_IS_NAN(y))
+		return PyFloat_FromDouble(x+y);
+#endif
 	errno = 0;
 	PyFPE_START_PROTECT("in math_2", return 0)
 	x = (*func)(x, y);
@@ -100,13 +99,19 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 
 FUNC1(acos, acos,
       "acos(x)\n\nReturn the arc cosine (measured in radians) of x.")
+FUNC1(acosh, acosh,
+      "acosh(x)\n\nReturn the hyperbolic arc cosine (measured in radians) of x.")
 FUNC1(asin, asin,
       "asin(x)\n\nReturn the arc sine (measured in radians) of x.")
+FUNC1(asinh, asinh,
+      "asinh(x)\n\nReturn the hyperbolic arc sine (measured in radians) of x.")
 FUNC1(atan, atan,
       "atan(x)\n\nReturn the arc tangent (measured in radians) of x.")
 FUNC2(atan2, atan2,
       "atan2(y, x)\n\nReturn the arc tangent (measured in radians) of y/x.\n"
       "Unlike atan(y/x), the signs of both x and y are considered.")
+FUNC1(atanh, atanh,
+      "atanh(x)\n\nReturn the hyperbolic arc tangent (measured in radians) of x.")
 FUNC1(ceil, ceil,
       "ceil(x)\n\nReturn the ceiling of x as a float.\n"
       "This is the smallest integral value >= x.")
@@ -114,16 +119,8 @@ FUNC1(cos, cos,
       "cos(x)\n\nReturn the cosine of x (measured in radians).")
 FUNC1(cosh, cosh,
       "cosh(x)\n\nReturn the hyperbolic cosine of x.")
-
-#ifdef MS_WINDOWS
-#  define copysign _copysign
-#  define HAVE_COPYSIGN 1
-#endif
-#ifdef HAVE_COPYSIGN
 FUNC2(copysign, copysign,
       "copysign(x,y)\n\nReturn x with the sign of y.");
-#endif
-
 FUNC1(exp, exp,
       "exp(x)\n\nReturn e raised to the power of x.")
 FUNC1(fabs, fabs,
@@ -279,6 +276,38 @@ PyDoc_STRVAR(math_log_doc,
 If the base not specified, returns the natural logarithm (base e) of x.");
 
 static PyObject *
+math_log1p(PyObject *self, PyObject *args)
+{
+	PyObject *arg;
+	PyObject *base = NULL;
+	PyObject *num, *den;
+	PyObject *ans;
+
+	if (!PyArg_UnpackTuple(args, "log1p", 1, 2, &arg, &base))
+		return NULL;
+
+	num = loghelper(arg, log1p, "log");
+	if (num == NULL || base == NULL)
+		return num;
+
+	den = loghelper(base, log1p, "log");
+	if (den == NULL) {
+		Py_DECREF(num);
+		return NULL;
+	}
+
+	ans = PyNumber_Divide(num, den);
+	Py_DECREF(num);
+	Py_DECREF(den);
+	return ans;
+}
+
+PyDoc_STRVAR(math_log1p_doc,
+"log1p(x[, base]) -> the logarithm of 1+x to the given base.\n\
+If the base not specified, returns the natural logarithm (base e) of x.\n\
+The result is computed in a way which is accurate for x near zero.");
+
+static PyObject *
 math_log10(PyObject *self, PyObject *arg)
 {
 	return loghelper(arg, log10, "log10");
@@ -343,13 +372,14 @@ Checks if float x is infinite (positive or negative)");
 
 static PyMethodDef math_methods[] = {
 	{"acos",	math_acos,	METH_O,		math_acos_doc},
+	{"acosh",	math_acosh,	METH_O,		math_acosh_doc},
 	{"asin",	math_asin,	METH_O,		math_asin_doc},
+	{"asinh",	math_asinh,	METH_O,		math_asinh_doc},
 	{"atan",	math_atan,	METH_O,		math_atan_doc},
 	{"atan2",	math_atan2,	METH_VARARGS,	math_atan2_doc},
+	{"atanh",	math_atanh,	METH_O,		math_atanh_doc},
 	{"ceil",	math_ceil,	METH_O,		math_ceil_doc},
-#ifdef HAVE_COPYSIGN
 	{"copysign",	math_copysign,	METH_VARARGS,	math_copysign_doc},
-#endif
 	{"cos",		math_cos,	METH_O,		math_cos_doc},
 	{"cosh",	math_cosh,	METH_O,		math_cosh_doc},
 	{"degrees",	math_degrees,	METH_O,		math_degrees_doc},
@@ -363,6 +393,7 @@ static PyMethodDef math_methods[] = {
 	{"isnan",	math_isnan,	METH_O,		math_isnan_doc},
 	{"ldexp",	math_ldexp,	METH_VARARGS,	math_ldexp_doc},
 	{"log",		math_log,	METH_VARARGS,	math_log_doc},
+	{"log1p",	math_log1p,	METH_VARARGS,	math_log1p_doc},
 	{"log10",	math_log10,	METH_O,		math_log10_doc},
 	{"modf",	math_modf,	METH_O,		math_modf_doc},
 	{"pow",		math_pow,	METH_VARARGS,	math_pow_doc},
