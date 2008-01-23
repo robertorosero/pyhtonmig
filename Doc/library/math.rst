@@ -147,7 +147,11 @@ Power and logarithmic functions:
 
 .. function:: pow(x, y)
 
-   Return ``x**y``.
+   Return ``x**y``. ``1.0**y`` returns *1.0*, even for ``1.0**nan``. ``0**y``
+   returns *0.* for all positive *y* and *0*.
+
+   .. versionchanged:: 2.6
+   The outcome of 1**nan was undefined.
 
 
 .. function:: sqrt(x)

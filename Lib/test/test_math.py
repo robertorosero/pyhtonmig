@@ -321,6 +321,7 @@ class MathTests(unittest.TestCase):
             self.assertRaises(ValueError, math.pow, 1, NINF)
         self.assert_(math.isnan(math.pow(NAN, 1)))
         self.assert_(math.isnan(math.pow(2, NAN)))
+        self.assert_(math.isnan(math.pow(0, NAN)))
         self.assertEqual(math.pow(1, NAN), 1)
         self.assertEqual(1**NAN, 1)
         self.assertEqual(1**INF, 1)

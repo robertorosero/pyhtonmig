@@ -328,6 +328,16 @@ math_pow(PyObject *self, PyObject *args)
 	/* 1^x returns 1., even NaN and INF */
 	if (x == 1.0)
 		return PyFloat_FromDouble(1.);
+	if (x == 0.0) {
+		if (y >= 0.0)
+			return PyFloat_FromDouble(0.);
+		if (Py_IS_NAN(y))
+			return PyFloat_FromDouble(Py_NAN);
+		/* 0 raise to a negative value */
+		errno = EDOM;
+		is_error(x);
+		return NULL;
+	}
 #ifndef __GNUC__ /* Windows et al */
 	if (Py_IS_NAN(x) || Py_IS_NAN(y))
 		return PyFloat_FromDouble(x+y);
