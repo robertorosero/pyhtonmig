@@ -1029,6 +1029,9 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 			return NULL;
 		}
 		return PyFloat_FromDouble(0.0);
+	if (iv == 1.0) { /* 1**w is 1, even 1**inf and 1**nan */
+		return PyFloat_FromDouble(1.0);
+	}
 	}
 	if (iv < 0.0) {
 		/* Whether this is an error is a mess, and bumps into libm

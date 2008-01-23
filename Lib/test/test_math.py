@@ -320,7 +320,16 @@ class MathTests(unittest.TestCase):
             self.assertRaises(ValueError, math.pow, 1, INF)
             self.assertRaises(ValueError, math.pow, 1, NINF)
         self.assert_(math.isnan(math.pow(NAN, 1)))
-        self.assert_(math.isnan(math.pow(1, NAN)))
+        self.assert_(math.isnan(math.pow(2, NAN)))
+        self.assertEqual(math.pow(1, NAN), 1)
+        self.assertEqual(1**NAN, 1)
+        self.assertEqual(1**INF, 1)
+        self.assertEqual(1**NINF, 1)
+        self.assertEqual(1**0, 1)
+        self.assertEqual(1.**NAN, 1)
+        self.assertEqual(1.**INF, 1)
+        self.assertEqual(1.**NINF, 1)
+        self.assertEqual(1.**0, 1)
 
     def testRadians(self):
         self.assertRaises(TypeError, math.radians)

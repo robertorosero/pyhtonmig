@@ -133,8 +133,6 @@ FUNC2(fmod, fmod,
       "  x % y may differ.")
 FUNC2(hypot, hypot,
       "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
-FUNC2(pow, pow,
-      "pow(x,y)\n\nReturn x**y (x to the power of y).")
 FUNC1(sin, sin,
       "sin(x)\n\nReturn the sine of x (measured in radians).")
 FUNC1(sinh, sinh,
@@ -315,6 +313,38 @@ math_log10(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
+
+static PyObject *
+math_pow(PyObject *self, PyObject *args)
+{
+	PyObject *ox, *oy;
+	double x, y;
+	if (! PyArg_UnpackTuple(args, "pow", 2, 2, &ox, &oy))
+		return NULL;
+	x = PyFloat_AsDouble(ox);
+	y = PyFloat_AsDouble(oy);
+	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
+		return NULL;
+	/* 1^x returns 1., even NaN and INF */
+	if (x == 1.0)
+		return PyFloat_FromDouble(1.);
+#ifndef __GNUC__ /* Windows et al */
+	if (Py_IS_NAN(x) || Py_IS_NAN(y))
+		return PyFloat_FromDouble(x+y);
+#endif
+	errno = 0;
+	PyFPE_START_PROTECT("in math_pow", return 0)
+	x = pow(x, y);
+	PyFPE_END_PROTECT(x)
+	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	if (errno && is_error(x))
+		return NULL;
+	else
+		return PyFloat_FromDouble(x);
+}
+
+PyDoc_STRVAR(math_pow_doc,
+"pow(x,y)\n\nReturn x**y (x to the power of y).");
 
 static const double degToRad = Py_MATH_PI / 180.0;
 static const double radToDeg = 180.0 / Py_MATH_PI;
