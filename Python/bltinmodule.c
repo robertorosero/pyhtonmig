@@ -815,7 +815,6 @@ Return an iterator yielding the results of applying the function to the\n\
 items of the argument iterables(s).  If more than one iterable is given,\n\
 the function is called with an argument list consisting of the\n\
 corresponding item of each iterable, until an iterable is exhausted.\n\
-If the function is None, 'lambda *a: a' is assumed.\n\
 (This is identical to itertools.imap().)");
 
 
@@ -1009,11 +1008,14 @@ min_max(PyObject *args, PyObject *kwds, int op)
 				"%s() got an unexpected keyword argument", name);
 			return NULL;
 		}
+		Py_INCREF(keyfunc);
 	}
 
 	it = PyObject_GetIter(v);
-	if (it == NULL)
+	if (it == NULL) {
+		Py_XDECREF(keyfunc);
 		return NULL;
+	}
 
 	maxitem = NULL; /* the result */
 	maxval = NULL;  /* the value associated with the result */
@@ -1062,6 +1064,7 @@ min_max(PyObject *args, PyObject *kwds, int op)
 	else
 		Py_DECREF(maxval);
 	Py_DECREF(it);
+	Py_XDECREF(keyfunc);
 	return maxitem;
 
 Fail_it_item_and_val:
@@ -1072,6 +1075,7 @@ Fail_it:
 	Py_XDECREF(maxval);
 	Py_XDECREF(maxitem);
 	Py_DECREF(it);
+	Py_XDECREF(keyfunc);
 	return NULL;
 }
 

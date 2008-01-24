@@ -235,10 +235,11 @@ it.
 The *execution* of a function introduces a new symbol table used for the local
 variables of the function.  More precisely, all variable assignments in a
 function store the value in the local symbol table; whereas variable references
-first look in the local symbol table, then in the global symbol table, and then
-in the table of built-in names. Thus,  global variables cannot be directly
-assigned a value within a function (unless named in a :keyword:`global`
-statement), although they may be referenced.
+first look in the local symbol table, then in the local symbol tables of
+enclosing functions, then in the global symbol table, and finally in the table
+of built-in names. Thus, global variables cannot be directly assigned a value
+within a function (unless named in a :keyword:`global` statement), although they
+may be referenced.
 
 The actual parameters (arguments) to a function call are introduced in the local
 symbol table of the called function when it is called; thus, arguments are
@@ -263,7 +264,7 @@ like in C, procedures are just functions that don't return a value.  In fact,
 technically speaking, procedures do return a value, albeit a rather boring one.
 This value is called ``None`` (it's a built-in name).  Writing the value
 ``None`` is normally suppressed by the interpreter if it would be the only value
-written.  You can see it if you really want to using :keyword:`print`::
+written.  You can see it if you really want to using :func:`print`::
 
    >>> fib(0)
    >>> print(fib(0))

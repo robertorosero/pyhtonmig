@@ -204,17 +204,12 @@ loops that truncate the stream.
 .. function:: imap(function, *iterables)
 
    Make an iterator that computes the function using arguments from each of the
-   iterables.  If *function* is set to ``None``, then :func:`imap` returns the
-   arguments as a tuple.  Like :func:`map` but stops when the shortest iterable is
-   exhausted instead of filling in ``None`` for shorter iterables.  The reason for
-   the difference is that infinite iterator arguments are typically an error for
-   :func:`map` (because the output is fully evaluated) but represent a common and
-   useful way of supplying arguments to :func:`imap`. Equivalent to::
+   iterables.  Equivalent to::
 
       def imap(function, *iterables):
-          iterables = map(iter, iterables)
+          iterables = [iter(it) for it in iterables)
           while True:
-              args = [next(i) for i in iterables]
+              args = [next(it) for it in iterables]
               if function is None:
                   yield tuple(args)
               else:
@@ -260,12 +255,11 @@ loops that truncate the stream.
 
    When no iterables are specified, return a zero length iterator.
 
-   Note, the left-to-right evaluation order of the iterables is guaranteed. This
-   makes possible an idiom for clustering a data series into n-length groups using
-   ``izip(*[iter(s)]*n)``.  For data that doesn't fit n-length groups exactly, the
-   last tuple can be pre-padded with fill values using ``izip(*[chain(s,
-   [None]*(n-1))]*n)``.
+   The left-to-right evaluation order of the iterables is guaranteed. This
+   makes possible an idiom for clustering a data series into n-length groups
+   using ``izip(*[iter(s)]*n)``.
 
+<<<<<<< .working
    Note, when :func:`izip` is used with unequal length inputs, subsequent
    iteration over the longer iterables cannot reliably be continued after
    :func:`izip` terminates.  Potentially, up to one entry will be missing from
@@ -276,6 +270,11 @@ loops that truncate the stream.
    the iterator for retrieval with ``next(it)``).  In general, :func:`izip`
    should only be used with unequal length inputs when you don't care about
    trailing, unmatched values from the longer iterables.
+=======
+   :func:`izip` should only be used with unequal length inputs when you don't
+   care about trailing, unmatched values from the longer iterables.  If those
+   values are important, use :func:`izip_longest` instead.
+>>>>>>> .merge-right.r60208
 
 
 .. function:: izip_longest(*iterables[, fillvalue])
