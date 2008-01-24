@@ -17,8 +17,8 @@ if __name__ == '__main__':
     file = sys.argv[0]
 else:
     file = __file__
-testdir = os.path.dirname(file) or os.curdir
-test_file = os.path.join(testdir, 'cmath.ctest')
+test_dir = os.path.dirname(file) or os.curdir
+test_file = os.path.join(test_dir, 'cmath.ctest')
 
 def parse_testfile(fname):
     """Parse a file with test values
@@ -463,7 +463,11 @@ class MathTests(unittest.TestCase):
             self.ftest("%s:%s(%r)" % (id, fn, ar), result, er)
 
 def test_main():
-    run_unittest(MathTests)
+    from doctest import DocFileSuite
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(MathTests))
+    suite.addTest(DocFileSuite("ieee754.txt"))
+    run_unittest(suite)
 
 if __name__ == '__main__':
     test_main()
