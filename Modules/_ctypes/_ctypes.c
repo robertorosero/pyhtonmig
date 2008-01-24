@@ -1019,6 +1019,7 @@ ArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	long length;
 	int overflow;
 	Py_ssize_t itemsize, itemalign;
+	char buf[32];
 
 	typedict = PyTuple_GetItem(args, 2);
 	if (!typedict)
@@ -1057,6 +1058,27 @@ ArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		Py_DECREF((PyObject *)stgdict);
 		return NULL;
 	}
+
+	if (itemdict->format[0] == '(') {
+		sprintf(buf, "(%d,", length);
+		stgdict->format = alloc_format_string(buf, itemdict->format+1);
+	} else {
+		sprintf(buf, "(%d)", length);
+		stgdict->format = alloc_format_string(buf, itemdict->format);
+	}
+	if (stgdict->format == NULL) {
+		Py_DECREF((PyObject *)stgdict);
+		return NULL;
+	}
+	stgdict->ndim = itemdict->ndim + 1;
+	stgdict->shape = PyMem_Malloc(sizeof(Py_ssize_t *) * stgdict->ndim);
+	if (stgdict->shape == NULL) {
+		Py_DECREF((PyObject *)stgdict);
+		return NULL;
+	}
+	stgdict->shape[0] = length;
+	memmove(&stgdict->shape[1], itemdict->shape,
+		sizeof(Py_ssize_t) * (stgdict->ndim - 1));
 
 	itemsize = itemdict->size;
 	if (length * itemsize < 0) {

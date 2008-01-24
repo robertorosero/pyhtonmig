@@ -21,6 +21,8 @@ StgDict_init(StgDictObject *self, PyObject *args, PyObject *kwds)
 	if (PyDict_Type.tp_init((PyObject *)self, args, kwds) < 0)
 		return -1;
 	self->format = NULL;
+	self->ndim = 0;
+	self->shape = NULL;
 	return 0;
 }
 
@@ -40,6 +42,7 @@ StgDict_dealloc(StgDictObject *self)
 {
 	StgDict_clear(self);
 	PyMem_Free(self->format);
+	PyMem_Free(self->shape);
 	PyMem_Free(self->ffi_type_pointer.elements);
 	PyDict_Type.tp_dealloc((PyObject *)self);
 }

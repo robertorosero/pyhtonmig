@@ -200,7 +200,14 @@ typedef struct {
 	PyObject *restype;	/* CDataObject or NULL */
 	PyObject *checker;
 	int flags;		/* calling convention and such */
-	char *format;		/* pep3118 format string, needs PyMem_Free */
+
+	/* pep3118 fields, pointers neeed PyMem_Free */
+	char *format;
+	int ndim;
+	Py_ssize_t *shape;
+/*	Py_ssize_t *strides;	/* unused in ctypes */
+/*	Py_ssize_t *suboffsets;	/* unused in ctypes */
+
 } StgDictObject;
 
 /****************************************************************
