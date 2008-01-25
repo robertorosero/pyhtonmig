@@ -2318,7 +2318,32 @@ static PyMemberDef CData_members[] = {
 static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 {
 	CDataObject *self = (CDataObject *)_self;
-        return PyBuffer_FillInfo(view, self->b_ptr, self->b_size, 0, flags);
+	StgDictObject *dict = PyObject_stgdict(_self);
+
+	if (view == NULL) return 0;
+	if (((flags & PyBUF_LOCK) == PyBUF_LOCK)) {
+		PyErr_SetString(PyExc_BufferError,
+				"Cannot lock this object.");
+		return -1;
+	}
+
+	view->buf = self->b_ptr;
+	view->len = self->b_size;
+	view->readonly = 0;
+	view->itemsize = self->b_size;
+#if 1
+	/* XXX fix later */
+	/* use default format character if not set */
+	view->format = dict->format ? dict->format : "B";
+#else
+	view->format = dict->format;
+#endif
+	view->ndim = dict->ndim;
+	view->shape = dict->shape;
+	view->strides = NULL;
+	view->suboffsets = NULL;
+	view->internal = NULL;
+	return 0;
 }
 
 static PyBufferProcs CData_as_buffer = {
@@ -4403,42 +4428,6 @@ Simple_repr(CDataObject *self)
 	return result;
 }
 
-static int Simple_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
-{
-	CDataObject *self = (CDataObject *)_self;
-	StgDictObject *dict = PyObject_stgdict(_self);
-
-	if (view == NULL) return 0;
-	if (((flags & PyBUF_LOCK) == PyBUF_LOCK)) {
-		PyErr_SetString(PyExc_BufferError,
-				"Cannot lock this object.");
-		return -1;
-	}
-
-	view->buf = self->b_ptr;
-	view->len = self->b_size;
-	view->readonly = 0;
-	view->itemsize = self->b_size;
-#if 1
-	/* XXX fix later */
-	/* use default format character if not set */
-	view->format = dict->format ? dict->format : "B";
-#else
-	view->format = dict->format;
-#endif
-	view->ndim = 0;
-	view->shape = NULL;
-	view->strides = NULL;
-	view->suboffsets = NULL;
-	view->internal = NULL;
-	return 0;
-}
-
-static PyBufferProcs Simple_as_buffer = {
-	Simple_GetBuffer,
-        NULL,
-};
-
 static PyTypeObject Simple_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"_ctypes._SimpleCData",
@@ -4458,7 +4447,7 @@ static PyTypeObject Simple_Type = {
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
-	&Simple_as_buffer,			/* tp_as_buffer */
+	&CData_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"XXX to be provided",			/* tp_doc */
 	(traverseproc)CData_traverse,		/* tp_traverse */
