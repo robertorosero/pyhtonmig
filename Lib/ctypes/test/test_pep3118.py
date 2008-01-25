@@ -1,69 +1,112 @@
 import unittest
 from ctypes import *
-import struct, sys
+import re, struct, sys
 
 if sys.byteorder == "little":
     ENDIAN = "<"
 else:
     ENDIAN = ">"
 
-simple_types = [
-    ("b", c_byte),
-    ("B", c_ubyte),
-    ("h", c_short),
-    ("H", c_ushort),
-# c_int and c_uint may be aliases to c_long
-##    ("i", c_int),
-##    ("I", c_uint),
-    ("l", c_long),
-    ("L", c_ulong),
-    ("q", c_longlong),
-    ("Q", c_ulonglong),
-    ("f", c_float),
-    ("d", c_double),
-# c_longdouble may be an alias to c_double
-##    ("g", c_longdouble),
-    ("t", c_bool),
-# struct doesn't support this (yet)
-##    ("O", py_object),
-]
+def normalize(format):
+    # Remove current endian specifier and white space from a format
+    # string
+    format = format.replace(ENDIAN, "")
+    format = format.replace("=", "")
+    return re.sub(r"\s", "", format)
 
 class Test(unittest.TestCase):
 
-    def test_simpletypes(self):
-        # simple types in native byte order
-        for fmt, typ in simple_types:
-            v = memoryview(typ())
+    def test_types(self):
+        for tp, fmt, shape, itemtp in types:
+            ob = tp()
+            v = memoryview(ob)
+            try:
+                self.failUnlessEqual(normalize(v.format), fmt)
+                self.failUnlessEqual(v.size, sizeof(ob))
+                self.failUnlessEqual(v.itemsize, sizeof(itemtp))
+                self.failUnlessEqual(v.shape, shape)
+                self.failUnlessEqual(v.strides, None)
+                if v.shape:
+                    n = 1
+                    for dim in v.shape:
+                        n = n * dim
+                    self.failUnlessEqual(v.itemsize * n, v.size)
+            except:
+                # so that we can see the failing type
+                print(tp)
+                raise
 
-            # check the PEP3118 format string
-            self.failUnlessEqual(v.format, ENDIAN + fmt)
+# define some structure classes
 
-            # shape and strides are None for integral types
-            self.failUnlessEqual((v.shape, v.strides),
-                                 (None, None))
+class Point(Structure):
+    _fields_ = [("x", c_long), ("y", c_long)]
 
-            # size and itemsize must be what struct.calcsize reports
-            struct_size = struct.calcsize(fmt)
-            self.failUnlessEqual((v.size, v.itemsize),
-                                 (struct_size, struct_size))
+class PackedPoint(Structure):
+    _pack_ = 2
+    _fields_ = [("x", c_long), ("y", c_long)]
 
-    def test_pointertypes(self):
-        for fmt, typ in simple_types:
-            v = memoryview(POINTER(typ)())
+class Point2(Structure):
+    pass
+Point2._fields_ = [("x", c_long), ("y", c_long)]
 
-            # check the PEP3118 format string
-            self.failUnlessEqual(v.format, "&" + ENDIAN + fmt)
+class EmptyStruct(Structure):
+    _fields_ = []
 
-            # shape and strides are None for integral types
-            self.failUnlessEqual((v.shape, v.strides),
-                                 (None, None))
+class aUnion(Union):
+    _fields_ = [("a", c_int)]
 
-            # size and itemsize must be what struct.calcsize reports
-            # for pointers
-            struct_size = struct.calcsize("P")
-            self.failUnlessEqual((v.size, v.itemsize),
-                                 (struct_size, struct_size))
+types = [
+    # type                      format          shape           calc itemsize
 
+    ## simple types
+
+    (c_char,                    "c",            None,           c_char),
+    (c_byte,                    "b",            None,           c_byte),
+    (c_ubyte,                   "B",            None,           c_ubyte),
+    (c_short,                   "h",            None,           c_short),
+    (c_ushort,                  "H",            None,           c_ushort),
+    # c_int and c_uint may be aliases to c_long
+    (c_long,                    "l",            None,           c_long),
+    (c_ulong,                   "L",            None,           c_ulong),
+    (c_longlong,                "q",            None,           c_longlong),
+    (c_ulonglong,               "Q",            None,           c_ulonglong),
+
+    (c_float,                   "f",            None,           c_float),
+    (c_double,                  "d",            None,           c_double),
+    # c_longdouble may be an alias to c_double
+
+    (c_bool,                    "t",            None,           c_bool),
+    (py_object,                 "O",            None,           py_object),
+
+    ## pointers
+
+    (POINTER(c_byte),           "&b",           None,           POINTER(c_byte)),
+    (POINTER(POINTER(c_long)),  "&&l",          None,           POINTER(POINTER(c_long))),
+
+    ## arrays and pointers
+
+    (c_double * 4,              "(4)d",         (4,),           c_double),
+    (c_float * 4 * 3 * 2,       "(2,3,4)f",     (2,3,4),        c_float),
+    (POINTER(c_short) * 2,      "(2)&h",        (2,),           POINTER(c_short)),
+    (POINTER(c_short) * 2 * 3,  "(3,2)&h",      (3,2,),         POINTER(c_short)),
+    (POINTER(c_short * 2),      "&(2)h",        None,           POINTER(c_short)),
+
+    ## structures and unions
+
+    (Point,                     "T{l:x:l:y:}",  None,           Point),
+    # packed structures do not implement the pep
+    (PackedPoint,               "B",            None,           PackedPoint),
+    (Point2,                    "T{l:x:l:y:}",  None,           Point2),
+    (EmptyStruct,               "T{}",          None,           EmptyStruct),
+    # the pep does't support unions
+    (aUnion,                    "B",            None,           aUnion),
+
+    ## other
+
+    # function signatures are not implemented
+    (CFUNCTYPE(None),           "X{}",          None,           CFUNCTYPE(None)),
+
+    ]
 
 if __name__ == "__main__":
     unittest.main()
