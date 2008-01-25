@@ -65,11 +65,17 @@ types = [
     (c_ubyte,                   "B",            None,           c_ubyte),
     (c_short,                   "h",            None,           c_short),
     (c_ushort,                  "H",            None,           c_ushort),
+
     # c_int and c_uint may be aliases to c_long
+    #(c_int,                     "i",            None,           c_int),
+    #(c_uint,                    "I",            None,           c_uint),
+
     (c_long,                    "l",            None,           c_long),
     (c_ulong,                   "L",            None,           c_ulong),
-    (c_longlong,                "q",            None,           c_longlong),
-    (c_ulonglong,               "Q",            None,           c_ulonglong),
+
+    # c_longlong and c_ulonglong are aliases on 64-bit platforms
+    #(c_longlong,                "q",            None,           c_longlong),
+    #(c_ulonglong,               "Q",            None,           c_ulonglong),
 
     (c_float,                   "f",            None,           c_float),
     (c_double,                  "d",            None,           c_double),
