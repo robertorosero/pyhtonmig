@@ -344,7 +344,6 @@ extern void _AddTraceback(char *, char *, int);
 
 extern PyObject *CData_FromBaseObj(PyObject *type, PyObject *base, Py_ssize_t index, char *adr);
 extern char *alloc_format_string(const char *prefix, const char *suffix);
-extern char *replace_format_string(const char *prefix, char *suffix);
 
 /* XXX better name needed! */
 extern int IsSimpleSubType(PyObject *obj);

@@ -291,14 +291,6 @@ alloc_format_string(const char *prefix, const char *suffix)
 	return result;
 }
 
-char *
-replace_format_string(const char *prefix, char *suffix)
-{
-	char *result = alloc_format_string(prefix, suffix);
-	PyMem_Free(suffix);
-	return result;
-}
-
 /*
   StructType_Type - a meta type/class.  Creating a new class using this one as
   __metaclass__ will call the contructor StructUnionType_new.  It replaces the
@@ -2319,6 +2311,7 @@ static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 {
 	CDataObject *self = (CDataObject *)_self;
 	StgDictObject *dict = PyObject_stgdict(_self);
+	Py_ssize_t i;
 
 	if (view == NULL) return 0;
 	if (((flags & PyBUF_LOCK) == PyBUF_LOCK)) {
@@ -2330,7 +2323,6 @@ static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 	view->buf = self->b_ptr;
 	view->len = self->b_size;
 	view->readonly = 0;
-	view->itemsize = self->b_size;
 #if 1
 	/* XXX fix later */
 	/* use default format character if not set */
@@ -2340,6 +2332,10 @@ static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 #endif
 	view->ndim = dict->ndim;
 	view->shape = dict->shape;
+	view->itemsize = self->b_size;
+	for (i = 0; i < view->ndim; ++i) {
+		view->itemsize /= dict->shape[i];
+	}
 	view->strides = NULL;
 	view->suboffsets = NULL;
 	view->internal = NULL;
@@ -4824,7 +4820,7 @@ PyTypeObject Pointer_Type = {
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
-	&Simple_as_buffer,			/* tp_as_buffer */
+	&CData_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"XXX to be provided",			/* tp_doc */
 	(traverseproc)CData_traverse,		/* tp_traverse */

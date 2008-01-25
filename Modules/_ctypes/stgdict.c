@@ -408,9 +408,12 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		ffi_ofs = 0;
 	}
 
-	stgdict->format = alloc_format_string(NULL, "}");
-	if (stgdict->format == NULL)
-		return -1;
+	if (isStruct) {
+		stgdict->format = alloc_format_string(NULL, "T{");
+	} else {
+		/* PEP3118 doesn't support unions. Invent our own character... */
+		stgdict->format = alloc_format_string(NULL, "#{");
+	}
 
 #define realdict ((PyObject *)&stgdict->dict)
 	for (i = 0; i < len; ++i) {
@@ -471,13 +474,17 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		} else
 			bitsize = 0;
 		{
-			int len = PyUnicode_GetSize(name);
-			char *buf = alloca(len);
-			sprintf(buf, ":%s:", PyUnicode_AsString(name));
-/* XXX FIXME */
-/*			assert(dict->format); */
-			strcat(buf, dict->format ? dict->format : "XXX");
-			stgdict->format = replace_format_string(buf, stgdict->format);
+			char *fieldfmt = dict->format ? dict->format : "XXX";
+			char *fieldname = PyUnicode_AsString(name);
+			char *ptr;
+			Py_ssize_t len = strlen(fieldname) + strlen(fieldfmt);
+			char *buf = alloca(len + 2 + 1);
+			sprintf(buf, "%s:%s:", fieldfmt, fieldname);
+
+			ptr = stgdict->format;
+			stgdict->format = alloc_format_string(stgdict->format, buf);
+			PyMem_Free(ptr);
+
 			if (stgdict->format == NULL) {
 				Py_DECREF(pair);
 				return -1;
@@ -514,12 +521,7 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 	}
 #undef realdict
 
-	if (isStruct) {
-		stgdict->format = replace_format_string("T{", stgdict->format);
-	} else {
-		/* PEP3118 doesn't support unions. Invent our own character... */
-		stgdict->format = replace_format_string("#{", stgdict->format);
-	}
+	stgdict->format = alloc_format_string(stgdict->format, "}");
 	if (stgdict->format == NULL)
 		return -1;
 
