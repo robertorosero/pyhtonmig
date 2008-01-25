@@ -2096,6 +2096,13 @@ CFuncPtrType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 
 	stgdict->paramfunc = CFuncPtrType_paramfunc;
+	/* We do NOT expose the function signature in the format string.  It
+	   is impossible, generally, because the only requirement for the
+	   argtypes items is that they have a .from_param method - we do not
+	   know the types of the arguments (although, in practice, most
+	   argtypes would be a ctypes type).
+	*/
+	stgdict->format = alloc_format_string(NULL, "X{}");
 
 	/* create the new instance (which is a class,
 	   since we are a metatype!) */
