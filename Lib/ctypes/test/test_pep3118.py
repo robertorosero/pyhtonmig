@@ -25,7 +25,11 @@ class Test(unittest.TestCase):
                 self.failUnlessEqual(v.size, sizeof(ob))
                 self.failUnlessEqual(v.itemsize, sizeof(itemtp))
                 self.failUnlessEqual(v.shape, shape)
+                # ctypes object always have a non-strided memory block
                 self.failUnlessEqual(v.strides, None)
+                # they are always read/write
+                self.failIf(v.readonly)
+
                 if v.shape:
                     n = 1
                     for dim in v.shape:
