@@ -408,11 +408,13 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		ffi_ofs = 0;
 	}
 
-	if (isStruct) {
+	if (isStruct && !isPacked) {
 		stgdict->format = alloc_format_string(NULL, "T{");
 	} else {
-		/* PEP3118 doesn't support unions. Invent our own character... */
-		stgdict->format = alloc_format_string(NULL, "#{");
+		/* PEP3118 doesn't support union, or packed structures (well,
+		   only standard packing, but we dont support the pep for
+		   that). Use 'B' for bytes. */
+		stgdict->format = alloc_format_string(NULL, "B");
 	}
 
 #define realdict ((PyObject *)&stgdict->dict)
@@ -473,12 +475,13 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 			}
 		} else
 			bitsize = 0;
-		{
+		if (isStruct && !isPacked) {
 			char *fieldfmt = dict->format ? dict->format : "XXX";
 			char *fieldname = PyUnicode_AsString(name);
 			char *ptr;
 			Py_ssize_t len = strlen(fieldname) + strlen(fieldfmt);
 			char *buf = alloca(len + 2 + 1);
+
 			sprintf(buf, "%s:%s:", fieldfmt, fieldname);
 
 			ptr = stgdict->format;
@@ -521,9 +524,11 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 	}
 #undef realdict
 
-	stgdict->format = alloc_format_string(stgdict->format, "}");
-	if (stgdict->format == NULL)
-		return -1;
+	if (isStruct && !isPacked) {
+		stgdict->format = alloc_format_string(stgdict->format, "}");
+		if (stgdict->format == NULL)
+			return -1;
+	}
 
 	if (!isStruct)
 		size = union_size;
