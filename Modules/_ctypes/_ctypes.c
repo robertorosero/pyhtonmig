@@ -135,7 +135,7 @@ char *conversion_mode_errors = NULL;
   indicator set.  If called with a suffix of NULL the error indicator must
   already be set.
  */
-static char *
+char *
 alloc_format_string(const char *prefix, const char *suffix)
 {
 	size_t len;
@@ -166,6 +166,14 @@ alloc_format_string(const char *prefix, const char *suffix)
 	else
 		result[0] = '\0';
 	strcat(result, suffix);
+	return result;
+}
+
+char *
+replace_format_string(const char *prefix, char *suffix)
+{
+	char *result = alloc_format_string(prefix, suffix);
+	PyMem_Free(suffix);
 	return result;
 }
 
@@ -1059,6 +1067,7 @@ ArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
+	assert(itemdict->format);
 	if (itemdict->format[0] == '(') {
 		sprintf(buf, "(%d,", length);
 		stgdict->format = alloc_format_string(buf, itemdict->format+1);

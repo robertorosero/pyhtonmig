@@ -2,6 +2,7 @@
 #include <ffi.h>
 #ifdef MS_WIN32
 #include <windows.h>
+#include <malloc.h>
 #endif
 #include "ctypes.h"
 
@@ -55,6 +56,10 @@ StgDict_clone(StgDictObject *dst, StgDictObject *src)
 
 	StgDict_clear(dst);
 	PyMem_Free(dst->ffi_type_pointer.elements);
+	PyMem_Free(dst->format);
+	dst->format = NULL;
+	PyMem_Free(dst->shape);
+	dst->shape = NULL;
 	dst->ffi_type_pointer.elements = NULL;
 
 	d = (char *)dst;
@@ -68,6 +73,20 @@ StgDict_clone(StgDictObject *dst, StgDictObject *src)
 	Py_XINCREF(dst->converters);
 	Py_XINCREF(dst->restype);
 	Py_XINCREF(dst->checker);
+
+	if (src->format) {
+		dst->format = PyMem_Malloc(strlen(src->format) + 1);
+		if (dst->format == NULL)
+			return -1;
+		strcpy(dst->format, src->format);
+	}
+	if (src->shape) {
+		dst->shape = PyMem_Malloc(sizeof(Py_ssize_t) * src->ndim);
+		if (dst->shape == NULL)
+			return -1;
+		memcpy(dst->shape, src->shape,
+		       sizeof(Py_ssize_t) * src->ndim);
+	}
 
 	if (src->ffi_type_pointer.elements == NULL)
 		return 0;
@@ -346,6 +365,11 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		return -1;
 	}
 
+	if (stgdict->format) {
+		PyMem_Free(stgdict->format);
+		stgdict->format = NULL;
+	}
+
 	if (stgdict->ffi_type_pointer.elements)
 		PyMem_Free(stgdict->ffi_type_pointer.elements);
 
@@ -383,6 +407,10 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		       sizeof(ffi_type *) * (len + 1));
 		ffi_ofs = 0;
 	}
+
+	stgdict->format = alloc_format_string(NULL, "}");
+	if (stgdict->format == NULL)
+		return -1;
 
 #define realdict ((PyObject *)&stgdict->dict)
 	for (i = 0; i < len; ++i) {
@@ -442,6 +470,19 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 			}
 		} else
 			bitsize = 0;
+		{
+			int len = PyUnicode_GetSize(name);
+			char *buf = alloca(len);
+			sprintf(buf, ":%s:", PyUnicode_AsString(name));
+/* XXX FIXME */
+/*			assert(dict->format); */
+			strcat(buf, dict->format ? dict->format : "XXX");
+			stgdict->format = replace_format_string(buf, stgdict->format);
+			if (stgdict->format == NULL) {
+				Py_DECREF(pair);
+				return -1;
+			}
+		}
 		if (isStruct) {
 			prop = CField_FromDesc(desc, i,
 					       &field_size, bitsize, &bitofs,
@@ -472,6 +513,16 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		Py_DECREF(prop);
 	}
 #undef realdict
+
+	if (isStruct) {
+		stgdict->format = replace_format_string("T{", stgdict->format);
+	} else {
+		/* PEP3118 doesn't support unions. Invent our own character... */
+		stgdict->format = replace_format_string("#{", stgdict->format);
+	}
+	if (stgdict->format == NULL)
+		return -1;
+
 	if (!isStruct)
 		size = union_size;
 
