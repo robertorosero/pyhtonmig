@@ -263,20 +263,10 @@ alloc_format_string(const char *prefix, const char *suffix)
 	size_t len;
 	char *result;
 
-#if 1
-/* XXX fix later */
-	if (suffix == NULL) {
-		if (PyErr_Occurred())
-			return NULL;
-		/* use default format character if not set */
-		suffix = "B";
-	}
-#else
 	if (suffix == NULL) {
 		assert(PyErr_Occurred());
 		return NULL;
 	}
-#endif
 	len = strlen(suffix);
 	if (prefix)
 		len += strlen(prefix);
@@ -2330,13 +2320,8 @@ static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 	view->buf = self->b_ptr;
 	view->len = self->b_size;
 	view->readonly = 0;
-#if 1
-	/* XXX fix later */
 	/* use default format character if not set */
 	view->format = dict->format ? dict->format : "B";
-#else
-	view->format = dict->format;
-#endif
 	view->ndim = dict->ndim;
 	view->shape = dict->shape;
 	view->itemsize = self->b_size;
