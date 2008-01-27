@@ -1,5 +1,50 @@
 /* Math module -- standard C math library functions, pi and e */
 
+/* Here are some comments from Tim Peters, extracted from the
+   discussion attached to http://bugs.python.org/issue1640.  They
+   describe the general aims of the math module with respect to
+   special values, IEEE-754 floating-point exceptions, and Python
+   exceptions.
+
+These are the "spirit of 754" rules:
+
+1. If the mathematical result is a real number, but of magnitude too
+large to approximate by a machine float, overflow is signaled and the
+result is an infinity (with the appropriate sign).
+
+2. If the mathematical result is a real number, but of magnitude too
+small to approximate by a machine float, underflow is signaled and the
+result is a zero (with the appropriate sign).
+
+3. At a singularity (a value x such that the limit of f(y) as y
+approaches x exists and is an infinity), "divide by zero" is signaled
+and the result is an infinity (with the appropriate sign).  This is
+complicated a little by that the left-side and right-side limits may
+not be the same; e.g., 1/x approaches +inf or -inf as x approaches 0
+from the positive or negative directions.  In that specific case, the
+sign of the zero determines the result of 1/0.
+
+4. At a point where a function has no defined result in the extended
+reals (i.e., the reals plus an infinity or two), invalid operation is
+signaled and a NaN is returned.
+
+And these are what Python has historically /tried/ to do (but not
+always successfully, as platform libm behavior varies a lot):
+
+For #1, raise OverflowError.
+
+For #2, return a zero (with the appropriate sign if that happens by
+accident ;-)).
+
+For #3 and #4, raise ValueError.  It may have made sense to raise
+Python's ZeroDivisionError in #3, but historically that's only been
+raised for division by zero and mod by zero.
+
+*/
+
+/* Platform notes: on many BSDs and Mac OS X, the functions in libm never set
+   errno.  In GNU's libm, setting of errno is erratic. */
+
 #include "Python.h"
 #include "longintrepr.h" /* just for SHIFT */
 
@@ -39,20 +84,38 @@ is_error(double x)
 }
 
 static PyObject *
-math_1(PyObject *arg, double (*func) (double))
+math_1(PyObject *arg, double (*func) (double), int can_overflow)
 {
+	int x_is_infinity;
 	double x = PyFloat_AsDouble(arg);
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
-#ifndef __GNUC__ /* Windows et al */
+	/* a NaN input should be returned unscathed */
 	if (Py_IS_NAN(x))
-		return PyFloat_FromDouble(x+x);
-#endif
+		return PyFloat_FromDouble(x);
+	x_is_infinity = Py_IS_INFINITY(x);
 	errno = 0;
-	PyFPE_START_PROTECT("in math_1", return 0)
+	PyFPE_START_PROTECT("in math_1", return 0);
+	//printf("math_1: Before func call: errno=%d; input = %.20e\n", errno, x);
 	x = (*func)(x);
-	PyFPE_END_PROTECT(x)
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	//printf("math_1: Aftern func call: errno=%d; result = %.20e\n", errno, x);
+	PyFPE_END_PROTECT(x);
+
+	/* if the result was a NaN then we should be signalling a ValueError;
+	   this should only happen in the cases where C99 recommends raising
+	   invalid */
+	if (Py_IS_NAN(x))
+		errno = EDOM;
+
+	/* if the input was finite and the result is an infinity, then either
+	   overflow occurred and we should be setting errno to ERANGE so that
+	   Python raises an OverflowError, or we were evaluating at a
+	   singularity, and we should setting errno to EDOM so that Python
+	   raises ValueError.  Currently, none of the functions using math_1
+	   have singularities *and* the possibility of overflow :-) */
+	if (!x_is_infinity && Py_IS_INFINITY(x))
+		errno = can_overflow ? ERANGE : EDOM;
+
 	if (errno && is_error(x))
 		return NULL;
 	else
@@ -85,9 +148,9 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 		return PyFloat_FromDouble(x);
 }
 
-#define FUNC1(funcname, func, docstring) \
+#define FUNC1(funcname, func, can_overflow, docstring)			\
 	static PyObject * math_##funcname(PyObject *self, PyObject *args) { \
-		return math_1(args, func); \
+		return math_1(args, func, can_overflow);		    \
 	}\
         PyDoc_STRVAR(math_##funcname##_doc, docstring);
 
@@ -97,35 +160,35 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 	}\
         PyDoc_STRVAR(math_##funcname##_doc, docstring);
 
-FUNC1(acos, acos,
+FUNC1(acos, acos, 0,
       "acos(x)\n\nReturn the arc cosine (measured in radians) of x.")
-FUNC1(acosh, acosh,
+FUNC1(acosh, acosh, 0,
       "acosh(x)\n\nReturn the hyperbolic arc cosine (measured in radians) of x.")
-FUNC1(asin, asin,
+FUNC1(asin, asin, 0,
       "asin(x)\n\nReturn the arc sine (measured in radians) of x.")
-FUNC1(asinh, asinh,
+FUNC1(asinh, asinh, 0,
       "asinh(x)\n\nReturn the hyperbolic arc sine (measured in radians) of x.")
-FUNC1(atan, atan,
+FUNC1(atan, atan, 0,
       "atan(x)\n\nReturn the arc tangent (measured in radians) of x.")
 FUNC2(atan2, atan2,
       "atan2(y, x)\n\nReturn the arc tangent (measured in radians) of y/x.\n"
       "Unlike atan(y/x), the signs of both x and y are considered.")
-FUNC1(atanh, atanh,
+FUNC1(atanh, atanh, 0,
       "atanh(x)\n\nReturn the hyperbolic arc tangent (measured in radians) of x.")
-FUNC1(ceil, ceil,
+FUNC1(ceil, ceil, 0,
       "ceil(x)\n\nReturn the ceiling of x as a float.\n"
       "This is the smallest integral value >= x.")
-FUNC1(cos, cos,
+FUNC1(cos, cos, 0,
       "cos(x)\n\nReturn the cosine of x (measured in radians).")
-FUNC1(cosh, cosh,
+FUNC1(cosh, cosh, 1,
       "cosh(x)\n\nReturn the hyperbolic cosine of x.")
 FUNC2(copysign, copysign,
       "copysign(x,y)\n\nReturn x with the sign of y.");
-FUNC1(exp, exp,
+FUNC1(exp, exp, 1,
       "exp(x)\n\nReturn e raised to the power of x.")
-FUNC1(fabs, fabs,
+FUNC1(fabs, fabs, 0,
       "fabs(x)\n\nReturn the absolute value of the float x.")
-FUNC1(floor, floor,
+FUNC1(floor, floor, 0,
       "floor(x)\n\nReturn the floor of x as a float.\n"
       "This is the largest integral value <= x.")
 FUNC2(fmod, fmod,
@@ -133,15 +196,15 @@ FUNC2(fmod, fmod,
       "  x % y may differ.")
 FUNC2(hypot, hypot,
       "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
-FUNC1(sin, sin,
+FUNC1(sin, sin, 0,
       "sin(x)\n\nReturn the sine of x (measured in radians).")
-FUNC1(sinh, sinh,
+FUNC1(sinh, sinh, 1,
       "sinh(x)\n\nReturn the hyperbolic sine of x.")
-FUNC1(sqrt, sqrt,
+FUNC1(sqrt, sqrt, 0,
       "sqrt(x)\n\nReturn the square root of x.")
-FUNC1(tan, tan,
+FUNC1(tan, tan, 0,
       "tan(x)\n\nReturn the tangent of x (measured in radians).")
-FUNC1(tanh, tanh,
+FUNC1(tanh, tanh, 0,
       "tanh(x)\n\nReturn the hyperbolic tangent of x.")
 
 static PyObject *
@@ -239,7 +302,7 @@ loghelper(PyObject* arg, double (*func)(double), char *funcname)
 	}
 
 	/* Else let libm handle it by itself. */
-	return math_1(arg, func);
+	return math_1(arg, func, 0);
 }
 
 static PyObject *
@@ -319,34 +382,55 @@ math_pow(PyObject *self, PyObject *args)
 {
 	PyObject *ox, *oy;
 	double x, y;
+	int x_is_infinity, y_is_infinity;
+
 	if (! PyArg_UnpackTuple(args, "pow", 2, 2, &ox, &oy))
 		return NULL;
 	x = PyFloat_AsDouble(ox);
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-	/* 1^x returns 1., even NaN and INF */
-	if (x == 1.0)
+
+	/* 1**x and x**0 return 1., even if x is a NaN or infinity */
+	if (x == 1.0 || y == 0.0)
 		return PyFloat_FromDouble(1.);
-	if (x == 0.0) {
-		if (y >= 0.0 || Py_IS_NAN(y))
-			return PyFloat_FromDouble(0.);
-		else {
-			/* 0 raise to a negative value */
-			errno = EDOM;
-			is_error(x);
-			return NULL;
-		}
+
+	/* with the above two exceptions out of the way, usual rules for NaNs
+	   apply: if either x or y is a NaN then NaN should be returned. */
+	if (Py_IS_NAN(x))
+		return PyFloat_FromDouble(x);
+	if (Py_IS_NAN(y))
+		return PyFloat_FromDouble(y);
+
+	x_is_infinity = Py_IS_INFINITY(x);
+	y_is_infinity = Py_IS_INFINITY(y);
+
+	/* 0 ** negative should give a divide-by-zero exception according
+	   to IEEE-754;  we want errno = EDOM here to get a ValueError.
+	   Note: for 0.0 ** positive we let the libm routine take care of
+	   evaluation, to give maximum chance of getting the sign of the result
+	   correct. (e.g. (-0.0)**27 should be -0.0.) */
+	if (x == 0.0 && y < 0.0) {
+		errno = EDOM;
+		is_error(x);
+		return NULL;
 	}
-#ifndef __GNUC__ /* Windows et al */
-	if (Py_IS_NAN(x) || Py_IS_NAN(y))
-		return PyFloat_FromDouble(x+y);
-#endif
+
+	/* Finally, call the libm pow. */
 	errno = 0;
-	PyFPE_START_PROTECT("in math_pow", return 0)
+	PyFPE_START_PROTECT("in math_pow", return 0);
 	x = pow(x, y);
-	PyFPE_END_PROTECT(x)
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	PyFPE_END_PROTECT(x);
+
+	/* a NaN at this point should result in ValueError being raised */
+	if (Py_IS_NAN(x))
+		errno = EDOM;
+
+	/* if neither x nor y was infinity, then an infinite result here
+	   indicates overflow. */
+	if (!x_is_infinity && !y_is_infinity && Py_IS_INFINITY(x))
+		errno = ERANGE;
+
 	if (errno && is_error(x))
 		return NULL;
 	else

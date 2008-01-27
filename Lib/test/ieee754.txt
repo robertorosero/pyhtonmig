@@ -101,11 +101,12 @@ infinity and NaN.
 >>> pow(1, NAN)
 1.0
 
-The power of 0 raised to x is defined as 0, iff x is zero or positive. Negative
-values are a domain error or zero division error and NaN result in a silent NaN.
+The power of 0 raised to x is defined as 0, if x is positive. Negative
+values are a domain error or zero division error and NaN result in a
+silent NaN.
 
 >>> pow(0, 0)
-0.0
+1.0
 >>> pow(0, INF)
 0.0
 >>> pow(0, -INF)
@@ -123,12 +124,36 @@ nan
 Trigonometric Functions
 =======================
 
->>> sin(INF), sin(NINF), sin(NAN)
-(nan, nan, nan)
->>> cos(INF), cos(NINF), cos(NAN)
-(nan, nan, nan)
->>> tan(INF), tan(NINF), tan(NAN)
-(nan, nan, nan)
+>>> sin(INF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> sin(NINF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> sin(NAN)
+nan
+>>> cos(INF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> cos(NINF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> cos(NAN)
+nan
+>>> tan(INF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> tan(NINF)
+Traceback (most recent call last):
+...
+ValueError: math domain error
+>>> tan(NAN)
+nan
 
 Neither pi nor tan are exact, but you can assume that tan(pi/2) is a large value
 and tan(pi) is a very small value:
