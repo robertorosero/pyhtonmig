@@ -55,6 +55,11 @@ raised for division by zero and mod by zero.
 #include "Python.h"
 #include "longintrepr.h" /* just for SHIFT */
 
+#ifdef _OSF_SOURCE
+/* OSF1 5.1 doesn't make this available with XOPEN_SOURCE_EXTENDED defined */
+extern double copysign(double, double);
+#endif
+
 /* Call is_error when errno != 0, and where x is the result libm
  * returned.  is_error will usually set up an exception and return
  * true (1), but may return false (0) without setting up an exception.
@@ -295,11 +300,11 @@ loghelper(PyObject* arg, double (*func)(double), char *funcname)
 					"math domain error");
 			return NULL;
 		}
-		/* Value is ~= x * 2**(e*SHIFT), so the log ~=
-		   log(x) + log(2) * e * SHIFT.
-		   CAUTION:  e*SHIFT may overflow using int arithmetic,
+		/* Value is ~= x * 2**(e*PyLong_SHIFT), so the log ~=
+		   log(x) + log(2) * e * PyLong_SHIFT.
+		   CAUTION:  e*PyLong_SHIFT may overflow using int arithmetic,
 		   so force use of double. */
-		x = func(x) + (e * (double)SHIFT) * func(2.0);
+		x = func(x) + (e * (double)PyLong_SHIFT) * func(2.0);
 		return PyFloat_FromDouble(x);
 	}
 

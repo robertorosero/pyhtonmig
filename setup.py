@@ -4,6 +4,7 @@
 __version__ = "$Revision$"
 
 import sys, os, imp, re, optparse
+from glob import glob
 
 from distutils import log
 from distutils import sysconfig
@@ -142,12 +143,20 @@ class PyBuildExt(build_ext):
         self.distribution.scripts = [os.path.join(srcdir, filename)
                                      for filename in self.distribution.scripts]
 
+        # Python header files
+        headers = glob("Include/*.h") + ["pyconfig.h"]
+
         for ext in self.extensions[:]:
             ext.sources = [ find_module_file(filename, moddirlist)
                             for filename in ext.sources ]
             if ext.depends is not None:
                 ext.depends = [find_module_file(filename, alldirlist)
                                for filename in ext.depends]
+            else:
+                ext.depends = []
+            # re-compile extensions if a header file has been changed
+            ext.depends.extend(headers)
+
             ext.include_dirs.append( '.' ) # to get config.h
             for incdir in incdirlist:
                 ext.include_dirs.append( os.path.join(srcdir, incdir) )
@@ -420,6 +429,8 @@ class PyBuildExt(build_ext):
         exts.append( Extension("_heapq", ["_heapqmodule.c"]) )
         # operator.add() and similar goodies
         exts.append( Extension('operator', ['operator.c']) )
+        # Python 3.0 _fileio module
+        exts.append( Extension("_fileio", ["_fileio.c"]) )
         # _functools
         exts.append( Extension("_functools", ["_functoolsmodule.c"]) )
         # Python C API test module

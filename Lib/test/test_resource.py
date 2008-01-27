@@ -1,8 +1,9 @@
 import unittest
 from test import test_support
 
-
-import os, resource
+import os
+import resource
+import time
 
 # This test is checking a few specific problem spots with the resource module.
 
@@ -15,7 +16,6 @@ class ResourceTest(unittest.TestCase):
         self.assertRaises(TypeError, resource.setrlimit, 42, 42, 42)
 
     def test_fsize_ismax(self):
-
         try:
             (cur, max) = resource.getrlimit(resource.RLIMIT_FSIZE)
         except AttributeError:
@@ -54,6 +54,15 @@ class ResourceTest(unittest.TestCase):
                     try:
                         f.write("Y")
                         f.flush()
+                        # On some systems (e.g., Ubuntu on hppa) the flush()
+                        # doesn't always cause the exception, but the close()
+                        # does eventually.  Try closing several times in
+                        # an attempt to ensure the file is really synced and
+                        # the exception raised.
+                        for i in range(5):
+                            time.sleep(.1)
+                            f.flush()
+                            f.close()
                     except IOError:
                         if not limit_set:
                             raise
@@ -63,10 +72,10 @@ class ResourceTest(unittest.TestCase):
                         resource.setrlimit(resource.RLIMIT_FSIZE, (cur, max))
                 finally:
                     f.close()
-                    os.unlink(test_support.TESTFN)
             finally:
                 if limit_set:
                     resource.setrlimit(resource.RLIMIT_FSIZE, (cur, max))
+                test_support.unlink(test_support.TESTFN)
 
     def test_fsize_toobig(self):
         # Be sure that setrlimit is checking for really large values

@@ -12,7 +12,26 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
-- Patch #1720595: add T_BOOL to the range of structmember types.
+- Patch #1473257: generator objects gain a gi_code attribute. This is the
+  same object as the func_code attribute of the function that produced the
+  generator.
+
+- Issue #1920: "while 0" statements were completely removed by the compiler,
+  even in the presence of an "else" clause, which is supposed to be run when 
+  the condition is false. Now the compiler correctly emits bytecode for the
+  "else" suite.
+
+- A few crashers fixed: weakref_in_del.py (issue #1377858);
+  loosing_dict_ref.py (issue #1303614, test67.py);
+  borrowed_ref_[34].py (not in tracker).
+
+- Issue #1069410: The "can't load dll" message box on Windows is
+  suppressed while an extension is loaded by calling SetErrorMode in
+  dynload_win.c. The error is still reported properly.
+
+- Bug #1915: Python compiles with --enable-unicode=no again. However
+  several extension methods and modules do not work without unicode
+  support.
 
 - Issue #1882: when compiling code from a string, encoding cookies in the
   second line of code were not always recognized correctly.
@@ -24,7 +43,7 @@ Core and builtins
 
 - Issue #1679: "0x" was taken as a valid integer literal.
 
-- Issue #1865: Bytes as an alias for str and b"" as an alias "" were
+- Issue #1865: ``bytes`` as an alias for ``str`` and b"" as an alias "" were
   added.
 
 - sys.float_info / PyFloat_GetInfo: The floating point information
@@ -33,7 +52,7 @@ Core and builtins
 - Patch #1816: Added sys.flags structseq. It exposes the status of most
   command line arguments and PYTHON* environment variables.
 
-- Object/structseq.c: Implemented new structseq representation. The patch
+- Objects/structseq.c: Implemented new structseq representation. The patch
   makes structseqs (e.g. the return value of os.stat) more readable.
 
 - Patch #1700288: added a type attribute cache that caches method accesses,
@@ -83,14 +102,6 @@ Core and builtins
 - PEP 366: Allow explicit relative imports when executing modules
   inside packages with the -m switch via a new module level
   __package__ attribute.
-
-- Issue #1534: Added ``PyFloat_GetMax()``, ``PyFloat_GetMin()`` and
-  ``PyFloat_GetInfo()`` to the float API.
-
-- Issue #1521: On 64bit platforms, using PyArgs_ParseTuple with the t# of w#
-  format code incorrectly truncated the length to an int, even when
-  PY_SSIZE_T_CLEAN is set.  The str.decode method used to return incorrect
-  results with huge strings.
 
 - Issue #1402: Fix a crash on exit, when another thread is still running, and
   if the deallocation of its frames somehow calls the PyGILState_Ensure() /
@@ -148,18 +159,8 @@ Core and builtins
 - Patch #1031213: Decode source line in SyntaxErrors back to its original source
   encoding.
 
-- Py_ssize_t fields work in structmember when HAVE_LONG_LONG is not defined.
-
-- PEP 3123: Provide forward compatibility with Python 3.0, while keeping
-  backwards compatibility. Add Py_Refcnt, Py_Type, Py_Size, and
-  PyVarObject_HEAD_INIT.
-
 - Patch #1673759: add a missing overflow check when formatting floats
   with %G.
-
-- Patch #1733960: Allow T_LONGLONG to accept ints.
-
-- T_PYSSIZET can now be used in PyMemberDef lists for Py_ssize_t members.
 
 - Prevent expandtabs() on string and unicode objects from causing a segfault
   when a large width is passed on 32-bit platforms.
@@ -276,8 +277,6 @@ Core and builtins
 
 - patch #1630975: Fix crash when replacing sys.stdout in sitecustomize.py
 
-- Bug #1637022: Prefix AST symbols with _Py_.
-
 - Prevent seg fault on shutdown which could occur if an object
   raised a warning.
 
@@ -317,9 +316,6 @@ Core and builtins
 
 - list.pop(x) accepts any object x following the __index__ protocol.
 
-- Fix some leftovers from the conversion from int to Py_ssize_t
-  (relevant to strings and sequences of more than 2**31 items).
-
 - A number of places, including integer negation and absolute value,
   were fixed to not rely on undefined behaviour of the C compiler
   anymore.
@@ -344,9 +340,6 @@ Core and builtins
 - Bug #1551432: Exceptions do not define an explicit __unicode__ method.  This
   allows calling unicode() on exceptions classes directly to succeed.
 
-- Make _PyGILState_NoteThreadState() static, it was not used anywhere
-  outside of pystate.c and should not be necessary.
-
 - Bug #1542051: Exceptions now correctly call PyObject_GC_UnTrack.
   Also make sure that every exception class has __module__ set to
   'exceptions'.
@@ -369,7 +362,7 @@ Core and builtins
   required changing the .pyc magic number.  This means that .pyc files
   generated before 2.5c2 will be regenerated.
 
-- with and as are now keywords.
+- ``with`` and ``as`` are now keywords.
 
 - Bug #1664966: Fix crash in exec if Unicode filename can't be decoded.
 
@@ -380,8 +373,13 @@ Core and builtins
   threading.enumerate() list after the join() for a brief period until
   it actually exited.
 
+
 Library
 -------
+
+- #1765140: add an optional delay argument to FileHandler and its
+  subclasses. Defaults to false (existing behaviour), but if true,
+  defers opening the file until the first call to emit().
 
 - The pprint module now supports sets and frozensets.
 
@@ -1083,8 +1081,14 @@ Library
   does not claim to support starttls.  Adds the SMTP.ehlo_or_helo_if_needed()
   method.  Patch contributed by Bill Fenner.
 
+
 Extension Modules
 -----------------
+
+- #1940: make it possible to use curses.filter() before curses.initscr()
+  as the documentation says.
+
+- Backport of _fileio module from Python 3.0.
 
 - #1087741: mmap.mmap is now a class, not a factory function. It is also
   subclassable now.
@@ -1312,8 +1316,12 @@ Tools
   platform.python_implementation(); this will now be saved
   in the benchmark pickle
 
+
 Documentation
 -------------
+
+- RFE #1765140: Updated documentation on FileHandler and subclasses to
+  include new optional delay argument.
 
 - Bug #932563: Added section on getting contextual information into logging
   output, and added documentation for the new LoggerAdapter class.
@@ -1440,17 +1448,50 @@ Build
 - Makefile.pre.in(buildbottest): Run an optional script pybuildbot.identify
   to include some information about the build environment.
 
+
 C API
 -----
 
+- Backport of PyUnicode_FromString(), _FromStringAndSize(), _Format and
+  _FormatV from Python 3.0. Made PyLong_AsSsize_t and PyLong_FromSsize_t
+  public functions.
+
+- Patch #1720595: add T_BOOL to the range of structmember types.
+
+- Issue #1534: Added ``PyFloat_GetMax()``, ``PyFloat_GetMin()`` and
+  ``PyFloat_GetInfo()`` to the float API.
+
+- Issue #1521: On 64bit platforms, using PyArgs_ParseTuple with the t# of w#
+  format code incorrectly truncated the length to an int, even when
+  PY_SSIZE_T_CLEAN is set.  The str.decode method used to return incorrect
+  results with huge strings.
+
+- Issue #1629: Renamed Py_Size, Py_Type and Py_Refcnt to Py_SIZE, Py_TYPE
+  and Py_REFCNT.
+
+- PEP 3123: Provide forward compatibility with Python 3.0, while keeping
+  backwards compatibility. Add Py_Refcnt, Py_Type, Py_Size, and
+  PyVarObject_HEAD_INIT.
+
+- Py_ssize_t fields work in structmember when HAVE_LONG_LONG is not defined.
+
+- Patch #1733960: Allow T_LONGLONG to accept ints.
+
+- T_PYSSIZET can now be used in PyMemberDef lists for Py_ssize_t members.
+
 - Added a new API function ``PyImport_ImportModuleNoBlock``.
+
+- Bug #1637022: Prefix AST symbols with _Py_.
+
+- Fix some leftovers from the conversion from int to Py_ssize_t
+  (relevant to strings and sequences of more than 2**31 items).
+
+- Make _PyGILState_NoteThreadState() static, it was not used anywhere
+  outside of pystate.c and should not be necessary.
 
 - ``PyImport_Import`` and ``PyImport_ImportModule`` now always do absolute
   imports. In earlier versions they might have used relative imports under
   some conditions.
-
-- Issue #1629: Renamed Py_Size, Py_Type and Py_Refcnt to Py_SIZE, Py_TYPE
-  and Py_REFCNT.
 
 - Added case insensitive comparison methods ``PyOS_stricmp(char*, char*)``
   and ``PyOS_strnicmp(char*, char*, Py_ssize_t)``.
