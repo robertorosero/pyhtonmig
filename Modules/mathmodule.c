@@ -96,9 +96,7 @@ math_1(PyObject *arg, double (*func) (double), int can_overflow)
 	x_is_infinity = Py_IS_INFINITY(x);
 	errno = 0;
 	PyFPE_START_PROTECT("in math_1", return 0);
-	//printf("math_1: Before func call: errno=%d; input = %.20e\n", errno, x);
 	x = (*func)(x);
-	//printf("math_1: Aftern func call: errno=%d; result = %.20e\n", errno, x);
 	PyFPE_END_PROTECT(x);
 
 	/* if the result was a NaN then we should be signalling a ValueError;
