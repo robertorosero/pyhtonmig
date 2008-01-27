@@ -252,6 +252,12 @@ class MathTests(unittest.TestCase):
         self.assertRaises(TypeError, math.hypot)
         self.ftest('hypot(0,0)', math.hypot(0,0), 0)
         self.ftest('hypot(3,4)', math.hypot(3,4), 5)
+        self.assertEqual(math.hypot(NAN, INF), INF)
+        self.assertEqual(math.hypot(INF, NAN), INF)
+        self.assertEqual(math.hypot(NAN, NINF), INF)
+        self.assertEqual(math.hypot(NINF, NAN), INF)
+        self.assert_(math.isnan(math.hypot(1.0, NAN)))
+        self.assert_(math.isnan(math.hypot(NAN, -2.0)))
 
     def testLdexp(self):
         self.assertRaises(TypeError, math.ldexp)

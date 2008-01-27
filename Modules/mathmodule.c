@@ -42,8 +42,15 @@ raised for division by zero and mod by zero.
 
 */
 
-/* Platform notes: on many BSDs and Mac OS X, the functions in libm never set
-   errno.  In GNU's libm, setting of errno is erratic. */
+/*
+   In general, on an IEEE-754 platform the aim is to follow the C99
+   standard, including Annex 'F', whenever possible.  Where the
+   standard recommends raising the 'divide-by-zero' or 'invalid'
+   floating-point exceptions, Python should raise a ValueError.  Where
+   the standard recommends raising 'overflow', Python should raise an
+   OverflowError.  In all other circumstances a value should be
+   returned.
+ */
 
 #include "Python.h"
 #include "longintrepr.h" /* just for SHIFT */
@@ -131,15 +138,14 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-#ifndef __GNUC__ /* Windows et al */
-	if (Py_IS_NAN(x) || Py_IS_NAN(y))
-		return PyFloat_FromDouble(x+y);
-#endif
+        if (Py_IS_NAN(x))
+		return PyFloat_FromDouble(x);
+	if (Py_IS_NAN(y))
+		return PyFloat_FromDouble(y);
 	errno = 0;
 	PyFPE_START_PROTECT("in math_2", return 0)
 	x = (*func)(x, y);
-	PyFPE_END_PROTECT(x)
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	PyFPE_END_PROTECT(x);
 	if (errno && is_error(x))
 		return NULL;
 	else
@@ -192,8 +198,6 @@ FUNC1(floor, floor, 0,
 FUNC2(fmod, fmod,
       "fmod(x,y)\n\nReturn fmod(x, y), according to platform C."
       "  x % y may differ.")
-FUNC2(hypot, hypot,
-      "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
 FUNC1(sin, sin, 0,
       "sin(x)\n\nReturn the sine of x (measured in radians).")
 FUNC1(sinh, sinh, 1,
@@ -437,6 +441,52 @@ math_pow(PyObject *self, PyObject *args)
 
 PyDoc_STRVAR(math_pow_doc,
 "pow(x,y)\n\nReturn x**y (x to the power of y).");
+
+static PyObject *
+math_hypot(PyObject *self, PyObject *args)
+{
+	PyObject *ox, *oy;
+	double x, y;
+	int x_is_infinity, y_is_infinity;
+
+	if (! PyArg_UnpackTuple(args, "hypot", 2, 2, &ox, &oy))
+		return NULL;
+	x = PyFloat_AsDouble(ox);
+	y = PyFloat_AsDouble(oy);
+	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
+		return NULL;
+
+	/* hypot (+/-infinity, x) returns infinity, even if x is a NaN */
+	if (Py_IS_INFINITY(x) || Py_IS_INFINITY(y))
+		return PyFloat_FromDouble(Py_HUGE_VAL);
+
+	/* Now the usual rules apply: if either argument is a NaN, return NaN */
+	if (Py_IS_NAN(x))
+		return PyFloat_FromDouble(x);
+	if (Py_IS_NAN(y))
+		return PyFloat_FromDouble(y);
+
+	x_is_infinity = Py_IS_INFINITY(x);
+	y_is_infinity = Py_IS_INFINITY(y);
+
+	errno = 0;
+	PyFPE_START_PROTECT("in math_hypot", return 0);
+	x = hypot(x, y);
+	PyFPE_END_PROTECT(x);
+
+	/* we can get an infinity here either as an exact result, or
+	   as a result of overflow */
+	if (!x_is_infinity && !y_is_infinity && Py_IS_INFINITY(x))
+		errno = ERANGE;
+
+	if (errno && is_error(x))
+		return NULL;
+	else
+		return PyFloat_FromDouble(x);
+}
+
+PyDoc_STRVAR(math_hypot_doc,
+	     "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).");
 
 static const double degToRad = Py_MATH_PI / 180.0;
 static const double radToDeg = 180.0 / Py_MATH_PI;
