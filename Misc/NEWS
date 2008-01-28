@@ -12,6 +12,15 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Added ``from_cis`` constructor to the ``complex`` type to create a complex
+  from a polar or exp notation. The new method ``as_cis`` returns radius *r*
+  and angle *phi* of a complex.
+
+- Issue #XXXX: Four new methods were added to the math and cmath modules:
+  acosh, asinh, atanh and log1p. Replacement implementations for platforms
+  without the four functions and copysign in libm were added to a new file
+  Python/pymath.c.
+
 - Patch #1473257: generator objects gain a gi_code attribute. This is the
   same object as the func_code attribute of the function that produced the
   generator.
@@ -35,11 +44,6 @@ Core and builtins
 
 - Issue #1882: when compiling code from a string, encoding cookies in the
   second line of code were not always recognized correctly.
-
-- Issue #XXXX: Four new methods were added to the math and cmath modules:
-  acosh, asinh, atanh and log1p. Replacement implementations for platforms
-  without the four functions and copysign in libm were added to a new file
-  Python/pymath.c.
 
 - Issue #1679: "0x" was taken as a valid integer literal.
 

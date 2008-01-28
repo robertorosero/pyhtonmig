@@ -376,6 +376,8 @@ Notes:
    expotentional form ``r * exp(j * phi)``. The method ``as_cis()`` returns the
    radius *r* and angle *phi* of a complex number.
 
+   .. versionadded:: 2.6
+
 
 All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 :class:`float`) also include the following operations:

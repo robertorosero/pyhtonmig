@@ -151,7 +151,7 @@ Power and logarithmic functions:
    returns *0.* for all positive *y*, *0* and *NAN*.
 
    .. versionchanged:: 2.6
-   The outcome of ``1**nan`` and ``0**nan`` was undefined.
+      The outcome of ``1**nan`` and ``0**nan`` was undefined.
 
 
 .. function:: sqrt(x)
