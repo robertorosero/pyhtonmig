@@ -150,6 +150,34 @@ class MathTests(unittest.TestCase):
         self.assertRaises(TypeError, math.ceil, t)
         self.assertRaises(TypeError, math.ceil, t, 0)
 
+    if float.__getformat__("double").startswith("IEEE"):
+        def testCopysign(self):
+            self.assertRaises(TypeError, math.copysign)
+            # copysign should let us distinguish signs of zeros
+            self.assertEquals(copysign(1., 0.), 1.)
+            self.assertEquals(copysign(1., -0.), -1.)
+            self.assertEquals(copysign(INF, 0.), INF)
+            self.assertEquals(copysign(INF, -0.), NINF)
+            self.assertEquals(copysign(NINF, 0.), INF)
+            self.assertEquals(copysign(NINF, -0.), NINF)
+            # and of infinities
+            self.assertEquals(copysign(1., INF), 1.)
+            self.assertEquals(copysign(1., NINF), -1.)
+            self.assertEquals(copysign(INF, INF), INF)
+            self.assertEquals(copysign(INF, NINF), NINF)
+            self.assertEquals(copysign(NINF, INF), INF)
+            self.assertEquals(copysign(NINF, NINF), NINF)
+            self.assert_(math.isnan(copysign(NAN, 1.)))
+            self.assert_(math.isnan(copysign(NAN, INF)))
+            self.assert_(math.isnan(copysign(NAN, NINF)))
+            self.assert_(math.isnan(copysign(NAN, NAN)))
+            # copysign(INF, NAN) may be INF or it may be NINF, since
+            # we don't know whether the sign bit of NAN is set on any
+            # given platform.
+            self.assert_(math.isinf(copysign(INF, NAN)))
+            # similarly, copysign(2., NAN) could be 2. or -2.
+            self.assertEquals(abs(copysign(2., NAN)), 2.)
+
     def testCos(self):
         self.assertRaises(TypeError, math.cos)
         self.ftest('cos(-pi/2)', math.cos(-math.pi/2), 0)
@@ -234,6 +262,19 @@ class MathTests(unittest.TestCase):
         self.ftest('fmod(-10,1)', math.fmod(-10,1), 0)
         self.ftest('fmod(-10,0.5)', math.fmod(-10,0.5), 0)
         self.ftest('fmod(-10,1.5)', math.fmod(-10,1.5), -1)
+        self.assert_(math.isnan(math.fmod(NAN, 1.)))
+        self.assert_(math.isnan(math.fmod(1., NAN)))
+        self.assert_(math.isnan(math.fmod(NAN, NAN)))
+        self.assertRaises(ValueError, math.fmod, 1., 0.)
+        self.assertRaises(ValueError, math.fmod, INF, 1.)
+        self.assertRaises(ValueError, math.fmod, NINF, 1.)
+        self.assertRaises(ValueError, math.fmod, INF, 0.)
+        self.assertEquals(math.fmod(3.0, INF), 3.0)
+        self.assertEquals(math.fmod(-3.0, INF), -3.0)
+        self.assertEquals(math.fmod(3.0, NINF), 3.0)
+        self.assertEquals(math.fmod(-3.0, NINF), -3.0)
+        self.assertEquals(math.fmod(0.0, 3.0), 0.0)
+        self.assertEquals(math.fmod(0.0, NINF), 0.0)
 
     def testFrexp(self):
         self.assertRaises(TypeError, math.frexp)

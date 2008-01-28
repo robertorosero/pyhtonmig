@@ -143,14 +143,18 @@ math_2(PyObject *args, double (*func) (double, double), char *funcname)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-        if (Py_IS_NAN(x))
+	if (Py_IS_NAN(x))
 		return PyFloat_FromDouble(x);
 	if (Py_IS_NAN(y))
 		return PyFloat_FromDouble(y);
 	errno = 0;
-	PyFPE_START_PROTECT("in math_2", return 0)
+	PyFPE_START_PROTECT("in math_2", return 0);
 	x = (*func)(x, y);
 	PyFPE_END_PROTECT(x);
+
+	if (Py_IS_NAN(x))
+		errno = EDOM;
+
 	if (errno && is_error(x))
 		return NULL;
 	else
@@ -191,8 +195,6 @@ FUNC1(cos, cos, 0,
       "cos(x)\n\nReturn the cosine of x (measured in radians).")
 FUNC1(cosh, cosh, 1,
       "cosh(x)\n\nReturn the hyperbolic cosine of x.")
-FUNC2(copysign, copysign,
-      "copysign(x,y)\n\nReturn x with the sign of y.");
 FUNC1(exp, exp, 1,
       "exp(x)\n\nReturn e raised to the power of x.")
 FUNC1(fabs, fabs, 0,
@@ -383,6 +385,42 @@ math_log10(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
+
+/* copysign can't use math_2, since it doesn't follow the general rules for
+   NaNs (i.e., it's not true that copysign(x, y) is NaN whenever x or y is a
+   NaN.) */
+
+static PyObject *
+math_copysign(PyObject *self, PyObject *args)
+{
+	PyObject *ox, *oy;
+	double x, y;
+
+	if (! PyArg_UnpackTuple(args, "copysign", 2, 2, &ox, &oy))
+		return NULL;
+	x = PyFloat_AsDouble(ox);
+	y = PyFloat_AsDouble(oy);
+	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
+		return NULL;
+
+	errno = 0;
+	/* copysign shouldn't raise any floating-point
+	   exception, but better to be safe than sorry */
+	PyFPE_START_PROTECT("in math_copysign", return 0);
+	x = copysign(x, y);
+	PyFPE_END_PROTECT(x);
+
+	if (errno && is_error(x))
+		/* if errno is set then something unexpected happened.  Better
+		   to raise a Python exception than to return a possibly
+		   incorrect value in this case. */
+		return NULL;
+	else
+		return PyFloat_FromDouble(x);
+}
+
+PyDoc_STRVAR(math_copysign_doc,
+	     "copysign(x,y)\n\nReturn x with the sign of y.");
 
 static PyObject *
 math_pow(PyObject *self, PyObject *args)
