@@ -95,41 +95,49 @@ is_error(double x)
 	return result;
 }
 
+/* In math_1, the following rules are used to try to ensure that
+   functions raise the correct exceptions both on ANSI C platforms and
+   on C99 platforms:
+
+   (1) Whenever a non-NaN argument gives a NaN result, set errno = EDOM
+   to force Python to raise a ValueError.
+
+   (2) Whenever a finite argument gives an infinite result, set errno
+   to either EDOM or ERANGE to force Python to raise ValueError or
+   OverflowError respectively.  The "can_overflow" argument should be
+   set to 1 for functions which might overflow but never raise
+   "divide-by-zero", and 0 for functions that never overflow.
+   Fortunately, none of the single-argument functions currently
+   implemented can raise both "divide-by-zero" *and* "overflow".
+
+   (3) If neither of the above occurred but errno was set by the libm
+   function (this can happen in cases where Py_HUGE_VAL is not an
+   infinity) then raise OverflowError if errno==ERANGE and the result
+   was nonzero, do nothing if errno==ERANGE and the result was zero
+   (this can happen on underflow under ANSI C), and raise ValueError
+   if errno==EDOM.
+
+*/
+
 static PyObject *
 math_1(PyObject *arg, double (*func) (double), int can_overflow)
 {
-	int x_is_infinity;
-	double x = PyFloat_AsDouble(arg);
+	double x, r;
+	x = PyFloat_AsDouble(arg);
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
-	/* a NaN input should be returned unscathed */
-	if (Py_IS_NAN(x))
-		return PyFloat_FromDouble(x);
-	x_is_infinity = Py_IS_INFINITY(x);
 	errno = 0;
 	PyFPE_START_PROTECT("in math_1", return 0);
-	x = (*func)(x);
-	PyFPE_END_PROTECT(x);
-
-	/* if the result was a NaN then we should be signalling a ValueError;
-	   this should only happen in the cases where C99 recommends raising
-	   invalid */
-	if (Py_IS_NAN(x))
+	r = (*func)(x);
+	PyFPE_END_PROTECT(r);
+	if (!Py_IS_NAN(x) && Py_IS_NAN(r))
 		errno = EDOM;
-
-	/* if the input was finite and the result is an infinity, then either
-	   overflow occurred and we should be setting errno to ERANGE so that
-	   Python raises an OverflowError, or we were evaluating at a
-	   singularity, and we should setting errno to EDOM so that Python
-	   raises ValueError.  Currently, none of the functions using math_1
-	   have singularities *and* the possibility of overflow :-) */
-	if (!x_is_infinity && Py_IS_INFINITY(x))
+	if (Py_IS_FINITE(x) && Py_IS_INFINITY(r))
 		errno = can_overflow ? ERANGE : EDOM;
-
-	if (errno && is_error(x))
+	if (errno && is_error(r))
 		return NULL;
 	else
-		return PyFloat_FromDouble(x);
+		return PyFloat_FromDouble(r);
 }
 
 static PyObject *
