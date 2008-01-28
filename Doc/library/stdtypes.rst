@@ -302,7 +302,7 @@ All builtin numeric types support the following operations. See
 +--------------------+---------------------------------+--------+
 | ``float(x)``       | *x* converted to floating point | \(6)   |
 +--------------------+---------------------------------+--------+
-| ``complex(re,im)`` | a complex number with real part |        |
+| ``complex(re,im)`` | a complex number with real part | \(8)   |
 |                    | *re*, imaginary part *im*.      |        |
 |                    | *im* defaults to zero.          |        |
 +--------------------+---------------------------------+--------+
@@ -369,6 +369,13 @@ Notes:
 (7)
    Python defines ``pow(0, 0)`` and ``0 ** 0`` to be ``1``, as is common for
    programming languages.
+
+(8)
+   The complex type has also the constructor ``from_cis(r, phi)`` to create a
+   complex from the polar form ``r * (cos(phi) + j * sin(pih))`` or
+   expotentional form ``r * exp(j * phi)``. The method ``as_cis()`` returns the
+   radius *r* and angle *phi* of a complex number.
+
 
 All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 :class:`float`) also include the following operations:

@@ -9,7 +9,7 @@ warnings.filterwarnings(
 )
 
 from random import random
-from math import atan2
+from math import atan2, pi
 
 # These tests ensure that complex math does the right thing
 
@@ -358,6 +358,30 @@ class ComplexTest(unittest.TestCase):
                 os.remove(test_support.TESTFN)
             except (OSError, IOError):
                 pass
+
+    def assertCISEqual(self, a, b):
+        eps = 1E-7
+        if abs(a[0] - b[0]) > eps or abs(a[1] - b[1]) > eps:
+            self.fail((a ,b))
+
+    def test_as_cis(self):
+        self.assertCISEqual(complex().as_cis(), (0., 0.))
+        self.assertCISEqual(complex(1.).as_cis(), (1., 0.))
+        self.assertCISEqual(complex(-1.).as_cis(), (1., pi))
+        self.assertCISEqual(complex(0., 1).as_cis(), (1., pi/2))
+        self.assertCISEqual(complex(0., -1).as_cis(), (1., -pi/2))
+
+    def assertCEqual(self, a, b):
+        eps = 1E-7
+        if abs(a.real - b[0]) > eps or abs(a.imag - b[1]) > eps:
+            self.fail((a ,b))
+
+    def test_from_cis(self):
+        self.assertCEqual(complex.from_cis(0, 0), (0, 0))
+        self.assertCEqual(complex.from_cis(1, 0), (1., 0))
+        self.assertCEqual(complex.from_cis(1, -pi), (-1., 0))
+        self.assertCEqual(complex.from_cis(1, pi/2), (0, 1.))
+        self.assertCEqual(complex.from_cis(1, -pi/2), (0, -1.))
 
 def test_main():
     test_support.run_unittest(ComplexTest)

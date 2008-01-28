@@ -183,6 +183,31 @@ c_powi(Py_complex x, long n)
 
 }
 
+static Py_complex
+c_from_cis(float r, float phi)
+{
+	Py_complex cn;
+
+	if (r <= 0.) {
+		if (r != 0.) {
+			errno = EDOM;
+		}
+		cn.real = cn.imag = 0.;
+		return cn;
+	}
+
+	cn.real = r * cos(phi);
+	cn.imag = r * sin(phi);
+	return cn;
+}
+
+static void
+c_as_cis(Py_complex cn, float *r, float *phi)
+{
+	*r = hypot(cn.real, cn.imag);
+	*phi = atan2(cn.imag, cn.real);
+}
+
 static PyObject *
 complex_subtype_from_c_complex(PyTypeObject *type, Py_complex cval)
 {
@@ -748,9 +773,62 @@ complex_getnewargs(PyComplexObject *v)
 	return Py_BuildValue("(D)", &v->cval);
 }
 
+static PyObject *
+complex_from_cis(PyObject *ignored, PyObject *args)
+{
+	Py_complex c;
+	float r, phi;
+
+	if (!PyArg_ParseTuple(args, "ff:fromcis", &r, &phi))
+		return NULL;
+
+	PyFPE_START_PROTECT("complex_from_cis", return NULL)
+	errno = 0;
+	c = c_from_cis(r, phi);
+	PyFPE_END_PROTECT(r)
+	Py_ADJUST_ERANGE2(c.real, c.imag);
+	if (errno == EDOM) {
+		PyErr_SetString(PyExc_ValueError,
+				"r must not be negative");
+		return NULL;
+	}
+	return PyComplex_FromCComplex(c);
+}
+
+PyDoc_STRVAR(complex_from_cis_doc,
+"complex.from_cis(r, phi) -> complex\n"
+"\n"
+"Creates a complex number from the polar form r * (cos(phi) + j * sin(phi))"
+"or exponential form r * exp(j * phi)");
+
+static PyObject *
+complex_as_cis(PyObject *self)
+{
+	Py_complex c;
+	float r, phi;
+
+	c = ((PyComplexObject *)self)->cval;
+	PyFPE_START_PROTECT("complex_as_cis", return NULL)
+	errno = 0;
+	c_as_cis(c, &r, &phi);
+	PyFPE_END_PROTECT(r)
+	return Py_BuildValue("ff", r, phi);
+}
+
+PyDoc_STRVAR(complex_as_cis_doc,
+"complex.as_cis() -> r, phi\n"
+"\n"
+"Converts a complex number to the polar form r * (cos(phi) + j * sin(phi))"
+"or exponential form r * exp(j * phi)");
+
+
 static PyMethodDef complex_methods[] = {
+	{"as_cis",	(PyCFunction)complex_as_cis,	METH_NOARGS,
+	 complex_as_cis_doc},
 	{"conjugate",	(PyCFunction)complex_conjugate,	METH_NOARGS,
 	 complex_conjugate_doc},
+	{"from_cis",	(PyCFunction)complex_from_cis,
+	 METH_VARARGS | METH_STATIC, complex_from_cis_doc},
 	{"__getnewargs__",	(PyCFunction)complex_getnewargs,	METH_NOARGS},
 	{NULL,		NULL}		/* sentinel */
 };
