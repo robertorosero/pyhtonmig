@@ -233,7 +233,7 @@ math_frexp(PyObject *self, PyObject *arg)
 		return NULL;
 	errno = 0;
 	x = frexp(x, &i);
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	/* frexp shouldn't set errno;  check, just in case. */
 	if (errno && is_error(x))
 		return NULL;
 	else
@@ -250,19 +250,20 @@ PyDoc_STRVAR(math_frexp_doc,
 static PyObject *
 math_ldexp(PyObject *self, PyObject *args)
 {
-	double x;
+	double x, r;
 	int exp;
 	if (! PyArg_ParseTuple(args, "di:ldexp", &x, &exp))
 		return NULL;
 	errno = 0;
 	PyFPE_START_PROTECT("ldexp", return 0)
-	x = ldexp(x, exp);
-	PyFPE_END_PROTECT(x)
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
-	if (errno && is_error(x))
+	r = ldexp(x, exp);
+	PyFPE_END_PROTECT(r)
+	if (Py_IS_FINITE(x) && Py_IS_INFINITY(r))
+		errno = ERANGE;
+	if (errno && is_error(r))
 		return NULL;
 	else
-		return PyFloat_FromDouble(x);
+		return PyFloat_FromDouble(r);
 }
 
 PyDoc_STRVAR(math_ldexp_doc,
@@ -276,7 +277,9 @@ math_modf(PyObject *self, PyObject *arg)
 		return NULL;
 	errno = 0;
 	x = modf(x, &y);
-	Py_SET_ERRNO_ON_MATH_ERROR(x);
+	/* modf should never set errno; if it does, we raise a Python
+	 exception---better to raise an exception than silently return
+	 a possibly wrong value */
 	if (errno && is_error(x))
 		return NULL;
 	else

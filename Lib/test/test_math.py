@@ -289,6 +289,10 @@ class MathTests(unittest.TestCase):
         testfrexp('frexp(1)', math.frexp(1), (0.5, 1))
         testfrexp('frexp(2)', math.frexp(2), (0.5, 2))
 
+        self.assertEquals(math.frexp(INF)[0], INF)
+        self.assertEquals(math.frexp(NINF)[0], NINF)
+        self.assert_(math.isnan(math.frexp(NAN)[0]))
+
     def testHypot(self):
         self.assertRaises(TypeError, math.hypot)
         self.ftest('hypot(0,0)', math.hypot(0,0), 0)
@@ -306,6 +310,13 @@ class MathTests(unittest.TestCase):
         self.ftest('ldexp(1,1)', math.ldexp(1,1), 2)
         self.ftest('ldexp(1,-1)', math.ldexp(1,-1), 0.5)
         self.ftest('ldexp(-1,1)', math.ldexp(-1,1), -2)
+        self.assertRaises(OverflowError, math.ldexp, 1., 1000000)
+        self.assertRaises(OverflowError, math.ldexp, -1., 1000000)
+        self.assertEquals(math.ldexp(1., -1000000), 0.)
+        self.assertEquals(math.ldexp(-1., -1000000), -0.)
+        self.assertEquals(math.ldexp(INF, 30), INF)
+        self.assertEquals(math.ldexp(NINF, -213), NINF)
+        self.assert_(math.isnan(math.ldexp(NAN, 0)))
 
     def testLog(self):
         self.assertRaises(TypeError, math.log)
@@ -348,6 +359,13 @@ class MathTests(unittest.TestCase):
 
         testmodf('modf(1.5)', math.modf(1.5), (0.5, 1.0))
         testmodf('modf(-1.5)', math.modf(-1.5), (-0.5, -1.0))
+
+        self.assertEquals(math.modf(INF), (0.0, INF))
+        self.assertEquals(math.modf(NINF), (-0.0, NINF))
+
+        modf_nan = math.modf(NAN)
+        self.assert_(math.isnan(modf_nan[0]))
+        self.assert_(math.isnan(modf_nan[1]))
 
     def testPow(self):
         self.assertRaises(TypeError, math.pow)
