@@ -22,7 +22,31 @@ class Test(unittest.TestCase):
             ob = tp()
             v = memoryview(ob)
             try:
-                self.failUnlessEqual(normalize(v.format), fmt)
+                self.failUnlessEqual(normalize(v.format), normalize(fmt))
+                self.failUnlessEqual(v.size, sizeof(ob))
+                self.failUnlessEqual(v.itemsize, sizeof(itemtp))
+                self.failUnlessEqual(v.shape, shape)
+                # ctypes object always have a non-strided memory block
+                self.failUnlessEqual(v.strides, None)
+                # they are always read/write
+                self.failIf(v.readonly)
+
+                if v.shape:
+                    n = 1
+                    for dim in v.shape:
+                        n = n * dim
+                    self.failUnlessEqual(v.itemsize * n, v.size)
+            except:
+                # so that we can see the failing type
+                print(tp)
+                raise
+
+    def test_endian_types(self):
+        for tp, fmt, shape, itemtp in endian_types:
+            ob = tp()
+            v = memoryview(ob)
+            try:
+                self.failUnlessEqual(v.format, fmt)
                 self.failUnlessEqual(v.size, sizeof(ob))
                 self.failUnlessEqual(v.itemsize, sizeof(itemtp))
                 self.failUnlessEqual(v.shape, shape)
@@ -117,6 +141,19 @@ native_types = [
     # function signatures are not implemented
     (CFUNCTYPE(None),           "X{}",                  None,           CFUNCTYPE(None)),
 
+    ]
+
+class BEPoint(BigEndianStructure):
+    _fields_ = [("x", c_long), ("y", c_long)]
+
+class LEPoint(LittleEndianStructure):
+    _fields_ = [("x", c_long), ("y", c_long)]
+
+endian_types = [
+    (BEPoint,                   "T{>l:x:>l:y:}",        None,           BEPoint),
+    (LEPoint,                   "T{<l:x:<l:y:}",        None,           LEPoint),
+    (POINTER(BEPoint),          "&T{>l:x:>l:y:}",       None,           POINTER(BEPoint)),
+    (POINTER(LEPoint),          "&T{<l:x:<l:y:}",       None,           POINTER(LEPoint)),
     ]
 
 if __name__ == "__main__":

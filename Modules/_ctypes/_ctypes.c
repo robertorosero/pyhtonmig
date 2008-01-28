@@ -1823,14 +1823,14 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		PyObject_SetAttrString(swapped, "__ctype_be__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_le__", swapped);
 		/* We are creating the type for the OTHER endian */
-		sw_dict->format = alloc_format_string("<", stgdict->format);
+		sw_dict->format = alloc_format_string("<", stgdict->format+1);
 #else
 		PyObject_SetAttrString((PyObject *)result, "__ctype_be__", swapped);
 		PyObject_SetAttrString((PyObject *)result, "__ctype_le__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_le__", (PyObject *)result);
 		PyObject_SetAttrString(swapped, "__ctype_be__", swapped);
 		/* We are creating the type for the OTHER endian */
-		sw_dict->format = alloc_format_string(">", stgdict->format);
+		sw_dict->format = alloc_format_string(">", stgdict->format+1);
 #endif
 		Py_DECREF(swapped);
 		if (PyErr_Occurred()) {
