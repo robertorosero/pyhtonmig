@@ -39,6 +39,13 @@ The functions are:
    from 1 along the real axis to -∞, continuous from above.
 
 
+.. function:: arg(x)
+
+   Return argument, also known as the phase angle, of a complex.
+
+   .. versionadded:: 2.6
+
+
 .. function:: asin(x)
 
    Return the arc sine of *x*. This has the same branch cuts as :func:`acos`.
@@ -106,6 +113,21 @@ The functions are:
 
    Return the base-10 logarithm of *x*. This has the same branch cut as
    :func:`log`.
+
+
+.. function:: polar(x)
+
+   Convert a complex from rectangular coordinates to polar coordinates. r is
+   the distance from 0 and phi the phase angle.
+
+   .. versionadded:: 2.6
+
+
+.. function:: rect(r, phi)
+
+   Convert from polar coordinates to rectangular coordinates.
+
+   .. versionadded:: 2.6
 
 
 .. function:: sin(x)

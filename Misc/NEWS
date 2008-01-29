@@ -12,9 +12,8 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
-- Added ``from_cis`` constructor to the ``complex`` type to create a complex
-  from a polar or exp notation. The new method ``as_cis`` returns radius *r*
-  and angle *phi* of a complex.
+- Added arg(z) -> phi, polar(z) -> r, phi and rect(r, phi) -> z to the cmath
+  module.
 
 - Issue #XXXX: Four new methods were added to the math and cmath modules:
   acosh, asinh, atanh and log1p. Replacement implementations for platforms

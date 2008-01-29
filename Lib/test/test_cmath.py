@@ -3,6 +3,7 @@ from test.test_math import parse_testfile, test_file
 import unittest
 import os, sys
 import cmath, math
+from cmath import arg, polar, rect, pi
 
 class CMathTests(unittest.TestCase):
     # list of all functions in cmath
@@ -223,6 +224,38 @@ class CMathTests(unittest.TestCase):
             else:
                 self.rAssertAlmostEqual(expected.real, actual.real)
             self.rAssertAlmostEqual(expected.imag, actual.imag)
+
+    def assertCISEqual(self, a, b):
+        eps = 1E-7
+        if abs(a[0] - b[0]) > eps or abs(a[1] - b[1]) > eps:
+            self.fail((a ,b))
+
+    def test_polar(self):
+        self.assertCISEqual(polar(0), (0., 0.))
+        self.assertCISEqual(polar(1.), (1., 0.))
+        self.assertCISEqual(polar(-1.), (1., pi))
+        self.assertCISEqual(polar(1j), (1., pi/2))
+        self.assertCISEqual(polar(-1j), (1., -pi/2))
+
+    def test_arg(self):
+        self.assertAlmostEqual(arg(0), 0.)
+        self.assertAlmostEqual(arg(1.), 0.)
+        self.assertAlmostEqual(arg(-1.), pi)
+        self.assertAlmostEqual(arg(1j), pi/2)
+        self.assertAlmostEqual(arg(-1j), -pi/2)
+
+    def assertCEqual(self, a, b):
+        eps = 1E-7
+        if abs(a.real - b[0]) > eps or abs(a.imag - b[1]) > eps:
+            self.fail((a ,b))
+
+    def test_rect(self):
+        self.assertCEqual(rect(0, 0), (0, 0))
+        self.assertCEqual(rect(1, 0), (1., 0))
+        self.assertCEqual(rect(1, -pi), (-1., 0))
+        self.assertCEqual(rect(1, pi/2), (0, 1.))
+        self.assertCEqual(rect(1, -pi/2), (0, -1.))
+
 
 def test_main():
     run_unittest(CMathTests)

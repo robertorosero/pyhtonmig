@@ -33,8 +33,6 @@
 #define CM_SCALE_UP 2*(DBL_MANT_DIG/2) + 1
 #define CM_SCALE_DOWN -(DBL_MANT_DIG/2 + 1)
 
-
-
 /* forward declarations */
 static Py_complex c_asinh(Py_complex);
 static Py_complex c_atanh(Py_complex);
@@ -609,6 +607,75 @@ FUNC1(cmath_sqrt, c_sqrt)
 FUNC1(cmath_tan, c_tan)
 FUNC1(cmath_tanh, c_tanh)
 
+static PyObject *
+cmath_arg(PyObject *self, PyObject *args)
+{
+	Py_complex z;
+	double phi;
+	if (!PyArg_ParseTuple(args, "D:arg", &z))
+		return NULL;
+	errno = 0;
+	PyFPE_START_PROTECT("arg function", return 0)
+	phi = atan2(z.imag, z.real);
+	PyFPE_END_PROTECT(r)
+	if (errno != 0)
+		return math_error();
+	else
+		return PyFloat_FromDouble(phi);
+}
+
+PyDoc_STRVAR(cmath_arg_doc,
+"arg(z) -> float\n\n\
+Return argument, also known as the phase angle, of a complex.");
+
+static PyObject *
+cmath_polar(PyObject *self, PyObject *args)
+{
+	Py_complex z;
+	double r, phi;
+	if (!PyArg_ParseTuple(args, "D:polar", &z))
+		return NULL;
+	errno = 0;
+	PyFPE_START_PROTECT("polar function", return 0)
+	r = hypot(z.real, z.imag);
+	phi = atan2(z.imag, z.real);
+	PyFPE_END_PROTECT(r)
+	if (errno != 0)
+		return math_error();
+	else
+		return Py_BuildValue("dd", r, phi);
+}
+
+PyDoc_STRVAR(cmath_polar_doc,
+"polar(z) -> r: float, phi: float\n\n\
+Convert a complex from rectangular coordinates to polar coordinates. r is\n\
+the distance from 0 and phi the phase angle.");
+
+static PyObject *
+cmath_rect(PyObject *self, PyObject *args)
+{
+	Py_complex z;
+	double r, phi;
+	if (!PyArg_ParseTuple(args, "dd:rect", &r, &phi))
+		return NULL;
+	errno = 0;
+	if (r < 0.) {
+		errno = EDOM;
+		return math_error();
+	}
+	PyFPE_START_PROTECT("rect function", return 0)
+	z.real = r * cos(phi);
+	z.imag = r * sin(phi);
+	PyFPE_END_PROTECT(z)
+	if (errno != 0)
+		return math_error();
+	else
+		return PyComplex_FromCComplex(z);
+}
+
+PyDoc_STRVAR(cmath_rect_doc,
+"rect(r, phi) -> z: complex\n\n\
+Convert from polar coordinates to rectangular coordinates.");
 
 PyDoc_STRVAR(module_doc,
 "This module is always available. It provides access to mathematical\n"
@@ -617,6 +684,7 @@ PyDoc_STRVAR(module_doc,
 static PyMethodDef cmath_methods[] = {
 	{"acos",   cmath_acos,  METH_VARARGS, c_acos_doc},
 	{"acosh",  cmath_acosh, METH_VARARGS, c_acosh_doc},
+	{"arg",    cmath_arg,   METH_VARARGS, cmath_arg_doc},
 	{"asin",   cmath_asin,  METH_VARARGS, c_asin_doc},
 	{"asinh",  cmath_asinh, METH_VARARGS, c_asinh_doc},
 	{"atan",   cmath_atan,  METH_VARARGS, c_atan_doc},
@@ -626,6 +694,8 @@ static PyMethodDef cmath_methods[] = {
 	{"exp",    cmath_exp,   METH_VARARGS, c_exp_doc},
 	{"log",    cmath_log,   METH_VARARGS, cmath_log_doc},
 	{"log10",  cmath_log10, METH_VARARGS, c_log10_doc},
+	{"polar",  cmath_polar, METH_VARARGS, cmath_polar_doc},
+	{"rect",   cmath_rect,  METH_VARARGS, cmath_rect_doc},
 	{"sin",    cmath_sin,   METH_VARARGS, c_sin_doc},
 	{"sinh",   cmath_sinh,  METH_VARARGS, c_sinh_doc},
 	{"sqrt",   cmath_sqrt,  METH_VARARGS, c_sqrt_doc},
