@@ -23,8 +23,56 @@ result of the conversion.
    support signed zeros the continuity is as specified below.
 
 
-The functions are:
+Complex coordinates
+-------------------
 
+Complex numbers can be expressed by two important coordinate systems.
+Python's :class:`complex` type uses rectangular coordinates where a number
+on the complex plain is defined by two floats, the real part and the imaginary
+part.
+
+Definition::
+
+   z = x + 1j * y
+
+   x := real(z)
+   y := imag(z)
+
+In engineering the polar coordinate system is popular for complex numbers. In
+polar coordinates a complex number is defined by the radius *r* and the phase
+angle *φ*. The radius *r* is the absolute value of the complex, which can be
+viewed as distance from (0, 0). The radius *r* is always 0 or a positive float.
+The phase angle *φ* is the counter clockwise angle from the positive x axis,
+e.g. *1* has the angle *0*, *1j* has the angle *π/2* and *-1* the angle *-π*.
+
+Definition::
+
+   z = r * exp(1j * φ)
+   z = r * cis(φ)
+
+   r := abs(z)
+   phi := arg(z) := atan2(imag(z), real(z))
+   cis(φ) := cos(φ) + 1j * sin(φ)
+
+
+.. function:: polar(z) -> r, phi
+
+   Convert a complex from rectangular coordinates to polar coordinates.
+   ``polar(z)`` returns a tuple with the two elements *r* and *φ*. *r* is
+   the distance from 0 and *φ* the phase angle.
+
+   .. versionadded:: 2.6
+
+
+.. function:: rect(r, phi) -> complex
+
+   Convert from polar coordinates to rectangular coordinates.
+
+   .. versionadded:: 2.6
+
+
+cmath functions
+---------------
 
 .. function:: acos(x)
 
@@ -123,21 +171,6 @@ The functions are:
 
    Return the base-10 logarithm of *x*. This has the same branch cut as
    :func:`log`.
-
-
-.. function:: polar(x)
-
-   Convert a complex from rectangular coordinates to polar coordinates. r is
-   the distance from 0 and phi the phase angle.
-
-   .. versionadded:: 2.6
-
-
-.. function:: rect(r, phi)
-
-   Convert from polar coordinates to rectangular coordinates.
-
-   .. versionadded:: 2.6
 
 
 .. function:: sin(x)
