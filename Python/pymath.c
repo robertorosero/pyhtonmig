@@ -88,7 +88,6 @@ log1p(double x)
  */
 
 static const double ln2 = 6.93147180559945286227E-01;
-static const double huge = 1E+300;
 static const double two_pow_m28 = 3.7252902984619141E-09; /* 2**-28 */
 static const double two_pow_p28 = 268435456.0; /* 2**28 */
 static const double zero = 0.0;
@@ -115,8 +114,7 @@ asinh(double x)
 		return x+x;
 	}
 	if (absx < two_pow_m28) {	/* |x| < 2**-28 */
-		if ((huge + x) > 1.0)
-			return x;	/* return x inexact except 0 */
+		return x;	/* return x inexact except 0 */
 	} 
 	if (absx > two_pow_p28) {	/* |x| > 2**28 */
 		w = log(absx)+ln2;
