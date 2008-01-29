@@ -90,28 +90,29 @@ is_error(double x)
 	return result;
 }
 
-/* In math_1, the following rules are used to try to ensure that
-   functions raise the correct exceptions both on ANSI C platforms and
-   on C99 platforms:
+/*
+   math_1 is used to wrap a libm function f that takes a double
+   arguments and returns a double.
 
-   (1) Whenever a non-NaN argument gives a NaN result, set errno = EDOM
-   to force Python to raise a ValueError.
+   The error reporting follows these rules, which are designed to do the right thing
+   on C89/C99 platforms and IEEE 754/non IEEE 754 platforms.
 
-   (2) Whenever a finite argument gives an infinite result, set errno
-   to either EDOM or ERANGE to force Python to raise ValueError or
-   OverflowError respectively.  The "can_overflow" argument should be
-   set to 1 for functions which might overflow but never raise
-   "divide-by-zero", and 0 for functions that never overflow.
-   Fortunately, none of the single-argument functions currently
-   implemented can raise both "divide-by-zero" *and* "overflow".
+   - a NaN result from non-NaN inputs causes ValueError to be raised
+   - an infinite result from finite inputs causes OverflowError to be raised if can_overflow is 1,
+     or raises ValueError if can_overflow is 0.
+   - if the result is finite and errno == EDOM then ValueError is raised
+   - if the result is finite and nonzero and errno == ERANGE then OverflowError is raised
 
-   (3) If neither of the above occurred but errno was set by the libm
-   function (this can happen in cases where Py_HUGE_VAL is not an
-   infinity) then raise OverflowError if errno==ERANGE and the result
-   was nonzero, do nothing if errno==ERANGE and the result was zero
-   (this can happen on underflow under ANSI C), and raise ValueError
-   if errno==EDOM.
+   The last rule is used to catch overflow on platforms which follow C89
+   but for which HUGE_VAL is not an infinity.
 
+   For the majority of one-argument functions these rules are enough to ensure
+   that Python's functions behave as specified in 'Annex F' of the C99
+   standard, with the 'invalid' and 'divide-by-zero' floating-point exceptions
+   mapping to Python's ValueError and the 'overflow' floating-point exception
+   mapping to OverflowError.  math_1 only works for functions that don't have
+   singularities *and* the possibility of overflow; fortunately, that covers
+   everything we care about right now.
 */
 
 static PyObject *
@@ -125,43 +126,77 @@ math_1(PyObject *arg, double (*func) (double), int can_overflow)
 	PyFPE_START_PROTECT("in math_1", return 0);
 	r = (*func)(x);
 	PyFPE_END_PROTECT(r);
-	if (!Py_IS_NAN(x) && Py_IS_NAN(r))
-		errno = EDOM;
-	if (Py_IS_FINITE(x) && Py_IS_INFINITY(r))
-		errno = can_overflow ? ERANGE : EDOM;
+	if (Py_IS_NAN(r)) {
+		if (!Py_IS_NAN(x))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	else if (Py_IS_INFINITY(r)) {
+		if (Py_IS_FINITE(x))
+			errno = can_overflow ? ERANGE : EDOM;
+		else
+			errno = 0;
+	}
 	if (errno && is_error(r))
 		return NULL;
 	else
 		return PyFloat_FromDouble(r);
 }
 
+/*
+   math_2 is used to wrap a libm function f that takes two double
+   arguments and returns a double.
+
+   The error reporting follows these rules, which are designed to do the right thing
+   on C89/C99 platforms and IEEE 754/non IEEE 754 platforms.
+
+   - a NaN result from non-NaN inputs causes ValueError to be raised
+   - an infinite result from finite inputs causes OverflowError to be raised.
+   - if the result is finite and errno == EDOM then ValueError is raised
+   - if the result is finite and nonzero and errno == ERANGE then OverflowError is raised
+
+   The last rule is used to catch overflow on platforms which follow C89
+   but for which HUGE_VAL is not an infinity.
+
+   For most two-argument functions (copysign, fmod, hypot, atan2) these rules
+   are enough to ensure that Python's functions behave as specified in 'Annex
+   F' of the C99 standard, with the 'invalid' and 'divide-by-zero'
+   floating-point exceptions mapping to Python's ValueError and the 'overflow'
+   floating-point exception mapping to OverflowError.
+*/
+
 static PyObject *
 math_2(PyObject *args, double (*func) (double, double), char *funcname)
 {
 	PyObject *ox, *oy;
-	double x, y;
+	double x, y, r;
 	if (! PyArg_UnpackTuple(args, funcname, 2, 2, &ox, &oy))
 		return NULL;
 	x = PyFloat_AsDouble(ox);
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-	if (Py_IS_NAN(x))
-		return PyFloat_FromDouble(x);
-	if (Py_IS_NAN(y))
-		return PyFloat_FromDouble(y);
 	errno = 0;
 	PyFPE_START_PROTECT("in math_2", return 0);
-	x = (*func)(x, y);
-	PyFPE_END_PROTECT(x);
-
-	if (Py_IS_NAN(x))
-		errno = EDOM;
-
-	if (errno && is_error(x))
+	r = (*func)(x, y);
+	PyFPE_END_PROTECT(r);
+	if (Py_IS_NAN(r)) {
+		if (!Py_IS_NAN(x) && !Py_IS_NAN(y))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	else if (Py_IS_INFINITY(r)) {
+		if (Py_IS_FINITE(x) && Py_IS_FINITE(y))
+			errno = ERANGE;
+		else
+			errno = 0;
+	}
+	if (errno && is_error(r))
 		return NULL;
 	else
-		return PyFloat_FromDouble(x);
+		return PyFloat_FromDouble(r);
 }
 
 #define FUNC1(funcname, func, can_overflow, docstring)			\
@@ -194,6 +229,8 @@ FUNC1(atanh, atanh, 0,
 FUNC1(ceil, ceil, 0,
       "ceil(x)\n\nReturn the ceiling of x as a float.\n"
       "This is the smallest integral value >= x.")
+FUNC2(copysign, copysign,
+      "copysign(x,y)\n\nReturn x with the sign of y.")
 FUNC1(cos, cos, 0,
       "cos(x)\n\nReturn the cosine of x (measured in radians).")
 FUNC1(cosh, cosh, 1,
@@ -208,6 +245,8 @@ FUNC1(floor, floor, 0,
 FUNC2(fmod, fmod,
       "fmod(x,y)\n\nReturn fmod(x, y), according to platform C."
       "  x % y may differ.")
+FUNC2(hypot, hypot,
+      "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
 FUNC1(sin, sin, 0,
       "sin(x)\n\nReturn the sine of x (measured in radians).")
 FUNC1(sinh, sinh, 1,
@@ -392,48 +431,17 @@ math_log10(PyObject *self, PyObject *arg)
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
 
-/* copysign can't use math_2, since it doesn't follow the general rules for
-   NaNs (i.e., it's not true that copysign(x, y) is NaN whenever x or y is a
-   NaN.) */
-
-static PyObject *
-math_copysign(PyObject *self, PyObject *args)
-{
-	PyObject *ox, *oy;
-	double x, y;
-
-	if (! PyArg_UnpackTuple(args, "copysign", 2, 2, &ox, &oy))
-		return NULL;
-	x = PyFloat_AsDouble(ox);
-	y = PyFloat_AsDouble(oy);
-	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
-		return NULL;
-
-	errno = 0;
-	/* copysign shouldn't raise any floating-point
-	   exception, but better to be safe than sorry */
-	PyFPE_START_PROTECT("in math_copysign", return 0);
-	x = copysign(x, y);
-	PyFPE_END_PROTECT(x);
-
-	if (errno && is_error(x))
-		/* if errno is set then something unexpected happened.  Better
-		   to raise a Python exception than to return a possibly
-		   incorrect value in this case. */
-		return NULL;
-	else
-		return PyFloat_FromDouble(x);
-}
-
-PyDoc_STRVAR(math_copysign_doc,
-	     "copysign(x,y)\n\nReturn x with the sign of y.");
+/* pow can't use math_2, but needs its own wrapper: the problem is that an
+   infinite result can arise either as a result of overflow (in which case
+   OverflowError should be raised) or as a result of e.g. 0.**-5. (for which
+   ValueError needs to be raised.)
+*/
 
 static PyObject *
 math_pow(PyObject *self, PyObject *args)
 {
 	PyObject *ox, *oy;
-	double x, y;
-	int x_is_infinity, y_is_infinity;
+	double r, x, y;
 
 	if (! PyArg_UnpackTuple(args, "pow", 2, 2, &ox, &oy))
 		return NULL;
@@ -441,101 +449,48 @@ math_pow(PyObject *self, PyObject *args)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-
-	/* 1**x and x**0 return 1., even if x is a NaN or infinity */
+	/* 1**x and x**0 return 1., even if x is a NaN or infinity.  It may be
+	   necessary to uncomment the following two lines on Windows.
 	if (x == 1.0 || y == 0.0)
-		return PyFloat_FromDouble(1.);
-
-	/* with the above two exceptions out of the way, usual rules for NaNs
-	   apply: if either x or y is a NaN then NaN should be returned. */
-	if (Py_IS_NAN(x))
-		return PyFloat_FromDouble(x);
-	if (Py_IS_NAN(y))
-		return PyFloat_FromDouble(y);
-
-	x_is_infinity = Py_IS_INFINITY(x);
-	y_is_infinity = Py_IS_INFINITY(y);
-
-	/* 0 ** negative should give a divide-by-zero exception according
-	   to IEEE-754;  we want errno = EDOM here to get a ValueError.
-	   Note: for 0.0 ** positive we let the libm routine take care of
-	   evaluation, to give maximum chance of getting the sign of the result
-	   correct. (e.g. (-0.0)**27 should be -0.0.) */
-	if (x == 0.0 && y < 0.0) {
-		errno = EDOM;
-		is_error(x);
-		return NULL;
-	}
-
-	/* Finally, call the libm pow. */
+	        return PyFloat_FromDouble(1.);   */
 	errno = 0;
 	PyFPE_START_PROTECT("in math_pow", return 0);
-	x = pow(x, y);
-	PyFPE_END_PROTECT(x);
+	r = pow(x, y);
+	PyFPE_END_PROTECT(r);
+	if (Py_IS_NAN(r)) {
+		if (!Py_IS_NAN(x) && !Py_IS_NAN(y))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	/* an infinite result arises either from:
 
-	/* a NaN at this point should result in ValueError being raised */
-	if (Py_IS_NAN(x))
-		errno = EDOM;
+	   (A) (+/-0.)**negative,
+	   (B) overflow of x**y with both x and y finite (and x nonzero)
+	   (C) (+/-inf)**positive, or
+	   (D) x**inf with |x| > 1, or x**-inf with |x| < 1.
 
-	/* if neither x nor y was infinity, then an infinite result here
-	   indicates overflow. */
-	if (!x_is_infinity && !y_is_infinity && Py_IS_INFINITY(x))
-		errno = ERANGE;
+	   In case (A) we want ValueError to be raised.  In case (B)
+	   OverflowError should be raised.  In cases (C) and (D) the infinite
+	   result should be returned.
+	*/
+	else if (Py_IS_INFINITY(r)) {
+		if (x == 0.)
+			errno = EDOM;
+		else if (Py_IS_FINITE(x) && Py_IS_FINITE(y))
+			errno = ERANGE;
+		else
+			errno = 0;
+	}
 
-	if (errno && is_error(x))
+	if (errno && is_error(r))
 		return NULL;
 	else
-		return PyFloat_FromDouble(x);
+		return PyFloat_FromDouble(r);
 }
 
 PyDoc_STRVAR(math_pow_doc,
 "pow(x,y)\n\nReturn x**y (x to the power of y).");
-
-static PyObject *
-math_hypot(PyObject *self, PyObject *args)
-{
-	PyObject *ox, *oy;
-	double x, y;
-	int x_is_infinity, y_is_infinity;
-
-	if (! PyArg_UnpackTuple(args, "hypot", 2, 2, &ox, &oy))
-		return NULL;
-	x = PyFloat_AsDouble(ox);
-	y = PyFloat_AsDouble(oy);
-	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
-		return NULL;
-
-	/* hypot (+/-infinity, x) returns infinity, even if x is a NaN */
-	if (Py_IS_INFINITY(x) || Py_IS_INFINITY(y))
-		return PyFloat_FromDouble(Py_HUGE_VAL);
-
-	/* Now the usual rules apply: if either argument is a NaN, return NaN */
-	if (Py_IS_NAN(x))
-		return PyFloat_FromDouble(x);
-	if (Py_IS_NAN(y))
-		return PyFloat_FromDouble(y);
-
-	x_is_infinity = Py_IS_INFINITY(x);
-	y_is_infinity = Py_IS_INFINITY(y);
-
-	errno = 0;
-	PyFPE_START_PROTECT("in math_hypot", return 0);
-	x = hypot(x, y);
-	PyFPE_END_PROTECT(x);
-
-	/* we can get an infinity here either as an exact result, or
-	   as a result of overflow */
-	if (!x_is_infinity && !y_is_infinity && Py_IS_INFINITY(x))
-		errno = ERANGE;
-
-	if (errno && is_error(x))
-		return NULL;
-	else
-		return PyFloat_FromDouble(x);
-}
-
-PyDoc_STRVAR(math_hypot_doc,
-	     "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).");
 
 static const double degToRad = Py_MATH_PI / 180.0;
 static const double radToDeg = 180.0 / Py_MATH_PI;
