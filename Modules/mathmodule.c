@@ -255,8 +255,6 @@ FUNC1(floor, floor, 0,
 FUNC2(fmod, fmod,
       "fmod(x,y)\n\nReturn fmod(x, y), according to platform C."
       "  x % y may differ.")
-FUNC2(hypot, hypot,
-      "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
 FUNC1(log1p, log1p, 1,
       "log1p(x)\n\nReturn the natural logarithm of 1+x (base e).\n\
       The result is computed in a way which is accurate for x near zero.")
@@ -411,6 +409,47 @@ math_log10(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
+
+static PyObject *
+math_hypot(PyObject *self, PyObject *args)
+{
+	PyObject *ox, *oy;
+	double r, x, y;
+	if (! PyArg_UnpackTuple(args, "hypot", 2, 2, &ox, &oy))
+		return NULL;
+	x = PyFloat_AsDouble(ox);
+	y = PyFloat_AsDouble(oy);
+	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
+		return NULL;
+	/* hypot(x, +/-Inf) returns Inf, even if x is a NaN. */
+	if (Py_IS_INFINITY(x))
+		return PyFloat_FromDouble(fabs(x));
+	if (Py_IS_INFINITY(y))
+		return PyFloat_FromDouble(fabs(y));
+	errno = 0;
+	PyFPE_START_PROTECT("in math_hypot", return 0);
+	r = hypot(x, y);
+	PyFPE_END_PROTECT(r);
+	if (Py_IS_NAN(r)) {
+		if (!Py_IS_NAN(x) && !Py_IS_NAN(y))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	else if (Py_IS_INFINITY(r)) {
+		if (Py_IS_FINITE(x) && Py_IS_FINITE(y))
+			errno = ERANGE;
+		else
+			errno = 0;
+	}
+	if (errno && is_error(r))
+		return NULL;
+	else
+		return PyFloat_FromDouble(r);
+}
+
+PyDoc_STRVAR(math_hypot_doc,
+"hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).");
 
 /* pow can't use math_2, but needs its own wrapper: the problem is
    that an infinite result can arise either as a result of overflow
