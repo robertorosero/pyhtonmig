@@ -252,9 +252,6 @@ FUNC1(fabs, fabs, 0,
 FUNC1(floor, floor, 0,
       "floor(x)\n\nReturn the floor of x as a float.\n"
       "This is the largest integral value <= x.")
-FUNC2(fmod, fmod,
-      "fmod(x,y)\n\nReturn fmod(x, y), according to platform C."
-      "  x % y may differ.")
 FUNC1(log1p, log1p, 1,
       "log1p(x)\n\nReturn the natural logarithm of 1+x (base e).\n\
       The result is computed in a way which is accurate for x near zero.")
@@ -407,6 +404,40 @@ math_log10(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
+
+static PyObject *
+math_fmod(PyObject *self, PyObject *args)
+{
+	PyObject *ox, *oy;
+	double r, x, y;
+	if (! PyArg_UnpackTuple(args, "fmod", 2, 2, &ox, &oy))
+		return NULL;
+	x = PyFloat_AsDouble(ox);
+	y = PyFloat_AsDouble(oy);
+	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
+		return NULL;
+	/* fmod(x, +/-Inf) returns x for finite x. */
+	if (Py_IS_INFINITY(y) && Py_IS_FINITE(x))
+		return PyFloat_FromDouble(x);
+	errno = 0;
+	PyFPE_START_PROTECT("in math_fmod", return 0);
+	r = fmod(x, y);
+	PyFPE_END_PROTECT(r);
+	if (Py_IS_NAN(r)) {
+		if (!Py_IS_NAN(x) && !Py_IS_NAN(y))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	if (errno && is_error(r))
+		return NULL;
+	else
+		return PyFloat_FromDouble(r);
+}
+
+PyDoc_STRVAR(math_fmod_doc,
+"fmod(x,y)\n\nReturn fmod(x, y), according to platform C."
+"  x % y may differ.");
 
 static PyObject *
 math_hypot(PyObject *self, PyObject *args)
