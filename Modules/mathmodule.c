@@ -437,11 +437,9 @@ math_pow(PyObject *self, PyObject *args)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-	/* 1**x and x**0 return 1., even if x is a NaN or infinity.
-	   It may be necessary to uncomment the following two lines on
-	   Windows.
+	/* 1**x and x**0 return 1., even if x is a NaN or infinity. */
 	if (x == 1.0 || y == 0.0)
-	        return PyFloat_FromDouble(1.);   */
+	        return PyFloat_FromDouble(1.);
 	errno = 0;
 	PyFPE_START_PROTECT("in math_pow", return 0);
 	r = pow(x, y);
