@@ -50,7 +50,7 @@ Definition::
    z = r * exp(1j * φ)
    z = r * cis(φ)
 
-   r := abs(z)
+   r := abs(z) := sqrt(real(z)**2 + imag(z)**2)
    phi := arg(z) := atan2(imag(z), real(z))
    cis(φ) := cos(φ) + 1j * sin(φ)
 

@@ -257,6 +257,9 @@ FUNC2(fmod, fmod,
       "  x % y may differ.")
 FUNC2(hypot, hypot,
       "hypot(x,y)\n\nReturn the Euclidean distance, sqrt(x*x + y*y).")
+FUNC1(log1p, log1p, 1,
+      "log1p(x)\n\nReturn the natural logarithm of 1+x (base e).\n\
+      The result is computed in a way which is accurate for x near zero.")
 FUNC1(sin, sin, 0,
       "sin(x)\n\nReturn the sine of x (measured in radians).")
 FUNC1(sinh, sinh, 1,
@@ -399,16 +402,6 @@ math_log(PyObject *self, PyObject *args)
 PyDoc_STRVAR(math_log_doc,
 "log(x[, base]) -> the logarithm of x to the given base.\n\
 If the base not specified, returns the natural logarithm (base e) of x.");
-
-static PyObject *
-math_log1p(PyObject *self, PyObject *arg)
-{
-	return loghelper(arg, log1p, "log1p");
-}
-
-PyDoc_STRVAR(math_log1p_doc,
-"log1p(x) -> the natural logarithm of 1+x (base e).\n\
-The result is computed in a way which is accurate for x near zero.");
 
 static PyObject *
 math_log10(PyObject *self, PyObject *arg)

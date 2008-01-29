@@ -339,6 +339,9 @@ class MathTests(unittest.TestCase):
         self.assertEquals(math.log1p(INF), INF)
         self.assertRaises(ValueError, math.log1p, NINF)
         self.assert_(math.isnan(math.log1p(NAN)))
+        n= 2**90
+        self.assertAlmostEquals(math.log1p(n), 62.383246250395075)
+        self.assertAlmostEquals(math.log1p(n), math.log1p(float(n)))
 
     def testLog10(self):
         self.assertRaises(TypeError, math.log10)
