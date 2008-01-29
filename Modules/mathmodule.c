@@ -273,10 +273,16 @@ math_frexp(PyObject *self, PyObject *arg)
 	double x = PyFloat_AsDouble(arg);
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
-	errno = 0;
-	PyFPE_START_PROTECT("ldexp", return 0);
-	x = frexp(x, &i);
-	PyFPE_END_PROTECT(x);
+	/* deal with special cases directly, to sidestep platform
+	   differences */
+	if (Py_IS_NAN(x) || Py_IS_INFINITY(x) || !x) {
+		i = 0;
+	}
+	else {
+		PyFPE_START_PROTECT("in math_frexp", return 0);
+		x = frexp(x, &i);
+		PyFPE_END_PROTECT(x);
+	}
 	return Py_BuildValue("(di)", x, i);
 }
 
@@ -295,7 +301,7 @@ math_ldexp(PyObject *self, PyObject *args)
 	if (! PyArg_ParseTuple(args, "di:ldexp", &x, &exp))
 		return NULL;
 	errno = 0;
-	PyFPE_START_PROTECT("ldexp", return 0)
+	PyFPE_START_PROTECT("in math_ldexp", return 0)
 	r = ldexp(x, exp);
 	PyFPE_END_PROTECT(r)
 	if (Py_IS_FINITE(x) && Py_IS_INFINITY(r))
@@ -320,7 +326,7 @@ math_modf(PyObject *self, PyObject *arg)
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
 	errno = 0;
-	PyFPE_START_PROTECT("ldexp", return 0);
+	PyFPE_START_PROTECT("in math_modf", return 0);
 	x = modf(x, &y);
 	PyFPE_END_PROTECT(x);
 	return Py_BuildValue("(dd)", x, y);
