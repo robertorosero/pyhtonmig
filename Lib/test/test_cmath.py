@@ -5,6 +5,9 @@ import os, sys
 import cmath, math
 from cmath import arg, polar, rect, pi
 
+INF = float('inf')
+NAN = float('nan')
+
 class CMathTests(unittest.TestCase):
     # list of all functions in cmath
     test_functions = [getattr(cmath, fname) for fname in [
@@ -255,6 +258,28 @@ class CMathTests(unittest.TestCase):
         self.assertCEqual(rect(1, -pi), (-1., 0))
         self.assertCEqual(rect(1, pi/2), (0, 1.))
         self.assertCEqual(rect(1, -pi/2), (0, -1.))
+
+    def test_isnan(self):
+        self.failIf(cmath.isnan(1))
+        self.failIf(cmath.isnan(1j))
+        self.failIf(cmath.isnan(INF))
+        self.assert_(cmath.isnan(NAN))
+        self.assert_(cmath.isnan(complex(NAN, 0)))
+        self.assert_(cmath.isnan(complex(0, NAN)))
+        self.assert_(cmath.isnan(complex(NAN, NAN)))
+        self.assert_(cmath.isnan(complex(NAN, INF)))
+        self.assert_(cmath.isnan(complex(INF, NAN)))
+
+    def test_isinf(self):
+        self.failIf(cmath.isinf(1))
+        self.failIf(cmath.isinf(1j))
+        self.failIf(cmath.isinf(NAN))
+        self.assert_(cmath.isinf(INF))
+        self.assert_(cmath.isinf(complex(INF, 0)))
+        self.assert_(cmath.isinf(complex(0, INF)))
+        self.assert_(cmath.isinf(complex(INF, INF)))
+        self.assert_(cmath.isinf(complex(NAN, INF)))
+        self.assert_(cmath.isinf(complex(INF, NAN)))
 
 
 def test_main():

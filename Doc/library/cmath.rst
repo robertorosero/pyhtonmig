@@ -99,6 +99,16 @@ The functions are:
    Return the exponential value ``e**x``.
 
 
+.. function:: isinf(x)
+
+   .. versionadded:: 2.6
+
+
+.. function:: isnan(x)
+
+   .. versionadded:: 2.6
+
+
 .. function:: log(x[, base])
 
    Returns the logarithm of *x* to the given *base*. If the *base* is not

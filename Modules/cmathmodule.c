@@ -677,6 +677,34 @@ PyDoc_STRVAR(cmath_rect_doc,
 "rect(r, phi) -> z: complex\n\n\
 Convert from polar coordinates to rectangular coordinates.");
 
+static PyObject *
+cmath_isnan(PyObject *self, PyObject *args)
+{
+	Py_complex z;
+	if (!PyArg_ParseTuple(args, "D:isnan", &z))
+		return NULL;
+	return PyBool_FromLong(Py_IS_NAN(z.real) || Py_IS_NAN(z.imag));
+}
+
+PyDoc_STRVAR(cmath_isnan_doc,
+"isnan(z) -> bool\n\
+Checks if the real or imaginary part of z not a number (NaN)");
+
+static PyObject *
+cmath_isinf(PyObject *self, PyObject *args)
+{
+	Py_complex z;
+	if (!PyArg_ParseTuple(args, "D:isnan", &z))
+		return NULL;
+	return PyBool_FromLong(Py_IS_INFINITY(z.real) ||
+			       Py_IS_INFINITY(z.imag));
+}
+
+PyDoc_STRVAR(cmath_isinf_doc,
+"isinf(z) -> bool\n\
+Checks if the real or imaginary part of z is infinite.");
+
+
 PyDoc_STRVAR(module_doc,
 "This module is always available. It provides access to mathematical\n"
 "functions for complex numbers.");
@@ -692,6 +720,8 @@ static PyMethodDef cmath_methods[] = {
 	{"cos",    cmath_cos,   METH_VARARGS, c_cos_doc},
 	{"cosh",   cmath_cosh,  METH_VARARGS, c_cosh_doc},
 	{"exp",    cmath_exp,   METH_VARARGS, c_exp_doc},
+	{"isinf",  cmath_isinf, METH_VARARGS, cmath_isinf_doc},
+	{"isnan",  cmath_isnan, METH_VARARGS, cmath_isnan_doc},
 	{"log",    cmath_log,   METH_VARARGS, cmath_log_doc},
 	{"log10",  cmath_log10, METH_VARARGS, c_log10_doc},
 	{"polar",  cmath_polar, METH_VARARGS, cmath_polar_doc},
