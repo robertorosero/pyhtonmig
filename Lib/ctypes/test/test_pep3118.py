@@ -84,6 +84,11 @@ class EmptyStruct(Structure):
 class aUnion(Union):
     _fields_ = [("a", c_int)]
 
+################################################################
+#
+# This table contains format strings as they look on little endian
+# machines.  The test replaces '<' with '>' on big endian machines.
+#
 native_types = [
     # type                      format                  shape           calc itemsize
 
@@ -149,6 +154,11 @@ class BEPoint(BigEndianStructure):
 class LEPoint(LittleEndianStructure):
     _fields_ = [("x", c_long), ("y", c_long)]
 
+################################################################
+#
+# This table contains format strings as they really look, on both big
+# and little endian machines.
+#
 endian_types = [
     (BEPoint,                   "T{>l:x:>l:y:}",        None,           BEPoint),
     (LEPoint,                   "T{<l:x:<l:y:}",        None,           LEPoint),
