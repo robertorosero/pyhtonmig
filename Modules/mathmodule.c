@@ -277,12 +277,10 @@ math_frexp(PyObject *self, PyObject *arg)
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
 	errno = 0;
+	PyFPE_START_PROTECT("ldexp", return 0);
 	x = frexp(x, &i);
-	/* frexp shouldn't set errno;  check, just in case. */
-	if (errno && is_error(x))
-		return NULL;
-	else
-		return Py_BuildValue("(di)", x, i);
+	PyFPE_END_PROTECT(x);
+	return Py_BuildValue("(di)", x, i);
 }
 
 PyDoc_STRVAR(math_frexp_doc,
@@ -305,6 +303,10 @@ math_ldexp(PyObject *self, PyObject *args)
 	PyFPE_END_PROTECT(r)
 	if (Py_IS_FINITE(x) && Py_IS_INFINITY(r))
 		errno = ERANGE;
+	/* Windows MSVC8 sets errno = EDOM on ldexp(NaN, i);
+	   we unset it to avoid raising a ValueError here. */
+	if (errno == EDOM)
+		errno = 0;
 	if (errno && is_error(r))
 		return NULL;
 	else
@@ -321,14 +323,10 @@ math_modf(PyObject *self, PyObject *arg)
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
 	errno = 0;
+	PyFPE_START_PROTECT("ldexp", return 0);
 	x = modf(x, &y);
-	/* modf should never set errno; if it does, we raise a Python
-	 exception---better to raise an exception than silently return
-	 a possibly wrong value */
-	if (errno && is_error(x))
-		return NULL;
-	else
-		return Py_BuildValue("(dd)", x, y);
+	PyFPE_END_PROTECT(x);
+	return Py_BuildValue("(dd)", x, y);
 }
 
 PyDoc_STRVAR(math_modf_doc,
