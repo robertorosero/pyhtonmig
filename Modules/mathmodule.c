@@ -401,35 +401,13 @@ PyDoc_STRVAR(math_log_doc,
 If the base not specified, returns the natural logarithm (base e) of x.");
 
 static PyObject *
-math_log1p(PyObject *self, PyObject *args)
+math_log1p(PyObject *self, PyObject *arg)
 {
-	PyObject *arg;
-	PyObject *base = NULL;
-	PyObject *num, *den;
-	PyObject *ans;
-
-	if (!PyArg_UnpackTuple(args, "log1p", 1, 2, &arg, &base))
-		return NULL;
-
-	num = loghelper(arg, log1p, "log");
-	if (num == NULL || base == NULL)
-		return num;
-
-	den = loghelper(base, log1p, "log");
-	if (den == NULL) {
-		Py_DECREF(num);
-		return NULL;
-	}
-
-	ans = PyNumber_Divide(num, den);
-	Py_DECREF(num);
-	Py_DECREF(den);
-	return ans;
+	return loghelper(arg, log1p, "log1p");
 }
 
 PyDoc_STRVAR(math_log1p_doc,
-"log1p(x[, base]) -> the logarithm of 1+x to the given base.\n\
-If the base not specified, returns the natural logarithm (base e) of x.\n\
+"log1p(x) -> the natural logarithm of 1+x (base e).\n\
 The result is computed in a way which is accurate for x near zero.");
 
 static PyObject *
@@ -580,7 +558,7 @@ static PyMethodDef math_methods[] = {
 	{"isnan",	math_isnan,	METH_O,		math_isnan_doc},
 	{"ldexp",	math_ldexp,	METH_VARARGS,	math_ldexp_doc},
 	{"log",		math_log,	METH_VARARGS,	math_log_doc},
-	{"log1p",	math_log1p,	METH_VARARGS,	math_log1p_doc},
+	{"log1p",	math_log1p,	METH_O,		math_log1p_doc},
 	{"log10",	math_log10,	METH_O,		math_log10_doc},
 	{"modf",	math_modf,	METH_O,		math_modf_doc},
 	{"pow",		math_pow,	METH_VARARGS,	math_pow_doc},

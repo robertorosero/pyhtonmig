@@ -131,10 +131,9 @@ Power and logarithmic functions:
       *base* argument added.
 
 
-.. function:: log1p(x[, base])
+.. function:: log1p(x)
 
-   Return the logarithm of *1+x* to the given *base*. If the *base* is not specified,
-   return the natural logarithm of *1+x* (that is, the logarithm to base *e*). The
+   Return the natural logarithm of *1+x* (base *e*). The
    result is calculated in a way which is accurate for *x* near zero.
 
    .. versionadded:: 2.6
@@ -297,4 +296,3 @@ The module also defines two mathematical constants:
 
    Module :mod:`cmath`
       Complex number versions of many of these functions.
-
