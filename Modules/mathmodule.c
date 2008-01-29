@@ -94,25 +94,30 @@ is_error(double x)
    math_1 is used to wrap a libm function f that takes a double
    arguments and returns a double.
 
-   The error reporting follows these rules, which are designed to do the right thing
-   on C89/C99 platforms and IEEE 754/non IEEE 754 platforms.
+   The error reporting follows these rules, which are designed to do
+   the right thing on C89/C99 platforms and IEEE 754/non IEEE 754
+   platforms.
 
    - a NaN result from non-NaN inputs causes ValueError to be raised
-   - an infinite result from finite inputs causes OverflowError to be raised if can_overflow is 1,
-     or raises ValueError if can_overflow is 0.
-   - if the result is finite and errno == EDOM then ValueError is raised
-   - if the result is finite and nonzero and errno == ERANGE then OverflowError is raised
+   - an infinite result from finite inputs causes OverflowError to be
+     raised if can_overflow is 1, or raises ValueError if can_overflow
+     is 0.
+   - if the result is finite and errno == EDOM then ValueError is
+     raised
+   - if the result is finite and nonzero and errno == ERANGE then
+     OverflowError is raised
 
-   The last rule is used to catch overflow on platforms which follow C89
-   but for which HUGE_VAL is not an infinity.
+   The last rule is used to catch overflow on platforms which follow
+   C89 but for which HUGE_VAL is not an infinity.
 
-   For the majority of one-argument functions these rules are enough to ensure
-   that Python's functions behave as specified in 'Annex F' of the C99
-   standard, with the 'invalid' and 'divide-by-zero' floating-point exceptions
-   mapping to Python's ValueError and the 'overflow' floating-point exception
-   mapping to OverflowError.  math_1 only works for functions that don't have
-   singularities *and* the possibility of overflow; fortunately, that covers
-   everything we care about right now.
+   For the majority of one-argument functions these rules are enough
+   to ensure that Python's functions behave as specified in 'Annex F'
+   of the C99 standard, with the 'invalid' and 'divide-by-zero'
+   floating-point exceptions mapping to Python's ValueError and the
+   'overflow' floating-point exception mapping to OverflowError.
+   math_1 only works for functions that don't have singularities *and*
+   the possibility of overflow; fortunately, that covers everything we
+   care about right now.
 */
 
 static PyObject *
@@ -148,22 +153,27 @@ math_1(PyObject *arg, double (*func) (double), int can_overflow)
    math_2 is used to wrap a libm function f that takes two double
    arguments and returns a double.
 
-   The error reporting follows these rules, which are designed to do the right thing
-   on C89/C99 platforms and IEEE 754/non IEEE 754 platforms.
+   The error reporting follows these rules, which are designed to do
+   the right thing on C89/C99 platforms and IEEE 754/non IEEE 754
+   platforms.
 
    - a NaN result from non-NaN inputs causes ValueError to be raised
-   - an infinite result from finite inputs causes OverflowError to be raised.
-   - if the result is finite and errno == EDOM then ValueError is raised
-   - if the result is finite and nonzero and errno == ERANGE then OverflowError is raised
+   - an infinite result from finite inputs causes OverflowError to be
+     raised.
+   - if the result is finite and errno == EDOM then ValueError is
+     raised
+   - if the result is finite and nonzero and errno == ERANGE then
+     OverflowError is raised
 
-   The last rule is used to catch overflow on platforms which follow C89
-   but for which HUGE_VAL is not an infinity.
+   The last rule is used to catch overflow on platforms which follow
+   C89 but for which HUGE_VAL is not an infinity.
 
-   For most two-argument functions (copysign, fmod, hypot, atan2) these rules
-   are enough to ensure that Python's functions behave as specified in 'Annex
-   F' of the C99 standard, with the 'invalid' and 'divide-by-zero'
-   floating-point exceptions mapping to Python's ValueError and the 'overflow'
-   floating-point exception mapping to OverflowError.
+   For most two-argument functions (copysign, fmod, hypot, atan2)
+   these rules are enough to ensure that Python's functions behave as
+   specified in 'Annex F' of the C99 standard, with the 'invalid' and
+   'divide-by-zero' floating-point exceptions mapping to Python's
+   ValueError and the 'overflow' floating-point exception mapping to
+   OverflowError.
 */
 
 static PyObject *
@@ -431,10 +441,10 @@ math_log10(PyObject *self, PyObject *arg)
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
 
-/* pow can't use math_2, but needs its own wrapper: the problem is that an
-   infinite result can arise either as a result of overflow (in which case
-   OverflowError should be raised) or as a result of e.g. 0.**-5. (for which
-   ValueError needs to be raised.)
+/* pow can't use math_2, but needs its own wrapper: the problem is
+   that an infinite result can arise either as a result of overflow
+   (in which case OverflowError should be raised) or as a result of
+   e.g. 0.**-5. (for which ValueError needs to be raised.)
 */
 
 static PyObject *
@@ -449,8 +459,9 @@ math_pow(PyObject *self, PyObject *args)
 	y = PyFloat_AsDouble(oy);
 	if ((x == -1.0 || y == -1.0) && PyErr_Occurred())
 		return NULL;
-	/* 1**x and x**0 return 1., even if x is a NaN or infinity.  It may be
-	   necessary to uncomment the following two lines on Windows.
+	/* 1**x and x**0 return 1., even if x is a NaN or infinity.
+	   It may be necessary to uncomment the following two lines on
+	   Windows.
 	if (x == 1.0 || y == 0.0)
 	        return PyFloat_FromDouble(1.);   */
 	errno = 0;
