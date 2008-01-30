@@ -55,20 +55,30 @@ Definition::
    cis(φ) := cos(φ) + 1j * sin(φ)
 
 
-.. function:: polar(z) -> r, phi
+.. function:: arg(x)
 
-   Convert a complex from rectangular coordinates to polar coordinates.
-   ``polar(z)`` returns a tuple with the two elements *r* and *φ*. *r* is
-   the distance from 0 and *φ* the phase angle.
+   Return argument, also known as the phase angle, of a complex.
 
    .. versionadded:: 2.6
 
 
-.. function:: rect(r, phi) -> complex
+.. function:: polar(x)
 
-   Convert from polar coordinates to rectangular coordinates.
+   Convert a :class:`complex` from rectangular coordinates to polar 
+   coordinates. The function returns a tuple with the two elements
+   *r* and *phi*. *r* is the distance from 0 and *phi* the phase 
+   angle.
 
    .. versionadded:: 2.6
+
+
+.. function:: rect(r, phi)
+
+   Convert from polar coordinates to rectangular coordinates and return
+   a :class:`complex`.
+
+   .. versionadded:: 2.6
+
 
 
 cmath functions
@@ -85,13 +95,6 @@ cmath functions
 
    Return the hyperbolic arc cosine of *x*. There is one branch cut, extending left
    from 1 along the real axis to -∞, continuous from above.
-
-
-.. function:: arg(x)
-
-   Return argument, also known as the phase angle, of a complex.
-
-   .. versionadded:: 2.6
 
 
 .. function:: asin(x)
@@ -149,10 +152,15 @@ cmath functions
 
 .. function:: isinf(x)
 
+   Return *True* if the real or the imaginary part of x is positive
+   or negative infinity.
+
    .. versionadded:: 2.6
 
 
 .. function:: isnan(x)
+
+   Return *True* if the real or imaginary part of x is not a number (NaN).
 
    .. versionadded:: 2.6
 
