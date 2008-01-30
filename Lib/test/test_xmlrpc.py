@@ -348,10 +348,14 @@ def is_unavailable_exception(e):
        given by operations on non-blocking sockets.'''
 
     # sometimes we get a -1 error code and/or empty headers
-    if e.errcode == -1 or e.headers is None:
-        return True
+    try:
+        if e.errcode == -1 or e.headers is None:
+            return True
+        exc_mess = e.headers.get('X-exception')
+    except AttributeError:
+        # Ignore socket.errors here.
+        exc_mess = str(e)
 
-    exc_mess = e.headers.get('X-exception')
     if exc_mess and 'temporarily unavailable' in exc_mess.lower():
         return True
 
@@ -393,7 +397,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     # [ch] The test 404 is causing lots of false alarms.
     def XXXtest_404(self):
@@ -419,7 +423,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_introspection2(self):
         try:
@@ -431,7 +435,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_introspection3(self):
         try:
@@ -443,7 +447,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_introspection4(self):
         # the SimpleXMLRPCServer doesn't support signatures, but
@@ -456,7 +460,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_multicall(self):
         try:
@@ -473,7 +477,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_non_existing_multicall(self):
         try:
@@ -494,7 +498,7 @@ class SimpleServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_dotted_attribute(self):
         # this will raise AttirebuteError because code don't want us to use
@@ -549,7 +553,7 @@ class FailingServerTestCase(unittest.TestCase):
             # ignore failures due to non-blocking socket 'unavailable' errors
             if not is_unavailable_exception(e):
                 # protocol error; provide additional information in test output
-                self.fail("%s\n%s" % (e, e.headers))
+                self.fail("%s\n%s" % (e, getattr(e, "headers", "")))
 
     def test_fail_no_info(self):
         # use the broken message class
@@ -560,7 +564,7 @@ class FailingServerTestCase(unittest.TestCase):
             p.pow(6,8)
         except (xmlrpclib.ProtocolError, socket.error), e:
             # ignore failures due to non-blocking socket 'unavailable' errors
-            if not is_unavailable_exception(e):
+            if not is_unavailable_exception(e) and hasattr(e, "headers"):
                 # The two server-side error headers shouldn't be sent back in this case
                 self.assertTrue(e.headers.get("X-exception") is None)
                 self.assertTrue(e.headers.get("X-traceback") is None)
@@ -580,7 +584,7 @@ class FailingServerTestCase(unittest.TestCase):
             p.pow(6,8)
         except (xmlrpclib.ProtocolError, socket.error), e:
             # ignore failures due to non-blocking socket 'unavailable' errors
-            if not is_unavailable_exception(e):
+            if not is_unavailable_exception(e) and hasattr(e, "headers"):
                 # We should get error info in the response
                 expected_err = "invalid literal for int() with base 10: 'I am broken'"
                 self.assertEqual(e.headers.get("x-exception"), expected_err)

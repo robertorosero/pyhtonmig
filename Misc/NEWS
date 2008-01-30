@@ -20,6 +20,12 @@ Core and builtins
   without the four functions and copysign in libm were added to a new file
   Python/pymath.c.
 
+- Patch #1970 by Antoine Pitrou: Speedup unicode whitespace and linebreak
+  detection
+
+- Added ``PyType_ClearCache()`` and ``sys._cleartypecache`` to clear the
+  internal lookup cache for ref leak tests.
+
 - Patch #1473257: generator objects gain a gi_code attribute. This is the
   same object as the func_code attribute of the function that produced the
   generator.

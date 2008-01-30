@@ -1529,9 +1529,9 @@ static PyObject *CreateSwappedType(PyTypeObject *type, PyObject *args, PyObject 
 
 	if (suffix == NULL)
 #ifdef WORDS_BIGENDIAN
-		suffix = PyString_FromString("_le");
+		suffix = PyString_InternFromString("_le");
 #else
-		suffix = PyString_FromString("_be");
+		suffix = PyString_InternFromString("_be");
 #endif
 
 	Py_INCREF(name);
@@ -3435,11 +3435,6 @@ CFuncPtr_call(CFuncPtrObject *self, PyObject *inargs, PyObject *kwds)
 
 
 	pProc = *(void **)self->b_ptr;
-	if (pProc == NULL) {
-		PyErr_SetString(PyExc_ValueError,
-				"attempt to call NULL function pointer");
-		return NULL;
-	}
 #ifdef MS_WIN32
 	if (self->index) {
 		/* It's a COM method */
@@ -4416,7 +4411,7 @@ Simple_repr(CDataObject *self)
 	}
 
 	if (format == NULL) {
-		format = PyString_FromString("%s(%r)");
+		format = PyString_InternFromString("%s(%r)");
 		if (format == NULL)
 			return NULL;
 	}
