@@ -45,19 +45,25 @@ viewed as distance from (0, 0). The radius *r* is always 0 or a positive float.
 The phase angle *φ* is the counter clockwise angle from the positive x axis,
 e.g. *1* has the angle *0*, *1j* has the angle *π/2* and *-1* the angle *-π*.
 
+.. note::
+   While :func:`phase` and func:`polar` return *+π* for a negative real they
+   may return *-π* for a complex with a very small negative imaginary
+   part, e.g. *-1-1E-300j*.
+
+
 Definition::
 
    z = r * exp(1j * φ)
    z = r * cis(φ)
 
    r := abs(z) := sqrt(real(z)**2 + imag(z)**2)
-   phi := arg(z) := atan2(imag(z), real(z))
+   phi := phase(z) := atan2(imag(z), real(z))
    cis(φ) := cos(φ) + 1j * sin(φ)
 
 
-.. function:: arg(x)
+.. function:: phase(x)
 
-   Return argument, also known as the phase angle, of a complex.
+   Return phase, also known as the argument, of a complex.
 
    .. versionadded:: 2.6
 

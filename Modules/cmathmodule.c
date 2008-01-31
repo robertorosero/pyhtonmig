@@ -608,11 +608,11 @@ FUNC1(cmath_tan, c_tan)
 FUNC1(cmath_tanh, c_tanh)
 
 static PyObject *
-cmath_arg(PyObject *self, PyObject *args)
+cmath_phase(PyObject *self, PyObject *args)
 {
 	Py_complex z;
 	double phi;
-	if (!PyArg_ParseTuple(args, "D:arg", &z))
+	if (!PyArg_ParseTuple(args, "D:phase", &z))
 		return NULL;
 	errno = 0;
 	PyFPE_START_PROTECT("arg function", return 0)
@@ -624,8 +624,8 @@ cmath_arg(PyObject *self, PyObject *args)
 		return PyFloat_FromDouble(phi);
 }
 
-PyDoc_STRVAR(cmath_arg_doc,
-"arg(z) -> float\n\n\
+PyDoc_STRVAR(cmath_phase_doc,
+"phase(z) -> float\n\n\
 Return argument, also known as the phase angle, of a complex.");
 
 static PyObject *
@@ -712,7 +712,6 @@ PyDoc_STRVAR(module_doc,
 static PyMethodDef cmath_methods[] = {
 	{"acos",   cmath_acos,  METH_VARARGS, c_acos_doc},
 	{"acosh",  cmath_acosh, METH_VARARGS, c_acosh_doc},
-	{"arg",    cmath_arg,   METH_VARARGS, cmath_arg_doc},
 	{"asin",   cmath_asin,  METH_VARARGS, c_asin_doc},
 	{"asinh",  cmath_asinh, METH_VARARGS, c_asinh_doc},
 	{"atan",   cmath_atan,  METH_VARARGS, c_atan_doc},
@@ -724,6 +723,7 @@ static PyMethodDef cmath_methods[] = {
 	{"isnan",  cmath_isnan, METH_VARARGS, cmath_isnan_doc},
 	{"log",    cmath_log,   METH_VARARGS, cmath_log_doc},
 	{"log10",  cmath_log10, METH_VARARGS, c_log10_doc},
+	{"phase",  cmath_phase, METH_VARARGS, cmath_phase_doc},
 	{"polar",  cmath_polar, METH_VARARGS, cmath_polar_doc},
 	{"rect",   cmath_rect,  METH_VARARGS, cmath_rect_doc},
 	{"sin",    cmath_sin,   METH_VARARGS, c_sin_doc},

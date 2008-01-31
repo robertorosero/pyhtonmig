@@ -3,7 +3,7 @@ from test.test_math import parse_testfile, test_file
 import unittest
 import os, sys
 import cmath, math
-from cmath import arg, polar, rect, pi
+from cmath import phase, polar, rect, pi
 
 INF = float('inf')
 NAN = float('nan')
@@ -240,12 +240,14 @@ class CMathTests(unittest.TestCase):
         self.assertCISEqual(polar(1j), (1., pi/2))
         self.assertCISEqual(polar(-1j), (1., -pi/2))
 
-    def test_arg(self):
-        self.assertAlmostEqual(arg(0), 0.)
-        self.assertAlmostEqual(arg(1.), 0.)
-        self.assertAlmostEqual(arg(-1.), pi)
-        self.assertAlmostEqual(arg(1j), pi/2)
-        self.assertAlmostEqual(arg(-1j), -pi/2)
+    def test_phase(self):
+        self.assertAlmostEqual(phase(0), 0.)
+        self.assertAlmostEqual(phase(1.), 0.)
+        self.assertAlmostEqual(phase(-1.), pi)
+        self.assertAlmostEqual(phase(-1.+1E-300j), pi)
+        self.assertAlmostEqual(phase(-1.-1E-300j), -pi)
+        self.assertAlmostEqual(phase(1j), pi/2)
+        self.assertAlmostEqual(phase(-1j), -pi/2)
 
     def assertCEqual(self, a, b):
         eps = 1E-7
