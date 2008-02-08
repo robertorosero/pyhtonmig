@@ -46,44 +46,51 @@ static PyObject * math_error(void);
 
 /* special_type takes a double and returns an integer code indicating
    the type of the double as follows:
-
-    0 : -infinity
-    1 : negative finite number (nonzero)
-    2 : -0.
-    3 : 0.
-    4 : positive finite number (nonzero)
-    5 : infinity
-    6 : nan
-
- XXX this should probably be an enum, for the sake of clarity
 */
 
-static int
+enum special_types {
+	ST_NINF,	/* 0, negative infinity */
+	ST_NEG,		/* 1, negative finite number (nonzero) */
+	ST_NZERO,	/* 2, -0. */
+	ST_PZERO,	/* 3, +0. */
+	ST_POS,		/* 4, positive finite number (nonzero) */
+	ST_PINF,	/* 5, positive infinity */
+	ST_NAN,		/* 6, Not a Number */
+};
+
+static enum special_types 
 special_type(double d)
 {
 	if (Py_IS_FINITE(d)) {
-		if (d) {
+		if (d != 0) {
 			if (copysign(1., d) == 1.)
-				return 3;
+				return ST_POS;
 			else
-				return 2;
+				return ST_NEG;
 		}
 		else {
 			if (copysign(1., d) == 1.)
-				return 4;
+				return ST_PZERO;
 			else
-				return 1;
+				return ST_NZERO;
 		}
 	}
-	else {
-		if (Py_IS_NAN(d))
-			return 6;
-		else if (copysign(1., d) == 1.)
-			return 5;
-		else
-			return 0;
-	}
+	if (Py_IS_NAN(d))
+		return ST_NAN;
+	if (copysign(1., d) == 1.)
+		return ST_PINF;
+	else
+		return ST_NINF;
 }
+
+#define SPECIAL_VALUE(z, table)						\
+	if (!Py_IS_FINITE((z).real) || !Py_IS_FINITE((z).imag)) {	\
+		double *special_value = table[special_type((z).real)]	\
+					     [special_type((z).imag)];	\
+		r.real = special_value[0];				\
+		r.imag = special_value[1];				\
+		return r;						\
+	}
 
 #define P Py_MATH_PI
 #define I Py_HUGE_VAL
@@ -106,15 +113,8 @@ static Py_complex
 c_acos(Py_complex z)
 {
 	Py_complex s1, s2, r;
-	double *special_value;
 
-	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
-		special_value = acos_special_values[special_type(z.real)]
-			                           [special_type(z.imag)];
-		r.real = special_value[0];
-		r.imag = special_value[1];
-		return r;
-	}
+	SPECIAL_VALUE(z, acos_special_values);
 
         if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		/* avoid unnecessary overflow for large arguments */
