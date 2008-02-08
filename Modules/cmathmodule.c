@@ -42,12 +42,80 @@ static Py_complex c_sqrt(Py_complex);
 static Py_complex c_tanh(Py_complex);
 static PyObject * math_error(void);
 
+/* Code to deal with special values (infinities, NaNs, etc.). */
+
+/* special_type takes a double and returns an integer code indicating
+   the type of the double as follows:
+
+    0 : -infinity
+    1 : negative finite number (nonzero)
+    2 : -0.
+    3 : 0.
+    4 : positive finite number (nonzero)
+    5 : infinity
+    6 : nan
+
+ XXX this should probably be an enum, for the sake of clarity
+*/
+
+static int
+special_type(double d)
+{
+	if (Py_IS_FINITE(d)) {
+		if (d) {
+			if (copysign(1., d) == 1.)
+				return 3;
+			else
+				return 2;
+		}
+		else {
+			if (copysign(1., d) == 1.)
+				return 4;
+			else
+				return 1;
+		}
+	}
+	else {
+		if (Py_IS_NAN(d))
+			return 6;
+		else if (copysign(1., d) == 1.)
+			return 5;
+		else
+			return 0;
+	}
+}
+
+#define P Py_MATH_PI
+#define I Py_HUGE_VAL
+#define N Py_NAN
+#define U -1.345e26  /* unlikely value, used as placeholder */
+
 /* First, the C functions that do the real work */
+
+static double acos_special_values[7][7][2] = {
+	{{.75*P, I}, {P, I}, {P, I}, {P, -I}, {P, -I}, {.75*P, -I}, {N, I}},
+	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {N, N}},
+	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {.25*P, N}},
+	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {.25*P, N}},
+	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {N, N}},
+	{{.25*P, I}, {0, I}, {0, I}, {0, -I}, {0, -I}, {.25*P, -I}, {N, I}},
+	{{N, I},     {N, N}, {N, N}, {N, N},  {N, N},  {N, N},      {N, N}}
+};
 
 static Py_complex
 c_acos(Py_complex z)
 {
 	Py_complex s1, s2, r;
+	double *special_value;
+
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		special_value = acos_special_values[special_type(z.real)]
+			                           [special_type(z.imag)];
+		r.real = special_value[0];
+		r.imag = special_value[1];
+		return r;
+	}
+
         if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		/* avoid unnecessary overflow for large arguments */
 		r.real = atan2(fabs(z.imag), z.real);
