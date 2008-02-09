@@ -27,6 +27,23 @@ class CMathTests(unittest.TestCase):
     def rAssertAlmostEqual(self, a, b, rel_eps = 2e-15, abs_eps = 5e-323):
         """Check that two floating-point numbers are almost equal."""
 
+        # special values testing
+        if math.isnan(a):
+            if math.isnan(b):
+                return
+            self.fail("%s should be nan" % repr(b))
+
+        if math.isinf(a):
+            if a == b:
+                return
+            self.fail("finite result where infinity excpected: "
+                      "expected %s, got %s" % (repr(a), repr(b)))
+
+        if not a and not b:
+            if math.atan2(a, -1.) != math.atan2(b, -1.):
+                self.fail("zero has wrong sign: expected %s, got %s" %
+                          (repr(a), repr(b)))
+
         # test passes if either the absolute error or the relative
         # error is sufficiently small.  The defaults amount to an
         # error of between 9 ulps and 19 ulps on an IEEE-754 compliant
@@ -213,12 +230,19 @@ class CMathTests(unittest.TestCase):
     def test_specific_values(self):
         if not float.__getformat__("double").startswith("IEEE"):
             return
-        for id, fn, ar, ai, er, ei in parse_testfile(test_file):
+        for id, fn, ar, ai, er, ei, flags in parse_testfile(test_file):
             arg = complex(ar, ai)
             expected = complex(er, ei)
             function = getattr(cmath, fn)
-            actual = function(arg)
+            if 'divide-by-zero' in flags or 'invalid' in flags:
+                self.assertRaises(ValueError, function, arg)
+                continue
 
+            if 'overflow' in flags:
+                self.assertRaises(OverflowError, function, arg)
+                continue
+
+            actual = function(arg)
             if fn=='log':
                 # for the real part of the log function, we allow an
                 # absolute error of up to 2e-15.

@@ -58,7 +58,7 @@ enum special_types {
 	ST_NAN,		/* 6, Not a Number */
 };
 
-static enum special_types 
+static enum special_types
 special_type(double d)
 {
 	if (Py_IS_FINITE(d)) {
@@ -85,28 +85,25 @@ special_type(double d)
 
 #define SPECIAL_VALUE(z, table)						\
 	if (!Py_IS_FINITE((z).real) || !Py_IS_FINITE((z).imag)) {	\
-		double *special_value = table[special_type((z).real)]	\
-					     [special_type((z).imag)];	\
-		r.real = special_value[0];				\
-		r.imag = special_value[1];				\
-		return r;						\
+		errno = 0;                                              \
+		return table[special_type((z).real)]	                \
+			    [special_type((z).imag)];			\
 	}
 
 #define P Py_MATH_PI
 #define I Py_HUGE_VAL
 #define N Py_NAN
-#define U -1.345e26  /* unlikely value, used as placeholder */
 
 /* First, the C functions that do the real work */
 
-static double acos_special_values[7][7][2] = {
-	{{.75*P, I}, {P, I}, {P, I}, {P, -I}, {P, -I}, {.75*P, -I}, {N, I}},
-	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {N, N}},
-	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {.25*P, N}},
-	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {.25*P, N}},
-	{{.5*P, I},  {U, U}, {U, U}, {U, U},  {U, U},  {.5*P, -I},  {N, N}},
-	{{.25*P, I}, {0, I}, {0, I}, {0, -I}, {0, -I}, {.25*P, -I}, {N, I}},
-	{{N, I},     {N, N}, {N, N}, {N, N},  {N, N},  {N, N},      {N, N}}
+static Py_complex acos_special_values[7][7] = {
+	{{.75*P,I},{P,I}, {P,I},    {P,-I},    {P, -I}, {.75*P,-I},{N,I}},
+	{{.5*P,I}, {},    {},       {},        {},      {.5*P,-I}, {N,N}},
+	{{.5*P,I}, {},    {.5*P,0.},{.5*P,-0.},{},      {.5*P,-I}, {.5*P,N}},
+	{{.5*P,I}, {},    {.5*P,0.},{.5*P,-0.},{},      {.5*P,-I}, {.5*P,N}},
+	{{.5*P,I}, {},    {},       {},        {},      {.5*P,-I}, {N,N}},
+	{{.25*P,I},{0.,I},{0.,I},   {0.,-I},   {0.,-I}, {.25*P,-I},{N,I}},
+	{{N,I},    {N,N}, {N,N},    {N,N},     {N,N},   {N,-I},    {N,N}}
 };
 
 static Py_complex
@@ -122,9 +119,11 @@ c_acos(Py_complex z)
 		/* split into cases to make sure that the branch cut has the
 		   correct continuity on systems with unsigned zeros */
 		if (z.real < 0.) {
-			r.imag = -copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., z.imag);
+			r.imag = -copysign(log(hypot(z.real/2., z.imag/2.)) +
+					   M_LN2*2., z.imag);
 		} else {
-			r.imag = copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., -z.imag);
+			r.imag = copysign(log(hypot(z.real/2., z.imag/2.)) +
+					  M_LN2*2., -z.imag);
 		}
 	} else {
 		s1.real = 1.-z.real;
@@ -136,6 +135,7 @@ c_acos(Py_complex z)
 		r.real = 2.*atan2(s1.real, s2.real);
 		r.imag = asinh(s2.real*s1.imag - s2.imag*s1.real);
 	}
+	errno = 0;
 	return r;
 }
 
@@ -145,10 +145,22 @@ PyDoc_STRVAR(c_acos_doc,
 "Return the arc cosine of x.");
 
 
+static Py_complex acosh_special_values[7][7] = {
+	{{I,-.75*P},{I,-P}, {I,-P},    {I,P},    {I,P}, {I,.75*P},{I,N}},
+	{{I,-.5*P}, {},     {},        {},       {},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {0.,-.5*P},{0.,.5*P},{},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {0.,-.5*P},{0.,.5*P},{},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {},        {},       {},    {I,.5*P}, {N,N}},
+	{{I,-.25*P},{I,-0.},{I,-0.},   {I,0.},   {I,0.},{I,.25*P},{I,N}},
+	{{I,N},     {N,N},  {N,N},     {N,N},    {N,N}, {I,N},    {N,N}}
+};
+
 static Py_complex
 c_acosh(Py_complex z)
 {
 	Py_complex s1, s2, r;
+
+	SPECIAL_VALUE(z, acosh_special_values);
 
         if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		/* avoid unnecessary overflow for large arguments */
@@ -164,6 +176,7 @@ c_acosh(Py_complex z)
 		r.real = asinh(s1.real*s2.real + s1.imag*s2.imag);
 		r.imag = 2.*atan2(s1.imag, s2.real);
 	}
+	errno = 0;
 	return r;
 }
 
@@ -192,16 +205,30 @@ PyDoc_STRVAR(c_asin_doc,
 "Return the arc sine of x.");
 
 
+static Py_complex asinh_special_values[7][7] = {
+	{{-I,-.25*P},{-I,-0.},{-I,-0.}, {-I,0.}, {-I,0.},{-I,.25*P},{-I,N}},
+	{{-I,-.5*P}, {},      {},       {},      {},     {-I,.5*P}, {N,N}},
+	{{-I,-.5*P}, {},      {-0.,-0.},{-0.,0.},{},     {-I,.5*P}, {N,N}},
+	{{I,-.5*P},  {},      {0.,-0.}, {0.,0.}, {},     {I,.5*P},  {N,N}},
+	{{I,-.5*P},  {},      {},       {},      {},     {I,.5*P},  {N,N}},
+	{{I,-.25*P}, {I,-0.}, {I,-0.},  {I,0.},  {I,0.}, {I,.25*P}, {I,N}},
+	{{I,N},      {N,N},   {N,-0.},  {N,0.},  {N,N},  {I,N},     {N,N}}
+};
+
 static Py_complex
 c_asinh(Py_complex z)
 {
 	Py_complex s1, s2, r;
 
+	SPECIAL_VALUE(z, asinh_special_values);
+
         if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		if (z.imag >= 0.) {
-			r.real = copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., z.real);
+			r.real = copysign(log(hypot(z.real/2., z.imag/2.)) +
+					  M_LN2*2., z.real);
 		} else {
-			r.real = -copysign(log(hypot(z.real/2., z.imag/2.)) + M_LN2*2., -z.real);
+			r.real = -copysign(log(hypot(z.real/2., z.imag/2.)) +
+					   M_LN2*2., -z.real);
 		}
 		r.imag = atan2(z.imag, fabs(z.real));
 	} else {
@@ -214,6 +241,7 @@ c_asinh(Py_complex z)
 		r.real = asinh(s1.real*s2.imag-s2.real*s1.imag);
 		r.imag = atan2(z.imag, s1.real*s2.real-s1.imag*s2.imag);
 	}
+	errno = 0;
 	return r;
 }
 
@@ -242,11 +270,23 @@ PyDoc_STRVAR(c_atan_doc,
 "Return the arc tangent of x.");
 
 
+static Py_complex atanh_special_values[7][7] = {
+	{{-0.,-.5*P},{-0.,-.5*P},{-0.,-.5*P},{-0.,.5*P},{-0.,.5*P},{-0.,.5*P},{-0.,N}},
+	{{-0.,-.5*P},{},         {},         {},        {},        {-0.,.5*P},{N,N}},
+	{{-0.,-.5*P},{},         {-0.,-0.},  {-0.,0.},  {},        {-0.,.5*P},{-0.,N}},
+	{{0.,-.5*P}, {},         {0.,-0.},   {0.,0.},   {},        {0.,.5*P}, {0.,N}},
+	{{0.,-.5*P}, {},         {},         {},        {},        {0.,.5*P}, {N,N}},
+	{{0.,-.5*P}, {0.,-.5*P}, {0.,-.5*P}, {0.,.5*P}, {0.,.5*P}, {0.,.5*P}, {0.,N}},
+	{{0.,-.5*P}, {N,N},      {N,N},      {N,N},     {N,N},     {0.,.5*P}, {N,N}}
+};
+
 static Py_complex
 c_atanh(Py_complex z)
 {
 	Py_complex r;
 	double ay, h;
+
+	SPECIAL_VALUE(z, atanh_special_values);
 
 	/* Reduce to case where z.real >= 0., using atanh(z) = -atanh(-z). */
 	if (z.real < 0.) {
@@ -255,7 +295,7 @@ c_atanh(Py_complex z)
 
 	ay = fabs(z.imag);
 	if (z.real > CM_SQRT_LARGE_DOUBLE || ay > CM_SQRT_LARGE_DOUBLE) {
-		/* 
+		/*
 		   if abs(z) is large then we use the approximation
 		   atanh(z) ~ 1/z +/- i*pi/2 (+/- depending on the sign
 		   of z.imag)
@@ -267,17 +307,22 @@ c_atanh(Py_complex z)
 		   ensure that the branch cut has the correct continuity on
 		   systems that don't support signed zeros */
 		r.imag = -copysign(Py_MATH_PI/2., -z.imag);
+		errno = 0;
 	} else if (z.real == 1. && ay < CM_SQRT_DBL_MIN) {
 		/* C99 standard says:  atanh(1+/-0.) should be inf +/- 0i */
-		r.real = -log(sqrt(ay)/sqrt(hypot(ay, 2.)));
 		if (ay == 0.) {
+			r.real = I;
 			r.imag = z.imag;
+			errno = EDOM;
 		} else {
+			r.real = -log(sqrt(ay)/sqrt(hypot(ay, 2.)));
 			r.imag = copysign(atan2(2., -ay)/2, z.imag);
+			errno = 0;
 		}
 	} else {
 		r.real = log1p(4.*z.real/((1-z.real)*(1-z.real) + ay*ay))/4.;
 		r.imag = -atan2(-2.*z.imag, (1-z.real)*(1+z.real) - ay*ay)/2.;
+		errno = 0;
 	}
 	return r;
 }
@@ -305,11 +350,48 @@ PyDoc_STRVAR(c_cos_doc,
 "Return the cosine of x.");
 
 
+/* cosh(infinity + i*y) needs to be dealt with specially */
+static Py_complex cosh_special_values[7][7] = {
+	{{I,N}, {},   {I,0.},  {I,-0.}, {},   {I,N}, {I,N}},
+	{{N,N}, {},   {},      {},      {},   {N,N}, {N,N}},
+	{{N,0.},{},   {1.,0.}, {1.,-0.},{},   {N,0.},{N,0.}},
+	{{N,0.},{},   {1.,-0.},{1.,0.}, {},   {N,0.},{N,0.}},
+	{{N,N}, {},   {},      {},      {},   {N,N}, {N,N}},
+	{{I,N}, {},   {I,-0.}, {I,0.},  {},   {I,N}, {I,N}},
+	{{N,N}, {N,N},{N,0.},  {N,0.},  {N,N},{N,N}, {N,N}}
+};
+
 static Py_complex
 c_cosh(Py_complex z)
 {
 	Py_complex r;
 	double x_minus_one;
+
+	/* special treatment for cosh(+/-inf + iy) if y is not a NaN */
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		if (Py_IS_INFINITY(z.real) && Py_IS_FINITE(z.imag) &&
+		    (z.imag != 0.)) {
+			if (z.real > 0) {
+				r.real = copysign(I, cos(z.imag));
+				r.imag = copysign(I, sin(z.imag));
+			}
+			else {
+				r.real = copysign(I, cos(z.imag));
+				r.imag = -copysign(I, sin(z.imag));
+			}
+		}
+		else {
+			r = cosh_special_values[special_type(z.real)]
+				               [special_type(z.imag)];
+		}
+		/* need to set errno = EDOM if y is +/- infinity and x is not
+		   a NaN */
+		if (Py_IS_INFINITY(z.imag) && !Py_IS_NAN(z.real))
+			errno = EDOM;
+		else
+			errno = 0;
+		return r;
+	}
 
 	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
 		/* deal correctly with cases where cosh(z.real) overflows but
@@ -321,6 +403,11 @@ c_cosh(Py_complex z)
 		r.real = cos(z.imag) * cosh(z.real);
 		r.imag = sin(z.imag) * sinh(z.real);
 	}
+	/* detect overflow, and set errno accordingly */
+	if (Py_IS_INFINITY(r.real) || Py_IS_INFINITY(r.imag))
+		errno = ERANGE;
+	else
+		errno = 0;
 	return r;
 }
 
@@ -330,11 +417,50 @@ PyDoc_STRVAR(c_cosh_doc,
 "Return the hyperbolic cosine of x.");
 
 
+/* exp(infinity + i*y) and exp(-infinity + i*y) need special treatment for
+   finite y */
+static Py_complex exp_special_values[7][7] = {
+	{{0.,0.},{},   {0.,-0.},{0.,0.},{},   {0.,0.},{0.,0.}},
+	{{N,N},  {},   {},      {},     {},   {N,N},  {N,N}},
+	{{N,N},  {},   {1.,-0.},{1.,0.},{},   {N,N},  {N,N}},
+	{{N,N},  {},   {1.,-0.},{1.,0.},{},   {N,N},  {N,N}},
+	{{N,N},  {},   {},      {},     {},   {N,N},  {N,N}},
+	{{I,N},  {},   {I,-0.}, {I,0.}, {},   {I,N},  {I,N}},
+	{{N,N},  {N,N},{N,-0.}, {N,0.}, {N,N},{N,N},  {N,N}}
+};
+
 static Py_complex
 c_exp(Py_complex z)
 {
 	Py_complex r;
 	double l;
+
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		if (Py_IS_INFINITY(z.real) && Py_IS_FINITE(z.imag)
+		    && (z.imag != 0.)) {
+			if (z.real > 0) {
+				r.real = copysign(I, cos(z.imag));
+				r.imag = copysign(I, sin(z.imag));
+			}
+			else {
+				r.real = copysign(0., cos(z.imag));
+				r.imag = copysign(0., sin(z.imag));
+			}
+		}
+		else {
+			r = exp_special_values[special_type(z.real)]
+				              [special_type(z.imag)];
+		}
+		/* need to set errno = EDOM if y is +/- infinity and x is not
+		   a NaN and not -infinity */
+		if (Py_IS_INFINITY(z.imag) &&
+		    (Py_IS_FINITE(z.real) ||
+		     (Py_IS_INFINITY(z.real) && z.real > 0)))
+			errno = EDOM;
+		else
+			errno = 0;
+		return r;
+	}
 
 	if (z.real > CM_LOG_LARGE_DOUBLE) {
 		l = exp(z.real-1.);
@@ -345,6 +471,11 @@ c_exp(Py_complex z)
 		r.real = l*cos(z.imag);
 		r.imag = l*sin(z.imag);
 	}
+	/* detect overflow, and set errno accordingly */
+	if (Py_IS_INFINITY(r.real) || Py_IS_INFINITY(r.imag))
+		errno = ERANGE;
+	else
+		errno = 0;
 	return r;
 }
 
@@ -353,6 +484,16 @@ PyDoc_STRVAR(c_exp_doc,
 "\n"
 "Return the exponential value e**x.");
 
+
+static Py_complex log_special_values[7][7] = {
+	{{I,-.75*P},{I,-P}, {I,-P},  {I,P},  {I,P}, {I,.75*P},{I,N}},
+	{{I,-.5*P}, {},     {},      {},     {},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {-I,-P}, {-I,P}, {},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {-I,-0.},{-I,0.},{},    {I,.5*P}, {N,N}},
+	{{I,-.5*P}, {},     {},      {},     {},    {I,.5*P}, {N,N}},
+	{{I,-.25*P},{I,-0.},{I,-0.}, {I,0.}, {I,0.},{I,.25*P},{I,N}},
+	{{I,N},     {N,N},  {N,N},   {N,N},  {N,N}, {I,N},    {N,N}}
+};
 
 static Py_complex
 c_log(Py_complex z)
@@ -388,14 +529,26 @@ c_log(Py_complex z)
 	Py_complex r;
 	double ax, ay, am, an, h;
 
+	SPECIAL_VALUE(z, log_special_values);
+
 	ax = fabs(z.real);
 	ay = fabs(z.imag);
 
 	if (ax > CM_LARGE_DOUBLE || ay > CM_LARGE_DOUBLE) {
 		r.real = log(hypot(ax/2., ay/2.)) + M_LN2;
-	} else if (ax < DBL_MIN && ay < DBL_MIN && (ax > 0. || ay > 0.)) {
-		/* catch cases where hypot(ax, ay) is subnormal */
-		r.real = log(hypot(ldexp(ax, DBL_MANT_DIG), ldexp(ay, DBL_MANT_DIG))) - DBL_MANT_DIG*M_LN2;
+	} else if (ax < DBL_MIN && ay < DBL_MIN) {
+		if (ax > 0. || ay > 0.) {
+			/* catch cases where hypot(ax, ay) is subnormal */
+			r.real = log(hypot(ldexp(ax, DBL_MANT_DIG),
+				 ldexp(ay, DBL_MANT_DIG))) - DBL_MANT_DIG*M_LN2;
+		}
+		else {
+			/* log(+/-0. +/- 0i) */
+			r.real = -I;
+			r.imag = atan2(z.imag, z.real);
+			errno = EDOM;
+			return r;
+		}
 	} else {
 		h = hypot(ax, ay);
 		if (0.71 <= h && h <= 1.73) {
@@ -407,6 +560,7 @@ c_log(Py_complex z)
 		}
 	}
 	r.imag = atan2(z.imag, z.real);
+	errno = 0;
 	return r;
 }
 
@@ -415,10 +569,13 @@ static Py_complex
 c_log10(Py_complex z)
 {
 	Py_complex r;
+	int errno_save;
 
 	r = c_log(z);
+	errno_save = errno; /* just in case the divisions affect errno */
 	r.real = r.real / M_LN10;
 	r.imag = r.imag / M_LN10;
+	errno = errno_save;
 	return r;
 }
 
@@ -447,11 +604,49 @@ PyDoc_STRVAR(c_sin_doc,
 "Return the sine of x.");
 
 
+/* sinh(infinity + i*y) needs to be dealt with specially */
+static Py_complex sinh_special_values[7][7] = {
+	{{I,N}, {},   {-I,-0.}, {-I,0.}, {},   {I,N}, {I,N}},
+	{{N,N}, {},   {},       {},      {},   {N,N}, {N,N}},
+	{{0.,N},{},   {-0.,-0.},{-0.,0.},{},   {0.,N},{0.,N}},
+	{{0.,N},{},   {0.,-0.}, {0.,0.}, {},   {0.,N},{0.,N}},
+	{{N,N}, {},   {},       {},      {},   {N,N}, {N,N}},
+	{{I,N}, {},   {I,-0.},  {I,0.},  {},   {I,N}, {I,N}},
+	{{N,N}, {N,N},{N,-0.},  {N,0.},  {N,N},{N,N}, {N,N}}
+};
+
 static Py_complex
 c_sinh(Py_complex z)
 {
 	Py_complex r;
 	double x_minus_one;
+
+	/* special treatment for sinh(+/-inf + iy) if y is finite and
+	   nonzero */
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		if (Py_IS_INFINITY(z.real) && Py_IS_FINITE(z.imag)
+		    && (z.imag != 0.)) {
+			if (z.real > 0) {
+				r.real = copysign(I, cos(z.imag));
+				r.imag = copysign(I, sin(z.imag));
+			}
+			else {
+				r.real = -copysign(I, cos(z.imag));
+				r.imag = copysign(I, sin(z.imag));
+			}
+		}
+		else {
+			r = sinh_special_values[special_type(z.real)]
+				               [special_type(z.imag)];
+		}
+		/* need to set errno = EDOM if y is +/- infinity and x is not
+		   a NaN */
+		if (Py_IS_INFINITY(z.imag) && !Py_IS_NAN(z.real))
+			errno = EDOM;
+		else
+			errno = 0;
+		return r;
+	}
 
 	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
 		x_minus_one = z.real - copysign(1., z.real);
@@ -461,6 +656,11 @@ c_sinh(Py_complex z)
 		r.real = cos(z.imag) * sinh(z.real);
 		r.imag = sin(z.imag) * cosh(z.real);
 	}
+	/* detect overflow, and set errno accordingly */
+	if (Py_IS_INFINITY(r.real) || Py_IS_INFINITY(r.imag))
+		errno = ERANGE;
+	else
+		errno = 0;
 	return r;
 
 }
@@ -470,6 +670,16 @@ PyDoc_STRVAR(c_sinh_doc,
 "\n"
 "Return the hyperbolic sine of x.");
 
+
+static Py_complex sqrt_special_values[7][7] = {
+	{{I,-I},{0.,-I},{0.,-I}, {0.,I}, {0.,I},{I,I},{N,I}},
+	{{I,-I},{},     {},      {},     {},    {I,I},{N,N}},
+	{{I,-I},{},     {0.,-0.},{0.,0.},{},    {I,I},{N,N}},
+	{{I,-I},{},     {0.,-0.},{0.,0.},{},    {I,I},{N,N}},
+	{{I,-I},{},     {},      {},     {},    {I,I},{N,N}},
+	{{I,-I},{I,-0.},{I,-0.}, {I,0.}, {I,0.},{I,I},{I,N}},
+	{{I,-I},{N,N},  {N,N},   {N,N},  {N,N}, {I,I},{N,N}}
+};
 
 static Py_complex
 c_sqrt(Py_complex z)
@@ -505,6 +715,8 @@ c_sqrt(Py_complex z)
 	double s,d;
 	double ax, ay;
 
+	SPECIAL_VALUE(z, sqrt_special_values);
+
 	if (z.real == 0. && z.imag == 0.) {
 		r.real = 0.;
 		r.imag = z.imag;
@@ -517,7 +729,8 @@ c_sqrt(Py_complex z)
 	if (ax < DBL_MIN && ay < DBL_MIN && (ax > 0. || ay > 0.)) {
 		/* here we catch cases where hypot(ax, ay) is subnormal */
 		ax = ldexp(ax, CM_SCALE_UP);
-		s = ldexp(sqrt(ax + hypot(ax, ldexp(ay, CM_SCALE_UP))), CM_SCALE_DOWN);
+		s = ldexp(sqrt(ax + hypot(ax, ldexp(ay, CM_SCALE_UP))),
+			  CM_SCALE_DOWN);
 	} else {
 		ax /= 8.;
 		s = 2.*sqrt(ax + hypot(ax, ay/8.));
@@ -531,6 +744,7 @@ c_sqrt(Py_complex z)
 		r.real = d;
 		r.imag = copysign(s, z.imag);
 	}
+	errno = 0;
 	return r;
 }
 
@@ -559,6 +773,17 @@ PyDoc_STRVAR(c_tan_doc,
 "Return the tangent of x.");
 
 
+/* tanh(infinity + i*y) needs to be dealt with specially */
+static Py_complex tanh_special_values[7][7] = {
+	{{-1.,0.},{},   {-1.,-0.},{-1.,0.},{},   {-1.,0.},{-1.,0.}},
+	{{N,N},   {},   {},       {},      {},   {N,N},   {N,N}},
+	{{N,N},   {},   {-0.,-0.},{-0.,0.},{},   {N,N},   {N,N}},
+	{{N,N},   {},   {0.,-0.}, {0.,0.}, {},   {N,N},   {N,N}},
+	{{N,N},   {},   {},       {},      {},   {N,N},   {N,N}},
+	{{1.,0.}, {},   {1.,-0.}, {1.,0.}, {},   {1.,0.}, {1.,0.}},
+	{{N,N},   {N,N},{N,-0.},  {N,0.},  {N,N},{N,N},   {N,N}}
+};
+
 static Py_complex
 c_tanh(Py_complex z)
 {
@@ -577,9 +802,39 @@ c_tanh(Py_complex z)
 	Py_complex r;
 	double tx, ty, cx, txty, denom;
 
+	/* special treatment for tanh(+/-inf + iy) if y is finite and
+	   nonzero */
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		if (Py_IS_INFINITY(z.real) && Py_IS_FINITE(z.imag)
+		    && (z.imag != 0.)) {
+			if (z.real > 0) {
+				r.real = 1.0;
+				r.imag = copysign(0.,
+						  2.*sin(z.imag)*cos(z.imag));
+			}
+			else {
+				r.real = -1.0;
+				r.imag = copysign(0.,
+						  2.*sin(z.imag)*cos(z.imag));
+			}
+		}
+		else {
+			r = tanh_special_values[special_type(z.real)]
+				               [special_type(z.imag)];
+		}
+		/* need to set errno = EDOM if z.imag is +/-infinity and
+		   z.real is finite */
+		if (Py_IS_INFINITY(z.imag) && Py_IS_FINITE(z.real))
+			errno = EDOM;
+		else
+			errno = 0;
+		return r;
+	}
+
+	/* danger of overflow in 2.*z.imag !*/
 	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
 		r.real = copysign(1., z.real);
-                r.imag = 2.*sin(2.*z.imag)*exp(-2.*fabs(z.real));
+                r.imag = 4.*sin(z.imag)*cos(z.imag)*exp(-2.*fabs(z.real));
 	} else {
 		tx = tanh(z.real);
 		ty = tan(z.imag);
@@ -589,6 +844,7 @@ c_tanh(Py_complex z)
 		r.real = tx*(1.+ty*ty)/denom;
 		r.imag = ((ty/denom)*cx)*cx;
 	}
+	errno = 0;
 	return r;
 }
 
@@ -596,6 +852,7 @@ PyDoc_STRVAR(c_tanh_doc,
 "tanh(x)\n"
 "\n"
 "Return the hyperbolic tangent of x.");
+
 
 static PyObject *
 cmath_log(PyObject *self, PyObject *args)
@@ -612,7 +869,6 @@ cmath_log(PyObject *self, PyObject *args)
 	if (PyTuple_GET_SIZE(args) == 2)
 		x = c_quot(x, c_log(y));
 	PyFPE_END_PROTECT(x)
-	Py_ADJUST_ERANGE2(x.real, x.imag);
 	if (errno != 0)
 		return math_error();
 	return PyComplex_FromCComplex(x);
@@ -640,18 +896,24 @@ math_error(void)
 static PyObject *
 math_1(PyObject *args, Py_complex (*func)(Py_complex))
 {
-	Py_complex x;
+	Py_complex x,r ;
 	if (!PyArg_ParseTuple(args, "D", &x))
 		return NULL;
 	errno = 0;
-	PyFPE_START_PROTECT("complex function", return 0)
-	x = (*func)(x);
-	PyFPE_END_PROTECT(x)
-	Py_ADJUST_ERANGE2(x.real, x.imag);
-	if (errno != 0)
-		return math_error();
-	else
-		return PyComplex_FromCComplex(x);
+	PyFPE_START_PROTECT("complex function", return 0);
+	r = (*func)(x);
+	PyFPE_END_PROTECT(r);
+	if (errno == EDOM) {
+		PyErr_SetString(PyExc_ValueError, "math domain error");
+		return NULL;
+	}
+	else if (errno == ERANGE) {
+		PyErr_SetString(PyExc_OverflowError, "math range error");
+		return NULL;
+	}
+	else {
+		return PyComplex_FromCComplex(r);
+	}
 }
 
 #define FUNC1(stubname, func) \

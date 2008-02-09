@@ -34,11 +34,14 @@ def parse_testfile(fname):
 
             lhs, rhs = line.split('->')
             id, fn, arg_real, arg_imag = lhs.split()
-            exp_real, exp_imag = rhs.split()
+            rhs_pieces = rhs.split()
+            exp_real, exp_imag = rhs_pieces[0], rhs_pieces[1]
+            flags = rhs_pieces[2:]
 
             yield (id, fn,
                    float(arg_real), float(arg_imag),
-                   float(exp_real), float(exp_imag)
+                   float(exp_real), float(exp_imag),
+                   flags
                   )
 
 class MathTests(unittest.TestCase):
@@ -515,9 +518,10 @@ class MathTests(unittest.TestCase):
     def test_testfile(self):
         if not float.__getformat__("double").startswith("IEEE"):
             return
-        for id, fn, ar, ai, er, ei in parse_testfile(test_file):
-            # Skip if either input or result is complex
-            if ai != 0. or ei != 0.:
+        for id, fn, ar, ai, er, ei, flags in parse_testfile(test_file):
+            # Skip if either the input or result is complex, or if
+            # flags is nonempty
+            if ai != 0. or ei != 0. or flags:
                 continue
             func = getattr(math, fn)
             result = func(ar)

@@ -1,21 +1,38 @@
 -- Testcases for functions in cmath.
--- 
+--
 -- Each line takes the form:
--- 
--- <testid> <function> <input_value> -> <output_value>
--- 
+--
+-- <testid> <function> <input_value> -> <output_value> <flags>
+--
 -- where:
+--
 --   <testid> is a short name identifying the test,
+--
 --   <function> is the function to be tested (exp, cos, asinh, ...),
+--
 --   <input_value> is a pair of floats separated by whitespace
 --     representing real and imaginary parts of a complex number, and
---   <output_value> is the expected (ideal) output value, again 
+--
+--   <output_value> is the expected (ideal) output value, again
 --     represented as a pair of floats.
--- 
+--
+--   <flags> is a list of the floating-point flags required by C99
+--
+-- The possible flags are:
+--
+--   divide-by-zero : raised when a finite input gives a
+--     mathematically infinite result.
+--
+--   overflow : raised when a finite input gives a finite result whose
+--     real or imaginary part is too large to fit in the usual range
+--     of an IEEE 754 double.
+--
+--   invalid : raised for invalid inputs.
+--
 -- Lines beginning with '--' (like this one) start a comment, and are
 -- ignored.  Blank lines, or lines containing only whitespace, are also
 -- ignored.
--- 
+
 
 --------------------------
 -- acos: Inverse cosine --
@@ -149,6 +166,46 @@ acos0229 acos 6.2073425897211614e-313 -0.0 -> 1.5707963267948966 0.0
 acos0230 acos -4.9406564584124654e-324 0.0 -> 1.5707963267948966 -0.0
 acos0231 acos -1.7107517052899003e-318 -0.0 -> 1.5707963267948966 0.0
 
+-- special values
+acos1000 acos 0.0 0.0 -> 1.5707963267948966 -0.0
+acos1001 acos 0.0 -0.0 -> 1.5707963267948966 0.0
+acos1002 acos -0.0 0.0 -> 1.5707963267948966 -0.0
+acos1003 acos -0.0 -0.0 -> 1.5707963267948966 0.0
+acos1004 acos 0.0 nan -> 1.5707963267948966 nan
+acos1005 acos -0.0 nan -> 1.5707963267948966 nan
+acos1006 acos -2.3 inf -> 1.5707963267948966 -inf
+acos1007 acos -0.0 inf -> 1.5707963267948966 -inf
+acos1008 acos 0.0 inf -> 1.5707963267948966 -inf
+acos1009 acos 2.3 inf -> 1.5707963267948966 -inf
+acos1010 acos -2.3 nan -> nan nan
+acos1011 acos 2.3 nan -> nan nan
+acos1012 acos -inf 2.3 -> 3.1415926535897931 -inf
+acos1013 acos -inf 0.0 -> 3.1415926535897931 -inf
+acos1014 acos inf 2.3 -> 0.0 -inf
+acos1015 acos inf 0.0 -> 0.0 -inf
+acos1016 acos -inf inf -> 2.3561944901923448 -inf
+acos1017 acos inf inf -> 0.78539816339744828 -inf
+acos1018 acos inf nan -> nan inf
+acos1019 acos -inf nan -> nan inf
+acos1020 acos nan 0.0 -> nan nan
+acos1021 acos nan 2.3 -> nan nan
+acos1022 acos nan inf -> nan -inf
+acos1023 acos nan nan -> nan nan
+acos1024 acos -2.3 -inf -> 1.5707963267948966 inf
+acos1025 acos -0.0 -inf -> 1.5707963267948966 inf
+acos1026 acos 0.0 -inf -> 1.5707963267948966 inf
+acos1027 acos 2.3 -inf -> 1.5707963267948966 inf
+acos1028 acos -inf -2.3 -> 3.1415926535897931 inf
+acos1029 acos -inf -0.0 -> 3.1415926535897931 inf
+acos1030 acos inf -2.3 -> 0.0 inf
+acos1031 acos inf -0.0 -> 0.0 inf
+acos1032 acos -inf -inf -> 2.3561944901923448 inf
+acos1033 acos inf -inf -> 0.78539816339744828 inf
+acos1034 acos nan -0.0 -> nan nan
+acos1035 acos nan -2.3 -> nan nan
+acos1036 acos nan -inf -> nan inf
+
+
 --------------------------------------
 -- acosh: Inverse hyperbolic cosine --
 --------------------------------------
@@ -281,6 +338,46 @@ acosh0229 acosh 1.5304346893494371e-312 -0.0 -> 0.0 -1.5707963267948966
 acosh0230 acosh -3.7450175954766488e-320 0.0 -> 0.0 1.5707963267948966
 acosh0231 acosh -8.4250563080885801e-311 -0.0 -> 0.0 -1.5707963267948966
 
+-- special values
+acosh1000 acosh 0.0 0.0 -> 0.0 1.5707963267948966
+acosh1001 acosh -0.0 0.0 -> 0.0 1.5707963267948966
+acosh1002 acosh 0.0 inf -> inf 1.5707963267948966
+acosh1003 acosh 2.3 inf -> inf 1.5707963267948966
+acosh1004 acosh -0.0 inf -> inf 1.5707963267948966
+acosh1005 acosh -2.3 inf -> inf 1.5707963267948966
+acosh1006 acosh 0.0 nan -> nan nan
+acosh1007 acosh 2.3 nan -> nan nan
+acosh1008 acosh -0.0 nan -> nan nan
+acosh1009 acosh -2.3 nan -> nan nan
+acosh1010 acosh -inf 0.0 -> inf 3.1415926535897931
+acosh1011 acosh -inf 2.3 -> inf 3.1415926535897931
+acosh1012 acosh inf 0.0 -> inf 0.0
+acosh1013 acosh inf 2.3 -> inf 0.0
+acosh1014 acosh -inf inf -> inf 2.3561944901923448
+acosh1015 acosh inf inf -> inf 0.78539816339744828
+acosh1016 acosh inf nan -> inf nan
+acosh1017 acosh -inf nan -> inf nan
+acosh1018 acosh nan 0.0 -> nan nan
+acosh1019 acosh nan 2.3 -> nan nan
+acosh1020 acosh nan inf -> inf nan
+acosh1021 acosh nan nan -> nan nan
+acosh1022 acosh 0.0 -0.0 -> 0.0 -1.5707963267948966
+acosh1023 acosh -0.0 -0.0 -> 0.0 -1.5707963267948966
+acosh1024 acosh 0.0 -inf -> inf -1.5707963267948966
+acosh1025 acosh 2.3 -inf -> inf -1.5707963267948966
+acosh1026 acosh -0.0 -inf -> inf -1.5707963267948966
+acosh1027 acosh -2.3 -inf -> inf -1.5707963267948966
+acosh1028 acosh -inf -0.0 -> inf -3.1415926535897931
+acosh1029 acosh -inf -2.3 -> inf -3.1415926535897931
+acosh1030 acosh inf -0.0 -> inf -0.0
+acosh1031 acosh inf -2.3 -> inf -0.0
+acosh1032 acosh -inf -inf -> inf -2.3561944901923448
+acosh1033 acosh inf -inf -> inf -0.78539816339744828
+acosh1034 acosh nan -0.0 -> nan nan
+acosh1035 acosh nan -2.3 -> nan nan
+acosh1036 acosh nan -inf -> inf nan
+
+
 ------------------------
 -- asin: Inverse sine --
 ------------------------
@@ -398,6 +495,7 @@ asin0216 asin 0.80843929176985907 1.0150851827767876e+308 -> 7.9642507396113875e
 asin0217 asin 8.2544809829680901 -1.7423548140539474e+308 -> 4.7375430746865733e-308 -710.44459336242164
 asin0218 asin -5.2499000118824295 4.6655578977512214e+307 -> -1.1252459249113292e-307 709.1269781491103
 asin0219 asin -5.9904782760833433 -4.7315689314781163e+307 -> -1.2660659419394637e-307 -709.14102757522312
+
 
 ------------------------------------
 -- asinh: Inverse hyperbolic sine --
@@ -531,15 +629,55 @@ asinh0229 asinh 3.3833911866596068e-318 -0.0 -> 3.3833911866596068e-318 -0.0
 asinh0230 asinh -4.9406564584124654e-324 0.0 -> -4.9406564584124654e-324 0.0
 asinh0231 asinh -2.221137922799485e-308 -0.0 -> -2.2211379227994845e-308 -0.0
 
+-- special values
+asinh1000 asinh 0.0 0.0 -> 0.0 0.0
+asinh1001 asinh 0.0 -0.0 -> 0.0 -0.0
+asinh1002 asinh -0.0 0.0 -> -0.0 0.0
+asinh1003 asinh -0.0 -0.0 -> -0.0 -0.0
+asinh1004 asinh 0.0 inf -> inf 1.5707963267948966
+asinh1005 asinh 2.3 inf -> inf 1.5707963267948966
+asinh1006 asinh 0.0 nan -> nan nan
+asinh1007 asinh 2.3 nan -> nan nan
+asinh1008 asinh inf 0.0 -> inf 0.0
+asinh1009 asinh inf 2.3 -> inf 0.0
+asinh1010 asinh inf inf -> inf 0.78539816339744828
+asinh1011 asinh inf nan -> inf nan
+asinh1012 asinh nan 0.0 -> nan 0.0
+asinh1013 asinh nan 2.3 -> nan nan
+asinh1014 asinh nan inf -> inf nan
+asinh1015 asinh nan nan -> nan nan
+asinh1016 asinh 0.0 -inf -> inf -1.5707963267948966
+asinh1017 asinh 2.3 -inf -> inf -1.5707963267948966
+asinh1018 asinh inf -0.0 -> inf -0.0
+asinh1019 asinh inf -2.3 -> inf -0.0
+asinh1020 asinh inf -inf -> inf -0.78539816339744828
+asinh1021 asinh nan -0.0 -> nan -0.0
+asinh1022 asinh nan -2.3 -> nan nan
+asinh1023 asinh nan -inf -> inf nan
+asinh1024 asinh -0.0 -inf -> -inf -1.5707963267948966
+asinh1025 asinh -2.3 -inf -> -inf -1.5707963267948966
+asinh1026 asinh -0.0 nan -> nan nan
+asinh1027 asinh -2.3 nan -> nan nan
+asinh1028 asinh -inf -0.0 -> -inf -0.0
+asinh1029 asinh -inf -2.3 -> -inf -0.0
+asinh1030 asinh -inf -inf -> -inf -0.78539816339744828
+asinh1031 asinh -inf nan -> -inf nan
+asinh1032 asinh -0.0 inf -> -inf 1.5707963267948966
+asinh1033 asinh -2.3 inf -> -inf 1.5707963267948966
+asinh1034 asinh -inf 0.0 -> -inf 0.0
+asinh1035 asinh -inf 2.3 -> -inf 0.0
+asinh1036 asinh -inf inf -> -inf 0.78539816339744828
+
+
 ---------------------------
 -- atan: Inverse tangent --
 ---------------------------
 
 -- zeros
 atan0000 atan 0.0 0.0 -> 0.0 0.0
-atan0001 atan 0.0 -0.0 -> 0.0 0.0
+atan0001 atan 0.0 -0.0 -> 0.0 -0.0
 atan0002 atan -0.0 0.0 -> -0.0 0.0
-atan0003 atan -0.0 -0.0 -> -0.0 0.0
+atan0003 atan -0.0 -0.0 -> -0.0 -0.0
 
 -- values along both sides of imaginary axis
 atan0010 atan 0.0 -9.8813129168249309e-324 -> 0.0 -9.8813129168249309e-324
@@ -631,9 +769,9 @@ atan0205 atan -0.0 1.0045063210373196e+308 -> -1.5707963267948966 9.955138947929
 atan0206 atan 0.0 -9.5155296715763696e+307 -> 1.5707963267948966 -1.050913648020118e-308
 atan0207 atan -0.0 -1.5565700490496501e+308 -> -1.5707963267948966 -6.4243816114189071e-309
 atan0208 atan 1.2956339389525244e+308 0.0 -> 1.5707963267948966 0.0
-atan0209 atan 1.4408126243772151e+308 -0.0 -> 1.5707963267948966 0.0
+atan0209 atan 1.4408126243772151e+308 -0.0 -> 1.5707963267948966 -0.0
 atan0210 atan -1.0631786461936417e+308 0.0 -> -1.5707963267948966 0.0
-atan0211 atan -1.0516056964171069e+308 -0.0 -> -1.5707963267948966 0.0
+atan0211 atan -1.0516056964171069e+308 -0.0 -> -1.5707963267948966 -0.0
 atan0212 atan 1.236162319603838e+308 4.6827953496242936 -> 1.5707963267948966 0.0
 atan0213 atan 7.000516472897218e+307 -5.8631608017844163 -> 1.5707963267948966 -0.0
 atan0214 atan -1.5053444003338508e+308 5.1199197268420313 -> -1.5707963267948966 0.0
@@ -650,6 +788,7 @@ atan0302 atan 9.9999999999999999e-161 -1.0 -> 0.78539816339744828 -184.553381029
 atan0303 atan -1e-165 1.0 -> -0.78539816339744828 190.30984376228875
 atan0304 atan -9.9998886718268301e-321 -1.0 -> -0.78539816339744828 -368.76019403576692
 
+
 ---------------------------------------
 -- atanh: Inverse hyperbolic tangent --
 ---------------------------------------
@@ -657,8 +796,8 @@ atan0304 atan -9.9998886718268301e-321 -1.0 -> -0.78539816339744828 -368.7601940
 -- zeros
 atanh0000 atanh 0.0 0.0 -> 0.0 0.0
 atanh0001 atanh 0.0 -0.0 -> 0.0 -0.0
-atanh0002 atanh -0.0 0.0 -> 0.0 0.0
-atanh0003 atanh -0.0 -0.0 -> 0.0 -0.0
+atanh0002 atanh -0.0 0.0 -> -0.0 0.0
+atanh0003 atanh -0.0 -0.0 -> -0.0 -0.0
 
 -- values along both sides of real axis
 atanh0010 atanh -9.8813129168249309e-324 0.0 -> -9.8813129168249309e-324 0.0
@@ -746,9 +885,9 @@ atanh0201 atanh 1.158701641241358e+308 -6.5579268873375853e+307 -> 6.53653752677
 atanh0202 atanh -1.3435325735762247e+308 9.8947369259601547e+307 -> -4.8256680906589956e-309 1.5707963267948966
 atanh0203 atanh -1.4359857522598942e+308 -9.4701204702391004e+307 -> -4.8531282262872645e-309 -1.5707963267948966
 atanh0204 atanh 0.0 5.6614181068098497e+307 -> 0.0 1.5707963267948966
-atanh0205 atanh -0.0 6.9813212721450139e+307 -> 0.0 1.5707963267948966
+atanh0205 atanh -0.0 6.9813212721450139e+307 -> -0.0 1.5707963267948966
 atanh0206 atanh 0.0 -7.4970613060311453e+307 -> 0.0 -1.5707963267948966
-atanh0207 atanh -0.0 -1.5280601880314068e+308 -> 0.0 -1.5707963267948966
+atanh0207 atanh -0.0 -1.5280601880314068e+308 -> -0.0 -1.5707963267948966
 atanh0208 atanh 8.2219472336000745e+307 0.0 -> 1.2162568933954813e-308 1.5707963267948966
 atanh0209 atanh 1.4811519617280899e+308 -0.0 -> 6.7515017083951325e-309 -1.5707963267948966
 atanh0210 atanh -1.2282016263598785e+308 0.0 -> -8.1419856360537615e-309 1.5707963267948966
@@ -768,9 +907,9 @@ atanh0221 atanh 1.7391110733611878e-321 -4.3547800672541419e-313 -> 1.7391110733
 atanh0222 atanh -5.9656816081325078e-317 9.9692253555416263e-313 -> -5.9656816081325078e-317 9.9692253555416263e-313
 atanh0223 atanh -6.5606671178400239e-313 -2.1680936406357335e-309 -> -6.5606671178400239e-313 -2.1680936406357335e-309
 atanh0224 atanh 0.0 2.5230944401820779e-319 -> 0.0 2.5230944401820779e-319
-atanh0225 atanh -0.0 5.6066569490064658e-320 -> 0.0 5.6066569490064658e-320
+atanh0225 atanh -0.0 5.6066569490064658e-320 -> -0.0 5.6066569490064658e-320
 atanh0226 atanh 0.0 -2.4222487249468377e-317 -> 0.0 -2.4222487249468377e-317
-atanh0227 atanh -0.0 -3.0861101089206037e-316 -> 0.0 -3.0861101089206037e-316
+atanh0227 atanh -0.0 -3.0861101089206037e-316 -> -0.0 -3.0861101089206037e-316
 atanh0228 atanh 3.1219222884393986e-310 0.0 -> 3.1219222884393986e-310 0.0
 atanh0229 atanh 9.8926337564976196e-309 -0.0 -> 9.8926337564976196e-309 -0.0
 atanh0230 atanh -1.5462535092918154e-312 0.0 -> -1.5462535092918154e-312 0.0
@@ -782,6 +921,50 @@ atanh0301 atanh 1.0 9.9999999999999997e-155 -> 177.64562575082149 0.785398163397
 atanh0302 atanh -1.0 1e-161 -> -185.70467357630065 0.78539816339744828
 atanh0303 atanh 1.0 -1e-165 -> 190.30984376228875 -0.78539816339744828
 atanh0304 atanh -1.0 -9.8813129168249309e-324 -> -372.22003596069061 -0.78539816339744828
+
+-- special values
+atanh1000 atanh 0.0 0.0 -> 0.0 0.0
+atanh1001 atanh 0.0 nan -> 0.0 nan
+atanh1002 atanh 1.0 0.0 -> inf 0.0                      divide-by-zero
+atanh1003 atanh 0.0 inf -> 0.0 1.5707963267948966
+atanh1004 atanh 2.3 inf -> 0.0 1.5707963267948966
+atanh1005 atanh 2.3 nan -> nan nan
+atanh1006 atanh inf 0.0 -> 0.0 1.5707963267948966
+atanh1007 atanh inf 2.3 -> 0.0 1.5707963267948966
+atanh1008 atanh inf inf -> 0.0 1.5707963267948966
+atanh1009 atanh inf nan -> 0.0 nan
+atanh1010 atanh nan 0.0 -> nan nan
+atanh1011 atanh nan 2.3 -> nan nan
+atanh1012 atanh nan inf -> 0.0 1.5707963267948966
+atanh1013 atanh nan nan -> nan nan
+atanh1014 atanh 0.0 -0.0 -> 0.0 -0.0
+atanh1015 atanh 1.0 -0.0 -> inf -0.0                    divide-by-zero
+atanh1016 atanh 0.0 -inf -> 0.0 -1.5707963267948966
+atanh1017 atanh 2.3 -inf -> 0.0 -1.5707963267948966
+atanh1018 atanh inf -0.0 -> 0.0 -1.5707963267948966
+atanh1019 atanh inf -2.3 -> 0.0 -1.5707963267948966
+atanh1020 atanh inf -inf -> 0.0 -1.5707963267948966
+atanh1021 atanh nan -0.0 -> nan nan
+atanh1022 atanh nan -2.3 -> nan nan
+atanh1023 atanh nan -inf -> 0.0 -1.5707963267948966
+atanh1024 atanh -0.0 -0.0 -> -0.0 -0.0
+atanh1025 atanh -0.0 nan -> -0.0 nan
+atanh1026 atanh -1.0 -0.0 -> -inf -0.0                  divide-by-zero
+atanh1027 atanh -0.0 -inf -> -0.0 -1.5707963267948966
+atanh1028 atanh -2.3 -inf -> -0.0 -1.5707963267948966
+atanh1029 atanh -2.3 nan -> nan nan
+atanh1030 atanh -inf -0.0 -> -0.0 -1.5707963267948966
+atanh1031 atanh -inf -2.3 -> -0.0 -1.5707963267948966
+atanh1032 atanh -inf -inf -> -0.0 -1.5707963267948966
+atanh1033 atanh -inf nan -> -0.0 nan
+atanh1034 atanh -0.0 0.0 -> -0.0 0.0
+atanh1035 atanh -1.0 0.0 -> -inf 0.0                    divide-by-zero
+atanh1036 atanh -0.0 inf -> -0.0 1.5707963267948966
+atanh1037 atanh -2.3 inf -> -0.0 1.5707963267948966
+atanh1038 atanh -inf 0.0 -> -0.0 1.5707963267948966
+atanh1039 atanh -inf 2.3 -> -0.0 1.5707963267948966
+atanh1040 atanh -inf inf -> -0.0 1.5707963267948966
+
 
 ----------------------------
 -- log: Natural logarithm --
@@ -911,6 +1094,46 @@ log0131 log -2.813283897266934e-317 -0.0 -> -728.88512203138862 -3.1415926535897
 log0200 log -0.59999999999999998 0.80000000000000004 -> 2.2204460492503132e-17 2.2142974355881808
 log0201 log 0.79999999999999993 0.60000000000000009 -> 6.1629758220391547e-33 0.64350110879328448
 
+-- special values
+log1000 log -0.0 0.0 -> -inf 3.1415926535897931         divide-by-zero
+log1001 log 0.0 0.0 -> -inf 0.0                         divide-by-zero
+log1002 log 0.0 inf -> inf 1.5707963267948966
+log1003 log 2.3 inf -> inf 1.5707963267948966
+log1004 log -0.0 inf -> inf 1.5707963267948966
+log1005 log -2.3 inf -> inf 1.5707963267948966
+log1006 log 0.0 nan -> nan nan
+log1007 log 2.3 nan -> nan nan
+log1008 log -0.0 nan -> nan nan
+log1009 log -2.3 nan -> nan nan
+log1010 log -inf 0.0 -> inf 3.1415926535897931
+log1011 log -inf 2.3 -> inf 3.1415926535897931
+log1012 log inf 0.0 -> inf 0.0
+log1013 log inf 2.3 -> inf 0.0
+log1014 log -inf inf -> inf 2.3561944901923448
+log1015 log inf inf -> inf 0.78539816339744828
+log1016 log inf nan -> inf nan
+log1017 log -inf nan -> inf nan
+log1018 log nan 0.0 -> nan nan
+log1019 log nan 2.3 -> nan nan
+log1020 log nan inf -> inf nan
+log1021 log nan nan -> nan nan
+log1022 log -0.0 -0.0 -> -inf -3.1415926535897931       divide-by-zero
+log1023 log 0.0 -0.0 -> -inf -0.0                       divide-by-zero
+log1024 log 0.0 -inf -> inf -1.5707963267948966
+log1025 log 2.3 -inf -> inf -1.5707963267948966
+log1026 log -0.0 -inf -> inf -1.5707963267948966
+log1027 log -2.3 -inf -> inf -1.5707963267948966
+log1028 log -inf -0.0 -> inf -3.1415926535897931
+log1029 log -inf -2.3 -> inf -3.1415926535897931
+log1030 log inf -0.0 -> inf -0.0
+log1031 log inf -2.3 -> inf -0.0
+log1032 log -inf -inf -> inf -2.3561944901923448
+log1033 log inf -inf -> inf -0.78539816339744828
+log1034 log nan -0.0 -> nan nan
+log1035 log nan -2.3 -> nan nan
+log1036 log nan -inf -> inf nan
+
+
 -----------------------
 -- sqrt: Square root --
 -----------------------
@@ -1019,14 +1242,55 @@ sqrt0131 sqrt -1.5477066694467245e-310 -0.0 -> 0.0 -1.2440685951533077e-155
 sqrt0140 sqrt 1.6999999999999999e+308 -1.6999999999999999e+308 -> 1.4325088230154573e+154 -5.9336458271212207e+153
 sqrt0141 sqrt -1.797e+308 -9.9999999999999999e+306 -> 3.7284476432057307e+152 -1.3410406899802901e+154
 
--- For exp, cosh, sinh, tanh we limit tests to arguments whose 
+-- special values
+sqrt1000 sqrt 0.0 0.0 -> 0.0 0.0
+sqrt1001 sqrt -0.0 0.0 -> 0.0 0.0
+sqrt1002 sqrt 0.0 inf -> inf inf
+sqrt1003 sqrt 2.3 inf -> inf inf
+sqrt1004 sqrt inf inf -> inf inf
+sqrt1005 sqrt -0.0 inf -> inf inf
+sqrt1006 sqrt -2.3 inf -> inf inf
+sqrt1007 sqrt -inf inf -> inf inf
+sqrt1008 sqrt nan inf -> inf inf
+sqrt1009 sqrt 0.0 nan -> nan nan
+sqrt1010 sqrt 2.3 nan -> nan nan
+sqrt1011 sqrt -0.0 nan -> nan nan
+sqrt1012 sqrt -2.3 nan -> nan nan
+sqrt1013 sqrt -inf 0.0 -> 0.0 inf
+sqrt1014 sqrt -inf 2.3 -> 0.0 inf
+sqrt1015 sqrt inf 0.0 -> inf 0.0
+sqrt1016 sqrt inf 2.3 -> inf 0.0
+sqrt1017 sqrt -inf nan -> nan inf
+sqrt1018 sqrt inf nan -> inf nan
+sqrt1019 sqrt nan 0.0 -> nan nan
+sqrt1020 sqrt nan 2.3 -> nan nan
+sqrt1021 sqrt nan nan -> nan nan
+sqrt1022 sqrt 0.0 -0.0 -> 0.0 -0.0
+sqrt1023 sqrt -0.0 -0.0 -> 0.0 -0.0
+sqrt1024 sqrt 0.0 -inf -> inf -inf
+sqrt1025 sqrt 2.3 -inf -> inf -inf
+sqrt1026 sqrt inf -inf -> inf -inf
+sqrt1027 sqrt -0.0 -inf -> inf -inf
+sqrt1028 sqrt -2.3 -inf -> inf -inf
+sqrt1029 sqrt -inf -inf -> inf -inf
+sqrt1030 sqrt nan -inf -> inf -inf
+sqrt1031 sqrt -inf -0.0 -> 0.0 -inf
+sqrt1032 sqrt -inf -2.3 -> 0.0 -inf
+sqrt1033 sqrt inf -0.0 -> inf -0.0
+sqrt1034 sqrt inf -2.3 -> inf -0.0
+sqrt1035 sqrt nan -0.0 -> nan nan
+sqrt1036 sqrt nan -2.3 -> nan nan
+
+
+-- For exp, cosh, sinh, tanh we limit tests to arguments whose
 -- imaginary part is less than 10 in absolute value:  most math
--- libraries have poor accuracy for (real) sine and cosine for 
--- large arguments, and the accuracy of these complex functions 
+-- libraries have poor accuracy for (real) sine and cosine for
+-- large arguments, and the accuracy of these complex functions
 -- suffer correspondingly.
--- 
--- Similarly, for cos, sin and tan we limit tests to arguments 
--- with relatively small real part. 
+--
+-- Similarly, for cos, sin and tan we limit tests to arguments
+-- with relatively small real part.
+
 
 -------------------------------
 -- exp: Exponential function --
@@ -1064,9 +1328,77 @@ exp0023 exp 0.94356313429255245 3.418530463518592 -> -2.4712285695346194 -0.7024
 exp0030 exp 710.0 0.78500000000000003 -> 1.5803016909637158e+308 1.5790437551806911e+308
 exp0031 exp 710.0 -0.78500000000000003 -> 1.5803016909637158e+308 -1.5790437551806911e+308
 
--- values for which exp(x) underflows
+-- values for which exp(x) is subnormal, or underflows to 0
 exp0040 exp -735.0 0.78500000000000003 -> 4.3976783136329355e-320 4.3942198541120468e-320
 exp0041 exp -735.0 -2.3559999999999999 -> -4.3952079854037293e-320 -4.396690182341253e-320
+exp0042 exp -745.0 0.0 -> 4.9406564584124654e-324 0.0
+exp0043 exp -745.0 0.7 -> 0.0 0.0
+exp0044 exp -745.0 2.1 -> -0.0 0.0
+exp0045 exp -745.0 3.7 -> -0.0 -0.0
+exp0046 exp -745.0 5.3 -> 0.0 -0.0
+
+-- values for which exp(z) overflows
+exp0050 exp 710.0 0.0 -> inf 0.0                        overflow
+exp0051 exp 711.0 0.7 -> inf inf                        overflow
+exp0052 exp 710.0 1.5 -> 1.5802653829857376e+307 inf    overflow
+exp0053 exp 710.0 1.6 -> -6.5231579995501372e+306 inf   overflow
+exp0054 exp 710.0 2.8 -> -inf 7.4836177417448528e+307   overflow
+
+-- special values
+exp1000 exp 0.0 0.0 -> 1.0 0.0
+exp1001 exp -0.0 0.0 -> 1.0 0.0
+exp1002 exp 0.0 inf -> nan nan          invalid
+exp1003 exp 2.3 inf -> nan nan          invalid
+exp1004 exp -0.0 inf -> nan nan         invalid
+exp1005 exp -2.3 inf -> nan nan         invalid
+exp1006 exp 0.0 nan -> nan nan
+exp1007 exp 2.3 nan -> nan nan
+exp1008 exp -0.0 nan -> nan nan
+exp1009 exp -2.3 nan -> nan nan
+exp1010 exp -inf 0.0 -> 0.0 0.0
+exp1011 exp -inf 1.4 -> 0.0 0.0
+exp1012 exp -inf 2.8 -> -0.0 0.0
+exp1013 exp -inf 4.2 -> -0.0 -0.0
+exp1014 exp -inf 5.6 -> 0.0 -0.0
+exp1015 exp -inf 7.0 -> 0.0 0.0
+exp1016 exp inf 0.0 -> inf 0.0
+exp1017 exp inf 1.4 -> inf inf
+exp1018 exp inf 2.8 -> -inf inf
+exp1019 exp inf 4.2 -> -inf -inf
+exp1020 exp inf 5.6 -> inf -inf
+exp1021 exp inf 7.0 -> inf inf
+exp1022 exp -inf inf -> 0.0 0.0
+exp1023 exp inf inf -> inf nan          invalid
+exp1024 exp -inf nan -> 0.0 0.0
+exp1025 exp inf nan -> inf nan
+exp1026 exp nan 0.0 -> nan 0.0
+exp1027 exp nan 2.3 -> nan nan
+exp1028 exp nan inf -> nan nan
+exp1029 exp nan nan -> nan nan
+exp1030 exp 0.0 -0.0 -> 1.0 -0.0
+exp1031 exp -0.0 -0.0 -> 1.0 -0.0
+exp1032 exp 0.0 -inf -> nan nan         invalid
+exp1033 exp 2.3 -inf -> nan nan         invalid
+exp1034 exp -0.0 -inf -> nan nan        invalid
+exp1035 exp -2.3 -inf -> nan nan        invalid
+exp1036 exp -inf -0.0 -> 0.0 -0.0
+exp1037 exp -inf -1.4 -> 0.0 -0.0
+exp1038 exp -inf -2.8 -> -0.0 -0.0
+exp1039 exp -inf -4.2 -> -0.0 0.0
+exp1040 exp -inf -5.6 -> 0.0 0.0
+exp1041 exp -inf -7.0 -> 0.0 -0.0
+exp1042 exp inf -0.0 -> inf -0.0
+exp1043 exp inf -1.4 -> inf -inf
+exp1044 exp inf -2.8 -> -inf -inf
+exp1045 exp inf -4.2 -> -inf inf
+exp1046 exp inf -5.6 -> inf inf
+exp1047 exp inf -7.0 -> inf -inf
+exp1048 exp -inf -inf -> 0.0 0.0
+exp1049 exp inf -inf -> inf nan         invalid
+exp1050 exp nan -0.0 -> nan -0.0
+exp1051 exp nan -2.3 -> nan nan
+exp1052 exp nan -inf -> nan nan
+
 
 -----------------------------
 -- cosh: Hyperbolic Cosine --
@@ -1104,6 +1436,62 @@ cosh0023 cosh 2.218885944363501 2.0015727395883687 -> -1.94294321081968 4.129026
 cosh0030 cosh 710.5 2.3519999999999999 -> -1.2967465239355998e+308 1.3076707908857333e+308
 cosh0031 cosh -710.5 0.69999999999999996 -> 1.4085466381392499e+308 -1.1864024666450239e+308
 
+-- special values
+cosh1000 cosh 0.0 0.0 -> 1.0 0.0
+cosh1001 cosh 0.0 inf -> nan 0.0        invalid
+cosh1002 cosh 0.0 nan -> nan 0.0
+cosh1003 cosh 2.3 inf -> nan nan        invalid
+cosh1004 cosh 2.3 nan -> nan nan
+cosh1005 cosh inf 0.0 -> inf 0.0
+cosh1006 cosh inf 1.4 -> inf inf
+cosh1007 cosh inf 2.8 -> -inf inf
+cosh1008 cosh inf 4.2 -> -inf -inf
+cosh1009 cosh inf 5.6 -> inf -inf
+cosh1010 cosh inf 7.0 -> inf inf
+cosh1011 cosh inf inf -> inf nan        invalid
+cosh1012 cosh inf nan -> inf nan
+cosh1013 cosh nan 0.0 -> nan 0.0
+cosh1014 cosh nan 2.3 -> nan nan
+cosh1015 cosh nan inf -> nan nan
+cosh1016 cosh nan nan -> nan nan
+cosh1017 cosh 0.0 -0.0 -> 1.0 -0.0
+cosh1018 cosh 0.0 -inf -> nan 0.0       invalid
+cosh1019 cosh 2.3 -inf -> nan nan       invalid
+cosh1020 cosh inf -0.0 -> inf -0.0
+cosh1021 cosh inf -1.4 -> inf -inf
+cosh1022 cosh inf -2.8 -> -inf -inf
+cosh1023 cosh inf -4.2 -> -inf inf
+cosh1024 cosh inf -5.6 -> inf inf
+cosh1025 cosh inf -7.0 -> inf -inf
+cosh1026 cosh inf -inf -> inf nan       invalid
+cosh1027 cosh nan -0.0 -> nan 0.0
+cosh1028 cosh nan -2.3 -> nan nan
+cosh1029 cosh nan -inf -> nan nan
+cosh1030 cosh -0.0 -0.0 -> 1.0 0.0
+cosh1031 cosh -0.0 -inf -> nan 0.0      invalid
+cosh1032 cosh -0.0 nan -> nan 0.0
+cosh1033 cosh -2.3 -inf -> nan nan      invalid
+cosh1034 cosh -2.3 nan -> nan nan
+cosh1035 cosh -inf -0.0 -> inf 0.0
+cosh1036 cosh -inf -1.4 -> inf inf
+cosh1037 cosh -inf -2.8 -> -inf inf
+cosh1038 cosh -inf -4.2 -> -inf -inf
+cosh1039 cosh -inf -5.6 -> inf -inf
+cosh1040 cosh -inf -7.0 -> inf inf
+cosh1041 cosh -inf -inf -> inf nan      invalid
+cosh1042 cosh -inf nan -> inf nan
+cosh1043 cosh -0.0 0.0 -> 1.0 -0.0
+cosh1044 cosh -0.0 inf -> nan 0.0       invalid
+cosh1045 cosh -2.3 inf -> nan nan       invalid
+cosh1046 cosh -inf 0.0 -> inf -0.0
+cosh1047 cosh -inf 1.4 -> inf -inf
+cosh1048 cosh -inf 2.8 -> -inf -inf
+cosh1049 cosh -inf 4.2 -> -inf inf
+cosh1050 cosh -inf 5.6 -> inf inf
+cosh1051 cosh -inf 7.0 -> inf -inf
+cosh1052 cosh -inf inf -> inf nan       invalid
+
+
 ---------------------------
 -- sinh: Hyperbolic Sine --
 ---------------------------
@@ -1139,6 +1527,62 @@ sinh0023 sinh 0.043713693678420068 0.22512549887532657 -> 0.042624198673416713 0
 -- large real part
 sinh0030 sinh 710.5 -2.3999999999999999 -> -1.3579970564885919e+308 -1.24394470907798e+308
 sinh0031 sinh -710.5 0.80000000000000004 -> -1.2830671601735164e+308 1.3210954193997678e+308
+
+-- special values
+sinh1000 sinh 0.0 0.0 -> 0.0 0.0
+sinh1000 sinh 0.0 inf -> 0.0 nan        invalid
+sinh1000 sinh 0.0 nan -> 0.0 nan
+sinh1000 sinh 2.3 inf -> nan nan        invalid
+sinh1000 sinh 2.3 nan -> nan nan
+sinh1000 sinh inf 0.0 -> inf 0.0
+sinh1000 sinh inf 1.4 -> inf inf
+sinh1000 sinh inf 2.8 -> -inf inf
+sinh1000 sinh inf 4.2 -> -inf -inf
+sinh1000 sinh inf 5.6 -> inf -inf
+sinh1000 sinh inf 7.0 -> inf inf
+sinh1000 sinh inf inf -> inf nan        invalid
+sinh1000 sinh inf nan -> inf nan
+sinh1000 sinh nan 0.0 -> nan 0.0
+sinh1000 sinh nan 2.3 -> nan nan
+sinh1000 sinh nan inf -> nan nan
+sinh1000 sinh nan nan -> nan nan
+sinh1000 sinh 0.0 -0.0 -> 0.0 -0.0
+sinh1000 sinh 0.0 -inf -> 0.0 nan       invalid
+sinh1000 sinh 2.3 -inf -> nan nan       invalid
+sinh1000 sinh inf -0.0 -> inf -0.0
+sinh1000 sinh inf -1.4 -> inf -inf
+sinh1000 sinh inf -2.8 -> -inf -inf
+sinh1000 sinh inf -4.2 -> -inf inf
+sinh1000 sinh inf -5.6 -> inf inf
+sinh1000 sinh inf -7.0 -> inf -inf
+sinh1000 sinh inf -inf -> inf nan       invalid
+sinh1000 sinh nan -0.0 -> nan -0.0
+sinh1000 sinh nan -2.3 -> nan nan
+sinh1000 sinh nan -inf -> nan nan
+sinh1000 sinh -0.0 -0.0 -> -0.0 -0.0
+sinh1000 sinh -0.0 -inf -> 0.0 nan      invalid
+sinh1000 sinh -0.0 nan -> 0.0 nan
+sinh1000 sinh -2.3 -inf -> nan nan      invalid
+sinh1000 sinh -2.3 nan -> nan nan
+sinh1000 sinh -inf -0.0 -> -inf -0.0
+sinh1000 sinh -inf -1.4 -> -inf -inf
+sinh1000 sinh -inf -2.8 -> inf -inf
+sinh1000 sinh -inf -4.2 -> inf inf
+sinh1000 sinh -inf -5.6 -> -inf inf
+sinh1000 sinh -inf -7.0 -> -inf -inf
+sinh1000 sinh -inf -inf -> inf nan      invalid
+sinh1000 sinh -inf nan -> inf nan
+sinh1000 sinh -0.0 0.0 -> -0.0 0.0
+sinh1000 sinh -0.0 inf -> 0.0 nan       invalid
+sinh1000 sinh -2.3 inf -> nan nan       invalid
+sinh1000 sinh -inf 0.0 -> -inf 0.0
+sinh1000 sinh -inf 1.4 -> -inf inf
+sinh1000 sinh -inf 2.8 -> inf inf
+sinh1000 sinh -inf 4.2 -> inf -inf
+sinh1000 sinh -inf 5.6 -> -inf -inf
+sinh1000 sinh -inf 7.0 -> -inf inf
+sinh1000 sinh -inf inf -> inf nan       invalid
+
 
 ------------------------------
 -- tanh: Hyperbolic Tangent --
@@ -1178,6 +1622,62 @@ tanh0031 tanh -711 7.4000000000000004 -> -1.0 0.0
 tanh0032 tanh 1000 -2.3199999999999998 -> 1.0 0.0
 tanh0033 tanh -1.0000000000000001e+300 -9.6699999999999999 -> -1.0 -0.0
 
+--special values
+tanh1000 tanh 0.0 0.0 -> 0.0 0.0
+tanh1001 tanh 0.0 inf -> nan nan        invalid
+tanh1002 tanh 2.3 inf -> nan nan        invalid
+tanh1003 tanh 0.0 nan -> nan nan
+tanh1004 tanh 2.3 nan -> nan nan
+tanh1005 tanh inf 0.0 -> 1.0 0.0
+tanh1006 tanh inf 0.7 -> 1.0 0.0
+tanh1007 tanh inf 1.4 -> 1.0 0.0
+tanh1008 tanh inf 2.1 -> 1.0 -0.0
+tanh1009 tanh inf 2.8 -> 1.0 -0.0
+tanh1010 tanh inf 3.5 -> 1.0 0.0
+tanh1011 tanh inf inf -> 1.0 0.0
+tanh1012 tanh inf nan -> 1.0 0.0
+tanh1013 tanh nan 0.0 -> nan 0.0
+tanh1014 tanh nan 2.3 -> nan nan
+tanh1015 tanh nan inf -> nan nan
+tanh1016 tanh nan nan -> nan nan
+tanh1017 tanh 0.0 -0.0 -> 0.0 -0.0
+tanh1018 tanh 0.0 -inf -> nan nan       invalid
+tanh1019 tanh 2.3 -inf -> nan nan       invalid
+tanh1020 tanh inf -0.0 -> 1.0 -0.0
+tanh1021 tanh inf -0.7 -> 1.0 -0.0
+tanh1022 tanh inf -1.4 -> 1.0 -0.0
+tanh1023 tanh inf -2.1 -> 1.0 0.0
+tanh1024 tanh inf -2.8 -> 1.0 0.0
+tanh1025 tanh inf -3.5 -> 1.0 -0.0
+tanh1026 tanh inf -inf -> 1.0 0.0
+tanh1027 tanh nan -0.0 -> nan -0.0
+tanh1028 tanh nan -2.3 -> nan nan
+tanh1029 tanh nan -inf -> nan nan
+tanh1030 tanh -0.0 -0.0 -> -0.0 -0.0
+tanh1031 tanh -0.0 -inf -> nan nan      invalid
+tanh1032 tanh -2.3 -inf -> nan nan      invalid
+tanh1033 tanh -0.0 nan -> nan nan
+tanh1034 tanh -2.3 nan -> nan nan
+tanh1035 tanh -inf -0.0 -> -1.0 -0.0
+tanh1036 tanh -inf -0.7 -> -1.0 -0.0
+tanh1037 tanh -inf -1.4 -> -1.0 -0.0
+tanh1038 tanh -inf -2.1 -> -1.0 0.0
+tanh1039 tanh -inf -2.8 -> -1.0 0.0
+tanh1040 tanh -inf -3.5 -> -1.0 -0.0
+tanh1041 tanh -inf -inf -> -1.0 0.0
+tanh1042 tanh -inf nan -> -1.0 0.0
+tanh1043 tanh -0.0 0.0 -> -0.0 0.0
+tanh1044 tanh -0.0 inf -> nan nan       invalid
+tanh1045 tanh -2.3 inf -> nan nan       invalid
+tanh1046 tanh -inf 0.0 -> -1.0 0.0
+tanh1047 tanh -inf 0.7 -> -1.0 0.0
+tanh1048 tanh -inf 1.4 -> -1.0 0.0
+tanh1049 tanh -inf 2.1 -> -1.0 -0.0
+tanh1050 tanh -inf 2.8 -> -1.0 -0.0
+tanh1051 tanh -inf 3.5 -> -1.0 0.0
+tanh1052 tanh -inf inf -> -1.0 0.0
+
+
 -----------------
 -- cos: Cosine --
 -----------------
@@ -1210,6 +1710,7 @@ cos0021 cos 4.8048375263775256 0.0062248852898515658 -> 0.092318702015846243 0.0
 cos0022 cos 7.9914515433858515 0.71659966615501436 -> -0.17375439906936566 -0.77217043527294582
 cos0023 cos 0.45124351152540226 1.6992693993812158 -> 2.543477948972237 -1.1528193694875477
 
+
 ---------------
 -- sin: Sine --
 ---------------
@@ -1241,6 +1742,7 @@ sin0020 sin 0.024861722816513169 0.33044620756118515 -> 0.026228801369651 0.3363
 sin0021 sin 1.4342727387492671 0.81361889790284347 -> 1.3370960060947923 0.12336137961387163
 sin0022 sin 1.1518087354403725 4.8597235966150558 -> 58.919141989603041 26.237003403758852
 sin0023 sin 0.00087773078406649192 34.792379211312095 -> 565548145569.38245 644329685822700.62
+
 
 ------------------
 -- tan: Tangent --
