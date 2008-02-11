@@ -882,8 +882,11 @@ float_div(PyObject *v, PyObject *w)
 	CONVERT_TO_DOUBLE(v, a);
 	CONVERT_TO_DOUBLE(w, b);
 	if (b == 0.0) {
-		PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-		return NULL;
+		if (PyFloat_GetIEEE754() == 0) {
+			PyErr_SetString(PyExc_ZeroDivisionError,
+					"float division");
+			return NULL;
+		}
 	}
 	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
@@ -901,10 +904,12 @@ float_classic_div(PyObject *v, PyObject *w)
 	    PyErr_Warn(PyExc_DeprecationWarning, "classic float division") < 0)
 		return NULL;
 	if (b == 0.0) {
-		PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-		return NULL;
-	}
-	PyFPE_START_PROTECT("divide", return 0)
+		if (PyFloat_GetIEEE754() == 0) {
+			PyErr_SetString(PyExc_ZeroDivisionError,
+					"float division");
+			return NULL;
+		}
+	}	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
 	PyFPE_END_PROTECT(a)
 	return PyFloat_FromDouble(a);
@@ -1744,6 +1749,25 @@ PyFloat_Fini(void)
 			list = list->next;
 		}
 	}
+}
+
+/* inline this */
+int
+PyFloat_GetIEEE754(void)
+{
+	PyThreadState *tstate = PyThreadState_GET();
+	return tstate->float_ieee754;
+}
+
+int
+PyFloat_SetIEEE754(state)
+{
+	int old_state;
+	PyThreadState *tstate = PyThreadState_GET();
+
+	old_state = tstate->float_ieee754;
+	tstate->float_ieee754 = state;
+	return old_state;
 }
 
 /*----------------------------------------------------------------------------

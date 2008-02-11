@@ -10,6 +10,7 @@ import unittest
 import threading
 from contextlib import *  # Tests __all__
 from test import test_support
+import math
 
 class ContextManagerTestCase(unittest.TestCase):
 
@@ -329,6 +330,25 @@ class LockContextTestCase(unittest.TestCase):
             else:
                 return True
         self.boilerPlate(lock, locked)
+
+class IEEE754TestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.state = math.get_ieee754()
+
+    def tearDown(self):
+        math.set_ieee754(self.state)
+
+    def test_ieee754(self):
+        with ieee754():
+            r1 = 42./0.
+            r2 = -23./0.
+            r3 = 0./0.
+        self.assert_(math.isinf(r1))
+        self.assert_(r1 > 0)
+        self.assert_(math.isinf(r2))
+        self.assert_(r2 < 0)
+        self.assert_(math.isnan(r3))
 
 # This is needed to make the test actually run under regrtest.py!
 def test_main():

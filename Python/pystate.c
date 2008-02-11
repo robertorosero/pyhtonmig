@@ -193,6 +193,8 @@ PyThreadState_New(PyInterpreterState *interp)
 		tstate->c_profileobj = NULL;
 		tstate->c_traceobj = NULL;
 
+		tstate->float_ieee754 = 0;
+
 #ifdef WITH_THREAD
 		_PyGILState_NoteThreadState(tstate);
 #endif

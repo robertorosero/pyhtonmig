@@ -1,8 +1,9 @@
 """Utilities for with-statement contexts.  See PEP 343."""
 
 import sys
+import math as _math
 
-__all__ = ["contextmanager", "nested", "closing"]
+__all__ = ["contextmanager", "nested", "closing", "ieee754"]
 
 class GeneratorContextManager(object):
     """Helper for @contextmanager decorator."""
@@ -155,3 +156,24 @@ class closing(object):
         return self.thing
     def __exit__(self, *exc_info):
         self.thing.close()
+
+class ieee754(object):
+    """Context for IEEE 754 floating point behavior
+
+    Example:
+    >>> with ieee754():
+    ...     r1 = 42./0.
+    ...     r2 = -23./0.
+    ...     r2 = 0./0.
+    ...
+    >>> print r1, r2, r3
+    (inf, -inf, nan)
+    """
+    def __init__(self, state=True):
+        self.new_state = state
+
+    def __enter__(self):
+        self.old_state = _math.set_ieee754(self.new_state)
+
+    def __exit__(self, *args):
+        _math.set_ieee754(self.old_state)

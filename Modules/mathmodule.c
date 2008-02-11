@@ -599,6 +599,29 @@ PyDoc_STRVAR(math_isinf_doc,
 "isinf(x) -> bool\n\
 Checks if float x is infinite (positive or negative)");
 
+static PyObject *
+math_set_ieee754(PyObject *self, PyObject *arg)
+{
+	int state;
+
+	state = PyObject_IsTrue(arg);
+	if (state == -1)
+		return NULL;
+	
+	return PyBool_FromLong((long)PyFloat_SetIEEE754(state));
+}
+
+PyDoc_STRVAR(math_set_ieee754_doc,
+"set_ieee754(bool) -> bool");
+
+static PyObject *
+math_get_ieee754(PyObject *self, PyObject *arg)
+{
+	return PyBool_FromLong((long)PyFloat_GetIEEE754());
+}
+
+PyDoc_STRVAR(math_get_ieee754_doc,
+"get_ieee754() -> bool");
 
 static PyMethodDef math_methods[] = {
 	{"acos",	math_acos,	METH_O,		math_acos_doc},
@@ -618,6 +641,7 @@ static PyMethodDef math_methods[] = {
 	{"floor",	math_floor,	METH_O,		math_floor_doc},
 	{"fmod",	math_fmod,	METH_VARARGS,	math_fmod_doc},
 	{"frexp",	math_frexp,	METH_O,		math_frexp_doc},
+	{"get_ieee754",	math_get_ieee754,	METH_NOARGS,	math_get_ieee754_doc},
 	{"hypot",	math_hypot,	METH_VARARGS,	math_hypot_doc},
 	{"isinf",	math_isinf,	METH_O,		math_isinf_doc},
 	{"isnan",	math_isnan,	METH_O,		math_isnan_doc},
@@ -628,6 +652,7 @@ static PyMethodDef math_methods[] = {
 	{"modf",	math_modf,	METH_O,		math_modf_doc},
 	{"pow",		math_pow,	METH_VARARGS,	math_pow_doc},
 	{"radians",	math_radians,	METH_O,		math_radians_doc},
+	{"set_ieee754",	math_set_ieee754,	METH_O,	math_set_ieee754_doc},
 	{"sin",		math_sin,	METH_O,		math_sin_doc},
 	{"sinh",	math_sinh,	METH_O,		math_sinh_doc},
 	{"sqrt",	math_sqrt,	METH_O,		math_sqrt_doc},
