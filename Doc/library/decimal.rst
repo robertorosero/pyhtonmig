@@ -1,6 +1,6 @@
 
-:mod:`decimal` --- Decimal floating point arithmetic
-====================================================
+:mod:`decimal` --- Decimal fixed point and floating point arithmetic
+====================================================================
 
 .. module:: decimal
    :synopsis: Implementation of the General Decimal Arithmetic  Specification.
@@ -21,6 +21,11 @@
 The :mod:`decimal` module provides support for decimal floating point
 arithmetic.  It offers several advantages over the :class:`float` datatype:
 
+* Decimal "is based on a floating-point model which was designed with people
+  in mind, and necessarily has a paramount guiding principle -- computers must
+  provide an arithmetic that works in the same way as the arithmetic that
+  people learn at school." -- excerpt from the decimal arithmetic specification.
+
 * Decimal numbers can be represented exactly.  In contrast, numbers like
   :const:`1.1` do not have an exact representation in binary floating point. End
   users typically would not expect :const:`1.1` to display as
@@ -30,7 +35,7 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   + 0.1 + 0.1 - 0.3`` is exactly equal to zero.  In binary floating point, the result
   is :const:`5.5511151231257827e-017`.  While near to zero, the differences
   prevent reliable equality testing and differences can accumulate. For this
-  reason, decimal would be preferred in accounting applications which have strict
+  reason, decimal is preferred in accounting applications which have strict
   equality invariants.
 
 * The decimal module incorporates a notion of significant places so that ``1.30
@@ -55,6 +60,13 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   standards.  While the built-in float type exposes only a modest portion of its
   capabilities, the decimal module exposes all required parts of the standard.
   When needed, the programmer has full control over rounding and signal handling.
+  This includes an option to enforce exact arithmetic by using exceptions
+  to block any inexact operations.
+
+* The decimal module was designed to support "without prejudice, both exact
+  unrounded decimal arithmetic (sometimes called fixed-point arithmetic)
+  and rounded floating-point arithmetic."  -- excerpt from the decimal
+  arithmetic specification.
 
 The module design is centered around three concepts:  the decimal number, the
 context for arithmetic, and signals.
@@ -91,7 +103,7 @@ reset them before monitoring a calculation.
      Specification <http://www2.hursley.ibm.com/decimal/decarith.html>`_.
 
    * IEEE standard 854-1987, `Unofficial IEEE 854 Text
-     <http://www.cs.berkeley.edu/~ejr/projects/754/private/drafts/854-1987/dir.html>`_.
+     <http://754r.ucbtest.org/standards/854.pdf>`_.
 
 .. %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -878,7 +890,7 @@ described below. In addition, the module provides three pre-made contexts:
    :const:`ROUND_HALF_EVEN`.  All flags are cleared.  No traps are enabled (so that
    exceptions are not raised during computations).
 
-   Because the trapped are disabled, this context is useful for applications that
+   Because the traps are disabled, this context is useful for applications that
    prefer to have result value of :const:`NaN` or :const:`Infinity` instead of
    raising exceptions.  This allows an application to complete a run in the
    presence of conditions that would otherwise halt the program.
@@ -1290,6 +1302,19 @@ A variant is :const:`sNaN` which signals rather than remaining quiet after every
 operation.  This is a useful return value when an invalid result needs to
 interrupt a calculation for special handling.
 
+The behavior of Python's comparison operators can be a little surprising where a
+:const:`NaN` is involved.  A test for equality where one of the operands is a
+quiet or signaling :const:`NaN` always returns :const:`False` (even when doing
+``Decimal('NaN')==Decimal('NaN')``), while a test for inequality always returns
+:const:`True`.  An attempt to compare two Decimals using any of the ``<``,
+``<=``, ``>`` or ``>=`` operators will raise the :exc:`InvalidOperation` signal
+if either operand is a :const:`NaN`, and return :const:`False` if this signal is
+not trapped.  Note that the General Decimal Arithmetic specification does not
+specify the behavior of direct comparisons; these rules for comparisons
+involving a :const:`NaN` were taken from the IEEE 854 standard (see Table 3 in
+section 5.7).  To ensure strict standards-compliance, use the :meth:`compare`
+and :meth:`compare-signal` methods instead.
+
 The signed zeros can result from calculations that underflow. They keep the sign
 that would have resulted if the calculation had been carried out to greater
 precision.  Since their magnitude is zero, both positive and negative zeros are
@@ -1568,39 +1593,29 @@ Q. Is there a way to convert a regular float to a :class:`Decimal`?
 
 A. Yes, all binary floating point numbers can be exactly expressed as a
 Decimal.  An exact conversion may take more precision than intuition would
-suggest, so trapping :const:`Inexact` will signal a need for more precision::
+suggest, so we trap :const:`Inexact` to signal a need for more precision::
 
-   def floatToDecimal(f):
-       "Convert a floating point number to a Decimal with no loss of information"
-       # Transform (exactly) a float to a mantissa (0.5 <= abs(m) < 1.0) and an
-       # exponent.  Double the mantissa until it is an integer.  Use the integer
-       # mantissa and exponent to compute an equivalent Decimal.  If this cannot
-       # be done exactly, then retry with more precision.
+    def float_to_decimal(f):
+        "Convert a floating point number to a Decimal with no loss of information"
+        n, d = f.as_integer_ratio()
+        with localcontext() as ctx:
+            ctx.traps[Inexact] = True
+            while True:
+                try:
+                   return Decimal(n) / Decimal(d)
+                except Inexact:
+                    ctx.prec += 1
 
-       mantissa, exponent = math.frexp(f)
-       while mantissa != int(mantissa):
-           mantissa *= 2.0
-           exponent -= 1
-       mantissa = int(mantissa)
+    >>> float_to_decimal(math.pi)
+    Decimal("3.141592653589793115997963468544185161590576171875")
 
-       oldcontext = getcontext()
-       setcontext(Context(traps=[Inexact]))
-       try:
-           while True:
-               try:
-                  return mantissa * Decimal(2) ** exponent
-               except Inexact:
-                   getcontext().prec += 1
-       finally:
-           setcontext(oldcontext)
-
-Q. Why isn't the :func:`floatToDecimal` routine included in the module?
+Q. Why isn't the :func:`float_to_decimal` routine included in the module?
 
 A. There is some question about whether it is advisable to mix binary and
 decimal floating point.  Also, its use requires some care to avoid the
 representation issues associated with binary floating point::
 
-   >>> floatToDecimal(1.1)
+   >>> float_to_decimal(1.1)
    Decimal("1.100000000000000088817841970012523233890533447265625")
 
 Q. Within a complex calculation, how can I make sure that I haven't gotten a

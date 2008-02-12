@@ -20,10 +20,32 @@ Core and builtins
   without the four functions and copysign in libm were added to a new file
   Python/pymath.c.
 
+- Issue #2045: Fix an infinite recursion triggered when printing a subclass of
+  collections.defaultdict, if its default_factory is set to a bound method.
+
+- Fixed a minor memory leak in dictobject.c. The content of the free
+  list was not freed on interpreter shutdown.
+
+- Limit free list of method and builtin function objects to 256 entries
+  each.
+
+- Patch #1953: Added ``sys._compact_freelists()`` and the C API functions
+  ``PyInt_CompactFreeList`` and ``PyFloat_CompactFreeList``
+  to compact the internal free lists of pre-allocted ints and floats.
+
+- Bug #1983: Fixed return type of fork(), fork1() and forkpty() calls.
+  Python expected the return type int but the fork familie returns pi_t.
+
+- Issue #1678380: Fix a bug that identifies 0j and -0j when they appear
+  in the same code unit.
+
+- Issue #2025 :  Add tuple.count() and tuple.index() methods to comply with
+  the collections.Sequence API.
+
 - Patch #1970 by Antoine Pitrou: Speedup unicode whitespace and linebreak
   detection
 
-- Added ``PyType_ClearCache()`` and ``sys._cleartypecache`` to clear the
+- Added ``PyType_ClearCache()`` and ``sys._clear_type_cache`` to clear the
   internal lookup cache for ref leak tests.
 
 - Patch #1473257: generator objects gain a gi_code attribute. This is the
@@ -385,6 +407,27 @@ Core and builtins
 
 Library
 -------
+
+- Rename rational.py to fractions.py and the rational.Rational class
+  to fractions.Fraction, to avoid the name clash with the abstract
+  base class numbers.Rational.  See discussion in issue #1682.
+
+- The pickletools module now provides an optimize() function
+  that eliminates unused PUT opcodes from a pickle string.
+
+- #2021: Allow tempfile.NamedTemporaryFile and SpooledTemporaryFile
+  to be used in with statements by correctly supporting the context
+  management protocol.
+
+- #1979: Add rich comparisons to Decimal, and make Decimal comparisons
+  involving a NaN follow the IEEE 754 standard.
+
+- #2004: tarfile.py: Use mode 0700 for temporary directories and default
+  permissions for missing directories.
+
+- #175006: The debugger used to skip the condition of a "while" statement
+  after the first iteration. Now it correctly steps on the expression, and
+  breakpoints on the "while" statement are honored on each loop.
 
 - #1765140: add an optional delay argument to FileHandler and its
   subclasses. Defaults to false (existing behaviour), but if true,
@@ -1094,6 +1137,8 @@ Library
 Extension Modules
 -----------------
 
+- Updated ``big5hkscs`` codec to the HKSCS revision of 2004.
+
 - #1940: make it possible to use curses.filter() before curses.initscr()
   as the documentation says.
 
@@ -1272,8 +1317,13 @@ Extension Modules
 
 - Bug #1372: zlibmodule.c: int overflow in PyZlib_decompress
 
+- bsddb module: Fix memory leak when using database cursors on
+  databases without a DBEnv.
+
 Tests
 -----
+
+- Refactor test_profile and test_cprofile to use the same code to profile.
 
 - Make test_runpy reentrant by fixing _check_module to clear out any module
   being tested.  Was causing an error by __import__ doing a reload on the
@@ -1391,6 +1441,15 @@ Tools/Demos
 Build
 -----
 
+- Have the search path for building extensions follow the declared order in
+  $CPPFLAGS and $LDFLAGS when adding directories from those environment
+  variables.
+
+- Bug #1983: Added a check to pyport to verify that sizeof(pid_t) is
+  smaller or equal sizeof(long).
+
+- Bug #1234: Fixed semaphore errors on AIX 5.2
+
 - Issue #1726: Remove Python/atof.c from PCBuild/pythoncore.vcproj
 
 - Removed PCbuild8/ directory and added a new build directory for VS 2005
@@ -1461,6 +1520,16 @@ Build
 C API
 -----
 
+- Unified naming convention for free lists and their limits. All free lists
+  in Object/ are named ``free_list``, the counter ``numfree`` and the upper
+  limit is a macro ``PyName_MAXFREELIST`` inside an #ifndef block.
+
+- ``PySet_Add()`` can now modify a newly created frozenset.  Similarly to
+  ``PyTuple_SetItem``, it can be used to populate a brand new frozenset; but 
+  it does not steal a reference to the added item.
+
+- Added ``PySet_Check()`` and ``PyFrozenSet_Check()`` to the set API. 
+
 - Backport of PyUnicode_FromString(), _FromStringAndSize(), _Format and
   _FormatV from Python 3.0. Made PyLong_AsSsize_t and PyLong_FromSsize_t
   public functions.
@@ -1511,6 +1580,10 @@ C API
 
 Windows
 -------
+
+- Patch #1706: Drop support for Win9x, WinME and NT4. Python now requires 
+  Windows 2000 or greater. The _WINVER and NTDDI_VERSION macros are set to
+  Win2k for x86/32bit builds and WinXP for AMD64 builds.
 
 - Conditionalize definition of _CRT_SECURE_NO_DEPRECATE
   and _CRT_NONSTDC_NO_DEPRECATE.

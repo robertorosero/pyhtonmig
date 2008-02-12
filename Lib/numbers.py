@@ -174,7 +174,10 @@ class Complex(Number):
         """self == other"""
         raise NotImplementedError
 
-    # __ne__ is inherited from object and negates whatever __eq__ does.
+    def __ne__(self, other):
+        """self != other"""
+        # The default __ne__ doesn't negate __eq__ until 3.0.
+        return not (self == other)
 
 Complex.register(complex)
 
@@ -292,7 +295,13 @@ class Rational(Real, Exact):
 
     # Concrete implementation of Real's conversion to float.
     def __float__(self):
-        """float(self) = self.numerator / self.denominator"""
+        """float(self) = self.numerator / self.denominator
+
+        It's important that this conversion use the integer's "true"
+        division rather than casting one side to float before dividing
+        so that ratios of huge integers convert without overflowing.
+
+        """
         return self.numerator / self.denominator
 
 

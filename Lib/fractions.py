@@ -9,9 +9,9 @@ import numbers
 import operator
 import re
 
-__all__ = ["Rational"]
+__all__ = ["Fraction"]
 
-RationalAbc = numbers.Rational
+Rational = numbers.Rational
 
 
 def gcd(a, b):
@@ -25,35 +25,44 @@ def gcd(a, b):
     return a
 
 
-_RATIONAL_FORMAT = re.compile(
-    r'^\s*(?P<sign>[-+]?)(?P<num>\d+)'
-    r'(?:/(?P<denom>\d+)|\.(?P<decimal>\d+))?\s*$')
+_RATIONAL_FORMAT = re.compile(r"""
+    \A\s*                      # optional whitespace at the start, then
+    (?P<sign>[-+]?)            # an optional sign, then
+    (?=\d|\.\d)                # lookahead for digit or .digit
+    (?P<num>\d*)               # numerator (possibly empty)
+    (?:                        # followed by an optional
+       /(?P<denom>\d+)         # / and denominator
+    |                          # or
+       \.(?P<decimal>\d*)      # decimal point and fractional part
+    )?
+    \s*\Z                      # and optional whitespace to finish
+""", re.VERBOSE)
 
 
-class Rational(RationalAbc):
+class Fraction(Rational):
     """This class implements rational numbers.
 
-    Rational(8, 6) will produce a rational number equivalent to
+    Fraction(8, 6) will produce a rational number equivalent to
     4/3. Both arguments must be Integral. The numerator defaults to 0
-    and the denominator defaults to 1 so that Rational(3) == 3 and
-    Rational() == 0.
+    and the denominator defaults to 1 so that Fraction(3) == 3 and
+    Fraction() == 0.
 
-    Rationals can also be constructed from strings of the form
+    Fractions can also be constructed from strings of the form
     '[-+]?[0-9]+((/|.)[0-9]+)?', optionally surrounded by spaces.
 
     """
 
-    __slots__ = ('numerator', 'denominator')
+    __slots__ = ('_numerator', '_denominator')
 
     # We're immutable, so use __new__ not __init__
     def __new__(cls, numerator=0, denominator=1):
-        """Constructs a Rational.
+        """Constructs a Fraction.
 
-        Takes a string like '3/2' or '1.5', another Rational, or a
+        Takes a string like '3/2' or '1.5', another Fraction, or a
         numerator/denominator pair.
 
         """
-        self = super(Rational, cls).__new__(cls)
+        self = super(Fraction, cls).__new__(cls)
 
         if denominator == 1:
             if isinstance(numerator, basestring):
@@ -61,7 +70,7 @@ class Rational(RationalAbc):
                 input = numerator
                 m = _RATIONAL_FORMAT.match(input)
                 if m is None:
-                    raise ValueError('Invalid literal for Rational: ' + input)
+                    raise ValueError('Invalid literal for Fraction: ' + input)
                 numerator = m.group('num')
                 decimal = m.group('decimal')
                 if decimal:
@@ -78,7 +87,7 @@ class Rational(RationalAbc):
                     numerator = -numerator
 
             elif (not isinstance(numerator, numbers.Integral) and
-                  isinstance(numerator, RationalAbc)):
+                  isinstance(numerator, Rational)):
                 # Handle copies from other rationals.
                 other_rational = numerator
                 numerator = other_rational.numerator
@@ -86,59 +95,59 @@ class Rational(RationalAbc):
 
         if (not isinstance(numerator, numbers.Integral) or
             not isinstance(denominator, numbers.Integral)):
-            raise TypeError("Rational(%(numerator)s, %(denominator)s):"
+            raise TypeError("Fraction(%(numerator)s, %(denominator)s):"
                             " Both arguments must be integral." % locals())
 
         if denominator == 0:
-            raise ZeroDivisionError('Rational(%s, 0)' % numerator)
+            raise ZeroDivisionError('Fraction(%s, 0)' % numerator)
 
         g = gcd(numerator, denominator)
-        self.numerator = int(numerator // g)
-        self.denominator = int(denominator // g)
+        self._numerator = int(numerator // g)
+        self._denominator = int(denominator // g)
         return self
 
-    @classmethod
-    def from_float(cls, f):
+    @staticmethod
+    def from_float(f):
         """Converts a finite float to a rational number, exactly.
 
-        Beware that Rational.from_float(0.3) != Rational(3, 10).
+        Beware that Fraction.from_float(0.3) != Fraction(3, 10).
 
         """
         if not isinstance(f, float):
-            raise TypeError("%s.from_float() only takes floats, not %r (%s)" %
-                            (cls.__name__, f, type(f).__name__))
+            raise TypeError("Fraction.from_float() only takes floats, "
+                            "not %r (%s)" % (f, type(f).__name__))
         if math.isnan(f) or math.isinf(f):
-            raise TypeError("Cannot convert %r to %s." % (f, cls.__name__))
-        return cls(*f.as_integer_ratio())
+            raise TypeError("Cannot convert %r to Fraction." % f)
+        return Fraction(*f.as_integer_ratio())
 
-    @classmethod
-    def from_decimal(cls, dec):
+    @staticmethod
+    def from_decimal(dec):
         """Converts a finite Decimal instance to a rational number, exactly."""
         from decimal import Decimal
         if not isinstance(dec, Decimal):
             raise TypeError(
-                "%s.from_decimal() only takes Decimals, not %r (%s)" %
-                (cls.__name__, dec, type(dec).__name__))
+                "Fraction.from_decimal() only takes Decimals, not %r (%s)" %
+                (dec, type(dec).__name__))
         if not dec.is_finite():
             # Catches infinities and nans.
-            raise TypeError("Cannot convert %s to %s." % (dec, cls.__name__))
+            raise TypeError("Cannot convert %s to Fraction." % dec)
         sign, digits, exp = dec.as_tuple()
         digits = int(''.join(map(str, digits)))
         if sign:
             digits = -digits
         if exp >= 0:
-            return cls(digits * 10 ** exp)
+            return Fraction(digits * 10 ** exp)
         else:
-            return cls(digits, 10 ** -exp)
+            return Fraction(digits, 10 ** -exp)
 
-    @classmethod
-    def from_continued_fraction(cls, seq):
-        'Build a Rational from a continued fraction expessed as a sequence'
+    @staticmethod
+    def from_continued_fraction(seq):
+        'Build a Fraction from a continued fraction expessed as a sequence'
         n, d = 1, 0
         for e in reversed(seq):
             n, d = d, n
             n += e * d
-        return cls(n, d) if seq else cls(0)
+        return Fraction(n, d) if seq else Fraction(0)
 
     def as_continued_fraction(self):
         'Return continued fraction expressed as a list'
@@ -160,7 +169,7 @@ class Rational(RationalAbc):
         if self.denominator <= max_denominator:
             return self
         cf = self.as_continued_fraction()
-        result = Rational(0)
+        result = Fraction(0)
         for i in range(1, len(cf)):
             new = self.from_continued_fraction(cf[:i])
             if new.denominator > max_denominator:
@@ -168,9 +177,17 @@ class Rational(RationalAbc):
             result = new
         return result
 
+    @property
+    def numerator(a):
+        return a._numerator
+
+    @property
+    def denominator(a):
+        return a._denominator
+
     def __repr__(self):
         """repr(self)"""
-        return ('Rational(%r,%r)' % (self.numerator, self.denominator))
+        return ('Fraction(%r, %r)' % (self.numerator, self.denominator))
 
     def __str__(self):
         """str(self)"""
@@ -179,16 +196,6 @@ class Rational(RationalAbc):
         else:
             return '%s/%s' % (self.numerator, self.denominator)
 
-    """ XXX This section needs a lot more commentary
-
-    * Explain the typical sequence of checks, calls, and fallbacks.
-    * Explain the subtle reasons why this logic was needed.
-    * It is not clear how common cases are handled (for example, how
-      does the ratio of two huge integers get converted to a float
-      without overflowing the long-->float conversion.
-
-    """
-
     def _operator_fallbacks(monomorphic_operator, fallback_operator):
         """Generates forward and reverse operators given a purely-rational
         operator and a function from the operator module.
@@ -196,10 +203,81 @@ class Rational(RationalAbc):
         Use this like:
         __op__, __rop__ = _operator_fallbacks(just_rational_op, operator.op)
 
+        In general, we want to implement the arithmetic operations so
+        that mixed-mode operations either call an implementation whose
+        author knew about the types of both arguments, or convert both
+        to the nearest built in type and do the operation there. In
+        Fraction, that means that we define __add__ and __radd__ as:
+
+            def __add__(self, other):
+                # Both types have numerators/denominator attributes,
+                # so do the operation directly
+                if isinstance(other, (int, long, Fraction)):
+                    return Fraction(self.numerator * other.denominator +
+                                    other.numerator * self.denominator,
+                                    self.denominator * other.denominator)
+                # float and complex don't have those operations, but we
+                # know about those types, so special case them.
+                elif isinstance(other, float):
+                    return float(self) + other
+                elif isinstance(other, complex):
+                    return complex(self) + other
+                # Let the other type take over.
+                return NotImplemented
+
+            def __radd__(self, other):
+                # radd handles more types than add because there's
+                # nothing left to fall back to.
+                if isinstance(other, Rational):
+                    return Fraction(self.numerator * other.denominator +
+                                    other.numerator * self.denominator,
+                                    self.denominator * other.denominator)
+                elif isinstance(other, Real):
+                    return float(other) + float(self)
+                elif isinstance(other, Complex):
+                    return complex(other) + complex(self)
+                return NotImplemented
+
+
+        There are 5 different cases for a mixed-type addition on
+        Fraction. I'll refer to all of the above code that doesn't
+        refer to Fraction, float, or complex as "boilerplate". 'r'
+        will be an instance of Fraction, which is a subtype of
+        Rational (r : Fraction <: Rational), and b : B <:
+        Complex. The first three involve 'r + b':
+
+            1. If B <: Fraction, int, float, or complex, we handle
+               that specially, and all is well.
+            2. If Fraction falls back to the boilerplate code, and it
+               were to return a value from __add__, we'd miss the
+               possibility that B defines a more intelligent __radd__,
+               so the boilerplate should return NotImplemented from
+               __add__. In particular, we don't handle Rational
+               here, even though we could get an exact answer, in case
+               the other type wants to do something special.
+            3. If B <: Fraction, Python tries B.__radd__ before
+               Fraction.__add__. This is ok, because it was
+               implemented with knowledge of Fraction, so it can
+               handle those instances before delegating to Real or
+               Complex.
+
+        The next two situations describe 'b + r'. We assume that b
+        didn't know about Fraction in its implementation, and that it
+        uses similar boilerplate code:
+
+            4. If B <: Rational, then __radd_ converts both to the
+               builtin rational type (hey look, that's us) and
+               proceeds.
+            5. Otherwise, __radd__ tries to find the nearest common
+               base ABC, and fall back to its builtin type. Since this
+               class doesn't subclass a concrete type, there's no
+               implementation to fall back to, so we need to try as
+               hard as possible to return an actual value, or the user
+               will get a TypeError.
+
         """
         def forward(a, b):
-            if isinstance(b, RationalAbc):
-                # Includes ints.
+            if isinstance(b, (int, long, Fraction)):
                 return monomorphic_operator(a, b)
             elif isinstance(b, float):
                 return fallback_operator(float(a), b)
@@ -211,7 +289,7 @@ class Rational(RationalAbc):
         forward.__doc__ = monomorphic_operator.__doc__
 
         def reverse(b, a):
-            if isinstance(a, RationalAbc):
+            if isinstance(a, Rational):
                 # Includes ints.
                 return monomorphic_operator(a, b)
             elif isinstance(a, numbers.Real):
@@ -227,7 +305,7 @@ class Rational(RationalAbc):
 
     def _add(a, b):
         """a + b"""
-        return Rational(a.numerator * b.denominator +
+        return Fraction(a.numerator * b.denominator +
                         b.numerator * a.denominator,
                         a.denominator * b.denominator)
 
@@ -235,7 +313,7 @@ class Rational(RationalAbc):
 
     def _sub(a, b):
         """a - b"""
-        return Rational(a.numerator * b.denominator -
+        return Fraction(a.numerator * b.denominator -
                         b.numerator * a.denominator,
                         a.denominator * b.denominator)
 
@@ -243,13 +321,13 @@ class Rational(RationalAbc):
 
     def _mul(a, b):
         """a * b"""
-        return Rational(a.numerator * b.numerator, a.denominator * b.denominator)
+        return Fraction(a.numerator * b.numerator, a.denominator * b.denominator)
 
     __mul__, __rmul__ = _operator_fallbacks(_mul, operator.mul)
 
     def _div(a, b):
         """a / b"""
-        return Rational(a.numerator * b.denominator,
+        return Fraction(a.numerator * b.denominator,
                         a.denominator * b.numerator)
 
     __truediv__, __rtruediv__ = _operator_fallbacks(_div, operator.truediv)
@@ -259,7 +337,7 @@ class Rational(RationalAbc):
         """a // b"""
         # Will be math.floor(a / b) in 3.0.
         div = a / b
-        if isinstance(div, RationalAbc):
+        if isinstance(div, Rational):
             # trunc(math.floor(div)) doesn't work if the rational is
             # more precise than a float because the intermediate
             # rounding may cross an integer boundary.
@@ -271,7 +349,7 @@ class Rational(RationalAbc):
         """a // b"""
         # Will be math.floor(a / b) in 3.0.
         div = a / b
-        if isinstance(div, RationalAbc):
+        if isinstance(div, Rational):
             # trunc(math.floor(div)) doesn't work if the rational is
             # more precise than a float because the intermediate
             # rounding may cross an integer boundary.
@@ -297,14 +375,14 @@ class Rational(RationalAbc):
         result will be rational.
 
         """
-        if isinstance(b, RationalAbc):
+        if isinstance(b, Rational):
             if b.denominator == 1:
                 power = b.numerator
                 if power >= 0:
-                    return Rational(a.numerator ** power,
+                    return Fraction(a.numerator ** power,
                                     a.denominator ** power)
                 else:
-                    return Rational(a.denominator ** -power,
+                    return Fraction(a.denominator ** -power,
                                     a.numerator ** -power)
             else:
                 # A fractional power will generally produce an
@@ -319,8 +397,8 @@ class Rational(RationalAbc):
             # If a is an int, keep it that way if possible.
             return a ** b.numerator
 
-        if isinstance(a, RationalAbc):
-            return Rational(a.numerator, a.denominator) ** b
+        if isinstance(a, Rational):
+            return Fraction(a.numerator, a.denominator) ** b
 
         if b.denominator == 1:
             return a ** b.numerator
@@ -328,16 +406,16 @@ class Rational(RationalAbc):
         return a ** float(b)
 
     def __pos__(a):
-        """+a: Coerces a subclass instance to Rational"""
-        return Rational(a.numerator, a.denominator)
+        """+a: Coerces a subclass instance to Fraction"""
+        return Fraction(a.numerator, a.denominator)
 
     def __neg__(a):
         """-a"""
-        return Rational(-a.numerator, a.denominator)
+        return Fraction(-a.numerator, a.denominator)
 
     def __abs__(a):
         """abs(a)"""
-        return Rational(abs(a.numerator), a.denominator)
+        return Fraction(abs(a.numerator), a.denominator)
 
     def __trunc__(a):
         """trunc(a)"""
@@ -345,42 +423,6 @@ class Rational(RationalAbc):
             return -(-a.numerator // a.denominator)
         else:
             return a.numerator // a.denominator
-
-    __int__ = __trunc__
-
-    def __floor__(a):
-        """Will be math.floor(a) in 3.0."""
-        return a.numerator // a.denominator
-
-    def __ceil__(a):
-        """Will be math.ceil(a) in 3.0."""
-        # The negations cleverly convince floordiv to return the ceiling.
-        return -(-a.numerator // a.denominator)
-
-    def __round__(self, ndigits=None):
-        """Will be round(self, ndigits) in 3.0.
-
-        Rounds half toward even.
-        """
-        if ndigits is None:
-            floor, remainder = divmod(self.numerator, self.denominator)
-            if remainder * 2 < self.denominator:
-                return floor
-            elif remainder * 2 > self.denominator:
-                return floor + 1
-            # Deal with the half case:
-            elif floor % 2 == 0:
-                return floor
-            else:
-                return floor + 1
-        shift = 10**abs(ndigits)
-        # See _operator_fallbacks.forward to check that the results of
-        # these operations will always be Rational and therefore have
-        # __round__().
-        if ndigits > 0:
-            return Rational((self * shift).__round__(), shift)
-        else:
-            return Rational((self / shift).__round__() * shift)
 
     def __hash__(self):
         """hash(self)
@@ -403,7 +445,7 @@ class Rational(RationalAbc):
 
     def __eq__(a, b):
         """a == b"""
-        if isinstance(b, RationalAbc):
+        if isinstance(b, Rational):
             return (a.numerator == b.numerator and
                     a.denominator == b.denominator)
         if isinstance(b, numbers.Complex) and b.imag == 0:
@@ -430,7 +472,7 @@ class Rational(RationalAbc):
         if isinstance(b, float):
             b = a.from_float(b)
         try:
-            # XXX: If b <: Real but not <: RationalAbc, this is likely
+            # XXX: If b <: Real but not <: Rational, this is likely
             # to fall back to a float. If the actual values differ by
             # less than MIN_FLOAT, this could falsely call them equal,
             # which would make <= inconsistent with ==. Better ways of
@@ -438,7 +480,7 @@ class Rational(RationalAbc):
             diff = a - b
         except TypeError:
             return NotImplemented
-        if isinstance(diff, RationalAbc):
+        if isinstance(diff, Rational):
             return op(diff.numerator, 0)
         return op(diff, 0)
 
@@ -468,11 +510,11 @@ class Rational(RationalAbc):
         return (self.__class__, (str(self),))
 
     def __copy__(self):
-        if type(self) == Rational:
+        if type(self) == Fraction:
             return self     # I'm immutable; therefore I am my own clone
         return self.__class__(self.numerator, self.denominator)
 
     def __deepcopy__(self, memo):
-        if type(self) == Rational:
+        if type(self) == Fraction:
             return self     # My components are also immutable
         return self.__class__(self.numerator, self.denominator)

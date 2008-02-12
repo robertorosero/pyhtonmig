@@ -25,10 +25,11 @@ with the corresponding argument.
 """
 from __future__ import with_statement
 
-import unittest
 import glob
+import math
 import os, sys
 import pickle, copy
+import unittest
 from decimal import *
 from test.test_support import (TestSkipped, run_unittest, run_doctest,
                                is_resource_enabled)
@@ -837,6 +838,19 @@ class DecimalArithmeticOperatorsTest(unittest.TestCase):
         self.assertEqual(-Decimal(45), Decimal(-45))           #  -
         self.assertEqual(abs(Decimal(45)), abs(Decimal(-45)))  # abs
 
+    def test_nan_comparisons(self):
+        n = Decimal('NaN')
+        s = Decimal('sNaN')
+        i = Decimal('Inf')
+        f = Decimal('2')
+        for x, y in [(n, n), (n, i), (i, n), (n, f), (f, n),
+                     (s, n), (n, s), (s, i), (i, s), (s, f), (f, s), (s, s)]:
+            self.assert_(x != y)
+            self.assert_(not (x == y))
+            self.assert_(not (x < y))
+            self.assert_(not (x <= y))
+            self.assert_(not (x > y))
+            self.assert_(not (x >= y))
 
 # The following are two functions used to test threading in the next class
 
@@ -1146,7 +1160,12 @@ class DecimalUsabilityTest(unittest.TestCase):
         checkSameDec("__add__", True)
         checkSameDec("__div__", True)
         checkSameDec("__divmod__", True)
-        checkSameDec("__cmp__", True)
+        checkSameDec("__eq__", True)
+        checkSameDec("__ne__", True)
+        checkSameDec("__le__", True)
+        checkSameDec("__lt__", True)
+        checkSameDec("__ge__", True)
+        checkSameDec("__gt__", True)
         checkSameDec("__float__")
         checkSameDec("__floordiv__", True)
         checkSameDec("__hash__")
@@ -1225,7 +1244,7 @@ class DecimalPythonAPItests(unittest.TestCase):
             # should work the same as to_integral in the ROUND_DOWN mode
             d = Decimal(s)
             r = d.to_integral(ROUND_DOWN)
-            self.assertEqual(Decimal(trunc(d)), r)
+            self.assertEqual(Decimal(math.trunc(d)), r)
 
 class ContextAPItests(unittest.TestCase):
 

@@ -38,16 +38,16 @@ today = ''
 today_fmt = '%B %d, %Y'
 
 # List of files that shouldn't be included in the build.
-unused_files = [
-    'whatsnew/2.0.rst',
-    'whatsnew/2.1.rst',
-    'whatsnew/2.2.rst',
-    'whatsnew/2.3.rst',
-    'whatsnew/2.4.rst',
-    'whatsnew/2.5.rst',
-    'maclib/scrap.rst',
-    'library/xmllib.rst',
-    'library/xml.etree.rst',
+unused_docs = [
+    'whatsnew/2.0',
+    'whatsnew/2.1',
+    'whatsnew/2.2',
+    'whatsnew/2.3',
+    'whatsnew/2.4',
+    'whatsnew/2.5',
+    'maclib/scrap',
+    'library/xmllib',
+    'library/xml.etree',
 ]
 
 # Relative filename of the reference count data file.
@@ -102,29 +102,29 @@ latex_font_size = '10pt'
 # (source start file, target name, title, author, document class [howto/manual]).
 _stdauthor = r'Guido van Rossum\\Fred L. Drake, Jr., editor'
 latex_documents = [
-    ('c-api/index.rst', 'c-api.tex',
+    ('c-api/index', 'c-api.tex',
      'The Python/C API', _stdauthor, 'manual'),
-    ('distutils/index.rst', 'distutils.tex',
+    ('distutils/index', 'distutils.tex',
      'Distributing Python Modules', _stdauthor, 'manual'),
-    ('documenting/index.rst', 'documenting.tex',
+    ('documenting/index', 'documenting.tex',
      'Documenting Python', 'Georg Brandl', 'manual'),
-    ('extending/index.rst', 'extending.tex',
+    ('extending/index', 'extending.tex',
      'Extending and Embedding Python', _stdauthor, 'manual'),
-    ('install/index.rst', 'install.tex',
+    ('install/index', 'install.tex',
      'Installing Python Modules', _stdauthor, 'manual'),
-    ('library/index.rst', 'library.tex',
+    ('library/index', 'library.tex',
      'The Python Library Reference', _stdauthor, 'manual'),
-    ('reference/index.rst', 'reference.tex',
+    ('reference/index', 'reference.tex',
      'The Python Language Reference', _stdauthor, 'manual'),
-    ('tutorial/index.rst', 'tutorial.tex',
+    ('tutorial/index', 'tutorial.tex',
      'Python Tutorial', _stdauthor, 'manual'),
-    ('using/index.rst', 'using.tex',
+    ('using/index', 'using.tex',
      'Using Python', _stdauthor, 'manual'),
-    ('whatsnew/' + version + '.rst', 'whatsnew.tex',
+    ('whatsnew/' + version, 'whatsnew.tex',
      'What\'s New in Python', 'A. M. Kuchling', 'howto'),
 ]
 # Collect all HOWTOs individually
-latex_documents.extend(('howto/' + fn, 'howto-' + fn[:-4] + '.tex',
+latex_documents.extend(('howto/' + fn[:-4], 'howto-' + fn[:-4] + '.tex',
                         'HOWTO', _stdauthor, 'howto')
                        for fn in os.listdir('howto')
                        if fn.endswith('.rst') and fn != 'index.rst')
@@ -138,4 +138,4 @@ latex_preamble = r'''
 '''
 
 # Documents to append as an appendix to all manuals.
-latex_appendices = ['glossary.rst', 'about.rst', 'license.rst', 'copyright.rst']
+latex_appendices = ['glossary', 'about', 'license', 'copyright']

@@ -55,7 +55,7 @@ PyFloat_GetMin(void)
 	return DBL_MIN;
 }
 
-static PyTypeObject FloatInfoType = {0};
+static PyTypeObject FloatInfoType = {0, 0, 0, 0, 0, 0};
 
 PyDoc_STRVAR(floatinfo__doc__,
 "sys.floatinfo\n\
@@ -94,15 +94,9 @@ static PyStructSequence_Desc floatinfo_desc = {
 PyObject *
 PyFloat_GetInfo(void)
 {
-	static PyObject* floatinfo;
+	PyObject* floatinfo;
 	int pos = 0;
 
-	if (floatinfo != NULL) {
-		Py_INCREF(floatinfo);
-		return floatinfo;
-	}
-	PyStructSequence_InitType(&FloatInfoType, &floatinfo_desc);
-	
 	floatinfo = PyStructSequence_New(&FloatInfoType);
 	if (floatinfo == NULL) {
 		return NULL;
@@ -131,8 +125,6 @@ PyFloat_GetInfo(void)
 		Py_CLEAR(floatinfo);
 		return NULL;
 	}
-
-	Py_INCREF(floatinfo);
 	return floatinfo;
 }
 
@@ -1159,20 +1151,19 @@ float_float(PyObject *v)
 }
 
 static PyObject *
-float_as_integer_ratio(PyObject *v)
+float_as_integer_ratio(PyObject *v, PyObject *unused)
 {
 	double self;
 	double float_part;
 	int exponent;
-	int is_negative;
-	const int chunk_size = 28;
+	int i;
+
 	PyObject *prev;
-	PyObject *py_chunk = NULL;
 	PyObject *py_exponent = NULL;
 	PyObject *numerator = NULL;
 	PyObject *denominator = NULL;
 	PyObject *result_pair = NULL;
-	PyNumberMethods *long_methods;
+	PyNumberMethods *long_methods = PyLong_Type.tp_as_number;
 
 #define INPLACE_UPDATE(obj, call) \
 	prev = obj; \
@@ -1194,93 +1185,31 @@ float_as_integer_ratio(PyObject *v)
 	}
 #endif
 
-	if (self == 0) {
-		numerator = PyInt_FromLong(0);
-		if (numerator == NULL) goto error;
-		denominator = PyInt_FromLong(1);
-		if (denominator == NULL) goto error;
-		result_pair = PyTuple_Pack(2, numerator, denominator);
-		/* Hand ownership over to the tuple. If the tuple
-		   wasn't created successfully, we want to delete the
-		   ints anyway. */
-		Py_DECREF(numerator);
-		Py_DECREF(denominator);
-		return result_pair;
-	}
-
-	/* XXX: Could perhaps handle FLT_RADIX!=2 by using ilogb and
-	   scalbn, but those may not be in C89. */
 	PyFPE_START_PROTECT("as_integer_ratio", goto error);
-	float_part = frexp(self, &exponent);
-	is_negative = 0;
-	if (float_part < 0) {
-		float_part = -float_part;
-		is_negative = 1;
-		/* 0.5 <= float_part < 1.0 */
-	}
+	float_part = frexp(self, &exponent);  	/* self == float_part * 2**exponent exactly */
 	PyFPE_END_PROTECT(float_part);
-	/* abs(self) == float_part * 2**exponent exactly */
+	
+	for (i=0; i<300 && float_part != floor(float_part) ; i++) {
+		float_part *= 2.0;
+		exponent--;
+	}	
+	/* self == float_part * 2**exponent exactly and float_part is integral.
+           If FLT_RADIX != 2, the 300 steps may leave a tiny fractional part
+           to be truncated by PyLong_FromDouble(). */
 
-	/* Suck up chunk_size bits at a time; 28 is enough so that we
-	   suck up all bits in 2 iterations for all known binary
-	   double-precision formats, and small enough to fit in a
-	   long. */
-	numerator = PyLong_FromLong(0);
+	numerator = PyLong_FromDouble(float_part);
 	if (numerator == NULL) goto error;
 
-	long_methods = PyLong_Type.tp_as_number;
-
-	py_chunk = PyLong_FromLong(chunk_size);
-	if (py_chunk == NULL) goto error;
-
-	while (float_part != 0) {
-		/* invariant: abs(self) ==
-		   (numerator + float_part) * 2**exponent exactly */
-		long digit;
-		PyObject *py_digit;
-
-		PyFPE_START_PROTECT("as_integer_ratio", goto error);
-		/* Pull chunk_size bits out of float_part, into digits. */
-		float_part = ldexp(float_part, chunk_size);
-		digit = (long)float_part;
-		float_part -= digit;
-                /* 0 <= float_part < 1 */
-		exponent -= chunk_size;
-		PyFPE_END_PROTECT(float_part);
-
-		/* Shift digits into numerator. */
-		// numerator <<= chunk_size
-		INPLACE_UPDATE(numerator,
-			       long_methods->nb_lshift(numerator, py_chunk));
-		if (numerator == NULL) goto error;
-
-		// numerator |= digit
-		py_digit = PyLong_FromLong(digit);
-		if (py_digit == NULL) goto error;
-		INPLACE_UPDATE(numerator,
-			       long_methods->nb_or(numerator, py_digit));
-		Py_DECREF(py_digit);
-		if (numerator == NULL) goto error;
-	}
-
-	/* Add in the sign bit. */
-	if (is_negative) {
-		INPLACE_UPDATE(numerator,
-			       long_methods->nb_negative(numerator));
-		if (numerator == NULL) goto error;
-	}
-
-	/* now self = numerator * 2**exponent exactly; fold in 2**exponent */
+	/* fold in 2**exponent */
 	denominator = PyLong_FromLong(1);
-	py_exponent = PyLong_FromLong(labs(exponent));
+	py_exponent = PyLong_FromLong(labs((long)exponent));
 	if (py_exponent == NULL) goto error;
 	INPLACE_UPDATE(py_exponent,
 		       long_methods->nb_lshift(denominator, py_exponent));
 	if (py_exponent == NULL) goto error;
 	if (exponent > 0) {
 		INPLACE_UPDATE(numerator,
-			       long_methods->nb_multiply(numerator,
-							 py_exponent));
+			       long_methods->nb_multiply(numerator, py_exponent));
 		if (numerator == NULL) goto error;
 	}
 	else {
@@ -1289,12 +1218,17 @@ float_as_integer_ratio(PyObject *v)
 		py_exponent = NULL;
 	}
 
+	/* Returns ints instead of longs where possible */
+	INPLACE_UPDATE(numerator, PyNumber_Int(numerator));
+	if (numerator == NULL) goto error;
+	INPLACE_UPDATE(denominator, PyNumber_Int(denominator));
+	if (denominator == NULL) goto error;
+
 	result_pair = PyTuple_Pack(2, numerator, denominator);
 
 #undef INPLACE_UPDATE
 error:
 	Py_XDECREF(py_exponent);
-	Py_XDECREF(py_chunk);
 	Py_XDECREF(denominator);
 	Py_XDECREF(numerator);
 	return result_pair;
@@ -1303,17 +1237,16 @@ error:
 PyDoc_STRVAR(float_as_integer_ratio_doc,
 "float.as_integer_ratio() -> (int, int)\n"
 "\n"
-"Returns a pair of integers, not necessarily in lowest terms, whose\n"
-"ratio is exactly equal to the original float. This method raises an\n"
-"OverflowError on infinities and a ValueError on nans. The resulting\n"
-"denominator will be positive.\n"
+"Returns a pair of integers, whose ratio is exactly equal to the original\n"
+"float and with a positive denominator.\n"
+"Raises OverflowError on infinities and a ValueError on nans.\n"
 "\n"
 ">>> (10.0).as_integer_ratio()\n"
-"(167772160L, 16777216L)\n"
+"(10, 1)\n"
 ">>> (0.0).as_integer_ratio()\n"
 "(0, 1)\n"
 ">>> (-.25).as_integer_ratio()\n"
-"(-134217728L, 536870912L)");
+"(-1, 4)");
 
 
 static PyObject *
@@ -1667,20 +1600,21 @@ _PyFloat_Init(void)
 	/* Initialize floating point repr */
 	_PyFloat_DigitsInit();
 #endif
+	/* Init float info */
+	if (FloatInfoType.tp_name == 0)
+		PyStructSequence_InitType(&FloatInfoType, &floatinfo_desc);
 }
 
 void
-PyFloat_Fini(void)
+PyFloat_CompactFreeList(size_t *pbc, size_t *pbf, size_t *bsum)
 {
 	PyFloatObject *p;
 	PyFloatBlock *list, *next;
 	unsigned i;
-	int bc, bf;	/* block count, number of freed blocks */
-	int frem, fsum;	/* remaining unfreed floats per block, total */
+	size_t bc = 0, bf = 0;	/* block count, number of freed blocks */
+	size_t fsum = 0;	/* total unfreed ints */
+	int frem;		/* remaining unfreed ints per block */
 
-	bc = 0;
-	bf = 0;
-	fsum = 0;
 	list = block_list;
 	block_list = NULL;
 	free_list = NULL;
@@ -1715,6 +1649,22 @@ PyFloat_Fini(void)
 		fsum += frem;
 		list = next;
 	}
+	*pbc = bc;
+	*pbf = bf;
+	*bsum = fsum;
+}
+
+void
+PyFloat_Fini(void)
+{
+	PyFloatObject *p;
+	PyFloatBlock *list;
+	unsigned i;
+	size_t bc, bf;	/* block count, number of freed blocks */
+	size_t fsum;	/* total unfreed floats per block */
+
+	PyFloat_CompactFreeList(&bc, &bf, &fsum);
+
 	if (!Py_VerboseFlag)
 		return;
 	fprintf(stderr, "# cleanup floats");
@@ -1723,7 +1673,9 @@ PyFloat_Fini(void)
 	}
 	else {
 		fprintf(stderr,
-			": %d unfreed float%s in %d out of %d block%s\n",
+			": %" PY_FORMAT_SIZE_T "d unfreed floats%s in %"
+			PY_FORMAT_SIZE_T "d out of %"
+			PY_FORMAT_SIZE_T "d block%s\n",
 			fsum, fsum == 1 ? "" : "s",
 			bc - bf, bc, bc == 1 ? "" : "s");
 	}

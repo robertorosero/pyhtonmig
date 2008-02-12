@@ -4,9 +4,17 @@
 #include "Python.h"
 #include "structmember.h"
 
+/* Free list for method objects to safe malloc/free overhead
+ * The im_self element is used to chain the elements.
+ */
+static PyMethodObject *free_list;
+static int numfree = 0;
+#ifndef PyMethod_MAXFREELIST
+#define PyMethod_MAXFREELIST 256
+#endif
+
 #define TP_DESCR_GET(t) \
     (PyType_HasFeature(t, Py_TPFLAGS_HAVE_CLASS) ? (t)->tp_descr_get : NULL)
-
 
 /* Forward */
 static PyObject *class_lookup(PyClassObject *, PyObject *,
@@ -1798,7 +1806,29 @@ instance_index(PyInstanceObject *self)
 
 
 UNARY(instance_invert, "__invert__")
-UNARY(instance_int, "__int__")
+UNARY(_instance_trunc, "__trunc__")
+
+static PyObject *
+instance_int(PyInstanceObject *self)
+{
+	PyObject *truncated;
+	static PyObject *int_name;
+	if (int_name == NULL) {
+		int_name = PyString_InternFromString("__int__");
+		if (int_name == NULL)
+			return NULL;
+	}
+	if (PyObject_HasAttr((PyObject*)self, int_name))
+		return generic_unary_op(self, int_name);
+
+	truncated = _instance_trunc(self);
+	/* __trunc__ is specified to return an Integral type, but
+	   int() needs to return an int. */
+	return _PyNumber_ConvertIntegralToInt(
+		truncated,
+		"__trunc__ returned non-Integral (type %.200s)");
+}
+
 UNARY_FB(instance_long, "__long__", instance_int)
 UNARY(instance_float, "__float__")
 UNARY(instance_oct, "__oct__")
@@ -2171,8 +2201,6 @@ PyTypeObject PyInstance_Type = {
    In case (b), im_self is NULL
 */
 
-static PyMethodObject *free_list;
-
 PyObject *
 PyMethod_New(PyObject *func, PyObject *self, PyObject *klass)
 {
@@ -2185,6 +2213,7 @@ PyMethod_New(PyObject *func, PyObject *self, PyObject *klass)
 	if (im != NULL) {
 		free_list = (PyMethodObject *)(im->im_self);
 		PyObject_INIT(im, &PyMethod_Type);
+		numfree--;
 	}
 	else {
 		im = PyObject_GC_New(PyMethodObject, &PyMethod_Type);
@@ -2310,8 +2339,14 @@ instancemethod_dealloc(register PyMethodObject *im)
 	Py_DECREF(im->im_func);
 	Py_XDECREF(im->im_self);
 	Py_XDECREF(im->im_class);
-	im->im_self = (PyObject *)free_list;
-	free_list = im;
+	if (numfree < PyMethod_MAXFREELIST) {
+		im->im_self = (PyObject *)free_list;
+		free_list = im;
+		numfree++;
+	}
+	else {
+		PyObject_GC_Del(im);
+	}
 }
 
 static int
@@ -2598,5 +2633,7 @@ PyMethod_Fini(void)
 		PyMethodObject *im = free_list;
 		free_list = (PyMethodObject *)(im->im_self);
 		PyObject_GC_Del(im);
+		numfree--;
 	}
+	assert(numfree == 0);
 }

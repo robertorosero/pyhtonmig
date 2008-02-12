@@ -51,9 +51,11 @@ _PySet_Dummy(void)
     } while(0)
 
 /* Reuse scheme to save calls to malloc, free, and memset */
-#define MAXFREESETS 80
-static PySetObject *free_sets[MAXFREESETS];
-static int num_free_sets = 0;
+#ifndef PySet_MAXFREELIST
+#define PySet_MAXFREELIST 80
+#endif
+static PySetObject *free_list[PySet_MAXFREELIST];
+static int numfree = 0;
 
 /*
 The basic lookup function used by all operations.
@@ -558,8 +560,8 @@ set_dealloc(PySetObject *so)
 	}
 	if (so->table != so->smalltable)
 		PyMem_DEL(so->table);
-	if (num_free_sets < MAXFREESETS && PyAnySet_CheckExact(so))
-		free_sets[num_free_sets++] = so;
+	if (numfree < PySet_MAXFREELIST && PyAnySet_CheckExact(so))
+		free_list[numfree++] = so;
 	else 
 		Py_TYPE(so)->tp_free(so);
 	Py_TRASHCAN_SAFE_END(so)
@@ -983,9 +985,9 @@ make_new_set(PyTypeObject *type, PyObject *iterable)
 	}
 
 	/* create PySetObject structure */
-	if (num_free_sets && 
+	if (numfree &&
 	    (type == &PySet_Type  ||  type == &PyFrozenSet_Type)) {
-		so = free_sets[--num_free_sets];
+		so = free_list[--numfree];
 		assert (so != NULL && PyAnySet_CheckExact(so));
 		Py_TYPE(so) = type;
 		_Py_NewReference((PyObject *)so);
@@ -1053,9 +1055,9 @@ PySet_Fini(void)
 {
 	PySetObject *so;
 
-	while (num_free_sets) {
-		num_free_sets--;
-		so = free_sets[num_free_sets];
+	while (numfree) {
+		numfree--;
+		so = free_list[numfree];
 		PyObject_GC_Del(so);
 	}
 	Py_CLEAR(dummy);
@@ -1129,8 +1131,22 @@ set_copy(PySetObject *so)
 }
 
 static PyObject *
+set_copy_method(PySetObject *so)
+{
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "set.copy() not supported in 3.x") < 0)
+		return NULL;
+	return make_new_set(Py_TYPE(so), (PyObject *)so);
+}
+
+static PyObject *
 frozenset_copy(PySetObject *so)
 {
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "frozenset.copy() not supported in 3.x") < 0)
+		return NULL;
 	if (PyFrozenSet_CheckExact(so)) {
 		Py_INCREF(so);
 		return (PyObject *)so;
@@ -1909,7 +1925,7 @@ static PyMethodDef set_methods[] = {
 	 clear_doc},
 	{"__contains__",(PyCFunction)set_direct_contains,	METH_O | METH_COEXIST,
 	 contains_doc},
-	{"copy",	(PyCFunction)set_copy,		METH_NOARGS,
+	{"copy",	(PyCFunction)set_copy_method,	METH_NOARGS,
 	 copy_doc},
 	{"discard",	(PyCFunction)set_discard,	METH_O,
 	 discard_doc},
@@ -2188,7 +2204,8 @@ PySet_Discard(PyObject *set, PyObject *key)
 int
 PySet_Add(PyObject *anyset, PyObject *key)
 {
-	if (!PyAnySet_Check(anyset)) {
+	if (!PySet_Check(anyset) && 
+	    (!PyFrozenSet_Check(anyset) || Py_REFCNT(anyset) != 1)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
@@ -2306,6 +2323,10 @@ test_c_api(PySetObject *so)
 	f = PyFrozenSet_New(dup);
 	assertRaises(PySet_Clear(f) == -1, PyExc_SystemError);
 	assertRaises(_PySet_Update(f, dup) == -1, PyExc_SystemError);
+	assert(PySet_Add(f, elem) == 0);
+	Py_INCREF(f);
+	assertRaises(PySet_Add(f, elem) == -1, PyExc_SystemError);
+	Py_DECREF(f);
 	Py_DECREF(f);
 
 	/* Exercise direct iteration */

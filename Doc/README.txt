@@ -14,7 +14,7 @@ those familiar with the previous docs written in LaTeX.
 Building the docs
 =================
 
-You need to install Python 2.5 or higher; the toolset used to build the docs are
+You need to install Python 2.4 or higher; the toolset used to build the docs are
 written in Python.  The toolset used to build the documentation is called
 *Sphinx*, it is not included in this tree, but maintained separately in the
 Python Subversion repository.  Also needed are Jinja, a templating engine
@@ -50,6 +50,10 @@ Available make targets are:
 
  * "latex", which builds LaTeX source files that can be run with "pdflatex"
    to produce PDF documents.
+
+ * "linkcheck", which checks all external references to see whether they are
+   broken, redirected or malformed, and outputs this information to stdout
+   as well as a plain-text (.txt) file.
 
  * "changes", which builds an overview over all versionadded/versionchanged/
    deprecated items in the current version. This is meant as a help for the

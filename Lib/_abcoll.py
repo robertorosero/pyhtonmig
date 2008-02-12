@@ -56,8 +56,7 @@ class Iterable:
 Iterable.register(str)
 
 
-class Iterator:
-    __metaclass__ = ABCMeta
+class Iterator(Iterable):
 
     @abstractmethod
     def __next__(self):
@@ -122,9 +121,7 @@ class Callable:
 ### SETS ###
 
 
-class Set:
-    __metaclass__ = ABCMeta
-
+class Set(Sized, Iterable, Container):
     """A set is a finite, iterable container.
 
     This class provides concrete generic implementations of all
@@ -134,19 +131,6 @@ class Set:
     semantics are fixed), all you have to do is redefine __le__ and
     then the other operations will automatically follow suit.
     """
-
-    @abstractmethod
-    def __contains__(self, value):
-        return False
-
-    @abstractmethod
-    def __iter__(self):
-        while False:
-            yield None
-
-    @abstractmethod
-    def __len__(self):
-        return 0
 
     def __le__(self, other):
         if not isinstance(other, Set):
@@ -163,14 +147,32 @@ class Set:
             return NotImplemented
         return len(self) < len(other) and self.__le__(other)
 
+    def __gt__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        return other < self
+
+    def __ge__(self, other):
+        if not isinstance(other, Set):
+            return NotImplemented
+        return other <= self
+
     def __eq__(self, other):
         if not isinstance(other, Set):
             return NotImplemented
         return len(self) == len(other) and self.__le__(other)
 
+    def __ne__(self, other):
+        return not (self == other)
+
     @classmethod
     def _from_iterable(cls, it):
-        return frozenset(it)
+        '''Construct an instance of the class from any iterable input.
+
+        Must override this method if the class constructor signature
+        does not accept an iterable for an input.
+        '''
+        return cls(it)
 
     def __and__(self, other):
         if not isinstance(other, Iterable):
@@ -266,16 +268,6 @@ class MutableSet(Set):
         self.discard(value)
         return value
 
-    def toggle(self, value):
-        """Return True if it was added, False if deleted."""
-        # XXX This implementation is not thread-safe
-        if value in self:
-            self.discard(value)
-            return False
-        else:
-            self.add(value)
-            return True
-
     def clear(self):
         """This is slow (creates N new iterators!) but effective."""
         try:
@@ -296,9 +288,13 @@ class MutableSet(Set):
         return self
 
     def __ixor__(self, it):
-        # This calls toggle(), so if that is overridded, we call the override
+        if not isinstance(it, Set):
+            it = self._from_iterable(it)
         for value in it:
-            self.toggle(it)
+            if value in self:
+                self.discard(value)
+            else:
+                self.add(value)
         return self
 
     def __isub__(self, it):
@@ -312,8 +308,7 @@ MutableSet.register(set)
 ### MAPPINGS ###
 
 
-class Mapping:
-    __metaclass__ = ABCMeta
+class Mapping(Sized, Iterable, Container):
 
     @abstractmethod
     def __getitem__(self, key):
@@ -333,15 +328,6 @@ class Mapping:
         else:
             return True
 
-    @abstractmethod
-    def __len__(self):
-        return 0
-
-    @abstractmethod
-    def __iter__(self):
-        while False:
-            yield None
-
     def keys(self):
         return KeysView(self)
 
@@ -351,9 +337,14 @@ class Mapping:
     def values(self):
         return ValuesView(self)
 
+    def __eq__(self, other):
+        return isinstance(other, Mapping) and \
+               dict(self.items()) == dict(other.items())
 
-class MappingView:
-    __metaclass__ = ABCMeta
+    def __ne__(self, other):
+        return not (self == other)
+
+class MappingView(Sized):
 
     def __init__(self, mapping):
         self._mapping = mapping
@@ -459,15 +450,20 @@ class MutableMapping(Mapping):
         for key, value in kwds.items():
             self[key] = value
 
+    def setdefault(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = default
+        return default
+
 MutableMapping.register(dict)
 
 
 ### SEQUENCES ###
 
 
-class Sequence:
-    __metaclass__ = ABCMeta
-
+class Sequence(Sized, Iterable, Container):
     """All the operations on a read-only sequence.
 
     Concrete subclasses must override __new__ or __init__,
@@ -478,19 +474,15 @@ class Sequence:
     def __getitem__(self, index):
         raise IndexError
 
-    @abstractmethod
-    def __len__(self):
-        return 0
-
     def __iter__(self):
         i = 0
-        while True:
-            try:
+        try:
+            while True:
                 v = self[i]
-            except IndexError:
-                break
-            yield v
-            i += 1
+                yield v
+                i += 1
+        except IndexError:
+            return
 
     def __contains__(self, value):
         for v in self:

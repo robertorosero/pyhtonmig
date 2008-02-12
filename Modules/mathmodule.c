@@ -267,6 +267,17 @@ FUNC1(tanh, tanh, 0,
       "tanh(x)\n\nReturn the hyperbolic tangent of x.")
 
 static PyObject *
+math_trunc(PyObject *self, PyObject *number)
+{
+	return PyObject_CallMethod(number, "__trunc__", NULL);
+}
+
+PyDoc_STRVAR(math_trunc_doc,
+"trunc(x:Real) -> Integral\n"
+"\n"
+"Truncates x to the nearest Integral toward 0. Uses the __trunc__ magic method.");
+
+static PyObject *
 math_frexp(PyObject *self, PyObject *arg)
 {
 	int i;
@@ -658,6 +669,7 @@ static PyMethodDef math_methods[] = {
 	{"sqrt",	math_sqrt,	METH_O,		math_sqrt_doc},
 	{"tan",		math_tan,	METH_O,		math_tan_doc},
 	{"tanh",	math_tanh,	METH_O,		math_tanh_doc},
+ 	{"trunc",	math_trunc,	METH_O,		math_trunc_doc},
 	{NULL,		NULL}		/* sentinel */
 };
 

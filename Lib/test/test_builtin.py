@@ -5,7 +5,7 @@ from test.test_support import fcmp, have_unicode, TESTFN, unlink, \
                               run_unittest, run_with_locale
 from operator import neg
 
-import sys, warnings, cStringIO, random, rational, UserDict
+import sys, warnings, cStringIO, random, fractions, UserDict
 warnings.filterwarnings("ignore", "hex../oct.. of negative int",
                         FutureWarning, __name__)
 warnings.filterwarnings("ignore", "integer argument expected",
@@ -689,7 +689,21 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, float, Foo4(42))
 
     def test_floatasratio(self):
-        R = rational.Rational
+        for f, ratio in [
+                (0.875, (7, 8)),
+                (-0.875, (-7, 8)),
+                (0.0, (0, 1)),
+                (11.5, (23, 2)),
+            ]:
+            self.assertEqual(f.as_integer_ratio(), ratio)
+
+        for i in range(10000):
+            f = random.random()
+            f *= 10 ** random.randint(-100, 100)
+            n, d = f.as_integer_ratio()
+            self.assertEqual(float(n).__truediv__(d), f)
+
+        R = fractions.Fraction
         self.assertEqual(R(0, 1),
                          R(*float(0.0).as_integer_ratio()))
         self.assertEqual(R(5, 2),
@@ -920,6 +934,14 @@ class BuiltinTest(unittest.TestCase):
 
     def test_intconversion(self):
         # Test __int__()
+        class ClassicMissingMethods:
+            pass
+        self.assertRaises(AttributeError, int, ClassicMissingMethods())
+
+        class MissingMethods(object):
+            pass
+        self.assertRaises(TypeError, int, MissingMethods())
+
         class Foo0:
             def __int__(self):
                 return 42
@@ -950,6 +972,49 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int(Foo3()), 0)
         self.assertEqual(int(Foo4()), 42L)
         self.assertRaises(TypeError, int, Foo5())
+
+        class Classic:
+            pass
+        for base in (object, Classic):
+            class IntOverridesTrunc(base):
+                def __int__(self):
+                    return 42
+                def __trunc__(self):
+                    return -12
+            self.assertEqual(int(IntOverridesTrunc()), 42)
+
+            class JustTrunc(base):
+                def __trunc__(self):
+                    return 42
+            self.assertEqual(int(JustTrunc()), 42)
+
+            for trunc_result_base in (object, Classic):
+                class Integral(trunc_result_base):
+                    def __int__(self):
+                        return 42
+
+                class TruncReturnsNonInt(base):
+                    def __trunc__(self):
+                        return Integral()
+                self.assertEqual(int(TruncReturnsNonInt()), 42)
+
+                class NonIntegral(trunc_result_base):
+                    def __trunc__(self):
+                        # Check that we avoid infinite recursion.
+                        return NonIntegral()
+
+                class TruncReturnsNonIntegral(base):
+                    def __trunc__(self):
+                        return NonIntegral()
+                try:
+                    int(TruncReturnsNonIntegral())
+                except TypeError as e:
+                    self.assertEquals(str(e),
+                                      "__trunc__ returned non-Integral"
+                                      " (type NonIntegral)")
+                else:
+                    self.fail("Failed to raise TypeError with %s" %
+                              ((base, trunc_result_base),))
 
     def test_intern(self):
         self.assertRaises(TypeError, intern)
@@ -1193,6 +1258,14 @@ class BuiltinTest(unittest.TestCase):
 
     def test_longconversion(self):
         # Test __long__()
+        class ClassicMissingMethods:
+            pass
+        self.assertRaises(AttributeError, long, ClassicMissingMethods())
+
+        class MissingMethods(object):
+            pass
+        self.assertRaises(TypeError, long, MissingMethods())
+
         class Foo0:
             def __long__(self):
                 return 42L
@@ -1223,6 +1296,49 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(long(Foo3()), 0)
         self.assertEqual(long(Foo4()), 42)
         self.assertRaises(TypeError, long, Foo5())
+
+        class Classic:
+            pass
+        for base in (object, Classic):
+            class LongOverridesTrunc(base):
+                def __long__(self):
+                    return 42
+                def __trunc__(self):
+                    return -12
+            self.assertEqual(long(LongOverridesTrunc()), 42)
+
+            class JustTrunc(base):
+                def __trunc__(self):
+                    return 42
+            self.assertEqual(long(JustTrunc()), 42)
+
+            for trunc_result_base in (object, Classic):
+                class Integral(trunc_result_base):
+                    def __int__(self):
+                        return 42
+
+                class TruncReturnsNonLong(base):
+                    def __trunc__(self):
+                        return Integral()
+                self.assertEqual(long(TruncReturnsNonLong()), 42)
+
+                class NonIntegral(trunc_result_base):
+                    def __trunc__(self):
+                        # Check that we avoid infinite recursion.
+                        return NonIntegral()
+
+                class TruncReturnsNonIntegral(base):
+                    def __trunc__(self):
+                        return NonIntegral()
+                try:
+                    long(TruncReturnsNonIntegral())
+                except TypeError as e:
+                    self.assertEquals(str(e),
+                                      "__trunc__ returned non-Integral"
+                                      " (type NonIntegral)")
+                else:
+                    self.fail("Failed to raise TypeError with %s" %
+                              ((base, trunc_result_base),))
 
     def test_map(self):
         self.assertEqual(
@@ -1765,38 +1881,6 @@ class BuiltinTest(unittest.TestCase):
             def __getitem__(self, index):
                 raise ValueError
         self.assertRaises(ValueError, sum, BadSeq())
-
-    def test_trunc(self):
-
-        self.assertEqual(trunc(1), 1)
-        self.assertEqual(trunc(-1), -1)
-        self.assertEqual(type(trunc(1)), int)
-        self.assertEqual(type(trunc(1.5)), int)
-        self.assertEqual(trunc(1.5), 1)
-        self.assertEqual(trunc(-1.5), -1)
-        self.assertEqual(trunc(1.999999), 1)
-        self.assertEqual(trunc(-1.999999), -1)
-        self.assertEqual(trunc(-0.999999), -0)
-        self.assertEqual(trunc(-100.999), -100)
-
-        class TestTrunc(object):
-            def __trunc__(self):
-                return 23
-
-        class TestNoTrunc(object):
-            pass
-
-        self.assertEqual(trunc(TestTrunc()), 23)
-
-        self.assertRaises(TypeError, trunc)
-        self.assertRaises(TypeError, trunc, 1, 2)
-        # XXX: This is not ideal, but see the comment in builtin_trunc().
-        self.assertRaises(AttributeError, trunc, TestNoTrunc())
-
-        t = TestNoTrunc()
-        t.__trunc__ = lambda *args: args
-        self.assertEquals((), trunc(t))
-        self.assertRaises(TypeError, trunc, t, 0)
 
     def test_tuple(self):
         self.assertEqual(tuple(()), ())

@@ -754,17 +754,6 @@ a 11-tuple where the entries in the tuple are counts of:\n\
 10. Number of stack pops performed by call_function()"
 );
 
-static PyObject *
-sys_cleartypecache(PyObject* self, PyObject* args)
-{
-	PyType_ClearCache();
-	Py_RETURN_NONE;
-}
-
-PyDoc_STRVAR(cleartypecache_doc,
-"_cleartypecache() -> None\n\
-Clear the internal type lookup cache.");
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -783,12 +772,44 @@ extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 }
 #endif
 
+static PyObject *
+sys_clear_type_cache(PyObject* self, PyObject* args)
+{
+	PyType_ClearCache();
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(sys_clear_type_cache__doc__,
+"_clear_type_cache() -> None\n\
+Clear the internal type lookup cache.");
+
+
+static PyObject *
+sys_compact_freelists(PyObject* self, PyObject* args)
+{
+	size_t isum, ibc, ibf;
+	size_t fsum, fbc, fbf;
+
+	PyInt_CompactFreeList(&ibc, &ibf, &isum);
+	PyFloat_CompactFreeList(&fbc, &fbf, &fsum);
+
+	return Py_BuildValue("(kkk)(kkk)", isum, ibc, ibf,
+					   fsum, fbc, fbf);
+
+}
+
+PyDoc_STRVAR(sys_compact_freelists__doc__,
+"_compact_freelists() -> ((remaing_objects, total_blocks, freed_blocks), ...)\n\
+Compact the free lists of ints and floats.");
+
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
 	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
 	 callstats_doc},
-	{"_cleartypecache", sys_cleartypecache, METH_NOARGS,
-	 cleartypecache_doc},
+	{"_clear_type_cache",	sys_clear_type_cache,	  METH_NOARGS,
+	 sys_clear_type_cache__doc__},
+	{"_compact_freelists",	sys_compact_freelists,	  METH_NOARGS,
+	 sys_compact_freelists__doc__},
 	{"_current_frames", sys_current_frames, METH_NOARGS,
 	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
@@ -1107,7 +1128,7 @@ PyDoc_STRVAR(flags__doc__,
 \n\
 Flags provided through command line arguments or environment vars.");
 
-static PyTypeObject FlagsType;
+static PyTypeObject FlagsType = {0, 0, 0, 0, 0, 0};
 
 static PyStructSequence_Field flags_fields[] = {
 	{"debug",		"-d"},
@@ -1180,8 +1201,6 @@ make_flags(void)
 	if (PyErr_Occurred()) {
 		return NULL;
 	}
-
-	Py_INCREF(seq);
 	return seq;
 }
 
@@ -1199,6 +1218,11 @@ _PySys_Init(void)
 	if (m == NULL)
 		return NULL;
 	sysdict = PyModule_GetDict(m);
+#define SET_SYS_FROM_STRING(key, value)			\
+	v = value;					\
+	if (v != NULL)					\
+		PyDict_SetItemString(sysdict, key, v);	\
+	Py_XDECREF(v)
 
 	{
 		/* XXX: does this work on Win/Win64? (see posix_fstat) */
@@ -1258,19 +1282,17 @@ _PySys_Init(void)
 	Py_XDECREF(sysin);
 	Py_XDECREF(sysout);
 	Py_XDECREF(syserr);
-	PyDict_SetItemString(sysdict, "version",
-			     v = PyString_FromString(Py_GetVersion()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "hexversion",
-			     v = PyInt_FromLong(PY_VERSION_HEX));
-	Py_XDECREF(v);
+
+	SET_SYS_FROM_STRING("version",
+			     PyString_FromString(Py_GetVersion()));
+	SET_SYS_FROM_STRING("hexversion",
+			     PyInt_FromLong(PY_VERSION_HEX));
 	svnversion_init();
-	v = Py_BuildValue("(ssz)", "CPython", branch, svn_revision);
-	PyDict_SetItemString(sysdict, "subversion", v);
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "dont_write_bytecode",
-			     v = PyBool_FromLong(Py_DontWriteBytecodeFlag));
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("subversion",
+			    Py_BuildValue("(ssz)", "CPython", branch,
+					  svn_revision));
+	SET_SYS_FROM_STRING("dont_write_bytecode",
+			    PyBool_FromLong(Py_DontWriteBytecodeFlag));
 	/*
 	 * These release level checks are mutually exclusive and cover
 	 * the field, so don't get too fancy with the pre-processor!
@@ -1284,12 +1306,6 @@ _PySys_Init(void)
 #elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
 	s = "final";
 #endif
-
-#define SET_SYS_FROM_STRING(key, value)			\
-	v = value;					\
-	if (v != NULL)					\
-		PyDict_SetItemString(sysdict, key, v);	\
-	Py_XDECREF(v)
 
 	SET_SYS_FROM_STRING("version_info",
 			    Py_BuildValue("iiisi", PY_MAJOR_VERSION,
@@ -1340,7 +1356,6 @@ _PySys_Init(void)
 	SET_SYS_FROM_STRING("winver",
 			    PyString_FromString(PyWin_DLLVersionString));
 #endif
-#undef SET_SYS_FROM_STRING
 	if (warnoptions == NULL) {
 		warnoptions = PyList_New(0);
 	}
@@ -1351,12 +1366,14 @@ _PySys_Init(void)
 		PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
 	}
 
-	PyStructSequence_InitType(&FlagsType, &flags_desc);
-	PyDict_SetItemString(sysdict, "flags", make_flags());
+	if (FlagsType.tp_name == 0)
+		PyStructSequence_InitType(&FlagsType, &flags_desc);
+	SET_SYS_FROM_STRING("flags", make_flags());
 	/* prevent user from creating new instances */
 	FlagsType.tp_init = NULL;
 	FlagsType.tp_new = NULL;
 
+#undef SET_SYS_FROM_STRING
 	if (PyErr_Occurred())
 		return NULL;
 	return m;

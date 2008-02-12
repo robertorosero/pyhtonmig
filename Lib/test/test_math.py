@@ -454,6 +454,37 @@ class MathTests(unittest.TestCase):
         self.ftest('tanh(-inf)', math.tanh(NINF), -1)
         self.assert_(math.isnan(math.tanh(NAN)))
 
+    def test_trunc(self):
+        self.assertEqual(math.trunc(1), 1)
+        self.assertEqual(math.trunc(-1), -1)
+        self.assertEqual(type(math.trunc(1)), int)
+        self.assertEqual(type(math.trunc(1.5)), int)
+        self.assertEqual(math.trunc(1.5), 1)
+        self.assertEqual(math.trunc(-1.5), -1)
+        self.assertEqual(math.trunc(1.999999), 1)
+        self.assertEqual(math.trunc(-1.999999), -1)
+        self.assertEqual(math.trunc(-0.999999), -0)
+        self.assertEqual(math.trunc(-100.999), -100)
+
+        class TestTrunc(object):
+            def __trunc__(self):
+                return 23
+
+        class TestNoTrunc(object):
+            pass
+
+        self.assertEqual(math.trunc(TestTrunc()), 23)
+
+        self.assertRaises(TypeError, math.trunc)
+        self.assertRaises(TypeError, math.trunc, 1, 2)
+        # XXX: This is not ideal, but see the comment in math_trunc().
+        self.assertRaises(AttributeError, math.trunc, TestNoTrunc())
+
+        t = TestNoTrunc()
+        t.__trunc__ = lambda *args: args
+        self.assertEquals((), math.trunc(t))
+        self.assertRaises(TypeError, math.trunc, t, 0)
+
     def testCopysign(self):
         self.assertEqual(math.copysign(1, 42), 1.0)
         self.assertEqual(math.copysign(0., 42), 0.0)

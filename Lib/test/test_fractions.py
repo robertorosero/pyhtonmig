@@ -1,15 +1,15 @@
-"""Tests for Lib/rational.py."""
+"""Tests for Lib/fractions.py."""
 
 from decimal import Decimal
 from test.test_support import run_unittest, verbose
 import math
 import operator
-import rational
+import fractions
 import unittest
 from copy import copy, deepcopy
 from cPickle import dumps, loads
-R = rational.Rational
-gcd = rational.gcd
+R = fractions.Fraction
+gcd = fractions.gcd
 
 
 class GcdTest(unittest.TestCase):
@@ -31,7 +31,7 @@ def _components(r):
     return (r.numerator, r.denominator)
 
 
-class RationalTest(unittest.TestCase):
+class FractionTest(unittest.TestCase):
 
     def assertTypedEquals(self, expected, actual):
         """Asserts that both the types and values are the same."""
@@ -60,7 +60,7 @@ class RationalTest(unittest.TestCase):
         self.assertEquals((7, 15), _components(R(7, 15)))
         self.assertEquals((10**23, 1), _components(R(10**23)))
 
-        self.assertRaisesMessage(ZeroDivisionError, "Rational(12, 0)",
+        self.assertRaisesMessage(ZeroDivisionError, "Fraction(12, 0)",
                                  R, 12, 0)
         self.assertRaises(TypeError, R, 1.5)
         self.assertRaises(TypeError, R, 1.5 + 3j)
@@ -78,50 +78,67 @@ class RationalTest(unittest.TestCase):
 
         self.assertEquals((16, 5), _components(R(" 3.2 ")))
         self.assertEquals((-16, 5), _components(R(u" -3.2 ")))
+        self.assertEquals((-3, 1), _components(R(u" -3. ")))
+        self.assertEquals((3, 5), _components(R(u" .6 ")))
 
 
         self.assertRaisesMessage(
-            ZeroDivisionError, "Rational(3, 0)",
+            ZeroDivisionError, "Fraction(3, 0)",
             R, "3/0")
         self.assertRaisesMessage(
-            ValueError, "Invalid literal for Rational: 3/",
+            ValueError, "Invalid literal for Fraction: 3/",
             R, "3/")
         self.assertRaisesMessage(
-            ValueError, "Invalid literal for Rational: 3 /2",
+            ValueError, "Invalid literal for Fraction: 3 /2",
             R, "3 /2")
         self.assertRaisesMessage(
             # Denominators don't need a sign.
-            ValueError, "Invalid literal for Rational: 3/+2",
+            ValueError, "Invalid literal for Fraction: 3/+2",
             R, "3/+2")
         self.assertRaisesMessage(
             # Imitate float's parsing.
-            ValueError, "Invalid literal for Rational: + 3/2",
+            ValueError, "Invalid literal for Fraction: + 3/2",
             R, "+ 3/2")
         self.assertRaisesMessage(
             # Avoid treating '.' as a regex special character.
-            ValueError, "Invalid literal for Rational: 3a2",
+            ValueError, "Invalid literal for Fraction: 3a2",
             R, "3a2")
         self.assertRaisesMessage(
             # Only parse ordinary decimals, not scientific form.
-            ValueError, "Invalid literal for Rational: 3.2e4",
+            ValueError, "Invalid literal for Fraction: 3.2e4",
             R, "3.2e4")
         self.assertRaisesMessage(
-            # Don't accept combinations of decimals and rationals.
-            ValueError, "Invalid literal for Rational: 3/7.2",
+            # Don't accept combinations of decimals and fractions.
+            ValueError, "Invalid literal for Fraction: 3/7.2",
             R, "3/7.2")
         self.assertRaisesMessage(
-            # Don't accept combinations of decimals and rationals.
-            ValueError, "Invalid literal for Rational: 3.2/7",
+            # Don't accept combinations of decimals and fractions.
+            ValueError, "Invalid literal for Fraction: 3.2/7",
             R, "3.2/7")
+        self.assertRaisesMessage(
+            # Allow 3. and .3, but not .
+            ValueError, "Invalid literal for Fraction: .",
+            R, ".")
 
     def testImmutable(self):
         r = R(7, 3)
         r.__init__(2, 15)
         self.assertEquals((7, 3), _components(r))
 
+        self.assertRaises(AttributeError, setattr, r, 'numerator', 12)
+        self.assertRaises(AttributeError, setattr, r, 'denominator', 6)
+        self.assertEquals((7, 3), _components(r))
+
+        # But if you _really_ need to:
+        r._numerator = 4
+        r._denominator = 2
+        self.assertEquals((4, 2), _components(r))
+        # Which breaks some important operations:
+        self.assertNotEquals(R(4, 2), r)
+
     def testFromFloat(self):
         self.assertRaisesMessage(
-            TypeError, "Rational.from_float() only takes floats, not 3 (int)",
+            TypeError, "Fraction.from_float() only takes floats, not 3 (int)",
             R.from_float, 3)
 
         self.assertEquals((0, 1), _components(R.from_float(-0.0)))
@@ -137,19 +154,19 @@ class RationalTest(unittest.TestCase):
         inf = 1e1000
         nan = inf - inf
         self.assertRaisesMessage(
-            TypeError, "Cannot convert inf to Rational.",
+            TypeError, "Cannot convert inf to Fraction.",
             R.from_float, inf)
         self.assertRaisesMessage(
-            TypeError, "Cannot convert -inf to Rational.",
+            TypeError, "Cannot convert -inf to Fraction.",
             R.from_float, -inf)
         self.assertRaisesMessage(
-            TypeError, "Cannot convert nan to Rational.",
+            TypeError, "Cannot convert nan to Fraction.",
             R.from_float, nan)
 
     def testFromDecimal(self):
         self.assertRaisesMessage(
             TypeError,
-            "Rational.from_decimal() only takes Decimals, not 3 (int)",
+            "Fraction.from_decimal() only takes Decimals, not 3 (int)",
             R.from_decimal, 3)
         self.assertEquals(R(0), R.from_decimal(Decimal("-0")))
         self.assertEquals(R(5, 10), R.from_decimal(Decimal("0.5")))
@@ -159,16 +176,16 @@ class RationalTest(unittest.TestCase):
                           R.from_decimal(Decimal("0." + "9" * 30)))
 
         self.assertRaisesMessage(
-            TypeError, "Cannot convert Infinity to Rational.",
+            TypeError, "Cannot convert Infinity to Fraction.",
             R.from_decimal, Decimal("inf"))
         self.assertRaisesMessage(
-            TypeError, "Cannot convert -Infinity to Rational.",
+            TypeError, "Cannot convert -Infinity to Fraction.",
             R.from_decimal, Decimal("-inf"))
         self.assertRaisesMessage(
-            TypeError, "Cannot convert NaN to Rational.",
+            TypeError, "Cannot convert NaN to Fraction.",
             R.from_decimal, Decimal("nan"))
         self.assertRaisesMessage(
-            TypeError, "Cannot convert sNaN to Rational.",
+            TypeError, "Cannot convert sNaN to Fraction.",
             R.from_decimal, Decimal("snan"))
 
     def testFromContinuedFraction(self):
@@ -195,16 +212,8 @@ class RationalTest(unittest.TestCase):
         self.assertEqual(R.from_float(0.0).approximate(10000), R(0))
 
     def testConversions(self):
-        self.assertTypedEquals(-1, trunc(R(-11, 10)))
+        self.assertTypedEquals(-1, math.trunc(R(-11, 10)))
         self.assertTypedEquals(-1, int(R(-11, 10)))
-        self.assertTypedEquals(-2, R(-11, 10).__floor__())
-        self.assertTypedEquals(-1, R(-11, 10).__ceil__())
-        self.assertTypedEquals(-1, R(-10, 10).__ceil__())
-
-        self.assertTypedEquals(0, R(-1, 10).__round__())
-        self.assertTypedEquals(0, R(-5, 10).__round__())
-        self.assertTypedEquals(-2, R(-15, 10).__round__())
-        self.assertTypedEquals(-1, R(-7, 10).__round__())
 
         self.assertEquals(False, bool(R(0, 1)))
         self.assertEquals(True, bool(R(3, 2)))
@@ -217,13 +226,6 @@ class RationalTest(unittest.TestCase):
                                 float(R(long('2'*400+'7'), long('3'*400+'1'))))
 
         self.assertTypedEquals(0.1+0j, complex(R(1,10)))
-
-    def testRound(self):
-        self.assertTypedEquals(R(-200), R(-150).__round__(-2))
-        self.assertTypedEquals(R(-200), R(-250).__round__(-2))
-        self.assertTypedEquals(R(30), R(26).__round__(-1))
-        self.assertTypedEquals(R(-2, 10), R(-15, 100).__round__(1))
-        self.assertTypedEquals(R(-2, 10), R(-25, 100).__round__(1))
 
 
     def testArithmetic(self):
@@ -299,7 +301,7 @@ class RationalTest(unittest.TestCase):
         # Decimal refuses mixed comparisons.
         self.assertRaisesMessage(
             TypeError,
-            "unsupported operand type(s) for +: 'Rational' and 'Decimal'",
+            "unsupported operand type(s) for +: 'Fraction' and 'Decimal'",
             operator.add, R(3,11), Decimal('3.1415926'))
         self.assertNotEquals(R(5, 2), Decimal('2.5'))
 
@@ -311,6 +313,8 @@ class RationalTest(unittest.TestCase):
         self.assertFalse(R(2, 3) <= R(1, 2))
         self.assertTrue(R(1, 2) == R(1, 2))
         self.assertFalse(R(1, 2) == R(1, 3))
+        self.assertFalse(R(1, 2) != R(1, 2))
+        self.assertTrue(R(1, 2) != R(1, 3))
 
     def testMixedLess(self):
         self.assertTrue(2 < R(5, 2))
@@ -337,11 +341,11 @@ class RationalTest(unittest.TestCase):
         # Because 10**23 can't be represented exactly as a float:
         self.assertFalse(R(10**23) == float(10**23))
         # The first test demonstrates why these are important.
-        self.assertFalse(1e23 < float(R(trunc(1e23) + 1)))
-        self.assertTrue(1e23 < R(trunc(1e23) + 1))
-        self.assertFalse(1e23 <= R(trunc(1e23) - 1))
-        self.assertTrue(1e23 > R(trunc(1e23) - 1))
-        self.assertFalse(1e23 >= R(trunc(1e23) + 1))
+        self.assertFalse(1e23 < float(R(math.trunc(1e23) + 1)))
+        self.assertTrue(1e23 < R(math.trunc(1e23) + 1))
+        self.assertFalse(1e23 <= R(math.trunc(1e23) - 1))
+        self.assertTrue(1e23 > R(math.trunc(1e23) - 1))
+        self.assertFalse(1e23 >= R(math.trunc(1e23) + 1))
 
     def testBigComplexComparisons(self):
         self.assertFalse(R(10**23) == complex(10**23))
@@ -359,7 +363,7 @@ class RationalTest(unittest.TestCase):
         self.assertFalse(R(5, 2) == 2)
 
     def testStringification(self):
-        self.assertEquals("Rational(7,3)", repr(R(7, 3)))
+        self.assertEquals("Fraction(7, 3)", repr(R(7, 3)))
         self.assertEquals("7/3", str(R(7, 3)))
         self.assertEquals("7", str(R(7, 1)))
 
@@ -402,7 +406,7 @@ class RationalTest(unittest.TestCase):
         self.assertEqual(id(r), id(deepcopy(r)))
 
 def test_main():
-    run_unittest(RationalTest, GcdTest)
+    run_unittest(FractionTest, GcdTest)
 
 if __name__ == '__main__':
     test_main()
