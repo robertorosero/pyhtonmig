@@ -64,7 +64,7 @@ class Fraction(Rational):
         """
         self = super(Fraction, cls).__new__(cls)
 
-        if denominator == 1:
+        if type(numerator) not in (int, long) and denominator == 1:
             if isinstance(numerator, basestring):
                 # Handle construction from strings.
                 input = numerator
@@ -86,96 +86,112 @@ class Fraction(Rational):
                 if m.group('sign') == '-':
                     numerator = -numerator
 
-            elif (not isinstance(numerator, numbers.Integral) and
-                  isinstance(numerator, Rational)):
-                # Handle copies from other rationals.
+            elif isinstance(numerator, Rational):
+                # Handle copies from other rationals. Integrals get
+                # caught here too, but it doesn't matter because
+                # denominator is already 1.
                 other_rational = numerator
                 numerator = other_rational.numerator
                 denominator = other_rational.denominator
 
-        if (not isinstance(numerator, numbers.Integral) or
-            not isinstance(denominator, numbers.Integral)):
-            raise TypeError("Fraction(%(numerator)s, %(denominator)s):"
-                            " Both arguments must be integral." % locals())
-
         if denominator == 0:
             raise ZeroDivisionError('Fraction(%s, 0)' % numerator)
 
+        numerator = numerator.__index__()
+        denominator = denominator.__index__()
         g = gcd(numerator, denominator)
-        self._numerator = int(numerator // g)
-        self._denominator = int(denominator // g)
+        self._numerator = numerator // g
+        self._denominator = denominator // g
         return self
 
-    @staticmethod
-    def from_float(f):
+    @classmethod
+    def from_float(cls, f):
         """Converts a finite float to a rational number, exactly.
 
         Beware that Fraction.from_float(0.3) != Fraction(3, 10).
 
         """
         if not isinstance(f, float):
-            raise TypeError("Fraction.from_float() only takes floats, "
-                            "not %r (%s)" % (f, type(f).__name__))
+            raise TypeError("%s.from_float() only takes floats, not %r (%s)" %
+                            (cls.__name__, f, type(f).__name__))
         if math.isnan(f) or math.isinf(f):
-            raise TypeError("Cannot convert %r to Fraction." % f)
-        return Fraction(*f.as_integer_ratio())
+            raise TypeError("Cannot convert %r to %s." % (f, cls.__name__))
+        return cls(*f.as_integer_ratio())
 
-    @staticmethod
-    def from_decimal(dec):
+    @classmethod
+    def from_decimal(cls, dec):
         """Converts a finite Decimal instance to a rational number, exactly."""
         from decimal import Decimal
         if not isinstance(dec, Decimal):
             raise TypeError(
-                "Fraction.from_decimal() only takes Decimals, not %r (%s)" %
-                (dec, type(dec).__name__))
+                "%s.from_decimal() only takes Decimals, not %r (%s)" %
+                (cls.__name__, dec, type(dec).__name__))
         if not dec.is_finite():
             # Catches infinities and nans.
-            raise TypeError("Cannot convert %s to Fraction." % dec)
+            raise TypeError("Cannot convert %s to %s." % (dec, cls.__name__))
         sign, digits, exp = dec.as_tuple()
         digits = int(''.join(map(str, digits)))
         if sign:
             digits = -digits
         if exp >= 0:
-            return Fraction(digits * 10 ** exp)
+            return cls(digits * 10 ** exp)
         else:
-            return Fraction(digits, 10 ** -exp)
+            return cls(digits, 10 ** -exp)
 
-    @staticmethod
-    def from_continued_fraction(seq):
-        'Build a Fraction from a continued fraction expessed as a sequence'
-        n, d = 1, 0
-        for e in reversed(seq):
-            n, d = d, n
-            n += e * d
-        return Fraction(n, d) if seq else Fraction(0)
+    def limit_denominator(self, max_denominator=1000000):
+        """Closest Fraction to self with denominator at most max_denominator.
 
-    def as_continued_fraction(self):
-        'Return continued fraction expressed as a list'
-        n = self.numerator
-        d = self.denominator
-        cf = []
-        while d:
-            e = int(n // d)
-            cf.append(e)
-            n -= e * d
-            n, d = d, n
-        return cf
+        >>> Fraction('3.141592653589793').limit_denominator(10)
+        Fraction(22, 7)
+        >>> Fraction('3.141592653589793').limit_denominator(100)
+        Fraction(311, 99)
+        >>> Fraction(1234, 5678).limit_denominator(10000)
+        Fraction(1234, 5678)
 
-    def approximate(self, max_denominator):
-        'Best rational approximation with a denominator <= max_denominator'
-        # XXX First cut at algorithm
-        # Still needs rounding rules as specified at
-        #       http://en.wikipedia.org/wiki/Continued_fraction
-        if self.denominator <= max_denominator:
-            return self
-        cf = self.as_continued_fraction()
-        result = Fraction(0)
-        for i in range(1, len(cf)):
-            new = self.from_continued_fraction(cf[:i])
-            if new.denominator > max_denominator:
+        """
+        # Algorithm notes: For any real number x, define a *best upper
+        # approximation* to x to be a rational number p/q such that:
+        #
+        #   (1) p/q >= x, and
+        #   (2) if p/q > r/s >= x then s > q, for any rational r/s.
+        #
+        # Define *best lower approximation* similarly.  Then it can be
+        # proved that a rational number is a best upper or lower
+        # approximation to x if, and only if, it is a convergent or
+        # semiconvergent of the (unique shortest) continued fraction
+        # associated to x.
+        #
+        # To find a best rational approximation with denominator <= M,
+        # we find the best upper and lower approximations with
+        # denominator <= M and take whichever of these is closer to x.
+        # In the event of a tie, the bound with smaller denominator is
+        # chosen.  If both denominators are equal (which can happen
+        # only when max_denominator == 1 and self is midway between
+        # two integers) the lower bound---i.e., the floor of self, is
+        # taken.
+
+        if max_denominator < 1:
+            raise ValueError("max_denominator should be at least 1")
+        if self._denominator <= max_denominator:
+            return Fraction(self)
+
+        p0, q0, p1, q1 = 0, 1, 1, 0
+        n, d = self._numerator, self._denominator
+        while True:
+            a = n//d
+            q2 = q0+a*q1
+            if q2 > max_denominator:
                 break
-            result = new
-        return result
+            p0, q0, p1, q1 = p1, q1, p0+a*p1, q2
+            n, d = d, n-a*d
+
+        k = (max_denominator-q0)//q1
+        bound1 = Fraction(p0+k*p1, q0+k*q1)
+        bound2 = Fraction(p1, q1)
+        if abs(bound2 - self) <= abs(bound1-self):
+            return bound2
+        else:
+            return bound1
 
     @property
     def numerator(a):
@@ -187,14 +203,14 @@ class Fraction(Rational):
 
     def __repr__(self):
         """repr(self)"""
-        return ('Fraction(%r, %r)' % (self.numerator, self.denominator))
+        return ('Fraction(%r, %r)' % (self._numerator, self._denominator))
 
     def __str__(self):
         """str(self)"""
-        if self.denominator == 1:
-            return str(self.numerator)
+        if self._denominator == 1:
+            return str(self._numerator)
         else:
-            return '%s/%s' % (self.numerator, self.denominator)
+            return '%s/%s' % (self._numerator, self._denominator)
 
     def _operator_fallbacks(monomorphic_operator, fallback_operator):
         """Generates forward and reverse operators given a purely-rational
@@ -379,11 +395,11 @@ class Fraction(Rational):
             if b.denominator == 1:
                 power = b.numerator
                 if power >= 0:
-                    return Fraction(a.numerator ** power,
-                                    a.denominator ** power)
+                    return Fraction(a._numerator ** power,
+                                    a._denominator ** power)
                 else:
-                    return Fraction(a.denominator ** -power,
-                                    a.numerator ** -power)
+                    return Fraction(a._denominator ** -power,
+                                    a._numerator ** -power)
             else:
                 # A fractional power will generally produce an
                 # irrational number.
@@ -393,36 +409,36 @@ class Fraction(Rational):
 
     def __rpow__(b, a):
         """a ** b"""
-        if b.denominator == 1 and b.numerator >= 0:
+        if b._denominator == 1 and b._numerator >= 0:
             # If a is an int, keep it that way if possible.
-            return a ** b.numerator
+            return a ** b._numerator
 
         if isinstance(a, Rational):
             return Fraction(a.numerator, a.denominator) ** b
 
-        if b.denominator == 1:
-            return a ** b.numerator
+        if b._denominator == 1:
+            return a ** b._numerator
 
         return a ** float(b)
 
     def __pos__(a):
         """+a: Coerces a subclass instance to Fraction"""
-        return Fraction(a.numerator, a.denominator)
+        return Fraction(a._numerator, a._denominator)
 
     def __neg__(a):
         """-a"""
-        return Fraction(-a.numerator, a.denominator)
+        return Fraction(-a._numerator, a._denominator)
 
     def __abs__(a):
         """abs(a)"""
-        return Fraction(abs(a.numerator), a.denominator)
+        return Fraction(abs(a._numerator), a._denominator)
 
     def __trunc__(a):
         """trunc(a)"""
-        if a.numerator < 0:
-            return -(-a.numerator // a.denominator)
+        if a._numerator < 0:
+            return -(-a._numerator // a._denominator)
         else:
-            return a.numerator // a.denominator
+            return a._numerator // a._denominator
 
     def __hash__(self):
         """hash(self)
@@ -432,22 +448,22 @@ class Fraction(Rational):
 
         """
         # XXX since this method is expensive, consider caching the result
-        if self.denominator == 1:
+        if self._denominator == 1:
             # Get integers right.
-            return hash(self.numerator)
+            return hash(self._numerator)
         # Expensive check, but definitely correct.
         if self == float(self):
             return hash(float(self))
         else:
             # Use tuple's hash to avoid a high collision rate on
             # simple fractions.
-            return hash((self.numerator, self.denominator))
+            return hash((self._numerator, self._denominator))
 
     def __eq__(a, b):
         """a == b"""
         if isinstance(b, Rational):
-            return (a.numerator == b.numerator and
-                    a.denominator == b.denominator)
+            return (a._numerator == b.numerator and
+                    a._denominator == b.denominator)
         if isinstance(b, numbers.Complex) and b.imag == 0:
             b = b.real
         if isinstance(b, float):
@@ -502,7 +518,7 @@ class Fraction(Rational):
 
     def __nonzero__(a):
         """a != 0"""
-        return a.numerator != 0
+        return a._numerator != 0
 
     # support for pickling, copy, and deepcopy
 
@@ -512,9 +528,9 @@ class Fraction(Rational):
     def __copy__(self):
         if type(self) == Fraction:
             return self     # I'm immutable; therefore I am my own clone
-        return self.__class__(self.numerator, self.denominator)
+        return self.__class__(self._numerator, self._denominator)
 
     def __deepcopy__(self, memo):
         if type(self) == Fraction:
             return self     # My components are also immutable
-        return self.__class__(self.numerator, self.denominator)
+        return self.__class__(self._numerator, self._denominator)

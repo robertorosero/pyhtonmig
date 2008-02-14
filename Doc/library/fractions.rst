@@ -1,6 +1,6 @@
 
 :mod:`fractions` --- Rational numbers
-====================================
+=====================================
 
 .. module:: fractions
    :synopsis: Rational numbers.
@@ -44,6 +44,24 @@ Fraction number class.
    This classmethod constructs a :class:`Fraction` representing the
    exact value of *dec*, which must be a
    :class:`decimal.Decimal`.
+
+
+.. method:: Fraction.limit_denominator(max_denominator=1000000)
+
+   Finds and returns the closest :class:`Fraction` to ``self`` that
+   has denominator at most max_denominator.  This method is useful for
+   finding rational approximations to a given floating-point number::
+
+      >>> Fraction('3.1415926535897932').limit_denominator(1000)
+      Fraction(355, 113)
+
+   or for recovering a rational number that's represented as a float::
+
+      >>> from math import pi, cos
+      >>> Fraction.from_float(cos(pi/3))
+      Fraction(4503599627370497L, 9007199254740992L)
+      >>> Fraction.from_float(cos(pi/3)).limit_denominator()
+      Fraction(1, 2)
 
 
 .. method:: Fraction.__floor__()
