@@ -564,14 +564,14 @@ info-$(RELEASE).tar.bz2: info
 		| bzip2 -9 >../$@
 
 latex-$(RELEASE).tgz:
-	$(PYTHON) $(TOOLSDIR)/mksourcepkg --gzip $(RELEASE) tags/r251c1
+	$(PYTHON) $(TOOLSDIR)/mksourcepkg --gzip $(RELEASE)
 
 latex-$(RELEASE).tar.bz2:
-	$(PYTHON) $(TOOLSDIR)/mksourcepkg --bzip2 $(RELEASE) tags/r251c1
+	$(PYTHON) $(TOOLSDIR)/mksourcepkg --bzip2 $(RELEASE)
 
 latex-$(RELEASE).zip:
 	rm -f $@
-	$(PYTHON) $(TOOLSDIR)/mksourcepkg --zip $(RELEASE) tags/r251c1
+	$(PYTHON) $(TOOLSDIR)/mksourcepkg --zip $(RELEASE)
 
 pdf-$(PAPER)-$(RELEASE).tar: $(PDFFILES)
 	rm -f $@
@@ -700,7 +700,7 @@ pkglist:
 	$(TOOLSDIR)/mkpkglist >pkglist.html
 
 distfiles:	paperdist edist
-	$(TOOLSDIR)/mksourcepkg --bzip2 --zip $(RELEASE) tags/r251c1
+	$(TOOLSDIR)/mksourcepkg --bzip2 --zip $(RELEASE)
 	$(TOOLSDIR)/mkpkglist >pkglist.html
 
 
