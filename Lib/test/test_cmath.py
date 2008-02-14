@@ -243,7 +243,7 @@ class CMathTests(unittest.TestCase):
                 continue
 
             actual = function(arg)
-            if fn=='log':
+            if fn in ('log', 'log10'):
                 # for the real part of the log function, we allow an
                 # absolute error of up to 2e-15.
                 self.rAssertAlmostEqual(expected.real, actual.real,
