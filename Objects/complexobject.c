@@ -618,6 +618,13 @@ static PyObject *
 complex_abs(PyComplexObject *v)
 {
 	double result;
+	/* if either the real or imaginary part is an infinity, return
+	   infinity, even if the other part is a NaN */
+        if (Py_IS_INFINITY(v->cval.real))
+		return PyFloat_FromDouble(fabs(v->cval.real));
+	if (Py_IS_INFINITY(v->cval.imag))
+		return PyFloat_FromDouble(fabs(v->cval.imag));
+
 	PyFPE_START_PROTECT("complex_abs", return 0)
 	result = hypot(v->cval.real,v->cval.imag);
 	PyFPE_END_PROTECT(result)
