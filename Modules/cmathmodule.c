@@ -99,7 +99,7 @@ special_type(double d)
    special value arrays need a constant we have to role our own infinity
    and nan. */
 #  define INF (DBL_MAX*DBL_MAX)
-#  define N (I*0.)
+#  define N (INF*0.)
 #else
 #  define INF Py_HUGE_VAL
 #  define N Py_NAN
