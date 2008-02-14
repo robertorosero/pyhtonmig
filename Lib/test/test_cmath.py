@@ -8,6 +8,44 @@ from cmath import phase, polar, rect, pi
 INF = float('inf')
 NAN = float('nan')
 
+complex_zeros = [complex(x, y) for x in [0.0, -0.0] for y in [0.0, -0.0]]
+complex_infinities = [complex(x, y) for x, y in [
+        (INF, 0.0),  # 1st quadrant
+        (INF, 2.3),
+        (INF, INF),
+        (2.3, INF),
+        (0.0, INF),
+        (-0.0, INF), # 2nd quadrant
+        (-2.3, INF),
+        (-INF, INF),
+        (-INF, 2.3),
+        (-INF, 0.0),
+        (-INF, -0.0), # 3rd quadrant
+        (-INF, -2.3),
+        (-INF, -INF),
+        (-2.3, -INF),
+        (-0.0, -INF),
+        (0.0, -INF), # 4th quadrant
+        (2.3, -INF),
+        (INF, -INF),
+        (INF, -2.3),
+        (INF, -0.0)
+        ]]
+complex_nans = [complex(x, y) for x, y in [
+        (NAN, -INF),
+        (NAN, -2.3),
+        (NAN, -0.0),
+        (NAN, 0.0),
+        (NAN, 2.3),
+        (NAN, INF),
+        (-INF, NAN),
+        (-2.3, NAN),
+        (-0.0, NAN),
+        (0.0, NAN),
+        (2.3, NAN),
+        (INF, NAN)
+        ]]
+
 class CMathTests(unittest.TestCase):
     # list of all functions in cmath
     test_functions = [getattr(cmath, fname) for fname in [
@@ -272,6 +310,66 @@ class CMathTests(unittest.TestCase):
         self.assertAlmostEqual(phase(-1.-1E-300j), -pi)
         self.assertAlmostEqual(phase(1j), pi/2)
         self.assertAlmostEqual(phase(-1j), -pi/2)
+
+        # zeros
+        self.assertEqual(phase(complex(0.0, 0.0)), 0.0)
+        self.assertEqual(phase(complex(0.0, -0.0)), -0.0)
+        self.assertEqual(phase(complex(-0.0, 0.0)), pi)
+        self.assertEqual(phase(complex(-0.0, -0.0)), -pi)
+
+        # infinities
+        self.assertAlmostEqual(phase(complex(-INF, -0.0)), -pi)
+        self.assertAlmostEqual(phase(complex(-INF, -2.3)), -pi)
+        self.assertAlmostEqual(phase(complex(-INF, -INF)), -0.75*pi)
+        self.assertAlmostEqual(phase(complex(-2.3, -INF)), -pi/2)
+        self.assertAlmostEqual(phase(complex(-0.0, -INF)), -pi/2)
+        self.assertAlmostEqual(phase(complex(0.0, -INF)), -pi/2)
+        self.assertAlmostEqual(phase(complex(2.3, -INF)), -pi/2)
+        self.assertAlmostEqual(phase(complex(INF, -INF)), -pi/4)
+        self.assertEqual(phase(complex(INF, -2.3)), -0.0)
+        self.assertEqual(phase(complex(INF, -0.0)), -0.0)
+        self.assertEqual(phase(complex(INF, 0.0)), 0.0)
+        self.assertEqual(phase(complex(INF, 2.3)), 0.0)
+        self.assertAlmostEqual(phase(complex(INF, INF)), pi/4)
+        self.assertAlmostEqual(phase(complex(2.3, INF)), pi/2)
+        self.assertAlmostEqual(phase(complex(0.0, INF)), pi/2)
+        self.assertAlmostEqual(phase(complex(-0.0, INF)), pi/2)
+        self.assertAlmostEqual(phase(complex(-2.3, INF)), pi/2)
+        self.assertAlmostEqual(phase(complex(-INF, INF)), 0.75*pi)
+        self.assertAlmostEqual(phase(complex(-INF, 2.3)), pi)
+        self.assertAlmostEqual(phase(complex(-INF, 0.0)), pi)
+
+        # real or imaginary part NaN
+        for z in complex_nans:
+            self.assert_(math.isnan(phase(z)))
+
+    def test_abs(self):
+        # zeros
+        for z in complex_zeros:
+            self.assertEqual(abs(z), 0.0)
+
+        # infinities
+        for z in complex_infinities:
+            self.assertEqual(abs(z), INF)
+
+        # real or imaginary part NaN
+        self.assertEqual(abs(complex(NAN, -INF)), INF)
+        self.assert_(math.isnan(abs(complex(NAN, -2.3))))
+        self.assert_(math.isnan(abs(complex(NAN, -0.0))))
+        self.assert_(math.isnan(abs(complex(NAN, 0.0))))
+        self.assert_(math.isnan(abs(complex(NAN, 2.3))))
+        self.assertEqual(abs(complex(NAN, INF)), INF)
+        self.assertEqual(abs(complex(-INF, NAN)), INF)
+        self.assert_(math.isnan(abs(complex(-2.3, NAN))))
+        self.assert_(math.isnan(abs(complex(-0.0, NAN))))
+        self.assert_(math.isnan(abs(complex(0.0, NAN))))
+        self.assert_(math.isnan(abs(complex(2.3, NAN))))
+        self.assertEqual(abs(complex(INF, NAN)), INF)
+        self.assert_(math.isnan(abs(complex(NAN, NAN))))
+
+        # result overflows
+        if float.__getformat__("double").startswith("IEEE"):
+            self.assertRaises(OverflowError, abs, complex(1.4e308, 1.4e308))
 
     def assertCEqual(self, a, b):
         eps = 1E-7

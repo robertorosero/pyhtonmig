@@ -621,6 +621,16 @@ complex_abs(PyComplexObject *v)
 	PyFPE_START_PROTECT("complex_abs", return 0)
 	result = hypot(v->cval.real,v->cval.imag);
 	PyFPE_END_PROTECT(result)
+
+	/* an infinite result from finite operands should
+	   result in OverflowError */
+	if (Py_IS_INFINITY(result) &&
+	    Py_IS_FINITE(v->cval.real) &&
+	    Py_IS_FINITE(v->cval.imag)) {
+		PyErr_SetString(PyExc_OverflowError,
+				"absolute value too large");
+		return NULL;
+	}
 	return PyFloat_FromDouble(result);
 }
 
