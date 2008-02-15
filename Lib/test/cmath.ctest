@@ -29,6 +29,16 @@
 --
 --   invalid : raised for invalid inputs.
 --
+--   ignore-real-sign : indicates that the sign of the real part of
+--     the result is unspecified; if the real part of the result is
+--     given as inf, then both -inf and inf should be accepted as
+--     correct.
+--
+--   ignore-imag-sign : indicates that the sign of the imaginary part
+--     of the result is unspecified.
+--
+-- Flags may appear in any order.
+--
 -- Lines beginning with '--' (like this one) start a comment, and are
 -- ignored.  Blank lines, or lines containing only whitespace, are also
 -- ignored.
@@ -185,8 +195,8 @@ acos1014 acos inf 2.3 -> 0.0 -inf
 acos1015 acos inf 0.0 -> 0.0 -inf
 acos1016 acos -inf inf -> 2.3561944901923448 -inf
 acos1017 acos inf inf -> 0.78539816339744828 -inf
-acos1018 acos inf nan -> nan inf
-acos1019 acos -inf nan -> nan inf
+acos1018 acos inf nan -> nan inf                        ignore-imag-sign
+acos1019 acos -inf nan -> nan inf                       ignore-imag-sign
 acos1020 acos nan 0.0 -> nan nan
 acos1021 acos nan 2.3 -> nan nan
 acos1022 acos nan inf -> nan -inf
@@ -644,7 +654,7 @@ asinh1010 asinh inf inf -> inf 0.78539816339744828
 asinh1011 asinh inf nan -> inf nan
 asinh1012 asinh nan 0.0 -> nan 0.0
 asinh1013 asinh nan 2.3 -> nan nan
-asinh1014 asinh nan inf -> inf nan
+asinh1014 asinh nan inf -> inf nan                      ignore-real-sign
 asinh1015 asinh nan nan -> nan nan
 asinh1016 asinh 0.0 -inf -> inf -1.5707963267948966
 asinh1017 asinh 2.3 -inf -> inf -1.5707963267948966
@@ -653,7 +663,7 @@ asinh1019 asinh inf -2.3 -> inf -0.0
 asinh1020 asinh inf -inf -> inf -0.78539816339744828
 asinh1021 asinh nan -0.0 -> nan -0.0
 asinh1022 asinh nan -2.3 -> nan nan
-asinh1023 asinh nan -inf -> inf nan
+asinh1023 asinh nan -inf -> inf nan                     ignore-real-sign
 asinh1024 asinh -0.0 -inf -> -inf -1.5707963267948966
 asinh1025 asinh -2.3 -inf -> -inf -1.5707963267948966
 asinh1026 asinh -0.0 nan -> nan nan
@@ -935,7 +945,7 @@ atanh1008 atanh inf inf -> 0.0 1.5707963267948966
 atanh1009 atanh inf nan -> 0.0 nan
 atanh1010 atanh nan 0.0 -> nan nan
 atanh1011 atanh nan 2.3 -> nan nan
-atanh1012 atanh nan inf -> 0.0 1.5707963267948966
+atanh1012 atanh nan inf -> 0.0 1.5707963267948966       ignore-real-sign
 atanh1013 atanh nan nan -> nan nan
 atanh1014 atanh 0.0 -0.0 -> 0.0 -0.0
 atanh1015 atanh 1.0 -0.0 -> inf -0.0                    divide-by-zero
@@ -946,7 +956,7 @@ atanh1019 atanh inf -2.3 -> 0.0 -1.5707963267948966
 atanh1020 atanh inf -inf -> 0.0 -1.5707963267948966
 atanh1021 atanh nan -0.0 -> nan nan
 atanh1022 atanh nan -2.3 -> nan nan
-atanh1023 atanh nan -inf -> 0.0 -1.5707963267948966
+atanh1023 atanh nan -inf -> 0.0 -1.5707963267948966     ignore-real-sign
 atanh1024 atanh -0.0 -0.0 -> -0.0 -0.0
 atanh1025 atanh -0.0 nan -> -0.0 nan
 atanh1026 atanh -1.0 -0.0 -> -inf -0.0                  divide-by-zero
@@ -1428,7 +1438,7 @@ sqrt1013 sqrt -inf 0.0 -> 0.0 inf
 sqrt1014 sqrt -inf 2.3 -> 0.0 inf
 sqrt1015 sqrt inf 0.0 -> inf 0.0
 sqrt1016 sqrt inf 2.3 -> inf 0.0
-sqrt1017 sqrt -inf nan -> nan inf
+sqrt1017 sqrt -inf nan -> nan inf       ignore-imag-sign
 sqrt1018 sqrt inf nan -> inf nan
 sqrt1019 sqrt nan 0.0 -> nan nan
 sqrt1020 sqrt nan 2.3 -> nan nan
@@ -1535,10 +1545,10 @@ exp1018 exp inf 2.8 -> -inf inf
 exp1019 exp inf 4.2 -> -inf -inf
 exp1020 exp inf 5.6 -> inf -inf
 exp1021 exp inf 7.0 -> inf inf
-exp1022 exp -inf inf -> 0.0 0.0
-exp1023 exp inf inf -> inf nan          invalid
-exp1024 exp -inf nan -> 0.0 0.0
-exp1025 exp inf nan -> inf nan
+exp1022 exp -inf inf -> 0.0 0.0         ignore-real-sign ignore-imag-sign
+exp1023 exp inf inf -> inf nan          invalid ignore-real-sign
+exp1024 exp -inf nan -> 0.0 0.0         ignore-real-sign ignore-imag-sign
+exp1025 exp inf nan -> inf nan          ignore-real-sign
 exp1026 exp nan 0.0 -> nan 0.0
 exp1027 exp nan 2.3 -> nan nan
 exp1028 exp nan inf -> nan nan
@@ -1561,8 +1571,8 @@ exp1044 exp inf -2.8 -> -inf -inf
 exp1045 exp inf -4.2 -> -inf inf
 exp1046 exp inf -5.6 -> inf inf
 exp1047 exp inf -7.0 -> inf -inf
-exp1048 exp -inf -inf -> 0.0 0.0
-exp1049 exp inf -inf -> inf nan         invalid
+exp1048 exp -inf -inf -> 0.0 0.0        ignore-real-sign ignore-imag-sign
+exp1049 exp inf -inf -> inf nan         invalid ignore-real-sign
 exp1050 exp nan -0.0 -> nan -0.0
 exp1051 exp nan -2.3 -> nan nan
 exp1052 exp nan -inf -> nan nan
@@ -1606,8 +1616,8 @@ cosh0031 cosh -710.5 0.69999999999999996 -> 1.4085466381392499e+308 -1.186402466
 
 -- special values
 cosh1000 cosh 0.0 0.0 -> 1.0 0.0
-cosh1001 cosh 0.0 inf -> nan 0.0        invalid
-cosh1002 cosh 0.0 nan -> nan 0.0
+cosh1001 cosh 0.0 inf -> nan 0.0        invalid ignore-imag-sign
+cosh1002 cosh 0.0 nan -> nan 0.0        ignore-imag-sign
 cosh1003 cosh 2.3 inf -> nan nan        invalid
 cosh1004 cosh 2.3 nan -> nan nan
 cosh1005 cosh inf 0.0 -> inf 0.0
@@ -1616,14 +1626,14 @@ cosh1007 cosh inf 2.8 -> -inf inf
 cosh1008 cosh inf 4.2 -> -inf -inf
 cosh1009 cosh inf 5.6 -> inf -inf
 cosh1010 cosh inf 7.0 -> inf inf
-cosh1011 cosh inf inf -> inf nan        invalid
+cosh1011 cosh inf inf -> inf nan        invalid ignore-real-sign
 cosh1012 cosh inf nan -> inf nan
-cosh1013 cosh nan 0.0 -> nan 0.0
+cosh1013 cosh nan 0.0 -> nan 0.0        ignore-imag-sign
 cosh1014 cosh nan 2.3 -> nan nan
 cosh1015 cosh nan inf -> nan nan
 cosh1016 cosh nan nan -> nan nan
 cosh1017 cosh 0.0 -0.0 -> 1.0 -0.0
-cosh1018 cosh 0.0 -inf -> nan 0.0       invalid
+cosh1018 cosh 0.0 -inf -> nan 0.0       invalid ignore-imag-sign
 cosh1019 cosh 2.3 -inf -> nan nan       invalid
 cosh1020 cosh inf -0.0 -> inf -0.0
 cosh1021 cosh inf -1.4 -> inf -inf
@@ -1631,13 +1641,13 @@ cosh1022 cosh inf -2.8 -> -inf -inf
 cosh1023 cosh inf -4.2 -> -inf inf
 cosh1024 cosh inf -5.6 -> inf inf
 cosh1025 cosh inf -7.0 -> inf -inf
-cosh1026 cosh inf -inf -> inf nan       invalid
-cosh1027 cosh nan -0.0 -> nan 0.0
+cosh1026 cosh inf -inf -> inf nan       invalid ignore-real-sign
+cosh1027 cosh nan -0.0 -> nan 0.0       ignore-imag-sign
 cosh1028 cosh nan -2.3 -> nan nan
 cosh1029 cosh nan -inf -> nan nan
 cosh1030 cosh -0.0 -0.0 -> 1.0 0.0
-cosh1031 cosh -0.0 -inf -> nan 0.0      invalid
-cosh1032 cosh -0.0 nan -> nan 0.0
+cosh1031 cosh -0.0 -inf -> nan 0.0      invalid ignore-imag-sign
+cosh1032 cosh -0.0 nan -> nan 0.0       ignore-imag-sign
 cosh1033 cosh -2.3 -inf -> nan nan      invalid
 cosh1034 cosh -2.3 nan -> nan nan
 cosh1035 cosh -inf -0.0 -> inf 0.0
@@ -1646,10 +1656,10 @@ cosh1037 cosh -inf -2.8 -> -inf inf
 cosh1038 cosh -inf -4.2 -> -inf -inf
 cosh1039 cosh -inf -5.6 -> inf -inf
 cosh1040 cosh -inf -7.0 -> inf inf
-cosh1041 cosh -inf -inf -> inf nan      invalid
+cosh1041 cosh -inf -inf -> inf nan      invalid ignore-real-sign
 cosh1042 cosh -inf nan -> inf nan
 cosh1043 cosh -0.0 0.0 -> 1.0 -0.0
-cosh1044 cosh -0.0 inf -> nan 0.0       invalid
+cosh1044 cosh -0.0 inf -> nan 0.0       invalid ignore-imag-sign
 cosh1045 cosh -2.3 inf -> nan nan       invalid
 cosh1046 cosh -inf 0.0 -> inf -0.0
 cosh1047 cosh -inf 1.4 -> inf -inf
@@ -1657,7 +1667,7 @@ cosh1048 cosh -inf 2.8 -> -inf -inf
 cosh1049 cosh -inf 4.2 -> -inf inf
 cosh1050 cosh -inf 5.6 -> inf inf
 cosh1051 cosh -inf 7.0 -> inf -inf
-cosh1052 cosh -inf inf -> inf nan       invalid
+cosh1052 cosh -inf inf -> inf nan       invalid ignore-real-sign
 
 
 ---------------------------
@@ -1698,58 +1708,58 @@ sinh0031 sinh -710.5 0.80000000000000004 -> -1.2830671601735164e+308 1.321095419
 
 -- special values
 sinh1000 sinh 0.0 0.0 -> 0.0 0.0
-sinh1000 sinh 0.0 inf -> 0.0 nan        invalid
-sinh1000 sinh 0.0 nan -> 0.0 nan
-sinh1000 sinh 2.3 inf -> nan nan        invalid
-sinh1000 sinh 2.3 nan -> nan nan
-sinh1000 sinh inf 0.0 -> inf 0.0
-sinh1000 sinh inf 1.4 -> inf inf
-sinh1000 sinh inf 2.8 -> -inf inf
-sinh1000 sinh inf 4.2 -> -inf -inf
-sinh1000 sinh inf 5.6 -> inf -inf
-sinh1000 sinh inf 7.0 -> inf inf
-sinh1000 sinh inf inf -> inf nan        invalid
-sinh1000 sinh inf nan -> inf nan
-sinh1000 sinh nan 0.0 -> nan 0.0
-sinh1000 sinh nan 2.3 -> nan nan
-sinh1000 sinh nan inf -> nan nan
-sinh1000 sinh nan nan -> nan nan
-sinh1000 sinh 0.0 -0.0 -> 0.0 -0.0
-sinh1000 sinh 0.0 -inf -> 0.0 nan       invalid
-sinh1000 sinh 2.3 -inf -> nan nan       invalid
-sinh1000 sinh inf -0.0 -> inf -0.0
-sinh1000 sinh inf -1.4 -> inf -inf
-sinh1000 sinh inf -2.8 -> -inf -inf
-sinh1000 sinh inf -4.2 -> -inf inf
-sinh1000 sinh inf -5.6 -> inf inf
-sinh1000 sinh inf -7.0 -> inf -inf
-sinh1000 sinh inf -inf -> inf nan       invalid
-sinh1000 sinh nan -0.0 -> nan -0.0
-sinh1000 sinh nan -2.3 -> nan nan
-sinh1000 sinh nan -inf -> nan nan
-sinh1000 sinh -0.0 -0.0 -> -0.0 -0.0
-sinh1000 sinh -0.0 -inf -> 0.0 nan      invalid
-sinh1000 sinh -0.0 nan -> 0.0 nan
-sinh1000 sinh -2.3 -inf -> nan nan      invalid
-sinh1000 sinh -2.3 nan -> nan nan
-sinh1000 sinh -inf -0.0 -> -inf -0.0
-sinh1000 sinh -inf -1.4 -> -inf -inf
-sinh1000 sinh -inf -2.8 -> inf -inf
-sinh1000 sinh -inf -4.2 -> inf inf
-sinh1000 sinh -inf -5.6 -> -inf inf
-sinh1000 sinh -inf -7.0 -> -inf -inf
-sinh1000 sinh -inf -inf -> inf nan      invalid
-sinh1000 sinh -inf nan -> inf nan
-sinh1000 sinh -0.0 0.0 -> -0.0 0.0
-sinh1000 sinh -0.0 inf -> 0.0 nan       invalid
-sinh1000 sinh -2.3 inf -> nan nan       invalid
-sinh1000 sinh -inf 0.0 -> -inf 0.0
-sinh1000 sinh -inf 1.4 -> -inf inf
-sinh1000 sinh -inf 2.8 -> inf inf
-sinh1000 sinh -inf 4.2 -> inf -inf
-sinh1000 sinh -inf 5.6 -> -inf -inf
-sinh1000 sinh -inf 7.0 -> -inf inf
-sinh1000 sinh -inf inf -> inf nan       invalid
+sinh1001 sinh 0.0 inf -> 0.0 nan        invalid ignore-real-sign
+sinh1002 sinh 0.0 nan -> 0.0 nan        ignore-real-sign
+sinh1003 sinh 2.3 inf -> nan nan        invalid
+sinh1004 sinh 2.3 nan -> nan nan
+sinh1005 sinh inf 0.0 -> inf 0.0
+sinh1006 sinh inf 1.4 -> inf inf
+sinh1007 sinh inf 2.8 -> -inf inf
+sinh1008 sinh inf 4.2 -> -inf -inf
+sinh1009 sinh inf 5.6 -> inf -inf
+sinh1010 sinh inf 7.0 -> inf inf
+sinh1011 sinh inf inf -> inf nan        invalid ignore-real-sign
+sinh1012 sinh inf nan -> inf nan        ignore-real-sign
+sinh1013 sinh nan 0.0 -> nan 0.0
+sinh1014 sinh nan 2.3 -> nan nan
+sinh1015 sinh nan inf -> nan nan
+sinh1016 sinh nan nan -> nan nan
+sinh1017 sinh 0.0 -0.0 -> 0.0 -0.0
+sinh1018 sinh 0.0 -inf -> 0.0 nan       invalid ignore-real-sign
+sinh1019 sinh 2.3 -inf -> nan nan       invalid
+sinh1020 sinh inf -0.0 -> inf -0.0
+sinh1021 sinh inf -1.4 -> inf -inf
+sinh1022 sinh inf -2.8 -> -inf -inf
+sinh1023 sinh inf -4.2 -> -inf inf
+sinh1024 sinh inf -5.6 -> inf inf
+sinh1025 sinh inf -7.0 -> inf -inf
+sinh1026 sinh inf -inf -> inf nan       invalid ignore-real-sign
+sinh1027 sinh nan -0.0 -> nan -0.0
+sinh1028 sinh nan -2.3 -> nan nan
+sinh1029 sinh nan -inf -> nan nan
+sinh1030 sinh -0.0 -0.0 -> -0.0 -0.0
+sinh1031 sinh -0.0 -inf -> 0.0 nan      invalid ignore-real-sign
+sinh1032 sinh -0.0 nan -> 0.0 nan       ignore-real-sign
+sinh1033 sinh -2.3 -inf -> nan nan      invalid
+sinh1034 sinh -2.3 nan -> nan nan
+sinh1035 sinh -inf -0.0 -> -inf -0.0
+sinh1036 sinh -inf -1.4 -> -inf -inf
+sinh1037 sinh -inf -2.8 -> inf -inf
+sinh1038 sinh -inf -4.2 -> inf inf
+sinh1039 sinh -inf -5.6 -> -inf inf
+sinh1040 sinh -inf -7.0 -> -inf -inf
+sinh1041 sinh -inf -inf -> inf nan      invalid ignore-real-sign
+sinh1042 sinh -inf nan -> inf nan       ignore-real-sign
+sinh1043 sinh -0.0 0.0 -> -0.0 0.0
+sinh1044 sinh -0.0 inf -> 0.0 nan       invalid ignore-real-sign
+sinh1045 sinh -2.3 inf -> nan nan       invalid
+sinh1046 sinh -inf 0.0 -> -inf 0.0
+sinh1047 sinh -inf 1.4 -> -inf inf
+sinh1048 sinh -inf 2.8 -> inf inf
+sinh1049 sinh -inf 4.2 -> inf -inf
+sinh1050 sinh -inf 5.6 -> -inf -inf
+sinh1051 sinh -inf 7.0 -> -inf inf
+sinh1052 sinh -inf inf -> inf nan       invalid ignore-real-sign
 
 
 ------------------------------
@@ -1802,8 +1812,8 @@ tanh1007 tanh inf 1.4 -> 1.0 0.0
 tanh1008 tanh inf 2.1 -> 1.0 -0.0
 tanh1009 tanh inf 2.8 -> 1.0 -0.0
 tanh1010 tanh inf 3.5 -> 1.0 0.0
-tanh1011 tanh inf inf -> 1.0 0.0
-tanh1012 tanh inf nan -> 1.0 0.0
+tanh1011 tanh inf inf -> 1.0 0.0        ignore-imag-sign
+tanh1012 tanh inf nan -> 1.0 0.0        ignore-imag-sign
 tanh1013 tanh nan 0.0 -> nan 0.0
 tanh1014 tanh nan 2.3 -> nan nan
 tanh1015 tanh nan inf -> nan nan
@@ -1817,7 +1827,7 @@ tanh1022 tanh inf -1.4 -> 1.0 -0.0
 tanh1023 tanh inf -2.1 -> 1.0 0.0
 tanh1024 tanh inf -2.8 -> 1.0 0.0
 tanh1025 tanh inf -3.5 -> 1.0 -0.0
-tanh1026 tanh inf -inf -> 1.0 0.0
+tanh1026 tanh inf -inf -> 1.0 0.0       ignore-imag-sign
 tanh1027 tanh nan -0.0 -> nan -0.0
 tanh1028 tanh nan -2.3 -> nan nan
 tanh1029 tanh nan -inf -> nan nan
@@ -1832,8 +1842,8 @@ tanh1037 tanh -inf -1.4 -> -1.0 -0.0
 tanh1038 tanh -inf -2.1 -> -1.0 0.0
 tanh1039 tanh -inf -2.8 -> -1.0 0.0
 tanh1040 tanh -inf -3.5 -> -1.0 -0.0
-tanh1041 tanh -inf -inf -> -1.0 0.0
-tanh1042 tanh -inf nan -> -1.0 0.0
+tanh1041 tanh -inf -inf -> -1.0 0.0     ignore-imag-sign
+tanh1042 tanh -inf nan -> -1.0 0.0      ignore-imag-sign
 tanh1043 tanh -0.0 0.0 -> -0.0 0.0
 tanh1044 tanh -0.0 inf -> nan nan       invalid
 tanh1045 tanh -2.3 inf -> nan nan       invalid
@@ -1843,7 +1853,7 @@ tanh1048 tanh -inf 1.4 -> -1.0 0.0
 tanh1049 tanh -inf 2.1 -> -1.0 -0.0
 tanh1050 tanh -inf 2.8 -> -1.0 -0.0
 tanh1051 tanh -inf 3.5 -> -1.0 0.0
-tanh1052 tanh -inf inf -> -1.0 0.0
+tanh1052 tanh -inf inf -> -1.0 0.0      ignore-imag-sign
 
 
 -----------------
@@ -1988,52 +1998,52 @@ tan0023 tan 0.067014779477908945 5.8517361577457097 -> 2.2088639754800034e-06 0.
 
 -- special values
 rect1000 rect 0.0 0.0 -> 0.0 0.0
-rect1001 rect 0.0 inf -> 0.0 0.0
+rect1001 rect 0.0 inf -> 0.0 0.0        ignore-real-sign ignore-imag-sign
 rect1002 rect 2.3 inf -> nan nan        invalid
-rect1003 rect inf inf -> inf nan        invalid
+rect1003 rect inf inf -> inf nan        invalid ignore-real-sign
 rect1004 rect inf 0.0 -> inf 0.0
 rect1005 rect inf 1.4 -> inf inf
 rect1006 rect inf 2.8 -> -inf inf
 rect1007 rect inf 4.2 -> -inf -inf
 rect1008 rect inf 5.6 -> inf -inf
 rect1009 rect inf 7.0 -> inf inf
-rect1010 rect nan 0.0 -> nan 0.0
+rect1010 rect nan 0.0 -> nan 0.0        ignore-imag-sign
 rect1011 rect nan 2.3 -> nan nan
 rect1012 rect nan inf -> nan nan
 rect1013 rect nan nan -> nan nan
-rect1014 rect inf nan -> inf nan
+rect1014 rect inf nan -> inf nan        ignore-real-sign
 rect1015 rect 2.3 nan -> nan nan
-rect1016 rect 0.0 nan -> 0.0 0.0
+rect1016 rect 0.0 nan -> 0.0 0.0        ignore-real-sign ignore-imag-sign
 rect1017 rect 0.0 -0.0 -> 0.0 -0.0
-rect1018 rect 0.0 -inf -> 0.0 0.0
+rect1018 rect 0.0 -inf -> 0.0 0.0       ignore-real-sign ignore-imag-sign
 rect1019 rect 2.3 -inf -> nan nan       invalid
-rect1020 rect inf -inf -> inf nan       invalid
+rect1020 rect inf -inf -> inf nan       invalid ignore-real-sign
 rect1021 rect inf -0.0 -> inf -0.0
 rect1022 rect inf -1.4 -> inf -inf
 rect1023 rect inf -2.8 -> -inf -inf
 rect1024 rect inf -4.2 -> -inf inf
 rect1025 rect inf -5.6 -> inf inf
 rect1026 rect inf -7.0 -> inf -inf
-rect1027 rect nan -0.0 -> nan 0.0
+rect1027 rect nan -0.0 -> nan 0.0       ignore-imag-sign
 rect1028 rect nan -2.3 -> nan nan
 rect1029 rect nan -inf -> nan nan
 rect1030 rect -0.0 0.0 -> -0.0 -0.0
-rect1031 rect -0.0 inf -> 0.0 0.0
+rect1031 rect -0.0 inf -> 0.0 0.0       ignore-real-sign ignore-imag-sign
 rect1032 rect -2.3 inf -> nan nan       invalid
-rect1033 rect -inf inf -> -inf nan      invalid
+rect1033 rect -inf inf -> -inf nan      invalid ignore-real-sign
 rect1034 rect -inf 0.0 -> -inf -0.0
 rect1035 rect -inf 1.4 -> -inf -inf
 rect1036 rect -inf 2.8 -> inf -inf
 rect1037 rect -inf 4.2 -> inf inf
 rect1038 rect -inf 5.6 -> -inf inf
 rect1039 rect -inf 7.0 -> -inf -inf
-rect1040 rect -inf nan -> inf nan
+rect1040 rect -inf nan -> inf nan       ignore-real-sign
 rect1041 rect -2.3 nan -> nan nan
-rect1042 rect -0.0 nan -> 0.0 0.0
+rect1042 rect -0.0 nan -> 0.0 0.0       ignore-real-sign ignore-imag-sign
 rect1043 rect -0.0 -0.0 -> -0.0 0.0
-rect1044 rect -0.0 -inf -> 0.0 0.0
+rect1044 rect -0.0 -inf -> 0.0 0.0      ignore-real-sign ignore-imag-sign
 rect1045 rect -2.3 -inf -> nan nan      invalid
-rect1046 rect -inf -inf -> -inf nan     invalid
+rect1046 rect -inf -inf -> -inf nan     invalid ignore-real-sign
 rect1047 rect -inf -0.0 -> -inf 0.0
 rect1048 rect -inf -1.4 -> -inf inf
 rect1049 rect -inf -2.8 -> inf inf

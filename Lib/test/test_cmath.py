@@ -290,6 +290,14 @@ class CMathTests(unittest.TestCase):
                 continue
 
             actual = function(arg)
+
+            if 'ignore-real-sign' in flags:
+                actual = complex(abs(actual.real), actual.imag)
+                expected = complex(abs(expected.real), expected.imag)
+            if 'ignore-imag-sign' in flags:
+                actual = complex(actual.real, abs(actual.imag))
+                expected = complex(expected.real, abs(expected.imag))
+
             if fn in ('log', 'log10'):
                 # for the real part of the log function, we allow an
                 # absolute error of up to 2e-15.
