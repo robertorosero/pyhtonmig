@@ -390,6 +390,8 @@ All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 
 .. XXXJH exceptions: overflow (when? what operations?) zerodivision
 
+.. XXX float.is_integer, isnan, isinf, as_integer_ratio
+
 
 .. _bitstring-ops:
 

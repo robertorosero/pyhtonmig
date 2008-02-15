@@ -721,6 +721,12 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(OverflowError, float('-inf').as_integer_ratio)
         self.assertRaises(ValueError, float('nan').as_integer_ratio)
 
+    def test_float_is_integer(self):
+        for f in (0., -1., 1., 23., 1E100, -1E300):
+            self.assert_(f.is_integer(), f)
+        for f in (0.1, 1E-10, -10.5, float("inf"), float("nan")):
+            self.failIf(f.is_integer(), f)
+
     def test_getattr(self):
         import sys
         self.assert_(getattr(sys, 'stdout') is sys.stdout)

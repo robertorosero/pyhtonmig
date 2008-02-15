@@ -1131,6 +1131,46 @@ float_coerce(PyObject **pv, PyObject **pw)
 }
 
 static PyObject *
+float_is_integer(PyObject *v)
+{
+	double x = PyFloat_AsDouble(v);
+	PyObject *o;
+	
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	if (!Py_IS_FINITE(x))
+		Py_RETURN_FALSE;
+	PyFPE_START_PROTECT("is_integer", return 0)
+	o = (floor(x) == x) ? Py_True : Py_False;
+	PyFPE_END_PROTECT(x)
+	if (errno != 0) {
+		PyErr_SetFromErrno(errno == ERANGE ? PyExc_OverflowError :
+						     PyExc_ValueError);
+		return NULL;
+	}
+	Py_INCREF(o);
+	return o;
+}
+
+static PyObject *
+float_is_inf(PyObject *v)
+{
+	double x = PyFloat_AsDouble(v);
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)Py_IS_INFINITY(x));
+}
+
+static PyObject *
+float_is_nan(PyObject *v)
+{
+	double x = PyFloat_AsDouble(v);
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)Py_IS_NAN(x));
+}
+
+static PyObject *
 float_trunc(PyObject *v)
 {
 	double x = PyFloat_AsDouble(v);
@@ -1448,12 +1488,18 @@ float_getzero(PyObject *v, void *closure)
 }
 
 static PyMethodDef float_methods[] = {
-  	{"conjugate",	(PyCFunction)float_float,	METH_NOARGS,
+	{"conjugate",	(PyCFunction)float_float,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any float."},
 	{"__trunc__",	(PyCFunction)float_trunc, METH_NOARGS,
          "Returns the Integral closest to x between 0 and x."},
 	{"as_integer_ratio", (PyCFunction)float_as_integer_ratio, METH_NOARGS,
 	 float_as_integer_ratio_doc},
+	{"is_integer",	(PyCFunction)float_is_integer,	METH_NOARGS,
+	 "Returns True if the float is an integer."},
+	{"is_inf",	(PyCFunction)float_is_inf,	METH_NOARGS,
+	 "Returns True if the float is positive or negative infinite."},
+	{"is_nan",	(PyCFunction)float_is_nan,	METH_NOARGS,
+	 "Returns True if the float is not a number (NaN)."},
 	{"__getnewargs__",	(PyCFunction)float_getnewargs,	METH_NOARGS},
 	{"__getformat__",	(PyCFunction)float_getformat,	
 	 METH_O|METH_CLASS,		float_getformat_doc},

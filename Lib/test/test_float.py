@@ -6,6 +6,9 @@ import math
 from math import isinf, isnan
 import operator
 
+INF = float("inf")
+NAN = float("nan")
+
 class FormatFunctionsTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -202,6 +205,17 @@ class InfNanTest(unittest.TestCase):
 
         self.assertEqual(str(1e300 * 1e300 * 0), "nan")
         self.assertEqual(str(-1e300 * 1e300 * 0), "nan")
+
+    def test_float_nan(self):
+        self.assert_(NAN.is_nan())
+        self.failIf(INF.is_nan())
+        self.failIf((0.).is_nan())
+
+    def test_float_inf(self):
+        self.assert_(INF.is_inf())
+        self.failIf(NAN.is_inf())
+        self.failIf((0.).is_inf())
+
 
 class IEEE754TestCase(unittest.TestCase):
 

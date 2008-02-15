@@ -20,6 +20,8 @@ Core and builtins
   without the four functions and copysign in libm were added to a new file
   Python/pymath.c.
 
+- Added methods is_inf, is_nan and is_integer to float type.
+
 - Fixed repr() and str() of complex numbers with infinity or nan as real or
   imaginary part.
 
