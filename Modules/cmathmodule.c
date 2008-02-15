@@ -993,6 +993,27 @@ PyDoc_STRVAR(cmath_polar_doc,
 Convert a complex from rectangular coordinates to polar coordinates. r is\n\
 the distance from 0 and phi the phase angle.");
 
+/*
+  rect() isn't covered by the C99 standard, but it's not too hard to
+  figure out 'spirit of C99' rules for special value handing:
+
+    rect(x, t) should behave like exp(log(x), t) for positive-signed x
+    rect(x, t) should behave like -exp(log(-x), t) for negative-signed x
+    rect(nan, t) should behave like exp(nan, t), except that rect(nan, 0)
+      gives nan +- 0j with the sign of the imaginary part unspecified.
+
+*/
+
+static Py_complex rect_special_values[7][7] = {
+	{{INF,N},{U,U},{-INF,0.},{-INF,-0.},{U,U},{INF,N},{INF,N}},
+	{{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
+	{{0.,0.},{U,U},{-0.,0.}, {-0.,-0.}, {U,U},{0.,0.},{0.,0.}},
+	{{0.,0.},{U,U},{0.,-0.}, {0.,0.},   {U,U},{0.,0.},{0.,0.}},
+	{{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
+	{{INF,N},{U,U},{INF,-0.},{INF,0.},  {U,U},{INF,N},{INF,N}},
+	{{N,N},  {N,N},{N,0.},   {N,0.},    {N,N},{N,N},  {N,N}}
+};
+
 static PyObject *
 cmath_rect(PyObject *self, PyObject *args)
 {
@@ -1001,13 +1022,41 @@ cmath_rect(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "dd:rect", &r, &phi))
 		return NULL;
 	errno = 0;
-	if (r < 0.) {
-		errno = EDOM;
-		return math_error();
-	}
 	PyFPE_START_PROTECT("rect function", return 0)
-	z.real = r * cos(phi);
-	z.imag = r * sin(phi);
+
+	/* deal with special values */
+	if (!Py_IS_FINITE(r) || !Py_IS_FINITE(phi)) {
+		/* if r is +/-infinity and phi is finite but nonzero then
+		   result is (+-INF +-INF i), but we need to compute cos(phi)
+		   and sin(phi) to figure out the signs. */
+		if (Py_IS_INFINITY(r) && (Py_IS_FINITE(phi)
+					  && (phi != 0.))) {
+			if (r > 0) {
+				z.real = copysign(INF, cos(phi));
+				z.imag = copysign(INF, sin(phi));
+			}
+			else {
+				z.real = -copysign(INF, cos(phi));
+				z.imag = -copysign(INF, sin(phi));
+			}
+		}
+		else {
+			z = rect_special_values[special_type(r)]
+				               [special_type(phi)];
+		}
+		/* need to set errno = EDOM if r is a nonzero number and phi
+		   is infinite */
+		if (r != 0. && !Py_IS_NAN(r) && Py_IS_INFINITY(phi))
+			errno = EDOM;
+		else
+			errno = 0;
+	}
+	else {
+		z.real = r * cos(phi);
+		z.imag = r * sin(phi);
+		errno = 0;
+	}
+
 	PyFPE_END_PROTECT(z)
 	if (errno != 0)
 		return math_error();

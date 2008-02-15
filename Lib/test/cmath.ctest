@@ -1944,3 +1944,99 @@ tan0021 tan 1.7809617968443272 1.5052381702853379 -> -0.044066222118946903 1.093
 tan0022 tan 1.1615313900880577 1.7956298728647107 -> 0.041793186826390362 1.0375339546034792
 tan0023 tan 0.067014779477908945 5.8517361577457097 -> 2.2088639754800034e-06 0.9999836182420061
 
+------------------------------------------------------------------------
+-- rect: Conversion from polar coordinates to rectangular coordinates --
+------------------------------------------------------------------------
+--
+-- For cmath.rect, we can use the same testcase syntax as for the
+-- complex -> complex functions above, but here the input arguments
+-- should be interpreted as a pair of floating-point numbers rather
+-- than the real and imaginary parts of a complex number.
+--
+-- Here are the 'spirit of C99' rules for rect.  First, the short
+-- version:
+--
+--    rect(x, t) = exp(log(x)+it) for positive-signed x
+--    rect(x, t) = -exp(log(-x)+it) for negative-signed x
+--    rect(nan, t) = exp(nan + it), except that in rect(nan, +-0) the
+--      sign of the imaginary part is unspecified.
+--
+-- and now the long version:
+--
+--   rect(x, -t) = conj(rect(x, t)) for all x and t
+--   rect(-x, t) = -rect(x, t) for all x and t
+--   rect(+0, +0) returns +0 + i0
+--   rect(+0, inf) returns +- 0 +- i0, where the signs of the real and
+--     imaginary parts are unspecified.
+--   rect(x, inf) returns NaN + i NaN and raises the "invalid"
+--     floating-point exception, for finite nonzero x.
+--   rect(inf, inf) returns +-inf + i NaN and raises the "invalid"
+--     floating-point exception (where the sign of the real part of the
+--     result is unspecified).
+--   rect(inf, +0) returns inf+i0
+--   rect(inf, x) returns inf*cis(x), for finite nonzero x
+--   rect(inf, NaN) returns +-inf+i NaN, where the sign of the real part
+--     of the result is unspecified.
+--   rect(NaN, x) returns NaN + i NaN for all nonzero numbers (including
+--     infinities) x
+--   rect(NaN, 0) returns NaN +- i0, where the sign of the imaginary
+--     part is unspecified
+--   rect(NaN, NaN) returns NaN + i NaN
+--   rect(x, NaN) returns NaN + i NaN for finite nonzero x
+--   rect(+0, NaN) return +-0 +- i0, where the signs of the real and
+--     imaginary parts are unspecified.
+
+-- special values
+rect1000 rect 0.0 0.0 -> 0.0 0.0
+rect1001 rect 0.0 inf -> 0.0 0.0
+rect1002 rect 2.3 inf -> nan nan        invalid
+rect1003 rect inf inf -> inf nan        invalid
+rect1004 rect inf 0.0 -> inf 0.0
+rect1005 rect inf 1.4 -> inf inf
+rect1006 rect inf 2.8 -> -inf inf
+rect1007 rect inf 4.2 -> -inf -inf
+rect1008 rect inf 5.6 -> inf -inf
+rect1009 rect inf 7.0 -> inf inf
+rect1010 rect nan 0.0 -> nan 0.0
+rect1011 rect nan 2.3 -> nan nan
+rect1012 rect nan inf -> nan nan
+rect1013 rect nan nan -> nan nan
+rect1014 rect inf nan -> inf nan
+rect1015 rect 2.3 nan -> nan nan
+rect1016 rect 0.0 nan -> 0.0 0.0
+rect1017 rect 0.0 -0.0 -> 0.0 -0.0
+rect1018 rect 0.0 -inf -> 0.0 0.0
+rect1019 rect 2.3 -inf -> nan nan       invalid
+rect1020 rect inf -inf -> inf nan       invalid
+rect1021 rect inf -0.0 -> inf -0.0
+rect1022 rect inf -1.4 -> inf -inf
+rect1023 rect inf -2.8 -> -inf -inf
+rect1024 rect inf -4.2 -> -inf inf
+rect1025 rect inf -5.6 -> inf inf
+rect1026 rect inf -7.0 -> inf -inf
+rect1027 rect nan -0.0 -> nan 0.0
+rect1028 rect nan -2.3 -> nan nan
+rect1029 rect nan -inf -> nan nan
+rect1030 rect -0.0 0.0 -> -0.0 -0.0
+rect1031 rect -0.0 inf -> 0.0 0.0
+rect1032 rect -2.3 inf -> nan nan       invalid
+rect1033 rect -inf inf -> -inf nan      invalid
+rect1034 rect -inf 0.0 -> -inf -0.0
+rect1035 rect -inf 1.4 -> -inf -inf
+rect1036 rect -inf 2.8 -> inf -inf
+rect1037 rect -inf 4.2 -> inf inf
+rect1038 rect -inf 5.6 -> -inf inf
+rect1039 rect -inf 7.0 -> -inf -inf
+rect1040 rect -inf nan -> inf nan
+rect1041 rect -2.3 nan -> nan nan
+rect1042 rect -0.0 nan -> 0.0 0.0
+rect1043 rect -0.0 -0.0 -> -0.0 0.0
+rect1044 rect -0.0 -inf -> 0.0 0.0
+rect1045 rect -2.3 -inf -> nan nan      invalid
+rect1046 rect -inf -inf -> -inf nan     invalid
+rect1047 rect -inf -0.0 -> -inf 0.0
+rect1048 rect -inf -1.4 -> -inf inf
+rect1049 rect -inf -2.8 -> inf inf
+rect1050 rect -inf -4.2 -> inf -inf
+rect1051 rect -inf -5.6 -> -inf -inf
+rect1052 rect -inf -7.0 -> -inf inf

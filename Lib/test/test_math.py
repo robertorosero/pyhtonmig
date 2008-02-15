@@ -554,6 +554,9 @@ class MathTests(unittest.TestCase):
             # flags is nonempty
             if ai != 0. or ei != 0. or flags:
                 continue
+            if fn == 'rect':
+                # no real analogue of rect
+                continue
             func = getattr(math, fn)
             result = func(ar)
             self.ftest("%s:%s(%r)" % (id, fn, ar), result, er)

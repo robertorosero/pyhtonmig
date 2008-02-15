@@ -268,10 +268,19 @@ class CMathTests(unittest.TestCase):
     def test_specific_values(self):
         if not float.__getformat__("double").startswith("IEEE"):
             return
+
+        def rect_complex(z):
+            """Wrapped version of rect that accepts a complex number instead of
+            two float arguments."""
+            return cmath.rect(z.real, z.imag)
+
         for id, fn, ar, ai, er, ei, flags in parse_testfile(test_file):
             arg = complex(ar, ai)
             expected = complex(er, ei)
-            function = getattr(cmath, fn)
+            if fn == 'rect':
+                function = rect_complex
+            else:
+                function = getattr(cmath, fn)
             if 'divide-by-zero' in flags or 'invalid' in flags:
                 self.assertRaises(ValueError, function, arg)
                 continue
