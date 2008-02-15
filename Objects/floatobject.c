@@ -1171,6 +1171,15 @@ float_is_nan(PyObject *v)
 }
 
 static PyObject *
+float_is_finite(PyObject *v)
+{
+	double x = PyFloat_AsDouble(v);
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)Py_IS_FINITE(x));
+}
+
+static PyObject *
 float_trunc(PyObject *v)
 {
 	double x = PyFloat_AsDouble(v);
@@ -1498,6 +1507,8 @@ static PyMethodDef float_methods[] = {
 	 "Returns True if the float is an integer."},
 	{"is_inf",	(PyCFunction)float_is_inf,	METH_NOARGS,
 	 "Returns True if the float is positive or negative infinite."},
+	{"is_finite",	(PyCFunction)float_is_finite,	METH_NOARGS,
+	 "Returns True if the float is finite, neither infinite nor NaN."},
 	{"is_nan",	(PyCFunction)float_is_nan,	METH_NOARGS,
 	 "Returns True if the float is not a number (NaN)."},
 	{"__getnewargs__",	(PyCFunction)float_getnewargs,	METH_NOARGS},

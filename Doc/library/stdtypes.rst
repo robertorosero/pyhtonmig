@@ -315,6 +315,8 @@ All builtin numeric types support the following operations. See
 +--------------------+---------------------------------+--------+
 | ``x ** y``         | *x* to the power *y*            | \(7)   |
 +--------------------+---------------------------------+--------+
+| ``x.is_finite()``  | test for finite value           | \(8)   |
++--------------------+---------------------------------+--------+
 
 .. index::
    triple: operations on; numeric; types
@@ -369,6 +371,11 @@ Notes:
 (7)
    Python defines ``pow(0, 0)`` and ``0 ** 0`` to be ``1``, as is common for
    programming languages.
+
+(8)
+   :class:`int` and :class:`long` are always finite. A :class:`real` is finite
+   when it's neither infinite nor NaN. A :class:`complex` is finite when both
+   its real and its imaginary part is finite.
 
 
 All :class:`numbers.Real` types (:class:`int`, :class:`long`, and

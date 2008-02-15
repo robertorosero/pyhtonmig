@@ -1108,9 +1108,17 @@ _PyInt_Format(PyIntObject *v, int base, int newstyle)
 	return PyString_FromStringAndSize(p, &buf[sizeof(buf)] - p);
 }
 
+static PyObject *
+int_is_finite(PyObject *v)
+{
+	Py_RETURN_TRUE;
+}
+
 static PyMethodDef int_methods[] = {
 	{"conjugate",	(PyCFunction)int_int,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any int."},
+	{"is_finite",	(PyCFunction)int_is_finite,	METH_NOARGS,
+	 "Returns always True."},
 	{"__trunc__",	(PyCFunction)int_int,	METH_NOARGS,
          "Truncating an Integral returns itself."},
 	{"__getnewargs__",	(PyCFunction)int_getnewargs,	METH_NOARGS},

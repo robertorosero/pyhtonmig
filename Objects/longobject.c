@@ -3380,9 +3380,17 @@ long_getN(PyLongObject *v, void *context) {
 	return PyLong_FromLong((intptr_t)context);
 }
 
+static PyObject *
+long_is_finite(PyObject *v)
+{
+	Py_RETURN_TRUE;
+}
+
 static PyMethodDef long_methods[] = {
 	{"conjugate",	(PyCFunction)long_long,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any long."},
+	{"is_finite",	(PyCFunction)long_is_finite,	METH_NOARGS,
+	 "Returns always True."},
 	{"__trunc__",	(PyCFunction)long_long,	METH_NOARGS,
          "Truncating an Integral returns itself."},
 	{"__getnewargs__",	(PyCFunction)long_getnewargs,	METH_NOARGS},

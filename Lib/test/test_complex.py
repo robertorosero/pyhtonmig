@@ -373,6 +373,16 @@ class ComplexTest(unittest.TestCase):
             except (OSError, IOError):
                 pass
 
+    def test_finite(self):
+        self.assert_(complex(23, 42).is_finite())
+        self.assert_(complex(0, 0).is_finite())
+        self.failIf(complex(INF, -2).is_finite())
+        self.failIf(complex(1, INF).is_finite())
+        self.failIf(complex(INF, INF).is_finite())
+        self.failIf(complex(NAN, -2).is_finite())
+        self.failIf(complex(1, NAN).is_finite())
+        self.failIf(complex(NAN, NAN).is_finite())
+
     if float.__getformat__("double").startswith("IEEE"):
         def test_plus_minus_0j(self):
             # test that -0j and 0j literals are not identified

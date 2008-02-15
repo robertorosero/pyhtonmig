@@ -938,6 +938,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int('2br45qc', 35), 4294967297L)
         self.assertEqual(int('1z141z5', 36), 4294967297L)
 
+        self.assertEqual(int(0).is_finite(), True)
+
     def test_intconversion(self):
         # Test __int__()
         class ClassicMissingMethods:
@@ -1260,6 +1262,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(long('2qhxjlj', 34), 4294967297)
         self.assertEqual(long('2br45qc', 35), 4294967297)
         self.assertEqual(long('1z141z5', 36), 4294967297)
+
+        self.assertEqual(long(0).is_finite(), True)
 
 
     def test_longconversion(self):

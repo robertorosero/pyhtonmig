@@ -796,9 +796,25 @@ complex_getnewargs(PyComplexObject *v)
 	return Py_BuildValue("(D)", &v->cval);
 }
 
+static PyObject *
+complex_is_finite(PyObject *self)
+{
+	Py_complex c;
+	c = ((PyComplexObject *)self)->cval;
+	return PyBool_FromLong((long)(Py_IS_FINITE(c.real) &&
+				      Py_IS_FINITE(c.imag)));
+}
+
+PyDoc_STRVAR(complex_is_finite_doc,
+"complex.is_finite() -> bool\n"
+"\n"
+"Returns True if the real and the imaginary part is finite.");
+
 static PyMethodDef complex_methods[] = {
 	{"conjugate",	(PyCFunction)complex_conjugate,	METH_NOARGS,
 	 complex_conjugate_doc},
+	{"is_finite",	(PyCFunction)complex_is_finite,	METH_NOARGS,
+	 complex_is_finite_doc},
 	{"__getnewargs__",	(PyCFunction)complex_getnewargs,	METH_NOARGS},
 	{NULL,		NULL}		/* sentinel */
 };
