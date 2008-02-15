@@ -2,12 +2,9 @@
 import unittest, struct
 import os
 from test import test_support
-
-def isinf(x):
-    return x * 0.5 == x
-
-def isnan(x):
-    return x != x
+import math
+from math import isinf, isnan
+import operator
 
 class FormatFunctionsTestCase(unittest.TestCase):
 
@@ -206,6 +203,37 @@ class InfNanTest(unittest.TestCase):
         self.assertEqual(str(1e300 * 1e300 * 0), "nan")
         self.assertEqual(str(-1e300 * 1e300 * 0), "nan")
 
+class IEEE754TestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.old_state = math.set_ieee754(True)
+
+    def tearDown(self):
+        math.set_ieee754(self.old_state)
+
+    def test_div(self):
+        self.assert_(isinf(2./0.))
+        self.assert_(2./0. > 0)
+        self.assert_(isinf(-2./0.))
+        self.assert_(-2./0. < 0)
+        self.assert_(isnan(0./0.))
+
+        self.assertRaises(ZeroDivisionError, operator.floordiv, 1., 0.)
+        self.assertRaises(ZeroDivisionError, operator.floordiv, 0., 0.)
+        self.assertRaises(ZeroDivisionError, operator.div, 1, 0)
+        self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
+
+    def test_mod(self):
+        self.assert_(isinf(2. % 0.))
+        self.assert_(2. % 0. > 0)
+        self.assert_(isinf(-2. % 0.))
+        self.assert_(-2. % 0. < 0)
+        self.assert_(isnan(0. % 0.))
+
+        self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
+        self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
+
+
 def test_main():
     test_support.run_unittest(
         FormatFunctionsTestCase,
@@ -213,6 +241,7 @@ def test_main():
         IEEEFormatTestCase,
         ReprTestCase,
         InfNanTest,
+        IEEE754TestCase
         )
 
 if __name__ == '__main__':

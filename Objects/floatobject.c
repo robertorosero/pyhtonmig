@@ -874,11 +874,15 @@ float_div(PyObject *v, PyObject *w)
 	CONVERT_TO_DOUBLE(v, a);
 	CONVERT_TO_DOUBLE(w, b);
 	if (b == 0.0) {
-		if (PyFloat_GetIEEE754() == 0) {
+		if (!PyFloat_GetIEEE754()) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
 					"float division");
 			return NULL;
 		}
+		else if (a == 0.)
+			return PyFloat_FromDouble(Py_NAN);
+		else
+			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, a));
 	}
 	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
@@ -896,12 +900,17 @@ float_classic_div(PyObject *v, PyObject *w)
 	    PyErr_Warn(PyExc_DeprecationWarning, "classic float division") < 0)
 		return NULL;
 	if (b == 0.0) {
-		if (PyFloat_GetIEEE754() == 0) {
+		if (!PyFloat_GetIEEE754()) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
 					"float division");
 			return NULL;
 		}
-	}	PyFPE_START_PROTECT("divide", return 0)
+		else if (a == 0.)
+			return PyFloat_FromDouble(Py_NAN);
+		else
+			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, a));
+	}
+	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
 	PyFPE_END_PROTECT(a)
 	return PyFloat_FromDouble(a);
@@ -915,8 +924,15 @@ float_rem(PyObject *v, PyObject *w)
  	CONVERT_TO_DOUBLE(v, vx);
  	CONVERT_TO_DOUBLE(w, wx);
 	if (wx == 0.0) {
-		PyErr_SetString(PyExc_ZeroDivisionError, "float modulo");
-		return NULL;
+		if (!PyFloat_GetIEEE754()) {
+			PyErr_SetString(PyExc_ZeroDivisionError,
+					"float modulo");
+			return NULL;
+		}
+		else if (vx == 0.)
+			return PyFloat_FromDouble(Py_NAN);
+		else
+			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, vx));
 	}
 	PyFPE_START_PROTECT("modulo", return 0)
 	mod = fmod(vx, wx);
