@@ -20,6 +20,13 @@ Core and builtins
   without the four functions and copysign in libm were added to a new file
   Python/pymath.c.
 
+- Fixed repr() and str() of complex numbers with infinity or nan as real or
+  imaginary part.
+
+- Clear all free list during a gc.collect() of the highest generation in order
+  to allow pymalloc to free more arenas. Python may give back memory to the
+  OS earlier.
+
 - Issue #2045: Fix an infinite recursion triggered when printing a subclass of
   collections.defaultdict, if its default_factory is set to a bound method.
 
