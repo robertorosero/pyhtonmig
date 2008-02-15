@@ -2050,3 +2050,55 @@ rect1049 rect -inf -2.8 -> inf inf
 rect1050 rect -inf -4.2 -> inf -inf
 rect1051 rect -inf -5.6 -> -inf -inf
 rect1052 rect -inf -7.0 -> -inf inf
+
+-------------------------------------------------------------------------
+-- polar: Conversion from rectangular coordinates to polar coordinates --
+-------------------------------------------------------------------------
+--
+-- For cmath.polar, we can use the same testcase syntax as for the
+-- complex -> complex functions above, but here the output arguments
+-- should be interpreted as a pair of floating-point numbers rather
+-- than the real and imaginary parts of a complex number.
+--
+-- Annex G of the C99 standard describes fully both the real and
+-- imaginary parts of polar (as cabs and carg, respectively, which in turn
+-- are defined in terms of the functions hypot and atan2).
+
+-- special values
+polar1000 polar 0.0 0.0 -> 0.0 0.0
+polar1001 polar 0.0 -0.0 -> 0.0 -0.0
+polar1002 polar -0.0 0.0 -> 0.0 3.1415926535897931
+polar1003 polar -0.0 -0.0 -> 0.0 -3.1415926535897931
+polar1004 polar inf 0.0 -> inf 0.0
+polar1005 polar inf 2.3 -> inf 0.0
+polar1006 polar inf inf -> inf 0.78539816339744828
+polar1007 polar 2.3 inf -> inf 1.5707963267948966
+polar1008 polar 0.0 inf -> inf 1.5707963267948966
+polar1009 polar -0.0 inf -> inf 1.5707963267948966
+polar1010 polar -2.3 inf -> inf 1.5707963267948966
+polar1011 polar -inf inf -> inf 2.3561944901923448
+polar1012 polar -inf 2.3 -> inf 3.1415926535897931
+polar1013 polar -inf 0.0 -> inf 3.1415926535897931
+polar1014 polar -inf -0.0 -> inf -3.1415926535897931
+polar1015 polar -inf -2.3 -> inf -3.1415926535897931
+polar1016 polar -inf -inf -> inf -2.3561944901923448
+polar1017 polar -2.3 -inf -> inf -1.5707963267948966
+polar1018 polar -0.0 -inf -> inf -1.5707963267948966
+polar1019 polar 0.0 -inf -> inf -1.5707963267948966
+polar1020 polar 2.3 -inf -> inf -1.5707963267948966
+polar1021 polar inf -inf -> inf -0.78539816339744828
+polar1022 polar inf -2.3 -> inf -0.0
+polar1023 polar inf -0.0 -> inf -0.0
+polar1024 polar nan -inf -> inf nan
+polar1025 polar nan -2.3 -> nan nan
+polar1026 polar nan -0.0 -> nan nan
+polar1027 polar nan 0.0 -> nan nan
+polar1028 polar nan 2.3 -> nan nan
+polar1029 polar nan inf -> inf nan
+polar1030 polar nan nan -> nan nan
+polar1031 polar inf nan -> inf nan
+polar1032 polar 2.3 nan -> nan nan
+polar1033 polar 0.0 nan -> nan nan
+polar1034 polar -0.0 nan -> nan nan
+polar1035 polar -2.3 nan -> nan nan
+polar1036 polar -inf nan -> inf nan

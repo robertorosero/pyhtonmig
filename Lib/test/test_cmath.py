@@ -274,11 +274,18 @@ class CMathTests(unittest.TestCase):
             two float arguments."""
             return cmath.rect(z.real, z.imag)
 
+        def polar_complex(z):
+            """Wrapped version of polar that returns a complex number instead of
+            two floats."""
+            return complex(*polar(z))
+
         for id, fn, ar, ai, er, ei, flags in parse_testfile(test_file):
             arg = complex(ar, ai)
             expected = complex(er, ei)
             if fn == 'rect':
                 function = rect_complex
+            elif fn == 'polar':
+                function = polar_complex
             else:
                 function = getattr(cmath, fn)
             if 'divide-by-zero' in flags or 'invalid' in flags:
