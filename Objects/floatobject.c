@@ -12,16 +12,10 @@
 
 /* global NAN and INF objects */
 #ifdef Py_NAN
-static PyObject *PyFloat_NAN = NULL;
-#define Py_RETURN_NAN return Py_INCREF(PyFloat_NAN), PyFloat_NAN
+PyObject *PyFloat_NAN = NULL;
 #endif
-static PyObject *PyFloat_PINF = NULL;
-static PyObject *PyFloat_NINF = NULL;
-#define Py_RETURN_INF(sign) 					\
-	if (copysign(1., sign) == 1.)				\
-		return Py_INCREF(PyFloat_PINF), PyFloat_PINF;	\
-	else							\
-		return Py_INCREF(PyFloat_NINF), PyFloat_NINF
+PyObject *PyFloat_PINF = NULL;
+PyObject *PyFloat_NINF = NULL;
 
 /* Special free list -- see comments for same code in intobject.c. */
 #define BLOCK_SIZE	1000	/* 1K less typical malloc overhead */
@@ -402,110 +396,6 @@ PyFloat_AsStringEx(char *buf, PyFloatObject *v, int precision)
 	format_float(buf, 100, v, precision);
 }
 
-#ifdef Py_BROKEN_REPR
-/* The following function is based on Tcl_PrintDouble,
- * from tclUtil.c.
- */
-
-#define is_infinite(d)	( (d) > DBL_MAX || (d) < -DBL_MAX )
-#define is_nan(d)		((d) != (d))
-
-static void
-format_double_repr(char *dst, double value)
-{
-    char *p, c;
-    int exp;
-    int signum;
-    char buffer[30];
-
-	/*
-	 * Handle NaN.
-	 */
-
-	if (is_nan(value)) {
-	    strcpy(dst, "nan");
-	    return;
-	}
-
-	/*
-	 * Handle infinities.
-	 */
-
-	if (is_infinite(value)) {
-	    if (value < 0) {
-		strcpy(dst, "-inf");
-	    } else {
-		strcpy(dst, "inf");
-	    }
-	    return;
-	}
-
-	/*
-	 * Ordinary (normal and denormal) values.
-	 */
-
-	exp = _PyFloat_Digits(buffer, value, &signum)+1;
-	if (signum) {
-	    *dst++ = '-';
-	}
-	p = buffer;
-	if (exp < -3 || exp > 17) {
-	    /*
-	     * E format for numbers < 1e-3 or >= 1e17.
-	     */
-
-	    *dst++ = *p++;
-	    c = *p;
-	    if (c != '\0') {
-		*dst++ = '.';
-		while (c != '\0') {
-		    *dst++ = c;
-		    c = *++p;
-		}
-	    }
-	    sprintf(dst, "e%+d", exp-1);
-	} else {
-	    /*
-	     * F format for others.
-	     */
-
-	    if (exp <= 0) {
-		*dst++ = '0';
-	    }
-	    c = *p;
-	    while (exp-- > 0) {
-		if (c != '\0') {
-		    *dst++ = c;
-		    c = *++p;
-		} else {
-		    *dst++ = '0';
-		}
-	    }
-	    *dst++ = '.';
-	    if (c == '\0') {
-		*dst++ = '0';
-	    } else {
-		while (++exp < 0) {
-		    *dst++ = '0';
-		}
-		while (c != '\0') {
-		    *dst++ = c;
-		    c = *++p;
-		}
-	    }
-	    *dst++ = '\0';
-	}
-}
-
-static void
-format_float_repr(char *buf, PyFloatObject *v)
-{
-	assert(PyFloat_Check(v));
-	format_double_repr(buf, PyFloat_AS_DOUBLE(v));
-}
-
-#endif /* Py_BROKEN_REPR */
-
 /* Macro and helper that convert PyObject obj to a C double and store
    the value in dbl; this replaces the functionality of the coercion
    slot function.  If conversion to double raises an exception, obj is
@@ -590,13 +480,8 @@ float_print(PyFloatObject *v, FILE *fp, int flags)
 static PyObject *
 float_repr(PyFloatObject *v)
 {
-#ifdef Py_BROKEN_REPR
-	char buf[30];
-	format_float_repr(buf, v);
-#else
 	char buf[100];
 	format_float(buf, sizeof(buf), v, PREC_REPR);
-#endif
 
 	return PyString_FromString(buf);
 }
@@ -1642,6 +1527,7 @@ PyTypeObject PyFloat_Type = {
 void
 _PyFloat_Init(void)
 {
+	int state;
 	/* We attempt to determine if this machine is using IEEE
 	   floating point formats by peering at the bits of some
 	   carefully chosen values.  If it looks like we are on an
@@ -1688,10 +1574,6 @@ _PyFloat_Init(void)
 	double_format = detected_double_format;
 	float_format = detected_float_format;
 
-#ifdef Py_BROKEN_REPR	
-	/* Initialize floating point repr */
-	_PyFloat_DigitsInit();
-#endif
 	/* Init float info */
 	if (FloatInfoType.tp_name == 0)
 		PyStructSequence_InitType(&FloatInfoType, &floatinfo_desc);
@@ -1704,11 +1586,16 @@ _PyFloat_Init(void)
 		assert(PyFloat_CheckExact(var));		\
 		_Py_NewReference(var);				\
 	}
+
+	state = PyFloat_SetIEEE754(1);
 #ifdef Py_NAN
 	static_float(PyFloat_NAN, Py_NAN);
 #endif
 	static_float(PyFloat_PINF, Py_HUGE_VAL);
 	static_float(PyFloat_NINF, -Py_HUGE_VAL);
+	PyFloat_SetIEEE754(state);
+
+#undef static_float
 }
 
 void

@@ -21,6 +21,17 @@ PyAPI_DATA(PyTypeObject) PyFloat_Type;
 #define PyFloat_Check(op) PyObject_TypeCheck(op, &PyFloat_Type)
 #define PyFloat_CheckExact(op) (Py_TYPE(op) == &PyFloat_Type)
 
+#ifdef Py_NAN
+#define Py_RETURN_NAN return Py_INCREF(PyFloat_NAN), PyFloat_NAN
+#endif
+
+#define Py_RETURN_INF(sign) do					\
+	if (copysign(1., sign) == 1.) {				\
+		return Py_INCREF(PyFloat_PINF), PyFloat_PINF;	\
+	} else {						\
+		return Py_INCREF(PyFloat_NINF), PyFloat_NINF;	\
+	} while(0)
+
 PyAPI_FUNC(double) PyFloat_GetMax(void);
 PyAPI_FUNC(double) PyFloat_GetMin(void);
 PyAPI_FUNC(PyObject *) PyFloat_GetInfo(void);
