@@ -220,7 +220,7 @@ class InfNanTest(unittest.TestCase):
 class IEEE754TestCase(unittest.TestCase):
 
     def setUp(self):
-        self.old_state = math.set_ieee754(True)
+        self.old_state = math.set_ieee754(math.IEEE_754)
 
     def tearDown(self):
         math.set_ieee754(self.old_state)
@@ -247,6 +247,46 @@ class IEEE754TestCase(unittest.TestCase):
         self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
         self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
 
+class IEEEStrictTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.old_state = math.set_ieee754(math.IEEE_STRICT)
+
+    def tearDown(self):
+        math.set_ieee754(self.old_state)
+
+    def value(self, op, *args):
+        self.assertRaises(ValueError, op, *args)
+
+    def overflow(self, op, *args):
+        self.assertRaises(OverflowError, op, *args)
+
+    def test_errors(self):
+        self.overflow(operator.mul, 1E300, 1E300)
+        self.overflow(operator.add, INF, 1)
+        self.overflow(operator.sub, INF, 1)
+        self.overflow(operator.div, INF, 1)
+        self.overflow(operator.mul, INF, 1)
+        self.overflow(operator.pow, INF, 1)
+        self.value(operator.add, NAN, 1)
+        self.value(operator.sub, NAN, 1)
+        self.value(operator.div, NAN, 1)
+        self.value(operator.mul, NAN, 1)
+        self.value(operator.pow, NAN, 1)
+        self.value(operator.mod, INF, 1)
+        self.assertRaises(ZeroDivisionError, operator.floordiv, 1., 0.)
+        self.assertRaises(ZeroDivisionError, operator.floordiv, 0., 0.)
+        self.assertRaises(ZeroDivisionError, operator.div, 1, 0)
+        self.assertRaises(ZeroDivisionError, operator.div, 0, 0)
+
+    def test_fromstring(self):
+        self.assertAlmostEqual(float("1E100"), 1E100)
+        self.assertAlmostEqual(float("-1E308"), -1E308)
+        self.overflow(float, "1E400")
+        self.overflow(float, "inf")
+        self.overflow(float, "-inf")
+        self.value(float, "nan")
+
 
 def test_main():
     test_support.run_unittest(
@@ -255,7 +295,8 @@ def test_main():
         IEEEFormatTestCase,
         ReprTestCase,
         InfNanTest,
-        IEEE754TestCase
+        IEEE754TestCase,
+        IEEEStrictTestCase
         )
 
 if __name__ == '__main__':

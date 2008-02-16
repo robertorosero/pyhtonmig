@@ -62,9 +62,6 @@ PyAPI_FUNC(void) PyFloat_AsReprString(char*, PyFloatObject *v);
    preserve precision across conversions. */
 PyAPI_FUNC(void) PyFloat_AsString(char*, PyFloatObject *v);
 
-PyAPI_FUNC(int) PyFloat_GetIEEE754(void);
-PyAPI_FUNC(int) PyFloat_SetIEEE754(int);
-
 /* _PyFloat_{Pack,Unpack}{4,8}
  *
  * The struct and pickle (at least) modules need an efficient platform-

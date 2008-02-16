@@ -547,7 +547,7 @@ complex_div(PyComplexObject *v, PyComplexObject *w)
 
 	PyFPE_START_PROTECT("complex_div", return 0)
 	errno = 0;
-	if (PyFloat_GetIEEE754())
+	if (PyIEEE_GET() == PyIEEE_754)
 		quot = c_quot_ieee754(v->cval,w->cval);
 	else
 		quot = c_quot(v->cval,w->cval);
@@ -571,7 +571,7 @@ complex_classic_div(PyComplexObject *v, PyComplexObject *w)
 
 	PyFPE_START_PROTECT("complex_classic_div", return 0)
 	errno = 0;
-	if (PyFloat_GetIEEE754())
+	if (PyIEEE_GET() == PyIEEE_754)
 		quot = c_quot_ieee754(v->cval,w->cval);
 	else
 		quot = c_quot(v->cval,w->cval);

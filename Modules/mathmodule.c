@@ -613,26 +613,30 @@ Checks if float x is infinite (positive or negative)");
 static PyObject *
 math_set_ieee754(PyObject *self, PyObject *arg)
 {
-	int state;
+	long state = PyInt_AsLong(arg);
 
-	state = PyObject_IsTrue(arg);
-	if (state == -1)
+	if (state == -1 && PyErr_Occurred())
 		return NULL;
-	
-	return PyBool_FromLong((long)PyFloat_SetIEEE754(state));
+	if (!(state == PyIEEE_Python || state == PyIEEE_754 ||
+	      state == PyIEEE_Strict)) {
+		PyErr_Format(PyExc_ValueError, "Invalid state %ld", state);
+		return NULL;
+	}
+
+	return PyInt_FromLong((long)PyIEEE_SetState(state));
 }
 
 PyDoc_STRVAR(math_set_ieee754_doc,
-"set_ieee754(bool) -> bool");
+"set_ieee754(int) -> int");
 
 static PyObject *
 math_get_ieee754(PyObject *self, PyObject *arg)
 {
-	return PyBool_FromLong((long)PyFloat_GetIEEE754());
+	return PyInt_FromLong((long)PyIEEE_GetState());
 }
 
 PyDoc_STRVAR(math_get_ieee754_doc,
-"get_ieee754() -> bool");
+"get_ieee754() -> int");
 
 static PyMethodDef math_methods[] = {
 	{"acos",	math_acos,	METH_O,		math_acos_doc},
@@ -681,27 +685,18 @@ PyDoc_STRVAR(module_doc,
 PyMODINIT_FUNC
 initmath(void)
 {
-	PyObject *m, *d, *v;
+	PyObject *m;
 
 	m = Py_InitModule3("math", math_methods, module_doc);
 	if (m == NULL)
 		goto finally;
-	d = PyModule_GetDict(m);
-	if (d == NULL)
-		goto finally;
 
-        if (!(v = PyFloat_FromDouble(Py_MATH_PI)))
-                goto finally;
-	if (PyDict_SetItemString(d, "pi", v) < 0)
-                goto finally;
-	Py_DECREF(v);
+	PyModule_AddObject(m, "pi", PyFloat_FromDouble(Py_MATH_PI));
+	PyModule_AddObject(m, "e", PyFloat_FromDouble(Py_MATH_E));
+	PyModule_AddIntConstant(m, "IEEE_PYTHON", PyIEEE_Python);
+	PyModule_AddIntConstant(m, "IEEE_754", PyIEEE_754);
+	PyModule_AddIntConstant(m, "IEEE_STRICT", PyIEEE_Strict);
 
-        if (!(v = PyFloat_FromDouble(Py_MATH_E)))
-                goto finally;
-	if (PyDict_SetItemString(d, "e", v) < 0)
-                goto finally;
-	Py_DECREF(v);
-
-  finally:
+    finally:
 	return;
 }

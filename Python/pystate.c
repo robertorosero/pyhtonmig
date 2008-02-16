@@ -193,7 +193,7 @@ PyThreadState_New(PyInterpreterState *interp)
 		tstate->c_profileobj = NULL;
 		tstate->c_traceobj = NULL;
 
-		tstate->float_ieee754 = 0;
+		tstate->float_ieee754 = PyIEEE_Python;
 
 #ifdef WITH_THREAD
 		_PyGILState_NoteThreadState(tstate);
@@ -633,6 +633,23 @@ PyGILState_Release(PyGILState_STATE oldstate)
 	/* Release the lock if necessary */
 	else if (oldstate == PyGILState_UNLOCKED)
 		PyEval_SaveThread();
+}
+
+int
+PyIEEE_GetState(void)
+{
+	return PyThreadState_Get()->float_ieee754;
+}
+
+int
+PyIEEE_SetState(int state)
+{
+	int old_state;
+	PyThreadState *tstate = PyThreadState_Get();
+
+	old_state = tstate->float_ieee754;
+	tstate->float_ieee754 = state;
+	return old_state;
 }
 
 #ifdef __cplusplus

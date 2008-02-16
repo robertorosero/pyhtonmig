@@ -143,6 +143,16 @@ PyFloat_FromDouble(double fval)
 		if ((free_list = fill_free_list()) == NULL)
 			return NULL;
 	}
+	if (PyIEEE_GET() == PyIEEE_Strict) {
+		if (Py_IS_NAN(fval)) {
+			PyErr_SetString(PyExc_ValueError, "Not a Number");
+			return NULL;
+		}
+		if (Py_IS_INFINITY(fval)) {
+			PyErr_SetString(PyExc_OverflowError, "Infinity");
+			return NULL;
+		}
+	}
 	/* Inline PyObject_New */
 	op = free_list;
 	free_list = (PyFloatObject *)Py_TYPE(op);
@@ -242,10 +252,20 @@ PyFloat_FromString(PyObject *v, char **pend)
 			p++;
 		}
 		if (PyOS_strnicmp(p, "inf", 4) == 0) {
+			if (PyIEEE_GET() == PyIEEE_Strict) {
+				PyErr_SetString(PyExc_OverflowError,
+						"Infinity");
+				return NULL;
+			}
 			Py_RETURN_INF(sign);
 		}
 #ifdef Py_NAN
 		if(PyOS_strnicmp(p, "nan", 4) == 0) {
+			if (PyIEEE_GET() == PyIEEE_Strict) {
+				PyErr_SetString(PyExc_ValueError,
+						"Not a Number");
+				return NULL;
+			}
 			Py_RETURN_NAN;
 		}
 #endif
@@ -773,7 +793,7 @@ float_div(PyObject *v, PyObject *w)
 	CONVERT_TO_DOUBLE(w, b);
 #ifdef Py_NAN
 	if (b == 0.0) {
-		if (!PyFloat_GetIEEE754()) {
+		if (PyIEEE_GET() == PyIEEE_Python) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
 					"float division");
 			return NULL;
@@ -801,7 +821,7 @@ float_classic_div(PyObject *v, PyObject *w)
 		return NULL;
 #ifdef Py_NAN
 	if (b == 0.0) {
-		if (!PyFloat_GetIEEE754()) {
+		if (PyIEEE_GET() == PyIEEE_Python) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
 					"float division");
 			return NULL;
@@ -827,7 +847,7 @@ float_rem(PyObject *v, PyObject *w)
 	CONVERT_TO_DOUBLE(w, wx);
 #ifdef Py_NAN
 	if (wx == 0.0) {
-		if (!PyFloat_GetIEEE754()) {
+		if (PyIEEE_GET() == PyIEEE_Python) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
 					"float modulo");
 			return NULL;
@@ -1587,13 +1607,13 @@ _PyFloat_Init(void)
 		_Py_NewReference(var);				\
 	}
 
-	state = PyFloat_SetIEEE754(1);
+	state = PyIEEE_SetState(PyIEEE_Python);
 #ifdef Py_NAN
 	static_float(PyFloat_NAN, Py_NAN);
 #endif
 	static_float(PyFloat_PINF, Py_HUGE_VAL);
 	static_float(PyFloat_NINF, -Py_HUGE_VAL);
-	PyFloat_SetIEEE754(state);
+	PyIEEE_SetState(state);
 
 #undef static_float
 }
@@ -1700,25 +1720,6 @@ PyFloat_Fini(void)
 			list = list->next;
 		}
 	}
-}
-
-/* inline this */
-int
-PyFloat_GetIEEE754(void)
-{
-	PyThreadState *tstate = PyThreadState_GET();
-	return tstate->float_ieee754;
-}
-
-int
-PyFloat_SetIEEE754(state)
-{
-	int old_state;
-	PyThreadState *tstate = PyThreadState_GET();
-
-	old_state = tstate->float_ieee754;
-	tstate->float_ieee754 = state;
-	return old_state;
 }
 
 /*----------------------------------------------------------------------------
