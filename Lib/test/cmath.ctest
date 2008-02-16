@@ -2064,6 +2064,9 @@ rect1052 rect -inf -7.0 -> -inf inf
 -- imaginary parts of polar (as cabs and carg, respectively, which in turn
 -- are defined in terms of the functions hypot and atan2).
 
+-- overflow
+polar0100 polar 1.4e308 1.4e308 -> inf 0.78539816339744828      overflow
+
 -- special values
 polar1000 polar 0.0 0.0 -> 0.0 0.0
 polar1001 polar 0.0 -0.0 -> 0.0 -0.0

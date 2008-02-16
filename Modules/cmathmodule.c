@@ -977,10 +977,9 @@ cmath_polar(PyObject *self, PyObject *args)
 	double r, phi;
 	if (!PyArg_ParseTuple(args, "D:polar", &z))
 		return NULL;
-	errno = 0;
 	PyFPE_START_PROTECT("polar function", return 0)
-	r = hypot(z.real, z.imag);
-	phi = atan2(z.imag, z.real);
+	phi = atan2(z.imag, z.real); /* should not cause any exception */
+	r = c_abs(z); /* sets errno to ERANGE on overflow;  otherwise 0 */
 	PyFPE_END_PROTECT(r)
 	if (errno != 0)
 		return math_error();
@@ -997,10 +996,10 @@ the distance from 0 and phi the phase angle.");
   rect() isn't covered by the C99 standard, but it's not too hard to
   figure out 'spirit of C99' rules for special value handing:
 
-    rect(x, t) should behave like exp(log(x), t) for positive-signed x
-    rect(x, t) should behave like -exp(log(-x), t) for negative-signed x
-    rect(nan, t) should behave like exp(nan, t), except that rect(nan, 0)
-      gives nan +- 0j with the sign of the imaginary part unspecified.
+    rect(x, t) should behave like exp(log(x) + it) for positive-signed x
+    rect(x, t) should behave like -exp(log(-x) + it) for negative-signed x
+    rect(nan, t) should behave like exp(nan + it), except that rect(nan, 0)
+      gives nan +- i0 with the sign of the imaginary part unspecified.
 
 */
 

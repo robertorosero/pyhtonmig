@@ -183,6 +183,38 @@ c_powi(Py_complex x, long n)
 
 }
 
+double
+c_abs(Py_complex z)
+{
+	/* sets errno = ERANGE on overflow;  otherwise errno = 0 */
+	double result;
+
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		/* C99 rules: if either the real or the imaginary part is an
+		   infinity, return infinity, even if the other part is a
+		   NaN. */
+		if (Py_IS_INFINITY(z.real)) {
+			result = fabs(z.real);
+			errno = 0;
+			return result;
+		}
+		if (Py_IS_INFINITY(z.imag)) {
+			result = fabs(z.imag);
+			errno = 0;
+			return result;
+		}
+		/* either the real or imaginary part is a NaN,
+		   and neither is infinite. Result should be NaN. */
+		return Py_NAN;
+	}
+	result = hypot(z.real, z.imag);
+	if (!Py_IS_FINITE(result))
+		errno = ERANGE;
+	else
+		errno = 0;
+	return result;
+}
+
 static PyObject *
 complex_subtype_from_c_complex(PyTypeObject *type, Py_complex cval)
 {
@@ -648,22 +680,12 @@ static PyObject *
 complex_abs(PyComplexObject *v)
 {
 	double result;
-	/* if either the real or imaginary part is an infinity, return
-	   infinity, even if the other part is a NaN */
-        if (Py_IS_INFINITY(v->cval.real))
-		return PyFloat_FromDouble(fabs(v->cval.real));
-	if (Py_IS_INFINITY(v->cval.imag))
-		return PyFloat_FromDouble(fabs(v->cval.imag));
 
 	PyFPE_START_PROTECT("complex_abs", return 0)
-	result = hypot(v->cval.real,v->cval.imag);
+	result = c_abs(v->cval);
 	PyFPE_END_PROTECT(result)
 
-	/* an infinite result from finite operands should
-	   result in OverflowError */
-	if (Py_IS_INFINITY(result) &&
-	    Py_IS_FINITE(v->cval.real) &&
-	    Py_IS_FINITE(v->cval.imag)) {
+	if (errno == ERANGE) {
 		PyErr_SetString(PyExc_OverflowError,
 				"absolute value too large");
 		return NULL;
