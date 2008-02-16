@@ -10,6 +10,19 @@
 #include <ctype.h>
 #include <float.h>
 
+/* global NAN and INF objects */
+#ifdef Py_NAN
+static PyObject *PyFloat_NAN = NULL;
+#define Py_RETURN_NAN return Py_INCREF(PyFloat_NAN), PyFloat_NAN
+#endif
+static PyObject *PyFloat_PINF = NULL;
+static PyObject *PyFloat_NINF = NULL;
+#define Py_RETURN_INF(sign) 					\
+	if (copysign(1., sign) == 1.)				\
+		return Py_INCREF(PyFloat_PINF), PyFloat_PINF;	\
+	else							\
+		return Py_INCREF(PyFloat_NINF), PyFloat_NINF
+
 /* Special free list -- see comments for same code in intobject.c. */
 #define BLOCK_SIZE	1000	/* 1K less typical malloc overhead */
 #define BHEAD_SIZE	8	/* Enough for a 64-bit pointer */
@@ -235,11 +248,11 @@ PyFloat_FromString(PyObject *v, char **pend)
 			p++;
 		}
 		if (PyOS_strnicmp(p, "inf", 4) == 0) {
-			return PyFloat_FromDouble(sign * Py_HUGE_VAL);
+			Py_RETURN_INF(sign);
 		}
 #ifdef Py_NAN
 		if(PyOS_strnicmp(p, "nan", 4) == 0) {
-			return PyFloat_FromDouble(Py_NAN);
+			Py_RETURN_NAN;
 		}
 #endif
 		PyOS_snprintf(buffer, sizeof(buffer),
@@ -873,6 +886,7 @@ float_div(PyObject *v, PyObject *w)
 	double a,b;
 	CONVERT_TO_DOUBLE(v, a);
 	CONVERT_TO_DOUBLE(w, b);
+#ifdef Py_NAN
 	if (b == 0.0) {
 		if (!PyFloat_GetIEEE754()) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
@@ -880,10 +894,11 @@ float_div(PyObject *v, PyObject *w)
 			return NULL;
 		}
 		else if (a == 0.)
-			return PyFloat_FromDouble(Py_NAN);
+			Py_RETURN_NAN;
 		else
-			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, a));
+			Py_RETURN_INF(a);
 	}
+#endif
 	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
 	PyFPE_END_PROTECT(a)
@@ -899,6 +914,7 @@ float_classic_div(PyObject *v, PyObject *w)
 	if (Py_DivisionWarningFlag >= 2 &&
 	    PyErr_Warn(PyExc_DeprecationWarning, "classic float division") < 0)
 		return NULL;
+#ifdef Py_NAN
 	if (b == 0.0) {
 		if (!PyFloat_GetIEEE754()) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
@@ -906,10 +922,11 @@ float_classic_div(PyObject *v, PyObject *w)
 			return NULL;
 		}
 		else if (a == 0.)
-			return PyFloat_FromDouble(Py_NAN);
+			Py_RETURN_NAN;
 		else
-			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, a));
+			Py_RETURN_INF(a);
 	}
+#endif
 	PyFPE_START_PROTECT("divide", return 0)
 	a = a / b;
 	PyFPE_END_PROTECT(a)
@@ -921,8 +938,9 @@ float_rem(PyObject *v, PyObject *w)
 {
 	double vx, wx;
 	double mod;
- 	CONVERT_TO_DOUBLE(v, vx);
- 	CONVERT_TO_DOUBLE(w, wx);
+	CONVERT_TO_DOUBLE(v, vx);
+	CONVERT_TO_DOUBLE(w, wx);
+#ifdef Py_NAN
 	if (wx == 0.0) {
 		if (!PyFloat_GetIEEE754()) {
 			PyErr_SetString(PyExc_ZeroDivisionError,
@@ -930,10 +948,11 @@ float_rem(PyObject *v, PyObject *w)
 			return NULL;
 		}
 		else if (vx == 0.)
-			return PyFloat_FromDouble(Py_NAN);
+			Py_RETURN_NAN;
 		else
-			return PyFloat_FromDouble(copysign(Py_HUGE_VAL, vx));
+			Py_RETURN_INF(vx);
 	}
+#endif
 	PyFPE_START_PROTECT("modulo", return 0)
 	mod = fmod(vx, wx);
 	/* note: checking mod*wx < 0 is incorrect -- underflows to
@@ -1676,6 +1695,20 @@ _PyFloat_Init(void)
 	/* Init float info */
 	if (FloatInfoType.tp_name == 0)
 		PyStructSequence_InitType(&FloatInfoType, &floatinfo_desc);
+
+	/* static floats */
+#define static_float(var, value)				\
+	if (var == NULL)					\
+		var = PyFloat_FromDouble(value);		\
+	else {							\
+		assert(PyFloat_CheckExact(var));		\
+		_Py_NewReference(var);				\
+	}
+#ifdef Py_NAN
+	static_float(PyFloat_NAN, Py_NAN);
+#endif
+	static_float(PyFloat_PINF, Py_HUGE_VAL);
+	static_float(PyFloat_NINF, -Py_HUGE_VAL);
 }
 
 void
@@ -1735,6 +1768,12 @@ PyFloat_Fini(void)
 	unsigned i;
 	size_t bc, bf;	/* block count, number of freed blocks */
 	size_t fsum;	/* total unfreed floats per block */
+
+#ifdef Py_NAN
+	Py_XDECREF(PyFloat_NAN);
+#endif
+	Py_XDECREF(PyFloat_PINF);
+	Py_XDECREF(PyFloat_NINF);
 
 	PyFloat_CompactFreeList(&bc, &bf, &fsum);
 
