@@ -125,23 +125,16 @@ c_quot_ieee754(Py_complex a, Py_complex b)
 {
 	/* IEEE 754 style division */
 	if (b.real == 0. && b.imag == 0.) {
+		/* Complex division by zero
+		 * - division of a complex w/o an imaginary part behaves like
+		 *   float division: (x+0j)/(0+0j) == x/0
+		 * - (0+0j)/(0+0j) results in NAN
+		 * - for the remaining cases it's trying to do something
+		 *   sensible while keeping the invariant abs(c/0) == inf
+		 */
 		Py_complex quot;
-		if (a.real == 0. && a.imag == 0.) {
-			/* 0./0. */
-			quot.real = Py_NAN;
-			quot.imag = Py_NAN;
-		}
-		else {
-			float re, im;
-			/* the outcome is inexact but we care only about the
-			 * sign bits
-			 * (a+ib)/(c+id) = (ac+bd)/(c2+d2) + i(bc-ad)/(c2+d2)
-			 */
-			re = a.real * b.real + a.imag * b.imag;
-			im = a.imag * b.real - a.real * b.imag;
-			quot.real = copysign(Py_HUGE_VAL, re);
-			quot.imag = copysign(Py_HUGE_VAL, im);
-		}
+		quot.real = copysign(Py_HUGE_VAL, b.real) * a.real;
+		quot.imag = copysign(Py_HUGE_VAL, b.imag) * a.imag;
 		return quot;
 	}
 	return c_quot(a, b);

@@ -54,14 +54,16 @@ class ComplexTest(unittest.TestCase):
         self.assert_(a is b)
 
     def assertInf(self, a, real_sign=1, imag_sign=1):
-        self.assert_(isinf(a.real), a)
-        self.assertEqual(copysign(1, a.real), real_sign)
-        self.assert_(isinf(a.imag), a)
-        self.assertEqual(copysign(1, a.imag), imag_sign)
-
-    def assertNan(self, a):
-        self.assert_(isnan(a.real), a)
-        self.assert_(isnan(a.imag), a)
+        if not real_sign:
+            self.assert_(isnan(a.real), a)
+        else:
+            self.assert_(isinf(a.real), a)
+            self.assertEqual(copysign(1, a.real), real_sign)
+        if not imag_sign:
+            self.assert_(isnan(a.imag), a)
+        else:
+            self.assert_(isinf(a.imag), a)
+            self.assertEqual(copysign(1, a.imag), imag_sign)
 
     def check_div(self, x, y):
         """Compute complex z=x*y, and check that z/x==y and z/y==x."""
@@ -112,15 +114,16 @@ class ComplexTest(unittest.TestCase):
 
     def test_div_ieee754(self):
         with ieee754():
-            self.assertInf(complex(1., 0) / complex(0.), 1, 1)
-            self.assertInf(complex(-1., 0) / complex(0.), 1, 1)
-            self.assertInf(complex(0, 1.) / complex(0.), 1, 1)
-            self.assertInf(complex(0, -1.) / complex(0.), 1, -1)
+            self.assertInf(complex(1., 0) / complex(0.), 1, 0)
+            self.assertInf(complex(-1., 0) / complex(0.), -1, 0)
+            self.assertInf(complex(-1., 0) / complex(-0.), 1, 0)
+            self.assertInf(complex(0, 1.) / complex(0.), 0, 1)
+            self.assertInf(complex(0, -1.) / complex(0.), 0, -1)
             self.assertInf(complex(1., 1.) / complex(0.), 1, 1)
             self.assertInf(complex(1., -1.) / complex(0.), 1, -1)
-            self.assertInf(complex(-1., 1.) / complex(0.), 1, 1)
-            self.assertInf(complex(-1., -1.) / complex(0.), -1, 1)
-            self.assertNan(complex(0.) / complex(0.))
+            self.assertInf(complex(-1., 1.) / complex(0.), -1, 1)
+            self.assertInf(complex(-1., -1.) / complex(0.), -1, -1)
+            self.assertInf(complex(0.) / complex(0.), 0, 0)
 
     def test_coerce(self):
         self.assertRaises(OverflowError, complex.__coerce__, 1+1j, 1L<<10000)
