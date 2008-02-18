@@ -10,7 +10,6 @@ warnings.filterwarnings(
 
 from random import random
 from math import atan2, pi, isinf, isnan, copysign
-from contextlib import ieee754
 
 INF = float("inf")
 NAN = float("nan")
@@ -111,19 +110,6 @@ class ComplexTest(unittest.TestCase):
     def test_floordiv(self):
         self.assertAlmostEqual(complex.__floordiv__(3+0j, 1.5+0j), 2)
         self.assertRaises(ZeroDivisionError, complex.__floordiv__, 3+0j, 0+0j)
-
-    def test_div_ieee754(self):
-        with ieee754():
-            self.assertInf(complex(1., 0) / complex(0.), 1, 0)
-            self.assertInf(complex(-1., 0) / complex(0.), -1, 0)
-            self.assertInf(complex(-1., 0) / complex(-0.), 1, 0)
-            self.assertInf(complex(0, 1.) / complex(0.), 0, 1)
-            self.assertInf(complex(0, -1.) / complex(0.), 0, -1)
-            self.assertInf(complex(1., 1.) / complex(0.), 1, 1)
-            self.assertInf(complex(1., -1.) / complex(0.), 1, -1)
-            self.assertInf(complex(-1., 1.) / complex(0.), -1, 1)
-            self.assertInf(complex(-1., -1.) / complex(0.), -1, -1)
-            self.assertInf(complex(0.) / complex(0.), 0, 0)
 
     def test_coerce(self):
         self.assertRaises(OverflowError, complex.__coerce__, 1+1j, 1L<<10000)

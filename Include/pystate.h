@@ -44,12 +44,6 @@ struct _frame; /* Avoid including frameobject.h */
 /* Py_tracefunc return -1 when raising an exception, or 0 for success. */
 typedef int (*Py_tracefunc)(PyObject *, struct _frame *, int, PyObject *);
 
-typedef enum {
-    PyIEEE_Python,	/* Python standard mode */
-    PyIEEE_754,		/* IEEE 754 mode */
-    PyIEEE_Strict,	/* strict Python mode */
-} PyIEEE_Mode;
-
 /* The following values are used for 'what' for tracefunc functions: */
 #define PyTrace_CALL 0
 #define PyTrace_EXCEPTION 1
@@ -100,8 +94,6 @@ typedef struct _ts {
 
     PyObject *async_exc; /* Asynchronous exception to raise */
     long thread_id; /* Thread id where this tstate was created */
-
-    PyIEEE_Mode float_ieee754; /* floating point operation behavior */
 
     /* XXX signal handlers should also be here */
 
@@ -196,11 +188,6 @@ typedef struct _frame *(*PyThreadFrameGetter)(PyThreadState *self_);
 
 /* hook for PyEval_GetFrame(), requested for Psyco */
 PyAPI_DATA(PyThreadFrameGetter) _PyThreadState_GetFrame;
-
-/* IEEE floating op state */
-#define PyIEEE_GET() PyThreadState_GET()->float_ieee754
-PyAPI_FUNC(int) PyIEEE_GetState(void);
-PyAPI_FUNC(int) PyIEEE_SetState(int);
 
 #ifdef __cplusplus
 }

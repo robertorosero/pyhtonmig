@@ -121,26 +121,6 @@ c_quot(Py_complex a, Py_complex b)
 }
 
 Py_complex
-c_quot_ieee754(Py_complex a, Py_complex b)
-{
-	/* IEEE 754 style division */
-	if (b.real == 0. && b.imag == 0.) {
-		/* Complex division by zero
-		 * - division of a complex w/o an imaginary part behaves like
-		 *   float division: (x+0j)/(0+0j) == x/0
-		 * - (0+0j)/(0+0j) results in NAN
-		 * - for the remaining cases it's trying to do something
-		 *   sensible while keeping the invariant abs(c/0) == inf
-		 */
-		Py_complex quot;
-		quot.real = copysign(Py_HUGE_VAL, b.real) * a.real;
-		quot.imag = copysign(Py_HUGE_VAL, b.imag) * a.imag;
-		return quot;
-	}
-	return c_quot(a, b);
-}
-
-Py_complex
 c_pow(Py_complex a, Py_complex b)
 {
 	Py_complex r;
@@ -540,10 +520,7 @@ complex_div(PyComplexObject *v, PyComplexObject *w)
 
 	PyFPE_START_PROTECT("complex_div", return 0)
 	errno = 0;
-	if (PyIEEE_GET() == PyIEEE_754)
-		quot = c_quot_ieee754(v->cval,w->cval);
-	else
-		quot = c_quot(v->cval,w->cval);
+	quot = c_quot(v->cval,w->cval);
 	PyFPE_END_PROTECT(quot)
 	if (errno == EDOM) {
 		PyErr_SetString(PyExc_ZeroDivisionError, "complex division");
@@ -564,10 +541,7 @@ complex_classic_div(PyComplexObject *v, PyComplexObject *w)
 
 	PyFPE_START_PROTECT("complex_classic_div", return 0)
 	errno = 0;
-	if (PyIEEE_GET() == PyIEEE_754)
-		quot = c_quot_ieee754(v->cval,w->cval);
-	else
-		quot = c_quot(v->cval,w->cval);
+	quot = c_quot(v->cval,w->cval);
 	PyFPE_END_PROTECT(quot)
 	if (errno == EDOM) {
 		PyErr_SetString(PyExc_ZeroDivisionError, "complex division");

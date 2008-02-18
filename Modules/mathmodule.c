@@ -610,34 +610,6 @@ PyDoc_STRVAR(math_isinf_doc,
 "isinf(x) -> bool\n\
 Checks if float x is infinite (positive or negative)");
 
-static PyObject *
-math_set_ieee754(PyObject *self, PyObject *arg)
-{
-	long state = PyInt_AsLong(arg);
-
-	if (state == -1 && PyErr_Occurred())
-		return NULL;
-	if (!(state == PyIEEE_Python || state == PyIEEE_754 ||
-	      state == PyIEEE_Strict)) {
-		PyErr_Format(PyExc_ValueError, "Invalid state %ld", state);
-		return NULL;
-	}
-
-	return PyInt_FromLong((long)PyIEEE_SetState(state));
-}
-
-PyDoc_STRVAR(math_set_ieee754_doc,
-"set_ieee754(int) -> int");
-
-static PyObject *
-math_get_ieee754(PyObject *self, PyObject *arg)
-{
-	return PyInt_FromLong((long)PyIEEE_GetState());
-}
-
-PyDoc_STRVAR(math_get_ieee754_doc,
-"get_ieee754() -> int");
-
 static PyMethodDef math_methods[] = {
 	{"acos",	math_acos,	METH_O,		math_acos_doc},
 	{"acosh",	math_acosh,	METH_O,		math_acosh_doc},
@@ -656,7 +628,6 @@ static PyMethodDef math_methods[] = {
 	{"floor",	math_floor,	METH_O,		math_floor_doc},
 	{"fmod",	math_fmod,	METH_VARARGS,	math_fmod_doc},
 	{"frexp",	math_frexp,	METH_O,		math_frexp_doc},
-	{"get_ieee754",	math_get_ieee754,	METH_NOARGS,	math_get_ieee754_doc},
 	{"hypot",	math_hypot,	METH_VARARGS,	math_hypot_doc},
 	{"isinf",	math_isinf,	METH_O,		math_isinf_doc},
 	{"isnan",	math_isnan,	METH_O,		math_isnan_doc},
@@ -667,7 +638,6 @@ static PyMethodDef math_methods[] = {
 	{"modf",	math_modf,	METH_O,		math_modf_doc},
 	{"pow",		math_pow,	METH_VARARGS,	math_pow_doc},
 	{"radians",	math_radians,	METH_O,		math_radians_doc},
-	{"set_ieee754",	math_set_ieee754,	METH_O,	math_set_ieee754_doc},
 	{"sin",		math_sin,	METH_O,		math_sin_doc},
 	{"sinh",	math_sinh,	METH_O,		math_sinh_doc},
 	{"sqrt",	math_sqrt,	METH_O,		math_sqrt_doc},
@@ -693,9 +663,6 @@ initmath(void)
 
 	PyModule_AddObject(m, "pi", PyFloat_FromDouble(Py_MATH_PI));
 	PyModule_AddObject(m, "e", PyFloat_FromDouble(Py_MATH_E));
-	PyModule_AddIntConstant(m, "IEEE_PYTHON", PyIEEE_Python);
-	PyModule_AddIntConstant(m, "IEEE_754", PyIEEE_754);
-	PyModule_AddIntConstant(m, "IEEE_STRICT", PyIEEE_Strict);
 
     finally:
 	return;
