@@ -18,7 +18,7 @@ if __name__ == '__main__':
 else:
     file = __file__
 test_dir = os.path.dirname(file) or os.curdir
-test_file = os.path.join(test_dir, 'cmath.ctest')
+test_file = os.path.join(test_dir, 'cmath_testcases.txt')
 
 def parse_testfile(fname):
     """Parse a file with test values
