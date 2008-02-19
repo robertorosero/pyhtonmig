@@ -276,6 +276,27 @@ c_atan(Py_complex z)
 	return r;
 }
 
+/* Windows screws up atan2 for inf and nan */
+static double
+c_atan2(Py_complex z)
+{
+	if (Py_IS_NAN(z.real) || Py_IS_NAN(z.imag))
+		return Py_NAN;
+	if (Py_IS_INFINITY(z.imag)) {
+		if (Py_IS_INFINITY(z.real)) {
+			if (copysign(1., z.real) == 1.)
+				/* atan2(+-inf, +inf) == +-pi/4 */
+				return copysign(0.25*Py_MATH_PI, z.imag);
+			else
+				/* atan2(+-inf, -inf) == +-pi*3/4 */
+				return copysign(0.75*Py_MATH_PI, z.imag);
+		}
+		/* atan2(+-inf, x) == +-pi/2 for finite x */
+		return copysign(0.5*Py_MATH_PI, z.imag);
+	}
+	return atan2(z.imag, z.real);
+}
+
 PyDoc_STRVAR(c_atan_doc,
 "atan(x)\n"
 "\n"
@@ -958,7 +979,7 @@ cmath_phase(PyObject *self, PyObject *args)
 		return NULL;
 	errno = 0;
 	PyFPE_START_PROTECT("arg function", return 0)
-	phi = atan2(z.imag, z.real);
+	phi = c_atan2(z);
 	PyFPE_END_PROTECT(r)
 	if (errno != 0)
 		return math_error();
@@ -978,7 +999,7 @@ cmath_polar(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "D:polar", &z))
 		return NULL;
 	PyFPE_START_PROTECT("polar function", return 0)
-	phi = atan2(z.imag, z.real); /* should not cause any exception */
+	phi = c_atan2(z); /* should not cause any exception */
 	r = c_abs(z); /* sets errno to ERANGE on overflow;  otherwise 0 */
 	PyFPE_END_PROTECT(r)
 	if (errno != 0)
