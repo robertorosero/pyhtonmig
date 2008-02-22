@@ -121,7 +121,7 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
   switch (cif->rtype->type)
     {
     case FFI_TYPE_VOID:
-#if !defined(X86_WIN32) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
+#ifdef X86
     case FFI_TYPE_STRUCT:
 #endif
 #if defined(X86) || defined(X86_DARWIN)
@@ -142,7 +142,7 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
       cif->flags = FFI_TYPE_SINT64;
       break;
 
-#if defined(X86_WIN32) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#ifndef X86
     case FFI_TYPE_STRUCT:
       if (cif->rtype->size == 1)
         {
