@@ -1,5 +1,6 @@
 /* -----------------------------------------------------------------------
    ffi.c - (c) 2003-2004 Randolph Chung <tausq@debian.org>
+           (c) 2008 Red Hat, Inc.
 
    HPPA Foreign Function Interface
    HP-UX PA ABI support (c) 2006 Free Software Foundation, Inc.

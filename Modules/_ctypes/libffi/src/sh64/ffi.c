@@ -1,5 +1,6 @@
 /* -----------------------------------------------------------------------
    ffi.c - Copyright (c) 2003, 2004 Kaz Kojima
+           Copyright (c) 2008 Anthony Green
    
    SuperH SHmedia Foreign Function Interface 
 

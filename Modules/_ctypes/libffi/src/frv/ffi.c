@@ -1,6 +1,7 @@
 /* -----------------------------------------------------------------------
-   ffi.c - Copyright (c) 2004  Anthony Green
-   Copyright (C) 2007  Free Software Foundation, Inc.
+   ffi.c - Copyright (C) 2004  Anthony Green
+           Copyright (C) 2007  Free Software Foundation, Inc.
+	   Copyright (C) 2008  Red Hat, Inc.
    
    FR-V Foreign Function Interface 
 

@@ -1,5 +1,6 @@
 /* -----------------------------------------------------------------------
    ffi.c - Copyright (c) 2004  Renesas Technology
+           Copyright (c) 2008  Red Hat, Inc.
    
    M32R Foreign Function Interface 
 

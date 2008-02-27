@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------
-   ffi.c - Copyright (c) 1996, 2007 Red Hat, Inc.
+   ffi.c - Copyright (c) 1996, 2007, 2008  Red Hat, Inc.
            Copyright (c) 2008       David Daney
    
    MIPS Foreign Function Interface 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------
-   ffi.c - Copyright (c) 1996, 1998, 1999, 2001, 2007  Red Hat, Inc.
+   ffi.c - Copyright (c) 1996, 1998, 1999, 2001, 2007, 2008  Red Hat, Inc.
            Copyright (c) 2002  Ranjit Mathew
            Copyright (c) 2002  Bo Thorsen
            Copyright (c) 2002  Roger Sayle
@@ -249,7 +249,7 @@ ffi_closure_SYSV_inner (closure, respp, args)
      void **respp;
      void *args;
 {
-  /* our various things... */
+  /* our various things...  */
   ffi_cif       *cif;
   void         **arg_area;
 
