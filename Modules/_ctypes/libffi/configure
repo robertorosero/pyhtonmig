@@ -22724,7 +22724,7 @@ esac
 ac_config_links="$ac_config_links include/ffitarget.h:src/$TARGETDIR/ffitarget.h"
 
 
-ac_config_files="$ac_config_files include/Makefile include/ffi.h Makefile testsuite/Makefile man/Makefile libffi.pc"
+ac_config_files="$ac_config_files include/ffi.h"
 
 
 ac_config_links="$ac_config_links include/ffi_common.h:include/ffi_common.h"
@@ -23516,12 +23516,7 @@ do
     "include") CONFIG_COMMANDS="$CONFIG_COMMANDS include" ;;
     "src") CONFIG_COMMANDS="$CONFIG_COMMANDS src" ;;
     "include/ffitarget.h") CONFIG_LINKS="$CONFIG_LINKS include/ffitarget.h:src/$TARGETDIR/ffitarget.h" ;;
-    "include/Makefile") CONFIG_FILES="$CONFIG_FILES include/Makefile" ;;
     "include/ffi.h") CONFIG_FILES="$CONFIG_FILES include/ffi.h" ;;
-    "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-    "testsuite/Makefile") CONFIG_FILES="$CONFIG_FILES testsuite/Makefile" ;;
-    "man/Makefile") CONFIG_FILES="$CONFIG_FILES man/Makefile" ;;
-    "libffi.pc") CONFIG_FILES="$CONFIG_FILES libffi.pc" ;;
     "include/ffi_common.h") CONFIG_LINKS="$CONFIG_LINKS include/ffi_common.h:include/ffi_common.h" ;;
     "fficonfig.py") CONFIG_FILES="$CONFIG_FILES fficonfig.py" ;;
 

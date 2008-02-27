@@ -390,7 +390,7 @@ case $host in
 esac
 AC_CONFIG_LINKS(include/ffitarget.h:src/$TARGETDIR/ffitarget.h)
 
-AC_CONFIG_FILES(include/Makefile include/ffi.h Makefile testsuite/Makefile man/Makefile libffi.pc)
+AC_CONFIG_FILES(include/ffi.h)
 
 AC_CONFIG_LINKS(include/ffi_common.h:include/ffi_common.h)
 
