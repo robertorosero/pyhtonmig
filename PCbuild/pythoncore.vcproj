@@ -1055,6 +1055,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Modules\future_builtins.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Modules\gcmodule.c"
 				>
 			</File>
@@ -1628,6 +1632,14 @@
 			</File>
 			<File
 				RelativePath="..\Python\errors.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Python\formatter_string.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Python\formatter_unicode.c"
 				>
 			</File>
 			<File

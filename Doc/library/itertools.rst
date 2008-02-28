@@ -76,6 +76,44 @@ loops that truncate the stream.
                   yield element
 
 
+.. function:: combinations(iterable, r)
+
+   Return successive *r* length combinations of elements in the *iterable*.
+
+   Combinations are emitted in a lexicographic sort order.  So, if the 
+   input *iterable* is sorted, the combination tuples will be produced
+   in sorted order.  
+
+   Elements are treated as unique based on their position, not on their
+   value.  So if the input elements are unique, there will be no repeat
+   values within a single combination.
+
+   Each result tuple is ordered to match the input order.  So, every
+   combination is a subsequence of the input *iterable*.
+
+   Example:  ``combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)``
+
+   Equivalent to::
+
+        def combinations(iterable, r):
+            pool = tuple(iterable)
+            n = len(pool)
+            assert 0 <= r <= n
+            vec = range(r)
+            yield tuple(pool[i] for i in vec)
+            while 1:
+                for i in reversed(range(r)):
+                    if vec[i] != i + n - r:
+                        break
+                else:
+                    return
+                vec[i] += 1
+                for j in range(i+1, r):
+                    vec[j] = vec[j-1] + 1
+                yield tuple(pool[i] for i in vec)
+
+   .. versionadded:: 2.6
+
 .. function:: count([n])
 
    Make an iterator that returns consecutive integers starting with *n*. If not
@@ -302,6 +340,36 @@ loops that truncate the stream.
 
    .. versionadded:: 2.6
 
+.. function:: product(*iterables[, repeat])
+
+   Cartesian product of input iterables.
+
+   Equivalent to nested for-loops in a generator expression. For example,
+   ``product(A, B)`` returns the same as ``((x,y) for x in A for y in B)``.
+
+   The leftmost iterators are in the outermost for-loop, so the output tuples
+   cycle in a manner similar to an odometer (with the rightmost element
+   changing on every iteration).  This results in a lexicographic ordering
+   so that if the inputs iterables are sorted, the product tuples are emitted
+   in sorted order.
+
+   To compute the product of an iterable with itself, specify the number of
+   repetitions with the optional *repeat* keyword argument.  For example,
+   ``product(A, repeat=4)`` means the same as ``product(A, A, A, A)``.
+
+   Equivalent to the following except that the actual implementation does not
+   build-up intermediate results in memory::
+
+       def product(*args, **kwds):
+           pools = map(tuple, args) * kwds.get('repeat', 1)
+           if pools:            
+               result = [[]]
+               for pool in pools:
+                   result = [x+[y] for x in result for y in pool]
+               for prod in result:
+                   yield tuple(prod)
+
+   .. versionadded:: 2.6
 
 .. function:: repeat(object[, times])
 
@@ -535,4 +603,10 @@ which incur interpreter overhead. ::
            except StopIteration:
                pending -= 1
                nexts = cycle(islice(nexts, pending))
+
+   def powerset(iterable):
+       "powerset('ab') --> set([]), set(['b']), set(['a']), set(['a', 'b'])"
+       skip = object()
+       for t in product(*izip(repeat(skip), iterable)):
+           yield set(e for e in t if e is not skip)
 

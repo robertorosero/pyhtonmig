@@ -4,6 +4,8 @@
 
 #include "Python.h"
 
+#include "formatter_string.h"
+
 #include <ctype.h>
 
 #ifdef COUNT_ALLOCS
@@ -771,15 +773,7 @@ PyString_AsStringAndSize(register PyObject *obj,
 /* -------------------------------------------------------------------- */
 /* Methods */
 
-#define STRINGLIB_CHAR char
-
-#define STRINGLIB_CMP memcmp
-#define STRINGLIB_LEN PyString_GET_SIZE
-#define STRINGLIB_NEW PyString_FromStringAndSize
-#define STRINGLIB_STR PyString_AS_STRING
-
-#define STRINGLIB_EMPTY nullstring
-
+#include "stringlib/stringdefs.h"
 #include "stringlib/fastsearch.h"
 
 #include "stringlib/count.h"
@@ -3910,6 +3904,19 @@ string_getnewargs(PyStringObject *v)
 	return Py_BuildValue("(s#)", v->ob_sval, Py_SIZE(v));
 }
 
+
+#include "stringlib/string_format.h"
+
+PyDoc_STRVAR(format__doc__,
+"S.format(*args, **kwargs) -> unicode\n\
+\n\
+");
+
+PyDoc_STRVAR(p_format__doc__,
+"S.__format__(format_spec) -> unicode\n\
+\n\
+");
+
 
 static PyMethodDef
 string_methods[] = {
@@ -3954,6 +3961,10 @@ string_methods[] = {
 	{"rjust", (PyCFunction)string_rjust, METH_VARARGS, rjust__doc__},
 	{"center", (PyCFunction)string_center, METH_VARARGS, center__doc__},
 	{"zfill", (PyCFunction)string_zfill, METH_VARARGS, zfill__doc__},
+	{"format", (PyCFunction) do_string_format, METH_VARARGS | METH_KEYWORDS, format__doc__},
+	{"__format__", (PyCFunction) string__format__, METH_VARARGS, p_format__doc__},
+	{"_formatter_field_name_split", (PyCFunction) formatter_field_name_split, METH_NOARGS},
+	{"_formatter_parser", (PyCFunction) formatter_parser, METH_NOARGS},
 	{"encode", (PyCFunction)string_encode, METH_VARARGS, encode__doc__},
 	{"decode", (PyCFunction)string_decode, METH_VARARGS, decode__doc__},
 	{"expandtabs", (PyCFunction)string_expandtabs, METH_VARARGS,
@@ -4574,6 +4585,7 @@ PyString_Format(PyObject *format, PyObject *args)
 			int prec = -1;
 			int c = '\0';
 			int fill;
+			int isnumok;
 			PyObject *v = NULL;
 			PyObject *temp = NULL;
 			char *pbuf;
@@ -4775,23 +4787,52 @@ PyString_Format(PyObject *format, PyObject *args)
 			case 'X':
 				if (c == 'i')
 					c = 'd';
-				if (PyLong_Check(v)) {
-					int ilen;
-					temp = _PyString_FormatLong(v, flags,
-						prec, c, &pbuf, &ilen);
-					len = ilen;
-					if (!temp)
-						goto error;
-					sign = 1;
+				isnumok = 0;
+				if (PyNumber_Check(v)) {
+					PyObject *iobj=NULL;
+
+					if (PyInt_Check(v) || (PyLong_Check(v))) {
+						iobj = v;
+						Py_INCREF(iobj);
+					}
+					else {
+						iobj = PyNumber_Int(v);
+						if (iobj==NULL) iobj = PyNumber_Long(v);
+					}
+					if (iobj!=NULL) {
+						if (PyInt_Check(iobj)) {
+							isnumok = 1;
+							pbuf = formatbuf;
+							len = formatint(pbuf,
+									sizeof(formatbuf),
+									flags, prec, c, iobj);
+							Py_DECREF(iobj);
+							if (len < 0)
+								goto error;
+							sign = 1;
+						}
+						else if (PyLong_Check(iobj)) {
+							int ilen;
+							
+							isnumok = 1;
+							temp = _PyString_FormatLong(iobj, flags,
+								prec, c, &pbuf, &ilen);
+							Py_DECREF(iobj);
+							len = ilen;
+							if (!temp)
+								goto error;
+							sign = 1;
+						}
+						else {
+							Py_DECREF(iobj);
+						}
+					}
 				}
-				else {
-					pbuf = formatbuf;
-					len = formatint(pbuf,
-							sizeof(formatbuf),
-							flags, prec, c, v);
-					if (len < 0)
-						goto error;
-					sign = 1;
+				if (!isnumok) {
+					PyErr_Format(PyExc_TypeError, 
+					    "%%%c format: a number is required, "
+					    "not %.200s", c, Py_TYPE(v)->tp_name);
+					goto error;
 				}
 				if (flags & F_ZERO)
 					fill = '0';

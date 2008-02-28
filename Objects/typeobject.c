@@ -306,6 +306,40 @@ type_set_module(PyTypeObject *type, PyObject *value, void *context)
 }
 
 static PyObject *
+type_abstractmethods(PyTypeObject *type, void *context)
+{
+	PyObject *mod = PyDict_GetItemString(type->tp_dict,
+					     "__abstractmethods__");
+	if (!mod) {
+		PyErr_Format(PyExc_AttributeError, "__abstractmethods__");
+		return NULL;
+	}
+	Py_XINCREF(mod);
+	return mod;
+}
+
+static int
+type_set_abstractmethods(PyTypeObject *type, PyObject *value, void *context)
+{
+	/* __abstractmethods__ should only be set once on a type, in
+	   abc.ABCMeta.__new__, so this function doesn't do anything
+	   special to update subclasses.
+	*/
+	int res = PyDict_SetItemString(type->tp_dict,
+				       "__abstractmethods__", value);
+	if (res == 0) {
+		type_modified(type);
+		if (value && PyObject_IsTrue(value)) {
+			type->tp_flags |= Py_TPFLAGS_IS_ABSTRACT;
+		}
+		else {
+			type->tp_flags &= ~Py_TPFLAGS_IS_ABSTRACT;
+		}
+	}
+	return res;
+}
+
+static PyObject *
 type_get_bases(PyTypeObject *type, void *context)
 {
 	Py_INCREF(type->tp_bases);
@@ -542,6 +576,8 @@ static PyGetSetDef type_getsets[] = {
 	{"__name__", (getter)type_name, (setter)type_set_name, NULL},
 	{"__bases__", (getter)type_get_bases, (setter)type_set_bases, NULL},
 	{"__module__", (getter)type_module, (setter)type_set_module, NULL},
+	{"__abstractmethods__", (getter)type_abstractmethods,
+	 (setter)type_set_abstractmethods, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
 	{0}
@@ -2749,6 +2785,56 @@ object_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	if (err < 0)
 		return NULL;
+
+	if (type->tp_flags & Py_TPFLAGS_IS_ABSTRACT) {
+		static PyObject *comma = NULL;
+		PyObject *abstract_methods = NULL;
+		PyObject *builtins;
+		PyObject *sorted;
+		PyObject *sorted_methods = NULL;
+		PyObject *joined = NULL;
+		const char *joined_str;
+
+		/* Compute ", ".join(sorted(type.__abstractmethods__))
+		   into joined. */
+		abstract_methods = type_abstractmethods(type, NULL);
+		if (abstract_methods == NULL)
+			goto error;
+		builtins = PyEval_GetBuiltins();
+		if (builtins == NULL)
+			goto error;
+		sorted = PyDict_GetItemString(builtins, "sorted");
+		if (sorted == NULL)
+			goto error;
+		sorted_methods = PyObject_CallFunctionObjArgs(sorted,
+							      abstract_methods,
+							      NULL);
+		if (sorted_methods == NULL)
+			goto error;
+		if (comma == NULL) {
+			comma = PyString_InternFromString(", ");
+			if (comma == NULL)
+				goto error;
+		}
+		joined = PyObject_CallMethod(comma, "join",
+					     "O",  sorted_methods);
+		if (joined == NULL)
+			goto error;
+		joined_str = PyString_AsString(joined);
+		if (joined_str == NULL)
+			goto error;
+
+		PyErr_Format(PyExc_TypeError,
+			     "Can't instantiate abstract class %s "
+			     "with abstract methods %s",
+			     type->tp_name,
+			     joined_str);
+	error:
+		Py_XDECREF(joined);
+		Py_XDECREF(sorted_methods);
+		Py_XDECREF(abstract_methods);
+		return NULL;
+	}
 	return type->tp_alloc(type, 0);
 }
 
@@ -3210,11 +3296,74 @@ object_reduce_ex(PyObject *self, PyObject *args)
 	return _common_reduce(self, proto);
 }
 
+static PyObject *
+object_subclasshook(PyObject *cls, PyObject *args)
+{
+	Py_INCREF(Py_NotImplemented);
+	return Py_NotImplemented;
+}
+
+PyDoc_STRVAR(object_subclasshook_doc,
+"Abstract classes can override this to customize issubclass().\n"
+"\n"
+"This is invoked early on by abc.ABCMeta.__subclasscheck__().\n"
+"It should return True, False or NotImplemented.  If it returns\n"
+"NotImplemented, the normal algorithm is used.  Otherwise, it\n"
+"overrides the normal algorithm (and the outcome is cached).\n");
+
+/*
+   from PEP 3101, this code implements:
+
+   class object:
+       def __format__(self, format_spec):
+           if isinstance(format_spec, str):
+               return format(str(self), format_spec)
+           elif isinstance(format_spec, unicode):
+               return format(unicode(self), format_spec)
+*/
+static PyObject *
+object_format(PyObject *self, PyObject *args)
+{
+        PyObject *format_spec;
+        PyObject *self_as_str = NULL;
+        PyObject *result = NULL;
+        PyObject *format_meth = NULL;
+
+        if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
+                return NULL;
+	if (PyUnicode_Check(format_spec)) {
+	        self_as_str = PyObject_Unicode(self);
+	} else if (PyString_Check(format_spec)) {
+	        self_as_str = PyObject_Str(self);
+	} else {
+	        PyErr_SetString(PyExc_TypeError, "argument to __format__ must be unicode or str");
+	        return NULL;
+	}
+
+        if (self_as_str != NULL) {
+                /* find the format function */
+                format_meth = PyObject_GetAttrString(self_as_str, "__format__");
+                if (format_meth != NULL) {
+                       /* and call it */
+                        result = PyObject_CallFunctionObjArgs(format_meth, format_spec, NULL);
+                }
+        }
+
+        Py_XDECREF(self_as_str);
+        Py_XDECREF(format_meth);
+
+        return result;
+}
+
 static PyMethodDef object_methods[] = {
 	{"__reduce_ex__", object_reduce_ex, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
 	{"__reduce__", object_reduce, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
+	{"__subclasshook__", object_subclasshook, METH_CLASS | METH_VARARGS,
+	 object_subclasshook_doc},
+        {"__format__", object_format, METH_VARARGS,
+         PyDoc_STR("default object formatter")},
 	{0}
 };
 

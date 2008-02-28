@@ -282,6 +282,8 @@ PYTHON_OBJS=	\
 		Python/getopt.o \
 		Python/pystrcmp.o \
 		Python/pystrtod.o \
+		Python/formatter_unicode.o \
+		Python/formatter_string.o \
 		Python/$(DYNLOADFILE) \
 		$(LIBOBJS) \
 		$(MACHDEP_OBJS) \
@@ -515,6 +517,28 @@ Python/importdl.o: $(srcdir)/Python/importdl.c
 
 Objects/unicodectype.o:	$(srcdir)/Objects/unicodectype.c \
 				$(srcdir)/Objects/unicodetype_db.h
+
+STRINGLIB_HEADERS= \
+		$(srcdir)/Objects/stringlib/count.h \
+		$(srcdir)/Objects/stringlib/fastsearch.h \
+		$(srcdir)/Objects/stringlib/find.h \
+		$(srcdir)/Objects/stringlib/formatter.h \
+		$(srcdir)/Objects/stringlib/partition.h \
+		$(srcdir)/Objects/stringlib/stringdefs.h \
+		$(srcdir)/Objects/stringlib/string_format.h \
+		$(srcdir)/Objects/stringlib/unicodedefs.h
+
+Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
+				$(STRINGLIB_HEADERS)
+
+Objects/stringobject.o: $(srcdir)/Objects/stringobject.c \
+				$(STRINGLIB_HEADERS)
+
+Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
+				$(STRINGLIB_HEADERS)
+
+Python/formatter_string.o: $(srcdir)/Python/formatter_string.c \
+				$(STRINGLIB_HEADERS)
 
 ############################################################################
 # Header files
