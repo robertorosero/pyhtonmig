@@ -506,6 +506,45 @@ asin0217 asin 8.2544809829680901 -1.7423548140539474e+308 -> 4.7375430746865733e
 asin0218 asin -5.2499000118824295 4.6655578977512214e+307 -> -1.1252459249113292e-307 709.1269781491103
 asin0219 asin -5.9904782760833433 -4.7315689314781163e+307 -> -1.2660659419394637e-307 -709.14102757522312
 
+-- special values
+asin1000 asin -0.0 0.0 -> -0.0 0.0
+asin1001 asin 0.0 0.0 -> 0.0 0.0
+asin1002 asin -0.0 -0.0 -> -0.0 -0.0
+asin1003 asin 0.0 -0.0 -> 0.0 -0.0
+asin1004 asin -inf 0.0 -> -1.5707963267948966 inf
+asin1005 asin -inf 2.2999999999999998 -> -1.5707963267948966 inf
+asin1006 asin nan 0.0 -> nan nan
+asin1007 asin nan 2.2999999999999998 -> nan nan
+asin1008 asin -0.0 inf -> -0.0 inf
+asin1009 asin -2.2999999999999998 inf -> -0.0 inf
+asin1010 asin -inf inf -> -0.78539816339744828 inf
+asin1011 asin nan inf -> nan inf
+asin1012 asin -0.0 nan -> -0.0 nan
+asin1013 asin -2.2999999999999998 nan -> nan nan
+asin1014 asin -inf nan -> nan inf ignore-imag-sign
+asin1015 asin nan nan -> nan nan
+asin1016 asin inf 0.0 -> 1.5707963267948966 inf
+asin1017 asin inf 2.2999999999999998 -> 1.5707963267948966 inf
+asin1018 asin 0.0 inf -> 0.0 inf
+asin1019 asin 2.2999999999999998 inf -> 0.0 inf
+asin1020 asin inf inf -> 0.78539816339744828 inf
+asin1021 asin 0.0 nan -> 0.0 nan
+asin1022 asin 2.2999999999999998 nan -> nan nan
+asin1023 asin inf nan -> nan inf ignore-imag-sign
+asin1024 asin inf -0.0 -> 1.5707963267948966 -inf
+asin1025 asin inf -2.2999999999999998 -> 1.5707963267948966 -inf
+asin1026 asin nan -0.0 -> nan nan
+asin1027 asin nan -2.2999999999999998 -> nan nan
+asin1028 asin 0.0 -inf -> 0.0 -inf
+asin1029 asin 2.2999999999999998 -inf -> 0.0 -inf
+asin1030 asin inf -inf -> 0.78539816339744828 -inf
+asin1031 asin nan -inf -> nan -inf
+asin1032 asin -inf -0.0 -> -1.5707963267948966 -inf
+asin1033 asin -inf -2.2999999999999998 -> -1.5707963267948966 -inf
+asin1034 asin -0.0 -inf -> -0.0 -inf
+asin1035 asin -2.2999999999999998 -inf -> -0.0 -inf
+asin1036 asin -inf -inf -> -0.78539816339744828 -inf
+
 
 ------------------------------------
 -- asinh: Inverse hyperbolic sine --
@@ -797,6 +836,49 @@ atan0301 atan 1e-155 1.0 -> 0.78539816339744828 178.79691829731851
 atan0302 atan 9.9999999999999999e-161 -1.0 -> 0.78539816339744828 -184.55338102980363
 atan0303 atan -1e-165 1.0 -> -0.78539816339744828 190.30984376228875
 atan0304 atan -9.9998886718268301e-321 -1.0 -> -0.78539816339744828 -368.76019403576692
+
+-- special values
+atan1000 atan -0.0 0.0 -> -0.0 0.0
+atan1001 atan nan 0.0 -> nan 0.0
+atan1002 atan -0.0 1.0 -> -0.0 inf divide-by-zero
+atan1003 atan -inf 0.0 -> -1.5707963267948966 0.0
+atan1004 atan -inf 2.2999999999999998 -> -1.5707963267948966 0.0
+atan1005 atan nan 2.2999999999999998 -> nan nan
+atan1006 atan -0.0 inf -> -1.5707963267948966 0.0
+atan1007 atan -2.2999999999999998 inf -> -1.5707963267948966 0.0
+atan1008 atan -inf inf -> -1.5707963267948966 0.0
+atan1009 atan nan inf -> nan 0.0
+atan1010 atan -0.0 nan -> nan nan
+atan1011 atan -2.2999999999999998 nan -> nan nan
+atan1012 atan -inf nan -> -1.5707963267948966 0.0 ignore-imag-sign
+atan1013 atan nan nan -> nan nan
+atan1014 atan 0.0 0.0 -> 0.0 0.0
+atan1015 atan 0.0 1.0 -> 0.0 inf divide-by-zero
+atan1016 atan inf 0.0 -> 1.5707963267948966 0.0
+atan1017 atan inf 2.2999999999999998 -> 1.5707963267948966 0.0
+atan1018 atan 0.0 inf -> 1.5707963267948966 0.0
+atan1019 atan 2.2999999999999998 inf -> 1.5707963267948966 0.0
+atan1020 atan inf inf -> 1.5707963267948966 0.0
+atan1021 atan 0.0 nan -> nan nan
+atan1022 atan 2.2999999999999998 nan -> nan nan
+atan1023 atan inf nan -> 1.5707963267948966 0.0 ignore-imag-sign
+atan1024 atan 0.0 -0.0 -> 0.0 -0.0
+atan1025 atan nan -0.0 -> nan -0.0
+atan1026 atan 0.0 -1.0 -> 0.0 -inf divide-by-zero
+atan1027 atan inf -0.0 -> 1.5707963267948966 -0.0
+atan1028 atan inf -2.2999999999999998 -> 1.5707963267948966 -0.0
+atan1029 atan nan -2.2999999999999998 -> nan nan
+atan1030 atan 0.0 -inf -> 1.5707963267948966 -0.0
+atan1031 atan 2.2999999999999998 -inf -> 1.5707963267948966 -0.0
+atan1032 atan inf -inf -> 1.5707963267948966 -0.0
+atan1033 atan nan -inf -> nan -0.0
+atan1034 atan -0.0 -0.0 -> -0.0 -0.0
+atan1035 atan -0.0 -1.0 -> -0.0 -inf divide-by-zero
+atan1036 atan -inf -0.0 -> -1.5707963267948966 -0.0
+atan1037 atan -inf -2.2999999999999998 -> -1.5707963267948966 -0.0
+atan1038 atan -0.0 -inf -> -1.5707963267948966 -0.0
+atan1039 atan -2.2999999999999998 -inf -> -1.5707963267948966 -0.0
+atan1040 atan -inf -inf -> -1.5707963267948966 -0.0
 
 
 ---------------------------------------
@@ -1888,6 +1970,61 @@ cos0021 cos 4.8048375263775256 0.0062248852898515658 -> 0.092318702015846243 0.0
 cos0022 cos 7.9914515433858515 0.71659966615501436 -> -0.17375439906936566 -0.77217043527294582
 cos0023 cos 0.45124351152540226 1.6992693993812158 -> 2.543477948972237 -1.1528193694875477
 
+-- special values
+cos1000 cos -0.0 0.0 -> 1.0 0.0
+cos1001 cos -inf 0.0 -> nan 0.0 invalid ignore-imag-sign
+cos1002 cos nan 0.0 -> nan 0.0 ignore-imag-sign
+cos1003 cos -inf 2.2999999999999998 -> nan nan invalid
+cos1004 cos nan 2.2999999999999998 -> nan nan
+cos1005 cos -0.0 inf -> inf 0.0
+cos1006 cos -1.3999999999999999 inf -> inf inf
+cos1007 cos -2.7999999999999998 inf -> -inf inf
+cos1008 cos -4.2000000000000002 inf -> -inf -inf
+cos1009 cos -5.5999999999999996 inf -> inf -inf
+cos1010 cos -7.0 inf -> inf inf
+cos1011 cos -inf inf -> inf nan invalid ignore-real-sign
+cos1012 cos nan inf -> inf nan
+cos1013 cos -0.0 nan -> nan 0.0 ignore-imag-sign
+cos1014 cos -2.2999999999999998 nan -> nan nan
+cos1015 cos -inf nan -> nan nan
+cos1016 cos nan nan -> nan nan
+cos1017 cos 0.0 0.0 -> 1.0 -0.0
+cos1018 cos inf 0.0 -> nan 0.0 invalid ignore-imag-sign
+cos1019 cos inf 2.2999999999999998 -> nan nan invalid
+cos1020 cos 0.0 inf -> inf -0.0
+cos1021 cos 1.3999999999999999 inf -> inf -inf
+cos1022 cos 2.7999999999999998 inf -> -inf -inf
+cos1023 cos 4.2000000000000002 inf -> -inf inf
+cos1024 cos 5.5999999999999996 inf -> inf inf
+cos1025 cos 7.0 inf -> inf -inf
+cos1026 cos inf inf -> inf nan invalid ignore-real-sign
+cos1027 cos 0.0 nan -> nan 0.0 ignore-imag-sign
+cos1028 cos 2.2999999999999998 nan -> nan nan
+cos1029 cos inf nan -> nan nan
+cos1030 cos 0.0 -0.0 -> 1.0 0.0
+cos1031 cos inf -0.0 -> nan 0.0 invalid ignore-imag-sign
+cos1032 cos nan -0.0 -> nan 0.0 ignore-imag-sign
+cos1033 cos inf -2.2999999999999998 -> nan nan invalid
+cos1034 cos nan -2.2999999999999998 -> nan nan
+cos1035 cos 0.0 -inf -> inf 0.0
+cos1036 cos 1.3999999999999999 -inf -> inf inf
+cos1037 cos 2.7999999999999998 -inf -> -inf inf
+cos1038 cos 4.2000000000000002 -inf -> -inf -inf
+cos1039 cos 5.5999999999999996 -inf -> inf -inf
+cos1040 cos 7.0 -inf -> inf inf
+cos1041 cos inf -inf -> inf nan invalid ignore-real-sign
+cos1042 cos nan -inf -> inf nan
+cos1043 cos -0.0 -0.0 -> 1.0 -0.0
+cos1044 cos -inf -0.0 -> nan 0.0 invalid ignore-imag-sign
+cos1045 cos -inf -2.2999999999999998 -> nan nan invalid
+cos1046 cos -0.0 -inf -> inf -0.0
+cos1047 cos -1.3999999999999999 -inf -> inf -inf
+cos1048 cos -2.7999999999999998 -inf -> -inf -inf
+cos1049 cos -4.2000000000000002 -inf -> -inf inf
+cos1050 cos -5.5999999999999996 -inf -> inf inf
+cos1051 cos -7.0 -inf -> inf -inf
+cos1052 cos -inf -inf -> inf nan invalid ignore-real-sign
+
 
 ---------------
 -- sin: Sine --
@@ -1921,6 +2058,61 @@ sin0021 sin 1.4342727387492671 0.81361889790284347 -> 1.3370960060947923 0.12336
 sin0022 sin 1.1518087354403725 4.8597235966150558 -> 58.919141989603041 26.237003403758852
 sin0023 sin 0.00087773078406649192 34.792379211312095 -> 565548145569.38245 644329685822700.62
 
+-- special values
+sin1000 sin -0.0 0.0 -> -0.0 0.0
+sin1001 sin -inf 0.0 -> nan 0.0 invalid ignore-imag-sign
+sin1002 sin nan 0.0 -> nan 0.0 ignore-imag-sign
+sin1003 sin -inf 2.2999999999999998 -> nan nan invalid
+sin1004 sin nan 2.2999999999999998 -> nan nan
+sin1005 sin -0.0 inf -> -0.0 inf
+sin1006 sin -1.3999999999999999 inf -> -inf inf
+sin1007 sin -2.7999999999999998 inf -> -inf -inf
+sin1008 sin -4.2000000000000002 inf -> inf -inf
+sin1009 sin -5.5999999999999996 inf -> inf inf
+sin1010 sin -7.0 inf -> -inf inf
+sin1011 sin -inf inf -> nan inf invalid ignore-imag-sign
+sin1012 sin nan inf -> nan inf ignore-imag-sign
+sin1013 sin -0.0 nan -> -0.0 nan
+sin1014 sin -2.2999999999999998 nan -> nan nan
+sin1015 sin -inf nan -> nan nan
+sin1016 sin nan nan -> nan nan
+sin1017 sin 0.0 0.0 -> 0.0 0.0
+sin1018 sin inf 0.0 -> nan 0.0 invalid ignore-imag-sign
+sin1019 sin inf 2.2999999999999998 -> nan nan invalid
+sin1020 sin 0.0 inf -> 0.0 inf
+sin1021 sin 1.3999999999999999 inf -> inf inf
+sin1022 sin 2.7999999999999998 inf -> inf -inf
+sin1023 sin 4.2000000000000002 inf -> -inf -inf
+sin1024 sin 5.5999999999999996 inf -> -inf inf
+sin1025 sin 7.0 inf -> inf inf
+sin1026 sin inf inf -> nan inf invalid ignore-imag-sign
+sin1027 sin 0.0 nan -> 0.0 nan
+sin1028 sin 2.2999999999999998 nan -> nan nan
+sin1029 sin inf nan -> nan nan
+sin1030 sin 0.0 -0.0 -> 0.0 -0.0
+sin1031 sin inf -0.0 -> nan 0.0 invalid ignore-imag-sign
+sin1032 sin nan -0.0 -> nan 0.0 ignore-imag-sign
+sin1033 sin inf -2.2999999999999998 -> nan nan invalid
+sin1034 sin nan -2.2999999999999998 -> nan nan
+sin1035 sin 0.0 -inf -> 0.0 -inf
+sin1036 sin 1.3999999999999999 -inf -> inf -inf
+sin1037 sin 2.7999999999999998 -inf -> inf inf
+sin1038 sin 4.2000000000000002 -inf -> -inf inf
+sin1039 sin 5.5999999999999996 -inf -> -inf -inf
+sin1040 sin 7.0 -inf -> inf -inf
+sin1041 sin inf -inf -> nan inf invalid ignore-imag-sign
+sin1042 sin nan -inf -> nan inf ignore-imag-sign
+sin1043 sin -0.0 -0.0 -> -0.0 -0.0
+sin1044 sin -inf -0.0 -> nan 0.0 invalid ignore-imag-sign
+sin1045 sin -inf -2.2999999999999998 -> nan nan invalid
+sin1046 sin -0.0 -inf -> -0.0 -inf
+sin1047 sin -1.3999999999999999 -inf -> -inf -inf
+sin1048 sin -2.7999999999999998 -inf -> -inf inf
+sin1049 sin -4.2000000000000002 -inf -> inf inf
+sin1050 sin -5.5999999999999996 -inf -> inf -inf
+sin1051 sin -7.0 -inf -> -inf -inf
+sin1052 sin -inf -inf -> nan inf invalid ignore-imag-sign
+
 
 ------------------
 -- tan: Tangent --
@@ -1953,6 +2145,62 @@ tan0020 tan 4.1459766396068325 12.523017205605756 -> 2.4022514758988068e-11 1.00
 tan0021 tan 1.7809617968443272 1.5052381702853379 -> -0.044066222118946903 1.0932684517702778
 tan0022 tan 1.1615313900880577 1.7956298728647107 -> 0.041793186826390362 1.0375339546034792
 tan0023 tan 0.067014779477908945 5.8517361577457097 -> 2.2088639754800034e-06 0.9999836182420061
+
+-- special values
+tan1000 tan -0.0 0.0 -> -0.0 0.0
+tan1001 tan -inf 0.0 -> nan nan invalid
+tan1002 tan -inf 2.2999999999999998 -> nan nan invalid
+tan1003 tan nan 0.0 -> nan nan
+tan1004 tan nan 2.2999999999999998 -> nan nan
+tan1005 tan -0.0 inf -> -0.0 1.0
+tan1006 tan -0.69999999999999996 inf -> -0.0 1.0
+tan1007 tan -1.3999999999999999 inf -> -0.0 1.0
+tan1008 tan -2.1000000000000001 inf -> 0.0 1.0
+tan1009 tan -2.7999999999999998 inf -> 0.0 1.0
+tan1010 tan -3.5 inf -> -0.0 1.0
+tan1011 tan -inf inf -> -0.0 1.0 ignore-real-sign
+tan1012 tan nan inf -> -0.0 1.0 ignore-real-sign
+tan1013 tan -0.0 nan -> -0.0 nan
+tan1014 tan -2.2999999999999998 nan -> nan nan
+tan1015 tan -inf nan -> nan nan
+tan1016 tan nan nan -> nan nan
+tan1017 tan 0.0 0.0 -> 0.0 0.0
+tan1018 tan inf 0.0 -> nan nan invalid
+tan1019 tan inf 2.2999999999999998 -> nan nan invalid
+tan1020 tan 0.0 inf -> 0.0 1.0
+tan1021 tan 0.69999999999999996 inf -> 0.0 1.0
+tan1022 tan 1.3999999999999999 inf -> 0.0 1.0
+tan1023 tan 2.1000000000000001 inf -> -0.0 1.0
+tan1024 tan 2.7999999999999998 inf -> -0.0 1.0
+tan1025 tan 3.5 inf -> 0.0 1.0
+tan1026 tan inf inf -> -0.0 1.0 ignore-real-sign
+tan1027 tan 0.0 nan -> 0.0 nan
+tan1028 tan 2.2999999999999998 nan -> nan nan
+tan1029 tan inf nan -> nan nan
+tan1030 tan 0.0 -0.0 -> 0.0 -0.0
+tan1031 tan inf -0.0 -> nan nan invalid
+tan1032 tan inf -2.2999999999999998 -> nan nan invalid
+tan1033 tan nan -0.0 -> nan nan
+tan1034 tan nan -2.2999999999999998 -> nan nan
+tan1035 tan 0.0 -inf -> 0.0 -1.0
+tan1036 tan 0.69999999999999996 -inf -> 0.0 -1.0
+tan1037 tan 1.3999999999999999 -inf -> 0.0 -1.0
+tan1038 tan 2.1000000000000001 -inf -> -0.0 -1.0
+tan1039 tan 2.7999999999999998 -inf -> -0.0 -1.0
+tan1040 tan 3.5 -inf -> 0.0 -1.0
+tan1041 tan inf -inf -> -0.0 -1.0 ignore-real-sign
+tan1042 tan nan -inf -> -0.0 -1.0 ignore-real-sign
+tan1043 tan -0.0 -0.0 -> -0.0 -0.0
+tan1044 tan -inf -0.0 -> nan nan invalid
+tan1045 tan -inf -2.2999999999999998 -> nan nan invalid
+tan1046 tan -0.0 -inf -> -0.0 -1.0
+tan1047 tan -0.69999999999999996 -inf -> -0.0 -1.0
+tan1048 tan -1.3999999999999999 -inf -> -0.0 -1.0
+tan1049 tan -2.1000000000000001 -inf -> 0.0 -1.0
+tan1050 tan -2.7999999999999998 -inf -> 0.0 -1.0
+tan1051 tan -3.5 -inf -> -0.0 -1.0
+tan1052 tan -inf -inf -> -0.0 -1.0 ignore-real-sign
+
 
 ------------------------------------------------------------------------
 -- rect: Conversion from polar coordinates to rectangular coordinates --
