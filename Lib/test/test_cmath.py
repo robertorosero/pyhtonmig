@@ -46,6 +46,37 @@ complex_nans = [complex(x, y) for x, y in [
         (INF, NAN)
         ]]
 
+def almostEqualF(a, b, rel_err=2e-15, abs_err = 5e-323):
+    """Determine whether floating-point values a and b are equal to within
+    a (small) rounding error.  The default values for rel_err and
+    abs_err are chosen to be suitable for platforms where a float is
+    represented by an IEEE 754 double.  They allow an error of between
+    9 and 19 ulps."""
+
+    # special values testing
+    if math.isnan(a):
+        return math.isnan(b)
+    if math.isinf(a):
+        return a == b
+
+    # if both a and b are zero, check whether they have the same sign
+    # (in theory there are examples where it would be legitimate for a
+    # and b to have opposite signs; in practice these hardly ever
+    # occur).
+    if not a and not b:
+        return math.copysign(1., a) == math.copysign(1., b)
+
+    # if a-b overflows, or b is infinite, return False.  Again, in
+    # theory there are examples where a is within a few ulps of the
+    # max representable float, and then b could legitimately be
+    # infinite.  In practice these examples are rare.
+    try:
+        absolute_error = abs(b-a)
+    except OverflowError:
+        return False
+    else:
+        return absolute_error <= max(abs_err, rel_err * abs(a))
+
 class CMathTests(unittest.TestCase):
     # list of all functions in cmath
     test_functions = [getattr(cmath, fname) for fname in [
@@ -62,7 +93,7 @@ class CMathTests(unittest.TestCase):
     def tearDown(self):
         self.test_values.close()
 
-    def rAssertAlmostEqual(self, a, b, rel_eps = 2e-15, abs_eps = 5e-323):
+    def rAssertAlmostEqual(self, a, b, rel_err = 2e-15, abs_err = 5e-323):
         """Check that two floating-point numbers are almost equal."""
 
         # special values testing
@@ -92,7 +123,7 @@ class CMathTests(unittest.TestCase):
         except OverflowError:
             pass
         else:
-            if absolute_error <= max(abs_eps, rel_eps * abs(a)):
+            if absolute_error <= max(abs_err, rel_err * abs(a)):
                 return
         self.fail("%s and %s are not sufficiently close" % (repr(a), repr(b)))
 
@@ -289,12 +320,22 @@ class CMathTests(unittest.TestCase):
             else:
                 function = getattr(cmath, fn)
             if 'divide-by-zero' in flags or 'invalid' in flags:
-                self.assertRaises(ValueError, function, arg)
-                continue
+                try:
+                    actual = function(arg)
+                except ValueError:
+                    continue
+                else:
+                    test_str = "%s: %s(complex(%r, %r))" % (id, fn, ar, ai)
+                    self.fail('ValueError not raised in test %s' % test_str)
 
             if 'overflow' in flags:
-                self.assertRaises(OverflowError, function, arg)
-                continue
+                try:
+                    actual = function(arg)
+                except OverflowError:
+                    continue
+                else:
+                    test_str = "%s: %s(complex(%r, %r))" % (id, fn, ar, ai)
+                    self.fail('OverflowError not raised in test %s' % test_str)
 
             actual = function(arg)
 
@@ -305,14 +346,24 @@ class CMathTests(unittest.TestCase):
                 actual = complex(actual.real, abs(actual.imag))
                 expected = complex(expected.real, abs(expected.imag))
 
+            # for the real part of the log function, we allow an
+            # absolute error of up to 2e-15.
             if fn in ('log', 'log10'):
-                # for the real part of the log function, we allow an
-                # absolute error of up to 2e-15.
-                self.rAssertAlmostEqual(expected.real, actual.real,
-                                        abs_eps = 2e-15)
+                real_abs_err = 2e-15
             else:
-                self.rAssertAlmostEqual(expected.real, actual.real)
-            self.rAssertAlmostEqual(expected.imag, actual.imag)
+                real_abs_err = 5e-323
+
+            if not (almostEqualF(expected.real, actual.real,
+                                 abs_err = real_abs_err) and
+                    almostEqualF(expected.imag, actual.imag)):
+                error_message = (
+                    "%s: %s(complex(%r, %r))\n" % (id, fn, ar, ai) +
+                    "Expected: complex(%r, %r)\n" %
+                                    (expected.real, expected.imag) +
+                    "Received: complex(%r, %r)\n" %
+                                    (actual.real, actual.imag) +
+                    "Received value insufficiently close to expected value.")
+                self.fail(error_message)
 
     def assertCISEqual(self, a, b):
         eps = 1E-7
