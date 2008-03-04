@@ -14,7 +14,7 @@
 
 void ffi_call_SYSV (extended_cif *,
 		    unsigned, unsigned,
-		    void *, void (*fn)(void));
+		    void *, void (*fn) ());
 void *ffi_prep_args (void *stack, extended_cif *ecif);
 void ffi_closure_SYSV (ffi_closure *);
 void ffi_closure_struct_SYSV (ffi_closure *);
@@ -166,7 +166,7 @@ ffi_prep_cif_machdep (ffi_cif *cif)
 }
 
 void
-ffi_call (ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue)
+ffi_call (ffi_cif *cif, void (*fn) (), void *rvalue, void **avalue)
 {
   extended_cif ecif;
 

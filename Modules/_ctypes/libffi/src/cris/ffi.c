@@ -236,11 +236,11 @@ ffi_prep_cif_machdep (ffi_cif * cif)
 
 extern void ffi_call_SYSV (int (*)(char *, extended_cif *),
 			   extended_cif *,
-			   unsigned, unsigned, unsigned *, void (*fn)(void))
+			   unsigned, unsigned, unsigned *, void (*fn) ())
      __attribute__ ((__visibility__ ("hidden")));
 
 void
-ffi_call (ffi_cif * cif, void (*fn)(void), void *rvalue, void **avalue)
+ffi_call (ffi_cif * cif, void (*fn) (), void *rvalue, void **avalue)
 {
   extended_cif ecif;
 

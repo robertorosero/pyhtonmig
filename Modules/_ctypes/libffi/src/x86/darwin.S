@@ -1,4 +1,3 @@
-#ifdef __i386__
 /* -----------------------------------------------------------------------
    darwin.S - Copyright (c) 1996, 1998, 2001, 2002, 2003, 2005  Red Hat, Inc.
 	Copyright (C) 2008  Free Software Foundation, Inc.
@@ -442,5 +441,3 @@ LEFDE3:
 #endif
 
 #endif /* ifndef __x86_64__ */
-
-#endif /* defined __i386__ */

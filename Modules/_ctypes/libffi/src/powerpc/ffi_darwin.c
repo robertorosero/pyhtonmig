@@ -1,4 +1,3 @@
-#if !(defined(__APPLE__) && !defined(__ppc__))
 /* -----------------------------------------------------------------------
    ffi_darwin.c
 
@@ -799,4 +798,3 @@ int ffi_closure_helper_DARWIN (ffi_closure* closure, void * rvalue,
   /* Tell ffi_closure_ASM to perform return type promotions.  */
   return cif->rtype->type;
 }
-#endif
