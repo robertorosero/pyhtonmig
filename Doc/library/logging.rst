@@ -43,7 +43,7 @@ can include messages from third-party modules.
 It is, of course, possible to log messages with different verbosity levels or to
 different destinations.  Support for writing log messages to files, HTTP
 GET/POST locations, email via SMTP, generic sockets, or OS-specific logging
-mechnisms are all supported by the standard module.  You can also create your
+mechanisms are all supported by the standard module.  You can also create your
 own log destination class if you have special requirements not met by any of the
 built-in classes.
 
@@ -245,8 +245,8 @@ With the logger object configured, the following methods create log messages:
   little more verbose for logging messages than using the log level convenience
   methods listed above, but this is how to log at custom log levels.
 
-:func:`getLogger` returns a reference to a logger instance with a name of name
-if a name is provided, or root if not.  The names are period-separated
+:func:`getLogger` returns a reference to a logger instance with the specified
+if it it is provided, or ``root`` if not.  The names are period-separated
 hierarchical structures.  Multiple calls to :func:`getLogger` with the same name
 will return a reference to the same logger object.  Loggers that are further
 down in the hierarchical list are children of loggers higher up in the list.
@@ -267,7 +267,7 @@ destination.  Logger objects can add zero or more handler objects to themselves
 with an :func:`addHandler` method.  As an example scenario, an application may
 want to send all log messages to a log file, all log messages of error or higher
 to stdout, and all messages of critical to an email address.  This scenario
-requires three individual handlers where each hander is responsible for sending
+requires three individual handlers where each handler is responsible for sending
 messages of a specific severity to a specific location.
 
 The standard library includes quite a few handler types; this tutorial uses only
@@ -298,7 +298,7 @@ Formatters
 ^^^^^^^^^^
 
 Formatter objects configure the final order, structure, and contents of the log
-message.  Unlike the base logging.Handler class, application code may
+message.  Unlike the base :class:`logging.Handler` class, application code may
 instantiate formatter classes, although you could likely subclass the formatter
 if your application needs special behavior.  The constructor takes two optional
 arguments: a message format string and a date format string.  If there is no
@@ -1651,27 +1651,28 @@ timed intervals.
    You can use the *when* to specify the type of *interval*. The list of possible
    values is, note that they are not case sensitive:
 
-   +----------+-----------------------+
-   | Value    | Type of interval      |
-   +==========+=======================+
-   | S        | Seconds               |
-   +----------+-----------------------+
-   | M        | Minutes               |
-   +----------+-----------------------+
-   | H        | Hours                 |
-   +----------+-----------------------+
-   | D        | Days                  |
-   +----------+-----------------------+
-   | W        | Week day (0=Monday)   |
-   +----------+-----------------------+
-   | midnight | Roll over at midnight |
-   +----------+-----------------------+
+   +----------------+-----------------------+
+   | Value          | Type of interval      |
+   +================+=======================+
+   | ``'S'``        | Seconds               |
+   +----------------+-----------------------+
+   | ``'M'``        | Minutes               |
+   +----------------+-----------------------+
+   | ``'H'``        | Hours                 |
+   +----------------+-----------------------+
+   | ``'D'``        | Days                  |
+   +----------------+-----------------------+
+   | ``'W'``        | Week day (0=Monday)   |
+   +----------------+-----------------------+
+   | ``'midnight'`` | Roll over at midnight |
+   +----------------+-----------------------+
 
-   If *backupCount* is non-zero, the system will save old log files by appending
-   extensions to the filename. The extensions are date-and-time based, using the
-   strftime format ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on
-   the rollover interval. At most *backupCount* files will be kept, and if more
-   would be created when rollover occurs, the oldest one is deleted.
+   The system will save old log files by appending extensions to the filename.
+   The extensions are date-and-time based, using the strftime format
+   ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on the rollover
+   interval. If *backupCount* is nonzero, at most *backupCount* files will be
+   kept, and if more would be created when rollover occurs, the oldest one is
+   deleted.
 
 
 .. method:: TimedRotatingFileHandler.doRollover()

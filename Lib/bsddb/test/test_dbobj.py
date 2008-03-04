@@ -1,7 +1,6 @@
 
-import sys, os, string
+import os, string
 import unittest
-import glob
 import tempfile
 
 try:
@@ -10,6 +9,11 @@ try:
 except ImportError:
     # For Python 2.3
     from bsddb import db, dbobj
+
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 
 #----------------------------------------------------------------------
@@ -20,7 +24,7 @@ class dbobjTestCase(unittest.TestCase):
     db_name = 'test-dbobj.db'
 
     def setUp(self):
-        homeDir = os.path.join(tempfile.gettempdir(), 'db_home')
+        homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         self.homeDir = homeDir
         try: os.mkdir(homeDir)
         except os.error: pass
@@ -30,9 +34,7 @@ class dbobjTestCase(unittest.TestCase):
             del self.db
         if hasattr(self, 'env'):
             del self.env
-        files = glob.glob(os.path.join(self.homeDir, '*'))
-        for file in files:
-            os.remove(file)
+        test_support.rmtree(self.homeDir)
 
     def test01_both(self):
         class TestDBEnv(dbobj.DBEnv): pass

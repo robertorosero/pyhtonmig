@@ -66,7 +66,6 @@ Req-started-unread-response    _CS_REQ_STARTED    <response_class>
 Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 """
 
-import errno
 import mimetools
 import socket
 from urlparse import urlsplit
@@ -439,6 +438,9 @@ class HTTPResponse:
                 self.length = int(length)
             except ValueError:
                 self.length = None
+            else:
+                if self.length < 0:  # ignore nonsensical negative lengths
+                    self.length = None
         else:
             self.length = None
 
@@ -547,7 +549,13 @@ class HTTPResponse:
                 i = line.find(';')
                 if i >= 0:
                     line = line[:i] # strip chunk-extensions
-                chunk_left = int(line, 16)
+                try:
+                    chunk_left = int(line, 16)
+                except ValueError:
+                    # close the connection as protocol synchronisation is
+                    # probably lost
+                    self.close()
+                    raise IncompleteRead(value)
                 if chunk_left == 0:
                     break
             if amt is None:

@@ -230,14 +230,15 @@ generator are those that would be produced by considering each of the
 evaluating the expression to yield a value that is reached the innermost block
 for each iteration.
 
-Variables used in the generator expression are evaluated lazily when the
-:meth:`next` method is called for generator object (in the same fashion as
-normal generators). However, the leftmost :keyword:`for` clause is immediately
-evaluated so that error produced by it can be seen before any other possible
-error in the code that handles the generator expression. Subsequent
-:keyword:`for` clauses cannot be evaluated immediately since they may depend on
-the previous :keyword:`for` loop. For example: ``(x*y for x in range(10) for y
-in bar(x))``.
+Variables used in the generator expression are evaluated lazily in a separate
+scope when the :meth:`next` method is called for the generator object (in the
+same fashion as for normal generators).  However, the :keyword:`in` expression
+of the leftmost :keyword:`for` clause is immediately evaluated in the current
+scope so that an error produced by it can be seen before any other possible
+error in the code that handles the generator expression.  Subsequent
+:keyword:`for` and :keyword:`if` clauses cannot be evaluated immediately since
+they may depend on the previous :keyword:`for` loop.  For example:
+``(x*y for x in range(10) for y in bar(x))``.
 
 The parentheses can be omitted on calls with only one argument. See section
 :ref:`calls` for the detail.
@@ -395,7 +396,7 @@ generator function:
    generator, or raises :exc:`StopIteration` if the generator exits without
    yielding another value. When :meth:`send` is called to start the generator, it
    must be called with :const:`None` as the argument, because there is no
-   :keyword:`yield` expression that could receieve the value.
+   :keyword:`yield` expression that could receive the value.
 
 
 .. method:: generator.throw(type[, value[, traceback]])
@@ -677,7 +678,7 @@ there were no excess keyword arguments.
 
 If the syntax ``*expression`` appears in the function call, ``expression`` must
 evaluate to a sequence.  Elements from this sequence are treated as if they were
-additional positional arguments; if there are postional arguments *x1*,...,*xN*
+additional positional arguments; if there are positional arguments *x1*,...,*xN*
 , and ``expression`` evaluates to a sequence *y1*,...,*yM*, this is equivalent
 to a call with M+N positional arguments *x1*,...,*xN*,*y1*,...,*yM*.
 

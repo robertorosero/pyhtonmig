@@ -20,9 +20,8 @@
 #
 # $Id$
 
-import sys, os, re
+import os, re
 import tempfile
-import shutil
 try:
     import cPickle
     pickle = cPickle
@@ -40,6 +39,10 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbtables
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 
 #----------------------------------------------------------------------
@@ -58,7 +61,7 @@ class TableDBTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.tdb.close()
-        shutil.rmtree(self.testHomeDir)
+        test_support.rmtree(self.testHomeDir)
 
     def test01(self):
         tabname = "test01"

@@ -76,6 +76,67 @@ loops that truncate the stream.
                   yield element
 
 
+.. function:: itertools.chain.from_iterable(iterable)
+
+   Alternate constructor for :func:`chain`.  Gets chained inputs from a 
+   single iterable argument that is evaluated lazily.  Equivalent to::
+
+      @classmethod
+      def from_iterable(iterables):
+          for it in iterables:
+              for element in it:
+                  yield element
+
+   .. versionadded:: 2.6
+
+
+.. function:: combinations(iterable, r)
+
+   Return successive *r* length combinations of elements in the *iterable*.
+
+   Combinations are emitted in lexicographic sort order.  So, if the 
+   input *iterable* is sorted, the combination tuples will be produced
+   in sorted order.  
+
+   Elements are treated as unique based on their position, not on their
+   value.  So if the input elements are unique, there will be no repeat
+   values in each combination.
+
+   Each result tuple is ordered to match the input order.  So, every
+   combination is a subsequence of the input *iterable*.
+
+   Equivalent to::
+
+        def combinations(iterable, r):
+            'combinations(range(4), 3) --> (0,1,2) (0,1,3) (0,2,3) (1,2,3)'
+            pool = tuple(iterable)
+            n = len(pool)
+            indices = range(r)
+            yield tuple(pool[i] for i in indices)
+            while 1:
+                for i in reversed(range(r)):
+                    if indices[i] != i + n - r:
+                        break
+                else:
+                    return
+                indices[i] += 1
+                for j in range(i+1, r):
+                    indices[j] = indices[j-1] + 1
+                yield tuple(pool[i] for i in indices)
+
+   The code for :func:`combinations` can be also expressed as a subsequence
+   of :func:`permutations` after filtering entries where the elements are not
+   in sorted order (according to their position in the input pool)::
+
+        def combinations(iterable, r):
+            pool = tuple(iterable)
+            n = len(pool)
+            for indices in permutations(range(n), r):
+                if sorted(indices) == list(indices):
+                    yield tuple(pool[i] for i in indices)
+
+   .. versionadded:: 2.6
+
 .. function:: count([n])
 
    Make an iterator that returns consecutive integers starting with *n*. If not
@@ -302,6 +363,89 @@ loops that truncate the stream.
 
    .. versionadded:: 2.6
 
+.. function:: permutations(iterable[, r])
+
+   Return successive *r* length permutations of elements in the *iterable*.
+
+   If *r* is not specified or is ``None``, then *r* defaults to the length
+   of the *iterable* and all possible full-length permutations 
+   are generated.
+
+   Permutations are emitted in lexicographic sort order.  So, if the 
+   input *iterable* is sorted, the permutation tuples will be produced
+   in sorted order.  
+
+   Elements are treated as unique based on their position, not on their
+   value.  So if the input elements are unique, there will be no repeat
+   values in each permutation.
+
+   Equivalent to::
+
+        def permutations(iterable, r=None):
+            'permutations(range(3), 2) --> (0,1) (0,2) (1,0) (1,2) (2,0) (2,1)'
+            pool = tuple(iterable)
+            n = len(pool)
+            r = n if r is None else r
+            indices = range(n)
+            cycles = range(n-r+1, n+1)[::-1]
+            yield tuple(pool[i] for i in indices[:r])
+            while n:
+                for i in reversed(range(r)):
+                    cycles[i] -= 1
+                    if cycles[i] == 0:
+                        indices[i:] = indices[i+1:] + indices[i:i+1]
+                        cycles[i] = n - i
+                    else:
+                        j = cycles[i]
+                        indices[i], indices[-j] = indices[-j], indices[i]
+                        yield tuple(pool[i] for i in indices[:r])
+                        break
+                else:
+                    return
+
+   The code for :func:`permutations` can be also expressed as a subsequence of 
+   :func:`product`, filtered to exclude entries with repeated elements (those
+   from the same position in the input pool)::
+
+        def permutations(iterable, r=None):
+            pool = tuple(iterable)
+            n = len(pool)
+            r = n if r is None else r
+            for indices in product(range(n), repeat=r):
+                if len(set(indices)) == r:
+                    yield tuple(pool[i] for i in indices)
+
+   .. versionadded:: 2.6
+
+.. function:: product(*iterables[, repeat])
+
+   Cartesian product of input iterables.
+
+   Equivalent to nested for-loops in a generator expression. For example,
+   ``product(A, B)`` returns the same as ``((x,y) for x in A for y in B)``.
+
+   The leftmost iterators are in the outermost for-loop, so the output tuples
+   cycle like an odometer (with the rightmost element changing on every 
+   iteration).  This results in a lexicographic ordering so that if the 
+   inputs iterables are sorted, the product tuples are emitted
+   in sorted order.
+
+   To compute the product of an iterable with itself, specify the number of
+   repetitions with the optional *repeat* keyword argument.  For example,
+   ``product(A, repeat=4)`` means the same as ``product(A, A, A, A)``.
+
+   This function is equivalent to the following code, except that the
+   actual implementation does not build up intermediate results in memory::
+
+       def product(*args, **kwds):
+           pools = map(tuple, args) * kwds.get('repeat', 1)
+           result = [[]]
+           for pool in pools:
+               result = [x+[y] for x in result for y in pool]
+           for prod in result:
+               yield tuple(prod)
+
+   .. versionadded:: 2.6
 
 .. function:: repeat(object[, times])
 
@@ -492,13 +636,13 @@ which incur interpreter overhead. ::
 
    def ncycles(seq, n):
        "Returns the sequence elements n times"
-       return chain(*repeat(seq, n))
+       return chain.from_iterable(repeat(seq, n))
 
    def dotproduct(vec1, vec2):
        return sum(imap(operator.mul, vec1, vec2))
 
    def flatten(listOfLists):
-       return list(chain(*listOfLists))
+       return list(chain.from_iterable(listOfLists))
 
    def repeatfunc(func, times=None, *args):
        """Repeat calls to func with specified arguments.
@@ -507,8 +651,7 @@ which incur interpreter overhead. ::
        """
        if times is None:
            return starmap(func, repeat(args))
-       else:
-           return starmap(func, repeat(args, times))
+       return starmap(func, repeat(args, times))
 
    def pairwise(iterable):
        "s -> (s0,s1), (s1,s2), (s2, s3), ..."
@@ -525,7 +668,7 @@ which incur interpreter overhead. ::
 
    def roundrobin(*iterables):
        "roundrobin('abc', 'd', 'ef') --> 'a', 'd', 'e', 'b', 'f', 'c'"
-       # Recipe contributed by George Sakkis
+       # Recipe credited to George Sakkis
        pending = len(iterables)
        nexts = cycle(iter(it).next for it in iterables)
        while pending:
@@ -535,4 +678,11 @@ which incur interpreter overhead. ::
            except StopIteration:
                pending -= 1
                nexts = cycle(islice(nexts, pending))
+
+   def powerset(iterable):
+       "powerset('ab') --> set([]), set(['a']), set(['b']), set(['a', 'b'])"
+       # Recipe credited to Eric Raymond
+       pairs = [(2**i, x) for i, x in enumerate(iterable)]
+       for n in xrange(2**len(pairs)):
+           yield set(x for m, x in pairs if m&n)
 

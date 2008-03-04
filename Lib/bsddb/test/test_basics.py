@@ -4,9 +4,7 @@ various DB flags, etc.
 """
 
 import os
-import sys
 import errno
-import shutil
 import string
 import tempfile
 from pprint import pprint
@@ -19,6 +17,11 @@ try:
 except ImportError:
     # For Python 2.3
     from bsddb import db
+
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 from test_all import verbose
 
@@ -54,13 +57,9 @@ class BasicTestCase(unittest.TestCase):
 
     def setUp(self):
         if self.useEnv:
-            homeDir = os.path.join(tempfile.gettempdir(), 'db_home')
+            homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
             self.homeDir = homeDir
-            try:
-                shutil.rmtree(homeDir)
-            except OSError, e:
-                # unix returns ENOENT, windows returns ESRCH
-                if e.errno not in (errno.ENOENT, errno.ESRCH): raise
+            test_support.rmtree(homeDir)
             os.mkdir(homeDir)
             try:
                 self.env = db.DBEnv()
@@ -74,7 +73,7 @@ class BasicTestCase(unittest.TestCase):
                 tempfile.tempdir = None
             # Yes, a bare except is intended, since we're re-raising the exc.
             except:
-                shutil.rmtree(homeDir)
+                test_support.rmtree(homeDir)
                 raise
         else:
             self.env = None
@@ -98,8 +97,8 @@ class BasicTestCase(unittest.TestCase):
     def tearDown(self):
         self.d.close()
         if self.env is not None:
+            test_support.rmtree(self.homeDir)
             self.env.close()
-            shutil.rmtree(self.homeDir)
             ## Make a new DBEnv to remove the env files from the home dir.
             ## (It can't be done while the env is open, nor after it has been
             ## closed, so we make a new one to do it.)

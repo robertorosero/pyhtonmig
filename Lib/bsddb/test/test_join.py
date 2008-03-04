@@ -1,10 +1,8 @@
 """TestCases for using the DB.join and DBCursor.join_item methods.
 """
 
-import sys, os, string
+import os
 import tempfile
-import time
-from pprint import pprint
 
 try:
     from threading import Thread, currentThread
@@ -22,6 +20,10 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbshelve
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 #----------------------------------------------------------------------
 
@@ -49,7 +51,7 @@ class JoinTestCase(unittest.TestCase):
 
     def setUp(self):
         self.filename = self.__class__.__name__ + '.db'
-        homeDir = os.path.join(tempfile.gettempdir(), 'db_home')
+        homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         self.homeDir = homeDir
         try: os.mkdir(homeDir)
         except os.error: pass
@@ -58,10 +60,7 @@ class JoinTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.env.close()
-        import glob
-        files = glob.glob(os.path.join(self.homeDir, '*'))
-        for file in files:
-            os.remove(file)
+        test_support.rmtree(self.homeDir)
 
     def test01_join(self):
         if verbose:

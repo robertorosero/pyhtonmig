@@ -166,7 +166,7 @@ builtin_apply(PyObject *self, PyObject *args)
 
 	if (Py_Py3kWarningFlag &&
 	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "apply() not supported in 3.x") < 0)
+		       "apply() not supported in 3.x. Use func(*args, **kwargs).") < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
@@ -209,11 +209,23 @@ Deprecated since release 2.3. Instead, use the extended call syntax:\n\
 
 
 static PyObject *
+builtin_bin(PyObject *self, PyObject *v)
+{
+        return PyNumber_ToBase(v, 2);
+}
+
+PyDoc_STRVAR(bin_doc,
+"bin(number) -> string\n\
+\n\
+Return the binary representation of an integer or long integer.");
+
+
+static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
 	if (Py_Py3kWarningFlag &&
 	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "callable() not supported in 3.x") < 0)
+		       "callable() not supported in 3.x. Use hasattr(o, '__call__').") < 0)
 		return NULL;
 	return PyBool_FromLong((long)PyCallable_Check(v));
 }
@@ -672,7 +684,7 @@ builtin_execfile(PyObject *self, PyObject *args)
 
 	if (Py_Py3kWarningFlag &&
 	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "execfile() not supported in 3.x") < 0)
+		       "execfile() not supported in 3.x.  Use exec().") < 0)
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "s|O!O:execfile",
@@ -897,9 +909,15 @@ builtin_map(PyObject *self, PyObject *args)
 	func = PyTuple_GetItem(args, 0);
 	n--;
 
-	if (func == Py_None && n == 1) {
-		/* map(None, S) is the same as list(S). */
-		return PySequence_List(PyTuple_GetItem(args, 1));
+	if (func == Py_None) {
+		if (Py_Py3kWarningFlag &&
+		    PyErr_Warn(PyExc_DeprecationWarning, 
+			       "map(None, ...) not supported in 3.x. Use list(...).") < 0)
+			return NULL;
+		if (n == 1) {
+			/* map(None, S) is the same as list(S). */
+			return PySequence_List(PyTuple_GetItem(args, 1));
+		}
 	}
 
 	/* Get space for sequence descriptors.  Must NULL out the iterator
@@ -2366,6 +2384,7 @@ static PyMethodDef builtin_methods[] = {
  	{"all",		builtin_all,        METH_O, all_doc},
  	{"any",		builtin_any,        METH_O, any_doc},
  	{"apply",	builtin_apply,      METH_VARARGS, apply_doc},
+	{"bin",		builtin_bin,	    METH_O, bin_doc},
  	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
  	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},

@@ -2,7 +2,6 @@
 """
 
 import os
-import sys
 import unittest
 import tempfile
 
@@ -13,12 +12,17 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbshelve, hashopen
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
+
 #----------------------------------------------------------------------
 
 class MiscTestCase(unittest.TestCase):
     def setUp(self):
         self.filename = self.__class__.__name__ + '.db'
-        homeDir = os.path.join(tempfile.gettempdir(), 'db_home')
+        homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         self.homeDir = homeDir
         try:
             os.mkdir(homeDir)
@@ -26,12 +30,8 @@ class MiscTestCase(unittest.TestCase):
             pass
 
     def tearDown(self):
-        try:
-            os.remove(self.filename)
-        except OSError:
-            pass
-        import shutil
-        shutil.rmtree(self.homeDir)
+        test_support.unlink(self.filename)
+        test_support.rmtree(self.homeDir)
 
     def test01_badpointer(self):
         dbs = dbshelve.open(self.filename)

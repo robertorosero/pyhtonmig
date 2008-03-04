@@ -1,6 +1,6 @@
 import unittest
 import tempfile
-import sys, os, glob
+import os, glob
 
 try:
     # For Pythons w/distutils pybsddb
@@ -8,6 +8,11 @@ try:
 except ImportError:
     # For Python 2.3
     from bsddb import db
+
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 
 #----------------------------------------------------------------------
@@ -17,7 +22,7 @@ class pget_bugTestCase(unittest.TestCase):
     db_name = 'test-cursor_pget.db'
 
     def setUp(self):
-        self.homeDir = os.path.join(tempfile.gettempdir(), 'db_home')
+        self.homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         try:
             os.mkdir(self.homeDir)
         except os.error:
@@ -42,9 +47,7 @@ class pget_bugTestCase(unittest.TestCase):
         del self.secondary_db
         del self.primary_db
         del self.env
-        for file in glob.glob(os.path.join(self.homeDir, '*')):
-            os.remove(file)
-        os.removedirs(self.homeDir)
+        test_support.rmtree(self.homeDir)
 
     def test_pget(self):
         cursor = self.secondary_db.cursor()

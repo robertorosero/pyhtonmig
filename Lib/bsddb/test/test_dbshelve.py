@@ -2,9 +2,8 @@
 TestCases for checking dbShelve objects.
 """
 
-import sys, os, string
+import os, string
 import tempfile, random
-from pprint import pprint
 from types import *
 import unittest
 
@@ -14,6 +13,11 @@ try:
 except ImportError:
     # For Python 2.3
     from bsddb import db, dbshelve
+
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 from test_all import verbose
 
@@ -246,7 +250,7 @@ class ThreadHashShelveTestCase(BasicShelveTestCase):
 class BasicEnvShelveTestCase(DBShelveTestCase):
     def do_open(self):
         self.homeDir = homeDir = os.path.join(
-            tempfile.gettempdir(), 'db_home')
+            tempfile.gettempdir(), 'db_home%d'%os.getpid())
         try: os.mkdir(homeDir)
         except os.error: pass
         self.env = db.DBEnv()
@@ -263,12 +267,8 @@ class BasicEnvShelveTestCase(DBShelveTestCase):
 
 
     def tearDown(self):
+        test_support.rmtree(self.homeDir)
         self.do_close()
-        import glob
-        files = glob.glob(os.path.join(self.homeDir, '*'))
-        for file in files:
-            os.remove(file)
-
 
 
 class EnvBTreeShelveTestCase(BasicEnvShelveTestCase):
