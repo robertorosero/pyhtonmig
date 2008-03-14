@@ -3,10 +3,13 @@
 /* much code borrowed from mathmodule.c */
 
 #include "Python.h"
-
-/* we need DBL_MAX, DBL_MIN, DBL_EPSILON and DBL_MANT_DIG from float.h */
-/* We assume that FLT_RADIX is 2, not 10 or 16. */
+/* we need DBL_MAX, DBL_MIN, DBL_EPSILON, DBL_MANT_DIG and FLT_RADIX from
+   float.h.  We assume that FLT_RADIX is either 2 or 16. */
 #include <float.h>
+
+#if (FLT_RADIX != 2 && FLT_RADIX != 16)
+#error "Modules/cmathmodule.c expects FLT_RADIX to be 2 or 16"
+#endif
 
 #ifndef M_LN2
 #define M_LN2 (0.6931471805599453094) /* natural log of 2 */
@@ -28,10 +31,20 @@
 #define CM_LOG_LARGE_DOUBLE (log(CM_LARGE_DOUBLE))
 #define CM_SQRT_DBL_MIN (sqrt(DBL_MIN))
 
-/* CM_SCALE_UP defines the power of 2 to multiply by to turn a subnormal into
-   a normal; used in sqrt.  must be odd */
-#define CM_SCALE_UP 2*(DBL_MANT_DIG/2) + 1
-#define CM_SCALE_DOWN -(DBL_MANT_DIG/2 + 1)
+/* 
+   CM_SCALE_UP is an odd integer chosen such that multiplication by
+   2**CM_SCALE_UP is sufficient to turn a subnormal into a normal.
+   CM_SCALE_DOWN is (-(CM_SCALE_UP+1)/2).  These scalings are used to compute
+   square roots accurately when the real and imaginary parts of the argument
+   are subnormal.
+*/
+
+#if FLT_RADIX==2
+#define CM_SCALE_UP (2*(DBL_MANT_DIG/2) + 1)
+#elif FLT_RADIX==16
+#define CM_SCALE_UP (4*DBL_MANT_DIG+1)
+#endif
+#define CM_SCALE_DOWN (-(CM_SCALE_UP+1)/2)
 
 /* forward declarations */
 static Py_complex c_asinh(Py_complex);
@@ -96,7 +109,7 @@ special_type(double d)
 #define P34 0.75*Py_MATH_PI
 #ifdef MS_WINDOWS
 /* On Windows HUGE_VAL is an extern variable and not a constant. Since the
-   special value arrays need a constant we have to role our own infinity
+   special value arrays need a constant we have to roll our own infinity
    and nan. */
 #  define INF (DBL_MAX*DBL_MAX)
 #  define N (INF*0.)
@@ -106,16 +119,23 @@ special_type(double d)
 #endif /* MS_WINDOWS */
 #define U -9.5426319407711027e33 /* unlikely value, used as placeholder */
 
-/* First, the C functions that do the real work */
+/* First, the C functions that do the real work.  Each of the c_*
+   functions computes and returns the C99 Annex G recommended result
+   and also sets errno as follows: errno = 0 if no floating-point
+   exception is associated with the result; errno = EDOM if C99 Annex
+   G recommends raising divide-by-zero or invalid for this result; and
+   errno = ERANGE where the overflow floating-point signal should be
+   raised.
+*/
 
 static Py_complex acos_special_values[7][7] = {
-	{{P34,INF}, {P,INF}, {P,INF},    {P,-INF},    {P, -INF}, {P34,-INF}, {N,INF}},
-	{{P12,INF}, {U,U}, {U,U},    {U,U},     {U,U},   {P12,-INF}, {N,N}},
-	{{P12,INF}, {U,U}, {P12,0.}, {P12,-0.}, {U,U},   {P12,-INF}, {P12,N}},
-	{{P12,INF}, {U,U}, {P12,0.}, {P12,-0.}, {U,U},   {P12,-INF}, {P12,N}},
-	{{P12,INF}, {U,U}, {U,U},    {U,U},     {U,U},   {P12,-INF}, {N,N}},
-	{{P14,INF}, {0.,INF},{0.,INF},   {0.,-INF},   {0.,-INF}, {P14,-INF}, {N,INF}},
-	{{N,INF},   {N,N}, {N,N},    {N,N},     {N,N},   {N,-INF},    {N,N}}
+  {{P34,INF},{P,INF}, {P,INF}, {P,-INF}, {P,-INF}, {P34,-INF},{N,INF}},
+  {{P12,INF},{U,U},   {U,U},   {U,U},    {U,U},    {P12,-INF},{N,N}},
+  {{P12,INF},{U,U},   {P12,0.},{P12,-0.},{U,U},    {P12,-INF},{P12,N}},
+  {{P12,INF},{U,U},   {P12,0.},{P12,-0.},{U,U},    {P12,-INF},{P12,N}},
+  {{P12,INF},{U,U},   {U,U},   {U,U},    {U,U},    {P12,-INF},{N,N}},
+  {{P14,INF},{0.,INF},{0.,INF},{0.,-INF},{0.,-INF},{P14,-INF},{N,INF}},
+  {{N,INF},  {N,N},   {N,N},   {N,N},    {N,N},    {N,-INF},  {N,N}}
 };
 
 static Py_complex
@@ -125,7 +145,7 @@ c_acos(Py_complex z)
 
 	SPECIAL_VALUE(z, acos_special_values);
 
-        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+	if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		/* avoid unnecessary overflow for large arguments */
 		r.real = atan2(fabs(z.imag), z.real);
 		/* split into cases to make sure that the branch cut has the
@@ -158,13 +178,13 @@ PyDoc_STRVAR(c_acos_doc,
 
 
 static Py_complex acosh_special_values[7][7] = {
-	{{INF,-P34}, {INF,-P}, {INF,-P},    {INF,P},    {INF,P}, {INF,P34}, {INF,N}},
-	{{INF,-P12}, {U,U},  {U,U},     {U,U},    {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {0.,-P12}, {0.,P12}, {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {0.,-P12}, {0.,P12}, {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {U,U},     {U,U},    {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P14}, {INF,-0.},{INF,-0.},   {INF,0.},   {INF,0.},{INF,P14}, {INF,N}},
-	{{INF,N},    {N,N},  {N,N},     {N,N},    {N,N}, {INF,N},   {N,N}}
+  {{INF,-P34},{INF,-P}, {INF,-P}, {INF,P}, {INF,P}, {INF,P34},{INF,N}},
+  {{INF,-P12},{U,U},    {U,U},    {U,U},   {U,U},   {INF,P12},{N,N}},
+  {{INF,-P12},{U,U},    {0.,-P12},{0.,P12},{U,U},   {INF,P12},{N,N}},
+  {{INF,-P12},{U,U},    {0.,-P12},{0.,P12},{U,U},   {INF,P12},{N,N}},
+  {{INF,-P12},{U,U},    {U,U},    {U,U},   {U,U},   {INF,P12},{N,N}},
+  {{INF,-P14},{INF,-0.},{INF,-0.},{INF,0.},{INF,0.},{INF,P14},{INF,N}},
+  {{INF,N},   {N,N},    {N,N},    {N,N},   {N,N},   {INF,N},  {N,N}}
 };
 
 static Py_complex
@@ -174,7 +194,7 @@ c_acosh(Py_complex z)
 
 	SPECIAL_VALUE(z, acosh_special_values);
 
-        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+	if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		/* avoid unnecessary overflow for large arguments */
 		r.real = log(hypot(z.real/2., z.imag/2.)) + M_LN2*2.;
 		r.imag = atan2(z.imag, z.real);
@@ -218,13 +238,13 @@ PyDoc_STRVAR(c_asin_doc,
 
 
 static Py_complex asinh_special_values[7][7] = {
-	{{-INF,-P14}, {-INF,-0.},{-INF,-0.}, {-INF,0.}, {-INF,0.},{-INF,P14}, {-INF,N}},
-	{{-INF,-P12}, {U,U},   {U,U},    {U,U},   {U,U},  {-INF,P12}, {N,N}},
-	{{-INF,-P12}, {U,U},   {-0.,-0.},{-0.,0.},{U,U},  {-INF,P12}, {N,N}},
-	{{INF,-P12},  {U,U},   {0.,-0.}, {0.,0.}, {U,U},  {INF,P12},  {N,N}},
-	{{INF,-P12},  {U,U},   {U,U},    {U,U},   {U,U},  {INF,P12},  {N,N}},
-	{{INF,-P14},  {INF,-0.}, {INF,-0.},  {INF,0.},  {INF,0.}, {INF,P14},  {INF,N}},
-	{{INF,N},     {N,N},   {N,-0.},  {N,0.},  {N,N},  {INF,N},    {N,N}}
+  {{-INF,-P14},{-INF,-0.},{-INF,-0.},{-INF,0.},{-INF,0.},{-INF,P14},{-INF,N}},
+  {{-INF,-P12},{U,U},     {U,U},     {U,U},    {U,U},    {-INF,P12},{N,N}},
+  {{-INF,-P12},{U,U},     {-0.,-0.}, {-0.,0.}, {U,U},    {-INF,P12},{N,N}},
+  {{INF,-P12}, {U,U},     {0.,-0.},  {0.,0.},  {U,U},    {INF,P12}, {N,N}},
+  {{INF,-P12}, {U,U},     {U,U},     {U,U},    {U,U},    {INF,P12}, {N,N}},
+  {{INF,-P14}, {INF,-0.}, {INF,-0.}, {INF,0.}, {INF,0.}, {INF,P14}, {INF,N}},
+  {{INF,N},    {N,N},     {N,-0.},   {N,0.},   {N,N},    {INF,N},   {N,N}}
 };
 
 static Py_complex
@@ -234,7 +254,7 @@ c_asinh(Py_complex z)
 
 	SPECIAL_VALUE(z, asinh_special_values);
 
-        if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
+	if (fabs(z.real) > CM_LARGE_DOUBLE || fabs(z.imag) > CM_LARGE_DOUBLE) {
 		if (z.imag >= 0.) {
 			r.real = copysign(log(hypot(z.real/2., z.imag/2.)) +
 					  M_LN2*2., z.real);
@@ -304,13 +324,13 @@ PyDoc_STRVAR(c_atan_doc,
 
 
 static Py_complex atanh_special_values[7][7] = {
-	{{-0.,-P12},{-0.,-P12}, {-0.,-P12}, {-0.,P12}, {-0.,P12}, {-0.,P12},{-0.,N}},
-	{{-0.,-P12},{U,U},      {U,U},      {U,U},     {U,U},     {-0.,P12},{N,N}},
-	{{-0.,-P12},{U,U},      {-0.,-0.},  {-0.,0.},  {U,U},     {-0.,P12},{-0.,N}},
-	{{0.,-P12}, {U,U},      {0.,-0.},   {0.,0.},   {U,U},     {0.,P12}, {0.,N}},
-	{{0.,-P12}, {U,U},      {U,U},      {U,U},     {U,U},     {0.,P12}, {N,N}},
-	{{0.,-P12}, {0.,-P12},  {0.,-P12},  {0.,P12},  {0.,P12},  {0.,P12}, {0.,N}},
-	{{0.,-P12}, {N,N},      {N,N},      {N,N},     {N,N},     {0.,P12}, {N,N}}
+  {{-0.,-P12},{-0.,-P12},{-0.,-P12},{-0.,P12},{-0.,P12},{-0.,P12},{-0.,N}},
+  {{-0.,-P12},{U,U},     {U,U},     {U,U},    {U,U},    {-0.,P12},{N,N}},
+  {{-0.,-P12},{U,U},     {-0.,-0.}, {-0.,0.}, {U,U},    {-0.,P12},{-0.,N}},
+  {{0.,-P12}, {U,U},     {0.,-0.},  {0.,0.},  {U,U},    {0.,P12}, {0.,N}},
+  {{0.,-P12}, {U,U},     {U,U},     {U,U},    {U,U},    {0.,P12}, {N,N}},
+  {{0.,-P12}, {0.,-P12}, {0.,-P12}, {0.,P12}, {0.,P12}, {0.,P12}, {0.,N}},
+  {{0.,-P12}, {N,N},     {N,N},     {N,N},    {N,N},    {0.,P12}, {N,N}}
 };
 
 static Py_complex
@@ -385,13 +405,13 @@ PyDoc_STRVAR(c_cos_doc,
 
 /* cosh(infinity + i*y) needs to be dealt with specially */
 static Py_complex cosh_special_values[7][7] = {
-	{{INF,N}, {U,U},{INF,0.},  {INF,-0.}, {U,U},{INF,N}, {INF,N}},
-	{{N,N}, {U,U},{U,U},   {U,U},   {U,U},{N,N}, {N,N}},
-	{{N,0.},{U,U},{1.,0.}, {1.,-0.},{U,U},{N,0.},{N,0.}},
-	{{N,0.},{U,U},{1.,-0.},{1.,0.}, {U,U},{N,0.},{N,0.}},
-	{{N,N}, {U,U},{U,U},   {U,U},   {U,U},{N,N}, {N,N}},
-	{{INF,N}, {U,U},{INF,-0.}, {INF,0.},  {U,U},{INF,N}, {INF,N}},
-	{{N,N}, {N,N},{N,0.},  {N,0.},  {N,N},{N,N}, {N,N}}
+  {{INF,N},{U,U},{INF,0.}, {INF,-0.},{U,U},{INF,N},{INF,N}},
+  {{N,N},  {U,U},{U,U},    {U,U},    {U,U},{N,N},  {N,N}},
+  {{N,0.}, {U,U},{1.,0.},  {1.,-0.}, {U,U},{N,0.}, {N,0.}},
+  {{N,0.}, {U,U},{1.,-0.}, {1.,0.},  {U,U},{N,0.}, {N,0.}},
+  {{N,N},  {U,U},{U,U},    {U,U},    {U,U},{N,N},  {N,N}},
+  {{INF,N} {U,U},{INF,-0.},{INF,0.}, {U,U},{INF,N},{INF,N}},
+  {{N,N},  {N,N},{N,0.},   {N,0.},   {N,N},{N,N},  {N,N}}
 };
 
 static Py_complex
@@ -453,13 +473,13 @@ PyDoc_STRVAR(c_cosh_doc,
 /* exp(infinity + i*y) and exp(-infinity + i*y) need special treatment for
    finite y */
 static Py_complex exp_special_values[7][7] = {
-	{{0.,0.},{U,U},{0.,-0.},{0.,0.},{U,U},{0.,0.},{0.,0.}},
-	{{N,N},  {U,U},{U,U},   {U,U},  {U,U},{N,N},  {N,N}},
-	{{N,N},  {U,U},{1.,-0.},{1.,0.},{U,U},{N,N},  {N,N}},
-	{{N,N},  {U,U},{1.,-0.},{1.,0.},{U,U},{N,N},  {N,N}},
-	{{N,N},  {U,U},{U,U},   {U,U},  {U,U},{N,N},  {N,N}},
-	{{INF,N},  {U,U},{INF,-0.}, {INF,0.}, {U,U},{INF,N},  {INF,N}},
-	{{N,N},  {N,N},{N,-0.}, {N,0.}, {N,N},{N,N},  {N,N}}
+  {{0.,0.},{U,U},{0.,-0.}, {0.,0.}, {U,U},{0.,0.},{0.,0.}},
+  {{N,N},  {U,U},{U,U},    {U,U},   {U,U},{N,N},  {N,N}},
+  {{N,N},  {U,U},{1.,-0.}, {1.,0.}, {U,U},{N,N},  {N,N}},
+  {{N,N},  {U,U},{1.,-0.}, {1.,0.}, {U,U},{N,N},  {N,N}},
+  {{N,N},  {U,U},{U,U},    {U,U},   {U,U},{N,N},  {N,N}},
+  {{INF,N},{U,U},{INF,-0.},{INF,0.},{U,U},{INF,N},{INF,N}},
+  {{N,N},  {N,N},{N,-0.},  {N,0.},  {N,N},{N,N},  {N,N}}
 };
 
 static Py_complex
@@ -519,13 +539,13 @@ PyDoc_STRVAR(c_exp_doc,
 
 
 static Py_complex log_special_values[7][7] = {
-	{{INF,-P34}, {INF,-P}, {INF,-P},  {INF,P},  {INF,P}, {INF,P34}, {INF,N}},
-	{{INF,-P12}, {U,U},  {U,U},   {U,U},  {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {-INF,-P}, {-INF,P}, {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {-INF,-0.},{-INF,0.},{U,U}, {INF,P12}, {N,N}},
-	{{INF,-P12}, {U,U},  {U,U},   {U,U},  {U,U}, {INF,P12}, {N,N}},
-	{{INF,-P14}, {INF,-0.},{INF,-0.}, {INF,0.}, {INF,0.},{INF,P14}, {INF,N}},
-	{{INF,N},    {N,N},  {N,N},   {N,N},  {N,N}, {INF,N},   {N,N}}
+  {{INF,-P34},{INF,-P}, {INF,-P},  {INF,P},  {INF,P}, {INF,P34}, {INF,N}},
+  {{INF,-P12},{U,U},    {U,U},     {U,U},    {U,U},   {INF,P12}, {N,N}},
+  {{INF,-P12},{U,U},    {-INF,-P}, {-INF,P}, {U,U},   {INF,P12}, {N,N}},
+  {{INF,-P12},{U,U},    {-INF,-0.},{-INF,0.},{U,U},   {INF,P12}, {N,N}},
+  {{INF,-P12},{U,U},    {U,U},     {U,U},    {U,U},   {INF,P12}, {N,N}},
+  {{INF,-P14},{INF,-0.},{INF,-0.}, {INF,0.}, {INF,0.},{INF,P14}, {INF,N}},
+  {{INF,N},   {N,N},    {N,N},     {N,N},    {N,N},   {INF,N},   {N,N}}
 };
 
 static Py_complex
@@ -639,13 +659,13 @@ PyDoc_STRVAR(c_sin_doc,
 
 /* sinh(infinity + i*y) needs to be dealt with specially */
 static Py_complex sinh_special_values[7][7] = {
-	{{INF,N}, {U,U},{-INF,-0.}, {-INF,0.}, {U,U},{INF,N}, {INF,N}},
-	{{N,N}, {U,U},{U,U},    {U,U},   {U,U},{N,N}, {N,N}},
-	{{0.,N},{U,U},{-0.,-0.},{-0.,0.},{U,U},{0.,N},{0.,N}},
-	{{0.,N},{U,U},{0.,-0.}, {0.,0.}, {U,U},{0.,N},{0.,N}},
-	{{N,N}, {U,U},{U,U},    {U,U},   {U,U},{N,N}, {N,N}},
-	{{INF,N}, {U,U},{INF,-0.},  {INF,0.},  {U,U},{INF,N}, {INF,N}},
-	{{N,N}, {N,N},{N,-0.},  {N,0.},  {N,N},{N,N}, {N,N}}
+  {{INF,N},{U,U},{-INF,-0.},{-INF,0.},{U,U},{INF,N},{INF,N}},
+  {{N,N},  {U,U},{U,U},     {U,U},    {U,U},{N,N},  {N,N}},
+  {{0.,N}, {U,U},{-0.,-0.}, {-0.,0.}, {U,U},{0.,N}, {0.,N}},
+  {{0.,N}, {U,U},{0.,-0.},  {0.,0.},  {U,U},{0.,N}, {0.,N}},
+  {{N,N},  {U,U},{U,U},     {U,U},    {U,U},{N,N},  {N,N}},
+  {{INF,N},{U,U},{INF,-0.}, {INF,0.}, {U,U},{INF,N},{INF,N}},
+  {{N,N},  {N,N},{N,-0.},   {N,0.},   {N,N},{N,N},  {N,N}}
 };
 
 static Py_complex
@@ -695,7 +715,6 @@ c_sinh(Py_complex z)
 	else
 		errno = 0;
 	return r;
-
 }
 
 PyDoc_STRVAR(c_sinh_doc,
@@ -705,13 +724,13 @@ PyDoc_STRVAR(c_sinh_doc,
 
 
 static Py_complex sqrt_special_values[7][7] = {
-	{{INF,-INF},{0.,-INF},{0.,-INF}, {0.,INF}, {0.,INF},{INF,INF},{N,INF}},
-	{{INF,-INF},{U,U},  {U,U},   {U,U},  {U,U}, {INF,INF},{N,N}},
-	{{INF,-INF},{U,U},  {0.,-0.},{0.,0.},{U,U}, {INF,INF},{N,N}},
-	{{INF,-INF},{U,U},  {0.,-0.},{0.,0.},{U,U}, {INF,INF},{N,N}},
-	{{INF,-INF},{U,U},  {U,U},   {U,U},  {U,U}, {INF,INF},{N,N}},
-	{{INF,-INF},{INF,-0.},{INF,-0.}, {INF,0.}, {INF,0.},{INF,INF},{INF,N}},
-	{{INF,-INF},{N,N},  {N,N},   {N,N},  {N,N}, {INF,INF},{N,N}}
+  {{INF,-INF},{0.,-INF},{0.,-INF},{0.,INF},{0.,INF},{INF,INF},{N,INF}},
+  {{INF,-INF},{U,U},    {U,U},    {U,U},   {U,U},   {INF,INF},{N,N}},
+  {{INF,-INF},{U,U},    {0.,-0.}, {0.,0.}, {U,U},   {INF,INF},{N,N}},
+  {{INF,-INF},{U,U},    {0.,-0.}, {0.,0.}, {U,U},   {INF,INF},{N,N}},
+  {{INF,-INF},{U,U},    {U,U},    {U,U},   {U,U},   {INF,INF},{N,N}},
+  {{INF,-INF},{INF,-0.},{INF,-0.},{INF,0.},{INF,0.},{INF,INF},{INF,N}},
+  {{INF,-INF},{N,N},    {N,N},    {N,N},   {N,N},   {INF,INF},{N,N}}
 };
 
 static Py_complex
@@ -768,7 +787,7 @@ c_sqrt(Py_complex z)
 		ax /= 8.;
 		s = 2.*sqrt(ax + hypot(ax, ay/8.));
 	}
-        d = ay/(2.*s);
+	d = ay/(2.*s);
 
 	if (z.real >= 0.) {
 		r.real = s;
@@ -808,13 +827,13 @@ PyDoc_STRVAR(c_tan_doc,
 
 /* tanh(infinity + i*y) needs to be dealt with specially */
 static Py_complex tanh_special_values[7][7] = {
-	{{-1.,0.},{U,U},{-1.,-0.},{-1.,0.},{U,U},{-1.,0.},{-1.,0.}},
-	{{N,N},   {U,U},{U,U},    {U,U},   {U,U},{N,N},   {N,N}},
-	{{N,N},   {U,U},{-0.,-0.},{-0.,0.},{U,U},{N,N},   {N,N}},
-	{{N,N},   {U,U},{0.,-0.}, {0.,0.}, {U,U},{N,N},   {N,N}},
-	{{N,N},   {U,U},{U,U},    {U,U},   {U,U},{N,N},   {N,N}},
-	{{1.,0.}, {U,U},{1.,-0.}, {1.,0.}, {U,U},{1.,0.}, {1.,0.}},
-	{{N,N},   {N,N},{N,-0.},  {N,0.},  {N,N},{N,N},   {N,N}}
+  {{-1.,0.},{U,U},{-1.,-0.},{-1.,0.},{U,U},{-1.,0.},{-1.,0.}},
+  {{N,N},   {U,U},{U,U},    {U,U},   {U,U},{N,N},   {N,N}},
+  {{N,N},   {U,U},{-0.,-0.},{-0.,0.},{U,U},{N,N},   {N,N}},
+  {{N,N},   {U,U},{0.,-0.}, {0.,0.}, {U,U},{N,N},   {N,N}},
+  {{N,N},   {U,U},{U,U},    {U,U},   {U,U},{N,N},   {N,N}},
+  {{1.,0.}, {U,U},{1.,-0.}, {1.,0.}, {U,U},{1.,0.}, {1.,0.}},
+  {{N,N},   {N,N},{N,-0.},  {N,0.},  {N,N},{N,N},   {N,N}}
 };
 
 static Py_complex
@@ -867,7 +886,7 @@ c_tanh(Py_complex z)
 	/* danger of overflow in 2.*z.imag !*/
 	if (fabs(z.real) > CM_LOG_LARGE_DOUBLE) {
 		r.real = copysign(1., z.real);
-                r.imag = 4.*sin(z.imag)*cos(z.imag)*exp(-2.*fabs(z.real));
+		r.imag = 4.*sin(z.imag)*cos(z.imag)*exp(-2.*fabs(z.real));
 	} else {
 		tx = tanh(z.real);
 		ty = tan(z.imag);
@@ -1025,13 +1044,13 @@ the distance from 0 and phi the phase angle.");
 */
 
 static Py_complex rect_special_values[7][7] = {
-	{{INF,N},{U,U},{-INF,0.},{-INF,-0.},{U,U},{INF,N},{INF,N}},
-	{{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
-	{{0.,0.},{U,U},{-0.,0.}, {-0.,-0.}, {U,U},{0.,0.},{0.,0.}},
-	{{0.,0.},{U,U},{0.,-0.}, {0.,0.},   {U,U},{0.,0.},{0.,0.}},
-	{{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
-	{{INF,N},{U,U},{INF,-0.},{INF,0.},  {U,U},{INF,N},{INF,N}},
-	{{N,N},  {N,N},{N,0.},   {N,0.},    {N,N},{N,N},  {N,N}}
+  {{INF,N},{U,U},{-INF,0.},{-INF,-0.},{U,U},{INF,N},{INF,N}},
+  {{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
+  {{0.,0.},{U,U},{-0.,0.}, {-0.,-0.}, {U,U},{0.,0.},{0.,0.}},
+  {{0.,0.},{U,U},{0.,-0.}, {0.,0.},   {U,U},{0.,0.},{0.,0.}},
+  {{N,N},  {U,U},{U,U},    {U,U},     {U,U},{N,N},  {N,N}},
+  {{INF,N},{U,U},{INF,-0.},{INF,0.},  {U,U},{INF,N},{INF,N}},
+  {{N,N},  {N,N},{N,0.},   {N,0.},    {N,N},{N,N},  {N,N}}
 };
 
 static PyObject *
