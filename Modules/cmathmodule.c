@@ -410,7 +410,7 @@ static Py_complex cosh_special_values[7][7] = {
   {{N,0.}, {U,U},{1.,0.},  {1.,-0.}, {U,U},{N,0.}, {N,0.}},
   {{N,0.}, {U,U},{1.,-0.}, {1.,0.},  {U,U},{N,0.}, {N,0.}},
   {{N,N},  {U,U},{U,U},    {U,U},    {U,U},{N,N},  {N,N}},
-  {{INF,N} {U,U},{INF,-0.},{INF,0.}, {U,U},{INF,N},{INF,N}},
+  {{INF,N},{U,U},{INF,-0.},{INF,0.}, {U,U},{INF,N},{INF,N}},
   {{N,N},  {N,N},{N,0.},   {N,0.},   {N,N},{N,N},  {N,N}}
 };
 
