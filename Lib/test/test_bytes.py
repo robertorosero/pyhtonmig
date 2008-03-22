@@ -36,14 +36,14 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(len(b), 0)
         self.assertRaises(IndexError, lambda: b[0])
         self.assertRaises(IndexError, lambda: b[1])
-        self.assertRaises(IndexError, lambda: b[sys.maxsize])
-        self.assertRaises(IndexError, lambda: b[sys.maxsize+1])
+        self.assertRaises(IndexError, lambda: b[sys.maxint])
+        self.assertRaises(IndexError, lambda: b[sys.maxint+1])
         self.assertRaises(IndexError, lambda: b[10**100])
         self.assertRaises(IndexError, lambda: b[-1])
         self.assertRaises(IndexError, lambda: b[-2])
-        self.assertRaises(IndexError, lambda: b[-sys.maxsize])
-        self.assertRaises(IndexError, lambda: b[-sys.maxsize-1])
-        self.assertRaises(IndexError, lambda: b[-sys.maxsize-2])
+        self.assertRaises(IndexError, lambda: b[-sys.maxint])
+        self.assertRaises(IndexError, lambda: b[-sys.maxint-1])
+        self.assertRaises(IndexError, lambda: b[-sys.maxint-2])
         self.assertRaises(IndexError, lambda: b[-10**100])
 
     def test_from_list(self):
@@ -83,14 +83,14 @@ class BaseBytesTest(unittest.TestCase):
 
     def test_constructor_value_errors(self):
         self.assertRaises(ValueError, self.type2test, [-1])
-        self.assertRaises(ValueError, self.type2test, [-sys.maxsize])
-        self.assertRaises(ValueError, self.type2test, [-sys.maxsize-1])
-        self.assertRaises(ValueError, self.type2test, [-sys.maxsize-2])
+        self.assertRaises(ValueError, self.type2test, [-sys.maxint])
+        self.assertRaises(ValueError, self.type2test, [-sys.maxint-1])
+        self.assertRaises(ValueError, self.type2test, [-sys.maxint-2])
         self.assertRaises(ValueError, self.type2test, [-10**100])
         self.assertRaises(ValueError, self.type2test, [256])
         self.assertRaises(ValueError, self.type2test, [257])
-        self.assertRaises(ValueError, self.type2test, [sys.maxsize])
-        self.assertRaises(ValueError, self.type2test, [sys.maxsize+1])
+        self.assertRaises(ValueError, self.type2test, [sys.maxint])
+        self.assertRaises(ValueError, self.type2test, [sys.maxint+1])
         self.assertRaises(ValueError, self.type2test, [10**100])
 
     def test_compare(self):
@@ -210,7 +210,7 @@ class BaseBytesTest(unittest.TestCase):
             self.assertRaises(TypeError, lambda: 3.14 * b)
             # XXX Shouldn't bytes and bytearray agree on what to raise?
             self.assertRaises((OverflowError, MemoryError),
-                              lambda: b * sys.maxsize)
+                              lambda: b * sys.maxint)
 
     def test_repeat_1char(self):
         self.assertEqual(self.type2test(b'x')*100, self.type2test([ord('x')]*100))
@@ -866,7 +866,7 @@ class FixedStringTest(test.string_tests.BaseTest):
     def fixtype(self, obj):
         if isinstance(obj, str):
             return obj.encode("utf-8")
-        return super().fixtype(obj)
+        return super(FixedStringTest, self).fixtype(obj)
 
     # Currently the bytes containment testing uses a single integer
     # value. This may not be the final design, but until then the
@@ -964,12 +964,13 @@ class ByteArraySubclassTest(unittest.TestCase):
 
 def test_main():
     #test.test_support.run_unittest(BytesTest)
-    test.test_support.run_unittest(ByteArrayTest)
     #test.test_support.run_unittest(AssortedBytesTest)
     #test.test_support.run_unittest(BytesAsStringTest)
-    test.test_support.run_unittest(ByteArrayAsStringTest)
-    test.test_support.run_unittest(ByteArraySubclassTest)
-    test.test_support.run_unittest(BytearrayPEP3137Test)
+    test.test_support.run_unittest(
+        ByteArrayTest,
+        ByteArrayAsStringTest,
+        ByteArraySubclassTest,
+        BytearrayPEP3137Test)
 
 if __name__ == "__main__":
     test_main()
