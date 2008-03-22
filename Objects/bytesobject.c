@@ -3079,8 +3079,7 @@ bytes_methods[] = {
     {"endswith", (PyCFunction)bytes_endswith, METH_VARARGS, endswith__doc__},
     {"expandtabs", (PyCFunction)stringlib_expandtabs, METH_VARARGS,
      expandtabs__doc__},
-    /* XXX extend causes an infinite recursion 
-    {"extend", (PyCFunction)bytes_extend, METH_O, extend__doc__}, */
+    {"extend", (PyCFunction)bytes_extend, METH_O, extend__doc__},
     {"find", (PyCFunction)bytes_find, METH_VARARGS, find__doc__},
     {"fromhex", (PyCFunction)bytes_fromhex, METH_VARARGS|METH_CLASS,
      fromhex_doc},
@@ -3170,7 +3169,8 @@ PyTypeObject PyBytes_Type = {
     PyObject_GenericGetAttr,            /* tp_getattro */
     0,                                  /* tp_setattro */
     &bytes_as_buffer,                   /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | 
+    Py_TPFLAGS_HAVE_NEWBUFFER,          /* tp_flags */
     bytes_doc,                          /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
