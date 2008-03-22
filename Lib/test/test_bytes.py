@@ -120,12 +120,12 @@ class BaseBytesTest(unittest.TestCase):
         warnings.simplefilter('ignore', BytesWarning)
         # Byte comparisons with unicode should always fail!
         # Test this for all expected byte orders and Unicode character sizes
-        self.assertEqual(self.type2test(b"\0a\0b\0c") == "abc", False)
-        self.assertEqual(self.type2test(b"\0\0\0a\0\0\0b\0\0\0c") == "abc", False)
-        self.assertEqual(self.type2test(b"a\0b\0c\0") == "abc", False)
-        self.assertEqual(self.type2test(b"a\0\0\0b\0\0\0c\0\0\0") == "abc", False)
-        self.assertEqual(self.type2test() == str(), False)
-        self.assertEqual(self.type2test() != str(), True)
+        self.assertEqual(self.type2test(b"\0a\0b\0c") == u"abc", False)
+        self.assertEqual(self.type2test(b"\0\0\0a\0\0\0b\0\0\0c") == u"abc", False)
+        self.assertEqual(self.type2test(b"a\0b\0c\0") == u"abc", False)
+        self.assertEqual(self.type2test(b"a\0\0\0b\0\0\0c\0\0\0") == u"abc", False)
+        self.assertEqual(self.type2test() == unicode(), False)
+        self.assertEqual(self.type2test() != unicode(), True)
 
     def test_reversed(self):
         input = list(map(ord, "Hello"))
@@ -166,7 +166,7 @@ class BaseBytesTest(unittest.TestCase):
                     self.assertEqual(b[start:stop:step], self.type2test(L[start:stop:step]))
 
     def test_encoding(self):
-        sample = "Hello world\n\u1234\u5678\u9abc\udef0"
+        sample = u"Hello world\n\u1234\u5678\u9abc\udef0"
         for enc in ("utf8", "utf16"):
             b = self.type2test(sample, enc)
             self.assertEqual(b, self.type2test(sample.encode(enc)))
@@ -198,8 +198,8 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b1 + b2, b"abcdef")
         self.assertEqual(b1 + bytes(b"def"), b"abcdef")
         self.assertEqual(bytes(b"def") + b1, b"defabc")
-        self.assertRaises(TypeError, lambda: b1 + "def")
-        self.assertRaises(TypeError, lambda: "abc" + b2)
+        self.assertRaises(TypeError, lambda: b1 + u"def")
+        self.assertRaises(TypeError, lambda: u"abc" + b2)
 
     def test_repeat(self):
         for b in b"abc", self.type2test(b"abc"):
@@ -225,7 +225,7 @@ class BaseBytesTest(unittest.TestCase):
         self.assertRaises(ValueError, lambda: -1 in b)
         self.assertRaises(TypeError, lambda: None in b)
         self.assertRaises(TypeError, lambda: float(ord('a')) in b)
-        self.assertRaises(TypeError, lambda: "a" in b)
+        self.assertRaises(TypeError, lambda: u"a" in b)
         for f in bytes, bytearray:
             self.failUnless(f(b"") in b)
             self.failUnless(f(b"a") in b)
@@ -242,17 +242,17 @@ class BaseBytesTest(unittest.TestCase):
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
-        self.assertEquals(self.type2test.fromhex(''), self.type2test())
+        self.assertEquals(self.type2test.fromhex(u''), self.type2test())
         b = bytearray([0x1a, 0x2b, 0x30])
-        self.assertEquals(self.type2test.fromhex('1a2B30'), b)
-        self.assertEquals(self.type2test.fromhex('  1A 2B  30   '), b)
-        self.assertEquals(self.type2test.fromhex('0000'), b'\0\0')
+        self.assertEquals(self.type2test.fromhex(u'1a2B30'), b)
+        self.assertEquals(self.type2test.fromhex(u'  1A 2B  30   '), b)
+        self.assertEquals(self.type2test.fromhex(u'0000'), b'\0\0')
         self.assertRaises(TypeError, self.type2test.fromhex, b'1B')
-        self.assertRaises(ValueError, self.type2test.fromhex, 'a')
-        self.assertRaises(ValueError, self.type2test.fromhex, 'rt')
-        self.assertRaises(ValueError, self.type2test.fromhex, '1a b cd')
-        self.assertRaises(ValueError, self.type2test.fromhex, '\x00')
-        self.assertRaises(ValueError, self.type2test.fromhex, '12   \x00   34')
+        self.assertRaises(ValueError, self.type2test.fromhex, u'a')
+        self.assertRaises(ValueError, self.type2test.fromhex, u'rt')
+        self.assertRaises(ValueError, self.type2test.fromhex, u'1a b cd')
+        self.assertRaises(ValueError, self.type2test.fromhex, u'\x00')
+        self.assertRaises(ValueError, self.type2test.fromhex, u'12   \x00   34')
 
     def test_join(self):
         self.assertEqual(self.type2test(b"").join([]), b"")
@@ -355,7 +355,7 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(self.type2test(b'  a  bb  c  ').split(None, 3), [b'a', b'bb', b'c'])
 
     def test_split_string_error(self):
-        self.assertRaises(TypeError, self.type2test(b'a b').split, ' ')
+        self.assertRaises(TypeError, self.type2test(b'a b').split, u' ')
 
     def test_rsplit(self):
         b = self.type2test(b'mississippi')
@@ -376,7 +376,7 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(self.type2test(b'  a  bb  c  ').rsplit(None, 3), [b'a', b'bb', b'c'])
 
     def test_rsplit_string_error(self):
-        self.assertRaises(TypeError, self.type2test(b'a b').rsplit, ' ')
+        self.assertRaises(TypeError, self.type2test(b'a b').rsplit, u' ')
 
     def test_rsplit_unicodewhitespace(self):
         b = self.type2test(b"\x09\x0A\x0B\x0C\x0D\x1C\x1D\x1E\x1F")
@@ -432,15 +432,16 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b.lstrip(), b'abc \t\n\r\f\v')
         self.assertEqual(b.rstrip(), b' \t\n\r\f\vabc')
 
-    def test_strip_bytearray(self):
+    def XXXtest_strip_bytearray(self):
+        # XXX memoryview not available
         self.assertEqual(self.type2test(b'abc').strip(memoryview(b'ac')), b'b')
         self.assertEqual(self.type2test(b'abc').lstrip(memoryview(b'ac')), b'bc')
         self.assertEqual(self.type2test(b'abc').rstrip(memoryview(b'ac')), b'ab')
 
     def test_strip_string_error(self):
-        self.assertRaises(TypeError, self.type2test(b'abc').strip, 'b')
-        self.assertRaises(TypeError, self.type2test(b'abc').lstrip, 'b')
-        self.assertRaises(TypeError, self.type2test(b'abc').rstrip, 'b')
+        self.assertRaises(TypeError, self.type2test(b'abc').strip, u'b')
+        self.assertRaises(TypeError, self.type2test(b'abc').lstrip, u'b')
+        self.assertRaises(TypeError, self.type2test(b'abc').rstrip, u'b')
 
     def test_ord(self):
         b = self.type2test(b'\0A\x7f\x80\xff')
@@ -604,7 +605,7 @@ class ByteArrayTest(BaseBytesTest):
         b += b"xyz"
         self.assertEqual(b, b"abcdefxyz")
         try:
-            b += ""
+            b += u""
         except TypeError:
             pass
         else:
