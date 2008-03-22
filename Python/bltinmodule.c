@@ -1434,6 +1434,13 @@ builtin_ord(PyObject *self, PyObject* obj)
 			ord = (long)((unsigned char)*PyString_AS_STRING(obj));
 			return PyInt_FromLong(ord);
 		}
+	} else if (PyBytes_Check(obj)) {
+		size = PyBytes_GET_SIZE(obj);
+		if (size == 1) {
+			ord = (long)((unsigned char)*PyBytes_AS_STRING(obj));
+			return PyInt_FromLong(ord);
+		}
+
 #ifdef Py_USING_UNICODE
 	} else if (PyUnicode_Check(obj)) {
 		size = PyUnicode_GET_SIZE(obj);

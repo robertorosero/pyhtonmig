@@ -714,13 +714,19 @@ bytes_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
     }
 
     if (PyString_Check(arg)) {
-        PyObject *new;
+        PyObject *new, *encoded;
         if (encoding != NULL) {
-            PyErr_SetString(PyExc_TypeError,
-                            "str argument with an encoding");
-            return -1;
+            encoded = PyCodec_Encode(arg, encoding, errors);
+            if (encoded == NULL)
+                return -1;
+            assert(PyString_Check(encoded));
+        }
+        else {
+            encoded = arg;
+            Py_INCREF(arg);
         }
         new = bytes_iconcat(self, arg);
+        Py_DECREF(encoded);
         if (new == NULL)
             return -1;
         Py_DECREF(new);
