@@ -1335,6 +1335,7 @@ static PyBufferProcs string_as_buffer = {
 	(segcountproc)string_buffer_getsegcount,
 	(charbufferproc)string_buffer_getcharbuf,
 	(getbufferproc)string_buffer_getbuffer,
+	0, /* XXX */
 };
 
 
@@ -4083,8 +4084,7 @@ PyTypeObject PyBaseString_Type = {
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
-        Py_TPFLAGS_HAVE_NEWBUFFER,		/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	basestring_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -4133,7 +4133,8 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
-		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_STRING_SUBCLASS,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_STRING_SUBCLASS |
+		Py_TPFLAGS_HAVE_NEWBUFFER,	/* tp_flags */
 	string_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

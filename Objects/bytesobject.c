@@ -49,6 +49,50 @@ _getbytevalue(PyObject* arg, int *value)
     return 1;
 }
 
+static Py_ssize_t
+bytes_buffer_getreadbuf(PyBytesObject *self, Py_ssize_t index, const void **ptr)
+{
+    if ( index != 0 ) {
+        PyErr_SetString(PyExc_SystemError,
+                "accessing non-existent bytes segment");
+        return -1;
+    }
+    *ptr = (void *)self->ob_bytes;
+    return Py_SIZE(self);
+}
+
+static Py_ssize_t
+bytes_buffer_getwritebuf(PyBytesObject *self, Py_ssize_t index, const void **ptr)
+{
+    if ( index != 0 ) {
+        PyErr_SetString(PyExc_SystemError,
+                "accessing non-existent bytes segment");
+        return -1;
+    }
+    *ptr = (void *)self->ob_bytes;
+    return Py_SIZE(self);
+}
+
+static Py_ssize_t
+bytes_buffer_getsegcount(PyBytesObject *self, Py_ssize_t *lenp)
+{
+    if ( lenp )
+        *lenp = Py_SIZE(self);
+    return 1;
+}
+
+static Py_ssize_t
+bytes_buffer_getcharbuf(PyBytesObject *self, Py_ssize_t index, const char **ptr)
+{
+    if ( index != 0 ) {
+        PyErr_SetString(PyExc_SystemError,
+                "accessing non-existent bytes segment");
+        return -1;
+    }
+    *ptr = self->ob_bytes;
+    return Py_SIZE(self);
+}
+
 static int
 bytes_getbuffer(PyBytesObject *obj, Py_buffer *view, int flags)
 {
@@ -939,12 +983,12 @@ bytes_repr(PyBytesObject *self)
 static PyObject *
 bytes_str(PyObject *op)
 {
-	if (Py_BytesWarningFlag) {
-		if (PyErr_WarnEx(PyExc_BytesWarning,
-				 "str() on a bytearray instance", 1))
-			return NULL;
-	}
-	return bytes_repr((PyBytesObject*)op);
+    if (Py_BytesWarningFlag) {
+        if (PyErr_WarnEx(PyExc_BytesWarning,
+                 "str() on a bytearray instance", 1))
+            return NULL;
+    }
+    return bytes_repr((PyBytesObject*)op);
 }
 
 static PyObject *
@@ -3058,10 +3102,10 @@ static PyMappingMethods bytes_as_mapping = {
 };
 
 static PyBufferProcs bytes_as_buffer = {
-    0,
-    0,
-    0,
-    0,
+    (readbufferproc)bytes_buffer_getreadbuf,
+    (writebufferproc)bytes_buffer_getwritebuf,
+    (segcountproc)bytes_buffer_getsegcount,
+    (charbufferproc)bytes_buffer_getcharbuf,
     (getbufferproc)bytes_getbuffer,
     (releasebufferproc)bytes_releasebuffer,
 };
