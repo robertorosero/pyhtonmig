@@ -713,12 +713,26 @@ bytes_init(PyBytesObject *self, PyObject *args, PyObject *kwds)
         return 0;
     }
 
+    if (PyString_Check(arg)) {
+        PyObject *new;
+        if (encoding != NULL) {
+            PyErr_SetString(PyExc_TypeError,
+                            "str argument with an encoding");
+            return -1;
+        }
+        new = bytes_iconcat(self, arg);
+        if (new == NULL)
+            return -1;
+        Py_DECREF(new);
+        return 0;
+    }
+
     if (PyUnicode_Check(arg)) {
         /* Encode via the codec registry */
         PyObject *encoded, *new;
         if (encoding == NULL) {
             PyErr_SetString(PyExc_TypeError,
-                            "string argument without an encoding");
+                            "unicode argument without an encoding");
             return -1;
         }
         encoded = PyCodec_Encode(arg, encoding, errors);
@@ -3038,6 +3052,10 @@ static PyMappingMethods bytes_as_mapping = {
 };
 
 static PyBufferProcs bytes_as_buffer = {
+    0,
+    0,
+    0,
+    0,
     (getbufferproc)bytes_getbuffer,
     (releasebufferproc)bytes_releasebuffer,
 };

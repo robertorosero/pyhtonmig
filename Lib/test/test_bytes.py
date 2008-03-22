@@ -448,9 +448,6 @@ class BaseBytesTest(unittest.TestCase):
                          [0, 65, 127, 128, 255])
 
 
-class BytesTest(BaseBytesTest):
-    type2test = bytes
-
 class ByteArrayTest(BaseBytesTest):
     type2test = bytearray
 
@@ -886,9 +883,6 @@ class FixedStringTest(test.string_tests.BaseTest):
 class ByteArrayAsStringTest(FixedStringTest):
     type2test = bytearray
 
-class BytesAsStringTest(FixedStringTest):
-    type2test = bytes
-
 
 class ByteArraySubclass(bytearray):
     pass
@@ -969,10 +963,10 @@ class ByteArraySubclassTest(unittest.TestCase):
 
 
 def test_main():
-    test.test_support.run_unittest(BytesTest)
+    #test.test_support.run_unittest(BytesTest)
     test.test_support.run_unittest(ByteArrayTest)
-    test.test_support.run_unittest(AssortedBytesTest)
-    test.test_support.run_unittest(BytesAsStringTest)
+    #test.test_support.run_unittest(AssortedBytesTest)
+    #test.test_support.run_unittest(BytesAsStringTest)
     test.test_support.run_unittest(ByteArrayAsStringTest)
     test.test_support.run_unittest(ByteArraySubclassTest)
     test.test_support.run_unittest(BytearrayPEP3137Test)

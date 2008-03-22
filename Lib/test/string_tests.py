@@ -727,6 +727,9 @@ class CommonTest(unittest.TestCase):
 
         self.checkraises(TypeError, '123', 'zfill')
 
+# XXX alias for py3k forward compatibility
+BaseTest = CommonTest
+
 class MixinStrUnicodeUserStringTest:
     # additional tests that only work for
     # stringlike objects, i.e. str, unicode, UserString

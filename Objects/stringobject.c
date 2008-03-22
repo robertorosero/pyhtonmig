@@ -1303,6 +1303,13 @@ string_buffer_getcharbuf(PyStringObject *self, Py_ssize_t index, const char **pt
 	return Py_SIZE(self);
 }
 
+static int
+string_buffer_getbuffer(PyStringObject *self, Py_buffer *view, int flags)
+{
+	return PyBuffer_FillInfo(view, (void *)self->ob_sval, Py_SIZE(self),
+				 0, flags);
+}
+
 static PySequenceMethods string_as_sequence = {
 	(lenfunc)string_length, /*sq_length*/
 	(binaryfunc)string_concat, /*sq_concat*/
@@ -1325,6 +1332,7 @@ static PyBufferProcs string_as_buffer = {
 	(writebufferproc)string_buffer_getwritebuf,
 	(segcountproc)string_buffer_getsegcount,
 	(charbufferproc)string_buffer_getcharbuf,
+	(getbufferproc)string_buffer_getbuffer,
 };
 
 
