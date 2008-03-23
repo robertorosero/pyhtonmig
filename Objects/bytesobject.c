@@ -46,7 +46,7 @@ _getbytevalue(PyObject* arg, int *value)
             PyErr_SetString(PyExc_ValueError, "string must be of size 1");
             return 0;
         }
-        face_value = ((PyStringObject*)arg)->ob_sval[0];
+        face_value = Py_CHARMASK(((PyStringObject*)arg)->ob_sval[0]);
     }
     else {
         PyErr_Format(PyExc_TypeError, "an integer or string of size 1 is required");
@@ -608,10 +608,12 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
         }
         else {
             Py_ssize_t ival = PyNumber_AsSsize_t(values, PyExc_ValueError);
-            if (ival == -1 && PyErr_Occurred())
+            if (ival == -1 && PyErr_Occurred()) {
                 /* Also accept str of size 1 in 2.x */
+                PyErr_Clear();
                 if (!_getbytevalue(values, &ival))
                     return -1;
+            }
             if (ival < 0 || ival >= 256) {
                 PyErr_SetString(PyExc_ValueError,
                                 "byte must be in range(0, 256)");
