@@ -607,19 +607,16 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
             slicelen = 1;
         }
         else {
-#if 0
             Py_ssize_t ival = PyNumber_AsSsize_t(values, PyExc_ValueError);
             if (ival == -1 && PyErr_Occurred())
-                return -1;
+                /* Also accept str of size 1 in 2.x */
+                if (!_getbytevalue(values, &ival))
+                    return -1;
             if (ival < 0 || ival >= 256) {
                 PyErr_SetString(PyExc_ValueError,
                                 "byte must be in range(0, 256)");
                 return -1;
             }
-#endif
-            int ival;
-            if (!_getbytevalue(values, &ival))
-                return -1;
             self->ob_bytes[i] = (char)ival;
             return 0;
         }

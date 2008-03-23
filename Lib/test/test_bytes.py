@@ -175,11 +175,11 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b, self.type2test(sample[:-4], "utf-8"))
 
     def test_decode(self):
-        sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
+        sample = u"Hello world\n\u1234\u5678\u9abc\def0\def0"
         for enc in ("utf8", "utf16"):
             b = self.type2test(sample, enc)
             self.assertEqual(b.decode(enc), sample)
-        sample = "Hello world\n\x80\x81\xfe\xff"
+        sample = u"Hello world\n\x80\x81\xfe\xff"
         b = self.type2test(sample, "latin1")
         self.assertRaises(UnicodeDecodeError, b.decode, "utf8")
         self.assertEqual(b.decode("utf8", "ignore"), "Hello world\n")
@@ -468,7 +468,9 @@ class ByteArrayTest(BaseBytesTest):
                 b = bytearray(20)
                 n = f.readinto(b)
             self.assertEqual(n, len(short_sample))
-            self.assertEqual(list(b), list(sample))
+            # Python 2.x
+            b_sample = (ord(s) for s in sample)
+            self.assertEqual(list(b), list(b_sample))
             # Test writing in binary mode
             with open(tfn, "wb") as f:
                 f.write(b)
@@ -647,16 +649,16 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(a[5:], orig)
         a = bytearray(b'')
         # Test iterators that don't have a __length_hint__
-        #XXX a.extend(map(int, orig * 25))
-        a.extend(int(x) for x in orig * 25)
-        self.assertEqual(a, orig * 25)
-        self.assertEqual(a[-5:], orig)
-        a = bytearray(b'')
-        a.extend(iter(map(int, orig * 50)))
+        a.extend(map(ord, orig * 25))
+        a.extend(ord(x) for x in orig * 25)
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = bytearray(b'')
-        a.extend(list(map(int, orig * 50)))
+        a.extend(iter(map(ord, orig * 50)))
+        self.assertEqual(a, orig * 50)
+        self.assertEqual(a[-5:], orig)
+        a = bytearray(b'')
+        a.extend(list(map(ord, orig * 50)))
         self.assertEqual(a, orig * 50)
         self.assertEqual(a[-5:], orig)
         a = bytearray(b'')
@@ -672,12 +674,12 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, b'heo')
         self.assertRaises(ValueError, lambda: b.remove(ord('l')))
         self.assertRaises(ValueError, lambda: b.remove(400))
-        self.assertRaises(TypeError, lambda: b.remove('e'))
+        self.assertRaises(TypeError, lambda: b.remove(u'e'))
         # remove first and last
         b.remove(ord('o'))
         b.remove(ord('h'))
         self.assertEqual(b, b'e')
-        self.assertRaises(TypeError, lambda: b.remove(b'e'))
+        self.assertRaises(TypeError, lambda: b.remove(u'e'))
 
     def test_pop(self):
         b = bytearray(b'world')
@@ -698,7 +700,7 @@ class ByteArrayTest(BaseBytesTest):
         b = bytearray()
         b.append(ord('A'))
         self.assertEqual(len(b), 1)
-        self.assertRaises(TypeError, lambda: b.append(b'o'))
+        self.assertRaises(TypeError, lambda: b.append(u'o'))
 
     def test_insert(self):
         b = bytearray(b'msssspp')
@@ -880,6 +882,10 @@ class FixedStringTest(test.string_tests.BaseTest):
         pass
     def test_lower(self):
         pass
+    def test_hash(self):
+        # XXX check this out
+        pass
+
 
 class ByteArrayAsStringTest(FixedStringTest):
     type2test = bytearray
