@@ -997,12 +997,15 @@ bytes_repr(PyBytesObject *self)
 static PyObject *
 bytes_str(PyObject *op)
 {
+#if 0
     if (Py_BytesWarningFlag) {
         if (PyErr_WarnEx(PyExc_BytesWarning,
                  "str() on a bytearray instance", 1))
             return NULL;
     }
     return bytes_repr((PyBytesObject*)op);
+#endif
+    return PyString_FromStringAndSize(((PyBytesObject*)op)->ob_bytes, Py_SIZE(op));
 }
 
 static PyObject *
