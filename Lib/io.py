@@ -427,7 +427,7 @@ class IOBase(object):
         self._checkClosed()
         return self
 
-    def __next__(self):
+    def next(self):
         line = self.readline()
         if not line:
             raise StopIteration
@@ -1484,7 +1484,7 @@ class TextIOWrapper(TextIOBase):
                 result += self._get_decoded_chars(n - len(result))
             return result
 
-    def __next__(self):
+    def next(self):
         self._telling = False
         line = self.readline()
         if not line:

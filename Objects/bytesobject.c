@@ -40,8 +40,16 @@ _getbytevalue(PyObject* arg, int *value)
             PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
             return 0;
         }
-    } else {
-        PyErr_Format(PyExc_TypeError, "an integer is required");
+    }
+    else if (PyString_CheckExact(arg)) {
+        if (Py_SIZE(arg) != 1) {
+            PyErr_SetString(PyExc_ValueError, "string must be of size 1");
+            return 0;
+        }
+        face_value = ((PyStringObject*)arg)->ob_sval[0];
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "an integer or string of size 1 is required");
         return 0;
     }
 
@@ -554,6 +562,9 @@ bytes_setitem(PyBytesObject *self, Py_ssize_t i, PyObject *value)
     if (value == NULL)
         return bytes_setslice(self, i, i+1, NULL);
 
+    if (!_getbytevalue(value, &ival))
+        return -1;
+#if 0
     ival = PyNumber_AsSsize_t(value, PyExc_ValueError);
     if (ival == -1 && PyErr_Occurred())
         return -1;
@@ -562,6 +573,7 @@ bytes_setitem(PyBytesObject *self, Py_ssize_t i, PyObject *value)
         PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
         return -1;
     }
+#endif
 
     self->ob_bytes[i] = ival;
     return 0;
@@ -595,6 +607,7 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
             slicelen = 1;
         }
         else {
+#if 0
             Py_ssize_t ival = PyNumber_AsSsize_t(values, PyExc_ValueError);
             if (ival == -1 && PyErr_Occurred())
                 return -1;
@@ -603,6 +616,10 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
                                 "byte must be in range(0, 256)");
                 return -1;
             }
+#endif
+            int ival;
+            if (!_getbytevalue(values, &ival))
+                return -1;
             self->ob_bytes[i] = (char)ival;
             return 0;
         }
