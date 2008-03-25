@@ -865,6 +865,7 @@ class BytearrayPEP3137Test(unittest.TestCase,
 
 
 class FixedStringTest(test.string_tests.BaseTest):
+    subclassable = False
 
     def fixtype(self, obj):
         if isinstance(obj, str):
@@ -891,8 +892,8 @@ class ByteArrayAsStringTest(FixedStringTest):
     type2test = bytearray
 
 
-class ByteArraySubclass(bytearray):
-    pass
+#class ByteArraySubclass(bytearray):
+#    pass
 
 class ByteArraySubclassTest(unittest.TestCase):
 
@@ -968,6 +969,15 @@ class ByteArraySubclassTest(unittest.TestCase):
         x = subclass(newarg=4, source=b"abcd")
         self.assertEqual(x, b"abcd")
 
+class ByteArrayNotSubclassTest(unittest.TestCase):
+    def test_not_subclassable(self):
+        try:
+            class ByteArraySubclass(bytearray):
+                pass
+        except TypeError:
+            pass
+        else:
+            self.fail("Bytearray is subclassable")
 
 def test_main():
     #test.test_support.run_unittest(BytesTest)
@@ -976,7 +986,8 @@ def test_main():
     test.test_support.run_unittest(
         ByteArrayTest,
         ByteArrayAsStringTest,
-        ByteArraySubclassTest,
+        #ByteArraySubclassTest,
+        ByteArrayNotSubclassTest,
         BytearrayPEP3137Test)
 
 if __name__ == "__main__":
