@@ -258,7 +258,6 @@ Py_InitializeEx(int install_sigs)
 	if (!warnings_module) {
 		PyErr_Clear();
 	}
-#if 0
 	else {
 		PyObject *o;
 		char *action[8];
@@ -278,7 +277,6 @@ Py_InitializeEx(int install_sigs)
 				      "warning filter for BytesWarning.");
 		Py_DECREF(o);
         }
-#endif
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
