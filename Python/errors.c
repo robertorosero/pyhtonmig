@@ -608,7 +608,7 @@ PyErr_NewException(const char *name, PyObject *base, PyObject *dict)
 			goto failure;
 	}
 	/* Create a real new-style class. */
-	result = PyObject_CallFunction((PyObject *)&PyType_Type, "sOO",
+	result = PyObject_CallFunction((PyObject *)&PyType_Type, "UOO",
 				       dot+1, bases, dict);
   failure:
 	Py_XDECREF(bases);
@@ -626,7 +626,7 @@ PyErr_WriteUnraisable(PyObject *obj)
 	PyObject *f, *t, *v, *tb;
 	PyErr_Fetch(&t, &v, &tb);
 	f = PySys_GetObject("stderr");
-	if (f != NULL) {
+	if (f != NULL && f != Py_None) {
 		PyFile_WriteString("Exception ", f);
 		if (t) {
 			PyObject* moduleName;
@@ -645,7 +645,7 @@ PyErr_WriteUnraisable(PyObject *obj)
 			else {
 				char* modstr = PyUnicode_AsString(moduleName);
 				if (modstr &&
-				    strcmp(modstr, "__builtin__") != 0)
+				    strcmp(modstr, "builtins") != 0)
 				{
 					PyFile_WriteString(modstr, f);
 					PyFile_WriteString(".", f);
@@ -711,7 +711,7 @@ PyErr_WarnExplicit(PyObject *category, const char *message,
 {
 	PyObject *mod, *dict, *func = NULL;
 
-	mod = PyImport_ImportModule("warnings");
+	mod = PyImport_ImportModuleNoBlock("warnings");
 	if (mod != NULL) {
 		dict = PyModule_GetDict(mod);
 		func = PyDict_GetItemString(dict, "warn_explicit");
@@ -752,7 +752,7 @@ PyErr_SyntaxLocation(const char *filename, int lineno)
 	PyErr_NormalizeException(&exc, &v, &tb);
 	/* XXX check that it is, indeed, a syntax error. It might not
 	 * be, though. */
-	tmp = PyInt_FromLong(lineno);
+	tmp = PyLong_FromLong(lineno);
 	if (tmp == NULL)
 		PyErr_Clear();
 	else {

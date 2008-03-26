@@ -9,7 +9,7 @@ except ImportError:
 
 import time
 import os
-import sys
+import pwd
 import unittest
 import warnings
 warnings.filterwarnings('ignore', '.* potential security risk .*',
@@ -29,7 +29,7 @@ class PosixTester(unittest.TestCase):
         # test posix functions which take no arguments and have
         # no side-effects which we need to cleanup (e.g., fork, wait, abort)
         NO_ARG_FUNCTIONS = [ "ctermid", "getcwd", "getcwdu", "uname",
-                             "times", "getloadavg", "tmpnam",
+                             "times", "getloadavg",
                              "getegid", "geteuid", "getgid", "getgroups",
                              "getpid", "getpgrp", "getppid", "getuid",
                            ]
@@ -142,6 +142,33 @@ class PosixTester(unittest.TestCase):
         if hasattr(posix, 'stat'):
             self.assert_(posix.stat(test_support.TESTFN))
 
+    if hasattr(posix, 'chown'):
+        def test_chown(self):
+            # raise an OSError if the file does not exist
+            os.unlink(test_support.TESTFN)
+            self.assertRaises(OSError, posix.chown, test_support.TESTFN, -1, -1)
+
+            # re-create the file
+            open(test_support.TESTFN, 'w').close()
+            if os.getuid() == 0:
+                try:
+                    # Many linux distros have a nfsnobody user as MAX_UID-2
+                    # that makes a good test case for signedness issues.
+                    #   http://bugs.python.org/issue1747858
+                    # This part of the test only runs when run as root.
+                    # Only scary people run their tests as root.
+                    ent = pwd.getpwnam('nfsnobody')
+                    posix.chown(test_support.TESTFN, ent.pw_uid, ent.pw_gid)
+                except KeyError:
+                    pass
+            else:
+                # non-root cannot chown to root, raises OSError
+                self.assertRaises(OSError, posix.chown,
+                                  test_support.TESTFN, 0, 0)
+
+            # test a successful chown call
+            posix.chown(test_support.TESTFN, os.getuid(), os.getgid())
+
     def test_chdir(self):
         if hasattr(posix, 'chdir'):
             posix.chdir(os.curdir)
@@ -171,17 +198,6 @@ class PosixTester(unittest.TestCase):
             os.close(reader)
             os.close(writer)
 
-    def test_tempnam(self):
-        if hasattr(posix, 'tempnam'):
-            self.assert_(posix.tempnam())
-            self.assert_(posix.tempnam(os.curdir))
-            self.assert_(posix.tempnam(os.curdir, 'blah'))
-
-    def test_tmpfile(self):
-        if hasattr(posix, 'tmpfile'):
-            fp = posix.tmpfile()
-            fp.close()
-
     def test_utime(self):
         if hasattr(posix, 'utime'):
             now = time.time()
@@ -203,6 +219,11 @@ class PosixTester(unittest.TestCase):
             st = os.stat(test_support.TESTFN)
             if hasattr(st, 'st_flags'):
                 posix.lchflags(test_support.TESTFN, st.st_flags)
+
+    def test_environ(self):
+        for k, v in posix.environ.items():
+            self.assertEqual(type(k), str)
+            self.assertEqual(type(v), str)
 
 def test_main():
     test_support.run_unittest(PosixTester)

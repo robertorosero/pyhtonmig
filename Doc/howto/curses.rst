@@ -1,9 +1,11 @@
+.. _curses-howto:
+
 **********************************
   Curses Programming with Python
 **********************************
 
 :Author: A.M. Kuchling, Eric S. Raymond
-:Release: 2.02
+:Release: 2.03
 
 
 .. topic:: Abstract
@@ -50,7 +52,7 @@ everything, though.
 No one has made a Windows port of the curses module.  On a Windows platform, try
 the Console module written by Fredrik Lundh.  The Console module provides
 cursor-addressable text output, plus full support for mouse and keyboard input,
-and is available from http://effbot.org/efflib/console.
+and is available from http://effbot.org/zone/console-index.htm.
 
 
 The Python curses module
@@ -367,8 +369,8 @@ It's possible to change this behavior with the method :meth:`nodelay`. After
 ``nodelay(1)``, :meth:`getch` for the window becomes non-blocking and returns
 ``curses.ERR`` (a value of -1) when no input is ready.  There's also a
 :func:`halfdelay` function, which can be used to (in effect) set a timer on each
-:meth:`getch`; if no input becomes available within the number of milliseconds
-specified as the argument to :func:`halfdelay`, curses raises an exception.
+:meth:`getch`; if no input becomes available within a specified
+delay (measured in tenths of a second), curses raises an exception.
 
 The :meth:`getch` method returns an integer; if it's between 0 and 255, it
 represents the ASCII code of the key pressed.  Values greater than 255 are
@@ -430,5 +432,5 @@ ncurses; feel free to add that.
 If you write an interesting little program, feel free to contribute it as
 another demo.  We can always use more of them!
 
-The ncurses FAQ: http://dickey.his.com/ncurses/ncurses.faq.html
+The ncurses FAQ: http://invisible-island.net/ncurses/ncurses.faq.html
 

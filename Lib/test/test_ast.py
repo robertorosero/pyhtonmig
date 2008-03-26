@@ -1,8 +1,8 @@
-import sys, itertools
+import sys
 import _ast
 
 def to_tuple(t):
-    if t is None or isinstance(t, (basestring, int, int, complex)):
+    if t is None or isinstance(t, (str, int, complex)):
         return t
     elif isinstance(t, list):
         return [to_tuple(e) for e in t]
@@ -142,7 +142,7 @@ def run_tests():
     for input, output, kind in ((exec_tests, exec_results, "exec"),
                                 (single_tests, single_results, "single"),
                                 (eval_tests, eval_results, "eval")):
-        for i, o in itertools.izip(input, output):
+        for i, o in zip(input, output):
             ast_tree = compile(i, "?", kind, 0x400)
             tup = to_tuple(ast_tree)
             assert tup == o, ("kind=%r\ninput=%r\nexpected=%r\ngot=%r" %

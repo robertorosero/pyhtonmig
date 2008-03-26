@@ -5,11 +5,7 @@
 .. module:: bisect
    :synopsis: Array bisection algorithms for binary searching.
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
-
-
-.. % LaTeX produced by Fred L. Drake, Jr. <fdrake@acm.org>, with an
-.. % example based on the PyModules FAQ entry by Aaron Watters
-.. % <arw@pythonpros.com>.
+.. example based on the PyModules FAQ entry by Aaron Watters <arw@pythonpros.com>
 
 This module provides support for maintaining a list in sorted order without
 having to sort the list after each insertion.  For long lists of items with
@@ -68,7 +64,7 @@ Examples
 The :func:`bisect` function is generally useful for categorizing numeric data.
 This example uses :func:`bisect` to look up a letter grade for an exam total
 (say) based on a set of ordered numeric breakpoints: 85 and up is an 'A', 75..84
-is a 'B', etc. ::
+is a 'B', etc.
 
    >>> grades = "FEDCBA"
    >>> breakpoints = [30, 44, 66, 75, 85]

@@ -1,4 +1,3 @@
-
 :mod:`heapq` --- Heap queue algorithm
 =====================================
 
@@ -7,9 +6,6 @@
 .. moduleauthor:: Kevin O'Connor
 .. sectionauthor:: Guido van Rossum <guido@python.org>
 .. sectionauthor:: François Pinard
-
-
-.. % Theoretical explanation:
 
 This module provides an implementation of the heap queue algorithm, also known
 as the priority queue algorithm.
@@ -47,6 +43,13 @@ The following functions are provided:
    Pop and return the smallest item from the *heap*, maintaining the heap
    invariant.  If the heap is empty, :exc:`IndexError` is raised.
 
+.. function:: heappushpop(heap, item)
+
+   Push *item* on the heap, then pop and return the smallest item from the
+   *heap*.  The combined action runs more efficiently than :func:`heappush`
+   followed by a separate call to :func:`heappop`.
+
+   .. versionadded:: 2.6
 
 .. function:: heapify(x)
 
@@ -65,7 +68,7 @@ The following functions are provided:
       if item > heap[0]:
           item = heapreplace(heap, item)
 
-Example of use::
+Example of use:
 
    >>> from heapq import heappush, heappop
    >>> heap = []
@@ -82,7 +85,6 @@ Example of use::
    >>> data.sort()
    >>> data == ordered
    True
-   >>>
 
 The module also offers three general purpose functions based on heaps.
 
@@ -90,8 +92,8 @@ The module also offers three general purpose functions based on heaps.
 .. function:: merge(*iterables)
 
    Merge multiple sorted inputs into a single sorted output (for example, merge
-   timestamped entries from multiple log files).  Returns an iterator over over the
-   sorted values.
+   timestamped entries from multiple log files).  Returns an :term:`iterator`
+   over over the sorted values.
 
    Similar to ``sorted(itertools.chain(*iterables))`` but returns an iterable, does
    not pull the data into memory all at once, and assumes that each of the input

@@ -325,14 +325,14 @@ class sdist (Command):
           * the build tree (typically "build")
           * the release tree itself (only an issue if we ran "sdist"
             previously with --keep-temp, or it aborted)
-          * any RCS, CVS and .svn directories
+          * any RCS, CVS, .svn, .hg, .git, .bzr, _darcs directories
         """
         build = self.get_finalized_command('build')
         base_dir = self.distribution.get_fullname()
 
         self.filelist.exclude_pattern(None, prefix=build.build_base)
         self.filelist.exclude_pattern(None, prefix=base_dir)
-        self.filelist.exclude_pattern(r'/(RCS|CVS|\.svn)/.*', is_regex=1)
+        self.filelist.exclude_pattern(r'(^|/)(RCS|CVS|\.svn|\.hg|\.git|\.bzr|_darcs)/.*', is_regex=1)
 
     def write_manifest(self):
         """Write the file list in 'self.filelist' (presumably as filled in
@@ -357,6 +357,7 @@ class sdist (Command):
             if line[-1] == '\n':
                 line = line[0:-1]
             self.filelist.append(line)
+        manifest.close()
 
     def make_release_tree(self, base_dir, files):
         """Create the directory tree that will become the source

@@ -5,7 +5,6 @@ Other Graphical User Interface Packages
 
 There are an number of extension widget sets to :mod:`Tkinter`.
 
-
 .. seealso::
 
    `Python megawidgets <http://pmw.sourceforge.net/>`_
@@ -29,26 +28,22 @@ There are an number of extension widget sets to :mod:`Tkinter`.
       since they can operate directly on Python data structures, without having to
       transfer data through the Tk/Tcl layer.
 
-      .. % 
 
 The major cross-platform (Windows, Mac OS X, Unix-like) GUI toolkits that are
 also available for Python:
-
 
 .. seealso::
 
    `PyGTK <http://www.pygtk.org/>`_
       is a set of bindings for the `GTK <http://www.gtk.org/>`_ widget set. It
-      provides an object oriented interface that is slightly higher level than the C
-      one. It comes with many more widgets than Tkinter provides, and
-      has good Python-specific reference documentation. There are also `bindings
-      <http://www.daa.com.au/~james/gnome/>`_ to  `GNOME <http://www.gnome.org>`_.
-      One well known PyGTK application is
-      `PythonCAD <http://www.pythoncad.org/>`_. An
-      online `tutorial <http://www.pygtk.org/pygtk2tutorial/index.html>`_ is
-      available.
+      provides an object oriented interface that is slightly higher level than
+      the C one. It comes with many more widgets than Tkinter provides, and has
+      good Python-specific reference documentation. There are also bindings to
+      `GNOME <http://www.gnome.org>`_.  One well known PyGTK application is
+      `PythonCAD <http://www.pythoncad.org/>`_. An online `tutorial
+      <http://www.pygtk.org/pygtk2tutorial/index.html>`_ is available.
 
-   `PyQt <//http://www.riverbankcomputing.co.uk/pyqt/index.php>`_
+   `PyQt <http://www.riverbankcomputing.co.uk/pyqt/index.php>`_
       PyQt is a :program:`sip`\ -wrapped binding to the Qt toolkit.  Qt is an
       extensive C++ GUI application development framework that is
       available for Unix, Windows and Mac OS X. :program:`sip` is a tool
@@ -63,14 +58,14 @@ also available for Python:
    `wxPython <http://www.wxpython.org>`_
       wxPython is a cross-platform GUI toolkit for Python that is built around
       the popular `wxWidgets <http://www.wxwidgets.org/>`_ (formerly wxWindows)
-      C++ toolkit.  It provides a native look and feel for applications on
+      C++ toolkit.  It provides a native look and feel for applications on
       Windows, Mac OS X, and Unix systems by using each platform's native
-      widgets where ever possible, (GTK+ on Unix-like systems).  In addition to
+      widgets where ever possible, (GTK+ on Unix-like systems).  In addition to
       an extensive set of widgets, wxPython provides classes for online
       documentation and context sensitive help, printing, HTML viewing,
       low-level device context drawing, drag and drop, system clipboard access,
       an XML-based resource format and more, including an ever growing library
-      of user-contributed modules.  wxPython has a book, `wxPython in Action
+      of user-contributed modules.  wxPython has a book, `wxPython in Action
       <http://www.amazon.com/exec/obidos/ASIN/1932394621>`_, by Noel Rappin and
       Robin Dunn.
 

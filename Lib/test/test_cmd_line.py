@@ -1,3 +1,6 @@
+# Tests invocation of the interpreter with various command line arguments
+# All tests are executed with environment variables ignored
+# See test_cmd_line_script.py for testing of script execution
 
 import test.test_support, unittest
 import sys
@@ -10,18 +13,25 @@ def _spawn_python(*args):
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 def _kill_python(p):
+    return _kill_python_and_exit_code(p)[0]
+
+def _kill_python_and_exit_code(p):
     p.stdin.close()
     data = p.stdout.read()
     p.stdout.close()
     # try to cleanup the child so we don't appear to leak when running
     # with regrtest -R.  This should be a no-op on Windows.
     subprocess._cleanup()
-    return data
+    returncode = p.wait()
+    return data, returncode
 
 class CmdLineTest(unittest.TestCase):
     def start_python(self, *args):
+        return self.start_python_and_exit_code(*args)[0]
+
+    def start_python_and_exit_code(self, *args):
         p = _spawn_python(*args)
-        return _kill_python(p)
+        return _kill_python_and_exit_code(p)
 
     def exit_code(self, *args):
         cmd_line = [sys.executable, '-E']
@@ -57,6 +67,17 @@ class CmdLineTest(unittest.TestCase):
     def test_version(self):
         version = ('Python %d.%d' % sys.version_info[:2]).encode("ascii")
         self.assertTrue(self.start_python('-V').startswith(version))
+
+    def test_verbose(self):
+        # -v causes imports to write to stderr.  If the write to
+        # stderr itself causes an import to happen (for the output
+        # codec), a recursion loop can occur.
+        data, rc = self.start_python_and_exit_code('-v')
+        self.assertEqual(rc, 0)
+        self.assertTrue(b'stack overflow' not in data)
+        data, rc = self.start_python_and_exit_code('-vv')
+        self.assertEqual(rc, 0)
+        self.assertTrue(b'stack overflow' not in data)
 
     def test_run_module(self):
         # Test expected operation of the '-m' switch

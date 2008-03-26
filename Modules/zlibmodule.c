@@ -197,10 +197,11 @@ PyZlib_decompress(PyObject *self, PyObject *args)
     PyObject *result_str;
     Byte *input;
     int length, err;
-    int wsize=DEF_WBITS, r_strlen=DEFAULTALLOC;
+    int wsize=DEF_WBITS;
+    Py_ssize_t r_strlen=DEFAULTALLOC;
     z_stream zst;
 
-    if (!PyArg_ParseTuple(args, "s#|ii:decompress",
+    if (!PyArg_ParseTuple(args, "s#|in:decompress",
 			  &input, &length, &wsize, &r_strlen))
 	return NULL;
 
@@ -914,14 +915,14 @@ PyDoc_STRVAR(adler32__doc__,
 static PyObject *
 PyZlib_adler32(PyObject *self, PyObject *args)
 {
-    uLong adler32val = adler32(0L, Z_NULL, 0);
+    uLong adler32val = 1;  /* adler32(0L, Z_NULL, 0) */
     Byte *buf;
     int len;
 
-    if (!PyArg_ParseTuple(args, "s#|k:adler32", &buf, &len, &adler32val))
+    if (!PyArg_ParseTuple(args, "s#|I:adler32", &buf, &len, &adler32val))
 	return NULL;
     adler32val = adler32(adler32val, buf, len);
-    return PyInt_FromLong(adler32val);
+    return PyLong_FromUnsignedLong(adler32val & 0xffffffffU);
 }
 
 PyDoc_STRVAR(crc32__doc__,
@@ -933,13 +934,13 @@ PyDoc_STRVAR(crc32__doc__,
 static PyObject *
 PyZlib_crc32(PyObject *self, PyObject *args)
 {
-    uLong crc32val = crc32(0L, Z_NULL, 0);
+    uLong crc32val = 0;  /* crc32(0L, Z_NULL, 0) */
     Byte *buf;
     int len;
-    if (!PyArg_ParseTuple(args, "s#|k:crc32", &buf, &len, &crc32val))
+    if (!PyArg_ParseTuple(args, "s#|I:crc32", &buf, &len, &crc32val))
 	return NULL;
     crc32val = crc32(crc32val, buf, len);
-    return PyInt_FromLong(crc32val);
+    return PyLong_FromUnsignedLong(crc32val & 0xffffffffU);
 }
 
 
@@ -1011,8 +1012,8 @@ PyMODINIT_FUNC
 PyInit_zlib(void)
 {
     PyObject *m, *ver;
-    Py_Type(&Comptype) = &PyType_Type;
-    Py_Type(&Decomptype) = &PyType_Type;
+    Py_TYPE(&Comptype) = &PyType_Type;
+    Py_TYPE(&Decomptype) = &PyType_Type;
     m = Py_InitModule4("zlib", zlib_methods,
 		       zlib_module_documentation,
 		       (PyObject*)NULL,PYTHON_API_VERSION);

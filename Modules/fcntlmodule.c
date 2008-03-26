@@ -73,7 +73,7 @@ fcntl_fcntl(PyObject *self, PyObject *args)
 		PyErr_SetFromErrno(PyExc_IOError);
 		return NULL;
 	}
-	return PyInt_FromLong((long)ret);
+	return PyLong_FromLong((long)ret);
 }
 
 PyDoc_STRVAR(fcntl_doc,
@@ -97,11 +97,20 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 {
 #define IOCTL_BUFSZ 1024
 	int fd;
-	/* In PyArg_ParseTuple below, use the unsigned int 'I' format for
-	   the signed int 'code' variable, because Python turns 0x8000000
-	   into a large positive number (PyLong, or PyInt on 64-bit
-	   platforms,) whereas C expects it to be a negative int */
-	int code;
+	/* In PyArg_ParseTuple below, we use the unsigned non-checked 'I'
+	   format for the 'code' parameter because Python turns 0x8000000
+	   into either a large positive number (PyLong or PyInt on 64-bit
+	   platforms) or a negative number on others (32-bit PyInt)
+	   whereas the system expects it to be a 32bit bit field value
+	   regardless of it being passed as an int or unsigned long on
+	   various platforms.  See the termios.TIOCSWINSZ constant across
+	   platforms for an example of thise.
+
+	   If any of the 64bit platforms ever decide to use more than 32bits
+	   in their unsigned long ioctl codes this will break and need
+	   special casing based on the platform being built on.
+	 */
+	unsigned int code;
 	int arg;
 	int ret;
 	char *str;
@@ -152,7 +161,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			return NULL;
 		}
 		if (mutate_arg) {
-			return PyInt_FromLong(ret);
+			return PyLong_FromLong(ret);
 		}
 		else {
 			return PyString_FromStringAndSize(buf, len);
@@ -198,7 +207,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 		PyErr_SetFromErrno(PyExc_IOError);
 		return NULL;
 	}
-	return PyInt_FromLong((long)ret);
+	return PyLong_FromLong((long)ret);
 #undef IOCTL_BUFSZ
 }
 
@@ -333,22 +342,22 @@ fcntl_lockf(PyObject *self, PyObject *args)
 		l.l_start = l.l_len = 0;
 		if (startobj != NULL) {
 #if !defined(HAVE_LARGEFILE_SUPPORT)
-			l.l_start = PyInt_AsLong(startobj);
+			l.l_start = PyLong_AsLong(startobj);
 #else
 			l.l_start = PyLong_Check(startobj) ?
 					PyLong_AsLongLong(startobj) :
-					PyInt_AsLong(startobj);
+					PyLong_AsLong(startobj);
 #endif
 			if (PyErr_Occurred())
 				return NULL;
 		}
 		if (lenobj != NULL) {
 #if !defined(HAVE_LARGEFILE_SUPPORT)
-			l.l_len = PyInt_AsLong(lenobj);
+			l.l_len = PyLong_AsLong(lenobj);
 #else
 			l.l_len = PyLong_Check(lenobj) ?
 					PyLong_AsLongLong(lenobj) :
-					PyInt_AsLong(lenobj);
+					PyLong_AsLong(lenobj);
 #endif
 			if (PyErr_Occurred())
 				return NULL;
@@ -378,7 +387,7 @@ following values:\n\
     LOCK_SH - acquire a shared lock\n\
     LOCK_EX - acquire an exclusive lock\n\
 \n\
-When operation is LOCK_SH or LOCK_EX, it can also be bit-wise OR'd with\n\
+When operation is LOCK_SH or LOCK_EX, it can also be bitwise ORed with\n\
 LOCK_NB to avoid blocking on lock acquisition.  If LOCK_NB is used and the\n\
 lock cannot be acquired, an IOError will be raised and the exception will\n\
 have an errno attribute set to EACCES or EAGAIN (depending on the operating\n\
@@ -414,7 +423,7 @@ a file or socket object.");
 static int
 ins(PyObject* d, char* symbol, long value)
 {
-        PyObject* v = PyInt_FromLong(value);
+        PyObject* v = PyLong_FromLong(value);
         if (!v || PyDict_SetItemString(d, symbol, v) < 0)
                 return -1;
 

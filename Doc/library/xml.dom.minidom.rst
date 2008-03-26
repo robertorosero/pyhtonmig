@@ -147,7 +147,7 @@ module documentation.  This section lists the differences between the API and
    document. Encoding this string in an encoding other than UTF-8 is likely
    incorrect, since UTF-8 is the default encoding of XML.
 
-   With an explicit *encoding* argument, the result is a byte string in the
+   With an explicit *encoding* [1]_ argument, the result is a byte string in the
    specified encoding. It is recommended that this argument is always specified. To
    avoid :exc:`UnicodeError` exceptions in case of unrepresentable text data, the
    encoding argument should be specified as "utf-8".
@@ -201,22 +201,22 @@ rules apply:
 
 * Operations are used as methods. Since the DOM uses only :keyword:`in`
   parameters, the arguments are passed in normal order (from left to right).
-  There are no optional arguments. :keyword:`void` operations return ``None``.
+  There are no optional arguments. ``void`` operations return ``None``.
 
 * IDL attributes map to instance attributes. For compatibility with the OMG IDL
   language mapping for Python, an attribute ``foo`` can also be accessed through
-  accessor methods :meth:`_get_foo` and :meth:`_set_foo`.  :keyword:`readonly`
+  accessor methods :meth:`_get_foo` and :meth:`_set_foo`.  ``readonly``
   attributes must not be changed; this is not enforced at runtime.
 
 * The types ``short int``, ``unsigned int``, ``unsigned long long``, and
   ``boolean`` all map to Python integer objects.
 
 * The type ``DOMString`` maps to Python strings. :mod:`xml.dom.minidom` supports
-  either byte or Unicode strings, but will normally produce Unicode strings.
+  either bytes or strings, but will normally produce strings.
   Values of type ``DOMString`` may also be ``None`` where allowed to have the IDL
   ``null`` value by the DOM specification from the W3C.
 
-* :keyword:`const` declarations map to variables in their respective scope (e.g.
+* ``const`` declarations map to variables in their respective scope (e.g.
   ``xml.dom.minidom.Node.PROCESSING_INSTRUCTION_NODE``); they must not be changed.
 
 * ``DOMException`` is currently not supported in :mod:`xml.dom.minidom`.
@@ -252,3 +252,9 @@ The following interfaces have no implementation in :mod:`xml.dom.minidom`:
 Most of these reflect information in the XML document that is not of general
 utility to most DOM users.
 
+.. rubric:: Footnotes
+
+.. [#] The encoding string included in XML output should conform to the
+   appropriate standards. For example, "UTF-8" is valid, but "UTF8" is
+   not. See http://www.w3.org/TR/2006/REC-xml11-20060816/#NT-EncodingDecl
+   and http://www.iana.org/assignments/character-sets .

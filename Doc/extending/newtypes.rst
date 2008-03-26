@@ -70,12 +70,12 @@ probably will!  (On Windows, MSVC is known to call this an error and refuse to
 compile the code.)
 
 For contrast, let's take a look at the corresponding definition for standard
-Python integers::
+Python floats::
 
    typedef struct {
        PyObject_HEAD
-       long ob_ival;
-   } PyIntObject;
+       double ob_fval;
+   } PyFloatObject;
 
 Moving on, we come to the crunch --- the type object. ::
 
@@ -428,7 +428,7 @@ reference counts.  When don't we have to do this?
 * when decrementing a reference count in a :attr:`tp_dealloc` handler when
   garbage-collections is not supported [#]_
 
-We want to want to expose our instance variables as attributes. There are a
+We want to expose our instance variables as attributes. There are a
 number of ways to do that. The simplest way is to define member definitions::
 
    static PyMemberDef Noddy_members[] = {
@@ -616,7 +616,7 @@ and register it in the :attr:`tp_getset` slot::
 
    Noddy_getseters,           /* tp_getset */
 
-to register out attribute getters and setters.
+to register our attribute getters and setters.
 
 The last item in a :ctype:`PyGetSetDef` structure is the closure mentioned
 above. In this case, we aren't using the closure, so we just pass *NULL*.
@@ -1110,7 +1110,7 @@ Note that this list does not place any restrictions on the values of the
 attributes, when the values are computed, or how relevant data is stored.
 
 When :cfunc:`PyType_Ready` is called, it uses three tables referenced by the
-type object to create *descriptors* which are placed in the dictionary of the
+type object to create :term:`descriptor`\s which are placed in the dictionary of the
 type object.  Each descriptor controls access to one attribute of the instance
 object.  Each of the tables is optional; if all three are *NULL*, instances of
 the type will only have attributes that are inherited from their base type, and
@@ -1154,7 +1154,7 @@ be read-only or read-write.  The structures in the table are defined as::
        char *doc;
    } PyMemberDef;
 
-For each entry in the table, a descriptor will be constructed and added to the
+For each entry in the table, a :term:`descriptor` will be constructed and added to the
 type which will be able to extract a value from the instance structure.  The
 :attr:`type` field should contain one of the type codes defined in the
 :file:`structmember.h` header; the value will be used to determine how to
@@ -1196,16 +1196,14 @@ class object, and get the doc string using its :attr:`__doc__` attribute.
 As with the :attr:`tp_methods` table, a sentinel entry with a :attr:`name` value
 of *NULL* is required.
 
-.. % XXX Descriptors need to be explained in more detail somewhere, but
-.. % not here.
-.. % 
-.. % Descriptor objects have two handler functions which correspond to
-.. % the \member{tp_getattro} and \member{tp_setattro} handlers.  The
-.. % \method{__get__()} handler is a function which is passed the
-.. % descriptor, instance, and type objects, and returns the value of the
-.. % attribute, or it returns \NULL{} and sets an exception.  The
-.. % \method{__set__()} handler is passed the descriptor, instance, type,
-.. % and new value;
+.. XXX Descriptors need to be explained in more detail somewhere, but not here.
+   
+   Descriptor objects have two handler functions which correspond to the
+   \member{tp_getattro} and \member{tp_setattro} handlers.  The
+   \method{__get__()} handler is a function which is passed the descriptor,
+   instance, and type objects, and returns the value of the attribute, or it
+   returns \NULL{} and sets an exception.  The \method{__set__()} handler is
+   passed the descriptor, instance, type, and new value;
 
 
 Type-specific Attribute Management
@@ -1540,7 +1538,7 @@ might be something like the following::
    less careful about decrementing their reference counts, however, we accept
    instances of string subclasses. Even though deallocating normal strings won't
    call back into our objects, we can't guarantee that deallocating an instance of
-   a string subclass won't. call back into out objects.
+   a string subclass won't call back into our objects.
 
 .. [#] Even in the third version, we aren't guaranteed to avoid cycles.  Instances of
    string subclasses are allowed and string subclasses could allow cycles even if

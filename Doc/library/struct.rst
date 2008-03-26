@@ -73,7 +73,7 @@ Python values should be obvious given their types:
 +--------+-------------------------+--------------------+-------+
 | ``B``  | :ctype:`unsigned char`  | integer            |       |
 +--------+-------------------------+--------------------+-------+
-| ``t``  | :ctype:`_Bool`          | bool               | \(1)  |
+| ``?``  | :ctype:`_Bool`          | bool               | \(1)  |
 +--------+-------------------------+--------------------+-------+
 | ``h``  | :ctype:`short`          | integer            |       |
 +--------+-------------------------+--------------------+-------+
@@ -81,15 +81,15 @@ Python values should be obvious given their types:
 +--------+-------------------------+--------------------+-------+
 | ``i``  | :ctype:`int`            | integer            |       |
 +--------+-------------------------+--------------------+-------+
-| ``I``  | :ctype:`unsigned int`   | long               |       |
+| ``I``  | :ctype:`unsigned int`   | integer            |       |
 +--------+-------------------------+--------------------+-------+
 | ``l``  | :ctype:`long`           | integer            |       |
 +--------+-------------------------+--------------------+-------+
-| ``L``  | :ctype:`unsigned long`  | long               |       |
+| ``L``  | :ctype:`unsigned long`  | integer            |       |
 +--------+-------------------------+--------------------+-------+
-| ``q``  | :ctype:`long long`      | long               | \(2)  |
+| ``q``  | :ctype:`long long`      | integer            | \(2)  |
 +--------+-------------------------+--------------------+-------+
-| ``Q``  | :ctype:`unsigned long   | long               | \(2)  |
+| ``Q``  | :ctype:`unsigned long   | integer            | \(2)  |
 |        | long`                   |                    |       |
 +--------+-------------------------+--------------------+-------+
 | ``f``  | :ctype:`float`          | float              |       |
@@ -106,7 +106,7 @@ Python values should be obvious given their types:
 Notes:
 
 (1)
-   The ``'t'`` conversion code corresponds to the :ctype:`_Bool` type defined by
+   The ``'?'`` conversion code corresponds to the :ctype:`_Bool` type defined by
    C99. If this type is not available, it is simulated using a :ctype:`char`. In
    standard mode, it is always represented by one byte.
 
@@ -139,18 +139,9 @@ count-1, it is padded with null bytes so that exactly count bytes in all are
 used.  Note that for :func:`unpack`, the ``'p'`` format character consumes count
 bytes, but that the string returned can never contain more than 255 characters.
 
-For the ``'I'``, ``'L'``, ``'q'`` and ``'Q'`` format characters, the return
-value is a Python long integer.
 
-For the ``'P'`` format character, the return value is a Python integer or long
-integer, depending on the size needed to hold a pointer when it has been cast to
-an integer type.  A *NULL* pointer will always be returned as the Python integer
-``0``. When packing pointer-sized values, Python integer or long integer objects
-may be used.  For example, the Alpha and Merced processors use 64-bit pointer
-values, meaning a Python long integer will be used to hold the pointer; other
-platforms use 32-bit pointers and will use a Python integer.
 
-For the ``'t'`` format character, the return value is either :const:`True` or
+For the ``'?'`` format character, the return value is either :const:`True` or
 :const:`False`. When packing, the truth value of the argument object is used.
 Either 0 or 1 in the native or standard bool representation will be packed, and
 any non-zero value will be True when unpacking.
@@ -184,7 +175,7 @@ For example, Motorola and Sun processors are big-endian; Intel and DEC
 processors are little-endian.
 
 Native size and alignment are determined using the C compiler's
-:keyword:`sizeof` expression.  This is always combined with native byte order.
+``sizeof`` expression.  This is always combined with native byte order.
 
 Standard size and alignment are as follows: no alignment is required for any
 type (so you have to use pad bytes); :ctype:`short` is 2 bytes; :ctype:`int` and

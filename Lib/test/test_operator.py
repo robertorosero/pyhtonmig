@@ -137,15 +137,6 @@ class OperatorTestCase(unittest.TestCase):
         self.failUnless(operator.delitem(a, 1) is None)
         self.assert_(a == [4, 2, 1])
 
-    def test_delslice(self):
-        a = list(range(10))
-        self.failUnlessRaises(TypeError, operator.delslice, a)
-        self.failUnlessRaises(TypeError, operator.delslice, a, None, None)
-        self.failUnless(operator.delslice(a, 2, 8) is None)
-        self.assert_(a == [0, 1, 8, 9])
-        operator.delslice(a, 0, test_support.MAX_Py_ssize_t)
-        self.assertEqual(a, [])
-
     def test_floordiv(self):
         self.failUnlessRaises(TypeError, operator.floordiv, 5)
         self.failUnlessRaises(TypeError, operator.floordiv, None, None)
@@ -161,14 +152,6 @@ class OperatorTestCase(unittest.TestCase):
         self.failUnlessRaises(TypeError, operator.getitem)
         self.failUnlessRaises(TypeError, operator.getitem, a, None)
         self.failUnless(operator.getitem(a, 2) == 2)
-
-    def test_getslice(self):
-        a = list(range(10))
-        self.failUnlessRaises(TypeError, operator.getslice)
-        self.failUnlessRaises(TypeError, operator.getslice, a, None, None)
-        self.failUnless(operator.getslice(a, 4, 6) == [4, 5])
-        b = operator.getslice(a, 0, test_support.MAX_Py_ssize_t)
-        self.assertEqual(b, a)
 
     def test_indexOf(self):
         self.failUnlessRaises(TypeError, operator.indexOf)
@@ -298,15 +281,6 @@ class OperatorTestCase(unittest.TestCase):
         self.assert_(a == [2, 1, 2])
         self.assertRaises(IndexError, operator.setitem, a, 4, 2)
 
-    def test_setslice(self):
-        a = list(range(4))
-        self.failUnlessRaises(TypeError, operator.setslice, a)
-        self.failUnlessRaises(TypeError, operator.setslice, a, None, None, None)
-        self.failUnless(operator.setslice(a, 1, 3, [2, 1]) is None)
-        self.assert_(a == [0, 2, 1, 3])
-        operator.setslice(a, 0, test_support.MAX_Py_ssize_t, [])
-        self.assertEqual(a, [])
-
     def test_sub(self):
         self.failUnlessRaises(TypeError, operator.sub)
         self.failUnlessRaises(TypeError, operator.sub, None, None)
@@ -364,9 +338,29 @@ class OperatorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, operator.attrgetter('x', (), 'y'), record)
 
         class C(object):
-            def __getattr(self, name):
+            def __getattr__(self, name):
                 raise SyntaxError
-        self.failUnlessRaises(AttributeError, operator.attrgetter('foo'), C())
+        self.failUnlessRaises(SyntaxError, operator.attrgetter('foo'), C())
+
+        # recursive gets
+        a = A()
+        a.name = 'arthur'
+        a.child = A()
+        a.child.name = 'thomas'
+        f = operator.attrgetter('child.name')
+        self.assertEqual(f(a), 'thomas')
+        self.assertRaises(AttributeError, f, a.child)
+        f = operator.attrgetter('name', 'child.name')
+        self.assertEqual(f(a), ('arthur', 'thomas'))
+        f = operator.attrgetter('name', 'child.name', 'child.child.name')
+        self.assertRaises(AttributeError, f, a)
+
+        a.child.child = A()
+        a.child.child.name = 'johnson'
+        f = operator.attrgetter('child.child.name')
+        self.assertEqual(f(a), 'johnson')
+        f = operator.attrgetter('name', 'child.name', 'child.child.name')
+        self.assertEqual(f(a), ('arthur', 'thomas', 'johnson'))
 
     def test_itemgetter(self):
         a = 'ABCDE'
@@ -376,9 +370,9 @@ class OperatorTestCase(unittest.TestCase):
         self.assertRaises(IndexError, f, a)
 
         class C(object):
-            def __getitem(self, name):
+            def __getitem__(self, name):
                 raise SyntaxError
-        self.failUnlessRaises(TypeError, operator.itemgetter(42), C())
+        self.failUnlessRaises(SyntaxError, operator.itemgetter(42), C())
 
         f = operator.itemgetter('name')
         self.assertRaises(TypeError, f, a)
@@ -401,6 +395,24 @@ class OperatorTestCase(unittest.TestCase):
         data = list(map(str, range(20)))
         self.assertEqual(operator.itemgetter(2,10,5)(data), ('2', '10', '5'))
         self.assertRaises(TypeError, operator.itemgetter(2, 'x', 5), data)
+
+    def test_methodcaller(self):
+        self.assertRaises(TypeError, operator.methodcaller)
+        class A:
+            def foo(self, *args, **kwds):
+                return args[0] + args[1]
+            def bar(self, f=42):
+                return f
+        a = A()
+        f = operator.methodcaller('foo')
+        self.assertRaises(IndexError, f, a)
+        f = operator.methodcaller('foo', 1, 2)
+        self.assertEquals(f(a), 3)
+        f = operator.methodcaller('bar')
+        self.assertEquals(f(a), 42)
+        self.assertRaises(TypeError, f, a, a)
+        f = operator.methodcaller('bar', f=5)
+        self.assertEquals(f(a), 5)
 
     def test_inplace(self):
         class C(object):

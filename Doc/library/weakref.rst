@@ -13,42 +13,53 @@
 The :mod:`weakref` module allows the Python programmer to create :dfn:`weak
 references` to objects.
 
-.. % When making changes to the examples in this file, be sure to update
-.. % Lib/test/test_weakref.py::libreftest too!
+.. When making changes to the examples in this file, be sure to update
+   Lib/test/test_weakref.py::libreftest too!
 
 In the following, the term :dfn:`referent` means the object which is referred to
 by a weak reference.
 
 A weak reference to an object is not enough to keep the object alive: when the
-only remaining references to a referent are weak references, garbage collection
-is free to destroy the referent and reuse its memory for something else.  A
-primary use for weak references is to implement caches or mappings holding large
-objects, where it's desired that a large object not be kept alive solely because
-it appears in a cache or mapping.  For example, if you have a number of large
-binary image objects, you may wish to associate a name with each.  If you used a
-Python dictionary to map names to images, or images to names, the image objects
-would remain alive just because they appeared as values or keys in the
-dictionaries.  The :class:`WeakKeyDictionary` and :class:`WeakValueDictionary`
-classes supplied by the :mod:`weakref` module are an alternative, using weak
-references to construct mappings that don't keep objects alive solely because
-they appear in the mapping objects.  If, for example, an image object is a value
-in a :class:`WeakValueDictionary`, then when the last remaining references to
-that image object are the weak references held by weak mappings, garbage
-collection can reclaim the object, and its corresponding entries in weak
-mappings are simply deleted.
+only remaining references to a referent are weak references,
+:term:`garbage collection` is free to destroy the referent and reuse its memory
+for something else.  A primary use for weak references is to implement caches or
+mappings holding large objects, where it's desired that a large object not be
+kept alive solely because it appears in a cache or mapping.
+
+For example, if you have a number of large binary image objects, you may wish to
+associate a name with each.  If you used a Python dictionary to map names to
+images, or images to names, the image objects would remain alive just because
+they appeared as values or keys in the dictionaries.  The
+:class:`WeakKeyDictionary` and :class:`WeakValueDictionary` classes supplied by
+the :mod:`weakref` module are an alternative, using weak references to construct
+mappings that don't keep objects alive solely because they appear in the mapping
+objects.  If, for example, an image object is a value in a
+:class:`WeakValueDictionary`, then when the last remaining references to that
+image object are the weak references held by weak mappings, garbage collection
+can reclaim the object, and its corresponding entries in weak mappings are
+simply deleted.
 
 :class:`WeakKeyDictionary` and :class:`WeakValueDictionary` use weak references
 in their implementation, setting up callback functions on the weak references
 that notify the weak dictionaries when a key or value has been reclaimed by
-garbage collection.  Most programs should find that using one of these weak
-dictionary types is all they need -- it's not usually necessary to create your
-own weak references directly.  The low-level machinery used by the weak
-dictionary implementations is exposed by the :mod:`weakref` module for the
-benefit of advanced uses.
+garbage collection.  :class:`WeakSet` implements the :class:`set` interface,
+but keeps weak references to its elements, just like a
+:class:`WeakKeyDictionary` does.
+
+Most programs should find that using one of these weak container types is all
+they need -- it's not usually necessary to create your own weak references
+directly.  The low-level machinery used by the weak dictionary implementations
+is exposed by the :mod:`weakref` module for the benefit of advanced uses.
+
+.. note::
+
+   Weak references to an object are cleared before the object's :meth:`__del__`
+   is called, to ensure that the weak reference callback (if any) finds the
+   object still alive.
 
 Not all objects can be weakly referenced; those objects which can include class
-instances, functions written in Python (but not in C), methods (both bound and
-unbound), sets, frozensets, file objects, generators, type objects, DBcursor
+instances, functions written in Python (but not in C), instance methods, sets,
+frozensets, file objects, :term:`generator`\s, type objects, :class:`DBcursor`
 objects from the :mod:`bsddb` module, sockets, arrays, deques, and regular
 expression pattern objects.
 
@@ -58,7 +69,7 @@ support weak references but can add support through subclassing::
    class Dict(dict):
        pass
 
-   obj = Dict(red=1, green=2, blue=3)   # this object is weak referencable
+   obj = Dict(red=1, green=2, blue=3)   # this object is weak referenceable
 
 Extension types can easily be made to support weak references; see
 :ref:`weakref-support`.
@@ -82,7 +93,7 @@ Extension types can easily be made to support weak references; see
    but cannot be propagated; they are handled in exactly the same way as exceptions
    raised from an object's :meth:`__del__` method.
 
-   Weak references are hashable if the *object* is hashable.  They will maintain
+   Weak references are :term:`hashable` if the *object* is hashable.  They will maintain
    their hash value even after the *object* was deleted.  If :func:`hash` is called
    the first time only after the *object* was deleted, the call will raise
    :exc:`TypeError`.
@@ -101,7 +112,7 @@ Extension types can easily be made to support weak references; see
    the proxy in most contexts instead of requiring the explicit dereferencing used
    with weak reference objects.  The returned object will have a type of either
    ``ProxyType`` or ``CallableProxyType``, depending on whether *object* is
-   callable.  Proxy objects are not hashable regardless of the referent; this
+   callable.  Proxy objects are not :term:`hashable` regardless of the referent; this
    avoids a number of problems related to their fundamentally mutable nature, and
    prevent their use as dictionary keys.  *callback* is the same as the parameter
    of the same name to the :func:`ref` function.
@@ -127,11 +138,11 @@ Extension types can easily be made to support weak references; see
 
    .. note::
 
-      Caution:  Because a :class:`WeakKeyDictionary` is built on top of a Python
+      Caution: Because a :class:`WeakKeyDictionary` is built on top of a Python
       dictionary, it must not change size when iterating over it.  This can be
-      difficult to ensure for a :class:`WeakKeyDictionary` because actions performed
-      by the program during iteration may cause items in the dictionary to vanish "by
-      magic" (as a side effect of garbage collection).
+      difficult to ensure for a :class:`WeakKeyDictionary` because actions
+      performed by the program during iteration may cause items in the
+      dictionary to vanish "by magic" (as a side effect of garbage collection).
 
 :class:`WeakKeyDictionary` objects have the following additional methods.  These
 expose the internal references directly.  The references are not guaranteed to
@@ -143,7 +154,7 @@ than needed.
 
 .. method:: WeakKeyDictionary.iterkeyrefs()
 
-   Return an iterator that yields the weak references to the keys.
+   Return an :term:`iterator` that yields the weak references to the keys.
 
 
 .. method:: WeakKeyDictionary.keyrefs()
@@ -171,12 +182,18 @@ methods of :class:`WeakKeyDictionary` objects.
 
 .. method:: WeakValueDictionary.itervaluerefs()
 
-   Return an iterator that yields the weak references to the values.
+   Return an :term:`iterator` that yields the weak references to the values.
 
 
 .. method:: WeakValueDictionary.valuerefs()
 
    Return a list of weak references to the values.
+
+
+.. class:: WeakSet([elements])
+
+   Set class that keeps weak references to its elements.  An element will be
+   discarded when no strong reference to it exists any more.
 
 
 .. data:: ReferenceType
@@ -220,7 +237,7 @@ Weak Reference Objects
 ----------------------
 
 Weak reference objects have no attributes or methods, but do allow the referent
-to be obtained, if it still exists, by calling it::
+to be obtained, if it still exists, by calling it:
 
    >>> import weakref
    >>> class Object:
@@ -233,7 +250,7 @@ to be obtained, if it still exists, by calling it::
    True
 
 If the referent no longer exists, calling the reference object returns
-:const:`None`::
+:const:`None`:
 
    >>> del o, o2
    >>> print(r())
@@ -297,7 +314,7 @@ objects that it has seen before.  The IDs of the objects can then be used in
 other data structures without forcing the objects to remain alive, but the
 objects can still be retrieved by ID if they do.
 
-.. % Example contributed by Tim Peters.
+.. Example contributed by Tim Peters.
 
 ::
 

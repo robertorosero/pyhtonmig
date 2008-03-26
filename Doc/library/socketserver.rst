@@ -44,7 +44,7 @@ to behave autonomously; the default is :const:`False`, meaning that Python will
 not exit until all threads created by :class:`ThreadingMixIn` have exited.
 
 Server classes have the same external methods and attributes, no matter what
-network protocol they use:
+network protocol they use.
 
 
 Server Creation Notes
@@ -113,11 +113,11 @@ or inappropriate for the service) is to maintain an explicit table of partially
 finished requests and to use :func:`select` to decide which request to work on
 next (or whether to handle a new incoming request).  This is particularly
 important for stream services where each client can potentially be connected for
-a long time (if threads or subprocesses cannot be used).
+a long time (if threads or subprocesses cannot be used). See :mod:`asyncore` for
+another way to manage this.
 
-.. % XXX should data and methods be intermingled, or separate?
-.. % how should the distinction between class and instance variables be
-.. % drawn?
+.. XXX should data and methods be intermingled, or separate?
+   how should the distinction between class and instance variables be drawn?
 
 
 Server Objects
@@ -133,16 +133,24 @@ Server Objects
 
 .. function:: handle_request()
 
-   Process a single request.  This function calls the following methods in order:
-   :meth:`get_request`, :meth:`verify_request`, and :meth:`process_request`.  If
-   the user-provided :meth:`handle` method of the handler class raises an
-   exception, the server's :meth:`handle_error` method will be called.
+   Process a single request.  This function calls the following methods in
+   order: :meth:`get_request`, :meth:`verify_request`, and
+   :meth:`process_request`.  If the user-provided :meth:`handle` method of the
+   handler class raises an exception, the server's :meth:`handle_error` method
+   will be called.  If no request is received within :attr:`self.timeout`
+   seconds, :meth:`handle_timeout` will be called and :meth:`handle_request`
+   will return.
 
 
-.. function:: serve_forever()
+.. function:: serve_forever(poll_interval=0.5)
 
-   Handle an infinite number of requests.  This simply calls :meth:`handle_request`
-   inside an infinite loop.
+   Handle requests until an explicit :meth:`shutdown` request.  Polls for
+   shutdown every *poll_interval* seconds.
+
+
+.. function:: shutdown()
+
+   Tells the :meth:`serve_forever` loop to stop and waits until it does.
 
 
 .. data:: address_family
@@ -171,8 +179,7 @@ Server Objects
 
 The server classes support the following class variables:
 
-.. % XXX should class variables be covered before instance variables, or
-.. % vice versa?
+.. XXX should class variables be covered before instance variables, or vice versa?
 
 
 .. data:: allow_reuse_address
@@ -195,12 +202,18 @@ The server classes support the following class variables:
    The type of socket used by the server; :const:`socket.SOCK_STREAM` and
    :const:`socket.SOCK_DGRAM` are two possible values.
 
+.. data:: timeout
+
+   Timeout duration, measured in seconds, or :const:`None` if no timeout is
+   desired.  If :meth:`handle_request` receives no incoming requests within the
+   timeout period, the :meth:`handle_timeout` method is called.
+
 There are various server methods that can be overridden by subclasses of base
 server classes like :class:`TCPServer`; these methods aren't useful to external
 users of the server object.
 
-.. % should the default implementations of these be documented, or should
-.. % it be assumed that the user will look at SocketServer.py?
+.. XXX should the default implementations of these be documented, or should
+   it be assumed that the user will look at SocketServer.py?
 
 
 .. function:: finish_request()
@@ -222,6 +235,13 @@ users of the server object.
    method raises an exception.  The default action is to print the traceback to
    standard output and continue handling further requests.
 
+.. function:: handle_timeout()
+
+   This function is called when the :attr:`timeout` attribute has been set to a 
+   value other than :const:`None` and the timeout period has passed with no 
+   requests being received.  The default action for forking servers is
+   to collect the status of any child processes that have exited, while
+   in threading servers this method does nothing.
 
 .. function:: process_request(request, client_address)
 
@@ -230,9 +250,9 @@ users of the server object.
    or thread to handle the request; the :class:`ForkingMixIn` and
    :class:`ThreadingMixIn` classes do this.
 
-.. % Is there any point in documenting the following two functions?
-.. % What would the purpose of overriding them be: initializing server
-.. % instance variables, adding new network families?
+.. Is there any point in documenting the following two functions?
+   What would the purpose of overriding them be: initializing server
+   instance variables, adding new network families?
 
 
 .. function:: server_activate()

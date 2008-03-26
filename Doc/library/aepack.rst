@@ -6,9 +6,7 @@
    :platform: Mac
    :synopsis: Conversion between Python variables and AppleEvent data containers.
 .. sectionauthor:: Vincent Marchetti <vincem@en.com>
-
-
-.. % \moduleauthor{Jack Jansen?}{email}
+.. moduleauthor:: Jack Jansen
 
 The :mod:`aepack` module defines functions for converting (packing) Python
 variables to AppleEvent descriptors and back (unpacking). Within Python the
@@ -86,7 +84,3 @@ The :mod:`aepack` module defines the following functions:
 
    Module :mod:`aetypes`
       Python definitions of codes for Apple Event descriptor types.
-
-   `Inside Macintosh: Interapplication Communication <http://developer.apple.com/techpubs/mac/IAC/IAC-2.html>`_
-      Information about inter-process communications on the Macintosh.
-

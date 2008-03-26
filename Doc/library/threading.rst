@@ -615,18 +615,19 @@ impossible to detect the termination of alien threads.
 
    When the *timeout* argument is present and not ``None``, it should be a floating
    point number specifying a timeout for the operation in seconds (or fractions
-   thereof). As :meth:`join` always  returns ``None``, you must call
-   :meth:`isAlive` to decide whether  a timeout happened.
+   thereof). As :meth:`join` always returns ``None``, you must call :meth:`isAlive`
+   after :meth:`join` to decide whether a timeout happened -- if the thread is
+   still alive, the :meth:`join` call timed out.
 
    When the *timeout* argument is not present or ``None``, the operation will block
    until the thread terminates.
 
    A thread can be :meth:`join`\ ed many times.
 
-   :meth:`join` may throw a :exc:`RuntimeError`, if an attempt is made to join the
-   current thread as that would cause a deadlock. It is also an error to
-   :meth:`join` a thread before it has been started and attempts to do so raises
-   same exception.
+   :meth:`join` raises a :exc:`RuntimeError` if an attempt is made to join
+   the current thread as that would cause a deadlock. It is also an error to
+   :meth:`join` a thread before it has been started and attempts to do so
+   raises the same exception.
 
 
 .. method:: Thread.getName()
@@ -716,7 +717,6 @@ Currently, :class:`Lock`, :class:`RLock`, :class:`Condition`,
 :class:`Semaphore`, and :class:`BoundedSemaphore` objects may be used as
 :keyword:`with` statement context managers.  For example::
 
-   from __future__ import with_statement
    import threading
 
    some_rlock = threading.RLock()
@@ -724,3 +724,26 @@ Currently, :class:`Lock`, :class:`RLock`, :class:`Condition`,
    with some_rlock:
        print("some_rlock is locked while this executes")
 
+
+.. _threaded-imports:
+
+Importing in threaded code
+--------------------------
+
+While the import machinery is thread safe, there are two key
+restrictions on threaded imports due to inherent limitations in the way
+that thread safety is provided:
+
+* Firstly, other than in the main module, an import should not have the
+  side effect of spawning a new thread and then waiting for that thread in
+  any way. Failing to abide by this restriction can lead to a deadlock if
+  the spawned thread directly or indirectly attempts to import a module.
+* Secondly, all import attempts must be completed before the interpreter
+  starts shutting itself down. This can be most easily achieved by only
+  performing imports from non-daemon threads created through the threading
+  module. Daemon threads and threads created directly with the thread
+  module will require some other form of synchronization to ensure they do
+  not attempt imports after system shutdown has commenced. Failure to
+  abide by this restriction will lead to intermittent exceptions and
+  crashes during interpreter shutdown (as the late imports attempt to
+  access machinery which is no longer in a valid state).

@@ -7,14 +7,13 @@
 .. moduleauthor:: Paul Prescod <paul@prescod.net>
 
 
-.. % Markup notes:
-.. % 
-.. % Many of the attributes of the XMLParser objects are callbacks.
-.. % Since signature information must be presented, these are described
-.. % using the methoddesc environment.  Since they are attributes which
-.. % are set by client code, in-text references to these attributes
-.. % should be marked using the \member macro and should not include the
-.. % parentheses used when marking functions and methods.
+.. Markup notes:
+
+   Many of the attributes of the XMLParser objects are callbacks.  Since
+   signature information must be presented, these are described using the method
+   directive.  Since they are attributes which are set by client code, in-text
+   references to these attributes should be marked using the :member: role.
+
 
 .. index:: single: Expat
 
@@ -63,7 +62,7 @@ The :mod:`xml.parsers.expat` module contains two functions:
    must be a string naming the encoding  used by the XML data.  Expat doesn't
    support as many encodings as Python does, and its repertoire of encodings can't
    be extended; it supports UTF-8, UTF-16, ISO-8859-1 (Latin1), and ASCII.  If
-   *encoding* is given it will override the implicit or explicit encoding of the
+   *encoding* [1]_ is given it will override the implicit or explicit encoding of the
    document.
 
    Expat can optionally do XML namespace processing for you, enabled by providing a
@@ -178,8 +177,13 @@ XMLParser Objects
 
 .. attribute:: xmlparser.buffer_size
 
-   The size of the buffer used when :attr:`buffer_text` is true.  This value cannot
-   be changed at this time.
+   The size of the buffer used when :attr:`buffer_text` is true.  
+   A new buffer size can be set by assigning a new integer value 
+   to this attribute.  
+   When the size is changed, the buffer will be flushed.
+
+   .. versionchanged:: 2.6
+      The buffer size can now be changed.
 
 
 .. attribute:: xmlparser.buffer_text
@@ -843,4 +847,12 @@ The ``errors`` object has the following attributes:
 
 .. data:: XML_ERROR_SUSPEND_PE
    :noindex:
+
+
+.. rubric:: Footnotes
+
+.. [#] The encoding string included in XML output should conform to the
+   appropriate standards. For example, "UTF-8" is valid, but "UTF8" is
+   not. See http://www.w3.org/TR/2006/REC-xml11-20060816/#NT-EncodingDecl
+   and http://www.iana.org/assignments/character-sets .
 

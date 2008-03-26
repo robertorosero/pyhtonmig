@@ -49,8 +49,9 @@ class BlockingIOError(IOError):
         self.characters_written = characters_written
 
 
-def open(file, mode="r", buffering=None, encoding=None, newline=None):
-    """Replacement for the built-in open function.
+def open(file, mode="r", buffering=None, encoding=None, errors=None,
+         newline=None, closefd=True):
+    r"""Replacement for the built-in open function.
 
     Args:
       file: string giving the name of the file to be opened;
@@ -60,6 +61,7 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
                  can be: 0 = unbuffered, 1 = line buffered,
                  larger = fully buffered.
       encoding: optional string giving the text encoding.
+      errors: optional string giving the encoding error handling.
       newline: optional newlines specifier; must be None, '', '\n', '\r'
                or '\r\n'; all other values are illegal.  It controls the
                handling of line endings.  It works as follows:
@@ -81,9 +83,12 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
           other legal values, any `'\n'` characters written are
           translated to the given string.
 
+      closefd: optional argument to keep the underlying file descriptor
+               open when the file is closed.  It must not be false when
+               a filename is given.
+
     (*) If a file descriptor is given, it is closed when the returned
-    I/O object is closed.  If you don't want this to happen, use
-    os.dup() to create a duplicate file descriptor.
+    I/O object is closed, unless closefd=False is given.
 
     Mode strings characters:
       'r': open for reading (default)
@@ -95,7 +100,7 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
       'U': universal newline mode (for backwards compatibility)
 
     Constraints:
-      - encoding must not be given when a binary mode is given
+      - encoding or errors must not be given when a binary mode is given
       - buffering must not be zero when a text mode is given
 
     Returns:
@@ -103,14 +108,16 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
       binary stream, a buffered binary stream, or a buffered text
       stream, open for reading and/or writing.
     """
-    if not isinstance(file, (basestring, int)):
+    if not isinstance(file, (str, int)):
         raise TypeError("invalid file: %r" % file)
-    if not isinstance(mode, basestring):
+    if not isinstance(mode, str):
         raise TypeError("invalid mode: %r" % mode)
     if buffering is not None and not isinstance(buffering, int):
         raise TypeError("invalid buffering: %r" % buffering)
-    if encoding is not None and not isinstance(encoding, basestring):
+    if encoding is not None and not isinstance(encoding, str):
         raise TypeError("invalid encoding: %r" % encoding)
+    if errors is not None and not isinstance(errors, str):
+        raise TypeError("invalid errors: %r" % errors)
     modes = set(mode)
     if modes - set("arwb+tU") or len(mode) > len(modes):
         raise ValueError("invalid mode: %r" % mode)
@@ -132,17 +139,22 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
         raise ValueError("must have exactly one of read/write/append mode")
     if binary and encoding is not None:
         raise ValueError("binary mode doesn't take an encoding argument")
+    if binary and errors is not None:
+        raise ValueError("binary mode doesn't take an errors argument")
     if binary and newline is not None:
         raise ValueError("binary mode doesn't take a newline argument")
     raw = FileIO(file,
                  (reading and "r" or "") +
                  (writing and "w" or "") +
                  (appending and "a" or "") +
-                 (updating and "+" or ""))
+                 (updating and "+" or ""),
+                 closefd)
     if buffering is None:
         buffering = -1
-    if buffering < 0 and raw.isatty():
-        buffering = 1
+    line_buffering = False
+    if buffering == 1 or buffering < 0 and raw.isatty():
+        buffering = -1
+        line_buffering = True
     if buffering < 0:
         buffering = DEFAULT_BUFFER_SIZE
         try:
@@ -172,10 +184,32 @@ def open(file, mode="r", buffering=None, encoding=None, newline=None):
         buffer.name = file
         buffer.mode = mode
         return buffer
-    text = TextIOWrapper(buffer, encoding, newline)
+    text = TextIOWrapper(buffer, encoding, errors, newline, line_buffering)
     text.name = file
     text.mode = mode
     return text
+
+class _DocDescriptor:
+    """Helper for builtins.open.__doc__
+    """
+    def __get__(self, obj, typ):
+        return (
+            "open(file, mode='r', buffering=None, encoding=None, "
+                 "errors=None, newline=None, closefd=True)\n\n" +
+            open.__doc__)
+
+class OpenWrapper:
+    """Wrapper for builtins.open
+
+    Trick so that open won't become a bound method when stored
+    as a class variable (as dumbdbm does).
+
+    See initstdio() in Python/pythonrun.c.
+    """
+    __doc__ = _DocDescriptor()
+
+    def __new__(cls, *args, **kwargs):
+        return open(*args, **kwargs)
 
 
 class UnsupportedOperation(ValueError, IOError):
@@ -331,6 +365,7 @@ class IOBase(metaclass=abc.ABCMeta):
 
     def __enter__(self) -> "IOBase":  # That's a forward reference
         """Context management protocol.  Returns self."""
+        self._checkClosed()
         return self
 
     def __exit__(self, *args) -> None:
@@ -362,7 +397,7 @@ class IOBase(metaclass=abc.ABCMeta):
         """For backwards compatibility, a (slowish) readline()."""
         if hasattr(self, "peek"):
             def nreadahead():
-                readahead = self.peek(1, unsafe=True)
+                readahead = self.peek(1)
                 if not readahead:
                     return 1
                 n = (readahead.find(b"\n") + 1) or len(readahead)
@@ -374,7 +409,7 @@ class IOBase(metaclass=abc.ABCMeta):
                 return 1
         if limit is None:
             limit = -1
-        res = bytes()
+        res = bytearray()
         while limit < 0 or len(res) < limit:
             b = self.read(nreadahead())
             if not b:
@@ -382,7 +417,7 @@ class IOBase(metaclass=abc.ABCMeta):
             res += b
             if res.endswith(b"\n"):
                 break
-        return res
+        return bytes(res)
 
     def __iter__(self):
         self._checkClosed()
@@ -437,20 +472,20 @@ class RawIOBase(IOBase):
             n = -1
         if n < 0:
             return self.readall()
-        b = bytes(n.__index__())
+        b = bytearray(n.__index__())
         n = self.readinto(b)
         del b[n:]
-        return b
+        return bytes(b)
 
     def readall(self):
         """readall() -> bytes.  Read until EOF, using multiple read() call."""
-        res = bytes()
+        res = bytearray()
         while True:
             data = self.read(DEFAULT_BUFFER_SIZE)
             if not data:
                 break
             res += data
-        return res
+        return bytes(res)
 
     def readinto(self, b: bytes) -> int:
         """readinto(b: bytes) -> int.  Read up to len(b) bytes into b.
@@ -585,6 +620,11 @@ class _BufferedIOMixin(BufferedIOBase):
         return self.raw.tell()
 
     def truncate(self, pos=None):
+        # Flush the stream.  We're mixing buffered I/O with lower-level I/O,
+        # and a flush may be necessary to synch both views of the current
+        # file state.
+        self.flush()
+
         if pos is None:
             pos = self.tell()
         return self.raw.truncate(pos)
@@ -633,14 +673,14 @@ class BytesIO(BufferedIOBase):
     # XXX More docs
 
     def __init__(self, initial_bytes=None):
-        buffer = b""
+        buf = bytearray()
         if initial_bytes is not None:
-            buffer += initial_bytes
-        self._buffer = buffer
+            buf += initial_bytes
+        self._buffer = buf
         self._pos = 0
 
     def getvalue(self):
-        return self._buffer
+        return bytes(self._buffer)
 
     def read(self, n=None):
         if n is None:
@@ -650,7 +690,7 @@ class BytesIO(BufferedIOBase):
         newpos = min(len(self._buffer), self._pos + n)
         b = self._buffer[self._pos : newpos]
         self._pos = newpos
-        return b
+        return bytes(b)
 
     def read1(self, n):
         return self.read(n)
@@ -672,6 +712,10 @@ class BytesIO(BufferedIOBase):
         return n
 
     def seek(self, pos, whence=0):
+        try:
+            pos = pos.__index__()
+        except AttributeError as err:
+            raise TypeError("an integer is required") from err
         if whence == 0:
             self._pos = max(0, pos)
         elif whence == 1:
@@ -741,14 +785,12 @@ class BufferedReader(_BufferedIOMixin):
             out = nodata_val
         return out
 
-    def peek(self, n=0, *, unsafe=False):
+    def peek(self, n=0):
         """Returns buffered bytes without advancing the position.
 
         The argument indicates a desired minimal number of bytes; we
         do at most one raw read to satisfy it.  We never return more
         than self.buffer_size.
-
-        Unless unsafe=True is passed, we return a copy.
         """
         want = min(n, self.buffer_size)
         have = len(self._read_buf)
@@ -757,21 +799,17 @@ class BufferedReader(_BufferedIOMixin):
             current = self.raw.read(to_read)
             if current:
                 self._read_buf += current
-        result = self._read_buf
-        if unsafe:
-            result = result[:]
-        return result
+        return self._read_buf
 
     def read1(self, n):
-        """Reads up to n bytes.
+        """Reads up to n bytes, with at most one read() system call.
 
-        Returns up to n bytes.  If at least one byte is buffered,
-        we only return buffered bytes.  Otherwise, we do one
-        raw read.
+        Returns up to n bytes.  If at least one byte is buffered, we
+        only return buffered bytes.  Otherwise, we do one raw read.
         """
         if n <= 0:
             return b""
-        self.peek(1, unsafe=True)
+        self.peek(1)
         return self.read(min(n, len(self._read_buf)))
 
     def tell(self):
@@ -797,7 +835,7 @@ class BufferedWriter(_BufferedIOMixin):
         self.max_buffer_size = (2*buffer_size
                                 if max_buffer_size is None
                                 else max_buffer_size)
-        self._write_buf = b""
+        self._write_buf = bytearray()
 
     def write(self, b):
         if self.closed:
@@ -886,8 +924,8 @@ class BufferedRWPair(BufferedIOBase):
     def write(self, b):
         return self.writer.write(b)
 
-    def peek(self, n=0, *, unsafe=False):
-        return self.reader.peek(n, unsafe=unsafe)
+    def peek(self, n=0):
+        return self.reader.peek(n)
 
     def read1(self, n):
         return self.reader.read1(n)
@@ -947,9 +985,9 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         self.flush()
         return BufferedReader.readinto(self, b)
 
-    def peek(self, n=0, *, unsafe=False):
+    def peek(self, n=0):
         self.flush()
-        return BufferedReader.peek(self, n, unsafe=unsafe)
+        return BufferedReader.peek(self, n)
 
     def read1(self, n):
         self.flush()
@@ -1015,6 +1053,85 @@ class TextIOBase(IOBase):
         return None
 
 
+class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
+    """Codec used when reading a file in universal newlines mode.
+    It wraps another incremental decoder, translating \\r\\n and \\r into \\n.
+    It also records the types of newlines encountered.
+    When used with translate=False, it ensures that the newline sequence is
+    returned in one piece.
+    """
+    def __init__(self, decoder, translate, errors='strict'):
+        codecs.IncrementalDecoder.__init__(self, errors=errors)
+        self.buffer = b''
+        self.translate = translate
+        self.decoder = decoder
+        self.seennl = 0
+
+    def decode(self, input, final=False):
+        # decode input (with the eventual \r from a previous pass)
+        if self.buffer:
+            input = self.buffer + input
+
+        output = self.decoder.decode(input, final=final)
+
+        # retain last \r even when not translating data:
+        # then readline() is sure to get \r\n in one pass
+        if output.endswith("\r") and not final:
+            output = output[:-1]
+            self.buffer = b'\r'
+        else:
+            self.buffer = b''
+
+        # Record which newlines are read
+        crlf = output.count('\r\n')
+        cr = output.count('\r') - crlf
+        lf = output.count('\n') - crlf
+        self.seennl |= (lf and self._LF) | (cr and self._CR) \
+                    | (crlf and self._CRLF)
+
+        if self.translate:
+            if crlf:
+                output = output.replace("\r\n", "\n")
+            if cr:
+                output = output.replace("\r", "\n")
+
+        return output
+
+    def getstate(self):
+        buf, flag = self.decoder.getstate()
+        return buf + self.buffer, flag
+
+    def setstate(self, state):
+        buf, flag = state
+        if buf.endswith(b'\r'):
+            self.buffer = b'\r'
+            buf = buf[:-1]
+        else:
+            self.buffer = b''
+        self.decoder.setstate((buf, flag))
+
+    def reset(self):
+        self.seennl = 0
+        self.buffer = b''
+        self.decoder.reset()
+
+    _LF = 1
+    _CR = 2
+    _CRLF = 4
+
+    @property
+    def newlines(self):
+        return (None,
+                "\n",
+                "\r",
+                ("\r", "\n"),
+                "\r\n",
+                ("\n", "\r\n"),
+                ("\r", "\r\n"),
+                ("\r", "\n", "\r\n")
+               )[self.seennl]
+
+
 class TextIOWrapper(TextIOBase):
 
     """Buffered text stream.
@@ -1024,7 +1141,8 @@ class TextIOWrapper(TextIOBase):
 
     _CHUNK_SIZE = 128
 
-    def __init__(self, buffer, encoding=None, newline=None):
+    def __init__(self, buffer, encoding=None, errors=None, newline=None,
+                 line_buffering=False):
         if newline not in (None, "", "\n", "\r", "\r\n"):
             raise ValueError("illegal newline value: %r" % (newline,))
         if encoding is None:
@@ -1041,31 +1159,56 @@ class TextIOWrapper(TextIOBase):
                 else:
                     encoding = locale.getpreferredencoding()
 
+        if not isinstance(encoding, str):
+            raise ValueError("invalid encoding: %r" % encoding)
+
+        if errors is None:
+            errors = "strict"
+        else:
+            if not isinstance(errors, str):
+                raise ValueError("invalid errors: %r" % errors)
+
         self.buffer = buffer
+        self._line_buffering = line_buffering
         self._encoding = encoding
+        self._errors = errors
         self._readuniversal = not newline
         self._readtranslate = newline is None
         self._readnl = newline
         self._writetranslate = newline != ''
         self._writenl = newline or os.linesep
-        self._seennl = 0
+        self._encoder = None
         self._decoder = None
-        self._pending = ""
-        self._snapshot = None
+        self._decoded_chars = ''  # buffer for text returned from decoder
+        self._decoded_chars_used = 0  # offset into _decoded_chars for read()
+        self._snapshot = None  # info for reconstructing decoder state
         self._seekable = self._telling = self.buffer.seekable()
+
+    # self._snapshot is either None, or a tuple (dec_flags, next_input)
+    # where dec_flags is the second (integer) item of the decoder state
+    # and next_input is the chunk of input bytes that comes next after the
+    # snapshot point.  We use this to reconstruct decoder states in tell().
+
+    # Naming convention:
+    #   - "bytes_..." for integer variables that count input bytes
+    #   - "chars_..." for integer variables that count decoded characters
+
+    def __repr__(self):
+        return '<TIOW %x>' % id(self)
 
     @property
     def encoding(self):
         return self._encoding
 
-    # A word about _snapshot.  This attribute is either None, or a
-    # tuple (decoder_state, readahead, pending) where decoder_state is
-    # the second (integer) item of the decoder state, readahead is the
-    # chunk of bytes that was read, and pending is the characters that
-    # were rendered by the decoder after feeding it those bytes.  We
-    # use this to reconstruct intermediate decoder states in tell().
+    @property
+    def errors(self):
+        return self._errors
 
-    def _seekable(self):
+    @property
+    def line_buffering(self):
+        return self._line_buffering
+
+    def seekable(self):
         return self._seekable
 
     def flush(self):
@@ -1092,147 +1235,250 @@ class TextIOWrapper(TextIOBase):
     def write(self, s: str):
         if self.closed:
             raise ValueError("write to closed file")
-        if not isinstance(s, basestring):
+        if not isinstance(s, str):
             raise TypeError("can't write %s to text stream" %
                             s.__class__.__name__)
-        haslf = "\n" in s
+        length = len(s)
+        haslf = (self._writetranslate or self._line_buffering) and "\n" in s
         if haslf and self._writetranslate and self._writenl != "\n":
             s = s.replace("\n", self._writenl)
+        encoder = self._encoder or self._get_encoder()
         # XXX What if we were just reading?
-        b = s.encode(self._encoding)
+        b = encoder.encode(s)
         self.buffer.write(b)
-        if haslf and self.isatty():
+        if self._line_buffering and (haslf or "\r" in s):
             self.flush()
-        self._snapshot = self._decoder = None
-        return len(s)
+        self._snapshot = None
+        if self._decoder:
+            self._decoder.reset()
+        return length
+
+    def _get_encoder(self):
+        make_encoder = codecs.getincrementalencoder(self._encoding)
+        self._encoder = make_encoder(self._errors)
+        return self._encoder
 
     def _get_decoder(self):
         make_decoder = codecs.getincrementaldecoder(self._encoding)
-        if make_decoder is None:
-            raise IOError("Can't find an incremental decoder for encoding %s" %
-                          self._encoding)
-        decoder = self._decoder = make_decoder()  # XXX: errors
+        decoder = make_decoder(self._errors)
+        if self._readuniversal:
+            decoder = IncrementalNewlineDecoder(decoder, self._readtranslate)
+        self._decoder = decoder
         return decoder
 
+    # The following three methods implement an ADT for _decoded_chars.
+    # Text returned from the decoder is buffered here until the client
+    # requests it by calling our read() or readline() method.
+    def _set_decoded_chars(self, chars):
+        """Set the _decoded_chars buffer."""
+        self._decoded_chars = chars
+        self._decoded_chars_used = 0
+
+    def _get_decoded_chars(self, n=None):
+        """Advance into the _decoded_chars buffer."""
+        offset = self._decoded_chars_used
+        if n is None:
+            chars = self._decoded_chars[offset:]
+        else:
+            chars = self._decoded_chars[offset:offset + n]
+        self._decoded_chars_used += len(chars)
+        return chars
+
+    def _rewind_decoded_chars(self, n):
+        """Rewind the _decoded_chars buffer."""
+        if self._decoded_chars_used < n:
+            raise AssertionError("rewind decoded_chars out of bounds")
+        self._decoded_chars_used -= n
+
     def _read_chunk(self):
+        """
+        Read and decode the next chunk of data from the BufferedReader.
+
+        The return value is True unless EOF was reached.  The decoded string
+        is placed in self._decoded_chars (replacing its previous value).
+        The entire input chunk is sent to the decoder, though some of it
+        may remain buffered in the decoder, yet to be converted.
+        """
+
         if self._decoder is None:
             raise ValueError("no decoder")
-        if not self._telling:
-            readahead = self.buffer.read1(self._CHUNK_SIZE)
-            pending = self._decoder.decode(readahead, not readahead)
-            return readahead, pending
-        decoder_buffer, decoder_state = self._decoder.getstate()
-        readahead = self.buffer.read1(self._CHUNK_SIZE)
-        pending = self._decoder.decode(readahead, not readahead)
-        self._snapshot = (decoder_state, decoder_buffer + readahead, pending)
-        return readahead, pending
 
-    def _encode_decoder_state(self, ds, pos):
-        x = 0
-        for i in bytes(ds):
-            x = x<<8 | i
-        return (x<<64) | pos
+        if self._telling:
+            # To prepare for tell(), we need to snapshot a point in the
+            # file where the decoder's input buffer is empty.
 
-    def _decode_decoder_state(self, pos):
-        x, pos = divmod(pos, 1<<64)
-        if not x:
-            return None, pos
-        b = b""
-        while x:
-            b.append(x&0xff)
-            x >>= 8
-        return str(b[::-1]), pos
+            dec_buffer, dec_flags = self._decoder.getstate()
+            # Given this, we know there was a valid snapshot point
+            # len(dec_buffer) bytes ago with decoder state (b'', dec_flags).
+
+        # Read a chunk, decode it, and put the result in self._decoded_chars.
+        input_chunk = self.buffer.read1(self._CHUNK_SIZE)
+        eof = not input_chunk
+        self._set_decoded_chars(self._decoder.decode(input_chunk, eof))
+
+        if self._telling:
+            # At the snapshot point, len(dec_buffer) bytes before the read,
+            # the next input to be decoded is dec_buffer + input_chunk.
+            self._snapshot = (dec_flags, dec_buffer + input_chunk)
+
+        return not eof
+
+    def _pack_cookie(self, position, dec_flags=0,
+                           bytes_to_feed=0, need_eof=0, chars_to_skip=0):
+        # The meaning of a tell() cookie is: seek to position, set the
+        # decoder flags to dec_flags, read bytes_to_feed bytes, feed them
+        # into the decoder with need_eof as the EOF flag, then skip
+        # chars_to_skip characters of the decoded result.  For most simple
+        # decoders, tell() will often just give a byte offset in the file.
+        return (position | (dec_flags<<64) | (bytes_to_feed<<128) |
+               (chars_to_skip<<192) | bool(need_eof)<<256)
+
+    def _unpack_cookie(self, bigint):
+        rest, position = divmod(bigint, 1<<64)
+        rest, dec_flags = divmod(rest, 1<<64)
+        rest, bytes_to_feed = divmod(rest, 1<<64)
+        need_eof, chars_to_skip = divmod(rest, 1<<64)
+        return position, dec_flags, bytes_to_feed, need_eof, chars_to_skip
 
     def tell(self):
         if not self._seekable:
-            raise IOError("Underlying stream is not seekable")
+            raise IOError("underlying stream is not seekable")
         if not self._telling:
-            raise IOError("Telling position disabled by next() call")
+            raise IOError("telling position disabled by next() call")
         self.flush()
         position = self.buffer.tell()
         decoder = self._decoder
         if decoder is None or self._snapshot is None:
-            if self._pending:
-                raise ValueError("pending data")
+            if self._decoded_chars:
+                # This should never happen.
+                raise AssertionError("pending decoded text")
             return position
-        decoder_state, readahead, pending = self._snapshot
-        position -= len(readahead)
-        needed = len(pending) - len(self._pending)
-        if not needed:
-            return self._encode_decoder_state(decoder_state, position)
+
+        # Skip backward to the snapshot point (see _read_chunk).
+        dec_flags, next_input = self._snapshot
+        position -= len(next_input)
+
+        # How many decoded characters have been used up since the snapshot?
+        chars_to_skip = self._decoded_chars_used
+        if chars_to_skip == 0:
+            # We haven't moved from the snapshot point.
+            return self._pack_cookie(position, dec_flags)
+
+        # Starting from the snapshot position, we will walk the decoder
+        # forward until it gives us enough decoded characters.
         saved_state = decoder.getstate()
         try:
-            decoder.setstate((b"", decoder_state))
-            n = 0
-            bb = bytes(1)
-            for i, bb[0] in enumerate(readahead):
-                n += len(decoder.decode(bb))
-                if n >= needed:
-                    decoder_buffer, decoder_state = decoder.getstate()
-                    return self._encode_decoder_state(
-                        decoder_state,
-                        position + (i+1) - len(decoder_buffer))
-            raise IOError("Can't reconstruct logical file position")
+            # Note our initial start point.
+            decoder.setstate((b'', dec_flags))
+            start_pos = position
+            start_flags, bytes_fed, chars_decoded = dec_flags, 0, 0
+            need_eof = 0
+
+            # Feed the decoder one byte at a time.  As we go, note the
+            # nearest "safe start point" before the current location
+            # (a point where the decoder has nothing buffered, so seek()
+            # can safely start from there and advance to this location).
+            next_byte = bytearray(1)
+            for next_byte[0] in next_input:
+                bytes_fed += 1
+                chars_decoded += len(decoder.decode(next_byte))
+                dec_buffer, dec_flags = decoder.getstate()
+                if not dec_buffer and chars_decoded <= chars_to_skip:
+                    # Decoder buffer is empty, so this is a safe start point.
+                    start_pos += bytes_fed
+                    chars_to_skip -= chars_decoded
+                    start_flags, bytes_fed, chars_decoded = dec_flags, 0, 0
+                if chars_decoded >= chars_to_skip:
+                    break
+            else:
+                # We didn't get enough decoded data; signal EOF to get more.
+                chars_decoded += len(decoder.decode(b'', final=True))
+                need_eof = 1
+                if chars_decoded < chars_to_skip:
+                    raise IOError("can't reconstruct logical file position")
+
+            # The returned cookie corresponds to the last safe start point.
+            return self._pack_cookie(
+                start_pos, start_flags, bytes_fed, need_eof, chars_to_skip)
         finally:
             decoder.setstate(saved_state)
 
-    def seek(self, pos, whence=0):
+    def seek(self, cookie, whence=0):
         if not self._seekable:
-            raise IOError("Underlying stream is not seekable")
-        if whence == 1:
-            if pos != 0:
-                raise IOError("Can't do nonzero cur-relative seeks")
-            pos = self.tell()
+            raise IOError("underlying stream is not seekable")
+        if whence == 1: # seek relative to current position
+            if cookie != 0:
+                raise IOError("can't do nonzero cur-relative seeks")
+            # Seeking to the current position should attempt to
+            # sync the underlying buffer with the current position.
             whence = 0
-        if whence == 2:
-            if pos != 0:
-                raise IOError("Can't do nonzero end-relative seeks")
+            cookie = self.tell()
+        if whence == 2: # seek relative to end of file
+            if cookie != 0:
+                raise IOError("can't do nonzero end-relative seeks")
             self.flush()
-            pos = self.buffer.seek(0, 2)
+            position = self.buffer.seek(0, 2)
+            self._set_decoded_chars('')
             self._snapshot = None
-            self._pending = ""
-            self._decoder = None
-            return pos
+            if self._decoder:
+                self._decoder.reset()
+            return position
         if whence != 0:
-            raise ValueError("Invalid whence (%r, should be 0, 1 or 2)" %
+            raise ValueError("invalid whence (%r, should be 0, 1 or 2)" %
                              (whence,))
-        if pos < 0:
-            raise ValueError("Negative seek position %r" % (pos,))
+        if cookie < 0:
+            raise ValueError("negative seek position %r" % (cookie,))
         self.flush()
-        orig_pos = pos
-        ds, pos = self._decode_decoder_state(pos)
-        if not ds:
-            self.buffer.seek(pos)
-            self._snapshot = None
-            self._pending = ""
-            self._decoder = None
-            return pos
-        decoder = self._decoder or self._get_decoder()
-        decoder.set_state(("", ds))
-        self.buffer.seek(pos)
-        self._snapshot = (ds, b"", "")
-        self._pending = ""
-        self._decoder = decoder
-        return orig_pos
+
+        # The strategy of seek() is to go back to the safe start point
+        # and replay the effect of read(chars_to_skip) from there.
+        start_pos, dec_flags, bytes_to_feed, need_eof, chars_to_skip = \
+            self._unpack_cookie(cookie)
+
+        # Seek back to the safe start point.
+        self.buffer.seek(start_pos)
+        self._set_decoded_chars('')
+        self._snapshot = None
+
+        # Restore the decoder to its state from the safe start point.
+        if self._decoder or dec_flags or chars_to_skip:
+            self._decoder = self._decoder or self._get_decoder()
+            self._decoder.setstate((b'', dec_flags))
+            self._snapshot = (dec_flags, b'')
+
+        if chars_to_skip:
+            # Just like _read_chunk, feed the decoder and save a snapshot.
+            input_chunk = self.buffer.read(bytes_to_feed)
+            self._set_decoded_chars(
+                self._decoder.decode(input_chunk, need_eof))
+            self._snapshot = (dec_flags, input_chunk)
+
+            # Skip chars_to_skip of the decoded characters.
+            if len(self._decoded_chars) < chars_to_skip:
+                raise IOError("can't restore logical file position")
+            self._decoded_chars_used = chars_to_skip
+
+        return cookie
 
     def read(self, n=None):
         if n is None:
             n = -1
         decoder = self._decoder or self._get_decoder()
-        res = self._pending
         if n < 0:
-            res += decoder.decode(self.buffer.read(), True)
-            self._pending = ""
+            # Read everything.
+            result = (self._get_decoded_chars() +
+                      decoder.decode(self.buffer.read(), final=True))
+            self._set_decoded_chars('')
             self._snapshot = None
-            return self._replacenl(res)
+            return result
         else:
-            while len(res) < n:
-                readahead, pending = self._read_chunk()
-                res += pending
-                if not readahead:
-                    break
-            self._pending = res[n:]
-            return self._replacenl(res[:n])
+            # Keep reading chunks until we have n characters to return.
+            eof = False
+            result = self._get_decoded_chars(n)
+            while len(result) < n and not eof:
+                eof = not self._read_chunk()
+                result += self._get_decoded_chars(n - len(result))
+            return result
 
     def __next__(self):
         self._telling = False
@@ -1244,161 +1490,108 @@ class TextIOWrapper(TextIOBase):
         return line
 
     def readline(self, limit=None):
-        if limit is not None:
-            # XXX Hack to support limit argument, for backwards compatibility
-            line = self.readline()
-            if len(line) <= limit:
-                return line
-            line, self._pending = line[:limit], line[limit:] + self._pending
-            return line
+        if limit is None:
+            limit = -1
 
-        line = self._pending
+        # Grab all the decoded text (we will rewind any extra bits later).
+        line = self._get_decoded_chars()
+
         start = 0
-        cr_eof = False
         decoder = self._decoder or self._get_decoder()
 
         pos = endpos = None
-        ending = None
         while True:
-            if self._readuniversal:
+            if self._readtranslate:
+                # Newlines are already translated, only search for \n
+                pos = line.find('\n', start)
+                if pos >= 0:
+                    endpos = pos + 1
+                    break
+                else:
+                    start = len(line)
+
+            elif self._readuniversal:
                 # Universal newline search. Find any of \r, \r\n, \n
+                # The decoder ensures that \r\n are not split in two pieces
 
                 # In C we'd look for these in parallel of course.
                 nlpos = line.find("\n", start)
                 crpos = line.find("\r", start)
                 if crpos == -1:
                     if nlpos == -1:
+                        # Nothing found
                         start = len(line)
                     else:
                         # Found \n
-                        pos = nlpos
-                        endpos = pos + 1
-                        ending = self._LF
+                        endpos = nlpos + 1
                         break
                 elif nlpos == -1:
-                    if crpos == len(line) - 1:
-                        # Found \r at end of buffer, must keep reading
-                        start = crpos
-                        cr_eof = True
-                    else:
-                        # Found lone \r
-                        ending = self._CR
-                        pos = crpos
-                        endpos = pos + 1
-                        break
+                    # Found lone \r
+                    endpos = crpos + 1
+                    break
                 elif nlpos < crpos:
                     # Found \n
-                    pos = nlpos
-                    endpos = pos + 1
-                    ending = self._LF
+                    endpos = nlpos + 1
                     break
                 elif nlpos == crpos + 1:
                     # Found \r\n
-                    ending = self._CRLF
-                    pos = crpos
-                    endpos = pos + 2
+                    endpos = crpos + 2
                     break
                 else:
                     # Found \r
-                    pos = crpos
-                    endpos = pos + 1
-                    ending = self._CR
+                    endpos = crpos + 1
                     break
             else:
                 # non-universal
                 pos = line.find(self._readnl)
                 if pos >= 0:
-                    endpos = pos+len(self._readnl)
-                    ending = self._nlflag(self._readnl)
+                    endpos = pos + len(self._readnl)
                     break
+
+            if limit >= 0 and len(line) >= limit:
+                endpos = limit  # reached length limit
+                break
 
             # No line ending seen yet - get more data
             more_line = ''
-            while True:
-                readahead, pending = self._read_chunk()
-                more_line = pending
-                if more_line or not readahead:
+            while self._read_chunk():
+                if self._decoded_chars:
                     break
-            if more_line:
-                line += more_line
+            if self._decoded_chars:
+                line += self._get_decoded_chars()
             else:
                 # end of file
-                self._pending = ''
+                self._set_decoded_chars('')
                 self._snapshot = None
-                if cr_eof:
-                    self._seennl |= self._CR
-                    return line[:-1] + '\n'
-                else:
-                    return line
+                return line
 
-        self._pending = line[endpos:]
-        if self._readtranslate:
-            self._seennl |= ending
-            if ending != self._LF:
-                return line[:pos] + '\n'
-            else:
-                return line[:endpos]
-        else:
-            return line[:endpos]
+        if limit >= 0 and endpos > limit:
+            endpos = limit  # don't exceed limit
 
-    def _replacenl(self, data):
-        # Replace newlines in data as needed and record that they have
-        # been seen.
-        if not self._readtranslate:
-            return data
-        if self._readuniversal:
-            crlf = data.count('\r\n')
-            cr = data.count('\r') - crlf
-            lf = data.count('\n') - crlf
-            self._seennl |= (lf and self._LF) | (cr and self._CR) \
-                         | (crlf and self._CRLF)
-            if crlf:
-                data = data.replace("\r\n", "\n")
-            if cr:
-                data = data.replace("\r", "\n")
-        elif self._readnl == '\n':
-            # Only need to detect if \n was seen.
-            if data.count('\n'):
-                self._seennl |= self._LF
-        else:
-            newdata = data.replace(self._readnl, '\n')
-            if newdata is not data:
-                self._seennl |= self._nlflag(self._readnl)
-            data = newdata
-        return data
+        # Rewind _decoded_chars to just after the line ending we found.
+        self._rewind_decoded_chars(len(line) - endpos)
+        return line[:endpos]
 
-    _LF = 1
-    _CR = 2
-    _CRLF = 4
     @property
     def newlines(self):
-        return (None,
-                "\n",
-                "\r",
-                ("\r", "\n"),
-                "\r\n",
-                ("\n", "\r\n"),
-                ("\r", "\r\n"),
-                ("\r", "\n", "\r\n")
-               )[self._seennl]
-
-    def _nlflag(self, nlstr):
-        return [None, "\n", "\r", None, "\r\n"].index(nlstr)
+        return self._decoder.newlines if self._decoder else None
 
 class StringIO(TextIOWrapper):
 
     # XXX This is really slow, but fully functional
 
-    def __init__(self, initial_value="", encoding="utf-8", newline="\n"):
+    def __init__(self, initial_value="", encoding="utf-8",
+                 errors="strict", newline="\n"):
         super(StringIO, self).__init__(BytesIO(),
                                        encoding=encoding,
+                                       errors=errors,
                                        newline=newline)
         if initial_value:
-            if not isinstance(initial_value, basestring):
+            if not isinstance(initial_value, str):
                 initial_value = str(initial_value)
             self.write(initial_value)
             self.seek(0)
 
     def getvalue(self):
         self.flush()
-        return self.buffer.getvalue().decode(self._encoding)
+        return self.buffer.getvalue().decode(self._encoding, self._errors)

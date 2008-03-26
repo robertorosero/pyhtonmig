@@ -42,21 +42,6 @@ class TestBasicOps(unittest.TestCase):
         self.assertRaises(TypeError, self.gen.seed, 1, 2)
         self.assertRaises(TypeError, type(self.gen), [])
 
-    def test_jumpahead(self):
-        self.gen.seed()
-        state1 = self.gen.getstate()
-        self.gen.jumpahead(100)
-        state2 = self.gen.getstate()    # s/b distinct from state1
-        self.assertNotEqual(state1, state2)
-        self.gen.jumpahead(100)
-        state3 = self.gen.getstate()    # s/b distinct from state2
-        self.assertNotEqual(state2, state3)
-
-        self.assertRaises(TypeError, self.gen.jumpahead)  # needs an arg
-        self.assertRaises(TypeError, self.gen.jumpahead, "ick")  # wrong type
-        self.assertRaises(TypeError, self.gen.jumpahead, 2.3)  # wrong type
-        self.assertRaises(TypeError, self.gen.jumpahead, 2, 3)  # too many
-
     def test_sample(self):
         # For the entire allowable range of 0 <= k <= N, validate that
         # the sample is of the correct length and contains only unique items
@@ -99,26 +84,7 @@ class TestBasicOps(unittest.TestCase):
         self.gen.sample(tuple('abcdefghijklmnopqrst'), 2)
 
     def test_sample_on_dicts(self):
-        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
-
-        # SF bug #1460340 -- random.sample can raise KeyError
-        a = dict.fromkeys(list(range(10)) +
-                          list(range(10,100,2)) +
-                          list(range(100,110)))
-        self.gen.sample(a, 3)
-
-        # A followup to bug #1460340:  sampling from a dict could return
-        # a subset of its keys or of its values, depending on the size of
-        # the subset requested.
-        N = 30
-        d = dict((i, complex(i, i)) for i in range(N))
-        for k in range(N+1):
-            samp = self.gen.sample(d, k)
-            # Verify that we got ints back (keys); the values are complex.
-            for x in samp:
-                self.assert_(type(x) is int)
-        samp.sort()
-        self.assertEqual(samp, list(range(N)))
+        self.assertRaises(TypeError, self.gen.sample, dict.fromkeys('abcdef'), 2)
 
     def test_gauss(self):
         # Ensure that the seed() method initializes all the hidden state.  In
@@ -144,47 +110,18 @@ class TestBasicOps(unittest.TestCase):
         restoredseq = [newgen.random() for i in range(10)]
         self.assertEqual(origseq, restoredseq)
 
-class WichmannHill_TestBasicOps(TestBasicOps):
-    gen = random.WichmannHill()
-
-    def test_setstate_first_arg(self):
-        self.assertRaises(ValueError, self.gen.setstate, (2, None, None))
-
-    def test_strong_jumpahead(self):
-        # tests that jumpahead(n) semantics correspond to n calls to random()
-        N = 1000
-        s = self.gen.getstate()
-        self.gen.jumpahead(N)
-        r1 = self.gen.random()
-        # now do it the slow way
-        self.gen.setstate(s)
-        for i in range(N):
-            self.gen.random()
-        r2 = self.gen.random()
-        self.assertEqual(r1, r2)
-
-    def test_gauss_with_whseed(self):
-        # Ensure that the seed() method initializes all the hidden state.  In
-        # particular, through 2.2.1 it failed to reset a piece of state used
-        # by (and only by) the .gauss() method.
-
-        for seed in 1, 12, 123, 1234, 12345, 123456, 654321:
-            self.gen.whseed(seed)
-            x1 = self.gen.random()
-            y1 = self.gen.gauss(0, 1)
-
-            self.gen.whseed(seed)
-            x2 = self.gen.random()
-            y2 = self.gen.gauss(0, 1)
-
-            self.assertEqual(x1, x2)
-            self.assertEqual(y1, y2)
-
-    def test_bigrand(self):
-        # Verify warnings are raised when randrange is too large for random()
-        with test_support.catch_warning():
-            warnings.filterwarnings("error", "Underlying random")
-            self.assertRaises(UserWarning, self.gen.randrange, 2**60)
+    def test_bug_1727780(self):
+        # verify that version-2-pickles can be loaded
+        # fine, whether they are created on 32-bit or 64-bit
+        # platforms, and that version-3-pickles load fine.
+        files = [("randv2_32.pck", 780),
+                 ("randv2_64.pck", 866),
+                 ("randv3.pck", 343)]
+        for file, value in files:
+            f = open(test_support.findfile(file),"rb")
+            r = pickle.load(f)
+            f.close()
+            self.assertEqual(r.randrange(1000), value)
 
 class SystemRandom_TestBasicOps(TestBasicOps):
     gen = random.SystemRandom()
@@ -200,10 +137,6 @@ class SystemRandom_TestBasicOps(TestBasicOps):
     def test_seedargs(self):
         # Doesn't need to do anything except not fail
         self.gen.seed(100)
-
-    def test_jumpahead(self):
-        # Doesn't need to do anything except not fail
-        self.gen.jumpahead(100)
 
     def test_gauss(self):
         self.gen.gauss_next = None
@@ -479,6 +412,7 @@ class TestDistributions(unittest.TestCase):
         g.random = x[:].pop; g.gammavariate(1.0, 1.0)
         g.random = x[:].pop; g.gammavariate(200.0, 1.0)
         g.random = x[:].pop; g.betavariate(3.0, 3.0)
+        g.random = x[:].pop; g.triangular(0.0, 1.0, 1.0/3.0)
 
     def test_avg_std(self):
         # Use integration to test distribution average and standard deviation.
@@ -488,6 +422,7 @@ class TestDistributions(unittest.TestCase):
         x = [i/float(N) for i in range(1,N)]
         for variate, args, mu, sigmasqrd in [
                 (g.uniform, (1.0,10.0), (10.0+1.0)/2, (10.0-1.0)**2/12),
+                (g.triangular, (0.0, 1.0, 1.0/3.0), 4.0/9.0, 7.0/9.0/18.0),
                 (g.expovariate, (1.5,), 1/1.5, 1/1.5**2),
                 (g.paretovariate, (5.0,), 5.0/(5.0-1),
                                   5.0/((5.0-1)**2*(5.0-2))),
@@ -528,8 +463,7 @@ class TestModule(unittest.TestCase):
 
 
 def test_main(verbose=None):
-    testclasses =    [WichmannHill_TestBasicOps,
-                      MersenneTwister_TestBasicOps,
+    testclasses =    [MersenneTwister_TestBasicOps,
                       TestDistributions,
                       TestModule]
 

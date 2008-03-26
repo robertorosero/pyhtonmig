@@ -3,11 +3,8 @@
 
 .. module:: py_compile
    :synopsis: Generate byte-code files from Python source files.
-
-.. % Documentation based on module docstrings, by Fred L. Drake, Jr.
-.. % <fdrake@acm.org>
-
-
+.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
+.. documentation based on module docstrings
 
 .. index:: pair: file; byte-code
 
@@ -45,7 +42,12 @@ byte-code cache files in the directory containing the source code.
    structure to locate source files; it only compiles files named explicitly.
 
 When this module is run as a script, the :func:`main` is used to compile all the
-files named on the command line.
+files named on the command line.  The exit status is nonzero if one of the files
+could not be compiled.
+
+.. versionchanged:: 2.6
+
+   Added the nonzero exit status.
 
 
 .. seealso::

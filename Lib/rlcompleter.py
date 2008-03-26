@@ -33,7 +33,7 @@ used, and this module (and the readline module) are silently inactive.
 
 """
 
-import __builtin__
+import builtins
 import __main__
 
 __all__ = ["Completer"]
@@ -97,7 +97,7 @@ class Completer:
         matches = []
         n = len(text)
         for list in [keyword.kwlist,
-                     __builtin__.__dict__,
+                     builtins.__dict__,
                      self.namespace]:
             for word in list:
                 if word[:n] == text and word != "__builtins__":
@@ -119,7 +119,7 @@ class Completer:
         import re
         m = re.match(r"(\w+(\.\w+)*)\.(\w*)", text)
         if not m:
-            return
+            return []
         expr, attr = m.group(1, 3)
         object = eval(expr, self.namespace)
         words = dir(object)

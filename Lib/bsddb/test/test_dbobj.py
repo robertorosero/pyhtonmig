@@ -2,7 +2,6 @@
 import shutil
 import sys, os
 import unittest
-import glob
 import tempfile
 
 try:
@@ -12,6 +11,11 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbobj
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
+
 
 #----------------------------------------------------------------------
 
@@ -20,14 +24,17 @@ class dbobjTestCase(unittest.TestCase):
     db_name = 'test-dbobj.db'
 
     def setUp(self):
-        self.homeDir = tempfile.mkdtemp()
+        homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
+        self.homeDir = homeDir
+        try: os.mkdir(homeDir)
+        except os.error: pass
 
     def tearDown(self):
         if hasattr(self, 'db'):
             del self.db
         if hasattr(self, 'env'):
             del self.env
-        shutil.rmtree(self.homeDir)
+        test_support.rmtree(self.homeDir)
 
     def test01_both(self):
         class TestDBEnv(dbobj.DBEnv): pass

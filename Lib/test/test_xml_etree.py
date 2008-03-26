@@ -2,7 +2,8 @@
 # all included components work as they should.  For a more extensive
 # test suite, see the selftest script in the ElementTree distribution.
 
-import doctest, sys
+import doctest
+import sys
 
 from test import test_support
 
@@ -184,7 +185,7 @@ def parseliteral():
     >>> print(ET.tostring(element))
     <html><body>text</body></html>
     >>> print(repr(ET.tostring(element, "ascii")))
-    b'<?xml version=\'1.0\' encoding=\'ascii\'?>\n<html><body>text</body></html>'
+    b"<?xml version='1.0' encoding='ascii'?>\n<html><body>text</body></html>"
     >>> _, ids = ET.XMLID("<html><body>text</body></html>")
     >>> len(ids)
     0

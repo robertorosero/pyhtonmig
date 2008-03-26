@@ -47,8 +47,9 @@ The module defines the following functions:
 .. function:: ioctl(fd, op[, arg[, mutate_flag]])
 
    This function is identical to the :func:`fcntl` function, except that the
-   operations are typically defined in the library module :mod:`termios` and the
    argument handling is even more complicated.
+
+   The op parameter is limited to values that can fit in 32-bits.
 
    The parameter *arg* can be one of an integer, absent (treated identically to the
    integer ``0``), an object supporting the read-only buffer interface (most likely
@@ -109,7 +110,7 @@ The module defines the following functions:
    * :const:`LOCK_EX` -- acquire an exclusive lock
 
    When *operation* is :const:`LOCK_SH` or :const:`LOCK_EX`, it can also be
-   bit-wise OR'd with :const:`LOCK_NB` to avoid blocking on lock acquisition.
+   bitwise ORed with :const:`LOCK_NB` to avoid blocking on lock acquisition.
    If :const:`LOCK_NB` is used and the lock cannot be acquired, an
    :exc:`IOError` will be raised and the exception will have an *errno*
    attribute set to :const:`EACCES` or :const:`EAGAIN` (depending on the

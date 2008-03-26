@@ -187,22 +187,20 @@ Windows Platform
 
    .. note::
 
-      This function only works if Mark Hammond's :mod:`win32all` package is installed
-      and (obviously) only runs on Win32 compatible platforms.
+      Note: this function works best with Mark Hammond's
+      :mod:`win32all` package installed, but also on Python 2.3 and
+      later (support for this was added in Python 2.6). It obviously
+      only runs on Win32 compatible platforms.
 
 
 Win95/98 specific
 ^^^^^^^^^^^^^^^^^
-
 
 .. function:: popen(cmd, mode='r', bufsize=None)
 
    Portable :func:`popen` interface.  Find a working popen implementation
    preferring :func:`win32pipe.popen`.  On Windows NT, :func:`win32pipe.popen`
    should work; on Windows 9x it hangs due to bugs in the MS C library.
-
-   .. % This KnowledgeBase article appears to be missing...
-   .. % See also \ulink{MS KnowledgeBase article Q150956}{}.
 
 
 Mac OS Platform
@@ -226,13 +224,31 @@ Unix Platforms
 --------------
 
 
-.. function:: dist(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake'))
+.. function:: dist(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...))
 
    Tries to determine the name of the OS distribution name Returns a tuple
    ``(distname, version, id)`` which defaults to the args given as parameters.
 
-.. % Document linux_distribution()?
+   ``supported_dists`` may be given to define the set of Linux
+   distributions to look for. It defaults to a list of currently
+   supported Linux distributions identified by their release file
+   name.
 
+.. function:: linux_distribution(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...), full_distribution_name=1)
+
+   Tries to determine the name of the Linux OS distribution name.
+
+   ``supported_dists`` may be given to define the set of Linux
+   distributions to look for. It defaults to a list of currently
+   supported Linux distributions identified by their release file
+   name.
+
+   If ``full_distribution_name`` is true (default), the full
+   distribution read from the OS is returned. Otherwise the short name
+   taken from ``supported_dists`` is used.
+
+   Returns a tuple ``(distname,version,id)`` which defaults to the
+   args given as parameters.
 
 .. function:: libc_ver(executable=sys.executable, lib='', version='', chunksize=2048)
 
@@ -241,7 +257,7 @@ Unix Platforms
    version)`` which default to the given parameters in case the lookup fails.
 
    Note that this function has intimate knowledge of how different libc versions
-   add symbols to the executable is probably only useable for executables compiled
+   add symbols to the executable is probably only usable for executables compiled
    using :program:`gcc`.
 
    The file is read and scanned in chunks of *chunksize* bytes.

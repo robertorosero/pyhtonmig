@@ -44,8 +44,9 @@ The :mod:`functools` module defines the following functions:
    some portion of a function's arguments and/or keywords resulting in a new object
    with a simplified signature.  For example, :func:`partial` can be used to create
    a callable that behaves like the :func:`int` function where the *base* argument
-   defaults to two::
+   defaults to two:
 
+      >>> from functools import partial
       >>> basetwo = partial(int, base=2)
       >>> basetwo.__doc__ = 'Convert base 2 string to an int.'
       >>> basetwo('10010')
@@ -76,9 +77,9 @@ The :mod:`functools` module defines the following functions:
    *WRAPPER_UPDATES* (which updates the wrapper function's *__dict__*, i.e. the
    instance dictionary).
 
-   The main intended use for this function is in decorator functions which wrap the
-   decorated function and return the wrapper. If the wrapper function is not
-   updated, the metadata of the returned function will reflect the wrapper
+   The main intended use for this function is in :term:`decorator` functions which
+   wrap the decorated function and return the wrapper. If the wrapper function is
+   not updated, the metadata of the returned function will reflect the wrapper
    definition rather than the original function definition, which is typically less
    than helpful.
 
@@ -87,8 +88,9 @@ The :mod:`functools` module defines the following functions:
 
    This is a convenience function for invoking ``partial(update_wrapper,
    wrapped=wrapped, assigned=assigned, updated=updated)`` as a function decorator
-   when defining a wrapper function. For example::
+   when defining a wrapper function. For example:
 
+      >>> from functools import wraps
       >>> def my_decorator(f):
       ...     @wraps(f)
       ...     def wrapper(*args, **kwds):

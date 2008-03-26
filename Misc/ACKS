@@ -33,6 +33,7 @@ Dwayne Bailey
 Stig Bakken
 Greg Ball
 Luigi Ballabio
+Jeff Balogh
 Michael J. Barber
 Chris Barker
 Quentin Barnes
@@ -109,8 +110,6 @@ Tony Campbell
 Brett Cannon
 Mike Carlton
 Terry Carroll
-Brian Leair
-Luke Kenneth Casson Leighton
 Donn Cave
 Per Cederqvist
 Octavian Cerna
@@ -168,6 +167,7 @@ Yves Dionne
 Daniel Dittmar
 Walter Dörwald
 Jaromir Dolecek
+Ismail Donmez
 Dima Dorfman
 Cesar Douady
 Dean Draayer
@@ -180,6 +180,7 @@ Luke Dunstan
 Andy Dustman
 Gary Duzan
 Eugene Dvurechenski
+Josip Dzolonga 
 Maxim Dzumanenko
 Hans Eckardt
 Grant Edwards
@@ -214,6 +215,7 @@ Nils Fischbeck
 Frederik Fix
 Matt Fleming
 Hernán Martínez Foffani
+Amaury Forgeot d'Arc
 Doug Fort
 John Fouhy
 Martin Franklin
@@ -224,6 +226,8 @@ Tadayoshi Funaba
 Gyro Funch
 Peter Funk
 Geoff Furnish
+Ulisses Furquim
+Achim Gaedke
 Lele Gaifax
 Santiago Gala
 Yitzchak Gale
@@ -275,6 +279,7 @@ Rycharde Hawkes
 Jochen Hayek
 Christian Heimes
 Thomas Heller
+Malte Helmert
 Lance Finn Helsten
 Jonathan Hendry
 James Henstridge
@@ -386,6 +391,7 @@ Piers Lauder
 Ben Laurie
 Simon Law
 Chris Lawrence
+Brian Leair
 Christopher Lee
 Inyeol Lee
 John J. Lee
@@ -393,10 +399,13 @@ Thomas Lee
 Luc Lefebvre
 Kip Lehman
 Joerg Lehmann
+Luke Kenneth Casson Leighton
 Marc-Andre Lemburg
+John Lenton
 Mark Levinson
 William Lewis
 Robert van Liere
+Shawn Ligocki
 Martin Ligr
 Christopher Lindblad
 Eric Lindvall
@@ -423,6 +432,7 @@ Steve Majewski
 Grzegorz Makarewicz
 Ken Manheimer
 Vladimir Marangozov
+David Marek
 Doug Marien
 Alex Martelli
 Anthony Martin
@@ -459,6 +469,7 @@ James A Morrison
 Sape Mullender
 Sjoerd Mullender
 Michael Muller
+John Nagle
 Takahiro Nakayama
 Travers Naran
 Fredrik Nehr
@@ -505,6 +516,7 @@ Fernando Pérez
 Mark Perrego
 Trevor Perrin
 Tim Peters
+Benjamin Peterson
 Chris Petrilli
 Bjorn Pettersen
 Geoff Philbrick
@@ -518,6 +530,8 @@ Martijn Pieters
 François Pinard
 Zach Pincus
 Michael Piotrowski
+Antoine Pitrou
+Michael Pomraning
 Iustin Pop
 John Popplewell
 Amrit Prem
@@ -550,6 +564,7 @@ Mark Roberts
 Andy Robinson
 Jim Robinson
 Kevin Rodgers
+Giampaolo Rodola
 Mike Romberg
 Case Roole
 Timothy Roscoe
@@ -578,12 +593,14 @@ Neil Schemenauer
 David Scherer
 Gregor Schmid
 Ralf Schmitt
+Michael Schneider
 Peter Schneider-Kamp
 Arvin Schnell
 Chad J. Schroeder
 Sam Schulenburg
 Stefan Schwarzer
 Dietmar Schwertberger
+Federico Schwindt
 Barry Scott
 Steven Scott
 Nick Seidenman
@@ -608,6 +625,7 @@ George Sipe
 J. Sipprell
 Kragen Sitaker
 Christopher Smith
+Eric V. Smith
 Gregory P. Smith
 Rafal Smotrzyk
 Dirk Soede
@@ -661,6 +679,7 @@ Anthony Tuininga
 Christopher Tur Lesniewski-Laas
 Stephen Turner
 Bill Tutt
+Eren Türkay
 Doobee R. Tzeck
 Lionel Ulmer
 Roger Upole
@@ -691,10 +710,13 @@ Bob Watson
 Aaron Watters
 Henrik Weber
 Corran Webster
+Stefan Wehr
 Zack Weinberg
 Edward Welbourne
 Cliff Wells
 Rickard Westman
+Jeff Wheeler
+Christopher White
 Mats Wichmann
 Truida Wiedijk
 Felix Wiemann
@@ -714,6 +736,7 @@ Lars Wirzenius
 Stefan Witzel
 Klaus-Juergen Wolf
 Dan Wolfe
+David Wolever
 Richard Wolff
 Gordon Worley
 Thomas Wouters
@@ -731,3 +754,5 @@ Artur Zaprzala
 Mike Zarnstorff
 Siebren van der Zee
 Uwe Zessin
+Trent Nelson
+Michael Foord

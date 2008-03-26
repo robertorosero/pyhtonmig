@@ -7,7 +7,7 @@ but random access is not allowed."""
 
 import struct, sys, time
 import zlib
-import __builtin__
+import builtins
 
 __all__ = ["GzipFile","open"]
 
@@ -17,7 +17,6 @@ READ, WRITE = 1, 2
 
 def U32(i):
     """Return i as an unsigned integer, assuming it fits in 32 bits.
-
     If it's >= 2GB when viewed as a 32-bit unsigned int, return a long.
     """
     if i < 0:
@@ -25,11 +24,8 @@ def U32(i):
     return i
 
 def LOWU32(i):
-    """Return the low-order 32 bits of an int, as a non-negative int."""
+    """Return the low-order 32 bits, as a non-negative int"""
     return i & 0xFFFFFFFF
-
-def write32(output, value):
-    output.write(struct.pack("<l", value))
 
 def write32u(output, value):
     # The L format writes the bit pattern correctly whether signed
@@ -37,7 +33,7 @@ def write32u(output, value):
     output.write(struct.pack("<L", value))
 
 def read32(input):
-    return struct.unpack("<l", input.read(4))[0]
+    return struct.unpack("<I", input.read(4))[0]
 
 def open(filename, mode="rb", compresslevel=9):
     """Shorthand for GzipFile(filename, mode, compresslevel).
@@ -92,7 +88,7 @@ class GzipFile:
         if mode and 'b' not in mode:
             mode += 'b'
         if fileobj is None:
-            fileobj = self.myfileobj = __builtin__.open(filename, mode or 'rb')
+            fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
         if filename is None:
             if hasattr(fileobj, 'name'): filename = fileobj.name
             else: filename = ''
@@ -141,7 +137,7 @@ class GzipFile:
 
     def _init_write(self, filename):
         self.name = filename
-        self.crc = zlib.crc32("")
+        self.crc = zlib.crc32("") & 0xffffffff
         self.size = 0
         self.writebuf = []
         self.bufsize = 0
@@ -168,7 +164,7 @@ class GzipFile:
             self.fileobj.write(fname + b'\000')
 
     def _init_read(self):
-        self.crc = zlib.crc32("")
+        self.crc = zlib.crc32("") & 0xffffffff
         self.size = 0
 
     def _read_gzip_header(self):
@@ -214,7 +210,7 @@ class GzipFile:
             raise ValueError("write() on closed GzipFile object")
         if len(data) > 0:
             self.size = self.size + len(data)
-            self.crc = zlib.crc32(data, self.crc)
+            self.crc = zlib.crc32(data, self.crc) & 0xffffffff
             self.fileobj.write( self.compress.compress(data) )
             self.offset += len(data)
 
@@ -306,7 +302,7 @@ class GzipFile:
             self._new_member = True
 
     def _add_read_data(self, data):
-        self.crc = zlib.crc32(data, self.crc)
+        self.crc = zlib.crc32(data, self.crc) & 0xffffffff
         self.extrabuf = self.extrabuf + data
         self.extrasize = self.extrasize + len(data)
         self.size = self.size + len(data)
@@ -319,24 +315,19 @@ class GzipFile:
         # stored is the true file size mod 2**32.
         self.fileobj.seek(-8, 1)
         crc32 = read32(self.fileobj)
-        isize = U32(read32(self.fileobj))   # may exceed 2GB
-        if U32(crc32) != U32(self.crc):
-            raise IOError("CRC check failed")
-        elif isize != LOWU32(self.size):
+        isize = read32(self.fileobj)  # may exceed 2GB
+        if crc32 != self.crc:
+            raise IOError("CRC check failed %s != %s" % (hex(crc32),
+                                                         hex(self.crc)))
+        elif isize != (self.size & 0xffffffff):
             raise IOError("Incorrect length of data produced")
 
     def close(self):
         if self.mode == WRITE:
             self.fileobj.write(self.compress.flush())
-            # The native zlib crc is an unsigned 32-bit integer, but
-            # the Python wrapper implicitly casts that to a signed C
-            # long.  So, on a 32-bit box self.crc may "look negative",
-            # while the same crc on a 64-bit box may "look positive".
-            # To avoid irksome warnings from the `struct` module, force
-            # it to look positive on all boxes.
-            write32u(self.fileobj, LOWU32(self.crc))
+            write32u(self.fileobj, self.crc)
             # self.size may exceed 2GB, or even 4GB
-            write32u(self.fileobj, LOWU32(self.size))
+            write32u(self.fileobj, self.size & 0xffffffff)
             self.fileobj = None
         elif self.mode == READ:
             self.fileobj = None
@@ -409,7 +400,7 @@ class GzipFile:
 
     def readline(self, size=-1):
         if size < 0:
-            size = sys.maxint
+            size = sys.maxsize
             readsize = self.min_readsize
         else:
             readsize = size
@@ -441,7 +432,7 @@ class GzipFile:
     def readlines(self, sizehint=0):
         # Negative numbers result in reading all the lines
         if sizehint <= 0:
-            sizehint = sys.maxint
+            sizehint = sys.maxsize
         L = []
         while sizehint > 0:
             line = self.readline()
@@ -487,13 +478,13 @@ def _test():
                     print("filename doesn't end in .gz:", repr(arg))
                     continue
                 f = open(arg, "rb")
-                g = __builtin__.open(arg[:-3], "wb")
+                g = builtins.open(arg[:-3], "wb")
         else:
             if arg == "-":
                 f = sys.stdin
                 g = GzipFile(filename="", mode="wb", fileobj=sys.stdout)
             else:
-                f = __builtin__.open(arg, "rb")
+                f = builtins.open(arg, "rb")
                 g = open(arg + ".gz", "wb")
         while True:
             chunk = f.read(1024)

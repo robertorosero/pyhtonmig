@@ -1,5 +1,6 @@
 import parser
 import unittest
+import sys
 from test import test_support
 
 #
@@ -136,6 +137,7 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
 
     def test_class_defs(self):
         self.check_suite("class foo():pass")
+        self.check_suite("class foo(object):pass")
 
     def test_import_from_statement(self):
         self.check_suite("from sys.path import *")
@@ -449,11 +451,31 @@ class CompileTestCase(unittest.TestCase):
         st = parser.suite('a = "\\u1"')
         self.assertRaises(SyntaxError, parser.compilest, st)
 
+class ParserStackLimitTestCase(unittest.TestCase):
+    """try to push the parser to/over it's limits.
+    see http://bugs.python.org/issue1881 for a discussion
+    """
+    def _nested_expression(self, level):
+        return "["*level+"]"*level
+
+    def test_deeply_nested_list(self):
+        # XXX used to be 99 levels in 2.x
+        e = self._nested_expression(93)
+        st = parser.expr(e)
+        st.compile()
+
+    def test_trigger_memory_error(self):
+        e = self._nested_expression(100)
+        print("Expecting 's_push: parser stack overflow' in next line",
+              file=sys.stderr)
+        self.assertRaises(MemoryError, parser.expr, e)
+
 def test_main():
     test_support.run_unittest(
         RoundtripLegalSyntaxTestCase,
         IllegalSyntaxTestCase,
         CompileTestCase,
+        ParserStackLimitTestCase,
     )
 
 

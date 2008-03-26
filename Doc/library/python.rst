@@ -13,7 +13,8 @@ overview:
 .. toctree::
 
    sys.rst
-   __builtin__.rst
+   builtins.rst
+   future_builtins.rst
    __main__.rst
    warnings.rst
    contextlib.rst

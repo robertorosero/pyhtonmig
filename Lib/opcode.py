@@ -71,6 +71,7 @@ def_op('BINARY_TRUE_DIVIDE', 27)
 def_op('INPLACE_FLOOR_DIVIDE', 28)
 def_op('INPLACE_TRUE_DIVIDE', 29)
 
+def_op('STORE_MAP', 54)
 def_op('INPLACE_ADD', 55)
 def_op('INPLACE_SUBTRACT', 56)
 def_op('INPLACE_MULTIPLY', 57)
@@ -111,7 +112,7 @@ name_op('STORE_NAME', 90)       # Index in name list
 name_op('DELETE_NAME', 91)      # ""
 def_op('UNPACK_SEQUENCE', 92)   # Number of tuple items
 jrel_op('FOR_ITER', 93)
-
+def_op('UNPACK_EX', 94)
 name_op('STORE_ATTR', 95)       # Index in name list
 name_op('DELETE_ATTR', 96)      # ""
 name_op('STORE_GLOBAL', 97)     # ""
@@ -123,7 +124,7 @@ name_op('LOAD_NAME', 101)       # Index in name list
 def_op('BUILD_TUPLE', 102)      # Number of tuple items
 def_op('BUILD_LIST', 103)       # Number of list items
 def_op('BUILD_SET', 104)        # Number of set items
-def_op('BUILD_MAP', 105)        # Always zero for now
+def_op('BUILD_MAP', 105)        # Number of dict entries (upto 255)
 name_op('LOAD_ATTR', 106)       # Index in name list
 def_op('COMPARE_OP', 107)       # Comparison operator
 hascompare.append(107)

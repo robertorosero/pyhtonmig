@@ -73,7 +73,7 @@ setup script). Indirectly provides the  :class:`distutils.dist.Distribution` and
    +--------------------+--------------------------------+-------------------------------------------------------------+
    | *classifiers*      | A list of categories for the   | The list of available                                       |
    |                    | package                        | categorizations is at                                       |
-   |                    |                                | http://cheeseshop.python.org/pypi?:action=list_classifiers. |
+   |                    |                                | http://pypi.python.org/pypi?:action=list_classifiers.       |
    +--------------------+--------------------------------+-------------------------------------------------------------+
    | *distclass*        | the :class:`Distribution`      | A subclass of                                               |
    |                    | class to use                   | :class:`distutils.core.Distribution`                        |
@@ -1199,7 +1199,7 @@ other utility module.
 
    If *force* is true, all files are recompiled regardless of timestamps.
 
-   The source filename encoded in each bytecode file defaults to the filenames
+   The source filename encoded in each :term:`bytecode` file defaults to the filenames
    listed in *py_files*; you can modify these with *prefix* and *basedir*.
    *prefix* is a string that will be stripped off of each source filename, and
    *base_dir* is a directory name that will be prepended (after *prefix* is
@@ -1820,7 +1820,25 @@ This module supplies the abstract base class :class:`Command`.
    :synopsis: Build the .py/.pyc files of a package
 
 
-.. % todo
+.. class:: build_py(Command)
+
+.. class:: build_py_2to3(build_py)
+
+   Alternative implementation of build_py which also runs the
+   2to3 conversion library on each .py file that is going to be
+   installed. To use this in a setup.py file for a distribution
+   that is designed to run with both Python 2.x and 3.x, add::
+
+     try:
+        from distutils.command.build_py import build_py_2to3 as build_py
+     except ImportError:
+        from distutils.command.build_py import build_py
+
+   to your setup.py, and later::
+
+      cmdclass = {'build_py':build_py}
+
+   to the invocation of setup().
 
 
 :mod:`distutils.command.build_scripts` --- Build the scripts of a package
@@ -1965,12 +1983,12 @@ Subclasses of :class:`Command` must define the following methods.
 as the parent with sub-commands ``install_lib``, ``install_headers``, etc.  The
 parent of a family of commands defines *sub_commands* as a class attribute; it's
 a list of 2-tuples ``(command_name, predicate)``, with *command_name* a string
-and *predicate* an unbound method, a string or None. *predicate* is a method of
+and *predicate* a function, a string or None. *predicate* is a method of
 the parent command that determines whether the corresponding command is
 applicable in the current situation.  (Eg. we ``install_headers`` is only
 applicable if we have any C header files to install.)  If *predicate* is None,
 that command is always applicable.
 
 *sub_commands* is usually defined at the \*end\* of a class, because predicates
-can be unbound methods, so they must already have been defined.  The canonical
-example is the :command:`install` command.
+can be methods of the class, so they must already have been defined.  The
+canonical example is the :command:`install` command.

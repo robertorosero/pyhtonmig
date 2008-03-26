@@ -7,7 +7,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """#"
 
-import __builtin__, sys
+import builtins, sys
 
 ### Registry and builtin stateless codec functions
 
@@ -237,7 +237,7 @@ class IncrementalDecoder(object):
     """
     def __init__(self, errors='strict'):
         """
-        Creates a IncrementalDecoder instance.
+        Create a IncrementalDecoder instance.
 
         The IncrementalDecoder may use different error handling schemes by
         providing the errors keyword argument. See the module docstring
@@ -247,26 +247,35 @@ class IncrementalDecoder(object):
 
     def decode(self, input, final=False):
         """
-        Decodes input and returns the resulting object.
+        Decode input and returns the resulting object.
         """
         raise NotImplementedError
 
     def reset(self):
         """
-        Resets the decoder to the initial state.
+        Reset the decoder to the initial state.
         """
 
     def getstate(self):
         """
-        Return the current state of the decoder. This must be a
-        (buffered_input, additional_state_info) tuple.
+        Return the current state of the decoder.
+
+        This must be a (buffered_input, additional_state_info) tuple.
+        buffered_input must be a bytes object containing bytes that
+        were passed to decode() that have not yet been converted.
+        additional_state_info must be a non-negative integer
+        representing the state of the decoder WITHOUT yet having
+        processed the contents of buffered_input.  In the initial state
+        and after reset(), getstate() must return (b"", 0).
         """
         return (b"", 0)
 
     def setstate(self, state):
         """
-        Set the current state of the decoder. state must have been
-        returned by getstate().
+        Set the current state of the decoder.
+
+        state must have been returned by getstate().  The effect of
+        setstate((b"", 0)) must be equivalent to reset().
         """
 
 class BufferedIncrementalDecoder(IncrementalDecoder):
@@ -858,7 +867,7 @@ def open(filename, mode='rb', encoding=None, errors='strict', buffering=1):
        'b' not in mode:
         # Force opening of the file in binary mode
         mode = mode + 'b'
-    file = __builtin__.open(filename, mode, buffering)
+    file = builtins.open(filename, mode, buffering)
     if encoding is None:
         return file
     info = lookup(encoding)

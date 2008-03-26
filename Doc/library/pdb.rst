@@ -103,9 +103,12 @@ slightly different way:
    being debugged (e.g. when an assertion fails).
 
 
-.. function:: post_mortem(traceback)
+.. function:: post_mortem([traceback])
 
-   Enter post-mortem debugging of the given *traceback* object.
+   Enter post-mortem debugging of the given *traceback* object.  If no 
+   *traceback* is given, it uses the one of the exception that is currently
+   being handled (an exception must be being handled if the default is to be
+   used).
 
 
 .. function:: pm()
@@ -239,7 +242,7 @@ commands [*bpnumber*]
    Specifying any command resuming execution (currently continue, step, next,
    return, jump, quit and their abbreviations) terminates the command list (as if
    that command was immediately followed by end). This is because any time you
-   resume execution (even with a simple next or step), you may encounterÂ· another
+   resume execution (even with a simple next or step), you may encounter another
    breakpoint--which could have its own command list, leading to ambiguities about
    which list to execute.
 
@@ -323,7 +326,7 @@ unalias *name*
       (Pdb)
 
 run [*args* ...]
-   Restart the debugged python program. If an argument is supplied, it is splitted
+   Restart the debugged python program. If an argument is supplied, it is split
    with "shlex" and the result is used as the new sys.argv. History, breakpoints,
    actions and debugger options are preserved. "restart" is an alias for "run".
 

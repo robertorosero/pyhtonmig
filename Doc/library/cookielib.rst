@@ -117,7 +117,7 @@ The following classes are provided:
       Extensions to this module, including a class for reading Microsoft Internet
       Explorer cookies on Windows.
 
-   http://www.netscape.com/newsref/std/cookie_spec.html
+   http://wp.netscape.com/newsref/std/cookie_spec.html
       The specification of the original Netscape cookie protocol.  Though this is
       still the dominant protocol, the 'Netscape cookie protocol' implemented by all
       the major browsers (and :mod:`cookielib`) only bears a passing resemblance to
@@ -140,7 +140,7 @@ The following classes are provided:
 CookieJar and FileCookieJar Objects
 -----------------------------------
 
-:class:`CookieJar` objects support the iterator protocol for iterating over
+:class:`CookieJar` objects support the :term:`iterator` protocol for iterating over
 contained :class:`Cookie` objects.
 
 :class:`CookieJar` has the following methods:

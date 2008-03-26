@@ -4,7 +4,7 @@
 #   Common Unittest Routines for CJK codecs
 #
 
-import sys, codecs, os.path
+import sys, codecs
 import unittest, re
 from test import test_support
 from io import BytesIO
@@ -52,6 +52,10 @@ class TestBase:
                 func = self.encode
             if expected:
                 result = func(source, scheme)[0]
+                if func is self.decode:
+                    self.assert_(type(result) is str, type(result))
+                else:
+                    self.assert_(type(result) is bytes, type(result))
                 self.assertEqual(result, expected)
             else:
                 self.assertRaises(UnicodeError, func, source, scheme)
@@ -110,7 +114,7 @@ class TestBase:
                                      'test.cjktest'), (b'abcdxefgh', 9))
 
         def myreplace(exc):
-            return ('x', sys.maxint + 1)
+            return ('x', sys.maxsize + 1)
         codecs.register_error("test.cjktest", myreplace)
         self.assertRaises(IndexError, self.encode, self.unmappedunicode,
                           'test.cjktest')
@@ -272,7 +276,10 @@ class TestBase_Mapping(unittest.TestCase):
 
     def __init__(self, *args, **kw):
         unittest.TestCase.__init__(self, *args, **kw)
-        self.open_mapping_file() # test it to report the error early
+        try:
+            self.open_mapping_file() # test it to report the error early
+        except IOError:
+            raise test_support.TestSkipped("Could not retrieve "+self.mapfileurl)
 
     def open_mapping_file(self):
         return test_support.open_urlresource(self.mapfileurl)

@@ -69,16 +69,21 @@ PyMemoryView_FromObject(PyObject *base)
 static PyObject *
 memory_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
 {
-        PyObject *obj;
-        if (!PyArg_UnpackTuple(args, "memoryview", 1, 1, &obj)) return NULL;
+	PyObject *obj;
+	static char *kwlist[] = {"object", 0};
 
-        return PyMemoryView_FromObject(obj);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:memoryview", kwlist,
+					 &obj)) {
+		return NULL;
+	}
+
+	return PyMemoryView_FromObject(obj);
 }
 
 
 static void
 _strided_copy_nd(char *dest, char *src, int nd, Py_ssize_t *shape,
-                 Py_ssize_t *strides, int itemsize, char fort)
+                 Py_ssize_t *strides, Py_ssize_t itemsize, char fort)
 {
         int k;
         Py_ssize_t outstride;
@@ -298,7 +303,7 @@ memory_format_get(PyMemoryViewObject *self)
 static PyObject *
 memory_itemsize_get(PyMemoryViewObject *self)
 {
-        return PyInt_FromLong(self->view.itemsize);
+        return PyLong_FromSsize_t(self->view.itemsize);
 }
 
 static PyObject *
@@ -315,7 +320,7 @@ _IntTupleFromSsizet(int len, Py_ssize_t *vals)
         intTuple = PyTuple_New(len);
         if (!intTuple) return NULL;
         for(i=0; i<len; i++) {
-                o = PyInt_FromSsize_t(vals[i]);
+                o = PyLong_FromSsize_t(vals[i]);
                 if (!o) {
                         Py_DECREF(intTuple);
                         return NULL;
@@ -346,7 +351,7 @@ memory_suboffsets_get(PyMemoryViewObject *self)
 static PyObject *
 memory_size_get(PyMemoryViewObject *self)
 {
-        return PyInt_FromSsize_t(self->view.len);
+        return PyLong_FromSsize_t(self->view.len);
 }
 
 static PyObject *
@@ -358,7 +363,7 @@ memory_readonly_get(PyMemoryViewObject *self)
 static PyObject *
 memory_ndim_get(PyMemoryViewObject *self)
 {
-        return PyInt_FromLong(self->view.ndim);
+        return PyLong_FromLong(self->view.ndim);
 }
 
 static PyGetSetDef memory_getsetlist[] ={

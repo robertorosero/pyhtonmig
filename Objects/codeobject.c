@@ -8,7 +8,7 @@
 /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
 
 static int
-all_name_chars(unsigned char *s)
+all_name_chars(Py_UNICODE *s)
 {
 	static char ok_name_char[256];
 	static unsigned char *name_chars = (unsigned char *)NAME_CHARS;
@@ -19,6 +19,8 @@ all_name_chars(unsigned char *s)
 			ok_name_char[*p] = 1;
 	}
 	while (*s) {
+		if (*s >= 128)
+			return 0;
 		if (ok_name_char[*s++] == 0)
 			return 0;
 	}
@@ -66,9 +68,6 @@ PyCode_New(int argcount, int kwonlyargcount,
 		PyErr_BadInternalCall();
 		return NULL;
 	}
-	Py_INCREF(name);
-	Py_INCREF(filename);
-
 	intern_strings(names);
 	intern_strings(varnames);
 	intern_strings(freevars);
@@ -76,11 +75,11 @@ PyCode_New(int argcount, int kwonlyargcount,
 	/* Intern selected string constants */
 	for (i = PyTuple_Size(consts); --i >= 0; ) {
 		PyObject *v = PyTuple_GetItem(consts, i);
-		if (!PyString_Check(v))
+		if (!PyUnicode_Check(v))
 			continue;
-		if (!all_name_chars((unsigned char *)PyString_AS_STRING(v)))
+		if (!all_name_chars(PyUnicode_AS_UNICODE(v)))
 			continue;
-		PyString_InternInPlace(&PyTuple_GET_ITEM(consts, i));
+		PyUnicode_InternInPlace(&PyTuple_GET_ITEM(consts, i));
 	}
 	co = PyObject_NEW(PyCodeObject, &PyCode_Type);
 	if (co != NULL) {
@@ -110,7 +109,6 @@ PyCode_New(int argcount, int kwonlyargcount,
 		co->co_lnotab = lnotab;
                 co->co_zombieframe = NULL;
 	}
-	Py_DECREF(name);
 	return co;
 }
 
@@ -181,8 +179,9 @@ validate_and_copy_tuple(PyObject *tup)
 }
 
 PyDoc_STRVAR(code_doc,
-"code(argcount, nlocals, stacksize, flags, codestring, constants, names,\n\
-      varnames, filename, name, firstlineno, lnotab[, freevars[, cellvars]])\n\
+"code(argcount, kwonlyargcount nlocals, stacksize, flags, codestring,\n\
+      constants, names, varnames, filename, name, firstlineno,\n\
+      lnotab[, freevars[, cellvars]])\n\
 \n\
 Create a code object.  Not for the faint of heart.");
 
@@ -206,7 +205,7 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	int firstlineno;
 	PyObject *lnotab;
 
-	if (!PyArg_ParseTuple(args, "iiiiiSO!O!O!SSiS|O!O!:code",
+	if (!PyArg_ParseTuple(args, "iiiiiSO!O!O!UUiS|O!O!:code",
 			      &argcount, &kwonlyargcount,
 				  &nlocals, &stacksize, &flags,
 			      &code,
