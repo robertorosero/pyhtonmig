@@ -27,9 +27,6 @@ class CommonTest(unittest.TestCase):
     # Change in subclasses to change the behaviour of fixtesttype()
     type2test = None
 
-    # is the type subclass-able?
-    subclassable = True
-
     # All tests pass their arguments to the testing methods
     # as str objects. fixtesttype() can be used to propagate
     # these arguments to the appropriate type
@@ -60,7 +57,7 @@ class CommonTest(unittest.TestCase):
         )
         # if the original is returned make sure that
         # this doesn't happen with subclasses
-        if self.subclassable and object == realresult:
+        if object == realresult:
             class subtype(self.__class__.type2test):
                 pass
             object = subtype(object)
