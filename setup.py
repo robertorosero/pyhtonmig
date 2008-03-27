@@ -1105,17 +1105,6 @@ class PyBuildExt(build_ext):
             exts.append(Extension('_codecs_%s' % loc,
                                   ['cjkcodecs/_codecs_%s.c' % loc]))
 
-        # Dynamic loading module
-        if sys.maxsize == 0x7fffffff:
-            # This requires sizeof(int) == sizeof(long) == sizeof(char*)
-            dl_inc = find_file('dlfcn.h', [], inc_dirs)
-            if (dl_inc is not None) and (platform not in ['atheos']):
-                exts.append( Extension('dl', ['dlmodule.c']) )
-            else:
-                missing.append('dl')
-        else:
-            missing.append('dl')
-
         # Thomas Heller's _ctypes module
         self.detect_ctypes(inc_dirs, lib_dirs)
 
@@ -1643,6 +1632,7 @@ def main():
 
           # Scripts to install
           scripts = ['Tools/scripts/pydoc', 'Tools/scripts/idle',
+                     'Tools/scripts/2to3',
                      'Lib/smtpd.py']
         )
 

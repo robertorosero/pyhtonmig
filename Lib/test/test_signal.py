@@ -1,6 +1,7 @@
 import unittest
 from test import test_support
 from contextlib import closing, nested
+import gc
 import pickle
 import select
 import signal
@@ -29,6 +30,14 @@ def exit_subprocess():
 
 class InterProcessSignalTests(unittest.TestCase):
     MAX_DURATION = 20   # Entire test should last at most 20 sec.
+
+    def setUp(self):
+        self.using_gc = gc.isenabled()
+        gc.disable()
+
+    def tearDown(self):
+        if self.using_gc:
+            gc.enable()
 
     def handlerA(self, *args):
         self.a_called = True
@@ -258,9 +267,95 @@ class SiginterruptTest(unittest.TestCase):
         i=self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 0))
         self.assertEquals(i, False)
 
+class ItimerTest(unittest.TestCase):
+    def setUp(self):
+        self.hndl_called = False
+        self.hndl_count = 0
+        self.itimer = None
+        self.old_alarm = signal.signal(signal.SIGALRM, self.sig_alrm)
+
+    def tearDown(self):
+        signal.signal(signal.SIGALRM, self.old_alarm)
+        if self.itimer is not None: # test_itimer_exc doesn't change this attr
+            # just ensure that itimer is stopped
+            signal.setitimer(self.itimer, 0)
+
+    def sig_alrm(self, *args):
+        self.hndl_called = True
+        if test_support.verbose:
+            print("SIGALRM handler invoked", args)
+
+    def sig_vtalrm(self, *args):
+        self.hndl_called = True
+
+        if self.hndl_count > 3:
+            # it shouldn't be here, because it should have been disabled.
+            raise signal.ItimerError("setitimer didn't disable ITIMER_VIRTUAL "
+                "timer.")
+        elif self.hndl_count == 3:
+            # disable ITIMER_VIRTUAL, this function shouldn't be called anymore
+            signal.setitimer(signal.ITIMER_VIRTUAL, 0)
+            if test_support.verbose:
+                print("last SIGVTALRM handler call")
+
+        self.hndl_count += 1
+
+        if test_support.verbose:
+            print("SIGVTALRM handler invoked", args)
+
+    def sig_prof(self, *args):
+        self.hndl_called = True
+        signal.setitimer(signal.ITIMER_PROF, 0)
+
+        if test_support.verbose:
+            print("SIGPROF handler invoked", args)
+
+    def test_itimer_exc(self):
+        # XXX I'm assuming -1 is an invalid itimer, but maybe some platform
+        # defines it ?
+        self.assertRaises(signal.ItimerError, signal.setitimer, -1, 0)
+        # Negative times are treated as zero on some platforms.
+        if 0:
+            self.assertRaises(signal.ItimerError,
+                              signal.setitimer, signal.ITIMER_REAL, -1)
+
+    def test_itimer_real(self):
+        self.itimer = signal.ITIMER_REAL
+        signal.setitimer(self.itimer, 1.0)
+        if test_support.verbose:
+            print("\ncall pause()...")
+        signal.pause()
+
+        self.assertEqual(self.hndl_called, True)
+
+    def test_itimer_virtual(self):
+        self.itimer = signal.ITIMER_VIRTUAL
+        signal.signal(signal.SIGVTALRM, self.sig_vtalrm)
+        signal.setitimer(self.itimer, 0.3, 0.2)
+
+        for i in range(100000000):
+            if signal.getitimer(self.itimer) == (0.0, 0.0):
+                break # sig_vtalrm handler stopped this itimer
+
+        # virtual itimer should be (0.0, 0.0) now
+        self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))
+        # and the handler should have been called
+        self.assertEquals(self.hndl_called, True)
+
+    def test_itimer_prof(self):
+        self.itimer = signal.ITIMER_PROF
+        signal.signal(signal.SIGPROF, self.sig_prof)
+        signal.setitimer(self.itimer, 0.2)
+
+        for i in range(100000000):
+            if signal.getitimer(self.itimer) == (0.0, 0.0):
+                break # sig_prof handler stopped this itimer
+
+        self.assertEqual(self.hndl_called, True)
+
 def test_main():
     test_support.run_unittest(BasicSignalTests, InterProcessSignalTests,
-        WakeupSignalTests, SiginterruptTest)
+        WakeupSignalTests, SiginterruptTest, ItimerTest)
 
 
 if __name__ == "__main__":
