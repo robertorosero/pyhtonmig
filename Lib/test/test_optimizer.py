@@ -90,14 +90,14 @@ else:
             ("13|7",          15)
         )
 
+        attrmap = {
+            int: 'n',
+            str: 's'
+        }
+
         for code, expected in tests:
             ast = self.compileast(code)
-            if type(expected) is int:
-                actual = ast.body[0].value.n
-            elif type(expected) is str:
-                actual = ast.body[0].value.s
-            else:
-                raise Exception("Unexpected value: %s" % (expected,))
+            actual = getattr(ast.body[0].value, attrmap[type(expected)])
             self.assertEqual(expected, actual)
 
     def test_binop_fold_num_with_variable(self):
