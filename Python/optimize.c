@@ -862,9 +862,17 @@ static int
 optimize_return(stmt_ty* stmt_ptr, PyArena* arena)
 {
     stmt_ty stmt = *stmt_ptr;
-    if (stmt->v.Return.value != NULL)
+    if (stmt->v.Return.value != NULL) {
         if (!optimize_expr(&stmt->v.Return.value, arena))
             return 0;
+
+        /* "return None" becomes "return" */
+        if (stmt->v.Return.value->kind == Name_kind) {
+            PyObject* id = stmt->v.Return.value->v.Name.id;
+            if (strcmp(PyString_AS_STRING(id), "None") == 0)
+                stmt->v.Return.value = NULL;
+        }
+    }
     return 1;
 }
 

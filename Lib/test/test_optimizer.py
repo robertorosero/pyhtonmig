@@ -73,12 +73,34 @@ else:
         return self.assertAstNode(_ast.Str, 's', expected, code)
 
     def test_binop_fold_num(self):
-        # check binary constant folding for numeric values
-        self.assertNum(3, "1 + 2")
-        self.assertNum(18, "2 * 8 + 4 - 2")
-        self.assertNum(16, "2 ** 4")
-        self.assertNum(4, "1 << 2")
-        self.assertAstNode(_ast.BinOp, None, None, "10 / 5")
+        tests = (
+            ("1 + 2",         3),
+            ("'@'*4",         "@@@@"),
+            ("'abc' + 'def'", "abcdef"),
+            ("3**4",          81),
+            ("3*4",           12),
+            ("13//4",         3),
+            ("14%4",          2),
+            ("2+3",           5),
+            ("13-4",          9),
+            ("13<<2",         52),
+            ("13>>2",         3),
+            ("13&7",          5),
+            ("13^7",          10),
+            ("13|7",          15)
+        )
+
+        for code, expected in tests:
+            ast = compile(code, "<string>", "exec", _ast.PyCF_ONLY_AST)
+
+            if type(expected) is int:
+                actual = ast.body[0].value.n
+            elif type(expected) is str:
+                actual = ast.body[0].value.s
+            else:
+                raise Exception("Unexpected value: %s" % (expected,))
+
+            self.assertEqual(expected, actual)
 
     def test_binop_fold_num_with_variable(self):
         # check binary constant folding occurs even where
@@ -101,11 +123,6 @@ x + 3 * 2
         self.assertEqual(_ast.Num, ast.body[1].value.right.__class__)
         self.assertEqual(6, ast.body[1].value.right.n)
 
-    def test_binop_fold_str(self):
-        # check binary constant folding for string values
-        self.assertStr("hello there", "'hello' + ' ' + 'there'")
-        self.assertStr("testtesttest", "'test' * 3")
-
     def test_unary_fold_num(self):
         # check unary constant folding for numeric values
         self.assertNum(-5, "-5")
@@ -113,6 +130,15 @@ x + 3 * 2
         self.assertNum(-3, "-+3")
         self.assertNum(False, "not True")
         self.assertNum(True, "not None")
+
+    def test_return_none_becomes_return(self):
+        code = """
+def foo():
+    return None
+"""
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
+        self.assertEqual(None, ast.body[0].body[0].value)
 
     def test_eliminate_code_after_return(self):
         # ensure code following a "return" is erased from the AST
