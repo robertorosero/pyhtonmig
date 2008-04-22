@@ -31,6 +31,7 @@
 #include "compile.h"
 #include "symtable.h"
 #include "opcode.h"
+#include "optimize.h"
 
 int Py_OptimizeFlag = 0;
 
@@ -298,8 +299,11 @@ PyNode_Compile(struct _node *n, const char *filename)
 	if (!arena)
 		return NULL;
 	mod = PyAST_FromNode(n, NULL, filename, arena);
-	if (mod)
-		co = PyAST_Compile(mod, filename, NULL, arena);
+	if (mod != NULL) {
+        if (PyAST_Optimize(&mod, arena)) {
+            co = PyAST_Compile(mod, filename, NULL, arena);
+        }
+    }
 	PyArena_Free(arena);
 	return co;
 }

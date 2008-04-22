@@ -6,6 +6,7 @@
 #include "node.h"
 #include "code.h"
 #include "eval.h"
+#include "optimize.h"
 
 #include <ctype.h>
 
@@ -472,6 +473,11 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 	PyCompilerFlags cf;
 	PyObject *result = NULL, *cmd, *tmp = NULL;
 	Py_ssize_t length;
+    static const int allowed_flags = PyCF_MASK |
+                                        PyCF_MASK_OBSOLETE |
+                                        PyCF_DONT_IMPLY_DEDENT |
+                                        PyCF_ONLY_AST |
+                                        PyCF_NO_OPTIMIZE;
 	static char *kwlist[] = {"source", "filename", "mode", "flags",
 				 "dont_inherit", NULL};
 	int start[] = {Py_file_input, Py_eval_input, Py_single_input};
@@ -483,8 +489,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 
 	cf.cf_flags = supplied_flags;
 
-	if (supplied_flags &
-	    ~(PyCF_MASK | PyCF_MASK_OBSOLETE | PyCF_DONT_IMPLY_DEDENT | PyCF_ONLY_AST))
+	if (supplied_flags & ~allowed_flags)
 	{
 		PyErr_SetString(PyExc_ValueError,
 				"compile(): unrecognised flags");
@@ -523,8 +528,13 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 				PyArena_Free(arena);
 				return NULL;
 			}
-			result = (PyObject*)PyAST_Compile(mod, filename,
-							  &cf, arena);
+            if (!(supplied_flags & PyCF_NO_OPTIMIZE)) {
+                if (!PyAST_Optimize(&mod, arena)) {
+                    PyArena_Free(arena);
+                    return NULL;
+                }
+            }
+			result = (PyObject*)PyAST_Compile(mod, filename, &cf, arena);
 			PyArena_Free(arena);
 		}
 		return result;

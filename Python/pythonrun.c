@@ -32,6 +32,8 @@
 #include "windows.h"
 #endif
 
+#include "optimize.h"
+
 #ifndef Py_REF_DEBUG
 #define PRINT_TOTAL_REFS()
 #else /* Py_REF_DEBUG */
@@ -1383,6 +1385,9 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
+        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+            if (!PyAST_Optimize(&mod, arena))
+                return NULL;
 		return mod;
 	}
 	else {
@@ -1408,6 +1413,9 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
+        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+            if (!PyAST_Optimize(&mod, arena))
+                return NULL;
 		return mod;
 	}
 	else {
