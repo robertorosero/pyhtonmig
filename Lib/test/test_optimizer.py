@@ -91,15 +91,13 @@ else:
         )
 
         for code, expected in tests:
-            ast = compile(code, "<string>", "exec", _ast.PyCF_ONLY_AST)
-
+            ast = self.compileast(code)
             if type(expected) is int:
                 actual = ast.body[0].value.n
             elif type(expected) is str:
                 actual = ast.body[0].value.s
             else:
                 raise Exception("Unexpected value: %s" % (expected,))
-
             self.assertEqual(expected, actual)
 
     def test_binop_fold_num_with_variable(self):
