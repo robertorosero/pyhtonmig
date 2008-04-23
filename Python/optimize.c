@@ -626,6 +626,12 @@ optimize_yield(expr_ty* expr_ptr, PyArena* arena)
     if (expr->v.Yield.value != NULL)
         if (!optimize_expr(&expr->v.Yield.value, arena))
             return 0;
+    /* "yield None" becomes "yield" */
+    if (expr->v.Yield.value->kind == Name_kind) {
+        PyObject* id = expr->v.Yield.value->v.Name.id;
+        if (strcmp(PyString_AS_STRING(id), "None") == 0)
+                expr->v.Yield.value = NULL;
+    }
     return 1;
 }
 

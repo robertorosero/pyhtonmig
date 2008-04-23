@@ -138,6 +138,16 @@ def foo():
         self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
         self.assertEqual(None, ast.body[0].body[0].value)
 
+    def test_yield_none_becomes_yield(self):
+        code = """
+def foo():
+    yield None
+"""
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Expr, ast.body[0].body[0].__class__)
+        self.assertEqual(_ast.Yield, ast.body[0].body[0].value.__class__)
+        self.assertEqual(None, ast.body[0].body[0].value.value)
+
     def test_eliminate_code_after_return(self):
         # ensure code following a "return" is erased from the AST
         code = """
