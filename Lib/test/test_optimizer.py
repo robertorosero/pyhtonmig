@@ -121,6 +121,19 @@ x + 3 * 2
         self.assertEqual(_ast.Num, ast.body[1].value.right.__class__)
         self.assertEqual(6, ast.body[1].value.right.n)
 
+    def test_binop_failure_left_until_runtime(self):
+        ast = self.compileast("5 + '3'")
+
+        # ensure no optimization has taken place
+        self.assertEqual(_ast.Expr, ast.body[0].__class__)
+        self.assertEqual(_ast.BinOp, ast.body[0].value.__class__)
+
+        try:
+            exec compile(ast)
+            self.fail("expected this to raise a TypeError")
+        except TypeError:
+            pass
+
     def test_unary_fold_num(self):
         # check unary constant folding for numeric values
         self.assertNum(-5, "-5")
@@ -128,6 +141,19 @@ x + 3 * 2
         self.assertNum(-3, "-+3")
         self.assertNum(False, "not True")
         self.assertNum(True, "not None")
+
+    def test_unary_failure_left_until_runtime(self):
+        ast = self.compileast("~'bad!'")
+
+        # ensure no optimization has taken place
+        self.assertEqual(_ast.Expr, ast.body[0].__class__)
+        self.assertEqual(_ast.UnaryOp, ast.body[0].value.__class__)
+
+        try:
+            exec compile(ast)
+            self.fail("expected this to raise a TypeError")
+        except TypeError:
+            pass
 
     def test_return_none_becomes_return(self):
         code = """

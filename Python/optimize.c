@@ -135,24 +135,6 @@ optimize_expr_seq(asdl_seq** seq_ptr, PyArena* arena)
     return 1;
 }
 
-#if 0
-/**
- * Shrink an ASDL sequence by trimming off the last few elements.
- */
-static asdl_seq*
-_asdl_seq_shrink(asdl_seq* seq, int newlen, PyArena* arena)
-{
-    asdl_seq* new;
-    int n;
-    new = asdl_seq_new(newlen, arena);
-    if (new == NULL)
-        return NULL;
-    for (n = 0; n < newlen; n++)
-        asdl_seq_SET(new, n, asdl_seq_GET(seq, n));
-    return new;
-}
-#endif
-
 /**
  * Replace an AST node at position `n' with the node(s) in `replacement'.
  */
@@ -456,18 +438,17 @@ optimize_bin_op(expr_ty* expr_ptr, PyArena* arena)
         
         if (res == NULL) {
             if (PyErr_Occurred()) {
-                /* if we're out of memory, we need to complain about it now! */
-                if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
+                /* complain about out of memory errors right away */
+                if (PyErr_ExceptionMatches(PyExc_MemoryError))
                     return 0;
-                }
-                /* otherwise, the binop failed: clear the error */
+                /* leave all other errors for runtime */
                 else
                     PyErr_Clear();
             }
-            /* do not optimize this expression */
             return 1;
         }
 
+        /* XXX: is this check still necessary? */
         size = PyObject_Size(res);
         if (size == -1) {
             PyErr_Clear();
@@ -540,8 +521,17 @@ optimize_unary_op(expr_ty* expr_ptr, PyArena* arena)
                 return 0;
         }
 
-        if (res == NULL)
-            return 0;
+        if (res == NULL) {
+            if (PyErr_Occurred()) {
+                /* complain about out of memory errors right away */
+                if (PyErr_ExceptionMatches(PyExc_MemoryError))
+                    return 0;
+                /* leave all other errors for runtime */
+                else
+                    PyErr_Clear();
+            }
+            return 1;
+        }
 
         expr = _expr_from_object(res, expr->lineno, expr->col_offset, arena);
         if (!expr) {
