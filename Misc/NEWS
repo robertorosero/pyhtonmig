@@ -12,11 +12,17 @@ What's New in Python 2.6 alpha 3?
 Core and builtins
 -----------------
 
+- Issue #2681: The octal literal ``0o8`` was incorrecly acctepted. Now it
+  properly raises a SyntaxError.
+
 - Patch #2617: Reserved -J and -X arguments for Jython, IronPython and other
   implementations of Python. 
 
 Extensions Modules
 ------------------
+
+- Issue #2670:  Fix a failure in urllib2.build_opener(), when passed two
+  handlers that derive the same default base class.
 
 - Added kill, terminate and send_signal(sig) to subprocess.Popen.
 
@@ -36,6 +42,16 @@ Extensions Modules
 
 Library
 -------
+
+- Issue #2635: Fix bug in 'fix_sentence_endings' textwrap.fill option,
+  where an extra space was added after a word containing (but not
+  ending in) '.', '!' or '?'.
+
+- Add from_buffer() and from_buffer_copy() class methods to ctypes
+  data types
+
+- Issue #2682: ctypes callback functions no longer contain a cyclic
+  reference to themselves.
 
 - The getpass module has been improved on Unix.  It now uses /dev/tty
   by default and uses stderr instead of stdout.  A GetPassWarning is
@@ -114,6 +130,8 @@ Tests
 Build
 -----
 
+- Issue #1496032: On alpha, use -mieee when gcc is the compiler.
+
 - Issue #2544: On HP-UX systems, use 'gcc -shared' for linking when
   gcc is used as compiler.
 
@@ -124,6 +142,9 @@ C API
   to the new files Include/pymath.h and Python/pymath.h for 
   platforms which provide the functions through their libm. The
   files also contains several helpers and constants for math.
+
+- Added a new convenience function, PyErr_WarnPy3k, for issuing Py3k
+  warnings.
 
 
 What's New in Python 2.6 alpha 2?

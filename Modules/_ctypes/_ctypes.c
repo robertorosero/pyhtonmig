@@ -412,6 +412,115 @@ CDataType_from_address(PyObject *type, PyObject *value)
 	return CData_AtAddress(type, buf);
 }
 
+static char from_buffer_doc[] =
+"C.from_buffer(object, offset=0) -> C instance\ncreate a C instance from a writeable buffer";
+
+static int
+KeepRef(CDataObject *target, Py_ssize_t index, PyObject *keep);
+
+static PyObject *
+CDataType_from_buffer(PyObject *type, PyObject *args)
+{
+	void *buffer;
+	Py_ssize_t buffer_len;
+	Py_ssize_t offset = 0;
+	PyObject *obj, *result;
+	StgDictObject *dict = PyType_stgdict(type);
+	assert (dict);
+
+	if (!PyArg_ParseTuple(args,
+#if (PY_VERSION_HEX < 0x02050000)
+			      "O|i:from_buffer",
+#else
+			      "O|n:from_buffer",
+#endif
+			      &obj, &offset))
+		return NULL;
+
+	if (-1 == PyObject_AsWriteBuffer(obj, &buffer, &buffer_len))
+		return NULL;
+
+	if (offset < 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"offset cannit be negative");
+		return NULL;
+	}
+	if (dict->size > buffer_len - offset) {
+		PyErr_Format(PyExc_ValueError,
+#if (PY_VERSION_HEX < 0x02050000)
+			     "Buffer size too small (%d instead of at least %d bytes)",
+#else
+			     "Buffer size too small (%zd instead of at least %zd bytes)",
+#endif
+			     buffer_len, dict->size + offset);
+		return NULL;
+	}
+
+	result = CData_AtAddress(type, (char *)buffer + offset);
+	if (result == NULL)
+		return NULL;
+
+	Py_INCREF(obj);
+	if (-1 == KeepRef((CDataObject *)result, -1, obj)) {
+		Py_DECREF(result);
+		return NULL;
+	}
+	return result;
+}
+
+static char from_buffer_copy_doc[] =
+"C.from_buffer_copy(object, offset=0) -> C instance\ncreate a C instance from a readable buffer";
+
+static PyObject *
+GenericCData_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+static PyObject *
+CDataType_from_buffer_copy(PyObject *type, PyObject *args)
+{
+	void *buffer;
+	Py_ssize_t buffer_len;
+	Py_ssize_t offset = 0;
+	PyObject *obj, *result;
+	StgDictObject *dict = PyType_stgdict(type);
+	assert (dict);
+
+	if (!PyArg_ParseTuple(args,
+#if (PY_VERSION_HEX < 0x02050000)
+			      "O|i:from_buffer",
+#else
+			      "O|n:from_buffer",
+#endif
+			      &obj, &offset))
+		return NULL;
+
+	if (-1 == PyObject_AsReadBuffer(obj, &buffer, &buffer_len))
+		return NULL;
+
+	if (offset < 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"offset cannit be negative");
+		return NULL;
+	}
+
+	if (dict->size > buffer_len - offset) {
+		PyErr_Format(PyExc_ValueError,
+#if (PY_VERSION_HEX < 0x02050000)
+			     "Buffer size too small (%d instead of at least %d bytes)",
+#else
+			     "Buffer size too small (%zd instead of at least %zd bytes)",
+#endif
+			     buffer_len, dict->size + offset);
+		return NULL;
+	}
+
+	result = GenericCData_new((PyTypeObject *)type, NULL, NULL);
+	if (result == NULL)
+		return NULL;
+	memcpy(((CDataObject *)result)->b_ptr,
+	       (char *)buffer+offset, dict->size);
+	return result;
+}
+
 static char in_dll_doc[] =
 "C.in_dll(dll, name) -> C instance\naccess a C instance in a dll";
 
@@ -516,6 +625,8 @@ CDataType_from_param(PyObject *type, PyObject *value)
 static PyMethodDef CDataType_methods[] = {
 	{ "from_param", CDataType_from_param, METH_O, from_param_doc },
 	{ "from_address", CDataType_from_address, METH_O, from_address_doc },
+	{ "from_buffer", CDataType_from_buffer, METH_VARARGS, from_buffer_doc, },
+	{ "from_buffer_copy", CDataType_from_buffer_copy, METH_VARARGS, from_buffer_copy_doc, },
 	{ "in_dll", CDataType_in_dll, METH_VARARGS, in_dll_doc },
 	{ NULL, NULL },
 };
@@ -845,6 +956,8 @@ PointerType_from_param(PyObject *type, PyObject *value)
 
 static PyMethodDef PointerType_methods[] = {
 	{ "from_address", CDataType_from_address, METH_O, from_address_doc },
+	{ "from_buffer", CDataType_from_buffer, METH_VARARGS, from_buffer_doc, },
+	{ "from_buffer_copy", CDataType_from_buffer_copy, METH_VARARGS, from_buffer_copy_doc, },
 	{ "in_dll", CDataType_in_dll, METH_VARARGS, in_dll_doc},
 	{ "from_param", (PyCFunction)PointerType_from_param, METH_O, from_param_doc},
 	{ "set_type", (PyCFunction)PointerType_set_type, METH_O },
@@ -1859,6 +1972,8 @@ SimpleType_from_param(PyObject *type, PyObject *value)
 static PyMethodDef SimpleType_methods[] = {
 	{ "from_param", SimpleType_from_param, METH_O, from_param_doc },
 	{ "from_address", CDataType_from_address, METH_O, from_address_doc },
+	{ "from_buffer", CDataType_from_buffer, METH_VARARGS, from_buffer_doc, },
+	{ "from_buffer_copy", CDataType_from_buffer_copy, METH_VARARGS, from_buffer_copy_doc, },
 	{ "in_dll", CDataType_in_dll, METH_VARARGS, in_dll_doc},
 	{ NULL, NULL },
 };
@@ -3096,7 +3211,7 @@ CFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	CFuncPtrObject *self;
 	PyObject *callable;
 	StgDictObject *dict;
-	ffi_info *thunk;
+	CThunkObject *thunk;
 
 	if (PyTuple_GET_SIZE(args) == 0)
 		return GenericCData_new(type, args, kwds);
@@ -3153,11 +3268,6 @@ CFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	/*****************************************************************/
-	/* The thunk keeps unowned references to callable and dict->argtypes
-	   so we have to keep them alive somewhere else: callable is kept in self,
-	   dict->argtypes is in the type's stgdict.
-	*/
 	thunk = AllocFunctionCallback(callable,
 				      dict->argtypes,
 				      dict->restype,
@@ -3166,27 +3276,22 @@ CFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 
 	self = (CFuncPtrObject *)GenericCData_new(type, args, kwds);
-	if (self == NULL)
+	if (self == NULL) {
+		Py_DECREF(thunk);
 		return NULL;
+	}
 
 	Py_INCREF(callable);
 	self->callable = callable;
 
 	self->thunk = thunk;
-	*(void **)self->b_ptr = *(void **)thunk;
-
-	/* We store ourself in self->b_objects[0], because the whole instance
-	   must be kept alive if stored in a structure field, for example.
-	   Cycle GC to the rescue! And we have a unittest proving that this works
-	   correctly...
-	*/
-
-	Py_INCREF((PyObject *)self); /* for KeepRef */
-	if (-1 == KeepRef((CDataObject *)self, 0, (PyObject *)self)) {
+	*(void **)self->b_ptr = (void *)thunk->pcl;
+	
+	Py_INCREF((PyObject *)thunk); /* for KeepRef */
+	if (-1 == KeepRef((CDataObject *)self, 0, (PyObject *)thunk)) {
 		Py_DECREF((PyObject *)self);
 		return NULL;
 	}
-
 	return (PyObject *)self;
 }
 
@@ -3639,6 +3744,7 @@ CFuncPtr_traverse(CFuncPtrObject *self, visitproc visit, void *arg)
 	Py_VISIT(self->argtypes);
 	Py_VISIT(self->converters);
 	Py_VISIT(self->paramflags);
+	Py_VISIT(self->thunk);
 	return CData_traverse((CDataObject *)self, visit, arg);
 }
 
@@ -3652,13 +3758,7 @@ CFuncPtr_clear(CFuncPtrObject *self)
 	Py_CLEAR(self->argtypes);
 	Py_CLEAR(self->converters);
 	Py_CLEAR(self->paramflags);
-
-	if (self->thunk) {
-		FreeClosure(self->thunk->pcl);
-		PyMem_Free(self->thunk);
-		self->thunk = NULL;
-	}
-
+	Py_CLEAR(self->thunk);
 	return CData_clear((CDataObject *)self);
 }
 
@@ -5184,6 +5284,9 @@ init_ctypes(void)
 		return;
 
 	if (PyType_Ready(&PyCArg_Type) < 0)
+		return;
+
+	if (PyType_Ready(&CThunk_Type) < 0)
 		return;
 
 	/* StgDict is derived from PyDict_Type */
