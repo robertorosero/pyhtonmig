@@ -1173,10 +1173,10 @@ ArrayType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	assert(itemdict->format);
 	if (itemdict->format[0] == '(') {
-		sprintf(buf, "(%d,", length);
+		sprintf(buf, "(%ld,", length);
 		stgdict->format = alloc_format_string(buf, itemdict->format+1);
 	} else {
-		sprintf(buf, "(%d)", length);
+		sprintf(buf, "(%ld)", length);
 		stgdict->format = alloc_format_string(buf, itemdict->format);
 	}
 	if (stgdict->format == NULL) {
