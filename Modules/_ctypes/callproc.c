@@ -1568,8 +1568,100 @@ buffer_info(PyObject *self, PyObject *arg)
 	return Py_BuildValue("siN", dict->format, dict->ndim, shape);
 }
 
+static PyObject *
+unpickle(PyObject *self, PyObject *args)
+{
+	PyObject *typ;
+	PyObject *state;
+	PyObject *result;
+	PyObject *tmp;
+
+	if (!PyArg_ParseTuple(args, "OO", &typ, &state))
+		return NULL;
+	result = PyObject_CallMethod(typ, "__new__", "O", typ);
+	if (result == NULL)
+		return NULL;
+	tmp = PyObject_CallMethod(result, "__setstate__", "O", state);
+	if (tmp == NULL) {
+		Py_DECREF(result);
+		return NULL;
+	}
+	Py_DECREF(tmp);
+	return result;
+}
+
+static PyObject *
+POINTER(PyObject *self, PyObject *cls)
+{
+	PyObject *result;
+	PyTypeObject *typ;
+	PyObject *key;
+	char *buf;
+
+	result = PyDict_GetItem(_pointer_type_cache, cls);
+	if (result) {
+		Py_INCREF(result);
+		return result;
+	}
+	if (PyUnicode_CheckExact(cls)) {
+		char *name = PyUnicode_AsString(cls);
+		buf = alloca(strlen(name) + 3 + 1);
+		sprintf(buf, "LP_%s", name);
+		result = PyObject_CallFunction((PyObject *)Py_TYPE(&Pointer_Type),
+					       "s(O){}",
+					       buf,
+					       &Pointer_Type);
+		if (result == NULL)
+			return result;
+		key = PyLong_FromVoidPtr(result);
+	} else if (PyType_Check(cls)) {
+		typ = (PyTypeObject *)cls;
+		buf = alloca(strlen(typ->tp_name) + 3 + 1);
+		sprintf(buf, "LP_%s", typ->tp_name);
+		result = PyObject_CallFunction((PyObject *)Py_TYPE(&Pointer_Type),
+					       "s(O){sO}",
+					       buf,
+					       &Pointer_Type,
+					       "_type_", cls);
+		if (result == NULL)
+			return result;
+		Py_INCREF(cls);
+		key = cls;
+	} else {
+		PyErr_SetString(PyExc_TypeError, "must be a ctypes type");
+		return NULL;
+	}
+	if (-1 == PyDict_SetItem(_pointer_type_cache, key, result)) {
+		Py_DECREF(result);
+		Py_DECREF(key);
+		return NULL;
+	}
+	Py_DECREF(key);
+	return result;
+}
+
+static PyObject *
+pointer(PyObject *self, PyObject *arg)
+{
+	PyObject *result;
+	PyObject *typ;
+
+	typ = PyDict_GetItem(_pointer_type_cache, (PyObject *)Py_TYPE(arg));
+	if (typ)
+		return PyObject_CallFunctionObjArgs(typ, arg, NULL);
+	typ = POINTER(NULL, (PyObject *)Py_TYPE(arg));
+	if (typ == NULL)
+			return NULL;
+	result = PyObject_CallFunctionObjArgs(typ, arg, NULL);
+	Py_DECREF(typ);
+	return result;
+}
+
 PyMethodDef module_methods[] = {
 	{"buffer_info", buffer_info, METH_O, "Return buffer interface information"},
+	{"POINTER", POINTER, METH_O },
+	{"pointer", pointer, METH_O },
+	{"_unpickle", unpickle, METH_VARARGS },
 	{"resize", resize, METH_VARARGS, "Resize the memory buffer of a ctypes instance"},
 #ifdef CTYPES_UNICODE
 	{"set_conversion_mode", set_conversion_mode, METH_VARARGS, set_conversion_mode_doc},

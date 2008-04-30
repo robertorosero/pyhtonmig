@@ -61,7 +61,7 @@ AC_SUBST(CONFIG_ARGS)
 CONFIG_ARGS="$ac_configure_args"
 
 AC_ARG_ENABLE(universalsdk,
-	AC_HELP_STRING(--enable-universalsdk@<:@SDKDIR@:>@, Build agains Mac OS X 10.4u SDK (ppc/i386)),
+	AC_HELP_STRING(--enable-universalsdk@<:@=SDKDIR@:>@, Build against Mac OS X 10.4u SDK (ppc/i386)),
 [
 	case $enableval in
 	yes)
@@ -332,6 +332,10 @@ AC_SUBST(CONFIGURE_MACOSX_DEPLOYMENT_TARGET)
 AC_SUBST(EXPORT_MACOSX_DEPLOYMENT_TARGET)
 CONFIGURE_MACOSX_DEPLOYMENT_TARGET=
 EXPORT_MACOSX_DEPLOYMENT_TARGET='#'
+
+AC_MSG_CHECKING(machine type as reported by uname -m)
+ac_sys_machine=`uname -m`
+AC_MSG_RESULT($ac_sys_machine)
 
 # checks for alternative programs
 
@@ -792,13 +796,24 @@ yes)
     then
       BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
     fi
+
+    # if using gcc on alpha, use -mieee to get (near) full IEEE 754
+    # support.  Without this, treatment of subnormals doesn't follow
+    # the standard.
+    case $ac_sys_machine in
+         alpha*)
+                BASECFLAGS="$BASECFLAGS -mieee"
+                ;;
+    esac
+
     case $ac_sys_system in
 	SCO_SV*)
 	    BASECFLAGS="$BASECFLAGS -m486 -DSCO5"
 	    ;;
 	# is there any other compiler on Darwin besides gcc?
 	Darwin*)
-	    BASECFLAGS="$BASECFLAGS -Wno-long-double -no-cpp-precomp -mno-fused-madd"
+	    # -Wno-long-double, -no-cpp-precomp, and -mno-fused-madd
+	    # used to be here, but non-Apple gcc doesn't accept them.
 	    if test "${enable_universalsdk}"; then
 		BASECFLAGS="-arch ppc -arch i386 -isysroot ${UNIVERSALSDK} ${BASECFLAGS}"
 	    fi
@@ -1073,11 +1088,11 @@ dnl AC_MSG_RESULT($cpp_type)
 AC_HEADER_STDC
 AC_CHECK_HEADERS(asm/types.h conio.h curses.h direct.h dlfcn.h errno.h \
 fcntl.h grp.h \
-io.h langinfo.h libintl.h ncurses.h poll.h process.h pthread.h \
+ieeefp.h io.h langinfo.h libintl.h ncurses.h poll.h process.h pthread.h \
 shadow.h signal.h stdint.h stropts.h termios.h thread.h \
 unistd.h utime.h \
-sys/audioio.h sys/bsdtty.h sys/file.h sys/loadavg.h sys/lock.h sys/mkdev.h \
-sys/modem.h \
+sys/audioio.h sys/bsdtty.h sys/epoll.h sys/event.h sys/file.h sys/loadavg.h \
+sys/lock.h sys/mkdev.h sys/modem.h \
 sys/param.h sys/poll.h sys/select.h sys/socket.h sys/statvfs.h sys/stat.h \
 sys/time.h \
 sys/times.h sys/types.h sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
@@ -1177,7 +1192,7 @@ AC_TYPE_PID_T
 AC_TYPE_SIGNAL
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
-AC_CHECK_TYPE(ssize_t, 
+AC_CHECK_TYPE(ssize_t,
   AC_DEFINE(HAVE_SSIZE_T, 1, Define if your compiler provides ssize_t),,)
 
 # Sizes of various common basic types
@@ -1190,6 +1205,7 @@ AC_CHECK_SIZEOF(float, 4)
 AC_CHECK_SIZEOF(double, 8)
 AC_CHECK_SIZEOF(fpos_t, 4)
 AC_CHECK_SIZEOF(size_t, 4)
+AC_CHECK_SIZEOF(pid_t, 4)
 
 AC_MSG_CHECKING(for long long support)
 have_long_long=no
@@ -1466,7 +1482,11 @@ then
 		then LDSHARED='$(CC) -shared'
 		else LDSHARED='$(CC) -G';
 		fi ;;
-	hp*|HP*) LDSHARED="ld -b";;
+	hp*|HP*)
+		if test "$GCC" = "yes"
+		then LDSHARED='$(CC) -shared'
+		else LDSHARED='ld -b';
+		fi ;;
 	OSF*) LDSHARED="ld -shared -expect_unresolved \"*\"";;
 	Darwin/1.3*)
 		LDSHARED='$(CC) $(LDFLAGS) -bundle'
@@ -1729,20 +1749,10 @@ LIBS="$withval $LIBS"
 [AC_MSG_RESULT(no)])
 
 # Check for use of the system libffi library
-AC_CHECK_HEADER(ffi.h)
 AC_MSG_CHECKING(for --with-system-ffi)
 AC_ARG_WITH(system_ffi,
             AC_HELP_STRING(--with-system-ffi, build _ctypes module using an installed ffi library))
 
-if test -z "$with_system_ffi" && test "$ac_cv_header_ffi_h" = yes; then
-	case "$ac_sys_system/`uname -m`" in
-	Linux/alpha*)  with_system_ffi="yes"; CONFIG_ARGS="$CONFIG_ARGS --with-system-ffi";;
-	Linux/arm*)  with_system_ffi="yes"; CONFIG_ARGS="$CONFIG_ARGS --with-system-ffi";;
-	Linux/ppc*)  with_system_ffi="yes"; CONFIG_ARGS="$CONFIG_ARGS --with-system-ffi";;
-	Linux/s390*)  with_system_ffi="yes"; CONFIG_ARGS="$CONFIG_ARGS --with-system-ffi";;
-	*) with_system_ffi="no"
-	esac
-fi
 AC_MSG_RESULT($with_system_ffi)
 
 # Determine if signalmodule should be used.
@@ -1963,6 +1973,9 @@ if test "$posix_threads" = "yes"; then
                        Defined for Solaris 2.6 bug in pthread header.)
 		       ;;
       SunOS/5.8) AC_DEFINE(HAVE_BROKEN_POSIX_SEMAPHORES, 1,
+		       Define if the Posix semaphores do not work on your system)
+		       ;;
+      AIX/5) AC_DEFINE(HAVE_BROKEN_POSIX_SEMAPHORES, 1,
 		       Define if the Posix semaphores do not work on your system)
 		       ;;
       esac
@@ -2279,8 +2292,8 @@ fi
 AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
-AC_CHECK_FUNCS(alarm bind_textdomain_codeset chown clock confstr \
- ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
+AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
+ clock confstr ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getspnam getspent getsid getwd \
  kill killpg lchmod lchown lstat mkfifo mknod mktime \
@@ -2290,7 +2303,7 @@ AC_CHECK_FUNCS(alarm bind_textdomain_codeset chown clock confstr \
  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
  sigaction siginterrupt sigrelse strftime strlcpy \
  sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname unsetenv utimes waitpid wait3 wait4 wcscoll _getpty)
+ truncate uname unsetenv utimes waitpid wait3 wait4 wcscoll wcsxfrm _getpty)
 
 # For some functions, having a definition is not sufficient, since
 # we want to take their address.
@@ -2330,7 +2343,21 @@ AC_TRY_COMPILE([#include <unistd.h>], void *x=fdatasync,
   AC_MSG_RESULT(yes),
   AC_MSG_RESULT(no)
 )
-
+AC_MSG_CHECKING(for epoll)
+AC_TRY_COMPILE([#include <sys/epoll.h>], void *x=epoll_create,
+  AC_DEFINE(HAVE_EPOLL, 1, Define if you have the 'epoll' functions.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for kqueue)
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/event.h>
+    ], int x=kqueue(),
+  AC_DEFINE(HAVE_KQUEUE, 1, Define if you have the 'kqueue' functions.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
 # On some systems (eg. FreeBSD 5), we would find a definition of the
 # functions ctermid_r, setgroups in the library, but no prototype
 # (e.g. because we use _XOPEN_SOURCE). See whether we can take their
@@ -2503,10 +2530,13 @@ AC_CHECK_FUNCS(forkpty,,
    )
 )
 
+# Stuff for expat.
+AC_CHECK_FUNCS(memmove)
+
 # check for long file support functions
 AC_CHECK_FUNCS(fseek64 fseeko fstatvfs ftell64 ftello statvfs)
 
-AC_REPLACE_FUNCS(dup2 getcwd strdup strerror memmove)
+AC_REPLACE_FUNCS(dup2 getcwd strdup)
 AC_CHECK_FUNCS(getpgrp, 
   AC_TRY_COMPILE([#include <unistd.h>], 
    [getpgrp(0);], 

@@ -9,8 +9,8 @@ import socket
 import sys
 import os
 import os.path
+import shutil
 import warnings
-import types
 import unittest
 
 class Error(Exception):
@@ -65,6 +65,14 @@ def unlink(filename):
     except OSError:
         pass
 
+def rmtree(path):
+    try:
+        shutil.rmtree(path)
+    except OSError as e:
+        # Unix returns ENOENT, Windows returns ESRCH.
+        if e.errno not in (errno.ENOENT, errno.ESRCH):
+            raise
+
 def forget(modname):
     '''"Forget" a module was ever imported by removing it from sys.modules and
     deleting any .pyc and .pyo files.'''
@@ -95,31 +103,100 @@ def requires(resource, msg=None):
             msg = "Use of the `%s' resource not enabled" % resource
         raise ResourceDenied(msg)
 
-def bind_port(sock, host='', preferred_port=54321):
-    """Try to bind the sock to a port.  If we are running multiple
-    tests and we don't try multiple ports, the test can fails.  This
-    makes the test more robust."""
+HOST = 'localhost'
 
-    # Find some random ports that hopefully no one is listening on.
-    # Ideally each test would clean up after itself and not continue listening
-    # on any ports.  However, this isn't the case.  The last port (0) is
-    # a stop-gap that asks the O/S to assign a port.  Whenever the warning
-    # message below is printed, the test that is listening on the port should
-    # be fixed to close the socket at the end of the test.
-    # Another reason why we can't use a port is another process (possibly
-    # another instance of the test suite) is using the same port.
-    for port in [preferred_port, 9907, 10243, 32999, 0]:
-        try:
-            sock.bind((host, port))
-            if port == 0:
-                port = sock.getsockname()[1]
-            return port
-        except socket.error as e:
-            (err, msg) = e.args
-            if err != errno.EADDRINUSE:
-                raise
-            print('  WARNING: failed to listen on port %d, trying another' % port, file=sys.__stderr__)
-    raise TestFailed('unable to find port to listen on')
+def find_unused_port(family=socket.AF_INET, socktype=socket.SOCK_STREAM):
+    """Returns an unused port that should be suitable for binding.  This is
+    achieved by creating a temporary socket with the same family and type as
+    the 'sock' parameter (default is AF_INET, SOCK_STREAM), and binding it to
+    the specified host address (defaults to 0.0.0.0) with the port set to 0,
+    eliciting an unused ephemeral port from the OS.  The temporary socket is
+    then closed and deleted, and the ephemeral port is returned.
+
+    Either this method or bind_port() should be used for any tests where a
+    server socket needs to be bound to a particular port for the duration of
+    the test.  Which one to use depends on whether the calling code is creating
+    a python socket, or if an unused port needs to be provided in a constructor
+    or passed to an external program (i.e. the -accept argument to openssl's
+    s_server mode).  Always prefer bind_port() over find_unused_port() where
+    possible.  Hard coded ports should *NEVER* be used.  As soon as a server
+    socket is bound to a hard coded port, the ability to run multiple instances
+    of the test simultaneously on the same host is compromised, which makes the
+    test a ticking time bomb in a buildbot environment. On Unix buildbots, this
+    may simply manifest as a failed test, which can be recovered from without
+    intervention in most cases, but on Windows, the entire python process can
+    completely and utterly wedge, requiring someone to log in to the buildbot
+    and manually kill the affected process.
+
+    (This is easy to reproduce on Windows, unfortunately, and can be traced to
+    the SO_REUSEADDR socket option having different semantics on Windows versus
+    Unix/Linux.  On Unix, you can't have two AF_INET SOCK_STREAM sockets bind,
+    listen and then accept connections on identical host/ports.  An EADDRINUSE
+    socket.error will be raised at some point (depending on the platform and
+    the order bind and listen were called on each socket).
+
+    However, on Windows, if SO_REUSEADDR is set on the sockets, no EADDRINUSE
+    will ever be raised when attempting to bind two identical host/ports. When
+    accept() is called on each socket, the second caller's process will steal
+    the port from the first caller, leaving them both in an awkwardly wedged
+    state where they'll no longer respond to any signals or graceful kills, and
+    must be forcibly killed via OpenProcess()/TerminateProcess().
+
+    The solution on Windows is to use the SO_EXCLUSIVEADDRUSE socket option
+    instead of SO_REUSEADDR, which effectively affords the same semantics as
+    SO_REUSEADDR on Unix.  Given the propensity of Unix developers in the Open
+    Source world compared to Windows ones, this is a common mistake.  A quick
+    look over OpenSSL's 0.9.8g source shows that they use SO_REUSEADDR when
+    openssl.exe is called with the 's_server' option, for example. See
+    http://bugs.python.org/issue2550 for more info.  The following site also
+    has a very thorough description about the implications of both REUSEADDR
+    and EXCLUSIVEADDRUSE on Windows:
+    http://msdn2.microsoft.com/en-us/library/ms740621(VS.85).aspx)
+
+    XXX: although this approach is a vast improvement on previous attempts to
+    elicit unused ports, it rests heavily on the assumption that the ephemeral
+    port returned to us by the OS won't immediately be dished back out to some
+    other process when we close and delete our temporary socket but before our
+    calling code has a chance to bind the returned port.  We can deal with this
+    issue if/when we come across it.
+    """
+
+    tempsock = socket.socket(family, socktype)
+    port = bind_port(tempsock)
+    tempsock.close()
+    del tempsock
+    return port
+
+def bind_port(sock, host=HOST):
+    """Bind the socket to a free port and return the port number.  Relies on
+    ephemeral ports in order to ensure we are using an unbound port.  This is
+    important as many tests may be running simultaneously, especially in a
+    buildbot environment.  This method raises an exception if the sock.family
+    is AF_INET and sock.type is SOCK_STREAM, *and* the socket has SO_REUSEADDR
+    or SO_REUSEPORT set on it.  Tests should *never* set these socket options
+    for TCP/IP sockets.  The only case for setting these options is testing
+    multicasting via multiple UDP sockets.
+
+    Additionally, if the SO_EXCLUSIVEADDRUSE socket option is available (i.e.
+    on Windows), it will be set on the socket.  This will prevent anyone else
+    from bind()'ing to our host/port for the duration of the test.
+    """
+
+    if sock.family == socket.AF_INET and sock.type == socket.SOCK_STREAM:
+        if hasattr(socket, 'SO_REUSEADDR'):
+            if sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR) == 1:
+                raise TestFailed("tests should never set the SO_REUSEADDR "   \
+                                 "socket option on TCP/IP sockets!")
+        if hasattr(socket, 'SO_REUSEPORT'):
+            if sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT) == 1:
+                raise TestFailed("tests should never set the SO_REUSEPORT "   \
+                                 "socket option on TCP/IP sockets!")
+        if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+
+    sock.bind((host, 0))
+    port = sock.getsockname()[1]
+    return port
 
 FUZZ = 1e-6
 
@@ -179,9 +256,9 @@ else:
         except UnicodeEncodeError:
             pass
         else:
-            print('WARNING: The filename %r CAN be encoded by the filesystem.  ' \
-            'Unicode filename tests may not be effective' \
-            % TESTFN_UNICODE_UNENCODEABLE)
+            print('WARNING: The filename %r CAN be encoded by the filesystem.  '
+                  'Unicode filename tests may not be effective'
+                  % TESTFN_UNICODE_UNENCODEABLE)
 
 # Make sure we can write to TESTFN, try in /tmp if we can't
 fp = None
@@ -277,14 +354,26 @@ class WarningMessage(object):
         self.filename = None
         self.lineno = None
 
-    def _showwarning(self, message, category, filename, lineno, file=None):
+    def _showwarning(self, message, category, filename, lineno, file=None,
+                        line=None):
         self.message = message
         self.category = category
         self.filename = filename
         self.lineno = lineno
+        self.line = line
+
+    def reset(self):
+        self._showwarning(*((None,)*6))
+
+    def __str__(self):
+        return ("{message : %r, category : %r, filename : %r, lineno : %s, "
+                    "line : %r}" % (self.message,
+                            self.category.__name__ if self.category else None,
+                            self.filename, self.lineno, self.line))
+
 
 @contextlib.contextmanager
-def catch_warning():
+def catch_warning(module=warnings):
     """
     Guard the warnings filter from being permanently changed and record the
     data of the last warning that has been issued.
@@ -295,15 +384,15 @@ def catch_warning():
             warnings.warn("foo")
             assert str(w.message) == "foo"
     """
-    warning = WarningMessage()
-    original_filters = warnings.filters[:]
-    original_showwarning = warnings.showwarning
-    warnings.showwarning = warning._showwarning
+    warning_obj = WarningMessage()
+    original_filters = module.filters[:]
+    original_showwarning = module.showwarning
+    module.showwarning = warning_obj._showwarning
     try:
-        yield warning
+        yield warning_obj
     finally:
-        warnings.showwarning = original_showwarning
-        warnings.filters = original_filters
+        module.showwarning = original_showwarning
+        module.filters = original_filters
 
 class EnvironmentVarGuard(object):
 
@@ -372,19 +461,23 @@ def transient_internet():
 
 
 @contextlib.contextmanager
-def captured_stdout():
-    """Run the with statement body using a StringIO object as sys.stdout.
-    Example use::
+def captured_output(stream_name):
+    """Run the 'with' statement body using a StringIO object in place of a
+    specific attribute on the sys module.
+    Example use (with 'stream_name=stdout')::
 
        with captured_stdout() as s:
            print "hello"
        assert s.getvalue() == "hello"
     """
     import io
-    orig_stdout = sys.stdout
-    sys.stdout = io.StringIO()
-    yield sys.stdout
-    sys.stdout = orig_stdout
+    orig_stdout = getattr(sys, stream_name)
+    setattr(sys, stream_name, io.StringIO())
+    yield getattr(sys, stream_name)
+    setattr(sys, stream_name, orig_stdout)
+
+def captured_stdout():
+    return captured_output("stdout")
 
 
 #=======================================================================
@@ -424,7 +517,8 @@ def run_with_locale(catstr, *locales):
     return decorator
 
 #=======================================================================
-# Big-memory-test support. Separate from 'resources' because memory use should be configurable.
+# Big-memory-test support. Separate from 'resources' because memory use
+# should be configurable.
 
 # Some handy shorthands. Note that these are used for byte-limits as well
 # as size-limits, in the various bigmem tests
@@ -460,7 +554,7 @@ def bigmemtest(minsize, memuse, overhead=5*_1M):
     'minsize' is the minimum useful size for the test (in arbitrary,
     test-interpreted units.) 'memuse' is the number of 'bytes per size' for
     the test, or a good estimate of it. 'overhead' specifies fixed overhead,
-    independant of the testsize, and defaults to 5Mb.
+    independent of the testsize, and defaults to 5Mb.
 
     The decorator tries to guess a good value for 'size' and passes it to
     the decorated test function. If minsize * memuse is more than the
@@ -578,7 +672,8 @@ def run_doctest(module, verbosity=None):
     finally:
         sys.stdout = save_stdout
     if verbose:
-        print('doctest (%s) ... %d tests with zero failures' % (module.__name__, t))
+        print('doctest (%s) ... %d tests with zero failures' %
+              (module.__name__, t))
     return f, t
 
 #=======================================================================

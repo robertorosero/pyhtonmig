@@ -4,6 +4,8 @@ from test import test_support
 from random import random
 from math import atan2
 
+INF = float("inf")
+NAN = float("nan")
 # These tests ensure that complex math does the right thing
 
 class ComplexTest(unittest.TestCase):
@@ -316,6 +318,18 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(-6j,complex(repr(-6j)))
         self.assertEqual(6j,complex(repr(6j)))
 
+        self.assertEqual(repr(complex(1., INF)), "(1+inf*j)")
+        self.assertEqual(repr(complex(1., -INF)), "(1-inf*j)")
+        self.assertEqual(repr(complex(INF, 1)), "(inf+1j)")
+        self.assertEqual(repr(complex(-INF, INF)), "(-inf+inf*j)")
+        self.assertEqual(repr(complex(NAN, 1)), "(nan+1j)")
+        self.assertEqual(repr(complex(1, NAN)), "(1+nan*j)")
+        self.assertEqual(repr(complex(NAN, NAN)), "(nan+nan*j)")
+
+        self.assertEqual(repr(complex(0, INF)), "inf*j")
+        self.assertEqual(repr(complex(0, -INF)), "-inf*j")
+        self.assertEqual(repr(complex(0, NAN)), "nan*j")
+
     def test_neg(self):
         self.assertEqual(-(1+6j), -1-6j)
 
@@ -337,6 +351,13 @@ class ComplexTest(unittest.TestCase):
                 os.remove(test_support.TESTFN)
             except (OSError, IOError):
                 pass
+
+    if float.__getformat__("double").startswith("IEEE"):
+        def test_plus_minus_0j(self):
+            # test that -0j and 0j literals are not identified
+            z1, z2 = 0j, -0j
+            self.assertEquals(atan2(z1.imag, -1.), atan2(0., -1.))
+            self.assertEquals(atan2(z2.imag, -1.), atan2(-0., -1.))
 
 def test_main():
     test_support.run_unittest(ComplexTest)

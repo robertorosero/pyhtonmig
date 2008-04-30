@@ -401,14 +401,15 @@ static PyGetSetDef frame_getsetlist[] = {
    call depth of more than 20 or 30 is probably already exceptional
    unless the program contains run-away recursion.  I hope.
 
-   Later, MAXFREELIST was added to bound the # of frames saved on
+   Later, PyFrame_MAXFREELIST was added to bound the # of frames saved on
    free_list.  Else programs creating lots of cyclic trash involving
    frames could provoke free_list into growing without bound.
 */
 
 static PyFrameObject *free_list = NULL;
 static int numfree = 0;		/* number of frames currently in free_list */
-#define MAXFREELIST 200		/* max value for numfree */
+/* max value for numfree */
+#define PyFrame_MAXFREELIST 200	
 
 static void
 frame_dealloc(PyFrameObject *f)
@@ -441,7 +442,7 @@ frame_dealloc(PyFrameObject *f)
 	co = f->f_code;
 	if (co->co_zombieframe == NULL)
 		co->co_zombieframe = f;
-	else if (numfree < MAXFREELIST) {
+	else if (numfree < PyFrame_MAXFREELIST) {
 		++numfree;
 		f->f_back = free_list;
 		free_list = f;
@@ -896,10 +897,11 @@ PyFrame_LocalsToFast(PyFrameObject *f, int clear)
 }
 
 /* Clear out the free list */
-
-void
-PyFrame_Fini(void)
+int
+PyFrame_ClearFreeList(void)
 {
+	int freelist_size = numfree;
+	
 	while (free_list != NULL) {
 		PyFrameObject *f = free_list;
 		free_list = free_list->f_back;
@@ -907,6 +909,13 @@ PyFrame_Fini(void)
 		--numfree;
 	}
 	assert(numfree == 0);
+	return freelist_size;
+}
+
+void
+PyFrame_Fini(void)
+{
+	(void)PyFrame_ClearFreeList();
 	Py_XDECREF(builtin_object);
 	builtin_object = NULL;
 }

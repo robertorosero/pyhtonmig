@@ -20,7 +20,6 @@
 #
 # $Id$
 
-import shutil
 import sys, os, re
 import pickle
 import tempfile
@@ -35,6 +34,10 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbtables
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 
 #----------------------------------------------------------------------
@@ -43,13 +46,17 @@ class TableDBTestCase(unittest.TestCase):
     db_name = 'test-table.db'
 
     def setUp(self):
-        self.homeDir = tempfile.mkdtemp()
+        homeDir = tempfile.mkdtemp()
+        self.testHomeDir = homeDir
+        try: os.mkdir(homeDir)
+        except os.error: pass
+
         self.tdb = dbtables.bsdTableDB(
-            filename='tabletest.db', dbhome=self.homeDir, create=1)
+            filename='tabletest.db', dbhome=homeDir, create=1)
 
     def tearDown(self):
         self.tdb.close()
-        shutil.rmtree(self.homeDir)
+        test_support.rmtree(self.testHomeDir)
 
     def test01(self):
         tabname = "test01"
@@ -321,7 +328,7 @@ class TableDBTestCase(unittest.TestCase):
         self.tdb.Insert(tabname, {'Type': b'Unknown', 'Access': b'0'})
 
         def set_type(type):
-            if type == None:
+            if type is None:
                 return b'MP3'
             return type
 

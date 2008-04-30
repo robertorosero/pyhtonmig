@@ -33,6 +33,11 @@ Type Objects
    standard type object.  Return false in all other cases.
 
 
+.. cfunction:: unsigned int PyType_ClearCache(void)
+
+   Clears the internal lookup cache. Return the current version tag.
+
+
 .. cfunction:: int PyType_HasFeature(PyObject *o, int feature)
 
    Return true if the type object *o* sets the feature *feature*.  Type features

@@ -1,6 +1,8 @@
 #ifndef Py_UNICODEOBJECT_H
 #define Py_UNICODEOBJECT_H
 
+#include <stdarg.h>
+
 /*
 
 Unicode implementation based on original code by Fredrik Lundh,
@@ -208,6 +210,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS2_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS2_Fini
 # define _PyUnicode_Init _PyUnicodeUCS2_Init
+# define PyUnicode_ClearFreeList PyUnicodeUCS2_ClearFreelist
 # define _PyUnicode_IsAlpha _PyUnicodeUCS2_IsAlpha
 # define _PyUnicode_IsDecimalDigit _PyUnicodeUCS2_IsDecimalDigit
 # define _PyUnicode_IsDigit _PyUnicodeUCS2_IsDigit
@@ -301,6 +304,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS4_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS4_Fini
 # define _PyUnicode_Init _PyUnicodeUCS4_Init
+# define PyUnicode_ClearFreeList PyUnicodeUCS2_ClearFreelist
 # define _PyUnicode_IsAlpha _PyUnicodeUCS4_IsAlpha
 # define _PyUnicode_IsDecimalDigit _PyUnicodeUCS4_IsDecimalDigit
 # define _PyUnicode_IsDigit _PyUnicodeUCS4_IsDigit
@@ -356,7 +360,14 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 
 #else
 
-#define Py_UNICODE_ISSPACE(ch) _PyUnicode_IsWhitespace(ch)
+/* Since splitting on whitespace is an important use case, and whitespace
+   in most situations is solely ASCII whitespace, we optimize for the common
+   case by using a quick look-up table with an inlined check.
+ */
+extern const unsigned char _Py_ascii_whitespace[];
+
+#define Py_UNICODE_ISSPACE(ch) \
+	((ch) < 128U ? _Py_ascii_whitespace[(ch)] : _PyUnicode_IsWhitespace(ch))
 
 #define Py_UNICODE_ISLOWER(ch) _PyUnicode_IsLowercase(ch)
 #define Py_UNICODE_ISUPPER(ch) _PyUnicode_IsUppercase(ch)
@@ -403,6 +414,8 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+PyAPI_FUNC(int) PyUnicode_ClearFreeList(void);
 
 /* --- Unicode Type ------------------------------------------------------- */
 
@@ -647,7 +660,8 @@ PyAPI_FUNC(PyObject*) PyUnicode_FromOrdinal(int ordinal);
 */
 
 PyAPI_FUNC(PyObject *) _PyUnicode_AsDefaultEncodedString(
-    PyObject *, const char *);
+    PyObject *unicode,
+    const char *errors);
 
 /* Decode a null-terminated string using Py_FileSystemDefaultEncoding.
 
@@ -668,26 +682,36 @@ PyAPI_FUNC(PyObject*) PyUnicode_DecodeFSDefaultAndSize(
     Py_ssize_t size              /* size */
     );
 
+/* Returns a pointer to the default encoding (normally, UTF-8) of the
+   Unicode object unicode and the size of the encoded representation
+   in bytes stored in *size.
 
-/* Return a char* holding the UTF-8 encoded value of the
-   Unicode object.
+   In case of an error, no *size is set.
 
-   DEPRECATED: use PyUnicode_AsStringAndSize() instead.
 */
 
-PyAPI_FUNC(char *) PyUnicode_AsStringAndSize(PyObject*, Py_ssize_t *);
+PyAPI_FUNC(char *) PyUnicode_AsStringAndSize(
+    PyObject *unicode, 
+    Py_ssize_t *size);
 
-/* Returns the UTF-8 encoding, and its size.
+/* Returns a pointer to the default encoding (normally, UTf-8) of the
+   Unicode object unicode.
 
-   If the output argument is NULL, no size is stored.
- */
+   Use of this API is DEPRECATED since no size information can be
+   extracted from the returned data. Use PyUnicode_AsStringAndSize()
+   instead.
 
-PyAPI_FUNC(char *) PyUnicode_AsString(PyObject*);
+*/
 
-/* Returns the UTF-8 encoding.
+PyAPI_FUNC(char *) PyUnicode_AsString(PyObject *unicode);
 
-   This is equivalent to PyUnicode_AsStringAndSize(x, NULL).
+/* Returns the currently active default encoding.
 
+   The default encoding is currently implemented as run-time settable
+   process global.  This may change in future versions of the
+   interpreter to become a parameter which is managed on a per-thread
+   basis.
+   
  */
 
 PyAPI_FUNC(const char*) PyUnicode_GetDefaultEncoding(void);

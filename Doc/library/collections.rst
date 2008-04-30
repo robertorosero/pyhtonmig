@@ -1,72 +1,138 @@
 
-:mod:`collections` --- High-performance container datatypes
-===========================================================
+:mod:`collections` --- Container datatypes
+==========================================
 
 .. module:: collections
-   :synopsis: High-performance datatypes
+   :synopsis: Container datatypes
 .. moduleauthor:: Raymond Hettinger <python@rcn.com>
 .. sectionauthor:: Raymond Hettinger <python@rcn.com>
 
+.. testsetup:: *
+
+   from collections import *
+   import itertools
+   __name__ = '<doctest>'
 
 This module implements high-performance container datatypes.  Currently,
 there are two datatypes, :class:`deque` and :class:`defaultdict`, and
-one datatype factory function, :func:`namedtuple`. Python already
-includes built-in containers, :class:`dict`, :class:`list`,
-:class:`set`, and :class:`tuple`. In addition, the optional :mod:`bsddb`
-module has a :meth:`bsddb.btopen` method that can be used to create in-memory
-or file based ordered dictionaries with string keys.
+one datatype factory function, :func:`namedtuple`. This module also
+provides the :class:`UserDict` and :class:`UserList` classes which may
+be useful when inheriting directly from :class:`dict` or
+:class:`list` isn't convenient.
 
-Future editions of the standard library may include balanced trees and
-ordered dictionaries.
+The specialized containers provided in this module provide alternatives
+to Python's general purpose built-in containers, :class:`dict`,
+:class:`list`, :class:`set`, and :class:`tuple`.
+Besides the containers provided here, the optional :mod:`bsddb`
+module offers the ability to create in-memory or file based ordered
+dictionaries with string keys using the :meth:`bsddb.btopen` method.
 
 In addition to containers, the collections module provides some ABCs
-(abstract base classes) that can be used to test whether
-a class provides a particular interface, for example, is it hashable or
-a mapping. The ABCs provided include those in the following table:
+(abstract base classes) that can be used to test whether a class
+provides a particular interface, for example, is it hashable or
+a mapping, and some of them can also be used as mixin classes.
 
-=====================================  ========================================
-ABC                                    Notes
-=====================================  ========================================
-:class:`collections.Container`         Defines ``__contains__()``
-:class:`collections.Hashable`          Defines ``__hash__()``
-:class:`collections.Iterable`          Defines ``__iter__()``
-:class:`collections.Iterator`          Derived from :class:`Iterable` and in
-                                       addition defines ``__next__()``
-:class:`collections.Mapping`           Derived from :class:`Container`,
-                                       :class:`Iterable`,
-                                       and :class:`Sized`, and in addition
-                                       defines ``__getitem__()``, ``get()``,
-                                       ``__contains__()``, ``__len__()``,
-                                       ``__iter__()``, ``keys()``,
-                                       ``items()``, and ``values()``
-:class:`collections.MutableMapping`    Derived from :class:`Mapping`
-:class:`collections.MutableSequence`   Derived from :class:`Sequence`
-:class:`collections.MutableSet`        Derived from :class:`Set` and in
-                                       addition defines ``add()``,
-                                       ``clear()``, ``discard()``, ``pop()``,
-                                       and ``toggle()``
-:class:`collections.Sequence`          Derived from :class:`Container`,
-                                       :class:`Iterable`, and :class:`Sized`,
-                                       and in addition defines
-                                       ``__getitem__()``
-:class:`collections.Set`               Derived from :class:`Container`, :class:`Iterable`, and :class:`Sized`
-:class:`collections.Sized`             Defines ``__len__()``
-=====================================  ========================================
+ABCs - abstract base classes
+----------------------------
 
-.. XXX Have not included them all and the notes are incomplete
-.. Deliberately did one row wide to get a neater output
+The collections module offers the following ABCs:
+
+=========================  ====================  ======================  ====================================================
+ABC                        Inherits              Abstract Methods        Mixin Methods
+=========================  ====================  ======================  ====================================================
+:class:`Container`                               ``__contains__``
+:class:`Hashable`                                ``__hash__``
+:class:`Iterable`                                ``__iter__``
+:class:`Iterator`          :class:`Iterable`     ``__next__``            ``__iter__``
+:class:`Sized`          			 ``__len__``
+
+:class:`Mapping`           :class:`Sized`,       ``__getitem__``,        ``__contains__``, ``keys``, ``items``, ``values``,
+                           :class:`Iterable`,    ``__len__``. and        ``get``, ``__eq__``, and ``__ne__``
+                           :class:`Container`    ``__iter__``
+
+:class:`MutableMapping`    :class:`Mapping`      ``__getitem__``         Inherited Mapping methods and
+                                                 ``__setitem__``,        ``pop``, ``popitem``, ``clear``, ``update``,
+                                                 ``__delitem__``,        and ``setdefault``
+						 ``__iter__``, and
+                                                 ``__len__``
+
+:class:`Sequence`          :class:`Sized`,       ``__getitem__``         ``__contains__``. ``__iter__``, ``__reversed__``.
+                           :class:`Iterable`,    and ``__len__``         ``index``, and ``count``
+                           :class:`Container`
+
+:class:`MutableSequnce`    :class:`Sequence`     ``__getitem__``         Inherited Sequence methods and
+                                                 ``__delitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
+                                                 ``insert``,             ``remove``, and ``__iadd__``
+                                                 and ``__len__``
+
+:class:`Set`               :class:`Sized`,       ``__len__``,            ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
+                           :class:`Iterable`,    ``__iter__``, and       ``__gt__``, ``__ge__``, ``__and__``, ``__or__``
+                           :class:`Container`    ``__contains__``        ``__sub__``, ``__xor__``, and ``isdisjoint``
+
+:class:`MutableSet`        :class:`Set`          ``add`` and             Inherited Set methods and
+                                                 ``discard``             ``clear``, ``pop``, ``remove``, ``__ior__``,
+                                                                         ``__iand__``, ``__ixor__``, and ``__isub__``
+=========================  ====================  ======================  ====================================================
 
 These ABCs allow us to ask classes or instances if they provide
 particular functionality, for example::
 
-    from collections import Sized
-
     size = None
-    if isinstance(myvar, Sized):
+    if isinstance(myvar, collections.Sized):
 	size = len(myvar)
 
-(For more about ABCs, see the :mod:`abc` module and :pep:`3119`.)
+Several of the ABCs are also useful as mixins that make it easier to develop
+classes supporting container APIs.  For example, to write a class supporting
+the full :class:`Set` API, it only necessary to supply the three underlying
+abstract methods: :meth:`__contains__`, :meth:`__iter__`, and :meth:`__len__`.
+The ABC supplies the remaining methods such as :meth:`__and__` and
+:meth:`isdisjoint` ::
 
+    class ListBasedSet(collections.Set):
+         ''' Alternate set implementation favoring space over speed
+             and not requiring the set elements to be hashable. '''
+         def __init__(self, iterable):
+             self.elements = lst = []
+             for value in iterable:
+                 if value not in lst:
+                     lst.append(value)
+         def __iter__(self):
+             return iter(self.elements)
+         def __contains__(self, value):
+             return value in self.elements
+         def __len__(self):
+             return len(self.elements)
+
+    s1 = ListBasedSet('abcdef')
+    s2 = ListBasedSet('defghi')
+    overlap = s1 & s2            # The __and__() method is supported automatically
+
+Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
+
+(1)
+   Since some set operations create new sets, the default mixin methods need
+   a way to create new instances from an iterable. The class constructor is
+   assumed to have a signature in the form ``ClassName(iterable)``.
+   That assumption is factored-out to a single internal classmethod called
+   :meth:`_from_iterable` which calls ``cls(iterable)`` to produce a new set.
+   If the :class:`Set` mixin is being used in a class with a different
+   constructor signature, you will need to override :meth:`from_iterable`
+   with a classmethod that can construct new instances from
+   an iterable argument.
+
+(2)
+   To override the comparisons (presumably for speed, as the
+   semantics are fixed), redefine :meth:`__le__` and
+   then the other operations will automatically follow suit.
+
+(3)
+   The :class:`Set` mixin provides a :meth:`_hash` method to compute a hash value
+   for the set; however, :meth:`__hash__` is not defined because not all sets
+   are hashable or immutable.  To add set hashabilty using mixins,
+   inherit from both :meth:`Set` and :meth:`Hashable`, then define
+   ``__hash__ = Set._hash``.
+
+(For more about ABCs, see the :mod:`abc` module and :pep:`3119`.)
 
 
 .. _deque-objects:
@@ -100,70 +166,73 @@ particular functionality, for example::
    where only the most recent activity is of interest.
 
 
-Deque objects support the following methods:
+   Deque objects support the following methods:
 
-.. method:: deque.append(x)
+   .. method:: append(x)
 
-   Add *x* to the right side of the deque.
-
-
-.. method:: deque.appendleft(x)
-
-   Add *x* to the left side of the deque.
+      Add *x* to the right side of the deque.
 
 
-.. method:: deque.clear()
+   .. method:: appendleft(x)
 
-   Remove all elements from the deque leaving it with length 0.
-
-
-.. method:: deque.extend(iterable)
-
-   Extend the right side of the deque by appending elements from the iterable
-   argument.
+      Add *x* to the left side of the deque.
 
 
-.. method:: deque.extendleft(iterable)
+   .. method:: clear()
 
-   Extend the left side of the deque by appending elements from *iterable*.  Note,
-   the series of left appends results in reversing the order of elements in the
-   iterable argument.
+      Remove all elements from the deque leaving it with length 0.
 
 
-.. method:: deque.pop()
+   .. method:: extend(iterable)
 
-   Remove and return an element from the right side of the deque. If no elements
-   are present, raises an :exc:`IndexError`.
-
-
-.. method:: deque.popleft()
-
-   Remove and return an element from the left side of the deque. If no elements are
-   present, raises an :exc:`IndexError`.
+      Extend the right side of the deque by appending elements from the iterable
+      argument.
 
 
-.. method:: deque.remove(value)
+   .. method:: extendleft(iterable)
 
-   Removed the first occurrence of *value*.  If not found, raises a
-   :exc:`ValueError`.
+      Extend the left side of the deque by appending elements from *iterable*.
+      Note, the series of left appends results in reversing the order of
+      elements in the iterable argument.
 
 
-.. method:: deque.rotate(n)
+   .. method:: pop()
 
-   Rotate the deque *n* steps to the right.  If *n* is negative, rotate to the
-   left.  Rotating one step to the right is equivalent to:
-   ``d.appendleft(d.pop())``.
+      Remove and return an element from the right side of the deque. If no
+      elements are present, raises an :exc:`IndexError`.
+
+
+   .. method:: popleft()
+
+      Remove and return an element from the left side of the deque. If no
+      elements are present, raises an :exc:`IndexError`.
+
+
+   .. method:: remove(value)
+
+      Removed the first occurrence of *value*.  If not found, raises a
+      :exc:`ValueError`.
+
+
+   .. method:: rotate(n)
+
+      Rotate the deque *n* steps to the right.  If *n* is negative, rotate to
+      the left.  Rotating one step to the right is equivalent to:
+      ``d.appendleft(d.pop())``.
+
 
 In addition to the above, deques support iteration, pickling, ``len(d)``,
 ``reversed(d)``, ``copy.copy(d)``, ``copy.deepcopy(d)``, membership testing with
 the :keyword:`in` operator, and subscript references such as ``d[-1]``.
 
-Example::
+Example:
+
+.. doctest::
 
    >>> from collections import deque
    >>> d = deque('ghi')                 # make a new deque with three items
    >>> for elem in d:                   # iterate over the deque's elements
-   ...     print(elem.upper())
+   ...     print elem.upper()
    G
    H
    I
@@ -242,7 +311,7 @@ a reduction function, and calling :meth:`append` to add the result back to the
 deque.
 
 For example, building a balanced binary tree of nested lists entails reducing
-two adjacent nodes into one by grouping them in a list::
+two adjacent nodes into one by grouping them in a list:
 
    >>> def maketree(iterable):
    ...     d = deque(iterable)
@@ -280,32 +349,34 @@ in Unix::
    arguments.
 
 
-:class:`defaultdict` objects support the following method in addition to the
-standard :class:`dict` operations:
+   :class:`defaultdict` objects support the following method in addition to the
+   standard :class:`dict` operations:
 
-.. method:: defaultdict.__missing__(key)
+   .. method:: defaultdict.__missing__(key)
 
-   If the :attr:`default_factory` attribute is ``None``, this raises an
-   :exc:`KeyError` exception with the *key* as argument.
+      If the :attr:`default_factory` attribute is ``None``, this raises an
+      :exc:`KeyError` exception with the *key* as argument.
 
-   If :attr:`default_factory` is not ``None``, it is called without arguments to
-   provide a default value for the given *key*, this value is inserted in the
-   dictionary for the *key*, and returned.
+      If :attr:`default_factory` is not ``None``, it is called without arguments
+      to provide a default value for the given *key*, this value is inserted in
+      the dictionary for the *key*, and returned.
 
-   If calling :attr:`default_factory` raises an exception this exception is
-   propagated unchanged.
+      If calling :attr:`default_factory` raises an exception this exception is
+      propagated unchanged.
 
-   This method is called by the :meth:`__getitem__` method of the :class:`dict`
-   class when the requested key is not found; whatever it returns or raises is then
-   returned or raised by :meth:`__getitem__`.
-
-:class:`defaultdict` objects support the following instance variable:
+      This method is called by the :meth:`__getitem__` method of the
+      :class:`dict` class when the requested key is not found; whatever it
+      returns or raises is then returned or raised by :meth:`__getitem__`.
 
 
-.. attribute:: defaultdict.default_factory
+   :class:`defaultdict` objects support the following instance variable:
 
-   This attribute is used by the :meth:`__missing__` method; it is initialized from
-   the first argument to the constructor, if present, or to ``None``,  if absent.
+
+   .. attribute:: defaultdict.default_factory
+
+      This attribute is used by the :meth:`__missing__` method; it is
+      initialized from the first argument to the constructor, if present, or to
+      ``None``, if absent.
 
 
 .. _defaultdict-examples:
@@ -314,7 +385,7 @@ standard :class:`dict` operations:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Using :class:`list` as the :attr:`default_factory`, it is easy to group a
-sequence of key-value pairs into a dictionary of lists::
+sequence of key-value pairs into a dictionary of lists:
 
    >>> s = [('yellow', 1), ('blue', 2), ('yellow', 3), ('blue', 4), ('red', 1)]
    >>> d = defaultdict(list)
@@ -330,7 +401,7 @@ function which returns an empty :class:`list`.  The :meth:`list.append`
 operation then attaches the value to the new list.  When keys are encountered
 again, the look-up proceeds normally (returning the list for that key) and the
 :meth:`list.append` operation adds another value to the list. This technique is
-simpler and faster than an equivalent technique using :meth:`dict.setdefault`::
+simpler and faster than an equivalent technique using :meth:`dict.setdefault`:
 
    >>> d = {}
    >>> for k, v in s:
@@ -341,7 +412,7 @@ simpler and faster than an equivalent technique using :meth:`dict.setdefault`::
 
 Setting the :attr:`default_factory` to :class:`int` makes the
 :class:`defaultdict` useful for counting (like a bag or multiset in other
-languages)::
+languages):
 
    >>> s = 'mississippi'
    >>> d = defaultdict(int)
@@ -358,7 +429,7 @@ zero.  The increment operation then builds up the count for each letter.
 The function :func:`int` which always returns zero is just a special case of
 constant functions.  A faster and more flexible way to create constant functions
 is to use a lambda function which can supply any constant value (not just
-zero)::
+zero):
 
    >>> def constant_factory(value):
    ...     return lambda: value
@@ -368,7 +439,7 @@ zero)::
    'John ran to <missing>'
 
 Setting the :attr:`default_factory` to :class:`set` makes the
-:class:`defaultdict` useful for building a dictionary of sets::
+:class:`defaultdict` useful for building a dictionary of sets:
 
    >>> s = [('red', 1), ('blue', 2), ('red', 3), ('blue', 4), ('red', 1), ('blue', 4)]
    >>> d = defaultdict(set)
@@ -391,7 +462,7 @@ they add the ability to access fields by name instead of position index.
 .. function:: namedtuple(typename, fieldnames, [verbose])
 
    Returns a new tuple subclass named *typename*.  The new subclass is used to
-   create tuple-like objects that have fields accessable by attribute lookup as
+   create tuple-like objects that have fields accessible by attribute lookup as
    well as being indexable and iterable.  Instances of the subclass also have a
    helpful docstring (with typename and fieldnames) and a helpful :meth:`__repr__`
    method which lists the tuple contents in a ``name=value`` format.
@@ -403,7 +474,7 @@ they add the ability to access fields by name instead of position index.
    Any valid Python identifier may be used for a fieldname except for names
    starting with an underscore.  Valid identifiers consist of letters, digits,
    and underscores but do not start with a digit or underscore and cannot be
-   a :mod:`keyword` such as *class*, *for*, *return*, *global*, *pass*, *print*,
+   a :mod:`keyword` such as *class*, *for*, *return*, *global*, *pass*,
    or *raise*.
 
    If *verbose* is true, the class definition is printed just before being built.
@@ -411,41 +482,44 @@ they add the ability to access fields by name instead of position index.
    Named tuple instances do not have per-instance dictionaries, so they are
    lightweight and require no more memory than regular tuples.
 
-Example::
+Example:
+
+.. doctest::
+   :options: +NORMALIZE_WHITESPACE
 
    >>> Point = namedtuple('Point', 'x y', verbose=True)
    class Point(tuple):
            'Point(x, y)'
-
+   <BLANKLINE>
            __slots__ = ()
-
+   <BLANKLINE>
            _fields = ('x', 'y')
-
+   <BLANKLINE>
            def __new__(cls, x, y):
                return tuple.__new__(cls, (x, y))
-
+   <BLANKLINE>
            @classmethod
-           def _make(cls, iterable):
+           def _make(cls, iterable, new=tuple.__new__, len=len):
                'Make a new Point object from a sequence or iterable'
-               result = tuple.__new__(cls, iterable)
+               result = new(cls, iterable)
                if len(result) != 2:
                    raise TypeError('Expected 2 arguments, got %d' % len(result))
                return result
-
+   <BLANKLINE>
            def __repr__(self):
                return 'Point(x=%r, y=%r)' % self
-
+   <BLANKLINE>
            def _asdict(t):
                'Return a new dict which maps field names to their values'
                return {'x': t[0], 'y': t[1]}
-
+   <BLANKLINE>
            def _replace(self, **kwds):
                'Return a new Point object replacing specified fields with new values'
                result = self._make(map(kwds.pop, ('x', 'y'), self))
                if kwds:
                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
                return result
-
+   <BLANKLINE>
            x = property(itemgetter(0))
            y = property(itemgetter(1))
 
@@ -455,7 +529,7 @@ Example::
    >>> x, y = p                # unpack like a regular tuple
    >>> x, y
    (11, 22)
-   >>> p.x + p.y               # fields also accessable by name
+   >>> p.x + p.y               # fields also accessible by name
    33
    >>> p                       # readable __repr__ with a name=value style
    Point(x=11, y=22)
@@ -476,6 +550,16 @@ by the :mod:`csv` or :mod:`sqlite3` modules::
    for emp in map(EmployeeRecord._make, cursor.fetchall()):
        print(emp.name, emp.title)
 
+Named tuples can also be used to generate enumerated constants:
+
+.. testcode::
+
+   def enum(*names):
+       return namedtuple('Enum', ' '.join(names))(*range(len(names)))
+   
+   Status = enum('open', 'pending', 'closed')
+   assert (0, 1, 2) == (Status.open, Status.pending, Status.closed)
+
 In addition to the methods inherited from tuples, named tuples support
 three additional methods and one attribute.  To prevent conflicts with
 field names, the method and attribute names start with an underscore.
@@ -484,7 +568,7 @@ field names, the method and attribute names start with an underscore.
 
    Class method that makes a new instance from an existing sequence or iterable.
 
-::
+.. doctest::
 
       >>> t = [11, 22]
       >>> Point._make(t)
@@ -492,16 +576,15 @@ field names, the method and attribute names start with an underscore.
 
 .. method:: somenamedtuple._asdict()
 
-   Return a new dict which maps field names to their corresponding values:
-
-::
+   Return a new dict which maps field names to their corresponding values::
 
       >>> p._asdict()
       {'x': 11, 'y': 22}
-      
+
 .. method:: somenamedtuple._replace(kwargs)
 
-   Return a new instance of the named tuple replacing specified fields with new values:
+   Return a new instance of the named tuple replacing specified fields with new
+   values:
 
 ::
 
@@ -517,7 +600,7 @@ field names, the method and attribute names start with an underscore.
    Tuple of strings listing the field names.  Useful for introspection
    and for creating new named tuple types from existing named tuples.
 
-::
+.. doctest::
 
       >>> p._fields            # view the field names
       ('x', 'y')
@@ -528,12 +611,12 @@ field names, the method and attribute names start with an underscore.
       Pixel(x=11, y=22, red=128, green=255, blue=0)
 
 To retrieve a field whose name is stored in a string, use the :func:`getattr`
-function::
+function:
 
     >>> getattr(p, 'x')
     11
 
-To convert a dictionary to a named tuple, use the double-star-operator [#]_::
+To convert a dictionary to a named tuple, use the double-star-operator [#]_:
 
    >>> d = {'x': 11, 'y': 22}
    >>> Point(**d)
@@ -541,7 +624,7 @@ To convert a dictionary to a named tuple, use the double-star-operator [#]_::
 
 Since a named tuple is a regular Python class, it is easy to add or change
 functionality with a subclass.  Here is how to add a calculated field and
-a fixed-width print format::
+a fixed-width print format:
 
     >>> class Point(namedtuple('Point', 'x y')):
     ...     __slots__ = ()
@@ -553,30 +636,20 @@ a fixed-width print format::
 
     >>> for p in Point(3, 4), Point(14, 5/7.):
     ...     print(p)
-
     Point: x= 3.000  y= 4.000  hypot= 5.000
     Point: x=14.000  y= 0.714  hypot=14.018
 
-Another use for subclassing is to replace performance critcal methods with
-faster versions that bypass error-checking::
-
-    class Point(namedtuple('Point', 'x y')):
-        __slots__ = ()
-        _make = classmethod(tuple.__new__)
-        def _replace(self, _map=map, **kwds):
-            return self._make(_map(kwds.get, ('x', 'y'), self))
-
-The subclasses shown above set ``__slots__`` to an empty tuple.  This keeps
+The subclass shown above sets ``__slots__`` to an empty tuple.  This keeps
 keep memory requirements low by preventing the creation of instance dictionaries.
 
 
 Subclassing is not useful for adding new, stored fields.  Instead, simply
-create a new named tuple type from the :attr:`_fields` attribute::
+create a new named tuple type from the :attr:`_fields` attribute:
 
     >>> Point3D = namedtuple('Point3D', Point._fields + ('z',))
 
 Default values can be implemented by using :meth:`_replace` to
-customize a prototype instance::
+customize a prototype instance:
 
     >>> Account = namedtuple('Account', 'owner balance transaction_count')
     >>> default_account = Account('<owner name>', 0.0, 0)
@@ -586,3 +659,90 @@ customize a prototype instance::
 
 .. [#] For information on the double-star-operator see
    :ref:`tut-unpacking-arguments` and :ref:`calls`.
+
+
+
+:class:`UserDict` objects
+-------------------------
+
+The class, :class:`UserDict` acts as a wrapper around dictionary objects.  
+The need for this class has been partially supplanted by the ability to 
+subclass directly from :class:`dict`; however, this class can be easier
+to work with because the underlying dictionary is accessible as an
+attribute.
+
+.. class:: UserDict([initialdata])
+
+   Class that simulates a dictionary.  The instance's contents are kept in a
+   regular dictionary, which is accessible via the :attr:`data` attribute of
+   :class:`UserDict` instances.  If *initialdata* is provided, :attr:`data` is
+   initialized with its contents; note that a reference to *initialdata* will not
+   be kept, allowing it be used for other purposes.
+
+In addition to supporting the methods and operations of mappings, 
+:class:`UserDict` instances provide the following attribute:
+
+.. attribute:: UserDict.data
+
+   A real dictionary used to store the contents of the :class:`UserDict` class.
+
+
+
+:class:`UserList` objects
+-------------------------
+
+This class acts as a wrapper around list objects.  It is a useful base class
+for your own list-like classes which can inherit from them and override 
+existing methods or add new ones.  In this way, one can add new behaviors to
+lists.
+
+The need for this class has been partially supplanted by the ability to 
+subclass directly from :class:`list`; however, this class can be easier
+to work with because the underlying list is accessible as an attribute.
+
+.. class:: UserList([list])
+
+   Class that simulates a list.  The instance's contents are kept in a regular
+   list, which is accessible via the :attr:`data` attribute of :class:`UserList`
+   instances.  The instance's contents are initially set to a copy of *list*,
+   defaulting to the empty list ``[]``.  *list* can be any iterable, for
+   example a real Python list or a :class:`UserList` object.
+
+In addition to supporting the methods and operations of mutable sequences, 
+:class:`UserList` instances provide the following attribute:
+
+.. attribute:: UserList.data
+
+   A real :class:`list` object used to store the contents of the 
+   :class:`UserList` class.
+
+**Subclassing requirements:** Subclasses of :class:`UserList` are expect to
+offer a constructor which can be called with either no arguments or one
+argument.  List operations which return a new sequence attempt to create an
+instance of the actual implementation class.  To do so, it assumes that the
+constructor can be called with a single parameter, which is a sequence object
+used as a data source.
+
+If a derived class does not wish to comply with this requirement, all of the
+special methods supported by this class will need to be overridden; please
+consult the sources for information about the methods which need to be provided
+in that case.
+
+:class:`UserString` objects
+---------------------------
+
+The class, :class:`UserString` acts as a wrapper around string objects.  
+The need for this class has been partially supplanted by the ability to 
+subclass directly from :class:`str`; however, this class can be easier
+to work with because the underlying string is accessible as an
+attribute.
+
+.. class:: UserString([sequence])
+
+   Class that simulates a string or a Unicode string object.  The instance's
+   content is kept in a regular string object, which is accessible via the 
+   :attr:`data` attribute of :class:`UserString` instances.  The instance's 
+   contents are initially set to a copy of *sequence*.  The *sequence* can
+   be an instance of :class:`bytes`, :class:`str`, :class:`UserString` (or a
+   subclass) or an arbitrary sequence which can be converted into a string using
+   the built-in :func:`str` function.

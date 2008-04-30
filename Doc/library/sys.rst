@@ -54,6 +54,28 @@ always available.
    A string containing the copyright pertaining to the Python interpreter.
 
 
+.. function:: _compact_freelists()
+
+   Compact the free list of floats by deallocating unused blocks.
+   It can reduce the memory usage of the Python process several tenth of
+   thousands of integers or floats have been allocated at once.
+
+   The return value is a tuple of tuples each containing three elements,
+   amount of used objects, total block count before the blocks are deallocated
+   and amount of freed blocks. 
+
+   This function should be used for specialized purposes only.
+
+
+.. function:: _clear_type_cache()
+
+   Clear the internal type cache. The type cache is used to speed up attribute
+   and method lookups. Use the function *only* to drop unnecessary references
+   during reference leak debugging.
+
+   This function should be used for internal and specialized purposes only.
+
+
 .. function:: _current_frames()
 
    Return a dictionary mapping each thread's identifier to the topmost stack frame
@@ -219,8 +241,6 @@ always available.
    | :const:`unicode`             | -U                                       |
    +------------------------------+------------------------------------------+
 
-   .. versionadded:: 2.6
-
 
 .. data:: float_info
 
@@ -278,7 +298,7 @@ always available.
 .. function:: getdlopenflags()
 
    Return the current value of the flags that are used for :cfunc:`dlopen` calls.
-   The flag constants are defined in the :mod:`dl` and :mod:`DLFCN` modules.
+   The flag constants are defined in the :mod:`ctypes` and :mod:`DLFCN` modules.
    Availability: Unix.
 
 
@@ -334,8 +354,6 @@ always available.
 
    Get the profiler function as set by :func:`setprofile`.
 
-   .. versionadded:: 2.6
-
 
 .. function:: gettrace()
 
@@ -351,8 +369,6 @@ always available.
       profilers, coverage tools and the like. Its behavior is part of the
       implementation platform, rather than part of the language definition,
       and thus may not be available in all Python implementations.
-
-   .. versionadded:: 2.6
 
 
 .. function:: getwindowsversion()
@@ -530,8 +546,6 @@ always available.
    environment variable, but you can set it yourself to control bytecode file
    generation.
 
-   .. versionadded:: 2.6
-
 
 .. function:: setcheckinterval(interval)
 
@@ -561,8 +575,8 @@ always available.
    the interpreter loads extension modules.  Among other things, this will enable a
    lazy resolving of symbols when importing a module, if called as
    ``sys.setdlopenflags(0)``.  To share symbols across extension modules, call as
-   ``sys.setdlopenflags(dl.RTLD_NOW | dl.RTLD_GLOBAL)``.  Symbolic names for the
-   flag modules can be either found in the :mod:`dl` module, or in the :mod:`DLFCN`
+   ``sys.setdlopenflags(ctypes.RTLD_GLOBAL)``.  Symbolic names for the
+   flag modules can be either found in the :mod:`ctypes` module, or in the :mod:`DLFCN`
    module. If :mod:`DLFCN` is not available, it can be generated from
    :file:`/usr/include/dlfcn.h` using the :program:`h2py` script. Availability:
    Unix.

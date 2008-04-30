@@ -17,26 +17,13 @@ def _urlopen_with_retry(host, *args, **kwargs):
     for i in range(3):
         try:
             return urllib2.urlopen(host, *args, **kwargs)
-        except urllib2.URLError as last_exc:
+        except urllib2.URLError as e:
+            last_exc = e
             continue
         except:
             raise
     raise last_exc
 
-
-class URLTimeoutTest(unittest.TestCase):
-
-    TIMEOUT = 10.0
-
-    def setUp(self):
-        socket.setdefaulttimeout(self.TIMEOUT)
-
-    def tearDown(self):
-        socket.setdefaulttimeout(None)
-
-    def testURLread(self):
-        f = _urlopen_with_retry("http://www.python.org/")
-        x = f.read()
 
 
 class AuthTests(unittest.TestCase):
@@ -97,81 +84,12 @@ class CloseSocketTest(unittest.TestCase):
         response.close()
         self.assert_(fileobject.closed)
 
-class urlopenNetworkTests(unittest.TestCase):
-    """Tests urllib2.urlopen using the network.
-
-    These tests are not exhaustive.  Assuming that testing using files does a
-    good job overall of some of the basic interface features.  There are no
-    tests exercising the optional 'data' and 'proxies' arguments.  No tests
-    for transparent redirection have been written.
-
-    setUp is not used for always constructing a connection to
-    http://www.python.org/ since there a few tests that don't use that address
-    and making a connection is expensive enough to warrant minimizing unneeded
-    connections.
-
-    """
-
-    def test_basic(self):
-        # Simple test expected to pass.
-        open_url = _urlopen_with_retry("http://www.python.org/")
-        for attr in ("read", "close", "info", "geturl"):
-            self.assert_(hasattr(open_url, attr), "object returned from "
-                            "urlopen lacks the %s attribute" % attr)
-        try:
-            self.assert_(open_url.read(), "calling 'read' failed")
-        finally:
-            open_url.close()
-
-    def test_info(self):
-        # Test 'info'.
-        open_url = _urlopen_with_retry("http://www.python.org/")
-        try:
-            info_obj = open_url.info()
-        finally:
-            open_url.close()
-            self.assert_(isinstance(info_obj, mimetools.Message),
-                         "object returned by 'info' is not an instance of "
-                         "mimetools.Message")
-            self.assertEqual(info_obj.getsubtype(), "html")
-
-    def test_geturl(self):
-        # Make sure same URL as opened is returned by geturl.
-        URL = "http://www.python.org/"
-        open_url = _urlopen_with_retry(URL)
-        try:
-            gotten_url = open_url.geturl()
-        finally:
-            open_url.close()
-        self.assertEqual(gotten_url, URL)
-
-    def test_bad_address(self):
-        # Make sure proper exception is raised when connecting to a bogus
-        # address.
-        self.assertRaises(IOError,
-                          # SF patch 809915:  In Sep 2003, VeriSign started
-                          # highjacking invalid .com and .net addresses to
-                          # boost traffic to their own site.  This test
-                          # started failing then.  One hopes the .invalid
-                          # domain will be spared to serve its defined
-                          # purpose.
-                          # urllib2.urlopen, "http://www.sadflkjsasadf.com/")
-                          urllib2.urlopen, "http://www.python.invalid./")
-
-
 class OtherNetworkTests(unittest.TestCase):
     def setUp(self):
         if 0:  # for debugging
             import logging
             logger = logging.getLogger("test_urllib2net")
             logger.addHandler(logging.StreamHandler())
-
-    def test_range (self):
-        req = urllib2.Request("http://www.python.org",
-                              headers={'Range': 'bytes=20-39'})
-        result = _urlopen_with_retry(req)
-        data = result.read()
-        self.assertEqual(len(data), 20)
 
     # XXX The rest of these tests aren't very good -- they don't check much.
     # They do sometimes catch some major disasters, though.
@@ -199,16 +117,6 @@ class OtherNetworkTests(unittest.TestCase):
             self._test_urls(urls, self._extra_handlers(), urllib2.urlopen)
         finally:
             os.remove(TESTFN)
-
-    def test_http(self):
-        urls = [
-            'http://www.espn.com/', # redirect
-            'http://www.python.org/Spanish/Inquistion/',
-            ('http://www.python.org/cgi-bin/faqw.py',
-             'query=pythonistas&querytype=simple&casefold=yes&req=search', None),
-            'http://www.python.org/',
-            ]
-        self._test_urls(urls, self._extra_handlers())
 
     # XXX Following test depends on machine configurations that are internal
     # to CNRI.  Need to set up a public server with the right authentication
@@ -277,6 +185,7 @@ class OtherNetworkTests(unittest.TestCase):
 
         return handlers
 
+
 class TimeoutTest(unittest.TestCase):
     def test_http_basic(self):
         u = _urlopen_with_retry("http://www.python.org")
@@ -310,13 +219,13 @@ class TimeoutTest(unittest.TestCase):
         socket.setdefaulttimeout(60)
         try:
             u = _urlopen_with_retry(self.FTP_HOST, timeout=None)
-            self.assertEqual(u.fp.fp._sock.gettimeout(), 60)
+            self.assertEqual(u.fp.fp.raw._sock.gettimeout(), 60)
         finally:
             socket.setdefaulttimeout(prev)
 
     def test_ftp_NoneNodefault(self):
         u = _urlopen_with_retry(self.FTP_HOST, timeout=None)
-        self.assertTrue(u.fp.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.fp.raw._sock.gettimeout() is None)
 
     def test_ftp_Value(self):
         u = _urlopen_with_retry(self.FTP_HOST, timeout=60)
@@ -325,9 +234,7 @@ class TimeoutTest(unittest.TestCase):
 
 def test_main():
     test_support.requires("network")
-    test_support.run_unittest(URLTimeoutTest,
-                              urlopenNetworkTests,
-                              AuthTests,
+    test_support.run_unittest(AuthTests,
                               OtherNetworkTests,
                               CloseSocketTest,
                               TimeoutTest,

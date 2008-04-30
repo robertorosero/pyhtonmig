@@ -33,6 +33,24 @@ struct method_cache_entry {
 
 static struct method_cache_entry method_cache[1 << MCACHE_SIZE_EXP];
 static unsigned int next_version_tag = 0;
+static void type_modified(PyTypeObject *);
+
+unsigned int
+PyType_ClearCache(void)
+{
+	Py_ssize_t i;
+	unsigned int cur_version_tag = next_version_tag - 1;
+	
+	for (i = 0; i < (1 << MCACHE_SIZE_EXP); i++) {
+		method_cache[i].version = 0;
+		Py_CLEAR(method_cache[i].name);
+		method_cache[i].value = NULL;
+	}
+	next_version_tag = 0;
+	/* mark all version tags as invalid */
+	type_modified(&PyBaseObject_Type);
+	return cur_version_tag;
+}
 
 static void
 type_modified(PyTypeObject *type)
@@ -59,7 +77,7 @@ type_modified(PyTypeObject *type)
 	PyObject *raw, *ref;
 	Py_ssize_t i, n;
 
-	if(!PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+	if (!PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
 		return;
 
 	raw = type->tp_subclasses;
@@ -95,7 +113,7 @@ type_mro_modified(PyTypeObject *type, PyObject *bases) {
 	Py_ssize_t i, n;
 	int clear = 0;
 
-	if(!PyType_HasFeature(type, Py_TPFLAGS_HAVE_VERSION_TAG))
+	if (!PyType_HasFeature(type, Py_TPFLAGS_HAVE_VERSION_TAG))
 		return;
 
 	n = PyTuple_GET_SIZE(bases);
@@ -298,6 +316,40 @@ type_set_module(PyTypeObject *type, PyObject *value, void *context)
 	type_modified(type);
 
 	return PyDict_SetItemString(type->tp_dict, "__module__", value);
+}
+
+static PyObject *
+type_abstractmethods(PyTypeObject *type, void *context)
+{
+	PyObject *mod = PyDict_GetItemString(type->tp_dict,
+					     "__abstractmethods__");
+	if (!mod) {
+		PyErr_Format(PyExc_AttributeError, "__abstractmethods__");
+		return NULL;
+	}
+	Py_XINCREF(mod);
+	return mod;
+}
+
+static int
+type_set_abstractmethods(PyTypeObject *type, PyObject *value, void *context)
+{
+	/* __abstractmethods__ should only be set once on a type, in
+	   abc.ABCMeta.__new__, so this function doesn't do anything
+	   special to update subclasses.
+	*/
+	int res = PyDict_SetItemString(type->tp_dict,
+				       "__abstractmethods__", value);
+	if (res == 0) {
+		type_modified(type);
+		if (value && PyObject_IsTrue(value)) {
+			type->tp_flags |= Py_TPFLAGS_IS_ABSTRACT;
+		}
+		else {
+			type->tp_flags &= ~Py_TPFLAGS_IS_ABSTRACT;
+		}
+	}
+	return res;
 }
 
 static PyObject *
@@ -537,6 +589,8 @@ static PyGetSetDef type_getsets[] = {
 	{"__name__", (getter)type_name, (setter)type_set_name, NULL},
 	{"__bases__", (getter)type_get_bases, (setter)type_set_bases, NULL},
 	{"__module__", (getter)type_module, (setter)type_set_module, NULL},
+	{"__abstractmethods__", (getter)type_abstractmethods,
+	 (setter)type_set_abstractmethods, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
 	{0}
@@ -546,7 +600,6 @@ static PyObject *
 type_repr(PyTypeObject *type)
 {
 	PyObject *mod, *name, *rtn;
-	char *kind;
 
 	mod = type_module(type, NULL);
 	if (mod == NULL)
@@ -559,15 +612,10 @@ type_repr(PyTypeObject *type)
 	if (name == NULL)
 		return NULL;
 
-	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE)
-		kind = "class";
-	else
-		kind = "type";
-
 	if (mod != NULL && PyUnicode_CompareWithASCIIString(mod, "builtins"))
-		rtn = PyUnicode_FromFormat("<%s '%U.%U'>", kind, mod, name);
+		rtn = PyUnicode_FromFormat("<class '%U.%U'>", mod, name);
 	else
-		rtn = PyUnicode_FromFormat("<%s '%s'>", kind, type->tp_name);
+		rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
 
 	Py_XDECREF(mod);
 	Py_DECREF(name);
@@ -1342,8 +1390,8 @@ mro_implementation(PyTypeObject *type)
 	PyObject *bases, *result;
 	PyObject *to_merge, *bases_aslist;
 
-	if(type->tp_dict == NULL) {
-		if(PyType_Ready(type) < 0)
+	if (type->tp_dict == NULL) {
+		if (PyType_Ready(type) < 0)
 			return NULL;
 	}
 
@@ -2204,7 +2252,7 @@ _PyType_Lookup(PyTypeObject *type, PyObject *name)
 	unsigned int h;
 
 	if (MCACHE_CACHEABLE_NAME(name) &&
-	    PyType_HasFeature(type,Py_TPFLAGS_VALID_VERSION_TAG)) {
+	    PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
 		/* fast path */
 		h = MCACHE_HASH_METHOD(type, name);
 		if (method_cache[h].version == type->tp_version_tag &&
@@ -2620,6 +2668,52 @@ object_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	if (err < 0)
 		return NULL;
+
+	if (type->tp_flags & Py_TPFLAGS_IS_ABSTRACT) {
+		static PyObject *comma = NULL;
+		PyObject *abstract_methods = NULL;
+		PyObject *builtins;
+		PyObject *sorted;
+		PyObject *sorted_methods = NULL;
+		PyObject *joined = NULL;
+
+		/* Compute ", ".join(sorted(type.__abstractmethods__))
+		   into joined. */
+		abstract_methods = type_abstractmethods(type, NULL);
+		if (abstract_methods == NULL)
+			goto error;
+		builtins = PyEval_GetBuiltins();
+		if (builtins == NULL)
+			goto error;
+		sorted = PyDict_GetItemString(builtins, "sorted");
+		if (sorted == NULL)
+			goto error;
+		sorted_methods = PyObject_CallFunctionObjArgs(sorted,
+							      abstract_methods,
+							      NULL);
+		if (sorted_methods == NULL)
+			goto error;
+		if (comma == NULL) {
+			comma = PyUnicode_InternFromString(", ");
+			if (comma == NULL)
+				goto error;
+		}
+		joined = PyObject_CallMethod(comma, "join",
+					     "O",  sorted_methods);
+		if (joined == NULL)
+			goto error;
+
+		PyErr_Format(PyExc_TypeError,
+			     "Can't instantiate abstract class %s "
+			     "with abstract methods %U",
+			     type->tp_name,
+			     joined);
+	error:
+		Py_XDECREF(joined);
+		Py_XDECREF(sorted_methods);
+		Py_XDECREF(abstract_methods);
+		return NULL;
+	}
 	return type->tp_alloc(type, 0);
 }
 
@@ -3125,6 +3219,20 @@ object_reduce_ex(PyObject *self, PyObject *args)
 	return _common_reduce(self, proto);
 }
 
+static PyObject *
+object_subclasshook(PyObject *cls, PyObject *args)
+{
+	Py_INCREF(Py_NotImplemented);
+	return Py_NotImplemented;
+}
+
+PyDoc_STRVAR(object_subclasshook_doc,
+"Abstract classes can override this to customize issubclass().\n"
+"\n"
+"This is invoked early on by abc.ABCMeta.__subclasscheck__().\n"
+"It should return True, False or NotImplemented.  If it returns\n"
+"NotImplemented, the normal algorithm is used.  Otherwise, it\n"
+"overrides the normal algorithm (and the outcome is cached).\n");
 
 /*
    from PEP 3101, this code implements:
@@ -3165,6 +3273,8 @@ static PyMethodDef object_methods[] = {
 	 PyDoc_STR("helper for pickle")},
 	{"__reduce__", object_reduce, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
+	{"__subclasshook__", object_subclasshook, METH_CLASS | METH_VARARGS,
+	 object_subclasshook_doc},
         {"__format__", object_format, METH_VARARGS,
          PyDoc_STR("default object formatter")},
 	{0}

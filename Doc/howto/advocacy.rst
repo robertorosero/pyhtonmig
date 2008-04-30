@@ -160,7 +160,7 @@ for "compact":
    don't merge cleanly into the overall design scheme (thus, some fans of Classic C
    maintain that ANSI C is no longer compact).
 
-   (From http://www.catb.org/ esr/jargon/html/C/compact.html)
+   (From http://www.catb.org/~esr/jargon/html/C/compact.html)
 
 In this sense of the word, Python is quite compact, because the language has
 just a few ideas, which are used in lots of places.  Take namespaces, for
@@ -174,14 +174,14 @@ standard dictionary data type: .keys() returns all the keys, and so forth.
 This simplicity arises from Python's development history.  The language syntax
 derives from different sources; ABC, a relatively obscure teaching language, is
 one primary influence, and Modula-3 is another.  (For more information about ABC
-and Modula-3, consult their respective Web sites at http://www.cwi.nl/
-steven/abc/ and http://www.m3.org.)  Other features have come from C, Icon,
+and Modula-3, consult their respective Web sites at http://www.cwi.nl/~steven/abc/
+and http://www.m3.org.)  Other features have come from C, Icon,
 Algol-68, and even Perl.  Python hasn't really innovated very much, but instead
 has tried to keep the language small and easy to learn, building on ideas that
 have been tried in other languages and found useful.
 
 Simplicity is a virtue that should not be underestimated.  It lets you learn the
-language more quickly, and then rapidly write code, code that often works the
+language more quickly, and then rapidly write code -- code that often works the
 first time you run it.
 
 
@@ -265,8 +265,8 @@ the  organizations that use Python.
 **What are the restrictions on Python's use?**
 
 They're practically nonexistent.  Consult the :file:`Misc/COPYRIGHT` file in the
-source distribution, or http://www.python.org/doc/Copyright.html for the full
-language, but it boils down to three conditions.
+source distribution, or the section :ref:`history-and-license` for the full
+language, but it boils down to three conditions:
 
 * You have to leave the copyright notice on the software; if you don't include
   the source code in a product, you have to put the copyright notice in the
@@ -276,7 +276,7 @@ language, but it boils down to three conditions.
   product in any way.
 
 * If something goes wrong, you can't sue for damages.  Practically all software
-  licences contain this condition.
+  licenses contain this condition.
 
 Notice that you don't have to provide source code for anything that contains
 Python or is built with it.  Also, the Python interpreter and accompanying
@@ -346,7 +346,7 @@ http://www.opensource.org
    wasn't written commercially.  This site presents arguments that show how open
    source software can have considerable advantages over closed-source software.
 
-http://sunsite.unc.edu/LDP/HOWTO/mini/Advocacy.html
+http://www.faqs.org/docs/Linux-mini/Advocacy.html
    The Linux Advocacy mini-HOWTO was the inspiration for this document, and is also
    well worth reading for general suggestions on winning acceptance for a new
    technology, such as Linux or Python.  In general, you won't make much progress

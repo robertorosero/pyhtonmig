@@ -748,10 +748,41 @@ extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 }
 #endif
 
+static PyObject *
+sys_clear_type_cache(PyObject* self, PyObject* args)
+{
+	PyType_ClearCache();
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(sys_clear_type_cache__doc__,
+"_clear_type_cache() -> None\n\
+Clear the internal type lookup cache.");
+
+
+static PyObject *
+sys_compact_freelists(PyObject* self, PyObject* args)
+{
+	size_t fsum, fbc, fbf;
+
+	PyFloat_CompactFreeList(&fbc, &fbf, &fsum);
+
+	return Py_BuildValue("((kkk))", fsum, fbc, fbf);
+
+}
+
+PyDoc_STRVAR(sys_compact_freelists__doc__,
+"_compact_freelists() -> ((remaing_objects, total_blocks, freed_blocks),)\n\
+Compact the free lists of floats.");
+
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
 	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
 	 callstats_doc},
+	{"_clear_type_cache",	sys_clear_type_cache,	  METH_NOARGS,
+	 sys_clear_type_cache__doc__},
+	{"_compact_freelists",	sys_compact_freelists,	  METH_NOARGS,
+	 sys_compact_freelists__doc__},
 	{"_current_frames", sys_current_frames, METH_NOARGS,
 	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
@@ -851,7 +882,7 @@ PySys_ResetWarnOptions(void)
 }
 
 void
-PySys_AddWarnOption(const char *s)
+PySys_AddWarnOption(const wchar_t *s)
 {
 	PyObject *str;
 
@@ -861,11 +892,17 @@ PySys_AddWarnOption(const char *s)
 		if (warnoptions == NULL)
 			return;
 	}
-	str = PyUnicode_FromString(s);
+	str = PyUnicode_FromWideChar(s, -1);
 	if (str != NULL) {
 		PyList_Append(warnoptions, str);
 		Py_DECREF(str);
 	}
+}
+
+int
+PySys_HasWarnOptions(void)
+{
+    return (warnoptions != NULL && (PyList_Size(warnoptions) > 0)) ? 1 : 0;
 }
 
 /* XXX This doc string is too long to be a single string literal in VC++ 5.0.
@@ -1070,6 +1107,7 @@ static PyStructSequence_Field flags_fields[] = {
 #endif
 	/* {"unbuffered",		"-u"}, */
 	/* {"skip_first",		"-x"}, */
+	{"bytes_warning", "-b"},
 	{0}
 };
 
@@ -1113,13 +1151,12 @@ make_flags(void)
 #endif
 	/* SetFlag(saw_unbuffered_flag); */
 	/* SetFlag(skipfirstline); */
+    SetFlag(Py_BytesWarningFlag);
 #undef SetFlag
 
 	if (PyErr_Occurred()) {
 		return NULL;
 	}
-
-	Py_INCREF(seq);
 	return seq;
 }
 
@@ -1133,6 +1170,11 @@ _PySys_Init(void)
 	if (m == NULL)
 		return NULL;
 	sysdict = PyModule_GetDict(m);
+#define SET_SYS_FROM_STRING(key, value)			\
+	v = value;					\
+	if (v != NULL)					\
+		PyDict_SetItemString(sysdict, key, v);	\
+	Py_XDECREF(v)
 
 	{
 		/* XXX: does this work on Win/Win64? (see posix_fstat) */
@@ -1149,22 +1191,19 @@ _PySys_Init(void)
         /* stdin/stdout/stderr are now set by pythonrun.c */
 
 	PyDict_SetItemString(sysdict, "__displayhook__",
-                             PyDict_GetItemString(sysdict, "displayhook"));
+			     PyDict_GetItemString(sysdict, "displayhook"));
 	PyDict_SetItemString(sysdict, "__excepthook__",
-                             PyDict_GetItemString(sysdict, "excepthook"));
-	PyDict_SetItemString(sysdict, "version",
-			     v = PyUnicode_FromString(Py_GetVersion()));
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "hexversion",
-			     v = PyLong_FromLong(PY_VERSION_HEX));
-	Py_XDECREF(v);
+			     PyDict_GetItemString(sysdict, "excepthook"));
+	SET_SYS_FROM_STRING("version",
+			     PyUnicode_FromString(Py_GetVersion()));
+	SET_SYS_FROM_STRING("hexversion",
+			     PyLong_FromLong(PY_VERSION_HEX));
 	svnversion_init();
-	v = Py_BuildValue("(UUU)", "CPython", branch, svn_revision);
-	PyDict_SetItemString(sysdict, "subversion", v);
-	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "dont_write_bytecode",
-			     v = PyBool_FromLong(Py_DontWriteBytecodeFlag));
-	Py_XDECREF(v);
+	SET_SYS_FROM_STRING("subversion",
+			    Py_BuildValue("(UUU)", "CPython", branch,
+					  svn_revision));
+	SET_SYS_FROM_STRING("dont_write_bytecode",
+			     PyBool_FromLong(Py_DontWriteBytecodeFlag));
 	/*
 	 * These release level checks are mutually exclusive and cover
 	 * the field, so don't get too fancy with the pre-processor!
@@ -1179,12 +1218,6 @@ _PySys_Init(void)
 	s = "final";
 #endif
 
-#define SET_SYS_FROM_STRING(key, value)			\
-	v = value;					\
-	if (v != NULL)					\
-		PyDict_SetItemString(sysdict, key, v);	\
-	Py_XDECREF(v)
-
 	SET_SYS_FROM_STRING("version_info",
 			    Py_BuildValue("iiiUi", PY_MAJOR_VERSION,
 					       PY_MINOR_VERSION,
@@ -1197,12 +1230,12 @@ _PySys_Init(void)
 	SET_SYS_FROM_STRING("platform",
 			    PyUnicode_FromString(Py_GetPlatform()));
 	SET_SYS_FROM_STRING("executable",
-			    PyUnicode_DecodeFSDefault(
-				Py_GetProgramFullPath()));
+			    PyUnicode_FromWideChar(
+				   Py_GetProgramFullPath(), -1));
 	SET_SYS_FROM_STRING("prefix",
-			    PyUnicode_DecodeFSDefault(Py_GetPrefix()));
+			    PyUnicode_FromWideChar(Py_GetPrefix(), -1));
 	SET_SYS_FROM_STRING("exec_prefix",
-		   	    PyUnicode_DecodeFSDefault(Py_GetExecPrefix()));
+		   	    PyUnicode_FromWideChar(Py_GetExecPrefix(), -1));
 	SET_SYS_FROM_STRING("maxsize",
 			    PyLong_FromSsize_t(PY_SSIZE_T_MAX));
 	SET_SYS_FROM_STRING("float_info",
@@ -1231,7 +1264,6 @@ _PySys_Init(void)
 	SET_SYS_FROM_STRING("winver",
 			    PyUnicode_FromString(PyWin_DLLVersionString));
 #endif
-#undef SET_SYS_FROM_STRING
 	if (warnoptions == NULL) {
 		warnoptions = PyList_New(0);
 	}
@@ -1242,27 +1274,29 @@ _PySys_Init(void)
 		PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
 	}
 
-	PyStructSequence_InitType(&FlagsType, &flags_desc);
-	PyDict_SetItemString(sysdict, "flags", make_flags());
+	if (FlagsType.tp_name == 0)
+		PyStructSequence_InitType(&FlagsType, &flags_desc);
+	SET_SYS_FROM_STRING("flags", make_flags());
 	/* prevent user from creating new instances */
 	FlagsType.tp_init = NULL;
 	FlagsType.tp_new = NULL;
 
+#undef SET_SYS_FROM_STRING
 	if (PyErr_Occurred())
 		return NULL;
 	return m;
 }
 
 static PyObject *
-makepathobject(const char *path, int delim)
+makepathobject(const wchar_t *path, wchar_t delim)
 {
 	int i, n;
-	const char *p;
+	const wchar_t *p;
 	PyObject *v, *w;
 
 	n = 1;
 	p = path;
-	while ((p = strchr(p, delim)) != NULL) {
+	while ((p = wcschr(p, delim)) != NULL) {
 		n++;
 		p++;
 	}
@@ -1270,10 +1304,10 @@ makepathobject(const char *path, int delim)
 	if (v == NULL)
 		return NULL;
 	for (i = 0; ; i++) {
-		p = strchr(path, delim);
+		p = wcschr(path, delim);
 		if (p == NULL)
-			p = strchr(path, '\0'); /* End of string */
-		w = PyUnicode_DecodeFSDefaultAndSize(path, (Py_ssize_t) (p - path));
+			p = wcschr(path, L'\0'); /* End of string */
+		w = PyUnicode_FromWideChar(path, (Py_ssize_t)(p - path));
 		if (w == NULL) {
 			Py_DECREF(v);
 			return NULL;
@@ -1287,7 +1321,7 @@ makepathobject(const char *path, int delim)
 }
 
 void
-PySys_SetPath(const char *path)
+PySys_SetPath(const wchar_t *path)
 {
 	PyObject *v;
 	if ((v = makepathobject(path, DELIM)) == NULL)
@@ -1298,12 +1332,12 @@ PySys_SetPath(const char *path)
 }
 
 static PyObject *
-makeargvobject(int argc, char **argv)
+makeargvobject(int argc, wchar_t **argv)
 {
 	PyObject *av;
 	if (argc <= 0 || argv == NULL) {
 		/* Ensure at least one (empty) argument is seen */
-		static char *empty_argv[1] = {""};
+		static wchar_t *empty_argv[1] = {L""};
 		argv = empty_argv;
 		argc = 1;
 	}
@@ -1325,7 +1359,7 @@ makeargvobject(int argc, char **argv)
 			} else
 				v = PyUnicode_FromString(argv[i]);
 #else
-			PyObject *v = PyUnicode_FromString(argv[i]);
+			PyObject *v = PyUnicode_FromWideChar(argv[i], -1);
 #endif
 			if (v == NULL) {
 				Py_DECREF(av);
@@ -1338,13 +1372,38 @@ makeargvobject(int argc, char **argv)
 	return av;
 }
 
+#ifdef HAVE_REALPATH
+static wchar_t*
+_wrealpath(const wchar_t *path, wchar_t *resolved_path)
+{
+	char cpath[PATH_MAX];
+	char cresolved_path[PATH_MAX];
+	char *res;
+	size_t r;
+	r = wcstombs(cpath, path, PATH_MAX);
+	if (r == (size_t)-1 || r >= PATH_MAX) {
+		errno = EINVAL;
+		return NULL;
+	}
+	res = realpath(cpath, cresolved_path);
+	if (res == NULL)
+		return NULL;
+	r = mbstowcs(resolved_path, cresolved_path, PATH_MAX);
+	if (r == (size_t)-1 || r >= PATH_MAX) {
+		errno = EINVAL;
+		return NULL;
+	}
+	return resolved_path;
+}
+#endif
+
 void
-PySys_SetArgv(int argc, char **argv)
+PySys_SetArgv(int argc, wchar_t **argv)
 {
 #if defined(HAVE_REALPATH)
-	char fullpath[MAXPATHLEN];
+	wchar_t fullpath[MAXPATHLEN];
 #elif defined(MS_WINDOWS)
-	char fullpath[MAX_PATH];
+	wchar_t fullpath[MAX_PATH];
 #endif
 	PyObject *av = makeargvobject(argc, argv);
 	PyObject *path = PySys_GetObject("path");
@@ -1353,53 +1412,54 @@ PySys_SetArgv(int argc, char **argv)
 	if (PySys_SetObject("argv", av) != 0)
 		Py_FatalError("can't assign sys.argv");
 	if (path != NULL) {
-		char *argv0 = argv[0];
-		char *p = NULL;
+		wchar_t *argv0 = argv[0];
+		wchar_t *p = NULL;
 		Py_ssize_t n = 0;
 		PyObject *a;
+		extern int _Py_wreadlink(const wchar_t *, wchar_t *, size_t);
 #ifdef HAVE_READLINK
-		char link[MAXPATHLEN+1];
-		char argv0copy[2*MAXPATHLEN+1];
+		wchar_t link[MAXPATHLEN+1];
+		wchar_t argv0copy[2*MAXPATHLEN+1];
 		int nr = 0;
-		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0)
-			nr = readlink(argv0, link, MAXPATHLEN);
+		if (argc > 0 && argv0 != NULL && wcscmp(argv0, L"-c") != 0)
+			nr = _Py_wreadlink(argv0, link, MAXPATHLEN);
 		if (nr > 0) {
 			/* It's a symlink */
 			link[nr] = '\0';
 			if (link[0] == SEP)
 				argv0 = link; /* Link to absolute path */
-			else if (strchr(link, SEP) == NULL)
+			else if (wcschr(link, SEP) == NULL)
 				; /* Link without path */
 			else {
 				/* Must join(dirname(argv0), link) */
-				char *q = strrchr(argv0, SEP);
+				wchar_t *q = wcsrchr(argv0, SEP);
 				if (q == NULL)
 					argv0 = link; /* argv0 without path */
 				else {
 					/* Must make a copy */
-					strcpy(argv0copy, argv0);
-					q = strrchr(argv0copy, SEP);
-					strcpy(q+1, link);
+					wcscpy(argv0copy, argv0);
+					q = wcsrchr(argv0copy, SEP);
+					wcscpy(q+1, link);
 					argv0 = argv0copy;
 				}
 			}
 		}
 #endif /* HAVE_READLINK */
 #if SEP == '\\' /* Special case for MS filename syntax */
-		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0) {
-			char *q;
+		if (argc > 0 && argv0 != NULL && wcscmp(argv0, L"-c") != 0) {
+			wchar_t *q;
 #ifdef MS_WINDOWS
-			char *ptemp;
-			if (GetFullPathName(argv0,
-					   sizeof(fullpath),
+			wchar_t *ptemp;
+			if (GetFullPathNameW(argv0,
+					   sizeof(fullpath)/sizeof(fullpath[0]),
 					   fullpath,
 					   &ptemp)) {
 				argv0 = fullpath;
 			}
 #endif
-			p = strrchr(argv0, SEP);
+			p = wcsrchr(argv0, SEP);
 			/* Test for alternate separator */
-			q = strrchr(p ? p : argv0, '/');
+			q = wcsrchr(p ? p : argv0, '/');
 			if (q != NULL)
 				p = q;
 			if (p != NULL) {
@@ -1409,13 +1469,13 @@ PySys_SetArgv(int argc, char **argv)
 			}
 		}
 #else /* All other filename syntaxes */
-		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0) {
+		if (argc > 0 && argv0 != NULL && wcscmp(argv0, L"-c") != 0) {
 #if defined(HAVE_REALPATH)
-			if (realpath(argv0, fullpath)) {
+			if (_wrealpath(argv0, fullpath)) {
 				argv0 = fullpath;
 			}
 #endif
-			p = strrchr(argv0, SEP);
+			p = wcsrchr(argv0, SEP);
 		}
 		if (p != NULL) {
 			n = p + 1 - argv0;
@@ -1425,7 +1485,7 @@ PySys_SetArgv(int argc, char **argv)
 #endif /* Unix */
 		}
 #endif /* All others */
-		a = PyUnicode_FromStringAndSize(argv0, n);
+		a = PyUnicode_FromWideChar(argv0, n);
 		if (a == NULL)
 			Py_FatalError("no mem for sys.path insertion");
 		if (PyList_Insert(path, 0, a) < 0)

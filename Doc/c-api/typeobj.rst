@@ -560,7 +560,7 @@ The following three fields only exist if the
    The :attr:`tp_traverse` pointer is used by the garbage collector to detect
    reference cycles. A typical implementation of a :attr:`tp_traverse` function
    simply calls :cfunc:`Py_VISIT` on each of the instance's members that are Python
-   objects.  For exampe, this is function :cfunc:`local_traverse` from the
+   objects.  For example, this is function :cfunc:`local_traverse` from the
    :mod:`thread` extension module::
 
       static int
@@ -730,8 +730,7 @@ set.
 
    An optional pointer to a function that returns an iterator for the object.  Its
    presence normally signals that the instances of this type are iterable (although
-   sequences may be iterable without this function, and classic instances always
-   have this function, even if they don't define an :meth:`__iter__` method).
+   sequences may be iterable without this function).
 
    This function has the same signature as :cfunc:`PyObject_GetIter`.
 
@@ -742,9 +741,7 @@ set.
 
    An optional pointer to a function that returns the next item in an iterator, or
    raises :exc:`StopIteration` when the iterator is exhausted.  Its presence
-   normally signals that the instances of this type are iterators (although classic
-   instances always have this function, even if they don't define a
-   :meth:`__next__` method).
+   normally signals that the instances of this type are iterators.
 
    Iterator types should also define the :attr:`tp_iter` function, and that
    function should return the iterator instance itself (not a new iterator

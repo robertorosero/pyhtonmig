@@ -157,7 +157,7 @@ class HTTPError(URLError, addinfourl):
         # file object.  If this happens, the simplest workaround is to
         # not initialize the base classes.
         if fp is not None:
-            self.__super_init(fp, hdrs, url)
+            self.__super_init(fp, hdrs, url, code)
 
     def __str__(self):
         return 'HTTP Error %s: %s' % (self.code, self.msg)
@@ -531,8 +531,11 @@ class HTTPRedirectHandler(BaseHandler):
             # do the same.
             # be conciliant with URIs containing a space
             newurl = newurl.replace(' ', '%20')
+            newheaders = dict((k,v) for k,v in req.headers.items()
+                              if k.lower() not in ("content-length", "content-type")
+                             )
             return Request(newurl,
-                           headers=req.headers,
+                           headers=newheaders,
                            origin_req_host=req.get_origin_req_host(),
                            unverifiable=True)
         else:
@@ -774,7 +777,10 @@ class AbstractBasicAuthHandler:
     # XXX this allows for multiple auth-schemes, but will stupidly pick
     # the last one with a realm specified.
 
-    rx = re.compile('(?:.*,)*[ \t]*([^ \t]+)[ \t]+realm="([^"]*)"', re.I)
+    # allow for double- and single-quoted realm values
+    # (single quotes are a violation of the RFC, but appear in the wild)
+    rx = re.compile('(?:.*,)*[ \t]*([^ \t]+)[ \t]+'
+                    'realm=(["\'])(.*?)\\2', re.I)
 
     # XXX could pre-emptively send auth info already accepted (RFC 2617,
     # end of section 2, and section 1.2 immediately after "credentials"
@@ -794,7 +800,7 @@ class AbstractBasicAuthHandler:
         if authreq:
             mo = AbstractBasicAuthHandler.rx.search(authreq)
             if mo:
-                scheme, realm = mo.groups()
+                scheme, quote, realm = mo.groups()
                 if scheme.lower() == 'basic':
                     return self.retry_http_basic_auth(host, req, realm)
 

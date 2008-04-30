@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: Latin-1 -*-
+# -*- coding: latin-1 -*-
 """Generate Python documentation in HTML or text for interactive use.
 
 In the Python interpreter, do "from pydoc import help" to provide online
@@ -536,7 +536,7 @@ class HTMLDoc(Doc):
                 url = 'http://www.rfc-editor.org/rfc/rfc%d.txt' % int(rfc)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif pep:
-                url = 'http://www.python.org/peps/pep-%04d' % int(pep)
+                url = 'http://www.python.org/dev/peps/pep-%04d/' % int(pep)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif text[end:end+1] == '(':
                 results.append(self.namelink(name, methods, funcs, classes))
@@ -660,7 +660,7 @@ class HTMLDoc(Doc):
             contents = self.multicolumn(
                 modules, lambda t: self.modulelink(t[1]))
             result = result + self.bigsection(
-                'Modules', '#fffff', '#aa55cc', contents)
+                'Modules', '#ffffff', '#aa55cc', contents)
 
         if classes:
             classlist = [value for (key, value) in classes]
@@ -797,10 +797,7 @@ class HTMLDoc(Doc):
             tag += ':<br>\n'
 
             # Sort attrs by name.
-            try:
-                attrs.sort(key=lambda t: t[0])
-            except TypeError:
-                attrs.sort(lambda t1, t2: cmp(t1[0], t2[0]))    # 2.3 compat
+            attrs.sort(key=lambda t: t[0])
 
             # Pump out the attrs, segregated by kind.
             attrs = spill('Methods %s' % tag, attrs,
@@ -1077,7 +1074,7 @@ class TextDoc(Doc):
         if submodules:
             submodules.sort()
             result = result + self.section(
-                'SUBMODULES', join(submodules, '\n'))
+                'SUBMODULES', '\n'.join(submodules))
 
         if classes:
             classlist = [value for key, value in classes]
@@ -1203,7 +1200,6 @@ class TextDoc(Doc):
             else:
                 tag = "inherited from %s" % classname(thisclass,
                                                       object.__module__)
-            filter(lambda t: not t[0].startswith('_'), attrs)
 
             # Sort attrs by name.
             attrs.sort()
@@ -1488,7 +1484,8 @@ def render_doc(thing, title='Python Library Documentation: %s', forceload=0):
         desc += ' in ' + name[:name.rfind('.')]
     elif module and module is not object:
         desc += ' in module ' + module.__name__
-    elif not (inspect.ismodule(object) or
+
+    if not (inspect.ismodule(object) or
               inspect.isclass(object) or
               inspect.isroutine(object) or
               inspect.isgetsetdescriptor(object) or
@@ -1503,23 +1500,6 @@ def render_doc(thing, title='Python Library Documentation: %s', forceload=0):
 def doc(thing, title='Python Library Documentation: %s', forceload=0):
     """Display text documentation, given an object or a path to an object."""
     try:
-        object, name = resolve(thing, forceload)
-        desc = describe(object)
-        module = inspect.getmodule(object)
-        if name and '.' in name:
-            desc += ' in ' + name[:name.rfind('.')]
-        elif module and module is not object:
-            desc += ' in module ' + module.__name__
-        elif not (inspect.ismodule(object) or
-                  inspect.isclass(object) or
-                  inspect.isroutine(object) or
-                  inspect.isgetsetdescriptor(object) or
-                  inspect.ismemberdescriptor(object) or
-                  isinstance(object, property)):
-            # If the passed object is a piece of data or an instance,
-            # document its available methods instead of its value.
-            object = type(object)
-            desc += ' object'
         pager(render_doc(thing, title, forceload))
     except (ImportError, ErrorDuringImport) as value:
         print(value)
@@ -1983,9 +1963,8 @@ def serve(port, callback=None, completer=None):
 '#ffffff', '#7799ee')
                 def bltinlink(name):
                     return '<a href="%s.html">%s</a>' % (name, name)
-                names = filter(lambda x: x != '__main__',
-                               sys.builtin_module_names)
-                contents = html.multicolumn(list(names), bltinlink)
+                names = [x for x in sys.builtin_module_names if x != '__main__']
+                contents = html.multicolumn(names, bltinlink)
                 indices = ['<p>' + html.bigsection(
                     'Built-in Modules', '#ffffff', '#ee77aa', contents)]
 

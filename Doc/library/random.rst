@@ -68,6 +68,17 @@ Bookkeeping functions:
    the time :func:`setstate` was called.
 
 
+.. function:: jumpahead(n)
+
+   Change the internal state to one different from and likely far away from the
+   current state.  *n* is a non-negative integer which is used to scramble the
+   current state vector.  This is most useful in multi-threaded programs, in
+   conjunction with multiple instances of the :class:`Random` class:
+   :meth:`setstate` or :meth:`seed` can be used to force all instances into the
+   same internal state, and then :meth:`jumpahead` can be used to force the
+   instances' states far apart.
+
+
 .. function:: getrandbits(k)
 
    Returns a python integer with *k* random bits. This method is supplied with
@@ -141,6 +152,14 @@ be found in any statistics text.
 .. function:: uniform(a, b)
 
    Return a random floating point number *N* such that ``a <= N < b``.
+
+
+.. function:: triangular(low, high, mode)
+
+   Return a random floating point number *N* such that ``low <= N < high`` and
+   with the specified *mode* between those bounds.  The *low* and *high* bounds
+   default to zero and one.  The *mode* argument defaults to the midpoint
+   between the bounds, giving a symmetric distribution.
 
 
 .. function:: betavariate(alpha, beta)

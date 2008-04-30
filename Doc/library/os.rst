@@ -701,13 +701,13 @@ Files and Directories
 
 .. function:: getcwd()
 
-   Return a string representing the current working directory. Availability:
-   Macintosh, Unix, Windows.
+   Return a bytestring representing the current working directory.
+   Availability: Macintosh, Unix, Windows.
 
 
 .. function:: getcwdu()
 
-   Return a Unicode object representing the current working directory.
+   Return a string representing the current working directory.
    Availability: Macintosh, Unix, Windows.
 
 
@@ -1254,7 +1254,8 @@ to be ignored.
 
    For :func:`execle`, :func:`execlpe`, :func:`execve`, and :func:`execvpe` (note
    that these all end in "e"), the *env* parameter must be a mapping which is
-   used to define the environment variables for the new process; the :func:`execl`,
+   used to define the environment variables for the new process (these are used
+   instead of the current process' environment); the functions :func:`execl`,
    :func:`execlp`, :func:`execv`, and :func:`execvp` all cause the new process to
    inherit the environment of the current process. Availability: Macintosh, Unix,
    Windows.
@@ -1387,7 +1388,8 @@ written in Python, such as a mail server's external command delivery program.
 .. function:: fork()
 
    Fork a child process.  Return ``0`` in the child and the child's process id in the
-   parent. Availability: Macintosh, Unix.
+   parent.  If an error occurs :exc:`OSError` is raised.
+   Availability: Macintosh, Unix.
 
 
 .. function:: forkpty()
@@ -1396,7 +1398,8 @@ written in Python, such as a mail server's external command delivery program.
    terminal. Return a pair of ``(pid, fd)``, where *pid* is ``0`` in the child, the
    new child's process id in the parent, and *fd* is the file descriptor of the
    master end of the pseudo-terminal.  For a more portable approach, use the
-   :mod:`pty` module. Availability: Macintosh, some flavors of Unix.
+   :mod:`pty` module.  If an error occurs :exc:`OSError` is raised.
+   Availability: Macintosh, some flavors of Unix.
 
 
 .. function:: kill(pid, sig)
@@ -1482,7 +1485,8 @@ written in Python, such as a mail server's external command delivery program.
 
    For :func:`spawnle`, :func:`spawnlpe`, :func:`spawnve`, and :func:`spawnvpe`
    (note that these all end in "e"), the *env* parameter must be a mapping
-   which is used to define the environment variables for the new process; the
+   which is used to define the environment variables for the new process (they are
+   used instead of the current process' environment); the functions
    :func:`spawnl`, :func:`spawnlp`, :func:`spawnv`, and :func:`spawnvp` all cause
    the new process to inherit the environment of the current process.
 
@@ -1584,7 +1588,7 @@ written in Python, such as a mail server's external command delivery program.
    user time, children's system time, and elapsed real time since a fixed point in
    the past, in that order.  See the Unix manual page :manpage:`times(2)` or the
    corresponding Windows Platform API documentation. Availability: Macintosh, Unix,
-   Windows.
+   Windows.  On Windows, only the first two items are filled, the others are zero.
 
 
 .. function:: wait()

@@ -2,12 +2,12 @@
 import unittest, struct
 import os
 from test import test_support
+import math
+from math import isinf, isnan
+import operator
 
-def isinf(x):
-    return x * 0.5 == x
-
-def isnan(x):
-    return x != x
+INF = float("inf")
+NAN = float("nan")
 
 class FormatFunctionsTestCase(unittest.TestCase):
 
@@ -133,13 +133,10 @@ class FormatTestCase(unittest.TestCase):
         self.assertEqual(format(0.01, ''), '0.01')
         self.assertEqual(format(0.01, 'g'), '0.01')
 
-        self.assertEqual(format(0, 'f'), '0.000000')
 
         self.assertEqual(format(1.0, 'f'), '1.000000')
-        self.assertEqual(format(1, 'f'), '1.000000')
 
         self.assertEqual(format(-1.0, 'f'), '-1.000000')
-        self.assertEqual(format(-1, 'f'), '-1.000000')
 
         self.assertEqual(format( 1.0, ' f'), ' 1.000000')
         self.assertEqual(format(-1.0, ' f'), '-1.000000')
@@ -152,6 +149,18 @@ class FormatTestCase(unittest.TestCase):
         # conversion to string should fail
         self.assertRaises(ValueError, format, 3.0, "s")
 
+        # other format specifiers shouldn't work on floats,
+        #  in particular int specifiers
+        for format_spec in ([chr(x) for x in range(ord('a'), ord('z')+1)] +
+                            [chr(x) for x in range(ord('A'), ord('Z')+1)]):
+            if not format_spec in 'eEfFgGn%':
+                self.assertRaises(ValueError, format, 0.0, format_spec)
+                self.assertRaises(ValueError, format, 1.0, format_spec)
+                self.assertRaises(ValueError, format, -1.0, format_spec)
+                self.assertRaises(ValueError, format, 1e100, format_spec)
+                self.assertRaises(ValueError, format, -1e100, format_spec)
+                self.assertRaises(ValueError, format, 1e-100, format_spec)
+                self.assertRaises(ValueError, format, -1e-100, format_spec)
 
 class ReprTestCase(unittest.TestCase):
     def test_repr(self):
@@ -229,6 +238,17 @@ class InfNanTest(unittest.TestCase):
 
         self.assertEqual(str(1e300 * 1e300 * 0), "nan")
         self.assertEqual(str(-1e300 * 1e300 * 0), "nan")
+
+    def notest_float_nan(self):
+        self.assert_(NAN.is_nan())
+        self.failIf(INF.is_nan())
+        self.failIf((0.).is_nan())
+
+    def notest_float_inf(self):
+        self.assert_(INF.is_inf())
+        self.failIf(NAN.is_inf())
+        self.failIf((0.).is_inf())
+
 
 def test_main():
     test_support.run_unittest(

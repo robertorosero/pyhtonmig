@@ -125,6 +125,10 @@ SOURCE=..\..\Modules\_codecsmodule.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_collectionsmodule.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\_csv.c
 # End Source File
 # Begin Source File
@@ -165,10 +169,6 @@ SOURCE=..\..\PC\_subprocess.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_typesmodule.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\_weakref.c
 # End Source File
 # Begin Source File
@@ -190,6 +190,10 @@ SOURCE=..\..\Modules\zlib\adler32.c
 # Begin Source File
 
 SOURCE=..\..\Modules\arraymodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\_warnings.c
 # End Source File
 # Begin Source File
 
@@ -346,6 +350,14 @@ SOURCE=..\..\Parser\firstsets.c
 # Begin Source File
 
 SOURCE=..\..\Objects\floatobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\formatter_string.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\formatter_unicode.c
 # End Source File
 # Begin Source File
 
@@ -572,6 +584,10 @@ SOURCE=..\..\Python\pyarena.c
 # Begin Source File
 
 SOURCE=..\..\Python\pyfpe.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\pymath.c
 # End Source File
 # Begin Source File
 

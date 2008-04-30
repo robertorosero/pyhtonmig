@@ -52,9 +52,11 @@ _PySet_Dummy(void)
     } while(0)
 
 /* Reuse scheme to save calls to malloc, free, and memset */
-#define MAXFREESETS 80
-static PySetObject *free_sets[MAXFREESETS];
-static int num_free_sets = 0;
+#ifndef PySet_MAXFREELIST
+#define PySet_MAXFREELIST 80
+#endif
+static PySetObject *free_list[PySet_MAXFREELIST];
+static int numfree = 0;
 
 
 /*
@@ -561,8 +563,8 @@ set_dealloc(PySetObject *so)
 	}
 	if (so->table != so->smalltable)
 		PyMem_DEL(so->table);
-	if (num_free_sets < MAXFREESETS && PyAnySet_CheckExact(so))
-		free_sets[num_free_sets++] = so;
+	if (numfree < PySet_MAXFREELIST && PyAnySet_CheckExact(so))
+		free_list[numfree++] = so;
 	else 
 		Py_TYPE(so)->tp_free(so);
 	Py_TRASHCAN_SAFE_END(so)
@@ -904,7 +906,7 @@ set_update_internal(PySetObject *so, PyObject *other)
 {
 	PyObject *key, *it;
 
-	if (PyAnySet_CheckExact(other))
+	if (PyAnySet_Check(other))
 		return set_merge(so, other);
 
 	if (PyDict_CheckExact(other)) {
@@ -975,9 +977,9 @@ make_new_set(PyTypeObject *type, PyObject *iterable)
 	}
 
 	/* create PySetObject structure */
-	if (num_free_sets && 
+	if (numfree &&
 	    (type == &PySet_Type  ||  type == &PyFrozenSet_Type)) {
-		so = free_sets[--num_free_sets];
+		so = free_list[--numfree];
 		assert (so != NULL && PyAnySet_CheckExact(so));
 		Py_TYPE(so) = type;
 		_Py_NewReference((PyObject *)so);
@@ -1045,9 +1047,9 @@ PySet_Fini(void)
 {
 	PySetObject *so;
 
-	while (num_free_sets) {
-		num_free_sets--;
-		so = free_sets[num_free_sets];
+	while (numfree) {
+		numfree--;
+		so = free_list[numfree];
 		PyObject_GC_Del(so);
 	}
 	Py_CLEAR(dummy);
@@ -1199,7 +1201,7 @@ set_intersection(PySetObject *so, PyObject *other)
 	if (result == NULL)
 		return NULL;
 
-	if (PyAnySet_CheckExact(other)) {		
+	if (PyAnySet_Check(other)) {		
 		Py_ssize_t pos = 0;
 		setentry *entry;
 
@@ -1390,7 +1392,7 @@ set_difference_update_internal(PySetObject *so, PyObject *other)
 	if ((PyObject *)so == other)
 		return set_clear_internal(so);
 	
-	if (PyAnySet_CheckExact(other)) {
+	if (PyAnySet_Check(other)) {
 		setentry *entry;
 		Py_ssize_t pos = 0;
 
@@ -1439,7 +1441,7 @@ set_difference(PySetObject *so, PyObject *other)
 	setentry *entry;
 	Py_ssize_t pos = 0;
 
-	if (!PyAnySet_CheckExact(other)  && !PyDict_CheckExact(other)) {
+	if (!PyAnySet_Check(other)  && !PyDict_CheckExact(other)) {
 		result = set_copy(so);
 		if (result == NULL)
 			return NULL;
@@ -1546,7 +1548,7 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 		Py_RETURN_NONE;
 	}
 
-	if (PyAnySet_CheckExact(other)) {
+	if (PyAnySet_Check(other)) {
 		Py_INCREF(other);
 		otherset = (PySetObject *)other;
 	} else {
@@ -1629,7 +1631,7 @@ set_issubset(PySetObject *so, PyObject *other)
 	setentry *entry;
 	Py_ssize_t pos = 0;
 
-	if (!PyAnySet_CheckExact(other)) {
+	if (!PyAnySet_Check(other)) {
 		PyObject *tmp, *result;
 		tmp = make_new_set(&PySet_Type, other);
 		if (tmp == NULL)
@@ -1658,7 +1660,7 @@ set_issuperset(PySetObject *so, PyObject *other)
 {
 	PyObject *tmp, *result;
 
-	if (!PyAnySet_CheckExact(other)) {
+	if (!PyAnySet_Check(other)) {
 		tmp = make_new_set(&PySet_Type, other);
 		if (tmp == NULL)
 			return NULL;
@@ -2127,17 +2129,7 @@ PySet_New(PyObject *iterable)
 PyObject *
 PyFrozenSet_New(PyObject *iterable)
 {
-	PyObject *args, *result;
-
-	if (iterable == NULL)
-		args = PyTuple_New(0);
-	else
-		args = PyTuple_Pack(1, iterable);
-	if (args == NULL)
-		return NULL;
-	result = frozenset_new(&PyFrozenSet_Type, args, NULL);
-	Py_DECREF(args);
-	return result;
+	return make_new_set(&PyFrozenSet_Type, iterable);
 }
 
 Py_ssize_t
@@ -2153,7 +2145,7 @@ PySet_Size(PyObject *anyset)
 int
 PySet_Clear(PyObject *set)
 {
-	if (!PyType_IsSubtype(Py_TYPE(set), &PySet_Type)) {
+	if (!PySet_Check(set)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
@@ -2173,7 +2165,7 @@ PySet_Contains(PyObject *anyset, PyObject *key)
 int
 PySet_Discard(PyObject *set, PyObject *key)
 {
-	if (!PyType_IsSubtype(Py_TYPE(set), &PySet_Type)) {
+	if (!PySet_Check(set)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
@@ -2181,28 +2173,14 @@ PySet_Discard(PyObject *set, PyObject *key)
 }
 
 int
-PySet_Add(PyObject *set, PyObject *key)
+PySet_Add(PyObject *anyset, PyObject *key)
 {
-	if (!PyType_IsSubtype(Py_TYPE(set), &PySet_Type)) {
+	if (!PySet_Check(anyset) && 
+	    (!PyFrozenSet_Check(anyset) || Py_REFCNT(anyset) != 1)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	return set_add_key((PySetObject *)set, key);
-}
-
-int
-_PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **key)
-{
-	setentry *entry_ptr;
-
-	if (!PyAnySet_Check(set)) {
-		PyErr_BadInternalCall();
-		return -1;
-	}
-	if (set_next((PySetObject *)set, pos, &entry_ptr) == 0)
-		return 0;
-	*key = entry_ptr->key;
-	return 1;
+	return set_add_key((PySetObject *)anyset, key);
 }
 
 int
@@ -2224,7 +2202,7 @@ _PySet_NextEntry(PyObject *set, Py_ssize_t *pos, PyObject **key, long *hash)
 PyObject *
 PySet_Pop(PyObject *set)
 {
-	if (!PyType_IsSubtype(Py_TYPE(set), &PySet_Type)) {
+	if (!PySet_Check(set)) {
 		PyErr_BadInternalCall();
 		return NULL;
 	}
@@ -2234,7 +2212,7 @@ PySet_Pop(PyObject *set)
 int
 _PySet_Update(PyObject *set, PyObject *iterable)
 {
-	if (!PyType_IsSubtype(Py_TYPE(set), &PySet_Type)) {
+	if (!PySet_Check(set)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
@@ -2261,6 +2239,7 @@ test_c_api(PySetObject *so)
 	Py_ssize_t i;
 	PyObject *elem=NULL, *dup=NULL, *t, *f, *dup2, *x;
 	PyObject *ob = (PyObject *)so;
+	long hash;
 
 	/* Verify preconditions and exercise type/size checks */
 	assert(PyAnySet_Check(ob));
@@ -2301,11 +2280,15 @@ test_c_api(PySetObject *so)
 	f = PyFrozenSet_New(dup);
 	assertRaises(PySet_Clear(f) == -1, PyExc_SystemError);
 	assertRaises(_PySet_Update(f, dup) == -1, PyExc_SystemError);
+	assert(PySet_Add(f, elem) == 0);
+	Py_INCREF(f);
+	assertRaises(PySet_Add(f, elem) == -1, PyExc_SystemError);
+	Py_DECREF(f);
 	Py_DECREF(f);
 
 	/* Exercise direct iteration */
 	i = 0, count = 0;
-	while (_PySet_Next((PyObject *)dup, &i, &x)) {
+	while (_PySet_NextEntry((PyObject *)dup, &i, &x, &hash)) {
 		s = PyUnicode_AsString(x);
 		assert(s && (s[0] == 'a' || s[0] == 'b' || s[0] == 'c'));
 		count++;
@@ -2330,7 +2313,6 @@ test_c_api(PySetObject *so)
 	f = PyFrozenSet_New(dup);
 	assert(PySet_Size(f) == 3);
 	assert(PyFrozenSet_CheckExact(f));
-	assertRaises(PySet_Add(f, elem) == -1, PyExc_SystemError);
 	assertRaises(PySet_Discard(f, elem) == -1, PyExc_SystemError);
 	assertRaises(PySet_Pop(f) == NULL, PyExc_SystemError);
 	Py_DECREF(f);

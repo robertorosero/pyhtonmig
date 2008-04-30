@@ -34,210 +34,224 @@ to a handler.  Code to create and run the server looks like this::
 
 .. class:: HTTPServer(server_address, RequestHandlerClass)
 
-   This class builds on the :class:`TCPServer` class by storing the server address
-   as instance variables named :attr:`server_name` and :attr:`server_port`. The
-   server is accessible by the handler, typically through the handler's
-   :attr:`server` instance variable.
+   This class builds on the :class:`TCPServer` class by storing the server
+   address as instance variables named :attr:`server_name` and
+   :attr:`server_port`. The server is accessible by the handler, typically
+   through the handler's :attr:`server` instance variable.
 
 
 .. class:: BaseHTTPRequestHandler(request, client_address, server)
 
    This class is used to handle the HTTP requests that arrive at the server. By
-   itself, it cannot respond to any actual HTTP requests; it must be subclassed to
-   handle each request method (e.g. GET or POST). :class:`BaseHTTPRequestHandler`
-   provides a number of class and instance variables, and methods for use by
-   subclasses.
+   itself, it cannot respond to any actual HTTP requests; it must be subclassed
+   to handle each request method (e.g. GET or
+   POST). :class:`BaseHTTPRequestHandler` provides a number of class and
+   instance variables, and methods for use by subclasses.
 
-   The handler will parse the request and the headers, then call a method specific
-   to the request type. The method name is constructed from the request. For
-   example, for the request method ``SPAM``, the :meth:`do_SPAM` method will be
-   called with no arguments. All of the relevant information is stored in instance
-   variables of the handler.  Subclasses should not need to override or extend the
-   :meth:`__init__` method.
+   The handler will parse the request and the headers, then call a method
+   specific to the request type. The method name is constructed from the
+   request. For example, for the request method ``SPAM``, the :meth:`do_SPAM`
+   method will be called with no arguments. All of the relevant information is
+   stored in instance variables of the handler.  Subclasses should not need to
+   override or extend the :meth:`__init__` method.
 
-:class:`BaseHTTPRequestHandler` has the following instance variables:
+   :class:`BaseHTTPRequestHandler` has the following instance variables:
 
 
-.. attribute:: BaseHTTPRequestHandler.client_address
+   .. attribute:: client_address
 
-   Contains a tuple of the form ``(host, port)`` referring to the client's address.
+      Contains a tuple of the form ``(host, port)`` referring to the client's
+      address.
 
 
-.. attribute:: BaseHTTPRequestHandler.command
+   .. attribute:: command
 
-   Contains the command (request type). For example, ``'GET'``.
+      Contains the command (request type). For example, ``'GET'``.
 
 
-.. attribute:: BaseHTTPRequestHandler.path
+   .. attribute:: path
 
-   Contains the request path.
+      Contains the request path.
 
 
-.. attribute:: BaseHTTPRequestHandler.request_version
+   .. attribute:: request_version
 
-   Contains the version string from the request. For example, ``'HTTP/1.0'``.
+      Contains the version string from the request. For example, ``'HTTP/1.0'``.
 
 
-.. attribute:: BaseHTTPRequestHandler.headers
+   .. attribute:: headers
 
-   Holds an instance of the class specified by the :attr:`MessageClass` class
-   variable. This instance parses and manages the headers in the HTTP request.
+      Holds an instance of the class specified by the :attr:`MessageClass` class
+      variable. This instance parses and manages the headers in the HTTP
+      request.
 
 
-.. attribute:: BaseHTTPRequestHandler.rfile
+   .. attribute:: rfile
 
-   Contains an input stream, positioned at the start of the optional input data.
+      Contains an input stream, positioned at the start of the optional input
+      data.
 
 
-.. attribute:: BaseHTTPRequestHandler.wfile
+   .. attribute:: wfile
 
-   Contains the output stream for writing a response back to the client. Proper
-   adherence to the HTTP protocol must be used when writing to this stream.
+      Contains the output stream for writing a response back to the
+      client. Proper adherence to the HTTP protocol must be used when writing to
+      this stream.
 
-:class:`BaseHTTPRequestHandler` has the following class variables:
 
+   :class:`BaseHTTPRequestHandler` has the following class variables:
 
-.. attribute:: BaseHTTPRequestHandler.server_version
 
-   Specifies the server software version.  You may want to override this. The
-   format is multiple whitespace-separated strings, where each string is of the
-   form name[/version]. For example, ``'BaseHTTP/0.2'``.
+   .. attribute:: server_version
 
+      Specifies the server software version.  You may want to override this. The
+      format is multiple whitespace-separated strings, where each string is of
+      the form name[/version]. For example, ``'BaseHTTP/0.2'``.
 
-.. attribute:: BaseHTTPRequestHandler.sys_version
 
-   Contains the Python system version, in a form usable by the
-   :attr:`version_string` method and the :attr:`server_version` class variable. For
-   example, ``'Python/1.4'``.
+   .. attribute:: sys_version
 
+      Contains the Python system version, in a form usable by the
+      :attr:`version_string` method and the :attr:`server_version` class
+      variable. For example, ``'Python/1.4'``.
 
-.. attribute:: BaseHTTPRequestHandler.error_message_format
 
-   Specifies a format string for building an error response to the client. It uses
-   parenthesized, keyed format specifiers, so the format operand must be a
-   dictionary. The *code* key should be an integer, specifying the numeric HTTP
-   error code value. *message* should be a string containing a (detailed) error
-   message of what occurred, and *explain* should be an explanation of the error
-   code number. Default *message* and *explain* values can found in the *responses*
-   class variable.
+   .. attribute:: error_message_format
 
+      Specifies a format string for building an error response to the client. It
+      uses parenthesized, keyed format specifiers, so the format operand must be
+      a dictionary. The *code* key should be an integer, specifying the numeric
+      HTTP error code value. *message* should be a string containing a
+      (detailed) error message of what occurred, and *explain* should be an
+      explanation of the error code number. Default *message* and *explain*
+      values can found in the *responses* class variable.
 
-.. attribute:: BaseHTTPRequestHandler.protocol_version
 
-   This specifies the HTTP protocol version used in responses.  If set to
-   ``'HTTP/1.1'``, the server will permit HTTP persistent connections; however,
-   your server *must* then include an accurate ``Content-Length`` header (using
-   :meth:`send_header`) in all of its responses to clients.  For backwards
-   compatibility, the setting defaults to ``'HTTP/1.0'``.
+   .. attribute:: error_content_type
 
+      Specifies the Content-Type HTTP header of error responses sent to the
+      client.  The default value is ``'text/html'``.
 
-.. attribute:: BaseHTTPRequestHandler.MessageClass
 
-   .. index:: single: Message (in module mimetools)
+   .. attribute:: protocol_version
 
-   Specifies a :class:`rfc822.Message`\ -like class to parse HTTP headers.
-   Typically, this is not overridden, and it defaults to
-   :class:`mimetools.Message`.
+      This specifies the HTTP protocol version used in responses.  If set to
+      ``'HTTP/1.1'``, the server will permit HTTP persistent connections;
+      however, your server *must* then include an accurate ``Content-Length``
+      header (using :meth:`send_header`) in all of its responses to clients.
+      For backwards compatibility, the setting defaults to ``'HTTP/1.0'``.
 
 
-.. attribute:: BaseHTTPRequestHandler.responses
+   .. attribute:: MessageClass
 
-   This variable contains a mapping of error code integers to two-element tuples
-   containing a short and long message. For example, ``{code: (shortmessage,
-   longmessage)}``. The *shortmessage* is usually used as the *message* key in an
-   error response, and *longmessage* as the *explain* key (see the
-   :attr:`error_message_format` class variable).
+      .. index:: single: Message (in module mimetools)
 
-A :class:`BaseHTTPRequestHandler` instance has the following methods:
+      Specifies a :class:`rfc822.Message`\ -like class to parse HTTP headers.
+      Typically, this is not overridden, and it defaults to
+      :class:`mimetools.Message`.
 
 
-.. method:: BaseHTTPRequestHandler.handle()
+   .. attribute:: responses
 
-   Calls :meth:`handle_one_request` once (or, if persistent connections are
-   enabled, multiple times) to handle incoming HTTP requests. You should never need
-   to override it; instead, implement appropriate :meth:`do_\*` methods.
+      This variable contains a mapping of error code integers to two-element tuples
+      containing a short and long message. For example, ``{code: (shortmessage,
+      longmessage)}``. The *shortmessage* is usually used as the *message* key in an
+      error response, and *longmessage* as the *explain* key (see the
+      :attr:`error_message_format` class variable).
 
 
-.. method:: BaseHTTPRequestHandler.handle_one_request()
+   A :class:`BaseHTTPRequestHandler` instance has the following methods:
 
-   This method will parse and dispatch the request to the appropriate :meth:`do_\*`
-   method.  You should never need to override it.
 
+   .. method:: handle()
 
-.. method:: BaseHTTPRequestHandler.send_error(code[, message])
+      Calls :meth:`handle_one_request` once (or, if persistent connections are
+      enabled, multiple times) to handle incoming HTTP requests. You should
+      never need to override it; instead, implement appropriate :meth:`do_\*`
+      methods.
 
-   Sends and logs a complete error reply to the client. The numeric *code*
-   specifies the HTTP error code, with *message* as optional, more specific text. A
-   complete set of headers is sent, followed by text composed using the
-   :attr:`error_message_format` class variable.
 
+   .. method:: handle_one_request()
 
-.. method:: BaseHTTPRequestHandler.send_response(code[, message])
+      This method will parse and dispatch the request to the appropriate
+      :meth:`do_\*` method.  You should never need to override it.
 
-   Sends a response header and logs the accepted request. The HTTP response line is
-   sent, followed by *Server* and *Date* headers. The values for these two headers
-   are picked up from the :meth:`version_string` and :meth:`date_time_string`
-   methods, respectively.
 
+   .. method:: send_error(code[, message])
 
-.. method:: BaseHTTPRequestHandler.send_header(keyword, value)
+      Sends and logs a complete error reply to the client. The numeric *code*
+      specifies the HTTP error code, with *message* as optional, more specific text. A
+      complete set of headers is sent, followed by text composed using the
+      :attr:`error_message_format` class variable.
 
-   Writes a specific HTTP header to the output stream. *keyword* should specify the
-   header keyword, with *value* specifying its value.
 
+   .. method:: send_response(code[, message])
 
-.. method:: BaseHTTPRequestHandler.end_headers()
+      Sends a response header and logs the accepted request. The HTTP response
+      line is sent, followed by *Server* and *Date* headers. The values for
+      these two headers are picked up from the :meth:`version_string` and
+      :meth:`date_time_string` methods, respectively.
 
-   Sends a blank line, indicating the end of the HTTP headers in the response.
 
+   .. method:: send_header(keyword, value)
 
-.. method:: BaseHTTPRequestHandler.log_request([code[, size]])
+      Writes a specific HTTP header to the output stream. *keyword* should
+      specify the header keyword, with *value* specifying its value.
 
-   Logs an accepted (successful) request. *code* should specify the numeric HTTP
-   code associated with the response. If a size of the response is available, then
-   it should be passed as the *size* parameter.
 
+   .. method:: end_headers()
 
-.. method:: BaseHTTPRequestHandler.log_error(...)
+      Sends a blank line, indicating the end of the HTTP headers in the
+      response.
 
-   Logs an error when a request cannot be fulfilled. By default, it passes the
-   message to :meth:`log_message`, so it takes the same arguments (*format* and
-   additional values).
 
+   .. method:: log_request([code[, size]])
 
-.. method:: BaseHTTPRequestHandler.log_message(format, ...)
+      Logs an accepted (successful) request. *code* should specify the numeric
+      HTTP code associated with the response. If a size of the response is
+      available, then it should be passed as the *size* parameter.
 
-   Logs an arbitrary message to ``sys.stderr``. This is typically overridden to
-   create custom error logging mechanisms. The *format* argument is a standard
-   printf-style format string, where the additional arguments to
-   :meth:`log_message` are applied as inputs to the formatting. The client address
-   and current date and time are prefixed to every message logged.
 
+   .. method:: log_error(...)
 
-.. method:: BaseHTTPRequestHandler.version_string()
+      Logs an error when a request cannot be fulfilled. By default, it passes
+      the message to :meth:`log_message`, so it takes the same arguments
+      (*format* and additional values).
 
-   Returns the server software's version string. This is a combination of the
-   :attr:`server_version` and :attr:`sys_version` class variables.
 
+   .. method:: log_message(format, ...)
 
-.. method:: BaseHTTPRequestHandler.date_time_string([timestamp])
+      Logs an arbitrary message to ``sys.stderr``. This is typically overridden
+      to create custom error logging mechanisms. The *format* argument is a
+      standard printf-style format string, where the additional arguments to
+      :meth:`log_message` are applied as inputs to the formatting. The client
+      address and current date and time are prefixed to every message logged.
 
-   Returns the date and time given by *timestamp* (which must be in the format
-   returned by :func:`time.time`), formatted for a message header. If *timestamp*
-   is omitted, it uses the current date and time.
 
-   The result looks like ``'Sun, 06 Nov 1994 08:49:37 GMT'``.
+   .. method:: version_string()
 
+      Returns the server software's version string. This is a combination of the
+      :attr:`server_version` and :attr:`sys_version` class variables.
 
-.. method:: BaseHTTPRequestHandler.log_date_time_string()
 
-   Returns the current date and time, formatted for logging.
+   .. method:: date_time_string([timestamp])
 
+      Returns the date and time given by *timestamp* (which must be in the
+      format returned by :func:`time.time`), formatted for a message header. If
+      *timestamp* is omitted, it uses the current date and time.
 
-.. method:: BaseHTTPRequestHandler.address_string()
+      The result looks like ``'Sun, 06 Nov 1994 08:49:37 GMT'``.
 
-   Returns the client address, formatted for logging. A name lookup is performed on
-   the client's IP address.
+
+   .. method:: log_date_time_string()
+
+      Returns the current date and time, formatted for logging.
+
+
+   .. method:: address_string()
+
+      Returns the client address, formatted for logging. A name lookup is
+      performed on the client's IP address.
 
 
 .. seealso::

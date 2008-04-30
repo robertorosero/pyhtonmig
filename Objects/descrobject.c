@@ -168,7 +168,7 @@ descr_setcheck(PyDescrObject *descr, PyObject *obj, PyObject *value,
 	       int *pres)
 {
 	assert(obj != NULL);
-	if (!PyObject_IsInstance(obj, (PyObject *)(descr->d_type))) {
+	if (!PyObject_TypeCheck(obj, descr->d_type)) {
 		PyErr_Format(PyExc_TypeError,
 			     "descriptor '%V' for '%.100s' objects "
 			     "doesn't apply to '%.100s' object",
@@ -1083,7 +1083,7 @@ static PyMemberDef property_members[] = {
 PyDoc_STRVAR(getter_doc,
 	     "Descriptor to change the getter on a property.");
 
-PyObject *
+static PyObject *
 property_getter(PyObject *self, PyObject *getter)
 {
 	return property_copy(self, getter, NULL, NULL, NULL);
@@ -1093,7 +1093,7 @@ property_getter(PyObject *self, PyObject *getter)
 PyDoc_STRVAR(setter_doc,
 	     "Descriptor to change the setter on a property.");
 
-PyObject *
+static PyObject *
 property_setter(PyObject *self, PyObject *setter)
 {
 	return property_copy(self, NULL, setter, NULL, NULL);
@@ -1103,7 +1103,7 @@ property_setter(PyObject *self, PyObject *setter)
 PyDoc_STRVAR(deleter_doc,
 	     "Descriptor to change the deleter on a property.");
 
-PyObject *
+static PyObject *
 property_deleter(PyObject *self, PyObject *deleter)
 {
 	return property_copy(self, NULL, NULL, deleter, NULL);

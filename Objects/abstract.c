@@ -673,7 +673,7 @@ PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
 {
 	if (view == NULL) return 0;
 	if (((flags & PyBUF_LOCK) == PyBUF_LOCK) &&
-	    readonly >= 0) {
+	    readonly != 0) {
 		PyErr_SetString(PyExc_BufferError,
 				"Cannot lock this object.");
 		return -1;
@@ -704,6 +704,57 @@ PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
 	return 0;
 }
 
+PyObject *
+PyObject_Format(PyObject *obj, PyObject *format_spec)
+{
+    static PyObject * str__format__ = NULL;
+    PyObject *meth;
+    PyObject *empty = NULL;
+    PyObject *result = NULL;
+
+    /* Initialize cached value */
+    if (str__format__ == NULL) {
+        /* Initialize static variable needed by _PyType_Lookup */
+        str__format__ = PyUnicode_FromString("__format__");
+        if (str__format__ == NULL)
+            goto done;
+    }
+
+    /* If no format_spec is provided, use an empty string */
+    if (format_spec == NULL) {
+        empty = PyUnicode_FromUnicode(NULL, 0);
+        format_spec = empty;
+    }
+
+    /* Make sure the type is initialized.  float gets initialized late */
+    if (Py_TYPE(obj)->tp_dict == NULL)
+        if (PyType_Ready(Py_TYPE(obj)) < 0)
+            goto done;
+
+    /* Find the (unbound!) __format__ method (a borrowed reference) */
+    meth = _PyType_Lookup(Py_TYPE(obj), str__format__);
+    if (meth == NULL) {
+        PyErr_Format(PyExc_TypeError,
+                "Type %.100s doesn't define __format__",
+                Py_TYPE(obj)->tp_name);
+            goto done;
+    }
+
+    /* And call it, binding it to the value */
+    result = PyObject_CallFunctionObjArgs(meth, obj, format_spec, NULL);
+
+    if (result && !PyUnicode_Check(result)) {
+        PyErr_SetString(PyExc_TypeError,
+            "__format__ method did not return string");
+        Py_DECREF(result);
+        result = NULL;
+        goto done;
+    }
+
+done:
+    Py_XDECREF(empty);
+    return result;
+}
 /* Operations on numbers */
 
 int
@@ -1242,6 +1293,40 @@ PyNumber_AsSsize_t(PyObject *item, PyObject *err)
 }
 
 
+PyObject *
+_PyNumber_ConvertIntegralToInt(PyObject *integral, const char* error_format)
+{
+	static PyObject *int_name = NULL;
+	if (int_name == NULL) {
+		int_name = PyUnicode_InternFromString("__int__");
+		if (int_name == NULL)
+			return NULL;
+	}
+
+	if (integral && !PyLong_Check(integral)) { 
+		/* Don't go through tp_as_number->nb_int to avoid
+		   hitting the classic class fallback to __trunc__. */
+		PyObject *int_func = PyObject_GetAttr(integral, int_name);
+		if (int_func == NULL) {
+			PyErr_Clear(); /* Raise a different error. */
+			goto non_integral_error;
+		}
+		Py_DECREF(integral);
+		integral = PyEval_CallObject(int_func, NULL);
+		Py_DECREF(int_func);
+		if (integral && !PyLong_Check(integral)) { 
+			goto non_integral_error;
+		}
+	}
+	return integral;
+
+non_integral_error:
+	PyErr_Format(PyExc_TypeError, error_format, Py_TYPE(integral)->tp_name);
+	Py_DECREF(integral);
+	return NULL;
+}
+
+
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
 long_from_string(const char *s, Py_ssize_t len)
@@ -1265,8 +1350,16 @@ PyObject *
 PyNumber_Long(PyObject *o)
 {
 	PyNumberMethods *m;
+	static PyObject *trunc_name = NULL;
+	PyObject *trunc_func;
 	const char *buffer;
 	Py_ssize_t buffer_len;
+
+	if (trunc_name == NULL) {
+		trunc_name = PyUnicode_InternFromString("__trunc__");
+		if (trunc_name == NULL)
+			return NULL;
+	}
 
 	if (o == NULL)
 		return null_error();
@@ -1287,6 +1380,7 @@ PyNumber_Long(PyObject *o)
 		return res;
 	}
 	if (m && m->nb_long) { /* This should include subclasses of long */
+		/* Classic classes always take this branch. */
 		PyObject *res = m->nb_long(o);
 		if (res && !PyLong_Check(res)) {
 			PyErr_Format(PyExc_TypeError,
@@ -1299,6 +1393,27 @@ PyNumber_Long(PyObject *o)
 	}
 	if (PyLong_Check(o)) /* A long subclass without nb_long */
 		return _PyLong_Copy((PyLongObject *)o);
+	trunc_func = PyObject_GetAttr(o, trunc_name);
+	if (trunc_func) {
+		PyObject *truncated = PyEval_CallObject(trunc_func, NULL);
+		PyObject *int_instance;
+		Py_DECREF(trunc_func);
+		/* __trunc__ is specified to return an Integral type,
+		   but long() needs to return a long. */
+		int_instance = _PyNumber_ConvertIntegralToInt(
+			truncated,
+			"__trunc__ returned non-Integral (type %.200s)");
+		return int_instance;
+	}
+	PyErr_Clear();  /* It's not an error if  o.__trunc__ doesn't exist. */
+
+	if (PyString_Check(o))
+		/* need to do extra error checking that PyLong_FromString()
+		 * doesn't do.  In particular long('9.5') must raise an
+		 * exception, not truncate the float.
+		 */
+		return long_from_string(PyString_AS_STRING(o),
+					PyString_GET_SIZE(o));
 	if (PyUnicode_Check(o))
 		/* The above check is done in PyLong_FromUnicode(). */
 		return PyLong_FromUnicode(PyUnicode_AS_UNICODE(o),
@@ -1341,13 +1456,19 @@ PyNumber_Float(PyObject *o)
 PyObject *
 PyNumber_ToBase(PyObject *n, int base)
 {
-	PyObject *res;
+	PyObject *res = NULL;
 	PyObject *index = PyNumber_Index(n);
 
 	if (!index)
 		return NULL;
-	assert(PyLong_Check(index));
-	res = _PyLong_Format(index, base);
+	if (PyLong_Check(index))
+		res = _PyLong_Format(index, base);
+	else
+		/* It should not be possible to get here, as
+		   PyNumber_Index already has a check for the same
+		   condition */
+		PyErr_SetString(PyExc_ValueError, "PyNumber_ToBase: index not "
+				"int or long");
 	Py_DECREF(index);
 	return res;
 }
@@ -2333,7 +2454,7 @@ abstract_get_bases(PyObject *cls)
 	PyObject *bases;
 
 	if (__bases__ == NULL) {
-		__bases__ = PyUnicode_FromString("__bases__");
+		__bases__ = PyUnicode_InternFromString("__bases__");
 		if (__bases__ == NULL)
 			return NULL;
 	}
@@ -2413,7 +2534,7 @@ recursive_isinstance(PyObject *inst, PyObject *cls, int recursion_depth)
 	int retval = 0;
 
 	if (__class__ == NULL) {
-		__class__ = PyUnicode_FromString("__class__");
+		__class__ = PyUnicode_InternFromString("__class__");
 		if (__class__ == NULL)
 			return -1;
 	}
@@ -2476,11 +2597,21 @@ recursive_isinstance(PyObject *inst, PyObject *cls, int recursion_depth)
 int
 PyObject_IsInstance(PyObject *inst, PyObject *cls)
 {
-	PyObject *t, *v, *tb;
+	static PyObject *name = NULL;
 	PyObject *checker;
-	PyErr_Fetch(&t, &v, &tb);
-	checker = PyObject_GetAttrString(cls, "__instancecheck__");
-	PyErr_Restore(t, v, tb);
+
+	/* Quick test for an exact match */
+	if (Py_TYPE(inst) == (PyTypeObject *)cls)
+		return 1;
+
+	if (name == NULL) {
+		name = PyUnicode_InternFromString("__instancecheck__");
+		if (name == NULL)
+			return -1;
+	}
+	checker = PyObject_GetAttr(cls, name);
+	if (checker == NULL && PyErr_Occurred())
+		PyErr_Clear();
 	if (checker != NULL) {
 		PyObject *res;
 		int ok = -1;
@@ -2547,10 +2678,17 @@ recursive_issubclass(PyObject *derived, PyObject *cls, int recursion_depth)
 int
 PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 {
+	static PyObject *name = NULL;
 	PyObject *t, *v, *tb;
 	PyObject *checker;
 	PyErr_Fetch(&t, &v, &tb);
-	checker = PyObject_GetAttrString(cls, "__subclasscheck__");
+	
+	if (name == NULL) {
+		name = PyUnicode_InternFromString("__subclasscheck__");
+		if (name == NULL)
+			return -1;
+	}
+	checker = PyObject_GetAttr(cls, name);
 	PyErr_Restore(t, v, tb);
 	if (checker != NULL) {
 		PyObject *res;

@@ -15,9 +15,8 @@
 
 This module provides a single class, :class:`RobotFileParser`, which answers
 questions about whether or not a particular user agent can fetch a URL on the
-Web site that published the :file:`robots.txt` file.  For more details on  the
-structure of :file:`robots.txt` files, see
-http://www.robotstxt.org/wc/norobots.html.
+Web site that published the :file:`robots.txt` file.  For more details on the
+structure of :file:`robots.txt` files, see http://www.robotstxt.org/orig.html.
 
 
 .. class:: RobotFileParser()
@@ -26,35 +25,35 @@ http://www.robotstxt.org/wc/norobots.html.
    single :file:`robots.txt` file.
 
 
-   .. method:: RobotFileParser.set_url(url)
+   .. method:: set_url(url)
 
       Sets the URL referring to a :file:`robots.txt` file.
 
 
-   .. method:: RobotFileParser.read()
+   .. method:: read()
 
       Reads the :file:`robots.txt` URL and feeds it to the parser.
 
 
-   .. method:: RobotFileParser.parse(lines)
+   .. method:: parse(lines)
 
       Parses the lines argument.
 
 
-   .. method:: RobotFileParser.can_fetch(useragent, url)
+   .. method:: can_fetch(useragent, url)
 
       Returns ``True`` if the *useragent* is allowed to fetch the *url* according to
       the rules contained in the parsed :file:`robots.txt` file.
 
 
-   .. method:: RobotFileParser.mtime()
+   .. method:: mtime()
 
       Returns the time the ``robots.txt`` file was last fetched.  This is useful for
       long-running web spiders that need to check for new ``robots.txt`` files
       periodically.
 
 
-   .. method:: RobotFileParser.modified()
+   .. method:: modified()
 
       Sets the time the ``robots.txt`` file was last fetched to the current time.
 

@@ -2,9 +2,6 @@
 TestCases for testing the locking sub-system.
 """
 
-import os
-from pprint import pprint
-import shutil
 import sys
 import tempfile
 import time
@@ -26,6 +23,11 @@ except ImportError:
     # For Python 2.3
     from bsddb import db
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
+
 
 #----------------------------------------------------------------------
 
@@ -40,7 +42,7 @@ class LockingTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.env.close()
-        shutil.rmtree(self.homeDir)
+        test_support.rmtree(self.homeDir)
 
 
     def test01_simple(self):

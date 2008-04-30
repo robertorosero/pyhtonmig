@@ -160,6 +160,7 @@ PyObject *
 PyLong_FromLong(long ival)
 {
 	PyLongObject *v;
+        unsigned long abs_ival;
 	unsigned long t;  /* unsigned so >> doesn't propagate sign bit */
 	int ndigits = 0;
 	int sign = 1;
@@ -167,8 +168,14 @@ PyLong_FromLong(long ival)
 	CHECK_SMALL_INT(ival);
 
 	if (ival < 0) {
-		ival = -ival;
+		/* if LONG_MIN == -LONG_MAX-1 (true on most platforms) then
+		   ANSI C says that the result of -ival is undefined when ival
+		   == LONG_MIN.  Hence the following workaround. */
+		abs_ival = (unsigned long)(-1-ival) + 1;
 		sign = -1;
+	}
+	else {
+		abs_ival = (unsigned long)ival;
 	}
 
 	/* Fast path for single-digits ints */
@@ -193,7 +200,7 @@ PyLong_FromLong(long ival)
 	}
 
 	/* Larger numbers: loop to determine number of digits */
-	t = (unsigned long)ival;
+	t = abs_ival;
 	while (t) {
 		++ndigits;
 		t >>= PyLong_SHIFT;
@@ -202,7 +209,7 @@ PyLong_FromLong(long ival)
 	if (v != NULL) {
 		digit *p = v->ob_digit;
 		Py_SIZE(v) = ndigits*sign;
-		t = (unsigned long)ival;
+		t = abs_ival;
 		while (t) {
 			*p++ = (digit)(t & PyLong_MASK);
 			t >>= PyLong_SHIFT;
@@ -1033,21 +1040,27 @@ PyObject *
 PyLong_FromLongLong(PY_LONG_LONG ival)
 {
 	PyLongObject *v;
+	unsigned PY_LONG_LONG abs_ival;
 	unsigned PY_LONG_LONG t;  /* unsigned so >> doesn't propagate sign bit */
 	int ndigits = 0;
 	int negative = 0;
 
 	CHECK_SMALL_INT(ival);
 	if (ival < 0) {
-		ival = -ival;
+		/* avoid signed overflow on negation;  see comments
+		   in PyLong_FromLong above. */
+		abs_ival = (unsigned PY_LONG_LONG)(-1-ival) + 1;
 		negative = 1;
+	}
+	else {
+		abs_ival = (unsigned PY_LONG_LONG)ival;
 	}
 
 	/* Count the number of Python digits.
 	   We used to pick 5 ("big enough for anything"), but that's a
 	   waste of time and space given that 5*15 = 75 bits are rarely
 	   needed. */
-	t = (unsigned PY_LONG_LONG)ival;
+	t = abs_ival;
 	while (t) {
 		++ndigits;
 		t >>= PyLong_SHIFT;
@@ -1056,7 +1069,7 @@ PyLong_FromLongLong(PY_LONG_LONG ival)
 	if (v != NULL) {
 		digit *p = v->ob_digit;
 		Py_SIZE(v) = negative ? -ndigits : ndigits;
-		t = (unsigned PY_LONG_LONG)ival;
+		t = abs_ival;
 		while (t) {
 			*p++ = (digit)(t & PyLong_MASK);
 			t >>= PyLong_SHIFT;
@@ -1099,13 +1112,39 @@ PyLong_FromUnsignedLongLong(unsigned PY_LONG_LONG ival)
 PyObject *
 PyLong_FromSsize_t(Py_ssize_t ival)
 {
-	Py_ssize_t bytes = ival;
-	int one = 1;
-	if (ival < PyLong_BASE)
-		return PyLong_FromLong(ival);
-	return _PyLong_FromByteArray(
-			(unsigned char *)&bytes,
-			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 1);
+	PyLongObject *v;
+	size_t abs_ival;
+	size_t t;  /* unsigned so >> doesn't propagate sign bit */
+	int ndigits = 0;
+	int negative = 0;
+
+	CHECK_SMALL_INT(ival);
+	if (ival < 0) {
+		/* avoid signed overflow when ival = SIZE_T_MIN */
+		abs_ival = (size_t)(-1-ival)+1;
+		negative = 1;
+	}
+	else {
+		abs_ival = (size_t)ival;
+	}
+
+	/* Count the number of Python digits. */
+	t = abs_ival;
+	while (t) {
+		++ndigits;
+		t >>= PyLong_SHIFT;
+	}
+	v = _PyLong_New(ndigits);
+	if (v != NULL) {
+		digit *p = v->ob_digit;
+		Py_SIZE(v) = negative ? -ndigits : ndigits;
+		t = abs_ival;
+		while (t) {
+			*p++ = (digit)(t & PyLong_MASK);
+			t >>= PyLong_SHIFT;
+		}
+	}
+	return (PyObject *)v;
 }
 
 /* Create a new long int object from a C size_t. */
@@ -1113,13 +1152,28 @@ PyLong_FromSsize_t(Py_ssize_t ival)
 PyObject *
 PyLong_FromSize_t(size_t ival)
 {
-	size_t bytes = ival;
-	int one = 1;
+	PyLongObject *v;
+	size_t t;
+	int ndigits = 0;
+
 	if (ival < PyLong_BASE)
 		return PyLong_FromLong(ival);
-	return _PyLong_FromByteArray(
-			(unsigned char *)&bytes,
-			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
+	/* Count the number of Python digits. */
+	t = ival;
+	while (t) {
+		++ndigits;
+		t >>= PyLong_SHIFT;
+	}
+	v = _PyLong_New(ndigits);
+	if (v != NULL) {
+		digit *p = v->ob_digit;
+		Py_SIZE(v) = ndigits;
+		while (ival) {
+			*p++ = (digit)(ival & PyLong_MASK);
+			ival >>= PyLong_SHIFT;
+		}
+	}
+	return (PyObject *)v;
 }
 
 /* Get a C PY_LONG_LONG int from a long int object.
@@ -3570,9 +3624,21 @@ long_round(PyObject *self, PyObject *args)
 #undef UNDEF_NDIGITS
 }
 
+#if 0
+static PyObject *
+long_is_finite(PyObject *v)
+{
+	Py_RETURN_TRUE;
+}
+#endif
+
 static PyMethodDef long_methods[] = {
 	{"conjugate",	(PyCFunction)long_long,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any int."},
+#if 0
+	{"is_finite",	(PyCFunction)long_is_finite,	METH_NOARGS,
+	 "Returns always True."},
+#endif
 	{"__trunc__",	(PyCFunction)long_long,	METH_NOARGS,
          "Truncating an Integral returns itself."},
 	{"__floor__",	(PyCFunction)long_long,	METH_NOARGS,
@@ -3705,17 +3771,32 @@ int
 _PyLong_Init(void)
 {
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
-	int ival;
+	int ival, size;
 	PyLongObject *v = small_ints;
-	for (ival = -NSMALLNEGINTS; ival < 0; ival++, v++) {
-		PyObject_INIT(v, &PyLong_Type);
-		Py_SIZE(v) = -1;
-		v->ob_digit[0] = -ival;
-	}
-	for (; ival < NSMALLPOSINTS; ival++, v++) {
-		PyObject_INIT(v, &PyLong_Type);
-		Py_SIZE(v) = ival ? 1 : 0;
-		v->ob_digit[0] = ival;
+
+	for (ival = -NSMALLNEGINTS; ival <  NSMALLPOSINTS; ival++, v++) {
+		size = (ival < 0) ? -1 : ((ival == 0) ? 0 : 1);
+		if (Py_TYPE(v) == &PyLong_Type) {
+			/* The element is already initialized, most likely
+			 * the Python interpreter was initialized before.
+			 */
+			Py_ssize_t refcnt;
+			PyObject* op = (PyObject*)v;
+
+			refcnt = Py_REFCNT(op) < 0 ? 0 : Py_REFCNT(op);
+			_Py_NewReference(op);
+			/* _Py_NewReference sets the ref count to 1 but
+			 * the ref count might be larger. Set the refcnt
+			 * to the original refcnt + 1 */	 
+			Py_REFCNT(op) = refcnt + 1;
+			assert(Py_SIZE(op) == size);
+			assert(v->ob_digit[0] == abs(ival));
+		}
+		else {
+			PyObject_INIT(v, &PyLong_Type);
+		}
+		Py_SIZE(v) = size;
+		v->ob_digit[0] = abs(ival);
 	}
 #endif
 	return 1;
@@ -3724,19 +3805,15 @@ _PyLong_Init(void)
 void
 PyLong_Fini(void)
 {
-#if 0
-	int i;
-	/* This is currently not needed; the small integers
-	   are statically allocated */
+	/* Integers are currently statically allocated. Py_DECREF is not
+	   needed, but Python must forget about the reference or multiple
+	   reinitializations will fail. */
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
-        PyIntObject **q;
-
-        i = NSMALLNEGINTS + NSMALLPOSINTS;
-        q = small_ints;
-        while (--i >= 0) {
-                Py_XDECREF(*q);
-                *q++ = NULL;
-        }
-#endif
+	int i;
+	PyLongObject *v = small_ints;
+	for (i = 0; i < NSMALLNEGINTS + NSMALLPOSINTS; i++, v++) {
+		_Py_DEC_REFTOTAL;
+		_Py_ForgetReference((PyObject*)v);
+	}
 #endif
 }

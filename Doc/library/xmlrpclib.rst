@@ -32,10 +32,7 @@ between conformable Python objects and XML on the wire.
    all clients and servers; see http://ontosys.com/xml-rpc/extensions.php for a
    description.  The *use_datetime* flag can be used to cause date/time values to
    be presented as :class:`datetime.datetime` objects; this is false by default.
-   :class:`datetime.datetime`, :class:`datetime.date` and :class:`datetime.time`
-   objects may be passed to calls.  :class:`datetime.date` objects are converted
-   with a time of "00:00:00". :class:`datetime.time` objects are converted using
-   today's date.
+   :class:`datetime.datetime` objects may be passed to calls.
 
    Both the HTTP and HTTPS transports support the URL syntax extension for HTTP
    Basic Authentication: ``http://user:pass@host:port/path``.  The  ``user:pass``
@@ -79,9 +76,7 @@ between conformable Python objects and XML on the wire.
    +---------------------------------+---------------------------------------------+
    | :const:`dates`                  | in seconds since the epoch (pass in an      |
    |                                 | instance of the :class:`DateTime` class) or |
-   |                                 | a :class:`datetime.datetime`,               |
-   |                                 | :class:`datetime.date` or                   |
-   |                                 | :class:`datetime.time` instance             |
+   |                                 | a :class:`datetime.datetime` instance.      |
    +---------------------------------+---------------------------------------------+
    | :const:`binary data`            | pass in an instance of the :class:`Binary`  |
    |                                 | wrapper class                               |
@@ -194,7 +189,7 @@ A working example follows. The server code::
        return n%2 == 0
 
    server = SimpleXMLRPCServer(("localhost", 8000))
-   print "Listening on port 8000..."
+   print("Listening on port 8000...")
    server.register_function(is_even, "is_even")
    server.serve_forever()
 
@@ -203,18 +198,18 @@ The client code for the preceding server::
    import xmlrpclib
 
    proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
-   print "3 is even: %s" % str(proxy.is_even(3))
-   print "100 is even: %s" % str(proxy.is_even(100))
+   print("3 is even: %s" % str(proxy.is_even(3)))
+   print("100 is even: %s" % str(proxy.is_even(100)))
 
 .. _datetime-objects:
 
 DateTime Objects
 ----------------
 
-This class may be initialized with seconds since the epoch, a time tuple, an ISO
-8601 time/date string, or a :class:`datetime.datetime`, :class:`datetime.date`
-or :class:`datetime.time` instance.  It has the following methods, supported
-mainly for internal use by the marshalling/unmarshalling code:
+This class may be initialized with seconds since the epoch, a time
+tuple, an ISO 8601 time/date string, or a :class:`datetime.datetime`
+instance.  It has the following methods, supported mainly for internal
+use by the marshalling/unmarshalling code:
 
 
 .. method:: DateTime.decode(string)
@@ -241,7 +236,7 @@ A working example follows. The server code::
        return xmlrpclib.DateTime(today)
 
    server = SimpleXMLRPCServer(("localhost", 8000))
-   print "Listening on port 8000..."
+   print("Listening on port 8000...")
    server.register_function(today, "today")
    server.serve_forever()
 
@@ -255,7 +250,7 @@ The client code for the preceding server::
    today = proxy.today()
    # convert the ISO8601 string to a datetime object
    converted = datetime.datetime.strptime(today.value, "%Y%m%dT%H:%M:%S")
-   print "Today: %s" % converted.strftime("%d.%m.%Y, %H:%M")
+   print("Today: %s" % converted.strftime("%d.%m.%Y, %H:%M"))
 
 .. _binary-objects:
 
@@ -300,7 +295,7 @@ XMLRPC::
         handle.close()
 
    server = SimpleXMLRPCServer(("localhost", 8000))
-   print "Listening on port 8000..."
+   print("Listening on port 8000...")
    server.register_function(python_logo, 'python_logo')
 
    server.serve_forever()
@@ -343,7 +338,7 @@ returning a complex type object.  The server code::
        return x+y+0j
 
    server = SimpleXMLRPCServer(("localhost", 8000))
-   print "Listening on port 8000..."
+   print("Listening on port 8000...")
    server.register_function(add, 'add')
 
    server.serve_forever()
@@ -356,9 +351,9 @@ The client code for the preceding server::
    try:
        proxy.add(2, 5)
    except xmlrpclib.Fault, err:
-       print "A fault occured"
-       print "Fault code: %d" % err.faultCode
-       print "Fault string: %s" % err.faultString
+       print("A fault occured")
+       print("Fault code: %d" % err.faultCode)
+       print("Fault string: %s" % err.faultString)
 
 
 
@@ -403,11 +398,11 @@ by providing an invalid URI::
    try:
        proxy.some_method()
    except xmlrpclib.ProtocolError, err:
-       print "A protocol error occured"
-       print "URL: %s" % err.url
-       print "HTTP/HTTPS headers: %s" % err.headers
-       print "Error code: %d" % err.errcode
-       print "Error message: %s" % err.errmsg
+       print("A protocol error occured")
+       print("URL: %s" % err.url)
+       print("HTTP/HTTPS headers: %s" % err.headers)
+       print("Error code: %d" % err.errcode)
+       print("Error message: %s" % err.errmsg)
 
 MultiCall Objects
 -----------------
@@ -444,7 +439,7 @@ A usage example of this class follows.  The server code ::
 
    # A simple server with simple arithmetic functions
    server = SimpleXMLRPCServer(("localhost", 8000))
-   print "Listening on port 8000..."
+   print("Listening on port 8000...")
    server.register_multicall_functions()
    server.register_function(add, 'add')
    server.register_function(subtract, 'subtract')
@@ -464,7 +459,7 @@ The client code for the preceding server::
    multicall.divide(7,3)
    result = multicall()
 
-   print "7+3=%d, 7-3=%d, 7*3=%d, 7/3=%d" % tuple(result)
+   print("7+3=%d, 7-3=%d, 7*3=%d, 7/3=%d" % tuple(result))
 
 
 Convenience Functions
@@ -495,10 +490,7 @@ Convenience Functions
    ``None`` if no method name is present in the packet. If the XML-RPC packet
    represents a fault condition, this function will raise a :exc:`Fault` exception.
    The *use_datetime* flag can be used to cause date/time values to be presented as
-   :class:`datetime.datetime` objects; this is false by default. Note that even if
-   you call an XML-RPC method with :class:`datetime.date` or :class:`datetime.time`
-   objects, they are converted to :class:`DateTime` objects internally, so only
-   :class:`datetime.datetime` objects will be returned.
+   :class:`datetime.datetime` objects; this is false by default.
 
 
 .. _xmlrpc-client-example:

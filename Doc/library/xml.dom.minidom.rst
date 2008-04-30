@@ -126,7 +126,7 @@ module documentation.  This section lists the differences between the API and
    to discard children of that node.
 
 
-.. method:: Node.writexml(writer[,indent=""[,addindent=""[,newl=""]]])
+.. method:: Node.writexml(writer[, indent=""[, addindent=""[, newl=""[, encoding=""]]]])
 
    Write XML to the writer object.  The writer should have a :meth:`write` method
    which matches that of the file object interface.  The *indent* parameter is the
@@ -147,13 +147,13 @@ module documentation.  This section lists the differences between the API and
    document. Encoding this string in an encoding other than UTF-8 is likely
    incorrect, since UTF-8 is the default encoding of XML.
 
-   With an explicit *encoding* argument, the result is a byte string in the
+   With an explicit *encoding* [1]_ argument, the result is a byte string in the
    specified encoding. It is recommended that this argument is always specified. To
    avoid :exc:`UnicodeError` exceptions in case of unrepresentable text data, the
    encoding argument should be specified as "utf-8".
 
 
-.. method:: Node.toprettyxml([indent[, newl[, encoding]]])
+.. method:: Node.toprettyxml([indent=""[, newl=""[, encoding=""]]])
 
    Return a pretty-printed version of the document. *indent* specifies the
    indentation string and defaults to a tabulator; *newl* specifies the string
@@ -212,7 +212,7 @@ rules apply:
   ``boolean`` all map to Python integer objects.
 
 * The type ``DOMString`` maps to Python strings. :mod:`xml.dom.minidom` supports
-  either byte or Unicode strings, but will normally produce Unicode strings.
+  either bytes or strings, but will normally produce strings.
   Values of type ``DOMString`` may also be ``None`` where allowed to have the IDL
   ``null`` value by the DOM specification from the W3C.
 
@@ -252,3 +252,9 @@ The following interfaces have no implementation in :mod:`xml.dom.minidom`:
 Most of these reflect information in the XML document that is not of general
 utility to most DOM users.
 
+.. rubric:: Footnotes
+
+.. [#] The encoding string included in XML output should conform to the
+   appropriate standards. For example, "UTF-8" is valid, but "UTF8" is
+   not. See http://www.w3.org/TR/2006/REC-xml11-20060816/#NT-EncodingDecl
+   and http://www.iana.org/assignments/character-sets .

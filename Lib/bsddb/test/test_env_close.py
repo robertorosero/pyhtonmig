@@ -6,7 +6,6 @@ import os
 import shutil
 import sys
 import tempfile
-import glob
 import unittest
 
 try:
@@ -15,6 +14,11 @@ try:
 except ImportError:
     # For Python 2.3
     from bsddb import db
+
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 from bsddb.test.test_all import verbose
 
@@ -34,15 +38,15 @@ else:
 
 class DBEnvClosedEarlyCrash(unittest.TestCase):
     def setUp(self):
-        self.homeDir = tempfile.mkdtemp()
-        old_tempfile_tempdir = tempfile.tempdir
+        self.homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
+        try: os.mkdir(self.homeDir)
+        except os.error: pass
         tempfile.tempdir = self.homeDir
         self.filename = os.path.split(tempfile.mktemp())[1]
-        tempfile.tempdir = old_tempfile_tempdir
+        tempfile.tempdir = None
 
     def tearDown(self):
-        shutil.rmtree(self.homeDir)
-
+        test_support.rmtree(self.homeDir)
 
     def test01_close_dbenv_before_db(self):
         dbenv = db.DBEnv()

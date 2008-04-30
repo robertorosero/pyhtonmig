@@ -29,7 +29,6 @@ sqlite_dir = "../sqlite-source-3.3.4"
 # path to PCbuild directory
 PCBUILD="PCbuild"
 # msvcrt version
-#MSVCR = "71"
 MSVCR = "90"
 
 try:
@@ -106,8 +105,6 @@ extensions = [
 # Using the same UUID is fine since these files are versioned,
 # so Installer will always keep the newest version.
 # NOTE: All uuids are self generated.
-msvcr71_uuid = "{8666C8DD-D0B4-4B42-928E-A69E32FA5D4D}"
-msvcr90_uuid = "{9C28CD84-397C-4045-855C-28B02291A272}"
 pythondll_uuid = {
     "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
     "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}",
@@ -379,7 +376,7 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py2_ "[TARGETDIR]Lib"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
         # msidbCustomActionTypeFirstSequence + msidbCustomActionTypeTextData + msidbCustomActionTypeProperty
@@ -795,10 +792,16 @@ def add_features(db):
     # (i.e. additional Python libraries) need to follow the parent feature.
     # Features that have no advertisement trigger (e.g. the test suite)
     # must not support advertisement
-    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature
+    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature, private_crt
     default_feature = Feature(db, "DefaultFeature", "Python",
                               "Python Interpreter and Libraries",
                               1, directory = "TARGETDIR")
+    shared_crt = Feature(db, "SharedCRT", "MSVCRT", "C Run-Time (system-wide)", 0,
+                         level=0)
+    private_crt = Feature(db, "PrivateCRT", "MSVCRT", "C Run-Time (private)", 0,
+                          level=0)
+    add_data(db, "Condition", [("SharedCRT", 1, sys32cond),
+                               ("PrivateCRT", 1, "not "+sys32cond)])
     # We don't support advertisement of extensions
     ext_feature = Feature(db, "Extensions", "Register Extensions",
                           "Make this Python installation the default Python installation", 3,
@@ -815,51 +818,22 @@ def add_features(db):
                         "Python test suite (Lib/test/)", 11,
                         parent = default_feature, attributes=2|8)
 
-def extract_msvcr71():
-    import _winreg
-    # Find the location of the merge modules
-    k = _winreg.OpenKey(
-        _winreg.HKEY_LOCAL_MACHINE,
-        r"Software\Microsoft\VisualStudio\7.1\Setup\VS")
-    dir = _winreg.QueryValueEx(k, "MSMDir")[0]
-    _winreg.CloseKey(k)
-    files = glob.glob1(dir, "*CRT71*")
-    assert len(files) == 1, (dir, files)
-    file = os.path.join(dir, files[0])
-    # Extract msvcr71.dll
-    m = msilib.MakeMerge2()
-    m.OpenModule(file, 0)
-    m.ExtractFiles(".")
-    m.CloseModule()
-    # Find the version/language of msvcr71.dll
-    installer = msilib.MakeInstaller()
-    return installer.FileVersion("msvcr71.dll", 0), \
-           installer.FileVersion("msvcr71.dll", 1)
-
 def extract_msvcr90():
-    import _winreg
-    # Find the location of the merge modules
-    k = _winreg.OpenKey(
-        _winreg.HKEY_LOCAL_MACHINE,
-        r"Software\Microsoft\VisualStudio\9.0\Setup\VS")
-    prod_dir = _winreg.QueryValueEx(k, "ProductDir")[0]
-    _winreg.CloseKey(k)
+    # Find the redistributable files
+    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\x86\Microsoft.VC90.CRT")
 
-    # Copy msvcr90*
-    dir = os.path.join(prod_dir, r'VC\redist\x86\Microsoft.VC90.CRT')
-    files = glob.glob1(dir, "*CRT*.dll") + glob.glob1(dir, "*VCR*.dll")
-    for file in files:
-        shutil.copy(os.path.join(dir, file), '.')
-
-    dir = os.path.join(prod_dir, r'VC\redist\Debug_NonRedist\x86\Microsoft.VC90.DebugCRT')
-    files = glob.glob1(dir, "*CRT*.dll") + glob.glob1(dir, "*VCR*.dll")
-    for file in files:
-        shutil.copy(os.path.join(dir, file), '.')
-
-    # Find the version/language of msvcr90.dll
+    result = []
     installer = msilib.MakeInstaller()
-    return installer.FileVersion("msvcr90.dll", 0), \
-           installer.FileVersion("msvcr90.dll", 1)
+    # omit msvcm90 and msvcp90, as they aren't really needed
+    files = ["Microsoft.VC90.CRT.manifest", "msvcr90.dll"]
+    for f in files:
+        path = os.path.join(dir, f)
+        kw = {'src':path}
+        if f.endswith('.dll'):
+            kw['version'] = installer.FileVersion(path, 0)
+            kw['language'] = installer.FileVersion(path, 1)
+        result.append((f, kw))
+    return result
 
 class PyDirectory(Directory):
     """By default, all components in the Python installer
@@ -888,7 +862,10 @@ def add_files(db):
     root.add_file("%s/pythonw.exe" % PCBUILD)
 
     # msidbComponentAttributesSharedDllRefCount = 8, see "Component Table"
-    dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
+    #dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
+    #install python30.dll into root dir for now
+    dlldir = root
+
     pydll = "python%s%s.dll" % (major, minor)
     pydllsrc = os.path.join(srcdir, PCBUILD, pydll)
     dlldir.start_component("DLLDIR", flags = 8, keyfile = pydll, uuid = pythondll_uuid)
@@ -901,25 +878,25 @@ def add_files(db):
     dlldir.add_file("%s/python%s%s.dll" % (PCBUILD, major, minor),
                     version=pyversion,
                     language=installer.FileVersion(pydllsrc, 1))
-    # XXX determine dependencies
-    if MSVCR == "90":
-        # XXX don't package the CRT for the moment;
-        # this should probably use the merge module in the long run.
-        pass
-        #version, lang = extract_msvcr90()
-        #dlldir.start_component("msvcr90", flags=8, keyfile="msvcr90.dll",
-        #                       uuid=msvcr90_uuid)
-        #dlldir.add_file("msvcr90.dll", src=os.path.abspath("msvcr90.dll"),
-        #                version=version, language=lang)
-        #tmpfiles.append("msvcr90.dll")
-    else:
-        version, lang = extract_msvcr71()
-        dlldir.start_component("msvcr71", flags=8, keyfile="msvcr71.dll",
-                               uuid=msvcr71_uuid)
-        dlldir.add_file("msvcr71.dll", src=os.path.abspath("msvcr71.dll"),
-                        version=version, language=lang)
-        tmpfiles.append("msvcr71.dll")
+    DLLs = PyDirectory(db, cab, root, srcdir + "/" + PCBUILD, "DLLs", "DLLS|DLLs")
 
+    # msvcr90.dll: Need to place the DLL and the manifest into the root directory,
+    # plus another copy of the manifest in the DLLs directory, with the manifest
+    # pointing to the root directory
+    root.start_component("msvcr90", feature=private_crt)
+    # Results are ID,keyword pairs
+    manifest, crtdll = extract_msvcr90()
+    root.add_file(manifest[0], **manifest[1])
+    root.add_file(crtdll[0], **crtdll[1])
+    # Copy the manifest
+    manifest_dlls = manifest[0]+".root"
+    open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
+    DLLs.start_component("msvcr90_dlls", feature=private_crt)
+    DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
+
+    # Now start the main component for the DLLs directory;
+    # no regular files have been added to the directory yet.
+    DLLs.start_component()
 
     # Check if _ctypes.pyd exists
     have_ctypes = os.path.exists(srcdir+"/%s/_ctypes.pyd" % PCBUILD)
@@ -992,10 +969,7 @@ def add_files(db):
             lib.glob("*.gif")
             lib.add_file("idle.icns")
         if dir=="command" and parent.physical=="distutils":
-            lib.add_file("wininst-6.0.exe")
-            lib.add_file("wininst-7.1.exe")
-            lib.add_file("wininst-8.0.exe")
-            lib.add_file("wininst-9.0.exe")
+            lib.glob("wininst*.exe")
         if dir=="setuptools":
             lib.add_file("cli.exe")
             lib.add_file("gui.exe")
@@ -1012,7 +986,7 @@ def add_files(db):
                 pydirs.append((lib, f))
     # Add DLLs
     default_feature.set_current()
-    lib = PyDirectory(db, cab, root, srcdir + "/" + PCBUILD, "DLLs", "DLLS|DLLs")
+    lib = DLLs
     lib.add_file("py.ico", src=srcdir+"/PC/py.ico")
     lib.add_file("pyc.ico", src=srcdir+"/PC/pyc.ico")
     dlls = []
@@ -1030,8 +1004,10 @@ def add_files(db):
         sqlite_arch = "/ia64"
     elif msilib.msi_type=="x64;1033":
         sqlite_arch = "/amd64"
+        tclsuffix = "64"
     else:
         sqlite_arch = ""
+        tclsuffix = ""
     lib.add_file(srcdir+"/"+sqlite_dir+sqlite_arch+"/sqlite3.dll")
     if have_tcl:
         if not os.path.exists("%s/%s/_tkinter.pyd" % (srcdir, PCBUILD)):
@@ -1040,7 +1016,7 @@ def add_files(db):
             lib.start_component("TkDLLs", tcltk)
             lib.add_file("_tkinter.pyd")
             dlls.append("_tkinter.pyd")
-            tcldir = os.path.normpath(srcdir+"/../tcltk/bin")
+            tcldir = os.path.normpath(srcdir+("/../tcltk%s/bin" % tclsuffix))
             for f in glob.glob1(tcldir, "*.dll"):
                 lib.add_file(f, src=os.path.join(tcldir, f))
     # check whether there are any unknown extensions
@@ -1064,7 +1040,7 @@ def add_files(db):
         lib.add_file('libpython%s%s.a' % (major, minor))
     if have_tcl:
         # Add Tcl/Tk
-        tcldirs = [(root, '../tcltk/lib', 'tcl')]
+        tcldirs = [(root, '../tcltk%s/lib' % tclsuffix, 'tcl')]
         tcltk.set_current()
         while tcldirs:
             parent, phys, dir = tcldirs.pop()

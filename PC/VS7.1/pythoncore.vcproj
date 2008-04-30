@@ -395,9 +395,6 @@
 			RelativePath="..\..\Pc\_subprocess.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_typesmodule.c">
-		</File>
-		<File
 			RelativePath="..\..\Modules\_weakref.c">
 		</File>
 		<File
@@ -411,6 +408,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Modules\arraymodule.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\_warnings.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\asdl.c">
@@ -513,6 +513,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\floatobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\formatter_unicode.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\frameobject.c">
@@ -693,6 +696,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Python\pyfpe.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\pymath.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\pystate.c">

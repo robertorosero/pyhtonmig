@@ -25,7 +25,7 @@ scheduler:
 Example::
 
    >>> import sched, time
-   >>> s=sched.scheduler(time.time, time.sleep)
+   >>> s = sched.scheduler(time.time, time.sleep)
    >>> def print_time(): print("From print_time", time.time())
    ...
    >>> def print_some_times():
@@ -129,5 +129,3 @@ Scheduler Objects
    Read-only attribute returning a list of upcoming events in the order they
    will be run.  Each event is shown as a :term:`named tuple` with the
    following fields:  time, priority, action, argument.
-
-   .. versionadded:: 2.6

@@ -14,7 +14,7 @@ those familiar with the previous docs written in LaTeX.
 Building the docs
 =================
 
-You need to install Python 2.5.1 or higher (but Python 3.0 is not supported yet);
+You need to install Python 2.4 or higher (but Python 3.0 is not supported yet);
 the toolset used to build the docs are written in Python.  The toolset used
 to build the documentation is called *Sphinx*, it is not included in this
 tree, but maintained separately in the Python Subversion repository.  Also
@@ -56,9 +56,16 @@ Available make targets are:
  * "latex", which builds LaTeX source files that can be run with "pdflatex"
    to produce PDF documents.
 
+ * "linkcheck", which checks all external references to see whether they are
+   broken, redirected or malformed, and outputs this information to stdout
+   as well as a plain-text (.txt) file.
+
  * "changes", which builds an overview over all versionadded/versionchanged/
    deprecated items in the current version. This is meant as a help for the
    writer of the "What's New" document.
+
+ * "coverage", which builds a coverage overview for standard library modules
+   and C API.
 
 A "make update" updates the Subversion checkouts in `tools/`.
 
@@ -116,7 +123,7 @@ The Python source is copyrighted, but you can freely use and copy it
 as long as you don't change or remove the copyright notice:
 
 ----------------------------------------------------------------------
-Copyright (c) 2000-2007 Python Software Foundation.
+Copyright (c) 2000-2008 Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.

@@ -482,7 +482,7 @@ class LongTest(unittest.TestCase):
                 eq(x > y, Rcmp > 0, Frm("%r > %r %d", x, y, Rcmp))
                 eq(x >= y, Rcmp >= 0, Frm("%r >= %r %d", x, y, Rcmp))
 
-    def test_format(self):
+    def test__format__(self):
         self.assertEqual(format(123456789, 'd'), '123456789')
         self.assertEqual(format(123456789, 'd'), '123456789')
 
@@ -526,16 +526,27 @@ class LongTest(unittest.TestCase):
         self.assertEqual(format(1234, "+b"), "+10011010010")
         self.assertEqual(format(-1234, "+b"), "-10011010010")
 
-        # conversion to float
-        self.assertEqual(format(0, 'f'), '0.000000')
-
         # make sure these are errors
         self.assertRaises(ValueError, format, 3, "1.3")  # precision disallowed
         self.assertRaises(ValueError, format, 3, "+c")   # sign not allowed
                                                          # with 'c'
-        self.assertRaises(ValueError, format, 3, "R")    # bogus format type
-        # conversion to string should fail
-        self.assertRaises(ValueError, format, 3, "s")
+
+        # ensure that only int and float type specifiers work
+        for format_spec in ([chr(x) for x in range(ord('a'), ord('z')+1)] +
+                            [chr(x) for x in range(ord('A'), ord('Z')+1)]):
+            if not format_spec in 'bcdoxXeEfFgGn%':
+                self.assertRaises(ValueError, format, 0, format_spec)
+                self.assertRaises(ValueError, format, 1, format_spec)
+                self.assertRaises(ValueError, format, -1, format_spec)
+                self.assertRaises(ValueError, format, 2**100, format_spec)
+                self.assertRaises(ValueError, format, -(2**100), format_spec)
+
+        # ensure that float type specifiers work; format converts
+        #  the int to a float
+        for format_spec in 'eEfFgGn%':
+            for value in [0, 1, -1, 100, -100, 1234567890, -1234567890]:
+                self.assertEqual(format(value, format_spec),
+                                 format(float(value), format_spec))
 
     def test_nan_inf(self):
         self.assertRaises(OverflowError, int, float('inf'))

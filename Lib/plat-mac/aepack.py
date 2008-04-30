@@ -20,7 +20,6 @@ import Carbon.File
 import io
 import aetypes
 from aetypes import mkenum, ObjectSpecifier
-import os
 
 # These ones seem to be missing from AppleEvents
 # (they're in AERegistry.h)
@@ -83,7 +82,7 @@ def pack(x, forcetype = None):
         else:
             return pack(x).AECoerceDesc(forcetype)
 
-    if x == None:
+    if x is None:
         return AE.AECreateDesc(b'null', '')
 
     if isinstance(x, AEDescType):

@@ -506,7 +506,7 @@ Document Objects
 ^^^^^^^^^^^^^^^^
 
 A :class:`Document` represents an entire XML document, including its constituent
-elements, attributes, processing instructions, comments etc.  Remeber that it
+elements, attributes, processing instructions, comments etc.  Remember that it
 inherits properties from :class:`Node`.
 
 
@@ -641,8 +641,8 @@ of that class.
 
 .. method:: Element.removeAttribute(name)
 
-   Remove an attribute by name.  No exception is raised if there is no matching
-   attribute.
+   Remove an attribute by name.  If there is no matching attribute, a
+   :exc:`NotFoundErr` is raised.
 
 
 .. method:: Element.removeAttributeNode(oldAttr)
@@ -985,7 +985,7 @@ according to the following table.
 +------------------+-------------------------------------------+
 
 Additionally, the :class:`DOMString` defined in the recommendation is mapped to
-a Python string or Unicode string.  Applications should be able to handle
+a bytes or string object.  Applications should be able to handle
 Unicode whenever a string is returned from the DOM.
 
 The IDL ``null`` value is mapped to ``None``, which may be accepted or

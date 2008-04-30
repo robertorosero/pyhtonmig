@@ -5,7 +5,6 @@ import os
 import sys
 import time
 import errno
-import shutil
 import tempfile
 from pprint import pprint
 from random import random
@@ -34,6 +33,11 @@ except ImportError:
     # For Python 2.3
     from bsddb import db, dbutils
 
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
+
 
 #----------------------------------------------------------------------
 
@@ -47,7 +51,12 @@ class BaseThreadedTestCase(unittest.TestCase):
         if verbose:
             dbutils._deadlock_VerboseFile = sys.stdout
 
-        self.homeDir = tempfile.mkdtemp()
+        homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
+        self.homeDir = homeDir
+        try:
+            os.mkdir(homeDir)
+        except OSError as e:
+            if e.errno != errno.EEXIST: raise
         self.env = db.DBEnv()
         self.setEnvOpts()
         self.env.open(self.homeDir, self.envflags | db.DB_CREATE)
@@ -61,7 +70,7 @@ class BaseThreadedTestCase(unittest.TestCase):
     def tearDown(self):
         self.d.close()
         self.env.close()
-        shutil.rmtree(self.homeDir)
+        test_support.rmtree(self.homeDir)
 
     def setEnvOpts(self):
         pass

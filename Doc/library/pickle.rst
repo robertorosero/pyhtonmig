@@ -110,7 +110,7 @@ advantage of using printable ASCII (and of some other characteristics of
 :mod:`pickle`'s representation) is that for debugging or recovery purposes it is
 possible for a human to read the pickled file with a standard text editor.
 
-There are currently 3 different protocols which can be used for pickling.
+There are currently 4 different protocols which can be used for pickling.
 
 * Protocol version 0 is the original ASCII protocol and is backwards compatible
   with earlier versions of Python.
@@ -121,11 +121,14 @@ There are currently 3 different protocols which can be used for pickling.
 * Protocol version 2 was introduced in Python 2.3.  It provides much more
   efficient pickling of :term:`new-style class`\es.
 
+* Protocol version 3 was added in Python 3.0.  It has explicit support for
+  bytes and cannot be unpickled by Python 2.x pickle modules.
+
 Refer to :pep:`307` for more information.
 
-If a *protocol* is not specified, protocol 0 is used. If *protocol* is specified
-as a negative value or :const:`HIGHEST_PROTOCOL`, the highest protocol version
-available will be used.
+If a *protocol* is not specified, protocol 3 is used.  If *protocol* is 
+specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest
+protocol version available will be used.
 
 A binary format, which is slightly more efficient, can be chosen by specifying a
 *protocol* version >= 1.
@@ -164,9 +167,9 @@ process more convenient:
    Write a pickled representation of *obj* to the open file object *file*.  This is
    equivalent to ``Pickler(file, protocol).dump(obj)``.
 
-   If the *protocol* parameter is omitted, protocol 0 is used. If *protocol* is
-   specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest protocol
-   version will be used.
+   If the *protocol* parameter is omitted, protocol 3 is used.  If *protocol* is
+   specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest 
+   protocol version will be used.
 
    *file* must have a :meth:`write` method that accepts a single string argument.
    It can thus be a file object opened for writing, a :mod:`StringIO` object, or
@@ -191,18 +194,18 @@ process more convenient:
 
 .. function:: dumps(obj[, protocol])
 
-   Return the pickled representation of the object as a string, instead of writing
-   it to a file.
+   Return the pickled representation of the object as a :class:`bytes`
+   object, instead of writing it to a file.
 
-   If the *protocol* parameter is omitted, protocol 0 is used. If *protocol* is
-   specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest protocol
-   version will be used.
+   If the *protocol* parameter is omitted, protocol 3 is used.  If *protocol* 
+   is specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest 
+   protocol version will be used.
 
 
-.. function:: loads(string)
+.. function:: loads(bytes_object)
 
-   Read a pickled object hierarchy from a string.  Characters in the string past
-   the pickled object's representation are ignored.
+   Read a pickled object hierarchy from a :class:`bytes` object.
+   Bytes past the pickled object's representation are ignored.
 
 The :mod:`pickle` module also defines three exceptions:
 
@@ -234,7 +237,7 @@ The :mod:`pickle` module also exports two callables [#]_, :class:`Pickler` and
 
    This takes a file-like object to which it will write a pickle data stream.
 
-   If the *protocol* parameter is omitted, protocol 0 is used. If *protocol* is
+   If the *protocol* parameter is omitted, protocol 3 is used.  If *protocol* is
    specified as a negative value or :const:`HIGHEST_PROTOCOL`, the highest
    protocol version will be used.
 
@@ -242,34 +245,34 @@ The :mod:`pickle` module also exports two callables [#]_, :class:`Pickler` and
    It can thus be an open file object, a :mod:`StringIO` object, or any other
    custom object that meets this interface.
 
-:class:`Pickler` objects define one (or two) public methods:
+   :class:`Pickler` objects define one (or two) public methods:
 
 
-.. method:: Pickler.dump(obj)
+   .. method:: dump(obj)
 
-   Write a pickled representation of *obj* to the open file object given in the
-   constructor.  Either the binary or ASCII format will be used, depending on the
-   value of the *protocol* argument passed to the constructor.
+      Write a pickled representation of *obj* to the open file object given in the
+      constructor.  Either the binary or ASCII format will be used, depending on the
+      value of the *protocol* argument passed to the constructor.
 
 
-.. method:: Pickler.clear_memo()
+   .. method:: clear_memo()
 
-   Clears the pickler's "memo".  The memo is the data structure that remembers
-   which objects the pickler has already seen, so that shared or recursive objects
-   pickled by reference and not by value.  This method is useful when re-using
-   picklers.
+      Clears the pickler's "memo".  The memo is the data structure that remembers
+      which objects the pickler has already seen, so that shared or recursive objects
+      pickled by reference and not by value.  This method is useful when re-using
+      picklers.
 
-   .. note::
+      .. note::
 
-      Prior to Python 2.3, :meth:`clear_memo` was only available on the picklers
-      created by :mod:`cPickle`.  In the :mod:`pickle` module, picklers have an
-      instance variable called :attr:`memo` which is a Python dictionary.  So to clear
-      the memo for a :mod:`pickle` module pickler, you could do the following::
+         Prior to Python 2.3, :meth:`clear_memo` was only available on the picklers
+         created by :mod:`cPickle`.  In the :mod:`pickle` module, picklers have an
+         instance variable called :attr:`memo` which is a Python dictionary.  So to clear
+         the memo for a :mod:`pickle` module pickler, you could do the following::
 
-         mypickler.memo.clear()
+            mypickler.memo.clear()
 
-      Code that does not need to support older versions of Python should simply use
-      :meth:`clear_memo`.
+         Code that does not need to support older versions of Python should simply use
+         :meth:`clear_memo`.
 
 It is possible to make multiple calls to the :meth:`dump` method of the same
 :class:`Pickler` instance.  These must then be matched to the same number of
@@ -293,29 +296,30 @@ instance.  If the same object is pickled by multiple :meth:`dump` calls, the
    reading, a :mod:`StringIO` object, or any other custom object that meets this
    interface.
 
-:class:`Unpickler` objects have one (or two) public methods:
+   :class:`Unpickler` objects have one (or two) public methods:
 
 
-.. method:: Unpickler.load()
+   .. method:: load()
 
-   Read a pickled object representation from the open file object given in the
-   constructor, and return the reconstituted object hierarchy specified therein.
+      Read a pickled object representation from the open file object given in
+      the constructor, and return the reconstituted object hierarchy specified
+      therein.
 
-   This method automatically determines whether the data stream was written in
-   binary mode or not.
+      This method automatically determines whether the data stream was written
+      in binary mode or not.
 
 
-.. method:: Unpickler.noload()
+   .. method:: noload()
 
-   This is just like :meth:`load` except that it doesn't actually create any
-   objects.  This is useful primarily for finding what's called "persistent ids"
-   that may be referenced in a pickle data stream.  See section
-   :ref:`pickle-protocol` below for more details.
+      This is just like :meth:`load` except that it doesn't actually create any
+      objects.  This is useful primarily for finding what's called "persistent
+      ids" that may be referenced in a pickle data stream.  See section
+      :ref:`pickle-protocol` below for more details.
 
-   **Note:** the :meth:`noload` method is currently only available on
-   :class:`Unpickler` objects created with the :mod:`cPickle` module.
-   :mod:`pickle` module :class:`Unpickler`\ s do not have the :meth:`noload`
-   method.
+      **Note:** the :meth:`noload` method is currently only available on
+      :class:`Unpickler` objects created with the :mod:`cPickle` module.
+      :mod:`pickle` module :class:`Unpickler`\ s do not have the :meth:`noload`
+      method.
 
 
 What can be pickled and unpickled?
@@ -327,7 +331,7 @@ The following types can be pickled:
 
 * integers, floating point numbers, complex numbers
 
-* normal and Unicode strings
+* strings, bytes, bytearrays
 
 * tuples, lists, sets, and dictionaries containing only picklable objects
 
@@ -400,6 +404,7 @@ Pickling and unpickling normal class instances
    single: __init__() (instance constructor)
 
 .. XXX is __getinitargs__ only used with old-style classes?
+.. XXX update w.r.t Py3k's classes
 
 When a pickled class instance is unpickled, its :meth:`__init__` method is
 normally *not* invoked.  If it is desirable that the :meth:`__init__` method be
@@ -444,12 +449,17 @@ can do what they want. [#]_
 
 .. warning::
 
-   For :term:`new-style class`\es, if :meth:`__getstate__` returns a false
-   value, the :meth:`__setstate__` method will not be called.
+   If :meth:`__getstate__` returns a false value, the :meth:`__setstate__`
+   method will not be called.
 
 
 Pickling and unpickling extension types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. index::
+   single: __reduce__() (pickle protocol)
+   single: __reduce_ex__() (pickle protocol)
+   single: __safe_for_unpickling__ (pickle protocol)
 
 When the :class:`Pickler` encounters an object of a type it knows nothing about
 --- such as an extension type --- it looks in two places for a hint of how to
@@ -463,8 +473,9 @@ local name relative to its module; the pickle module searches the module
 namespace to determine the object's module.
 
 When a tuple is returned, it must be between two and five elements long.
-Optional elements can either be omitted, or ``None`` can be provided  as their
-value.  The semantics of each element are:
+Optional elements can either be omitted, or ``None`` can be provided as their
+value.  The contents of this tuple are pickled as normal and used to
+reconstruct the object at unpickling time.  The semantics of each element are:
 
 * A callable object that will be called to create the initial version of the
   object.  The next element of the tuple will provide arguments for this callable,
@@ -525,6 +536,10 @@ unpickling as described above.
 
 Pickling and unpickling external objects
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. index::
+   single: persistent_id (pickle protocol)
+   single: persistent_load (pickle protocol)
 
 For the benefit of object persistence, the :mod:`pickle` module supports the
 notion of a reference to an object outside the pickled data stream.  Such
@@ -615,6 +630,10 @@ with the :meth:`noload` method on the Unpickler.
 Subclassing Unpicklers
 ----------------------
 
+.. index::
+   single: load_global() (pickle protocol)
+   single: find_global() (pickle protocol)
+
 By default, unpickling will import any class that it finds in the pickle data.
 You can control exactly what gets unpickled and what gets called by customizing
 your unpickler.  Unfortunately, exactly how you do this is different depending
@@ -659,7 +678,7 @@ that a self-referencing list is pickled and restored correctly. ::
    import pickle
 
    data1 = {'a': [1, 2.0, 3, 4+6j],
-            'b': ('string', u'Unicode string'),
+            'b': ("string", "string using Unicode features \u0394"),
             'c': None}
 
    selfref_list = [1, 2, 3]
@@ -667,8 +686,8 @@ that a self-referencing list is pickled and restored correctly. ::
 
    output = open('data.pkl', 'wb')
 
-   # Pickle dictionary using protocol 0.
-   pickle.dump(data1, output)
+   # Pickle dictionary using protocol 2.
+   pickle.dump(data1, output, 2)
 
    # Pickle the list using the highest protocol available.
    pickle.dump(selfref_list, output, -1)

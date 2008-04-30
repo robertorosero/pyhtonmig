@@ -312,10 +312,9 @@ static Py_buffer * _malloc_view(PyObject *obj)
                         "Py_buffer malloc failed");
         return NULL;
     }
-    /* XXX(gps): PyBUF_LOCKDATA is desired to prevent other theads from
-       trashing the data buffer while we release the GIL during the db
-       operation.  see http://bugs.python.org/issue1035 */
-    if (PyObject_GetBuffer(obj, view, PyBUF_SIMPLE) == -1) {
+    /* We use PyBUF_LOCK to prevent other threads from trashing the data
+       buffer while we release the GIL.  http://bugs.python.org/issue1035 */
+    if (PyObject_GetBuffer(obj, view, PyBUF_LOCK) == -1) {
         PyMem_Free(view);
         return NULL;
     }
@@ -904,7 +903,6 @@ DBCursor_dealloc(DBCursorObject* self)
     }
 
     if (self->dbc != NULL) {
-        MYDB_BEGIN_ALLOW_THREADS;
 	/* If the underlying database has been closed, we don't
 	   need to do anything. If the environment has been closed
 	   we need to leak, as BerkeleyDB will crash trying to access
@@ -913,9 +911,14 @@ DBCursor_dealloc(DBCursorObject* self)
 	   a database open. */
 	if (self->mydb->db && self->mydb->myenvobj &&
 	    !self->mydb->myenvobj->closed)
+        /* test for: open db + no environment or non-closed environment */
+	if (self->mydb->db && (!self->mydb->myenvobj || (self->mydb->myenvobj &&
+	    !self->mydb->myenvobj->closed))) {
+            MYDB_BEGIN_ALLOW_THREADS;
             err = self->dbc->c_close(self->dbc);
+            MYDB_END_ALLOW_THREADS;
+        }
         self->dbc = NULL;
-        MYDB_END_ALLOW_THREADS;
     }
     Py_XDECREF( self->mydb );
     PyObject_Del(self);

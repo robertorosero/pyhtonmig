@@ -15,13 +15,6 @@ function for the purposes of this module.
 
 The :mod:`functools` module defines the following functions:
 
-
-.. function:: reduce(function, iterable[, initializer])
-
-   This is the same function as :func:`reduce`.  It is made available in this module
-   to allow writing code more forward-compatible with Python 3.
-
-
 .. function:: partial(func[,*args][, **keywords])
 
    Return a new :class:`partial` object which when called will behave like *func*
@@ -44,15 +37,16 @@ The :mod:`functools` module defines the following functions:
    some portion of a function's arguments and/or keywords resulting in a new object
    with a simplified signature.  For example, :func:`partial` can be used to create
    a callable that behaves like the :func:`int` function where the *base* argument
-   defaults to two::
+   defaults to two:
 
+      >>> from functools import partial
       >>> basetwo = partial(int, base=2)
       >>> basetwo.__doc__ = 'Convert base 2 string to an int.'
       >>> basetwo('10010')
       18
 
 
-.. function:: reduce(function, sequence[, initializer])
+.. function:: reduce(function, iterable[, initializer])
 
    Apply *function* of two arguments cumulatively to the items of *sequence*, from
    left to right, so as to reduce the sequence to a single value.  For example,
@@ -87,8 +81,9 @@ The :mod:`functools` module defines the following functions:
 
    This is a convenience function for invoking ``partial(update_wrapper,
    wrapped=wrapped, assigned=assigned, updated=updated)`` as a function decorator
-   when defining a wrapper function. For example::
+   when defining a wrapper function. For example:
 
+      >>> from functools import wraps
       >>> def my_decorator(f):
       ...     @wraps(f)
       ...     def wrapper(*args, **kwds):

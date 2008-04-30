@@ -980,15 +980,10 @@ class ConfigDialog(Toplevel):
         self.SetThemeType()
         ##load theme element option menu
         themeNames = list(self.themeElements.keys())
-        themeNames.sort(self.__ThemeNameIndexCompare)
+        themeNames.sort(key=lambda x: self.themeElements[x][1])
         self.optMenuHighlightTarget.SetMenu(themeNames,themeNames[0])
         self.PaintThemeSample()
         self.SetHighlightTarget()
-
-    def __ThemeNameIndexCompare(self,a,b):
-        if self.themeElements[a][1]<self.themeElements[b][1]: return -1
-        elif self.themeElements[a][1]==self.themeElements[b][1]: return 0
-        else: return 1
 
     def LoadKeyCfg(self):
         ##current keys type radiobutton
@@ -1119,15 +1114,12 @@ class ConfigDialog(Toplevel):
     def ActivateConfigChanges(self):
         "Dynamically apply configuration changes"
         winInstances = self.parent.instance_dict.keys()
-        theme = idleConf.CurrentTheme()
-        cursor_color = idleConf.GetHighlight(theme, 'cursor', fgBg='fg')
         for instance in winInstances:
             instance.ResetColorizer()
             instance.ResetFont()
             instance.set_notabs_indentwidth()
             instance.ApplyKeybindings()
             instance.reset_help_menu_entries()
-            instance.text.configure(insertbackground=cursor_color)
 
     def Cancel(self):
         self.destroy()

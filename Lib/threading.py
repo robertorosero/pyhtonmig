@@ -391,6 +391,9 @@ class Thread(_Verbose):
     # shutdown and thus raises an exception about trying to perform some
     # operation on/with a NoneType
     __exc_info = _sys.exc_info
+    # Keep sys.exc_clear too to clear the exception just before
+    # allowing .join() to return.
+    #XXX __exc_clear = _sys.exc_clear
 
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
@@ -403,7 +406,7 @@ class Thread(_Verbose):
         self._args = args
         self._kwargs = kwargs
         self._daemonic = self._set_daemon()
-        self._started = False
+        self._started = Event()
         self._stopped = False
         self._block = Condition(Lock())
         self._initialized = True
@@ -418,7 +421,7 @@ class Thread(_Verbose):
     def __repr__(self):
         assert self._initialized, "Thread.__init__() was not called"
         status = "initial"
-        if self._started:
+        if self._started.isSet():
             status = "started"
         if self._stopped:
             status = "stopped"
@@ -429,7 +432,8 @@ class Thread(_Verbose):
     def start(self):
         if not self._initialized:
             raise RuntimeError("thread.__init__() not called")
-        if self._started:
+
+        if self._started.isSet():
             raise RuntimeError("thread already started")
         if __debug__:
             self._note("%s.start(): starting thread", self)
@@ -437,12 +441,16 @@ class Thread(_Verbose):
         _limbo[self] = self
         _active_limbo_lock.release()
         _start_new_thread(self._bootstrap, ())
-        self._started = True
-        _sleep(0.000001)    # 1 usec, to let the thread run (Solaris hack)
+        self._started.wait()
 
     def run(self):
-        if self._target:
-            self._target(*self._args, **self._kwargs)
+        try:
+            if self._target:
+                self._target(*self._args, **self._kwargs)
+        finally:
+            # Avoid a refcycle if the thread is running a function with
+            # an argument that has a member that points to the thread.
+            del self._target, self._args, self._kwargs
 
     def _bootstrap(self):
         # Wrapper around the real bootstrap code that ignores
@@ -450,11 +458,11 @@ class Thread(_Verbose):
         # happen when a daemon thread wakes up at an unfortunate
         # moment, finds the world around it destroyed, and raises some
         # random exception *** while trying to report the exception in
-        # __bootstrap_inner() below ***.  Those random exceptions
+        # _bootstrap_inner() below ***.  Those random exceptions
         # don't help anybody, and they confuse users, so we suppress
         # them.  We suppress them only when it appears that the world
         # indeed has already been destroyed, so that exceptions in
-        # __bootstrap_inner() during normal business hours are properly
+        # _bootstrap_inner() during normal business hours are properly
         # reported.  Also, we only suppress them for daemonic threads;
         # if a non-daemonic encounters this, something else is wrong.
         try:
@@ -466,29 +474,29 @@ class Thread(_Verbose):
 
     def _bootstrap_inner(self):
         try:
-            self._started = True
+            self._started.set()
             _active_limbo_lock.acquire()
             _active[_get_ident()] = self
             del _limbo[self]
             _active_limbo_lock.release()
             if __debug__:
-                self._note("%s.__bootstrap(): thread started", self)
+                self._note("%s._bootstrap(): thread started", self)
 
             if _trace_hook:
-                self._note("%s.__bootstrap(): registering trace hook", self)
+                self._note("%s._bootstrap(): registering trace hook", self)
                 _sys.settrace(_trace_hook)
             if _profile_hook:
-                self._note("%s.__bootstrap(): registering profile hook", self)
+                self._note("%s._bootstrap(): registering profile hook", self)
                 _sys.setprofile(_profile_hook)
 
             try:
                 self.run()
             except SystemExit:
                 if __debug__:
-                    self._note("%s.__bootstrap(): raised SystemExit", self)
+                    self._note("%s._bootstrap(): raised SystemExit", self)
             except:
                 if __debug__:
-                    self._note("%s.__bootstrap(): unhandled exception", self)
+                    self._note("%s._bootstrap(): unhandled exception", self)
                 # If sys.stderr is no more (most likely from interpreter
                 # shutdown) use self._stderr.  Otherwise still use sys (as in
                 # _sys) in case sys.stderr was redefined since the creation of
@@ -521,7 +529,14 @@ class Thread(_Verbose):
                         del exc_type, exc_value, exc_tb
             else:
                 if __debug__:
-                    self._note("%s.__bootstrap(): normal return", self)
+                    self._note("%s._bootstrap(): normal return", self)
+            finally:
+                # Prevent a race in
+                # test_threading.test_no_refcycle_through_target when
+                # the exception keeps the target alive past when we
+                # assert that it's dead.
+                #XXX self.__exc_clear()
+                pass
         finally:
             with _active_limbo_lock:
                 self._stop()
@@ -562,20 +577,21 @@ class Thread(_Verbose):
         # since it isn't if dummy_threading is *not* being used then don't
         # hide the exception.
 
-        _active_limbo_lock.acquire()
         try:
-            try:
+            with _active_limbo_lock:
                 del _active[_get_ident()]
-            except KeyError:
-                if 'dummy_threading' not in _sys.modules:
-                    raise
-        finally:
-            _active_limbo_lock.release()
+                # There must not be any python code between the previous line
+                # and after the lock is released.  Otherwise a tracing function
+                # could try to acquire the lock again in the same thread, (in
+                # currentThread()), and would block.
+        except KeyError:
+            if 'dummy_threading' not in _sys.modules:
+                raise
 
     def join(self, timeout=None):
         if not self._initialized:
             raise RuntimeError("Thread.__init__() not called")
-        if not self._started:
+        if not self._started.isSet():
             raise RuntimeError("cannot join thread before it is started")
         if self is currentThread():
             raise RuntimeError("cannot join current thread")
@@ -616,7 +632,7 @@ class Thread(_Verbose):
 
     def isAlive(self):
         assert self._initialized, "Thread.__init__() not called"
-        return self._started and not self._stopped
+        return self._started.isSet() and not self._stopped
 
     def isDaemon(self):
         assert self._initialized, "Thread.__init__() not called"
@@ -625,7 +641,7 @@ class Thread(_Verbose):
     def setDaemon(self, daemonic):
         if not self._initialized:
             raise RuntimeError("Thread.__init__() not called")
-        if self._started:
+        if self._started.isSet():
             raise RuntimeError("cannot set daemon status of active thread");
         self._daemonic = daemonic
 
@@ -667,7 +683,7 @@ class _MainThread(Thread):
 
     def __init__(self):
         Thread.__init__(self, name="MainThread")
-        self._started = True
+        self._started.set()
         _active_limbo_lock.acquire()
         _active[_get_ident()] = self
         _active_limbo_lock.release()
@@ -713,7 +729,8 @@ class _DummyThread(Thread):
         # instance is immortal, that's bad, so release this resource.
         del self._block
 
-        self._started = True
+
+        self._started.set()
         _active_limbo_lock.acquire()
         _active[_get_ident()] = self
         _active_limbo_lock.release()

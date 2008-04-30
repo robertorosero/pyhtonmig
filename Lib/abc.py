@@ -3,7 +3,7 @@
 
 """Abstract Base Classes (ABCs) according to PEP 3119."""
 
-from weakref import WeakSet
+from _weakrefset import WeakSet
 
 def abstractmethod(funcobj):
     """A decorator indicating abstract methods.
@@ -52,50 +52,6 @@ class abstractproperty(property):
     __isabstractmethod__ = True
 
 
-class _Abstract(object):
-
-    """Helper class inserted into the bases by ABCMeta (using _fix_bases()).
-
-    You should never need to explicitly subclass this class.
-    """
-
-    def __new__(cls, *args, **kwds):
-        am = cls.__dict__.get("__abstractmethods__")
-        if am:
-            raise TypeError("Can't instantiate abstract class %s "
-                            "with abstract methods %s" %
-                            (cls.__name__, ", ".join(sorted(am))))
-        if (args or kwds) and cls.__init__ is object.__init__:
-            raise TypeError("Can't pass arguments to __new__ "
-                            "without overriding __init__")
-        return super().__new__(cls)
-
-    @classmethod
-    def __subclasshook__(cls, subclass):
-        """Abstract classes can override this to customize issubclass().
-
-        This is invoked early on by __subclasscheck__() below.  It
-        should return True, False or NotImplemented.  If it returns
-        NotImplemented, the normal algorithm is used.  Otherwise, it
-        overrides the normal algorithm (and the outcome is cached).
-        """
-        return NotImplemented
-
-
-def _fix_bases(bases):
-    """Helper method that inserts _Abstract in the bases if needed."""
-    for base in bases:
-        if issubclass(base, _Abstract):
-            # _Abstract is already a base (maybe indirectly)
-            return bases
-    if object in bases:
-        # Replace object with _Abstract
-        return tuple([_Abstract if base is object else base
-                      for base in bases])
-    # Append _Abstract to the end
-    return bases + (_Abstract,)
-
-
 class ABCMeta(type):
 
     """Metaclass for defining Abstract Base Classes (ABCs).
@@ -118,7 +74,6 @@ class ABCMeta(type):
     _abc_invalidation_counter = 0
 
     def __new__(mcls, name, bases, namespace):
-        bases = _fix_bases(bases)
         cls = super().__new__(mcls, name, bases, namespace)
         # Compute set of abstract method names
         abstracts = {name
@@ -129,7 +84,7 @@ class ABCMeta(type):
                 value = getattr(cls, name, None)
                 if getattr(value, "__isabstractmethod__", False):
                     abstracts.add(name)
-        cls.__abstractmethods__ = abstracts
+        cls.__abstractmethods__ = frozenset(abstracts)
         # Set up inheritance registry
         cls._abc_registry = WeakSet()
         cls._abc_cache = WeakSet()
@@ -162,8 +117,19 @@ class ABCMeta(type):
 
     def __instancecheck__(cls, instance):
         """Override for isinstance(instance, cls)."""
-        return any(cls.__subclasscheck__(c)
-                   for c in {instance.__class__, type(instance)})
+        # Inline the cache checking
+        subclass = instance.__class__
+        if subclass in cls._abc_cache:
+            return True
+        subtype = type(instance)
+        if subtype is subclass:
+            if (cls._abc_negative_cache_version ==
+                ABCMeta._abc_invalidation_counter and
+                subclass in cls._abc_negative_cache):
+                return False
+            # Fall back to the subclass check.
+            return cls.__subclasscheck__(subclass)
+        return any(cls.__subclasscheck__(c) for c in {subclass, subtype})
 
     def __subclasscheck__(cls, subclass):
         """Override for issubclass(subclass, cls)."""

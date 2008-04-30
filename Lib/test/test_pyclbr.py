@@ -3,7 +3,7 @@
    Nick Mathewson
 '''
 from test.test_support import run_unittest
-import unittest, sys
+import sys
 from types import FunctionType, MethodType, BuiltinFunctionType
 import pyclbr
 from unittest import TestCase
@@ -55,7 +55,7 @@ class PyclbrTest(TestCase):
 
         ignore = set(ignore) | set(['object'])
 
-        if module == None:
+        if module is None:
             # Import it.
             # ('<silly>' is to work around an API silliness in __import__)
             module = __import__(moduleName, globals(), {}, ['<silly>'])

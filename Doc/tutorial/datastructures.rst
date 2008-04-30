@@ -83,17 +83,20 @@ objects:
 
 
 .. method:: list.append(x)
+   :noindex:
 
    Add an item to the end of the list; equivalent to ``a[len(a):] = [x]``.
 
 
 .. method:: list.extend(L)
+   :noindex:
 
    Extend the list by appending all the items in the given list; equivalent to
    ``a[len(a):] = L``.
 
 
 .. method:: list.insert(i, x)
+   :noindex:
 
    Insert an item at a given position.  The first argument is the index of the
    element before which to insert, so ``a.insert(0, x)`` inserts at the front of
@@ -101,12 +104,14 @@ objects:
 
 
 .. method:: list.remove(x)
+   :noindex:
 
    Remove the first item from the list whose value is *x*. It is an error if there
    is no such item.
 
 
 .. method:: list.pop([i])
+   :noindex:
 
    Remove the item at the given position in the list, and return it.  If no index
    is specified, ``a.pop()`` removes and returns the last item in the list.  (The
@@ -116,22 +121,26 @@ objects:
 
 
 .. method:: list.index(x)
+   :noindex:
 
    Return the index in the list of the first item whose value is *x*. It is an
    error if there is no such item.
 
 
 .. method:: list.count(x)
+   :noindex:
 
    Return the number of times *x* appears in the list.
 
 
 .. method:: list.sort()
+   :noindex:
 
    Sort the items of the list, in place.
 
 
 .. method:: list.reverse()
+   :noindex:
 
    Reverse the elements of the list, in place.
 
@@ -273,7 +282,7 @@ Here are some nested for loops and other fancy behavior::
 
 List comprehensions can be applied to complex expressions and nested functions::
 
-   >>> [str(round(355/113.0, i)) for i in range(1, 6)]
+   >>> [str(round(355/113, i)) for i in range(1, 6)]
    ['3.1', '3.14', '3.142', '3.1416', '3.14159']
 
 
@@ -437,6 +446,9 @@ Here is a brief demonstration::
    >>> fruit = set(basket)               # create a set without duplicates
    >>> fruit
    {'orange', 'pear', 'apple', 'banana'}
+   >>> fruit = {'orange', 'apple'}       # {} syntax is equivalent to [] for lists
+   >>> fruit
+   {'orange', 'apple'}
    >>> 'orange' in fruit                 # fast membership testing
    True
    >>> 'crabgrass' in fruit
@@ -457,6 +469,11 @@ Here is a brief demonstration::
    >>> a ^ b                              # letters in a or b but not both
    {'r', 'd', 'b', 'm', 'z', 'l'}
 
+Like for lists, there is a set comprehension syntax::
+
+   >>> a = {x for x in 'abracadabra' if x not in 'abc'}
+   >>> a
+   {'r', 'd'}
 
 
 
@@ -518,12 +535,12 @@ comprehensions can compactly specify the key-value list. ::
 
    >>> dict([('sape', 4139), ('guido', 4127), ('jack', 4098)])
    {'sape': 4139, 'jack': 4098, 'guido': 4127}
-   >>> dict([(x, x**2) for x in (2, 4, 6)])     # use a list comprehension
-   {2: 4, 4: 16, 6: 36}
 
-Later in the tutorial, we will learn about Generator Expressions which are even
-better suited for the task of supplying key-values pairs to the :func:`dict`
-constructor.
+In addition, dict comprehensions can be used to create dictionaries from
+arbitrary key and value expressions::
+
+   >>> {x: x**2 for x in (2, 4, 6)}
+   {2: 4, 4: 16, 6: 36}
 
 When the keys are simple strings, it is sometimes easier to specify pairs using
 keyword arguments::
@@ -532,9 +549,8 @@ keyword arguments::
    {'sape': 4139, 'jack': 4098, 'guido': 4127}
 
 
+.. XXX Find out the right way to do these DUBOIS
 .. _tut-loopidioms:
-.. % 
-   Find out the right way to do these DUBOIS
 
 Looping Techniques
 ==================

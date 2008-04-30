@@ -73,7 +73,7 @@ Python values should be obvious given their types:
 +--------+-------------------------+--------------------+-------+
 | ``B``  | :ctype:`unsigned char`  | integer            |       |
 +--------+-------------------------+--------------------+-------+
-| ``t``  | :ctype:`_Bool`          | bool               | \(1)  |
+| ``?``  | :ctype:`_Bool`          | bool               | \(1)  |
 +--------+-------------------------+--------------------+-------+
 | ``h``  | :ctype:`short`          | integer            |       |
 +--------+-------------------------+--------------------+-------+
@@ -106,7 +106,7 @@ Python values should be obvious given their types:
 Notes:
 
 (1)
-   The ``'t'`` conversion code corresponds to the :ctype:`_Bool` type defined by
+   The ``'?'`` conversion code corresponds to the :ctype:`_Bool` type defined by
    C99. If this type is not available, it is simulated using a :ctype:`char`. In
    standard mode, it is always represented by one byte.
 
@@ -141,7 +141,7 @@ bytes, but that the string returned can never contain more than 255 characters.
 
 
 
-For the ``'t'`` format character, the return value is either :const:`True` or
+For the ``'?'`` format character, the return value is either :const:`True` or
 :const:`False`. When packing, the truth value of the argument object is used.
 Either 0 or 1 in the native or standard bool representation will be packed, and
 any non-zero value will be True when unpacking.
@@ -242,37 +242,37 @@ The :mod:`struct` module also defines the following type:
    since the format string only needs to be compiled once.
 
 
-Compiled Struct objects support the following methods and attributes:
+   Compiled Struct objects support the following methods and attributes:
 
-.. method:: Struct.pack(v1, v2, ...)
+   .. method:: pack(v1, v2, ...)
 
-   Identical to the :func:`pack` function, using the compiled format.
-   (``len(result)`` will equal :attr:`self.size`.)
-
-
-.. method:: Struct.pack_into(buffer, offset, v1, v2, ...)
-
-   Identical to the :func:`pack_into` function, using the compiled format.
+      Identical to the :func:`pack` function, using the compiled format.
+      (``len(result)`` will equal :attr:`self.size`.)
 
 
-.. method:: Struct.unpack(string)
+   .. method:: pack_into(buffer, offset, v1, v2, ...)
 
-   Identical to the :func:`unpack` function, using the compiled format.
-   (``len(string)`` must equal :attr:`self.size`).
-
-
-.. method:: Struct.unpack_from(buffer[, offset=0])
-
-   Identical to the :func:`unpack_from` function, using the compiled format.
-   (``len(buffer[offset:])`` must be at least :attr:`self.size`).
+      Identical to the :func:`pack_into` function, using the compiled format.
 
 
-.. attribute:: Struct.format
+   .. method:: unpack(string)
 
-   The format string used to construct this Struct object.
+      Identical to the :func:`unpack` function, using the compiled format.
+      (``len(string)`` must equal :attr:`self.size`).
 
-.. attribute:: Struct.size
 
-   The calculated size of the struct (and hence of the string) corresponding
-   to :attr:`format`.
+   .. method:: unpack_from(buffer[, offset=0])
+
+      Identical to the :func:`unpack_from` function, using the compiled format.
+      (``len(buffer[offset:])`` must be at least :attr:`self.size`).
+
+
+   .. attribute:: format
+
+      The format string used to construct this Struct object.
+
+   .. attribute:: size
+
+      The calculated size of the struct (and hence of the string) corresponding
+      to :attr:`format`.
 

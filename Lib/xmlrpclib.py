@@ -287,6 +287,20 @@ boolean = Boolean = bool
 # @param value The time, given as an ISO 8601 string, a time
 #              tuple, or a integer time value.
 
+def _strftime(value):
+    if datetime:
+        if isinstance(value, datetime.datetime):
+            return "%04d%02d%02dT%02d:%02d:%02d" % (
+                value.year, value.month, value.day,
+                value.hour, value.minute, value.second)
+
+    if not isinstance(value, (tuple, time.struct_time)):
+        if value == 0:
+            value = time.time()
+        value = time.localtime(value)
+
+    return "%04d%02d%02dT%02d:%02d:%02d" % value[:6]
+
 class DateTime:
     """DateTime wrapper for an ISO 8601 string or time tuple or
     localtime integer value to generate 'dateTime.iso8601' XML-RPC
@@ -294,33 +308,62 @@ class DateTime:
     """
 
     def __init__(self, value=0):
-        if not isinstance(value, str):
-            if datetime and isinstance(value, datetime.datetime):
-                self.value = value.strftime("%Y%m%dT%H:%M:%S")
-                return
-            if datetime and isinstance(value, datetime.date):
-                self.value = value.strftime("%Y%m%dT%H:%M:%S")
-                return
-            if datetime and isinstance(value, datetime.time):
-                today = datetime.datetime.now().strftime("%Y%m%d")
-                self.value = value.strftime(today+"T%H:%M:%S")
-                return
-            if not isinstance(value, (tuple, time.struct_time)):
-                if value == 0:
-                    value = time.time()
-                value = time.localtime(value)
-            value = time.strftime("%Y%m%dT%H:%M:%S", value)
-        self.value = value
+        if isinstance(value, str):
+            self.value = value
+        else:
+            self.value = _strftime(value)
+
+    def make_comparable(self, other):
+        if isinstance(other, DateTime):
+            s = self.value
+            o = other.value
+        elif datetime and isinstance(other, datetime.datetime):
+            s = self.value
+            o = other.strftime("%Y%m%dT%H:%M:%S")
+        elif isinstance(other, (str, unicode)):
+            s = self.value
+            o = other
+        elif hasattr(other, "timetuple"):
+            s = self.timetuple()
+            o = other.timetuple()
+        else:
+            otype = (hasattr(other, "__class__")
+                     and other.__class__.__name__
+                     or type(other))
+            raise TypeError("Can't compare %s and %s" %
+                            (self.__class__.__name__, otype))
+        return s, o
+
+    def __lt__(self, other):
+        s, o = self.make_comparable(other)
+        return s < o
+
+    def __le__(self, other):
+        s, o = self.make_comparable(other)
+        return s <= o
+
+    def __gt__(self, other):
+        s, o = self.make_comparable(other)
+        return s > o
+
+    def __ge__(self, other):
+        s, o = self.make_comparable(other)
+        return s >= o
 
     def __eq__(self, other):
-        if isinstance(other, DateTime):
-            other = other.value
-        return self.value == other
+        s, o = self.make_comparable(other)
+        return s == o
 
     def __ne__(self, other):
-        if isinstance(other, DateTime):
-            other = other.value
-        return self.value != other
+        s, o = self.make_comparable(other)
+        return s != o
+
+    def timetuple(self):
+        return time.strptime(self.value, "%Y%m%dT%H:%M:%S")
+
+    def __cmp__(self, other):
+        s, o = self.make_comparable(other)
+        return cmp(s, o)
 
     ##
     # Get date/time value.
@@ -665,22 +708,9 @@ class Marshaller:
     if datetime:
         def dump_datetime(self, value, write):
             write("<value><dateTime.iso8601>")
-            write(value.strftime("%Y%m%dT%H:%M:%S"))
+            write(_strftime(value))
             write("</dateTime.iso8601></value>\n")
         dispatch[datetime.datetime] = dump_datetime
-
-        def dump_date(self, value, write):
-            write("<value><dateTime.iso8601>")
-            write(value.strftime("%Y%m%dT00:00:00"))
-            write("</dateTime.iso8601></value>\n")
-        dispatch[datetime.date] = dump_date
-
-        def dump_time(self, value, write):
-            write("<value><dateTime.iso8601>")
-            write(datetime.datetime.now().date().strftime("%Y%m%dT"))
-            write(value.strftime("%H:%M:%S"))
-            write("</dateTime.iso8601></value>\n")
-        dispatch[datetime.time] = dump_time
 
     def dump_instance(self, value, write):
         # check for special wrappers

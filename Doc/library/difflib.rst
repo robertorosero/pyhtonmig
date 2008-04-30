@@ -1,4 +1,3 @@
-
 :mod:`difflib` --- Helpers for computing deltas
 ===============================================
 
@@ -8,7 +7,10 @@
 .. sectionauthor:: Tim Peters <tim_one@users.sourceforge.net>
 .. Markup by Fred L. Drake, Jr. <fdrake@acm.org>
 
+.. testsetup::
 
+   import sys
+   from difflib import *
 
 This module provides classes and functions for comparing sequences. It
 can be used for example, for comparing files, and can produce difference
@@ -144,7 +146,25 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    expressed in the format returned by :func:`time.ctime`.  If not specified, the
    strings default to blanks.
 
-   :file:`Tools/scripts/diff.py` is a command-line front-end for this function.
+      >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
+      >>> s2 = ['python\n', 'eggy\n', 'hamster\n', 'guido\n']
+      >>> for line in context_diff(s1, s2, fromfile='before.py', tofile='after.py'):
+      ...     sys.stdout.write(line)  # doctest: +NORMALIZE_WHITESPACE
+      *** before.py
+      --- after.py
+      ***************
+      *** 1,4 ****
+      ! bacon
+      ! eggs
+      ! ham
+        guido
+      --- 1,4 ----
+      ! python
+      ! eggy
+      ! hamster
+        guido
+
+   See :ref:`difflib-interface` for a more detailed example.
 
 
 .. function:: get_close_matches(word, possibilities[, n][, cutoff])
@@ -160,7 +180,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    Possibilities that don't score at least that similar to *word* are ignored.
 
    The best (no more than *n*) matches among the possibilities are returned in a
-   list, sorted by similarity score, most similar first. ::
+   list, sorted by similarity score, most similar first.
 
       >>> get_close_matches('appel', ['ape', 'apple', 'peach', 'puppy'])
       ['apple', 'ape']
@@ -195,7 +215,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    function :func:`IS_CHARACTER_JUNK`, which filters out whitespace characters (a
    blank or tab; note: bad idea to include newline in this!).
 
-   :file:`Tools/scripts/ndiff.py` is a command-line front-end to this function. ::
+   :file:`Tools/scripts/ndiff.py` is a command-line front-end to this function.
 
       >>> diff = ndiff('one\ntwo\nthree\n'.splitlines(1),
       ...              'ore\ntree\nemu\n'.splitlines(1))
@@ -219,7 +239,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    lines originating from file 1 or 2 (parameter *which*), stripping off line
    prefixes.
 
-   Example::
+   Example:
 
       >>> diff = ndiff('one\ntwo\nthree\n'.splitlines(1),
       ...              'ore\ntree\nemu\n'.splitlines(1))
@@ -259,7 +279,23 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    expressed in the format returned by :func:`time.ctime`.  If not specified, the
    strings default to blanks.
 
-   :file:`Tools/scripts/diff.py` is a command-line front-end for this function.
+
+      >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
+      >>> s2 = ['python\n', 'eggy\n', 'hamster\n', 'guido\n']
+      >>> for line in unified_diff(s1, s2, fromfile='before.py', tofile='after.py'):
+      ...     sys.stdout.write(line)   # doctest: +NORMALIZE_WHITESPACE
+      --- before.py
+      +++ after.py
+      @@ -1,4 +1,4 @@
+      -bacon
+      -eggs
+      -ham
+      +python
+      +eggy
+      +hamster
+       guido
+
+   See :ref:`difflib-interface` for a more detailed example.
 
 
 .. function:: IS_LINE_JUNK(line)
@@ -307,172 +343,176 @@ The :class:`SequenceMatcher` class has this constructor:
    The optional arguments *a* and *b* are sequences to be compared; both default to
    empty strings.  The elements of both sequences must be :term:`hashable`.
 
-:class:`SequenceMatcher` objects have the following methods:
+   :class:`SequenceMatcher` objects have the following methods:
 
 
-.. method:: SequenceMatcher.set_seqs(a, b)
+   .. method:: set_seqs(a, b)
 
-   Set the two sequences to be compared.
+      Set the two sequences to be compared.
 
-:class:`SequenceMatcher` computes and caches detailed information about the
-second sequence, so if you want to compare one sequence against many sequences,
-use :meth:`set_seq2` to set the commonly used sequence once and call
-:meth:`set_seq1` repeatedly, once for each of the other sequences.
-
-
-.. method:: SequenceMatcher.set_seq1(a)
-
-   Set the first sequence to be compared.  The second sequence to be compared is
-   not changed.
+   :class:`SequenceMatcher` computes and caches detailed information about the
+   second sequence, so if you want to compare one sequence against many
+   sequences, use :meth:`set_seq2` to set the commonly used sequence once and
+   call :meth:`set_seq1` repeatedly, once for each of the other sequences.
 
 
-.. method:: SequenceMatcher.set_seq2(b)
+   .. method:: set_seq1(a)
 
-   Set the second sequence to be compared.  The first sequence to be compared is
-   not changed.
+      Set the first sequence to be compared.  The second sequence to be compared
+      is not changed.
 
 
-.. method:: SequenceMatcher.find_longest_match(alo, ahi, blo, bhi)
+   .. method:: set_seq2(b)
 
-   Find longest matching block in ``a[alo:ahi]`` and ``b[blo:bhi]``.
+      Set the second sequence to be compared.  The first sequence to be compared
+      is not changed.
 
-   If *isjunk* was omitted or ``None``, :meth:`find_longest_match` returns ``(i, j,
-   k)`` such that ``a[i:i+k]`` is equal to ``b[j:j+k]``, where ``alo <= i <= i+k <=
-   ahi`` and ``blo <= j <= j+k <= bhi``. For all ``(i', j', k')`` meeting those
-   conditions, the additional conditions ``k >= k'``, ``i <= i'``, and if ``i ==
-   i'``, ``j <= j'`` are also met. In other words, of all maximal matching blocks,
-   return one that starts earliest in *a*, and of all those maximal matching blocks
-   that start earliest in *a*, return the one that starts earliest in *b*. ::
 
-      >>> s = SequenceMatcher(None, " abcd", "abcd abcd")
-      >>> s.find_longest_match(0, 5, 0, 9)
-      (0, 4, 5)
+   .. method:: find_longest_match(alo, ahi, blo, bhi)
 
-   If *isjunk* was provided, first the longest matching block is determined as
-   above, but with the additional restriction that no junk element appears in the
-   block.  Then that block is extended as far as possible by matching (only) junk
-   elements on both sides. So the resulting block never matches on junk except as
-   identical junk happens to be adjacent to an interesting match.
+      Find longest matching block in ``a[alo:ahi]`` and ``b[blo:bhi]``.
 
-   Here's the same example as before, but considering blanks to be junk. That
-   prevents ``' abcd'`` from matching the ``' abcd'`` at the tail end of the second
-   sequence directly.  Instead only the ``'abcd'`` can match, and matches the
-   leftmost ``'abcd'`` in the second sequence::
+      If *isjunk* was omitted or ``None``, :meth:`find_longest_match` returns
+      ``(i, j, k)`` such that ``a[i:i+k]`` is equal to ``b[j:j+k]``, where ``alo
+      <= i <= i+k <= ahi`` and ``blo <= j <= j+k <= bhi``. For all ``(i', j',
+      k')`` meeting those conditions, the additional conditions ``k >= k'``, ``i
+      <= i'``, and if ``i == i'``, ``j <= j'`` are also met. In other words, of
+      all maximal matching blocks, return one that starts earliest in *a*, and
+      of all those maximal matching blocks that start earliest in *a*, return
+      the one that starts earliest in *b*.
 
-      >>> s = SequenceMatcher(lambda x: x==" ", " abcd", "abcd abcd")
-      >>> s.find_longest_match(0, 5, 0, 9)
-      (1, 0, 4)
+         >>> s = SequenceMatcher(None, " abcd", "abcd abcd")
+         >>> s.find_longest_match(0, 5, 0, 9)
+         Match(a=0, b=4, size=5)
 
-   If no blocks match, this returns ``(alo, blo, 0)``.
+      If *isjunk* was provided, first the longest matching block is determined
+      as above, but with the additional restriction that no junk element appears
+      in the block.  Then that block is extended as far as possible by matching
+      (only) junk elements on both sides. So the resulting block never matches
+      on junk except as identical junk happens to be adjacent to an interesting
+      match.
 
-   .. versionchanged:: 2.6
+      Here's the same example as before, but considering blanks to be junk. That
+      prevents ``' abcd'`` from matching the ``' abcd'`` at the tail end of the
+      second sequence directly.  Instead only the ``'abcd'`` can match, and
+      matches the leftmost ``'abcd'`` in the second sequence:
+
+         >>> s = SequenceMatcher(lambda x: x==" ", " abcd", "abcd abcd")
+         >>> s.find_longest_match(0, 5, 0, 9)
+         Match(a=1, b=0, size=4)
+
+      If no blocks match, this returns ``(alo, blo, 0)``.
+
       This method returns a :term:`named tuple` ``Match(a, b, size)``.
 
 
-.. method:: SequenceMatcher.get_matching_blocks()
+   .. method:: get_matching_blocks()
 
-   Return list of triples describing matching subsequences. Each triple is of the
-   form ``(i, j, n)``, and means that ``a[i:i+n] == b[j:j+n]``.  The triples are
-   monotonically increasing in *i* and *j*.
+      Return list of triples describing matching subsequences. Each triple is of
+      the form ``(i, j, n)``, and means that ``a[i:i+n] == b[j:j+n]``.  The
+      triples are monotonically increasing in *i* and *j*.
 
-   The last triple is a dummy, and has the value ``(len(a), len(b), 0)``.  It is
-   the only triple with ``n == 0``.  If ``(i, j, n)`` and ``(i', j', n')`` are
-   adjacent triples in the list, and the second is not the last triple in the list,
-   then ``i+n != i'`` or ``j+n != j'``; in other words, adjacent triples always
-   describe non-adjacent equal blocks.
+      The last triple is a dummy, and has the value ``(len(a), len(b), 0)``.  It
+      is the only triple with ``n == 0``.  If ``(i, j, n)`` and ``(i', j', n')``
+      are adjacent triples in the list, and the second is not the last triple in
+      the list, then ``i+n != i'`` or ``j+n != j'``; in other words, adjacent
+      triples always describe non-adjacent equal blocks.
 
-   .. XXX Explain why a dummy is used!
+      .. XXX Explain why a dummy is used!
 
-   ::
+      .. doctest::
 
-      >>> s = SequenceMatcher(None, "abxcd", "abcd")
-      >>> s.get_matching_blocks()
-      [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
-
-
-.. method:: SequenceMatcher.get_opcodes()
-
-   Return list of 5-tuples describing how to turn *a* into *b*. Each tuple is of
-   the form ``(tag, i1, i2, j1, j2)``.  The first tuple has ``i1 == j1 == 0``, and
-   remaining tuples have *i1* equal to the *i2* from the preceding tuple, and,
-   likewise, *j1* equal to the previous *j2*.
-
-   The *tag* values are strings, with these meanings:
-
-   +---------------+---------------------------------------------+
-   | Value         | Meaning                                     |
-   +===============+=============================================+
-   | ``'replace'`` | ``a[i1:i2]`` should be replaced by          |
-   |               | ``b[j1:j2]``.                               |
-   +---------------+---------------------------------------------+
-   | ``'delete'``  | ``a[i1:i2]`` should be deleted.  Note that  |
-   |               | ``j1 == j2`` in this case.                  |
-   +---------------+---------------------------------------------+
-   | ``'insert'``  | ``b[j1:j2]`` should be inserted at          |
-   |               | ``a[i1:i1]``. Note that ``i1 == i2`` in     |
-   |               | this case.                                  |
-   +---------------+---------------------------------------------+
-   | ``'equal'``   | ``a[i1:i2] == b[j1:j2]`` (the sub-sequences |
-   |               | are equal).                                 |
-   +---------------+---------------------------------------------+
-
-   For example::
-
-      >>> a = "qabxcd"
-      >>> b = "abycdf"
-      >>> s = SequenceMatcher(None, a, b)
-      >>> for tag, i1, i2, j1, j2 in s.get_opcodes():
-      ...    print(("%7s a[%d:%d] (%s) b[%d:%d] (%s)" %
-      ...           (tag, i1, i2, a[i1:i2], j1, j2, b[j1:j2])))
-       delete a[0:1] (q) b[0:0] ()
-        equal a[1:3] (ab) b[0:2] (ab)
-      replace a[3:4] (x) b[2:3] (y)
-        equal a[4:6] (cd) b[3:5] (cd)
-       insert a[6:6] () b[5:6] (f)
+         >>> s = SequenceMatcher(None, "abxcd", "abcd")
+         >>> s.get_matching_blocks()
+         [Match(a=0, b=0, size=2), Match(a=3, b=2, size=2), Match(a=5, b=4, size=0)]
 
 
-.. method:: SequenceMatcher.get_grouped_opcodes([n])
+   .. method:: get_opcodes()
 
-   Return a :term:`generator` of groups with up to *n* lines of context.
+      Return list of 5-tuples describing how to turn *a* into *b*. Each tuple is
+      of the form ``(tag, i1, i2, j1, j2)``.  The first tuple has ``i1 == j1 ==
+      0``, and remaining tuples have *i1* equal to the *i2* from the preceding
+      tuple, and, likewise, *j1* equal to the previous *j2*.
 
-   Starting with the groups returned by :meth:`get_opcodes`, this method splits out
-   smaller change clusters and eliminates intervening ranges which have no changes.
+      The *tag* values are strings, with these meanings:
 
-   The groups are returned in the same format as :meth:`get_opcodes`.
+      +---------------+---------------------------------------------+
+      | Value         | Meaning                                     |
+      +===============+=============================================+
+      | ``'replace'`` | ``a[i1:i2]`` should be replaced by          |
+      |               | ``b[j1:j2]``.                               |
+      +---------------+---------------------------------------------+
+      | ``'delete'``  | ``a[i1:i2]`` should be deleted.  Note that  |
+      |               | ``j1 == j2`` in this case.                  |
+      +---------------+---------------------------------------------+
+      | ``'insert'``  | ``b[j1:j2]`` should be inserted at          |
+      |               | ``a[i1:i1]``. Note that ``i1 == i2`` in     |
+      |               | this case.                                  |
+      +---------------+---------------------------------------------+
+      | ``'equal'``   | ``a[i1:i2] == b[j1:j2]`` (the sub-sequences |
+      |               | are equal).                                 |
+      +---------------+---------------------------------------------+
+
+      For example:
+
+        >>> a = "qabxcd"
+        >>> b = "abycdf"
+        >>> s = SequenceMatcher(None, a, b)
+        >>> for tag, i1, i2, j1, j2 in s.get_opcodes():
+        ...    print(("%7s a[%d:%d] (%s) b[%d:%d] (%s)" %
+        ...           (tag, i1, i2, a[i1:i2], j1, j2, b[j1:j2])))
+         delete a[0:1] (q) b[0:0] ()
+          equal a[1:3] (ab) b[0:2] (ab)
+        replace a[3:4] (x) b[2:3] (y)
+          equal a[4:6] (cd) b[3:5] (cd)
+         insert a[6:6] () b[5:6] (f)
 
 
-.. method:: SequenceMatcher.ratio()
+   .. method:: get_grouped_opcodes([n])
 
-   Return a measure of the sequences' similarity as a float in the range [0, 1].
+      Return a :term:`generator` of groups with up to *n* lines of context.
 
-   Where T is the total number of elements in both sequences, and M is the number
-   of matches, this is 2.0\*M / T. Note that this is ``1.0`` if the sequences are
-   identical, and ``0.0`` if they have nothing in common.
+      Starting with the groups returned by :meth:`get_opcodes`, this method
+      splits out smaller change clusters and eliminates intervening ranges which
+      have no changes.
 
-   This is expensive to compute if :meth:`get_matching_blocks` or
-   :meth:`get_opcodes` hasn't already been called, in which case you may want to
-   try :meth:`quick_ratio` or :meth:`real_quick_ratio` first to get an upper bound.
+      The groups are returned in the same format as :meth:`get_opcodes`.
 
 
-.. method:: SequenceMatcher.quick_ratio()
+   .. method:: ratio()
 
-   Return an upper bound on :meth:`ratio` relatively quickly.
+      Return a measure of the sequences' similarity as a float in the range [0,
+      1].
 
-   This isn't defined beyond that it is an upper bound on :meth:`ratio`, and is
-   faster to compute.
+      Where T is the total number of elements in both sequences, and M is the
+      number of matches, this is 2.0\*M / T. Note that this is ``1.0`` if the
+      sequences are identical, and ``0.0`` if they have nothing in common.
+
+      This is expensive to compute if :meth:`get_matching_blocks` or
+      :meth:`get_opcodes` hasn't already been called, in which case you may want
+      to try :meth:`quick_ratio` or :meth:`real_quick_ratio` first to get an
+      upper bound.
 
 
-.. method:: SequenceMatcher.real_quick_ratio()
+   .. method:: quick_ratio()
 
-   Return an upper bound on :meth:`ratio` very quickly.
+      Return an upper bound on :meth:`ratio` relatively quickly.
 
-   This isn't defined beyond that it is an upper bound on :meth:`ratio`, and is
-   faster to compute than either :meth:`ratio` or :meth:`quick_ratio`.
+      This isn't defined beyond that it is an upper bound on :meth:`ratio`, and
+      is faster to compute.
+
+
+   .. method:: real_quick_ratio()
+
+      Return an upper bound on :meth:`ratio` very quickly.
+
+      This isn't defined beyond that it is an upper bound on :meth:`ratio`, and
+      is faster to compute than either :meth:`ratio` or :meth:`quick_ratio`.
 
 The three methods that return the ratio of matching to total characters can give
 different results due to differing levels of approximation, although
 :meth:`quick_ratio` and :meth:`real_quick_ratio` are always at least as large as
-:meth:`ratio`::
+:meth:`ratio`:
 
    >>> s = SequenceMatcher(None, "abcd", "bcde")
    >>> s.ratio()
@@ -488,7 +528,7 @@ different results due to differing levels of approximation, although
 SequenceMatcher Examples
 ------------------------
 
-This example compares two strings, considering blanks to be "junk:" ::
+This example compares two strings, considering blanks to be "junk:"
 
    >>> s = SequenceMatcher(lambda x: x == " ",
    ...                     "private Thread currentThread;",
@@ -496,19 +536,18 @@ This example compares two strings, considering blanks to be "junk:" ::
 
 :meth:`ratio` returns a float in [0, 1], measuring the similarity of the
 sequences.  As a rule of thumb, a :meth:`ratio` value over 0.6 means the
-sequences are close matches::
+sequences are close matches:
 
    >>> print(round(s.ratio(), 3))
    0.866
 
 If you're only interested in where the sequences match,
-:meth:`get_matching_blocks` is handy::
+:meth:`get_matching_blocks` is handy:
 
    >>> for block in s.get_matching_blocks():
    ...     print("a[%d] and b[%d] match for %d elements" % block)
    a[0] and b[0] match for 8 elements
-   a[8] and b[17] match for 6 elements
-   a[14] and b[23] match for 15 elements
+   a[8] and b[17] match for 21 elements
    a[29] and b[38] match for 0 elements
 
 Note that the last tuple returned by :meth:`get_matching_blocks` is always a
@@ -516,14 +555,13 @@ dummy, ``(len(a), len(b), 0)``, and this is the only case in which the last
 tuple element (number of elements matched) is ``0``.
 
 If you want to know how to change the first sequence into the second, use
-:meth:`get_opcodes`::
+:meth:`get_opcodes`:
 
    >>> for opcode in s.get_opcodes():
    ...     print("%6s a[%d:%d] b[%d:%d]" % opcode)
     equal a[0:8] b[0:8]
    insert a[8:8] b[8:17]
-    equal a[8:14] b[17:23]
-    equal a[14:29] b[23:38]
+    equal a[8:29] b[17:38]
 
 See also the function :func:`get_close_matches` in this module, which shows how
 simple code building on :class:`SequenceMatcher` can be used to do useful work.
@@ -556,17 +594,17 @@ The :class:`Differ` class has this constructor:
    length 1), and returns true if the character is junk. The default is ``None``,
    meaning that no character is considered junk.
 
-:class:`Differ` objects are used (deltas generated) via a single method:
+   :class:`Differ` objects are used (deltas generated) via a single method:
 
 
-.. method:: Differ.compare(a, b)
+   .. method:: Differ.compare(a, b)
 
-   Compare two sequences of lines, and generate the delta (a sequence of lines).
+      Compare two sequences of lines, and generate the delta (a sequence of lines).
 
-   Each sequence must contain individual single-line strings ending with newlines.
-   Such sequences can be obtained from the :meth:`readlines` method of file-like
-   objects.  The delta generated also consists of newline-terminated strings, ready
-   to be printed as-is via the :meth:`writelines` method of a file-like object.
+      Each sequence must contain individual single-line strings ending with newlines.
+      Such sequences can be obtained from the :meth:`readlines` method of file-like
+      objects.  The delta generated also consists of newline-terminated strings, ready
+      to be printed as-is via the :meth:`writelines` method of a file-like object.
 
 
 .. _differ-examples:
@@ -576,7 +614,7 @@ Differ Example
 
 This example compares two texts. First we set up the texts, sequences of
 individual single-line strings ending with newlines (such sequences can also be
-obtained from the :meth:`readlines` method of file-like objects)::
+obtained from the :meth:`readlines` method of file-like objects):
 
    >>> text1 = '''  1. Beautiful is better than ugly.
    ...   2. Explicit is better than implicit.
@@ -593,7 +631,7 @@ obtained from the :meth:`readlines` method of file-like objects)::
    ...   5. Flat is better than nested.
    ... '''.splitlines(1)
 
-Next we instantiate a Differ object::
+Next we instantiate a Differ object:
 
    >>> d = Differ()
 
@@ -601,11 +639,11 @@ Note that when instantiating a :class:`Differ` object we may pass functions to
 filter out line and character "junk."  See the :meth:`Differ` constructor for
 details.
 
-Finally, we compare the two::
+Finally, we compare the two:
 
    >>> result = list(d.compare(text1, text2))
 
-``result`` is a list of strings, so let's pretty-print it::
+``result`` is a list of strings, so let's pretty-print it:
 
    >>> from pprint import pprint
    >>> pprint(result)
@@ -613,14 +651,14 @@ Finally, we compare the two::
     '-   2. Explicit is better than implicit.\n',
     '-   3. Simple is better than complex.\n',
     '+   3.   Simple is better than complex.\n',
-    '?     ++                                \n',
+    '?     ++\n',
     '-   4. Complex is better than complicated.\n',
-    '?            ^                     ---- ^  \n',
+    '?            ^                     ---- ^\n',
     '+   4. Complicated is better than complex.\n',
-    '?           ++++ ^                      ^  \n',
+    '?           ++++ ^                      ^\n',
     '+   5. Flat is better than nested.\n']
 
-As a single multi-line string it looks like this::
+As a single multi-line string it looks like this:
 
    >>> import sys
    >>> sys.stdout.writelines(result)
@@ -635,3 +673,75 @@ As a single multi-line string it looks like this::
    ?           ++++ ^                      ^
    +   5. Flat is better than nested.
 
+
+.. _difflib-interface:
+
+A command-line interface to difflib
+-----------------------------------
+
+This example shows how to use difflib to create a ``diff``-like utility.
+It is also contained in the Python source distribution, as
+:file:`Tools/scripts/diff.py`.
+
+.. testcode::
+
+   """ Command line interface to difflib.py providing diffs in four formats:
+
+   * ndiff:    lists every line and highlights interline changes.
+   * context:  highlights clusters of changes in a before/after format.
+   * unified:  highlights clusters of changes in an inline format.
+   * html:     generates side by side comparison with change highlights.
+
+   """
+
+   import sys, os, time, difflib, optparse
+
+   def main():
+        # Configure the option parser
+       usage = "usage: %prog [options] fromfile tofile"
+       parser = optparse.OptionParser(usage)
+       parser.add_option("-c", action="store_true", default=False,
+                         help='Produce a context format diff (default)')
+       parser.add_option("-u", action="store_true", default=False,
+                         help='Produce a unified format diff')
+       hlp = 'Produce HTML side by side diff (can use -c and -l in conjunction)'
+       parser.add_option("-m", action="store_true", default=False, help=hlp)
+       parser.add_option("-n", action="store_true", default=False,
+                         help='Produce a ndiff format diff')
+       parser.add_option("-l", "--lines", type="int", default=3,
+                         help='Set number of context lines (default 3)')
+       (options, args) = parser.parse_args()
+
+       if len(args) == 0:
+           parser.print_help()
+           sys.exit(1)
+       if len(args) != 2:
+           parser.error("need to specify both a fromfile and tofile")
+
+       n = options.lines
+       fromfile, tofile = args # as specified in the usage string
+
+       # we're passing these as arguments to the diff function
+       fromdate = time.ctime(os.stat(fromfile).st_mtime)
+       todate = time.ctime(os.stat(tofile).st_mtime)
+       fromlines = open(fromfile, 'U').readlines()
+       tolines = open(tofile, 'U').readlines()
+
+       if options.u:
+           diff = difflib.unified_diff(fromlines, tolines, fromfile, tofile,
+                                       fromdate, todate, n=n)
+       elif options.n:
+           diff = difflib.ndiff(fromlines, tolines)
+       elif options.m:
+           diff = difflib.HtmlDiff().make_file(fromlines, tolines, fromfile,
+                                               tofile, context=options.c,
+                                               numlines=n)
+       else:
+           diff = difflib.context_diff(fromlines, tolines, fromfile, tofile,
+                                       fromdate, todate, n=n)
+
+       # we're using writelines because diff is a generator
+       sys.stdout.writelines(diff)
+
+   if __name__ == '__main__':
+       main()

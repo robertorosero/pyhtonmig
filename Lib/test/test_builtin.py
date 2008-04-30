@@ -5,7 +5,7 @@ from test.test_support import fcmp, TESTFN, unlink,  run_unittest, \
                               run_with_locale
 from operator import neg
 
-import sys, warnings, random, UserDict, io
+import sys, warnings, random, collections, io, fractions
 warnings.filterwarnings("ignore", "hex../oct.. of negative int",
                         FutureWarning, __name__)
 warnings.filterwarnings("ignore", "integer argument expected",
@@ -210,7 +210,7 @@ class BuiltinTest(unittest.TestCase):
         # verify that circular objects are not handled
         a = []; a.append(a)
         b = []; b.append(b)
-        from UserList import UserList
+        from collections import UserList
         c = UserList(); c.append(c)
         self.assertRaises(RuntimeError, cmp, a, b)
         self.assertRaises(RuntimeError, cmp, b, c)
@@ -400,7 +400,7 @@ class BuiltinTest(unittest.TestCase):
 
         # Verify locals stores (used by list comps)
         eval('[locals() for i in (2,3)]', g, d)
-        eval('[locals() for i in (2,3)]', g, UserDict.UserDict())
+        eval('[locals() for i in (2,3)]', g, collections.UserDict())
 
         class SpreadSheet:
             "Sample application showing nested, calculated lookups."
@@ -447,6 +447,17 @@ class BuiltinTest(unittest.TestCase):
         if '__builtins__' in l:
             del l['__builtins__']
         self.assertEqual((g, l), ({'a': 1}, {'b': 2}))
+
+    def test_exec_redirected(self):
+        savestdout = sys.stdout
+        sys.stdout = None # Whatever that cannot flush()
+        try:
+            # Used to raise SystemError('error return without exception set')
+            exec('a')
+        except NameError:
+            pass
+        finally:
+            sys.stdout = savestdout
 
     def test_filter(self):
         self.assertEqual(list(filter(lambda c: 'a' <= c <= 'z', 'Hello World')), list('elloorld'))
@@ -541,24 +552,58 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, float, Foo4(42))
 
     def test_format(self):
-        class A:
-            def __init__(self, x):
-                self.x = x
-            def __format__(self, format_spec):
-                return str(self.x) + format_spec
-
-        # class that returns a bad type from __format__
-        class B:
-            def __format__(self, format_spec):
-                return 1.0
-
-        # class that is derived from string, used
-        #  as a format spec
-        class C(str):
-            pass
-
+        # Test the basic machinery of the format() builtin.  Don't test
+        #  the specifics of the various formatters
         self.assertEqual(format(3, ''), '3')
-        self.assertEqual(format(A(3), 'spec'), '3spec')
+
+        # Returns some classes to use for various tests.  There's
+        #  an old-style version, and a new-style version
+        def classes_new():
+            class A(object):
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromA(A):
+                pass
+
+            class Simple(object): pass
+            class DerivedFromSimple(Simple):
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromSimple2(DerivedFromSimple): pass
+            return A, DerivedFromA, DerivedFromSimple, DerivedFromSimple2
+
+        # In 3.0, classes_classic has the same meaning as classes_new
+        def classes_classic():
+            class A:
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromA(A):
+                pass
+
+            class Simple: pass
+            class DerivedFromSimple(Simple):
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromSimple2(DerivedFromSimple): pass
+            return A, DerivedFromA, DerivedFromSimple, DerivedFromSimple2
+
+        def class_test(A, DerivedFromA, DerivedFromSimple, DerivedFromSimple2):
+            self.assertEqual(format(A(3), 'spec'), '3spec')
+            self.assertEqual(format(DerivedFromA(4), 'spec'), '4spec')
+            self.assertEqual(format(DerivedFromSimple(5), 'abc'), '5abc')
+            self.assertEqual(format(DerivedFromSimple2(10), 'abcdef'),
+                             '10abcdef')
+
+        class_test(*classes_new())
+        class_test(*classes_classic())
 
         def empty_format_spec(value):
             # test that:
@@ -578,11 +623,19 @@ class BuiltinTest(unittest.TestCase):
         empty_format_spec(None)
 
         # TypeError because self.__format__ returns the wrong type
-        self.assertRaises(TypeError, format, B(), "")
+        class BadFormatResult:
+            def __format__(self, format_spec):
+                return 1.0
+        self.assertRaises(TypeError, format, BadFormatResult(), "")
 
-        # TypeError because format_spec is not unicode
+        # TypeError because format_spec is not unicode or str
         self.assertRaises(TypeError, format, object(), 4)
         self.assertRaises(TypeError, format, object(), object())
+
+        # tests for object.__format__ really belong elsewhere, but
+        #  there's no good place to put them
+        x = object().__format__('')
+        self.assert_(x.startswith('<object object at'))
 
         # first argument to object.__format__ must be string
         self.assertRaises(TypeError, object().__format__, 3)
@@ -590,7 +643,41 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, object().__format__, None)
 
         # make sure we can take a subclass of str as a format spec
-        self.assertEqual(format(0, C('10')), '         0')
+        class DerivedFromStr(str): pass
+        self.assertEqual(format(0, DerivedFromStr('10')), '         0')
+
+    def test_floatasratio(self):
+        for f, ratio in [
+                (0.875, (7, 8)),
+                (-0.875, (-7, 8)),
+                (0.0, (0, 1)),
+                (11.5, (23, 2)),
+            ]:
+            self.assertEqual(f.as_integer_ratio(), ratio)
+
+        for i in range(10000):
+            f = random.random()
+            f *= 10 ** random.randint(-100, 100)
+            n, d = f.as_integer_ratio()
+            self.assertEqual(float(n).__truediv__(d), f)
+
+        R = fractions.Fraction
+        self.assertEqual(R(0, 1),
+                         R(*float(0.0).as_integer_ratio()))
+        self.assertEqual(R(5, 2),
+                         R(*float(2.5).as_integer_ratio()))
+        self.assertEqual(R(1, 2),
+                         R(*float(0.5).as_integer_ratio()))
+        self.assertEqual(R(4728779608739021, 2251799813685248),
+                         R(*float(2.1).as_integer_ratio()))
+        self.assertEqual(R(-4728779608739021, 2251799813685248),
+                         R(*float(-2.1).as_integer_ratio()))
+        self.assertEqual(R(-2100, 1),
+                         R(*float(-2100.0).as_integer_ratio()))
+
+        self.assertRaises(OverflowError, float('inf').as_integer_ratio)
+        self.assertRaises(OverflowError, float('-inf').as_integer_ratio)
+        self.assertRaises(ValueError, float('nan').as_integer_ratio)
 
     def test_getattr(self):
         import sys
@@ -828,6 +915,14 @@ class BuiltinTest(unittest.TestCase):
 
     def test_intconversion(self):
         # Test __int__()
+        class ClassicMissingMethods:
+            pass
+        self.assertRaises(TypeError, int, ClassicMissingMethods())
+
+        class MissingMethods(object):
+            pass
+        self.assertRaises(TypeError, int, MissingMethods())
+
         class Foo0:
             def __int__(self):
                 return 42
@@ -858,6 +953,49 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int(Foo3()), 0)
         self.assertEqual(int(Foo4()), 42)
         self.assertRaises(TypeError, int, Foo5())
+
+        class Classic:
+            pass
+        for base in (object, Classic):
+            class IntOverridesTrunc(base):
+                def __int__(self):
+                    return 42
+                def __trunc__(self):
+                    return -12
+            self.assertEqual(int(IntOverridesTrunc()), 42)
+
+            class JustTrunc(base):
+                def __trunc__(self):
+                    return 42
+            self.assertEqual(int(JustTrunc()), 42)
+
+            for trunc_result_base in (object, Classic):
+                class Integral(trunc_result_base):
+                    def __int__(self):
+                        return 42
+
+                class TruncReturnsNonInt(base):
+                    def __trunc__(self):
+                        return Integral()
+                self.assertEqual(int(TruncReturnsNonInt()), 42)
+
+                class NonIntegral(trunc_result_base):
+                    def __trunc__(self):
+                        # Check that we avoid infinite recursion.
+                        return NonIntegral()
+
+                class TruncReturnsNonIntegral(base):
+                    def __trunc__(self):
+                        return NonIntegral()
+                try:
+                    int(TruncReturnsNonIntegral())
+                except TypeError as e:
+                    self.assertEquals(str(e),
+                                      "__trunc__ returned non-Integral"
+                                      " (type NonIntegral)")
+                else:
+                    self.fail("Failed to raise TypeError with %s" %
+                              ((base, trunc_result_base),))
 
     def test_iter(self):
         self.assertRaises(TypeError, iter)
@@ -1061,7 +1199,6 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int('2qhxjlj', 34), 4294967297)
         self.assertEqual(int('2br45qc', 35), 4294967297)
         self.assertEqual(int('1z141z5', 36), 4294967297)
-
 
     def test_longconversion(self):
         # Test __long__()
@@ -1624,37 +1761,6 @@ class BuiltinTest(unittest.TestCase):
                 raise ValueError
         self.assertRaises(ValueError, sum, BadSeq())
 
-    def test_trunc(self):
-
-        self.assertEqual(trunc(1), 1)
-        self.assertEqual(trunc(-1), -1)
-        self.assertEqual(type(trunc(1)), int)
-        self.assertEqual(type(trunc(1.5)), int)
-        self.assertEqual(trunc(1.5), 1)
-        self.assertEqual(trunc(-1.5), -1)
-        self.assertEqual(trunc(1.999999), 1)
-        self.assertEqual(trunc(-1.999999), -1)
-        self.assertEqual(trunc(-0.999999), -0)
-        self.assertEqual(trunc(-100.999), -100)
-
-        class TestTrunc:
-            def __trunc__(self):
-                return 23
-
-        class TestNoTrunc:
-            pass
-
-        self.assertEqual(trunc(TestTrunc()), 23)
-
-        self.assertRaises(TypeError, trunc)
-        self.assertRaises(TypeError, trunc, 1, 2)
-        self.assertRaises(TypeError, trunc, TestNoTrunc())
-
-        t = TestNoTrunc()
-        t.__trunc__ = lambda *args: args
-        self.assertRaises(TypeError, trunc, t)
-        self.assertRaises(TypeError, trunc, t, 0)
-
     def test_tuple(self):
         self.assertEqual(tuple(()), ())
         t0_3 = (0, 1, 2, 3)
@@ -1734,6 +1840,15 @@ class BuiltinTest(unittest.TestCase):
                     return i
         self.assertRaises(ValueError, list, zip(BadSeq(), BadSeq()))
 
+    def test_bin(self):
+        self.assertEqual(bin(0), '0b0')
+        self.assertEqual(bin(1), '0b1')
+        self.assertEqual(bin(-1), '-0b1')
+        self.assertEqual(bin(2**65), '0b1' + '0' * 65)
+        self.assertEqual(bin(2**65-1), '0b' + '1' * 65)
+        self.assertEqual(bin(-(2**65)), '-0b1' + '0' * 65)
+        self.assertEqual(bin(-(2**65-1)), '-0b' + '1' * 65)
+
 class TestSorted(unittest.TestCase):
 
     def test_basic(self):
@@ -1744,9 +1859,6 @@ class TestSorted(unittest.TestCase):
         self.assertNotEqual(data, copy)
 
         data.reverse()
-        random.shuffle(copy)
-        self.assertEqual(data, sorted(copy, cmp=lambda x, y: (x < y) - (x > y)))
-        self.assertNotEqual(data, copy)
         random.shuffle(copy)
         self.assertEqual(data, sorted(copy, key=lambda x: -x))
         self.assertNotEqual(data, copy)

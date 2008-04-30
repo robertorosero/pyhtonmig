@@ -216,11 +216,11 @@ range_item(rangeobject *r, Py_ssize_t i)
         if (!PyErr_Occurred())
             PyErr_SetString(PyExc_IndexError,
                             "range object index out of range");
-            return NULL;
-        }
+        return NULL;
+    }
 
     /* XXX(nnorwitz): optimize for short ints. */
-    rem = PyLong_FromSsize_t(i % len);
+    rem = PyLong_FromSsize_t(i);
     if (!rem)
         return NULL;
     incr = PyNumber_Multiply(rem, r->step);

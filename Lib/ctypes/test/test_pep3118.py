@@ -115,7 +115,7 @@ native_types = [
     (c_double,                  "<d",                   None,           c_double),
     # c_longdouble may be an alias to c_double
 
-    (c_bool,                    "<t",                   None,           c_bool),
+    (c_bool,                    "<?",                   None,           c_bool),
     (py_object,                 "<O",                   None,           py_object),
 
     ## pointers

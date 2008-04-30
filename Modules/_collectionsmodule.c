@@ -1183,7 +1183,7 @@ static PyMethodDef defdict_methods[] = {
 	{"__missing__", (PyCFunction)defdict_missing, METH_O,
 	 defdict_missing_doc},
 	{"copy", (PyCFunction)defdict_copy, METH_NOARGS,
-	 defdict_copy_doc},
+         defdict_copy_doc},
 	{"__copy__", (PyCFunction)defdict_copy, METH_NOARGS,
 	 defdict_copy_doc},
 	{"__reduce__", (PyCFunction)defdict_reduce, METH_NOARGS,
@@ -1209,16 +1209,32 @@ static PyObject *
 defdict_repr(defdictobject *dd)
 {
 	PyObject *baserepr;
-	PyObject *def;
+	PyObject *defrepr;
 	PyObject *result;
 	baserepr = PyDict_Type.tp_repr((PyObject *)dd);
 	if (baserepr == NULL)
 		return NULL;
 	if (dd->default_factory == NULL)
-		def = Py_None;
+		defrepr = PyUnicode_FromString("None");
 	else
-		def = dd->default_factory;
-	result = PyUnicode_FromFormat("defaultdict(%R, %U)", def, baserepr);
+	{
+		int status = Py_ReprEnter(dd->default_factory);
+		if (status != 0) {
+			if (status < 0)
+				return NULL;
+			defrepr = PyUnicode_FromString("...");
+		}
+		else
+			defrepr = PyObject_Repr(dd->default_factory);
+		Py_ReprLeave(dd->default_factory);
+	}
+	if (defrepr == NULL) {
+		Py_DECREF(baserepr);
+		return NULL;
+	}
+	result = PyUnicode_FromFormat("defaultdict(%U, %U)",
+				      defrepr, baserepr);
+	Py_DECREF(defrepr);
 	Py_DECREF(baserepr);
 	return result;
 }

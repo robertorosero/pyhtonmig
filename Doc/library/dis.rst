@@ -412,21 +412,24 @@ Miscellaneous opcodes.
 
 .. opcode:: WITH_CLEANUP ()
 
-   Cleans up the stack when a :keyword:`with` statement block exits.  TOS is the
-   context manager's :meth:`__exit__` bound method.  Below that are 1--3 values
-   indicating how/why the finally clause was entered:
+   Cleans up the stack when a :keyword:`with` statement block exits.  On top of
+   the stack are 1--3 values indicating how/why the finally clause was entered:
 
-   * SECOND = ``None``
-   * (SECOND, THIRD) = (``WHY_{RETURN,CONTINUE}``), retval
-   * SECOND = ``WHY_*``; no retval below it
-   * (SECOND, THIRD, FOURTH) = exc_info()
+   * TOP = ``None``
+   * (TOP, SECOND) = (``WHY_{RETURN,CONTINUE}``), retval
+   * TOP = ``WHY_*``; no retval below it
+   * (TOP, SECOND, THIRD) = exc_info()
 
-   In the last case, ``TOS(SECOND, THIRD, FOURTH)`` is called, otherwise
-   ``TOS(None, None, None)``.
+   Under them is EXIT, the context manager's :meth:`__exit__` bound method.
 
-   In addition, if the stack represents an exception, *and* the function call
-   returns a 'true' value, this information is "zapped", to prevent ``END_FINALLY``
-   from re-raising the exception.  (But non-local gotos should still be resumed.)
+   In the last case, ``EXIT(TOP, SECOND, THIRD)`` is called, otherwise
+   ``EXIT(None, None, None)``.
+
+   EXIT is removed from the stack, leaving the values above it in the same
+   order. In addition, if the stack represents an exception, *and* the function
+   call returns a 'true' value, this information is "zapped", to prevent
+   ``END_FINALLY`` from re-raising the exception.  (But non-local gotos should
+   still be resumed.)
 
    .. XXX explain the WHY stuff!
 
@@ -437,7 +440,7 @@ the more significant byte last.
 .. opcode:: STORE_NAME (namei)
 
    Implements ``name = TOS``. *namei* is the index of *name* in the attribute
-   :attr:`co_names` of the code object. The compiler tries to use ``STORE_LOCAL``
+   :attr:`co_names` of the code object. The compiler tries to use ``STORE_FAST``
    or ``STORE_GLOBAL`` if possible.
 
 
@@ -525,9 +528,11 @@ the more significant byte last.
 
 .. opcode:: IMPORT_NAME (namei)
 
-   Imports the module ``co_names[namei]``.  The module object is pushed onto the
-   stack.  The current namespace is not affected: for a proper import statement, a
-   subsequent ``STORE_FAST`` instruction modifies the namespace.
+   Imports the module ``co_names[namei]``.  TOS and TOS1 are popped and provide
+   the *fromlist* and *level* arguments of :func:`__import__`.  The module
+   object is pushed onto the stack.  The current namespace is not affected:
+   for a proper import statement, a subsequent ``STORE_FAST`` instruction
+   modifies the namespace.
 
 
 .. opcode:: IMPORT_FROM (namei)

@@ -80,7 +80,7 @@ WIN32 is still required for the locale module.
 #define MS_WIN32 /* only support win32 and greater. */
 #define MS_WINDOWS
 #ifndef PYTHONPATH
-#	define PYTHONPATH ".\\DLLs;.\\lib;.\\lib\\plat-win;.\\lib\\lib-tk"
+#	define PYTHONPATH L".\\DLLs;.\\lib;.\\lib\\plat-win;.\\lib\\lib-tk"
 #endif
 #define NT_THREADS
 #define WITH_THREAD
@@ -158,10 +158,12 @@ WIN32 is still required for the locale module.
 /* set the version macros for the windows headers */
 #ifdef MS_WINX64
 /* 64 bit only runs on XP or greater */
-#define Py_WINVER 0x0501
+#define Py_WINVER _WIN32_WINNT_WINXP
+#define Py_NTDDI NTDDI_WINXP
 #else
-/* NT 4.0 or greater required otherwise */
-#define Py_WINVER 0x0400
+/* Python 2.6+ requires Windows 2000 or greater */
+#define Py_WINVER _WIN32_WINNT_WIN2K
+#define Py_NTDDI NTDDI_WIN2KSP4
 #endif
 
 /* We only set these values when building Python - we don't want to force
@@ -171,7 +173,10 @@ WIN32 is still required for the locale module.
    structures etc so it can optionally use new Windows features if it
    determines at runtime they are available.
 */
-#ifdef Py_BUILD_CORE
+#if defined(Py_BUILD_CORE) || defined(Py_BUILD_CORE_MODULE)
+#ifndef NTDDI_VERSION
+#define NTDDI_VERSION Py_NTDDI
+#endif
 #ifndef WINVER
 #define WINVER Py_WINVER
 #endif
@@ -202,12 +207,13 @@ typedef _W64 int ssize_t;
 #endif /* MS_WIN32 && !MS_WIN64 */
 
 typedef int pid_t;
-#define hypot _hypot
 
 #include <float.h>
 #define Py_IS_NAN _isnan
 #define Py_IS_INFINITY(X) (!_finite(X) && !_isnan(X))
 #define Py_IS_FINITE(X) _finite(X)
+#define copysign _copysign
+#define hypot _hypot
 
 #endif /* _MSC_VER */
 
@@ -387,7 +393,7 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* Fairly standard from here! */
 
 /* Define to 1 if you have the `copysign' function. */
-/* #define HAVE_COPYSIGN 1*/
+#define HAVE_COPYSIGN 1
 
 /* Define to 1 if you have the `isinf' function. */
 #define HAVE_ISINF 1

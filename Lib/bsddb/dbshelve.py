@@ -32,18 +32,17 @@ storage.
 import pickle
 import sys
 
-#At version 2.3 cPickle switched to using protocol instead of bin and
-#DictMixin was added
+#At version 2.3 cPickle switched to using protocol instead of bin
 if sys.version_info[:3] >= (2, 3, 0):
     HIGHEST_PROTOCOL = pickle.HIGHEST_PROTOCOL
     def _dumps(object, protocol):
         return pickle.dumps(object, protocol=protocol)
-    from UserDict import DictMixin
+    from collections import MutableMapping
 else:
     HIGHEST_PROTOCOL = None
     def _dumps(object, protocol):
         return pickle.dumps(object, bin=protocol)
-    class DictMixin: pass
+    class MutableMapping: pass
 
 from . import db
 
@@ -90,7 +89,7 @@ def open(filename, flags=db.DB_CREATE, mode=0o660, filetype=db.DB_HASH,
 class DBShelveError(db.DBError): pass
 
 
-class DBShelf(DictMixin):
+class DBShelf(MutableMapping):
     """A shelf to hold pickled objects, built upon a bsddb DB object.  It
     automatically pickles/unpickles data objects going to/from the DB.
     """
@@ -136,11 +135,13 @@ class DBShelf(DictMixin):
 
 
     def keys(self, txn=None):
-        if txn != None:
+        if txn is not None:
             return self.db.keys(txn)
         else:
             return self.db.keys()
 
+    def __iter__(self):
+        return iter(self.keys())
 
     def open(self, *args, **kwargs):
         self.db.open(*args, **kwargs)
@@ -160,7 +161,7 @@ class DBShelf(DictMixin):
 
 
     def items(self, txn=None):
-        if txn != None:
+        if txn is not None:
             items = self.db.items(txn)
         else:
             items = self.db.items()
@@ -171,7 +172,7 @@ class DBShelf(DictMixin):
         return newitems
 
     def values(self, txn=None):
-        if txn != None:
+        if txn is not None:
             values = self.db.values(txn)
         else:
             values = self.db.values()

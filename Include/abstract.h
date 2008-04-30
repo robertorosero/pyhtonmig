@@ -611,6 +611,13 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
          */
 
 
+     PyAPI_FUNC(PyObject *) PyObject_Format(PyObject* obj,
+					    PyObject *format_spec);
+       /*
+	 Takes an arbitrary object and returns the result of
+	 calling obj.__format__(format_spec).
+       */
+
 /* Iterators */
 
      PyAPI_FUNC(PyObject *) PyObject_GetIter(PyObject *);
@@ -791,6 +798,19 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 
      PyAPI_FUNC(Py_ssize_t) PyNumber_AsSsize_t(PyObject *o, PyObject *exc);
+
+       /*
+         Returns the Integral instance converted to an int. The
+         instance is expected to be int or long or have an __int__
+         method. Steals integral's reference. error_format will be
+         used to create the TypeError if integral isn't actually an
+         Integral instance. error_format should be a format string
+         that can accept a char* naming integral's type.
+       */
+
+     PyAPI_FUNC(PyObject *) _PyNumber_ConvertIntegralToInt(
+             PyObject *integral,
+             const char* error_format);
 
        /*
         Returns the object converted to Py_ssize_t by going through

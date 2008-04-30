@@ -53,14 +53,18 @@ struct tagCDataObject {
 };
 
 typedef struct {
+	PyObject_VAR_HEAD
 	ffi_closure *pcl; /* the C callable */
 	ffi_cif cif;
 	PyObject *converters;
 	PyObject *callable;
+	PyObject *restype;
 	SETFUNC setfunc;
-	ffi_type *restype;
+	ffi_type *ffi_restype;
 	ffi_type *atypes[1];
-} ffi_info;
+} CThunkObject;
+extern PyTypeObject CThunk_Type;
+#define CThunk_CheckExact(v)	    ((v)->ob_type == &CThunk_Type)
 
 typedef struct {
 	/* First part identical to tagCDataObject */
@@ -76,7 +80,7 @@ typedef struct {
 	union value b_value;
 	/* end of tagCDataObject, additional fields follow */
 
-	ffi_info *thunk;
+	CThunkObject *thunk;
 	PyObject *callable;
 
 	/* These two fields will override the ones in the type's stgdict if
@@ -147,10 +151,10 @@ extern void init_callbacks_in_module(PyObject *m);
 
 extern PyMethodDef module_methods[];
 
-extern ffi_info *AllocFunctionCallback(PyObject *callable,
-				       PyObject *converters,
-				       PyObject *restype,
-				       int stdcall);
+extern CThunkObject *AllocFunctionCallback(PyObject *callable,
+					   PyObject *converters,
+					   PyObject *restype,
+					   int stdcall);
 /* a table entry describing a predefined ctypes type */
 struct fielddesc {
 	char code;
@@ -277,6 +281,9 @@ PyObject *_CallProc(PPROC pProc,
 #define FUNCFLAG_HRESULT 0x2
 #define FUNCFLAG_PYTHONAPI 0x4
 
+#define TYPEFLAG_ISPOINTER 0x100
+#define TYPEFLAG_HASPOINTER 0x200
+
 #define DICTFLAG_FINAL 0x1000
 
 struct tagPyCArgObject {
@@ -348,6 +355,7 @@ extern char *alloc_format_string(const char *prefix, const char *suffix);
 /* XXX better name needed! */
 extern int IsSimpleSubType(PyObject *obj);
 
+extern PyObject *_pointer_type_cache;
 
 #ifdef MS_WIN32
 extern PyObject *ComError;

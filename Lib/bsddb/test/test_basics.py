@@ -6,7 +6,6 @@ various DB flags, etc.
 import os
 import sys
 import errno
-import shutil
 import string
 import tempfile
 from pprint import pprint
@@ -21,6 +20,10 @@ except ImportError:
     from bsddb import db
 
 from bsddb.test.test_all import verbose
+try:
+    from bsddb3 import test_support
+except ImportError:
+    from test import test_support
 
 DASH = b'-'
 letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -54,7 +57,10 @@ class BasicTestCase(unittest.TestCase):
 
     def setUp(self):
         if self.useEnv:
-            self.homeDir = tempfile.mkdtemp()
+            homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
+            self.homeDir = homeDir
+            test_support.rmtree(homeDir)
+            os.mkdir(homeDir)
             try:
                 self.env = db.DBEnv()
                 self.env.set_lg_max(1024*1024)
@@ -68,7 +74,7 @@ class BasicTestCase(unittest.TestCase):
                 tempfile.tempdir = old_tempfile_tempdir
             # Yes, a bare except is intended, since we're re-raising the exc.
             except:
-                shutil.rmtree(self.homeDir)
+                test_support.rmtree(homeDir)
                 raise
         else:
             self.env = None
@@ -93,7 +99,8 @@ class BasicTestCase(unittest.TestCase):
         self.d.close()
         if self.env is not None:
             self.env.close()
-            shutil.rmtree(self.homeDir)
+            test_support.rmtree(self.homeDir)
+            ## XXX(nnorwitz): is this comment stil valid?
             ## Make a new DBEnv to remove the env files from the home dir.
             ## (It can't be done while the env is open, nor after it has been
             ## closed, so we make a new one to do it.)
@@ -359,7 +366,7 @@ class BasicTestCase(unittest.TestCase):
         else:
             if set_raises_error:
                 self.fail("expected exception")
-            if n != None:
+            if n is not None:
                 self.fail("expected None: %r" % (n,))
 
         rec = c.get_both(b'0404', self.makeData(b'0404'))
@@ -373,7 +380,7 @@ class BasicTestCase(unittest.TestCase):
         else:
             if get_raises_error:
                 self.fail("expected exception")
-            if n != None:
+            if n is not None:
                 self.fail("expected None: %r" % (n,))
 
         if self.d.get_type() == db.DB_BTREE:

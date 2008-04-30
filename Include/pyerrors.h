@@ -152,6 +152,8 @@ PyAPI_DATA(PyObject *) PyExc_WindowsError;
 PyAPI_DATA(PyObject *) PyExc_VMSError;
 #endif
 
+PyAPI_DATA(PyObject *) PyExc_BufferError;
+
 PyAPI_DATA(PyObject *) PyExc_MemoryErrorInst;
 PyAPI_DATA(PyObject *) PyExc_RecursionErrorInst;
 
@@ -215,13 +217,6 @@ PyAPI_FUNC(void) _PyErr_BadInternalCall(const char *filename, int lineno);
 PyAPI_FUNC(PyObject *) PyErr_NewException(const char *name, PyObject *base,
                                          PyObject *dict);
 PyAPI_FUNC(void) PyErr_WriteUnraisable(PyObject *);
-
-/* Issue a warning or exception */
-PyAPI_FUNC(int) PyErr_WarnEx(PyObject *category, const char *msg,
-			     Py_ssize_t stack_level);
-PyAPI_FUNC(int) PyErr_WarnExplicit(PyObject *, const char *,
-				   const char *, int,
-				   const char *, PyObject *);
 
 /* In sigcheck.c or signalmodule.c */
 PyAPI_FUNC(int) PyErr_CheckSignals(void);

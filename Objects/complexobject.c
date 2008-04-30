@@ -8,6 +8,10 @@
 #include "Python.h"
 #include "structmember.h"
 
+#ifdef HAVE_IEEEFP_H
+#include <ieeefp.h>
+#endif
+
 #ifndef WITHOUT_COMPLEX
 
 /* Precisions used by repr() and str(), respectively.
@@ -183,6 +187,38 @@ c_powi(Py_complex x, long n)
 
 }
 
+double
+c_abs(Py_complex z)
+{
+	/* sets errno = ERANGE on overflow;  otherwise errno = 0 */
+	double result;
+
+	if (!Py_IS_FINITE(z.real) || !Py_IS_FINITE(z.imag)) {
+		/* C99 rules: if either the real or the imaginary part is an
+		   infinity, return infinity, even if the other part is a
+		   NaN. */
+		if (Py_IS_INFINITY(z.real)) {
+			result = fabs(z.real);
+			errno = 0;
+			return result;
+		}
+		if (Py_IS_INFINITY(z.imag)) {
+			result = fabs(z.imag);
+			errno = 0;
+			return result;
+		}
+		/* either the real or imaginary part is a NaN,
+		   and neither is infinite. Result should be NaN. */
+		return Py_NAN;
+	}
+	result = hypot(z.real, z.imag);
+	if (!Py_IS_FINITE(result))
+		errno = ERANGE;
+	else
+		errno = 0;
+	return result;
+}
+
 static PyObject *
 complex_subtype_from_c_complex(PyTypeObject *type, Py_complex cval)
 {
@@ -265,13 +301,14 @@ PyComplex_AsCComplex(PyObject *op)
 	/* return -1 on failure */
 	cv.real = -1.;
 	cv.imag = 0.;
-	
+		
+	if (complex_str == NULL) {
+		if (!(complex_str = PyUnicode_FromString("__complex__")))
+			return cv;
+	}
+
         {
 		PyObject *complexfunc;
-		if (!complex_str) {
-			if (!(complex_str = PyUnicode_FromString("__complex__")))
-				return cv;
-		}
 		complexfunc = _PyType_Lookup(op->ob_type, complex_str);
 		/* complexfunc is a borrowed reference */
 		if (complexfunc) {
@@ -313,16 +350,48 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int precision)
 {
 	char format[32];
 	if (v->cval.real == 0.) {
-		PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
-		PyOS_ascii_formatd(buf, bufsz - 1, format, v->cval.imag);
-		strncat(buf, "j", 1);
+		if (!Py_IS_FINITE(v->cval.imag)) {
+			if (Py_IS_NAN(v->cval.imag))
+				strncpy(buf, "nan*j", 6);
+			else if (copysign(1, v->cval.imag) == 1)
+				strncpy(buf, "inf*j", 6);
+			else
+				strncpy(buf, "-inf*j", 7);
+		}
+		else {
+			PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
+			PyOS_ascii_formatd(buf, bufsz - 1, format, v->cval.imag);
+			strncat(buf, "j", 1);
+		}
 	} else {
 		char re[64], im[64];
 		/* Format imaginary part with sign, real part without */
-		PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
-		PyOS_ascii_formatd(re, sizeof(re), format, v->cval.real);
-		PyOS_snprintf(format, sizeof(format), "%%+.%ig", precision);
-		PyOS_ascii_formatd(im, sizeof(im), format, v->cval.imag);
+		if (!Py_IS_FINITE(v->cval.real)) {
+			if (Py_IS_NAN(v->cval.real))
+				strncpy(re, "nan", 4);
+			/* else if (copysign(1, v->cval.real) == 1) */
+			else if (v->cval.real > 0)
+				strncpy(re, "inf", 4);
+			else
+				strncpy(re, "-inf", 5);
+		}
+		else {
+			PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
+			PyOS_ascii_formatd(re, sizeof(re), format, v->cval.real);
+		}
+		if (!Py_IS_FINITE(v->cval.imag)) {
+			if (Py_IS_NAN(v->cval.imag))
+				strncpy(im, "+nan*", 6);
+			/* else if (copysign(1, v->cval.imag) == 1) */
+			else if (v->cval.imag > 0)
+				strncpy(im, "+inf*", 6);
+			else
+				strncpy(im, "-inf*", 6);
+		}
+		else {
+			PyOS_snprintf(format, sizeof(format), "%%+.%ig", precision);
+			PyOS_ascii_formatd(im, sizeof(im), format, v->cval.imag);
+		}
 		PyOS_snprintf(buf, bufsz, "(%s%sj)", re, im);
 	}
 }
@@ -540,9 +609,16 @@ static PyObject *
 complex_abs(PyComplexObject *v)
 {
 	double result;
+
 	PyFPE_START_PROTECT("complex_abs", return 0)
-	result = hypot(v->cval.real,v->cval.imag);
+	result = c_abs(v->cval);
 	PyFPE_END_PROTECT(result)
+
+	if (errno == ERANGE) {
+		PyErr_SetString(PyExc_OverflowError,
+				"absolute value too large");
+		return NULL;
+	}
 	return PyFloat_FromDouble(result);
 }
 
@@ -620,9 +696,29 @@ complex_getnewargs(PyComplexObject *v)
 	return Py_BuildValue("(D)", &v->cval);
 }
 
+#if 0
+static PyObject *
+complex_is_finite(PyObject *self)
+{
+	Py_complex c;
+	c = ((PyComplexObject *)self)->cval;
+	return PyBool_FromLong((long)(Py_IS_FINITE(c.real) &&
+				      Py_IS_FINITE(c.imag)));
+}
+
+PyDoc_STRVAR(complex_is_finite_doc,
+"complex.is_finite() -> bool\n"
+"\n"
+"Returns True if the real and the imaginary part is finite.");
+#endif
+
 static PyMethodDef complex_methods[] = {
 	{"conjugate",	(PyCFunction)complex_conjugate,	METH_NOARGS,
 	 complex_conjugate_doc},
+#if 0
+	{"is_finite",	(PyCFunction)complex_is_finite,	METH_NOARGS,
+	 complex_is_finite_doc},
+#endif
 	{"__getnewargs__",	(PyCFunction)complex_getnewargs,	METH_NOARGS},
 	{NULL,		NULL}		/* sentinel */
 };

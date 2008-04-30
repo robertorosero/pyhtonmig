@@ -405,9 +405,9 @@ compiler_unit_check(struct compiler_unit *u)
 {
 	basicblock *block;
 	for (block = u->u_blocks; block != NULL; block = block->b_list) {
-		assert(block != (void *)0xcbcbcbcb);
-		assert(block != (void *)0xfbfbfbfb);
-		assert(block != (void *)0xdbdbdbdb);
+		assert((void *)block != (void *)0xcbcbcbcb);
+		assert((void *)block != (void *)0xfbfbfbfb);
+		assert((void *)block != (void *)0xdbdbdbdb);
 		if (block->b_instr != NULL) {
 			assert(block->b_ialloc > 0);
 			assert(block->b_iused > 0);
@@ -652,11 +652,16 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 	return b->b_iused++;
 }
 
-/* Set the i_lineno member of the instruction at offse off if the
-   line number for the current expression/statement (?) has not
+/* Set the i_lineno member of the instruction at offset off if the
+   line number for the current expression/statement has not
    already been set.  If it has been set, the call has no effect.
 
-   Every time a new node is b
+   The line number is reset in the following cases:
+   - when entering a new scope
+   - on each statement
+   - on each expression that start a new line
+   - before the "except" clause
+   - before the "for" and "while" expressions
 */
 
 static void
@@ -885,24 +890,59 @@ compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 {
 	PyObject *t, *v;
 	Py_ssize_t arg;
+	unsigned char *p, *q;
+	Py_complex z;
+	double d;
+	int real_part_zero, imag_part_zero;
 
 	/* necessary to make sure types aren't coerced (e.g., int and long) */
         /* _and_ to distinguish 0.0 from -0.0 e.g. on IEEE platforms */
         if (PyFloat_Check(o)) {
-            double d = PyFloat_AS_DOUBLE(o);
-            unsigned char* p = (unsigned char*) &d;
-            /* all we need is to make the tuple different in either the 0.0
-             * or -0.0 case from all others, just to avoid the "coercion".
-             */
-            if (*p==0 && p[sizeof(double)-1]==0)
-                t = PyTuple_Pack(3, o, o->ob_type, Py_None);
-            else
-	        t = PyTuple_Pack(2, o, o->ob_type);
-        } else {
-	    t = PyTuple_Pack(2, o, o->ob_type);
+		d = PyFloat_AS_DOUBLE(o);
+		p = (unsigned char*) &d;
+		/* all we need is to make the tuple different in either the 0.0
+		 * or -0.0 case from all others, just to avoid the "coercion".
+		 */
+		if (*p==0 && p[sizeof(double)-1]==0)
+			t = PyTuple_Pack(3, o, o->ob_type, Py_None);
+		else
+			t = PyTuple_Pack(2, o, o->ob_type);
+	}
+	else if (PyComplex_Check(o)) {
+		/* complex case is even messier: we need to make complex(x,
+		   0.) different from complex(x, -0.) and complex(0., y)
+		   different from complex(-0., y), for any x and y.  In
+		   particular, all four complex zeros should be
+		   distinguished.*/
+		z = PyComplex_AsCComplex(o);
+		p = (unsigned char*) &(z.real);
+		q = (unsigned char*) &(z.imag);
+		/* all that matters here is that on IEEE platforms
+		   real_part_zero will be true if z.real == 0., and false if
+		   z.real == -0.  In fact, real_part_zero will also be true
+		   for some other rarely occurring nonzero floats, but this
+		   doesn't matter. Similar comments apply to
+		   imag_part_zero. */
+		real_part_zero = *p==0 && p[sizeof(double)-1]==0;
+		imag_part_zero = *q==0 && q[sizeof(double)-1]==0;
+		if (real_part_zero && imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_True, Py_True);
+		}
+		else if (real_part_zero && !imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_True, Py_False);
+		}
+		else if (!real_part_zero && imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_False, Py_True);
+		}
+		else {
+			t = PyTuple_Pack(2, o, o->ob_type);
+		}
+        }
+	else {
+		t = PyTuple_Pack(2, o, o->ob_type);
         }
 	if (t == NULL)
-	    return -1;
+		return -1;
 
 	v = PyDict_GetItem(dict, t);
 	if (!v) {
@@ -1133,7 +1173,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	int addNone = 1;
 	static PyObject *module;
 	if (!module) {
-		module = PyUnicode_FromString("<module>");
+		module = PyUnicode_InternFromString("<module>");
 		if (!module)
 			return NULL;
 	}
@@ -1477,7 +1517,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 
 	/* initialize statics */
 	if (locals == NULL) {
-		locals = PyUnicode_FromString("__locals__");
+		locals = PyUnicode_InternFromString("__locals__");
 		if (locals == NULL)
 			return 0;
 	}
@@ -1511,6 +1551,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 	{
 		/* use the class name for name mangling */
 		Py_INCREF(s->v.ClassDef.name);
+		Py_XDECREF(c->u->u_private);
 		c->u->u_private = s->v.ClassDef.name;
 		/* force it to have one mandatory argument */
 		c->u->u_argcount = 1;
@@ -1715,9 +1756,8 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.iter);
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
+	/* for expressions must be traced on each iteration,
+	   so we need to set an extra line number. */
 	c->u->u_lineno_set = 0;
 	ADDOP_JREL(c, FOR_ITER, cleanup);
 	VISIT(c, expr, s->v.For.target);
@@ -1764,6 +1804,9 @@ compiler_while(struct compiler *c, stmt_ty s)
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
 	if (constant == -1) {
+		/* while expressions must be traced on each iteration,
+		   so we need to set an extra line number. */
+		c->u->u_lineno_set = 0;
 		VISIT(c, expr, s->v.While.test);
 		ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
 		ADDOP(c, POP_TOP);
@@ -1942,22 +1985,22 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 	for (i = 0; i < n; i++) {
 		excepthandler_ty handler = (excepthandler_ty)asdl_seq_GET(
 						s->v.TryExcept.handlers, i);
-		if (!handler->type && i < n-1)
+		if (!handler->v.ExceptHandler.type && i < n-1)
 		    return compiler_error(c, "default 'except:' must be last");
-	c->u->u_lineno_set = 0;
-	c->u->u_lineno = handler->lineno;
+		c->u->u_lineno_set = 0;
+		c->u->u_lineno = handler->lineno;
 		except = compiler_new_block(c);
 		if (except == NULL)
 			return 0;
-		if (handler->type) {
+		if (handler->v.ExceptHandler.type) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, handler->type);
+			VISIT(c, expr, handler->v.ExceptHandler.type);
 			ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
 			ADDOP_JREL(c, JUMP_IF_FALSE, except);
 			ADDOP(c, POP_TOP);
 		}
 		ADDOP(c, POP_TOP);
-		if (handler->name) {
+		if (handler->v.ExceptHandler.name) {
             basicblock *cleanup_end, *cleanup_body;
 
             cleanup_end = compiler_new_block(c);
@@ -1965,7 +2008,7 @@ compiler_try_except(struct compiler *c, stmt_ty s)
             if(!(cleanup_end || cleanup_body))
                 return 0;
 
-            compiler_nameop(c, handler->name, Store);
+            compiler_nameop(c, handler->v.ExceptHandler.name, Store);
             ADDOP(c, POP_TOP);
 
             /*
@@ -1986,7 +2029,7 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 		        return 0;
 
             /* second # body */
-	        VISIT_SEQ(c, stmt, handler->body);
+		VISIT_SEQ(c, stmt, handler->v.ExceptHandler.body);
 	        ADDOP(c, POP_BLOCK);
 	        compiler_pop_fblock(c, FINALLY_TRY, cleanup_body);
 
@@ -1998,10 +2041,10 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 
             /* name = None */
             ADDOP_O(c, LOAD_CONST, Py_None, consts);
-            compiler_nameop(c, handler->name, Store);
+            compiler_nameop(c, handler->v.ExceptHandler.name, Store);
 
             /* del name */
-            compiler_nameop(c, handler->name, Del);
+            compiler_nameop(c, handler->v.ExceptHandler.name, Del);
 
 	        ADDOP(c, END_FINALLY);
 	        compiler_pop_fblock(c, FINALLY_END, cleanup_end);
@@ -2009,11 +2052,11 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 		else {
             ADDOP(c, POP_TOP);
             ADDOP(c, POP_TOP);
-		    VISIT_SEQ(c, stmt, handler->body);
+		    VISIT_SEQ(c, stmt, handler->v.ExceptHandler.body);
 		}
 		ADDOP_JREL(c, JUMP_FORWARD, end);
 		compiler_use_next_block(c, except);
-		if (handler->type)
+		if (handler->v.ExceptHandler.type)
 			ADDOP(c, POP_TOP);
 	}
 	ADDOP(c, END_FINALLY);
@@ -2177,8 +2220,16 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	if (Py_OptimizeFlag)
 		return 1;
 	if (assertion_error == NULL) {
-		assertion_error = PyUnicode_FromString("AssertionError");
+		assertion_error = PyUnicode_InternFromString("AssertionError");
 		if (assertion_error == NULL)
+			return 0;
+	}
+	if (s->v.Assert.test->kind == Tuple_kind &&
+	    asdl_seq_LEN(s->v.Assert.test->v.Tuple.elts) > 0) {
+		const char* msg =
+			"assertion is always true, perhaps remove parentheses?";
+		if (PyErr_WarnExplicit(PyExc_SyntaxWarning, msg, c->c_filename,
+				       c->u->u_lineno, NULL, NULL) == -1)
 			return 0;
 	}
 	VISIT(c, expr, s->v.Assert.test);
@@ -2306,8 +2357,11 @@ unaryop(unaryop_ty op)
 		return UNARY_POSITIVE;
 	case USub:
 		return UNARY_NEGATIVE;
+	default:
+		PyErr_Format(PyExc_SystemError,
+			"unary op %d should not be possible", op);
+		return 0;
 	}
-	return 0;
 }
 
 static int
@@ -2338,8 +2392,11 @@ binop(struct compiler *c, operator_ty op)
 		return BINARY_AND;
 	case FloorDiv:
 		return BINARY_FLOOR_DIVIDE;
+	default:
+		PyErr_Format(PyExc_SystemError,
+			"binary op %d should not be possible", op);
+		return 0;
 	}
-	return 0;
 }
 
 static int
@@ -2366,8 +2423,9 @@ cmpop(cmpop_ty op)
 		return PyCmp_IN;
 	case NotIn:
 		return PyCmp_NOT_IN;
+	default:
+		return PyCmp_BAD;
 	}
-	return PyCmp_BAD;
 }
 
 static int
@@ -2398,10 +2456,11 @@ inplace_binop(struct compiler *c, operator_ty op)
 		return INPLACE_AND;
 	case FloorDiv:
 		return INPLACE_FLOOR_DIVIDE;
+	default:
+		PyErr_Format(PyExc_SystemError,
+			"inplace binary op %d should not be possible", op);
+		return 0;
 	}
-	PyErr_Format(PyExc_SystemError,
-		     "inplace binary op %d should not be possible", op);
-	return 0;
 }
 
 static int
@@ -2572,6 +2631,11 @@ compiler_list(struct compiler *c, expr_ty e)
 		for (i = 0; i < n; i++) {
 			expr_ty elt = asdl_seq_GET(e->v.List.elts, i);
 			if (elt->kind == Starred_kind && !seen_star) {
+				if ((i >= (1 << 8)) ||
+				    (n-i-1 >= (INT_MAX >> 8)))
+					return compiler_error(c,
+						"too many expressions in "
+						"star-unpacking assignment");
 				ADDOP_I(c, UNPACK_EX, (i + ((n-i-1) << 8)));
 				seen_star = 1;
 				asdl_seq_SET(e->v.List.elts, i, elt->v.Starred.value);
@@ -2600,6 +2664,11 @@ compiler_tuple(struct compiler *c, expr_ty e)
 		for (i = 0; i < n; i++) {
 			expr_ty elt = asdl_seq_GET(e->v.Tuple.elts, i);
 			if (elt->kind == Starred_kind && !seen_star) {
+				if ((i >= (1 << 8)) ||
+				    (n-i-1 >= (INT_MAX >> 8)))
+					return compiler_error(c,
+						"too many expressions in "
+						"star-unpacking assignment");
 				ADDOP_I(c, UNPACK_EX, (i + ((n-i-1) << 8)));
 				seen_star = 1;
 				asdl_seq_SET(e->v.Tuple.elts, i, elt->v.Starred.value);
@@ -3040,7 +3109,7 @@ compiler_with(struct compiler *c, stmt_ty s)
 {
     static identifier enter_attr, exit_attr;
     basicblock *block, *finally;
-    identifier tmpexit, tmpvalue = NULL;
+    identifier tmpvalue = NULL;
 
     assert(s->kind == With_kind);
 
@@ -3059,12 +3128,6 @@ compiler_with(struct compiler *c, stmt_ty s)
     finally = compiler_new_block(c);
     if (!block || !finally)
 	return 0;
-
-    /* Create a temporary variable to hold context.__exit__ */
-    tmpexit = compiler_new_tmpname(c);
-    if (tmpexit == NULL)
-	return 0;
-    PyArena_AddPyObject(c->c_arena, tmpexit);
 
     if (s->v.With.optional_vars) {
 	/* Create a temporary variable to hold context.__enter__().
@@ -3085,11 +3148,10 @@ compiler_with(struct compiler *c, stmt_ty s)
     /* Evaluate EXPR */
     VISIT(c, expr, s->v.With.context_expr);
 
-    /* Squirrel away context.__exit__  */
+    /* Squirrel away context.__exit__ by stuffing it under context */
     ADDOP(c, DUP_TOP);
     ADDOP_O(c, LOAD_ATTR, exit_attr, names);
-    if (!compiler_nameop(c, tmpexit, Store))
-	return 0;
+    ADDOP(c, ROT_TWO);
 
     /* Call context.__enter__() */
     ADDOP_O(c, LOAD_ATTR, enter_attr, names);
@@ -3133,10 +3195,9 @@ compiler_with(struct compiler *c, stmt_ty s)
     if (!compiler_push_fblock(c, FINALLY_END, finally))
 	return 0;
 
-    /* Finally block starts; push tmpexit and issue our magic opcode. */
-    if (!compiler_nameop(c, tmpexit, Load) ||
-	!compiler_nameop(c, tmpexit, Del))
-	return 0;
+    /* Finally block starts; context.__exit__ is on the stack under
+       the exception or return information. Just issue our magic
+       opcode. */
     ADDOP(c, WITH_CLEANUP);
 
     /* Finally block ends. */
@@ -3727,10 +3788,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	assert(d_bytecode >= 0);
 	assert(d_lineno >= 0);
 
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
-	if (d_lineno == 0 && i->i_opcode != FOR_ITER)
+	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;
 
 	if (d_bytecode > 255) {

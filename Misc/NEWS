@@ -4,7 +4,7 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 3.0a3?
+What's New in Python 3.0a5?
 ===========================
 
 *Release date: XX-XXX-2008*
@@ -12,7 +12,157 @@ What's New in Python 3.0a3?
 Core and Builtins
 -----------------
 
-- map() and itertools.imap() no longer accept None for the first argument.
+- Fix misbehaviour of PyLong_FromSsize_t on systems where sizeof(size_t) >
+  sizeof(long).
+
+- Issue #2221: Corrected a SystemError "error return without exception set",
+  when the code executed by exec() raises an exception, and sys.stdout.flush()
+  also raises an error.
+
+- Bug #2565: The repr() of type objects now calls them 'class', 
+  not 'type' - whether they are builtin types or not.
+
+- The command line processing was converted to pass Unicode strings
+  through as unmodified as possible; as a consequence, the C API
+  related to command line arguments was changed to use wchar_t.
+
+- All backslashes in raw strings are interpreted literally.  This means that
+  '\u' and '\U' escapes are not treated specially.
+
+Extension Modules
+-----------------
+
+Library
+-------
+
+- Issue #2682: ctypes callback functions now longer contain a cyclic
+  reference to themselves.
+
+- Issue #2058: Remove the buf attribute and add __slots__ to the TarInfo
+  class in order to reduce tarfile's memory usage.
+
+- Bug #2606: Avoid calling .sort() on a dict_keys object.
+
+- The bundled libffi copy is now in sync with the recently released
+  libffi3.0.5 version, apart from some small changes to
+  Modules/_ctypes/libffi/configure.ac.
+
+Build
+-----
+
+- Issue #1496032: On alpha, use -mieee when gcc is the compiler.
+
+- "make install" is now an alias for "make altinstall", to prevent
+  accidentally overwriting a Python 2.x installation.
+  Use "make fullinstall" to force Python 3.0 to be installed as
+  "python".
+
+- Issue #2544: On HP-UX systems, use 'gcc -shared' for linking when
+  gcc is used as compiler.
+
+What's New in Python 3.0a4?
+===========================
+
+*Release date: 02-Apr-2008*
+
+Core and Builtins
+-----------------
+
+- Bug #2301: Don't try decoding the source code into the original
+  encoding for syntax errors.
+
+Extension Modules
+-----------------
+
+- The dl module was removed, use the ctypes module instead.
+
+- Use wchar_t functions in _locale module.
+
+Library
+-------
+
+- The class distutils.commands.build_py.build_py_2to3 can be used
+  as a build_py replacement to automatically run 2to3 on modules
+  that are going to be installed.
+
+- A new pickle protocol (protocol 3) is added with explicit support
+  for bytes.  This is the default protocol.  It intentionally cannot
+  be unpickled by Python 2.x.
+
+- When a pickle written by Python 2.x contains an (8-bit) str
+  instance, this is now decoded to a (Unicode) str instance.  The
+  encoding used to do this defaults to ASCII, but can be overridden
+  via two new keyword arguments to the Unpickler class.  Previously
+  this would create bytes instances, which is usually wrong: str
+  instances are often used to pickle attribute names etc., and text is
+  more common than binary data anyway.
+
+- Default to ASCII as the locale.getpreferredencoding, if the POSIX
+  system doesn't support CODESET and LANG isn't set or doesn't
+  allow deduction of an encoding.
+
+- Issue #1202: zlib.crc32 and zlib.adler32 now return an unsigned value.
+
+- Issue #719888: Updated tokenize to use a bytes API. generate_tokens has been
+  renamed tokenize and now works with bytes rather than strings. A new
+  detect_encoding function has been added for determining source file encoding
+  according to PEP-0263. Token sequences returned by tokenize always start
+  with an ENCODING token which specifies the encoding used to decode the file.
+  This token is used to encode the output of untokenize back to bytes.
+
+What's New in Python 3.0a3?
+===========================
+
+*Release date: 29-Feb-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #2282: io.TextIOWrapper was not overriding seekable() from io.IOBase.
+
+- Issue #2115: Important speedup in setting __slot__ attributes.  Also 
+  prevent a possible crash: an Abstract Base Class would try to access a slot 
+  on a registered virtual subclass.
+
+- Fixed repr() and str() of complex numbers with infinity or nan as real or
+  imaginary part.
+
+- Clear all free list during a gc.collect() of the highest generation in order
+  to allow pymalloc to free more arenas. Python may give back memory to the
+  OS earlier.
+
+- Issue #2045: Fix an infinite recursion triggered when printing a subclass of
+  collections.defaultdict, if its default_factory is set to a bound method.
+
+- Fixed a minor memory leak in dictobject.c. The content of the free
+  list was not freed on interpreter shutdown.
+
+- Limit free list of method and builtin function objects to 256 entries
+  each.
+
+- Patch #1953: Added ``sys._compact_freelists()`` and the C API functions
+  ``PyInt_CompactFreeList`` and ``PyFloat_CompactFreeList``
+  to compact the internal free lists of pre-allocted ints and floats.
+
+- Bug #1983: Fixed return type of fork(), fork1() and forkpty() calls.
+  Python expected the return type int but the fork familie returns pi_t.
+
+- Issue #1678380: Fix a bug that identifies 0j and -0j when they appear
+  in the same code unit.
+
+- Issue #2025 :  Add tuple.count() and tuple.index() methods to comply with
+  the collections.Sequence API.
+
+- Fixed multiple reinitialization of the Python interpreter. The small int
+  list in longobject.c has caused a seg fault during the third finalization.
+
+- Issue #1973: bytes.fromhex('') raises SystemError
+
+- Issue #1771: remove cmp parameter from sorted() and list.sort()
+
+- Issue #1969: split and rsplit in bytearray are inconsistent
+
+- map() and no longer accepts None for the first argument.
   Use zip() instead.
 
 - Issue #1769: Now int("- 1") is not allowed any more.
@@ -42,31 +192,56 @@ Core and Builtins
   gc module; gc.DEBUG_COLLECTABLE or gc.DEBUG_UNCOLLECTABLE are now enough to
   print the corresponding list of objects considered by the garbage collector.
 
-- Issue #1580: New free format floating point representation based on 
-  "Floating-Point Printer Sample Code", by Robert G. Burger. For example
-  repr(11./5) now returns '2.2' instead of '2.2000000000000002'.
-
 - Issue #1573: Improper use of the keyword-only syntax makes the parser crash.
 
 - Issue #1564: The set implementation should special-case PyUnicode instead
   of PyString.
 
+- Patch #1031213: Decode source line in SyntaxErrors back to its
+  original source encoding.
+
+- inspect.getsource() includes the decorators again.
+
+- Bug #1713: posixpath.ismount() claims symlink to a mountpoint is a
+  mountpoint.
+
+- Fix utf-8-sig incremental decoder, which didn't recognise a BOM when the
+  first chunk fed to the decoder started with a BOM, but was longer than 3
+  bytes.
+
 
 Extension Modules
 -----------------
 
+- Code for itertools ifilter(), imap(), and izip() moved to bultins and
+  renamed to filter(), map(), and zip().  Also, renamed izip_longest()
+  to zip_longest() and ifilterfalse() to filterfalse().
+
 - Issue #1762972: Readded the reload() function as imp.reload()
+
+- Bug #2111: mmap segfaults when trying to write a block opened with PROT_READ
+
+- #2063: correct order of utime and stime in os.times() result on Windows.
 
 
 Library
 -------
+
+- Weakref dictionaries now inherit from MutableMapping.
+  XXX their API still needs to be modernized (i.e. eliminate the iter methods).
+
+- Created new UserDict class in collections module.  This one inherits from and
+  complies with the MutableMapping ABC.  Also, moved UserString and UserList
+  to the collections module.  The MutableUserString class was removed.
+
+- Removed UserDict.DictMixin.  Replaced all its uses with
+  collections.MutableMapping.
 
 - Issue #1703: getpass() should flush after writing prompt.
 
 - Issue #1585: IDLE uses non-existent xrange() function.
 
 - Issue #1578: Problems in win_getpass.
-
 
 Build
 -----
@@ -391,6 +566,9 @@ C API
 
 Tests
 -----
+
+- Removed test.testall as test.regrtest replaces it.
+
 
 Documentation
 -------------

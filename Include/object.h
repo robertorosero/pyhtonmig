@@ -277,7 +277,6 @@ typedef struct {
 typedef struct {
      getbufferproc bf_getbuffer;
      releasebufferproc bf_releasebuffer;
-     inquiry bf_multisegment;
 } PyBufferProcs;
 
 typedef void (*freefunc)(void *);
@@ -428,6 +427,7 @@ PyAPI_FUNC(PyObject *) PyType_GenericAlloc(PyTypeObject *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyType_Lookup(PyTypeObject *, PyObject *);
+PyAPI_FUNC(unsigned int) PyType_ClearCache(void);
 
 /* Generic operations on objects */
 PyAPI_FUNC(int) PyObject_Print(PyObject *, FILE *, int);
@@ -532,6 +532,9 @@ given type object has a specified feature.
 #define Py_TPFLAGS_HAVE_VERSION_TAG   (1L<<18)
 #define Py_TPFLAGS_VALID_VERSION_TAG  (1L<<19)
 
+/* Type is abstract and cannot be instantiated */
+#define Py_TPFLAGS_IS_ABSTRACT (1L<<20)
+
 /* These flags are used to determine if a type is a subclass. */
 #define Py_TPFLAGS_INT_SUBCLASS		(1L<<23)
 #define Py_TPFLAGS_LONG_SUBCLASS	(1L<<24)
@@ -559,7 +562,7 @@ the refcount falls to 0; for
 objects that don't contain references to other objects or heap memory
 this can be the standard function free().  Both macros can be used
 wherever a void expression is allowed.  The argument must not be a
-NIL pointer.  If it may be NIL, use Py_XINCREF/Py_XDECREF instead.
+NULL pointer.  If it may be NULL, use Py_XINCREF/Py_XDECREF instead.
 The macro _Py_NewReference(op) initialize reference counts to 1, and
 in special builds (Py_REF_DEBUG, Py_TRACE_REFS) performs additional
 bookkeeping appropriate to the special build.

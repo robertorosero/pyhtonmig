@@ -86,7 +86,7 @@ The :mod:`csv` module defines the following functions:
       >>> import csv
       >>> spamReader = csv.reader(open('eggs.csv'), delimiter=' ', quotechar='|')
       >>> for row in spamReader:
-      ...     print ', '.join(row)
+      ...     print(', '.join(row))
       Spam, Spam, Spam, Spam, Spam, Baked Beans
       Spam, Lovely Spam, Wonderful Spam
 
@@ -121,7 +121,7 @@ The :mod:`csv` module defines the following functions:
 
 .. function:: register_dialect(name[, dialect][, fmtparam])
 
-   Associate *dialect* with *name*.  *name* must be a string or Unicode object. The
+   Associate *dialect* with *name*.  *name* must be a string. The
    dialect can be specified either by passing a sub-class of :class:`Dialect`, or
    by *fmtparam* keyword arguments, or both, with keyword arguments overriding
    parameters of the dialect. For full details about the dialect and formatting
@@ -209,19 +209,20 @@ The :mod:`csv` module defines the following classes:
 
    The :class:`Sniffer` class is used to deduce the format of a CSV file.
 
-The :class:`Sniffer` class provides two methods:
+   The :class:`Sniffer` class provides two methods:
 
-.. method:: Sniffer.sniff(sample[, delimiters=None])
+   .. method:: sniff(sample[, delimiters=None])
 
-   Analyze the given *sample* and return a :class:`Dialect` subclass reflecting the
-   parameters found.  If the optional *delimiters* parameter is given, it is
-   interpreted as a string containing possible valid delimiter characters.
+      Analyze the given *sample* and return a :class:`Dialect` subclass
+      reflecting the parameters found.  If the optional *delimiters* parameter
+      is given, it is interpreted as a string containing possible valid
+      delimiter characters.
 
 
-.. method:: Sniffer.has_header(sample)
+   .. method:: has_header(sample)
 
-   Analyze the sample text (presumed to be in CSV format) and return :const:`True`
-   if the first row appears to be a series of column headers.
+      Analyze the sample text (presumed to be in CSV format) and return
+      :const:`True` if the first row appears to be a series of column headers.
 
 An example for :class:`Sniffer` use::
 

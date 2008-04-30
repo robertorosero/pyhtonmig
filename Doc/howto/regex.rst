@@ -1,3 +1,5 @@
+.. _regex-howto:
+
 ****************************
   Regular Expression HOWTO
 ****************************
@@ -201,7 +203,7 @@ this RE against the string ``abcbd``.
 |      |           | ``bc``.                         |
 +------+-----------+---------------------------------+
 | 6    | ``abcb``  | Try ``b`` again.  This time     |
-|      |           | but the character at the        |
+|      |           | the character at the            |
 |      |           | current position is ``'b'``, so |
 |      |           | it succeeds.                    |
 +------+-----------+---------------------------------+
@@ -365,8 +367,8 @@ module.  If you have Tkinter available, you may also want to look at
 Python distribution.  It allows you to enter REs and strings, and displays
 whether the RE matches or fails. :file:`redemo.py` can be quite useful when
 trying to debug a complicated RE.  Phil Schwartz's `Kodos
-<http://www.phil-schwartz.com/kodos.spy>`_ is also an interactive tool for
-developing and testing RE patterns.
+<http://kodos.sourceforge.net/>`_ is also an interactive tool for developing and
+testing RE patterns.
 
 This HOWTO uses the standard Python interpreter for its examples. First, run the
 Python interpreter, import the :mod:`re` module, and compile a RE::
@@ -497,7 +499,7 @@ more convenient.  If a program contains a lot of regular expressions, or re-uses
 the same ones in several locations, then it might be worthwhile to collect all
 the definitions in one place, in a section of code that compiles all the REs
 ahead of time.  To take an example from the standard library, here's an extract
-from :file:`xmllib.py`::
+from the now deprecated :file:`xmllib.py`::
 
    ref = re.compile( ... )
    entityref = re.compile( ... )

@@ -26,9 +26,9 @@ Number-theoretic and representation functions:
 
 .. function:: ceil(x)
 
-   Return the ceiling of *x* as a float, the smallest integer value greater than
-   or equal to *x*. If *x* is not a float, delegates to ``x.__ceil__()``, which
-   should return an :class:`Integral` value.
+   Return the ceiling of *x*, the smallest integer greater than or equal to *x*.
+   If *x* is not a float, delegates to ``x.__ceil__()``, which should return an
+   :class:`Integral` value.
 
 
 .. function:: copysign(x, y)
@@ -44,9 +44,9 @@ Number-theoretic and representation functions:
 
 .. function:: floor(x)
 
-   Return the floor of *x* as a float, the largest integer value less than or
-   equal to *x*. If *x* is not a float, delegates to ``x.__floor__()``, which
-   should return an :class:`Integral` value.
+   Return the floor of *x*, the largest integer less than or equal to *x*.
+   If *x* is not a float, delegates to ``x.__floor__()``, which should return an
+   :class:`Integral` value.
 
 
 .. function:: fmod(x, y)
@@ -96,6 +96,13 @@ Number-theoretic and representation functions:
    Return the fractional and integer parts of *x*.  Both results carry the sign of
    *x*, and both are floats.
 
+
+.. function:: trunc(x)
+
+   Return the :class:`Real` value *x* truncated to an :class:`Integral` (usually
+   a long integer). Delegates to ``x.__trunc__()``.
+
+
 Note that :func:`frexp` and :func:`modf` have a different call/return pattern
 than their C equivalents: they take a single argument and return a pair of
 values, rather than returning their second return value through an 'output
@@ -109,7 +116,6 @@ necessarily has no fractional bits.
 
 Power and logarithmic functions:
 
-
 .. function:: exp(x)
 
    Return ``e**x``.
@@ -121,6 +127,12 @@ Power and logarithmic functions:
    return the natural logarithm of *x* (that is, the logarithm to base *e*).
 
 
+.. function:: log1p(x)
+
+   Return the natural logarithm of *1+x* (base *e*). The
+   result is calculated in a way which is accurate for *x* near zero.
+
+
 .. function:: log10(x)
 
    Return the base-10 logarithm of *x*.
@@ -128,7 +140,12 @@ Power and logarithmic functions:
 
 .. function:: pow(x, y)
 
-   Return ``x**y``.
+   Return ``x`` raised to the power ``y``.  Exceptional cases follow
+   Annex 'F' of the C99 standard as far as possible.  In particular,
+   ``pow(1.0, x)`` and ``pow(x, 0.0)`` always return ``1.0``, even
+   when ``x`` is a zero or a NaN.  If both ``x`` and ``y`` are finite,
+   ``x`` is negative, and ``y`` is not an integer then ``pow(x, y)``
+   is undefined, and raises :exc:`ValueError`.
 
 
 .. function:: sqrt(x)
@@ -198,6 +215,21 @@ Angular conversion:
 Hyperbolic functions:
 
 
+.. function:: acosh(x)
+
+   Return the inverse hyperbolic cosine of *x*.
+
+
+.. function:: asinh(x)
+
+   Return the inverse hyperbolic sine of *x*.
+
+
+.. function:: atanh(x)
+
+   Return the inverse hyperbolic tangent of *x*.
+
+
 .. function:: cosh(x)
 
    Return the hyperbolic cosine of *x*.
@@ -212,6 +244,8 @@ Hyperbolic functions:
 
    Return the hyperbolic tangent of *x*.
 
+
+
 The module also defines two mathematical constants:
 
 
@@ -223,6 +257,7 @@ The module also defines two mathematical constants:
 .. data:: e
 
    The mathematical constant *e*.
+
 
 .. note::
 
@@ -237,9 +272,17 @@ The module also defines two mathematical constants:
    :exc:`OverflowError` isn't defined, and in cases where ``math.log(0)`` raises
    :exc:`OverflowError`, ``math.log(0L)`` may raise :exc:`ValueError` instead.
 
+   All functions return a quiet *NaN* if at least one of the args is *NaN*.
+   Signaling *NaN*s raise an exception. The exception type still depends on the
+   platform and libm implementation. It's usually :exc:`ValueError` for *EDOM*
+   and :exc:`OverflowError` for errno *ERANGE*.
+
+   ..versionchanged:: 2.6
+      In earlier versions of Python the outcome of an operation with NaN as
+      input depended on platform and libm implementation.
+
 
 .. seealso::
 
    Module :mod:`cmath`
       Complex number versions of many of these functions.
-

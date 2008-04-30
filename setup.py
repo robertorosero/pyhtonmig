@@ -4,6 +4,7 @@
 __version__ = "$Revision$"
 
 import sys, os, imp, re, optparse
+from glob import glob
 
 from distutils import log
 from distutils import sysconfig
@@ -118,6 +119,8 @@ class PyBuildExt(build_ext):
             raise ValueError("No source directory; cannot proceed.")
 
         # Figure out the location of the source code for extension modules
+        # (This logic is copied in distutils.test.test_sysconfig,
+        # so building in a separate directory does not break test_distutils.)
         moddir = os.path.join(os.getcwd(), srcdir, 'Modules')
         moddir = os.path.normpath(moddir)
         srcdir, tail = os.path.split(moddir)
@@ -142,12 +145,20 @@ class PyBuildExt(build_ext):
         self.distribution.scripts = [os.path.join(srcdir, filename)
                                      for filename in self.distribution.scripts]
 
+        # Python header files
+        headers = glob("Include/*.h") + ["pyconfig.h"]
+
         for ext in self.extensions[:]:
             ext.sources = [ find_module_file(filename, moddirlist)
                             for filename in ext.sources ]
             if ext.depends is not None:
                 ext.depends = [find_module_file(filename, alldirlist)
                                for filename in ext.depends]
+            else:
+                ext.depends = []
+            # re-compile extensions if a header file has been changed
+            ext.depends.extend(headers)
+
             ext.include_dirs.append( '.' ) # to get config.h
             for incdir in incdirlist:
                 ext.include_dirs.append( os.path.join(srcdir, incdir) )
@@ -318,7 +329,7 @@ class PyBuildExt(build_ext):
                 parser.add_option(arg_name, dest="dirs", action="append")
                 options = parser.parse_args(env_val.split())[0]
                 if options.dirs:
-                    for directory in options.dirs:
+                    for directory in reversed(options.dirs):
                         add_dir_to_list(dir_list, directory)
 
         if os.path.normpath(sys.prefix) != '/usr':
@@ -401,10 +412,10 @@ class PyBuildExt(build_ext):
                                libraries=math_libs) )
         exts.append( Extension('datetime', ['datetimemodule.c', 'timemodule.c'],
                                libraries=math_libs) )
-        # random number generator implemented in C
-        exts.append( Extension("_random", ["_randommodule.c"]) )
         # fast iterator tools implemented in C
         exts.append( Extension("itertools", ["itertoolsmodule.c"]) )
+        # random number generator implemented in C
+        exts.append( Extension("_random", ["_randommodule.c"]) )
         # high-performance collections
         exts.append( Extension("_collections", ["_collectionsmodule.c"]) )
         # bisect
@@ -462,9 +473,6 @@ class PyBuildExt(build_ext):
 
         # select(2); not on ancient System V
         exts.append( Extension('select', ['selectmodule.c']) )
-
-        # Helper module for various ascii-encoders
-        exts.append( Extension('binascii', ['binascii.c']) )
 
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )
@@ -643,7 +651,10 @@ class PyBuildExt(build_ext):
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 6)
+        max_db_ver = (4, 5)  # XXX(gregory.p.smith): 4.6 "works" but seems to
+                             # have issues on many platforms.  I've temporarily
+                             # disabled 4.6 to see what the odd platform
+                             # buildbots say.
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -686,10 +697,10 @@ class PyBuildExt(build_ext):
         for dn in inc_dirs:
             std_variants.append(os.path.join(dn, 'db3'))
             std_variants.append(os.path.join(dn, 'db4'))
-            for x in (0,1,2,3,4,5,6):
+            for x in range(max_db_ver[1]+1):
                 std_variants.append(os.path.join(dn, "db4%d"%x))
                 std_variants.append(os.path.join(dn, "db4.%d"%x))
-            for x in (2,3):
+            for x in (3,):
                 std_variants.append(os.path.join(dn, "db3%d"%x))
                 std_variants.append(os.path.join(dn, "db3.%d"%x))
 
@@ -993,6 +1004,7 @@ class PyBuildExt(build_ext):
         # You can upgrade zlib to version 1.1.4 yourself by going to
         # http://www.gzip.org/zlib/
         zlib_inc = find_file('zlib.h', [], inc_dirs)
+        have_zlib = False
         if zlib_inc is not None:
             zlib_h = zlib_inc[0] + '/zlib.h'
             version = '"0.0.0"'
@@ -1014,12 +1026,28 @@ class PyBuildExt(build_ext):
                     exts.append( Extension('zlib', ['zlibmodule.c'],
                                            libraries = ['z'],
                                            extra_link_args = zlib_extra_link_args))
+                    have_zlib = True
                 else:
                     missing.append('zlib')
             else:
                 missing.append('zlib')
         else:
             missing.append('zlib')
+
+        # Helper module for various ascii-encoders.  Uses zlib for an optimized
+        # crc32 if we have it.  Otherwise binascii uses its own.
+        if have_zlib:
+            extra_compile_args = ['-DUSE_ZLIB_CRC32']
+            libraries = ['z']
+            extra_link_args = zlib_extra_link_args
+        else:
+            extra_compile_args = []
+            libraries = []
+            extra_link_args = []
+        exts.append( Extension('binascii', ['binascii.c'],
+                               extra_compile_args = extra_compile_args,
+                               libraries = libraries,
+                               extra_link_args = extra_link_args) )
 
         # Gustavo Niemeyer's bz2 module.
         if (self.compiler.find_library_file(lib_dirs, 'bz2')):
@@ -1078,17 +1106,6 @@ class PyBuildExt(build_ext):
         for loc in ('kr', 'jp', 'cn', 'tw', 'hk', 'iso2022'):
             exts.append(Extension('_codecs_%s' % loc,
                                   ['cjkcodecs/_codecs_%s.c' % loc]))
-
-        # Dynamic loading module
-        if sys.maxsize == 0x7fffffff:
-            # This requires sizeof(int) == sizeof(long) == sizeof(char*)
-            dl_inc = find_file('dlfcn.h', [], inc_dirs)
-            if (dl_inc is not None) and (platform not in ['atheos']):
-                exts.append( Extension('dl', ['dlmodule.c']) )
-            else:
-                missing.append('dl')
-        else:
-            missing.append('dl')
 
         # Thomas Heller's _ctypes module
         self.detect_ctypes(inc_dirs, lib_dirs)
@@ -1365,8 +1382,37 @@ class PyBuildExt(build_ext):
         # *** Uncomment these for TOGL extension only:
         #       -lGL -lGLU -lXext -lXmu \
 
+    def configure_ctypes_darwin(self, ext):
+        # Darwin (OS X) uses preconfigured files, in
+        # the Modules/_ctypes/libffi_osx directory.
+        (srcdir,) = sysconfig.get_config_vars('srcdir')
+        ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
+                                                  '_ctypes', 'libffi_osx'))
+        sources = [os.path.join(ffi_srcdir, p)
+                   for p in ['ffi.c',
+                             'x86/x86-darwin.S',
+                             'x86/x86-ffi_darwin.c',
+                             'x86/x86-ffi64.c',
+                             'powerpc/ppc-darwin.S',
+                             'powerpc/ppc-darwin_closure.S',
+                             'powerpc/ppc-ffi_darwin.c',
+                             'powerpc/ppc64-darwin_closure.S',
+                             ]]
+
+        # Add .S (preprocessed assembly) to C compiler source extensions.
+        self.compiler.src_extensions.append('.S')
+
+        include_dirs = [os.path.join(ffi_srcdir, 'include'),
+                        os.path.join(ffi_srcdir, 'powerpc')]
+        ext.include_dirs.extend(include_dirs)
+        ext.sources.extend(sources)
+        return True
+
     def configure_ctypes(self, ext):
         if not self.use_system_libffi:
+            if sys.platform == 'darwin':
+                return self.configure_ctypes_darwin(ext)
+
             (srcdir,) = sysconfig.get_config_vars('srcdir')
             ffi_builddir = os.path.join(self.build_temp, 'libffi')
             ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
@@ -1430,6 +1476,7 @@ class PyBuildExt(build_ext):
 
         if sys.platform == 'darwin':
             sources.append('_ctypes/darwin/dlfcn_simple.c')
+            extra_compile_args.append('-DMACOSX')
             include_dirs.append('_ctypes/darwin')
 # XXX Is this still needed?
 ##            extra_link_args.extend(['-read_only_relocs', 'warning'])
@@ -1458,6 +1505,11 @@ class PyBuildExt(build_ext):
 
         if not '--with-system-ffi' in sysconfig.get_config_var("CONFIG_ARGS"):
             return
+
+        if sys.platform == 'darwin':
+            # OS X 10.5 comes with libffi.dylib; the include files are
+            # in /usr/include/ffi
+            inc_dirs.append('/usr/include/ffi')
 
         ffi_inc = find_file('ffi.h', [], inc_dirs)
         if ffi_inc is not None:
@@ -1582,6 +1634,7 @@ def main():
 
           # Scripts to install
           scripts = ['Tools/scripts/pydoc', 'Tools/scripts/idle',
+                     'Tools/scripts/2to3',
                      'Lib/smtpd.py']
         )
 

@@ -64,7 +64,11 @@ PyObject *
 PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 {
 	register PyStringObject *op;
-	assert(size >= 0);
+	if (size < 0) {
+		PyErr_SetString(PyExc_SystemError,
+		    "Negative size passed to PyString_FromStringAndSize");
+		return NULL;
+	}
 	if (size == 0 && (op = nullstring) != NULL) {
 #ifdef COUNT_ALLOCS
 		null_strings++;
@@ -2772,7 +2776,7 @@ string_fromhex(PyObject *cls, PyObject *args)
 		}
 		buf[j++] = (top << 4) + bot;
 	}
-	if (_PyString_Resize(&newstring, j) < 0)
+	if (j != byteslen && _PyString_Resize(&newstring, j) < 0)
 		goto error;
 	return newstring;
 
@@ -2788,7 +2792,7 @@ string_getnewargs(PyStringObject *v)
 	return Py_BuildValue("(s#)", v->ob_sval, Py_SIZE(v));
 }
 
-
+
 static PyMethodDef
 string_methods[] = {
 	{"__getnewargs__",	(PyCFunction)string_getnewargs,	METH_NOARGS},

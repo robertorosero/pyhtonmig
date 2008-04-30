@@ -1906,9 +1906,9 @@ static PyObject *
 posix_chown(PyObject *self, PyObject *args)
 {
 	char *path = NULL;
-	int uid, gid;
+	long uid, gid;
 	int res;
-	if (!PyArg_ParseTuple(args, "etii:chown",
+	if (!PyArg_ParseTuple(args, "etll:chown",
 	                      Py_FileSystemDefaultEncoding, &path,
 	                      &uid, &gid))
 		return NULL;
@@ -3579,9 +3579,9 @@ posix_spawnvpe(PyObject *self, PyObject *args)
 
 	Py_BEGIN_ALLOW_THREADS
 #if defined(PYCC_GCC)
-	spawnval = spawnve(mode, path, argvlist, envlist);
+	spawnval = spawnvpe(mode, path, argvlist, envlist);
 #else
-	spawnval = _spawnve(mode, path, argvlist, envlist);
+	spawnval = _spawnvpe(mode, path, argvlist, envlist);
 #endif
 	Py_END_ALLOW_THREADS
 
@@ -3616,11 +3616,11 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork1(PyObject *self, PyObject *noargs)
 {
-	int pid = fork1();
+	pid_t pid = fork1();
 	if (pid == -1)
 		return posix_error();
 	PyOS_AfterFork();
-	return PyLong_FromLong((long)pid);
+	return PyLong_FromLong(pid);
 }
 #endif
 
@@ -3634,12 +3634,12 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork(PyObject *self, PyObject *noargs)
 {
-	int pid = fork();
+	pid_t pid = fork();
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
-	return PyLong_FromLong((long)pid);
+	return PyLong_FromLong(pid);
 }
 #endif
 
@@ -3741,14 +3741,15 @@ To both, return fd of newly opened pseudo-terminal.\n");
 static PyObject *
 posix_forkpty(PyObject *self, PyObject *noargs)
 {
-	int master_fd = -1, pid;
+	int master_fd = -1;
+	pid_t pid;
 
 	pid = forkpty(&master_fd, NULL, NULL, NULL);
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
-	return Py_BuildValue("(ii)", pid, master_fd);
+	return Py_BuildValue("(li)", pid, master_fd);
 }
 #endif
 
@@ -3963,7 +3964,8 @@ Kill a process with a signal.");
 static PyObject *
 posix_kill(PyObject *self, PyObject *args)
 {
-	int pid, sig;
+	pid_t pid;
+	int sig;
 	if (!PyArg_ParseTuple(args, "ii:kill", &pid, &sig))
 		return NULL;
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
@@ -4208,7 +4210,7 @@ posix_setgroups(PyObject *self, PyObject *groups)
 
 #if defined(HAVE_WAIT3) || defined(HAVE_WAIT4)
 static PyObject *
-wait_helper(int pid, int status, struct rusage *ru)
+wait_helper(pid_t pid, int status, struct rusage *ru)
 {
 	PyObject *result;
    	static PyObject *struct_rusage;
@@ -4274,7 +4276,8 @@ Wait for completion of a child process.");
 static PyObject *
 posix_wait3(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	struct rusage ru;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
@@ -4298,7 +4301,8 @@ Wait for completion of a given child process.");
 static PyObject *
 posix_wait4(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	struct rusage ru;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
@@ -4322,7 +4326,8 @@ Wait for completion of a given child process.");
 static PyObject *
 posix_waitpid(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
@@ -4371,7 +4376,7 @@ Wait for completion of a child process.");
 static PyObject *
 posix_wait(PyObject *self, PyObject *noargs)
 {
-	int pid;
+	pid_t pid;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
@@ -4541,10 +4546,10 @@ posix_times(PyObject *self, PyObject *noargs)
 	*/
 	return Py_BuildValue(
 		"ddddd",
-		(double)(kernel.dwHighDateTime*429.4967296 +
-		         kernel.dwLowDateTime*1e-7),
 		(double)(user.dwHighDateTime*429.4967296 +
 		         user.dwLowDateTime*1e-7),
+		(double)(kernel.dwHighDateTime*429.4967296 +
+		         kernel.dwLowDateTime*1e-7),
 		(double)0,
 		(double)0,
 		(double)0);
@@ -4566,7 +4571,8 @@ Call the system call getsid().");
 static PyObject *
 posix_getsid(PyObject *self, PyObject *args)
 {
-	int pid, sid;
+	pid_t pid;
+	int sid;
 	if (!PyArg_ParseTuple(args, "i:getsid", &pid))
 		return NULL;
 	sid = getsid(pid);
@@ -4600,7 +4606,8 @@ Call the system call setpgid().");
 static PyObject *
 posix_setpgid(PyObject *self, PyObject *args)
 {
-	int pid, pgrp;
+	pid_t pid;
+	int pgrp;
 	if (!PyArg_ParseTuple(args, "ii:setpgid", &pid, &pgrp))
 		return NULL;
 	if (setpgid(pid, pgrp) < 0)
@@ -4619,7 +4626,8 @@ Return the process group associated with the terminal given by a fd.");
 static PyObject *
 posix_tcgetpgrp(PyObject *self, PyObject *args)
 {
-	int fd, pgid;
+	int fd;
+	pid_t pgid;
 	if (!PyArg_ParseTuple(args, "i:tcgetpgrp", &fd))
 		return NULL;
 	pgid = tcgetpgrp(fd);
@@ -5231,7 +5239,6 @@ posix_unsetenv(PyObject *self, PyObject *args)
 }
 #endif /* unsetenv */
 
-#ifdef HAVE_STRERROR
 PyDoc_STRVAR(posix_strerror__doc__,
 "strerror(code) -> string\n\n\
 Translate an error code to a message string.");
@@ -5251,7 +5258,6 @@ posix_strerror(PyObject *self, PyObject *args)
 	}
 	return PyUnicode_FromString(message);
 }
-#endif /* strerror */
 
 
 #ifdef HAVE_SYS_WAIT_H
@@ -5533,7 +5539,6 @@ conv_confname(PyObject *arg, int *valuep, struct constdef *table,
         size_t hi = tablesize;
         int cmp;
         const char *confname;
-        Py_ssize_t namelen;
         if (!PyUnicode_Check(arg)) {
             PyErr_SetString(PyExc_TypeError,
                             "configuration names must be strings or integers");
@@ -5542,7 +5547,6 @@ conv_confname(PyObject *arg, int *valuep, struct constdef *table,
         confname = PyUnicode_AsString(arg);
         if (confname == NULL)
             return 0;
-        namelen = strlen(confname);
         while (lo < hi) {
             mid = (lo + hi) / 2;
             cmp = strcmp(confname, table[mid].name);
@@ -6969,9 +6973,7 @@ static PyMethodDef posix_methods[] = {
 #ifdef HAVE_UNSETENV
 	{"unsetenv",	posix_unsetenv, METH_VARARGS, posix_unsetenv__doc__},
 #endif
-#ifdef HAVE_STRERROR
 	{"strerror",	posix_strerror, METH_VARARGS, posix_strerror__doc__},
-#endif
 #ifdef HAVE_FCHDIR
 	{"fchdir",	posix_fchdir, METH_O, posix_fchdir__doc__},
 #endif

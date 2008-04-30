@@ -158,6 +158,7 @@ class MmapTests(unittest.TestCase):
             pass
         else:
             self.fail("Able to resize readonly memory map")
+        f.close()
         del m, f
         self.assertEqual(open(TESTFN, "rb").read(), b'a'*mapsize,
                "Readonly memory map data file was modified")
@@ -214,6 +215,7 @@ class MmapTests(unittest.TestCase):
                "Copy-on-write test data file should not be modified.")
         # Ensuring copy-on-write maps cannot be resized
         self.assertRaises(TypeError, m.resize, 2*mapsize)
+        f.close()
         del m, f
 
         # Ensuring invalid access parameter raises exception
@@ -424,6 +426,20 @@ class MmapTests(unittest.TestCase):
             def __new__(klass, *args, **kwargs):
                 return mmap.mmap.__new__(klass, -1, *args, **kwargs)
         anon_mmap(PAGESIZE)
+
+    def test_prot_readonly(self):
+        if not hasattr(mmap, 'PROT_READ'):
+            return
+        mapsize = 10
+        open(TESTFN, "wb").write(b"a"*mapsize)
+        f = open(TESTFN, "rb")
+        m = mmap.mmap(f.fileno(), mapsize, prot=mmap.PROT_READ)
+        self.assertRaises(TypeError, m.write, "foo")
+        f.close()
+
+    def test_error(self):
+        self.assert_(issubclass(mmap.error, EnvironmentError))
+        self.assert_("mmap.error" in str(mmap.error))
 
 
 def test_main():

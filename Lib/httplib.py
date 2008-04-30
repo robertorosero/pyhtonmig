@@ -66,7 +66,6 @@ Req-started-unread-response    _CS_REQ_STARTED    <response_class>
 Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 """
 
-import errno
 import io
 import mimetools
 import socket
@@ -449,7 +448,12 @@ class HTTPResponse:
             try:
                 self.length = int(length)
             except ValueError:
-                pass
+                self.length = None
+            else:
+                if self.length < 0:  # ignore nonsensical negative lengths
+                    self.length = None
+        else:
+            self.length = None
 
         # does the body have a fixed length? (of zero)
         if (status == NO_CONTENT or status == NOT_MODIFIED or
@@ -560,17 +564,23 @@ class HTTPResponse:
     def _read_chunked(self, amt):
         assert self.chunked != _UNKNOWN
         chunk_left = self.chunk_left
-        value = ""
+        value = b""
 
         # XXX This accumulates chunks by repeated string concatenation,
         # which is not efficient as the number or size of chunks gets big.
         while True:
             if chunk_left is None:
                 line = self.fp.readline()
-                i = line.find(";")
+                i = line.find(b";")
                 if i >= 0:
                     line = line[:i] # strip chunk-extensions
-                chunk_left = int(line, 16)
+                try:
+                    chunk_left = int(line, 16)
+                except ValueError:
+                    # close the connection as protocol synchronisation is
+                    # probably lost
+                    self.close()
+                    raise IncompleteRead(value)
                 if chunk_left == 0:
                     break
             if amt is None:
@@ -596,6 +606,10 @@ class HTTPResponse:
         ### note: we shouldn't have any trailers!
         while True:
             line = self.fp.readline()
+            if not line:
+                # a vanishingly small number of sites EOF without
+                # sending the trailer
+                break
             if line == b"\r\n":
                 break
 
