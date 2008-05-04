@@ -12,14 +12,16 @@ What's New in Python 2.6 alpha 3?
 Core and builtins
 -----------------
 
+- Issue #2719: backported the ``next()`` builtin from Python 3.
+
 - Issue #2681: The octal literal ``0o8`` was incorrecly acctepted. Now it
   properly raises a SyntaxError.
 
 - Patch #2617: Reserved -J and -X arguments for Jython, IronPython and other
   implementations of Python. 
 
-Extensions Modules
-------------------
+Extension Modules
+-----------------
 
 - Issue #2670:  Fix a failure in urllib2.build_opener(), when passed two
   handlers that derive the same default base class.
@@ -38,10 +40,14 @@ Extensions Modules
 - Issue #1631171: Re-implement the 'warnings' module in C (the original Python
   code has been kept as backup). This will allow for using the 'warning's
   machinery in such places as the parser where use of pure Python code is not
-  possible.
+  possible.  Both the ``showarning()`` and ``formatwarning()`` gain an
+  optional 'line' argument which is not called by default for
+  backwards-compatibility reasons.
 
 Library
 -------
+
+- Issue #2581: distutils: Vista UAC/elevation support for bdist_wininst
 
 - Issue #2635: Fix bug in 'fix_sentence_endings' textwrap.fill option,
   where an extra space was added after a word containing (but not
@@ -135,6 +141,9 @@ Build
 - Issue #2544: On HP-UX systems, use 'gcc -shared' for linking when
   gcc is used as compiler.
 
+- Issue #2573: On MacOS X it is now possible to install the framework
+  with a different name using --with-framework-name=NAME. 
+
 C API
 -----
 
@@ -227,8 +236,8 @@ Core and builtins
 
 - Issue #2143: Fix embedded readline() hang on SSL socket EOF.
 
-Extensions Modules
-------------------
+Extension Modules
+-----------------
 
 - Patch #2240: Implement signal.setitimer and signal.getitimer.
 

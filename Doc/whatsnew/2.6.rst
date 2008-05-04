@@ -137,7 +137,7 @@ SourceForge.  Four different trackers were examined: Atlassian's `Jira
 <http://www.atlassian.com/software/jira/>`__, 
 `Launchpad <http://www.launchpad.net>`__, 
 `Roundup <http://roundup.sourceforge.net/>`__, and 
-Trac <http://trac.edgewall.org/>`__.  
+`Trac <http://trac.edgewall.org/>`__.  
 The committee eventually settled on Jira
 and Roundup as the two candidates.  Jira is a commercial product that
 offers a no-cost hosted instance to free-software projects; Roundup 
@@ -171,7 +171,7 @@ http://svn.python.org/view/tracker/importer/.
     Roundup downloads and documentation.
 
 
-New Documentation Format: ReStructuredText Using Sphinx
+New Documentation Format: reStructuredText Using Sphinx
 -----------------------------------------------------------
 
 Since the Python project's inception around 1989, the documentation
@@ -734,7 +734,8 @@ and it also supports the ``b''`` notation.
 
 There's also a ``__future__`` import that causes all string literals
 to become Unicode strings.  This means that ``\u`` escape sequences 
-can be used to include Unicode characters.
+can be used to include Unicode characters::
+
 
     from __future__ import unicode_literals
 
@@ -742,6 +743,7 @@ can be used to include Unicode characters.
          '\u3081\u3000\u751f\u305f\u307e\u3054')
 
     print len(s)               # 12 Unicode characters
+
 
 
 .. seealso::
@@ -2158,17 +2160,12 @@ though it will be removed in Python 3.0.
 
 To use the new module, first you must create a TCP connection in the
 usual way and then pass it to the :func:`ssl.wrap_socket` function.
-XXX describe parameters.
-
-XXX Can specify if certificate is required, and obtain certificate info
-by calling getpeercert method.
-
-XXX Certain features require the OpenSSL package to be installed, notably
-  the 'openssl' binary.
+It's possible to specify whether a certificate is required, and to
+obtain certificate info by calling the :meth:`getpeercert` method.
 
 .. seealso::
 
-   SSL module documentation.
+   The documentation for the :mod:`ssl` module.
 
 
 .. ======================================================================

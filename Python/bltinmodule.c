@@ -167,7 +167,7 @@ builtin_apply(PyObject *self, PyObject *args)
 	PyObject *t = NULL, *retval = NULL;
 
 	if (PyErr_WarnPy3k("apply() not supported in 3.x; "
-		       "use func(*args, **kwargs)", 1) < 0)
+			   "use func(*args, **kwargs)", 1) < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
@@ -225,7 +225,7 @@ static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
 	if (PyErr_WarnPy3k("callable() not supported in 3.x; "
-		       "use hasattr(o, '__call__')", 1) < 0)
+			   "use hasattr(o, '__call__')", 1) < 0)
 		return NULL;
 	return PyBool_FromLong((long)PyCallable_Check(v));
 }
@@ -714,7 +714,7 @@ builtin_execfile(PyObject *self, PyObject *args)
 	int exists;
 
 	if (PyErr_WarnPy3k("execfile() not supported in 3.x; use exec()",
-                           1) < 0)
+			   1) < 0)
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "s|O!O:execfile",
@@ -941,7 +941,7 @@ builtin_map(PyObject *self, PyObject *args)
 
 	if (func == Py_None) {
 		if (PyErr_WarnPy3k("map(None, ...) not supported in 3.x; "
-			       "use list(...)", 1) < 0)
+				   "use list(...)", 1) < 0)
 			return NULL;
 		if (n == 1) {
 			/* map(None, S) is the same as list(S). */
@@ -1078,6 +1078,47 @@ function is called with an argument list consisting of the corresponding\n\
 item of each sequence, substituting None for missing values when not all\n\
 sequences have the same length.  If the function is None, return a list of\n\
 the items of the sequence (or a list of tuples if more than one sequence).");
+
+
+static PyObject *
+builtin_next(PyObject *self, PyObject *args)
+{
+	PyObject *it, *res;
+	PyObject *def = NULL;
+
+	if (!PyArg_UnpackTuple(args, "next", 1, 2, &it, &def))
+		return NULL;
+	if (!PyIter_Check(it)) {
+		PyErr_Format(PyExc_TypeError,
+			"%.200s object is not an iterator",
+			it->ob_type->tp_name);
+		return NULL;
+	}
+	
+	res = (*it->ob_type->tp_iternext)(it);
+	if (res != NULL) {
+		return res;
+	} else if (def != NULL) {
+		if (PyErr_Occurred()) {
+			if (!PyErr_ExceptionMatches(PyExc_StopIteration))
+				return NULL;
+			PyErr_Clear();
+		}
+		Py_INCREF(def);
+		return def;
+	} else if (PyErr_Occurred()) {
+		return NULL;
+	} else {
+		PyErr_SetNone(PyExc_StopIteration);
+		return NULL;
+	}
+}
+
+PyDoc_STRVAR(next_doc,
+"next(iterator[, default])\n\
+\n\
+Return the next item from the iterator. If default is given and the iterator\n\
+is exhausted, it is returned instead of raising StopIteration.");
 
 
 static PyObject *
@@ -1969,7 +2010,7 @@ builtin_reduce(PyObject *self, PyObject *args)
 	PyObject *seq, *func, *result = NULL, *it;
 
 	if (PyErr_WarnPy3k("reduce() not supported in 3.x; "
-		       "use functools.reduce()", 1) < 0)
+			   "use functools.reduce()", 1) < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "reduce", 2, 3, &func, &seq, &result))
@@ -2045,7 +2086,7 @@ static PyObject *
 builtin_reload(PyObject *self, PyObject *v)
 {
 	if (PyErr_WarnPy3k("In 3.x, reload() is renamed to imp.reload()",
-                           1) < 0)
+			   1) < 0)
 		return NULL;
 
 	return PyImport_ReloadModule(v);
@@ -2519,6 +2560,7 @@ static PyMethodDef builtin_methods[] = {
  	{"map",		builtin_map,        METH_VARARGS, map_doc},
  	{"max",		(PyCFunction)builtin_max,        METH_VARARGS | METH_KEYWORDS, max_doc},
  	{"min",		(PyCFunction)builtin_min,        METH_VARARGS | METH_KEYWORDS, min_doc},
+	{"next", 	builtin_next,       METH_VARARGS, next_doc},
  	{"oct",		builtin_oct,        METH_O, oct_doc},
  	{"open",	(PyCFunction)builtin_open,       METH_VARARGS | METH_KEYWORDS, open_doc},
  	{"ord",		builtin_ord,        METH_O, ord_doc},
