@@ -97,7 +97,7 @@ else:
 
         for code, expected in tests:
             ast = self.compileast(code)
-            actual = getattr(ast.body[0].value, attrmap[type(expected)])
+            actual = ast.body[0].value.annotations['const']
             self.assertEqual(expected, actual)
 
     def test_binop_fold_num_with_variable(self):
@@ -118,8 +118,8 @@ x + 3 * 2
         self.assertEqual(_ast.Expr, ast.body[1].__class__)
         self.assertEqual(_ast.BinOp, ast.body[1].value.__class__)
         self.assertEqual(_ast.Name, ast.body[1].value.left.__class__)
-        self.assertEqual(_ast.Num, ast.body[1].value.right.__class__)
-        self.assertEqual(6, ast.body[1].value.right.n)
+        self.assertEqual(_ast.BinOp, ast.body[1].value.right.__class__)
+        self.assertEqual(6, ast.body[1].value.right.annotations['const'])
 
     def test_binop_failure_left_until_runtime(self):
         ast = self.compileast("5 + '3'")
@@ -134,13 +134,22 @@ x + 3 * 2
         except TypeError:
             pass
 
+    def assertConstant(self, expected, code):
+        ast = self.compileast(code).body[0].value
+        if type(ast) is _ast.Str:
+            self.assertEqual(expected, ast.s)
+        elif type(ast) is _ast.Num:
+            self.assertEqual(expected, ast.n)
+        else:
+            self.assertEqual(expected, ast.annotations['const'])
+
     def test_unary_fold_num(self):
         # check unary constant folding for numeric values
-        self.assertNum(-5, "-5")
-        self.assertNum(True, "not 0")
-        self.assertNum(-3, "-+3")
-        self.assertNum(False, "not True")
-        self.assertNum(True, "not None")
+        self.assertConstant(-5, '-5')
+        self.assertConstant(True, "not 0")
+        self.assertConstant(-3, "-+3")
+        self.assertConstant(False, "not True")
+        self.assertConstant(True, "not None")
 
     def test_unary_failure_left_until_runtime(self):
         ast = self.compileast("~'bad!'")
@@ -187,6 +196,13 @@ def say_hello():
         self.assertEqual(_ast.FunctionDef, ast.body[0].__class__)
         self.assertEqual(3, len(ast.body[0].body))
         self.assertEqual(_ast.Pass, ast.body[0].body[2].__class__)
+
+    def test_fold_tuple_of_constants(self):
+        ast = self.compileast('(1, 2, 3)')
+        self.assertEqual((1, 2, 3), ast.body[0].value.annotations['const'])
+
+        ast = self.compileast('((1, 2), 3)')
+        self.assertEqual(((1, 2), 3), ast.body[0].value.annotations['const'])
 
 def test_main():
     test_support.run_unittest(AstOptimizerTest)

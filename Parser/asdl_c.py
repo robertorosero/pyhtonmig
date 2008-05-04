@@ -170,6 +170,7 @@ class StructVisitor(EmitVisitor):
             type = str(field.type)
             assert type in asdl.builtin_types, type
             emit("%s %s;" % (type, field.name), depth + 1);
+        emit("PyObject* annotations;", depth + 1)
         emit("};")
         emit("")
 
@@ -321,6 +322,7 @@ class FunctionVisitor(PrototypeVisitor):
             emit("p->v.%s.%s = %s;" % (name, argname, argname), 1)
         for argtype, argname, opt in attrs:
             emit("p->%s = %s;" % (argname, argname), 1)
+        emit("p->annotations = NULL;", 1)
 
     def emit_body_struct(self, name, args, attrs):
         def emit(s, depth=0, reflow=1):
@@ -417,6 +419,9 @@ class Obj2ModVisitor(PickleVisitor):
             args = [f.name.value for f in t.fields] + [a.name.value for a in sum.attributes]
             self.emit("*out = %s(%s);" % (t.name, self.buildArgs(args)), 2)
             self.emit("if (*out == NULL) goto failed;", 2)
+            self.emit('(*out)->annotations = PyObject_GetAttrString(obj, "annotations");', 2)
+            self.emit('if ((*out)->annotations == NULL)', 2)
+            self.emit('PyErr_Clear();', 3)
             self.emit("return 0;", 2)
             self.emit("}", 1)
         self.sumTrailer(name)
@@ -980,6 +985,9 @@ class ObjVisitor(PickleVisitor):
             self.emit('if (PyObject_SetAttrString(result, "%s", value) < 0)' % a.name, 1)
             self.emit('goto failed;', 2)
             self.emit('Py_DECREF(value);', 1)
+        if not is_simple(sum):
+            self.emit('if (o->annotations && PyObject_SetAttrString(result, "annotations", o->annotations) < 0)', 1)
+            self.emit('goto failed;', 2)
         self.func_end()
 
     def simpleSum(self, sum, name):

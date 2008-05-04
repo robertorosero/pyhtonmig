@@ -57,6 +57,7 @@ struct _mod {
                 } Suite;
                 
         } v;
+        PyObject* annotations;
 };
 
 enum _stmt_kind {FunctionDef_kind=1, ClassDef_kind=2, Return_kind=3,
@@ -182,6 +183,7 @@ struct _stmt {
         } v;
         int lineno;
         int col_offset;
+        PyObject* annotations;
 };
 
 enum _expr_kind {BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
@@ -295,6 +297,7 @@ struct _expr {
         } v;
         int lineno;
         int col_offset;
+        PyObject* annotations;
 };
 
 enum _slice_kind {Ellipsis_kind=1, Slice_kind=2, ExtSlice_kind=3, Index_kind=4};
@@ -316,6 +319,7 @@ struct _slice {
                 } Index;
                 
         } v;
+        PyObject* annotations;
 };
 
 struct _comprehension {
@@ -337,6 +341,7 @@ struct _excepthandler {
         } v;
         int lineno;
         int col_offset;
+        PyObject* annotations;
 };
 
 struct _arguments {

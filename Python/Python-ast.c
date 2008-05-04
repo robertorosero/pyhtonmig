@@ -936,6 +936,7 @@ Module(asdl_seq * body, PyArena *arena)
                 return NULL;
         p->kind = Module_kind;
         p->v.Module.body = body;
+        p->annotations = NULL;
         return p;
 }
 
@@ -948,6 +949,7 @@ Interactive(asdl_seq * body, PyArena *arena)
                 return NULL;
         p->kind = Interactive_kind;
         p->v.Interactive.body = body;
+        p->annotations = NULL;
         return p;
 }
 
@@ -965,6 +967,7 @@ Expression(expr_ty body, PyArena *arena)
                 return NULL;
         p->kind = Expression_kind;
         p->v.Expression.body = body;
+        p->annotations = NULL;
         return p;
 }
 
@@ -977,6 +980,7 @@ Suite(asdl_seq * body, PyArena *arena)
                 return NULL;
         p->kind = Suite_kind;
         p->v.Suite.body = body;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1005,6 +1009,7 @@ FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
         p->v.FunctionDef.decorator_list = decorator_list;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1028,6 +1033,7 @@ ClassDef(identifier name, asdl_seq * bases, asdl_seq * body, asdl_seq *
         p->v.ClassDef.decorator_list = decorator_list;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1042,6 +1048,7 @@ Return(expr_ty value, int lineno, int col_offset, PyArena *arena)
         p->v.Return.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1056,6 +1063,7 @@ Delete(asdl_seq * targets, int lineno, int col_offset, PyArena *arena)
         p->v.Delete.targets = targets;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1077,6 +1085,7 @@ Assign(asdl_seq * targets, expr_ty value, int lineno, int col_offset, PyArena
         p->v.Assign.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1109,6 +1118,7 @@ AugAssign(expr_ty target, operator_ty op, expr_ty value, int lineno, int
         p->v.AugAssign.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1126,6 +1136,7 @@ Print(expr_ty dest, asdl_seq * values, bool nl, int lineno, int col_offset,
         p->v.Print.nl = nl;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1154,6 +1165,7 @@ For(expr_ty target, expr_ty iter, asdl_seq * body, asdl_seq * orelse, int
         p->v.For.orelse = orelse;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1176,6 +1188,7 @@ While(expr_ty test, asdl_seq * body, asdl_seq * orelse, int lineno, int
         p->v.While.orelse = orelse;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1198,6 +1211,7 @@ If(expr_ty test, asdl_seq * body, asdl_seq * orelse, int lineno, int
         p->v.If.orelse = orelse;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1220,6 +1234,7 @@ With(expr_ty context_expr, expr_ty optional_vars, asdl_seq * body, int lineno,
         p->v.With.body = body;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1237,6 +1252,7 @@ Raise(expr_ty type, expr_ty inst, expr_ty tback, int lineno, int col_offset,
         p->v.Raise.tback = tback;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1254,6 +1270,7 @@ TryExcept(asdl_seq * body, asdl_seq * handlers, asdl_seq * orelse, int lineno,
         p->v.TryExcept.orelse = orelse;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1270,6 +1287,7 @@ TryFinally(asdl_seq * body, asdl_seq * finalbody, int lineno, int col_offset,
         p->v.TryFinally.finalbody = finalbody;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1290,6 +1308,7 @@ Assert(expr_ty test, expr_ty msg, int lineno, int col_offset, PyArena *arena)
         p->v.Assert.msg = msg;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1304,6 +1323,7 @@ Import(asdl_seq * names, int lineno, int col_offset, PyArena *arena)
         p->v.Import.names = names;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1326,6 +1346,7 @@ ImportFrom(identifier module, asdl_seq * names, int level, int lineno, int
         p->v.ImportFrom.level = level;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1348,6 +1369,7 @@ Exec(expr_ty body, expr_ty globals, expr_ty locals, int lineno, int col_offset,
         p->v.Exec.locals = locals;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1362,6 +1384,7 @@ Global(asdl_seq * names, int lineno, int col_offset, PyArena *arena)
         p->v.Global.names = names;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1381,6 +1404,7 @@ Expr(expr_ty value, int lineno, int col_offset, PyArena *arena)
         p->v.Expr.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1394,6 +1418,7 @@ Pass(int lineno, int col_offset, PyArena *arena)
         p->kind = Pass_kind;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1407,6 +1432,7 @@ Break(int lineno, int col_offset, PyArena *arena)
         p->kind = Break_kind;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1420,6 +1446,7 @@ Continue(int lineno, int col_offset, PyArena *arena)
         p->kind = Continue_kind;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1441,6 +1468,7 @@ BoolOp(boolop_ty op, asdl_seq * values, int lineno, int col_offset, PyArena
         p->v.BoolOp.values = values;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1473,6 +1501,7 @@ BinOp(expr_ty left, operator_ty op, expr_ty right, int lineno, int col_offset,
         p->v.BinOp.right = right;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1499,6 +1528,7 @@ UnaryOp(unaryop_ty op, expr_ty operand, int lineno, int col_offset, PyArena
         p->v.UnaryOp.operand = operand;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1525,6 +1555,7 @@ Lambda(arguments_ty args, expr_ty body, int lineno, int col_offset, PyArena
         p->v.Lambda.body = body;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1557,6 +1588,7 @@ IfExp(expr_ty test, expr_ty body, expr_ty orelse, int lineno, int col_offset,
         p->v.IfExp.orelse = orelse;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1573,6 +1605,7 @@ Dict(asdl_seq * keys, asdl_seq * values, int lineno, int col_offset, PyArena
         p->v.Dict.values = values;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1594,6 +1627,7 @@ ListComp(expr_ty elt, asdl_seq * generators, int lineno, int col_offset,
         p->v.ListComp.generators = generators;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1615,6 +1649,7 @@ GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno, int col_offset,
         p->v.GeneratorExp.generators = generators;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1629,6 +1664,7 @@ Yield(expr_ty value, int lineno, int col_offset, PyArena *arena)
         p->v.Yield.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1651,6 +1687,7 @@ Compare(expr_ty left, asdl_int_seq * ops, asdl_seq * comparators, int lineno,
         p->v.Compare.comparators = comparators;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1675,6 +1712,7 @@ Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty starargs,
         p->v.Call.kwargs = kwargs;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1694,6 +1732,7 @@ Repr(expr_ty value, int lineno, int col_offset, PyArena *arena)
         p->v.Repr.value = value;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1713,6 +1752,7 @@ Num(object n, int lineno, int col_offset, PyArena *arena)
         p->v.Num.n = n;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1732,6 +1772,7 @@ Str(string s, int lineno, int col_offset, PyArena *arena)
         p->v.Str.s = s;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1764,6 +1805,7 @@ Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int lineno, int
         p->v.Attribute.ctx = ctx;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1796,6 +1838,7 @@ Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx, int lineno, int
         p->v.Subscript.ctx = ctx;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1822,6 +1865,7 @@ Name(identifier id, expr_context_ty ctx, int lineno, int col_offset, PyArena
         p->v.Name.ctx = ctx;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1843,6 +1887,7 @@ List(asdl_seq * elts, expr_context_ty ctx, int lineno, int col_offset, PyArena
         p->v.List.ctx = ctx;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1864,6 +1909,7 @@ Tuple(asdl_seq * elts, expr_context_ty ctx, int lineno, int col_offset, PyArena
         p->v.Tuple.ctx = ctx;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1875,6 +1921,7 @@ Ellipsis(PyArena *arena)
         if (!p)
                 return NULL;
         p->kind = Ellipsis_kind;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1889,6 +1936,7 @@ Slice(expr_ty lower, expr_ty upper, expr_ty step, PyArena *arena)
         p->v.Slice.lower = lower;
         p->v.Slice.upper = upper;
         p->v.Slice.step = step;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1901,6 +1949,7 @@ ExtSlice(asdl_seq * dims, PyArena *arena)
                 return NULL;
         p->kind = ExtSlice_kind;
         p->v.ExtSlice.dims = dims;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1918,6 +1967,7 @@ Index(expr_ty value, PyArena *arena)
                 return NULL;
         p->kind = Index_kind;
         p->v.Index.value = value;
+        p->annotations = NULL;
         return p;
 }
 
@@ -1958,6 +2008,7 @@ ExceptHandler(expr_ty type, expr_ty name, asdl_seq * body, int lineno, int
         p->v.ExceptHandler.body = body;
         p->lineno = lineno;
         p->col_offset = col_offset;
+        p->annotations = NULL;
         return p;
 }
 
@@ -2064,6 +2115,9 @@ ast2obj_mod(void* _o)
                 Py_DECREF(value);
                 break;
         }
+        if (o->annotations && PyObject_SetAttrString(result, "annotations",
+            o->annotations) < 0)
+                goto failed;
         return result;
 failed:
         Py_XDECREF(value);
@@ -2441,6 +2495,9 @@ ast2obj_stmt(void* _o)
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
         Py_DECREF(value);
+        if (o->annotations && PyObject_SetAttrString(result, "annotations",
+            o->annotations) < 0)
+                goto failed;
         return result;
 failed:
         Py_XDECREF(value);
@@ -2764,6 +2821,9 @@ ast2obj_expr(void* _o)
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
         Py_DECREF(value);
+        if (o->annotations && PyObject_SetAttrString(result, "annotations",
+            o->annotations) < 0)
+                goto failed;
         return result;
 failed:
         Py_XDECREF(value);
@@ -2851,6 +2911,9 @@ ast2obj_slice(void* _o)
                 Py_DECREF(value);
                 break;
         }
+        if (o->annotations && PyObject_SetAttrString(result, "annotations",
+            o->annotations) < 0)
+                goto failed;
         return result;
 failed:
         Py_XDECREF(value);
@@ -3053,6 +3116,9 @@ ast2obj_excepthandler(void* _o)
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
         Py_DECREF(value);
+        if (o->annotations && PyObject_SetAttrString(result, "annotations",
+            o->annotations) < 0)
+                goto failed;
         return result;
 failed:
         Py_XDECREF(value);
@@ -3198,6 +3264,10 @@ obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
                 }
                 *out = Module(body, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Interactive_type)) {
@@ -3230,6 +3300,10 @@ obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
                 }
                 *out = Interactive(body, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Expression_type)) {
@@ -3249,6 +3323,10 @@ obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
                 }
                 *out = Expression(body, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Suite_type)) {
@@ -3281,6 +3359,10 @@ obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
                 }
                 *out = Suite(body, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
 
@@ -3411,6 +3493,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = FunctionDef(name, args, body, decorator_list, lineno,
                                    col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)ClassDef_type)) {
@@ -3509,6 +3595,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = ClassDef(name, bases, body, decorator_list, lineno,
                                 col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Return_type)) {
@@ -3527,6 +3617,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Return(value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Delete_type)) {
@@ -3559,6 +3653,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Delete(targets, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Assign_type)) {
@@ -3604,6 +3702,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Assign(targets, value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)AugAssign_type)) {
@@ -3649,6 +3751,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = AugAssign(target, op, value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Print_type)) {
@@ -3706,6 +3812,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Print(dest, values, nl, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)For_type)) {
@@ -3791,6 +3901,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = For(target, iter, body, orelse, lineno, col_offset,
                            arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)While_type)) {
@@ -3862,6 +3976,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = While(test, body, orelse, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)If_type)) {
@@ -3933,6 +4051,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = If(test, body, orelse, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)With_type)) {
@@ -3991,6 +4113,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = With(context_expr, optional_vars, body, lineno,
                             col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Raise_type)) {
@@ -4033,6 +4159,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Raise(type, inst, tback, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)TryExcept_type)) {
@@ -4118,6 +4248,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = TryExcept(body, handlers, orelse, lineno, col_offset,
                                  arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)TryFinally_type)) {
@@ -4176,6 +4310,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = TryFinally(body, finalbody, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Assert_type)) {
@@ -4207,6 +4345,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Assert(test, msg, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Import_type)) {
@@ -4239,6 +4381,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Import(names, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)ImportFrom_type)) {
@@ -4297,6 +4443,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 *out = ImportFrom(module, names, level, lineno, col_offset,
                                   arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Exec_type)) {
@@ -4340,6 +4490,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Exec(body, globals, locals, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Global_type)) {
@@ -4372,6 +4526,10 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Global(names, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Expr_type)) {
@@ -4391,24 +4549,40 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 }
                 *out = Expr(value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Pass_type)) {
 
                 *out = Pass(lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Break_type)) {
 
                 *out = Break(lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Continue_type)) {
 
                 *out = Continue(lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
 
@@ -4499,6 +4673,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = BoolOp(op, values, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)BinOp_type)) {
@@ -4544,6 +4722,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = BinOp(left, op, right, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)UnaryOp_type)) {
@@ -4576,6 +4758,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = UnaryOp(op, operand, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Lambda_type)) {
@@ -4608,6 +4794,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Lambda(args, body, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)IfExp_type)) {
@@ -4653,6 +4843,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = IfExp(test, body, orelse, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Dict_type)) {
@@ -4711,6 +4905,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Dict(keys, values, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)ListComp_type)) {
@@ -4756,6 +4954,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = ListComp(elt, generators, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)GeneratorExp_type)) {
@@ -4801,6 +5003,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = GeneratorExp(elt, generators, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Yield_type)) {
@@ -4819,6 +5025,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Yield(value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Compare_type)) {
@@ -4891,6 +5101,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 *out = Compare(left, ops, comparators, lineno, col_offset,
                                arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Call_type)) {
@@ -4987,6 +5201,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 *out = Call(func, args, keywords, starargs, kwargs, lineno,
                             col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Repr_type)) {
@@ -5006,6 +5224,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Repr(value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Num_type)) {
@@ -5025,6 +5247,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Num(n, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Str_type)) {
@@ -5044,6 +5270,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Str(s, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Attribute_type)) {
@@ -5089,6 +5319,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Attribute(value, attr, ctx, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Subscript_type)) {
@@ -5134,6 +5368,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Subscript(value, slice, ctx, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Name_type)) {
@@ -5166,6 +5404,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Name(id, ctx, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)List_type)) {
@@ -5211,6 +5453,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = List(elts, ctx, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Tuple_type)) {
@@ -5256,6 +5502,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 }
                 *out = Tuple(elts, ctx, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
 
@@ -5319,6 +5569,10 @@ obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
 
                 *out = Ellipsis(arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Slice_type)) {
@@ -5361,6 +5615,10 @@ obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
                 }
                 *out = Slice(lower, upper, step, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)ExtSlice_type)) {
@@ -5393,6 +5651,10 @@ obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
                 }
                 *out = ExtSlice(dims, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
         if (PyObject_IsInstance(obj, (PyObject*)Index_type)) {
@@ -5412,6 +5674,10 @@ obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
                 }
                 *out = Index(value, arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
 
@@ -5746,6 +6012,10 @@ obj2ast_excepthandler(PyObject* obj, excepthandler_ty* out, PyArena* arena)
                 *out = ExceptHandler(type, name, body, lineno, col_offset,
                                      arena);
                 if (*out == NULL) goto failed;
+                (*out)->annotations = PyObject_GetAttrString(obj,
+                 "annotations");
+                if ((*out)->annotations == NULL)
+                        PyErr_Clear();
                 return 0;
         }
 

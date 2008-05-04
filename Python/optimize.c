@@ -14,111 +14,51 @@ static int optimize_arguments(arguments_ty* args_ptr, PyArena* arena);
 static int optimize_slice(slice_ty* slice_ptr, PyArena* arena);
 
 /**
+ * Annotate a constant expression with its value.
+ */
+static int
+_annotate_constant(expr_ty expr, PyObject* v, PyArena* arena)
+{
+    if (expr->annotations == NULL) {
+        expr->annotations = PyDict_New();
+        if (expr->annotations == NULL)
+            return 0;
+        if (PyArena_AddPyObject(arena, expr->annotations) == -1)
+            return 0;
+    }
+
+    if (PyDict_SetItemString(expr->annotations, "const", v) == -1)
+        return 0;
+
+    return 1;
+}
+
+/**
  * Determine the constant value of a given expression. It's assumed that
  * constants have been folded.
  */
 static PyObject*
 _expr_constant_value(expr_ty expr)
 {
+    PyObject* obj;
+    
     if (expr->kind == Str_kind) {
         return expr->v.Str.s;
     }
     else if (expr->kind == Num_kind) {
         return expr->v.Num.n;
     }
-    else if (expr->kind == Name_kind) {
-        const char* name = PyString_AS_STRING(expr->v.Name.id);
-        if (strcmp(name, "True") == 0)
-            return Py_True;
-        else if (strcmp(name, "False") == 0)
-            return Py_False;
-        else if (strcmp(name, "None") == 0)
-            return Py_None;
-    }
-    return NULL;
-}
-
-/**
- * Determine whether or not the given expression represents a constant value.
- * This makes the assumption that constants have already been folded.
- */
-static int
-_expr_is_constant(expr_ty expr)
-{
-    return _expr_constant_value(expr) != NULL;
-}
-
-/*
- * builds a Name() node with a Load context from the given id.
- */
-static expr_ty
-_make_name(PyObject* id, int lineno, int col_offset, PyArena* arena)
-{
-    expr_ty expr;
-    if (id == NULL)
-        return NULL;
-    expr = Name(id, Load, lineno, col_offset, arena);
-    if (expr == NULL)
-        return NULL;
-    return expr;
-}
-
-/**
- * Builds an expr from the given constant value. Constant values can be
- * any Str or Num, or any one of True/False/None.
- */
-static expr_ty
-_expr_from_object(PyObject* object, int lineno, int col_offset, PyArena* arena)
-{
-    expr_ty expr = NULL;
-
-    if (PyString_Check(object) || PyUnicode_Check(object)) {
-        Py_INCREF(object);
-        expr = Str(object, lineno, col_offset, arena);
-    }
-    else if (PyNumber_Check(object)) {
-        Py_INCREF(object);
-        expr = Num(object, lineno, col_offset, arena);
-    }
-    else if (object == Py_None) {
-        object = PyString_FromString("None");
-        expr = _make_name(object, lineno, col_offset, arena);
-    }
-    else if (object == Py_True) {
-        object = PyString_FromString("True");
-        expr = _make_name(object, lineno, col_offset, arena);
-    }
-    else if (object == Py_False) {
-        object = PyString_FromString("False");
-        expr = _make_name(object, lineno, col_offset, arena);
-    }
     else {
-        PyErr_Format(PyExc_TypeError, "unknown constant value");
-        return NULL;
+        if (expr->annotations == NULL)
+            return NULL;
+
+        obj = PyDict_GetItemString(expr->annotations, "const");
+
+        if (obj == NULL)
+            PyErr_Clear();
+
+        return obj;
     }
-
-    if (expr == NULL)
-        return NULL;
-
-    if (PyArena_AddPyObject(arena, object) == -1) {
-        /* exception will be set in PyArena_AddPyObject */
-        Py_DECREF(object);
-        return NULL;
-    }
-
-    /* PyArena_AddPyObject decrements the refcount for us */
-    return expr;
-}
-
-/**
- * Returns 1 if the given expression evaluates to a true value. Otherwise,
- * returns 0. This function assumes that the given expr is constant.
- */
-static int
-_expr_is_true(expr_ty expr)
-{
-    assert(_expr_is_constant(expr));
-    return PyObject_IsTrue(_expr_constant_value(expr));
 }
 
 /**
@@ -181,17 +121,13 @@ static asdl_seq*
 _asdl_seq_replace_with_pass(asdl_seq* seq, int n, int lineno, int col_offset, PyArena* arena)
 {
     stmt_ty pass;
-    asdl_seq* new;
 
     pass = Pass(lineno, col_offset, arena);
     if (pass == NULL)
         return NULL;
-    new = asdl_seq_new(1, arena);
-    if (new == NULL)
-        return NULL;
-    asdl_seq_SET(new, 0, pass);
-    
-    return _asdl_seq_replace(seq, n, new, arena);
+    asdl_seq_SET(seq, n, pass);
+
+    return seq;
 }
 
 /**
@@ -203,14 +139,17 @@ optimize_stmt_seq(asdl_seq** seq_ptr, PyArena* arena)
     int n;
     asdl_seq* seq = *seq_ptr;
     for (n = 0; n < asdl_seq_LEN(seq); n++) {
-        stmt_ty stmt = asdl_seq_GET(seq, n);
+        stmt_ty stmt;
         if (!optimize_stmt((stmt_ty*)&asdl_seq_GET(seq, n), arena))
             return 0;
 
+        stmt = asdl_seq_GET(seq, n);
+
         if (stmt->kind == If_kind) {
+            PyObject* test = _expr_constant_value(stmt->v.If.test);
             /* eliminate branches that can never be reached */
-            if (_expr_is_constant(stmt->v.If.test)) {
-                if (_expr_is_true(stmt->v.If.test))
+            if (test != NULL) {
+                if (PyObject_IsTrue(test))
                     seq = _asdl_seq_replace(seq, n, stmt->v.If.body, arena);
                 else {
                     if (stmt->v.If.orelse == NULL) {
@@ -228,7 +167,7 @@ optimize_stmt_seq(asdl_seq** seq_ptr, PyArena* arena)
                 *seq_ptr = seq;
             }
         }
-        else if (stmt->kind == Return_kind) {
+        else if (stmt->kind == Return_kind && n < (asdl_seq_LEN(seq) - 1)) {
             /* eliminate all nodes after a return */
             seq = _asdl_seq_replace_with_pass(seq, n + 1,
                     stmt->lineno, stmt->col_offset, arena);
@@ -458,14 +397,13 @@ optimize_bin_op(expr_ty* expr_ptr, PyArena* arena)
             return 1;
         }
         
-        expr = _expr_from_object(res, expr->lineno, expr->col_offset, arena);
-        if (expr == NULL) {
+        if (!_annotate_constant(expr, res, arena)) {
             Py_DECREF(res);
             return 0;
         }
-        *expr_ptr = expr;
 
-        Py_DECREF(res);
+        /* XXX: is this necessary? */
+        /* Py_DECREF(res); */
     }
 
     return 1;
@@ -474,20 +412,14 @@ optimize_bin_op(expr_ty* expr_ptr, PyArena* arena)
 static int
 optimize_unary_op(expr_ty* expr_ptr, PyArena* arena)
 {
+    PyObject* operand;
     expr_ty expr = *expr_ptr;
     if (!optimize_expr(&expr->v.UnaryOp.operand, arena))
         return 0;
-    if (_expr_is_constant(expr->v.UnaryOp.operand)) {
-        PyObject* operand;
-        PyObject* res;
 
-        operand = _expr_constant_value(expr->v.UnaryOp.operand);
-        if (operand == NULL) {
-            /* XXX this should never happen ... */
-            PyErr_Format(PyExc_ValueError, "unknown constant type: %d",
-                    expr->v.UnaryOp.operand->kind);
-            return 0;
-        }
+    operand = _expr_constant_value(expr->v.UnaryOp.operand);
+    if (operand != NULL) {
+        PyObject* res;
 
         switch (expr->v.UnaryOp.op) {
             case Invert:
@@ -533,14 +465,13 @@ optimize_unary_op(expr_ty* expr_ptr, PyArena* arena)
             return 1;
         }
 
-        expr = _expr_from_object(res, expr->lineno, expr->col_offset, arena);
-        if (!expr) {
+        if (!_annotate_constant(expr, res, arena)) {
             Py_DECREF(res);
             return 0;
         }
-        *expr_ptr = expr;
 
-        Py_DECREF(res);
+        /* XXX: is this necessary? */
+        /* Py_DECREF(res); */
     }
     return 1;
 }
@@ -747,6 +678,50 @@ optimize_subscript(expr_ty* expr_ptr, PyArena* arena)
     return 1;
 }
 
+static PyObject*
+_make_constant_tuple(asdl_seq* values, PyArena* arena)
+{
+    expr_ty expr;
+    int i;
+    PyObject* tuple;
+    
+    tuple = PyTuple_New(asdl_seq_LEN(values));
+    if (tuple == NULL)
+        return NULL;
+
+    if (PyArena_AddPyObject(arena, tuple) == -1) {
+        Py_DECREF(tuple);
+        return NULL;
+    }
+
+    /* don't *think* we need to add the constant values to the arena */
+    for (i = 0; i < asdl_seq_LEN(values); i++) {
+        PyObject* value;
+        expr = (expr_ty)asdl_seq_GET(values, i);
+        value = _expr_constant_value(expr);
+        Py_INCREF(value);
+        if (PyTuple_SetItem(tuple, i, value) == -1)
+            return NULL;
+    }
+
+    return tuple;
+}
+
+static int
+_is_constant_seq(asdl_seq* values)
+{
+    expr_ty expr;
+    int i;
+
+    for (i = 0; i < asdl_seq_LEN(values); i++) {
+        expr = (expr_ty)asdl_seq_GET(values, i);
+        if (_expr_constant_value(expr) == NULL)
+            return 0;
+    }
+
+    return 1;
+}
+
 static int
 optimize_expr(expr_ty* expr_ptr, PyArena* arena)
 {
@@ -810,21 +785,56 @@ optimize_expr(expr_ty* expr_ptr, PyArena* arena)
             }
         case List_kind:
             {
+                /* TODO: optimize lists used in "in"/"not in" as per original
+                 *       peephole optimization code */
                 return optimize_expr_seq(&expr->v.List.elts, arena);
             }
         case Tuple_kind:
             {
-                return optimize_expr_seq(&expr->v.Tuple.elts, arena);
+                if (!optimize_expr_seq(&expr->v.Tuple.elts, arena))
+                    return 0;
+                
+                if (_is_constant_seq(expr->v.Tuple.elts)) {
+                    PyObject* value = _make_constant_tuple(expr->v.Tuple.elts,
+                                                            arena);
+                    if (value == NULL)
+                        return 0;
+                    if (!_annotate_constant(expr, value, arena))
+                        return 0;
+                }
+
+                return 1;
             }
         case Num_kind:
         case Str_kind:
+            {
+                return 1;
+            }
         case Name_kind:
             {
+                PyObject* v;
+                const char* id;
+                
+                id = PyString_AS_STRING(expr->v.Name.id);
+                v  = NULL;
+
+                if (strcmp(id, "None") == 0)
+                    v = Py_None;
+                else if (strcmp(id, "True") == 0)
+                    v = Py_True;
+                else if (strcmp(id, "False") == 0)
+                    v = Py_False;
+
+                if (v != NULL) {
+                    if (!_annotate_constant(expr, v, arena))
+                        return 0;
+                }
+
                 return 1;
             }
         default:
             PyErr_Format(PyExc_ValueError, "unknown expr_ty kind: %d",
-                    expr->kind);
+                            expr->kind);
             return 0;
     }
 }
@@ -925,6 +935,16 @@ optimize_for(stmt_ty* stmt_ptr, PyArena* arena)
         return 0;
     if (!optimize_expr(&stmt->v.For.iter, arena))
         return 0;
+    if (stmt->v.For.iter->kind == List_kind) {
+        if (_is_constant_seq(stmt->v.For.iter->v.List.elts)) {
+            PyObject* constant = _make_constant_tuple(
+                    stmt->v.For.iter->v.List.elts, arena);
+            if (constant == NULL)
+                return 0;
+            if (!_annotate_constant(stmt->v.For.iter, constant, arena))
+                return 0;
+        }
+    }
     if (!optimize_stmt_seq(&stmt->v.For.body, arena))
         return 0;
     if (!optimize_stmt_seq(&stmt->v.For.orelse, arena))
@@ -1204,6 +1224,8 @@ optimize_stmt(stmt_ty* stmt_ptr, PyArena* arena)
 int
 PyAST_Optimize(mod_ty* mod_ptr, PyArena* arena)
 {
-    return optimize_mod(mod_ptr, arena);
+    int res;
+    res = optimize_mod(mod_ptr, arena);
+    return res;
 }
 
