@@ -201,11 +201,34 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 				codestr[i+3] = NOP;
 				break;
 
+				/* Replace LOAD_GLOBAL/LOAD_NAME None
+                                   with LOAD_CONST None */
+			case LOAD_NAME:
+			case LOAD_GLOBAL:
+				j = GETARG(codestr, i);
+				name = PyString_AsString(PyTuple_GET_ITEM(names, j));
+				if (name == NULL  ||  strcmp(name, "None") != 0)
+					continue;
+				for (j=0 ; j < PyList_GET_SIZE(consts) ; j++) {
+					if (PyList_GET_ITEM(consts, j) == Py_None)
+						break;
+				}
+				if (j == PyList_GET_SIZE(consts)) {
+					if (PyList_Append(consts, Py_None) == -1)
+					        goto exitUnchanged;                                        
+				}
+				assert(PyList_GET_ITEM(consts, j) == Py_None);
+				codestr[i] = LOAD_CONST;
+				SETARG(codestr, i, j);
+				cumlc = lastlc + 1;
+				break;
+
 				/* Try to fold tuples of constants (includes a case for lists
 				   which are only used for "in" and "not in" tests).
 				   Skip over BUILD_SEQN 1 UNPACK_SEQN 1.
 				   Replace BUILD_SEQN 2 UNPACK_SEQN 2 with ROT2.
 				   Replace BUILD_SEQN 3 UNPACK_SEQN 3 with ROT3 ROT2. */
+			case BUILD_TUPLE:
 			case BUILD_LIST:
 				j = GETARG(codestr, i);
 				h = i - 3 * j;

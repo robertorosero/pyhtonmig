@@ -2831,11 +2831,6 @@ expr_constant(expr_ty e)
 			   return ! Py_OptimizeFlag;
 		/* fall through */
 	default:
-        if (e->annotations != NULL) {
-            PyObject* constant = PyDict_GetItemString(e->annotations, "const");
-            if (constant != NULL)
-                return PyObject_IsTrue(constant);
-        }
 		return -1;
 	}
 }
@@ -2977,16 +2972,6 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		c->u->u_lineno = e->lineno;
 		c->u->u_lineno_set = false;
 	}
-
-    /* if the expression is annotated with a constant value, use that instead */
-    if (e->annotations != NULL) {
-        PyObject* constant = PyDict_GetItemString(e->annotations, "const");
-        if (constant != NULL) {
-            ADDOP_O(c, LOAD_CONST, constant, consts);
-            return 1;
-        }
-    }
-
 	switch (e->kind) {
 	case BoolOp_kind:
 		return compiler_boolop(c, e);
@@ -3595,9 +3580,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	d_lineno = i->i_lineno - a->a_lineno;
 
 	assert(d_bytecode >= 0);
-#if 0
-	 assert(d_lineno >= 0);
-#endif
+	assert(d_lineno >= 0);
 
 	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;
