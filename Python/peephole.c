@@ -205,7 +205,6 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 				   Skip over BUILD_SEQN 1 UNPACK_SEQN 1.
 				   Replace BUILD_SEQN 2 UNPACK_SEQN 2 with ROT2.
 				   Replace BUILD_SEQN 3 UNPACK_SEQN 3 with ROT3 ROT2. */
-			case BUILD_TUPLE:
 			case BUILD_LIST:
 				j = GETARG(codestr, i);
 				h = i - 3 * j;

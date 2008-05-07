@@ -194,6 +194,34 @@ def foo():
         self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
         self.assertEqual(None, ast.body[0].body[0].value)
 
+    def test_tuple_of_constants(self):
+        tests = [
+            (1, 2, 3),
+            ("a", "b", "c"),
+            (1+3, 5, 8-2),
+            ((1, 2), (3, 4), 5)
+        ]
+
+        for obj in tests:
+            code = repr(obj)
+
+            ast = self.compileast(code)
+            self.assertEqual(_ast.Expr, ast.body[0].__class__)
+            self.assertEqual(_ast.Const, ast.body[0].value.__class__)
+            self.assertEqual(tuple, ast.body[0].value.value.__class__)
+            self.assertEqual(obj, ast.body[0].value.value)
+
+    def test_named_constants(self):
+        tests = [None, True, False]
+
+        for obj in tests:
+            code = repr(obj)
+
+            ast = self.compileast(code)
+            self.assertEqual(_ast.Expr, ast.body[0].__class__)
+            self.assertEqual(_ast.Const, ast.body[0].value.__class__)
+            self.assertEqual(obj, ast.body[0].value.value)
+
 def test_main():
     test_support.run_unittest(AstOptimizerTest)
 

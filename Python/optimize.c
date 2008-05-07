@@ -41,6 +41,9 @@ _expr_constant_value(expr_ty expr)
     return NULL;
 }
 
+/**
+ * Construct an expr_ty instance from the given constant PyObject value.
+ */
 static expr_ty
 _expr_from_object(PyObject* object, int lineno, int col_offset, PyArena* arena)
 {
@@ -54,7 +57,10 @@ _expr_from_object(PyObject* object, int lineno, int col_offset, PyArena* arena)
         Py_INCREF(object);
         expr = Num(object, lineno, col_offset, arena);
     }
-    else if (object == Py_None || object == Py_True || object == Py_False) {
+    else if (object == Py_None ||
+                object == Py_True ||
+                object == Py_False ||
+                PyTuple_Check(object)) {
         Py_INCREF(object);
         expr = Const(object, lineno, col_offset, arena);
     }
@@ -74,6 +80,53 @@ _expr_from_object(PyObject* object, int lineno, int col_offset, PyArena* arena)
 
     /* PyArena_AddPyObject decrements the refcount for us */
     return expr;
+}
+
+static int
+_is_sequence_of_constants(asdl_seq* seq)
+{
+    int i;
+    int length = asdl_seq_LEN(seq);
+    for (i = 0; i < length; i++) {
+        PyObject* value;
+        expr_ty expr;
+        
+        expr = (expr_ty)asdl_seq_GET(seq, i);
+        value = _expr_constant_value(expr);
+        if (value == NULL)
+            return 0;
+    }
+    return 1;
+}
+
+/**
+ * Build a tuple of constants from an expression sequence.
+ */
+static PyObject*
+_build_tuple_of_constants(asdl_seq* seq, PyArena* arena)
+{
+    PyObject* result;
+    int i;
+    int length = asdl_seq_LEN(seq);
+
+    result = PyTuple_New(length);
+    if (result == NULL)
+        return NULL;
+
+    if (PyArena_AddPyObject(arena, result) == -1) {
+        Py_DECREF(result);
+        return NULL;
+    }
+
+    for (i = 0; i < length; i++) {
+        PyObject* value;
+        expr_ty expr = (expr_ty)asdl_seq_GET(seq, i);
+        value = _expr_constant_value(expr);
+        Py_INCREF(value);
+        PyTuple_SetItem(result, i, value);
+    }
+
+    return result;
 }
 
 /**
@@ -684,6 +737,52 @@ optimize_subscript(expr_ty* expr_ptr, PyArena* arena)
 }
 
 static int
+optimize_tuple(expr_ty* expr_ptr, PyArena* arena)
+{
+    expr_ty expr = *expr_ptr;
+    if (!optimize_expr_seq(&expr->v.Tuple.elts, arena))
+        return 0;
+
+    if (_is_sequence_of_constants(expr->v.Tuple.elts)) {
+        PyObject* tuple = _build_tuple_of_constants(expr->v.Tuple.elts, arena);
+        if (tuple == NULL)
+            return 0;
+        *expr_ptr = Const(tuple, expr->lineno, expr->col_offset, arena);
+        if (*expr_ptr == NULL)
+            return 0;
+    }
+
+    return 1;
+}
+
+static int
+optimize_name(expr_ty* expr_ptr, PyArena* arena)
+{
+    expr_ty expr = *expr_ptr;
+    const char* id = PyString_AS_STRING(expr->v.Name.id);
+    PyObject* constvalue = NULL;
+
+    if (strcmp(id, "None") == 0) {
+        Py_INCREF(Py_None);
+        constvalue = Py_None;
+    }
+    else if (strcmp(id, "True") == 0) {
+        Py_INCREF(Py_True);
+        constvalue = Py_True;
+    }
+    else if (strcmp(id, "False") == 0) {
+        Py_INCREF(Py_False);
+        constvalue = Py_False;
+    }
+
+    if (constvalue != NULL)
+        *expr_ptr = Const(constvalue, expr->lineno,
+                            expr->col_offset, arena);
+
+    return 1;
+}
+
+static int
 optimize_expr(expr_ty* expr_ptr, PyArena* arena)
 {
     expr_ty expr = *expr_ptr;
@@ -750,32 +849,11 @@ optimize_expr(expr_ty* expr_ptr, PyArena* arena)
             }
         case Tuple_kind:
             {
-                return optimize_expr_seq(&expr->v.Tuple.elts, arena);
+                return optimize_tuple(expr_ptr, arena);
             }
         case Name_kind:
             {
-                const char* id = PyString_AS_STRING(expr->v.Name.id);
-                PyObject* constvalue = NULL;
-                /* XXX: dunno if we need to incref these or if Const()
-                 * takes care of that */
-                if (strcmp(id, "None") == 0) {
-                    Py_INCREF(Py_None);
-                    constvalue = Py_None;
-                }
-                else if (strcmp(id, "True") == 0) {
-                    Py_INCREF(Py_True);
-                    constvalue = Py_True;
-                }
-                else if (strcmp(id, "False") == 0) {
-                    Py_INCREF(Py_False);
-                    constvalue = Py_False;
-                }
-
-                if (constvalue != NULL)
-                    *expr_ptr = Const(constvalue, expr->lineno,
-                                        expr->col_offset, arena);
-
-                return 1;
+                return optimize_name(expr_ptr, arena);
             }
         case Num_kind:
         case Str_kind:
