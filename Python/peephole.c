@@ -135,7 +135,6 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 	int new_line, cum_orig_line, last_line, tabsiz;
 	int cumlc=0, lastlc=0;	/* Count runs of consecutive LOAD_CONSTs */
 	unsigned int *blocks = NULL;
-	char *name;
 
 	/* Bail out if an exception is set */
 	if (PyErr_Occurred())
@@ -199,28 +198,6 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 					continue;
 				SETARG(codestr, i, (j^1));
 				codestr[i+3] = NOP;
-				break;
-
-				/* Replace LOAD_GLOBAL/LOAD_NAME None
-                                   with LOAD_CONST None */
-			case LOAD_NAME:
-			case LOAD_GLOBAL:
-				j = GETARG(codestr, i);
-				name = PyString_AsString(PyTuple_GET_ITEM(names, j));
-				if (name == NULL  ||  strcmp(name, "None") != 0)
-					continue;
-				for (j=0 ; j < PyList_GET_SIZE(consts) ; j++) {
-					if (PyList_GET_ITEM(consts, j) == Py_None)
-						break;
-				}
-				if (j == PyList_GET_SIZE(consts)) {
-					if (PyList_Append(consts, Py_None) == -1)
-					        goto exitUnchanged;                                        
-				}
-				assert(PyList_GET_ITEM(consts, j) == Py_None);
-				codestr[i] = LOAD_CONST;
-				SETARG(codestr, i, j);
-				cumlc = lastlc + 1;
 				break;
 
 				/* Try to fold tuples of constants (includes a case for lists

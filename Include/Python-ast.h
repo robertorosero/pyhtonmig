@@ -188,8 +188,8 @@ enum _expr_kind {BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
                   IfExp_kind=5, Dict_kind=6, ListComp_kind=7,
                   GeneratorExp_kind=8, Yield_kind=9, Compare_kind=10,
                   Call_kind=11, Repr_kind=12, Num_kind=13, Str_kind=14,
-                  Attribute_kind=15, Subscript_kind=16, Name_kind=17,
-                  List_kind=18, Tuple_kind=19};
+                  Const_kind=15, Attribute_kind=16, Subscript_kind=17,
+                  Name_kind=18, List_kind=19, Tuple_kind=20};
 struct _expr {
         enum _expr_kind kind;
         union {
@@ -264,6 +264,10 @@ struct _expr {
                 struct {
                         string s;
                 } Str;
+                
+                struct {
+                        object value;
+                } Const;
                 
                 struct {
                         expr_ty value;
@@ -470,6 +474,8 @@ expr_ty _Py_Repr(expr_ty value, int lineno, int col_offset, PyArena *arena);
 expr_ty _Py_Num(object n, int lineno, int col_offset, PyArena *arena);
 #define Str(a0, a1, a2, a3) _Py_Str(a0, a1, a2, a3)
 expr_ty _Py_Str(string s, int lineno, int col_offset, PyArena *arena);
+#define Const(a0, a1, a2, a3) _Py_Const(a0, a1, a2, a3)
+expr_ty _Py_Const(object value, int lineno, int col_offset, PyArena *arena);
 #define Attribute(a0, a1, a2, a3, a4, a5) _Py_Attribute(a0, a1, a2, a3, a4, a5)
 expr_ty _Py_Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int
                       lineno, int col_offset, PyArena *arena);

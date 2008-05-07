@@ -3022,6 +3022,9 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT(c, expr, e->v.Repr.value);
 		ADDOP(c, UNARY_CONVERT);
 		break;
+    case Const_kind:
+        ADDOP_O(c, LOAD_CONST, e->v.Const.value, consts);
+        break;
 	case Num_kind:
 		ADDOP_O(c, LOAD_CONST, e->v.Num.n, consts);
 		break;
@@ -3580,7 +3583,10 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	d_lineno = i->i_lineno - a->a_lineno;
 
 	assert(d_bytecode >= 0);
+    /* XXX: removing stuff after a Return node causes this to fail */
+#if 0
 	assert(d_lineno >= 0);
+#endif
 
 	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;

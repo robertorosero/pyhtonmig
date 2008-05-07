@@ -228,6 +228,10 @@ static PyTypeObject *Str_type;
 static char *Str_fields[]={
         "s",
 };
+static PyTypeObject *Const_type;
+static char *Const_fields[]={
+        "value",
+};
 static PyTypeObject *Attribute_type;
 static char *Attribute_fields[]={
         "value",
@@ -717,6 +721,8 @@ static int init_types(void)
         if (!Num_type) return 0;
         Str_type = make_type("Str", expr_type, Str_fields, 1);
         if (!Str_type) return 0;
+        Const_type = make_type("Const", expr_type, Const_fields, 1);
+        if (!Const_type) return 0;
         Attribute_type = make_type("Attribute", expr_type, Attribute_fields, 3);
         if (!Attribute_type) return 0;
         Subscript_type = make_type("Subscript", expr_type, Subscript_fields, 3);
@@ -1736,6 +1742,25 @@ Str(string s, int lineno, int col_offset, PyArena *arena)
 }
 
 expr_ty
+Const(object value, int lineno, int col_offset, PyArena *arena)
+{
+        expr_ty p;
+        if (!value) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field value is required for Const");
+                return NULL;
+        }
+        p = (expr_ty)PyArena_Malloc(arena, sizeof(*p));
+        if (!p)
+                return NULL;
+        p->kind = Const_kind;
+        p->v.Const.value = value;
+        p->lineno = lineno;
+        p->col_offset = col_offset;
+        return p;
+}
+
+expr_ty
 Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int lineno, int
           col_offset, PyArena *arena)
 {
@@ -2670,6 +2695,15 @@ ast2obj_expr(void* _o)
                 value = ast2obj_string(o->v.Str.s);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "s", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
+                break;
+        case Const_kind:
+                result = PyType_GenericNew(Const_type, NULL, NULL);
+                if (!result) goto failed;
+                value = ast2obj_object(o->v.Const.value);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 break;
@@ -5046,6 +5080,25 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 if (*out == NULL) goto failed;
                 return 0;
         }
+        if (PyObject_IsInstance(obj, (PyObject*)Const_type)) {
+                object value;
+
+                if (PyObject_HasAttrString(obj, "value")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "value");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_object(tmp, &value, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"value\" missing from Const");
+                        return 1;
+                }
+                *out = Const(value, lineno, col_offset, arena);
+                if (*out == NULL) goto failed;
+                return 0;
+        }
         if (PyObject_IsInstance(obj, (PyObject*)Attribute_type)) {
                 expr_ty value;
                 identifier attr;
@@ -6003,6 +6056,7 @@ init_ast(void)
         if (PyDict_SetItemString(d, "Repr", (PyObject*)Repr_type) < 0) return;
         if (PyDict_SetItemString(d, "Num", (PyObject*)Num_type) < 0) return;
         if (PyDict_SetItemString(d, "Str", (PyObject*)Str_type) < 0) return;
+        if (PyDict_SetItemString(d, "Const", (PyObject*)Const_type) < 0) return;
         if (PyDict_SetItemString(d, "Attribute", (PyObject*)Attribute_type) <
             0) return;
         if (PyDict_SetItemString(d, "Subscript", (PyObject*)Subscript_type) <

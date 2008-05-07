@@ -68,6 +68,7 @@ module Python version "$Revision$"
 	     | Repr(expr value)
 	     | Num(object n) -- a number as a PyObject.
 	     | Str(string s) -- need to specify raw, unicode, etc?
+         | Const(object value) -- inject arbitary constants into the AST
 	     -- other literals? bools?
 
 	     -- the following expression can appear in assignment context

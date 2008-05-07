@@ -180,18 +180,11 @@ _asdl_seq_replace(asdl_seq* seq, int n, asdl_seq* replacement, PyArena* arena)
 static asdl_seq*
 _asdl_seq_replace_with_pass(asdl_seq* seq, int n, int lineno, int col_offset, PyArena* arena)
 {
-    stmt_ty pass;
-    asdl_seq* new;
-
-    pass = Pass(lineno, col_offset, arena);
+    stmt_ty pass = Pass(lineno, col_offset, arena);
     if (pass == NULL)
         return NULL;
-    new = asdl_seq_new(1, arena);
-    if (new == NULL)
-        return NULL;
-    asdl_seq_SET(new, 0, pass);
-    
-    return _asdl_seq_replace(seq, n, new, arena);
+    asdl_seq_SET(seq, n, pass);
+    return seq;
 }
 
 /**
@@ -228,7 +221,7 @@ optimize_stmt_seq(asdl_seq** seq_ptr, PyArena* arena)
                 *seq_ptr = seq;
             }
         }
-        else if (stmt->kind == Return_kind) {
+        else if (stmt->kind == Return_kind && n < (asdl_seq_LEN(seq) - 1)) {
             /* eliminate all nodes after a return */
             seq = _asdl_seq_replace_with_pass(seq, n + 1,
                     stmt->lineno, stmt->col_offset, arena);
@@ -816,9 +809,34 @@ optimize_expr(expr_ty* expr_ptr, PyArena* arena)
             {
                 return optimize_expr_seq(&expr->v.Tuple.elts, arena);
             }
+        case Name_kind:
+            {
+                const char* id = PyString_AS_STRING(expr->v.Name.id);
+                PyObject* constvalue = NULL;
+                /* XXX: dunno if we need to incref these or if Const()
+                 * takes care of that */
+                if (strcmp(id, "None") == 0) {
+                    Py_INCREF(Py_None);
+                    constvalue = Py_None;
+                }
+                else if (strcmp(id, "True") == 0) {
+                    Py_INCREF(Py_True);
+                    constvalue = Py_True;
+                }
+                else if (strcmp(id, "False") == 0) {
+                    Py_INCREF(Py_False);
+                    constvalue = Py_False;
+                }
+
+                if (constvalue != NULL)
+                    *expr_ptr = Const(constvalue, expr->lineno,
+                                        expr->col_offset, arena);
+
+                return 1;
+            }
         case Num_kind:
         case Str_kind:
-        case Name_kind:
+        case Const_kind:
             {
                 return 1;
             }
