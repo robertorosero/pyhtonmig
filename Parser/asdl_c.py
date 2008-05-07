@@ -292,14 +292,8 @@ class FunctionVisitor(PrototypeVisitor):
         emit("{")
         emit("%s p;" % ctype, 1)
         for argtype, argname, opt in args:
-            # XXX: Const() hack to force Py_None if NULL given to ctor
-            if str(argname) == 'value' and str(name) == 'Const':
-                emit("if (!%s) {" % argname, 1)
-                emit("Py_INCREF(Py_None);", 2)
-                emit("%s = Py_None;" % argname, 2)
-                emit("}", 1)
             # XXX hack alert: false is allowed for a bool
-            elif not opt and not (argtype == "bool" or argtype == "int"):
+            if not opt and not (argtype == "bool" or argtype == "int"):
                 emit("if (!%s) {" % argname, 1)
                 emit("PyErr_SetString(PyExc_ValueError,", 2)
                 msg = "field %s is required for %s" % (argname, name)
@@ -421,6 +415,12 @@ class Obj2ModVisitor(PickleVisitor):
             for f in t.fields:
                 self.visitField(f, t.name, sum=sum, depth=2)
             args = [f.name.value for f in t.fields] + [a.name.value for a in sum.attributes]
+            # XXX: hack for the Const() node: Py_None constants are valid here
+            if name.value == 'expr' and t.name.value == 'Const':
+                self.emit("if (%s == NULL) {" % args[0], 2)
+                self.emit("%s = Py_None;" % args[0], 3)
+                self.emit("Py_INCREF(%s);" % args[0], 3)
+                self.emit("}", 2)
             self.emit("*out = %s(%s);" % (t.name, self.buildArgs(args)), 2)
             self.emit("if (*out == NULL) goto failed;", 2)
             self.emit("return 0;", 2)

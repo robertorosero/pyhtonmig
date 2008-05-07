@@ -1746,8 +1746,9 @@ Const(object value, int lineno, int col_offset, PyArena *arena)
 {
         expr_ty p;
         if (!value) {
-                Py_INCREF(Py_None);
-                value = Py_None;
+                PyErr_SetString(PyExc_ValueError,
+                                "field value is required for Const");
+                return NULL;
         }
         p = (expr_ty)PyArena_Malloc(arena, sizeof(*p));
         if (!p)
@@ -5093,6 +5094,10 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 } else {
                         PyErr_SetString(PyExc_TypeError, "required field \"value\" missing from Const");
                         return 1;
+                }
+                if (value == NULL) {
+                        value = Py_None;
+                        Py_INCREF(value);
                 }
                 *out = Const(value, lineno, col_offset, arena);
                 if (*out == NULL) goto failed;

@@ -552,8 +552,12 @@ optimize_yield(expr_ty* expr_ptr, PyArena* arena)
 {
     expr_ty expr = *expr_ptr;
     if (expr->v.Yield.value != NULL) {
+        expr_ty value;
         if (!optimize_expr(&expr->v.Yield.value, arena))
             return 0;
+        value = expr->v.Yield.value;
+        if (value->kind == Const_kind && value->v.Const.value == Py_None)
+            expr->v.Yield.value = NULL;
     }
     return 1;
 }
@@ -817,8 +821,12 @@ optimize_return(stmt_ty* stmt_ptr, PyArena* arena)
 {
     stmt_ty stmt = *stmt_ptr;
     if (stmt->v.Return.value != NULL) {
+        expr_ty value;
         if (!optimize_expr(&stmt->v.Return.value, arena))
             return 0;
+        value = stmt->v.Return.value;
+        if (value->kind == Const_kind && value->v.Const.value == Py_None)
+            stmt->v.Return.value = NULL;
     }
     return 1;
 }
