@@ -1023,18 +1023,6 @@ optimize_assert(stmt_ty* stmt_ptr, PyArena* arena)
 }
 
 static int
-optimize_import(stmt_ty* stmt_ptr, PyArena* arena)
-{
-    return 1;
-}
-
-static int
-optimize_import_from(stmt_ty* stmt_ptr, PyArena* arena)
-{
-    return 1;
-}
-
-static int
 optimize_exec(stmt_ty* stmt_ptr, PyArena* arena)
 {
     stmt_ty stmt = *stmt_ptr;
@@ -1046,12 +1034,6 @@ optimize_exec(stmt_ty* stmt_ptr, PyArena* arena)
     if (stmt->v.Exec.locals != NULL)
         if (!optimize_expr(&stmt->v.Exec.locals, arena))
             return 0;
-    return 1;
-}
-
-static int
-optimize_global(stmt_ty* stmt_ptr, PyArena* arena)
-{
     return 1;
 }
 
@@ -1121,26 +1103,17 @@ optimize_stmt(stmt_ty* stmt_ptr, PyArena* arena)
             {
                 return optimize_assert(stmt_ptr, arena);
             }
-        case Import_kind:
-            {
-                return optimize_import(stmt_ptr, arena);
-            }
-        case ImportFrom_kind:
-            {
-                return optimize_import_from(stmt_ptr, arena);
-            }
         case Exec_kind:
             {
                 return optimize_exec(stmt_ptr, arena);
-            }
-        case Global_kind:
-            {
-                return optimize_global(stmt_ptr, arena);
             }
         case Expr_kind:
             {
                 return optimize_expr(&stmt->v.Expr.value, arena);
             }
+        case Import_kind:
+        case ImportFrom_kind:
+        case Global_kind:
         case Pass_kind:
         case Break_kind:
         case Continue_kind:
