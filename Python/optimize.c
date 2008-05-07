@@ -40,6 +40,7 @@ _expr_constant_value(expr_ty expr)
     }
     return NULL;
 }
+
 static expr_ty
 _expr_from_object(PyObject* object, int lineno, int col_offset, PyArena* arena)
 {
