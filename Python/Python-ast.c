@@ -2,7 +2,7 @@
 
 
 /*
-   __version__ 62047.
+   __version__ 62816.
 
    This module must be committed separately after each AST grammar change;
    The __version__ number is set to the revision number of the commit
@@ -1746,9 +1746,8 @@ Const(object value, int lineno, int col_offset, PyArena *arena)
 {
         expr_ty p;
         if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Const");
-                return NULL;
+                Py_INCREF(Py_None);
+                value = Py_None;
         }
         p = (expr_ty)PyArena_Malloc(arena, sizeof(*p));
         if (!p)
@@ -5988,7 +5987,7 @@ init_ast(void)
         if (PyModule_AddIntConstant(m, "PyCF_NO_OPTIMIZE", PyCF_NO_OPTIMIZE) <
             0)
                 return;
-        if (PyModule_AddStringConstant(m, "__version__", "62047") < 0)
+        if (PyModule_AddStringConstant(m, "__version__", "62816") < 0)
                 return;
         if (PyDict_SetItemString(d, "mod", (PyObject*)mod_type) < 0) return;
         if (PyDict_SetItemString(d, "Module", (PyObject*)Module_type) < 0)

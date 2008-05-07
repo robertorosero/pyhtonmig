@@ -292,8 +292,14 @@ class FunctionVisitor(PrototypeVisitor):
         emit("{")
         emit("%s p;" % ctype, 1)
         for argtype, argname, opt in args:
+            # XXX: Const() hack to force Py_None if NULL given to ctor
+            if str(argname) == 'value' and str(name) == 'Const':
+                emit("if (!%s) {" % argname, 1)
+                emit("Py_INCREF(Py_None);", 2)
+                emit("%s = Py_None;" % argname, 2)
+                emit("}", 1)
             # XXX hack alert: false is allowed for a bool
-            if not opt and not (argtype == "bool" or argtype == "int"):
+            elif not opt and not (argtype == "bool" or argtype == "int"):
                 emit("if (!%s) {" % argname, 1)
                 emit("PyErr_SetString(PyExc_ValueError,", 2)
                 msg = "field %s is required for %s" % (argname, name)
