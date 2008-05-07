@@ -169,6 +169,31 @@ def say_hello():
         self.assertEqual(3, len(ast.body[0].body))
         self.assertEqual(_ast.Pass, ast.body[0].body[2].__class__)
 
+    def test_yield_none_becomes_yield(self):
+        code = """
+def foo():
+    yield None
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(1, len(ast.body))
+        self.assertEqual(1, len(ast.body[0].body))
+        self.assertEqual(_ast.Expr, ast.body[0].body[0].__class__)
+        self.assertEqual(_ast.Yield, ast.body[0].body[0].value.__class__)
+        self.assertEqual(None, ast.body[0].body[0].value.value)
+
+    def test_return_none_becomes_return(self):
+        code = """
+def foo():
+    return None
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(1, len(ast.body))
+        self.assertEqual(1, len(ast.body[0].body))
+        self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
+        self.assertEqual(None, ast.body[0].body[0].value)
+
 def test_main():
     test_support.run_unittest(AstOptimizerTest)
 
