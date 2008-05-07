@@ -21,7 +21,7 @@ def warnpy3k(message, category=None, stacklevel=1):
             category = DeprecationWarning
         warn(message, category, stacklevel+1)
 
-def showwarning(message, category, filename, lineno, file=None, line=None):
+def _show_warning(message, category, filename, lineno, file=None, line=None):
     """Hook to write a warning to a file; replace if you like."""
     if file is None:
         file = sys.stderr
@@ -29,6 +29,9 @@ def showwarning(message, category, filename, lineno, file=None, line=None):
         file.write(formatwarning(message, category, filename, lineno, line))
     except IOError:
         pass # the file (probably stderr) is invalid - this warning gets lost.
+# Keep a worrking version around in case the deprecation of the old API is
+# triggered.
+showwarning = _show_warning
 
 def formatwarning(message, category, filename, lineno, line=None):
     """Function to format a warning the standard way."""
@@ -258,6 +261,26 @@ def warn_explicit(message, category, filename, lineno,
         raise RuntimeError(
               "Unrecognized action (%r) in warnings.filters:\n %s" %
               (action, item))
+    # Warn if showwarning() does not support the 'line' argument.
+    # Don't use 'inspect' as it relies on an extension module, which break the
+    # build thanks to 'warnings' being imported by setup.py.
+    fxn_code = None
+    if hasattr(showwarning, 'func_code'):
+        fxn_code = showwarning.func_code
+    elif hasattr(showwarning, '__func__'):
+        fxn_code = showwarning.__func__.func_code
+    if fxn_code:
+        args = fxn_code.co_varnames[:fxn_code.co_argcount]
+        if 'line' not in args:
+            showwarning_msg = ("functions overriding warnings.showwarning() "
+                                "must support the 'line' argument")
+            if message == showwarning_msg:
+                _show_warning(message, category, filename, lineno)
+            else:
+                warn(showwarning_msg, DeprecationWarning)
+    if not callable(showwarning):
+        raise TypeError("warnings.showwarning() must be set to a "
+                        "function or method")
     # Print message and context
     showwarning(message, category, filename, lineno)
 

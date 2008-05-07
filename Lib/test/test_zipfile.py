@@ -553,6 +553,17 @@ class PyZipFileTests(unittest.TestCase):
 
 
 class OtherTests(unittest.TestCase):
+    def testUnicodeFilenames(self):
+        zf = zipfile.ZipFile(TESTFN, "w")
+        zf.writestr(u"foo.txt", "Test for unicode filename")
+        zf.writestr(u"\xf6.txt", "Test for unicode filename")
+        self.assertTrue(isinstance(zf.infolist()[0].filename, unicode))
+        zf.close()
+        zf = zipfile.ZipFile(TESTFN, "r")
+        self.assertEqual(zf.filelist[0].filename, "foo.txt")
+        self.assertEqual(zf.filelist[1].filename, u"\xf6.txt")
+        zf.close()
+
     def testCreateNonExistentFileForAppend(self):
         if os.path.exists(TESTFN):
             os.unlink(TESTFN)

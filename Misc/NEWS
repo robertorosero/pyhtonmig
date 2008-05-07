@@ -20,6 +20,8 @@ Core and builtins
 - Patch #2617: Reserved -J and -X arguments for Jython, IronPython and other
   implementations of Python. 
 
+- Implemented PEP 370: Per user site-packages directory
+
 Extension Modules
 -----------------
 
@@ -42,10 +44,19 @@ Extension Modules
   machinery in such places as the parser where use of pure Python code is not
   possible.  Both the ``showarning()`` and ``formatwarning()`` gain an
   optional 'line' argument which is not called by default for
-  backwards-compatibility reasons.
+  backwards-compatibility reasons. Setting ``warnings.showwarning()`` to
+  an implementation that lacks support for the ``line`` argument will raise a
+  DeprecationWarning.
 
 Library
 -------
+
+- The audiodev module has been deprecated for removal in Python 3.0.
+
+- Issue #2750: Add the 'json' package. Based on simplejson 1.9 and contributed
+  by Bob Ippolito.
+
+- Issue #1734346: Support Unicode file names for zipfiles.
 
 - Issue #2581: distutils: Vista UAC/elevation support for bdist_wininst
 

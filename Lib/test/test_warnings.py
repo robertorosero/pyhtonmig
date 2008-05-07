@@ -225,6 +225,8 @@ class WarnTests(unittest.TestCase):
                 self.assertEqual(os.path.basename(w.filename), "test_warnings.py")
                 warning_tests.outer("spam6", stacklevel=2)
                 self.assertEqual(os.path.basename(w.filename), "warning_tests.py")
+                warning_tests.outer("spam6.5", stacklevel=3)
+                self.assertEqual(os.path.basename(w.filename), "test_warnings.py")
 
                 warning_tests.inner("spam7", stacklevel=9999)
                 self.assertEqual(os.path.basename(w.filename), "sys")
@@ -386,6 +388,15 @@ class _WarningsTests(BaseTest):
                 result = stream.getvalue()
         self.failUnless(text in result)
 
+    def test_showwarning_not_callable(self):
+        self.module.filterwarnings("always", category=UserWarning)
+        old_showwarning = self.module.showwarning
+        self.module.showwarning = 23
+        try:
+            self.assertRaises(TypeError, self.module.warn, "Warning!")
+        finally:
+            self.module.showwarning = old_showwarning
+
     def test_show_warning_output(self):
         # With showarning() missing, make sure that output is okay.
         text = 'test show_warning'
@@ -461,6 +472,32 @@ class PyWarningsDisplayTests(BaseTest, WarningsDisplayTests):
     module = py_warnings
 
 
+class ShowwarningDeprecationTests(BaseTest):
+
+    """Test the deprecation of the old warnings.showwarning() API works."""
+
+    @staticmethod
+    def bad_showwarning(message, category, filename, lineno, file=None):
+        pass
+
+    def test_deprecation(self):
+        # message, category, filename, lineno[, file[, line]]
+        args = ("message", UserWarning, "file name", 42)
+        with test_support.catch_warning(self.module):
+            self.module.filterwarnings("error", category=DeprecationWarning)
+            self.module.showwarning = self.bad_showwarning
+            self.assertRaises(DeprecationWarning, self.module.warn_explicit,
+                                *args)
+
+class CShowwarningDeprecationTests(ShowwarningDeprecationTests):
+    module = c_warnings
+
+
+class PyShowwarningDeprecationTests(ShowwarningDeprecationTests):
+    module = py_warnings
+
+
+
 def test_main():
     py_warnings.onceregistry.clear()
     c_warnings.onceregistry.clear()
@@ -471,6 +508,8 @@ def test_main():
                                 CWCmdLineTests, PyWCmdLineTests,
                                 _WarningsTests,
                                 CWarningsDisplayTests, PyWarningsDisplayTests,
+                                CShowwarningDeprecationTests,
+                                PyShowwarningDeprecationTests,
                              )
 
 
