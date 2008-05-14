@@ -7494,8 +7494,9 @@ PyDoc_STRVAR(split__doc__,
 \n\
 Return a list of the words in S, using sep as the\n\
 delimiter string.  If maxsplit is given, at most maxsplit\n\
-splits are done. If sep is not specified or is None,\n\
-any whitespace string is a separator.");
+splits are done. If sep is not specified or is None, any\n\
+whitespace string is a separator and empty strings are\n\
+removed from the result.");
 
 static PyObject*
 unicode_split(PyUnicodeObject *self, PyObject *args)

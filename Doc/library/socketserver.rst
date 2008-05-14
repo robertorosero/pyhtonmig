@@ -1,12 +1,19 @@
-
-:mod:`SocketServer` --- A framework for network servers
+:mod:`socketserver` --- A framework for network servers
 =======================================================
 
 .. module:: SocketServer
+   :synopsis: Old name for the socketserver module.
+
+.. module:: socketserver
    :synopsis: A framework for network servers.
 
+.. note::
+   The :mod:`SocketServer` module has been renamed to :mod:`socketserver` in
+   Python 3.0.  It is importable under both names in Python 2.6 and the rest of
+   the 2.x series.
 
-The :mod:`SocketServer` module simplifies the task of writing network servers.
+
+The :mod:`socketserver` module simplifies the task of writing network servers.
 
 There are four basic server classes: :class:`TCPServer` uses the Internet TCP
 protocol, which provides for continuous streams of data between the client and
@@ -156,7 +163,7 @@ Server Objects
 .. data:: address_family
 
    The family of protocols to which the server's socket belongs.
-   :const:`socket.AF_INET` and :const:`socket.AF_UNIX` are two possible values.
+   Common examples are :const:`socket.AF_INET` and :const:`socket.AF_UNIX`.
 
 
 .. data:: RequestHandlerClass
@@ -200,7 +207,7 @@ The server classes support the following class variables:
 .. data:: socket_type
 
    The type of socket used by the server; :const:`socket.SOCK_STREAM` and
-   :const:`socket.SOCK_DGRAM` are two possible values.
+   :const:`socket.SOCK_DGRAM` are two common values.
 
 .. data:: timeout
 
@@ -213,7 +220,7 @@ server classes like :class:`TCPServer`; these methods aren't useful to external
 users of the server object.
 
 .. XXX should the default implementations of these be documented, or should
-   it be assumed that the user will look at SocketServer.py?
+   it be assumed that the user will look at socketserver.py?
 
 
 .. function:: finish_request()

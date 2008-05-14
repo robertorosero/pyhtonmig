@@ -478,7 +478,7 @@ Modules/Setup: $(srcdir)/Modules/Setup.dist
 		echo "Modules/Setup.dist is newer than Modules/Setup;"; \
 		echo "check to make sure you have all the updates you"; \
 		echo "need in your Modules/Setup file."; \
-		echo "Usually, copying Setup.dist to Setup will work."; \
+		echo "Usually, copying Modules/Setup.dist to Modules/Setup will work."; \
 		echo "-----------------------------------------------"; \
 	fi
 
@@ -550,7 +550,8 @@ STRINGLIB_HEADERS= \
 		$(srcdir)/Objects/stringlib/stringdefs.h \
 		$(srcdir)/Objects/stringlib/string_format.h \
 		$(srcdir)/Objects/stringlib/transmogrify.h \
-		$(srcdir)/Objects/stringlib/unicodedefs.h
+		$(srcdir)/Objects/stringlib/unicodedefs.h \
+		$(srcdir)/Objects/stringlib/localeutil.h
 
 Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
 				$(STRINGLIB_HEADERS)
@@ -809,12 +810,13 @@ LIBSUBDIRS=	lib-tk site-packages test test/output test/data \
 		test/decimaltestdata \
 		encodings compiler hotshot \
 		email email/mime email/test email/test/data \
+		json json/tests \
 		sqlite3 sqlite3/test \
 		logging bsddb bsddb/test csv wsgiref \
-		lib2to3 lib2to3/fixes lib2to3/pgen2 \
+		lib2to3 lib2to3/fixes lib2to3/pgen2 lib2to3/tests \
 		ctypes ctypes/test ctypes/macholib idlelib idlelib/Icons \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
-		setuptools setuptools/command setuptools/tests setuptools.egg-info \
+		lib-old \
 		curses $(MACHDEPS)
 libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	@for i in $(SCRIPTDIR) $(LIBDEST); \

@@ -191,7 +191,7 @@ def addsitedir(sitedir, known_paths=None):
 def check_enableusersite():
     """Check if user site directory is safe for inclusion
 
-    The functions tests for the command line flag (including environment var),
+    The function tests for the command line flag (including environment var),
     process uid/gid equal to effective uid/gid.
 
     None: Disabled for security reasons
@@ -522,7 +522,7 @@ def _script():
 
     Exit codes with --user-base or --user-site:
       0 - user site directory is enabled
-      1 - user site diretory is disabled by user
+      1 - user site directory is disabled by user
       2 - uses site directory is disabled by super user
           or for security reasons
      >2 - unknown error

@@ -10,7 +10,8 @@ class AllTest(unittest.TestCase):
     def check_all(self, modname):
         names = {}
         with catch_warning():
-            warnings.filterwarnings("ignore", ".* module", DeprecationWarning)
+            warnings.filterwarnings("ignore", ".* (module|package)",
+                                    DeprecationWarning)
             try:
                 exec "import %s" % modname in names
             except ImportError:
@@ -41,7 +42,7 @@ class AllTest(unittest.TestCase):
         self.check_all("MimeWriter")
         self.check_all("Queue")
         self.check_all("SimpleHTTPServer")
-        self.check_all("SocketServer")
+        self.check_all("socketserver")
         self.check_all("StringIO")
         self.check_all("UserString")
         self.check_all("aifc")
@@ -60,7 +61,7 @@ class AllTest(unittest.TestCase):
         self.check_all("commands")
         self.check_all("compileall")
         self.check_all("copy")
-        self.check_all("copy_reg")
+        self.check_all("copyreg")
         self.check_all("csv")
         self.check_all("dbhash")
         self.check_all("decimal")

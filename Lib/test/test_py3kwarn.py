@@ -1,7 +1,7 @@
 import unittest
 import sys
-from test.test_support import (catch_warning, TestSkipped, run_unittest,
-                                TestSkipped)
+from test.test_support import (catch_warning, CleanImport,
+                               TestSkipped, run_unittest)
 import warnings
 
 if not sys.py3kwarning:
@@ -126,30 +126,50 @@ class TestPy3KWarnings(unittest.TestCase):
 
 class TestStdlibRemovals(unittest.TestCase):
 
-    all_platforms = ('audiodev',)
+    # test.testall not tested as it executes all unit tests as an
+    # import side-effect.
+    all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
+                        'Bastion', 'compiler', 'dircache', 'fpformat',
+                        'ihooks', 'mhlib')
+    inclusive_platforms = {'irix' : ('pure', 'AL', 'al'),
+                          'darwin' : ('autoGIL', 'Carbon', 'OSATerminology',
+                                      'icglue', 'Nav', 'MacOS', 'aepack',
+                                      'aetools', 'aetypes', 'applesingle',
+                                      'appletrawmain', 'appletrunner',
+                                      'argvemulator', 'bgenlocations',
+                                      'EasyDialogs', 'macerrors', 'macostools',
+                                      'findertools', 'FrameWork', 'ic',
+                                      'gensuitemodule', 'icopen', 'macresource',
+                                      'MiniAEFrame', 'pimp', 'PixMapWrapper',
+                                      'terminalcommand', 'videoreader',
+                                      '_builtinSuites', 'CodeWarrior',
+                                      'Explorer', 'Finder', 'Netscape',
+                                      'StdSuites', 'SystemEvents', 'Terminal',
+                                      'cfmfile', 'bundlebuilder', 'buildtools',
+                                      'ColorPicker')}
+    optional_modules = ('bsddb185', 'Canvas', 'dl', 'linuxaudiodev', 'imageop',
+                        'sv')
 
-    def check_removal(self, module_name):
+    def check_removal(self, module_name, optional=False):
         """Make sure the specified module, when imported, raises a
         DeprecationWarning and specifies itself in the message."""
-        original_module = None
-        if module_name in sys.modules:
-            original_module = sys.modules[module_name]
-            del sys.modules[module_name]
-        try:
-            with catch_warning() as w:
+        with CleanImport(module_name):
+            with catch_warning(record=False) as w:
                 warnings.filterwarnings("error", ".+ removed",
                                         DeprecationWarning)
                 try:
                     __import__(module_name, level=0)
                 except DeprecationWarning as exc:
-                    self.assert_(module_name in exc.args[0])
+                    self.assert_(module_name in exc.args[0],
+                                 "%s warning didn't contain module name"
+                                 % module_name)
+                except ImportError:
+                    if not optional:
+                        self.fail("Non-optional module {0} raised an "
+                                  "ImportError.".format(module_name))
                 else:
-                    self.fail("DeprecationWarning not raised for %s" %
-                                module_name)
-        finally:
-            if original_module:
-                sys.modules[module_name] = original_module
-
+                    self.fail("DeprecationWarning not raised for {0}"
+                                .format(module_name))
 
     def test_platform_independent_removals(self):
         # Make sure that the modules that are available on all platforms raise
@@ -157,9 +177,71 @@ class TestStdlibRemovals(unittest.TestCase):
         for module_name in self.all_platforms:
             self.check_removal(module_name)
 
+    def test_platform_specific_removals(self):
+        # Test the removal of platform-specific modules.
+        for module_name in self.inclusive_platforms.get(sys.platform, []):
+            self.check_removal(module_name, optional=True)
+
+    def test_optional_module_removals(self):
+        # Test the removal of modules that may or may not be built.
+        for module_name in self.optional_modules:
+            self.check_removal(module_name, optional=True)
+
+    def test_os_path_walk(self):
+        msg = "In 3.x, os.path.walk is removed in favor of os.walk."
+        def dumbo(where, names, args): pass
+        for path_mod in ("ntpath", "macpath", "os2emxpath", "posixpath"):
+            mod = __import__(path_mod)
+            with catch_warning() as w:
+                # Since os3exmpath just imports it from ntpath
+                warnings.simplefilter("always")
+                mod.walk(".", dumbo, None)
+            self.assertEquals(str(w.message), msg)
+
+
+class TestStdlibRenames(unittest.TestCase):
+
+    renames = {'copy_reg': 'copyreg', 'Queue': 'queue',
+               'SocketServer': 'socketserver'}
+
+    def check_rename(self, module_name, new_module_name):
+        """Make sure that:
+        - A DeprecationWarning is raised when importing using the
+          old 2.x module name.
+        - The module can be imported using the new 3.x name.
+        - The warning message specify both names.
+        """
+        with CleanImport(module_name):
+            with catch_warning(record=False) as w:
+                warnings.filterwarnings("error", ".+ renamed to",
+                                        DeprecationWarning)
+                try:
+                    __import__(module_name, level=0)
+                except DeprecationWarning as exc:
+                    self.assert_(module_name in exc.args[0])
+                    self.assert_(new_module_name in exc.args[0])
+                else:
+                    self.fail("DeprecationWarning not raised for %s" %
+                              module_name)
+        with CleanImport(new_module_name):
+            try:
+                __import__(new_module_name, level=0)
+            except ImportError:
+                self.fail("cannot import %s with its 3.x name, %s" %
+                          module_name, new_module_name)
+            except DeprecationWarning:
+                self.fail("unexpected DeprecationWarning raised for %s" %
+                          module_name)
+
+    def test_module_renames(self):
+        for module_name, new_module_name in self.renames.items():
+            self.check_rename(module_name, new_module_name)
+
 
 def test_main():
-    run_unittest(TestPy3KWarnings, TestStdlibRemovals)
+    run_unittest(TestPy3KWarnings,
+                 TestStdlibRemovals,
+                 TestStdlibRenames)
 
 if __name__ == '__main__':
     test_main()

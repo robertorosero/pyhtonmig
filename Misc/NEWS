@@ -4,10 +4,112 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.6 beta 1?
+================================
+
+*Release date: XX-June-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #2831: enumerate() now has a ``start`` argument.
+
+- Issue #2801: fix bug in the float.is_integer method where a ValueError
+  was sometimes incorrectly raised.
+
+- Issue #2790: sys.flags was not properly exposing its bytes_warning attribute.
+
+- Issue #2196: hasattr now lets exceptions which do not inherit Exception
+  (KeyboardInterrupt, and SystemExit) propagate instead of ignoring them
+
+Extension Modules
+-----------------
+
+- Support for Windows9x has been removed from the winsound module.
+
+- bsddb module updated to version 4.6.4.
+
+Library
+-------
+
+- The al and AL modules for IRIX have been deprecated for removal in
+  Python 3.0.
+
+- #1713041: fix pprint's handling of maximum depth.
+
+- The timing module has been deprecated for removal in Python 3.0.
+
+- The sv module has been deprecated for removal in Python 3.0.
+
+- The multifile module has been deprecated as per PEP 4.
+
+- The SocketServer module has been renamed 'socketserver'.  The old
+  name is now deprecated.
+
+- The imageop module has been deprecated for removal in Python 3.0.
+
+- #2250: Exceptions raised during evaluation of names in rlcompleter's
+  ``Completer.complete()`` method are now caught and ignored.
+
+- #2659: Added ``break_on_hyphens`` option to textwrap TextWrapper class.
+
+- The mhlib module has been deprecated for removal in Python 3.0.
+
+- The linuxaudiodev module has been deprecated for removal in Python 3.0.
+
+- The ihooks module has been deprecated for removal in Python 3.0.
+
+- The fpformat module has been deprecated for removal in Python 3.0.
+
+- The dl module has been deprecated for removal in Python 3.0.
+
+- The Canvas module has been deprecated for removal in Python 3.0.
+
+- The compiler package has been deprecated for removal in Python 3.0.
+
+- The Bastion and rexec modules have been deprecated for removal in Python 3.0.
+
+- The bsddb185 module has been deprecated for removal in Python 3.0.
+
+- The pure module has been deprecated for removal in Python 3.0.
+
+- Issue #2487: change the semantics of math.ldexp(x, n) when n is too
+  large to fit in a C long.  ldexp(x, n) now returns a zero (with
+  suitable sign) if n is large and negative; previously, it raised
+  OverflowError.
+
+- The toaiff module has been deprecated for removal in Python 3.0.
+
+- The test.testall module has been deprecated for removal in Python 3.0.
+
+- The new module has been deprecated for removal in Python 3.0.
+
+- The user module has been deprecated for removal in Python 3.0.
+
+- The stringold module has been deprecated for removal in Python 3.0.
+
+- The mutex module has been deprecated for removal in Python 3.0.
+
+- The imputil module has been deprecated for removal in Python 3.0.
+
+- test.test_support.catch_warning() gained a 'record' argument.
+
+- os.path.walk is deprecated in favor of os.walk.
+
+- pdb gained the "until" command.
+
+- The Mac Modules (including Carbon) have been deprecated for removal in
+  3.0.
+
+Build
+-----
+
+- ``Lib/lib-old`` is now added to sys.path.
+
 What's New in Python 2.6 alpha 3?
 =================================
 
-*Release date: XX-XXX-2008*
+*Release date: 08-May-2008*
 
 Core and builtins
 -----------------
@@ -313,6 +415,11 @@ Library
 - Issue #705836: struct.pack(">f", x) now raises OverflowError on all
   platforms when x is too large to fit into an IEEE 754 float; previously
   it only raised OverflowError on non IEEE 754 platforms.
+
+- Issues #2166, #1741 and #1531505: now distutils deals with HOME
+  correctly under win32
+
+- #1858: distutils: added multiple server support in .pypirc
 
 - Issue #1106316: pdb.post_mortem()'s parameter, "traceback", is now
   optional: it defaults to the traceback of the exception that is currently

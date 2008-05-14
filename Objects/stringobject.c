@@ -784,6 +784,10 @@ PyString_AsStringAndSize(register PyObject *obj,
 #include "stringlib/find.h"
 #include "stringlib/partition.h"
 
+#define _Py_InsertThousandsGrouping _PyString_InsertThousandsGrouping
+#include "stringlib/localeutil.h"
+
+
 
 static int
 string_print(PyStringObject *op, FILE *fp, int flags)
@@ -1498,7 +1502,8 @@ PyDoc_STRVAR(split__doc__,
 Return a list of the words in the string S, using sep as the\n\
 delimiter string.  If maxsplit is given, at most maxsplit\n\
 splits are done. If sep is not specified or is None, any\n\
-whitespace string is a separator.");
+whitespace string is a separator and empty strings are removed\n\
+from the result.");
 
 static PyObject *
 string_split(PyStringObject *self, PyObject *args)

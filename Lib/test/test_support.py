@@ -37,6 +37,20 @@ class ResourceDenied(TestSkipped):
     and unexpected skips.
     """
 
+def import_module(name, deprecated=False):
+    """Import the module to be tested, raising TestSkipped if it is not
+    available."""
+    with catch_warning(record=False):
+        if deprecated:
+            warnings.filterwarnings("ignore", ".+ (module|package)",
+                                    DeprecationWarning)
+        try:
+            module = __import__(name, level=0)
+        except ImportError:
+            raise TestSkipped("No module named " + name)
+        else:
+            return module
+
 verbose = 1              # Flag set to 0 by regrtest.py
 use_resources = None     # Flag set to [] by regrtest.py
 max_memuse = 0           # Disable bigmem tests (they will still be run with
@@ -382,7 +396,7 @@ class WarningMessage(object):
 
 
 @contextlib.contextmanager
-def catch_warning(module=warnings):
+def catch_warning(module=warnings, record=True):
     """
     Guard the warnings filter from being permanently changed and record the
     data of the last warning that has been issued.
@@ -393,15 +407,49 @@ def catch_warning(module=warnings):
             warnings.warn("foo")
             assert str(w.message) == "foo"
     """
-    warning_obj = WarningMessage()
     original_filters = module.filters[:]
     original_showwarning = module.showwarning
-    module.showwarning = warning_obj._showwarning
+    if record:
+        warning_obj = WarningMessage()
+        module.showwarning = warning_obj._showwarning
     try:
-        yield warning_obj
+        yield warning_obj if record else None
     finally:
         module.showwarning = original_showwarning
         module.filters = original_filters
+
+
+class CleanImport(object):
+    """Context manager to force import to return a new module reference.
+
+    This is useful for testing module-level behaviours, such as
+    the emission of a DepreciationWarning on import.
+
+    Use like this:
+
+        with CleanImport("foo"):
+            __import__("foo") # new reference
+    """
+
+    def __init__(self, *module_names):
+        self.original_modules = sys.modules.copy()
+        for module_name in module_names:
+            if module_name in sys.modules:
+                module = sys.modules[module_name]
+                # It is possible that module_name is just an alias for
+                # another module (e.g. stub for modules renamed in 3.x).
+                # In that case, we also need delete the real module to clear
+                # the import cache.
+                if module.__name__ != module_name:
+                    del sys.modules[module.__name__]
+                del sys.modules[module_name]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *ignore_exc):
+        sys.modules.update(self.original_modules)
+
 
 class EnvironmentVarGuard(object):
 

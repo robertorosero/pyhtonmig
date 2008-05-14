@@ -5,7 +5,7 @@ connect to the Idle process, which listens for the connection.  Since Idle has
 has only one client per server, this was not a limitation.
 
    +---------------------------------+ +-------------+
-   | SocketServer.BaseRequestHandler | | SocketIO    |
+   | socketserver.BaseRequestHandler | | SocketIO    |
    +---------------------------------+ +-------------+
                    ^                   | register()  |
                    |                   | unregister()|
@@ -31,13 +31,13 @@ import sys
 import os
 import socket
 import select
-import SocketServer
+import socketserver
 import struct
 import cPickle as pickle
 import threading
-import Queue
+import queue
 import traceback
-import copy_reg
+import copyreg
 import types
 import marshal
 
@@ -60,18 +60,18 @@ def pickle_code(co):
 #      assert isinstance(fn, type.FunctionType)
 #      return repr(fn)
 
-copy_reg.pickle(types.CodeType, pickle_code, unpickle_code)
-# copy_reg.pickle(types.FunctionType, pickle_function, unpickle_function)
+copyreg.pickle(types.CodeType, pickle_code, unpickle_code)
+# copyreg.pickle(types.FunctionType, pickle_function, unpickle_function)
 
 BUFSIZE = 8*1024
 LOCALHOST = '127.0.0.1'
 
-class RPCServer(SocketServer.TCPServer):
+class RPCServer(socketserver.TCPServer):
 
     def __init__(self, addr, handlerclass=None):
         if handlerclass is None:
             handlerclass = RPCHandler
-        SocketServer.TCPServer.__init__(self, addr, handlerclass)
+        socketserver.TCPServer.__init__(self, addr, handlerclass)
 
     def server_bind(self):
         "Override TCPServer method, no bind() phase for connecting entity"
@@ -117,8 +117,8 @@ class RPCServer(SocketServer.TCPServer):
 #----------------- end class RPCServer --------------------
 
 objecttable = {}
-request_queue = Queue.Queue(0)
-response_queue = Queue.Queue(0)
+request_queue = queue.Queue(0)
+response_queue = queue.Queue(0)
 
 
 class SocketIO(object):
@@ -413,7 +413,7 @@ class SocketIO(object):
             # send queued response if there is one available
             try:
                 qmsg = response_queue.get(0)
-            except Queue.Empty:
+            except queue.Empty:
                 pass
             else:
                 seq, response = qmsg
@@ -492,7 +492,7 @@ class RemoteProxy(object):
     def __init__(self, oid):
         self.oid = oid
 
-class RPCHandler(SocketServer.BaseRequestHandler, SocketIO):
+class RPCHandler(socketserver.BaseRequestHandler, SocketIO):
 
     debugging = False
     location = "#S"  # Server
@@ -500,10 +500,10 @@ class RPCHandler(SocketServer.BaseRequestHandler, SocketIO):
     def __init__(self, sock, addr, svr):
         svr.current_handler = self ## cgt xxx
         SocketIO.__init__(self, sock)
-        SocketServer.BaseRequestHandler.__init__(self, sock, addr, svr)
+        socketserver.BaseRequestHandler.__init__(self, sock, addr, svr)
 
     def handle(self):
-        "handle() method required by SocketServer"
+        "handle() method required by socketserver"
         self.mainloop()
 
     def get_remote_proxy(self, oid):
