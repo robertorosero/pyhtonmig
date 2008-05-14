@@ -131,7 +131,8 @@ class TestStdlibRemovals(unittest.TestCase):
     all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
                         'Bastion', 'compiler', 'dircache', 'fpformat',
                         'ihooks', 'mhlib')
-    inclusive_platforms = {'irix' : ('pure', 'AL', 'al'),
+    inclusive_platforms = {'irix' : ('pure', 'AL', 'al', 'CD', 'cd', 'cddb',
+                                     'cdplayer', 'CL', 'cl'),
                           'darwin' : ('autoGIL', 'Carbon', 'OSATerminology',
                                       'icglue', 'Nav', 'MacOS', 'aepack',
                                       'aetools', 'aetypes', 'applesingle',
@@ -202,7 +203,8 @@ class TestStdlibRemovals(unittest.TestCase):
 class TestStdlibRenames(unittest.TestCase):
 
     renames = {'copy_reg': 'copyreg', 'Queue': 'queue',
-               'SocketServer': 'socketserver'}
+               'SocketServer': 'socketserver',
+               'ConfigParser': 'configparser'}
 
     def check_rename(self, module_name, new_module_name):
         """Make sure that:
