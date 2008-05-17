@@ -12,6 +12,11 @@ What's New in Python 2.6 beta 1?
 Core and Builtins
 -----------------
 
+- Issue #2863: generators now have a ``gen.__name__`` attribute that equals
+  ``gen.gi_code.co_name``, like ``func.__name___`` that equals
+  ``func.func_code.co_name``.  The repr() of a generator now also contains
+  this name.
+
 - Issue #2831: enumerate() now has a ``start`` argument.
 
 - Issue #2801: fix bug in the float.is_integer method where a ValueError
@@ -25,12 +30,71 @@ Core and Builtins
 Extension Modules
 -----------------
 
-- Support for Windows9x has been removed from the winsound module.
+- Support os.O_ASYNC and fcntl.FASYNC if the constants exist on the platform.
+
+- Support for Windows 9x has been removed from the winsound module.
 
 - bsddb module updated to version 4.6.4.
 
+- Fixed #2870: cmathmodule.c compile error
+
 Library
 -------
+
+- Issue 1793: Function ctypes.util.find_msvcrt() added that returns
+  the name of the C runtime library that Python uses.
+  ctypes.util.find_library(name) now call this function when name is
+  'm' or 'c'.
+
+- The Tkinter module has been made a package and renamed 'tkinter'.  All
+  Tkinter-related modules (like Tix, ScrolledText, turtle etc.) are now
+  submodules of that package and have been renamed to conform to PEP 8
+  standards.
+
+- The repr module has been renamed 'reprlib'.  The old name is now
+  deprecated.
+
+- The statvfs module has been deprecated for removal in Python 3.0.
+
+- The sunaudiodev and SUNAUDIODEV modules have been deprecated for removal in
+  Python 3.0.
+
+- The WAIT module from IRIX has been deprecated for removal in Python 3.0.
+
+- The torgb module from IRIX has been deprecated for removal in Python 3.0.
+
+- The SV module from IRIX has been deprecated for removal in Python 3.0.
+
+- The readcd module from IRIX has been deprecated for removal in Python 3.0.
+
+- The panelparser module from IRIX has been deprecated for removal in
+  Python 3.0.
+
+-The panel module from IRIX has been deprecated for removal in Python 3.0.
+
+- The jpeg module from IRIX has been deprecated for removal in Python 3.0.
+
+- The IOCTL module from IRIX has been deprecated for removal in Python 3.0.
+
+- The IN module from IRIX has been deprecated for removal in Python 3.0.
+
+- The imgfile module from IRIX has been deprecated for removal in Python 3.0.
+
+- The GLWS module from IRIX has been deprecated for removal in Python 3.0.
+
+- The GET module from IRIX has been deprecated for removal in Python 3.0.
+
+- The fm module from IRIX has been deprecated for removal in Python 3.0.
+
+- The FL, flp, and fl modules from IRIX have been deprecated for removal in
+  Python 3.0.
+
+- The FILE module on IRIX has been deprecated for removal in Python 3.0.
+
+- The ERRNO module on IRIX has been deprecated for removal in Python 3.0.
+
+- The DEVICE, GL, gl, and cgen modules (which indirectly includes cgensupport)
+  have been deprecated for removal in Python 3.0.
 
 - The ConfigParser module has been renamed 'configparser'.  The old
   name is now deprecated.
@@ -118,6 +182,7 @@ Build
 -----
 
 - ``Lib/lib-old`` is now added to sys.path.
+
 
 What's New in Python 2.6 alpha 3?
 =================================

@@ -130,9 +130,13 @@ class TestStdlibRemovals(unittest.TestCase):
     # import side-effect.
     all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
                         'Bastion', 'compiler', 'dircache', 'fpformat',
-                        'ihooks', 'mhlib')
+                        'ihooks', 'mhlib', 'statvfs')
     inclusive_platforms = {'irix' : ('pure', 'AL', 'al', 'CD', 'cd', 'cddb',
-                                     'cdplayer', 'CL', 'cl'),
+                                     'cdplayer', 'CL', 'cl', 'DEVICE', 'GL',
+                                     'gl', 'ERRNO', 'FILE', 'FL', 'flp', 'fl',
+                                     'fm', 'GET', 'GLWS', 'imgfile', 'IN',
+                                     'IOCTL', 'jpeg', 'panel', 'panelparser',
+                                     'readcd', 'SV', 'torgb', 'WAIT'),
                           'darwin' : ('autoGIL', 'Carbon', 'OSATerminology',
                                       'icglue', 'Nav', 'MacOS', 'aepack',
                                       'aetools', 'aetypes', 'applesingle',
@@ -147,9 +151,11 @@ class TestStdlibRemovals(unittest.TestCase):
                                       'Explorer', 'Finder', 'Netscape',
                                       'StdSuites', 'SystemEvents', 'Terminal',
                                       'cfmfile', 'bundlebuilder', 'buildtools',
-                                      'ColorPicker')}
+                                      'ColorPicker'),
+                           'sunos5' : ('sunaudiodev', 'SUNAUDIODEV'),
+                          }
     optional_modules = ('bsddb185', 'Canvas', 'dl', 'linuxaudiodev', 'imageop',
-                        'sv')
+                        'sv', 'cPickle')
 
     def check_removal(self, module_name, optional=False):
         """Make sure the specified module, when imported, raises a
@@ -204,7 +210,24 @@ class TestStdlibRenames(unittest.TestCase):
 
     renames = {'copy_reg': 'copyreg', 'Queue': 'queue',
                'SocketServer': 'socketserver',
-               'ConfigParser': 'configparser'}
+               'ConfigParser': 'configparser',
+               'repr': 'reprlib',
+               'FileDialog': 'tkinter.filedialog',
+               'FixTk': 'tkinter._fix',
+               'ScrolledText': 'tkinter.scrolledtext',
+               'SimpleDialog': 'tkinter.simpledialog',
+               'Tix': 'tkinter.tix',
+               'tkColorChooser': 'tkinter.colorchooser',
+               'tkCommonDialog': 'tkinter.commondialog',
+               'Tkconstants': 'tkinter.constants',
+               'Tkdnd': 'tkinter.dnd',
+               'tkFileDialog': 'tkinter.filedialog',
+               'tkFont': 'tkinter.font',
+               'Tkinter': 'tkinter',
+               'tkMessageBox': 'tkinter.messagebox',
+               'tkSimpleDialog': 'tkinter.simpledialog',
+               'turtle': 'tkinter.turtle'
+               }
 
     def check_rename(self, module_name, new_module_name):
         """Make sure that:
