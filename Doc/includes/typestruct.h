@@ -72,5 +72,12 @@ typedef struct _typeobject {
     PyObject *tp_cache;
     PyObject *tp_subclasses;
     PyObject *tp_weaklist;
+    destructor tp_del;
+
+    /* Type attribute cache version tag. Added in version 2.6 */
+    unsigned int tp_version_tag;
+
+    /* Memory usage. Added in version 2.6  */
+    footprintfunc tp_footprint;
 
 } PyTypeObject;

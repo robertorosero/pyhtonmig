@@ -472,6 +472,16 @@ available.  They are listed here in alphabetical order.
 
    The float type is described in :ref:`typesnumeric`.
 
+
+.. function:: footprint(x)
+
+   Return the size of an object in bytes. The object can be any type of
+   object. All built-in objects will return correct results, but this
+   must not hold true for third-party extensions.
+
+   .. versionadded:: 2.6
+
+
 .. function:: frozenset([iterable])
    :noindex:
 

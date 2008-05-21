@@ -418,6 +418,13 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 equivalent to the Python expression: type(o).
        */
 
+     PyAPI_FUNC(Py_ssize_t) PyObject_Footprint(PyObject *o);
+ 
+        /*
+	  Return the memory footprint (i.e. size in bytes) of object o or NULL 
+	  on failure.
+        */
+
      PyAPI_FUNC(Py_ssize_t) PyObject_Size(PyObject *o);
 
        /*

@@ -2194,6 +2194,18 @@ dict_init(PyObject *self, PyObject *args, PyObject *kwds)
 	return dict_update_common(self, args, kwds, "dict");
 }
 
+static Py_ssize_t
+dict_footprint(PyDictObject *mp)
+{
+	Py_ssize_t res;
+
+	res = sizeof(PyDictObject) + sizeof(mp->ma_table);
+	if (mp->ma_table == mp->ma_smalltable)
+		return res;
+	else
+		return res + (mp->ma_mask + 1) * sizeof(PyDictEntry);
+}
+
 static PyObject *
 dict_iter(PyDictObject *dict)
 {
@@ -2252,6 +2264,15 @@ PyTypeObject PyDict_Type = {
 	PyType_GenericAlloc,			/* tp_alloc */
 	dict_new,				/* tp_new */
 	PyObject_GC_Del,        		/* tp_free */
+	0,                                      /* tp_is_gc */
+	0,                                      /* tp_bases */
+	0,                                      /* tp_mro */
+	0,                                      /* tp_cache */
+	0,                                      /* tp_subclasses */
+	0,                                      /* tp_weaklist */
+	0,                                      /* tp_del */
+	0,                                      /* tp_version_tag */
+	(footprintfunc)dict_footprint,          /* tp_footprint */
 };
 
 /* For backward compatibility with old dictionary interface */
