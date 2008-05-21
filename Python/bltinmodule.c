@@ -1310,21 +1310,6 @@ PyDoc_STRVAR(len_doc,
 \n\
 Return the number of items of a sequence or mapping.");
 
-static PyObject *
-builtin_footprint(PyObject *self, PyObject *o)
-{
-	Py_ssize_t res;
-              
-	res = PyObject_Footprint(o);
-	if (res < 0 && PyErr_Occurred())
-		return NULL;
-	return PyInt_FromSsize_t(res);
-}
-
-PyDoc_STRVAR(footprint_doc,
-"footprint(object) -> integer\n\
-\n\
-Return the memory footprint an object in bytes.");
 
 static PyObject *
 builtin_locals(PyObject *self)
@@ -2565,7 +2550,6 @@ static PyMethodDef builtin_methods[] = {
  	{"issubclass",  builtin_issubclass, METH_VARARGS, issubclass_doc},
  	{"iter",	builtin_iter,       METH_VARARGS, iter_doc},
  	{"len",		builtin_len,        METH_O, len_doc},
- 	{"footprint",	builtin_footprint,  METH_O, footprint_doc},
  	{"locals",	(PyCFunction)builtin_locals,     METH_NOARGS, locals_doc},
  	{"map",		builtin_map,        METH_VARARGS, map_doc},
  	{"max",		(PyCFunction)builtin_max,        METH_VARARGS | METH_KEYWORDS, max_doc},

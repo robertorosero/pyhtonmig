@@ -640,6 +640,24 @@ sys_mdebug(PyObject *self, PyObject *args)
 #endif /* USE_MALLOPT */
 
 static PyObject *
+sys_sizeof(PyObject *self, PyObject *o)
+{
+	Py_ssize_t res;
+              
+	res = PyObject_Footprint(o);
+	if (res < 0 && PyErr_Occurred())
+		return NULL;
+	return PyInt_FromSsize_t(res);
+}
+
+PyDoc_STRVAR(sizeof_doc,
+"sizeof(object) -> integer\n\
+\n\
+Return the memory footprint of an object in bytes.");
+
+
+
+static PyObject *
 sys_getrefcount(PyObject *self, PyObject *arg)
 {
 	return PyInt_FromSsize_t(arg->ob_refcnt);
@@ -880,6 +898,7 @@ static PyMethodDef sys_methods[] = {
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
 	{"gettrace",	sys_gettrace, METH_NOARGS, gettrace_doc},
 	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
+ 	{"sizeof",	sys_sizeof,  METH_O, sizeof_doc},
 	{NULL,		NULL}		/* sentinel */
 };
 
