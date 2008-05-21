@@ -123,6 +123,13 @@ class TestPy3KWarnings(unittest.TestCase):
         with catch_warning() as w:
             self.assertWarning(buffer('a'), w, expected)
 
+    def test_file_xreadlines(self):
+        expected = ("f.xreadlines() not supported in 3.x, "
+                    "try 'for line in f' instead")
+        with file(__file__) as f:
+            with catch_warning() as w:
+                self.assertWarning(f.xreadlines(), w, expected)
+
 
 class TestStdlibRemovals(unittest.TestCase):
 
@@ -208,26 +215,10 @@ class TestStdlibRemovals(unittest.TestCase):
 
 class TestStdlibRenames(unittest.TestCase):
 
-    renames = {'copy_reg': 'copyreg', 'Queue': 'queue',
+    renames = {'Queue': 'queue',
                'SocketServer': 'socketserver',
                'ConfigParser': 'configparser',
-               'repr': 'reprlib',
-               'FileDialog': 'tkinter.filedialog',
-               'FixTk': 'tkinter._fix',
-               'ScrolledText': 'tkinter.scrolledtext',
-               'SimpleDialog': 'tkinter.simpledialog',
-               'Tix': 'tkinter.tix',
-               'tkColorChooser': 'tkinter.colorchooser',
-               'tkCommonDialog': 'tkinter.commondialog',
-               'Tkconstants': 'tkinter.constants',
-               'Tkdnd': 'tkinter.dnd',
-               'tkFileDialog': 'tkinter.filedialog',
-               'tkFont': 'tkinter.font',
-               'Tkinter': 'tkinter',
-               'tkMessageBox': 'tkinter.messagebox',
-               'tkSimpleDialog': 'tkinter.simpledialog',
-               'turtle': 'tkinter.turtle'
-               }
+               'repr': 'reprlib'}
 
     def check_rename(self, module_name, new_module_name):
         """Make sure that:
