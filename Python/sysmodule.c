@@ -640,18 +640,19 @@ sys_mdebug(PyObject *self, PyObject *args)
 #endif /* USE_MALLOPT */
 
 static PyObject *
-sys_sizeof(PyObject *self, PyObject *o)
+sys_sizeof(PyObject *self, PyObject *args)
 {
-	Py_ssize_t res;
-              
-	res = PyObject_Footprint(o);
+	PyObject *res;
+        
+	res = PyObject_CallMethod(args, "__sizeof__", NULL);
 	if (res < 0 && PyErr_Occurred())
 		return NULL;
-	return PyInt_FromSsize_t(res);
+
+	return res;
 }
 
 PyDoc_STRVAR(sizeof_doc,
-"sizeof(object) -> integer\n\
+"sizeof(object) -> long\n\
 \n\
 Return the memory footprint of an object in bytes.");
 

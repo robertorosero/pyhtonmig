@@ -3398,6 +3398,26 @@ object_format(PyObject *self, PyObject *args)
         return result;
 }
 
+static PyObject *
+object_sizeof(PyObject *self, PyObject *args)
+{
+	Py_ssize_t res, size;
+ 
+	res = 0;
+	size = self->ob_type->tp_itemsize;
+	if (size > 0) {
+		Py_ssize_t len;
+		len = PyObject_Size(self);
+		if (PyErr_Occurred())
+			return NULL;
+		if (len)
+			res += len * size;
+	}
+	res += self->ob_type->tp_basicsize;
+
+	return PyLong_FromLong(res);	 
+}
+
 static PyMethodDef object_methods[] = {
 	{"__reduce_ex__", object_reduce_ex, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
@@ -3406,6 +3426,8 @@ static PyMethodDef object_methods[] = {
 	{"__subclasshook__", object_subclasshook, METH_CLASS | METH_VARARGS,
 	 object_subclasshook_doc},
         {"__format__", object_format, METH_VARARGS,
+         PyDoc_STR("default object formatter")},
+        {"__sizeof__", object_sizeof, METH_NOARGS,
          PyDoc_STR("default object formatter")},
 	{0}
 };
