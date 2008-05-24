@@ -515,6 +515,8 @@ class SizeofTest(unittest.TestCase):
         p = self.p
         # dict
         self.check_sizeof({}, 3*l + 3*p + 8*(l + 2*p))
+        longdict = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
+        self.check_sizeof(longdict, 3*l + 3*p + 8*(l + 2*p) + 16*(l + 2*p))
 
 
 def test_main():
