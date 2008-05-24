@@ -385,8 +385,142 @@ class SysModuleTest(unittest.TestCase):
 ##        self.assert_(r[0][2] > 100, r[0][2])
 ##        self.assert_(r[1][2] > 100, r[1][2])
 
+
+class SizeofTest(unittest.TestCase):
+
+
+    def setUp(self):
+        import struct
+        self.i = len(struct.pack('i', 0))
+        self.l = len(struct.pack('l', 0))
+        self.p = len(struct.pack('P', 0))
+        self.headersize = self.l + self.p
+        if hasattr(sys, "gettotalrefcount"):
+            self.headersize += 2 * self.p
+        self.f = open(test.test_support.TESTFN, 'wb')
+
+    def tearDown(self):
+        import os
+        if self.f:
+            self.f.close()
+        os.remove(test.test_support.TESTFN)
+
+    def check_sizeof(self, o, size, ):
+        size += self.headersize
+        result = sys.sizeof(o)
+        msg = 'wrong size for ' + str(type(o)) + ': '+\
+              str(result) + ' != ' + str(size)
+        self.assertEqual(result, size, msg)
+
+    def align(self, value):
+        mod = value % self.p
+        if mod != 0:
+            return value - mod + self.p
+        else:
+            return value
+
+    def test_align(self):
+        self.assertTrue( (self.align(0) % self.p) == 0 )
+        self.assertTrue( (self.align(1) % self.p) == 0 )
+        self.assertTrue( (self.align(3) % self.p) == 0 )
+        self.assertTrue( (self.align(4) % self.p) == 0 )
+        self.assertTrue( (self.align(7) % self.p) == 0 )
+        self.assertTrue( (self.align(8) % self.p) == 0 )
+        self.assertTrue( (self.align(9) % self.p) == 0 )
+
+    def test_standardobjects(self):
+        import inspect
+        i = self.i
+        l = self.l
+        p = self.p
+        # bool
+        self.check_sizeof(True, self.l)
+        # buffer
+        self.check_sizeof(buffer(''), 2*p + 2*l + self.align(i) +l)
+        # bytearray
+        self.check_sizeof(bytes(), self.align(i) + l + p)
+        # cell
+        def get_cell():
+            x = 42
+            def inner():
+                return x
+            return inner
+        self.check_sizeof(get_cell().func_closure[0], p)
+        # class
+        class clazz():
+            def method():
+                pass
+#        self.check_sizeof(clazz, 6*p)
+        # instance
+#        self.check_sizeof(clazz(), 3*p)
+        # method
+#        self.check_sizeof(clazz().method, 4*p)
+        # code
+        self.check_sizeof(get_cell().func_code, self.align(4*i) + 8*p +\
+                            self.align(i) + 2*p)
+        # complex
+        self.check_sizeof(complex(0,1), 2*8)
+        # enumerate
+        self.check_sizeof(enumerate([]), l + 3*p)
+        # reverse
+        self.check_sizeof(reversed(''), l + p )
+        # file
+        self.check_sizeof(self.f, 4*p + self.align(2*i) + 4*p +\
+                            self.align(3*i) + 2*p + self.align(i))
+        # float
+        self.check_sizeof(float(0), 8)
+        # function
+        def func(): pass
+        self.check_sizeof(func, 9 * l)
+        class c():
+            @staticmethod
+            def foo():
+                pass
+            @classmethod
+            def bar(cls):
+                pass
+            # staticmethod
+            self.check_sizeof(foo, l)
+            # classmethod
+            self.check_sizeof(bar, l)
+        # generator
+        def get_gen(): yield 1
+        self.check_sizeof(get_gen(), p + self.align(i) + 2*p)
+        # integer
+        self.check_sizeof(1, l)
+        # builtin_function_or_method
+        self.check_sizeof(abs, 3*p)
+        # module
+        self.check_sizeof(unittest, p)
+        # xange
+        self.check_sizeof(xrange(1), 3*p)
+        # slice
+        self.check_sizeof(slice(0), 3*p)
+
+    def test_variable_size(self):
+        i = self.i
+        l = self.l
+        p = self.p
+        self.headersize += l
+        # list
+        self.check_sizeof([], p + l)
+        self.check_sizeof([1, 2, 3], p + l)
+        # string
+        self.check_sizeof('', l + self.align(i + 1))
+        self.check_sizeof('abc', l + self.align(i + 1) + 3)
+
+    def test_special_types(self):
+        i = self.i
+        l = self.l
+        p = self.p
+        # dict
+        self.check_sizeof({}, 3*l + 3*p + 8*(l + 2*p))
+
+
 def test_main():
-    test.test_support.run_unittest(SysModuleTest)
+    test_classes = (SysModuleTest, SizeofTest)
+
+    test.test_support.run_unittest(*test_classes)
 
 if __name__ == "__main__":
     test_main()

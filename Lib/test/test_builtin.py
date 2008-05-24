@@ -1467,135 +1467,6 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(bin(-(2**65)), '-0b1' + '0' * 65)
         self.assertEqual(bin(-(2**65-1)), '-0b' + '1' * 65)
 
-class FootprintTest(unittest.TestCase):
-
-
-    def setUp(self):
-        import struct
-        self.i = len(struct.pack('i', 0))
-        self.l = len(struct.pack('l', 0))
-        self.p = len(struct.pack('P', 0))
-        self.headersize = self.l + self.p
-        if hasattr(sys, "gettotalrefcount"):
-            self.headersize += 2 * self.p
-        self.f = open(TESTFN, 'wb')
-
-    def tearDown(self):
-        import os
-        if self.f:
-            self.f.close()
-        os.remove(TESTFN)
-
-    def check_footprint(self, o, size, ):
-        size += self.headersize
-        msg = 'wrong size for ' + str(type(o)) + ': '+\
-              str(footprint(o)) + ' != ' + str(size)
-        self.assertEqual(footprint(o), size, msg)
-
-    def align(self, value):
-        mod = value % self.p
-        if mod != 0:
-            return value - mod + self.p
-        else:
-            return value
-
-    def test_align(self):
-        self.assertTrue( (self.align(0) % self.p) == 0 )
-        self.assertTrue( (self.align(1) % self.p) == 0 )
-        self.assertTrue( (self.align(3) % self.p) == 0 )
-        self.assertTrue( (self.align(4) % self.p) == 0 )
-        self.assertTrue( (self.align(7) % self.p) == 0 )
-        self.assertTrue( (self.align(8) % self.p) == 0 )
-        self.assertTrue( (self.align(9) % self.p) == 0 )
-
-    def test_standardobjects(self):
-        import inspect
-        i = self.i
-        l = self.l
-        p = self.p
-        # bool
-        self.check_footprint(True, self.l)
-        # buffer
-        self.check_footprint(buffer(''), 2*p + 2*l + self.align(i) +l)
-        # bytearray
-        self.check_footprint(bytes(), self.align(i) + l + p)
-        # cell
-        def get_cell():
-            x = 42
-            def inner():
-                return x
-            return inner
-        self.check_footprint(get_cell().func_closure[0], p)
-        # class
-        class clazz():
-            def method():
-                pass
-        self.check_footprint(clazz, 6*p)
-        # instance
-        self.check_footprint(clazz(), 3*p)
-        # method
-        self.check_footprint(clazz().method, 4*p)
-        # code
-        self.check_footprint(get_cell().func_code, self.align(4*i) + 8*p +\
-                            self.align(i) + 2*p)
-        # complex
-        self.check_footprint(complex(0,1), 2*8)
-        # enumerate
-        self.check_footprint(enumerate([]), l + 3*p)
-        # reverse
-        self.check_footprint(reversed(''), l + p )
-        # file
-        self.check_footprint(self.f, 4*p + self.align(2*i) + 4*p +\
-                            self.align(3*i) + 2*p + self.align(i))
-        # float
-        self.check_footprint(float(0), 8)
-        # function
-        def func(): pass
-        self.check_footprint(func, 9 * l)
-        class c():
-            @staticmethod
-            def foo():
-                pass
-            @classmethod
-            def bar(cls):
-                pass
-            # staticmethod
-            self.check_footprint(foo, l)
-            # classmethod
-            self.check_footprint(bar, l)
-        # generator
-        def get_gen(): yield 1
-        self.check_footprint(get_gen(), p + self.align(i) + 2*p)
-        # integer
-        self.check_footprint(1, l)
-        # builtin_function_or_method
-        self.check_footprint(abs, 3*p)
-        # module
-        self.check_footprint(unittest, p)
-        # xange
-        self.check_footprint(xrange(1), 3*p)
-        # slice
-        self.check_footprint(slice(0), 3*p)
-
-    def test_variable_size(self):
-        i = self.i
-        l = self.l
-        p = self.p
-        self.headersize += l
-        # list
-        self.check_footprint([], p + l)
-        self.check_footprint([1, 2, 3], p + l)
-        # string
-        self.check_footprint('', l + self.align(i + 1))
-        self.check_footprint('abc', l + self.align(i + 1) + 3)
-
-    def test_special_types(self):
-        i = self.i
-        l = self.l
-        p = self.p
-        # dict
-        self.check_footprint({}, 3*l + 3*p + 8*(l + 2*p))
-
 class TestSorted(unittest.TestCase):
 
     def test_basic(self):
@@ -1636,7 +1507,7 @@ class TestSorted(unittest.TestCase):
         self.assertRaises(TypeError, sorted, data, None, lambda x,y: 0)
 
 def test_main(verbose=None):
-    test_classes = (BuiltinTest, TestSorted, FootprintTest)
+    test_classes = (BuiltinTest, TestSorted)
 
     run_unittest(*test_classes)
 
