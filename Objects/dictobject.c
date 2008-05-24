@@ -2032,6 +2032,16 @@ dict_iteritems(PyDictObject *dict)
 	return dictiter_new(dict, &PyDictIterItem_Type);
 }
 
+static PyObject *
+dict_sizeof(PyDictObject *mp)
+{
+	Py_ssize_t res;
+
+	res = sizeof(PyDictObject) + sizeof(mp->ma_table);
+	if (mp->ma_table != mp->ma_smalltable)
+		res = res + (mp->ma_mask + 1) * sizeof(PyDictEntry);
+	return PyLong_FromLong(res);
+}
 
 PyDoc_STRVAR(has_key__doc__,
 "D.has_key(k) -> True if D has a key k, else False");
@@ -2040,6 +2050,9 @@ PyDoc_STRVAR(contains__doc__,
 "D.__contains__(k) -> True if D has a key k, else False");
 
 PyDoc_STRVAR(getitem__doc__, "x.__getitem__(y) <==> x[y]");
+
+PyDoc_STRVAR(sizeof__doc__,
+"D.__sizeof__() -> size of D in bytes");
 
 PyDoc_STRVAR(get__doc__,
 "D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.");
@@ -2092,6 +2105,8 @@ static PyMethodDef mapp_methods[] = {
 	 contains__doc__},
 	{"__getitem__", (PyCFunction)dict_subscript,	METH_O | METH_COEXIST,
 	 getitem__doc__},
+	{"__sizeof__",	(PyCFunction)dict_sizeof,	METH_NOARGS,
+	 sizeof__doc__},
 	{"has_key",	(PyCFunction)dict_has_key,      METH_O,
 	 has_key__doc__},
 	{"get",         (PyCFunction)dict_get,          METH_VARARGS,
@@ -2194,18 +2209,6 @@ dict_init(PyObject *self, PyObject *args, PyObject *kwds)
 	return dict_update_common(self, args, kwds, "dict");
 }
 
-static Py_ssize_t
-dict_footprint(PyDictObject *mp)
-{
-	Py_ssize_t res;
-
-	res = sizeof(PyDictObject) + sizeof(mp->ma_table);
-	if (mp->ma_table == mp->ma_smalltable)
-		return res;
-	else
-		return res + (mp->ma_mask + 1) * sizeof(PyDictEntry);
-}
-
 static PyObject *
 dict_iter(PyDictObject *dict)
 {
@@ -2264,15 +2267,6 @@ PyTypeObject PyDict_Type = {
 	PyType_GenericAlloc,			/* tp_alloc */
 	dict_new,				/* tp_new */
 	PyObject_GC_Del,        		/* tp_free */
-	0,                                      /* tp_is_gc */
-	0,                                      /* tp_bases */
-	0,                                      /* tp_mro */
-	0,                                      /* tp_cache */
-	0,                                      /* tp_subclasses */
-	0,                                      /* tp_weaklist */
-	0,                                      /* tp_del */
-	0,                                      /* tp_version_tag */
-	(footprintfunc)dict_footprint,          /* tp_footprint */
 };
 
 /* For backward compatibility with old dictionary interface */
