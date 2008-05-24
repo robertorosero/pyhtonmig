@@ -407,7 +407,7 @@ class SizeofTest(unittest.TestCase):
 
     def check_sizeof(self, o, size, ):
         size += self.headersize
-        result = sys.sizeof(o)
+        result = sys.getsizeof(o)
         msg = 'wrong size for ' + str(type(o)) + ': '+\
               str(result) + ' != ' + str(size)
         self.assertEqual(result, size, msg)

@@ -640,7 +640,7 @@ sys_mdebug(PyObject *self, PyObject *args)
 #endif /* USE_MALLOPT */
 
 static PyObject *
-sys_sizeof(PyObject *self, PyObject *args)
+sys_getsizeof(PyObject *self, PyObject *args)
 {
 	PyObject *res;
         
@@ -651,10 +651,10 @@ sys_sizeof(PyObject *self, PyObject *args)
 	return res;
 }
 
-PyDoc_STRVAR(sizeof_doc,
-"sizeof(object) -> long\n\
+PyDoc_STRVAR(getsizeof_doc,
+"getsizeof(object) -> long\n\
 \n\
-Return the memory footprint of an object in bytes.");
+Return the size of object in bytes.");
 
 
 
@@ -869,6 +869,7 @@ static PyMethodDef sys_methods[] = {
 	{"getrefcount",	(PyCFunction)sys_getrefcount, METH_O, getrefcount_doc},
 	{"getrecursionlimit", (PyCFunction)sys_getrecursionlimit, METH_NOARGS,
 	 getrecursionlimit_doc},
+ 	{"getsizeof",	sys_getsizeof,  METH_O, getsizeof_doc},
 	{"_getframe", sys_getframe, METH_VARARGS, getframe_doc},
 #ifdef MS_WINDOWS
 	{"getwindowsversion", (PyCFunction)sys_getwindowsversion, METH_NOARGS,
@@ -899,7 +900,6 @@ static PyMethodDef sys_methods[] = {
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
 	{"gettrace",	sys_gettrace, METH_NOARGS, gettrace_doc},
 	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
- 	{"sizeof",	sys_sizeof,  METH_O, sizeof_doc},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -1050,6 +1050,7 @@ getdlopenflags() -- returns flags to be used for dlopen() calls\n\
 getprofile() -- get the global profiling function\n\
 getrefcount() -- return the reference count for an object (plus one :-)\n\
 getrecursionlimit() -- return the max recursion depth for the interpreter\n\
+getsizeof() -- return the size of an object in bytes\n\
 gettrace() -- get the global debug tracing function\n\
 setcheckinterval() -- control how often the interpreter checks for events\n\
 setdlopenflags() -- set the flags to be used for dlopen() calls\n\
