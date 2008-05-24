@@ -304,13 +304,6 @@ is considered sufficient for this determination.
    .. versionadded:: 2.2
 
 
-.. cfunction:: int PyObject_Footprint(PyObject *o)
-
-   Return the memory footprint (i.e. size in bytes) of object o or NULL on failure. 
-
-   .. versionadded:: 2.6
-
-
 .. cfunction:: Py_ssize_t PyObject_Length(PyObject *o)
                Py_ssize_t PyObject_Size(PyObject *o)
 

@@ -1092,21 +1092,6 @@ The next fields, up to and including :attr:`tp_weaklist`, only exist if the
    Weak reference list head, for weak references to this type object.  Not
    inherited.  Internal use only.
 
-
-.. cmember:: footprintfunc PyTypeObject.tp_footprint
-
-   An optional function pointer that returns the memory footprint of the 
-   object. This function should be used if the memory usage of the object
-   cannot be determined with tp_basicsize plus, if applicable, 
-   tp_itemsize * length of the object. If the field is not set, the memory
-   footprint is computed as described. Note that this formula does not 
-   include any referenced objects, e.g. attributes. 
-   
-   The value -1 should not be returned as a normal return value; when an 
-   error occurs during the computation of the hash value, the function 
-   should set an exception and return -1.
-
-
 The remaining fields are only defined if the feature test macro
 :const:`COUNT_ALLOCS` is defined, and are for internal use only. They are
 documented here for completeness.  None of these fields are inherited by
