@@ -502,9 +502,6 @@ class SizeofTest(unittest.TestCase):
         l = self.l
         p = self.p
         self.headersize += l
-        # list
-        self.check_sizeof([], p + l)
-        self.check_sizeof([1, 2, 3], p + l)
         # string
         self.check_sizeof('', l + self.align(i + 1))
         self.check_sizeof('abc', l + self.align(i + 1) + 3)
@@ -517,6 +514,9 @@ class SizeofTest(unittest.TestCase):
         self.check_sizeof({}, 3*l + 3*p + 8*(l + 2*p))
         longdict = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
         self.check_sizeof(longdict, 3*l + 3*p + 8*(l + 2*p) + 16*(l + 2*p))
+        # list
+        self.check_sizeof([], l + p + l)
+        self.check_sizeof([1, 2, 3], l + p + l + 3*l)
 
 
 def test_main():
