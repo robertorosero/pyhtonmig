@@ -328,7 +328,6 @@ typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
 typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*newfunc)(struct _typeobject *, PyObject *, PyObject *);
 typedef PyObject *(*allocfunc)(struct _typeobject *, Py_ssize_t);
-typedef Py_ssize_t (*footprintfunc)(PyObject *);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -408,9 +407,6 @@ typedef struct _typeobject {
 
 	/* Type attribute cache version tag. Added in version 2.6 */
 	unsigned int tp_version_tag;
-
-	/* Memory footprint. Added in version 2.6  */
-	footprintfunc tp_footprint;
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */

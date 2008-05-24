@@ -58,36 +58,6 @@ PyObject_Type(PyObject *o)
 }
 
 Py_ssize_t
-PyObject_Footprint(PyObject *o)
-{
-	Py_ssize_t res;
-	Py_ssize_t size;
-	footprintfunc m;
-
-	if (o == NULL) {
-		null_error();
-		return -1;
-	}
-
-	m = o->ob_type->tp_footprint;
-	if (m)
-		return o->ob_type->tp_footprint(o);
-
-	res = 0;
-	size = o->ob_type->tp_itemsize;
-	if (size > 0) {
-		Py_ssize_t len;
-		len = PyObject_Size(o);
-		if (len == -1 && PyErr_Occurred())
-			return -1;
-		if (len)
-			res += len * size;
-	}
-	res += o->ob_type->tp_basicsize;
-	return res;
-}
-
-Py_ssize_t
 PyObject_Size(PyObject *o)
 {
 	PySequenceMethods *m;
