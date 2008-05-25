@@ -643,11 +643,9 @@ static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args)
 {
 	PyObject *res;
-        
 	res = PyObject_CallMethod(args, "__sizeof__", NULL);
 	if (res < 0 && PyErr_Occurred())
 		return NULL;
-
 	return res;
 }
 
