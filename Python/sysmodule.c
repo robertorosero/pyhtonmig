@@ -654,8 +654,6 @@ PyDoc_STRVAR(getsizeof_doc,
 \n\
 Return the size of object in bytes.");
 
-
-
 static PyObject *
 sys_getrefcount(PyObject *self, PyObject *arg)
 {
