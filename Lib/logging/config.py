@@ -35,7 +35,7 @@ try:
 except ImportError:
     thread = None
 
-from socketserver import ThreadingTCPServer, StreamRequestHandler
+from SocketServer import ThreadingTCPServer, StreamRequestHandler
 
 
 DEFAULT_LOGGING_CONFIG_PORT = 9030
@@ -65,9 +65,9 @@ def fileConfig(fname, defaults=None):
     rather than a filename, in which case the file-like object will be read
     using readfp.
     """
-    import configparser
+    import ConfigParser
 
-    cp = configparser.ConfigParser(defaults)
+    cp = ConfigParser.ConfigParser(defaults)
     if hasattr(cp, 'readfp') and hasattr(fname, 'readline'):
         cp.readfp(fname)
     else:

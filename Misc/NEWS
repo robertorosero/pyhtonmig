@@ -36,6 +36,9 @@ Core and Builtins
 Extension Modules
 -----------------
 
+- Issue #2819: add full-precision summation function to math module,
+  based on Hettinger's ASPN Python Cookbook recipe.
+
 - Issue #2592: delegate nb_index and the floor/truediv slots in
   weakref.proxy.
 
@@ -44,7 +47,8 @@ Extension Modules
 
 - Support for Windows 9x has been removed from the winsound module.
 
-- bsddb module updated to version 4.6.4.
+- bsddb module updated to version 4.7.0.
+  http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.0
 
 - Issue #2858: Fix potential memory corruption when
   bsddb.db.DBEnv.lock_get and other bsddb.db object constructors
@@ -54,6 +58,9 @@ Extension Modules
 
 Library
 -------
+
+- Issue #1390: Raise ValueError in toxml when an invalid comment would
+  otherwise be produced.
 
 - Issue #2914: TimedRotatingFileHandler now takes an optional keyword
   argument "utc" to use UTC time rather than local time.
@@ -71,9 +78,6 @@ Library
   the name of the C runtime library that Python uses.
   ctypes.util.find_library(name) now call this function when name is
   'm' or 'c'.
-
-- The repr module has been renamed 'reprlib'.  The old name is now
-  deprecated.
 
 - The statvfs module has been deprecated for removal in Python 3.0.
 
@@ -131,9 +135,6 @@ Library
 - The DEVICE, GL, gl, and cgen modules (which indirectly includes
   cgensupport) have been deprecated for removal in Python 3.0.
 
-- The ConfigParser module has been renamed 'configparser'.  The old
-  name is now deprecated.
-
 - The CL, CL_old, and cl modules for IRIX have been deprecated for
   removal in Python 3.0.
 
@@ -156,9 +157,6 @@ Library
 - The sv module has been deprecated for removal in Python 3.0.
 
 - The multifile module has been deprecated as per PEP 4.
-
-- The SocketServer module has been renamed 'socketserver'.  The old
-  name is now deprecated.
 
 - The imageop module has been deprecated for removal in Python 3.0.
 
@@ -222,6 +220,8 @@ Library
 
 Build
 -----
+
+- Patch #1722225: Support QNX 6.
 
 - ``Lib/lib-old`` is now added to sys.path.
 
@@ -1901,13 +1901,13 @@ Library
 Extension Modules
 -----------------
 
-- Patch #1657: added select.epoll and select.kqueue
+- Patch #1657: added select.epoll and select.kqueue.
 
 - Patch #1506171: added operator.methodcaller().
 
 - Patch #1826: operator.attrgetter() now supports dotted attribute paths.
 
-- Patch #1957: syslogmodule: Release GIL when calling syslog(3)
+- Patch #1957: syslogmodule: Release GIL when calling syslog(3).
 
 - Bug #2112: mmap.error is now a subclass of EnvironmentError and not
   a direct EnvironmentError.

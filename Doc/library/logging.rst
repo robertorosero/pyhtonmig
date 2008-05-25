@@ -1299,17 +1299,17 @@ the receiving end. A simple way of doing this is attaching a
    logger2.warning('Jail zesty vixen who grabbed pay from quack.')
    logger2.error('The five boxing wizards jump quickly.')
 
-At the receiving end, you can set up a receiver using the :mod:`socketserver`
+At the receiving end, you can set up a receiver using the :mod:`SocketServer`
 module. Here is a basic working example::
 
    import cPickle
    import logging
    import logging.handlers
-   import socketserver
+   import SocketServer
    import struct
 
 
-   class LogRecordStreamHandler(socketserver.StreamRequestHandler):
+   class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
        """Handler for a streaming logging request.
 
        This basically logs the record using whatever logging policy is
@@ -1351,7 +1351,7 @@ module. Here is a basic working example::
            # cycles and network bandwidth!
            logger.handle(record)
 
-   class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
+   class LogRecordSocketReceiver(SocketServer.ThreadingTCPServer):
        """simple TCP socket-based logging receiver suitable for testing.
        """
 
@@ -1360,7 +1360,7 @@ module. Here is a basic working example::
        def __init__(self, host='localhost',
                     port=logging.handlers.DEFAULT_TCP_LOGGING_PORT,
                     handler=LogRecordStreamHandler):
-           socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
+           SocketServer.ThreadingTCPServer.__init__(self, (host, port), handler)
            self.abort = 0
            self.timeout = 1
            self.logname = None
@@ -2240,12 +2240,12 @@ in :mod:`logging` itself) and defining handlers which are declared either in
 
 .. function:: fileConfig(fname[, defaults])
 
-   Reads the logging configuration from a :mod:`configparser`\-format file named
-   *fname*.  This function can be called several times from an application,
-   allowing an end user the ability to select from various pre-canned
-   configurations (if the developer provides a mechanism to present the choices
-   and load the chosen configuration). Defaults to be passed to the ConfigParser
-   can be specified in the *defaults* argument.
+   Reads the logging configuration from a ConfigParser-format file named *fname*.
+   This function can be called several times from an application, allowing an end
+   user the ability to select from various pre-canned configurations (if the
+   developer provides a mechanism to present the choices and load the chosen
+   configuration). Defaults to be passed to ConfigParser can be specified in the
+   *defaults* argument.
 
 
 .. function:: listen([port])
@@ -2275,20 +2275,18 @@ in :mod:`logging` itself) and defining handlers which are declared either in
 Configuration file format
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The configuration file format understood by :func:`fileConfig` is
-based on :mod:`configparser` functionality. The file must contain
-sections called ``[loggers]``, ``[handlers]`` and ``[formatters]``
-which identify by name the entities of each type which are defined in
-the file. For each such entity, there is a separate section which
-identified how that entity is configured. Thus, for a logger named
-``log01`` in the ``[loggers]`` section, the relevant configuration
-details are held in a section ``[logger_log01]``. Similarly, a handler
-called ``hand01`` in the ``[handlers]`` section will have its
-configuration held in a section called ``[handler_hand01]``, while a
-formatter called ``form01`` in the ``[formatters]`` section will have
-its configuration specified in a section called
-``[formatter_form01]``. The root logger configuration must be
-specified in a section called ``[logger_root]``.
+The configuration file format understood by :func:`fileConfig` is based on
+ConfigParser functionality. The file must contain sections called ``[loggers]``,
+``[handlers]`` and ``[formatters]`` which identify by name the entities of each
+type which are defined in the file. For each such entity, there is a separate
+section which identified how that entity is configured. Thus, for a logger named
+``log01`` in the ``[loggers]`` section, the relevant configuration details are
+held in a section ``[logger_log01]``. Similarly, a handler called ``hand01`` in
+the ``[handlers]`` section will have its configuration held in a section called
+``[handler_hand01]``, while a formatter called ``form01`` in the
+``[formatters]`` section will have its configuration specified in a section
+called ``[formatter_form01]``. The root logger configuration must be specified
+in a section called ``[logger_root]``.
 
 Examples of these sections in the file are given below. ::
 
