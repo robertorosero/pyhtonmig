@@ -3415,7 +3415,7 @@ object_sizeof(PyObject *self, PyObject *args)
 	}
 	res += self->ob_type->tp_basicsize;
 
-	return PyLong_FromLong(res);	 
+	return PyInt_FromSsize_t(res);	 
 }
 
 static PyMethodDef object_methods[] = {
