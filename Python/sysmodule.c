@@ -642,11 +642,7 @@ sys_mdebug(PyObject *self, PyObject *args)
 static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args)
 {
-	PyObject *res;
-	res = PyObject_CallMethod(args, "__sizeof__", NULL);
-	if (res < 0 && PyErr_Occurred())
-		return NULL;
-	return res;
+	return PyObject_CallMethod(args, "__sizeof__", NULL);
 }
 
 PyDoc_STRVAR(getsizeof_doc,
