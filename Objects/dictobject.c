@@ -2040,7 +2040,7 @@ dict_sizeof(PyDictObject *mp)
 	res = sizeof(PyDictObject) + sizeof(mp->ma_table);
 	if (mp->ma_table != mp->ma_smalltable)
 		res = res + (mp->ma_mask + 1) * sizeof(PyDictEntry);
-	return PyLong_FromLong(res);
+	return PyInt_FromSsize_t(res);
 }
 
 PyDoc_STRVAR(has_key__doc__,
