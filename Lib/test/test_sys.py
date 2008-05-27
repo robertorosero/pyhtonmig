@@ -1,6 +1,6 @@
 # -*- coding: iso-8859-1 -*-
 import unittest, test.test_support
-import sys, cStringIO
+import sys, cStringIO, inspect
 
 class SysModuleTest(unittest.TestCase):
 
@@ -388,7 +388,6 @@ class SysModuleTest(unittest.TestCase):
 
 class SizeofTest(unittest.TestCase):
 
-
     def setUp(self):
         import struct
         self.i = len(struct.pack('i', 0))
@@ -407,7 +406,10 @@ class SizeofTest(unittest.TestCase):
 
     def check_sizeof(self, o, size, ):
         size += self.headersize
-        result = sys.getsizeof(o)
+        if not inspect.isclass(o):
+            result = sys.getsizeof(o)
+        else:
+            result = o.__sizeof__(o)
         msg = 'wrong size for ' + str(type(o)) + ': '+\
               str(result) + ' != ' + str(size)
         self.assertEqual(result, size, msg)
@@ -450,11 +452,11 @@ class SizeofTest(unittest.TestCase):
         class clazz():
             def method():
                 pass
-#        self.check_sizeof(clazz, 6*p)
+ #       self.check_sizeof(clazz, 6*p)
         # instance
 #        self.check_sizeof(clazz(), 3*p)
         # method
-#        self.check_sizeof(clazz().method, 4*p)
+        self.check_sizeof(clazz().method, 4*p)
         # code
         self.check_sizeof(get_cell().func_code, self.align(4*i) + 8*p +\
                             self.align(i) + 2*p)
@@ -505,6 +507,14 @@ class SizeofTest(unittest.TestCase):
         # string
         self.check_sizeof('', l + self.align(i + 1))
         self.check_sizeof('abc', l + self.align(i + 1) + 3)
+        # long
+        self.check_sizeof(0L, + self.align(2))
+        self.check_sizeof(1L, + self.align(2))
+        self.check_sizeof(-1L, + self.align(2))
+        self.check_sizeof(32768L, + self.align(2) + 2)
+        self.check_sizeof(32768L*32768L-1, + self.align(2) + 2)
+        self.check_sizeof(32768L*32768L, + self.align(2) + 4)
+
 
     def test_special_types(self):
         i = self.i
