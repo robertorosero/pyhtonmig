@@ -2608,11 +2608,20 @@ type_subclasses(PyTypeObject *type, PyObject *args_ignored)
 	return list;
 }
 
+static PyObject *
+type_sizeof(PyObject *self, PyObject *args)
+{
+	printf("type_sizeof\n");
+	return PyInt_FromSsize_t(self->ob_type->tp_basicsize);
+}
+
 static PyMethodDef type_methods[] = {
 	{"mro", (PyCFunction)mro_external, METH_NOARGS,
 	 PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
 	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
 	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
+	{"__sizeof__", type_sizeof, METH_NOARGS,
+         PyDoc_STR("default sizeof implementation for type")},
 	{0}
 };
 
@@ -3402,17 +3411,11 @@ static PyObject *
 object_sizeof(PyObject *self, PyObject *args)
 {
 	Py_ssize_t res, size;
- 
+
 	res = 0;
 	size = self->ob_type->tp_itemsize;
-	if (size > 0) {
-		Py_ssize_t len;
-		len = PyObject_Size(self);
-		if (PyErr_Occurred())
-			return NULL;
-		if (len)
-			res += len * size;
-	}
+	if (size > 0)
+		res = self->ob_type->ob_size * size;
 	res += self->ob_type->tp_basicsize;
 
 	return PyInt_FromSsize_t(res);	 
@@ -3428,7 +3431,7 @@ static PyMethodDef object_methods[] = {
         {"__format__", object_format, METH_VARARGS,
          PyDoc_STR("default object formatter")},
         {"__sizeof__", object_sizeof, METH_NOARGS,
-         PyDoc_STR("default object formatter")},
+         PyDoc_STR("default sizeof implementation")},
 	{0}
 };
 
