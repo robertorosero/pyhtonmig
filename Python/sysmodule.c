@@ -659,7 +659,7 @@ sys_getsizeof(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(getsizeof_doc,
-"getsizeof(object) -> long\n\
+"getsizeof(object) -> int\n\
 \n\
 Return the size of object in bytes.");
 
