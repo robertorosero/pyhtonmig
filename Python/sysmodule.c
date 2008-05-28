@@ -642,13 +642,15 @@ sys_mdebug(PyObject *self, PyObject *args)
 static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args)
 {
-	/* work-around to deal with objects which inherit from type */
+	/* work-around to deal with objects which inherit from type, .. */
 	if (args->ob_type == &PyType_Type) {
 		return PyObject_CallMethod((PyObject *)(args->ob_type), "__sizeof__", NULL);
 	}
+	/* .. old-style classes,  */
 	else if (args->ob_type == &PyClass_Type) {
 		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
 	}
+	/* .. and instances of old-style classes */
 	else if (args->ob_type == &PyInstance_Type) {
 		return PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
 	}
