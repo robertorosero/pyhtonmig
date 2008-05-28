@@ -3445,6 +3445,7 @@ static PyObject *
 long_sizeof(PyLongObject *v)
 {
 	Py_ssize_t res;
+
 	res = sizeof(PyLongObject) + abs(v->ob_size) * sizeof(digit);
         if (v->ob_size != 0)
 		res -=  sizeof(digit);

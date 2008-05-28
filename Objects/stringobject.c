@@ -4008,9 +4008,9 @@ string_methods[] = {
 	{"expandtabs", (PyCFunction)string_expandtabs, METH_VARARGS,
 	 expandtabs__doc__},
 	{"splitlines", (PyCFunction)string_splitlines, METH_VARARGS,
-	 sizeof__doc__},
-	{"__sizeof__", (PyCFunction)string_sizeof, METH_NOARGS,
  	 splitlines__doc__},
+	{"__sizeof__", (PyCFunction)string_sizeof, METH_NOARGS,
+	 sizeof__doc__},
 	{"__getnewargs__",	(PyCFunction)string_getnewargs,	METH_NOARGS},
 	{NULL,     NULL}		     /* sentinel */
 };
