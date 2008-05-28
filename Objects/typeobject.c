@@ -2611,7 +2611,6 @@ type_subclasses(PyTypeObject *type, PyObject *args_ignored)
 static PyObject *
 type_sizeof(PyObject *self, PyObject *args)
 {
-	printf("type_sizeof\n");
 	return PyInt_FromSsize_t(self->ob_type->tp_basicsize);
 }
 
@@ -2621,7 +2620,7 @@ static PyMethodDef type_methods[] = {
 	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
 	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
 	{"__sizeof__", type_sizeof, METH_NOARGS | METH_CLASS,
-         PyDoc_STR("default sizeof implementation for type")},
+         PyDoc_STR("__sizeof__() -> size of type in bytes")},
 	{0}
 };
 
@@ -3431,7 +3430,7 @@ static PyMethodDef object_methods[] = {
         {"__format__", object_format, METH_VARARGS,
          PyDoc_STR("default object formatter")},
         {"__sizeof__", object_sizeof, METH_NOARGS,
-         PyDoc_STR("default sizeof implementation")},
+         PyDoc_STR("__sizeof__() -> size of object in bytes")},
 	{0}
 };
 
