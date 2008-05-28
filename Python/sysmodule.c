@@ -642,7 +642,18 @@ sys_mdebug(PyObject *self, PyObject *args)
 static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args)
 {
-	return PyObject_CallMethod(args, "__sizeof__", NULL);
+	/* work-around to deal with objects which inherit from type */
+	if (args->ob_type == &PyType_Type) {
+		return PyObject_CallMethod((PyObject *)(args->ob_type), "__sizeof__", NULL);
+	}
+	else if (args->ob_type == &PyClass_Type) {
+		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
+	}
+	else if (args->ob_type == &PyInstance_Type) {
+		return PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
+	}
+	else 
+		return PyObject_CallMethod(args, "__sizeof__", NULL);
 }
 
 PyDoc_STRVAR(getsizeof_doc,

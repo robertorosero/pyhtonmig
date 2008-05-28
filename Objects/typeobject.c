@@ -2620,7 +2620,7 @@ static PyMethodDef type_methods[] = {
 	 PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
 	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
 	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
-	{"__sizeof__", type_sizeof, METH_NOARGS,
+	{"__sizeof__", type_sizeof, METH_NOARGS | METH_CLASS,
          PyDoc_STR("default sizeof implementation for type")},
 	{0}
 };

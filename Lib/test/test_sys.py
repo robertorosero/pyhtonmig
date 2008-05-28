@@ -406,12 +406,9 @@ class SizeofTest(unittest.TestCase):
 
     def check_sizeof(self, o, size, ):
         size += self.headersize
-        if not inspect.isclass(o):
-            result = sys.getsizeof(o)
-        else:
-            result = o.__sizeof__(o)
-        msg = 'wrong size for ' + str(type(o)) + ': '+\
-              str(result) + ' != ' + str(size)
+        result = sys.getsizeof(o)
+        msg = 'wrong size for ' + str(type(o)) + ': got '+\
+              str(result) + ', expected ' + str(size)
         self.assertEqual(result, size, msg)
 
     def align(self, value):
@@ -448,15 +445,15 @@ class SizeofTest(unittest.TestCase):
                 return x
             return inner
         self.check_sizeof(get_cell().func_closure[0], p)
-        # class
-        class clazz():
+        # old-style class
+        class class_oldstyle():
             def method():
                 pass
- #       self.check_sizeof(clazz, 6*p)
+        self.check_sizeof(class_oldstyle, 6*p)
         # instance
-#        self.check_sizeof(clazz(), 3*p)
+        self.check_sizeof(class_oldstyle(), 3*p)
         # method
-        self.check_sizeof(clazz().method, 4*p)
+        self.check_sizeof(class_oldstyle().method, 4*p)
         # code
         self.check_sizeof(get_cell().func_code, self.align(4*i) + 8*p +\
                             self.align(i) + 2*p)
@@ -504,6 +501,15 @@ class SizeofTest(unittest.TestCase):
         l = self.l
         p = self.p
         self.headersize += l
+        # new-style class
+        class class_newstyle(object):
+            def method():
+                pass
+        # type (PyTypeObject + PyNumberMethods +  PyMappingMethods +
+        #       PySequenceMethods +  PyBufferProcs)
+        len_typeobject = p + 2*l + 15*p + l + 4*p + l + 9*p + l + 11*p
+        self.check_sizeof(class_newstyle, \
+                              len_typeobject + 42*p + 10*p + 3*p + 6*p)
         # string
         self.check_sizeof('', l + self.align(i + 1))
         self.check_sizeof('abc', l + self.align(i + 1) + 3)
