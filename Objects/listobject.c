@@ -2426,7 +2426,7 @@ list_sizeof(PyListObject *self)
 	Py_ssize_t res;
 
 	res = sizeof(PyListObject) + self->allocated * sizeof(void*);
-	return PyLong_FromLong(res);
+	return PyInt_FromSsize_t(res);
 }
 
 static PyObject *list_iter(PyObject *seq);

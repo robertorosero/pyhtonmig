@@ -413,7 +413,7 @@ always available.
 
    Return the size of an object in bytes. The object can be any type of
    object. All built-in objects will return correct results, but this
-   must not hold true for third-party extensions as it is implementation 
+   does not have to hold true for third-party extensions as it is implementation 
    specific.
 
    .. versionadded:: 2.6

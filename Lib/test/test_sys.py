@@ -402,7 +402,7 @@ class SizeofTest(unittest.TestCase):
         self.file.close()
         os.remove(test.test_support.TESTFN)
 
-    def check_sizeof(self, o, size, ):
+    def check_sizeof(self, o, size):
         result = sys.getsizeof(o)
         msg = 'wrong size for %s: got %d, expected %d' \
             % (type(o), result, size)
@@ -424,7 +424,7 @@ class SizeofTest(unittest.TestCase):
         self.assertTrue( (self.align(8) % self.p) == 0 )
         self.assertTrue( (self.align(9) % self.p) == 0 )
 
-    def test_standardobjects(self):
+    def test_standardtypes(self):
         i = self.i
         l = self.l
         p = self.p
@@ -493,11 +493,7 @@ class SizeofTest(unittest.TestCase):
         # slice
         self.check_sizeof(slice(0), h + 3*p)
 
-    def test_variable_size(self):
-        i = self.i
-        l = self.l
-        p = self.p
-        h = self.headersize + l
+        h += l
         # new-style class
         class class_newstyle(object):
             def method():
@@ -507,19 +503,9 @@ class SizeofTest(unittest.TestCase):
         len_typeobject = p + 2*l + 15*p + l + 4*p + l + 9*p + l + 11*p
         self.check_sizeof(class_newstyle, h + \
                               len_typeobject + 42*p + 10*p + 3*p + 6*p)
-        # string
-        self.check_sizeof('', h + l + self.align(i + 1))
-        self.check_sizeof('abc', h + l + self.align(i + 1) + 3)
-        # long
-        self.check_sizeof(0L, h + self.align(2))
-        self.check_sizeof(1L, h + self.align(2))
-        self.check_sizeof(-1L, h + self.align(2))
-        self.check_sizeof(32768L, h + self.align(2) + 2)
-        self.check_sizeof(32768L*32768L-1, h + self.align(2) + 2)
-        self.check_sizeof(32768L*32768L, h + self.align(2) + 4)
 
 
-    def test_special_types(self):
+    def test_specialtypes(self):
         i = self.i
         l = self.l
         p = self.p
@@ -531,6 +517,18 @@ class SizeofTest(unittest.TestCase):
         # list
         self.check_sizeof([], h + l + p + l)
         self.check_sizeof([1, 2, 3], h + l + p + l + 3*l)
+
+        h += l
+        # long
+        self.check_sizeof(0L, h + self.align(2))
+        self.check_sizeof(1L, h + self.align(2))
+        self.check_sizeof(-1L, h + self.align(2))
+        self.check_sizeof(32768L, h + self.align(2) + 2)
+        self.check_sizeof(32768L*32768L-1, h + self.align(2) + 2)
+        self.check_sizeof(32768L*32768L, h + self.align(2) + 4)
+        # string
+        self.check_sizeof('', h + l + self.align(i + 1))
+        self.check_sizeof('abc', h + l + self.align(i + 1) + 3)
 
 
 def test_main():

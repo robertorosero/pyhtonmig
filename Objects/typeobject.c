@@ -3409,12 +3409,12 @@ object_format(PyObject *self, PyObject *args)
 static PyObject *
 object_sizeof(PyObject *self, PyObject *args)
 {
-	Py_ssize_t res, size;
+	Py_ssize_t res, isize;
 
 	res = 0;
-	size = self->ob_type->tp_itemsize;
-	if (size > 0)
-		res = self->ob_type->ob_size * size;
+	isize = self->ob_type->tp_itemsize;
+	if (isize > 0)
+		res = self->ob_type->ob_size * isize;
 	res += self->ob_type->tp_basicsize;
 
 	return PyInt_FromSsize_t(res);	 
