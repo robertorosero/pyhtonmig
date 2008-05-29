@@ -2608,19 +2608,11 @@ type_subclasses(PyTypeObject *type, PyObject *args_ignored)
 	return list;
 }
 
-static PyObject *
-type_sizeof(PyObject *self, PyObject *args)
-{
-	return PyInt_FromSsize_t(self->ob_type->tp_basicsize);
-}
-
 static PyMethodDef type_methods[] = {
 	{"mro", (PyCFunction)mro_external, METH_NOARGS,
 	 PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
 	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
 	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
-	{"__sizeof__", type_sizeof, METH_NOARGS | METH_CLASS,
-         PyDoc_STR("__sizeof__() -> size of type in bytes")},
 	{0}
 };
 

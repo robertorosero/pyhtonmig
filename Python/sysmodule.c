@@ -642,19 +642,35 @@ sys_mdebug(PyObject *self, PyObject *args)
 static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args)
 {
-	/* work-around to deal with objects which inherit from type, .. */
-	if (args->ob_type == &PyType_Type) {
-		return PyObject_CallMethod((PyObject *)(args->ob_type), "__sizeof__", NULL);
+	static PyObject * str__sizeof__ = NULL;
+
+	/* Initialize static variable needed by _PyType_Lookup */
+	if (str__sizeof__ == NULL) {
+		str__sizeof__ = PyString_InternFromString("__sizeof__");
+		if (str__sizeof__ == NULL)
+			return NULL;
 	}
-	/* .. old-style classes,  */
-	else if (args->ob_type == &PyClass_Type) {
-		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
-	}
-	/* .. and instances of old-style classes */
-	else if (args->ob_type == &PyInstance_Type) {
+
+	/* Type objects */
+	if (PyType_Check(args)){
+		PyObject *method = _PyType_Lookup(Py_TYPE(args),
+						  str__sizeof__);
+		if (method == NULL) {
+			PyErr_Format(PyExc_TypeError,
+				     "Type %.100s doesn't define __sizeof__",
+				     Py_TYPE(args)->tp_name);
+			return NULL;
+		}
+		/* And call it, binding it to the value */
+		return PyObject_CallFunctionObjArgs(method, args, NULL);
+	} 
+	/* Instance of old-style classes */
+	else if(PyInstance_Check(args))
 		return PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
-	}
-	else 
+	/* Old-style class */
+	else if (PyClass_Check(args))
+		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
+	else
 		return PyObject_CallMethod(args, "__sizeof__", NULL);
 }
 
