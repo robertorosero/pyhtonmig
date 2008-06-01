@@ -1431,20 +1431,9 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
-        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE)) {
-            PyFutureFeatures* future;
-            struct symtable* st;
-
-            if (!PyAST_BuildSymbolInfo(mod, &future, &st, filename, flags)) {
-                if (!PyAST_Optimize(&mod, st, arena)) {
-                    PyObject_Free(future);
-                    PySymtable_Free(st);
-                    return NULL;
-                }
-                PyObject_Free(future);
-                PySymtable_Free(st);
-            }
-        }
+        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+            if (!PyAST_Optimize(&mod, arena))
+                return NULL;
 		return mod;
 	}
 	else {
@@ -1470,20 +1459,9 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
-        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE)) {
-            PyFutureFeatures* future;
-            struct symtable* st;
-
-            if (!PyAST_BuildSymbolInfo(mod, &future, &st, filename, flags)) {
-                if (!PyAST_Optimize(&mod, st, arena)) {
-                    PySymtable_Free(st);
-                    PyObject_Free(future);
-                    return NULL;
-                }
-                PySymtable_Free(st);
-                PyObject_Free(future);
-            }
-        }
+        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+            if (!PyAST_Optimize(&mod, arena))
+                return NULL;
 		return mod;
 	}
 	else {

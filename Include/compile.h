@@ -32,8 +32,6 @@ struct _mod; /* Declare the existence of this type */
 PyAPI_FUNC(PyCodeObject *) PyAST_Compile(struct _mod *, const char *,
 					PyCompilerFlags *, PyArena *);
 PyAPI_FUNC(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
-PyAPI_FUNC(int) PyAST_BuildSymbolInfo(struct _mod *, PyFutureFeatures**,
-                    struct symtable**, const char*, PyCompilerFlags*);
 
 #define ERR_LATE_FUTURE \
 "from __future__ imports must occur at the beginning of the file"

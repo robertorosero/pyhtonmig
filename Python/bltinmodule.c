@@ -6,7 +6,6 @@
 #include "node.h"
 #include "code.h"
 #include "eval.h"
-#include "symtable.h"
 #include "optimize.h"
 
 #include <ctype.h>
@@ -516,8 +515,6 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 		else {
 			PyArena *arena;
 			mod_ty mod;
-            struct symtable* st;
-            PyFutureFeatures* future;
 
 			arena = PyArena_New();
 			mod = PyAST_obj2mod(cmd, arena, mode);
@@ -525,15 +522,9 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 				PyArena_Free(arena);
 				return NULL;
 			}
-            if (!PyAST_BuildSymbolInfo(mod, &future, &st, filename, &cf)) {
-                PyArena_Free(arena);
-                return NULL;
-            }
             if (!(supplied_flags & PyCF_NO_OPTIMIZE)) {
-                if (!PyAST_Optimize(&mod, st, arena)) {
+                if (!PyAST_Optimize(&mod, arena)) {
                     PyArena_Free(arena);
-                    PySymtable_Free(st);
-                    PyObject_Free(future);
                     return NULL;
                 }
             }
