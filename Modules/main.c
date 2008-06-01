@@ -99,6 +99,7 @@ static char *usage_5 = "\
 PYTHONHOME   : alternate <prefix> directory (or <prefix>%c<exec_prefix>).\n\
                The default module search path uses %s.\n\
 PYTHONCASEOK : ignore case in 'import' statements (Windows).\n\
+PYTHONIOENCODING: Encoding[:errors] used for stdin/stdout/stderr.\n\
 ";
 
 
@@ -195,7 +196,7 @@ static int RunMainFromImporter(char *filename)
 {
 	PyObject *argv0 = NULL, *importer = NULL;
 
-	if ((argv0 = PyString_FromString(filename)) && 
+	if ((argv0 = PyBytes_FromString(filename)) && 
 	    (importer = PyImport_GetImporter(argv0)) &&
 	    (importer->ob_type != &PyNullImporter_Type))
 	{

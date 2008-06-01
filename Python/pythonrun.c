@@ -134,10 +134,19 @@ Py_InitializeEx(int install_sigs)
 	PyThreadState *tstate;
 	PyObject *bimod, *sysmod;
 	char *p;
-#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
-	char *codeset;
-	char *saved_locale;
+	char *icodeset; /* On Windows, input codeset may theoretically 
+			   differ from output codeset. */
+	char *codeset = NULL;
+	char *errors = NULL;
+	int free_codeset = 0;
+	int overridden = 0;
 	PyObject *sys_stream, *sys_isatty;
+#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
+	char *saved_locale, *loc_codeset;
+#endif
+#ifdef MS_WINDOWS
+	char ibuf[128];
+	char buf[128];
 #endif
 	extern void _Py_ReadyTypes(void);
 
@@ -171,7 +180,7 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyInt_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
-	if (!PyBytes_Init())
+	if (!PyByteArray_Init())
 		Py_FatalError("Py_Initialize: can't init bytearray");
 
 	_PyFloat_Init();
@@ -240,38 +249,75 @@ Py_InitializeEx(int install_sigs)
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
 
+	if ((p = Py_GETENV("PYTHONIOENCODING")) && *p != '\0') {
+		p = icodeset = codeset = strdup(p);
+		free_codeset = 1;
+		errors = strchr(p, ':');
+		if (errors) {
+			*errors = '\0';
+			errors++;
+		}
+		overridden = 1;
+	}
+
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
 	   user's preference, if the CODESET names a well-known
 	   Python codec, and Py_FileSystemDefaultEncoding isn't
 	   initialized by other means. Also set the encoding of
-	   stdin and stdout if these are terminals.  */
+	   stdin and stdout if these are terminals, unless overridden.  */
 
-	saved_locale = strdup(setlocale(LC_CTYPE, NULL));
-	setlocale(LC_CTYPE, "");
-	codeset = nl_langinfo(CODESET);
-	if (codeset && *codeset) {
-		PyObject *enc = PyCodec_Encoder(codeset);
-		if (enc) {
-			codeset = strdup(codeset);
-			Py_DECREF(enc);
-		} else {
-			codeset = NULL;
-			PyErr_Clear();
+	if (!overridden || !Py_FileSystemDefaultEncoding) {
+		saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+		setlocale(LC_CTYPE, "");
+		loc_codeset = nl_langinfo(CODESET);
+		if (loc_codeset && *loc_codeset) {
+			PyObject *enc = PyCodec_Encoder(loc_codeset);
+			if (enc) {
+				loc_codeset = strdup(loc_codeset);
+				Py_DECREF(enc);
+			} else {
+				loc_codeset = NULL;
+				PyErr_Clear();
+			}
+		} else
+			loc_codeset = NULL;
+		setlocale(LC_CTYPE, saved_locale);
+		free(saved_locale);
+
+		if (!overridden) {
+			codeset = icodeset = loc_codeset;
+			free_codeset = 1;
 		}
-	} else
-		codeset = NULL;
-	setlocale(LC_CTYPE, saved_locale);
-	free(saved_locale);
+
+		/* Initialize Py_FileSystemDefaultEncoding from
+		   locale even if PYTHONIOENCODING is set. */
+		if (!Py_FileSystemDefaultEncoding) {
+			Py_FileSystemDefaultEncoding = loc_codeset;
+			if (!overridden)
+				free_codeset = 0;
+		}
+	}
+#endif
+
+#ifdef MS_WINDOWS
+	if (!overridden) {
+		icodeset = ibuf;
+		codeset = buf;
+		sprintf(ibuf, "cp%d", GetConsoleCP());
+		sprintf(buf, "cp%d", GetConsoleOutputCP());
+	}
+#endif
 
 	if (codeset) {
 		sys_stream = PySys_GetObject("stdin");
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if ((overridden ||
+		     (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, icodeset, errors))
 				Py_FatalError("Cannot set codeset of stdin");
 		}
 		Py_XDECREF(sys_isatty);
@@ -280,9 +326,10 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if ((overridden || 
+		     (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, codeset, errors))
 				Py_FatalError("Cannot set codeset of stdout");
 		}
 		Py_XDECREF(sys_isatty);
@@ -291,19 +338,17 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if((overridden || 
+		    (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, codeset, errors))
 				Py_FatalError("Cannot set codeset of stderr");
 		}
 		Py_XDECREF(sys_isatty);
 
-		if (!Py_FileSystemDefaultEncoding)
-			Py_FileSystemDefaultEncoding = codeset;
-		else
+		if (free_codeset)
 			free(codeset);
 	}
-#endif
 }
 
 void
@@ -452,8 +497,8 @@ Py_Finalize(void)
 	PyTuple_Fini();
 	PyList_Fini();
 	PySet_Fini();
-	PyString_Fini();
 	PyBytes_Fini();
+	PyByteArray_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
 	PyDict_Fini();
@@ -701,12 +746,12 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
 	}
 	v = PySys_GetObject("ps1");
 	if (v == NULL) {
-		PySys_SetObject("ps1", v = PyString_FromString(">>> "));
+		PySys_SetObject("ps1", v = PyBytes_FromString(">>> "));
 		Py_XDECREF(v);
 	}
 	v = PySys_GetObject("ps2");
 	if (v == NULL) {
-		PySys_SetObject("ps2", v = PyString_FromString("... "));
+		PySys_SetObject("ps2", v = PyBytes_FromString("... "));
 		Py_XDECREF(v);
 	}
 	for (;;) {
@@ -753,16 +798,16 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 		v = PyObject_Str(v);
 		if (v == NULL)
 			PyErr_Clear();
-		else if (PyString_Check(v))
-			ps1 = PyString_AsString(v);
+		else if (PyBytes_Check(v))
+			ps1 = PyBytes_AsString(v);
 	}
 	w = PySys_GetObject("ps2");
 	if (w != NULL) {
 		w = PyObject_Str(w);
 		if (w == NULL)
 			PyErr_Clear();
-		else if (PyString_Check(w))
-			ps2 = PyString_AsString(w);
+		else if (PyBytes_Check(w))
+			ps2 = PyBytes_AsString(w);
 	}
 	arena = PyArena_New();
 	if (arena == NULL) {
@@ -855,7 +900,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 		return -1;
 	d = PyModule_GetDict(m);
 	if (PyDict_GetItemString(d, "__file__") == NULL) {
-		PyObject *f = PyString_FromString(filename);
+		PyObject *f = PyBytes_FromString(filename);
 		if (f == NULL)
 			return -1;
 		if (PyDict_SetItemString(d, "__file__", f) < 0) {
@@ -939,7 +984,7 @@ parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
 		goto finally;
 	if (v == Py_None)
 		*filename = NULL;
-	else if (! (*filename = PyString_AsString(v)))
+	else if (! (*filename = PyBytes_AsString(v)))
 		goto finally;
 
 	Py_DECREF(v);
@@ -971,7 +1016,7 @@ parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
 		goto finally;
 	if (v == Py_None)
 		*text = NULL;
-	else if (! (*text = PyString_AsString(v)))
+	else if (! (*text = PyBytes_AsString(v)))
 		goto finally;
 	Py_DECREF(v);
 	return 1;
@@ -1194,7 +1239,7 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 			if (moduleName == NULL)
 				err = PyFile_WriteString("<unknown>", f);
 			else {
-				char* modstr = PyString_AsString(moduleName);
+				char* modstr = PyBytes_AsString(moduleName);
 				if (modstr && strcmp(modstr, "exceptions"))
 				{
 					err = PyFile_WriteString(modstr, f);
@@ -1218,8 +1263,8 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 			*/
 			if (s == NULL)
 				err = -1;
-			else if (!PyString_Check(s) ||
-				 PyString_GET_SIZE(s) != 0)
+			else if (!PyBytes_Check(s) ||
+				 PyBytes_GET_SIZE(s) != 0)
 				err = PyFile_WriteString(": ", f);
 			if (err == 0)
 			  err = PyFile_WriteObject(s, f, Py_PRINT_RAW);
@@ -1566,7 +1611,7 @@ err_input(perrdetail *err)
 		if (value != NULL) {
 			u = PyObject_Str(value);
 			if (u != NULL) {
-				msg = PyString_AsString(u);
+				msg = PyBytes_AsString(u);
 			}
 		}
 		if (msg == NULL)

@@ -12,6 +12,8 @@ What's New in Python 2.6 beta 1?
 Core and Builtins
 -----------------
 
+- New environment variable PYTHONIOENCODING.
+
 - Patch #2488: Add sys.maxsize.
 
 - Issue #2353: file.xreadlines() now emits a Py3k warning.
@@ -35,6 +37,9 @@ Core and Builtins
 
 Extension Modules
 -----------------
+
+- The heapq module does comparisons using LT instead of LE.  This
+  makes its implementation match that used by list.sort().
 
 - Issue #2819: add full-precision summation function to math module,
   based on Hettinger's ASPN Python Cookbook recipe.
@@ -62,6 +67,21 @@ Extension Modules
 
 Library
 -------
+
+- Issue #3011: locale module alias table was updated to the latest version
+  from the X.org locale.alias file
+
+- Issue #1797 (partial fix): ctypes NULL function pointers have a
+  False boolean value now.
+
+- Issue #2985: Allow 64-bit integer responses (``<i8>``) in XMLRPC
+  transfers.
+
+- Issue #2877: The UserString.MutableString class has been removed in
+  Python 3.0.
+
+- Do not close external file objects passed to tarfile.open(mode='w:bz2')
+  when the TarFile is closed.
 
 - Issue #2959: For consistency with other file-like objects, gzip's
   GzipFile.close() can now be called multiple times without raising
@@ -233,6 +253,17 @@ Build
 
 - ``Lib/lib-old`` is now added to sys.path.
 
+C API
+-----
+
+- Add ``PyType_Modified()`` as a public API to clear the type cache.
+
+- The PyBytes functions have been renamed to PyByteArray.
+
+- The PyString functions have been renamed to PyBytes. A batch of
+  defines were added so that the linker still sees the original
+  PyString names.
+
 
 What's New in Python 2.6 alpha 3?
 =================================
@@ -400,8 +431,7 @@ C API
   which provide the functions through their libm. The files also
   contains several helpers and constants for math.
 
-- Added a new convenience function, PyErr_WarnPy3k, for issuing Py3k
-  warnings.
+- Added a new convenience macro, PyErr_WarnPy3k, for issuing Py3k warnings.
 
 
 What's New in Python 2.6 alpha 2?

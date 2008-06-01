@@ -207,15 +207,32 @@ class TestStdlibRemovals(unittest.TestCase):
         for path_mod in ("ntpath", "macpath", "os2emxpath", "posixpath"):
             mod = __import__(path_mod)
             with catch_warning() as w:
-                # Since os3exmpath just imports it from ntpath
-                warnings.simplefilter("always")
-                mod.walk(".", dumbo, None)
+                mod.walk("crashers", dumbo, None)
             self.assertEquals(str(w.message), msg)
+
+    def test_commands_members(self):
+        import commands
+        members = {"mk2arg" : 2, "mkarg" : 1, "getstatus" : 1}
+        for name, arg_count in members.items():
+            with catch_warning(record=False):
+                warnings.filterwarnings("error")
+                func = getattr(commands, name)
+                self.assertRaises(DeprecationWarning, func, *([None]*arg_count))
+
+    def test_mutablestring_removal(self):
+        # UserString.MutableString has been removed in 3.0.
+        import UserString
+        with catch_warning(record=False):
+            warnings.filterwarnings("error", ".*MutableString",
+                                    DeprecationWarning)
+            self.assertRaises(DeprecationWarning, UserString.MutableString)
 
 
 def test_main():
-    run_unittest(TestPy3KWarnings,
-                 TestStdlibRemovals)
+    with catch_warning(record=True):
+        warnings.simplefilter("always")
+        run_unittest(TestPy3KWarnings,
+                     TestStdlibRemovals)
 
 if __name__ == '__main__':
     test_main()

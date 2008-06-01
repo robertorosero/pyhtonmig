@@ -303,6 +303,7 @@ OBJECT_OBJS=	\
 		Objects/boolobject.o \
 		Objects/bufferobject.o \
 		Objects/bytes_methods.o \
+		Objects/bytearrayobject.o \
 		Objects/bytesobject.o \
 		Objects/cellobject.o \
 		Objects/classobject.o \
@@ -329,7 +330,6 @@ OBJECT_OBJS=	\
 		Objects/rangeobject.o \
                 Objects/setobject.o \
 		Objects/sliceobject.o \
-		Objects/stringobject.o \
 		Objects/structseq.o \
 		Objects/tupleobject.o \
 		Objects/typeobject.o \
@@ -585,6 +585,7 @@ PYTHON_HEADERS= \
 		Include/bitset.h \
 		Include/boolobject.h \
 		Include/bytes_methods.h \
+		Include/bytearrayobject.h \
 		Include/bytesobject.h \
 		Include/bufferobject.h \
 		Include/cellobject.h \
