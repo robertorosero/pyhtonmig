@@ -180,6 +180,31 @@ static int compiler_with(struct compiler *, stmt_ty);
 static PyCodeObject *assemble(struct compiler *, int addNone);
 static PyObject *__doc__;
 
+int
+PyAST_BuildSymbolInfo(mod_ty mod, PyFutureFeatures** f, struct symtable** st,
+                        const char* filename, PyCompilerFlags* cf)
+{
+    int merged;
+
+    *f = PyFuture_FromAST(mod, filename);
+    if (*f == NULL)
+        return 0;
+
+    merged = (*f)->ff_features | (cf ? cf->cf_flags : 0);
+    (*f)->ff_features = merged;
+
+    *st = PySymtable_Build(mod, filename, *f);
+    if (*st == NULL) {
+        PyObject_Free(*st);
+        return 0;
+    }
+
+    if (cf != NULL)
+        cf->cf_flags = merged;
+
+    return 1;
+}
+
 PyObject *
 _Py_Mangle(PyObject *privateobj, PyObject *ident)
 {
@@ -247,7 +272,6 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 	struct compiler c;
 	PyCodeObject *co = NULL;
 	PyCompilerFlags local_flags;
-	int merged;
 
 	if (!__doc__) {
 		__doc__ = PyString_InternFromString("__doc__");
@@ -259,25 +283,13 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 		return NULL;
 	c.c_filename = filename;
 	c.c_arena = arena;
-	c.c_future = PyFuture_FromAST(mod, filename);
-	if (c.c_future == NULL)
-		goto finally;
 	if (!flags) {
 		local_flags.cf_flags = 0;
 		flags = &local_flags;
 	}
-	merged = c.c_future->ff_features | flags->cf_flags;
-	c.c_future->ff_features = merged;
-	flags->cf_flags = merged;
-	c.c_flags = flags;
-	c.c_nestlevel = 0;
-
-	c.c_st = PySymtable_Build(mod, filename, c.c_future);
-	if (c.c_st == NULL) {
-		if (!PyErr_Occurred())
-			PyErr_SetString(PyExc_SystemError, "no symtable");
-		goto finally;
-	}
+    if (!PyAST_BuildSymbolInfo(mod, &c.c_future, &c.c_st, filename, flags))
+        goto finally;
+    c.c_flags = flags;
 
 	/* XXX initialize to NULL for now, need to handle */
 	c.c_encoding = NULL;
@@ -300,8 +312,15 @@ PyNode_Compile(struct _node *n, const char *filename)
 		return NULL;
 	mod = PyAST_FromNode(n, NULL, filename, arena);
 	if (mod != NULL) {
-        if (PyAST_Optimize(&mod, arena)) {
-            co = PyAST_Compile(mod, filename, NULL, arena);
+        PyFutureFeatures* future;
+        struct symtable* st;
+
+        if (PyAST_BuildSymbolInfo(mod, &future, &st, filename, NULL)) {
+            if (PyAST_Optimize(&mod, st, arena)) {
+                co = PyAST_Compile(mod, filename, NULL, arena);
+            }
+            PyObject_Free(future);
+            PySymtable_Free(st);
         }
     }
 	PyArena_Free(arena);
@@ -311,10 +330,10 @@ PyNode_Compile(struct _node *n, const char *filename)
 static void
 compiler_free(struct compiler *c)
 {
-	if (c->c_st)
-		PySymtable_Free(c->c_st);
-	if (c->c_future)
-		PyObject_Free(c->c_future);
+    if (c->c_st != NULL)
+        PySymtable_Free(c->c_st);
+    if (c->c_future)
+        PyObject_Free(c->c_future);
 	Py_DECREF(c->c_stack);
 }
 
