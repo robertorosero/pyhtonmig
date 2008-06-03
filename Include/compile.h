@@ -27,10 +27,18 @@ typedef struct {
 #define FUTURE_PRINT_FUNCTION "print_function"
 #define FUTURE_UNICODE_LITERALS "unicode_literals"
 
+typedef struct {
+    const char*       ci_filename;
+    PyFutureFeatures* ci_future;
+    struct symtable*  ci_symtable;
+    PyCompilerFlags*  ci_flags;
+} PyCompilerInfo;
 
 struct _mod; /* Declare the existence of this type */
 PyAPI_FUNC(PyCodeObject *) PyAST_Compile(struct _mod *, const char *,
 					PyCompilerFlags *, PyArena *);
+PyAPI_FUNC(PyCodeObject *) PyAST_CompileEx(struct _mod *,
+                    PyCompilerInfo *, PyArena *);
 PyAPI_FUNC(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 
 #define ERR_LATE_FUTURE \

@@ -241,13 +241,13 @@ compiler_init(struct compiler *c)
 }
 
 PyCodeObject *
-PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
-	      PyArena *arena)
+PyAST_CompileEx(mod_ty mod, PyCompilerInfo* info, PyArena* arena)
 {
 	struct compiler c;
 	PyCodeObject *co = NULL;
 	PyCompilerFlags local_flags;
 	int merged;
+    PyCompilerFlags* flags = info->ci_flags;
 
 	if (!__doc__) {
 		__doc__ = PyBytes_InternFromString("__doc__");
@@ -257,9 +257,9 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 
 	if (!compiler_init(&c))
 		return NULL;
-	c.c_filename = filename;
+	c.c_filename = info->ci_filename;
 	c.c_arena = arena;
-	c.c_future = PyFuture_FromAST(mod, filename);
+	c.c_future = info->ci_future;
 	if (c.c_future == NULL)
 		goto finally;
 	if (!flags) {
@@ -272,7 +272,7 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 	c.c_flags = flags;
 	c.c_nestlevel = 0;
 
-	c.c_st = PySymtable_Build(mod, filename, c.c_future);
+	c.c_st = PySymtable_Build(mod, info->ci_filename, c.c_future);
 	if (c.c_st == NULL) {
 		if (!PyErr_Occurred())
 			PyErr_SetString(PyExc_SystemError, "no symtable");
@@ -288,6 +288,32 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 	compiler_free(&c);
 	assert(co || PyErr_Occurred());
 	return co;
+}
+
+PyCodeObject *
+PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
+	      PyArena *arena)
+{
+    PyCompilerInfo info;
+    PyCodeObject* result;
+
+    info.ci_filename = filename;
+    info.ci_flags    = flags;
+    info.ci_future   = PyFuture_FromAST(mod, filename);
+    if (info.ci_future == NULL)
+        return NULL;
+    info.ci_symtable = PySymtable_Build(mod, filename, info.ci_future);
+    if (info.ci_symtable == NULL) {
+        PyObject_Free(info.ci_future);
+        return NULL;
+    }
+
+    result = PyAST_CompileEx(mod, &info, arena);
+
+    PyObject_Free(info.ci_future);
+    PySymtable_Free(info.ci_symtable);
+
+    return result;
 }
 
 PyCodeObject *
@@ -311,10 +337,6 @@ PyNode_Compile(struct _node *n, const char *filename)
 static void
 compiler_free(struct compiler *c)
 {
-	if (c->c_st)
-		PySymtable_Free(c->c_st);
-	if (c->c_future)
-		PyObject_Free(c->c_future);
 	Py_DECREF(c->c_stack);
 }
 
