@@ -405,16 +405,149 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(out, '?')
 
 
+class SizeOfHelper(object):
+    "Helper class for sizeof tests"
+
+    def __init__(self, default_n=None):
+        """default_n can be used to set the default alignment offset.
+        If it is not set, n must be provided on every call of sizeof()."""
+        self.default_n = default_n
+
+    def align(self, value, n):
+        """ Align value to multiple of n."""
+        mod = value % n
+        if mod != 0:
+            return value - mod + n
+        else:
+            return value
+
+    def sizeof(self, members, n=None):
+        """ Calculate size of a struct in bytes, i.e. simulate sizeof().
+        members is the ordered list of members of the struct. n is the
+        offset used for the alignment. If n is not set in the constructor
+        it must be set here.
+        This function is recursive."""
+        res = 0
+        if n == None:
+            n = self.default_n
+        if n <=0:
+            raise ValueError("n has to be larger than 0")
+        if len(members) == 1:
+            res = self.align(members[0], n)
+            return res
+        else:
+            if (members[0] % n) == 0:
+                # perfect match: add first member and continue with the rest
+                res =  members[0] + self.sizeof(members[1:len(members)], n)
+                return res
+            else:
+                # space left, check if next member would still fit
+                index = 0
+                sum = members[index]
+                index += 1
+                while (index < len(members)) and ((sum + members[index] <= n)):
+                    sum +=  members[index]
+                    index += 1
+                res = self.align(sum, n)
+                if index != len(members):
+                    res += self.sizeof(members[index:len(members)], n)
+                return res
+
+class SizeOfHelperTest(unittest.TestCase):
+
+    def setUp(self):
+        self.sim = SizeOfHelper()
+
+    def test_align(self):
+        n = 8
+        self.assertEqual(self.sim.align(0, n) % n, 0)
+        self.assertEqual(self.sim.align(1, n) % n, 0)
+        self.assertEqual(self.sim.align(3, n) % n, 0)
+        self.assertEqual(self.sim.align(4, n) % n, 0)
+        self.assertEqual(self.sim.align(7, n) % n, 0)
+        self.assertEqual(self.sim.align(8, n) % n, 0)
+        self.assertEqual(self.sim.align(9, n) % n, 0)
+
+    def test_zero(self):
+        members = [0]
+        self.assertRaises(ValueError, self.sim.sizeof, members, max(members))
+
+    def test_char(self):
+        members = [1]
+        self.assertEqual(self.sim.sizeof(members, 1), 1)
+
+    def test_xchar(self):
+        import random
+        rand = random.randint(2,300)
+        members = [1] * rand
+        self.assertEqual(self.sim.sizeof(members, 1), rand*1)
+
+    def test_membermerge(self):
+        # test the merge of equal size members into one, eg [4, 4, 2]=[2*4, 2]
+        members = [2*4, 4]
+        self.assertEqual(self.sim.sizeof(members, 4), 12)
+
+    def init_types(self, i, l, p):
+        """Initialize types for testing, whereas i=int, l=long, and p=pointer.
+        The dict consists of a descriptive name as key and two list items. The
+        first is the ordered list of the type members, the second the expected
+        value for sizeof. The expected value has to be set in the caller
+        afterwards."""
+        types = {"3ip": [[i, i, i, p ], -1],\
+                 "ip": [[i, p], -1],\
+                 "pplpl": [[2*p, l, p, l], -1]}
+        return types
+
+    def test_ILP32(self):
+        i = l = p = 4
+        types = self.init_types(i, l, p)
+        types["3ip"][1] = 16
+        types["ip"][1] = 8
+        types["pplpl"][1] = 20
+        for v in types.values():
+            self.assertEqual(self.sim.sizeof(v[0], p), v[1])
+
+    def test_LP64(self):
+        i = 4
+        l = p = 8
+        types = self.init_types(i, l, p)
+        types["3ip"][1] = 24
+        types["ip"][1] = 16
+        types["pplpl"][1] = 40
+        for v in types.values():
+            self.assertEqual(self.sim.sizeof(v[0], p), v[1])
+
+    def test_LLP64(self):
+        i = l = 4
+        p = 8
+        types = self.init_types(i, l, p)
+        types["3ip"][1] = 24
+        types["ip"][1] = 16
+        types["pplpl"][1] = 40
+        for v in types.values():
+            self.assertEqual(self.sim.sizeof(v[0], p), v[1])
+
+    def test_ILP64(self):
+        i = l = p = 8
+        types = self.init_types(i, l, p)
+        types["3ip"][1] = 32
+        types["ip"][1] = 16
+        types["pplpl"][1] = 40
+        for v in types.values():
+            self.assertEqual(self.sim.sizeof(v[0], p), v[1])
+
 class SizeofTest(unittest.TestCase):
 
     def setUp(self):
         import struct
+        # determine size of basic types
         self.i = len(struct.pack('i', 0))
         self.l = len(struct.pack('l', 0))
         self.p = len(struct.pack('P', 0))
-        self.headersize = self.l + self.p
+        self.header = [self.l, self.p]
         if hasattr(sys, "gettotalrefcount"):
-            self.headersize += 2 * self.p
+            self.header.extend([2*self.p])
+        self.helper = SizeOfHelper(default_n=self.p)
         self.file = open(test.test_support.TESTFN, 'wb')
 
     def tearDown(self):
@@ -427,64 +560,50 @@ class SizeofTest(unittest.TestCase):
             % (type(o), result, size)
         self.assertEqual(result, size, msg)
 
-    def align(self, value):
-        mod = value % self.p
-        if mod != 0:
-            return value - mod + self.p
-        else:
-            return value
-
-    def test_align(self):
-        self.assertEqual(self.align(0) % self.p, 0)
-        self.assertEqual(self.align(1) % self.p, 0)
-        self.assertEqual(self.align(3) % self.p, 0)
-        self.assertEqual(self.align(4) % self.p, 0)
-        self.assertEqual(self.align(7) % self.p, 0)
-        self.assertEqual(self.align(8) % self.p, 0)
-        self.assertEqual(self.align(9) % self.p, 0)
-
     def test_standardtypes(self):
         i = self.i
         l = self.l
         p = self.p
-        h = self.headersize
+        h = self.header
+        size = self.helper.sizeof
+
         # bool
-        self.check_sizeof(True, h + l)
+        self.check_sizeof(True, size(h + [l]))
         # buffer
-        self.check_sizeof(buffer(''), h + 2*p + 2*l + self.align(i) +l)
+        self.check_sizeof(buffer(''), size(h + [2*p, 2*l, i, l]))
         # cell
         def get_cell():
             x = 42
             def inner():
                 return x
             return inner
-        self.check_sizeof(get_cell().func_closure[0], h + p)
+        self.check_sizeof(get_cell().func_closure[0], size(h + [p]))
         # old-style class
         class class_oldstyle():
             def method():
                 pass
-        self.check_sizeof(class_oldstyle, h + 6*p)
+        self.check_sizeof(class_oldstyle, size(h + [6*p]))
         # instance
-        self.check_sizeof(class_oldstyle(), h + 3*p)
+        self.check_sizeof(class_oldstyle(), size(h + [3*p]))
         # method
-        self.check_sizeof(class_oldstyle().method, h + 4*p)
+        self.check_sizeof(class_oldstyle().method, size(h + [4*p]))
         # code
-        self.check_sizeof(get_cell().func_code, h + self.align(4*i) + 8*p +\
-                            self.align(i) + 2*p)
+        self.check_sizeof(get_cell().func_code, size(h +\
+                            [4*i, 8*p, i, 2*p]))
         # complex
-        self.check_sizeof(complex(0,1), h + 2*8)
+        self.check_sizeof(complex(0,1), size(h + [2*8]))
         # enumerate
-        self.check_sizeof(enumerate([]), h + l + 3*p)
+        self.check_sizeof(enumerate([]), size(h + [l, 3*p]))
         # reverse
-        self.check_sizeof(reversed(''), h + l + p )
+        self.check_sizeof(reversed(''), size(h + [l, p]))
         # file
-        self.check_sizeof(self.file, h + 4*p + self.align(2*i) + 4*p +\
-                            self.align(3*i) + 3*p + self.align(i))
+        self.check_sizeof(self.file, size(h + [4*p, 2*i, 4*p,\
+                            3*i, 3*p, i]))
         # float
-        self.check_sizeof(float(0), h + 8)
+        self.check_sizeof(float(0), size(h + [8]))
         # function
         def func(): pass
-        self.check_sizeof(func, h + 9 * l)
+        self.check_sizeof(func, size(h + [9*l]))
         class c():
             @staticmethod
             def foo():
@@ -493,63 +612,65 @@ class SizeofTest(unittest.TestCase):
             def bar(cls):
                 pass
             # staticmethod
-            self.check_sizeof(foo, h + l)
+            self.check_sizeof(foo, size(h + [l]))
             # classmethod
-            self.check_sizeof(bar, h + l)
+            self.check_sizeof(bar, size(h + [l]))
         # generator
         def get_gen(): yield 1
-        self.check_sizeof(get_gen(), h + p + self.align(i) + 2*p)
+        self.check_sizeof(get_gen(), size(h + [p, i, 2*p]))
         # integer
-        self.check_sizeof(1, h + l)
+        self.check_sizeof(1, size(h + [l]))
         # builtin_function_or_method
-        self.check_sizeof(abs, h + 3*p)
+        self.check_sizeof(abs, size(h + [3*p]))
         # module
-        self.check_sizeof(unittest, h + p)
+        self.check_sizeof(unittest, size(h + [p]))
         # xrange
-        self.check_sizeof(xrange(1), h + 3*p)
+        self.check_sizeof(xrange(1), size(h + [3*p]))
         # slice
-        self.check_sizeof(slice(0), h + 3*p)
+        self.check_sizeof(slice(0), size(h + [3*p]))
 
-        h += l
+        h.append(l)
         # new-style class
         class class_newstyle(object):
             def method():
                 pass
         # type (PyTypeObject + PyNumberMethods +  PyMappingMethods +
         #       PySequenceMethods +  PyBufferProcs)
-        len_typeobject = p + 2*l + 15*p + l + 4*p + l + 9*p + l + 11*p
-        self.check_sizeof(class_newstyle,
-                          h + len_typeobject + 42*p + 10*p + 3*p + 6*p)
-
+        typeobject_members = [p, 2*l, 15*p, l, 4*p, l, 9*p, l, 11*p]
+        self.check_sizeof(class_newstyle, size(h + typeobject_members +\
+                              [42*p, 10*p, 3*p, 6*p]))
 
     def test_specialtypes(self):
         i = self.i
         l = self.l
         p = self.p
-        h = self.headersize
-        # dict
-        self.check_sizeof({}, h + 3*l + 3*p + 8*(l + 2*p))
-        longdict = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
-        self.check_sizeof(longdict, h + 3*l + 3*p + 8*(l + 2*p) + 16*(l + 2*p))
-        # list
-        self.check_sizeof([], h + l + p + l)
-        self.check_sizeof([1, 2, 3], h + l + p + l + 3*l)
+        h = self.header
+        size = self.helper.sizeof
 
-        h += l
+        # dict
+        self.check_sizeof({}, size(h + [3*l, 3*p, 8*size([l, 2*p])]))
+        longdict = {1:1, 2:2, 3:3, 4:4, 5:5, 6:6, 7:7, 8:8}
+        self.check_sizeof(longdict, size(h + [3*l, 3*p, \
+                                     8*size([l, 2*p]), 16*size([l, 2*p])]))
+        # list
+        self.check_sizeof([], size(h + [l, p, l]))
+        self.check_sizeof([1, 2, 3], size(h + [l, p, l, 3*l]))
+
+        h.append(l)
         # long
-        self.check_sizeof(0L, h + self.align(2))
-        self.check_sizeof(1L, h + self.align(2))
-        self.check_sizeof(-1L, h + self.align(2))
-        self.check_sizeof(32768L, h + self.align(2) + 2)
-        self.check_sizeof(32768L*32768L-1, h + self.align(2) + 2)
-        self.check_sizeof(32768L*32768L, h + self.align(2) + 4)
+        self.check_sizeof(0L, size(h + [2]))
+        self.check_sizeof(1L, size(h + [2]))
+        self.check_sizeof(-1L, size(h + [2]))
+        self.check_sizeof(32768L, size(h + [2]) + 2)
+        self.check_sizeof(32768L*32768L-1, size(h + [2]) +2)
+        self.check_sizeof(32768L*32768L, size(h + [2]) + 4)
         # string
-        self.check_sizeof('', h + l + self.align(i + 1))
-        self.check_sizeof('abc', h + l + self.align(i + 1) + 3)
+        self.check_sizeof('', size(h + [l, i + 1]))
+        self.check_sizeof('abc', size(h + [l, i + 1]) + 3)
 
 
 def test_main():
-    test_classes = (SysModuleTest, SizeofTest)
+    test_classes = (SysModuleTest, SizeOfHelperTest, SizeofTest)
 
     test.test_support.run_unittest(*test_classes)
 
