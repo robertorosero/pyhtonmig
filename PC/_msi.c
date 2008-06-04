@@ -35,7 +35,7 @@ uuidcreate(PyObject* obj, PyObject*args)
 	return NULL;
     }
 
-    oresult = PyString_FromString(cresult);
+    oresult = PyBytes_FromString(cresult);
     RpcStringFree(&cresult);
     return oresult;
 
@@ -136,14 +136,14 @@ static FNFCIGETNEXTCABINET(cb_getnextcabinet)
 	PyObject *result = PyObject_CallMethod(pv, "getnextcabinet", "i", pccab->iCab);
 	if (result == NULL)
 	    return -1;
-	if (!PyString_Check(result)) {
+	if (!PyBytes_Check(result)) {
 	    PyErr_Format(PyExc_TypeError, 
 		"Incorrect return type %s from getnextcabinet",
 		result->ob_type->tp_name);
 	    Py_DECREF(result);
 	    return FALSE;
 	}
-	strncpy(pccab->szCab, PyString_AsString(result), sizeof(pccab->szCab));
+	strncpy(pccab->szCab, PyBytes_AsString(result), sizeof(pccab->szCab));
 	return TRUE;
     }
     return FALSE;
@@ -339,6 +339,49 @@ record_getfieldcount(msiobj* record, PyObject* args)
 }
 
 static PyObject*
+record_getinteger(msiobj* record, PyObject* args)
+{
+    unsigned int field;
+    int status;
+    
+    if (!PyArg_ParseTuple(args, "I:GetInteger", &field))
+        return NULL;
+    status = MsiRecordGetInteger(record->h, field);
+    if (status == MSI_NULL_INTEGER){
+        PyErr_SetString(MSIError, "could not convert record field to integer");
+        return NULL;
+    }
+    return PyInt_FromLong((long) status);
+}
+
+static PyObject*
+record_getstring(msiobj* record, PyObject* args)
+{
+    unsigned int field;
+    unsigned int status;
+    char buf[2000];
+    char *res = buf;
+    DWORD size = sizeof(buf);
+    PyObject* string;
+    
+    if (!PyArg_ParseTuple(args, "I:GetString", &field))
+        return NULL;
+    status = MsiRecordGetString(record->h, field, res, &size);
+    if (status == ERROR_MORE_DATA) {
+        res = (char*) malloc(size + 1);
+        if (res == NULL)
+            return PyErr_NoMemory();
+        status = MsiRecordGetString(record->h, field, res, &size);
+    }
+    if (status != ERROR_SUCCESS)
+        return msierror((int) status);
+    string = PyString_FromString(res);
+    if (buf != res)
+        free(res);
+    return string;
+}
+
+static PyObject*
 record_cleardata(msiobj* record, PyObject *args)
 {
     int status = MsiRecordClearData(record->h);
@@ -405,6 +448,10 @@ record_setinteger(msiobj* record, PyObject *args)
 static PyMethodDef record_methods[] = {
     { "GetFieldCount", (PyCFunction)record_getfieldcount, METH_NOARGS, 
 	PyDoc_STR("GetFieldCount() -> int\nWraps MsiRecordGetFieldCount")},
+    { "GetInteger", (PyCFunction)record_getinteger, METH_VARARGS,
+    PyDoc_STR("GetInteger(field) -> int\nWraps MsiRecordGetInteger")},
+    { "GetString", (PyCFunction)record_getstring, METH_VARARGS,
+    PyDoc_STR("GetString(field) -> string\nWraps MsiRecordGetString")},
     { "SetString", (PyCFunction)record_setstring, METH_VARARGS, 
 	PyDoc_STR("SetString(field,str) -> None\nWraps MsiRecordSetString")},
     { "SetStream", (PyCFunction)record_setstream, METH_VARARGS, 
@@ -507,7 +554,7 @@ summary_getproperty(msiobj* si, PyObject *args)
 	    PyErr_SetString(PyExc_NotImplementedError, "FILETIME result");
 	    return NULL;
 	case VT_LPSTR:
-	    result = PyString_FromStringAndSize(sval, ssize);
+	    result = PyBytes_FromStringAndSize(sval, ssize);
 	    if (sval != sbuf)
 		free(sval);
 	    return result;
@@ -539,9 +586,9 @@ summary_setproperty(msiobj* si, PyObject *args)
     if (!PyArg_ParseTuple(args, "iO:SetProperty", &field, &data))
 	return NULL;
 
-    if (PyString_Check(data)) {
+    if (PyBytes_Check(data)) {
 	status = MsiSummaryInfoSetProperty(si->h, field, VT_LPSTR,
-	    0, NULL, PyString_AsString(data));
+	    0, NULL, PyBytes_AsString(data));
     } else if (PyInt_Check(data)) {
 	status = MsiSummaryInfoSetProperty(si->h, field, VT_I4,
 	    PyInt_AsLong(data), NULL, NULL);

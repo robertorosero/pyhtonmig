@@ -385,6 +385,25 @@ class SysModuleTest(unittest.TestCase):
 ##        self.assert_(r[0][2] > 100, r[0][2])
 ##        self.assert_(r[1][2] > 100, r[1][2])
 
+    def test_ioencoding(self):
+        import subprocess,os
+        env = dict(os.environ)
+
+        # Test character: cent sign, encoded as 0x4A (ASCII J) in CP424,
+        # not representable in ASCII.
+
+        env["PYTHONIOENCODING"] = "cp424"
+        p = subprocess.Popen([sys.executable, "-c", 'print unichr(0xa2)'],
+                             stdout = subprocess.PIPE, env=env)
+        out = p.stdout.read().strip()
+        self.assertEqual(out, unichr(0xa2).encode("cp424"))
+
+        env["PYTHONIOENCODING"] = "ascii:replace"
+        p = subprocess.Popen([sys.executable, "-c", 'print unichr(0xa2)'],
+                             stdout = subprocess.PIPE, env=env)
+        out = p.stdout.read().strip()
+        self.assertEqual(out, '?')
+
 
 class SizeofTest(unittest.TestCase):
 
@@ -400,7 +419,7 @@ class SizeofTest(unittest.TestCase):
 
     def tearDown(self):
         self.file.close()
-        os.remove(test.test_support.TESTFN)
+        test.test_support.unlink(test.test_support.TESTFN)
 
     def check_sizeof(self, o, size):
         result = sys.getsizeof(o)
@@ -416,13 +435,13 @@ class SizeofTest(unittest.TestCase):
             return value
 
     def test_align(self):
-        self.assertTrue( (self.align(0) % self.p) == 0 )
-        self.assertTrue( (self.align(1) % self.p) == 0 )
-        self.assertTrue( (self.align(3) % self.p) == 0 )
-        self.assertTrue( (self.align(4) % self.p) == 0 )
-        self.assertTrue( (self.align(7) % self.p) == 0 )
-        self.assertTrue( (self.align(8) % self.p) == 0 )
-        self.assertTrue( (self.align(9) % self.p) == 0 )
+        self.assertEqual(self.align(0) % self.p, 0)
+        self.assertEqual(self.align(1) % self.p, 0)
+        self.assertEqual(self.align(3) % self.p, 0)
+        self.assertEqual(self.align(4) % self.p, 0)
+        self.assertEqual(self.align(7) % self.p, 0)
+        self.assertEqual(self.align(8) % self.p, 0)
+        self.assertEqual(self.align(9) % self.p, 0)
 
     def test_standardtypes(self):
         i = self.i
@@ -433,8 +452,6 @@ class SizeofTest(unittest.TestCase):
         self.check_sizeof(True, h + l)
         # buffer
         self.check_sizeof(buffer(''), h + 2*p + 2*l + self.align(i) +l)
-        # bytearray
-        self.check_sizeof(bytes(), h + self.align(i) + l + p)
         # cell
         def get_cell():
             x = 42
@@ -462,7 +479,7 @@ class SizeofTest(unittest.TestCase):
         self.check_sizeof(reversed(''), h + l + p )
         # file
         self.check_sizeof(self.file, h + 4*p + self.align(2*i) + 4*p +\
-                            self.align(3*i) + 2*p + self.align(i))
+                            self.align(3*i) + 3*p + self.align(i))
         # float
         self.check_sizeof(float(0), h + 8)
         # function
@@ -488,7 +505,7 @@ class SizeofTest(unittest.TestCase):
         self.check_sizeof(abs, h + 3*p)
         # module
         self.check_sizeof(unittest, h + p)
-        # xange
+        # xrange
         self.check_sizeof(xrange(1), h + 3*p)
         # slice
         self.check_sizeof(slice(0), h + 3*p)
@@ -501,8 +518,8 @@ class SizeofTest(unittest.TestCase):
         # type (PyTypeObject + PyNumberMethods +  PyMappingMethods +
         #       PySequenceMethods +  PyBufferProcs)
         len_typeobject = p + 2*l + 15*p + l + 4*p + l + 9*p + l + 11*p
-        self.check_sizeof(class_newstyle, h + \
-                              len_typeobject + 42*p + 10*p + 3*p + 6*p)
+        self.check_sizeof(class_newstyle,
+                          h + len_typeobject + 42*p + 10*p + 3*p + 6*p)
 
 
     def test_specialtypes(self):

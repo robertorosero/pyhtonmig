@@ -55,7 +55,7 @@ fcntl_fcntl(PyObject *self, PyObject *args)
 			PyErr_SetFromErrno(PyExc_IOError);
 			return NULL;
 		}
-		return PyString_FromStringAndSize(buf, len);
+		return PyBytes_FromStringAndSize(buf, len);
 	}
 
 	PyErr_Clear();
@@ -164,7 +164,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			return PyInt_FromLong(ret);
 		}
 		else {
-			return PyString_FromStringAndSize(buf, len);
+			return PyBytes_FromStringAndSize(buf, len);
 		}
 	}
 
@@ -185,7 +185,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			PyErr_SetFromErrno(PyExc_IOError);
 			return NULL;
 		}
-		return PyString_FromStringAndSize(buf, len);
+		return PyBytes_FromStringAndSize(buf, len);
 	}
 
 	PyErr_Clear();
@@ -510,6 +510,9 @@ all_ins(PyObject* d)
         if (ins(d, "F_SETLKW64", (long)F_SETLKW64)) return -1;
 #endif
 /* GNU extensions, as of glibc 2.2.4. */
+#ifdef FASYNC
+        if (ins(d, "FASYNC", (long)FASYNC)) return -1;
+#endif
 #ifdef F_SETLEASE
         if (ins(d, "F_SETLEASE", (long)F_SETLEASE)) return -1;
 #endif

@@ -3,7 +3,6 @@
 
 #include "Python.h"
 #include <ctype.h>
-#include "formatter_string.h"
 
 static PyObject *int_int(PyIntObject *v);
 
@@ -368,7 +367,7 @@ PyInt_FromString(char *s, char **pend, int base)
 	if (*end != '\0') {
   bad:
 		slen = strlen(s) < 200 ? strlen(s) : 200;
-		sobj = PyString_FromStringAndSize(s, slen);
+		sobj = PyBytes_FromStringAndSize(s, slen);
 		if (sobj == NULL)
 			return NULL;
 		srepr = PyObject_Repr(sobj);
@@ -377,7 +376,7 @@ PyInt_FromString(char *s, char **pend, int base)
 			return NULL;
 		PyErr_Format(PyExc_ValueError,
 			     "invalid literal for int() with base %d: %s",
-			     base, PyString_AS_STRING(srepr));
+			     base, PyBytes_AS_STRING(srepr));
 		Py_DECREF(srepr);
 		return NULL;
 	}
@@ -965,11 +964,11 @@ int_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return PyInt_FromLong(0L);
 	if (base == -909)
 		return PyNumber_Int(x);
-	if (PyString_Check(x)) {
+	if (PyBytes_Check(x)) {
 		/* Since PyInt_FromString doesn't have a length parameter,
 		 * check here for possible NULs in the string. */
-		char *string = PyString_AS_STRING(x);
-		if (strlen(string) != PyString_Size(x)) {
+		char *string = PyBytes_AS_STRING(x);
+		if (strlen(string) != PyBytes_Size(x)) {
 			/* create a repr() of the input string,
 			 * just like PyInt_FromString does */
 			PyObject *srepr;
@@ -978,7 +977,7 @@ int_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				return NULL;
 			PyErr_Format(PyExc_ValueError,
 			     "invalid literal for int() with base %d: %s",
-			     base, PyString_AS_STRING(srepr));
+			     base, PyBytes_AS_STRING(srepr));
 			Py_DECREF(srepr);
 			return NULL;
 		}
@@ -1106,7 +1105,7 @@ _PyInt_Format(PyIntObject *v, int base, int newstyle)
 	if (negative)
 		*--p = '-';
 
-	return PyString_FromStringAndSize(p, &buf[sizeof(buf)] - p);
+	return PyBytes_FromStringAndSize(p, &buf[sizeof(buf)] - p);
 }
 
 static PyObject *
@@ -1116,27 +1115,23 @@ int__format__(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
 		return NULL;
-	if (PyString_Check(format_spec))
-		return string_int__format__(self, args);
+	if (PyBytes_Check(format_spec))
+		return _PyInt_FormatAdvanced(self,
+					     PyBytes_AS_STRING(format_spec),
+					     PyBytes_GET_SIZE(format_spec));
 	if (PyUnicode_Check(format_spec)) {
 		/* Convert format_spec to a str */
-		PyObject *result = NULL;
-		PyObject *newargs = NULL;
-		PyObject *string_format_spec = NULL;
+		PyObject *result;
+		PyObject *str_spec = PyObject_Str(format_spec);
 
-		string_format_spec = PyObject_Str(format_spec);
-		if (string_format_spec == NULL)
-			goto done;
+		if (str_spec == NULL)
+			return NULL;
 
-		newargs = Py_BuildValue("(O)", string_format_spec);
-		if (newargs == NULL)
-			goto done;
+		result = _PyInt_FormatAdvanced(self,
+					       PyBytes_AS_STRING(str_spec),
+					       PyBytes_GET_SIZE(str_spec));
 
-		result = string_int__format__(self, newargs);
-
-		done:
-		Py_XDECREF(string_format_spec);
-		Py_XDECREF(newargs);
+		Py_DECREF(str_spec);
 		return result;
 	}
 	PyErr_SetString(PyExc_TypeError, "__format__ requires str or unicode");

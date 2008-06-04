@@ -135,9 +135,9 @@ typedef Py_intptr_t	Py_ssize_t;
  * all platforms (Python interprets the format string itself, and does whatever
  * the platform C requires to convert a size_t/Py_ssize_t argument):
  *
- *     PyString_FromFormat
+ *     PyBytes_FromFormat
  *     PyErr_Format
- *     PyString_FromFormatV
+ *     PyBytes_FromFormatV
  *
  * Lower-level uses require that you interpolate the correct format modifier
  * yourself (e.g., calling printf, fprintf, sprintf, PyOS_snprintf); for
@@ -452,6 +452,13 @@ int shutdown( int, int );
 #ifdef HAVE__GETPTY
 #include <sys/types.h>		/* we need to import mode_t */
 extern char * _getpty(int *, int, mode_t, int);
+#endif
+
+/* On QNX 6, struct termio must be declared by including sys/termio.h
+   if TCGETA, TCSETA, TCSETAW, or TCSETAF are used.  sys/termio.h must
+   be included before termios.h or it will generate an error. */
+#ifdef HAVE_SYS_TERMIO_H
+#include <sys/termio.h>
 #endif
 
 #if defined(HAVE_OPENPTY) || defined(HAVE_FORKPTY)

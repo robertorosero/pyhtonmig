@@ -717,7 +717,8 @@ platforms.  For descriptions of their availability and use, consult
    combined using the bitwise OR operator ``|``. Availability: Windows.
 
 
-.. data:: O_DIRECT
+.. data:: O_ASYNC
+          O_DIRECT
           O_DIRECTORY
           O_NOFOLLOW
           O_NOATIME
@@ -2030,7 +2031,7 @@ Miscellaneous System Information
 
    Return the number of processes in the system run queue averaged over the last
    1, 5, and 15 minutes or raises :exc:`OSError` if the load average was
-   unobtainable.
+   unobtainable.  Availability: Unix.
 
    .. versionadded:: 2.3
 

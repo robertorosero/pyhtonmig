@@ -49,7 +49,7 @@ __getstate__() and __setstate__().  See the documentation for module
 """
 
 import types
-from copyreg import dispatch_table
+from copy_reg import dispatch_table
 
 class Error(Exception):
     pass
@@ -399,16 +399,17 @@ def _test():
     print l2
     l.append({l[1]: l, 'xyz': l[2]})
     l3 = copy(l)
-    import reprlib
-    print map(reprlib.repr, l)
-    print map(reprlib.repr, l1)
-    print map(reprlib.repr, l2)
-    print map(reprlib.repr, l3)
+    import repr
+    print map(repr.repr, l)
+    print map(repr.repr, l1)
+    print map(repr.repr, l2)
+    print map(repr.repr, l3)
     l3 = deepcopy(l)
-    print map(reprlib.repr, l)
-    print map(reprlib.repr, l1)
-    print map(reprlib.repr, l2)
-    print map(reprlib.repr, l3)
+    import repr
+    print map(repr.repr, l)
+    print map(repr.repr, l1)
+    print map(repr.repr, l2)
+    print map(repr.repr, l3)
 
 if __name__ == '__main__':
     _test()

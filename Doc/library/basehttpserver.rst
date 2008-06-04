@@ -1,9 +1,13 @@
-
 :mod:`BaseHTTPServer` --- Basic HTTP server
 ===========================================
 
 .. module:: BaseHTTPServer
    :synopsis: Basic HTTP server (base class for SimpleHTTPServer and CGIHTTPServer).
+
+.. note::
+   The :mod:`BaseHTTPServer` module has been merged into :mod:`http.server` in
+   Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to 3.0.
 
 
 .. index::
@@ -21,7 +25,7 @@ Usually, this module isn't used directly, but is used as a basis for building
 functioning Web servers. See the :mod:`SimpleHTTPServer` and
 :mod:`CGIHTTPServer` modules.
 
-The first class, :class:`HTTPServer`, is a :class:`socketserver.TCPServer`
+The first class, :class:`HTTPServer`, is a :class:`SocketServer.TCPServer`
 subclass.  It creates and listens at the HTTP socket, dispatching the requests
 to a handler.  Code to create and run the server looks like this::
 

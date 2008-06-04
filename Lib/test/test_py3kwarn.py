@@ -123,6 +123,13 @@ class TestPy3KWarnings(unittest.TestCase):
         with catch_warning() as w:
             self.assertWarning(buffer('a'), w, expected)
 
+    def test_file_xreadlines(self):
+        expected = ("f.xreadlines() not supported in 3.x, "
+                    "try 'for line in f' instead")
+        with file(__file__) as f:
+            with catch_warning() as w:
+                self.assertWarning(f.xreadlines(), w, expected)
+
 
 class TestStdlibRemovals(unittest.TestCase):
 
@@ -130,7 +137,7 @@ class TestStdlibRemovals(unittest.TestCase):
     # import side-effect.
     all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
                         'Bastion', 'compiler', 'dircache', 'fpformat',
-                        'ihooks', 'mhlib', 'statvfs')
+                        'ihooks', 'mhlib', 'statvfs', 'htmllib', 'sgmllib')
     inclusive_platforms = {'irix' : ('pure', 'AL', 'al', 'CD', 'cd', 'cddb',
                                      'cdplayer', 'CL', 'cl', 'DEVICE', 'GL',
                                      'gl', 'ERRNO', 'FILE', 'FL', 'flp', 'fl',
@@ -155,7 +162,7 @@ class TestStdlibRemovals(unittest.TestCase):
                            'sunos5' : ('sunaudiodev', 'SUNAUDIODEV'),
                           }
     optional_modules = ('bsddb185', 'Canvas', 'dl', 'linuxaudiodev', 'imageop',
-                        'sv')
+                        'sv', 'cPickle')
 
     def check_removal(self, module_name, optional=False):
         """Make sure the specified module, when imported, raises a
@@ -200,58 +207,32 @@ class TestStdlibRemovals(unittest.TestCase):
         for path_mod in ("ntpath", "macpath", "os2emxpath", "posixpath"):
             mod = __import__(path_mod)
             with catch_warning() as w:
-                # Since os3exmpath just imports it from ntpath
-                warnings.simplefilter("always")
-                mod.walk(".", dumbo, None)
+                mod.walk("crashers", dumbo, None)
             self.assertEquals(str(w.message), msg)
 
+    def test_commands_members(self):
+        import commands
+        members = {"mk2arg" : 2, "mkarg" : 1, "getstatus" : 1}
+        for name, arg_count in members.items():
+            with catch_warning(record=False):
+                warnings.filterwarnings("error")
+                func = getattr(commands, name)
+                self.assertRaises(DeprecationWarning, func, *([None]*arg_count))
 
-class TestStdlibRenames(unittest.TestCase):
-
-    renames = {'copy_reg': 'copyreg', 'Queue': 'queue',
-               'SocketServer': 'socketserver',
-               'ConfigParser': 'configparser',
-               'repr': 'reprlib',
-               }
-
-    def check_rename(self, module_name, new_module_name):
-        """Make sure that:
-        - A DeprecationWarning is raised when importing using the
-          old 2.x module name.
-        - The module can be imported using the new 3.x name.
-        - The warning message specify both names.
-        """
-        with CleanImport(module_name):
-            with catch_warning(record=False) as w:
-                warnings.filterwarnings("error", ".+ renamed to",
-                                        DeprecationWarning)
-                try:
-                    __import__(module_name, level=0)
-                except DeprecationWarning as exc:
-                    self.assert_(module_name in exc.args[0])
-                    self.assert_(new_module_name in exc.args[0])
-                else:
-                    self.fail("DeprecationWarning not raised for %s" %
-                              module_name)
-        with CleanImport(new_module_name):
-            try:
-                __import__(new_module_name, level=0)
-            except ImportError:
-                self.fail("cannot import %s with its 3.x name, %s" %
-                          module_name, new_module_name)
-            except DeprecationWarning:
-                self.fail("unexpected DeprecationWarning raised for %s" %
-                          module_name)
-
-    def test_module_renames(self):
-        for module_name, new_module_name in self.renames.items():
-            self.check_rename(module_name, new_module_name)
+    def test_mutablestring_removal(self):
+        # UserString.MutableString has been removed in 3.0.
+        import UserString
+        with catch_warning(record=False):
+            warnings.filterwarnings("error", ".*MutableString",
+                                    DeprecationWarning)
+            self.assertRaises(DeprecationWarning, UserString.MutableString)
 
 
 def test_main():
-    run_unittest(TestPy3KWarnings,
-                 TestStdlibRemovals,
-                 TestStdlibRenames)
+    with catch_warning(record=True):
+        warnings.simplefilter("always")
+        run_unittest(TestPy3KWarnings,
+                     TestStdlibRemovals)
 
 if __name__ == '__main__':
     test_main()
