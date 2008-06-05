@@ -272,7 +272,7 @@ PyAST_CompileEx(mod_ty mod, PyCompilerInfo* info, PyArena* arena)
 	c.c_flags = flags;
 	c.c_nestlevel = 0;
 
-	c.c_st = PySymtable_Build(mod, info->ci_filename, c.c_future);
+	c.c_st = info->ci_symtable;
 	if (c.c_st == NULL) {
 		if (!PyErr_Occurred())
 			PyErr_SetString(PyExc_SystemError, "no symtable");
@@ -292,28 +292,30 @@ PyAST_CompileEx(mod_ty mod, PyCompilerInfo* info, PyArena* arena)
 
 PyCodeObject *
 PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
-	      PyArena *arena)
+				PyArena *arena)
 {
-    PyCompilerInfo info;
-    PyCodeObject* result;
+	PyCompilerInfo ci;
+	PyCodeObject* co = NULL;
 
-    info.ci_filename = filename;
-    info.ci_flags    = flags;
-    info.ci_future   = PyFuture_FromAST(mod, filename);
-    if (info.ci_future == NULL)
-        return NULL;
-    info.ci_symtable = PySymtable_Build(mod, filename, info.ci_future);
-    if (info.ci_symtable == NULL) {
-        PyObject_Free(info.ci_future);
-        return NULL;
-    }
+	ci.ci_filename = filename;
+	ci.ci_flags    = flags;
+	ci.ci_future   = NULL;
+	ci.ci_symtable = NULL;
 
-    result = PyAST_CompileEx(mod, &info, arena);
+	ci.ci_future   = PyFuture_FromAST(mod, filename);
+	if (ci.ci_future == NULL)
+		goto cleanup;
+	ci.ci_symtable = PySymtable_Build(mod, filename, ci.ci_future);
+	if (ci.ci_symtable == NULL)
+		goto cleanup;
+	co = PyAST_CompileEx(mod, &ci, arena);
 
-    PyObject_Free(info.ci_future);
-    PySymtable_Free(info.ci_symtable);
-
-    return result;
+cleanup:
+	if (ci.ci_future != NULL)
+		PyObject_Free(ci.ci_future);
+	if (ci.ci_symtable != NULL)
+		PySymtable_Free(ci.ci_symtable);
+	return co;
 }
 
 PyCodeObject *
@@ -321,15 +323,33 @@ PyNode_Compile(struct _node *n, const char *filename)
 {
 	PyCodeObject *co = NULL;
 	mod_ty mod;
+	PyCompilerInfo ci;
 	PyArena *arena = PyArena_New();
 	if (!arena)
 		return NULL;
+
+	ci.ci_filename = filename;
+	ci.ci_future = NULL;
+	ci.ci_symtable = NULL;
+	ci.ci_flags  = NULL;
+
 	mod = PyAST_FromNode(n, NULL, filename, arena);
 	if (mod != NULL) {
-        if (PyAST_Optimize(&mod, arena)) {
-            co = PyAST_Compile(mod, filename, NULL, arena);
-        }
-    }
+		ci.ci_future = PyFuture_FromAST(mod, filename);
+		if (ci.ci_future == NULL)
+			goto cleanup;
+		ci.ci_symtable = PySymtable_Build(mod, filename, ci.ci_future);
+		if (ci.ci_symtable == NULL)
+			goto cleanup;
+		if (!PyAST_Optimize(&mod, ci.ci_symtable, arena))
+			goto cleanup;
+		co = PyAST_CompileEx(mod, &ci, arena);
+	}
+cleanup:
+	if (ci.ci_symtable != NULL)
+		PySymtable_Free(ci.ci_symtable);
+	if (ci.ci_future != NULL)
+		PyObject_Free(ci.ci_future);
 	PyArena_Free(arena);
 	return co;
 }

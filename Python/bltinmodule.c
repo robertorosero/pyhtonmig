@@ -6,6 +6,7 @@
 #include "node.h"
 #include "code.h"
 #include "eval.h"
+#include "symtable.h"
 #include "optimize.h"
 
 #include <ctype.h>
@@ -448,6 +449,53 @@ builtin_coerce(PyObject *self, PyObject *args)
 	return res;
 }
 
+static PyObject*
+_ast_compile(PyObject *cmd, const char *filename, int mode, int optimize, 
+            PyCompilerFlags *cf)
+{
+	PyArena *arena = NULL;
+	struct symtable *st = NULL;
+	PyFutureFeatures *ff = NULL;
+	PyCodeObject* co = NULL;
+	mod_ty mod;
+	PyCompilerInfo ci;
+
+	arena = PyArena_New();
+	mod = PyAST_obj2mod(cmd, arena, mode);
+	if (mod == NULL)
+		goto cleanup;
+	ff = PyFuture_FromAST(mod, filename);
+	if (ff == NULL)
+		goto cleanup;
+	st = PySymtable_Build(mod, filename, ff);
+	if (st == NULL)
+		goto cleanup;
+	if (optimize) {
+		if (!PyAST_Optimize(&mod, st, arena))
+			goto cleanup;
+	}
+
+	ci.ci_filename = filename;
+	ci.ci_future   = ff;
+	ci.ci_symtable = st;
+	ci.ci_flags    = cf;
+
+	if (!cf || !(cf->cf_flags & PyCF_NO_OPTIMIZE))
+		if (!PyAST_Optimize(&mod, ci.ci_symtable, arena))
+			goto cleanup;
+
+	co = PyAST_CompileEx(mod, &ci, arena);
+
+cleanup:
+	if (ff != NULL)
+		PyObject_Free(ff);
+	if (st != NULL)
+		PySymtable_Free(st);
+	if (arena != NULL)
+		PyArena_Free(arena);
+	return (PyObject*)co;
+}
+
 PyDoc_STRVAR(coerce_doc,
 "coerce(x, y) -> (x1, y1)\n\
 \n\
@@ -513,25 +561,12 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 			result = cmd;
 		}
 		else {
-			PyArena *arena;
-			mod_ty mod;
-
-			arena = PyArena_New();
-			mod = PyAST_obj2mod(cmd, arena, mode);
-			if (mod == NULL) {
-				PyArena_Free(arena);
-				return NULL;
-			}
-            if (!(supplied_flags & PyCF_NO_OPTIMIZE)) {
-                if (!PyAST_Optimize(&mod, arena)) {
-                    PyArena_Free(arena);
-                    return NULL;
-                }
-            }
-			result = (PyObject*)PyAST_Compile(mod, filename, &cf, arena);
-			PyArena_Free(arena);
+			result = _ast_compile(cmd, filename, mode,
+						!(supplied_flags & PyCF_NO_OPTIMIZE), &cf);
 		}
 		return result;
+
+        /* XXX: this is awful */
 	}
 
 #ifdef Py_USING_UNICODE

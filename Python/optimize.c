@@ -1211,8 +1211,9 @@ optimize_stmt(stmt_ty* stmt_ptr, PyArena* arena)
  * Optimize an AST.
  */
 int
-PyAST_Optimize(mod_ty* mod_ptr, PyArena* arena)
+PyAST_Optimize(mod_ty* mod_ptr, struct symtable* st, PyArena* arena)
 {
+    /* TODO: update optimize_* functions to accept an ste */
     return optimize_mod(mod_ptr, arena);
 }
 

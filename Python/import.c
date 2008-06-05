@@ -14,6 +14,8 @@
 #include "eval.h"
 #include "osdefs.h"
 #include "importdl.h"
+#include "optimize.h"
+#include "symtable.h"
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -818,18 +820,36 @@ parse_source_module(const char *pathname, FILE *fp)
 {
 	PyCodeObject *co = NULL;
 	mod_ty mod;
-	PyCompilerFlags flags;
+	PyCompilerInfo ci;
+	PyCompilerFlags cf;
 	PyArena *arena = PyArena_New();
 	if (arena == NULL)
 		return NULL;
 
-	flags.cf_flags = 0;
+	ci.ci_filename = pathname;
+	ci.ci_future = NULL;
+	ci.ci_symtable = NULL;
+	ci.ci_flags = &cf;
+	cf.cf_flags = 0;
 
-	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, &flags, 
-				   NULL, arena);
+	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0,
+                    &cf, NULL, arena);
 	if (mod) {
-		co = PyAST_Compile(mod, pathname, NULL, arena);
+		ci.ci_future = PyFuture_FromAST(mod, pathname);
+		if (ci.ci_future == NULL)
+			goto cleanup;
+		ci.ci_symtable = PySymtable_Build(mod, pathname, ci.ci_future);
+		if (ci.ci_symtable == NULL)
+			goto cleanup;
+		if (!PyAST_Optimize(&mod, ci.ci_symtable, arena))
+			goto cleanup;
+		co = PyAST_CompileEx(mod, &ci, arena);
 	}
+cleanup:
+	if (ci.ci_symtable != NULL)
+		PySymtable_Free(ci.ci_symtable);
+	if (ci.ci_future != NULL)
+		PyObject_Free(ci.ci_future);
 	PyArena_Free(arena);
 	return co;
 }

@@ -1325,12 +1325,34 @@ run_mod(mod_ty mod, const char *filename, PyObject *globals, PyObject *locals,
 	 PyCompilerFlags *flags, PyArena *arena)
 {
 	PyCodeObject *co;
-	PyObject *v;
-	co = PyAST_Compile(mod, filename, flags, arena);
-	if (co == NULL)
-		return NULL;
-	v = PyEval_EvalCode(co, globals, locals);
-	Py_DECREF(co);
+	PyObject *v = NULL;
+	PyCompilerInfo ci;
+
+	ci.ci_filename = filename;
+	ci.ci_future = NULL;
+	ci.ci_symtable = NULL;
+	ci.ci_flags = flags;
+
+	ci.ci_future = PyFuture_FromAST(mod, filename);
+	if (ci.ci_future == NULL)
+		goto cleanup;
+	ci.ci_symtable = PySymtable_Build(mod, filename, ci.ci_future);
+	if (ci.ci_symtable == NULL)
+		goto cleanup;
+	if (!flags || !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+		if (!PyAST_Optimize(&mod, ci.ci_symtable, arena))
+			goto cleanup;
+
+	co = PyAST_CompileEx(mod, &ci, arena);
+cleanup:
+	if (ci.ci_symtable != NULL)
+		PySymtable_Free(ci.ci_symtable);
+	if (ci.ci_future != NULL)
+		PyObject_Free(ci.ci_future);
+	if (co != NULL) {
+		v = PyEval_EvalCode(co, globals, locals);
+		Py_DECREF(co);
+	}
 	return v;
 }
 
@@ -1372,21 +1394,39 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 {
 	PyCodeObject *co;
 	mod_ty mod;
+	PyCompilerInfo ci;
 	PyArena *arena = PyArena_New();
 	if (arena == NULL)
 		return NULL;
 
+	ci.ci_filename = filename;
+	ci.ci_future = NULL;
+	ci.ci_symtable = NULL;
+	ci.ci_flags = flags;
+
 	mod = PyParser_ASTFromString(str, filename, start, flags, arena);
-	if (mod == NULL) {
-		PyArena_Free(arena);
-		return NULL;
-	}
+	if (mod == NULL)
+		goto cleanup;
+	ci.ci_future = PyFuture_FromAST(mod, filename);
+	if (ci.ci_future == NULL)
+		goto cleanup;
+	ci.ci_symtable = PySymtable_Build(mod, filename, ci.ci_future);
+	if (ci.ci_symtable == NULL)
+		goto cleanup;
+	if (!flags || !(flags->cf_flags & PyCF_NO_OPTIMIZE))
+		if (!PyAST_Optimize(&mod, ci.ci_symtable, arena))
+			goto cleanup;
 	if (flags && (flags->cf_flags & PyCF_ONLY_AST)) {
 		PyObject *result = PyAST_mod2obj(mod);
 		PyArena_Free(arena);
 		return result;
 	}
-	co = PyAST_Compile(mod, filename, flags, arena);
+	co = PyAST_CompileEx(mod, &ci, arena);
+cleanup:
+	if (ci.ci_future != NULL)
+		PyObject_Free(ci.ci_future);
+	if (ci.ci_symtable != NULL)
+		PySymtable_Free(ci.ci_symtable);
 	PyArena_Free(arena);
 	return (PyObject *)co;
 }
@@ -1431,9 +1471,6 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
-        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
-            if (!PyAST_Optimize(&mod, arena))
-                return NULL;
 		return mod;
 	}
 	else {
@@ -1459,9 +1496,6 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
-        if (mod != NULL && flags && !(flags->cf_flags & PyCF_NO_OPTIMIZE))
-            if (!PyAST_Optimize(&mod, arena))
-                return NULL;
 		return mod;
 	}
 	else {
