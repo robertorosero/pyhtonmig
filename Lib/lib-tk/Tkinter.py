@@ -30,7 +30,7 @@ button.pack(side=BOTTOM)
 tk.mainloop()
 """
 
-__version__ = "$Revision: 63501 $"
+__version__ = "$Revision$"
 
 import sys
 if sys.platform == "win32":
@@ -1054,11 +1054,17 @@ class Misc:
                 if callable(v):
                     v = self._register(v)
                 elif isinstance(v, (tuple, list)):
+                    nv = []
                     for item in v:
                         if not isinstance(item, (basestring, int)):
                             break
+                        elif isinstance(item, int):
+                            nv.append('%d' % item)
+                        else:
+                            # format it to proper Tcl code if it contains space
+                            nv.append(('{%s}' if ' ' in item else '%s') % item)
                     else:
-                        v = ' '.join(map(str, v))
+                        v = ' '.join(nv)
                 res = res + ('-'+k, v)
         return res
     def nametowidget(self, name):

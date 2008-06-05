@@ -565,8 +565,6 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 						!(supplied_flags & PyCF_NO_OPTIMIZE), &cf);
 		}
 		return result;
-
-        /* XXX: this is awful */
 	}
 
 #ifdef Py_USING_UNICODE
