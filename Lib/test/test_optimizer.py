@@ -194,6 +194,17 @@ def foo():
         self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
         self.assertEqual(None, ast.body[0].body[0].value)
 
+    def test_generators_work_even_if_yields_are_optimized_away(self):
+        code = """
+def mygen():
+    return
+    yield 5
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
+        self.assertEqual(_ast.Pass, ast.body[0].body[1].__class__)
+
     def test_tuple_of_constants(self):
         tests = [
             (1, 2, 3),
@@ -210,6 +221,15 @@ def foo():
             self.assertEqual(_ast.Const, ast.body[0].value.__class__)
             self.assertEqual(tuple, ast.body[0].value.value.__class__)
             self.assertEqual(obj, ast.body[0].value.value)
+
+    def test_folding_of_constant_list_in_for_loop(self):
+        code = """
+for i in [1, 2, 3]:
+    print i
+"""
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Const, ast.body[0].iter.__class__)
+        self.assertEqual((1, 2, 3), ast.body[0].iter.value)
 
     def test_named_constants(self):
         tests = [None, True, False]

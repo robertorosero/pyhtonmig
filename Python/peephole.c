@@ -20,55 +20,6 @@
 #define ISBASICBLOCK(blocks, start, bytes) \
 	(blocks[start]==blocks[start+bytes-1])
 
-/* Replace LOAD_CONST c1. LOAD_CONST c2 ... LOAD_CONST cn BUILD_TUPLE n
-   with	   LOAD_CONST (c1, c2, ... cn).
-   The consts table must still be in list form so that the
-   new constant (c1, c2, ... cn) can be appended.
-   Called with codestr pointing to the first LOAD_CONST.
-   Bails out with no change if one or more of the LOAD_CONSTs is missing. 
-   Also works for BUILD_LIST when followed by an "in" or "not in" test.
-*/
-static int
-tuple_of_constants(unsigned char *codestr, Py_ssize_t n, PyObject *consts)
-{
-	PyObject *newconst, *constant;
-	Py_ssize_t i, arg, len_consts;
-
-	/* Pre-conditions */
-	assert(PyList_CheckExact(consts));
-	assert(codestr[n*3] == BUILD_TUPLE || codestr[n*3] == BUILD_LIST);
-	assert(GETARG(codestr, (n*3)) == n);
-	for (i=0 ; i<n ; i++)
-		assert(codestr[i*3] == LOAD_CONST);
-
-	/* Buildup new tuple of constants */
-	newconst = PyTuple_New(n);
-	if (newconst == NULL)
-		return 0;
-	len_consts = PyList_GET_SIZE(consts);
-	for (i=0 ; i<n ; i++) {
-		arg = GETARG(codestr, (i*3));
-		assert(arg < len_consts);
-		constant = PyList_GET_ITEM(consts, arg);
-		Py_INCREF(constant);
-		PyTuple_SET_ITEM(newconst, i, constant);
-	}
-
-	/* Append folded constant onto consts */
-	if (PyList_Append(consts, newconst)) {
-		Py_DECREF(newconst);
-		return 0;
-	}
-	Py_DECREF(newconst);
-
-	/* Write NOPs over old LOAD_CONSTS and
-	   add a new LOAD_CONST newconst on top of the BUILD_TUPLE n */
-	memset(codestr, NOP, n*3);
-	codestr[n*3] = LOAD_CONST;
-	SETARG(codestr, (n*3), len_consts);
-	return 1;
-}
-
 static unsigned int *
 markblocks(unsigned char *code, Py_ssize_t len)
 {
@@ -198,44 +149,6 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 					continue;
 				SETARG(codestr, i, (j^1));
 				codestr[i+3] = NOP;
-				break;
-
-				/* Try to fold tuples of constants (includes a case for lists
-				   which are only used for "in" and "not in" tests).
-				   Skip over BUILD_SEQN 1 UNPACK_SEQN 1.
-				   Replace BUILD_SEQN 2 UNPACK_SEQN 2 with ROT2.
-				   Replace BUILD_SEQN 3 UNPACK_SEQN 3 with ROT3 ROT2. */
-			case BUILD_LIST:
-				j = GETARG(codestr, i);
-				h = i - 3 * j;
-				if (h >= 0  &&
-				    j <= lastlc	 &&
-				    ((opcode == BUILD_TUPLE && 
-				      ISBASICBLOCK(blocks, h, 3*(j+1))) ||
-				     (opcode == BUILD_LIST && 
-				      codestr[i+3]==COMPARE_OP && 
-				      ISBASICBLOCK(blocks, h, 3*(j+2)) &&
-				      (GETARG(codestr,i+3)==6 ||
-				       GETARG(codestr,i+3)==7))) &&
-				    tuple_of_constants(&codestr[h], j, consts)) {
-					assert(codestr[i] == LOAD_CONST);
-					cumlc = 1;
-					break;
-				}
-				if (codestr[i+3] != UNPACK_SEQUENCE  ||
-				    !ISBASICBLOCK(blocks,i,6) ||
-				    j != GETARG(codestr, i+3))
-					continue;
-				if (j == 1) {
-					memset(codestr+i, NOP, 6);
-				} else if (j == 2) {
-					codestr[i] = ROT_TWO;
-					memset(codestr+i+1, NOP, 5);
-				} else if (j == 3) {
-					codestr[i] = ROT_THREE;
-					codestr[i+1] = ROT_TWO;
-					memset(codestr+i+2, NOP, 4);
-				}
 				break;
 
 				/* Simplify conditional jump to conditional jump where the
