@@ -1324,7 +1324,7 @@ static PyObject *
 run_mod(mod_ty mod, const char *filename, PyObject *globals, PyObject *locals,
 	 PyCompilerFlags *flags, PyArena *arena)
 {
-	PyCodeObject *co;
+	PyCodeObject *co = NULL;
 	PyObject *v = NULL;
 	PyCompilerInfo ci;
 
@@ -1392,7 +1392,7 @@ PyObject *
 Py_CompileStringFlags(const char *str, const char *filename, int start,
 		      PyCompilerFlags *flags)
 {
-	PyCodeObject *co;
+	PyCodeObject *co = NULL;
 	mod_ty mod;
 	PyCompilerInfo ci;
 	PyArena *arena = PyArena_New();
