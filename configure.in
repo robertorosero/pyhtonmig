@@ -248,7 +248,7 @@ case $ac_sys_system/$ac_sys_release in
   # On OpenBSD, select(2) is not available if _XOPEN_SOURCE is defined,
   # even though select is a POSIX function. Reported by J. Ribbens.
   # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
-  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0@:>@) 
+  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0123@:>@) 
     define_xopen_source=no
     # OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
     # also defined. This can be overridden by defining _BSD_SOURCE
@@ -918,6 +918,7 @@ yes)
 
 
 		BASECFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${BASECFLAGS}"
+		CFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${CFLAGS}"
 	    fi
 
 	    ;;
@@ -1320,6 +1321,17 @@ if test "$have_long_long" = yes ; then
 AC_CHECK_SIZEOF(long long, 8)
 fi
 
+AC_MSG_CHECKING(for long double support)
+have_long_double=no
+AC_TRY_COMPILE([], [long double x; x = (long double)0.;], [
+  AC_DEFINE(HAVE_LONG_DOUBLE, 1, [Define this if you have the type long double.])
+  have_long_double=yes
+])
+AC_MSG_RESULT($have_long_double)
+if test "$have_long_long" = yes ; then
+AC_CHECK_SIZEOF(long double, 12)
+fi
+
 AC_MSG_CHECKING(for _Bool support)
 have_c99_bool=no
 AC_TRY_COMPILE([], [_Bool x; x = (_Bool)0;], [
@@ -1455,6 +1467,7 @@ yes)
 	;;
 esac
 AC_MSG_RESULT($enable_toolbox_glue)
+
 
 AC_SUBST(OTHER_LIBTOOL_OPT)
 case $ac_sys_system/$ac_sys_release in
@@ -1780,6 +1793,7 @@ then
 	esac
 fi
 AC_MSG_RESULT($LINKFORSHARED)
+
 
 AC_SUBST(CFLAGSFORSHARED)
 AC_MSG_CHECKING(CFLAGSFORSHARED)
@@ -2296,6 +2310,13 @@ if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
 		fi
 	fi
 fi
+
+AC_MSG_CHECKING(for OSX 10.5 SDK or later)
+AC_TRY_COMPILE([#include <Carbon/Carbon.h>], FSIORefNum fRef = 0,
+  AC_DEFINE(HAVE_OSX105_SDK, 1, Define if compiling using MacOS X 10.5 SDK or later.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
 
 # Check for --with-doc-strings
 AC_MSG_CHECKING(for --with-doc-strings)

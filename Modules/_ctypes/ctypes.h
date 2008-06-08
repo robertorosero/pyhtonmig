@@ -87,6 +87,7 @@ typedef struct {
 	PyObject_VAR_HEAD
 	ffi_closure *pcl; /* the C callable */
 	ffi_cif cif;
+	int flags;
 	PyObject *converters;
 	PyObject *callable;
 	PyObject *restype;
@@ -185,7 +186,7 @@ extern PyMethodDef module_methods[];
 extern CThunkObject *AllocFunctionCallback(PyObject *callable,
 					   PyObject *converters,
 					   PyObject *restype,
-					   int stdcall);
+					   int flags);
 /* a table entry describing a predefined ctypes type */
 struct fielddesc {
 	char code;
@@ -235,6 +236,14 @@ typedef struct {
 	PyObject *restype;	/* CDataObject or NULL */
 	PyObject *checker;
 	int flags;		/* calling convention and such */
+
+	/* pep3118 fields, pointers neeed PyMem_Free */
+	char *format;
+	int ndim;
+	Py_ssize_t *shape;
+/*	Py_ssize_t *strides;	*/ /* unused in ctypes */
+/*	Py_ssize_t *suboffsets;	*/ /* unused in ctypes */
+
 } StgDictObject;
 
 /****************************************************************
@@ -303,6 +312,8 @@ PyObject *_CallProc(PPROC pProc,
 #define FUNCFLAG_CDECL   0x1
 #define FUNCFLAG_HRESULT 0x2
 #define FUNCFLAG_PYTHONAPI 0x4
+#define FUNCFLAG_USE_ERRNO 0x8
+#define FUNCFLAG_USE_LASTERROR 0x10
 
 #define TYPEFLAG_ISPOINTER 0x100
 #define TYPEFLAG_HASPOINTER 0x200
@@ -415,11 +426,13 @@ extern void *MallocClosure(void);
 extern void _AddTraceback(char *, char *, int);
 
 extern PyObject *CData_FromBaseObj(PyObject *type, PyObject *base, Py_ssize_t index, char *adr);
+extern char *alloc_format_string(const char *prefix, const char *suffix);
 
 /* XXX better name needed! */
 extern int IsSimpleSubType(PyObject *obj);
 
 extern PyObject *_pointer_type_cache;
+PyObject *get_error_object(int **pspace);
 
 #ifdef MS_WIN32
 extern PyObject *ComError;
