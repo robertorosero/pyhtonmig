@@ -185,15 +185,15 @@ _Py_Mangle(PyObject *privateobj, PyObject *ident)
 {
 	/* Name mangling: __private becomes _classname__private.
 	   This is independent from how the name is used. */
-	const char *p, *name = PyBytes_AsString(ident);
+	const char *p, *name = PyString_AsString(ident);
 	char *buffer;
 	size_t nlen, plen;
-	if (privateobj == NULL || !PyBytes_Check(privateobj) ||
+	if (privateobj == NULL || !PyString_Check(privateobj) ||
 	    name == NULL || name[0] != '_' || name[1] != '_') {
 		Py_INCREF(ident);
 		return ident;
 	}
-	p = PyBytes_AsString(privateobj);
+	p = PyString_AsString(privateobj);
 	nlen = strlen(name);
 	/* Don't mangle __id__ or names with dots.
 
@@ -217,11 +217,11 @@ _Py_Mangle(PyObject *privateobj, PyObject *ident)
 		return ident; /* Don't mangle if class is just underscores */
 	}
 	plen = strlen(p);
-	ident = PyBytes_FromStringAndSize(NULL, 1 + nlen + plen);
+	ident = PyString_FromStringAndSize(NULL, 1 + nlen + plen);
 	if (!ident)
 		return 0;
 	/* ident = "_" + p[:plen] + name # i.e. 1+plen+nlen bytes */
-	buffer = PyBytes_AS_STRING(ident);
+	buffer = PyString_AS_STRING(ident);
 	buffer[0] = '_';
 	strncpy(buffer+1, p, plen);
 	strcpy(buffer+1+plen, name);
@@ -250,7 +250,7 @@ PyAST_CompileEx(mod_ty mod, PyCompilerInfo* info, PyArena* arena)
     PyCompilerFlags* flags = info->ci_flags;
 
 	if (!__doc__) {
-		__doc__ = PyBytes_InternFromString("__doc__");
+		__doc__ = PyString_InternFromString("__doc__");
 		if (!__doc__)
 			return NULL;
 	}
@@ -586,7 +586,7 @@ compiler_new_tmpname(struct compiler *c)
 {
 	char tmpname[256];
 	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]", ++c->u->u_tmpname);
-	return PyBytes_FromString(tmpname);
+	return PyString_FromString(tmpname);
 }
 
 /* Allocate a new block and return a pointer to it.
@@ -1239,7 +1239,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	int addNone = 1;
 	static PyObject *module;
 	if (!module) {
-		module = PyBytes_InternFromString("<module>");
+		module = PyString_InternFromString("<module>");
 		if (!module)
 			return NULL;
 	}
@@ -1291,8 +1291,8 @@ get_ref_type(struct compiler *c, PyObject *name)
 	    PyOS_snprintf(buf, sizeof(buf),
 			  "unknown scope for %.100s in %.100s(%s) in %s\n"
 			  "symbols: %s\nlocals: %s\nglobals: %s\n",
-			  PyBytes_AS_STRING(name), 
-			  PyBytes_AS_STRING(c->u->u_name), 
+			  PyString_AS_STRING(name), 
+			  PyString_AS_STRING(c->u->u_name), 
 			  PyObject_REPR(c->u->u_ste->ste_id),
 			  c->c_filename,
 			  PyObject_REPR(c->u->u_ste->ste_symbols),
@@ -1350,9 +1350,9 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 			printf("lookup %s in %s %d %d\n"
 				"freevars of %s: %s\n",
 				PyObject_REPR(name), 
-				PyBytes_AS_STRING(c->u->u_name), 
+				PyString_AS_STRING(c->u->u_name), 
 				reftype, arg,
-				PyBytes_AS_STRING(co->co_name),
+				PyString_AS_STRING(co->co_name),
 				PyObject_REPR(co->co_freevars));
 			Py_FatalError("compiler_make_closure()");
 		}
@@ -1387,7 +1387,7 @@ compiler_arguments(struct compiler *c, arguments_ty args)
 	for (i = 0; i < n; i++) {
 		expr_ty arg = (expr_ty)asdl_seq_GET(args->args, i);
 		if (arg->kind == Tuple_kind) {
-			PyObject *id = PyBytes_FromFormat(".%d", i);
+			PyObject *id = PyString_FromFormat(".%d", i);
 			if (id == NULL) {
 				return 0;
 			}
@@ -1480,7 +1480,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 	Py_XDECREF(c->u->u_private);
 	c->u->u_private = s->v.ClassDef.name;
 	Py_INCREF(c->u->u_private);
-	str = PyBytes_InternFromString("__name__");
+	str = PyString_InternFromString("__name__");
 	if (!str || !compiler_nameop(c, str, Load)) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
@@ -1488,7 +1488,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 	}
 	
 	Py_DECREF(str);
-	str = PyBytes_InternFromString("__module__");
+	str = PyString_InternFromString("__module__");
 	if (!str || !compiler_nameop(c, str, Store)) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
@@ -1555,7 +1555,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 	assert(e->kind == Lambda_kind);
 
 	if (!name) {
-		name = PyBytes_InternFromString("<lambda>");
+		name = PyString_InternFromString("<lambda>");
 		if (!name)
 			return 0;
 	}
@@ -1945,7 +1945,7 @@ compiler_import_as(struct compiler *c, identifier name, identifier asname)
 	   If there is a dot in name, we need to split it and emit a 
 	   LOAD_ATTR for each name.
 	*/
-	const char *src = PyBytes_AS_STRING(name);
+	const char *src = PyString_AS_STRING(name);
 	const char *dot = strchr(src, '.');
 	if (dot) {
 		/* Consume the base module name to get the first attribute */
@@ -1954,7 +1954,7 @@ compiler_import_as(struct compiler *c, identifier name, identifier asname)
 			/* NB src is only defined when dot != NULL */
 			PyObject *attr;
 			dot = strchr(src, '.');
-			attr = PyBytes_FromStringAndSize(src, 
+			attr = PyString_FromStringAndSize(src, 
 					    dot ? dot - src : strlen(src));
 			if (!attr)
 				return -1;
@@ -2003,10 +2003,10 @@ compiler_import(struct compiler *c, stmt_ty s)
 		}
 		else {
 			identifier tmp = alias->name;
-			const char *base = PyBytes_AS_STRING(alias->name);
+			const char *base = PyString_AS_STRING(alias->name);
 			char *dot = strchr(base, '.');
 			if (dot)
-				tmp = PyBytes_FromStringAndSize(base, 
+				tmp = PyString_FromStringAndSize(base, 
 								 dot - base);
 			r = compiler_nameop(c, tmp, Store);
 			if (dot) {
@@ -2049,7 +2049,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	}
 
 	if (s->lineno > c->c_future->ff_lineno) {
-		if (!strcmp(PyBytes_AS_STRING(s->v.ImportFrom.module),
+		if (!strcmp(PyString_AS_STRING(s->v.ImportFrom.module),
 			    "__future__")) {
 			Py_DECREF(level);
 			Py_DECREF(names);
@@ -2069,7 +2069,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = (alias_ty)asdl_seq_GET(s->v.ImportFrom.names, i);
 		identifier store_name;
 
-		if (i == 0 && *PyBytes_AS_STRING(alias->name) == '*') {
+		if (i == 0 && *PyString_AS_STRING(alias->name) == '*') {
 			assert(n == 1);
 			ADDOP(c, IMPORT_STAR);
 			return 1;
@@ -2099,7 +2099,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	if (Py_OptimizeFlag)
 		return 1;
 	if (assertion_error == NULL) {
-		assertion_error = PyBytes_InternFromString("AssertionError");
+		assertion_error = PyString_InternFromString("AssertionError");
 		if (assertion_error == NULL)
 			return 0;
 	}
@@ -2382,7 +2382,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 
 	/* First check for assignment to __debug__. Param? */
 	if ((ctx == Store || ctx == AugStore || ctx == Del)
-	    && !strcmp(PyBytes_AS_STRING(name), "__debug__")) {
+	    && !strcmp(PyString_AS_STRING(name), "__debug__")) {
 		return compiler_error(c, "can not assign to __debug__");
 	}
 
@@ -2420,7 +2420,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	}
 
 	/* XXX Leave assert here, but handle __doc__ and the like better */
-	assert(scope || PyBytes_AS_STRING(name)[0] == '_');
+	assert(scope || PyString_AS_STRING(name)[0] == '_');
 
 	switch (optype) {
 	case OP_DEREF:
@@ -2434,7 +2434,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			PyErr_Format(PyExc_SyntaxError,
 				     "can not delete variable '%s' referenced "
 				     "in nested scope",
-				     PyBytes_AS_STRING(name));
+				     PyString_AS_STRING(name));
 			Py_DECREF(mangled);
 			return 0;
 		case Param:
@@ -2819,7 +2819,7 @@ compiler_genexp(struct compiler *c, expr_ty e)
 					       0)))->iter;
 
 	if (!name) {
-		name = PyBytes_FromString("<genexpr>");
+		name = PyString_FromString("<genexpr>");
 		if (!name)
 			return 0;
 	}
@@ -2868,7 +2868,7 @@ expr_constant(expr_ty e)
 	case Name_kind:
 		/* __debug__ is not assignable, so we can optimize
 		 * it away in if and while statements */
-		if (strcmp(PyBytes_AS_STRING(e->v.Name.id),
+		if (strcmp(PyString_AS_STRING(e->v.Name.id),
 			   "__debug__") == 0)
 			   return ! Py_OptimizeFlag;
 		/* fall through */
@@ -2910,12 +2910,12 @@ compiler_with(struct compiler *c, stmt_ty s)
     assert(s->kind == With_kind);
 
     if (!enter_attr) {
-	enter_attr = PyBytes_InternFromString("__enter__");
+	enter_attr = PyString_InternFromString("__enter__");
 	if (!enter_attr)
 	    return 0;
     }
     if (!exit_attr) {
-	exit_attr = PyBytes_InternFromString("__exit__");
+	exit_attr = PyString_InternFromString("__exit__");
 	if (!exit_attr)
 	    return 0;
     }
@@ -3521,10 +3521,10 @@ assemble_init(struct assembler *a, int nblocks, int firstlineno)
 {
 	memset(a, 0, sizeof(struct assembler));
 	a->a_lineno = firstlineno;
-	a->a_bytecode = PyBytes_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
+	a->a_bytecode = PyString_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
 	if (!a->a_bytecode)
 		return 0;
-	a->a_lnotab = PyBytes_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
+	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
 	if (!a->a_lnotab)
 		return 0;
 	a->a_postorder = (basicblock **)PyObject_Malloc(
@@ -3636,17 +3636,17 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	if (d_bytecode > 255) {
 		int j, nbytes, ncodes = d_bytecode / 255;
 		nbytes = a->a_lnotab_off + 2 * ncodes;
-		len = PyBytes_GET_SIZE(a->a_lnotab);
+		len = PyString_GET_SIZE(a->a_lnotab);
 		if (nbytes >= len) {
 			if (len * 2 < nbytes)
 				len = nbytes;
 			else
 				len *= 2;
-			if (_PyBytes_Resize(&a->a_lnotab, len) < 0)
+			if (_PyString_Resize(&a->a_lnotab, len) < 0)
 				return 0;
 		}
 		lnotab = (unsigned char *)
-			   PyBytes_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+			   PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
 		for (j = 0; j < ncodes; j++) {
 			*lnotab++ = 255;
 			*lnotab++ = 0;
@@ -3658,17 +3658,17 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	if (d_lineno > 255) {
 		int j, nbytes, ncodes = d_lineno / 255;
 		nbytes = a->a_lnotab_off + 2 * ncodes;
-		len = PyBytes_GET_SIZE(a->a_lnotab);
+		len = PyString_GET_SIZE(a->a_lnotab);
 		if (nbytes >= len) {
 			if (len * 2 < nbytes)
 				len = nbytes;
 			else
 				len *= 2;
-			if (_PyBytes_Resize(&a->a_lnotab, len) < 0)
+			if (_PyString_Resize(&a->a_lnotab, len) < 0)
 				return 0;
 		}
 		lnotab = (unsigned char *)
-			   PyBytes_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+			   PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
 		*lnotab++ = d_bytecode;
 		*lnotab++ = 255;
 		d_bytecode = 0;
@@ -3680,13 +3680,13 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		a->a_lnotab_off += ncodes * 2;
 	}
 
-	len = PyBytes_GET_SIZE(a->a_lnotab);
+	len = PyString_GET_SIZE(a->a_lnotab);
 	if (a->a_lnotab_off + 2 >= len) {
-		if (_PyBytes_Resize(&a->a_lnotab, len * 2) < 0)
+		if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
 			return 0;
 	}
 	lnotab = (unsigned char *)
-			PyBytes_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+			PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
 
 	a->a_lnotab_off += 2;
 	if (d_bytecode) {
@@ -3711,7 +3711,7 @@ static int
 assemble_emit(struct assembler *a, struct instr *i)
 {
 	int size, arg = 0, ext = 0;
-	Py_ssize_t len = PyBytes_GET_SIZE(a->a_bytecode);
+	Py_ssize_t len = PyString_GET_SIZE(a->a_bytecode);
 	char *code;
 
 	size = instrsize(i);
@@ -3722,10 +3722,10 @@ assemble_emit(struct assembler *a, struct instr *i)
 	if (i->i_lineno && !assemble_lnotab(a, i))
 		return 0;
 	if (a->a_offset + size >= len) {
-		if (_PyBytes_Resize(&a->a_bytecode, len * 2) < 0)
+		if (_PyString_Resize(&a->a_bytecode, len * 2) < 0)
 		    return 0;
 	}
-	code = PyBytes_AS_STRING(a->a_bytecode) + a->a_offset;
+	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
 	a->a_offset += size;
 	if (size == 6) {
 		assert(i->i_hasarg);
@@ -3898,7 +3898,7 @@ makecode(struct compiler *c, struct assembler *a)
 	freevars = dict_keys_inorder(c->u->u_freevars, PyTuple_Size(cellvars));
 	if (!freevars)
 	    goto error;
-	filename = PyBytes_FromString(c->c_filename);
+	filename = PyString_FromString(c->c_filename);
 	if (!filename)
 		goto error;
 
@@ -4018,9 +4018,9 @@ assemble(struct compiler *c, int addNone)
 				goto error;
 	}
 
-	if (_PyBytes_Resize(&a.a_lnotab, a.a_lnotab_off) < 0)
+	if (_PyString_Resize(&a.a_lnotab, a.a_lnotab_off) < 0)
 		goto error;
-	if (_PyBytes_Resize(&a.a_bytecode, a.a_offset) < 0)
+	if (_PyString_Resize(&a.a_bytecode, a.a_offset) < 0)
 		goto error;
 
 	co = makecode(c, &a);

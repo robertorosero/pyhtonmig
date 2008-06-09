@@ -151,7 +151,7 @@ set_lookkey(PySetObject *so, PyObject *key, register long hash)
 
 /*
  * Hacked up version of set_lookkey which can assume keys are always strings;
- * This means we can always use _PyBytes_Eq directly and not have to check to
+ * This means we can always use _PyString_Eq directly and not have to check to
  * see if the comparison altered the table.
  */
 static setentry *
@@ -168,7 +168,7 @@ set_lookkey_string(PySetObject *so, PyObject *key, register long hash)
 	   including subclasses of str; e.g., one reason to subclass
 	   strings is to override __eq__, and for speed we don't cater to
 	   that here. */
-	if (!PyBytes_CheckExact(key)) {
+	if (!PyString_CheckExact(key)) {
 		so->lookup = set_lookkey;
 		return set_lookkey(so, key, hash);
 	}
@@ -179,7 +179,7 @@ set_lookkey_string(PySetObject *so, PyObject *key, register long hash)
 	if (entry->key == dummy)
 		freeslot = entry;
 	else {
-		if (entry->hash == hash && _PyBytes_Eq(entry->key, key))
+		if (entry->hash == hash && _PyString_Eq(entry->key, key))
 			return entry;
 		freeslot = NULL;
 	}
@@ -194,7 +194,7 @@ set_lookkey_string(PySetObject *so, PyObject *key, register long hash)
 		if (entry->key == key
 		    || (entry->hash == hash
 			&& entry->key != dummy
-			&& _PyBytes_Eq(entry->key, key)))
+			&& _PyString_Eq(entry->key, key)))
 			return entry;
 		if (entry->key == dummy && freeslot == NULL)
 			freeslot = entry;
@@ -381,8 +381,8 @@ set_add_key(register PySetObject *so, PyObject *key)
 	register long hash;
 	register Py_ssize_t n_used;
 
-	if (!PyBytes_CheckExact(key) ||
-	    (hash = ((PyBytesObject *) key)->ob_shash) == -1) {
+	if (!PyString_CheckExact(key) ||
+	    (hash = ((PyStringObject *) key)->ob_shash) == -1) {
 		hash = PyObject_Hash(key);
 		if (hash == -1)
 			return -1;
@@ -428,8 +428,8 @@ set_discard_key(PySetObject *so, PyObject *key)
 	PyObject *old_key;
 
 	assert (PyAnySet_Check(so));
-	if (!PyBytes_CheckExact(key) ||
-	    (hash = ((PyBytesObject *) key)->ob_shash) == -1) {
+	if (!PyString_CheckExact(key) ||
+	    (hash = ((PyStringObject *) key)->ob_shash) == -1) {
 		hash = PyObject_Hash(key);
 		if (hash == -1)
 			return -1;
@@ -618,7 +618,7 @@ set_repr(PySetObject *so)
 	if (status != 0) {
 		if (status < 0)
 			return NULL;
-		return PyBytes_FromFormat("%s(...)", so->ob_type->tp_name);
+		return PyString_FromFormat("%s(...)", so->ob_type->tp_name);
 	}
 
 	keys = PySequence_List((PyObject *)so);
@@ -629,8 +629,8 @@ set_repr(PySetObject *so)
 	if (listrepr == NULL)
 		goto done;
 
-	result = PyBytes_FromFormat("%s(%s)", so->ob_type->tp_name,
-		PyBytes_AS_STRING(listrepr));
+	result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
+		PyString_AS_STRING(listrepr));
 	Py_DECREF(listrepr);
 done:
 	Py_ReprLeave((PyObject*)so);
@@ -685,8 +685,8 @@ set_contains_key(PySetObject *so, PyObject *key)
 	long hash;
 	setentry *entry;
 
-	if (!PyBytes_CheckExact(key) ||
-	    (hash = ((PyBytesObject *) key)->ob_shash) == -1) {
+	if (!PyString_CheckExact(key) ||
+	    (hash = ((PyStringObject *) key)->ob_shash) == -1) {
 		hash = PyObject_Hash(key);
 		if (hash == -1)
 			return -1;
@@ -967,15 +967,20 @@ set_update_internal(PySetObject *so, PyObject *other)
 }
 
 static PyObject *
-set_update(PySetObject *so, PyObject *other)
+set_update(PySetObject *so, PyObject *args)
 {
-	if (set_update_internal(so, other) == -1)
-		return NULL;
+	Py_ssize_t i;
+
+	for (i=0 ; i<PyTuple_GET_SIZE(args) ; i++) {
+		PyObject *other = PyTuple_GET_ITEM(args, i);
+		if (set_update_internal(so, other) == -1)
+			return NULL;
+	}
 	Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(update_doc, 
-"Update a set with the union of itself and another.");
+"Update a set with the union of itself and others.");
 
 static PyObject *
 make_new_set(PyTypeObject *type, PyObject *iterable)
@@ -983,7 +988,7 @@ make_new_set(PyTypeObject *type, PyObject *iterable)
 	register PySetObject *so = NULL;
 
 	if (dummy == NULL) { /* Auto-initialize dummy */
-		dummy = PyBytes_FromString("<dummy key>");
+		dummy = PyString_FromString("<dummy key>");
 		if (dummy == NULL)
 			return NULL;
 	}
@@ -1156,9 +1161,42 @@ set_clear(PySetObject *so)
 PyDoc_STRVAR(clear_doc, "Remove all elements from this set.");
 
 static PyObject *
-set_union(PySetObject *so, PyObject *other)
+set_union(PySetObject *so, PyObject *args)
 {
 	PySetObject *result;
+	PyObject *other;
+	Py_ssize_t i;
+
+	result = (PySetObject *)set_copy(so);
+	if (result == NULL)
+		return NULL;
+
+	for (i=0 ; i<PyTuple_GET_SIZE(args) ; i++) {
+		other = PyTuple_GET_ITEM(args, i);
+		if ((PyObject *)so == other)
+			return (PyObject *)result;
+		if (set_update_internal(result, other) == -1) {
+			Py_DECREF(result);
+			return NULL;
+		}
+	}
+	return (PyObject *)result;
+}
+
+PyDoc_STRVAR(union_doc,
+ "Return the union of sets as a new set.\n\
+\n\
+(i.e. all elements that are in either set.)");
+
+static PyObject *
+set_or(PySetObject *so, PyObject *other)
+{
+	PySetObject *result;
+
+	if (!PyAnySet_Check(so) || !PyAnySet_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
 
 	result = (PySetObject *)set_copy(so);
 	if (result == NULL)
@@ -1170,21 +1208,6 @@ set_union(PySetObject *so, PyObject *other)
 		return NULL;
 	}
 	return (PyObject *)result;
-}
-
-PyDoc_STRVAR(union_doc,
- "Return the union of two sets as a new set.\n\
-\n\
-(i.e. all elements that are in either set.)");
-
-static PyObject *
-set_or(PySetObject *so, PyObject *other)
-{
-	if (!PyAnySet_Check(so) || !PyAnySet_Check(other)) {
-		Py_INCREF(Py_NotImplemented);
-		return Py_NotImplemented;
-	}
-	return set_union(so, other);
 }
 
 static PyObject *
@@ -1947,9 +1970,9 @@ static PyMethodDef set_methods[] = {
 	{"test_c_api",	(PyCFunction)test_c_api,	METH_NOARGS,
 	 test_c_api_doc},
 #endif
-	{"union",	(PyCFunction)set_union,		METH_O,
+	{"union",	(PyCFunction)set_union,		METH_VARARGS,
 	 union_doc},
-	{"update",	(PyCFunction)set_update,	METH_O,
+	{"update",	(PyCFunction)set_update,	METH_VARARGS,
 	 update_doc},
 	{NULL,		NULL}	/* sentinel */
 };
@@ -2062,7 +2085,7 @@ static PyMethodDef frozenset_methods[] = {
 	 reduce_doc},
 	{"symmetric_difference",(PyCFunction)set_symmetric_difference,	METH_O,
 	 symmetric_difference_doc},
-	{"union",	(PyCFunction)set_union,		METH_O,
+	{"union",	(PyCFunction)set_union,		METH_VARARGS,
 	 union_doc},
 	{NULL,		NULL}	/* sentinel */
 };
@@ -2322,7 +2345,7 @@ test_c_api(PySetObject *so)
 	/* Exercise direct iteration */
 	i = 0, count = 0;
 	while (_PySet_Next((PyObject *)dup, &i, &x)) {
-		s = PyBytes_AsString(x);
+		s = PyString_AsString(x);
 		assert(s && (s[0] == 'a' || s[0] == 'b' || s[0] == 'c'));
 		count++;
 	}

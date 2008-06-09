@@ -46,7 +46,7 @@ static PyObject *parsestrplus(struct compiling *, const node *n);
 
 static identifier
 new_identifier(const char* n, PyArena *arena) {
-    PyObject* id = PyBytes_InternFromString(n);
+    PyObject* id = PyString_InternFromString(n);
     PyArena_AddPyObject(arena, id);
     return id;
 }
@@ -111,6 +111,30 @@ ast_error_finish(const char *filename)
     if (!value)
         return;
     PyErr_Restore(type, value, tback);
+}
+
+static int
+ast_warn(struct compiling *c, const node *n, char *msg)
+{
+    if (PyErr_WarnExplicit(PyExc_SyntaxWarning, msg, c->c_filename, LINENO(n),
+                           NULL, NULL) < 0) {
+        /* if -Werr, change it to a SyntaxError */
+        if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_SyntaxWarning))
+            ast_error(n, msg);
+        return 0;
+    }
+    return 1;
+}
+
+static int
+forbidden_check(struct compiling *c, const node *n, const char *x)
+{
+    if (!strcmp(x, "None"))
+        return ast_error(n, "assignment to None");
+    if (Py_Py3kWarningFlag && !(strcmp(x, "True") && strcmp(x, "False")) &&
+        !ast_warn(c, n, "assignment to True or False is forbidden in 3.x"))
+        return 0;
+    return 1;
 }
 
 /* num_stmts() returns number of contained statements.
@@ -351,20 +375,18 @@ set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
 
     switch (e->kind) {
         case Attribute_kind:
-            if (ctx == Store &&
-                !strcmp(PyBytes_AS_STRING(e->v.Attribute.attr), "None")) {
-                return ast_error(n, "assignment to None");
-            }
+            if (ctx == Store && !forbidden_check(c, n,
+                                PyBytes_AS_STRING(e->v.Attribute.attr)))
+                    return 0;
             e->v.Attribute.ctx = ctx;
             break;
         case Subscript_kind:
             e->v.Subscript.ctx = ctx;
             break;
         case Name_kind:
-            if (ctx == Store &&
-                !strcmp(PyBytes_AS_STRING(e->v.Name.id), "None")) {
-                    return ast_error(n, "assignment to None");
-            }
+            if (ctx == Store && !forbidden_check(c, n,
+                                PyBytes_AS_STRING(e->v.Name.id)))
+                    return 0;
             e->v.Name.ctx = ctx;
             break;
         case List_kind:
@@ -582,10 +604,8 @@ set_name:
         /* fpdef_node is either a NAME or an fplist */
         child = CHILD(fpdef_node, 0);
         if (TYPE(child) == NAME) {
-            if (!strcmp(STR(child), "None")) {
-                ast_error(child, "assignment to None");
-                return NULL;
-            }   
+            if (!forbidden_check(c, n, STR(child)))
+                return NULL;  
             arg = Name(NEW_IDENTIFIER(child), Store, LINENO(child),
                        child->n_col_offset, c->c_arena);
         }
@@ -681,6 +701,9 @@ ast_for_arguments(struct compiling *c, const node *n)
                     /* def foo((x)): is not complex, special case. */
                     if (NCH(ch) != 1) {
                         /* We have complex arguments, setup for unpacking. */
+                        if (Py_Py3kWarningFlag && !ast_warn(c, ch,
+                            "tuple parameter unpacking has been removed in 3.x"))
+                            goto error;
                         asdl_seq_SET(args, k++, compiler_complex_args(c, ch));
                         if (!asdl_seq_GET(args, k-1))
                                 goto error;
@@ -695,10 +718,8 @@ ast_for_arguments(struct compiling *c, const node *n)
                 }
                 if (TYPE(CHILD(ch, 0)) == NAME) {
                     expr_ty name;
-                    if (!strcmp(STR(CHILD(ch, 0)), "None")) {
-                        ast_error(CHILD(ch, 0), "assignment to None");
+                    if (!forbidden_check(c, n, STR(CHILD(ch, 0))))
                         goto error;
-                    }
                     name = Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                 Param, LINENO(ch), ch->n_col_offset,
                                 c->c_arena);
@@ -710,18 +731,14 @@ ast_for_arguments(struct compiling *c, const node *n)
                 i += 2; /* the name and the comma */
                 break;
             case STAR:
-                if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                    ast_error(CHILD(n, i+1), "assignment to None");
+                if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
                     goto error;
-                }
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
             case DOUBLESTAR:
-                if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                    ast_error(CHILD(n, i+1), "assignment to None");
+                if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
                     goto error;
-                }
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
@@ -844,10 +861,8 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
         return NULL;
-    else if (!strcmp(STR(CHILD(n, name_i)), "None")) {
-        ast_error(CHILD(n, name_i), "assignment to None");
+    else if (!forbidden_check(c, CHILD(n, name_i), STR(CHILD(n, name_i))))
         return NULL;
-    }
     args = ast_for_arguments(c, CHILD(n, name_i + 1));
     if (!args)
         return NULL;
@@ -1276,7 +1291,7 @@ ast_for_atom(struct compiling *c, const node *n)
                 if (errstr) {
                     char *s = "";
                     char buf[128];
-                    s = PyBytes_AsString(errstr);
+                    s = PyString_AsString(errstr);
                     PyOS_snprintf(buf, sizeof(buf), "(unicode error) %s", s);
                     ast_error(n, buf);
                 } else {
@@ -1363,14 +1378,9 @@ ast_for_atom(struct compiling *c, const node *n)
     }
     case BACKQUOTE: { /* repr */
         expr_ty expression;
-        if (Py_Py3kWarningFlag) {
-            if (PyErr_WarnExplicit(PyExc_SyntaxWarning,
-                                   "backquote not supported in 3.x; use repr()",
-                                   c->c_filename, LINENO(n),
-                                   NULL, NULL)) {
+        if (Py_Py3kWarningFlag &&
+            !ast_warn(c, n, "backquote not supported in 3.x; use repr()"))
             return NULL;
-            }
-        }
         expression = ast_for_testlist(c, CHILD(n, 1));
         if (!expression)
             return NULL;
@@ -1921,10 +1931,8 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                     return NULL;
                 }
                 key = e->v.Name.id;
-                if (!strcmp(PyBytes_AS_STRING(key), "None")) {
-                    ast_error(CHILD(ch, 0), "assignment to None");
+                if (!forbidden_check(c, CHILD(ch, 0), PyBytes_AS_STRING(key)))
                     return NULL;
-                }
                 e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
                     return NULL;
@@ -2051,10 +2059,9 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                 return NULL;
             case Name_kind: {
                 const char *var_name = PyBytes_AS_STRING(expr1->v.Name.id);
-                if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
-                    ast_error(ch, "assignment to None");
+                if ((var_name[0] == 'N' || var_name[0] == 'T' || var_name[0] == 'F') &&
+                    !forbidden_check(c, ch, var_name))
                     return NULL;
-                }
                 break;
             }
             case Attribute_kind:
@@ -2326,10 +2333,10 @@ alias_for_import_name(struct compiling *c, const node *n)
                     /* length of string plus one for the dot */
                     len += strlen(STR(CHILD(n, i))) + 1;
                 len--; /* the last name doesn't have a dot */
-                str = PyBytes_FromStringAndSize(NULL, len);
+                str = PyString_FromStringAndSize(NULL, len);
                 if (!str)
                     return NULL;
-                s = PyBytes_AS_STRING(str);
+                s = PyString_AS_STRING(str);
                 if (!s)
                     return NULL;
                 for (i = 0; i < NCH(n); i += 2) {
@@ -2340,13 +2347,13 @@ alias_for_import_name(struct compiling *c, const node *n)
                 }
                 --s;
                 *s = '\0';
-                PyBytes_InternInPlace(&str);
+                PyString_InternInPlace(&str);
                 PyArena_AddPyObject(c->c_arena, str);
                 return alias(str, NULL, c->c_arena);
             }
             break;
         case STAR:
-            str = PyBytes_InternFromString("*");
+            str = PyString_InternFromString("*");
             PyArena_AddPyObject(c->c_arena, str);
             return alias(str, NULL, c->c_arena);
         default:
@@ -2997,10 +3004,8 @@ ast_for_classdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     
     REQ(n, classdef);
 
-    if (!strcmp(STR(CHILD(n, 1)), "None")) {
-            ast_error(n, "assignment to None");
+    if (!forbidden_check(c, n, STR(CHILD(n, 1))))
             return NULL;
-    }
 
     if (NCH(n) == 4) {
         s = ast_for_suite(c, CHILD(n, 3));
@@ -3196,10 +3201,10 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
                 u = NULL;
         } else {
                 /* "\XX" may become "\u005c\uHHLL" (12 bytes) */
-                u = PyBytes_FromStringAndSize((char *)NULL, len * 4);
+                u = PyString_FromStringAndSize((char *)NULL, len * 4);
                 if (u == NULL)
                         return NULL;
-                p = buf = PyBytes_AsString(u);
+                p = buf = PyString_AsString(u);
                 end = s + len;
                 while (s < end) {
                         if (*s == '\\') {
@@ -3218,8 +3223,8 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
                                         Py_DECREF(u);
                                         return NULL;
                                 }
-                                r = PyBytes_AsString(w);
-                                rn = PyBytes_Size(w);
+                                r = PyString_AsString(w);
+                                rn = PyString_Size(w);
                                 assert(rn % 2 == 0);
                                 for (i = 0; i < rn; i += 2) {
                                         sprintf(p, "\\u%02x%02x",
@@ -3318,11 +3323,11 @@ parsestr(struct compiling *c, const char *s)
                         return v;
 #endif
                 } else {
-                        return PyBytes_FromStringAndSize(s, len);
+                        return PyString_FromStringAndSize(s, len);
                 }
         }
 
-        return PyBytes_DecodeEscape(s, len, NULL, unicode,
+        return PyString_DecodeEscape(s, len, NULL, unicode,
                                      need_encoding ? c->c_encoding : NULL);
 }
 
@@ -3343,8 +3348,8 @@ parsestrplus(struct compiling *c, const node *n)
                         s = parsestr(c, STR(CHILD(n, i)));
                         if (s == NULL)
                                 goto onError;
-                        if (PyBytes_Check(v) && PyBytes_Check(s)) {
-                                PyBytes_ConcatAndDel(&v, s);
+                        if (PyString_Check(v) && PyString_Check(s)) {
+                                PyString_ConcatAndDel(&v, s);
                                 if (v == NULL)
                                     goto onError;
                         }
