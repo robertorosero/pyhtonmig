@@ -142,7 +142,7 @@ class AST_Tests(unittest.TestCase):
                                     (single_tests, single_results, "single"),
                                     (eval_tests, eval_results, "eval")):
             for i, o in itertools.izip(input, output):
-                flags = _ast.PyCF_ONLY_AST | _ast.PyCF_NO_OPTIMIZE
+                flags = ast.PyCF_ONLY_AST | ast.PyCF_NO_OPTIMIZE
                 ast_tree = compile(i, "?", kind, flags)
                 self.assertEquals(to_tuple(ast_tree), o)
                 self._assert_order(ast_tree, (0, 0))
