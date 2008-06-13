@@ -13,7 +13,7 @@ Core and Builtins
 -----------------
 
 - Several set methods now accept multiple arguments:  update(), union(),
-  intersection() and intersection_update().
+  intersection(), intersection_update(), difference(), and difference_update().
 
 - Issue #2898: Added sys.getsizeof() to retrieve size of objects in bytes.
 
@@ -39,6 +39,11 @@ Core and Builtins
 - Issue #2196: hasattr() now lets exceptions which do not inherit
   Exception (KeyboardInterrupt, and SystemExit) propagate instead of
   ignoring them.
+
+- Added checks for integer overflows, contributed by Google. Some are
+  only available if asserts are left in the code, in cases where they
+  can't be triggered from Python code.
+
 
 Extension Modules
 -----------------
