@@ -12,6 +12,8 @@ What's New in Python 2.6 beta 1?
 Core and Builtins
 -----------------
 
+- Add future_builtins.ascii().
+
 - Several set methods now accept multiple arguments:  update(), union(),
   intersection(), intersection_update(), difference(), and difference_update().
 
@@ -82,11 +84,17 @@ Extension Modules
 Library
 -------
 
+- The rfc822 module has been deprecated for removal in 3.0.
+
+- The mimetools module has been deprecated for removal in 3.0.
+
 - The ctypes.byref function now takes an optional second parameter
   which allows to specify an offset in bytes for the constructed
   pointer-like object.
 
 - Added the ast module.
+
+- Added the multiprocessing module, PEP 371.
 
 - Factored out the indentation cleaning from inspect.getdoc() into
   inspect.cleandoc() to ease standalone use.
@@ -94,7 +102,7 @@ Library
 - Issue #1798: Add ctypes calling convention that allows safe access
   to errno.
 
-- Issue #2404: ctypes objects support the new pep3118 buffer interface
+- Issue #2404: ctypes objects support the new pep3118 buffer interface.
 
 - Patch #2125: Add GetInteger and GetString methods for 
   msilib.Record objects.
@@ -291,8 +299,12 @@ Library
 - The bundled OSX-specific copy of libbffi is now in sync with the version
   shipped with PyObjC 2.0 and includes support for x86_64 and ppc64 platforms.
 
+- The threading module gained alias for names that are removed in 3.x.
+
 Build
 -----
+
+- The Windows installer now includes Tk 8.5.
 
 - Patch #1722225: Support QNX 6.
 
@@ -300,7 +312,7 @@ Build
 
 - On MacOS X it is now possible to install the framework in 64-bit
   mode or even as a 4-way universal binary (that is, PPC, i386,
-  PPC64 and x86_64 support in one binary)
+  PPC64 and x86_64 support in one binary).
 
   This is controlled by the configure argument ``--with-universal-archs``:
 
@@ -389,7 +401,7 @@ Library
   ending in) '.', '!' or '?'.
 
 - Add from_buffer() and from_buffer_copy() class methods to ctypes
-  data types
+  data types.
 
 - Issue #2682: ctypes callback functions no longer contain a cyclic
   reference to themselves.
