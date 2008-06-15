@@ -222,7 +222,24 @@ def mygen():
             self.assertEqual(tuple, ast.body[0].value.value.__class__)
             self.assertEqual(obj, ast.body[0].value.value)
 
-    def test_folding_of_constant_list_in_for_loop(self):
+    def test_skip_unreachable_for_loop(self):
+        code = """
+for i in []:
+    print i
+"""
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Pass, ast.body[0].__class__)
+
+    def test_skip_unreachable_while_loop(self):
+        code = """
+while 0:
+    print 'foo'
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Pass, ast.body[0].__class__)
+
+    def test_fold_constant_list_in_for_loop(self):
         code = """
 for i in [1, 2, 3]:
     print i
@@ -241,6 +258,20 @@ for i in [1, 2, 3]:
             self.assertEqual(_ast.Expr, ast.body[0].__class__)
             self.assertEqual(_ast.Const, ast.body[0].value.__class__)
             self.assertEqual(obj, ast.body[0].value.value)
+
+    def test_jumps_to_returns_are_simplified(self):
+        code = """
+def foo(x):
+    if x:
+        y = 1
+    else:
+        y = 0
+    return y
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
+        self.assertEqual('y', ast.body[0].body[0].body[1].value.id)
 
 def test_main():
     test_support.run_unittest(AstOptimizerTest)
