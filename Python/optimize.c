@@ -269,13 +269,17 @@ _eliminate_unreachable_code(asdl_seq** seq_ptr, int n, PySTEntryObject* ste,
         PyObject* test = _expr_constant_value(stmt->v.While.test);
         if (test != NULL) {
             if (!PyObject_IsTrue(test)) {
-                /* XXX: what about orelse? */
-                seq = _asdl_seq_replace_with_pass(seq, n, stmt->lineno,
-                        stmt->col_offset, arena);
+                if (stmt->v.While.orelse != NULL) {
+                    seq = _asdl_seq_replace(seq, n, stmt->v.While.orelse,
+                                            arena);
+                }
+                else {
+                    seq = _asdl_seq_replace_with_pass(seq, n, stmt->lineno,
+                            stmt->col_offset, arena);
+                }
+                if (seq == NULL)
+                    return 0;
             }
-            if (seq == NULL)
-                return 0;
-            *seq_ptr = seq;
         }
     }
     /* eliminate unreachable for loops? */
@@ -283,13 +287,16 @@ _eliminate_unreachable_code(asdl_seq** seq_ptr, int n, PySTEntryObject* ste,
         PyObject* iter = _expr_constant_value(stmt->v.For.iter);
         if (iter != NULL) {
             if (PyObject_Size(iter) == 0) {
-                /* XXX: what about orelse? */
-                seq = _asdl_seq_replace_with_pass(seq, n, stmt->lineno,
-                        stmt->col_offset, arena);
+                if (stmt->v.For.orelse != NULL) {
+                    seq = _asdl_seq_replace(seq, n, stmt->v.For.orelse, arena);
+                }
+                else {
+                    seq = _asdl_seq_replace_with_pass(seq, n, stmt->lineno,
+                            stmt->col_offset, arena);
+                }
+                if (seq == NULL)
+                    return 0;
             }
-            if (seq == NULL)
-                return 0;
-            *seq_ptr = seq;
         }
     }
     /* eliminate all code after a "return" statement */
@@ -299,8 +306,9 @@ _eliminate_unreachable_code(asdl_seq** seq_ptr, int n, PySTEntryObject* ste,
                 stmt->lineno, stmt->col_offset, arena);
         if (seq == NULL)
             return 0;
-        *seq_ptr = seq;
     }
+
+    *seq_ptr = seq;
 
     return 1;
 }
