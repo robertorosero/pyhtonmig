@@ -74,11 +74,11 @@
 	/>
 	<UserMacro
 		Name="sqlite3Dir"
-		Value="$(externalsDir)\sqlite-source-3.3.4"
+		Value="$(externalsDir)\sqlite-3.5.9"
 	/>
 	<UserMacro
 		Name="bz2Dir"
-		Value="$(externalsDir)\bzip2-1.0.3"
+		Value="$(externalsDir)\bzip2-1.0.5"
 	/>
 	<UserMacro
 		Name="opensslDir"

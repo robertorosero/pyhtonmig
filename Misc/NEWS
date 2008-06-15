@@ -84,6 +84,9 @@ Extension Modules
 Library
 -------
 
+- Issue #2912: platform.uname now tries to determine unknown information even if
+  os.uname exists.
+
 - The rfc822 module has been deprecated for removal in 3.0.
 
 - The mimetools module has been deprecated for removal in 3.0.
@@ -304,7 +307,7 @@ Library
 Build
 -----
 
-- The Windows installer now includes Tk 8.5.
+- The Windows installer now includes Tk 8.5, bzip2 1.0.5, and SQLite 3.5.9.
 
 - Patch #1722225: Support QNX 6.
 
