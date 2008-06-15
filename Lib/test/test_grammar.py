@@ -612,6 +612,16 @@ hello world
             result.append(x)
         self.assertEqual(result, [1, 2, 3])
 
+        #
+        # Ensure that the else: clause is executed for an empty sequence
+        #
+        n = 0
+        for x in []:
+            n = 1
+        else:
+            n = 2
+        self.assertEqual(2, n)
+
     def testTry(self):
         ### try_stmt: 'try' ':' suite (except_clause ':' suite)+ ['else' ':' suite]
         ###         | 'try' ':' suite 'finally' ':' suite
