@@ -34,15 +34,6 @@ _expr_constant_value(expr_ty expr)
     else if (expr->kind == Num_kind) {
         return expr->v.Num.n;
     }
-    else if (expr->kind == Name_kind) {
-        const char* name = PyString_AS_STRING(expr->v.Name.id);
-        if (strcmp(name, "True") == 0)
-            return Py_True;
-        else if (strcmp(name, "False") == 0)
-            return Py_False;
-        else if (strcmp(name, "None") == 0)
-            return Py_None;
-    }
     else if (expr->kind == Const_kind) {
         return expr->v.Const.value;
     }
@@ -916,10 +907,16 @@ optimize_name(expr_ty* expr_ptr, PySTEntryObject* ste, PyArena* arena)
     const char* id = PyString_AS_STRING(expr->v.Name.id);
     PyObject* constvalue = NULL;
 
+    /* allow "assignment to none" error to naturally occur */
+    if (expr->v.Name.ctx != Load)
+        return 1;
+
     if (strcmp(id, "None") == 0) {
         Py_INCREF(Py_None);
         constvalue = Py_None;
     }
+/* this is not doable in 2.x ... */
+#if 0
     else if (strcmp(id, "True") == 0) {
         Py_INCREF(Py_True);
         constvalue = Py_True;
@@ -928,10 +925,14 @@ optimize_name(expr_ty* expr_ptr, PySTEntryObject* ste, PyArena* arena)
         Py_INCREF(Py_False);
         constvalue = Py_False;
     }
+#endif
 
-    if (constvalue != NULL)
+    if (constvalue != NULL) {
         *expr_ptr = Const(constvalue, expr->lineno,
                             expr->col_offset, arena);
+        if (*expr_ptr == NULL)
+            return 0;
+    }
 
     return 1;
 }
@@ -1007,12 +1008,7 @@ optimize_expr(expr_ty* expr_ptr, PySTEntryObject* ste, PyArena* arena)
             }
         case Name_kind:
             {
-                /* we probably only want to optimize loads ... storing values
-                 * in a Const makes no sense!
-                 */
-                if (expr->v.Name.ctx == Load)
-                    return optimize_name(expr_ptr, ste, arena);
-                /* fall through */
+                return optimize_name(expr_ptr, ste, arena);
             }
         case Num_kind:
         case Str_kind:

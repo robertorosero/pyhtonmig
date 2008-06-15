@@ -139,7 +139,8 @@ x + 3 * 2
         self.assertNum(-5, "-5")
         self.assertNum(True, "not 0")
         self.assertNum(-3, "-+3")
-        self.assertNum(False, "not True")
+        # XXX: cannot be enforced in 2.6
+        #self.assertNum(False, "not True")
         self.assertNum(True, "not None")
 
     def test_unary_failure_left_until_runtime(self):
@@ -249,7 +250,7 @@ for i in [1, 2, 3]:
         self.assertEqual((1, 2, 3), ast.body[0].iter.value)
 
     def test_named_constants(self):
-        tests = [None, True, False]
+        tests = [None]
 
         for obj in tests:
             code = repr(obj)
@@ -272,6 +273,19 @@ def foo(x):
         ast = self.compileast(code)
         self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
         self.assertEqual('y', ast.body[0].body[0].body[1].value.id)
+
+    def test_assignment_to_true_works(self):
+        # ---------------------------------------------------------------------
+        #   Please note that this test is for <2.6 to ensure that
+        #   assignment to True and False are possible despite any
+        #   optimizations.
+        # ---------------------------------------------------------------------
+
+        True = 0
+        assert not True
+
+        False = 1
+        assert False
 
 def test_main():
     test_support.run_unittest(AstOptimizerTest)
