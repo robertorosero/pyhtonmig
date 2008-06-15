@@ -1007,7 +1007,12 @@ optimize_expr(expr_ty* expr_ptr, PySTEntryObject* ste, PyArena* arena)
             }
         case Name_kind:
             {
-                return optimize_name(expr_ptr, ste, arena);
+                /* we probably only want to optimize loads ... storing values
+                 * in a Const makes no sense!
+                 */
+                if (expr->v.Name.ctx == Load)
+                    return optimize_name(expr_ptr, ste, arena);
+                /* fall through */
             }
         case Num_kind:
         case Str_kind:
