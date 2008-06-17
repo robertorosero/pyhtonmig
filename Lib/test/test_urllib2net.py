@@ -4,10 +4,11 @@ import unittest
 from test import support
 from test.test_urllib2 import sanepathname2url
 
-import socket
-import urllib2
-import sys
 import os
+import socket
+import sys
+import urllib.error
+import urllib.request
 
 
 def _retry_thrice(func, exc, *args, **kwargs):
@@ -28,7 +29,8 @@ def _wrap_with_retry_thrice(func, exc):
 
 # Connecting to remote hosts is flaky.  Make it more robust by retrying
 # the connection several times.
-_urlopen_with_retry = _wrap_with_retry_thrice(urllib2.urlopen, urllib2.URLError)
+_urlopen_with_retry = _wrap_with_retry_thrice(urllib.request.urlopen,
+                                              urllib.error.URLError)
 
 
 class AuthTests(unittest.TestCase):
@@ -82,7 +84,8 @@ class CloseSocketTest(unittest.TestCase):
         response = _urlopen_with_retry("http://www.python.org/")
         abused_fileobject = response.fp
         httpresponse = abused_fileobject.raw
-        self.assert_(httpresponse.__class__ is http.client.HTTPResponse)
+        self.assert_(httpresponse.__class__ is http.client.HTTPResponse,
+                     httpresponse.__class__)
         fileobject = httpresponse.fp
 
         self.assert_(not fileobject.closed)
@@ -116,8 +119,9 @@ class OtherNetworkTests(unittest.TestCase):
             f.write('hi there\n')
             f.close()
             urls = [
-                'file:'+sanepathname2url(os.path.abspath(TESTFN)),
-                ('file:///nonsensename/etc/passwd', None, urllib2.URLError),
+                'file:' + sanepathname2url(os.path.abspath(TESTFN)),
+                ('file:///nonsensename/etc/passwd', None,
+                 urllib.error.URLError),
                 ]
             self._test_urls(urls, self._extra_handlers(), retry=True)
         finally:
@@ -157,9 +161,9 @@ class OtherNetworkTests(unittest.TestCase):
         import logging
         debug = logging.getLogger("test_urllib2").debug
 
-        urlopen = urllib2.build_opener(*handlers).open
+        urlopen = urllib.request.build_opener(*handlers).open
         if retry:
-            urlopen = _wrap_with_retry_thrice(urlopen, urllib2.URLError)
+            urlopen = _wrap_with_retry_thrice(urlopen, urllib.error.URLError)
 
         for url in urls:
             if isinstance(url, tuple):
@@ -186,7 +190,7 @@ class OtherNetworkTests(unittest.TestCase):
     def _extra_handlers(self):
         handlers = []
 
-        cfh = urllib2.CacheFTPHandler()
+        cfh = urllib.request.CacheFTPHandler()
         cfh.setTimeout(1)
         handlers.append(cfh)
 
