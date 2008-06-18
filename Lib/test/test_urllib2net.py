@@ -80,17 +80,11 @@ class CloseSocketTest(unittest.TestCase):
         # calling .close() on urllib2's response objects should close the
         # underlying socket
 
-        # delve deep into response to fetch socket._socketobject
         response = _urlopen_with_retry("http://www.python.org/")
-        abused_fileobject = response.fp
-        httpresponse = abused_fileobject.raw
-        self.assert_(httpresponse.__class__ is http.client.HTTPResponse,
-                     httpresponse.__class__)
-        fileobject = httpresponse.fp
-
-        self.assert_(not fileobject.closed)
+        sock = response.fp
+        self.assert_(not sock.closed)
         response.close()
-        self.assert_(fileobject.closed)
+        self.assert_(sock.closed)
 
 class OtherNetworkTests(unittest.TestCase):
     def setUp(self):
@@ -201,7 +195,7 @@ class TimeoutTest(unittest.TestCase):
     def test_http_basic(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
         u = _urlopen_with_retry("http://www.python.org")
-        self.assertTrue(u.fp.raw.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp._sock.gettimeout() is None)
 
     def test_http_default_timeout(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
@@ -210,7 +204,7 @@ class TimeoutTest(unittest.TestCase):
             u = _urlopen_with_retry("http://www.python.org")
         finally:
             socket.setdefaulttimeout(None)
-        self.assertEqual(u.fp.raw.fp._sock.gettimeout(), 60)
+        self.assertEqual(u.fp._sock.gettimeout(), 60)
 
     def test_http_no_timeout(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
@@ -219,11 +213,11 @@ class TimeoutTest(unittest.TestCase):
             u = _urlopen_with_retry("http://www.python.org", timeout=None)
         finally:
             socket.setdefaulttimeout(None)
-        self.assertTrue(u.fp.raw.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp._sock.gettimeout() is None)
 
     def test_http_timeout(self):
         u = _urlopen_with_retry("http://www.python.org", timeout=120)
-        self.assertEqual(u.fp.raw.fp._sock.gettimeout(), 120)
+        self.assertEqual(u.fp._sock.gettimeout(), 120)
 
     FTP_HOST = "ftp://ftp.mirror.nl/pub/mirror/gnu/"
 
