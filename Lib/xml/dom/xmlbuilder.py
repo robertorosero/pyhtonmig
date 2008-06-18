@@ -223,14 +223,14 @@ class DOMEntityResolver(object):
         source.encoding = self._guess_media_encoding(source)
 
         # determine the base URI is we can
-        import posixpath, urlparse
-        parts = urlparse.urlparse(systemId)
+        import posixpath, urllib.parse
+        parts = urllib.parse.urlparse(systemId)
         scheme, netloc, path, params, query, fragment = parts
         # XXX should we check the scheme here as well?
         if path and not path.endswith("/"):
             path = posixpath.dirname(path) + "/"
             parts = scheme, netloc, path, params, query, fragment
-            source.baseURI = urlparse.urlunparse(parts)
+            source.baseURI = urllib.parse.urlunparse(parts)
 
         return source
 
