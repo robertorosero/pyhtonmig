@@ -420,12 +420,9 @@ class TestUrlopen(unittest.TestCase):
 
     def test_info(self):
         handler = self.start_server()
-        open_url = urllib.request.urlopen("http://localhost:%s" % handler.port)
-        info_obj = open_url.info()
-        self.assertEqual(info_obj.getsubtype(), "plain")
-
         try:
-            open_url = urllib.request.urlopen("http://localhost:%s" % handler.port)
+            open_url = urllib.request.urlopen(
+                "http://localhost:%s" % handler.port)
             info_obj = open_url.info()
             self.assert_(isinstance(info_obj, email.message.Message),
                          "object returned by 'info' is not an instance of "
