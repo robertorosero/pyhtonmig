@@ -526,9 +526,9 @@ class HTTPRedirectHandler(BaseHandler):
         # Some servers (incorrectly) return multiple Location headers
         # (so probably same goes for URI).  Use first header.
         if "location" in headers:
-            newurl = headers["location"][0]
+            newurl = headers["location"]
         elif "uri" in headers:
-            newurl = headers["uri"][0]
+            newurl = headers["uri"]
         else:
             return
         newurl = urllib.parse.urljoin(req.get_full_url(), newurl)
