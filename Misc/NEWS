@@ -7,10 +7,13 @@ Python News
 What's New in Python 2.6 beta 1?
 ================================
 
-*Release date: XX-June-2008*
+*Release date: 18-June-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3100: Corrected a crash on deallocation of a subclassed weakref which
+  holds the last (strong) reference to its referent.
 
 - Add future_builtins.ascii().
 
@@ -50,6 +53,8 @@ Core and Builtins
 Extension Modules
 -----------------
 
+- Issue #3116:  marshal.dumps() had quadratic behavior for strings > 32Mb.
+
 - Issue #2138: Add factorial() the math module.
 
 - The heapq module does comparisons using LT instead of LE.  This
@@ -84,6 +89,15 @@ Extension Modules
 Library
 -------
 
+- Issue #3136: fileConfig()'s disabling of old loggers is now conditional via
+  an optional disable_existing_loggers parameter, but the default value is
+  such that the old behaviour is preserved. Thanks to Leandro Lucarella for
+  the patch.
+
+- Issue #3126: StreamHandler and FileHandler check before calling "flush" and
+  "close" that the stream object has these, using hasattr (thanks to bobf for
+  the patch).
+
 - Issue #2912: platform.uname now tries to determine unknown information even if
   os.uname exists.
 
@@ -107,7 +121,7 @@ Library
 
 - Issue #2404: ctypes objects support the new pep3118 buffer interface.
 
-- Patch #2125: Add GetInteger and GetString methods for 
+- Patch #2125: Add GetInteger and GetString methods for
   msilib.Record objects.
 
 - Issue #2782: The datetime module's strftime methods now accept
@@ -294,7 +308,7 @@ Library
 - The Mac Modules (including Carbon) have been deprecated for removal
   in Python 3.0.
 
-- Library: on MacOS X you can now set ``ARCHFLAGS`` in the shell 
+- Library: on MacOS X you can now set ``ARCHFLAGS`` in the shell
   environment to control the '-arch' flags that are used to build
   an extension. This was added for compatibility with Apple's build
   of Python.
