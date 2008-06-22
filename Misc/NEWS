@@ -4,6 +4,25 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.6 beta 2?
+================================
+
+Core and Builtins
+-----------------
+
+- Issue #3004: Minor change to slice.indices(): the start and stop
+  arguments are now treated identically, making the behaviour easier
+  to describe and understand.  For example, slice(None, -10,
+  1).indices(9) now returns (0, 0, 1) instead of (0, -1, 1), and
+  slice(None, 10, -1).indices(10) returns (9, 9, -1) instead of (9,
+  10, -1).
+
+- Issue 3008: hex(), oct(), and bin() can now create exact reprs 
+  for floats.
+
+- Make bin() implementation parallel oct() and hex().
+
+
 What's New in Python 2.6 beta 1?
 ================================
 
@@ -88,6 +107,12 @@ Extension Modules
 
 Library
 -------
+
+- Issue #2888: Fixed the behaviour of pprint when working with nested
+  structures, to match the behaviour of 2.5 and 3.0 (now follows the common
+  sense).
+
+- Issue #1817: cgi now correctly handles the querystring on POST requests
 
 - Issue #3136: fileConfig()'s disabling of old loggers is now conditional via
   an optional disable_existing_loggers parameter, but the default value is
