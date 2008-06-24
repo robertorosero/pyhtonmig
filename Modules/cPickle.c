@@ -1523,6 +1523,8 @@ batch_list(Picklerobject *self, PyObject *iter)
 	static char append = APPEND;
 	static char appends = APPENDS;
 
+	self->nesting++;
+
 	assert(iter != NULL);
 
 	if (self->proto == 0) {
@@ -1661,6 +1663,8 @@ batch_dict(Picklerobject *self, PyObject *iter)
 
 	static char setitem = SETITEM;
 	static char setitems = SETITEMS;
+
+	self->nesting++;
 
 	assert(iter != NULL);
 
@@ -2366,6 +2370,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			res = save_string(self, args, 0);
 			goto finally;
 		}
+		break;
 
 #ifdef Py_USING_UNICODE
         case 'u':
@@ -2373,6 +2378,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			res = save_unicode(self, args, 0);
 			goto finally;
 		}
+		break;
 #endif
 	}
 
