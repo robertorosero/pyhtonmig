@@ -33,15 +33,6 @@ except ImportError:
     from pickle import PicklingError
 
 #
-#
-#
-
-try:
-    bytes
-except NameError:
-    bytes = str                  # XXX not needed in Py2.6 and Py3.0
-
-#
 # Register some things for pickling
 #
 
@@ -50,11 +41,6 @@ def reduce_array(a):
 copy_reg.pickle(array.array, reduce_array)
 
 view_types = [type(getattr({}, name)()) for name in ('items','keys','values')]
-if view_types[0] is not list:       # XXX only needed in Py3.0
-    def rebuild_as_list(obj):
-        return list, (list(obj),)
-    for view_type in view_types:
-        copy_reg.pickle(view_type, rebuild_as_list)
 
 #
 # Type for identifying shared objects
