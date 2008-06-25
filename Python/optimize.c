@@ -143,34 +143,6 @@ optimize_expr_seq(asdl_seq** seq_ptr, PySTEntryObject* ste, PyArena* arena)
 }
 
 /**
- */
-static asdl_seq*
-_asdl_seq_append(asdl_seq* seq1, int n1, asdl_seq* seq2, int n2,
-                    PyArena* arena)
-{
-    asdl_seq* new;
-    int newlen, i;
-    int len1, len2;
-
-    /* XXX: check this calculation */
-    len1 = asdl_seq_LEN(seq1) - n1;
-    len2 = asdl_seq_LEN(seq2) - n2;
-    newlen = len1 + len2;
-
-    new = asdl_seq_new(newlen, arena);
-    if (new == NULL)
-        return NULL;
-
-    for (i = 0; i < len1; i++)
-        asdl_seq_SET(new, i, asdl_seq_GET(seq1, n1 + i));
-
-    for (i = 0; i < len2; i++)
-        asdl_seq_SET(new, len1 + i, asdl_seq_GET(seq2, n2 + i));
-
-    return new;
-}
-
-/**
  * Replace an AST node at position `n' with the node(s) in `replacement'.
  */
 static asdl_seq*
@@ -224,6 +196,12 @@ _asdl_seq_replace_with_pass(asdl_seq* seq, int n, int lineno, int col_offset, Py
 
 #define LAST_IN_SEQ(seq) (asdl_seq_LEN((seq)) - 1)
 
+/* XXX: code elimination must be disabled until we work out what to do with
+ *      "continue" statements in a "finally" clause. If we eliminate a
+ *      branch containing a "try..finally" with a finally clause containing
+ *      a "continue" statement, we start breaking tests.
+ */
+#if 0
 /**
  * Eliminate code that we can determine will never be executed.
  */
@@ -303,7 +281,40 @@ _eliminate_unreachable_code(asdl_seq** seq_ptr, int n, PySTEntryObject* ste,
 
     return 1;
 }
+#endif
 
+/**
+ * Adds all ASDL nodes from seq1 with offset n1 to a new list, then
+ * appends the nodes in seq2 from offset n2. The resulting list is
+ * returned.
+ */
+static asdl_seq*
+_asdl_seq_append(asdl_seq* seq1, int n1, asdl_seq* seq2, int n2,
+                    PyArena* arena)
+{
+    asdl_seq* new;
+    int i;
+    int len1 = asdl_seq_LEN(seq1) - n1;
+    int len2 = asdl_seq_LEN(seq2) - n2;
+    int newlen = len1 + len2;
+
+    new = asdl_seq_new(newlen, arena);
+    if (new == NULL)
+        return NULL;
+
+    for (i = 0; i < len1; i++)
+        asdl_seq_SET(new, i, asdl_seq_GET(seq1, n1 + i));
+
+    for (i = 0; i < len2; i++)
+        asdl_seq_SET(new, len1 + i, asdl_seq_GET(seq2, n2 + i));
+
+    return new;
+}
+
+/**
+ * Appends a Return node to the end of `seq' using the given
+ * value.
+ */
 static asdl_seq*
 _asdl_seq_append_return(asdl_seq* seq, expr_ty value, PyArena* arena)
 {
@@ -320,37 +331,102 @@ _asdl_seq_append_return(asdl_seq* seq, expr_ty value, PyArena* arena)
     return _asdl_seq_append(seq, 0, retseq, 0, arena);
 }
 
+static int
+_inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
+{
+    /* if the else body is not present, there will be no jump anyway */
+    if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
+        stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
+                                    LAST_IN_SEQ(stmt->v.If.body));
+        
+        if (inner->kind != Return_kind) {
+            stmt->v.If.body =
+                _asdl_seq_append_return(stmt->v.If.body,
+                                        next->v.Return.value, arena);
+
+            if (stmt->v.If.body == NULL)
+                return 0;
+        }
+    }
+    /* TODO: we probably want to append a return to all but
+     *       the last handler too
+     */
+    else if (stmt->kind == TryExcept_kind) {
+        stmt_ty inner = asdl_seq_GET(stmt->v.TryExcept.body,
+                            LAST_IN_SEQ(stmt->v.TryExcept.body));
+        if (inner->kind != Return_kind && inner->kind != Raise_kind) {
+            /* XXX: if we inject a return into the "try" body of a
+             *      "try..except..else", we will miss the "else"!
+             *      We need to take a different path if the "else" is
+             *      present.
+             */
+            if (stmt->v.TryExcept.orelse == NULL) {
+                stmt->v.TryExcept.body =
+                    _asdl_seq_append_return(stmt->v.TryExcept.body,
+                                            next->v.Return.value, arena);
+                if (stmt->v.TryExcept.body == NULL)
+                    return 0;
+            }
+            else {
+                stmt->v.TryExcept.orelse =
+                    _asdl_seq_append_return(stmt->v.TryExcept.orelse,
+                                            next->v.Return.value, arena);
+                if (stmt->v.TryExcept.orelse == NULL)
+                    return 0;
+            }
+        }
+    }
+    else if (stmt->kind == TryFinally_kind) {
+        stmt_ty inner = asdl_seq_GET(stmt->v.TryFinally.body,
+                            LAST_IN_SEQ(stmt->v.TryFinally.body));
+        if (inner->kind != Return_kind && inner->kind != Raise_kind) {
+            stmt->v.TryFinally.body =
+                _asdl_seq_append_return(stmt->v.TryFinally.body,
+                                        next->v.Return.value, arena);
+            if (stmt->v.TryFinally.body == NULL)
+                return 0;
+        }
+    }
+
+    return 1;
+}
+
 /**
  * Simplify any branches that converge on a "return" statement such that
  * they immediately return rather than jump.
  */
 static int
-_simplify_jumps_to_return(asdl_seq* seq, PySTEntryObject* ste,
-                            PyArena* arena)
+_simplify_jumps(asdl_seq* seq, PySTEntryObject* ste, PyArena* arena)
 {
     int n, len;
 
     len = asdl_seq_LEN(seq);
 
     for (n = 0; n < len - 1; n++) {
-        stmt_ty stmt = asdl_seq_GET(seq, n);
-        stmt_ty next = asdl_seq_GET(seq, n+1);
+        stmt_ty stmt;
+        stmt_ty next;
+        
+        stmt = asdl_seq_GET(seq, n);
+
+/* XXX: this will only work at the top level of a function ... let's find
+ *      somewhere else for this optimization to live! */
+#if 0
+        /* on the last iteration, the target is an implicit `return None' */
+        if (n == len-1) {
+            if (stmt->kind == Return_kind)
+                continue;
+
+            next = Return(NULL, stmt->lineno, stmt->col_offset, arena);
+            if (next == NULL)
+                return 0;
+        }
+        else
+#endif
+        next = asdl_seq_GET(seq, n+1);
         
         if (next->kind == Return_kind) {
-            /* if the else body is not present, there will be no jump */
-            if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
-                stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
-                                            asdl_seq_LEN(stmt->v.If.body)-1);
-                
-                if (inner->kind != Return_kind) {
-                    stmt->v.If.body =
-                        _asdl_seq_append_return(stmt->v.If.body,
-                                                next->v.Return.value, arena);
-
-                    if (stmt->v.If.body == NULL)
-                        return 0;
-                }
-            }
+            if (!_inject_compound_stmt_return(stmt, next, arena))
+                return 0;
         }
     }
 
@@ -368,10 +444,12 @@ optimize_stmt_seq(asdl_seq** seq_ptr, PySTEntryObject* ste, PyArena* arena)
     for (n = 0; n < asdl_seq_LEN(seq); n++) {
         if (!optimize_stmt((stmt_ty*)&asdl_seq_GET(seq, n), ste, arena))
             return 0;
+#if 0
         if (!_eliminate_unreachable_code(seq_ptr, n, ste, arena))
             return 0;
+#endif
         if (ste->ste_type == FunctionBlock)
-            if (!_simplify_jumps_to_return(*seq_ptr, ste, arena))
+            if (!_simplify_jumps(*seq_ptr, ste, arena))
                 return 0;
     }
     return 1;
@@ -564,7 +642,7 @@ optimize_bin_op(expr_ty* expr_ptr, PySTEntryObject* ste, PyArena* arena)
                 }
             case FloorDiv:
                 {
-                    /* avoid divide-by-zero errors */
+                    /* raise divide-by-zero errors at runtime */
                     if (PyObject_IsTrue(right))
                         res = PyNumber_FloorDivide(left, right);
                     break;
@@ -1114,24 +1192,6 @@ _optimize_for_iter(stmt_ty* stmt_ptr, PySTEntryObject* ste, PyArena* arena)
     stmt_ty stmt = *stmt_ptr;
     if (!optimize_expr(&stmt->v.For.iter, ste, arena))
         return 0;
-    /* if the object we're iterating over is a list of constants,
-     * build the list at compile time. Note that this will actually
-     * transform the list into a tuple. This is safe because only
-     * the `for' loop can actually reference it.
-     */
-    if (stmt->v.For.iter->kind == List_kind) {
-        expr_ty list = stmt->v.For.iter;
-        if (_is_sequence_of_constants(list->v.List.elts)) {
-            PyObject* iter = _build_tuple_of_constants(list->v.List.elts,
-                                                        arena);
-            if (iter == NULL)
-                return 0;
-            stmt->v.For.iter = Const(iter, stmt->lineno, stmt->col_offset,
-                                        arena);
-            if (stmt->v.For.iter == NULL)
-                return 0;
-        }
-    }
     return 1;
 }
 
@@ -1416,6 +1476,6 @@ PyAST_Optimize(mod_ty* mod_ptr, struct symtable* st, PyArena* arena)
         return 0;
     result = optimize_mod(mod_ptr, ste, arena);
     Py_DECREF(ste);
-    return 1;
+    return result;
 }
 
