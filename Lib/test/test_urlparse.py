@@ -7,6 +7,24 @@ import urllib.parse
 RFC1808_BASE = "http://a/b/c/d;p?q#f"
 RFC2396_BASE = "http://a/b/c/d;p?q"
 
+# parse query string test cases. Each test case is a two-tuple that contains a
+# string with the query and a dictionary with the expected results.
+
+parse_qsl_test_cases = [
+    ("", []),
+    ("&", []),
+    ("&&", []),
+    ("=", [('', '')]),
+    ("=a", [('', 'a')]),
+    ("a", [('a', '')]),
+    ("a=", [('a', '')]),
+    ("a=", [('a', '')]),
+    ("&a=b", [('a', 'b')]),
+    ("a=a+b&b=b+c", [('a', 'a b'), ('b', 'b c')]),
+    ("a=1&a=2", [('a', '1'), ('a', '2')]),
+]
+
+
 class UrlParseTestCase(unittest.TestCase):
 
     def checkRoundtrips(self, url, parsed, split):
@@ -309,6 +327,10 @@ class UrlParseTestCase(unittest.TestCase):
         # Issue 1637: http://foo.com?query is legal
         self.assertEqual(urllib.parse.urlparse("http://example.com?blahblah=/foo"),
                          ('http', 'example.com', '', '', 'blahblah=/foo', ''))
+    def test_qsl(self):
+        for orig, expect in parse_qsl_test_cases:
+            result = urllib.parse.parse_qsl(orig, keep_blank_values=True)
+            self.assertEqual(result, expect, "Error parsing %s" % repr(orig))
 
 def test_main():
     support.run_unittest(UrlParseTestCase)

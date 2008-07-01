@@ -98,6 +98,46 @@ The :mod:`urllib.parse` module defines the following functions:
    states that these are equivalent).
 
 
+.. function:: parse_qs(qs[, keep_blank_values[, strict_parsing]])
+
+   Parse a query string given as a string argument (data of type
+   :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a
+   dictionary.  The dictionary keys are the unique query variable names and the
+   values are lists of values for each name.
+
+   The optional argument *keep_blank_values* is a flag indicating whether blank
+   values in URL encoded queries should be treated as blank strings.   A true value
+   indicates that blanks should be retained as  blank strings.  The default false
+   value indicates that blank values are to be ignored and treated as if they were
+   not included.
+
+   The optional argument *strict_parsing* is a flag indicating what to do with
+   parsing errors.  If false (the default), errors are silently ignored.  If true,
+   errors raise a :exc:`ValueError` exception.
+
+   Use the :func:`urllib.parse.urlencode` function to convert such dictionaries into
+   query strings.
+
+
+.. function:: parse_qsl(qs[, keep_blank_values[, strict_parsing]])
+
+   Parse a query string given as a string argument (data of type
+   :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a list of
+   name, value pairs.
+
+   The optional argument *keep_blank_values* is a flag indicating whether blank
+   values in URL encoded queries should be treated as blank strings.   A true value
+   indicates that blanks should be retained as  blank strings.  The default false
+   value indicates that blank values are to be ignored and treated as if they were
+   not included.
+
+   The optional argument *strict_parsing* is a flag indicating what to do with
+   parsing errors.  If false (the default), errors are silently ignored.  If true,
+   errors raise a :exc:`ValueError` exception.
+
+   Use the :func:`urllib.parse.urlencode` function to convert such lists of pairs into
+   query strings.
+
 .. function:: urlsplit(urlstring[, default_scheme[, allow_fragments]])
 
    This is similar to :func:`urlparse`, but does not split the params from the URL.
