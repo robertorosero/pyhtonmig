@@ -198,7 +198,8 @@ class TestHeapC(TestHeap):
     module = c_heapq
 
     def test_comparison_operator(self):
-        # Issue 3501: Make sure heapq works with both __lt__ and __le__
+        # Issue 3501: Make sure heapq works with both __lt__
+        # For python 3.0, __le__ alone is not enough
         def hsort(data, comp):
             data = [comp(x) for x in data]
             self.module.heapify(data)
@@ -211,12 +212,12 @@ class TestHeapC(TestHeap):
         class LE:
             def __init__(self, x):
                 self.x = x
-            def __lt__(self, other):
+            def __le__(self, other):
                 return self.x >= other.x
         data = [random.random() for i in range(100)]
         target = sorted(data, reverse=True)
         self.assertEqual(hsort(data, LT), target)
-        self.assertEqual(hsort(data, LE), target)
+        self.assertRaises(TypeError, data, LE)
 
 
 #==============================================================================

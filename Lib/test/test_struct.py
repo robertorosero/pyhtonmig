@@ -8,6 +8,7 @@ from test.support import TestFailed, verbose, run_unittest, catch_warning
 
 import sys
 ISBIGENDIAN = sys.byteorder == "big"
+IS32BIT = sys.maxsize == 0x7fffffff
 del sys
 
 try:
@@ -83,7 +84,7 @@ class StructTest(unittest.TestCase):
             self.fail("did not raise error for float coerce")
 
     def test_isbigendian(self):
-        self.assertEqual((struct.pack('=i', 1)[0] == chr(0)), ISBIGENDIAN)
+        self.assertEqual((struct.pack('=i', 1)[0] == 0), ISBIGENDIAN)
 
     def test_consistence(self):
         self.assertRaises(struct.error, struct.calcsize, 'Z')
@@ -579,6 +580,11 @@ class StructTest(unittest.TestCase):
 
             for c in [b'\x01', b'\x7f', b'\xff', b'\x0f', b'\xf0']:
                 self.assertTrue(struct.unpack('>?', c)[0])
+
+    if IS32BIT:
+        def test_crasher(self):
+            self.assertRaises(MemoryError, struct.pack, "357913941b", "a")
+
 
 def test_main():
     run_unittest(StructTest)

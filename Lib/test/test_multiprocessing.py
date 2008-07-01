@@ -1333,7 +1333,7 @@ class _TestConnection(BaseTestCase):
 
         self.assertRaises(ValueError, a.send_bytes, msg, 4, -1)
 
-
+"""
 class _TestListenerClient(BaseTestCase):
 
     ALLOWED_TYPES = ('processes', 'threads')
@@ -1353,7 +1353,7 @@ class _TestListenerClient(BaseTestCase):
             self.assertEqual(conn.recv(), 'hello')
             p.join()
             l.close()
-
+"""
 #
 # Test of sending connection and socket objects between processes
 #
@@ -1755,6 +1755,13 @@ globals().update(testcases_threads)
 #
 
 def test_main(run=None):
+    if sys.platform.startswith("linux"):
+        try:
+            lock = multiprocessing.RLock()
+        except OSError:
+            from test.support import TestSkipped
+            raise TestSkipped("OSError raises on RLock creation, see issue 3111!")
+
     if run is None:
         from test.support import run_unittest as run
 

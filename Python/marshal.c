@@ -70,7 +70,7 @@ w_more(int c, WFILE *p)
 	size = PyBytes_Size(p->str);
 	newsize = size + size + 1024;
 	if (newsize > 32*1024*1024) {
-		newsize = size + 1024*1024;
+		newsize = size + (size >> 3);	/* 12.5% overallocation */
 	}
 	if (_PyBytes_Resize(&p->str, newsize) != 0) {
 		p->ptr = p->end = NULL;
@@ -1191,7 +1191,7 @@ static PyMethodDef marshal_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static struct PyModuleDef impmodule = {
+static struct PyModuleDef marshalmodule = {
 	PyModuleDef_HEAD_INIT,
 	"marshal",
 	NULL,
@@ -1208,7 +1208,7 @@ static struct PyModuleDef impmodule = {
 PyMODINIT_FUNC
 PyMarshal_Init(void)
 {
-	PyObject *mod = PyModule_Create(&impmodule);
+	PyObject *mod = PyModule_Create(&marshalmodule);
 	if (mod == NULL)
 		return NULL;
 	PyModule_AddIntConstant(mod, "version", Py_MARSHAL_VERSION);

@@ -4,13 +4,35 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's new in Python 3.0b1?
+What's new in Python 3.0b2?
 ===========================
 
-*Release date: XX-June-2008*
+*Release date: XX-XXX-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3236: Return small longs from PyLong_FromString.
+
+Library
+-------
+
+- Issue #3145: help("modules whatever") failed when trying to load the source
+  code of every single module of the standard library, including invalid files
+  used in the test suite.
+
+What's new in Python 3.0b1?
+===========================
+
+*Release date: 18-Jun-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3211: warnings.warn_explicit() did not guard against its 'registry'
+  argument being anything other than a dict or None. Also fixed a bug in error
+  handling when 'message' and 'category' were both set to None, triggering a
+  bus error.
 
 - Issue #3100: Corrected a crash on deallocation of a subclassed weakref which
   holds the last (strong) reference to its referent.
@@ -80,6 +102,17 @@ Extension Modules
 
 Library
 -------
+
+- Patch #3133: http.server.CGIHTTPRequestHandler did not work on windows.
+
+- a new ``urllib`` package was created.  It consists of code from
+  ``urllib``, ``urllib2``, ``urlparse``, and ``robotparser``.  The old
+  modules have all been removed.  The new package has five submodules:
+  ``urllib.parse``, ``urllib.request``, ``urllib.response``,
+  ``urllib.error``, and ``urllib.robotparser``.  The
+  ``urllib.request.urlopen()`` function uses the url opener from
+  ``urllib2``.  (Note that the unittests have not been renamed for the
+  beta, but they will be renamed in the future.)
 
 - rfc822 has been removed in favor of the email package.
 

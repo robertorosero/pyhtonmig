@@ -82,12 +82,17 @@ is_error(double x)
 		 * should return a zero on underflow, and +- HUGE_VAL on
 		 * overflow, so testing the result for zero suffices to
 		 * distinguish the cases).
+		 *
+		 * On some platforms (Ubuntu/ia64) it seems that errno can be
+		 * set to ERANGE for subnormal results that do *not* underflow
+		 * to zero.  So to be safe, we'll ignore ERANGE whenever the
+		 * function result is less than one in absolute value.
 		 */
-		if (x)
+		if (fabs(x) < 1.0)
+			result = 0;
+		else
 			PyErr_SetString(PyExc_OverflowError,
 					"math range error");
-		else
-			result = 0;
 	}
 	else
                 /* Unexpected math error */
@@ -176,16 +181,16 @@ math_1_to_whatever(PyObject *arg, double (*func) (double),
 	PyFPE_END_PROTECT(r);
 	if (Py_IS_NAN(r) && !Py_IS_NAN(x)) {
 		PyErr_SetString(PyExc_ValueError,
-				"math domain error (invalid argument)");
+				"math domain error"); /* invalid arg */
 		return NULL;
 	}
 	if (Py_IS_INFINITY(r) && Py_IS_FINITE(x)) {
 			if (can_overflow)
 				PyErr_SetString(PyExc_OverflowError,
-					"math range error (overflow)");
+					"math range error"); /* overflow */
 			else
 				PyErr_SetString(PyExc_ValueError,
-					"math domain error (singularity)");
+					"math domain error"); /* singularity */
 			return NULL;
 	}
 	if (Py_IS_FINITE(r) && errno && is_error(r))
