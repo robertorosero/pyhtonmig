@@ -25,9 +25,9 @@ is currently supported on most popular platforms.  Here is an overview:
    cgitb.rst
    wsgiref.rst
    urllib.request.rst
-   urllib.robotparser.rst
-   urllib.error.rst
    urllib.parse.rst
+   urllib.error.rst
+   urllib.robotparser.rst
    http.client.rst
    ftplib.rst
    poplib.rst
