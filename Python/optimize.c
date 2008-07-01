@@ -100,6 +100,11 @@ _is_sequence_of_constants(asdl_seq* seq)
 
 /**
  * Build a tuple of constants from an expression sequence.
+ * A precondition is that the given seq returns a true
+ * value for _is_sequence_of_constants.
+ *
+ * XXX: for some reason this is transforming tuples
+ *      of longs to tuples of integers. Not sure why.
  */
 static PyObject*
 _build_tuple_of_constants(asdl_seq* seq, PyArena* arena)
@@ -118,11 +123,10 @@ _build_tuple_of_constants(asdl_seq* seq, PyArena* arena)
     }
 
     for (i = 0; i < length; i++) {
-        PyObject* value;
-        expr_ty expr = (expr_ty)asdl_seq_GET(seq, i);
-        value = _expr_constant_value(expr);
+        expr_ty expr = asdl_seq_GET(seq, i);
+        PyObject* value = _expr_constant_value(expr);
         Py_INCREF(value);
-        PyTuple_SetItem(result, i, value);
+        PyTuple_SET_ITEM(result, i, value);
     }
 
     return result;
