@@ -29,9 +29,24 @@ Core and Builtins
   would not cause a syntax error.  This was regression from 2.4 caused by the
   switch to the new compiler.
 
-
 Library
 -------
+
+- Issue #2663: add filtering capability to shutil.copytree().
+
+- Issue #1622: Correct interpretation of various ZIP header fields.
+
+- Issue #1526: Allow more than 64k files to be added to Zip64 file.
+
+- Issue #1746: Correct handling of zipfile archive comments (previously
+  archives with comments over 4k were flagged as invalid). Allow writing
+  Zip files with archives by setting the 'comment' attribute of a ZipFile.  
+
+- Issue #449227: Now with the rlcompleter module, callable objects are added
+  "(" when completed.
+
+- Issue #3190: Pydoc now hides the automatic module attribute __package__ (the
+  handling is now the same as that of other special attributes like __name__).
 
 - Issue #2885 (partial): The urllib.urlopen() function has been deprecated for
   removal in Python 3.0 in favor of urllib2.urlopen().
@@ -39,7 +54,6 @@ Library
 - Issue #2885 (partial): lib2to3 has been updated to handle the renaming of the
   urllib module in Python 3.0 to urllib.request, urllib.parse, and
   urllib.error.
-
 
 Build
 -----
