@@ -640,9 +640,16 @@ sys_mdebug(PyObject *self, PyObject *args)
 #endif /* USE_MALLOPT */
 
 static PyObject *
-sys_getsizeof(PyObject *self, PyObject *args)
+sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	static PyObject * str__sizeof__ = NULL;
+	PyObject *res = NULL;
+	static PyObject *str__sizeof__, *gc_head_size = NULL;
+	static char *kwlist[] = {"object", "default", 0};
+	PyObject *o, *dflt = NULL;
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:getsizeof",
+					 kwlist, &o, &dflt))
+		return NULL;
 
 	/* Initialize static variable needed by _PyType_Lookup */
 	if (str__sizeof__ == NULL) {
@@ -651,30 +658,54 @@ sys_getsizeof(PyObject *self, PyObject *args)
 			return NULL;
 	}
 
-	/* Type objects */
-	if (PyType_Check(args)){
-		PyObject *method = _PyType_Lookup(Py_TYPE(args),
+        /* Initialize static variable for GC head size */
+	if (gc_head_size == NULL) {
+		gc_head_size = PyInt_FromSsize_t(sizeof(PyGC_Head));
+		if (gc_head_size == NULL)
+			return NULL;
+	}
+
+	/* Make sure the type is initialized. float gets initialized late */
+	if (PyType_Ready(Py_TYPE(o)) < 0)
+		return NULL;
+
+	/* Instance of old-style class */
+	if (PyInstance_Check(o))
+		res = PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
+	/* all other objects */
+	else {
+		PyObject *method = _PyType_Lookup(Py_TYPE(o),
 						  str__sizeof__);
-		if (method == NULL) {
+		if (method == NULL)
 			PyErr_Format(PyExc_TypeError,
 				     "Type %.100s doesn't define __sizeof__",
-				     Py_TYPE(args)->tp_name);
-			return NULL;
-		}
-		return PyObject_CallFunctionObjArgs(method, args, NULL);
-	} 
-	/* Instance of old-style classes */
-	else if (PyInstance_Check(args))
-		return PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
-	/* Old-style classes */
-	else if (PyClass_Check(args))
-		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
-	else
-		return PyObject_CallMethod(args, "__sizeof__", NULL);
+				     Py_TYPE(o)->tp_name);
+		else
+			res = PyObject_CallFunctionObjArgs(method, o, NULL);
+	}
+	
+	/* Has a default value been given? */
+	if ((res == NULL) && (dflt != NULL) &&
+	    PyErr_ExceptionMatches(PyExc_TypeError))
+	{
+		PyErr_Clear();
+		Py_INCREF(dflt);
+		return dflt;
+	}
+	else if (res == NULL)
+		return res;
+
+	/* add gc_head size */
+	if (PyObject_IS_GC(o)) {
+		PyObject *tmp = res;
+		res = PyNumber_Add(tmp, gc_head_size);
+		Py_DECREF(tmp);
+	}
+	return res;
 }
 
 PyDoc_STRVAR(getsizeof_doc,
-"getsizeof(object) -> int\n\
+"getsizeof(object, default) -> int\n\
 \n\
 Return the size of object in bytes.");
 
@@ -829,32 +860,12 @@ PyDoc_STRVAR(sys_clear_type_cache__doc__,
 Clear the internal type lookup cache.");
 
 
-static PyObject *
-sys_compact_freelists(PyObject* self, PyObject* args)
-{
-	size_t isum, ibc, ibf;
-	size_t fsum, fbc, fbf;
-
-	PyInt_CompactFreeList(&ibc, &ibf, &isum);
-	PyFloat_CompactFreeList(&fbc, &fbf, &fsum);
-
-	return Py_BuildValue("(kkk)(kkk)", isum, ibc, ibf,
-					   fsum, fbc, fbf);
-
-}
-
-PyDoc_STRVAR(sys_compact_freelists__doc__,
-"_compact_freelists() -> ((remaing_objects, total_blocks, freed_blocks), ...)\n\
-Compact the free lists of ints and floats.");
-
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
 	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
 	 callstats_doc},
 	{"_clear_type_cache",	sys_clear_type_cache,	  METH_NOARGS,
 	 sys_clear_type_cache__doc__},
-	{"_compact_freelists",	sys_compact_freelists,	  METH_NOARGS,
-	 sys_compact_freelists__doc__},
 	{"_current_frames", sys_current_frames, METH_NOARGS,
 	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
@@ -889,7 +900,8 @@ static PyMethodDef sys_methods[] = {
 	{"getrefcount",	(PyCFunction)sys_getrefcount, METH_O, getrefcount_doc},
 	{"getrecursionlimit", (PyCFunction)sys_getrecursionlimit, METH_NOARGS,
 	 getrecursionlimit_doc},
- 	{"getsizeof",	sys_getsizeof,  METH_O, getsizeof_doc},
+	{"getsizeof",   (PyCFunction)sys_getsizeof,
+	 METH_VARARGS | METH_KEYWORDS, getsizeof_doc},
 	{"_getframe", sys_getframe, METH_VARARGS, getframe_doc},
 #ifdef MS_WINDOWS
 	{"getwindowsversion", (PyCFunction)sys_getwindowsversion, METH_NOARGS,

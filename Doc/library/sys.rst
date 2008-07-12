@@ -58,22 +58,6 @@ always available.
    A string containing the copyright pertaining to the Python interpreter.
 
 
-.. function:: _compact_freelists()
-
-   Compact the free lists of integers and floats by deallocating unused blocks.
-   It can reduce the memory usage of the Python process several tenth of
-   thousands of integers or floats have been allocated at once.
-
-   The return value is a tuple of tuples each containing three elements,
-   amount of used objects, total block count before the blocks are deallocated
-   and amount of freed blocks. The first tuple refers to ints, the second to
-   floats.
-
-   This function should be used for specialized purposes only.
-
-   .. versionadded:: 2.6
-
-
 .. function:: _clear_type_cache()
 
    Clear the internal type cache. The type cache is used to speed up attribute
@@ -409,12 +393,19 @@ always available.
    :func:`setrecursionlimit`.
 
 
-.. function:: getsizeof(object)
+.. function:: getsizeof(object[, default])
 
    Return the size of an object in bytes. The object can be any type of
    object. All built-in objects will return correct results, but this
-   does not have to hold true for third-party extensions as it is implementation 
+   does not have to hold true for third-party extensions as it is implementation
    specific.
+
+   The *default* argument allows to define a value which will be returned
+   if the object type does not provide means to retrieve the size and would
+   cause a `TypeError`. 
+
+   func:`getsizeof` calls the object's __sizeof__ method and adds an additional
+   garbage collector overhead if the object is managed by the garbage collector.
 
    .. versionadded:: 2.6
 

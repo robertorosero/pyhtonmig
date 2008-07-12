@@ -10,6 +10,11 @@ What's New in Python 2.6 beta 2?
 Core and Builtins
 -----------------
 
+
+- Issue #2517: Allow unicode messages in Exceptions again by correctly
+  bypassing the instance dictionary when looking up __unicode__ on
+  new-style classes.
+
 - Issue #3242: Fix a crash inside the print statement, if sys.stdout is
   set to a custom object whose write() method happens to install
   another file in sys.stdout.
@@ -26,11 +31,25 @@ Core and Builtins
   10, -1).
 
 - Issue #3219: Calling a function with repeated keyword arguments, f(a=2, a=23),
-  would not cause a syntax error.  This was regression from 2.4 caused by the
+  would not cause a syntax error.  This was a regression from 2.4 caused by the
   switch to the new compiler.
+
+- Issue #2862: Make int and float freelist management consistent with other
+  freelists.  Changes their CompactFreeList apis into ClearFreeList apis and
+  calls them via gc.collect().
 
 Library
 -------
+
+- Issue #3285: Fractions from_float() and from_decimal() accept Integral arguments.
+
+- Issue #3301: Bisect module behaved badly when lo was negative.
+
+- Issue #839496: SimpleHTTPServer used to open text files in text mode. This is
+  both unnecessary (HTTP allows text content to be sent in several forms) and
+  wrong because the actual transmitted size could differ from the
+  content-length.  The problem had been corrected in the 2.4 branch, but never
+  merged into trunk.
 
 - Issue #2663: add filtering capability to shutil.copytree().
 
@@ -42,8 +61,8 @@ Library
   archives with comments over 4k were flagged as invalid). Allow writing
   Zip files with archives by setting the 'comment' attribute of a ZipFile.  
 
-- Issue #449227: Now with the rlcompleter module, callable objects are added
-  "(" when completed.
+- Issue #449227: The rlcompleter module now adds "(" to callable objects 
+  when completed.
 
 - Issue #3190: Pydoc now hides the automatic module attribute __package__ (the
   handling is now the same as that of other special attributes like __name__).
@@ -51,14 +70,36 @@ Library
 - Issue #2885 (partial): The urllib.urlopen() function has been deprecated for
   removal in Python 3.0 in favor of urllib2.urlopen().
 
-- Issue #2885 (partial): lib2to3 has been updated to handle the renaming of the
-  urllib module in Python 3.0 to urllib.request, urllib.parse, and
-  urllib.error.
+- Issue #2113: Fix error in subprocess.Popen if the select system call is
+  interrupted by a signal.
+
+- Issue #3309: Fix bz2.BZFile iterator to release its internal lock
+  properly when raising an exception due to the bz2file being closed.
+  Prevents a deadlock.
+
+- Issue #3094: httplib.HTTPSConnection Host: headers no longer include the
+  redundant ":443" port number designation when the connection is using the
+  default https port (443).
 
 Build
 -----
 
 - Issue #3215: Build sqlite3 as sqlite3.dll, not sqlite3.pyd.
+
+
+Documentation
+-------------
+
+- Document that robotparser has been renamed to urllib.robotparser in
+  Python 3.0.
+
+- Document that urlparse has been renamed to urllib.parse in Python 3.0.
+
+- Document that urllib2 is split across multiple modules and renamed in
+  Python 3.0.
+
+- Document that urllib is split across multiple modules and renamed in
+  Python 3.0.
 
 
 What's New in Python 2.6 beta 1?
