@@ -25,39 +25,39 @@ else:
         self.assertEqual(2, ast.body[1].body[0].value.n)
         self.assertEqual(1, ast.body[1].orelse[0].value.n)
 
-#    def test_fold_if_stmt_with_constants(self):
-#        # ensure we can optimize conditionals using simple constants
-#        code = """
-#if 1:
-#    'true'
-#else:
-#    'false'
-#
-#if 0:
-#    'true'
-#else:
-#    'false'
-#
-#"""
-#        ast = self.compileast(code)
-#        self.assertEqual(2, len(ast.body))
-#        self.assertEqual(_ast.Str, ast.body[0].value.__class__)
-#        self.assertEqual('true', ast.body[0].value.s)
-#        self.assertEqual(_ast.Str, ast.body[1].value.__class__)
-#        self.assertEqual('false', ast.body[1].value.s)
+    def test_fold_if_stmt_with_constants(self):
+        # ensure we can optimize conditionals using simple constants
+        code = """
+if 1:
+    'true'
+else:
+    'false'
 
-#    def test_fold_unary_op_before_collapse_branch(self):
-#        # ensure unary op folding is applied before collapsing a branch
-#        code = """
-#if not 1:
-#    'true'
-#else:
-#    'false'
-#"""
-#        ast = self.compileast(code)
-#        self.assertEqual(1, len(ast.body))
-#        self.assertEqual(_ast.Str, ast.body[0].value.__class__)
-#        self.assertEqual('false', ast.body[0].value.s)
+if 0:
+    'true'
+else:
+    'false'
+
+"""
+        ast = self.compileast(code)
+        self.assertEqual(2, len(ast.body))
+        self.assertEqual(_ast.Str, ast.body[0].value.__class__)
+        self.assertEqual('true', ast.body[0].value.s)
+        self.assertEqual(_ast.Str, ast.body[1].value.__class__)
+        self.assertEqual('false', ast.body[1].value.s)
+
+    def test_fold_unary_op_before_collapse_branch(self):
+        # ensure unary op folding is applied before collapsing a branch
+        code = """
+if not 1:
+    'true'
+else:
+    'false'
+"""
+        ast = self.compileast(code)
+        self.assertEqual(1, len(ast.body))
+        self.assertEqual(_ast.Str, ast.body[0].value.__class__)
+        self.assertEqual('false', ast.body[0].value.s)
 
     def assertAstNode(self, expected_type, attr, expected_value, code):
         ast = self.compileast(code)
@@ -156,19 +156,19 @@ x + 3 * 2
         except TypeError:
             pass
 
-#    def test_eliminate_code_after_return(self):
-#        # ensure code following a "return" is erased from the AST
-#        code = """
-#def say_hello():
-#    print "Hello there"
-#    return True
-#    print "A secret message!"
-#"""
-#        ast = self.compileast(code)
-#        self.assertEqual(1, len(ast.body))
-#        self.assertEqual(_ast.FunctionDef, ast.body[0].__class__)
-#        self.assertEqual(3, len(ast.body[0].body))
-#        self.assertEqual(_ast.Pass, ast.body[0].body[2].__class__)
+    def test_eliminate_code_after_return(self):
+        # ensure code following a "return" is erased from the AST
+        code = """
+def say_hello():
+    print "Hello there"
+    return True
+    print "A secret message!"
+"""
+        ast = self.compileast(code)
+        self.assertEqual(1, len(ast.body))
+        self.assertEqual(_ast.FunctionDef, ast.body[0].__class__)
+        self.assertEqual(3, len(ast.body[0].body))
+        self.assertEqual(_ast.Pass, ast.body[0].body[2].__class__)
 
     def test_yield_none_becomes_yield(self):
         code = """
@@ -195,16 +195,16 @@ def foo():
         self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
         self.assertEqual(None, ast.body[0].body[0].value)
 
-#    def test_generators_work_even_if_yields_are_optimized_away(self):
-#        code = """
-#def mygen():
-#    return
-#    yield 5
-#"""
-#
-#        ast = self.compileast(code)
-#        self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
-#        self.assertEqual(_ast.Pass, ast.body[0].body[1].__class__)
+    def test_generators_work_even_if_yields_are_optimized_away(self):
+        code = """
+def mygen():
+    return
+    yield 5
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].__class__)
+        self.assertEqual(_ast.Pass, ast.body[0].body[1].__class__)
 
     def test_tuple_of_constants(self):
         tests = [
@@ -230,15 +230,19 @@ def foo():
 #"""
 #        ast = self.compileast(code)
 #        self.assertEqual(_ast.Pass, ast.body[0].__class__)
+
+    def test_skip_unreachable_while_loop(self):
+        code = """
+while 0:
+    print 'foo'
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Pass, ast.body[0].__class__)
+
 #
-#    def test_skip_unreachable_while_loop(self):
-#        code = """
-#while 0:
-#    print 'foo'
-#"""
+# XXX: constant list folding is currently disabled
 #
-#        ast = self.compileast(code)
-#        self.assertEqual(_ast.Pass, ast.body[0].__class__)
 
 #    def test_fold_constant_list_in_for_loop(self):
 #        code = """
@@ -287,18 +291,30 @@ def bar(x):
         self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
         self.assertEqual(1, ast.body[0].body[0].body[1].value.n)
 
-#    def test_jump_to_implicit_returns_are_simplified(self):
-#        code = """
-#def foo(x):
-#    if x:
-#        print x
-#    else:
-#        print "n/a"
-#"""
-#
-#        ast = self.compileast(code)
-#        self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
-#        self.assertEqual(None, ast.body[0].body[0].body[1].value)
+    def test_jump_to_implicit_returns_are_simplified(self):
+        code = """
+def foo(x):
+    if x:
+        print x
+    else:
+        print "n/a"
+"""
+
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
+        self.assertEqual(None, ast.body[0].body[0].body[1].value)
+
+        code = """
+def bar(x):
+    if x:
+        print x
+    else:
+        print "n/a"
+    return 1
+"""
+        ast = self.compileast(code)
+        self.assertEqual(_ast.Return, ast.body[0].body[0].body[1].__class__)
+        self.assertEqual(1, ast.body[0].body[0].body[1].value.n)
 
     def test_assignment_to_true_works(self):
         # ---------------------------------------------------------------------
