@@ -6,6 +6,8 @@
 #include "node.h"
 #include "ast.h"
 
+#define NEXTLINE(lineno) (lineno+1)
+
 typedef struct _optimizer_block {
     struct _optimizer_block* b_next; /* next block on the stack */
     PySTEntryObject*         b_ste;  /* symtable entry */
@@ -258,7 +260,7 @@ _eliminate_unreachable_code(optimizer* opt, asdl_seq** seq_ptr, int n)
     asdl_seq* seq = *seq_ptr;
     stmt_ty stmt = asdl_seq_GET(seq, n);
 
-    /* eliminate unreachable branches in an "if" statement? */
+    /* eliminate unreachable branches in an "if" statement */
     if (stmt->kind == If_kind) {
         PyObject* test = _expr_constant_value(stmt->v.If.test);
         if (test != NULL) {
@@ -376,13 +378,14 @@ _asdl_seq_append_return(asdl_seq* seq, expr_ty value, PyArena* arena)
     if (retseq == NULL)
         return NULL;
     last = asdl_seq_GET(seq, asdl_seq_LEN(seq)-1);
-    ret = Return(value, last->lineno, last->col_offset, arena);
+    ret = Return(value, NEXTLINE(last->lineno), last->col_offset, arena);
     if (ret == NULL)
         return NULL;
     asdl_seq_SET(retseq, 0, ret);
     return _asdl_seq_append(seq, 0, retseq, 0, arena);
 }
 
+#if 0
 static void
 _expr_incref(expr_ty expr)
 {
@@ -395,19 +398,21 @@ _expr_incref(expr_ty expr)
             Py_INCREF(expr->v.Const.value);
     }
 }
+#endif
 
 static int
 _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
 {
-#if 0
+    expr_ty value = NULL;
+    if (next != NULL)
+        value = next->v.Return.value;
+
     /* if the else body is not present, there will be no jump anyway */
     if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
         stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
                                     LAST_IN_SEQ(stmt->v.If.body));
         
         if (inner->kind != Return_kind) {
-            expr_ty value = next->v.Return.value;
-            _expr_incref(value);
             stmt->v.If.body =
                 _asdl_seq_append_return(stmt->v.If.body, value, arena);
 
@@ -422,8 +427,6 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
         stmt_ty inner = asdl_seq_GET(stmt->v.TryExcept.body,
                             LAST_IN_SEQ(stmt->v.TryExcept.body));
         if (inner->kind != Return_kind && inner->kind != Raise_kind) {
-            expr_ty value = next->v.Return.value;
-            _expr_incref(value);
             /* if we inject a return into the "try" body of a
              * "try..except..else", we will miss the "else"!
              * We need to take a different path if the "else" is
@@ -449,15 +452,12 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
         stmt_ty inner = asdl_seq_GET(stmt->v.TryFinally.body,
                             LAST_IN_SEQ(stmt->v.TryFinally.body));
         if (inner->kind != Return_kind && inner->kind != Raise_kind) {
-            expr_ty value = next->v.Return.value;
-            _expr_incref(value);
             stmt->v.TryFinally.body =
                 _asdl_seq_append_return(stmt->v.TryFinally.body, value, arena);
             if (stmt->v.TryFinally.body == NULL)
                 return 0;
         }
     }
-#endif
 
     return 1;
 }
@@ -467,32 +467,19 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
  * they immediately return rather than jump.
  */
 static int
-_simplify_jumps(optimizer* opt, asdl_seq* seq)
+_simplify_jumps(optimizer* opt, asdl_seq* seq, int top)
 {
     int n, len;
 
     len = asdl_seq_LEN(seq);
 
     for (n = 0; n < len; n++) {
-        stmt_ty stmt;
-        stmt_ty next;
-        
-        stmt = asdl_seq_GET(seq, n);
-
-        /* on the last iteration, the target is an implicit `return None' */
-        if (n == len-1) {
-            /* if a "return" is already present, we have nothing left to do */
-            if (stmt->kind == Return_kind)
-                break;
-
-            next = Return(NULL, stmt->lineno, stmt->col_offset, opt->opt_arena);
-            if (next == NULL)
-                return 0;
-        }
-        else
+        stmt_ty stmt = asdl_seq_GET(seq, n);
+        stmt_ty next = NULL;
+        if (n < len-1)
             next = asdl_seq_GET(seq, n+1);
-        
-        if (next->kind == Return_kind)
+        /* XXX: handle the implicit return only if top-level function seq */
+        if ((top && next == NULL) || (next && next->kind == Return_kind))
             if (!_inject_compound_stmt_return(stmt, next, opt->opt_arena))
                 return 0;
     }
@@ -515,7 +502,7 @@ optimize_stmt_seq(optimizer* opt, asdl_seq** seq_ptr)
             if (!_eliminate_unreachable_code(opt, seq_ptr, n))
                 return 0;
         if (opt->opt_current->b_ste->ste_type == FunctionBlock)
-            if (!_simplify_jumps(opt, *seq_ptr))
+            if (!_simplify_jumps(opt, *seq_ptr, 0))
                 return 0;
     }
     return 1;
@@ -1166,15 +1153,43 @@ optimize_expr(optimizer* opt, expr_ty* expr_ptr)
 }
 
 static int
+_contains_return(asdl_seq* seq)
+{
+    int i;
+    int len = asdl_seq_LEN(seq);
+    for (i = 0; i < len; i++)
+        if (((stmt_ty)asdl_seq_GET(seq, i))->kind == Return_kind)
+            return 1;
+    return 0;
+}
+
+static int
 optimize_function_def(optimizer* opt, stmt_ty* stmt_ptr)
 {
     stmt_ty stmt = *stmt_ptr;
+    
+    /* XXX: this breaks a bunch of tests. For now we use a second pass. */
+#if 0
+    /* Make any implicit returns explicit */
+    if (!_contains_return(stmt->v.FunctionDef.body)) {
+        stmt->v.FunctionDef.body =
+            _asdl_seq_append_return(stmt->v.FunctionDef.body, NULL,
+                                    opt->opt_arena);
+        if (stmt->v.FunctionDef.body == NULL)
+            return 0;
+    }
+#endif
+
     if (!optimize_arguments(opt, &stmt->v.FunctionDef.args))
         return 0;
     if (!optimize_expr_seq(opt, &stmt->v.FunctionDef.decorator_list))
         return 0;
     if (!optimize_stmt_seq(opt, &stmt->v.FunctionDef.body))
         return 0;
+    /* XXX: shallow second pass for implicit returns */
+    if (!_contains_return(stmt->v.FunctionDef.body))
+        if (!_simplify_jumps(opt, stmt->v.FunctionDef.body, 1))
+            return 0;
     return 1;
 }
 
