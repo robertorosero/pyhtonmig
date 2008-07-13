@@ -1314,6 +1314,9 @@ optimize_if(optimizer* opt, stmt_ty* stmt_ptr)
     if (!optimize_stmt_seq(opt, &stmt->v.If.orelse))
         return 0;
 
+    /* BEFORE: if not <A>: <B>; else: <C>
+     * AFTER:  if <A>: <C>; else: <B>
+     */
     if (stmt->v.If.test->kind == UnaryOp_kind &&
             stmt->v.If.test->v.UnaryOp.op == Not) {
         asdl_seq* body = stmt->v.If.orelse;
