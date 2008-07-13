@@ -297,6 +297,7 @@ _eliminate_unreachable_code(optimizer* opt, asdl_seq** seq_ptr, int n)
                 }
                 if (seq == NULL)
                     return 0;
+                *seq_ptr = seq;
             }
         }
     }
@@ -315,6 +316,7 @@ _eliminate_unreachable_code(optimizer* opt, asdl_seq** seq_ptr, int n)
                 }
                 if (seq == NULL)
                     return 0;
+                *seq_ptr = seq;
             }
         }
     }
@@ -325,6 +327,7 @@ _eliminate_unreachable_code(optimizer* opt, asdl_seq** seq_ptr, int n)
                 stmt->lineno, stmt->col_offset, opt->opt_arena);
         if (seq == NULL)
             return 0;
+        *seq_ptr = seq;
     }
 
     *seq_ptr = seq;
@@ -396,9 +399,8 @@ _expr_incref(expr_ty expr)
 static int
 _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
 {
-    /* if the else body is not present, there will be no jump anyway */
-    /* XXX: this is breaking string._TemplateMetaclass for some reason */
 #if 0
+    /* if the else body is not present, there will be no jump anyway */
     if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
         stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
                                     LAST_IN_SEQ(stmt->v.If.body));
@@ -413,7 +415,6 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
                 return 0;
         }
     }
-#endif
     /* TODO: we probably want to append a return to all but
      *       the last handler too
      */
@@ -456,6 +457,7 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
                 return 0;
         }
     }
+#endif
 
     return 1;
 }
