@@ -10,6 +10,33 @@ What's New in Python 2.6 beta 2?
 Core and Builtins
 -----------------
 
+- Issue #3156: Fix inconsistent behavior of the bytearray type: all
+  its methods now allow for items objects that can be converted to
+  an integer using operator.index().
+
+- Issue #3360: Fix incorrect parsing of '020000000000.0', which
+  produced a ValueError instead of giving the correct float.
+
+- Issue #3083: Add alternate (#) formatting for bin, oct, hex output
+  for str.format().  This adds the prefix 0b, 0o, or 0x, respectively.
+
+- Issue #3008: the float type has a new instance method 'float.hex'
+  and a new class method 'float.fromhex' to convert floating-point
+  numbers to and from hexadecimal strings, respectively.
+
+- Issue #2235: __hash__ is once again inherited by default. To allow
+  collections.Hashable to remain meaningful in the presence of the
+  default hash implementation (object.__hash__), it is now possible
+  to explicit block inheritance of hash by setting __hash__=None at
+  the Python level, or tp_hash=PyObject_HashNotImplemented at the C
+  level.
+
+- Issue #3221: Issue a RuntimeWarning instead of raising SystemError if
+  the parent module cannot be found while performing an absolute import.
+  This means that an incorrectly defined __package__ attribute will
+  now only prevent relative imports in that module rather than causing
+  all imports from that module to fail.
+
 - Issue #2517: Allow unicode messages in Exceptions again by correctly
   bypassing the instance dictionary when looking up __unicode__ on
   new-style classes.
@@ -39,6 +66,23 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #3395: fix reference in test_multiprocessing to old debugInfo method
+
+- Issue #3312: Fix two crashes in sqlite3.
+
+- Issue #1608818: Fix misbehavior in os.listdir() if readdir() fails.
+
+- Issue #3125: Remove copy_reg in multiprocessing and replace it with
+  ForkingPickler.register() to resolve conflict with ctypes.
+
+- Issue #3090: Fixed ARCHFLAGS parsing on OS/X 
+
+- Issue #3313: Fixed a crash when a failed dlopen() call does not set
+  a valid dlerror() message.
+
+- Issue #3258: Fixed a crash when a ctypes POINTER type to an
+  incomplete structure was created.
 
 - Issue #3339: dummy_thread.acquire() should not return None.
 
@@ -81,6 +125,18 @@ Library
 - Issue #3094: httplib.HTTPSConnection Host: headers no longer include the
   redundant ":443" port number designation when the connection is using the
   default https port (443).
+
+- Issue #874900: after an os.fork() call the threading module state is cleaned
+  up in the child process to prevent deadlock and report proper thread counts
+  if the new process uses the threading module.
+
+Tests
+-----
+
+- test.test_support.catch_warning now keeps track of all warnings it sees
+  and is now better documented. Explicit unit tests for this context manager
+  have been added to test_warnings.
+
 
 Build
 -----
