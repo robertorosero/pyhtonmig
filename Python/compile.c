@@ -3639,10 +3639,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	d_lineno = i->i_lineno - a->a_lineno;
 
 	assert(d_bytecode >= 0);
-    /* XXX: removing stuff after a Return node causes this to fail */
-#if 0
 	assert(d_lineno >= 0);
-#endif
 
 	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;

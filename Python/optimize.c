@@ -6,8 +6,6 @@
 #include "node.h"
 #include "ast.h"
 
-#define NEXTLINE(lineno) (lineno+1)
-
 typedef struct _optimizer_block {
     struct _optimizer_block* b_next; /* next block on the stack */
     PySTEntryObject*         b_ste;  /* symtable entry */
@@ -378,7 +376,7 @@ _asdl_seq_append_return(asdl_seq* seq, expr_ty value, PyArena* arena)
     if (retseq == NULL)
         return NULL;
     last = asdl_seq_GET(seq, asdl_seq_LEN(seq)-1);
-    ret = Return(value, NEXTLINE(last->lineno), last->col_offset, arena);
+    ret = Return(value, last->lineno, last->col_offset, arena);
     if (ret == NULL)
         return NULL;
     asdl_seq_SET(retseq, 0, ret);
@@ -404,9 +402,12 @@ static int
 _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
 {
     expr_ty value = NULL;
+    /* XXX!! ! !ASDASDASD PAY ATTENTION HERE!!!! */
+    /* This breaks lnotab because the `value' expr has a bad lineno! D'oh! */
     if (next != NULL)
         value = next->v.Return.value;
 
+#if 0
     /* if the else body is not present, there will be no jump anyway */
     if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
         stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
@@ -458,6 +459,7 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
                 return 0;
         }
     }
+#endif
 
     return 1;
 }
