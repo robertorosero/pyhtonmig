@@ -1185,52 +1185,32 @@ Samuele
 [22]
 [25, 26, 27, 28]
 
->>> def take(n, seq):
-...     return list(islice(seq, n))
+>>> def take(n, iterable):
+...     "Return first n items of the iterable as a list"
+...     return list(islice(iterable, n))
 
->>> def enumerate(iterable):
-...     return izip(count(), iterable)
+>>> def enumerate(iterable, start=0):
+...     return izip(count(start), iterable)
 
->>> def tabulate(function):
+>>> def tabulate(function, start=0):
 ...     "Return function(0), function(1), ..."
-...     return imap(function, count())
-
->>> def iteritems(mapping):
-...     return izip(mapping.iterkeys(), mapping.itervalues())
+...     return imap(function, count(start))
 
 >>> def nth(iterable, n):
-...     "Returns the nth item"
+...     "Returns the nth item or empty list"
 ...     return list(islice(iterable, n, n+1))
 
->>> def all(seq, pred=None):
-...     "Returns True if pred(x) is true for every element in the iterable"
-...     for elem in ifilterfalse(pred, seq):
-...         return False
-...     return True
+>>> def quantify(iterable, pred=bool):
+...     "Count how many times the predicate is true"
+...     return sum(imap(pred, iterable))
 
->>> def any(seq, pred=None):
-...     "Returns True if pred(x) is true for at least one element in the iterable"
-...     for elem in ifilter(pred, seq):
-...         return True
-...     return False
-
->>> def no(seq, pred=None):
-...     "Returns True if pred(x) is false for every element in the iterable"
-...     for elem in ifilter(pred, seq):
-...         return False
-...     return True
-
->>> def quantify(seq, pred=None):
-...     "Count how many times the predicate is true in the sequence"
-...     return sum(imap(pred, seq))
-
->>> def padnone(seq):
+>>> def padnone(iterable):
 ...     "Returns the sequence elements and then returns None indefinitely"
-...     return chain(seq, repeat(None))
+...     return chain(iterable, repeat(None))
 
->>> def ncycles(seq, n):
-...     "Returns the sequence elements n times"
-...     return chain(*repeat(seq, n))
+>>> def ncycles(iterable, n):
+...     "Returns the seqeuence elements n times"
+...     return chain(*repeat(iterable, n))
 
 >>> def dotproduct(vec1, vec2):
 ...     return sum(imap(operator.mul, vec1, vec2))
@@ -1281,9 +1261,24 @@ Samuele
 
 >>> def compress(data, selectors):
 ...     "compress('abcdef', [1,0,1,0,1,1]) --> a c e f"
-...     for d, s in izip(data, selectors):
-...         if s:
-...             yield d
+...     decorated = izip(data, selectors)
+...     filtered =  ifilter(operator.itemgetter(1), decorated)
+...     return imap(operator.itemgetter(0), filtered)
+
+>>> def combinations_with_replacement(iterable, r):
+...     "combinations_with_replacement('ABC', 3) --> AA AB AC BB BC CC"
+...     pool = tuple(iterable)
+...     n = len(pool)
+...     indices = [0] * r
+...     yield tuple(pool[i] for i in indices)
+...     while 1:
+...         for i in reversed(range(r)):
+...             if indices[i] != n - 1:
+...                 break
+...         else:
+...             return
+...         indices[i:] = [indices[i] + 1] * (r - i)
+...         yield tuple(pool[i] for i in indices)
 
 This is not part of the examples but it tests to make sure the definitions
 perform as purported.
@@ -1299,24 +1294,6 @@ perform as purported.
 
 >>> nth('abcde', 3)
 ['d']
-
->>> all([2, 4, 6, 8], lambda x: x%2==0)
-True
-
->>> all([2, 3, 6, 8], lambda x: x%2==0)
-False
-
->>> any([2, 4, 6, 8], lambda x: x%2==0)
-True
-
->>> any([1, 3, 5, 9], lambda x: x%2==0,)
-False
-
->>> no([1, 3, 5, 9], lambda x: x%2==0)
-True
-
->>> no([1, 2, 5, 9], lambda x: x%2==0)
-False
 
 >>> quantify(xrange(99), lambda x: x%2==0)
 50
@@ -1361,6 +1338,9 @@ False
 
 >>> list(compress('abcdef', [1,0,1,0,1,1]))
 ['a', 'c', 'e', 'f']
+
+>>> list(combinations_with_replacement('abc', 2))
+[('a', 'a'), ('a', 'b'), ('a', 'c'), ('b', 'b'), ('b', 'c'), ('c', 'c')]
 
 """
 
