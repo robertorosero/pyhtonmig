@@ -2039,7 +2039,7 @@ Files have the following methods:
    the :keyword:`with` statement.  For example, the following code will
    automatically close *f* when the :keyword:`with` block is exited::
 
-      from __future__ import with_statement
+      from __future__ import with_statement # This isn't required in Python 2.6
 
       with open("hello.txt") as f:
           for line in f:
@@ -2127,8 +2127,9 @@ Files have the following methods:
    returned, even if no *size* parameter was given.
 
    .. note::
-      As this function depends on the underlying  :cfunc:`fread` C function,
-      it will behave the same in details such as caching EOF.
+      This function is simply a wrapper for the underlying
+      :cfunc:`fread` C function, and will behave the same in corner cases,
+      such as whether the EOF value is cached.
 
 
 .. method:: file.readline([size])

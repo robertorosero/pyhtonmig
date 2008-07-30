@@ -12,6 +12,9 @@ What's New in Python 2.6 beta 3?
 Core and Builtins
 -----------------
 
+- Issue #1819: function calls with several named parameters are now on
+  average 35% faster (as measured by pybench).
+
 - Issue #2378: An unexpected UnboundLocalError or NameError could appear when
   the python debugger steps into a class statement: the free variables (local
   variables defined in an outer scope) would be deleted from the outer scope.
@@ -26,6 +29,19 @@ Core and Builtins
 Library
 -------
 
+- Issue #2523: Fix quadratic behaviour when read()ing a binary file without
+  asking for a specific length.
+
+- Issue #3449: Update decimal module to use most recent specification
+  (v. 1.68) and tests (v. 2.58) from IBM.
+
+- Issue 3437: Bug fix in robotparser parsing of Allow: lines.
+
+- Issue 1592:  Improve error reporting when operations are attempted
+  on a closed shelf.
+
+- Deprecate the "ast" parser function aliases.
+
 - Issue #3120: On 64-bit Windows the subprocess module was truncating handles.
 
 - Issue #3303: Fix a crash in locale.strcoll() when calling it with
@@ -38,6 +54,10 @@ Library
   configuration files.
 
 - Deprecate the sunaudio module for removal in Python 3.0.
+
+- Issue #3394: zipfile.writestr sets external attributes when passed a
+  file name rather than a ZipInfo instance, so files are extracted with
+  mode 0600 rather than 000 under Unix.
 
 
 What's New in Python 2.6 beta 2?

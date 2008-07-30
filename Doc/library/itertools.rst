@@ -368,9 +368,10 @@ loops that truncate the stream.
           except IndexError:
               pass
 
-   If one of the iterables is potentially infinite, then the :func:`izip_longest`
-   function should be wrapped with something that limits the number of calls (for
-   example :func:`islice` or :func:`takewhile`).
+   If one of the iterables is potentially infinite, then the
+   :func:`izip_longest` function should be wrapped with something that limits
+   the number of calls (for example :func:`islice` or :func:`takewhile`).  If
+   not specified, *fillvalue* defaults to ``None``.
 
    .. versionadded:: 2.6
 
@@ -644,13 +645,13 @@ which incur interpreter overhead.
        return izip(a, b)
 
    def grouper(n, iterable, fillvalue=None):
-       "grouper(3, 'abcdefg', 'x') --> ('a','b','c'), ('d','e','f'), ('g','x','x')"
+       "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
        args = [iter(iterable)] * n
        kwds = dict(fillvalue=fillvalue)
        return izip_longest(*args, **kwds)
 
    def roundrobin(*iterables):
-       "roundrobin('abc', 'd', 'ef') --> 'a', 'd', 'e', 'b', 'f', 'c'"
+       "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
        # Recipe credited to George Sakkis
        pending = len(iterables)
        nexts = cycle(iter(it).next for it in iterables)
@@ -670,22 +671,20 @@ which incur interpreter overhead.
            yield set(x for m, x in pairs if m&n)
 
    def compress(data, selectors):
-       "compress('abcdef', [1,0,1,0,1,1]) --> a c e f"
-       decorated = izip(data, selectors)
-       filtered =  ifilter(operator.itemgetter(1), decorated)
-       return imap(operator.itemgetter(0), filtered)
+       "compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"
+       return (d for d, s in izip(data, selectors) if s)
 
-    def combinations_with_replacement(iterable, r):
-        "combinations_with_replacement('ABC', 3) --> AA AB AC BB BC CC"
-        pool = tuple(iterable)
-        n = len(pool)
-        indices = [0] * r
-        yield tuple(pool[i] for i in indices)
-        while 1:
-            for i in reversed(range(r)):
-                if indices[i] != n - 1:
-                    break
-            else:
-                return
-            indices[i:] = [indices[i] + 1] * (r - i)
-            yield tuple(pool[i] for i in indices)
+   def combinations_with_replacement(iterable, r):
+       "combinations_with_replacement('ABC', 3) --> AA AB AC BB BC CC"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = [0] * r
+       yield tuple(pool[i] for i in indices)
+       while 1:
+           for i in reversed(range(r)):
+               if indices[i] != n - 1:
+                   break
+           else:
+               return
+           indices[i:] = [indices[i] + 1] * (r - i)
+           yield tuple(pool[i] for i in indices)
