@@ -12,6 +12,25 @@ What's New in Python 2.6 beta 3?
 Core and Builtins
 -----------------
 
+- Issue #3139: Make buffer-interface thread-safe wrt. PyArg_ParseTuple,
+  by denying s# to parse objects that have a releasebuffer procedure,
+  and introducing s*.
+
+- Issue #3537: Fix an assertion failure when an empty but presized dict
+  object was stored in the freelist.
+
+- Issue #1481296: Make long(float('nan')) and int(float('nan')) raise
+  ValueError consistently across platforms.
+
+- Issue #3479: On platforms where sizeof(int) is smaller than sizeof(long)
+  (64bit Unix, for example), unichr() would truncate its argument and return
+  u'\x00' for unichr(2**32). Now it properly raises an OverflowError.
+
+- Apply security patches from Apple.
+
+- Issue #2542: Now that issubclass() may call arbitrary code, ensure that
+  PyErr_ExceptionMatches returns 0 when an exception occurs there.
+
 - Issue #1819: function calls with several named parameters are now on
   average 35% faster (as measured by pybench).
 
@@ -29,8 +48,49 @@ Core and Builtins
 Library
 -------
 
+- Issue #3476: binary buffered reading through the new "io" library is now
+  thread-safe.
+
+- Silence the DeprecationWarning of rfc822 when it is imported by mimetools
+  since mimetools itself is deprecated. Because modules are cached, all
+  subsequent imports of rfc822 will not raise a visible DeprecationWarning.
+
+- Issue #3134: shutil referenced undefined WindowsError symbol.
+
+- Issue #1342811: Fix leak in Tkinter.Menu.delete. Commands associated to
+  menu entries were not deleted.
+
+- Copied the implementation of reduce() to _functools.reduce() to have a
+  version that did not raise a DeprecationWarning under -3.
+
+- Issue #3205: When iterating over a BZ2File fails allocating memory, raise
+  a MemoryError rather than silently stop the iteration.
+
+- Issue #3487: sre "bytecode" validator.  Passing invalid "re-bytecode"
+  to _sre.compile() will now be rejected.  This should not affect anybody
+  since the re.compile() function never generates invalid re-bytecode.
+
+- Issue #3436: Make csv.DictReader's fieldnames attribute a property so that
+  upon first access it can be automatically initialized from the csv file if
+  it wasn't initialized during instantiation.
+
+- Issue #2338: Create imp.reload() to help with transitioning to Python 3.0 as
+  the reload() built-in has been removed.
+
+- Changed code in the following modules/packages to remove warnings raised
+  while running under the ``-3`` flag: aifc, asynchat, asyncore, bdb, bsddb,
+  ConfigParser, cookielib, csv, difflib, DocXMLRPCServer, email, filecmp,
+  fileinput, inspect, logging, modulefinder, pdb, pickle, profile, pstats,
+  pydoc, re, rlcompleter, SimpleXMLRPCServer, shelve, socket, subprocess,
+  sqlite3, tarfile, Tkinter, test.test_support, textwrap, threading, tokenize,
+  traceback, urlparse, wsgiref, xml, xmlrpclib.
+
+- Issue #3039: Fix tarfile.TarFileCompat.writestr() which always
+  raised an AttributeError.
+
 - Issue #2523: Fix quadratic behaviour when read()ing a binary file without
-  asking for a specific length.
+  asking for a specific length. This problem only affected files opened
+  using the new "io" module, not the built-in open() function.
 
 - Issue #3449: Update decimal module to use most recent specification
   (v. 1.68) and tests (v. 2.58) from IBM.
@@ -58,6 +118,23 @@ Library
 - Issue #3394: zipfile.writestr sets external attributes when passed a
   file name rather than a ZipInfo instance, so files are extracted with
   mode 0600 rather than 000 under Unix.
+
+- Issue #1857: subprocess.Popen.poll gained an additional _deadstate keyword
+  argument in python 2.5, this broke code that subclassed Popen to include its
+  own poll method.  Fixed my moving _deadstate to an _internal_poll method.
+
+Build
+-----
+
+- Generate the PatternGrammar pickle during "make install".
+
+Documentation
+-------------
+
+- Issue #643841: The language reference now provides more detailed
+  coverage of the lookup process for special methods. The disclaimers
+  regarding lack of coverage of new-style classes have also been
+  removed, since the coverage is now fairly reasonable.
 
 
 What's New in Python 2.6 beta 2?
@@ -124,6 +201,12 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #3554: ctypes.string_at and ctypes.wstring_at did call Python
+  api functions without holding the GIL, which could lead to a fatal
+  error when they failed.
+
+- Issue #799428: Fix Tkinter.Misc._nametowidget to unwrap Tcl command objects.
 
 - Issue #3395: fix reference in test_multiprocessing to old debugInfo method
 

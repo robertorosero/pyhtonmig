@@ -90,6 +90,11 @@ Number-theoretic and representation functions:
    algorithm's accuracy depends on IEEE-754 arithmetic guarantees and the
    typical case where the rounding mode is half-even.
 
+   .. note::
+
+      The accuracy of fsum() may be impaired on builds that use
+      extended precision addition and then double-round the results.
+
    .. versionadded:: 2.6
 
 
