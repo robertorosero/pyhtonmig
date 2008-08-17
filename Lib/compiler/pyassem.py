@@ -644,19 +644,7 @@ def twobyte(val):
     return divmod(val, 256)
 
 class LineAddrTable:
-    """lnotab
-
-    This class builds the lnotab, which is documented in compile.c.
-    Here's a brief recap:
-
-    For each SET_LINENO instruction after the first one, two bytes are
-    added to lnotab.  (In some cases, multiple two-byte entries are
-    added.)  The first byte is the distance in bytes between the
-    instruction for the last SET_LINENO and the current SET_LINENO.
-    The second byte is offset in line numbers.  If either offset is
-    greater than 255, multiple two-byte entries are added -- see
-    compile.c for the delicate details.
-    """
+    """This class builds the lnotab."""
 
     def __init__(self):
         self.code = []
