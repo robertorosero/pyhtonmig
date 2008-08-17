@@ -59,7 +59,7 @@ PyCode_New(int argcount, int nlocals, int stacksize, int flags,
 	    cellvars == NULL || !PyTuple_Check(cellvars) ||
 	    name == NULL || !PyString_Check(name) ||
 	    filename == NULL || !PyString_Check(filename) ||
-	    lnotab == NULL || !PyString_Check(lnotab) ||
+	    lnotab == NULL || !PyList_Check(lnotab) ||
 	    !PyObject_CheckReadBuffer(code)) {
 		PyErr_BadInternalCall();
 		return NULL;

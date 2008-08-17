@@ -3534,7 +3534,7 @@ assemble_init(struct assembler *a, int nblocks, int firstlineno)
 	a->a_bytecode = PyString_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
 	if (!a->a_bytecode)
 		return 0;
-	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
+	a->a_lnotab = PyList_New(0);
 	if (!a->a_lnotab)
 		return 0;
 	if (nblocks > PY_SIZE_MAX / sizeof(basicblock *)) {
@@ -3582,143 +3582,35 @@ blocksize(basicblock *b)
 	return size;
 }
 
-/* All about a_lnotab.
-
-c_lnotab is an array of unsigned bytes disguised as a Python string.
-It is used to map bytecode offsets to source code line #s (when needed
-for tracebacks).
-
-The array is conceptually a list of
-    (bytecode offset increment, line number increment)
-pairs.	The details are important and delicate, best illustrated by example:
-
-    byte code offset	source code line number
-	0		    1
-	6		    2
-       50		    7
-      350		  307
-      361		  308
-
-The first trick is that these numbers aren't stored, only the increments
-from one row to the next (this doesn't really work, but it's a start):
-
-    0, 1,  6, 1,  44, 5,  300, 300,  11, 1
-
-The second trick is that an unsigned byte can't hold negative values, or
-values larger than 255, so (a) there's a deep assumption that byte code
-offsets and their corresponding line #s both increase monotonically, and (b)
-if at least one column jumps by more than 255 from one row to the next, more
-than one pair is written to the table. In case #b, there's no way to know
-from looking at the table later how many were written.	That's the delicate
-part.  A user of c_lnotab desiring to find the source line number
-corresponding to a bytecode address A should do something like this
-
-    lineno = addr = 0
-    for addr_incr, line_incr in c_lnotab:
-	addr += addr_incr
-	if addr > A:
-	    return lineno
-	lineno += line_incr
-
-In order for this to work, when the addr field increments by more than 255,
-the line # increment in each pair generated must be 0 until the remaining addr
-increment is < 256.  So, in the example above, assemble_lnotab (it used
-to be called com_set_lineno) should not (as was actually done until 2.2)
-expand 300, 300 to 255, 255, 45, 45, 
-	    but to 255,	  0, 45, 255, 0, 45.
-*/
-
 static int
 assemble_lnotab(struct assembler *a, struct instr *i)
 {
-	int d_bytecode, d_lineno;
-	int len;
-	unsigned char *lnotab;
+	PyObject* addr = NULL;
+	PyObject* line = NULL;
+	PyObject* entry = NULL;
 
-	d_bytecode = a->a_offset - a->a_lineno_off;
-	d_lineno = i->i_lineno - a->a_lineno;
+	addr = PyLong_FromLong(a->a_offset);
+	if (addr == NULL)
+		goto error;
 
-	assert(d_bytecode >= 0);
-	assert(d_lineno >= 0);
+	line = PyLong_FromLong(i->i_lineno);
+	if (line == NULL)
+		goto error;
 
-	if(d_bytecode == 0 && d_lineno == 0)
-		return 1;
+	entry = PyTuple_Pack(2, addr, line);
+	if (entry == NULL)
+		goto error;
 
-	if (d_bytecode > 255) {
-		int j, nbytes, ncodes = d_bytecode / 255;
-		nbytes = a->a_lnotab_off + 2 * ncodes;
-		len = PyString_GET_SIZE(a->a_lnotab);
-		if (nbytes >= len) {
-			if ((len <= INT_MAX / 2) && (len * 2 < nbytes))
-				len = nbytes;
-			else if (len <= INT_MAX / 2)
-				len *= 2;
-			else {
-				PyErr_NoMemory();
-				return 0;
-			}
-			if (_PyString_Resize(&a->a_lnotab, len) < 0)
-				return 0;
-		}
-		lnotab = (unsigned char *)
-			   PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
-		for (j = 0; j < ncodes; j++) {
-			*lnotab++ = 255;
-			*lnotab++ = 0;
-		}
-		d_bytecode -= ncodes * 255;
-		a->a_lnotab_off += ncodes * 2;
-	}
-	assert(d_bytecode <= 255);
-	if (d_lineno > 255) {
-		int j, nbytes, ncodes = d_lineno / 255;
-		nbytes = a->a_lnotab_off + 2 * ncodes;
-		len = PyString_GET_SIZE(a->a_lnotab);
-		if (nbytes >= len) {
-			if ((len <= INT_MAX / 2) && len * 2 < nbytes)
-				len = nbytes;
-			else if (len <= INT_MAX / 2)
-				len *= 2;
-			else {
-				PyErr_NoMemory();
-				return 0;
-			}
-			if (_PyString_Resize(&a->a_lnotab, len) < 0)
-				return 0;
-		}
-		lnotab = (unsigned char *)
-			   PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
-		*lnotab++ = d_bytecode;
-		*lnotab++ = 255;
-		d_bytecode = 0;
-		for (j = 1; j < ncodes; j++) {
-			*lnotab++ = 0;
-			*lnotab++ = 255;
-		}
-		d_lineno -= ncodes * 255;
-		a->a_lnotab_off += ncodes * 2;
-	}
+	if (PyList_Append(a->a_lnotab, entry) < 0)
+		goto error;
 
-	len = PyString_GET_SIZE(a->a_lnotab);
-	if (a->a_lnotab_off + 2 >= len) {
-		if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
-			return 0;
-	}
-	lnotab = (unsigned char *)
-			PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
-
-	a->a_lnotab_off += 2;
-	if (d_bytecode) {
-		*lnotab++ = d_bytecode;
-		*lnotab++ = d_lineno;
-	}
-	else {	/* First line of a block; def stmt, etc. */
-		*lnotab++ = 0;
-		*lnotab++ = d_lineno;
-	}
-	a->a_lineno = i->i_lineno;
-	a->a_lineno_off = a->a_offset;
 	return 1;
+
+error:
+	Py_XDECREF(addr);
+	Py_XDECREF(line);
+	Py_XDECREF(entry);
+	return 0;
 }
 
 /* assemble_emit()
@@ -3899,7 +3791,6 @@ makecode(struct compiler *c, struct assembler *a)
 	PyObject *name = NULL;
 	PyObject *freevars = NULL;
 	PyObject *cellvars = NULL;
-	PyObject *bytecode = NULL;
 	int nlocals, flags;
 
 	tmp = dict_keys_inorder(c->u->u_consts, 0);
@@ -3928,10 +3819,6 @@ makecode(struct compiler *c, struct assembler *a)
 	if (flags < 0)
 		goto error;
 
-	bytecode = PyCode_Optimize(a->a_bytecode, consts, names, a->a_lnotab);
-	if (!bytecode)
-		goto error;
-
 	tmp = PyList_AsTuple(consts); /* PyCode_New requires a tuple */
 	if (!tmp)
 		goto error;
@@ -3939,7 +3826,7 @@ makecode(struct compiler *c, struct assembler *a)
 	consts = tmp;
 
 	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), flags,
-			bytecode, consts, names, varnames,
+			a->a_bytecode, consts, names, varnames,
 			freevars, cellvars,
 			filename, c->u->u_name,
 			c->u->u_firstlineno,
@@ -3952,7 +3839,6 @@ makecode(struct compiler *c, struct assembler *a)
 	Py_XDECREF(name);
 	Py_XDECREF(freevars);
 	Py_XDECREF(cellvars);
-	Py_XDECREF(bytecode);
 	return co;
 }
 
@@ -4039,8 +3925,6 @@ assemble(struct compiler *c, int addNone)
 				goto error;
 	}
 
-	if (_PyString_Resize(&a.a_lnotab, a.a_lnotab_off) < 0)
-		goto error;
 	if (_PyString_Resize(&a.a_bytecode, a.a_offset) < 0)
 		goto error;
 
