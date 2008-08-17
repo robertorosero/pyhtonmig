@@ -197,14 +197,15 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	int firstlineno;
 	PyObject *lnotab;
 
-	if (!PyArg_ParseTuple(args, "iiiiSO!O!O!SSiS|O!O!:code",
+	if (!PyArg_ParseTuple(args, "iiiiSO!O!O!SSiO!|O!O!:code",
 			      &argcount, &nlocals, &stacksize, &flags,
 			      &code,
 			      &PyTuple_Type, &consts,
 			      &PyTuple_Type, &names,
 			      &PyTuple_Type, &varnames,
 			      &filename, &name,
-			      &firstlineno, &lnotab,
+			      &firstlineno,
+			      &PyList_Type, &lnotab,
 			      &PyTuple_Type, &freevars,
 			      &PyTuple_Type, &cellvars))
 		return NULL;
