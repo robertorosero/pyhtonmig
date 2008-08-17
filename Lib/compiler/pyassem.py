@@ -662,8 +662,6 @@ class LineAddrTable:
         self.code = []
         self.codeOffset = 0
         self.firstline = 0
-        self.lastline = 0
-        self.lastoff = 0
         self.lnotab = []
 
     def addCode(self, *args):
@@ -674,40 +672,14 @@ class LineAddrTable:
     def nextLine(self, lineno):
         if self.firstline == 0:
             self.firstline = lineno
-            self.lastline = lineno
         else:
-            # compute deltas
-            addr = self.codeOffset - self.lastoff
-            line = lineno - self.lastline
-            # Python assumes that lineno always increases with
-            # increasing bytecode address (lnotab is unsigned char).
-            # Depending on when SET_LINENO instructions are emitted
-            # this is not always true.  Consider the code:
-            #     a = (1,
-            #          b)
-            # In the bytecode stream, the assignment to "a" occurs
-            # after the loading of "b".  This works with the C Python
-            # compiler because it only generates a SET_LINENO instruction
-            # for the assignment.
-            if line >= 0:
-                push = self.lnotab.append
-                while addr > 255:
-                    push(255); push(0)
-                    addr -= 255
-                while line > 255:
-                    push(addr); push(255)
-                    line -= 255
-                    addr = 0
-                if addr > 0 or line > 0:
-                    push(addr); push(line)
-                self.lastline = lineno
-                self.lastoff = self.codeOffset
+            self.lnotab.append((self.codeOffset, lineno))
 
     def getCode(self):
         return ''.join(self.code)
 
     def getTable(self):
-        return ''.join(map(chr, self.lnotab))
+        return self.lnotab
 
 class StackDepthTracker:
     # XXX 1. need to keep track of stack depth on jumps
