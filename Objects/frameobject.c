@@ -70,9 +70,8 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int new_iblock = 0;		/* The new value of f_iblock */
 	unsigned char *code = NULL;	/* The bytecode for the frame... */
 	Py_ssize_t code_len = 0;	/* ...and its length */
-	char *lnotab = NULL;		/* Iterating over co_lnotab */
-	Py_ssize_t lnotab_len = 0;	/* (ditto) */
-	int offset = 0;			/* (ditto) */
+	Py_ssize_t lnotab_len = 0;
+	Py_ssize_t i;
 	int line = 0;			/* (ditto) */
 	int addr = 0;			/* (ditto) */
 	int min_addr = 0;		/* Scanning the SETUPs and POPs */
@@ -86,6 +85,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int in_finally[CO_MAXBLOCKS];	/* (ditto) */
 	int blockstack_top = 0;		/* (ditto) */
 	unsigned char setup_op = 0;	/* (ditto) */
+	PyObject *entry;
 
 	/* f_lineno must be an integer. */
 	if (!PyInt_Check(p_new_lineno)) {
@@ -114,13 +114,14 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 
 	/* Find the bytecode offset for the start of the given line, or the
 	 * first code-owning line after it. */
-	PyString_AsStringAndSize(f->f_code->co_lnotab, &lnotab, &lnotab_len);
 	addr = 0;
 	line = f->f_code->co_firstlineno;
 	new_lasti = -1;
-	for (offset = 0; offset < lnotab_len; offset += 2) {
-		addr += lnotab[offset];
-		line += lnotab[offset+1];
+	lnotab_len = PyList_GET_SIZE(f->f_code->co_lnotab);
+	for (i = 0; i < lnotab_len; i++) {
+		entry = PyList_GET_ITEM(f->f_code->co_lnotab, i);
+		addr = PyLong_AsLong(PyTuple_GET_ITEM(entry, 0));
+		line = PyLong_AsLong(PyTuple_GET_ITEM(entry, 1));
 		if (line >= new_lineno) {
 			new_lasti = addr;
 			new_lineno = line;
