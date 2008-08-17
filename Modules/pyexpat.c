@@ -262,13 +262,17 @@ static PyCodeObject*
 getcode(enum HandlerTypes slot, char* func_name, int lineno)
 {
     PyObject *code = NULL;
+    PyObject *lnotab = NULL;
     PyObject *name = NULL;
     PyObject *nulltuple = NULL;
     PyObject *filename = NULL;
 
     if (handler_info[slot].tb_code == NULL) {
-        code = PyList_New(0);
+        code = PyString_FromString("");
         if (code == NULL)
+            goto failed;
+        lnotab = PyList_New(0);
+        if (lnotab == NULL)
             goto failed;
         name = PyString_FromString(func_name);
         if (name == NULL)
@@ -293,11 +297,12 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
                        filename,	/* filename */
                        name,		/* name */
                        lineno,		/* firstlineno */
-                       code		/* lnotab */
+                       lnotab		/* lnotab */
                        );
         if (handler_info[slot].tb_code == NULL)
             goto failed;
         Py_DECREF(code);
+        Py_DECREF(lnotab);
         Py_DECREF(nulltuple);
         Py_DECREF(filename);
         Py_DECREF(name);
@@ -305,6 +310,7 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
     return handler_info[slot].tb_code;
  failed:
     Py_XDECREF(code);
+    Py_XDECREF(lnotab);
     Py_XDECREF(name);
     return NULL;
 }
