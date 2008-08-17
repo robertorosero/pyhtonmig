@@ -267,7 +267,7 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
     PyObject *filename = NULL;
 
     if (handler_info[slot].tb_code == NULL) {
-        code = PyString_FromString("");
+        code = PyList_New(0);
         if (code == NULL)
             goto failed;
         name = PyString_FromString(func_name);
