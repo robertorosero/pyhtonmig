@@ -508,16 +508,22 @@ was actually done until 2.2) expand 300, 300 to 255, 255,  45, 45, but to
 int
 PyCode_Addr2Line(PyCodeObject *co, int addrq)
 {
-	int size = PyString_Size(co->co_lnotab) / 2;
-	unsigned char *p = (unsigned char*)PyString_AsString(co->co_lnotab);
-	int line = co->co_firstlineno;
-	int addr = 0;
-	while (--size >= 0) {
-		addr += *p++;
+	PyObject* entry;
+	Py_ssize_t size;
+	int i;
+	int addr, line;
+
+	size = PyList_GET_SIZE(co->co_lnotab);
+	line = co->co_firstlineno;
+	for (i = 0; i < size; i++) {
+		entry = PyList_GET_ITEM(co->co_lnotab, i);
+		/* XXX: is truncation safe here? */
+		addr = (int)PyLong_AsLong(PyTuple_GET_ITEM(entry, 0));
 		if (addr > addrq)
 			break;
-		line += *p++;
+		line = (int)PyLong_AsLong(PyTuple_GET_ITEM(entry, 1));
 	}
+
 	return line;
 }
 
@@ -601,56 +607,35 @@ PyCode_Addr2Line(PyCodeObject *co, int addrq)
 int 
 PyCode_CheckLineNumber(PyCodeObject* co, int lasti, PyAddrPair *bounds)
 {
-        int size, addr, line;
-        unsigned char* p;
+	Py_ssize_t size;
+	PyObject* entry;
+	int i;
+	int addr, line;
 
-        p = (unsigned char*)PyString_AS_STRING(co->co_lnotab);
-        size = PyString_GET_SIZE(co->co_lnotab) / 2;
+	size = PyList_GET_SIZE(co->co_lnotab);
+	addr = bounds->ap_lower = 0;
+	line = co->co_firstlineno;
+	assert(line > 0);
+	for (i = 0; i < size; i++) {
+		if (addr > lasti)
+			break;
+		entry = PyList_GET_ITEM(co->co_lnotab, i);
+		/* XXX: is truncation safe here? */
+		addr = (int)PyLong_AsLong(PyTuple_GET_ITEM(entry, 0));
+		bounds->ap_lower = addr;
+		line = (int)PyLong_AsLong(PyTuple_GET_ITEM(entry, 1));
+	}
+		
+	if (addr != lasti)
+		line = -1;
 
-        addr = 0;
-        line = co->co_firstlineno;
-        assert(line > 0);
+	if (i < size) {
+		entry = PyList_GET_ITEM(co->co_lnotab, size-1);
+		bounds->ap_upper = PyLong_AsLong(PyTuple_GET_ITEM(entry, 0));
+	}
+	else {
+		bounds->ap_upper = INT_MAX;
+	}
 
-        /* possible optimization: if f->f_lasti == instr_ub
-           (likely to be a common case) then we already know
-           instr_lb -- if we stored the matching value of p
-           somwhere we could skip the first while loop. */
-
-        /* see comments in compile.c for the description of
-           co_lnotab.  A point to remember: increments to p
-           should come in pairs -- although we don't care about
-           the line increments here, treating them as byte
-           increments gets confusing, to say the least. */
-
-        bounds->ap_lower = 0;
-        while (size > 0) {
-                if (addr + *p > lasti)
-                        break;
-                addr += *p++;
-                if (*p) 
-                        bounds->ap_lower = addr;
-                line += *p++;
-                --size;
-        }
-
-        /* If lasti and addr don't match exactly, we don't want to
-           change the lineno slot on the frame or execute a trace
-           function.  Return -1 instead.
-        */
-        if (addr != lasti)
-                line = -1;
-        
-        if (size > 0) {
-                while (--size >= 0) {
-                        addr += *p++;
-                        if (*p++)
-                                break;
-                }
-                bounds->ap_upper = addr;
-        }
-        else {
-                bounds->ap_upper = INT_MAX;
-        }
-
-        return line;
+	return line;
 }
