@@ -3589,6 +3589,10 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	PyObject* line = NULL;
 	PyObject* entry = NULL;
 
+	/* if this is the first line of code in a block, create no lnotab entry */
+	if (a->a_lineno == i->i_lineno)
+		return 1;
+
 	addr = PyLong_FromLong(a->a_offset);
 	if (addr == NULL)
 		goto error;
