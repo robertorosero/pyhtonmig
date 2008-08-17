@@ -176,11 +176,8 @@ def findlabels(code):
 
 def findlinestarts(code):
     """Find the offsets in a byte code which are start of lines in the source.
-
-    Generate pairs (offset, lineno) as described in Python/compile.c.
-
     """
-    lastline = None
+    lastline = code.co_firstlineno
     for addr, line in code.co_lnotab:
         if line != lastline:
             yield (addr, line)
