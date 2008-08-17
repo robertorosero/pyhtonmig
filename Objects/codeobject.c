@@ -511,7 +511,7 @@ PyCode_Addr2Line(PyCodeObject *co, int addrq)
 {
 	PyObject* entry;
 	Py_ssize_t size;
-	int i;
+	Py_ssize_t i;
 	int addr, line;
 
 	size = PyList_GET_SIZE(co->co_lnotab);
