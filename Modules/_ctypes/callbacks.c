@@ -104,6 +104,7 @@ void _AddTraceback(char *funcname, char *filename, int lineno)
 	PyObject *py_globals = 0;
 	PyObject *empty_tuple = 0;
 	PyObject *empty_string = 0;
+	PyObject *empty_list = 0;
 	PyCodeObject *py_code = 0;
 	PyFrameObject *py_frame = 0;
     
@@ -117,6 +118,8 @@ void _AddTraceback(char *funcname, char *filename, int lineno)
 	if (!empty_tuple) goto bad;
 	empty_string = PyString_FromString("");
 	if (!empty_string) goto bad;
+	empty_list = PyList_New(0);
+	if (!empty_list) goto bad;
 	py_code = PyCode_New(
 		0,            /*int argcount,*/
 		0,            /*int nlocals,*/
@@ -131,7 +134,7 @@ void _AddTraceback(char *funcname, char *filename, int lineno)
 		py_srcfile,   /*PyObject *filename,*/
 		py_funcname,  /*PyObject *name,*/
 		lineno,   /*int firstlineno,*/
-		empty_string  /*PyObject *lnotab*/
+		empty_list  /*PyObject *lnotab*/
 		);
 	if (!py_code) goto bad;
 	py_frame = PyFrame_New(
@@ -149,6 +152,7 @@ void _AddTraceback(char *funcname, char *filename, int lineno)
 	Py_XDECREF(py_funcname);
 	Py_XDECREF(empty_tuple);
 	Py_XDECREF(empty_string);
+	Py_XDECREF(empty_list);
 	Py_XDECREF(py_code);
 	Py_XDECREF(py_frame);
 }
