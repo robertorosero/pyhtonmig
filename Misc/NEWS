@@ -48,6 +48,22 @@ Core and Builtins
 Library
 -------
 
+- Issue #2222: Fixed reference leak when occured os.rename()
+  fails unicode conversion on 2nd parameter. (windows only)
+
+- Issue 2464. urllib2 now supports a malformation in the URL received
+  in a redirect.
+
+- Silence the DeprecationWarning raised when importing mimetools in
+  BaseHTTPServer, cgi (and rfc822), httplib.
+
+- Issue #2776: fixed small issue when handling an URL with double slash
+  after a 302 response in the case of not going through a proxy.
+
+- Issue #2676: in the email package, content-type parsing was hanging on
+  pathological input because of quadratic or exponential behaviour of a
+  regular expression.
+
 - Issue #3476: binary buffered reading through the new "io" library is now
   thread-safe.
 
@@ -79,11 +95,11 @@ Library
 
 - Changed code in the following modules/packages to remove warnings raised
   while running under the ``-3`` flag: aifc, asynchat, asyncore, bdb, bsddb,
-  ConfigParser, cookielib, csv, difflib, DocXMLRPCServer, email, filecmp,
-  fileinput, inspect, logging, modulefinder, pdb, pickle, profile, pstats,
-  pydoc, re, rlcompleter, SimpleXMLRPCServer, shelve, socket, subprocess,
-  sqlite3, tarfile, Tkinter, test.test_support, textwrap, threading, tokenize,
-  traceback, urlparse, wsgiref, xml, xmlrpclib.
+  ConfigParser, cookielib, csv, difflib, distutils, DocXMLRPCServer, email,
+  filecmp, fileinput, inspect, logging, modulefinder, pdb, pickle, profile,
+  pstats, pydoc, re, rlcompleter, SimpleXMLRPCServer, shelve, socket,
+  subprocess, sqlite3, tarfile, Tkinter, test.test_support, textwrap,
+  threading, tokenize, traceback, urlparse, wsgiref, xml, xmlrpclib.
 
 - Issue #3039: Fix tarfile.TarFileCompat.writestr() which always
   raised an AttributeError.
