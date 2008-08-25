@@ -24,10 +24,28 @@ class FileTests(unittest.TestCase):
         self.assert_(os.access(test_support.TESTFN, os.W_OK))
 
     def test_closerange(self):
-        f = os.open(test_support.TESTFN, os.O_CREAT|os.O_RDWR)
+        first = os.open(test_support.TESTFN, os.O_CREAT|os.O_RDWR)
+        # We must allocate two consecutive file descriptors, otherwise
+        # it will mess up other file descriptors (perhaps even the three
+        # standard ones).
+        second = os.dup(first)
+        try:
+            retries = 0
+            while second != first + 1:
+                os.close(first)
+                retries += 1
+                if retries > 10:
+                    # XXX test skipped
+                    print >> sys.stderr, (
+                        "couldn't allocate two consecutive fds, "
+                        "skipping test_closerange")
+                    return
+                first, second = second, os.dup(second)
+        finally:
+            os.close(second)
         # close a fd that is open, and one that isn't
-        os.closerange(f, f+2)
-        self.assertRaises(OSError, os.write, f, "a")
+        os.closerange(first, first + 2)
+        self.assertRaises(OSError, os.write, first, "a")
 
 
 class TemporaryFileTests(unittest.TestCase):
@@ -276,8 +294,7 @@ class StatAttributeTests(unittest.TestCase):
     # systems support centiseconds
     if sys.platform == 'win32':
         def get_file_system(path):
-            import os
-            root = os.path.splitdrive(os.path.realpath("."))[0] + '\\'
+            root = os.path.splitdrive(os.path.abspath(path))[0] + '\\'
             import ctypes
             kernel32 = ctypes.windll.kernel32
             buf = ctypes.create_string_buffer("", 100)
@@ -295,7 +312,7 @@ class StatAttributeTests(unittest.TestCase):
             try:
                 os.stat(r"c:\pagefile.sys")
             except WindowsError, e:
-                if e == 2: # file does not exist; cannot run test
+                if e.errno == 2: # file does not exist; cannot run test
                     return
                 self.fail("Could not stat pagefile.sys")
 

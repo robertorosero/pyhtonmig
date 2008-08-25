@@ -4,13 +4,66 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6 beta 3?
-================================
+What's New in Python 2.6 release candidate 1?
+=============================================
 
-*Release date: XX-Aug-2008*
+*Release date: XX-XXX-2008*
 
 Core and Builtins
 -----------------
+
+- Fix crashes on memory allocation failure found with failmalloc.
+
+- Fix memory leaks found with valgrind and update suppressions file.
+
+- Fix compiler warnings in opt mode which would lead to invalid memory reads.
+
+- Fix problem using wrong name in decimal module reported by pychecker.
+
+- Issue #3642: Changed type of numarenas from uint to size_t
+  in order to silence a compilier warning on 64bit OSes.
+
+- Silenced another compiler warning about a used but not defined
+  function 'stringlib_contains_obj'.
+
+- Added warnings on the use of ``__getslice__``, ``__setslice__``, or
+  ``__delslice__``.
+
+Library
+-------
+
+- Silenced a trivial compiler warning in the sqlite module.
+
+- Fixed two format strings in the _collections module.
+
+Extension Modules
+-----------------
+
+- Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
+  exploitation of poor argument checking.
+
+
+What's New in Python 2.6 beta 3?
+================================
+
+*Release date: 20-Aug-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #1878: Remove Py_TPFLAGS_HAVE_VERSION_TAG from
+  Py_TPFLAGS_DEFAULT when not building the core.  This means 3rd party
+  extensions do not automatically benefit from the class attribute
+  cache; they will have to explicitly add Py_TPFLAGS_HAVE_VERSION_TAG
+  to their tp_flags field if they care.  This is a backwards
+  compatibility feature; in 3.0, all types will use the cache by
+  default.
+
+- Keyword arguments can now follow starred arguments. (``f(a, *args,
+  keyword=23)`` is now valid syntax.)
+
+- ctypes function pointers that are COM methods have a boolean True
+  value again.
 
 - Issue #3139: Make buffer-interface thread-safe wrt. PyArg_ParseTuple,
   by denying s# to parse objects that have a releasebuffer procedure,
@@ -47,6 +100,34 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #3612: Added some missing basic types in ctypes.wintypes.
+
+- The methods ``is_in_tuple()``, ``is_vararg()``, and ``is_keywordarg()`` of
+  symtable.Symbol have been deprecated for removal in 3.0 and the next release.
+
+- Issue #2234: distutils failed for some versions of the cygwin compiler. The
+  version reported by these tools does not necessarily follow the python
+  version numbering scheme, so the module is less strict when parsing it.
+
+- Issue #2235: Added Py3k warnings for types which will become unhashable
+  under the stricter __hash__ inheritance rules in 3.0. Several types
+  which did not meet the rules for hash invariants and were already
+  unhashable in 3.0 have now been explicitly flagged as unhashable in
+  2.6 as well (collections.Mapping, collections.Set, unittest.TestSuite,
+  xml.dom.minidom.NamedNodeMap, numbers.Number, UserList.UserList)
+
+- Update __all__ for cookielib, csv, os, urllib2, and weakref to include things
+  imported into the module but exposed as part of the module's API.
+
+- Remove an unneeded import of abc.ABCMeta from 'inspect'.
+
+- Remove unneeded imports of 'sys' and 'warnings' from 'io'.
+
+- Remove unneeded imports of 'warnings' from shelve, filecmp, and dummy_thread.
+
+- Issue #3575: Incremental decoder's decode function now takes bytearray
+  by using 's*' instead of 't#'.
 
 - Issue #2222: Fixed reference leak when occured os.rename()
   fails unicode conversion on 2nd parameter. (windows only)
@@ -146,6 +227,9 @@ Build
 
 Documentation
 -------------
+
+- Issue #2235: the C API function PyObject_HashNotImplemented and its
+  interaction with the tp_hash slot (added in 2.6b2) are now documented
 
 - Issue #643841: The language reference now provides more detailed
   coverage of the lookup process for special methods. The disclaimers
@@ -368,6 +452,7 @@ Core and Builtins
 
 Extension Modules
 -----------------
+- Issue #1179: [CVE-2007-4965] Integer overflow in imageop module.
 
 - Issue #3116:  marshal.dumps() had quadratic behavior for strings > 32Mb.
 
@@ -400,7 +485,7 @@ Extension Modules
 
 - Issue #2870: cmathmodule.c compile error.
 
-- Added a threading.Thread.getIdent() method.
+- Added a threading.Thread.ident property.
 
 Library
 -------
@@ -643,7 +728,8 @@ Library
 - The bundled OSX-specific copy of libbffi is now in sync with the version
   shipped with PyObjC 2.0 and includes support for x86_64 and ppc64 platforms.
 
-- The threading module gained alias for names that are removed in 3.x.
+- The threading module gained aliases for names that will be removed in the
+  3.x series.
 
 Build
 -----

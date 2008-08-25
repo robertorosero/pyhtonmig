@@ -39,7 +39,7 @@ def _old_api(callable, old_name):
         return callable
     @wraps(callable)
     def old(*args, **kwargs):
-        warnings.warnpy3k("In 3.x, {0} is renamed to {1}."
+        warnings.warnpy3k("{0}() is deprecated in favor of {1}()"
                           .format(old_name, callable.__name__),
                           stacklevel=3)
         return callable(*args, **kwargs)
@@ -67,7 +67,7 @@ if __debug__:
             if self.__verbose:
                 format = format % args
                 format = "%s: %s\n" % (
-                    current_thread().get_name(), format)
+                    current_thread().name, format)
                 _sys.stderr.write(format)
 
 else:
@@ -110,7 +110,7 @@ class _RLock(_Verbose):
         owner = self.__owner
         return "<%s(%s, %d)>" % (
                 self.__class__.__name__,
-                owner and owner.get_name(),
+                owner and owner.name,
                 self.__count)
 
     def acquire(self, blocking=1):
@@ -445,7 +445,7 @@ class Thread(_Verbose):
 
     def _set_daemon(self):
         # Overridden in _MainThread and _DummyThread
-        return current_thread().is_daemon()
+        return current_thread().daemon
 
     def __repr__(self):
         assert self.__initialized, "Thread.__init__() was not called"
@@ -534,7 +534,7 @@ class Thread(_Verbose):
                 # self.
                 if _sys:
                     _sys.stderr.write("Exception in thread %s:\n%s\n" %
-                                      (self.get_name(), _format_exc()))
+                                      (self.name, _format_exc()))
                 else:
                     # Do the best job possible w/o a huge amt. of code to
                     # approximate a traceback (code ideas from
@@ -542,7 +542,7 @@ class Thread(_Verbose):
                     exc_type, exc_value, exc_tb = self.__exc_info()
                     try:
                         print>>self.__stderr, (
-                            "Exception in thread " + self.get_name() +
+                            "Exception in thread " + self.name +
                             " (most likely raised during interpreter shutdown):")
                         print>>self.__stderr, (
                             "Traceback (most recent call last):")
@@ -651,19 +651,18 @@ class Thread(_Verbose):
         finally:
             self.__block.release()
 
-    def get_name(self):
+    @property
+    def name(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__name
 
-    getName = _old_api(get_name, "getName")
-
-    def set_name(self, name):
+    @name.setter
+    def name(self, name):
         assert self.__initialized, "Thread.__init__() not called"
         self.__name = str(name)
 
-    setName = _old_api(set_name, "setName")
-
-    def get_ident(self):
+    @property
+    def ident(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__ident
 
@@ -673,20 +672,38 @@ class Thread(_Verbose):
 
     isAlive = _old_api(is_alive, "isAlive")
 
-    def is_daemon(self):
+    @property
+    def daemon(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__daemonic
 
-    isDaemon = _old_api(is_daemon, "isDaemon")
-
-    def set_daemon(self, daemonic):
+    @daemon.setter
+    def daemon(self, daemonic):
         if not self.__initialized:
             raise RuntimeError("Thread.__init__() not called")
         if self.__started.is_set():
             raise RuntimeError("cannot set daemon status of active thread");
         self.__daemonic = daemonic
 
-    setDaemon = _old_api(set_daemon, "setDaemon")
+    def isDaemon(self):
+        warnings.warnpy3k("isDaemon() is deprecated in favor of the " \
+                          "Thread.daemon property")
+        return self.daemon
+
+    def setDaemon(self, daemonic):
+        warnings.warnpy3k("setDaemon() is deprecated in favor of the " \
+                          "Thread.daemon property")
+        self.daemon = daemonic
+
+    def getName(self):
+        warnings.warnpy3k("getName() is deprecated in favor of the " \
+                          "Thread.name property")
+        return self.name
+
+    def setName(self, name):
+        warnings.warnpy3k("setName() is deprecated in favor of the " \
+                          "Thread.name property")
+        self.name = name
 
 # The timer class was contributed by Itamar Shtull-Trauring
 
@@ -749,7 +766,7 @@ class _MainThread(Thread):
 
 def _pickSomeNonDaemonThread():
     for t in enumerate():
-        if not t.is_daemon() and t.is_alive():
+        if not t.daemon and t.is_alive():
             return t
     return None
 
@@ -905,7 +922,7 @@ def _test():
             counter = 0
             while counter < self.quota:
                 counter = counter + 1
-                self.queue.put("%s.%d" % (self.get_name(), counter))
+                self.queue.put("%s.%d" % (self.name, counter))
                 _sleep(random() * 0.00001)
 
 
@@ -930,7 +947,7 @@ def _test():
     P = []
     for i in range(NP):
         t = ProducerThread(Q, NI)
-        t.setName("Producer-%d" % (i+1))
+        t.name = ("Producer-%d" % (i+1))
         P.append(t)
     C = ConsumerThread(Q, NI*NP)
     for t in P:
