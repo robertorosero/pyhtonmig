@@ -12,7 +12,16 @@ What's New in Python 2.6 release candidate 1?
 Core and Builtins
 -----------------
 
-- Issue #2534: speed up isinstance() and issubclass() by 50-70%, so as to 
+- Issue #3751: str.rpartition would perform a left-partition when called with
+  a unicode argument.
+
+- Issue #3683: Fix compilation when --without-threads is given.
+
+- Issue #3668: Fix a memory leak with the "s*" argument parser in
+  PyArg_ParseTuple and friends, which occurred when the argument for "s*"
+  was correctly parsed but parsing of subsequent arguments failed.
+
+- Issue #2534: speed up isinstance() and issubclass() by 50-70%, so as to
   match Python 2.5 speed despite the __instancecheck__ / __subclasscheck__
   mechanism. In the process, fix a bug where isinstance() and issubclass(),
   when given a tuple of classes as second argument, were looking up
@@ -36,6 +45,13 @@ Core and Builtins
 - Added warnings on the use of ``__getslice__``, ``__setslice__``, or
   ``__delslice__``.
 
+- Issue #3678: Correctly pass LDFLAGS and LDLAST to the linker on shared
+  library targets in the Makefile.
+
+- Issue #1204: The configure script now tests for additional libraries
+  that may be required when linking against readline.  This fixes issues
+  with x86_64 builds on some platforms (a few Linux flavors and OpenBSD).
+
 C-API
 -----
 
@@ -44,15 +60,73 @@ C-API
 Library
 -------
 
+- Issue #1638033: Cookie.Morsel gained the httponly attribute.
+
+- Issue #3535: zipfile couldn't read some zip files larger than 2GB.
+
+- Issue #3776: Deprecate the bsddb package for removal in 3.0.
+
+- Issue #3762: platform.architecture() fails if python is lanched via
+  its symbolic link.
+
+- Issue #3772: Fixed regression problem in StreamHandler.emit().
+
+- Issue 600362: Relocated parse_qs() and parse_qsl(), from the cgi module
+  to the urlparse one.  Added a PendingDeprecationWarning in the old
+  module, it will be deprecated in the future.
+
+- Issue #2562: Fix distutils PKG-INFO writing logic to allow having
+  non-ascii characters and Unicode in setup.py meta-data.
+
+- Issue #3726: Allow spaces in separators in logging configuration files.
+
+- Issue #3719: platform.architecture() fails if there are spaces in the
+  path to the Python binary.
+
+- Issue 3602: Moved test.test_support.catch_warning() to
+  warnings.catch_warnings() along with some API cleanup. Expanding the tests
+  for catch_warnings() also led to an improvement in the raising of a
+  DeprecationWarning related to warnings.warn_explicit().
+
+- The deprecation warnings for the old camelCase threading API were removed.
+
+- logging: fixed lack of use of encoding attribute specified on a stream.
+
 - Silenced a trivial compiler warning in the sqlite module.
 
 - Fixed two format strings in the _collections module.
 
+- Issue #3703: _fileio.FileIO gave unhelpful error message when trying to open a
+  directory.
+
+- Issue #3708: os.urandom no longer goes into an infinite loop when passed a
+  non-integer floating point number.
+
+- Issue #3110: multiprocessing fails to compiel on solaris 10 due to missing
+  SEM_VALUE_MAX.
+
 Extension Modules
 -----------------
 
+- Issue #2975: When compiling several extension modules with Visual Studio 2008
+  from the same python interpreter, some environment variables would grow
+  without limit.
+
 - Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
   exploitation of poor argument checking.
+
+Tests
+-----
+
+- Issue #3796: Some tests functions were not enabled in test_float.
+
+- Issue #3768: Move test_py3kwarn over to the new API for catch_warnings().
+
+Build
+-----
+
+- Issue #3758: Rename the 'check' target to 'patchcheck' so as to not clash 
+  with GNU build target guidelines.
 
 
 What's New in Python 2.6 beta 3?
@@ -484,8 +558,9 @@ Extension Modules
 
 - Support for Windows 9x has been removed from the winsound module.
 
-- bsddb module updated to version 4.7.0.
-  http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.0
+- bsddb module updated to version 4.7.3pre2.
+  http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.3. This
+  code should be compatible with Python 3.0.
 
 - Issue #2858: Fix potential memory corruption when
   bsddb.db.DBEnv.lock_get and other bsddb.db object constructors
@@ -2651,8 +2726,8 @@ Extension Modules
 - fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
   were transposed.
 
-- Added support for linking the bsddb module against BerkeleyDB 4.5.x
-  and 4.6.x.
+- Added support for linking the bsddb module against BerkeleyDB 4.5.x,
+  4.6.x and 4.7.x.
 
 - Bug #1633621: if curses.resizeterm() or curses.resize_term() is
   called, update _curses.LINES, _curses.COLS, curses.LINES and

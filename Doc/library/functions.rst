@@ -381,10 +381,10 @@ available.  They are listed here in alphabetical order.
       >>> print eval('x+1')
       2
 
-   This function can also be used to execute arbitrary code objects (such as those
-   created by :func:`compile`).  In this case pass a code object instead of a
-   string.  The code object must have been compiled passing ``'eval'`` as the
-   *kind* argument.
+   This function can also be used to execute arbitrary code objects (such as
+   those created by :func:`compile`).  In this case pass a code object instead
+   of a string.  If the code object has been compiled with ``'exec'`` as the
+   *kind* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :keyword:`exec`
    statement.  Execution of statements from a file is supported by the
@@ -1215,7 +1215,8 @@ available.  They are listed here in alphabetical order.
 
 .. function:: super(type[, object-or-type])
 
-   Return the superclass of *type*.  If the second argument is omitted the super
+   Return a "super" object that acts like the superclass of *type*.
+   If the second argument is omitted the super
    object returned is unbound.  If the second argument is an object,
    ``isinstance(obj, type)`` must be true.  If the second argument is a type,
    ``issubclass(type2, type)`` must be true. :func:`super` only works for
