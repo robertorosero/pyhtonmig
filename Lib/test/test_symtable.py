@@ -44,7 +44,7 @@ def find_block(block, name):
 
 class SymtableTest(unittest.TestCase):
 
-    with test_support.catch_warning(record=False):
+    with warnings.catch_warnings():
         # Ignore warnings about "from blank import *"
         warnings.simplefilter("ignore", SyntaxWarning)
         top = symtable.symtable(TEST_CODE, "?", "exec")
@@ -60,7 +60,7 @@ class SymtableTest(unittest.TestCase):
         def check(w, msg):
             self.assertEqual(str(w.message), msg)
         sym = self.top.lookup("glob")
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             warnings.simplefilter("always", DeprecationWarning)
             self.assertFalse(sym.is_vararg())
             check(w, "is_vararg() is obsolete and will be removed")

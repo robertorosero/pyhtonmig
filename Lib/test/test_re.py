@@ -1,7 +1,7 @@
 import sys
 sys.path = ['.'] + sys.path
 
-from test.test_support import verbose, run_unittest, catch_warning
+from test.test_support import verbose, run_unittest
 import re
 from re import Scanner
 import sys, os, traceback
@@ -115,6 +115,10 @@ class ReTests(unittest.TestCase):
         self.assertRaises(ValueError, re.search, pattern, 'A', re.I)
         self.assertRaises(ValueError, re.findall, pattern, 'A', re.I)
         self.assertRaises(ValueError, re.compile, pattern, re.I)
+
+    def test_bug_3629(self):
+        # A regex that triggered a bug in the sre-code validator
+        re.compile("(?P<quote>)(?(quote))")
 
     def test_sub_template_numeric_escape(self):
         # bug 776311 and friends
@@ -447,7 +451,7 @@ class ReTests(unittest.TestCase):
         self.pickle_test(cPickle)
         # old pickles expect the _compile() reconstructor in sre module
         import warnings
-        with catch_warning():
+        with warnings.catch_warnings():
             warnings.filterwarnings("ignore", "The sre module is deprecated",
                                     DeprecationWarning)
             from sre import _compile

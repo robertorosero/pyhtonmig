@@ -528,11 +528,11 @@ all users using a machine or a particular site installation.
 Python 2.6 introduces a convention for user-specific site directories.
 The directory varies depending on the platform:
 
-* Unix and MacOS: :file:`~/.local/`
+* Unix and Mac OS X: :file:`~/.local/`
 * Windows: :file:`%APPDATA%/Python`
 
 Within this directory, there will be version-specific subdirectories,
-such as :file:`lib/python2.6/site-packages` on Unix/MacOS and
+such as :file:`lib/python2.6/site-packages` on Unix/Mac OS and
 :file:`Python26/site-packages` on Windows.
 
 If you don't like the default directory, it can be overridden by an
@@ -1723,9 +1723,6 @@ Optimizations
   free lists when garbage-collecting the highest generation of objects.
   This may return memory to the operating system sooner.
 
-The net result of the 2.6 optimizations is that Python 2.6 runs the pystone
-benchmark around XXX% faster than Python 2.5.
-
 .. ======================================================================
 
 .. _new-26-interpreter:
@@ -1794,7 +1791,6 @@ changes, or look through the Subversion logs for all the details.
   :mod:`mimetools`,
   :mod:`multifile`,
   :mod:`new`,
-  :mod:`popen2`,
   :mod:`pure`,
   :mod:`statvfs`,
   :mod:`sunaudiodev`,
@@ -1806,12 +1802,10 @@ changes, or look through the Subversion logs for all the details.
   were applied.  (Maintained by Josiah Carlson; see :issue:`1736190` for
   one patch.)
 
-.. |uacute| unicode:: 0xA9
-
-* The :mod:`bsddb` module also has a new maintainer, Jes|uacute|s Cea,
-  and the package is now available as a standalone package.
-  The web page for the package is
-  `www.jcea.es/programacion/pybsddb.htm <http://www.jcea.es/programacion/pybsddb.htm>`__.
+* The :mod:`bsddb` module also has a new maintainer, Jesús Cea, and the package
+  is now available as a standalone package.  The web page for the package is
+  `www.jcea.es/programacion/pybsddb.htm
+  <http://www.jcea.es/programacion/pybsddb.htm>`__.
 
 * The :mod:`bsddb.dbshelve` module now uses the highest pickling protocol
   available, instead of restricting itself to protocol 1.
@@ -2134,6 +2128,13 @@ changes, or look through the Subversion logs for all the details.
 
   (Contributed by Christian Heimes and Mark Dickinson.)
 
+* The :mod:`MimeWriter` module and :mod:`mimify` module
+  have been deprecated; use the :mod:`email`
+  package instead.
+
+* The :mod:`md5` module has been deprecated; use the :mod:`hashlib` module
+  instead.
+
 * :class:`mmap` objects now have a :meth:`rfind` method that searches for a
   substring beginning at the end of the string and searching
   backwards.  The :meth:`find` method also gained an *end* parameter
@@ -2216,6 +2217,9 @@ changes, or look through the Subversion logs for all the details.
   and can optionally take new command-line arguments for the program.
   (Contributed by Rocky Bernstein; :issue:`1393667`.)
 
+* The :mod:`posixfile` module has been deprecated; :func:`fcntl.lockf`
+  provides better locking.
+
   The :func:`post_mortem` function, used to begin debugging a
   traceback, will now use the traceback returned by :func:`sys.exc_info`
   if no traceback is supplied.   (Contributed by Facundo Batista;
@@ -2225,6 +2229,9 @@ changes, or look through the Subversion logs for all the details.
   that takes a string containing a pickle and removes some unused
   opcodes, returning a shorter pickle that contains the same data structure.
   (Contributed by Raymond Hettinger.)
+
+* The :mod:`popen2` module has been deprecated; use the :mod:`subprocess`
+  module.
 
 * A :func:`get_data` function was added to the :mod:`pkgutil`
   module that returns the contents of resource files included
@@ -2304,6 +2311,9 @@ changes, or look through the Subversion logs for all the details.
 
 * The :mod:`sets` module has been deprecated; it's better to
   use the built-in :class:`set` and :class:`frozenset` types.
+
+* The :mod:`sha` module has been deprecated; use the :mod:`hashlib` module
+  instead.
 
 * The :func:`shutil.copytree` function now has an optional *ignore* argument
   that takes a callable object.  This callable will receive each directory path
@@ -2390,6 +2400,10 @@ changes, or look through the Subversion logs for all the details.
   (Contributed by Pedro Werneck and Jeffrey Yasskin;
   :issue:`742598`, :issue:`1193577`.)
 
+* The :mod:`sqlite3` module, maintained by Gerhard Haering,
+  has been updated from version 2.3.2 in Python 2.5 to 
+  version 2.4.1.
+ 
 * The :mod:`struct` module now supports the C99 :ctype:`_Bool` type,
   using the format character ``'?'``.
   (Contributed by David Remahl.)
@@ -2439,18 +2453,18 @@ changes, or look through the Subversion logs for all the details.
   by calling :func:`sys.getprofile` and :func:`sys.gettrace`.
   (Contributed by Georg Brandl; :issue:`1648`.)
 
-* The :mod:`tarfile` module now supports POSIX.1-2001 (pax) and
-  POSIX.1-1988 (ustar) format tarfiles, in addition to the GNU tar
-  format that was already supported.  The default format
-  is GNU tar; specify the ``format`` parameter to open a file
-  using a different format::
+* The :mod:`tarfile` module now supports POSIX.1-2001 (pax) tarfiles in
+  addition to the POSIX.1-1988 (ustar) and GNU tar formats that were
+  already supported.  The default format is GNU tar; specify the
+  ``format`` parameter to open a file using a different format::
 
     tar = tarfile.open("output.tar", "w",
                        format=tarfile.PAX_FORMAT)
 
-  The new ``errors`` parameter specifies an error handling scheme for
-  character conversions.  ``'strict'``, ``'ignore'``, and
-  ``'replace'`` are the three standard ways Python can handle errors,;
+  The new ``encoding`` and ``errors`` parameters specify an encoding and
+  an error handling scheme for character conversions.  ``'strict'``,
+  ``'ignore'``, and ``'replace'`` are the three standard ways Python can
+  handle errors,;
   ``'utf-8'`` is a special value that replaces bad characters with
   their UTF-8 representation.  (Character conversions occur because the
   PAX format supports Unicode filenames, defaulting to UTF-8 encoding.)
@@ -2784,12 +2798,12 @@ Ippolito.
 The :mod:`plistlib` module: A Property-List Parser
 --------------------------------------------------
 
-The ``.plist`` format is commonly used on MacOS X to
+The ``.plist`` format is commonly used on Mac OS X to
 store basic data types (numbers, strings, lists,
 and dictionaries) by serializing them into an XML-based format.
 It resembles the XML-RPC serialization of data types.
 
-Despite being primarily used on MacOS X, the format
+Despite being primarily used on Mac OS X, the format
 has nothing Mac-specific about it and the Python implementation works
 on any platform that Python supports, so the :mod:`plistlib` module
 has been promoted to the standard library.
@@ -2905,7 +2919,7 @@ Changes to Python's build process and to the C API include:
   :file:`PCbuild` directory for the build files.  (Implemented by
   Christian Heimes.)
 
-* On MacOS X, Python 2.6 can be compiled as a 4-way universal build.
+* On Mac OS X, Python 2.6 can be compiled as a 4-way universal build.
   The :program:`configure` script
   can take a :option:`--with-universal-archs=[32-bit|64-bit|all]`
   switch, controlling whether the binaries are built for 32-bit
@@ -3057,7 +3071,7 @@ Port-Specific Changes: Windows
 
 .. ======================================================================
 
-Port-Specific Changes: MacOS X
+Port-Specific Changes: Mac OS X
 -----------------------------------
 
 * When compiling a framework build of Python, you can now specify the
@@ -3069,7 +3083,7 @@ Port-Specific Changes: MacOS X
   :func:`macostools.touched` function to be removed because it depended on the
   :mod:`macfs` module.  (:issue:`1490190`)
 
-* Many other MacOS modules have been deprecated and will removed in
+* Many other Mac OS modules have been deprecated and will removed in
   Python 3.0:
   :mod:`_builtinSuites`,
   :mod:`aepack`,
@@ -3157,6 +3171,13 @@ that may require changes to your code:
   now clears any existing contents of the deque
   before adding elements from the iterable.  This change makes the
   behavior match ``list.__init__()``.
+
+* :meth:`object.__init__` previously accepted arbitrary arguments and
+  keyword arguments, ignoring them.  In Python 2.6, this is no longer
+  allowed and will result in a :exc:`TypeError`.  This will affect 
+  :meth:`__init__` methods that end up calling the corresponding 
+  method on :class:`object` (perhaps through using :func:`super`).
+  See :issue:`1683368` for discussion.
 
 * The :class:`Decimal` constructor now accepts leading and trailing
   whitespace when passed a string.  Previously it would raise an

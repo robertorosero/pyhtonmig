@@ -4,13 +4,77 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6 release candidate 1?
-=============================================
+What's New in Python 2.6 final
+==============================
 
 *Release date: XX-XXX-2008*
 
 Core and Builtins
 -----------------
+
+Library
+-------
+
+Build
+-----
+
+- Bug #3887: Package x64 version of CRT for AMD64 Windows binaries.
+
+
+What's New in Python 2.6 release candidate 2?
+=============================================
+
+*Release date: 17-Sep-2008*
+
+Core and Builtins
+-----------------
+
+Extension Modules
+-----------------
+
+- Issue #3886: Possible integer overflows in the _hashopenssl module were
+  closed.
+
+Tools/Demos
+-----------
+
+- Issue #3850: recursion tests in Misc/find_recursion_limit.py can raise
+  AttributeError instead of RuntimeError, depending in which C API call
+  exactly the recursion limit is exceeded. Consequently, both exception types
+  are caught and silenced.
+
+Build
+-----
+
+- Issue #3617: Include a licensing statement regarding the Microsoft
+  C runtime in the Windows installer.
+
+
+What's New in Python 2.6 release candidate 1?
+=============================================
+
+*Release date: 12-Sep-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3642: Suppress warning in obmalloc when size_t is larger than uint.
+
+- Issue #3743: In a few places, PY_FORMAT_SIZE_T was incorrectly used with
+  PyString_FromFormat or PyErr_Format to display size_t values. The macro
+  PY_FORMAT_SIZE_T is designed to select the correct format for the OS
+  ``printf`` function, whereas PyString_FromFormat has an independent
+  implementation and uses "%zd" on all platforms for size_t values.
+  This makes a difference on win64, where ``printf`` needs "%Id" to display
+  64bit values.
+
+- Issue #3634: _weakref.ref(Exception).__init__() gave invalid return value on
+  error.
+
+- Issue #3777: long() applied to a float object now always return a long
+  object; previously an int would be returned for small values. the __long__
+  method is allowed to return either an int or a long, but the behaviour of
+  float objects should not change to respect backward compatibility.
 
 - Issue #3751: str.rpartition would perform a left-partition when called with
   a unicode argument.
@@ -36,9 +100,6 @@ Core and Builtins
 
 - Fix problem using wrong name in decimal module reported by pychecker.
 
-- Issue #3642: Changed type of numarenas from uint to size_t
-  in order to silence a compilier warning on 64bit OSes.
-
 - Silenced another compiler warning about a used but not defined
   function 'stringlib_contains_obj'.
 
@@ -59,6 +120,22 @@ C-API
 
 Library
 -------
+
+- Issue #3640: Pickling a list or a dict uses less local variables, to reduce
+  stack usage in the case of deeply nested objects.
+
+- Issue #3629: Fix sre "bytecode" validator for an end case.
+
+- Issue #3811: The Unicode database was updated to 5.1.
+
+- Issue #3781: Further warnings.catch_warnings() cleanup to prevent
+  silent misbehaviour when a single instance is nested in multiple
+  with statements, or when the methods are invoked in the wrong order.
+
+- Issue #3809: Fixed spurious 'test.blah' file left behind by test_logging.
+
+- Issue #3781: Clean up the API for warnings.catch_warnings() by having it
+  return a list or None rather than a custom object.
 
 - Issue #1638033: Cookie.Morsel gained the httponly attribute.
 
@@ -115,8 +192,21 @@ Extension Modules
 - Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
   exploitation of poor argument checking.
 
+- sqlite3: Changed docstring of iterdump() to mark method as "Non-standard".
+
+- Issue #3103: Reduced globals symbols used by sqlite3 module and made sure all
+  remaining ones have "pysqlite_" prefix.
+
+- Issue #3846: Release the GIL during sqlite3_prepare calls. This improves
+  concurrent access to the same SQLite database from multiple
+  threads/processes.
+
 Tests
 -----
+
+- Issue #3781: Add test.test_support.check_warnings() as a convenience
+  wrapper for warnings.catch_warnings() that makes it easier to check
+  that expected warning messages are being reported.
 
 - Issue #3796: Some tests functions were not enabled in test_float.
 
@@ -125,7 +215,14 @@ Tests
 Build
 -----
 
-- Issue #3758: Rename the 'check' target to 'patchcheck' so as to not clash 
+- Issue #3833: Use a different upgrade code for Win64 installers.
+
+- Issue #2271: Set SecureCustomProperties so that installation will properly
+  use the TARGETDIR even for unprivileged users.
+
+- Allow passing the MSI file name to merge.py.
+
+- Issue #3758: Rename the 'check' target to 'patchcheck' so as to not clash
   with GNU build target guidelines.
 
 

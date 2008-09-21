@@ -18,7 +18,7 @@ __all__ = ["Error", "TestFailed", "TestSkipped", "ResourceDenied", "import_modul
            "is_resource_enabled", "requires", "find_unused_port", "bind_port",
            "fcmp", "have_unicode", "is_jython", "TESTFN", "HOST", "FUZZ",
            "findfile", "verify", "vereq", "sortdict", "check_syntax_error",
-           "open_urlresource", "catch_warning", "CleanImport",
+           "open_urlresource", "check_warnings", "CleanImport",
            "EnvironmentVarGuard", "captured_output",
            "captured_stdout", "TransientResource", "transient_internet",
            "run_with_locale", "set_memlimit", "bigmemtest", "bigaddrspacetest",
@@ -52,7 +52,7 @@ class ResourceDenied(TestSkipped):
 def import_module(name, deprecated=False):
     """Import the module to be tested, raising TestSkipped if it is not
     available."""
-    with catch_warning(record=False):
+    with warnings.catch_warnings():
         if deprecated:
             warnings.filterwarnings("ignore", ".+ (module|package)",
                                     DeprecationWarning)
@@ -381,8 +381,27 @@ def open_urlresource(url):
     return open(fn)
 
 
-def catch_warning(module=warnings, record=True):
-    return warnings.catch_warnings(record=record, module=module)
+class WarningsRecorder(object):
+    """Convenience wrapper for the warnings list returned on
+       entry to the warnings.catch_warnings() context manager.
+    """
+    def __init__(self, warnings_list):
+        self.warnings = warnings_list
+
+    def __getattr__(self, attr):
+        if self.warnings:
+            return getattr(self.warnings[-1], attr)
+        elif attr in warnings.WarningMessage._WARNING_DETAILS:
+            return None
+        raise AttributeError("%r has no attribute %r" % (self, attr))
+
+    def reset(self):
+        del self.warnings[:]
+
+@contextlib.contextmanager
+def check_warnings():
+    with warnings.catch_warnings(record=True) as w:
+        yield WarningsRecorder(w)
 
 
 class CleanImport(object):
