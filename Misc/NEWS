@@ -12,8 +12,30 @@ What's New in Python 2.6 final
 Core and Builtins
 -----------------
 
+- Issue #3967: Fixed a crash in the count() and find() methods of string-like
+  objects, when the "start" parameter is a huge value.
+
+- Issue #3965: Fixed a crash on Windows when open() is given an invalid
+  filename or mode, and the filename is a unicode string.
+
+- Bug #3951: Py_USING_MEMORY_DEBUGGER should not be enabled by default.
+
 Library
 -------
+
+- Issue #3965: Allow repeated calls to turtle.Screen, by making it a
+  true singleton object.
+
+- Issue #3895: It was possible to crash the interpreter when an external timer
+  was used with cProfile that returned an object that could not be converted
+  into a float.
+
+- Issue #3950: Made turtle respect scale factors.
+
+- Issue #3547: Fixed ctypes structures bitfields of varying integer
+  sizes.
+
+- Issue #3879: A regression in urllib.getproxies_enviroment was fixed.
 
 Build
 -----
@@ -31,6 +53,9 @@ Core and Builtins
 
 Extension Modules
 -----------------
+
+- Security Issue #2: imageop did not validate arguments correctly and could
+  segfault as a result.
 
 - Issue #3886: Possible integer overflows in the _hashopenssl module were
   closed.
@@ -655,7 +680,7 @@ Extension Modules
 
 - Support for Windows 9x has been removed from the winsound module.
 
-- bsddb module updated to version 4.7.3pre2.
+- bsddb module updated to version 4.7.3.
   http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.3. This
   code should be compatible with Python 3.0.
 
