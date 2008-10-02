@@ -1,2 +1,2 @@
-buildbottest distclean:
+all buildbottest distclean:
 
