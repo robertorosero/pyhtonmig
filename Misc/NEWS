@@ -4,10 +4,35 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.7 alpha 1
+================================
+
+*Release date: XX-XXX-20XX*
+
+Core and Builtins
+-----------------
+
+- Issue #4069: When set.remove(element) is used with a set element, the element
+  is temporarily replaced with an equivalent frozenset.  But the eventual
+  KeyError would always report the empty frozenset([]) as the missing key. Now
+  it correctly refers to the initial element.
+
+Library
+-------
+
+- Issue #4014: Don't claim that Python has an Alpha release status, in addition
+  to claiming it is Mature.
+
+Build
+-----
+
+- Issue #3758: Add ``patchcheck`` build target to .PHONY.
+
+
 What's New in Python 2.6 final
 ==============================
 
-*Release date: XX-XXX-2008*
+*Release date: 01-Oct-2008*
 
 Core and Builtins
 -----------------
@@ -37,8 +62,14 @@ Library
 
 - Issue #3879: A regression in urllib.getproxies_enviroment was fixed.
 
+- Issue #3863: Disabled a unit test of fork being called from a thread
+  when running on platforms known to exhibit OS bugs when attempting that.
+
 Build
 -----
+
+- Bug #3989: Package the 2to3 script (as 2to3.py) in the Windows
+  installer.
 
 - Bug #3887: Package x64 version of CRT for AMD64 Windows binaries.
 
