@@ -210,7 +210,7 @@ class ASTHelpers_Test(unittest.TestCase):
         )
 
     def test_copy_location(self):
-        src = ast.parse('1 + 1', mode='eval')
+        src = ast.parse('1 + 1', mode='eval', optimize=False)
         src.body.right = ast.copy_location(ast.Num(2), src.body.right)
         self.assertEqual(ast.dump(src, include_attributes=True),
             'Expression(body=BinOp(left=Num(n=1, lineno=1, col_offset=0), '
@@ -235,7 +235,7 @@ class ASTHelpers_Test(unittest.TestCase):
         )
 
     def test_increment_lineno(self):
-        src = ast.parse('1 + 1', mode='eval')
+        src = ast.parse('1 + 1', mode='eval', optimize=False)
         self.assertEqual(ast.increment_lineno(src, n=3), src)
         self.assertEqual(ast.dump(src, include_attributes=True),
             'Expression(body=BinOp(left=Num(n=1, lineno=4, col_offset=0), '

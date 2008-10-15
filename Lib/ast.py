@@ -28,12 +28,15 @@
 from _ast import *
 
 
-def parse(expr, filename='<unknown>', mode='exec'):
+def parse(expr, filename='<unknown>', mode='exec', optimize=True):
     """
     Parse an expression into an AST node.
     Equivalent to compile(expr, filename, mode, PyCF_ONLY_AST).
     """
-    return compile(expr, filename, mode, PyCF_ONLY_AST)
+    flags = PyCF_ONLY_AST
+    if not optimize:
+        flags |= PyCF_NO_OPTIMIZE
+    return compile(expr, filename, mode, flags)
 
 
 def literal_eval(node_or_string):
@@ -63,6 +66,8 @@ def literal_eval(node_or_string):
         elif isinstance(node, Name):
             if node.id in _safe_names:
                 return _safe_names[node.id]
+        elif isinstance(node, Const):
+            return node.value
         raise ValueError('malformed string')
     return _convert(node_or_string)
 
