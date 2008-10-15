@@ -151,9 +151,6 @@ _is_sequence_of_constants(asdl_seq* seq)
  * Build a tuple of constants from an expression sequence.
  * A precondition is that the given seq returns a true
  * value for _is_sequence_of_constants.
- *
- * XXX: for some reason this is transforming tuples
- *      of longs to tuples of integers. Not sure why.
  */
 static PyObject*
 _build_tuple_of_constants(asdl_seq* seq, PyArena* arena)
@@ -402,12 +399,9 @@ static int
 _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
 {
     expr_ty value = NULL;
-    /* XXX!! ! !ASDASDASD PAY ATTENTION HERE!!!! */
-    /* This breaks lnotab because the `value' expr has a bad lineno! D'oh! */
     if (next != NULL)
         value = next->v.Return.value;
 
-#if 0
     /* if the else body is not present, there will be no jump anyway */
     if (stmt->kind == If_kind && stmt->v.If.orelse != NULL) {
         stmt_ty inner = asdl_seq_GET(stmt->v.If.body,
@@ -459,7 +453,6 @@ _inject_compound_stmt_return(stmt_ty stmt, stmt_ty next, PyArena* arena)
                 return 0;
         }
     }
-#endif
 
     return 1;
 }
