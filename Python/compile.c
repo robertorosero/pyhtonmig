@@ -1015,10 +1015,19 @@ compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 		else {
 			t = PyTuple_Pack(2, o, o->ob_type);
 		}
-        }
+	}
+	/* necessary for tuples of constants as produced by the AST optimizer */
+	/* e.g. (1, 0) and (1L, 0L) will otherwise be considered equal. */
+	else if (PyTuple_Check(o)) {
+		v = PyObject_Repr(o);
+		if (v == NULL)
+			return -1;
+		t = PyTuple_Pack(3, o, o->ob_type, v);
+		Py_DECREF(v);
+	}
 	else {
 		t = PyTuple_Pack(2, o, o->ob_type);
-        }
+	}
 	if (t == NULL)
 		return -1;
 
