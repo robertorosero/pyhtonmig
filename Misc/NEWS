@@ -32,7 +32,15 @@ Library
 Build
 -----
 
+- Issue #4018: Disable "for me" installations on Vista.
+
 - Issue #3758: Add ``patchcheck`` build target to .PHONY.
+
+C-API
+-----
+
+- Issue #4122: On Windows, fix a compilation error when using the
+  Py_UNICODE_ISSPACE macro in an extension module.
 
 
 What's New in Python 2.6 final
