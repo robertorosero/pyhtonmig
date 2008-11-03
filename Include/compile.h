@@ -41,8 +41,6 @@ PyAPI_FUNC(PyCodeObject *) PyAST_CompileEx(struct _mod *,
                     PyCompilerInfo *, PyArena *);
 PyAPI_FUNC(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 
-#define ERR_LATE_FUTURE \
-"from __future__ imports must occur at the beginning of the file"
 
 #ifdef __cplusplus
 }

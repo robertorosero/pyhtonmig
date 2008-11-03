@@ -12,6 +12,18 @@ What's New in Python 2.7 alpha 1
 Core and Builtins
 -----------------
 
+- Issue #4225: ``from __future__ import unicode_literals`` didn't work in an
+  exec statement.
+
+- Issue #4176: Fixed a crash when pickling an object which ``__reduce__``
+  method does not return iterators for the 4th and 5th items.
+
+- Issue #4209: Enabling unicode_literals and the print_function in the same
+  __future__ import didn't work.
+
+- Using ``nonlocal`` as a variable name will now raise a Py3k SyntaxWarning
+  because it is a reserved word in 3.x.
+
 - On windows, os.chdir given unicode was not working if GetCurrentDirectoryW
   returned a path longer than MAX_PATH. (But It's doubtful this code path is
   really executed because I cannot move to such directory on win2k)
@@ -24,6 +36,14 @@ Core and Builtins
 Library
 -------
 
+- Fixed a modulefinder crash on certain relative imports.
+
+- Issue #4150: Pdb's "up" command now works for generator frames in post-mortem
+  debugging.
+
+- Issue #4092: Return ArgInfo as promised in the documentation from
+  inspect.getargvalues.
+
 - Issue #3935: Properly support list subclasses in bisect's C implementation.
 
 - Issue #4014: Don't claim that Python has an Alpha release status, in addition
@@ -31,6 +51,8 @@ Library
 
 Build
 -----
+
+- Issue #4091: Install pythonxy.dll in system32 again.
 
 - Issue #4018: Disable "for me" installations on Vista.
 
