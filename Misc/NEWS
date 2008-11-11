@@ -12,6 +12,8 @@ What's New in Python 2.7 alpha 1
 Core and Builtins
 -----------------
 
+- Issue #4048: The parser module now correctly validates relative imports.
+
 - Issue #4225: ``from __future__ import unicode_literals`` didn't work in an
   exec statement.
 
@@ -36,6 +38,9 @@ Core and Builtins
 Library
 -------
 
+- Issue #3774: Fixed an error when create a Tkinter menu item without command
+  and then remove it.
+
 - Fixed a modulefinder crash on certain relative imports.
 
 - Issue #4150: Pdb's "up" command now works for generator frames in post-mortem
@@ -52,11 +57,17 @@ Library
 Build
 -----
 
+- Issue #1656675: Register a drop handler for .py* files on Windows.
+
+- Issue #4120: Exclude manifest from extension modules in VS2008.
+
 - Issue #4091: Install pythonxy.dll in system32 again.
 
 - Issue #4018: Disable "for me" installations on Vista.
 
 - Issue #3758: Add ``patchcheck`` build target to .PHONY.
+
+- Issue #4204: Fixed module build errors on FreeBSD 4.
 
 C-API
 -----
