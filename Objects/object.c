@@ -494,24 +494,24 @@ PyObject_Bytes(PyObject *v)
 
 /* The new comparison philosophy is: we completely separate three-way
    comparison from rich comparison.  That is, PyObject_Compare() and
-   PyObject_Cmp() *just* use the tp_compare slot.  And PyObject_RichCompare()
+   PyObject_Cmp() *just* use the tp_reserved slot.  And PyObject_RichCompare()
    and PyObject_RichCompareBool() *just* use the tp_richcompare slot.
 
    See (*) below for practical amendments.
 
-   IOW, only cmp() uses tp_compare; the comparison operators (==, !=, <=, <,
+   IOW, only cmp() uses tp_reserved; the comparison operators (==, !=, <=, <,
    >=, >) only use tp_richcompare.  Note that list.sort() only uses <.
 
-   (And yes, eventually we'll rip out cmp() and tp_compare.)
+   (And yes, eventually we'll rip out cmp() and tp_reserved.)
 
-   The calling conventions are different: tp_compare only gets called with two
+   The calling conventions are different: tp_reserved only gets called with two
    objects of the appropriate type; tp_richcompare gets called with a first
    argument of the appropriate type and a second object of an arbitrary type.
    We never do any kind of coercion.
 
    The return conventions are also different.
 
-   The tp_compare slot should return a C int, as follows:
+   The tp_reserved slot should return a C int, as follows:
 
      -1 if a < b or if an exception occurred
       0 if a == b
@@ -540,68 +540,6 @@ PyObject_Bytes(PyObject *v)
     comparison (but not the other way around!).
 
 */
-
-/* Forward */
-static PyObject *do_richcompare(PyObject *v, PyObject *w, int op);
-
-/* Perform a three-way comparison, raising TypeError if three-way comparison
-   is not supported.  */
-static int
-do_compare(PyObject *v, PyObject *w)
-{
-	cmpfunc f;
-	int ok;
-
-	if (v->ob_type == w->ob_type &&
-	    (f = v->ob_type->tp_compare) != NULL) {
-		return (*f)(v, w);
-	}
-
-	/* Now try three-way compare before giving up.  This is intentionally
-	   elaborate; if you have a it will raise TypeError if it detects two
-	   objects that aren't ordered with respect to each other. */
-	ok = PyObject_RichCompareBool(v, w, Py_LT);
-	if (ok < 0)
-		return -1; /* Error */
-	if (ok)
-		return -1; /* Less than */
-	ok = PyObject_RichCompareBool(v, w, Py_GT);
-	if (ok < 0)
-		return -1; /* Error */
-	if (ok)
-		return 1; /* Greater than */
-	ok = PyObject_RichCompareBool(v, w, Py_EQ);
-	if (ok < 0)
-		return -1; /* Error */
-	if (ok)
-		return 0; /* Equal */
-
-	/* Give up */
-	PyErr_Format(PyExc_TypeError,
-		     "unorderable types: '%.100s' != '%.100s'",
-		     v->ob_type->tp_name,
-		     w->ob_type->tp_name);
-	return -1;
-}
-
-/* Perform a three-way comparison.  This wraps do_compare() with a check for
-   NULL arguments and a recursion check. */
-int
-PyObject_Compare(PyObject *v, PyObject *w)
-{
-	int res;
-
-	if (v == NULL || w == NULL) {
-		if (!PyErr_Occurred())
-			PyErr_BadInternalCall();
-		return -1;
-	}
-	if (Py_EnterRecursiveCall(" in cmp"))
-		return -1;
-	res = do_compare(v, w);
-	Py_LeaveRecursiveCall();
-	return res < 0 ? -1 : res;
-}
 
 /* Map rich comparison operators to their swapped version, e.g. LT <--> GT */
 int _Py_SwappedOp[] = {Py_GT, Py_GE, Py_EQ, Py_NE, Py_LT, Py_LE};
@@ -1519,7 +1457,7 @@ static PyTypeObject PyNone_Type = {
 	0,		/*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
-	0,		/*tp_compare*/
+	0,		/*tp_reserved*/
 	none_repr,	/*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
@@ -1550,7 +1488,7 @@ static PyTypeObject PyNotImplemented_Type = {
 	0,		/*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
-	0,		/*tp_compare*/
+	0,		/*tp_reserved*/
 	NotImplemented_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/

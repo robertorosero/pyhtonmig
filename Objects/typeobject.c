@@ -656,7 +656,7 @@ type_repr(PyTypeObject *type)
 	if (name == NULL)
 		return NULL;
 
-	if (mod != NULL && PyUnicode_CompareWithASCIIString(mod, "builtins"))
+	if (mod != NULL && !PyUnicode_EqualToASCIIString(mod, "builtins"))
 		rtn = PyUnicode_FromFormat("<class '%U.%U'>", mod, name);
 	else
 		rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
@@ -2029,7 +2029,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			if (!valid_identifier(tmp))
 				goto bad_slots;
 			assert(PyUnicode_Check(tmp));
-			if (PyUnicode_CompareWithASCIIString(tmp, "__dict__") == 0) {
+			if (PyUnicode_EqualToASCIIString(tmp, "__dict__")) {
 				if (!may_add_dict || add_dict) {
 					PyErr_SetString(PyExc_TypeError,
 						"__dict__ slot disallowed: "
@@ -2038,7 +2038,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 				}
 				add_dict++;
 			}
-			if (PyUnicode_CompareWithASCIIString(tmp, "__weakref__") == 0) {
+			if (PyUnicode_EqualToASCIIString(tmp, "__weakref__")) {
 				if (!may_add_weak || add_weak) {
 					PyErr_SetString(PyExc_TypeError,
 						"__weakref__ slot disallowed: "
@@ -2060,9 +2060,9 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		for (i = j = 0; i < nslots; i++) {
 			tmp = PyTuple_GET_ITEM(slots, i);
 			if ((add_dict && 
-			     PyUnicode_CompareWithASCIIString(tmp, "__dict__") == 0) ||
+			     PyUnicode_EqualToASCIIString(tmp, "__dict__")) ||
 			    (add_weak && 
-			     PyUnicode_CompareWithASCIIString(tmp, "__weakref__") == 0))
+			     PyUnicode_EqualToASCIIString(tmp, "__weakref__")))
 				continue;
 			tmp =_Py_Mangle(name, tmp);
 			if (!tmp)
@@ -2584,7 +2584,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -2791,11 +2791,12 @@ object_repr(PyObject *self)
 	name = type_name(type, NULL);
 	if (name == NULL)
 		return NULL;
-	if (mod != NULL && PyUnicode_CompareWithASCIIString(mod, "builtins"))
+	if (mod != NULL && !PyUnicode_EqualToASCIIString(mod, "builtins"))
 		rtn = PyUnicode_FromFormat("<%U.%U object at %p>", mod, name, self);
 	else
 		rtn = PyUnicode_FromFormat("<%s object at %p>",
 					  type->tp_name, self);
+
 	Py_XDECREF(mod);
 	Py_DECREF(name);
 	return rtn;
@@ -2897,7 +2898,7 @@ same_slots_added(PyTypeObject *a, PyTypeObject *b)
 	slots_a = ((PyHeapTypeObject *)a)->ht_slots;
 	slots_b = ((PyHeapTypeObject *)b)->ht_slots;
 	if (slots_a && slots_b) {
-		if (PyObject_Compare(slots_a, slots_b) != 0)
+		if (PyObject_RichCompareBool(slots_a, slots_b, Py_NE) == 1)
 			return 0;
 		size += sizeof(PyObject *) * PyTuple_GET_SIZE(slots_a);
 	}
@@ -3357,7 +3358,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	object_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -3663,7 +3664,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_setattr = base->tp_setattr;
 		type->tp_setattro = base->tp_setattro;
 	}
-	/* tp_compare see tp_richcompare */
+	/* tp_reserved is ignored, see tp_richcompare */
 	COPYSLOT(tp_repr);
 	/* tp_hash see tp_richcompare */
 	COPYSLOT(tp_call);
@@ -3671,12 +3672,10 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	{
 		/* Copy comparison-related slots only when
 		   not overriding them anywhere */
-		if (type->tp_compare == NULL &&
-		    type->tp_richcompare == NULL &&
+		if (type->tp_richcompare == NULL &&
 		    type->tp_hash == NULL &&
 		    !overrides_hash(type))
 		{
-			type->tp_compare = base->tp_compare;
 			type->tp_richcompare = base->tp_richcompare;
 			type->tp_hash = base->tp_hash;
 		}
@@ -3888,6 +3887,13 @@ PyType_Ready(PyTypeObject *type)
 		    add_subclass((PyTypeObject *)b, type) < 0)
 			goto error;
 	}
+
+        /* Check reserved slots */
+        if (type->tp_reserved) {
+            PyErr_Format(PyExc_TypeError, 
+                         "type %s has tp_reserved",
+                         type->tp_name); 
+        }
 
 	/* All done -- set the ready flag */
 	assert(type->tp_dict != NULL);
@@ -5971,7 +5977,7 @@ super_getattro(PyObject *self, PyObject *name)
 		   (i.e. super, or a subclass), not the class of su->obj. */
 		skip = (PyUnicode_Check(name) &&
 			PyUnicode_GET_SIZE(name) == 9 &&
-			PyUnicode_CompareWithASCIIString(name, "__class__") == 0);
+			PyUnicode_EqualToASCIIString(name, "__class__"));
 	}
 
 	if (!skip) {
@@ -6168,8 +6174,8 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 		for (i = 0; i < n; i++) {
 			PyObject *name = PyTuple_GET_ITEM(co->co_freevars, i);
 			assert(PyUnicode_Check(name));
-                        if (!PyUnicode_CompareWithASCIIString(name,
-                                                              "__class__")) {
+                        if (PyUnicode_EqualToASCIIString(name,
+                                                       "__class__")) {
 				Py_ssize_t index = co->co_nlocals + 
 					PyTuple_GET_SIZE(co->co_cellvars) + i;
 				PyObject *cell = f->f_localsplus[index];
@@ -6252,7 +6258,7 @@ PyTypeObject PySuper_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	super_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

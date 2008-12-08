@@ -715,7 +715,7 @@ whichmodule(PyObject *global, PyObject *global_name)
     i = 0;
     module_name = NULL;
     while ((j = PyDict_Next(modules_dict, &i, &module_name, &module))) {
-        if (PyObject_Compare(module_name, main_str) == 0)
+        if (PyObject_RichCompareBool(module_name, main_str, Py_EQ) == 1)
             continue;
 
         obj = PyObject_GetAttr(module, global_name);
@@ -2041,7 +2041,7 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *obj)
         }
         else {
             use_newobj = PyUnicode_Check(name_str) && 
-                PyUnicode_Compare(name_str, newobj_str) == 0;
+                PyObject_RichCompareBool(name_str, newobj_str, Py_EQ) == 1;
             Py_DECREF(name_str);
         }
     }
@@ -2645,7 +2645,7 @@ static PyTypeObject Pickler_Type = {
     0,                                  /*tp_print*/
     0,                                  /*tp_getattr*/
     0,                                  /*tp_setattr*/
-    0,                                  /*tp_compare*/
+    0,                                  /*tp_reserved*/
     0,                                  /*tp_repr*/
     0,                                  /*tp_as_number*/
     0,                                  /*tp_as_sequence*/
@@ -4493,7 +4493,7 @@ static PyTypeObject Unpickler_Type = {
     0,                                  /*tp_print*/
     0,                                  /*tp_getattr*/
     0,	                                /*tp_setattr*/
-    0,                                  /*tp_compare*/
+    0,                                  /*tp_reserved*/
     0,                                  /*tp_repr*/
     0,                                  /*tp_as_number*/
     0,                                  /*tp_as_sequence*/

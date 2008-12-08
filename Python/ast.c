@@ -367,7 +367,7 @@ forbidden_name(expr_ty e, const node *n)
     const char **p;
     assert(PyUnicode_Check(e->v.Name.id));
     for (p = FORBIDDEN; *p; p++) {
-        if (PyUnicode_CompareWithASCIIString(e->v.Name.id, *p) == 0) {
+        if (PyUnicode_EqualToASCIIString(e->v.Name.id, *p)) {
             ast_error(n, "assignment to keyword");
             return 1;
         }
@@ -2020,7 +2020,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                 key = e->v.Name.id;
                 for (k = 0; k < nkeywords; k++) {
                     tmp = ((keyword_ty)asdl_seq_GET(keywords, k))->arg;
-                    if (!PyUnicode_Compare(tmp, key)) {
+                    if (PyObject_RichCompareBool(tmp, key, Py_EQ) != 0) {
                         ast_error(CHILD(ch, 0), "keyword argument repeated");
                         return NULL;
                     }

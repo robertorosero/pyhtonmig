@@ -5,6 +5,9 @@ import _ctypes_test
 
 lib = CDLL(_ctypes_test.__file__)
 
+def twcmp(x, y):
+    return (x > y) - (x < y)
+
 class LibTest(unittest.TestCase):
     def test_sqrt(self):
         lib.my_sqrt.argtypes = c_double,
@@ -19,7 +22,7 @@ class LibTest(unittest.TestCase):
         lib.my_qsort.restype = None
 
         def sort(a, b):
-            return cmp(a[0], b[0])
+            return twcmp(a[0], b[0])
 
         chars = create_string_buffer("spam, spam, and spam")
         lib.my_qsort(chars, len(chars)-1, sizeof(c_char), comparefunc(sort))

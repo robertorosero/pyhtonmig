@@ -788,17 +788,6 @@ PyTclObject_repr(PyTclObject *self)
 	                            self->value->typePtr->name, self->value);
 }
 
-static int
-PyTclObject_cmp(PyTclObject *self, PyTclObject *other)
-{
-	int res;
-	res = strcmp(Tcl_GetString(self->value),
-		     Tcl_GetString(other->value));
-	if (res < 0) return -1;
-	if (res > 0) return 1;
-	return 0;
-}
-
 PyDoc_STRVAR(get_typename__doc__, "name of the Tcl type");
 
 static PyObject*
@@ -825,7 +814,7 @@ static PyTypeObject PyTclObject_Type = {
 	0,			/*tp_print*/
 	0,			/*tp_getattr*/
 	0,			/*tp_setattr*/
-	(cmpfunc)PyTclObject_cmp,	/*tp_compare*/
+	0,			/*tp_reserved*/
 	(reprfunc)PyTclObject_repr,	/*tp_repr*/
 	0,			/*tp_as_number*/
 	0,			/*tp_as_sequence*/
@@ -2331,7 +2320,7 @@ static PyTypeObject Tktt_Type =
 	0,				     /*tp_print */
 	0,				     /*tp_getattr */
 	0,				     /*tp_setattr */
-	0,				     /*tp_compare */
+	0,				     /*tp_reserved */
 	Tktt_Repr,			     /*tp_repr */
 	0,				     /*tp_as_number */
 	0,				     /*tp_as_sequence */
@@ -2683,7 +2672,7 @@ static PyTypeObject Tkapp_Type =
 	0,				     /*tp_print */
 	0,				     /*tp_getattr */
 	0,				     /*tp_setattr */
-	0,				     /*tp_compare */
+	0,				     /*tp_reserved */
 	0,				     /*tp_repr */
 	0,				     /*tp_as_number */
 	0,				     /*tp_as_sequence */

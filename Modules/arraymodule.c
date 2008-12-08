@@ -2063,7 +2063,7 @@ static PyTypeObject Arraytype = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)array_repr,			/* tp_repr */
 	0,					/* tp_as_number*/
 	&array_as_sequence,			/* tp_as_sequence*/
@@ -2166,7 +2166,7 @@ static PyTypeObject PyArrayIter_Type = {
 	0,                                      /* tp_print */
 	0,                                      /* tp_getattr */
 	0,                                      /* tp_setattr */
-	0,                                      /* tp_compare */
+	0,                                      /* tp_reserved */
 	0,                                      /* tp_repr */
 	0,                                      /* tp_as_number */
 	0,                                      /* tp_as_sequence */

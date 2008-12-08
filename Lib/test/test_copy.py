@@ -5,6 +5,7 @@ import copyreg
 
 import unittest
 from test import support
+from test.support import fcmp
 
 class TestCopy(unittest.TestCase):
 
@@ -271,7 +272,7 @@ class TestCopy(unittest.TestCase):
         x = []
         x.append(x)
         y = copy.deepcopy(x)
-        self.assertRaises(RuntimeError, cmp, y, x)
+        self.assertRaises(RuntimeError, fcmp, y, x)
         self.assert_(y is not x)
         self.assert_(y[0] is y)
         self.assertEqual(len(y), 1)
@@ -287,7 +288,7 @@ class TestCopy(unittest.TestCase):
         x = ([],)
         x[0].append(x)
         y = copy.deepcopy(x)
-        self.assertRaises(RuntimeError, cmp, y, x)
+        self.assertRaises(RuntimeError, fcmp, y, x)
         self.assert_(y is not x)
         self.assert_(y[0] is not x[0])
         self.assert_(y[0][0] is y)
@@ -303,7 +304,7 @@ class TestCopy(unittest.TestCase):
         x = {}
         x['foo'] = x
         y = copy.deepcopy(x)
-        self.assertRaises(TypeError, cmp, y, x)
+        self.assertRaises(TypeError, fcmp, y, x)
         self.assert_(y is not x)
         self.assert_(y['foo'] is y)
         self.assertEqual(len(y), 1)

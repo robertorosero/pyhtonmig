@@ -863,16 +863,10 @@ They all return *NULL* or ``-1`` if an exception occurs.
    occurrences.
 
 
-.. cfunction:: int PyUnicode_Compare(PyObject *left, PyObject *right)
+.. cfunction:: int PyUnicode_EqualToASCIIString(PyObject *uni, char *string)
 
-   Compare two strings and return -1, 0, 1 for less than, equal, and greater than,
-   respectively.
-
-
-.. cfunction:: int PyUnicode_CompareWithASCIIString(PyObject *uni, char *string)
-
-   Compare a unicode object, *uni*, with *string* and return -1, 0, 1 for less
-   than, equal, and greater than, respectively.
+   Compare a unicode object, *uni*, with *string* and return 1 if equal,
+   otherwise 0.
 
 
 .. cfunction:: int PyUnicode_RichCompare(PyObject *left,  PyObject *right,  int op)

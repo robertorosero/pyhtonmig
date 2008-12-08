@@ -57,7 +57,7 @@ class TestContains(unittest.TestCase):
             works when the list is modified during the check.
             """
             aList = range(15)
-            def __cmp__(self, other):
+            def __lt__(self, other):
                 if other == 12:
                     self.aList.remove(12)
                     self.aList.remove(13)
@@ -72,7 +72,7 @@ class TestContains(unittest.TestCase):
             This class raises an exception during comparison.  That in
             turn causes the comparison to fail with a TypeError.
             """
-            def __cmp__(self, other):
+            def __lt__(self, other):
                 if other == 4:
                     raise RuntimeError("gotcha")
 

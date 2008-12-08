@@ -12,6 +12,13 @@ What's New in Python 3.1 alpha 0
 Core and Builtins
 -----------------
 
+- Issue #1717: Removed builtin cmp() function, dropped tp_compare
+  slot, the C API functions PyObject_Compare and PyUnicode_Compare
+  and the type definition cmpfunc. PyUnicode_CompareWithASCIIString 
+  was replaced PyUnicode_EqualToASCIIString.
+  The tp_compare slot is reserved for future usage. A type definition
+  with an assigned tp_compare slot will raise a TypeError. 
+
 - Issue #4445: Replace "sizeof(PyBytesObject)" with
   "offsetof(PyBytesObject, ob_sval) + 1" when allocating memory for
   bytes instances.  On a typical machine this saves 3 bytes of memory

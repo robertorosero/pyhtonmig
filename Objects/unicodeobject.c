@@ -6477,21 +6477,8 @@ unicode_compare(PyUnicodeObject *str1, PyUnicodeObject *str2)
 
 #endif
 
-int PyUnicode_Compare(PyObject *left,
-		      PyObject *right)
-{
-    if (PyUnicode_Check(left) && PyUnicode_Check(right))
-        return unicode_compare((PyUnicodeObject *)left,
-                               (PyUnicodeObject *)right);
-    PyErr_Format(PyExc_TypeError,
-                 "Can't compare %.100s and %.100s",
-                 left->ob_type->tp_name,
-                 right->ob_type->tp_name);
-    return -1;
-}
-
 int
-PyUnicode_CompareWithASCIIString(PyObject* uni, const char* str)
+PyUnicode_EqualToASCIIString(PyObject* uni, const char* str)
 {
     int i;
     Py_UNICODE *id;
@@ -6500,12 +6487,10 @@ PyUnicode_CompareWithASCIIString(PyObject* uni, const char* str)
     /* Compare Unicode string and source character set string */
     for (i = 0; id[i] && str[i]; i++)
 	if (id[i] != str[i])
-	    return ((int)id[i] < (int)str[i]) ? -1 : 1;
-    if (id[i])
-	return 1; /* uni is longer */
-    if (str[i])
-	return -1; /* str is longer */
-    return 0;
+	    return 0;
+    if (id[i] || str[i])
+	return 0;
+    return 1;
 }
 
 PyObject *PyUnicode_RichCompare(PyObject *left,
@@ -6514,9 +6499,13 @@ PyObject *PyUnicode_RichCompare(PyObject *left,
 {
     int result;
 
-    result = PyUnicode_Compare(left, right);
-    if (result == -1 && PyErr_Occurred())
-        goto onError;
+    if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
+        result = unicode_compare((PyUnicodeObject *)left,
+                                 (PyUnicodeObject *)right);
+    } else {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
 
     /* Convert the return value to a Boolean */
     switch (op) {
@@ -6539,49 +6528,6 @@ PyObject *PyUnicode_RichCompare(PyObject *left,
         result = (result == 1);
         break;
     }
-    return PyBool_FromLong(result);
-
- onError:
-
-    /* Standard case
-
-       Type errors mean that PyUnicode_FromObject() could not convert
-       one of the arguments (usually the right hand side) to Unicode,
-       ie. we can't handle the comparison request. However, it is
-       possible that the other object knows a comparison method, which
-       is why we return Py_NotImplemented to give the other object a
-       chance.
-
-    */
-    if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-        PyErr_Clear();
-        Py_INCREF(Py_NotImplemented);
-        return Py_NotImplemented;
-    }
-    if (op != Py_EQ && op != Py_NE)
-        return NULL;
-
-    /* Equality comparison.
-
-       This is a special case: we silence any PyExc_UnicodeDecodeError
-       and instead turn it into a PyErr_UnicodeWarning.
-
-    */
-    if (!PyErr_ExceptionMatches(PyExc_UnicodeDecodeError))
-        return NULL;
-    PyErr_Clear();
-    if (PyErr_WarnEx(PyExc_UnicodeWarning, 
-                     (op == Py_EQ) ? 
-                     "equal comparison "
-                     "failed to convert both arguments to str - "
-                     "interpreting them as being unequal"
-                     :
-                     "Unicode unequal comparison "
-                     "failed to convert both arguments to str - "
-                     "interpreting them as being unequal",
-                     1) < 0)
-        return NULL;
-    result = (op == Py_NE);
     return PyBool_FromLong(result);
 }
 

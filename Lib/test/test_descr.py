@@ -172,7 +172,6 @@ class OperatorsTest(unittest.TestCase):
 
     def test_dicts(self):
         # Testing dict operations...
-        ## self.binop_test({1:2}, {2:1}, -1, "cmp(a,b)", "__cmp__")
         self.binop_test({1:2,3:4}, 1, 1, "b in a", "__contains__")
         self.binop_test({1:2,3:4}, 2, 0, "b in a", "__contains__")
         self.binop_test({1:2,3:4}, 1, 2, "a[b]", "__getitem__")
@@ -332,8 +331,6 @@ class OperatorsTest(unittest.TestCase):
         # This is an ugly hack:
         copy._deepcopy_dispatch[spam.spamdict] = spamdict
 
-        ## self.binop_test(spamdict({1:2}), spamdict({2:1}), -1, "cmp(a,b)",
-        ##                 "__cmp__")
         self.binop_test(spamdict({1:2,3:4}), 1, 1, "b in a", "__contains__")
         self.binop_test(spamdict({1:2,3:4}), 2, 0, "b in a", "__contains__")
         self.binop_test(spamdict({1:2,3:4}), 1, 2, "a[b]", "__getitem__")
@@ -1609,23 +1606,6 @@ order (MRO) for bases """
         for i in range(10):
             self.assert_(i in p10)
         self.assertFalse(10 in p10)
-
-        ## # Safety test for __cmp__
-        ## def unsafecmp(a, b):
-        ##     try:
-        ##         a.__class__.__cmp__(a, b)
-        ##     except TypeError:
-        ##         pass
-        ##     else:
-        ##         self.fail("shouldn't allow %s.__cmp__(%r, %r)" % (
-        ##             a.__class__, a, b))
-        ##
-        ## unsafecmp("123", "123")
-        ## unsafecmp("123", "123")
-        ## unsafecmp(1, 1.0)
-        ## unsafecmp(1.0, 1)
-        ## unsafecmp(1, 1)
-        ## unsafecmp(1, 1)
 
     def test_weakrefs(self):
         # Testing weak references...

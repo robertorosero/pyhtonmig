@@ -869,7 +869,7 @@ PyTypeObject PySetIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -1816,13 +1816,6 @@ set_richcompare(PySetObject *v, PyObject *w, int op)
 	return Py_NotImplemented;
 }
 
-static int
-set_nocmp(PyObject *self, PyObject *other)
-{
-	PyErr_SetString(PyExc_TypeError, "cannot compare sets using cmp()");
-	return -1;
-}
-
 static PyObject *
 set_add(PySetObject *so, PyObject *key)
 {
@@ -2103,7 +2096,7 @@ PyTypeObject PySet_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	set_nocmp,			/* tp_compare */
+	0,				/* tp_reserved */
 	(reprfunc)set_repr,		/* tp_repr */
 	&set_as_number,			/* tp_as_number */
 	&set_as_sequence,		/* tp_as_sequence */
@@ -2200,7 +2193,7 @@ PyTypeObject PyFrozenSet_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	set_nocmp,			/* tp_compare */
+	0,				/* tp_reserved */
 	(reprfunc)set_repr,		/* tp_repr */
 	&frozenset_as_number,		/* tp_as_number */
 	&set_as_sequence,		/* tp_as_sequence */

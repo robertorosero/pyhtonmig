@@ -169,7 +169,6 @@ typedef struct {
 
 
 static void parser_free(PyST_Object *st);
-static int parser_compare(PyST_Object *left, PyST_Object *right);
 static PyObject* parser_compilest(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_isexpr(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_issuite(PyST_Object *, PyObject *, PyObject *);
@@ -203,7 +202,7 @@ PyTypeObject PyST_Type = {
     0,                                  /* tp_print             */
     0,                                  /* tp_getattr           */
     0,                                  /* tp_setattr           */
-    (cmpfunc)parser_compare,            /* tp_compare           */
+    0,                                  /* tp_reserved          */
     0,                                  /* tp_repr              */
     0,                                  /* tp_as_number         */
     0,                                  /* tp_as_sequence       */
@@ -229,56 +228,6 @@ PyTypeObject PyST_Type = {
     0,                                  /* tp_iternext */
     parser_methods,                     /* tp_methods */
 };  /* PyST_Type */
-
-
-static int
-parser_compare_nodes(node *left, node *right)
-{
-    int j;
-
-    if (TYPE(left) < TYPE(right))
-        return (-1);
-
-    if (TYPE(right) < TYPE(left))
-        return (1);
-
-    if (ISTERMINAL(TYPE(left)))
-        return (strcmp(STR(left), STR(right)));
-
-    if (NCH(left) < NCH(right))
-        return (-1);
-
-    if (NCH(right) < NCH(left))
-        return (1);
-
-    for (j = 0; j < NCH(left); ++j) {
-        int v = parser_compare_nodes(CHILD(left, j), CHILD(right, j));
-
-        if (v != 0)
-            return (v);
-    }
-    return (0);
-}
-
-
-/*  int parser_compare(PyST_Object* left, PyST_Object* right)
- *
- *  Comparison function used by the Python operators ==, !=, <, >, <=, >=
- *  This really just wraps a call to parser_compare_nodes() with some easy
- *  checks and protection code.
- *
- */
-static int
-parser_compare(PyST_Object *left, PyST_Object *right)
-{
-    if (left == right)
-        return (0);
-
-    if ((left == 0) || (right == 0))
-        return (-1);
-
-    return (parser_compare_nodes(left->st_node, right->st_node));
-}
 
 
 /*  parser_newstobject(node* st)
