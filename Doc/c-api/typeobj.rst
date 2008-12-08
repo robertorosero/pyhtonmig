@@ -244,7 +244,7 @@ type objects) *must* have the :attr:`ob_size` field.
    the subtype's :attr:`tp_setattr` and :attr:`tp_setattro` are both *NULL*.
 
 
-.. cmember:: void PyTypeObject.tp_reserved
+.. cmember:: void* PyTypeObject.tp_reserved
 
    Reserved slot, formaly known as tp_compare.
 
