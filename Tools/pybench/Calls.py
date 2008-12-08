@@ -178,7 +178,6 @@ class BuiltinFunctionCalls(Test):
         # localize functions
         f0 = globals
         f1 = hash
-        f2 = cmp
         f3 = range
 
         # do calls
@@ -191,11 +190,6 @@ class BuiltinFunctionCalls(Test):
             f1(i)
             f1(i)
             f1(i)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
             f3(1,3,2)
             f3(1,3,2)
             f3(1,3,2)
@@ -209,11 +203,6 @@ class BuiltinFunctionCalls(Test):
             f1(i)
             f1(i)
             f1(i)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
             f3(1,3,2)
             f3(1,3,2)
             f3(1,3,2)
@@ -227,11 +216,6 @@ class BuiltinFunctionCalls(Test):
             f1(i)
             f1(i)
             f1(i)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
             f3(1,3,2)
             f3(1,3,2)
             f3(1,3,2)
@@ -245,11 +229,6 @@ class BuiltinFunctionCalls(Test):
             f1(i)
             f1(i)
             f1(i)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
             f3(1,3,2)
             f3(1,3,2)
             f3(1,3,2)
@@ -263,11 +242,6 @@ class BuiltinFunctionCalls(Test):
             f1(i)
             f1(i)
             f1(i)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
-            f2(1,2)
             f3(1,3,2)
             f3(1,3,2)
             f3(1,3,2)
