@@ -228,9 +228,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 #define  PyObject_DelAttr(O,A) PyObject_SetAttr((O),(A),NULL)
 
+     /* No longer implemented, for Python 3.0.1 and above:
+
      PyAPI_FUNC(int) PyObject_Cmp(PyObject *o1, PyObject *o2, int *result);
 
-       /*
 	 Compare the values of o1 and o2 using a routine provided by
 	 o1, if one exists, otherwise with a routine provided by o2.
 	 The result of the comparison is returned in result.  Returns
