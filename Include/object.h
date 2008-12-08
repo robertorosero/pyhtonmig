@@ -294,7 +294,7 @@ typedef struct _typeobject {
 	printfunc tp_print;
 	getattrfunc tp_getattr;
 	setattrfunc tp_setattr;
-	void *tp_reserved; /* formaly known as tp_compare */
+	void *tp_reserved; /* formerly known as tp_compare */
 	reprfunc tp_repr;
 
 	/* Method suites for standard classes */

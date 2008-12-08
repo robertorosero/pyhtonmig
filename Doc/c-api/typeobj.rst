@@ -23,7 +23,7 @@ structure.
 Typedefs: unaryfunc, binaryfunc, ternaryfunc, inquiry, intargfunc,
 intintargfunc, intobjargproc, intintobjargproc, objobjargproc, destructor,
 freefunc, printfunc, getattrfunc, getattrofunc, setattrfunc, setattrofunc,
-cmpfunc, reprfunc, hashfunc
+reprfunc, hashfunc
 
 The structure definition for :ctype:`PyTypeObject` can be found in
 :file:`Include/object.h`.  For convenience of reference, this repeats the

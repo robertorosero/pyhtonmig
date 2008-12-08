@@ -678,9 +678,9 @@ indexes at which certain conditions are met::
             print('Blank line at line #%i' % i)
 
 
-``sorted(iterable, [cmp=None], [key=None], [reverse=False)`` collects all the
+``sorted(iterable, [key=None], [reverse=False)`` collects all the
 elements of the iterable into a list, sorts the list, and returns the sorted
-result.  The ``cmp``, ``key``, and ``reverse`` arguments are passed through to
+result.  The ``key`` and ``reverse`` arguments are passed through to
 the constructed list's ``.sort()`` method. ::
 
     >>> import random
