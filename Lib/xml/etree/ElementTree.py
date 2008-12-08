@@ -500,8 +500,8 @@ class QName:
         return hash(self.text)
     def __cmp__(self, other):
         if isinstance(other, QName):
-            return cmp(self.text, other.text)
-        return cmp(self.text, other)
+            return (self.text > other.text) - (self.text < other.text)
+        return (self.text > other) - (self.text < other)
 
 ##
 # ElementTree wrapper class.  This class represents an entire element

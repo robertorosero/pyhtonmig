@@ -351,7 +351,7 @@ class DateTime:
 
     def __cmp__(self, other):
         s, o = self.make_comparable(other)
-        return cmp(s, o)
+        return (s > o) - (s < o)
 
     ##
     # Get date/time value.

@@ -524,7 +524,7 @@ class NamedNodeMap(object):
         if self._attrs is getattr(other, "_attrs", None):
             return 0
         else:
-            return cmp(id(self), id(other))
+            return (id(self) > id(other)) - (id(self) < id(other))
 
     def __getitem__(self, attname_or_tuple):
         if isinstance(attname_or_tuple, tuple):
