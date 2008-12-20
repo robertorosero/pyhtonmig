@@ -7,7 +7,7 @@ Python News
 What's New in Python 3.1 alpha 0
 ================================
 
-*Release date: XX-XXX-2008*
+*Release date: XX-XXX-200X*
 
 Core and Builtins
 -----------------
@@ -18,6 +18,27 @@ Core and Builtins
   was replaced PyUnicode_EqualToASCIIString.
   The tp_compare slot is reserved for future usage. A type definition
   with an assigned tp_compare slot will raise a TypeError. 
+
+- Issue #3106: Speedup some comparisons (str/str and int/int).
+
+- Issue #2183: Simplify and optimize bytecode for list, dict and set
+  comprehensions. Original patch for list comprehensions by Neal Norwitz.
+
+- Issue #2467: gc.DEBUG_STATS reported invalid elapsed times. Also, always
+  print elapsed times, not only when some objects are uncollectable /
+  unreachable. Original patch by Neil Schemenauer.
+
+- Issue #3439: Add a bit_length method to int.
+
+- Issue #2173: When getting device encoding, check that return value of
+  nl_langinfo is not the empty string.  This was causing silent build
+  failures on OS X.
+
+- Issue #4597: Fixed several opcodes that weren't always propagating
+  exceptions.
+
+- Issue #4589: Fixed exception handling when the __exit__ function of a
+  context manager returns a value that cannot be converted to a bool.
 
 - Issue #4445: Replace "sizeof(PyBytesObject)" with
   "offsetof(PyBytesObject, ob_sval) + 1" when allocating memory for
@@ -41,6 +62,40 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #4574: reading an UTF16-encoded text file crashes if \r on 64-char
+  boundary.
+
+- Issue #4223: inspect.getsource() will now correctly display source code
+  for packages loaded via zipimport (or any other conformant PEP 302
+  loader). Original patch by Alexander Belopolsky.
+
+- Issue #4201: pdb can now access and display source code loaded via
+  zipimport (or any other conformant PEP 302 loader). Original patch by
+  Alexander Belopolsky.
+
+- Issue #4197: doctests in modules loaded via zipimport (or any other PEP
+  302 conformant loader) will now work correctly in most cases (they
+  are still subject to the constraints that exist for all code running
+  from inside a module loaded via a PEP 302 loader and attempting to
+  perform IO operations based on __file__). Original patch by
+  Alexander Belopolsky.
+
+- Issues #4082 and #4512: Add runpy support to zipimport in a manner that
+  allows backporting to maintenance branches. Original patch by
+  Alexander Belopolsky.
+
+- Issue #4163: textwrap module: allow word splitting on a hyphen preceded by
+  a non-ASCII letter.
+
+- Issue #4616: TarFile.utime(): Restore directory times on Windows.
+
+- Issue #4021: tokenize.detect_encoding() now raises a SyntaxError when the
+  codec cannot be found.  This is for compatibility with the builtin behavior.
+
+- Issue #4084: Fix max, min, max_mag and min_mag Decimal methods to
+  give correct results in the case where one argument is a quiet NaN
+  and the other is a finite number that requires rounding.
 
 - Issue #4483: _dbm module now builds on systems with gdbm & gdbm_compat
   libs.
@@ -80,6 +135,15 @@ Library
   support unusual filenames (such as those containing semi-colons) in
   Content-Disposition headers.
 
+Extension Modules
+-----------------
+
+- Issues #3167, #3682: Fix test_math failures for log, log10 on Solaris,
+  OpenBSD.
+
+- Issue #4583: array.array would not always prohibit resizing when a buffer
+  has been exported, resulting in an interpreter crash when accessing the
+  buffer.
 
 Build
 -----

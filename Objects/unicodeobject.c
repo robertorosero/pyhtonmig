@@ -6493,42 +6493,65 @@ PyUnicode_EqualToASCIIString(PyObject* uni, const char* str)
     return 1;
 }
 
+
+#define TEST_COND(cond) \
+	((cond) ? Py_True : Py_False)
+
 PyObject *PyUnicode_RichCompare(PyObject *left,
                                 PyObject *right,
                                 int op)
 {
     int result;
-
+    
     if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
-        result = unicode_compare((PyUnicodeObject *)left,
-                                 (PyUnicodeObject *)right);
-    } else {
-        Py_INCREF(Py_NotImplemented);
-        return Py_NotImplemented;
+        PyObject *v;
+        if (((PyUnicodeObject *) left)->length !=
+            ((PyUnicodeObject *) right)->length) {
+            if (op == Py_EQ) {
+                Py_INCREF(Py_False);
+                return Py_False;
+            }
+            if (op == Py_NE) {
+                Py_INCREF(Py_True);
+                return Py_True;
+            }
+        }
+        if (left == right)
+            result = 0;
+        else
+            result = unicode_compare((PyUnicodeObject *)left,
+                                     (PyUnicodeObject *)right);
+    
+        /* Convert the return value to a Boolean */
+        switch (op) {
+        case Py_EQ:
+            v = TEST_COND(result == 0);
+            break;
+        case Py_NE:
+            v = TEST_COND(result != 0);
+            break;
+        case Py_LE:
+            v = TEST_COND(result <= 0);
+            break;
+        case Py_GE:
+            v = TEST_COND(result >= 0);
+            break;
+        case Py_LT:
+            v = TEST_COND(result == -1);
+            break;
+        case Py_GT:
+            v = TEST_COND(result == 1);
+            break;
+        default:
+            PyErr_BadArgument();
+            return NULL;
+        }
+        Py_INCREF(v);
+        return v;
     }
-
-    /* Convert the return value to a Boolean */
-    switch (op) {
-    case Py_EQ:
-        result = (result == 0);
-        break;
-    case Py_NE:
-        result = (result != 0);
-        break;
-    case Py_LE:
-        result = (result <= 0);
-        break;
-    case Py_GE:
-        result = (result >= 0);
-        break;
-    case Py_LT:
-        result = (result == -1);
-        break;
-    case Py_GT:
-        result = (result == 1);
-        break;
-    }
-    return PyBool_FromLong(result);
+    
+    Py_INCREF(Py_NotImplemented);
+    return Py_NotImplemented;
 }
 
 int PyUnicode_Contains(PyObject *container,

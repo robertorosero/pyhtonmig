@@ -1120,6 +1120,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			}
 			Py_FatalError("invalid argument to DUP_TOPX"
 				      " (bytecode corruption?)");
+			/* Never returns, so don't bother to set why. */
 			break;
 
 		case UNARY_POSITIVE:
@@ -1305,9 +1306,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		case LIST_APPEND:
 			w = POP();
-			v = POP();
+			v = stack_pointer[-oparg];
 			err = PyList_Append(v, w);
-			Py_DECREF(v);
 			Py_DECREF(w);
 			if (err == 0) {
 				PREDICT(JUMP_ABSOLUTE);
@@ -1317,9 +1317,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		case SET_ADD:
 			w = POP();
-			v = POP();
+			v = stack_pointer[-oparg];
 			err = PySet_Add(v, w);
-			Py_DECREF(v);
 			Py_DECREF(w);
 			if (err == 0) {
 				PREDICT(JUMP_ABSOLUTE);
@@ -1736,6 +1735,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			if ((v = f->f_locals) == NULL) {
 				PyErr_Format(PyExc_SystemError,
 					     "no locals when loading %R", w);
+				why = WHY_EXCEPTION;
 				break;
 			}
 			if (PyDict_CheckExact(v)) {
@@ -1931,6 +1931,21 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			Py_DECREF(u);
 			Py_DECREF(w);
 			if (err == 0) continue;
+			break;
+
+		case MAP_ADD:
+			w = TOP();     /* key */
+			u = SECOND();  /* value */
+			STACKADJ(-2);
+			v = stack_pointer[-oparg];  /* dict */
+			assert (PyDict_CheckExact(v));
+			err = PyDict_SetItem(v, w, u);  /* v[w] = u */
+			Py_DECREF(u);
+			Py_DECREF(w);
+			if (err == 0) {
+				PREDICT(JUMP_ABSOLUTE);
+				continue;
+			}
 			break;
 
 		case LOAD_ATTR:
@@ -2189,7 +2204,17 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			Py_DECREF(exit_func);
 			if (x == NULL)
 				break; /* Go to error exit */
-			if (u != Py_None && PyObject_IsTrue(x)) {
+
+			if (u != Py_None)
+				err = PyObject_IsTrue(x);
+			else
+				err = 0;
+			Py_DECREF(x);
+
+			if (err < 0)
+				break; /* Go to error exit */
+			else if (err > 0) {
+				err = 0;
 				/* There was an exception and a True return */
 				STACKADJ(-2);
 				SET_TOP(PyLong_FromLong((long) WHY_SILENCED));
@@ -2197,7 +2222,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				Py_DECREF(v);
 				Py_DECREF(w);
 			}
-			Py_DECREF(x);
 			PREDICT(END_FINALLY);
 			break;
 		}
@@ -2278,7 +2302,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 			if (x != NULL && opcode == MAKE_CLOSURE) {
 				v = POP();
-				err = PyFunction_SetClosure(x, v);
+				if (PyFunction_SetClosure(x, v) != 0) {
+					/* Can't happen unless bytecode is corrupt. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 
@@ -2302,7 +2329,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					Py_DECREF(w);
 				}
 
-				err = PyFunction_SetAnnotations(x, v);
+				if (PyFunction_SetAnnotations(x, v) != 0) {
+					/* Can't happen unless
+					   PyFunction_SetAnnotations changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 				Py_DECREF(u);
 			}
@@ -2319,7 +2350,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					w = POP();
 					PyTuple_SET_ITEM(v, posdefaults, w);
 				}
-				err = PyFunction_SetDefaults(x, v);
+				if (PyFunction_SetDefaults(x, v) != 0) {
+					/* Can't happen unless
+                                           PyFunction_SetDefaults changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			if (x != NULL && kwdefaults > 0) {
@@ -2337,7 +2372,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					Py_DECREF(w);
 					Py_DECREF(u);
 				}
-				err = PyFunction_SetKwDefaults(x, v);
+				if (PyFunction_SetKwDefaults(x, v) != 0) {
+					/* Can't happen unless
+                                           PyFunction_SetKwDefaults changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			PUSH(x);

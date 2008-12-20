@@ -419,6 +419,36 @@ Notes:
    overflow check.
 
 
+Additional Methods on Integer Types
+-----------------------------------
+
+.. method:: int.bit_length()
+
+    Return the number of bits necessary to represent an integer in binary,
+    excluding the sign and leading zeros::
+
+        >>> n = -37
+        >>> bin(n)
+        '-0b100101'
+        >>> n.bit_length()
+        6
+
+    More precisely, if ``x`` is nonzero, then ``x.bit_length()`` is the
+    unique positive integer ``k`` such that ``2**(k-1) <= abs(x) < 2**k``.
+    Equivalently, when ``abs(x)`` is small enough to have a correctly
+    rounded logarithm, then ``k = 1 + int(log(abs(x), 2))``.
+    If ``x`` is zero, then ``x.bit_length()`` returns ``0``.
+
+    Equivalent to::
+
+        def bit_length(self):
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
+            s = s.lstrip('-0b') # remove leading zeros and minus sign
+            return len(s)       # len('100101') --> 6
+
+    .. versionadded:: 3.1
+
+
 Additional Methods on Float
 ---------------------------
 
@@ -1090,12 +1120,9 @@ functions based on regular expressions.
    ordinals, strings or ``None``.  Unmapped characters are left untouched.
    Characters mapped to ``None`` are deleted.
 
-   A *map* for :meth:`translate` is usually best created by
-   :meth:`str.maketrans`.
-
-   You can use the :func:`maketrans` helper function in the :mod:`string` module to
-   create a translation table. For string objects, set the *table* argument to
-   ``None`` for translations that only delete characters:
+   You can use :meth:`str.maketrans` to create a translation table.  For string
+   objects, set the *table* argument to ``None`` for translations that only
+   delete characters:
 
    .. note::
 
