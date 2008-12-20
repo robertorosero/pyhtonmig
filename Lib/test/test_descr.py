@@ -1001,8 +1001,8 @@ order (MRO) for bases """
         # Test lookup leaks [SF bug 572567]
         import sys,gc
         class G(object):
-            def __cmp__(self, other):
-                return 0
+            def __eq__(self, other):
+                return 1
         g = G()
         orig_objects = len(gc.get_objects())
         for i in range(10):
@@ -1522,7 +1522,6 @@ order (MRO) for bases """
         self.assertNotEqual(id(c1), id(c2))
         hash(c1)
         hash(c2)
-        ## self.assertEqual(cmp(c1, c2), cmp(id(c1), id(c2)))
         self.assertEqual(c1, c1)
         self.assert_(c1 != c2)
         self.assert_(not c1 != c1)
@@ -1546,7 +1545,6 @@ order (MRO) for bases """
         self.assertNotEqual(id(d1), id(d2))
         hash(d1)
         hash(d2)
-        ## self.assertEqual(cmp(d1, d2), cmp(id(d1), id(d2)))
         self.assertEqual(d1, d1)
         self.assertNotEqual(d1, d2)
         self.assert_(not d1 != d1)
@@ -2518,12 +2516,16 @@ order (MRO) for bases """
             c = {1: c1, 2: c2, 3: c3}
             for x in 1, 2, 3:
                 for y in 1, 2, 3:
-                    ## self.assert_(cmp(c[x], c[y]) == cmp(x, y), "x=%d, y=%d" % (x, y))
                     for op in "<", "<=", "==", "!=", ">", ">=":
-                        self.assert_(eval("c[x] %s c[y]" % op) == eval("x %s y" % op),
-                               "x=%d, y=%d" % (x, y))
-                    ## self.assert_(cmp(c[x], y) == cmp(x, y), "x=%d, y=%d" % (x, y))
-                    ## self.assert_(cmp(x, c[y]) == cmp(x, y), "x=%d, y=%d" % (x, y))
+                        self.assert_(eval("c[x] %s c[y]" % op) ==
+                                     eval("x %s y" % op),
+                                     "x=%d, y=%d" % (x, y))
+                        self.assert_(eval("c[x] %s y" % op) ==
+                                     eval("x %s y" % op),
+                                     "x=%d, y=%d" % (x, y))
+                        self.assert_(eval("x %s c[y]" % op) ==
+                                     eval("x %s y" % op),
+                                     "x=%d, y=%d" % (x, y))
 
     def test_rich_comparisons(self):
         # Testing rich comparisons...
