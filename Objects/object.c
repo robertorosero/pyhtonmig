@@ -626,44 +626,6 @@ PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 	return ok;
 }
 
-/* Turn the result of a three-way comparison into the result expected by a
-   rich comparison. */
-PyObject *
-Py_CmpToRich(int op, int cmp)
-{
-	PyObject *res;
-	int ok;
-
-	if (PyErr_Occurred())
-		return NULL;
-	switch (op) {
-	case Py_LT:
-		ok = cmp <  0;
-		break;
-	case Py_LE:
-		ok = cmp <= 0;
-		break;
-	case Py_EQ:
-		ok = cmp == 0;
-		break;
-	case Py_NE:
-		ok = cmp != 0;
-		break;
-	case Py_GT:
-		ok = cmp >  0;
-		break;
-	case Py_GE:
-		ok = cmp >= 0;
-		break;
-	default:
-		PyErr_BadArgument();
-		return NULL;
-	}
-	res = ok ? Py_True : Py_False;
-	Py_INCREF(res);
-	return res;
-}
-
 /* Set of hash utility functions to help maintaining the invariant that
 	if a==b then hash(a)==hash(b)
 
