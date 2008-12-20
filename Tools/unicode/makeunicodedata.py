@@ -511,10 +511,18 @@ def makeunicodename(unicode, trace):
     def cmpwords(a,b):
         aword, alist = a
         bword, blist = b
-        r = -cmp(len(alist),len(blist))
-        if r:
-            return r
-        return cmp(aword, bword)
+        len_alist, len_blist = len(alist), len(blist)
+        if len_alist != len_blist:
+            if len_alist < len_blist:
+                return 1
+            else:
+                return -1
+        if aword != bword:
+            if aword < bword:
+                return -1
+            else:
+                return 1
+        return 0
     wordlist.sort(key=CmpToKey(cmpwords))
 
     # figure out how many phrasebook escapes we need
