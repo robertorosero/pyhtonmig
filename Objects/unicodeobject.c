@@ -6477,8 +6477,21 @@ unicode_compare(PyUnicodeObject *str1, PyUnicodeObject *str2)
 
 #endif
 
+int PyUnicode_Compare(PyObject *left,
+		      PyObject *right)
+{
+    if (PyUnicode_Check(left) && PyUnicode_Check(right))
+        return unicode_compare((PyUnicodeObject *)left,
+                               (PyUnicodeObject *)right);
+    PyErr_Format(PyExc_TypeError,
+                 "Can't compare %.100s and %.100s",
+                 left->ob_type->tp_name,
+                 right->ob_type->tp_name);
+    return -1;
+}
+
 int
-PyUnicode_EqualToASCIIString(PyObject* uni, const char* str)
+PyUnicode_CompareWithASCIIString(PyObject* uni, const char* str)
 {
     int i;
     Py_UNICODE *id;
@@ -6487,10 +6500,12 @@ PyUnicode_EqualToASCIIString(PyObject* uni, const char* str)
     /* Compare Unicode string and source character set string */
     for (i = 0; id[i] && str[i]; i++)
 	if (id[i] != str[i])
-	    return 0;
-    if (id[i] || str[i])
-	return 0;
-    return 1;
+	    return ((int)id[i] < (int)str[i]) ? -1 : 1;
+    if (id[i])
+	return 1; /* uni is longer */
+    if (str[i])
+	return -1; /* str is longer */
+    return 0;
 }
 
 

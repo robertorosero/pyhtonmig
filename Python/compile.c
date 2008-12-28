@@ -2197,8 +2197,8 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	}
 
 	if (s->lineno > c->c_future->ff_lineno) {
-		if (PyUnicode_EqualToASCIIString(s->v.ImportFrom.module,
-					       "__future__")) {
+		if (!PyUnicode_CompareWithASCIIString(s->v.ImportFrom.module,
+						      "__future__")) {
 			Py_DECREF(level);
 			Py_DECREF(names);
 			return compiler_error(c, 

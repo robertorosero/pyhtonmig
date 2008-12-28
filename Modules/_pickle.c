@@ -2041,7 +2041,7 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *obj)
         }
         else {
             use_newobj = PyUnicode_Check(name_str) && 
-                PyObject_RichCompareBool(name_str, newobj_str, Py_EQ) == 1;
+                PyUnicode_Compare(name_str, newobj_str) == 0;
             Py_DECREF(name_str);
         }
     }

@@ -656,7 +656,7 @@ type_repr(PyTypeObject *type)
 	if (name == NULL)
 		return NULL;
 
-	if (mod != NULL && !PyUnicode_EqualToASCIIString(mod, "builtins"))
+	if (mod != NULL && PyUnicode_CompareWithASCIIString(mod, "builtins"))
 		rtn = PyUnicode_FromFormat("<class '%U.%U'>", mod, name);
 	else
 		rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
@@ -2029,7 +2029,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			if (!valid_identifier(tmp))
 				goto bad_slots;
 			assert(PyUnicode_Check(tmp));
-			if (PyUnicode_EqualToASCIIString(tmp, "__dict__")) {
+			if (PyUnicode_CompareWithASCIIString(tmp, "__dict__") == 0) {
 				if (!may_add_dict || add_dict) {
 					PyErr_SetString(PyExc_TypeError,
 						"__dict__ slot disallowed: "
@@ -2038,7 +2038,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 				}
 				add_dict++;
 			}
-			if (PyUnicode_EqualToASCIIString(tmp, "__weakref__")) {
+			if (PyUnicode_CompareWithASCIIString(tmp, "__weakref__") == 0) {
 				if (!may_add_weak || add_weak) {
 					PyErr_SetString(PyExc_TypeError,
 						"__weakref__ slot disallowed: "
@@ -2060,9 +2060,9 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		for (i = j = 0; i < nslots; i++) {
 			tmp = PyTuple_GET_ITEM(slots, i);
 			if ((add_dict && 
-			     PyUnicode_EqualToASCIIString(tmp, "__dict__")) ||
+			     PyUnicode_CompareWithASCIIString(tmp, "__dict__") == 0) ||
 			    (add_weak && 
-			     PyUnicode_EqualToASCIIString(tmp, "__weakref__")))
+			     PyUnicode_CompareWithASCIIString(tmp, "__weakref__") == 0))
 				continue;
 			tmp =_Py_Mangle(name, tmp);
 			if (!tmp)
@@ -2791,12 +2791,11 @@ object_repr(PyObject *self)
 	name = type_name(type, NULL);
 	if (name == NULL)
 		return NULL;
-	if (mod != NULL && !PyUnicode_EqualToASCIIString(mod, "builtins"))
+	if (mod != NULL && PyUnicode_CompareWithASCIIString(mod, "builtins"))
 		rtn = PyUnicode_FromFormat("<%U.%U object at %p>", mod, name, self);
 	else
 		rtn = PyUnicode_FromFormat("<%s object at %p>",
 					  type->tp_name, self);
-
 	Py_XDECREF(mod);
 	Py_DECREF(name);
 	return rtn;
@@ -5977,7 +5976,7 @@ super_getattro(PyObject *self, PyObject *name)
 		   (i.e. super, or a subclass), not the class of su->obj. */
 		skip = (PyUnicode_Check(name) &&
 			PyUnicode_GET_SIZE(name) == 9 &&
-			PyUnicode_EqualToASCIIString(name, "__class__"));
+			PyUnicode_CompareWithASCIIString(name, "__class__") == 0);
 	}
 
 	if (!skip) {
@@ -6174,8 +6173,8 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 		for (i = 0; i < n; i++) {
 			PyObject *name = PyTuple_GET_ITEM(co->co_freevars, i);
 			assert(PyUnicode_Check(name));
-                        if (PyUnicode_EqualToASCIIString(name,
-                                                       "__class__")) {
+                        if (!PyUnicode_CompareWithASCIIString(name,
+                                                              "__class__")) {
 				Py_ssize_t index = co->co_nlocals + 
 					PyTuple_GET_SIZE(co->co_cellvars) + i;
 				PyObject *cell = f->f_localsplus[index];

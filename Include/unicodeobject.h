@@ -152,6 +152,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_AsUnicode PyUnicodeUCS2_AsUnicode
 # define PyUnicode_AsUnicodeEscapeString PyUnicodeUCS2_AsUnicodeEscapeString
 # define PyUnicode_AsWideChar PyUnicodeUCS2_AsWideChar
+# define PyUnicode_Compare PyUnicodeUCS2_Compare
 # define PyUnicode_Concat PyUnicodeUCS2_Concat
 # define PyUnicode_Append PyUnicodeUCS2_Append
 # define PyUnicode_AppendAndDel PyUnicodeUCS2_AppendAndDel
@@ -249,6 +250,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_AsUnicode PyUnicodeUCS4_AsUnicode
 # define PyUnicode_AsUnicodeEscapeString PyUnicodeUCS4_AsUnicodeEscapeString
 # define PyUnicode_AsWideChar PyUnicodeUCS4_AsWideChar
+# define PyUnicode_Compare PyUnicodeUCS4_Compare
 # define PyUnicode_Concat PyUnicodeUCS4_Concat
 # define PyUnicode_Append PyUnicodeUCS4_Append
 # define PyUnicode_AppendAndDel PyUnicodeUCS4_AppendAndDel
@@ -1397,10 +1399,15 @@ PyAPI_FUNC(PyObject *) PyUnicode_Replace(
 				   -1 = all */
     );
 
-/* Compare two strings and return 1 if both are equal, otherwise 0
- */
+/* Compare two strings and return -1, 0, 1 for less than, equal,
+   greater than resp. */
 
-PyAPI_FUNC(int) PyUnicode_EqualToASCIIString(
+PyAPI_FUNC(int) PyUnicode_Compare(
+    PyObject *left,		/* Left string */ 
+    PyObject *right		/* Right string */
+    );
+
+PyAPI_FUNC(int) PyUnicode_CompareWithASCIIString(
     PyObject *left,
     const char *right
     );

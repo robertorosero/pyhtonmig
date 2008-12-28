@@ -494,7 +494,7 @@ analyze_cells(PyObject *scopes, PyObject *free, const char *restricted)
 		if (!PySet_Contains(free, name))
 			continue;
 		if (restricted != NULL &&
-                    !PyUnicode_EqualToASCIIString(name, restricted))
+                    PyUnicode_CompareWithASCIIString(name, restricted))
 			continue;
 		/* Replace LOCAL with CELL for this name, and remove
 		   from free. It is safe to replace the value of name 
@@ -1326,7 +1326,7 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		/* Special-case super: it counts as a use of __class__ */
                 if (e->v.Name.ctx == Load &&
 		    st->st_cur->ste_type == FunctionBlock &&
-                    PyUnicode_EqualToASCIIString(e->v.Name.id, "super")) {
+                    !PyUnicode_CompareWithASCIIString(e->v.Name.id, "super")) {
 			if (!GET_IDENTIFIER(__class__) ||
 			    !symtable_add_def(st, __class__, USE))
 				return 0;
@@ -1466,7 +1466,7 @@ symtable_visit_alias(struct symtable *st, alias_ty a)
 		store_name = name;
 		Py_INCREF(store_name);
 	}
-	if (!PyUnicode_EqualToASCIIString(name, "*")) {
+	if (PyUnicode_CompareWithASCIIString(name, "*")) {
 		int r = symtable_add_def(st, store_name, DEF_IMPORT); 
 		Py_DECREF(store_name);
 		return r;
