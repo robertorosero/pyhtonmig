@@ -164,8 +164,9 @@ variable(s) whose address should be passed.
    them. Instead, the implementation assumes that the string object uses the
    encoding passed in as parameter.
 
-``b`` (integer) [char]
-   Convert a Python integer to a tiny int, stored in a C :ctype:`char`.
+``b`` (integer) [unsigned char]
+   Convert a nonnegative Python integer to an unsigned tiny int, stored in a C
+   :ctype:`unsigned char`.
 
 ``B`` (integer) [unsigned char]
    Convert a Python integer to a tiny int without overflow checking, stored in a C
@@ -305,8 +306,8 @@ inside nested parentheses.  They are:
 
 ``;``
    The list of format units ends here; the string after the semicolon is used as
-   the error message *instead* of the default error message.  Clearly, ``:`` and
-   ``;`` mutually exclude each other.
+   the error message *instead* of the default error message.  ``:`` and ``;``
+   mutually exclude each other.
 
 Note that any Python object references which are provided to the caller are
 *borrowed* references; do not decrement their reference count!
@@ -552,3 +553,8 @@ and the following format units are left untouched.
 
    If there is an error in the format string, the :exc:`SystemError` exception is
    set and *NULL* returned.
+
+.. cfunction:: PyObject* Py_VaBuildValue(const char *format, va_list vargs)
+
+   Identical to :cfunc:`Py_BuildValue`, except that it accepts a va_list
+   rather than a variable number of arguments.

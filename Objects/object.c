@@ -344,8 +344,11 @@ _PyObject_Dump(PyObject* op)
 	if (op == NULL)
 		fprintf(stderr, "NULL\n");
 	else {
+		PyGILState_STATE gil;
 		fprintf(stderr, "object  : ");
+		gil = PyGILState_Ensure();
 		(void)PyObject_Print(op, stderr, 0);
+		PyGILState_Release(gil);
 		/* XXX(twouters) cast refcount to long until %zd is
 		   universally available */
 		fprintf(stderr, "\n"
@@ -724,6 +727,17 @@ PyObject_Hash(PyObject *v)
 	PyTypeObject *tp = Py_TYPE(v);
 	if (tp->tp_hash != NULL)
 		return (*tp->tp_hash)(v);
+	/* To keep to the general practice that inheriting
+	 * solely from object in C code should work without
+	 * an explicit call to PyType_Ready, we implicitly call
+	 * PyType_Ready here and then check the tp_hash slot again
+	 */
+	if (tp->tp_dict == NULL) {
+		if (PyType_Ready(tp) < 0)
+			return -1;
+		if (tp->tp_hash != NULL)
+			return (*tp->tp_hash)(v);
+	}
 	/* Otherwise, the object can't be hashed */
 	return PyObject_HashNotImplemented(v);
 }

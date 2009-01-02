@@ -19,6 +19,24 @@ Core and Builtins
   The tp_compare slot is reserved for future usage. A type definition
   with an assigned tp_compare slot will raise a TypeError. 
 
+- Issue #4747: When the terminal does not use utf-8, executing a script with
+  non-ascii characters in its name could fail with a "SyntaxError: None" error.
+
+- Issue #4797: IOError.filename was not set when _fileio.FileIO failed to open
+  file with `bytes' filename on Windows.
+
+- Issue #3680: Reference cycles created through a dict, set or deque iterator
+  did not get collected.
+
+- Issue #4701: PyObject_Hash now implicitly calls PyType_Ready on types
+  where the tp_hash and tp_dict slots are both NULL.
+
+- Issue #4759: None is now allowed as the first argument of
+  bytearray.translate().  It was always allowed for bytes.translate().
+
+- Added test case to ensure attempts to read from a file opened for writing
+  fail.
+
 - Issue #3106: Speedup some comparisons (str/str and int/int).
 
 - Issue #2183: Simplify and optimize bytecode for list, dict and set
@@ -60,8 +78,29 @@ Core and Builtins
 - Issue #4569: Interpreter crash when mutating a memoryview with an item size
   larger than 1.
 
+- Issue #4748: Lambda generators no longer return a value.
+
 Library
 -------
+
+- Issue #4702: Throwing a DistutilsPlatformError instead of IOError in case 
+  no MSVC compiler is found under Windows. Original patch by Philip Jenvey. 
+
+- Issue #4646: distutils was choking on empty options arg in the setup 
+  function. Original patch by Thomas Heller.
+
+- Issue #3767: Convert Tk object to string in tkColorChooser.
+
+- Issue #3248: Allow placing ScrolledText in a PanedWindow.
+
+- Issue #4444: Allow assertRaises() to be used as a context handler, so that
+  the code under test can be written inline if more practical.
+
+- Issue #4739: Add pydoc help topics for symbols, so that e.g. help('@')
+  works as expected in the interactive environment.
+
+- Issue #4756: zipfile.is_zipfile() now supports file-like objects. Patch by
+  Gabriel Genellina.
 
 - Issue #4574: reading an UTF16-encoded text file crashes if \r on 64-char
   boundary.
@@ -135,8 +174,15 @@ Library
   support unusual filenames (such as those containing semi-colons) in
   Content-Disposition headers.
 
+Tools/Demos
+-----------
+
+- Issue #4677: add two list comprehension tests to pybench.
+
 Extension Modules
 -----------------
+
+- Issue #1040026: Fix os.times result on systems where HZ is incorrect.
 
 - Issues #3167, #3682: Fix test_math failures for log, log10 on Solaris,
   OpenBSD.

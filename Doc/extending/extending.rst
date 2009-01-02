@@ -326,8 +326,8 @@ only non-\ ``static`` item defined in the module file::
        return PyModule_Create(&spammodule);
    }
 
-Note that PyMODINIT_FUNC declares the function as ``void`` return type,
-declares any special linkage declarations required by the platform, and for  C++
+Note that PyMODINIT_FUNC declares the function as ``PyObject *`` return type,
+declares any special linkage declarations required by the platform, and for C++
 declares the function as ``extern "C"``.
 
 When the Python program imports module :mod:`spam` for the first time,
@@ -882,7 +882,7 @@ memory and should be avoided completely. [#]_
 The advantage of borrowing over owning a reference is that you don't need to
 take care of disposing of the reference on all possible paths through the code
 --- in other words, with a borrowed reference you don't run the risk of leaking
-when a premature exit is taken.  The disadvantage of borrowing over leaking is
+when a premature exit is taken.  The disadvantage of borrowing over owning is
 that there are some subtle situations where in seemingly correct code a borrowed
 reference can be used after the owner from which it was borrowed has in fact
 disposed of it.
