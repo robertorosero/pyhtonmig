@@ -53,36 +53,36 @@ ABC                        Inherits               Abstract Methods        Mixin 
 :class:`Hashable`                                 ``__hash__``
 :class:`Iterable`                                 ``__iter__``
 :class:`Iterator`          :class:`Iterable`      ``__next__``            ``__iter__``
-:class:`Sized`          			  ``__len__``
+:class:`Sized`                                    ``__len__``
 :class:`Callable`                                 ``__call__``
-                                                  
+
 :class:`Sequence`          :class:`Sized`,        ``__getitem__``         ``__contains__``. ``__iter__``, ``__reversed__``.
                            :class:`Iterable`,     and ``__len__``         ``index``, and ``count``
-                           :class:`Container`     
-                                                  
+                           :class:`Container`
+
 :class:`MutableSequence`   :class:`Sequence`      ``__getitem__``         Inherited Sequence methods and
                                                   ``__delitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
                                                   ``insert``,             ``remove``, and ``__iadd__``
                                                   and ``__len__``
-                                                  
+
 :class:`Set`               :class:`Sized`,        ``__len__``,            ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
                            :class:`Iterable`,     ``__iter__``, and       ``__gt__``, ``__ge__``, ``__and__``, ``__or__``
                            :class:`Container`     ``__contains__``        ``__sub__``, ``__xor__``, and ``isdisjoint``
-                                                  
+
 :class:`MutableSet`        :class:`Set`           ``add`` and             Inherited Set methods and
                                                   ``discard``             ``clear``, ``pop``, ``remove``, ``__ior__``,
                                                                           ``__iand__``, ``__ixor__``, and ``__isub__``
-                                                  
+
 :class:`Mapping`           :class:`Sized`,        ``__getitem__``,        ``__contains__``, ``keys``, ``items``, ``values``,
                            :class:`Iterable`,     ``__len__``. and        ``get``, ``__eq__``, and ``__ne__``
                            :class:`Container`     ``__iter__``
-                                                  
+
 :class:`MutableMapping`    :class:`Mapping`       ``__getitem__``         Inherited Mapping methods and
                                                   ``__setitem__``,        ``pop``, ``popitem``, ``clear``, ``update``,
                                                   ``__delitem__``,        and ``setdefault``
-						  ``__iter__``, and
+                                                  ``__iter__``, and
                                                   ``__len__``
-                                                  
+
 :class:`MappingView`       :class:`Sized`                                 ``__len__``
 :class:`KeysView`          :class:`MappingView`,                          ``__contains__``,
                            :class:`Set`                                   ``__iter__``
@@ -96,7 +96,7 @@ particular functionality, for example::
 
     size = None
     if isinstance(myvar, collections.Sized):
-	size = len(myvar)
+        size = len(myvar)
 
 Several of the ABCs are also useful as mixins that make it easier to develop
 classes supporting container APIs.  For example, to write a class supporting
@@ -150,6 +150,139 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
    ``__hash__ = Set._hash``.
 
 (For more about ABCs, see the :mod:`abc` module and :pep:`3119`.)
+
+
+.. _counter-objects:
+
+:class:`Counter` objects
+------------------------
+
+A counter tool is provided to support convenient and rapid tallies.
+For example::
+
+    # Tally repeated words in a list
+    >>> words = ['red', 'blue', 'red', 'green', 'blue', 'blue']
+    >>> cnt = Counter()
+    >>> for word in words:
+    ...     cnt[word] += 1
+    >>> cnt
+    Counter({'blue': 3, 'red': 2, 'green': 1})
+
+    # Find the ten most common words in Hamlet
+    >>> import re
+    >>> words = re.findall('\w+', open('hamlet.txt').read().lower())
+    >>> Counter(hamlet_words).most_common(10)
+    [('the', 1143), ('and', 966), ('to', 762), ('of', 669), ('i', 631),
+     ('you', 554),  ('a', 546), ('my', 514), ('hamlet', 471), ('in', 451)]
+
+.. class:: Counter([iterable-or-mapping])
+
+   A :class:`Counter` is a :class:`dict` subclass for counting hashable items.
+   It is an unordered collection where elements are stored as dictionary keys
+   and their counts are stored as dictionary values.  Counts are allowed to be
+   any integer value including zero or negative counts.  The :class:`Counter`
+   class is similar to bags or multisets in other languages.
+
+   Elements are counted from an *iterable* or initialized from another
+   *mapping* (or counter)::
+
+       >>> c = Counter()                            # a new, empty counter
+       >>> c = Counter('gallahad')                  # a new counter from an iterable
+       >>> c = Counter({'red': 4, 'blue': 2})       # a new counter from a mapping
+
+   The returned object has a dictionary style interface except that it returns
+   a zero count for missing items (instead of raising a :exc:`KeyError` like a
+   dictionary would)::
+
+        >>> c = Counter(['egg', 'ham'])
+        >>> c['bacon']                              # count of a missing element is zero
+        0
+
+   Assigning a count of zero or reducing the count to zero leaves the
+   element in the dictionary.  Use ``del`` to remove the entry entirely:
+
+        >>> c = Counter(['arthur', 'gwain'])
+        >>> c['arthur'] = 0                         # set the count of 'arthur' to zero
+        >>> 'arthur' in c                           # but 'arthur' is still in the counter
+        True
+        >>> del c['arthur']                         # del will completely remove the entry
+
+   .. versionadded:: 2.7
+
+
+   Counter objects support two methods beyond those available for all
+   dictionaries:
+
+   .. method:: elements()
+
+      Return an iterator over elements repeating each as many times as its count.
+      Elements are returned in arbitrary order.  If an element's count has been
+      set to zero or a negative number, :meth:`elements` will ignore it.
+
+            >>> c = Counter({'a': 4, 'b': 2, 'd': 0, 'e': -2})
+            >>> list(c.elements())
+            ['a', 'a', 'a', 'a', 'b', 'b']
+
+   .. method:: most_common([n])
+
+      Return a list of the *n* most common elements and their counts from
+      the most common to the least.  If *n* is not specified or is ``None``,
+      return a list of all element counts in decreasing order of frequency.
+      Elements with equal counts are ordered arbitrarily::
+
+            >>> Counter('abracadabra').most_common(3)
+            [('a', 5), ('r', 2), ('b', 2)]
+
+   The usual dictionary methods are available for :class:`Counter` objects.
+   All of those work the same as they do for dictionaries except for two
+   which work differently for counters.
+
+   .. method:: fromkeys(iterable)
+
+       There is no equivalent class method for :class:`Counter` objects.
+       Raises a :exc:`NotImplementedError` when called.
+
+   .. method:: update([iterable-or-mapping])
+
+       Like :meth:`dict.update` but adds-in counts instead of replacing them.
+
+       Elements are counted from an *iterable* or added-in from another
+       *mapping* (or counter)::
+
+            >>> c = Counter('which')
+            >>> c.update('witch')           # add elements from another iterable
+            >>> d = Counter('watch')
+            >>> c.update(d)                 # add elements from another counter
+            >>> c['h']                      # four 'h' in which, witch, and watch
+            4
+
+Common patterns for working with :class:`Counter` objects::
+
+    sum(c.values())               # total of all counts
+    c.clear()                     # reset all counts
+    list(c)                       # list unique elements
+    set(c)                        # convert to a set
+    dict(c)                       # convert to a regular dictionary
+    c.items()                     # convert to a list of (elem, cnt) pairs
+    Counter(dict(list_of_pairs))  # convert from a list of (elem, cnt) pairs
+    c.most_common()[:-n:-1]       # n least common elements
+
+**References**:
+
+* Wikipedia entry for `Multisets <http://en.wikipedia.org/wiki/Multiset>`_
+
+* `Bag class <http://www.gnu.org/software/smalltalk/manual-base/html_node/Bag.html>`_
+  in Smalltalk
+* `C++ multisets <http://www.demo2s.com/Tutorial/Cpp/0380__set-multiset/Catalog0380__set-multiset.htm>`_
+  tutorial with standalone examples
+
+* An early Python `Bag <http://code.activestate.com/recipes/259174/>`_ recipe
+  for Python 2.4 and a `Counter <http://code.activestate.com/recipes/576611/>`_
+  comformant recipe for Python 2.5 and later
+
+* Use cases for multisets and mathematical operations on multisets.
+   Knuth, Donald. The Art of Computer Programming Volume II,
+   Section 4.6.3, Exercise 19
 
 
 
@@ -549,8 +682,8 @@ Example:
                if kwds:
                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
                return result
-   <BLANKLINE>            
-           def __getnewargs__(self): 
+   <BLANKLINE>
+           def __getnewargs__(self):
                return tuple(self)
    <BLANKLINE>
            x = property(itemgetter(0))
@@ -591,7 +724,7 @@ field names, the method and attribute names start with an underscore.
 
    Class method that makes a new instance from an existing sequence or iterable.
 
-.. doctest::
+   .. doctest::
 
       >>> t = [11, 22]
       >>> Point._make(t)
@@ -607,9 +740,7 @@ field names, the method and attribute names start with an underscore.
 .. method:: somenamedtuple._replace(kwargs)
 
    Return a new instance of the named tuple replacing specified fields with new
-   values:
-
-::
+   values::
 
       >>> p = Point(x=11, y=22)
       >>> p._replace(x=33)
@@ -623,7 +754,7 @@ field names, the method and attribute names start with an underscore.
    Tuple of strings listing the field names.  Useful for introspection
    and for creating new named tuple types from existing named tuples.
 
-.. doctest::
+   .. doctest::
 
       >>> p._fields            # view the field names
       ('x', 'y')

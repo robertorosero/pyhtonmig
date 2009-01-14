@@ -116,6 +116,8 @@ pythondll_uuid = {
 
 # Compute the name that Sphinx gives to the docfile
 docfile = ""
+if micro:
+    docfile = str(micro)
 if level < 0xf:
     docfile = '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
@@ -1248,7 +1250,10 @@ def add_registry(db):
                "[TARGETDIR]Doc\\"+docfile , "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
-               "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
+               "", r"[TARGETDIR]Python.exe", "REGISTRY.def"),
+              ("DisplayIcon", -1,
+               r"Software\Microsoft\Windows\CurrentVersion\Uninstall\%s" % product_code,
+               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY.def")
               ])
     # Shortcuts, see "Shortcut Table"
     add_data(db, "Directory",

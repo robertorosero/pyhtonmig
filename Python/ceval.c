@@ -213,6 +213,7 @@ PyEval_GetCallStats(PyObject *self)
 #include "pythread.h"
 
 static PyThread_type_lock interpreter_lock = 0; /* This is the GIL */
+static PyThread_type_lock pending_lock = 0; /* for pending calls */
 static long main_thread = 0;
 
 int
@@ -284,6 +285,7 @@ PyEval_ReInitThreads(void)
 	  adding a new function to each thread_*.h.  Instead, just
 	  create a new lock and waste a little bit of memory */
 	interpreter_lock = PyThread_allocate_lock();
+	pending_lock = PyThread_allocate_lock();
 	PyThread_acquire_lock(interpreter_lock, 1);
 	main_thread = PyThread_get_thread_ident();
 
@@ -356,19 +358,145 @@ PyEval_RestoreThread(PyThreadState *tstate)
 #ifdef WITH_THREAD
    Any thread can schedule pending calls, but only the main thread
    will execute them.
+   There is no facility to schedule calls to a particular thread, but
+   that should be easy to change, should that ever be required.  In
+   that case, the static variables here should go into the python
+   threadstate.
 #endif
+*/
 
-   XXX WARNING!  ASYNCHRONOUSLY EXECUTING CODE!
+#ifdef WITH_THREAD
+
+/* The WITH_THREAD implementation is thread-safe.  It allows
+   scheduling to be made from any thread, and even from an executing
+   callback.
+ */
+
+#define NPENDINGCALLS 32
+static struct {
+	int (*func)(void *);
+	void *arg;
+} pendingcalls[NPENDINGCALLS];
+static int pendingfirst = 0;
+static int pendinglast = 0;
+static volatile int pendingcalls_to_do = 1; /* trigger initialization of lock */
+static char pendingbusy = 0;
+
+int
+Py_AddPendingCall(int (*func)(void *), void *arg)
+{
+	int i, j, result=0;
+	PyThread_type_lock lock = pending_lock;
+	
+	/* try a few times for the lock.  Since this mechanism is used
+	 * for signal handling (on the main thread), there is a (slim)
+	 * chance that a signal is delivered on the same thread while we
+	 * hold the lock during the Py_MakePendingCalls() function.
+	 * This avoids a deadlock in that case.
+	 * Note that signals can be delivered on any thread.  In particular,
+	 * on Windows, a SIGINT is delivered on a system-created worker
+	 * thread.
+	 * We also check for lock being NULL, in the unlikely case that
+	 * this function is called before any bytecode evaluation takes place.
+	 */
+	if (lock != NULL) {
+		for (i = 0; i<100; i++) {
+			if (PyThread_acquire_lock(lock, NOWAIT_LOCK))
+				break;
+		}
+		if (i == 100)
+			return -1;
+	}
+
+	i = pendinglast;
+	j = (i + 1) % NPENDINGCALLS;
+	if (j == pendingfirst) {
+		result = -1; /* Queue full */
+	} else {
+		pendingcalls[i].func = func;
+		pendingcalls[i].arg = arg;
+		pendinglast = j;
+	}
+	/* signal main loop */
+	_Py_Ticker = 0;
+	pendingcalls_to_do = 1;
+	if (lock != NULL)
+		PyThread_release_lock(lock);
+	return result;
+}
+
+int
+Py_MakePendingCalls(void)
+{
+	int i;
+	int r = 0;
+
+	if (!pending_lock) {
+		/* initial allocation of the lock */
+		pending_lock = PyThread_allocate_lock();
+		if (pending_lock == NULL)
+			return -1;
+	}
+
+	/* only service pending calls on main thread */
+	if (main_thread && PyThread_get_thread_ident() != main_thread)
+		return 0; 
+	/* don't perform recursive pending calls */
+	if (pendingbusy)
+		return 0;
+	pendingbusy = 1;
+	/* perform a bounded number of calls, in case of recursion */
+	for (i=0; i<NPENDINGCALLS; i++) {
+		int j;  
+		int (*func)(void *);
+		void *arg;
+		
+		/* pop one item off the queue while holding the lock */
+		PyThread_acquire_lock(pending_lock, WAIT_LOCK);
+		j = pendingfirst;
+		if (j == pendinglast) {
+			func = NULL; /* Queue empty */
+		} else {
+			func = pendingcalls[j].func;
+			arg = pendingcalls[j].arg;
+			pendingfirst = (j + 1) % NPENDINGCALLS;
+		}
+		pendingcalls_to_do = pendingfirst != pendinglast;
+		PyThread_release_lock(pending_lock);
+		/* having released the lock, perform the callback */
+		if (func == NULL)
+			break;
+		r = func(arg);
+		if (r)
+			break;
+	}
+	pendingbusy = 0;
+	return r;
+}
+
+#else /* if ! defined WITH_THREAD */
+
+/*
+   WARNING!  ASYNCHRONOUSLY EXECUTING CODE!
+   This code is used for signal handling in python that isn't built
+   with WITH_THREAD.
+   Don't use this implementation when Py_AddPendingCalls() can happen
+   on a different thread!
+ 
    There are two possible race conditions:
-   (1) nested asynchronous registry calls;
-   (2) registry calls made while pending calls are being processed.
-   While (1) is very unlikely, (2) is a real possibility.
+   (1) nested asynchronous calls to Py_AddPendingCall()
+   (2) AddPendingCall() calls made while pending calls are being processed.
+   
+   (1) is very unlikely because typically signal delivery
+   is blocked during signal handling.  So it should be impossible.
+   (2) is a real possibility.
    The current code is safe against (2), but not against (1).
    The safety against (2) is derived from the fact that only one
-   thread (the main thread) ever takes things out of the queue.
-
-   XXX Darn!  With the advent of thread state, we should have an array
-   of pending calls per thread in the thread state!  Later...
+   thread is present, interrupted by signals, and that the critical
+   section is protected with the "busy" variable.  On Windows, which
+   delivers SIGINT on a system thread, this does not hold and therefore
+   Windows really shouldn't use this version.
+   The two threads could theoretically wiggle around the "busy" variable.
 */
 
 #define NPENDINGCALLS 32
@@ -378,7 +506,7 @@ static struct {
 } pendingcalls[NPENDINGCALLS];
 static volatile int pendingfirst = 0;
 static volatile int pendinglast = 0;
-static volatile int things_to_do = 0;
+static volatile int pendingcalls_to_do = 0;
 
 int
 Py_AddPendingCall(int (*func)(void *), void *arg)
@@ -386,8 +514,6 @@ Py_AddPendingCall(int (*func)(void *), void *arg)
 	static volatile int busy = 0;
 	int i, j;
 	/* XXX Begin critical section */
-	/* XXX If you want this to be safe against nested
-	   XXX asynchronous calls, you'll have to work harder! */
 	if (busy)
 		return -1;
 	busy = 1;
@@ -402,7 +528,7 @@ Py_AddPendingCall(int (*func)(void *), void *arg)
 	pendinglast = j;
 
 	_Py_Ticker = 0;
-	things_to_do = 1; /* Signal main loop */
+	pendingcalls_to_do = 1; /* Signal main loop */
 	busy = 0;
 	/* XXX End critical section */
 	return 0;
@@ -412,14 +538,10 @@ int
 Py_MakePendingCalls(void)
 {
 	static int busy = 0;
-#ifdef WITH_THREAD
-	if (main_thread && PyThread_get_thread_ident() != main_thread)
-		return 0;
-#endif
 	if (busy)
 		return 0;
 	busy = 1;
-	things_to_do = 0;
+	pendingcalls_to_do = 0;
 	for (;;) {
 		int i;
 		int (*func)(void *);
@@ -432,13 +554,15 @@ Py_MakePendingCalls(void)
 		pendingfirst = (i + 1) % NPENDINGCALLS;
 		if (func(arg) < 0) {
 			busy = 0;
-			things_to_do = 1; /* We're not done yet */
+			pendingcalls_to_do = 1; /* We're not done yet */
 			return -1;
 		}
 	}
 	busy = 0;
 	return 0;
 }
+
+#endif /* WITH_THREAD */
 
 
 /* The interpreter's recursion limit */
@@ -504,10 +628,17 @@ enum why_code {
 static enum why_code do_raise(PyObject *, PyObject *, PyObject *);
 static int unpack_iterable(PyObject *, int, PyObject **);
 
+/* Records whether tracing is on for any thread.  Counts the number of
+   threads for which tstate->c_tracefunc is non-NULL, so if the value
+   is 0, we know we don't have to check this thread's c_tracefunc.
+   This speeds up the if statement in PyEval_EvalFrameEx() after
+   fast_next_opcode*/
+static int _Py_TracingPossible = 0;
+
 /* for manipulating the thread switch and periodic "stuff" - used to be
    per thread, now just a pair o' globals */
 int _Py_CheckInterval = 100;
-volatile int _Py_Ticker = 100;
+volatile int _Py_Ticker = 0; /* so that we hit a "tick" first thing */
 
 PyObject *
 PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
@@ -825,7 +956,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 		/* Do periodic things.  Doing this every time through
 		   the loop would add too much overhead, so we do it
 		   only every Nth instruction.  We also do it if
-		   ``things_to_do'' is set, i.e. when an asynchronous
+		   ``pendingcalls_to_do'' is set, i.e. when an asynchronous
 		   event needs attention (e.g. a signal handler or
 		   async I/O handler); see Py_AddPendingCall() and
 		   Py_MakePendingCalls() above. */
@@ -841,12 +972,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #ifdef WITH_TSC
 			ticked = 1;
 #endif
-			if (things_to_do) {
+			if (pendingcalls_to_do) {
 				if (Py_MakePendingCalls() < 0) {
 					why = WHY_EXCEPTION;
 					goto on_error;
 				}
-				if (things_to_do)
+				if (pendingcalls_to_do)
 					/* MakePendingCalls() didn't succeed.
 					   Force early re-execution of this
 					   "periodic" code, possibly after
@@ -886,7 +1017,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		/* line-by-line tracing support */
 
-		if (tstate->c_tracefunc != NULL && !tstate->tracing) {
+		if (_Py_TracingPossible &&
+		    tstate->c_tracefunc != NULL && !tstate->tracing) {
 			/* see maybe_call_line_trace
 			   for expository comments */
 			f->f_stacktop = stack_pointer;
@@ -1041,6 +1173,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			}
 			Py_FatalError("invalid argument to DUP_TOPX"
 				      " (bytecode corruption?)");
+			/* Never returns, so don't bother to set why. */
 			break;
 
 		case UNARY_POSITIVE:
@@ -1285,9 +1418,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		case LIST_APPEND:
 			w = POP();
-			v = POP();
+			v = stack_pointer[-oparg];
 			err = PyList_Append(v, w);
-			Py_DECREF(v);
 			Py_DECREF(w);
 			if (err == 0) {
 				PREDICT(JUMP_ABSOLUTE);
@@ -1634,9 +1766,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 		case PRINT_NEWLINE:
 			if (stream == NULL || stream == Py_None) {
 				w = PySys_GetObject("stdout");
-				if (w == NULL)
+				if (w == NULL) {
 					PyErr_SetString(PyExc_RuntimeError,
 							"lost sys.stdout");
+					why = WHY_EXCEPTION;
+				}
 			}
 			if (w != NULL) {
 				/* w.write() may replace sys.stdout, so we
@@ -1862,6 +1996,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				PyErr_Format(PyExc_SystemError,
 					     "no locals when loading %s",
 					     PyObject_REPR(w));
+				why = WHY_EXCEPTION;
 				break;
 			}
 			if (PyDict_CheckExact(v)) {
@@ -2337,11 +2472,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			/* XXX Not the fastest way to call it... */
 			x = PyObject_CallFunctionObjArgs(exit_func, u, v, w,
 							 NULL);
-			if (x == NULL) {
-				Py_DECREF(exit_func);
+			Py_DECREF(exit_func);
+			if (x == NULL)
 				break; /* Go to error exit */
-			}
-			if (u != Py_None && PyObject_IsTrue(x)) {
+
+			if (u != Py_None)
+				err = PyObject_IsTrue(x);
+			else
+				err = 0;
+			Py_DECREF(x);
+
+			if (err < 0)
+				break; /* Go to error exit */
+			else if (err > 0) {
+				err = 0;
 				/* There was an exception and a true return */
 				STACKADJ(-2);
 				Py_INCREF(Py_None);
@@ -2353,8 +2497,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				/* The stack was rearranged to remove EXIT
 				   above. Let END_FINALLY do its thing */
 			}
-			Py_DECREF(x);
-			Py_DECREF(exit_func);
 			PREDICT(END_FINALLY);
 			break;
 		}
@@ -2451,7 +2593,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			Py_DECREF(v);
 			if (x != NULL) {
 				v = POP();
-				err = PyFunction_SetClosure(x, v);
+				if (PyFunction_SetClosure(x, v) != 0) {
+					/* Can't happen unless bytecode is corrupt. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			if (x != NULL && oparg > 0) {
@@ -2465,7 +2610,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					w = POP();
 					PyTuple_SET_ITEM(v, oparg, w);
 				}
-				err = PyFunction_SetDefaults(x, v);
+				if (PyFunction_SetDefaults(x, v) != 0) {
+					/* Can't happen unless
+                                           PyFunction_SetDefaults changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			PUSH(x);
@@ -3414,6 +3563,7 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 {
 	PyThreadState *tstate = PyThreadState_GET();
 	PyObject *temp = tstate->c_traceobj;
+	_Py_TracingPossible += (func != NULL) - (tstate->c_tracefunc != NULL);
 	Py_XINCREF(arg);
 	tstate->c_tracefunc = NULL;
 	tstate->c_traceobj = NULL;

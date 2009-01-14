@@ -73,13 +73,13 @@ This module defines one class called :class:`Popen`:
    specified by the :envvar:`COMSPEC` environment variable.
 
    *stdin*, *stdout* and *stderr* specify the executed programs' standard input,
-   standard output and standard error file handles, respectively.  Valid values are
-   ``PIPE``, an existing file descriptor (a positive integer), an existing file
-   object, and ``None``.  ``PIPE`` indicates that a new pipe to the child should be
-   created.  With ``None``, no redirection will occur; the child's file handles
-   will be inherited from the parent.  Additionally, *stderr* can be ``STDOUT``,
-   which indicates that the stderr data from the applications should be captured
-   into the same file handle as for stdout.
+   standard output and standard error file handles, respectively.  Valid values
+   are :data:`PIPE`, an existing file descriptor (a positive integer), an
+   existing file object, and ``None``.  :data:`PIPE` indicates that a new pipe
+   to the child should be created.  With ``None``, no redirection will occur;
+   the child's file handles will be inherited from the parent.  Additionally,
+   *stderr* can be :data:`STDOUT`, which indicates that the stderr data from the
+   applications should be captured into the same file handle as for stdout.
 
    If *preexec_fn* is set to a callable object, this object will be called in the
    child process just before the child is executed. (Unix only)
@@ -119,6 +119,20 @@ This module defines one class called :class:`Popen`:
    of the main window and priority for the new process.  (Windows only)
 
 
+.. data:: PIPE
+
+   Special value that can be used as the *stdin*, *stdout* or *stderr* argument
+   to :class:`Popen` and indicates that a pipe to the standard stream should be
+   opened.
+
+
+.. data:: STDOUT
+
+   Special value that can be used as the *stderr* argument to :class:`Popen` and
+   indicates that standard error should go into the same handle as standard
+   output.
+
+
 Convenience Functions
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -147,6 +161,30 @@ This module also defines two shortcut functions:
       check_call(["ls", "-l"])
 
    .. versionadded:: 2.5
+
+
+.. function:: check_output(*popenargs, **kwargs)
+
+   Run command with arguments and return its output as a byte string.
+
+   If the exit code was non-zero it raises a CalledProcessError.  The
+   CalledProcessError object will have the return code in the returncode
+   attribute and output in the output attribute.
+
+   The arguments are the same as for the Popen constructor.  Example:
+
+      >>> subprocess.check_output(["ls", "-l", "/dev/null"])
+      'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
+
+   The stdout argument is not allowed as it is used internally.
+   To capture standard error in the result, use stderr=subprocess.STDOUT.
+
+      >>> subprocess.check_output(
+              ["/bin/sh", "-c", "ls non_existant_file ; exit 0"],
+              stderr=subprocess.STDOUT)
+      'ls: non_existant_file: No such file or directory\n'
+
+   .. versionadded:: 2.7
 
 
 Exceptions
@@ -207,7 +245,7 @@ Instances of the :class:`Popen` class have the following methods:
    *input* argument should be a string to be sent to the child process, or
    ``None``, if no data should be sent to the child.
 
-   :meth:`communicate` returns a tuple ``(stdout, stderr)``.
+   :meth:`communicate` returns a tuple ``(stdoutdata, stderrdata)``.
 
    Note that if you want to send data to the process's stdin, you need to create
    the Popen object with ``stdin=PIPE``.  Similarly, to get anything other than
@@ -261,20 +299,21 @@ The following attributes are also available:
 
 .. attribute:: Popen.stdin
 
-   If the *stdin* argument is ``PIPE``, this attribute is a file object that
-   provides input to the child process.  Otherwise, it is ``None``.
+   If the *stdin* argument was :data:`PIPE`, this attribute is a file object
+   that provides input to the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stdout
 
-   If the *stdout* argument is ``PIPE``, this attribute is a file object that
-   provides output from the child process.  Otherwise, it is ``None``.
+   If the *stdout* argument was :data:`PIPE`, this attribute is a file object
+   that provides output from the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stderr
 
-   If the *stderr* argument is ``PIPE``, this attribute is file object that
-   provides error output from the child process.  Otherwise, it is ``None``.
+   If the *stderr* argument was :data:`PIPE`, this attribute is a file object
+   that provides error output from the child process.  Otherwise, it is
+   ``None``.
 
 
 .. attribute:: Popen.pid
@@ -287,7 +326,7 @@ The following attributes are also available:
    The child return code, set by :meth:`poll` and :meth:`wait` (and indirectly
    by :meth:`communicate`).  A ``None`` value indicates that the process
    hasn't terminated yet.
-   
+
    A negative value ``-N`` indicates that the child was terminated by signal
    ``N`` (Unix only).
 
@@ -358,8 +397,8 @@ A more realistic example would look like this::
        print >>sys.stderr, "Execution failed:", e
 
 
-Replacing os.spawn\*
-^^^^^^^^^^^^^^^^^^^^
+Replacing the os.spawn family
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 P_NOWAIT example::
 
@@ -386,8 +425,8 @@ Environment example::
    Popen(["/bin/mycmd", "myarg"], env={"PATH": "/usr/bin"})
 
 
-Replacing os.popen\*
-^^^^^^^^^^^^^^^^^^^^
+Replacing os.popen, os.popen2, os.popen3
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
 
@@ -430,8 +469,8 @@ Replacing os.popen\*
    (child_stdin, child_stdout_and_stderr) = (p.stdin, p.stdout)
 
 
-Replacing popen2.\*
-^^^^^^^^^^^^^^^^^^^
+Replacing functions from the popen2 module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 
@@ -454,15 +493,15 @@ Replacing popen2.\*
              stdin=PIPE, stdout=PIPE, close_fds=True)
    (child_stdout, child_stdin) = (p.stdout, p.stdin)
 
-The popen2.Popen3 and popen2.Popen4 basically works as subprocess.Popen, except
-that:
+:class:`popen2.Popen3` and :class:`popen2.Popen4` basically work as
+:class:`subprocess.Popen`, except that:
 
-* subprocess.Popen raises an exception if the execution fails
+* :class:`Popen` raises an exception if the execution fails.
 
 * the *capturestderr* argument is replaced with the *stderr* argument.
 
-* stdin=PIPE and stdout=PIPE must be specified.
+* ``stdin=PIPE`` and ``stdout=PIPE`` must be specified.
 
 * popen2 closes all file descriptors by default, but you have to specify
-  close_fds=True with subprocess.Popen.
+  ``close_fds=True`` with :class:`Popen`.
 

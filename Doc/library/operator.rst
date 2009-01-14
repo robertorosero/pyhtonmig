@@ -7,7 +7,7 @@
 
 
 .. testsetup::
-   
+
    import operator
    from operator import itemgetter
 
@@ -240,6 +240,10 @@ Operations which work with sequences include:
 
    Delete the slice of *a* from index *b* to index *c-1*.
 
+   .. deprecated:: 2.6
+      This function is removed in Python 3.x.  Use :func:`delitem` with a slice
+      index.
+
 
 .. function:: getitem(a, b)
               __getitem__(a, b)
@@ -251,6 +255,10 @@ Operations which work with sequences include:
               __getslice__(a, b, c)
 
    Return the slice of *a* from index *b* to index *c-1*.
+
+   .. deprecated:: 2.6
+      This function is removed in Python 3.x.  Use :func:`getitem` with a slice
+      index.
 
 
 .. function:: indexOf(a, b)
@@ -282,6 +290,11 @@ Operations which work with sequences include:
               __setslice__(a, b, c, v)
 
    Set the slice of *a* from index *b* to index *c-1* to the sequence *v*.
+
+   .. deprecated:: 2.6
+      This function is removed in Python 3.x.  Use :func:`setitem` with a slice
+      index.
+
 
 Many operations have an "in-place" version.  The following functions provide a
 more primitive access to in-place operators than the usual syntax does; for
@@ -424,7 +437,7 @@ objects.
 
       >>> class C:
       ...     pass
-      ... 
+      ...
       >>> import operator
       >>> obj = C()
       >>> operator.isMappingType(obj)
@@ -534,9 +547,9 @@ expect a function argument.
                 def g(obj):
                     return tuple(obj[item] for item in items)
             return g
-   
-   The items can be any type accepted by the operand's :meth:`__getitem__` 
-   method.  Dictionaries accept any hashable value.  Lists, tuples, and 
+
+   The items can be any type accepted by the operand's :meth:`__getitem__`
+   method.  Dictionaries accept any hashable value.  Lists, tuples, and
    strings accept an index or a slice:
 
       >>> itemgetter(1)('ABCDEFG')

@@ -1162,8 +1162,9 @@ of this is the :class:`NodeList` interface in the W3C's Document Object Model.)
 Basic customization
 -------------------
 
-
 .. method:: object.__new__(cls[, ...])
+
+   .. index:: pair: subclassing; immutable types
 
    Called to create a new instance of class *cls*.  :meth:`__new__` is a static
    method (special-cased so you need not declare it as such) that takes the class
@@ -2369,7 +2370,7 @@ the instance when looking up special methods::
    True
 
 In addition to bypassing any instance attributes in the interest of
-correctness, implicit special method lookup may also bypass the
+correctness, implicit special method lookup generally also bypasses the
 :meth:`__getattribute__` method even of the object's metaclass::
 
    >>> class Meta(type):

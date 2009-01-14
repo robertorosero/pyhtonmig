@@ -237,7 +237,7 @@ $(OUT)%$O: %.c
 
 # Output file names
 PYTHON_VER=	2.6
-PYTHON_LIB=	python26
+PYTHON_LIB=	python27
 PYTHON.LIB=	$(PYTHON_LIB)_s$A
 PYTHON.IMPLIB=	$(PYTHON_LIB)$A
 ifeq ($(EXEOMF),yes)
@@ -351,7 +351,6 @@ SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/getargs.c \
 		Python/getcompiler.c \
 		Python/getcopyright.c \
-		Python/getmtime.c \
 		Python/getplatform.c \
 		Python/getversion.c \
 		Python/graminit.c \

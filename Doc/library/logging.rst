@@ -121,7 +121,7 @@ Another useful feature of the logging API is the ability to produce different
 messages at different log levels.  This allows you to instrument your code with
 debug messages, for example, but turning the log level down so that those debug
 messages are not written for your production system.  The default levels are
-``CRITICAL``, ``ERROR``, ``WARNING``, ``INFO``, ``DEBUG`` and ``UNSET``.
+``CRITICAL``, ``ERROR``, ``WARNING``, ``INFO``, ``DEBUG`` and ``NOTSET``.
 
 The logger, handler, and log message call each specify a level.  The log message
 is only emitted if the handler and logger are configured to emit messages of
@@ -422,6 +422,8 @@ You can see that the config file approach has a few advantages over the Python
 code approach, mainly separation of configuration and code and the ability of
 noncoders to easily modify the logging properties.
 
+.. _library-config:
+
 Configuring Logging for a Library
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -460,6 +462,12 @@ done using loggers with names matching "foo.x.y", then the code::
 should have the desired effect. If an organisation produces a number of
 libraries, then the logger name specified can be "orgname.foo" rather than
 just "foo".
+
+.. versionadded:: 2.7
+
+The :class:`NullHandler` class was not present in previous versions, but is now
+included, so that it need not be defined in library code.
+
 
 
 Logging Levels
@@ -524,39 +532,55 @@ provided:
 
 #. :class:`FileHandler` instances send error messages to disk files.
 
-#. :class:`BaseRotatingHandler` is the base class for handlers that rotate log
-   files at a certain point. It is not meant to be  instantiated directly. Instead,
-   use :class:`RotatingFileHandler` or :class:`TimedRotatingFileHandler`.
+#. :class:`handlers.BaseRotatingHandler` is the base class for handlers that
+   rotate log files at a certain point. It is not meant to be  instantiated
+   directly. Instead, use :class:`RotatingFileHandler` or
+   :class:`TimedRotatingFileHandler`.
 
-#. :class:`RotatingFileHandler` instances send error messages to disk files,
+#. :class:`handlers.RotatingFileHandler` instances send error messages to disk files,
    with support for maximum log file sizes and log file rotation.
 
-#. :class:`TimedRotatingFileHandler` instances send error messages to disk files
+#. :class:`handlers.TimedRotatingFileHandler` instances send error messages to disk files
    rotating the log file at certain timed intervals.
 
-#. :class:`SocketHandler` instances send error messages to TCP/IP sockets.
+#. :class:`handlers.SocketHandler` instances send error messages to TCP/IP sockets.
 
-#. :class:`DatagramHandler` instances send error messages to UDP sockets.
+#. :class:`handlers.DatagramHandler` instances send error messages to UDP sockets.
 
-#. :class:`SMTPHandler` instances send error messages to a designated email
+#. :class:`handlers.SMTPHandler` instances send error messages to a designated email
    address.
 
-#. :class:`SysLogHandler` instances send error messages to a Unix syslog daemon,
+#. :class:`handlers.SysLogHandler` instances send error messages to a Unix syslog daemon,
    possibly on a remote machine.
 
-#. :class:`NTEventLogHandler` instances send error messages to a Windows
+#. :class:`handlers.NTEventLogHandler` instances send error messages to a Windows
    NT/2000/XP event log.
 
-#. :class:`MemoryHandler` instances send error messages to a buffer in memory,
+#. :class:`handlers.MemoryHandler` instances send error messages to a buffer in memory,
    which is flushed whenever specific criteria are met.
 
-#. :class:`HTTPHandler` instances send error messages to an HTTP server using
+#. :class:`handlers.HTTPHandler` instances send error messages to an HTTP server using
    either ``GET`` or ``POST`` semantics.
 
-The :class:`StreamHandler` and :class:`FileHandler` classes are defined in the
-core logging package. The other handlers are defined in a sub- module,
-:mod:`logging.handlers`. (There is also another sub-module,
-:mod:`logging.config`, for configuration functionality.)
+#. :class:`handlers.WatchedFileHandler` instances watch the file they are logging to. If
+the file changes, it is closed and reopened using the file name. This handler
+is only useful on Unix-like systems; Windows does not support the underlying
+mechanism used.
+
+#. :class:`NullHandler` instances do nothing with error messages. They are used
+   by library developers who want to use logging, but want to avoid the "No
+   handlers could be found for logger XXX" message which can be displayed if
+   the library user has not configured logging. See :ref:`library-config` for
+   more information.
+
+.. versionadded:: 2.7
+
+The :class:`NullHandler` class was not present in previous versions.
+
+The :class:`NullHandler`, :class:`StreamHandler` and :class:`FileHandler`
+classes are defined in the core logging package. The other handlers are
+defined in a sub- module, :mod:`logging.handlers`. (There is also another
+sub-module, :mod:`logging.config`, for configuration functionality.)
 
 Logged messages are formatted for presentation through instances of the
 :class:`Formatter` class. They are initialized with a format string suitable for
@@ -1599,10 +1623,34 @@ sends logging output to a disk file.  It inherits the output functionality from
       Outputs the record to the file.
 
 
+NullHandler
+^^^^^^^^^^^
+
+.. versionadded:: 2.7
+
+The :class:`NullHandler` class, located in the core :mod:`logging` package,
+does not do any formatting or output. It is essentially a "no-op" handler
+for use by library developers.
+
+
+.. class:: NullHandler()
+
+   Returns a new instance of the :class:`NullHandler` class.
+
+
+   .. method:: emit(record)
+
+      This method does nothing.
+
+See :ref:`library-config` for more information on how to use
+:class:`NullHandler`.
+
 WatchedFileHandler
 ^^^^^^^^^^^^^^^^^^
 
 .. versionadded:: 2.6
+
+.. module:: logging.handlers
 
 The :class:`WatchedFileHandler` class, located in the :mod:`logging.handlers`
 module, is a :class:`FileHandler` which watches the file it is logging to. If
@@ -2050,6 +2098,8 @@ supports sending logging messages to a Web server, using either ``GET`` or
 Formatter Objects
 -----------------
 
+.. currentmodule:: logging
+
 :class:`Formatter`\ s have the following attributes and methods. They are
 responsible for converting a :class:`LogRecord` to (usually) a string which can
 be interpreted by either a human or an external system. The base
@@ -2285,12 +2335,12 @@ in :mod:`logging` itself) and defining handlers which are declared either in
 
 .. function:: fileConfig(fname[, defaults])
 
-   Reads the logging configuration from a ConfigParser-format file named *fname*.
-   This function can be called several times from an application, allowing an end
-   user the ability to select from various pre-canned configurations (if the
-   developer provides a mechanism to present the choices and load the chosen
-   configuration). Defaults to be passed to ConfigParser can be specified in the
-   *defaults* argument.
+   Reads the logging configuration from a :mod:`ConfigParser`\-format file named
+   *fname*. This function can be called several times from an application,
+   allowing an end user the ability to select from various pre-canned
+   configurations (if the developer provides a mechanism to present the choices
+   and load the chosen configuration). Defaults to be passed to the ConfigParser
+   can be specified in the *defaults* argument.
 
 
 .. function:: listen([port])
@@ -2321,17 +2371,17 @@ Configuration file format
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The configuration file format understood by :func:`fileConfig` is based on
-ConfigParser functionality. The file must contain sections called ``[loggers]``,
-``[handlers]`` and ``[formatters]`` which identify by name the entities of each
-type which are defined in the file. For each such entity, there is a separate
-section which identified how that entity is configured. Thus, for a logger named
-``log01`` in the ``[loggers]`` section, the relevant configuration details are
-held in a section ``[logger_log01]``. Similarly, a handler called ``hand01`` in
-the ``[handlers]`` section will have its configuration held in a section called
-``[handler_hand01]``, while a formatter called ``form01`` in the
-``[formatters]`` section will have its configuration specified in a section
-called ``[formatter_form01]``. The root logger configuration must be specified
-in a section called ``[logger_root]``.
+:mod:`ConfigParser` functionality. The file must contain sections called
+``[loggers]``, ``[handlers]`` and ``[formatters]`` which identify by name the
+entities of each type which are defined in the file. For each such entity,
+there is a separate section which identifies how that entity is configured.
+Thus, for a logger named ``log01`` in the ``[loggers]`` section, the relevant
+configuration details are held in a section ``[logger_log01]``. Similarly, a
+handler called ``hand01`` in the ``[handlers]`` section will have its
+configuration held in a section called ``[handler_hand01]``, while a formatter
+called ``form01`` in the ``[formatters]`` section will have its configuration
+specified in a section called ``[formatter_form01]``. The root logger
+configuration must be specified in a section called ``[logger_root]``.
 
 Examples of these sections in the file are given below. ::
 

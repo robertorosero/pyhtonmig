@@ -47,8 +47,10 @@ from time import asctime
 from pprint import pformat
 from docutils.io import StringOutput
 from docutils.utils import new_document
-from sphinx.builder import Builder
-from sphinx.textwriter import TextWriter
+
+from sphinx.builders import Builder
+from sphinx.writers.text import TextWriter
+
 
 class PydocTopicsBuilder(Builder):
     name = 'pydoc-topics'
@@ -84,6 +86,9 @@ class PydocTopicsBuilder(Builder):
         finally:
             f.close()
 
+# Support for checking for suspicious markup
+
+import suspicious
 
 # Support for documenting Opcodes
 
@@ -108,5 +113,6 @@ def parse_opcode_signature(env, sig, signode):
 def setup(app):
     app.add_role('issue', issue_role)
     app.add_builder(PydocTopicsBuilder)
+    app.add_builder(suspicious.CheckSuspiciousMarkupBuilder)
     app.add_description_unit('opcode', 'opcode', '%s (opcode)',
                              parse_opcode_signature)

@@ -16,6 +16,9 @@ from test import inspect_fodder2 as mod2
 # getclasstree, getargspec, getargvalues, formatargspec, formatargvalues,
 # currentframe, stack, trace, isdatadescriptor
 
+# NOTE: There are some additional tests relating to interaction with
+#       zipimport in the test_zipimport_support test module.
+
 modfile = mod.__file__
 if modfile.endswith(('c', 'o')):
     modfile = modfile[:-1]
@@ -87,6 +90,17 @@ class TestPredicates(IsTestBase):
     def test_isroutine(self):
         self.assert_(inspect.isroutine(mod.spam))
         self.assert_(inspect.isroutine([].count))
+
+    def test_get_slot_members(self):
+        class C(object):
+            __slots__ = ("a", "b")
+
+        x = C()
+        x.a = 42
+        members = dict(inspect.getmembers(x))
+        self.assert_('a' in members)
+        self.assert_('b' not in members)
+
 
 class TestInterpreterStack(IsTestBase):
     def __init__(self, *args, **kwargs):

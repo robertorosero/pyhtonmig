@@ -338,15 +338,13 @@ Notes:
       module: math
       single: floor() (in module math)
       single: ceil() (in module math)
+      single: trunc() (in module math)
       pair: numeric; conversions
-      pair: C; language
 
-   Conversion from floating point to (long or plain) integer may round or
-   truncate as in C; see functions :func:`math.floor` and :func:`math.ceil` for
-   well-defined conversions.
-
-   .. deprecated:: 2.6
-      Instead, convert floats to long explicitly with :func:`trunc`.
+   Conversion from floats using :func:`int` or :func:`long` truncates toward
+   zero like the related function, :func:`math.trunc`.  Use the function
+   :func:`math.floor` to round downward and :func:`math.ceil` to round
+   upward.
 
 (3)
    See :ref:`built-in-funcs` for a full description.
@@ -362,9 +360,9 @@ Notes:
    though the result's type is not necessarily int.
 
 (6)
-   float also accepts the strings "nan" and "inf" with an optional prefix "+" 
+   float also accepts the strings "nan" and "inf" with an optional prefix "+"
    or "-" for Not a Number (NaN) and positive or negative infinity.
-   
+
    .. versionadded:: 2.6
 
 (7)
@@ -447,6 +445,37 @@ Notes:
    A right shift by *n* bits is equivalent to division by ``pow(2, n)``.
 
 
+Additional Methods on Integer Types
+-----------------------------------
+
+.. method:: int.bit_length()
+.. method:: long.bit_length()
+
+    Return the number of bits necessary to represent an integer in binary,
+    excluding the sign and leading zeros::
+
+        >>> n = -37
+        >>> bin(n)
+        '-0b100101'
+        >>> n.bit_length()
+        6
+
+    More precisely, if ``x`` is nonzero, then ``x.bit_length()`` is the
+    unique positive integer ``k`` such that ``2**(k-1) <= abs(x) < 2**k``.
+    Equivalently, when ``abs(x)`` is small enough to have a correctly
+    rounded logarithm, then ``k = 1 + int(log(abs(x), 2))``.
+    If ``x`` is zero, then ``x.bit_length()`` returns ``0``.
+
+    Equivalent to::
+
+        def bit_length(self):
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
+            s = s.lstrip('-0b') # remove leading zeros and minus sign
+            return len(s)       # len('100101') --> 6
+
+    .. versionadded:: 2.7
+
+
 Additional Methods on Float
 ---------------------------
 
@@ -458,7 +487,7 @@ The float type has some additional methods.
     original float and with a positive denominator.  Raises
     :exc:`OverflowError` on infinities and a :exc:`ValueError` on
     NaNs.
-    
+
     .. versionadded:: 2.6
 
 Two methods support conversion to
@@ -1178,7 +1207,7 @@ string functions based on regular expressions.
    Return the numeric string left filled with zeros in a string of length
    *width*.  A sign prefix is handled correctly.  The original string is
    returned if *width* is less than ``len(s)``.
-   
+
 
    .. versionadded:: 2.2.2
 
@@ -1190,7 +1219,7 @@ The following methods are present only on unicode objects:
    otherwise. Numeric characters include digit characters, and all characters
    that have the Unicode numeric value property, e.g. U+2155,
    VULGAR FRACTION ONE FIFTH.
-   
+
 .. method:: unicode.isdecimal()
 
    Return ``True`` if there are only decimal characters in S, ``False``
@@ -1867,7 +1896,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       Return the item of *d* with key *key*.  Raises a :exc:`KeyError` if *key*
       is not in the map.
 
-      .. versionadded:: 2.5 
+      .. versionadded:: 2.5
          If a subclass of dict defines a method :meth:`__missing__`, if the key
          *key* is not present, the ``d[key]`` operation calls that method with
          the key *key* as argument.  The ``d[key]`` operation then returns or
@@ -2186,7 +2215,7 @@ Files have the following methods:
    positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
    current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
    end).  There is no return value.
-   
+
    For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
    ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
 

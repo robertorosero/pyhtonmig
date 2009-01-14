@@ -154,6 +154,17 @@ _getbuffer(PyObject *obj, Py_buffer *view)
     return view->len;
 }
 
+static int
+_canresize(PyByteArrayObject *self)
+{
+    if (self->ob_exports > 0) {
+        PyErr_SetString(PyExc_BufferError,
+                "Existing exports of data: object cannot be re-sized");
+        return 0;
+    }
+    return 1;
+}
+
 /* Direct API functions */
 
 PyObject *
@@ -229,6 +240,13 @@ PyByteArray_Resize(PyObject *self, Py_ssize_t size)
     assert(PyByteArray_Check(self));
     assert(size >= 0);
 
+    if (size == Py_SIZE(self)) {
+        return 0;
+    }
+    if (!_canresize((PyByteArrayObject *)self)) {
+        return -1;
+    }
+
     if (size < alloc / 2) {
         /* Major downsize; resize down to exact size */
         alloc = size + 1;
@@ -246,16 +264,6 @@ PyByteArray_Resize(PyObject *self, Py_ssize_t size)
     else {
         /* Major upsize; resize up to exact size */
         alloc = size + 1;
-    }
-
-    if (((PyByteArrayObject *)self)->ob_exports > 0) {
-            /*
-            fprintf(stderr, "%d: %s", ((PyByteArrayObject *)self)->ob_exports,
-                    ((PyByteArrayObject *)self)->ob_bytes);
-            */
-            PyErr_SetString(PyExc_BufferError,
-                    "Existing exports of data: object cannot be re-sized");
-            return -1;
     }
 
     sval = PyMem_Realloc(((PyByteArrayObject *)self)->ob_bytes, alloc);
@@ -522,6 +530,10 @@ bytes_setslice(PyByteArrayObject *self, Py_ssize_t lo, Py_ssize_t hi,
 
     if (avail != needed) {
         if (avail > needed) {
+            if (!_canresize(self)) {
+                res = -1;
+                goto finish;
+            }
             /*
               0   lo               hi               old_size
               |   |<----avail----->|<-----tomove------>|
@@ -654,6 +666,8 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
         stop = start;
     if (step == 1) {
         if (slicelen != needed) {
+            if (!_canresize(self))
+                return -1;
             if (slicelen > needed) {
                 /*
                   0   start           stop              old_size
@@ -689,6 +703,8 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
             /* Delete slice */
             Py_ssize_t cur, i;
 
+            if (!_canresize(self))
+                return -1;
             if (step < 0) {
                 stop = start + 1;
                 start = stop + step * (slicelen - 1) - 1;
@@ -1427,28 +1443,32 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
     PyObject *input_obj = (PyObject*)self;
     const char *output_start;
     Py_ssize_t inlen;
-    PyObject *result;
+    PyObject *result = NULL;
     int trans_table[256];
-    PyObject *tableobj, *delobj = NULL;
+    PyObject *tableobj = NULL, *delobj = NULL;
     Py_buffer vtable, vdel;
 
     if (!PyArg_UnpackTuple(args, "translate", 1, 2,
                            &tableobj, &delobj))
           return NULL;
 
-    if (_getbuffer(tableobj, &vtable) < 0)
+    if (tableobj == Py_None) {
+        table = NULL;
+        tableobj = NULL;
+    } else if (_getbuffer(tableobj, &vtable) < 0) {
         return NULL;
-
-    if (vtable.len != 256) {
-        PyErr_SetString(PyExc_ValueError,
-                        "translation table must be 256 characters long");
-        result = NULL;
-        goto done;
+    } else {
+        if (vtable.len != 256) {
+            PyErr_SetString(PyExc_ValueError,
+                            "translation table must be 256 characters long");
+            goto done;
+        }
+        table = (const char*)vtable.buf;
     }
 
     if (delobj != NULL) {
         if (_getbuffer(delobj, &vdel) < 0) {
-            result = NULL;
+            delobj = NULL;  /* don't try to release vdel buffer on exit */
             goto done;
         }
     }
@@ -1457,7 +1477,6 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
         vdel.len = 0;
     }
 
-    table = (const char *)vtable.buf;
     inlen = PyByteArray_GET_SIZE(input_obj);
     result = PyByteArray_FromStringAndSize((char *)NULL, inlen);
     if (result == NULL)
@@ -1465,7 +1484,7 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
     output_start = output = PyByteArray_AsString(result);
     input = PyByteArray_AS_STRING(input_obj);
 
-    if (vdel.len == 0) {
+    if (vdel.len == 0 && table != NULL) {
         /* If no deletions are required, use faster code */
         for (i = inlen; --i >= 0; ) {
             c = Py_CHARMASK(*input++);
@@ -1474,8 +1493,13 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
         goto done;
     }
 
-    for (i = 0; i < 256; i++)
-        trans_table[i] = Py_CHARMASK(table[i]);
+    if (table == NULL) {
+        for (i = 0; i < 256; i++)
+            trans_table[i] = Py_CHARMASK(i);
+    } else {
+        for (i = 0; i < 256; i++)
+            trans_table[i] = Py_CHARMASK(table[i]);
+    }
 
     for (i = 0; i < vdel.len; i++)
         trans_table[(int) Py_CHARMASK( ((unsigned char*)vdel.buf)[i] )] = -1;
@@ -1491,7 +1515,8 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
         PyByteArray_Resize(result, output - output_start);
 
 done:
-    PyBuffer_Release(&vtable);
+    if (tableobj != NULL)
+        PyBuffer_Release(&vtable);
     if (delobj != NULL)
         PyBuffer_Release(&vdel);
     return result;
@@ -2730,6 +2755,8 @@ bytes_pop(PyByteArrayObject *self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "pop index out of range");
         return NULL;
     }
+    if (!_canresize(self))
+        return NULL;
 
     value = self->ob_bytes[where];
     memmove(self->ob_bytes + where, self->ob_bytes + where + 1, n - where);
@@ -2760,6 +2787,8 @@ bytes_remove(PyByteArrayObject *self, PyObject *arg)
         PyErr_SetString(PyExc_ValueError, "value not found in bytes");
         return NULL;
     }
+    if (!_canresize(self))
+        return NULL;
 
     memmove(self->ob_bytes + where, self->ob_bytes + where + 1, n - where);
     if (PyByteArray_Resize((PyObject *)self, n - 1) < 0)

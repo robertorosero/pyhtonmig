@@ -595,7 +595,7 @@ failures.
             TestCase.failUnlessAlmostEqual(first, second[, places[, msg]])
 
    Test that *first* and *second* are approximately equal by computing the
-   difference, rounding to the given number of decimal *places* (default 7), 
+   difference, rounding to the given number of decimal *places* (default 7),
    and comparing to zero.
    Note that comparing a given number of decimal places is not the same as
    comparing a given number of significant digits. If the values do not compare
@@ -606,15 +606,15 @@ failures.
             TestCase.failIfAlmostEqual(first, second[, places[, msg]])
 
    Test that *first* and *second* are not approximately equal by computing the
-   difference, rounding to the given number of decimal *places* (default 7), 
+   difference, rounding to the given number of decimal *places* (default 7),
    and comparing to zero.
    Note that comparing a given number of decimal places is not the same as
    comparing a given number of significant digits. If the values do not compare
    equal, the test will fail with the explanation given by *msg*, or :const:`None`.
 
 
-.. method:: TestCase.assertRaises(exception, callable, ...)
-            TestCase.failUnlessRaises(exception, callable, ...)
+.. method:: TestCase.assertRaises(exception[, callable, ...])
+            TestCase.failUnlessRaises(exception[, callable, ...])
 
    Test that an exception is raised when *callable* is called with any positional
    or keyword arguments that are also passed to :meth:`assertRaises`.  The test
@@ -622,6 +622,13 @@ failures.
    fails if no exception is raised.  To catch any of a group of exceptions, a tuple
    containing the exception classes may be passed as *exception*.
 
+   .. versionchanged:: 2.7
+
+      If *callable* is omitted or None, returns a context manager so that the code
+      under test can be written inline rather than as a function::
+
+        with self.failUnlessRaises(some_error_class):
+            do_something()
 
 .. method:: TestCase.failIf(expr[, msg])
             TestCase.assertFalse(expr[, msg])

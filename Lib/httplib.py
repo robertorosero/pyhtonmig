@@ -325,13 +325,18 @@ class HTTPResponse:
 
     # See RFC 2616 sec 19.6 and RFC 1945 sec 6 for details.
 
-    def __init__(self, sock, debuglevel=0, strict=0, method=None):
-        # The buffer size is specified as zero, because the headers of
-        # the response are read with readline().  If the reads were
-        # buffered the readline() calls could consume some of the
-        # response, which make be read via a recv() on the underlying
-        # socket.
-        self.fp = sock.makefile('rb', 0)
+    def __init__(self, sock, debuglevel=0, strict=0, method=None, buffering=False):
+        if buffering:
+            # The caller won't be using any sock.recv() calls, so buffering
+            # is fine and recommendef for performance
+            self.fp = sock.makefile('rb')
+        else:
+            # The buffer size is specified as zero, because the headers of
+            # the response are read with readline().  If the reads were
+            # buffered the readline() calls could consume some of the
+            # response, which make be read via a recv() on the underlying
+            # socket.
+            self.fp = sock.makefile('rb', 0)
         self.debuglevel = debuglevel
         self.strict = strict
         self._method = method
@@ -738,6 +743,7 @@ class HTTPConnection:
         """Send the currently buffered request and clear the buffer.
 
         Appends an extra \\r\\n to the buffer.
+        A message_body may be specified, to be appended to the request.
         """
         self._buffer.extend(("", ""))
         msg = "\r\n".join(self._buffer)
@@ -745,9 +751,14 @@ class HTTPConnection:
         # If msg and message_body are sent in a single send() call,
         # it will avoid performance problems caused by the interaction
         # between delayed ack and the Nagle algorithim.
-        if message_body is not None:
+        if isinstance(message_body, str):
             msg += message_body
+            message_body = None
         self.send(msg)
+        if message_body is not None:
+            #message_body was not a string (i.e. it is a file) and
+            #we must run the risk of Nagle
+            self.send(message_body)
 
     def putrequest(self, method, url, skip_host=0, skip_accept_encoding=0):
         """Send a request to the server.
@@ -927,14 +938,9 @@ class HTTPConnection:
             self._set_content_length(body)
         for hdr, value in headers.iteritems():
             self.putheader(hdr, value)
-        if isinstance(body, str):
-            self.endheaders(body)
-        else:
-            self.endheaders()
-            if body:  # when body is a file rather than a string
-                self.send(body)
+        self.endheaders(body)
 
-    def getresponse(self):
+    def getresponse(self, buffering=False):
         "Get the response from the server."
 
         # if a prior response has been completed, then forget about it.
@@ -960,13 +966,15 @@ class HTTPConnection:
         if self.__state != _CS_REQ_SENT or self.__response:
             raise ResponseNotReady()
 
+        args = (self.sock,)
+        kwds = {"strict":self.strict, "method":self._method}
         if self.debuglevel > 0:
-            response = self.response_class(self.sock, self.debuglevel,
-                                           strict=self.strict,
-                                           method=self._method)
-        else:
-            response = self.response_class(self.sock, strict=self.strict,
-                                           method=self._method)
+            args += (self.debuglevel,)
+        if buffering:
+            #only add this keyword if non-default, for compatibility with
+            #other response_classes.
+            kwds["buffering"] = True;
+        response = self.response_class(*args, **kwds)
 
         response.begin()
         assert response.will_close != _UNKNOWN
@@ -1030,7 +1038,7 @@ class HTTP:
         "Provide a getfile, since the superclass' does not use this concept."
         return self.file
 
-    def getreply(self):
+    def getreply(self, buffering=False):
         """Compat definition since superclass does not define it.
 
         Returns a tuple consisting of:
@@ -1039,7 +1047,12 @@ class HTTP:
         - any RFC822 headers in the response from the server
         """
         try:
-            response = self._conn.getresponse()
+            if not buffering:
+                response = self._conn.getresponse()
+            else:
+                #only add this keyword if non-default for compatibility
+                #with other connection classes
+                response = self._conn.getresponse(buffering)
         except BadStatusLine, e:
             ### hmm. if getresponse() ever closes the socket on a bad request,
             ### then we are going to have problems with self.sock

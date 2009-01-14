@@ -64,8 +64,21 @@ The :mod:`dis` module defines the following functions and constants:
 
 .. function:: disco(code[, lasti])
 
-   A synonym for disassemble.  It is more convenient to type, and kept for
-   compatibility with earlier Python releases.
+   A synonym for :func:`disassemble`.  It is more convenient to type, and kept
+   for compatibility with earlier Python releases.
+
+
+.. function:: findlinestarts(code)
+
+   This generator function uses the ``co_firstlineno`` and ``co_lnotab``
+   attributes of the code object *code* to find the offsets which are starts of
+   lines in the source code.  They are generated as ``(offset, lineno)`` pairs.
+
+
+.. function:: findlabels(code)
+
+   Detect all offsets in the code object *code* which are jump targets, and
+   return a list of these offsets.
 
 
 .. data:: opname
@@ -463,9 +476,11 @@ Miscellaneous opcodes.
    address to jump to (which should be a ``FOR_ITER`` instruction).
 
 
-.. opcode:: LIST_APPEND ()
+.. opcode:: LIST_APPEND (i)
 
-   Calls ``list.append(TOS1, TOS)``.  Used to implement list comprehensions.
+   Calls ``list.append(TOS[-i], TOS)``.  Used to implement list comprehensions.
+   While the appended value is popped off, the list object remains on the
+   stack so that it is available for further iterations of the loop.
 
 
 .. opcode:: LOAD_LOCALS ()
@@ -755,7 +770,7 @@ the more significant byte last.
    opcode finds the keyword parameters first.  For each keyword argument, the value
    is on top of the key.  Below the keyword parameters, the positional parameters
    are on the stack, with the right-most parameter on top.  Below the parameters,
-   the function object to call is on the stack.  Pops all function arguments, and 
+   the function object to call is on the stack.  Pops all function arguments, and
    the function itself off the stack, and pushes the return value.
 
 

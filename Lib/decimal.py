@@ -135,6 +135,7 @@ __all__ = [
 ]
 
 import copy as _copy
+import math as _math
 
 try:
     from collections import namedtuple as _namedtuple
@@ -216,7 +217,7 @@ class InvalidOperation(DecimalException):
         if args:
             ans = _dec_from_triple(args[0]._sign, args[0]._int, 'n', True)
             return ans._fix_nan(context)
-        return NaN
+        return _NaN
 
 class ConversionSyntax(InvalidOperation):
     """Trying to convert badly formed string.
@@ -226,7 +227,7 @@ class ConversionSyntax(InvalidOperation):
     syntax.  The result is [0,qNaN].
     """
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class DivisionByZero(DecimalException, ZeroDivisionError):
     """Division by 0.
@@ -242,7 +243,7 @@ class DivisionByZero(DecimalException, ZeroDivisionError):
     """
 
     def handle(self, context, sign, *args):
-        return Infsign[sign]
+        return _SignedInfinity[sign]
 
 class DivisionImpossible(InvalidOperation):
     """Cannot perform the division adequately.
@@ -253,7 +254,7 @@ class DivisionImpossible(InvalidOperation):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class DivisionUndefined(InvalidOperation, ZeroDivisionError):
     """Undefined result of division.
@@ -264,7 +265,7 @@ class DivisionUndefined(InvalidOperation, ZeroDivisionError):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class Inexact(DecimalException):
     """Had to round, losing information.
@@ -290,7 +291,7 @@ class InvalidContext(InvalidOperation):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class Rounded(DecimalException):
     """Number got rounded (not  necessarily changed during rounding).
@@ -340,15 +341,15 @@ class Overflow(Inexact, Rounded):
     def handle(self, context, sign, *args):
         if context.rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN,
                                 ROUND_HALF_DOWN, ROUND_UP):
-            return Infsign[sign]
+            return _SignedInfinity[sign]
         if sign == 0:
             if context.rounding == ROUND_CEILING:
-                return Infsign[sign]
+                return _SignedInfinity[sign]
             return _dec_from_triple(sign, '9'*context.prec,
                             context.Emax-context.prec+1)
         if sign == 1:
             if context.rounding == ROUND_FLOOR:
-                return Infsign[sign]
+                return _SignedInfinity[sign]
             return _dec_from_triple(sign, '9'*context.prec,
                              context.Emax-context.prec+1)
 
@@ -652,6 +653,46 @@ class Decimal(object):
                             "First convert the float to a string")
 
         raise TypeError("Cannot convert %r to Decimal" % value)
+
+    # @classmethod, but @decorator is not valid Python 2.3 syntax, so
+    # don't use it (see notes on Py2.3 compatibility at top of file)
+    def from_float(cls, f):
+        """Converts a float to a decimal number, exactly.
+
+        Note that Decimal.from_float(0.1) is not the same as Decimal('0.1').
+        Since 0.1 is not exactly representable in binary floating point, the
+        value is stored as the nearest representable value which is
+        0x1.999999999999ap-4.  The exact equivalent of the value in decimal
+        is 0.1000000000000000055511151231257827021181583404541015625.
+
+        >>> Decimal.from_float(0.1)
+        Decimal('0.1000000000000000055511151231257827021181583404541015625')
+        >>> Decimal.from_float(float('nan'))
+        Decimal('NaN')
+        >>> Decimal.from_float(float('inf'))
+        Decimal('Infinity')
+        >>> Decimal.from_float(-float('inf'))
+        Decimal('-Infinity')
+        >>> Decimal.from_float(-0.0)
+        Decimal('-0')
+
+        """
+        if isinstance(f, (int, long)):        # handle integer inputs
+            return cls(f)
+        if _math.isinf(f) or _math.isnan(f):  # raises TypeError if not a float
+            return cls(repr(f))
+        if _math.copysign(1.0, f) == 1.0:
+            sign = 0
+        else:
+            sign = 1
+        n, d = abs(f).as_integer_ratio()
+        k = d.bit_length() - 1
+        result = _dec_from_triple(sign, str(n*5**k), -k)
+        if cls is Decimal:
+            return result
+        else:
+            return cls(result)
+    from_float = classmethod(from_float)
 
     def _isnan(self):
         """Returns whether the number is not actually one.
@@ -1171,12 +1212,12 @@ class Decimal(object):
             if self._isinfinity():
                 if not other:
                     return context._raise_error(InvalidOperation, '(+-)INF * 0')
-                return Infsign[resultsign]
+                return _SignedInfinity[resultsign]
 
             if other._isinfinity():
                 if not self:
                     return context._raise_error(InvalidOperation, '0 * (+-)INF')
-                return Infsign[resultsign]
+                return _SignedInfinity[resultsign]
 
         resultexp = self._exp + other._exp
 
@@ -1226,7 +1267,7 @@ class Decimal(object):
                 return context._raise_error(InvalidOperation, '(+-)INF/(+-)INF')
 
             if self._isinfinity():
-                return Infsign[sign]
+                return _SignedInfinity[sign]
 
             if other._isinfinity():
                 context._raise_error(Clamped, 'Division by infinity')
@@ -1329,7 +1370,7 @@ class Decimal(object):
                 ans = context._raise_error(InvalidOperation, 'divmod(INF, INF)')
                 return ans, ans
             else:
-                return (Infsign[sign],
+                return (_SignedInfinity[sign],
                         context._raise_error(InvalidOperation, 'INF % x'))
 
         if not other:
@@ -1477,7 +1518,7 @@ class Decimal(object):
             if other._isinfinity():
                 return context._raise_error(InvalidOperation, 'INF // INF')
             else:
-                return Infsign[self._sign ^ other._sign]
+                return _SignedInfinity[self._sign ^ other._sign]
 
         if not other:
             if self:
@@ -1515,13 +1556,13 @@ class Decimal(object):
 
     __trunc__ = __int__
 
-    @property
     def real(self):
         return self
+    real = property(real)
 
-    @property
     def imag(self):
         return Decimal(0)
+    imag = property(imag)
 
     def conjugate(self):
         return self
@@ -1732,12 +1773,12 @@ class Decimal(object):
                 if not other:
                     return context._raise_error(InvalidOperation,
                                                 'INF * 0 in fma')
-                product = Infsign[self._sign ^ other._sign]
+                product = _SignedInfinity[self._sign ^ other._sign]
             elif other._exp == 'F':
                 if not self:
                     return context._raise_error(InvalidOperation,
                                                 '0 * INF in fma')
-                product = Infsign[self._sign ^ other._sign]
+                product = _SignedInfinity[self._sign ^ other._sign]
         else:
             product = _dec_from_triple(self._sign ^ other._sign,
                                        str(int(self._int) * int(other._int)),
@@ -2087,7 +2128,7 @@ class Decimal(object):
             if not self:
                 return context._raise_error(InvalidOperation, '0 ** 0')
             else:
-                return Dec_p1
+                return _One
 
         # result has sign 1 iff self._sign is 1 and other is an odd integer
         result_sign = 0
@@ -2109,19 +2150,19 @@ class Decimal(object):
             if other._sign == 0:
                 return _dec_from_triple(result_sign, '0', 0)
             else:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
 
         # Inf**(+ve or Inf) = Inf; Inf**(-ve or -Inf) = 0
         if self._isinfinity():
             if other._sign == 0:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
             else:
                 return _dec_from_triple(result_sign, '0', 0)
 
         # 1**other = 1, but the choice of exponent and the flags
         # depend on the exponent of self, and on whether other is a
         # positive integer, a negative integer, or neither
-        if self == Dec_p1:
+        if self == _One:
             if other._isinteger():
                 # exp = max(self._exp*max(int(other), 0),
                 # 1-context.prec) but evaluating int(other) directly
@@ -2154,7 +2195,7 @@ class Decimal(object):
             if (other._sign == 0) == (self_adj < 0):
                 return _dec_from_triple(result_sign, '0', 0)
             else:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
 
         # from here on, the result always goes through the call
         # to _fix at the end of this function.
@@ -2563,10 +2604,10 @@ class Decimal(object):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self._cmp(other)
@@ -2605,10 +2646,10 @@ class Decimal(object):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self._cmp(other)
@@ -2674,9 +2715,9 @@ class Decimal(object):
         """
         # if one is negative and the other is positive, it's easy
         if self._sign and not other._sign:
-            return Dec_n1
+            return _NegativeOne
         if not self._sign and other._sign:
-            return Dec_p1
+            return _One
         sign = self._sign
 
         # let's handle both NaN types
@@ -2686,51 +2727,51 @@ class Decimal(object):
             if self_nan == other_nan:
                 if self._int < other._int:
                     if sign:
-                        return Dec_p1
+                        return _One
                     else:
-                        return Dec_n1
+                        return _NegativeOne
                 if self._int > other._int:
                     if sign:
-                        return Dec_n1
+                        return _NegativeOne
                     else:
-                        return Dec_p1
-                return Dec_0
+                        return _One
+                return _Zero
 
             if sign:
                 if self_nan == 1:
-                    return Dec_n1
+                    return _NegativeOne
                 if other_nan == 1:
-                    return Dec_p1
+                    return _One
                 if self_nan == 2:
-                    return Dec_n1
+                    return _NegativeOne
                 if other_nan == 2:
-                    return Dec_p1
+                    return _One
             else:
                 if self_nan == 1:
-                    return Dec_p1
+                    return _One
                 if other_nan == 1:
-                    return Dec_n1
+                    return _NegativeOne
                 if self_nan == 2:
-                    return Dec_p1
+                    return _One
                 if other_nan == 2:
-                    return Dec_n1
+                    return _NegativeOne
 
         if self < other:
-            return Dec_n1
+            return _NegativeOne
         if self > other:
-            return Dec_p1
+            return _One
 
         if self._exp < other._exp:
             if sign:
-                return Dec_p1
+                return _One
             else:
-                return Dec_n1
+                return _NegativeOne
         if self._exp > other._exp:
             if sign:
-                return Dec_n1
+                return _NegativeOne
             else:
-                return Dec_p1
-        return Dec_0
+                return _One
+        return _Zero
 
 
     def compare_total_mag(self, other):
@@ -2771,11 +2812,11 @@ class Decimal(object):
 
         # exp(-Infinity) = 0
         if self._isinfinity() == -1:
-            return Dec_0
+            return _Zero
 
         # exp(0) = 1
         if not self:
-            return Dec_p1
+            return _One
 
         # exp(Infinity) = Infinity
         if self._isinfinity() == 1:
@@ -2927,15 +2968,15 @@ class Decimal(object):
 
         # ln(0.0) == -Infinity
         if not self:
-            return negInf
+            return _NegativeInfinity
 
         # ln(Infinity) = Infinity
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
 
         # ln(1.0) == 0.0
-        if self == Dec_p1:
-            return Dec_0
+        if self == _One:
+            return _Zero
 
         # ln(negative) raises InvalidOperation
         if self._sign == 1:
@@ -3007,11 +3048,11 @@ class Decimal(object):
 
         # log10(0.0) == -Infinity
         if not self:
-            return negInf
+            return _NegativeInfinity
 
         # log10(Infinity) = Infinity
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
 
         # log10(negative or -Infinity) raises InvalidOperation
         if self._sign == 1:
@@ -3063,7 +3104,7 @@ class Decimal(object):
 
         # logb(+/-Inf) = +Inf
         if self._isinfinity():
-            return Inf
+            return _Infinity
 
         # logb(0) = -Inf, DivisionByZero
         if not self:
@@ -3133,7 +3174,7 @@ class Decimal(object):
         (opa, opb) = self._fill_logical(context, self._int, other._int)
 
         # make the operation, and clean starting zeroes
-        result = "".join(str(int(a)|int(b)) for a,b in zip(opa,opb))
+        result = "".join([str(int(a)|int(b)) for a,b in zip(opa,opb)])
         return _dec_from_triple(0, result.lstrip('0') or '0', 0)
 
     def logical_xor(self, other, context=None):
@@ -3147,7 +3188,7 @@ class Decimal(object):
         (opa, opb) = self._fill_logical(context, self._int, other._int)
 
         # make the operation, and clean starting zeroes
-        result = "".join(str(int(a)^int(b)) for a,b in zip(opa,opb))
+        result = "".join([str(int(a)^int(b)) for a,b in zip(opa,opb)])
         return _dec_from_triple(0, result.lstrip('0') or '0', 0)
 
     def max_mag(self, other, context=None):
@@ -3163,10 +3204,10 @@ class Decimal(object):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self.copy_abs()._cmp(other.copy_abs())
@@ -3193,10 +3234,10 @@ class Decimal(object):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self.copy_abs()._cmp(other.copy_abs())
@@ -3220,7 +3261,7 @@ class Decimal(object):
             return ans
 
         if self._isinfinity() == -1:
-            return negInf
+            return _NegativeInfinity
         if self._isinfinity() == 1:
             return _dec_from_triple(0, '9'*context.prec, context.Etop())
 
@@ -3243,7 +3284,7 @@ class Decimal(object):
             return ans
 
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
         if self._isinfinity() == -1:
             return _dec_from_triple(1, '9'*context.prec, context.Etop())
 
@@ -3743,6 +3784,23 @@ class Context(object):
             return self._raise_error(ConversionSyntax,
                                      "diagnostic info too long in NaN")
         return d._fix(self)
+
+    def create_decimal_from_float(self, f):
+        """Creates a new Decimal instance from a float but rounding using self
+        as the context.
+
+        >>> context = Context(prec=5, rounding=ROUND_DOWN)
+        >>> context.create_decimal_from_float(3.1415926535897932)
+        Decimal('3.1415')
+        >>> context = Context(prec=5, traps=[Inexact])
+        >>> context.create_decimal_from_float(3.1415926535897932)
+        Traceback (most recent call last):
+            ...
+        Inexact: None
+
+        """
+        d = Decimal.from_float(f)       # An exact conversion
+        return d._fix(self)             # Apply the context rounding
 
     # Methods
     def abs(self, a):
@@ -5490,15 +5548,15 @@ def _format_align(body, spec_dict):
 ##### Useful Constants (internal use only) ################################
 
 # Reusable defaults
-Inf = Decimal('Inf')
-negInf = Decimal('-Inf')
-NaN = Decimal('NaN')
-Dec_0 = Decimal(0)
-Dec_p1 = Decimal(1)
-Dec_n1 = Decimal(-1)
+_Infinity = Decimal('Inf')
+_NegativeInfinity = Decimal('-Inf')
+_NaN = Decimal('NaN')
+_Zero = Decimal(0)
+_One = Decimal(1)
+_NegativeOne = Decimal(-1)
 
-# Infsign[sign] is infinity w/ that sign
-Infsign = (Inf, negInf)
+# _SignedInfinity[sign] is infinity w/ that sign
+_SignedInfinity = (_Infinity, _NegativeInfinity)
 
 
 
