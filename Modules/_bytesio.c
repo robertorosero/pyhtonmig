@@ -1,4 +1,6 @@
 #include "Python.h"
+#include "structmember.h"       /* for offsetof() */
+#include "_iomodule.h"
 
 typedef struct {
     PyObject_HEAD
@@ -6,6 +8,8 @@ typedef struct {
     Py_ssize_t pos;
     Py_ssize_t string_size;
     size_t buf_size;
+    PyObject *dict;
+    PyObject *weakreflist;
 } BytesIOObject;
 
 #define CHECK_CLOSED(self)                                  \
@@ -689,7 +693,7 @@ PyDoc_STRVAR(bytesio_doc,
 "Create a buffered I/O implementation using an in-memory bytes\n"
 "buffer, ready for reading and writing.");
 
-static PyTypeObject BytesIO_Type = {
+PyTypeObject PyBytesIO_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_bytesio._BytesIO",                       /*tp_name*/
     sizeof(BytesIOObject),                     /*tp_basicsize*/
@@ -714,7 +718,7 @@ static PyTypeObject BytesIO_Type = {
     0,                                         /*tp_traverse*/
     0,                                         /*tp_clear*/
     0,                                         /*tp_richcompare*/
-    0,                                         /*tp_weaklistoffset*/
+    offsetof(BytesIOObject, weakreflist),      /*tp_weaklistoffset*/
     PyObject_SelfIter,                         /*tp_iter*/
     (iternextfunc)bytesio_iternext,            /*tp_iternext*/
     bytesio_methods,                           /*tp_methods*/
@@ -724,36 +728,8 @@ static PyTypeObject BytesIO_Type = {
     0,                                         /*tp_dict*/
     0,                                         /*tp_descr_get*/
     0,                                         /*tp_descr_set*/
-    0,                                         /*tp_dictoffset*/
+    offsetof(BytesIOObject, dict),             /*tp_dictoffset*/
     (initproc)bytesio_init,                    /*tp_init*/
     0,                                         /*tp_alloc*/
     bytesio_new,                               /*tp_new*/
 };
-
-
-static struct PyModuleDef _bytesiomodule = {
-	PyModuleDef_HEAD_INIT,
-	"_bytesio",
-	NULL,
-	-1,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
-
-PyMODINIT_FUNC
-PyInit__bytesio(void)
-{
-    PyObject *m;
-
-    if (PyType_Ready(&BytesIO_Type) < 0)
-        return NULL;
-    m = PyModule_Create(&_bytesiomodule);
-    if (m == NULL)
-        return NULL;
-    Py_INCREF(&BytesIO_Type);
-    PyModule_AddObject(m, "_BytesIO", (PyObject *)&BytesIO_Type);
-    return m;
-}
