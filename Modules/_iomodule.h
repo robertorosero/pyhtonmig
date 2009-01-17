@@ -1,20 +1,4 @@
 /*
- * Temporarily rename symbols, to avoid mismatches with the main executable
- */
-#define PyRawIOBase_Type _newio_PyRawIOBase_Type
-#define PyFileIO_Type _newio_PyFileIO_Type
-#define PyBytesIO_Type _newio_PyBytesIO_Type
-#define PyIOBase_Type _newio_PyIOBase_Type
-#define PyRawIOBase_Type _newio_PyRawIOBase_Type
-#define PyBufferedIOBase_Type _newio_PyBufferedIOBase_Type
-#define PyBufferedReader_Type _newio_PyBufferedReader_Type
-#define PyBufferedWriter_Type _newio_PyBufferedWriter_Type
-#define PyBufferedRWPair_Type _newio_PyBufferedRWPair_Type
-#define PyBufferedRandom_Type _newio_PyBufferedRandom_Type
-#define PyTextIOWrapper_Type _newio_PyTextIOWrapper_Type
-#define PyIncrementalNewlineDecoder_Type _newio_PyIncrementalNewlineDecoder_Type
-
-/*
  * Declarations shared between the different parts of the io module
  */
 
