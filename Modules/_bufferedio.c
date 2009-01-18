@@ -344,8 +344,6 @@ BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
      * and a flush may be necessary to synch both views of the current
      *  file state.
      */
-    /* FIXME: raw objects don't have flush()
-     */
     res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_flush, NULL);
     if (res == NULL)
         return NULL;

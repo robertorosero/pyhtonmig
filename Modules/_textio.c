@@ -1952,6 +1952,33 @@ TextIOWrapper_tell(PyTextIOWrapperObject *self, PyObject *args)
     return NULL;
 }
 
+static PyObject *
+TextIOWrapper_truncate(PyTextIOWrapperObject *self, PyObject *args)
+{
+    PyObject *pos = Py_None;
+    PyObject *res;
+
+    CHECK_INITIALIZED(self)
+    if (!PyArg_ParseTuple(args, "|O:truncate", &pos)) {
+        return NULL;
+    }
+
+    res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_flush, NULL);
+    if (res == NULL)
+        return NULL;
+    Py_DECREF(res);
+
+    if (pos != Py_None) {
+        res = PyObject_CallMethodObjArgs((PyObject *) self,
+                                          _PyIO_str_seek, pos, NULL);
+        if (res == NULL)
+            return NULL;
+        Py_DECREF(res);
+    }
+
+    return PyObject_CallMethodObjArgs(self->buffer, _PyIO_str_truncate, NULL);
+}
+
 /* Inquiries */
 
 static PyObject *
@@ -2123,11 +2150,7 @@ static PyMethodDef TextIOWrapper_methods[] = {
 
     {"seek", (PyCFunction)TextIOWrapper_seek, METH_VARARGS},
     {"tell", (PyCFunction)TextIOWrapper_tell, METH_NOARGS},
-/*    {"truncate", (PyCFunction)TextIOWrapper_truncate, METH_VARARGS},
-    {"readinto", (PyCFunction)TextIOWrapper_readinto, METH_VARARGS},
-    {"peek", (PyCFunction)TextIOWrapper_peek, METH_VARARGS},
-    {"read1", (PyCFunction)TextIOWrapper_read1, METH_VARARGS},
-*/
+    {"truncate", (PyCFunction)TextIOWrapper_truncate, METH_VARARGS},
     {NULL, NULL}
 };
 
