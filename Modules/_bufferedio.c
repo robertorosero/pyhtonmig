@@ -57,8 +57,71 @@ BufferedIOBase_readinto(PyObject *self, PyObject *args)
     return NULL;
 }
 
+static PyObject *
+BufferedIOBase_unsupported(const char *message)
+{
+    PyErr_SetString(PyIOExc_UnsupportedOperation, message);
+    return NULL;
+}
+
+PyDoc_STRVAR(BufferedIOBase_read_doc,
+    "Read and return up to n bytes.\n"
+    "\n"
+    "If the argument is omitted, None, or negative, reads and\n"
+    "returns all data until EOF.\n"
+    "\n"
+    "If the argument is positive, and the underlying raw stream is\n"
+    "not 'interactive', multiple raw reads may be issued to satisfy\n"
+    "the byte count (unless EOF is reached first).  But for\n"
+    "interactive raw streams (as well as sockets and pipes), at most\n"
+    "one raw read will be issued, and a short result does not imply\n"
+    "that EOF is imminent.\n"
+    "\n"
+    "Returns an empty bytes object on EOF.\n"
+    "\n"
+    "Returns None if the underlying raw stream was open in non-blocking\n"
+    "mode and no data is available at the moment.\n");
+
+static PyObject *
+BufferedIOBase_read(PyObject *self, PyObject *args)
+{
+    return BufferedIOBase_unsupported("read");
+}
+
+PyDoc_STRVAR(BufferedIOBase_read1_doc,
+    "Read and return up to n bytes, with at most one read() call\n"
+    "to the underlying raw stream. A short result does not imply\n"
+    "that EOF is imminent.\n"
+    "\n"
+    "Returns an empty bytes object on EOF.\n");
+
+static PyObject *
+BufferedIOBase_read1(PyObject *self, PyObject *args)
+{
+    return BufferedIOBase_unsupported("read1");
+}
+
+PyDoc_STRVAR(BufferedIOBase_write_doc,
+    "Write the given buffer to the IO stream.\n"
+    "\n"
+    "Returns the number of bytes written, which is never less than\n"
+    "len(b).\n"
+    "\n"
+    "Raises BlockingIOError if the buffer is full and the\n"
+    "underlying raw stream cannot accept more data at the moment.\n");
+
+static PyObject *
+BufferedIOBase_write(PyObject *self, PyObject *args)
+{
+    return BufferedIOBase_unsupported("write");
+}
+
+
 static PyMethodDef BufferedIOBase_methods[] = {
-    {"readinto", BufferedIOBase_readinto, METH_VARARGS},
+    {"read", BufferedIOBase_read, METH_VARARGS, BufferedIOBase_read_doc},
+    {"read1", BufferedIOBase_read1, METH_VARARGS, BufferedIOBase_read1_doc},
+    {"readinto", BufferedIOBase_readinto, METH_VARARGS, NULL},
+    {"write", BufferedIOBase_write, METH_VARARGS, BufferedIOBase_write_doc},
     {NULL, NULL}
 };
 
