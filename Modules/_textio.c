@@ -1,3 +1,4 @@
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"
 #include "_iomodule.h"
@@ -1870,7 +1871,7 @@ TextIOWrapper_tell(PyTextIOWrapperObject *self, PyObject *args)
     while (input < input_end) {
         PyObject *state;
         char *dec_buffer;
-        int dec_buffer_len;
+        Py_ssize_t dec_buffer_len;
         int dec_flags;
 
         PyObject *decoded = PyObject_CallMethod(
