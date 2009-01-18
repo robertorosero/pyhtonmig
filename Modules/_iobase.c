@@ -125,6 +125,8 @@ IOBase_closed(PyObject *self)
     /* This gets the derived attribute, which is *not* __IOBase_closed
        in most cases! */
     res = PyObject_GetAttr(self, _PyIO_str_closed);
+    if (res == NULL)
+        return 0;
     closed = PyObject_IsTrue(res);
     Py_DECREF(res);
     return closed;
@@ -221,6 +223,7 @@ _PyIOBase_checkSeekable(PyObject *self, PyObject *args)
     if (res != Py_True) {
         Py_CLEAR(res);
         PyErr_SetString(PyExc_IOError, "File or stream is not seekable.");
+        return NULL;
     }
     if (args == Py_True) {
         Py_DECREF(res);
@@ -249,6 +252,7 @@ _PyIOBase_checkReadable(PyObject *self, PyObject *args)
     if (res != Py_True) {
         Py_CLEAR(res);
         PyErr_SetString(PyExc_IOError, "File or stream is not readable.");
+        return NULL;
     }
     if (args == Py_True) {
         Py_DECREF(res);
@@ -277,6 +281,7 @@ _PyIOBase_checkWritable(PyObject *self, PyObject *args)
     if (res != Py_True) {
         Py_CLEAR(res);
         PyErr_SetString(PyExc_IOError, "File or stream is not writable.");
+        return NULL;
     }
     if (args == Py_True) {
         Py_DECREF(res);
