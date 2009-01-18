@@ -335,16 +335,11 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 static void
 fileio_dealloc(PyFileIOObject *self)
 {
+	if (_PyIOBase_finalize((PyObject *) self) < 0)
+		return;
 	if (self->weakreflist != NULL)
 		PyObject_ClearWeakRefs((PyObject *) self);
-
-	if (self->fd >= 0 && self->closefd) {
-		if(internal_close(self))
-			PyErr_WriteUnraisable((PyObject*)self);
-	}
-
 	Py_CLEAR(self->dict);
-
 	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 

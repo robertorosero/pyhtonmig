@@ -178,26 +178,48 @@ IOBase_close(PyObject *self, PyObject *args)
 
 /* Destructor */
 
-static PyObject *
-IOBase_del(PyObject *self, PyObject *args)
+int
+_PyIOBase_finalize(PyObject *self)
 {
-    PyObject *res = NULL;
-    if (IOBase_closed(self))
-        Py_RETURN_NONE;
-    res = PyObject_CallMethodObjArgs(self, _PyIO_str_close, NULL);
-    if (res == NULL) {
-        /* At program exit time, it's possible that globals have already been
-         *  deleted, and then the close() call might fail.  Since there's
-         *  nothing we can do about such failures and they annoy the end
-         *  users, we suppress the traceback.
-         *
-         * XXX: this function can be called at other times and what if the
-         * error is genuine?
-         */
+    PyObject *res;
+    PyObject *tp, *v, *tb;
+    int closed = 1;
+    PyErr_Fetch(&tp, &v, &tb);
+    /* We need to resurrect the object as calling close() can invoke
+       arbitrary code. */
+    ((PyObject *) self)->ob_refcnt++;
+    /* The object could already be in an usable state, so we'll take any
+       error as meaning "stop, nothing to see here". */
+    res = PyObject_GetAttr(self, _PyIO_str_closed);
+    if (res == NULL)
         PyErr_Clear();
+    else {
+        closed = PyObject_IsTrue(res);
+        Py_DECREF(res);
+        if (closed == -1)
+            PyErr_Clear();
     }
-    Py_XDECREF(res);
-    Py_RETURN_NONE;
+    if (closed == 0) {
+        res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
+                                          NULL);
+        if (res == NULL) {
+            /* XXX dump exception on terminal?
+               But IOBase.__del__ prefers to remain silent... */
+            PyErr_Clear();
+        }
+        Py_XDECREF(res);
+    }
+    PyErr_Restore(tp, v, tb);
+    if (--((PyObject *) self)->ob_refcnt != 0)
+        return -1;
+    return 0;
+}
+
+static void
+IOBase_dealloc(PyObject *self)
+{
+    if (_PyIOBase_finalize(self) == 0)
+        Py_TYPE(self)->tp_free(self);
 }
 
 /* Inquiry methods */
@@ -588,7 +610,6 @@ static PyMethodDef IOBase_methods[] = {
     {"fileno", IOBase_fileno, METH_NOARGS, IOBase_fileno_doc},
     {"isatty", IOBase_isatty, METH_NOARGS, IOBase_isatty_doc},
 
-    {"__del__", IOBase_del, METH_NOARGS},
     {"__enter__", IOBase_enter, METH_NOARGS},
     {"__exit__", IOBase_exit, METH_VARARGS},
 
@@ -610,7 +631,7 @@ PyTypeObject PyIOBase_Type = {
     "IOBase",                   /*tp_name*/
     0,                          /*tp_basicsize*/
     0,                          /*tp_itemsize*/
-    0,                          /*tp_dealloc*/
+    IOBase_dealloc,             /*tp_dealloc*/
     0,                          /*tp_print*/
     0,                          /*tp_getattr*/
     0,                          /*tp_setattr*/

@@ -25,6 +25,12 @@ extern PyObject* _PyIOBase_checkClosed(PyObject *self, PyObject *args);
 
 extern PyObject* PyIOExc_UnsupportedOperation;
 
+/* Helper for finalization.
+   This function will revive an object ready to be deallocated and try to
+   close() it. It returns 0 if the object can be destroyed, or -1 if it
+   is alive again. */
+extern int _PyIOBase_finalize(PyObject *self);
+
 #define DEFAULT_BUFFER_SIZE (8 * 1024)  /* bytes */
 
 typedef struct {
@@ -35,7 +41,6 @@ typedef struct {
     Py_ssize_t written;
 } PyBlockingIOErrorObject;
 PyObject *PyExc_BlockingIOError;
-
 
 /*
  * Offset type for positioning.

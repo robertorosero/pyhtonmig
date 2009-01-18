@@ -338,6 +338,29 @@ class IOTest(unittest.TestCase):
         del f
         self.assertEqual(record, [1, 2, 3])
 
+    def test_IOBase_destructor(self):
+        record = []
+        class MyIO(io.IOBase):
+            def __init__(self):
+                pass
+            def __del__(self):
+                record.append(1)
+                try:
+                    f = io.IOBase.__del__
+                except AttributeError:
+                    pass
+                else:
+                    f(self)
+            def close(self):
+                record.append(2)
+                io.IOBase.close(self)
+            def flush(self):
+                record.append(3)
+                io.IOBase.flush(self)
+        f = MyIO()
+        del f
+        self.assertEqual(record, [1, 2, 3])
+
     def test_close_flushes(self):
         f = io.open(support.TESTFN, "wb")
         f.write(b"xxx")

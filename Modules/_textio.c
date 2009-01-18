@@ -782,26 +782,8 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
 static void
 TextIOWrapper_dealloc(PyTextIOWrapperObject *self)
 {
-    PyObject *res;
-    /* XXX this is inelegant */
-    if (Py_TYPE(self)->tp_del == NULL && self->ok) {
-        PyObject *tp, *v, *tb;
-        PyErr_Fetch(&tp, &v, &tb);
-        /* We need to resurrect the object as calling close() can invoke
-           arbitrary code. */
-        ((PyObject *) self)->ob_refcnt++;
-        res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
-                                          NULL);
-        if (res == NULL) {
-            /* XXX dump exception on terminal?
-               But IOBase.__del__ prefers to remain silent... */
-            PyErr_Clear();
-        }
-        Py_XDECREF(res);
-        PyErr_Restore(tp, v, tb);
-        if (--((PyObject *) self)->ob_refcnt != 0)
-            return;
-    }
+    if (_PyIOBase_finalize((PyObject *) self) < 0)
+        return;
     self->ok = 0;
     Py_CLEAR(self->buffer);
     Py_CLEAR(self->encoding);

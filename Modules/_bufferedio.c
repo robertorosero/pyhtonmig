@@ -285,26 +285,9 @@ typedef struct {
 static void
 BufferedObject_dealloc(BufferedObject *self)
 {
-    PyObject *res;
-    /* XXX this is inelegant */
-    if (Py_TYPE(self)->tp_del == NULL) {
-        PyObject *tp, *v, *tb;
-        PyErr_Fetch(&tp, &v, &tb);
-        /* We need to resurrect the object as calling close() can invoke
-           arbitrary code. */
-        ((PyObject *) self)->ob_refcnt++;
-        res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
-                                          NULL);
-        if (res == NULL) {
-            /* XXX dump exception on terminal?
-               But IOBase.__del__ prefers to remain silent... */
-            PyErr_Clear();
-        }
-        Py_XDECREF(res);
-        PyErr_Restore(tp, v, tb);
-        if (--((PyObject *) self)->ob_refcnt != 0)
-            return;
-    }
+    if (_PyIOBase_finalize((PyObject *) self) < 0)
+        return;
+    self->ok = 0;
     if (self->weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)self);
     Py_CLEAR(self->raw);
@@ -342,15 +325,18 @@ BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
 
     /* Flush the stream.  We're mixing buffered I/O with lower-level I/O,
      * and a flush may be necessary to synch both views of the current
-     *  file state.
+     * file state.
      */
     res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_flush, NULL);
     if (res == NULL)
         return NULL;
     Py_DECREF(res);
 
-    if (pos == Py_None)
+    if (pos == Py_None) {
         pos = PyObject_CallMethod(self->raw, "tell", NULL);
+        if (pos == NULL)
+            return NULL;
+    }
     else
         Py_INCREF(pos);
 
