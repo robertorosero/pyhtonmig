@@ -1809,7 +1809,8 @@ class MiscIOTest(unittest.TestCase):
             self.assertRaises(ValueError, f.seek, 0)
             self.assertRaises(ValueError, f.tell)
             self.assertRaises(ValueError, f.truncate)
-            self.assertRaises(ValueError, f.write, "")
+            self.assertRaises(ValueError, f.write,
+                              b"" if "b" in kwargs['mode'] else "")
             self.assertRaises(ValueError, f.writelines, [])
 
 

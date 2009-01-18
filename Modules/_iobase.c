@@ -105,6 +105,10 @@ static PyObject *
 IOBase_flush(PyObject *self, PyObject *args)
 {
     /* XXX Should this return the number of bytes written??? */
+    if (IS_CLOSED(self)) {
+        PyErr_SetString(PyExc_ValueError, "I/O operation on closed file.");
+        return NULL;
+    }
     Py_RETURN_NONE;
 }
 
@@ -131,7 +135,6 @@ IOBase_closed_get(PyObject *self, void *context)
 {
     return PyBool_FromLong(IS_CLOSED(self));
 }
-
 
 PyObject *
 _PyIOBase_checkClosed(PyObject *self, PyObject *args)
@@ -171,10 +174,14 @@ IOBase_close(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+/* Destructor */
+
 static PyObject *
 IOBase_del(PyObject *self, PyObject *args)
 {
     PyObject *res = NULL;
+    if (IOBase_closed(self))
+        Py_RETURN_NONE;
     res = PyObject_CallMethodObjArgs(self, _PyIO_str_close, NULL);
     if (res == NULL) {
         /* At program exit time, it's possible that globals have already been
