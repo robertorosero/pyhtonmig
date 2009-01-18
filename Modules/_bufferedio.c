@@ -721,6 +721,132 @@ end:
 }
 
 static PyObject *
+_Buffered_readline(BufferedObject *self, Py_ssize_t limit)
+{
+    PyObject *res = NULL;
+    PyObject *chunks = NULL;
+    Py_ssize_t n, written = 0;
+    const char *start, *s, *end;
+
+    if (BufferedIOMixin_closed(self)) {
+        PyErr_SetString(PyExc_ValueError, "readline of closed file");
+        return NULL;
+    }
+
+    ENTER_BUFFERED(self)
+
+    /* First, try to find a line in the buffer */
+    n = READAHEAD(self);
+    if (limit >= 0 && n > limit)
+        n = limit;
+    start = self->buffer + self->pos;
+    end = start + n;
+    s = start;
+    while (s < end) {
+        if (*s++ == '\n') {
+            res = PyBytes_FromStringAndSize(start, s - start);
+            if (res != NULL)
+                self->pos += s - start;
+            goto end;
+        }
+    }
+    if (n == limit) {
+        res = PyBytes_FromStringAndSize(start, n);
+        if (res != NULL)
+            self->pos += n;
+        goto end;
+    }
+
+    /* Now we try to get some more from the raw stream */
+    if (self->writable) {
+        res = _BufferedWriter_flush_unlocked(self, 1);
+        if (res == NULL)
+            goto end;
+        Py_CLEAR(res);
+    }
+    chunks = PyList_New(0);
+    if (chunks == NULL)
+        goto end;
+    if (n > 0) {
+        res = PyBytes_FromStringAndSize(start, n);
+        if (res == NULL)
+            goto end;
+        if (PyList_Append(chunks, res) < 0) {
+            Py_CLEAR(res);
+            goto end;
+        }
+        Py_CLEAR(res);
+        written += n;
+        if (limit >= 0)
+            limit -= n;
+    }
+
+    for (;;) {
+        _BufferedReader_reset_buf(self);
+        n = _BufferedReader_fill_buffer(self);
+        if (n == -1)
+            goto end;
+        if (n <= 0)
+            break;
+        if (limit >= 0 && n > limit)
+            n = limit;
+        start = self->buffer;
+        end = start + n;
+        s = start;
+        while (s < end) {
+            if (*s++ == '\n') {
+                res = PyBytes_FromStringAndSize(start, s - start);
+                if (res == NULL)
+                    goto end;
+                self->pos = s - start;
+                goto found;
+            }
+        }
+        res = PyBytes_FromStringAndSize(start, n);
+        if (res == NULL)
+            goto end;
+        if (n == limit) {
+            self->pos = n;
+            break;
+        }
+        if (PyList_Append(chunks, res) < 0) {
+            Py_CLEAR(res);
+            goto end;
+        }
+        Py_CLEAR(res);
+        written += n;
+        if (limit >= 0)
+            limit -= n;
+    }
+found:
+    if (res != NULL && PyList_Append(chunks, res) < 0) {
+        Py_CLEAR(res);
+        goto end;
+    }
+    Py_CLEAR(res);
+    res = _PyBytes_Join(PyBytes_FromStringAndSize(NULL, 0), chunks);
+
+end:
+    LEAVE_BUFFERED(self)
+    Py_XDECREF(chunks);
+    return res;
+}
+
+static PyObject *
+Buffered_readline(BufferedObject *self, PyObject *args)
+{
+    Py_ssize_t limit = -1;
+
+    CHECK_INITIALIZED(self)
+
+    if (!PyArg_ParseTuple(args, "|n:readline", &limit)) {
+        return NULL;
+    }
+    return _Buffered_readline(self, limit);
+}
+
+
+static PyObject *
 Buffered_tell(BufferedObject *self, PyObject *args)
 {
     Py_off_t pos;
@@ -846,6 +972,43 @@ end:
     return res;
 }
 
+static PyObject *
+Buffered_iternext(BufferedObject *self)
+{
+    PyObject *line;
+    PyTypeObject *tp;
+
+    CHECK_INITIALIZED(self);
+
+    tp = Py_TYPE(self);
+    if (tp == &PyBufferedReader_Type ||
+        tp == &PyBufferedRandom_Type) {
+        /* Skip method call overhead for speed */
+        line = _Buffered_readline(self, -1);
+    }
+    else {
+        line = PyObject_CallMethodObjArgs((PyObject *)self,
+                                           _PyIO_str_readline, NULL);
+        if (line && !PyBytes_Check(line)) {
+            PyErr_Format(PyExc_IOError,
+                         "readline() should have returned a bytes object, "
+                         "not '%.200s'", Py_TYPE(line)->tp_name);
+            Py_DECREF(line);
+            return NULL;
+        }
+    }
+
+    if (line == NULL)
+        return NULL;
+
+    if (PyBytes_GET_SIZE(line) == 0) {
+        /* Reached EOF or would have blocked */
+        Py_DECREF(line);
+        return NULL;
+    }
+
+    return line;
+}
 
 /*
  * class BufferedReader
@@ -1157,6 +1320,7 @@ static PyMethodDef BufferedReader_methods[] = {
     {"read", (PyCFunction)Buffered_read, METH_VARARGS},
     {"peek", (PyCFunction)Buffered_peek, METH_VARARGS},
     {"read1", (PyCFunction)Buffered_read1, METH_VARARGS},
+    {"readline", (PyCFunction)Buffered_readline, METH_VARARGS},
     {"seek", (PyCFunction)Buffered_seek, METH_VARARGS},
     {"tell", (PyCFunction)Buffered_tell, METH_NOARGS},
     {NULL, NULL}
@@ -1202,7 +1366,7 @@ PyTypeObject PyBufferedReader_Type = {
     0,                          /* tp_richcompare */
         offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
-    0,                          /* tp_iternext */
+    (iternextfunc)Buffered_iternext, /* tp_iternext */
     BufferedReader_methods,     /* tp_methods */
     BufferedReader_members,     /* tp_members */
     BufferedReader_getset,      /* tp_getset */
@@ -1844,6 +2008,7 @@ static PyMethodDef BufferedRandom_methods[] = {
     {"read", (PyCFunction)Buffered_read, METH_VARARGS},
     {"read1", (PyCFunction)Buffered_read1, METH_VARARGS},
     {"readinto", (PyCFunction)Buffered_readinto, METH_VARARGS},
+    {"readline", (PyCFunction)Buffered_readline, METH_VARARGS},
     {"peek", (PyCFunction)Buffered_peek, METH_VARARGS},
     {"write", (PyCFunction)BufferedWriter_write, METH_VARARGS},
     {NULL, NULL}
@@ -1889,7 +2054,7 @@ PyTypeObject PyBufferedRandom_Type = {
     0,                          /* tp_richcompare */
     offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
-    0,                          /* tp_iternext */
+    (iternextfunc)Buffered_iternext, /* tp_iternext */
     BufferedRandom_methods,     /* tp_methods */
     BufferedRandom_members,     /* tp_members */
     BufferedRandom_getset,      /* tp_getset */
