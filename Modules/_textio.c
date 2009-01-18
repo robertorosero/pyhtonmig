@@ -2031,13 +2031,17 @@ TextIOWrapper_iternext(PyTextIOWrapperObject *self)
     else {
         line = PyObject_CallMethodObjArgs((PyObject *)self,
                                            _PyIO_str_readline, NULL);
-        /* TODO: check return type */
+        if (line && !PyUnicode_Check(line)) {
+            PyErr_Format(PyExc_IOError,
+                         "readline() should have returned an str object, "
+                         "not '%.200s'", Py_TYPE(line)->tp_name);
+            Py_DECREF(line);
+            return NULL;
+        }
     }
 
     if (line == NULL)
         return NULL;
-
-    assert (PyUnicode_Check(line));
 
     if (PyUnicode_GET_SIZE(line) == 0) {
         /* Reached EOF or would have blocked */
