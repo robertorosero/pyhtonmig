@@ -431,7 +431,7 @@ class _PyFileLoader(object):
         if source_path is None:
             return None
         import tokenize
-        with closing(_fileio_FileIO(source_path, 'r')) as file:
+        with closing(_ioFileIO(source_path, 'r')) as file:
             encoding, lines = tokenize.detect_encoding(file.readline)
         # XXX Will fail when passed to compile() if the encoding is
         # anything other than UTF-8.
@@ -448,7 +448,7 @@ class _PyFileLoader(object):
         source_path = self._source_path()
         if source_path is None:
             return None
-        with closing(_fileio._FileIO(source_path, 'r')) as bytes_file:
+        with closing(_io.FileIO(source_path, 'r')) as bytes_file:
             return bytes_file.read(), source_path
 
     @check_name
@@ -463,7 +463,7 @@ class _PyFileLoader(object):
         path = self._bytecode_path()
         if path is None:
             return None
-        file = _fileio._FileIO(path, 'r')
+        file = _io.FileIO(path, 'r')
         try:
             with closing(file) as bytecode_file:
                 data = bytecode_file.read()
@@ -484,7 +484,7 @@ class _PyFileLoader(object):
         bytecode_path = self._bytecode_path()
         if not bytecode_path:
             bytecode_path = self._base_path + suffix_list(imp.PY_COMPILED)[0]
-        file = _fileio._FileIO(bytecode_path, 'w')
+        file = _io.FileIO(bytecode_path, 'w')
         try:
             with closing(file) as bytecode_file:
                 bytecode_file.write(magic)
@@ -579,7 +579,7 @@ class _PyFileLoader(object):
 
     def get_data(self, path):
         """Return the data from path as raw bytes."""
-        return _fileio._FileIO(path, 'r').read()
+        return _io.FileIO(path, 'r').read()
 
     @check_name
     def is_package(self, fullname):
