@@ -202,12 +202,10 @@ _PyIOBase_finalize(PyObject *self)
     if (closed == 0) {
         res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
                                           NULL);
-        if (res == NULL) {
-            /* XXX dump exception on terminal?
-               But IOBase.__del__ prefers to remain silent... */
+        if (res == NULL)
             PyErr_Clear();
-        }
-        Py_XDECREF(res);
+        else
+            Py_DECREF(res);
     }
     PyErr_Restore(tp, v, tb);
     if (--((PyObject *) self)->ob_refcnt != 0)
