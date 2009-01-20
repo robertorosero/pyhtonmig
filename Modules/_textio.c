@@ -65,13 +65,44 @@ TextIOBase_write(PyObject *self, PyObject *args)
     return _unsupported("read");
 }
 
-/* XXX properties: encoding, newlines */
-
+PyDoc_STRVAR(TextIOBase_encoding_doc,
+    "Encoding of the text stream.\n"
+    "\n"
+    "Subclasses should override.\n"
+    );
+
+static PyObject *
+TextIOBase_encoding_get(PyObject *self, void *context)
+{
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(TextIOBase_newlines_doc,
+    "Line endings translated so far.\n"
+    "\n"
+    "Only line endings translated during reading are considered.\n"
+    "\n"
+    "Subclasses should override.\n"
+    );
+
+static PyObject *
+TextIOBase_newlines_get(PyObject *self, void *context)
+{
+    Py_RETURN_NONE;
+}
+
+
 static PyMethodDef TextIOBase_methods[] = {
     {"read", TextIOBase_read, METH_VARARGS, TextIOBase_read_doc},
     {"readline", TextIOBase_readline, METH_VARARGS, TextIOBase_readline_doc},
     {"write", TextIOBase_write, METH_VARARGS, TextIOBase_write_doc},
     {NULL, NULL}
+};
+
+static PyGetSetDef TextIOBase_getset[] = {
+    {"encoding", (getter)TextIOBase_encoding_get, NULL, TextIOBase_encoding_doc},
+    {"newlines", (getter)TextIOBase_newlines_get, NULL, TextIOBase_newlines_doc},
+    {0}
 };
 
 PyTypeObject PyTextIOBase_Type = {
@@ -104,7 +135,7 @@ PyTypeObject PyTextIOBase_Type = {
     0,                          /* tp_iternext */
     TextIOBase_methods,         /* tp_methods */
     0,                          /* tp_members */
-    0,                          /* tp_getset */
+    TextIOBase_getset,          /* tp_getset */
     &PyIOBase_Type,             /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
