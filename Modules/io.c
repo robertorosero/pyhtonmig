@@ -1,3 +1,12 @@
+/*
+    An implementation of the new I/O lib as defined by PEP 3116 - "New I/O"
+    
+    Classes defined here: UnsupportedOperation, BlockingIOError.
+    Functions defined here: open().
+    
+    Mostly written by Amaury Forgeot d'Arc
+*/
+
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"

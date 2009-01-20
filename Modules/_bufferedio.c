@@ -1,3 +1,12 @@
+/*
+    An implementation of Buffered I/O as defined by PEP 3116 - "New I/O"
+    
+    Classes defined here: BufferedIOBase, BufferedReader, BufferedWriter,
+    BufferedRandom.
+    
+    Written by Amaury Forgeot d'Arc and Antoine Pitrou
+*/
+
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"

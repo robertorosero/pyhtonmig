@@ -1,3 +1,13 @@
+/*
+    An implementation of the I/O abstract base classes hierarchy
+    as defined by PEP 3116 - "New I/O"
+    
+    Classes defined here: IOBase, RawIOBase.
+    
+    Written by Amaury Forgeot d'Arc and Antoine Pitrou
+*/
+
+
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"
