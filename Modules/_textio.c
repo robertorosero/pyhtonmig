@@ -897,7 +897,9 @@ _TextIOWrapper_clear(PyTextIOWrapperObject *self)
     Py_CLEAR(self->decoder);
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->decoded_chars);
+    Py_CLEAR(self->pending_bytes);
     Py_CLEAR(self->snapshot);
+    Py_CLEAR(self->errors);
     return 0;
 }
 
@@ -921,7 +923,9 @@ TextIOWrapper_traverse(PyTextIOWrapperObject *self, visitproc visit, void *arg)
     Py_VISIT(self->decoder);
     Py_VISIT(self->readnl);
     Py_VISIT(self->decoded_chars);
+    Py_VISIT(self->pending_bytes);
     Py_VISIT(self->snapshot);
+    Py_VISIT(self->errors);
     Py_VISIT(self->dict);
     return 0;
 }
