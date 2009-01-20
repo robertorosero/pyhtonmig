@@ -410,9 +410,7 @@ class IOTest(unittest.TestCase):
     def test_garbage_collection(self):
         # FileIO objects are collected, and collecting them flushes
         # all data to disk.
-        class MyFileIO(io.FileIO):
-            pass
-        f = MyFileIO(support.TESTFN, "wb")
+        f = io.FileIO(support.TESTFN, "wb")
         f.write(b"abcxxx")
         f.f = f
         wr = weakref.ref(f)
@@ -708,6 +706,16 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(IOError, bufio.tell)
         self.assertRaises(IOError, bufio.read, 10)
 
+    def test_garbage_collection(self):
+        # BufferedReader objects are collected
+        rawio = io.FileIO(support.TESTFN, "w+b")
+        f = self.tp(rawio)
+        f.f = f
+        wr = weakref.ref(f)
+        del f
+        gc.collect()
+        self.assert_(wr() is None, wr)
+
 
 class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
     tp = io.BufferedWriter
@@ -918,6 +926,20 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(IOError, bufio.tell)
         self.assertRaises(IOError, bufio.write, b"abcdef")
 
+    def test_garbage_collection(self):
+        # BufferedWriter objects are collected, and collecting them flushes
+        # all data to disk.
+        rawio = io.FileIO(support.TESTFN, "w+b")
+        f = self.tp(rawio)
+        f.write(b"123xxx")
+        f.x = f
+        wr = weakref.ref(f)
+        del f
+        gc.collect()
+        self.assert_(wr() is None, wr)
+        with open(support.TESTFN, "rb") as f:
+            self.assertEqual(f.read(), b"123xxx")
+
 
 class BufferedRWPairTest(unittest.TestCase):
 
@@ -1057,6 +1079,10 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
     def testMisbehavedRawIO(self):
         BufferedReaderTest.testMisbehavedRawIO(self)
         BufferedWriterTest.testMisbehavedRawIO(self)
+
+    def test_garbage_collection(self):
+        BufferedReaderTest.test_garbage_collection(self)
+        BufferedWriterTest.test_garbage_collection(self)
 
 
 # To fully exercise seek/tell, the StatefulIncrementalDecoder has these
@@ -1404,6 +1430,21 @@ class TextIOWrapperTest(unittest.TestCase):
         def f():
             io.TextIOWrapper(rawio).xyzzy
         self.assertRaises(AttributeError, f)
+
+    def test_garbage_collection(self):
+        # TextIOWrapper objects are collected, and collecting them flushes
+        # all data to disk.
+        rawio = io.FileIO(support.TESTFN, "wb")
+        b = io.BufferedWriter(rawio)
+        t = io.TextIOWrapper(b, encoding="ascii")
+        t.write("456def")
+        t.x = t
+        wr = weakref.ref(t)
+        del t
+        gc.collect()
+        self.assert_(wr() is None, wr)
+        with open(support.TESTFN, "rb") as f:
+            self.assertEqual(f.read(), b"456def")
 
     # Systematic tests of the text I/O API
 

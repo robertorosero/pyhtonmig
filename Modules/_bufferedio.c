@@ -285,7 +285,7 @@ typedef struct {
 static void
 BufferedObject_dealloc(BufferedObject *self)
 {
-    if (_PyIOBase_finalize((PyObject *) self) < 0)
+    if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
         return;
     self->ok = 0;
     if (self->weakreflist != NULL)
@@ -303,6 +303,24 @@ BufferedObject_dealloc(BufferedObject *self)
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static int
+Buffered_traverse(BufferedObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->raw);
+    Py_VISIT(self->dict);
+    return 0;
+}
+
+static int
+Buffered_clear(BufferedObject *self)
+{
+    if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
+        return -1;
+    self->ok = 0;
+    Py_CLEAR(self->raw);
+    Py_CLEAR(self->dict);
+    return 0;
+}
 
 /*
  * _BufferedIOMixin methods
@@ -1406,12 +1424,13 @@ PyTypeObject PyBufferedReader_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+            | Py_TPFLAGS_HAVE_GC, /*tp_flags*/
     BufferedReader_doc,         /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)Buffered_traverse, /* tp_traverse */
+    (inquiry)Buffered_clear,    /* tp_clear */
     0,                          /* tp_richcompare */
-        offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
+    offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
     (iternextfunc)Buffered_iternext, /* tp_iternext */
     BufferedReader_methods,     /* tp_methods */
@@ -1740,10 +1759,11 @@ PyTypeObject PyBufferedWriter_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+        | Py_TPFLAGS_HAVE_GC,   /*tp_flags*/
     BufferedWriter_doc,         /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)Buffered_traverse, /* tp_traverse */
+    (inquiry)Buffered_clear,    /* tp_clear */
     0,                          /* tp_richcompare */
     offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
@@ -2094,10 +2114,11 @@ PyTypeObject PyBufferedRandom_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+        | Py_TPFLAGS_HAVE_GC,   /*tp_flags*/
     BufferedRandom_doc,         /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)Buffered_traverse, /* tp_traverse */
+    (inquiry)Buffered_clear,    /* tp_clear */
     0,                          /* tp_richcompare */
     offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */

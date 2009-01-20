@@ -779,11 +779,11 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     return -1;
 }
 
-static void
-TextIOWrapper_dealloc(PyTextIOWrapperObject *self)
+static int
+_TextIOWrapper_clear(PyTextIOWrapperObject *self)
 {
-    if (_PyIOBase_finalize((PyObject *) self) < 0)
-        return;
+    if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
+        return -1;
     self->ok = 0;
     Py_CLEAR(self->buffer);
     Py_CLEAR(self->encoding);
@@ -792,10 +792,41 @@ TextIOWrapper_dealloc(PyTextIOWrapperObject *self)
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->decoded_chars);
     Py_CLEAR(self->snapshot);
+    return 0;
+}
+
+static void
+TextIOWrapper_dealloc(PyTextIOWrapperObject *self)
+{
+    if (_TextIOWrapper_clear(self) < 0)
+        return;
     if (self->weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)self);
     Py_CLEAR(self->dict);
     Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static int
+TextIOWrapper_traverse(PyTextIOWrapperObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->buffer);
+    Py_VISIT(self->encoding);
+    Py_VISIT(self->encoder);
+    Py_VISIT(self->decoder);
+    Py_VISIT(self->readnl);
+    Py_VISIT(self->decoded_chars);
+    Py_VISIT(self->snapshot);
+    Py_VISIT(self->dict);
+    return 0;
+}
+
+static int
+TextIOWrapper_clear(PyTextIOWrapperObject *self)
+{
+    if (_TextIOWrapper_clear(self) < 0)
+        return -1;
+    Py_CLEAR(self->dict);
+    return 0;
 }
 
 static PyObject *
@@ -2173,10 +2204,11 @@ PyTypeObject PyTextIOWrapper_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+            | Py_TPFLAGS_HAVE_GC, /*tp_flags*/
     TextIOWrapper_doc,          /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)TextIOWrapper_traverse, /* tp_traverse */
+    (inquiry)TextIOWrapper_clear, /* tp_clear */
     0,                          /* tp_richcompare */
     offsetof(PyTextIOWrapperObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
