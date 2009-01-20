@@ -1241,7 +1241,7 @@ class unused_BufferedRandom(unused_BufferedWriter, unused_BufferedReader):
 BufferedRandom = _io.BufferedRandom
 
 
-class TextIOBase(IOBase):
+class unused_TextIOBase(IOBase):
 
     """Base class for text I/O.
 
@@ -1287,6 +1287,7 @@ class TextIOBase(IOBase):
         Subclasses should override.
         """
         return None
+TextIOBase = _io.TextIOBase
 
 
 IncrementalNewlineDecoder = _io.IncrementalNewlineDecoder
