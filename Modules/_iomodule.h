@@ -35,6 +35,11 @@ extern PyObject* PyIOExc_UnsupportedOperation;
    is alive again. */
 extern int _PyIOBase_finalize(PyObject *self);
 
+/* Returns true if the given FileIO object is closed.
+   Doesn't check the argument type, so be careful! */
+extern int _PyFileIO_closed(PyObject *self);
+
+
 #define DEFAULT_BUFFER_SIZE (8 * 1024)  /* bytes */
 
 typedef struct {

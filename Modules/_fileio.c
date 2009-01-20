@@ -57,6 +57,13 @@ PyTypeObject PyFileIO_Type;
 
 #define PyFileIO_Check(op) (PyObject_TypeCheck((op), &PyFileIO_Type))
 
+
+int
+_PyFileIO_closed(PyObject *self)
+{
+	return ((PyFileIOObject *)self)->fd < 0;
+}
+
 /* Returns 0 on success, -1 with exception set on failure. */
 static int
 internal_close(PyFileIOObject *self)

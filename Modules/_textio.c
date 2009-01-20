@@ -606,6 +606,9 @@ typedef struct
      * snapshot point.  We use this to reconstruct decoder states in tell().
      */
 
+    /* Cache raw object if it's a FileIO object */
+    PyObject *raw;
+
     PyObject *weakreflist;
     PyObject *dict;
 } PyTextIOWrapperObject;
@@ -697,7 +700,7 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     char *kwlist[] = {"buffer", "encoding", "errors",
                       "newline", "line_buffering",
                       NULL};
-    PyObject *buffer;
+    PyObject *buffer, *raw;
     char *encoding = NULL;
     char *errors = NULL;
     char *newline = NULL;
@@ -730,6 +733,7 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     Py_CLEAR(self->pending_bytes);
     Py_CLEAR(self->snapshot);
     Py_CLEAR(self->errors);
+    Py_CLEAR(self->raw);
     self->decoded_chars_used = 0;
     self->pending_bytes_count = 0;
     self->encodefunc = NULL;
@@ -871,6 +875,19 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
 
     self->buffer = buffer;
     Py_INCREF(buffer);
+    
+    if (Py_TYPE(buffer) == &PyBufferedReader_Type ||
+        Py_TYPE(buffer) == &PyBufferedWriter_Type ||
+        Py_TYPE(buffer) == &PyBufferedRandom_Type) {
+        raw = PyObject_GetAttrString(buffer, "raw");
+        /* Cache the raw FileIO object to speed up 'closed' checks */
+        if (raw == NULL)
+            PyErr_Clear();
+        else if (Py_TYPE(raw) == &PyFileIO_Type)
+            self->raw = raw;
+        else
+            Py_DECREF(raw);
+    }
 
     res = PyObject_CallMethod(buffer, "seekable", NULL);
     if (res == NULL)
@@ -900,6 +917,7 @@ _TextIOWrapper_clear(PyTextIOWrapperObject *self)
     Py_CLEAR(self->pending_bytes);
     Py_CLEAR(self->snapshot);
     Py_CLEAR(self->errors);
+    Py_CLEAR(self->raw);
     return 0;
 }
 
@@ -926,6 +944,8 @@ TextIOWrapper_traverse(PyTextIOWrapperObject *self, visitproc visit, void *arg)
     Py_VISIT(self->pending_bytes);
     Py_VISIT(self->snapshot);
     Py_VISIT(self->errors);
+    Py_VISIT(self->raw);
+
     Py_VISIT(self->dict);
     return 0;
 }
@@ -942,21 +962,23 @@ TextIOWrapper_clear(PyTextIOWrapperObject *self)
 static PyObject *
 TextIOWrapper_closed_get(PyTextIOWrapperObject *self, void *context);
 
-/* This macro takes some shortcuts to make the common case faster. We could
-   specialize even more, by detecting that the underlying buffer is a 
-   BufferedObject. */
+/* This macro takes some shortcuts to make the common case faster. */
 #define CHECK_CLOSED(self) \
     do { \
         int r; \
         PyObject *_res; \
         if (Py_TYPE(self) == &PyTextIOWrapper_Type) { \
-            _res = TextIOWrapper_closed_get(self, NULL); \
-            if (_res == NULL) \
-                return NULL; \
-            r = PyObject_IsTrue(_res); \
-            Py_DECREF(_res); \
-            if (r < 0) \
-                return NULL; \
+            if (self->raw != NULL) \
+                r = _PyFileIO_closed(self->raw); \
+            else { \
+                _res = TextIOWrapper_closed_get(self, NULL); \
+                if (_res == NULL) \
+                    return NULL; \
+                r = PyObject_IsTrue(_res); \
+                Py_DECREF(_res); \
+                if (r < 0) \
+                    return NULL; \
+            } \
             if (r > 0) { \
                 PyErr_SetString(PyExc_ValueError, \
                                 "I/O operation on closed file."); \
