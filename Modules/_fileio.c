@@ -62,7 +62,7 @@ static int
 internal_close(PyFileIOObject *self)
 {
 	int err = 0;
-	int save_errno;
+	int save_errno = 0;
 	if (self->fd >= 0) {
 		int fd = self->fd;
 		self->fd = -1;
@@ -137,6 +137,24 @@ dircheck(PyFileIOObject* self, const char *name)
 		exc = PyObject_CallFunction(PyExc_IOError, "(iss)",
 					    EISDIR, msg, name);
 		PyErr_SetObject(PyExc_IOError, exc);
+		Py_XDECREF(exc);
+		return -1;
+	}
+#endif
+	return 0;
+}
+
+static int
+check_fd(int fd)
+{
+#if defined(HAVE_FSTAT)
+	struct stat buf;
+	if (fstat(fd, &buf) < 0 && errno == EBADF) {
+		PyObject *exc;
+		char *msg = strerror(EBADF);
+		exc = PyObject_CallFunction(PyExc_OSError, "(is)",
+					    EBADF, msg);
+		PyErr_SetObject(PyExc_OSError, exc);
 		Py_XDECREF(exc);
 		return -1;
 	}
@@ -289,6 +307,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	if (fd >= 0) {
 		self->fd = fd;
 		self->closefd = closefd;
+		if (check_fd(fd))
+			goto error;
 	}
 	else {
 		self->closefd = 1;
@@ -619,7 +639,7 @@ portable_lseek(int fd, PyObject *posobj, int whence)
 #if SEEK_CUR != 1
 	case 1: whence = SEEK_CUR; break;
 #endif
-#if SEEL_END != 2
+#if SEEK_END != 2
 	case 2: whence = SEEK_END; break;
 #endif
 	}

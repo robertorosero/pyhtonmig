@@ -6,7 +6,8 @@ import unittest
 from array import array
 from weakref import proxy
 
-from test.support import TESTFN, findfile, check_warnings, run_unittest
+from test.support import (TESTFN, findfile, check_warnings, run_unittest,
+                          make_bad_fd)
 from collections import UserList
 
 from _io import FileIO as _FileIO
@@ -174,6 +175,10 @@ class OtherFileTests(unittest.TestCase):
         f = _FileIO(str(TESTFN), "w")
         f.close()
         os.unlink(TESTFN)
+
+    def testInvalidFd(self):
+        self.assertRaises(ValueError, _FileIO, -10)
+        self.assertRaises(OSError, _FileIO, make_bad_fd())
 
     def testBadModeArgument(self):
         # verify that we get a sensible error message for bad mode argument
