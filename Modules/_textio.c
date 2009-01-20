@@ -28,17 +28,24 @@ _unsupported(const char *message)
     return NULL;
 }
 
+PyDoc_STRVAR(TextIOBase_read_doc,
+    "Read at most n characters from stream.\n"
+    "\n"
+    "Read from underlying buffer until we have n characters or we hit EOF.\n"
+    "If n is negative or omitted, read until EOF.\n"
+    );
+
 static PyObject *
 TextIOBase_read(PyObject *self, PyObject *args)
 {
     return _unsupported("read");
 }
 
-static PyObject *
-TextIOBase_write(PyObject *self, PyObject *args)
-{
-    return _unsupported("read");
-}
+PyDoc_STRVAR(TextIOBase_readline_doc,
+    "Read until newline or EOF.\n"
+    "\n"
+    "Returns an empty string if EOF is hit immediately.\n"
+    );
 
 static PyObject *
 TextIOBase_readline(PyObject *self, PyObject *args)
@@ -46,8 +53,68 @@ TextIOBase_readline(PyObject *self, PyObject *args)
     return _unsupported("read");
 }
 
+PyDoc_STRVAR(TextIOBase_write_doc,
+    "Write string to stream.\n"
+    "Returns the number of characters written (which is always equal to\n"
+    "the length of the string).\n"
+    );
+
+static PyObject *
+TextIOBase_write(PyObject *self, PyObject *args)
+{
+    return _unsupported("read");
+}
+
 /* XXX properties: encoding, newlines */
 
+static PyMethodDef TextIOBase_methods[] = {
+    {"read", TextIOBase_read, METH_VARARGS, TextIOBase_read_doc},
+    {"readline", TextIOBase_readline, METH_VARARGS, TextIOBase_readline_doc},
+    {"write", TextIOBase_write, METH_VARARGS, TextIOBase_write_doc},
+    {NULL, NULL}
+};
+
+PyTypeObject PyTextIOBase_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "TextIOBase",               /*tp_name*/
+    0,                          /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
+    0,                          /*tp_dealloc*/
+    0,                          /*tp_print*/
+    0,                          /*tp_getattr*/
+    0,                          /*tp_setattr*/
+    0,                          /*tp_compare */
+    0,                          /*tp_repr*/
+    0,                          /*tp_as_number*/
+    0,                          /*tp_as_sequence*/
+    0,                          /*tp_as_mapping*/
+    0,                          /*tp_hash */
+    0,                          /*tp_call*/
+    0,                          /*tp_str*/
+    0,                          /*tp_getattro*/
+    0,                          /*tp_setattro*/
+    0,                          /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    TextIOBase_doc,             /* tp_doc */
+    0,                          /* tp_traverse */
+    0,                          /* tp_clear */
+    0,                          /* tp_richcompare */
+    0,                          /* tp_weaklistoffset */
+    0,                          /* tp_iter */
+    0,                          /* tp_iternext */
+    TextIOBase_methods,         /* tp_methods */
+    0,                          /* tp_members */
+    0,                          /* tp_getset */
+    &PyIOBase_Type,             /* tp_base */
+    0,                          /* tp_dict */
+    0,                          /* tp_descr_get */
+    0,                          /* tp_descr_set */
+    0,                          /* tp_dictoffset */
+    0,                          /* tp_init */
+    0,                          /* tp_alloc */
+    0,                          /* tp_new */
+};
+
 
 /* IncrementalNewlineDecoder */
 

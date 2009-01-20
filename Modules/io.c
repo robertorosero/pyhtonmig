@@ -674,8 +674,14 @@ PyInit__io(void)
     Py_INCREF(&PyBufferedRandom_Type);
     PyModule_AddObject(m, "BufferedRandom", (PyObject *) &PyBufferedRandom_Type);
 
+    /* BufferedIOBase */
+    if (PyType_Ready(&PyTextIOBase_Type) < 0)
+        goto fail;
+    Py_INCREF(&PyTextIOBase_Type);
+    PyModule_AddObject(m, "TextIOBase", (PyObject *) &PyTextIOBase_Type);
+
     /* TextIOWrapper */
-    PyTextIOWrapper_Type.tp_base = &PyIOBase_Type;
+    PyTextIOWrapper_Type.tp_base = &PyTextIOBase_Type;
     if (PyType_Ready(&PyTextIOWrapper_Type) < 0)
         goto fail;
     Py_INCREF(&PyTextIOWrapper_Type);

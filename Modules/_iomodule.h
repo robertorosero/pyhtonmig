@@ -2,11 +2,15 @@
  * Declarations shared between the different parts of the io module
  */
 
-extern PyTypeObject PyFileIO_Type;
-extern PyTypeObject PyBytesIO_Type;
+/* ABCs */
 extern PyTypeObject PyIOBase_Type;
 extern PyTypeObject PyRawIOBase_Type;
 extern PyTypeObject PyBufferedIOBase_Type;
+extern PyTypeObject PyTextIOBase_Type;
+
+/* Concrete classes */
+extern PyTypeObject PyFileIO_Type;
+extern PyTypeObject PyBytesIO_Type;
 extern PyTypeObject PyBufferedReader_Type;
 extern PyTypeObject PyBufferedWriter_Type;
 extern PyTypeObject PyBufferedRWPair_Type;
