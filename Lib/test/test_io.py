@@ -7,6 +7,8 @@ import array
 import threading
 import random
 import unittest
+import weakref
+import gc
 from itertools import chain, cycle, count
 from collections import deque
 from test import support
@@ -404,6 +406,21 @@ class IOTest(unittest.TestCase):
             self.assertEqual(f.buffer.raw.closefd, True)
             file = io.open(f.fileno(), "r", closefd=False)
             self.assertEqual(file.buffer.raw.closefd, False)
+
+    def test_garbage_collection(self):
+        # FileIO objects are collected, and collecting them flushes
+        # all data to disk.
+        class MyFileIO(io.FileIO):
+            pass
+        f = MyFileIO(support.TESTFN, "wb")
+        f.write(b"abcxxx")
+        f.f = f
+        wr = weakref.ref(f)
+        del f
+        gc.collect()
+        self.assert_(wr() is None, wr)
+        with open(support.TESTFN, "rb") as f:
+            self.assertEqual(f.read(), b"abcxxx")
 
 
 class MemorySeekTestMixin:

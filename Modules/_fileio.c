@@ -332,11 +332,26 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	return ret;
 }
 
+static int
+fileio_traverse(PyFileIOObject *self, visitproc visit, void *arg)
+{
+	Py_VISIT(self->dict);
+	return 0;
+}
+
+static int
+fileio_clear(PyFileIOObject *self)
+{
+	Py_CLEAR(self->dict);
+	return 0;
+}
+
 static void
 fileio_dealloc(PyFileIOObject *self)
 {
 	if (_PyIOBase_finalize((PyObject *) self) < 0)
 		return;
+	_PyObject_GC_UNTRACK(self);
 	if (self->weakreflist != NULL)
 		PyObject_ClearWeakRefs((PyObject *) self);
 	Py_CLEAR(self->dict);
@@ -918,12 +933,13 @@ PyTypeObject PyFileIO_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+			| Py_TPFLAGS_HAVE_GC,	/* tp_flags */
 	fileio_doc,				/* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
+	(traverseproc)fileio_traverse,		/* tp_traverse */
+	(inquiry)fileio_clear,			/* tp_clear */
 	0,					/* tp_richcompare */
-	offsetof(PyFileIOObject, weakreflist), /* tp_weaklistoffset */
+	offsetof(PyFileIOObject, weakreflist),	/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
 	fileio_methods,				/* tp_methods */
@@ -937,5 +953,5 @@ PyTypeObject PyFileIO_Type = {
 	fileio_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	fileio_new,				/* tp_new */
-	PyObject_Del,				/* tp_free */
+	PyObject_GC_Del,			/* tp_free */
 };
