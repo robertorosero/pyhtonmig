@@ -50,7 +50,7 @@ PyDoc_STRVAR(TextIOBase_readline_doc,
 static PyObject *
 TextIOBase_readline(PyObject *self, PyObject *args)
 {
-    return _unsupported("read");
+    return _unsupported("readline");
 }
 
 PyDoc_STRVAR(TextIOBase_write_doc,
@@ -62,7 +62,7 @@ PyDoc_STRVAR(TextIOBase_write_doc,
 static PyObject *
 TextIOBase_write(PyObject *self, PyObject *args)
 {
-    return _unsupported("read");
+    return _unsupported("write");
 }
 
 PyDoc_STRVAR(TextIOBase_encoding_doc,
