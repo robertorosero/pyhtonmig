@@ -1172,28 +1172,6 @@ TextIOWrapper_get_decoded_chars(PyTextIOWrapperObject *self, Py_ssize_t n)
     return chars;
 }
 
-/* Rewind the _decoded_chars buffer. */
-static int
-TextIOWrapper_rewind_decoded_chars(PyTextIOWrapperObject *self, Py_ssize_t n)
-{
-    if (self->decoded_chars_used < n) {
-        PyErr_SetString(PyExc_ValueError,
-                        "rewind decoded_chars out of bounds");
-        return -1;
-    }
-    self->decoded_chars_used -= n;
-    return self->decoded_chars_used;
-}
-
-static Py_ssize_t
-TextIOWrapper_decoded_chars_length(PyTextIOWrapperObject *self, Py_ssize_t n)
-{
-    if (self->decoded_chars == NULL)
-        return 0;
-    return PyUnicode_GetSize(self->decoded_chars) - self->decoded_chars_used;
-}
-
-
 /* Read and decode the next chunk of data from the BufferedReader.
  */
 static int
