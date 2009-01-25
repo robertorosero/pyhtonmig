@@ -34,7 +34,7 @@ maintains the heap invariant!
 
 __about__ = """Heap queues
 
-[explanation by Franï¿½ois Pinard]
+[explanation by François Pinard]
 
 Heaps are arrays for which a[k] <= a[2*k+1] and a[k] <= a[2*k+2] for
 all k, counting elements from 0.  For the sake of comparison,
@@ -262,7 +262,7 @@ def _siftdown(heap, startpos, pos):
 #
 # Cutting the # of comparisons is important, since these routines have no
 # way to extract "the priority" from an array element, so that intelligence
-# is likely to be hiding in custom _cmp__ methods, or in array elements
+# is likely to be hiding in custom comparison methods, or in array elements
 # storing (priority, record) tuples.  Comparisons are thus potentially
 # expensive.
 #
