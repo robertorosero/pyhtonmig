@@ -589,7 +589,8 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	is an iterator, this returns itself. */
 
 #define PyIter_Check(obj) \
-    ((obj)->ob_type->tp_iternext != NULL)
+    ((obj)->ob_type->tp_iternext != NULL && \
+     (obj)->ob_type->tp_iternext != &_PyObject_NextNotImplemented)
 
      PyAPI_FUNC(PyObject *) PyIter_Next(PyObject *);
      /* Takes an iterator object and calls its tp_iternext slot,
@@ -785,18 +786,12 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
      #define PyNumber_Int PyNumber_Long
 
+     PyAPI_FUNC(PyObject *) PyNumber_Long(PyObject *o);
+
        /*
 	 Returns the o converted to an integer object on success, or
 	 NULL on failure.  This is the equivalent of the Python
 	 expression: int(o).
-       */
-
-     PyAPI_FUNC(PyObject *) PyNumber_Long(PyObject *o);
-
-       /*
-	 Returns the o converted to a long integer object on success,
-	 or NULL on failure.  This is the equivalent of the Python
-	 expression: long(o).
        */
 
      PyAPI_FUNC(PyObject *) PyNumber_Float(PyObject *o);

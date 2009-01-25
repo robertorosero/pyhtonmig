@@ -886,7 +886,6 @@ dropwhile_next(dropwhileobject *lz)
 	long ok;
 	PyObject *(*iternext)(PyObject *);
 
-	assert(PyIter_Check(it));
 	iternext = *Py_TYPE(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
@@ -1031,7 +1030,6 @@ takewhile_next(takewhileobject *lz)
 	if (lz->stop == 1)
 		return NULL;
 
-	assert(PyIter_Check(it));
 	item = (*Py_TYPE(it)->tp_iternext)(it);
 	if (item == NULL)
 		return NULL;
@@ -1218,7 +1216,6 @@ islice_next(isliceobject *lz)
 	Py_ssize_t oldnext;
 	PyObject *(*iternext)(PyObject *);
 
-	assert(PyIter_Check(it));
 	iternext = *Py_TYPE(it)->tp_iternext;
 	while (lz->cnt < lz->next) {
 		item = iternext(it);
@@ -1229,7 +1226,6 @@ islice_next(isliceobject *lz)
 	}
 	if (lz->stop != -1 && lz->cnt >= lz->stop)
 		return NULL;
-	assert(PyIter_Check(it));
 	item = iternext(it);
 	if (item == NULL)
 		return NULL;
@@ -1361,7 +1357,6 @@ starmap_next(starmapobject *lz)
 	PyObject *result;
 	PyObject *it = lz->it;
 
-	assert(PyIter_Check(it));
 	args = (*Py_TYPE(it)->tp_iternext)(it);
 	if (args == NULL)
 		return NULL;
@@ -1880,10 +1875,6 @@ combinations_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		PyErr_SetString(PyExc_ValueError, "r must be non-negative");
 		goto error;
 	}
-	if (r > n) {
-		PyErr_SetString(PyExc_ValueError, "r cannot be bigger than the iterable");
-		goto error;
-	}
 
 	indices = PyMem_Malloc(r * sizeof(Py_ssize_t));
 	if (indices == NULL) {
@@ -1903,7 +1894,7 @@ combinations_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	co->indices = indices;
 	co->result = NULL;
 	co->r = r;
-	co->stopped = 0;
+	co->stopped = r > n ? 1 : 0;
 
 	return (PyObject *)co;
 
@@ -2143,10 +2134,6 @@ permutations_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		PyErr_SetString(PyExc_ValueError, "r must be non-negative");
 		goto error;
 	}
-	if (r > n) {
-		PyErr_SetString(PyExc_ValueError, "r cannot be bigger than the iterable");
-		goto error;
-	}
 
 	indices = PyMem_Malloc(n * sizeof(Py_ssize_t));
 	cycles = PyMem_Malloc(r * sizeof(Py_ssize_t));
@@ -2170,7 +2157,7 @@ permutations_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	po->cycles = cycles;
 	po->result = NULL;
 	po->r = r;
-	po->stopped = 0;
+	po->stopped = r > n ? 1 : 0;
 
 	return (PyObject *)po;
 
@@ -2411,7 +2398,6 @@ filterfalse_next(filterfalseobject *lz)
 	long ok;
 	PyObject *(*iternext)(PyObject *);
 
-	assert(PyIter_Check(it));
 	iternext = *Py_TYPE(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
@@ -2896,7 +2882,6 @@ zip_longest_next(ziplongestobject *lz)
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
-                                assert(PyIter_Check(it));
                                 item = (*Py_TYPE(it)->tp_iternext)(it);
                                 if (item == NULL) {
                                         lz->numactive -= 1;      
@@ -2925,7 +2910,6 @@ zip_longest_next(ziplongestobject *lz)
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
-                                assert(PyIter_Check(it));
                                 item = (*Py_TYPE(it)->tp_iternext)(it);
                                 if (item == NULL) {
                                         lz->numactive -= 1;      

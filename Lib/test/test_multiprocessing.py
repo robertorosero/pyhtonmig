@@ -62,6 +62,8 @@ else:
 HAVE_GETVALUE = not getattr(_multiprocessing,
                             'HAVE_BROKEN_SEM_GETVALUE', False)
 
+WIN32 = (sys.platform == "win32")
+
 #
 # Creates a wrapper for a function which records the time it takes to finish
 #
@@ -830,9 +832,15 @@ class _TestValue(BaseTestCase):
         obj3 = val3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawValue('i', 5)
+        arr4 = self.Value('i', 5, lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+
+        self.assertRaises(AttributeError, self.Value, 'i', 5, lock='navalue')
+
+        arr5 = self.RawValue('i', 5)
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 
 class _TestArray(BaseTestCase):
@@ -888,9 +896,15 @@ class _TestArray(BaseTestCase):
         obj3 = arr3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawArray('i', list(range(10)))
+        arr4 = self.Array('i', range(10), lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+        self.assertRaises(AttributeError,
+                          self.Array, 'i', range(10), lock='notalock')
+
+        arr5 = self.RawArray('i', range(10))
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 #
 #
@@ -1044,8 +1058,10 @@ class _TestZZZNumberOfObjects(BaseTestCase):
         multiprocessing.active_children()  # discard dead process objs
         gc.collect()                       # do garbage collection
         refs = self.manager._number_of_objects()
+        debug_info = self.manager._debug_info()
         if refs != EXPECTED_NUMBER:
             print(self.manager._debug_info())
+            print(debug_info)
 
         self.assertEqual(refs, EXPECTED_NUMBER)
 
@@ -1671,6 +1687,18 @@ class _TestLogging(BaseTestCase):
         logger.setLevel(level=LOG_LEVEL)
 
 #
+# Test to verify handle verification, see issue 3321
+#
+
+class TestInvalidHandle(unittest.TestCase):
+
+    def test_invalid_handles(self):
+        if WIN32:
+            return
+        conn = _multiprocessing.Connection(44977608)
+        self.assertRaises(IOError, conn.poll)
+        self.assertRaises(IOError, _multiprocessing.Connection, -1)
+#
 # Functions used to create test cases from the base ones in this module
 #
 
@@ -1774,7 +1802,7 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
-testcases_other = [OtherTest]
+testcases_other = [OtherTest, TestInvalidHandle]
 
 #
 #

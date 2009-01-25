@@ -144,16 +144,18 @@ typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 typedef struct bufferinfo {
 	void *buf;   
 	PyObject *obj;        /* owned reference */
-        Py_ssize_t len;
-        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
-                                 pointed to by strides in simple case.*/
-        int readonly;
-        int ndim;
-        char *format;
-        Py_ssize_t *shape;
-        Py_ssize_t *strides;
-        Py_ssize_t *suboffsets;
-        void *internal;
+	Py_ssize_t len;
+	Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
+			         pointed to by strides in simple case.*/
+	int readonly;
+	int ndim;
+	char *format;
+	Py_ssize_t *shape;
+	Py_ssize_t *strides;
+	Py_ssize_t *suboffsets;
+	Py_ssize_t smalltable[2];  /* static store for shape and strides of
+				      mono-dimensional buffers. */
+	void *internal;
 } Py_buffer;
 
 typedef int (*getbufferproc)(PyObject *, Py_buffer *, int);
@@ -217,7 +219,7 @@ typedef struct {
 	binaryfunc nb_xor;
 	binaryfunc nb_or;
 	unaryfunc nb_int;
-	unaryfunc nb_long;
+	void *nb_reserved;  /* the slot formerly known as nb_long */
 	unaryfunc nb_float;
 
 	binaryfunc nb_inplace_add;
@@ -433,6 +435,7 @@ PyAPI_FUNC(int) PyObject_SetAttr(PyObject *, PyObject *, PyObject *);
 PyAPI_FUNC(int) PyObject_HasAttr(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject **) _PyObject_GetDictPtr(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_SelfIter(PyObject *);
+PyAPI_FUNC(PyObject *) _PyObject_NextNotImplemented(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_GenericGetAttr(PyObject *, PyObject *);
 PyAPI_FUNC(int) PyObject_GenericSetAttr(PyObject *,
 					      PyObject *, PyObject *);

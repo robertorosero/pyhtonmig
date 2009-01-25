@@ -3602,7 +3602,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYNUM(nb_xor);
 		COPYNUM(nb_or);
 		COPYNUM(nb_int);
-		COPYNUM(nb_long);
 		COPYNUM(nb_float);
 		COPYNUM(nb_inplace_add);
 		COPYNUM(nb_inplace_subtract);
@@ -4832,7 +4831,6 @@ SLOT1BIN(slot_nb_xor, nb_xor, "__xor__", "__rxor__")
 SLOT1BIN(slot_nb_or, nb_or, "__or__", "__ror__")
 
 SLOT0(slot_nb_int, "__int__")
-SLOT0(slot_nb_long, "__long__")
 SLOT0(slot_nb_float, "__float__")
 SLOT1(slot_nb_inplace_add, "__iadd__", PyObject *, "O")
 SLOT1(slot_nb_inplace_subtract, "__isub__", PyObject *, "O")
@@ -5448,8 +5446,6 @@ static slotdef slotdefs[] = {
 	RBINSLOT("__ror__", nb_or, slot_nb_or, "|"),
 	UNSLOT("__int__", nb_int, slot_nb_int, wrap_unaryfunc,
 	       "int(x)"),
-	UNSLOT("__long__", nb_long, slot_nb_long, wrap_unaryfunc,
-	       "long(x)"),
 	UNSLOT("__float__", nb_float, slot_nb_float, wrap_unaryfunc,
 	       "float(x)"),
 	NBSLOT("__index__", nb_index, slot_nb_index, wrap_unaryfunc, 
@@ -5635,8 +5631,12 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 	}
 	do {
 		descr = _PyType_Lookup(type, p->name_strobj);
-		if (descr == NULL)
+		if (descr == NULL) {
+			if (ptr == (void**)&type->tp_iternext) {
+				specific = _PyObject_NextNotImplemented;
+			}
 			continue;
+		}
 		if (Py_TYPE(descr) == &PyWrapperDescr_Type) {
 			void **tptr = resolve_slotdups(type, p->name_strobj);
 			if (tptr == NULL || tptr == ptr)
@@ -5655,7 +5655,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 		else if (Py_TYPE(descr) == &PyCFunction_Type &&
 			 PyCFunction_GET_FUNCTION(descr) ==
 			 (PyCFunction)tp_new_wrapper &&
-			 strcmp(p->name, "__new__") == 0)
+			 ptr == (void**)&type->tp_new)
 		{
 			/* The __new__ wrapper is not a wrapper descriptor,
 			   so must be special-cased differently.
@@ -5675,7 +5675,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 			   point out a bug in this reasoning a beer. */
 		}
 		else if (descr == Py_None &&
-			 strcmp(p->name, "__hash__") == 0) {
+			 ptr == (void**)&type->tp_hash) {
 			/* We specifically allow __hash__ to be set to None
 			   to prevent inheritance of the default
 			   implementation from object.__hash__ */

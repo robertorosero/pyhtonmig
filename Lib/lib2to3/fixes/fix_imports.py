@@ -25,7 +25,6 @@ MAPPING = {'StringIO':  'io',
            'tkFont': 'tkinter.font',
            'tkMessageBox': 'tkinter.messagebox',
            'ScrolledText': 'tkinter.scrolledtext',
-           'turtle': 'tkinter.turtle',
            'Tkconstants': 'tkinter.constants',
            'Tix': 'tkinter.tix',
            'Tkinter': 'tkinter',
@@ -89,6 +88,10 @@ class FixImports(fixer_base.BaseFix):
     # This is overridden in fix_imports2.
     mapping = MAPPING
 
+    # We want to run this fixer late, so fix_import doesn't try to make stdlib
+    # renames into relative imports.
+    run_order = 6
+
     def build_pattern(self):
         return "|".join(build_pattern(self.mapping))
 
@@ -118,7 +121,7 @@ class FixImports(fixer_base.BaseFix):
     def transform(self, node, results):
         import_mod = results.get("module_name")
         if import_mod:
-            new_name = self.mapping[(import_mod or mod_name).value]
+            new_name = self.mapping[import_mod.value]
             import_mod.replace(Name(new_name, prefix=import_mod.get_prefix()))
             if "name_import" in results:
                 # If it's not a "from x import x, y" or "import x as y" import,
@@ -129,10 +132,8 @@ class FixImports(fixer_base.BaseFix):
                 # line (e.g., "import StringIO, urlparse"). The problem is that I
                 # can't figure out an easy way to make a pattern recognize the
                 # keys of MAPPING randomly sprinkled in an import statement.
-                while True:
-                    results = self.match(node)
-                    if not results:
-                        break
+                results = self.match(node)
+                if results:
                     self.transform(node, results)
         else:
             # Replace usage of the module.

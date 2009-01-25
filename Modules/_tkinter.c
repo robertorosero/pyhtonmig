@@ -2160,19 +2160,7 @@ Tkapp_CreateFileHandler(PyObject *self, PyObject *args)
 			      &file, &mask, &func))
 		return NULL;
 
-#ifdef WITH_THREAD
-	if (!self && !tcl_lock) {
-		/* We don't have the Tcl lock since Tcl is threaded. */
-		PyErr_SetString(PyExc_RuntimeError,
-				"_tkinter.createfilehandler not supported "
-				"for threaded Tcl");
-		return NULL;
-	}
-#endif
-
-	if (self) {
-		CHECK_TCL_APPARTMENT;
-	}
+	CHECK_TCL_APPARTMENT;
 
 	tfile = PyObject_AsFileDescriptor(file);
 	if (tfile < 0)
@@ -2203,19 +2191,7 @@ Tkapp_DeleteFileHandler(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O:deletefilehandler", &file))
 		return NULL;
 
-#ifdef WITH_THREAD
-	if (!self && !tcl_lock) {
-		/* We don't have the Tcl lock since Tcl is threaded. */
-		PyErr_SetString(PyExc_RuntimeError,
-				"_tkinter.deletefilehandler not supported "
-				"for threaded Tcl");
-		return NULL;
-	}
-#endif
-
-	if (self) {
-		CHECK_TCL_APPARTMENT;
-	}
+	CHECK_TCL_APPARTMENT;
 
 	tfile = PyObject_AsFileDescriptor(file);
 	if (tfile < 0)
@@ -2389,19 +2365,7 @@ Tkapp_CreateTimerHandler(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-#ifdef WITH_THREAD
-	if (!self && !tcl_lock) {
-		/* We don't have the Tcl lock since Tcl is threaded. */
-		PyErr_SetString(PyExc_RuntimeError,
-				"_tkinter.createtimerhandler not supported "
-				"for threaded Tcl");
-		return NULL;
-	}
-#endif
-
-	if (self) {
-		CHECK_TCL_APPARTMENT;
-	}
+	CHECK_TCL_APPARTMENT;
 
 	v = Tktt_New(func);
 	if (v) {
@@ -2427,20 +2391,8 @@ Tkapp_MainLoop(PyObject *selfptr, PyObject *args)
 	if (!PyArg_ParseTuple(args, "|i:mainloop", &threshold))
 		return NULL;
 
-#ifdef WITH_THREAD
-	if (!self && !tcl_lock) {
-		/* We don't have the Tcl lock since Tcl is threaded. */
-		PyErr_SetString(PyExc_RuntimeError,
-				"_tkinter.mainloop not supported "
-				"for threaded Tcl");
-		return NULL;
-	}
-#endif
-
-	if (self) {
-		CHECK_TCL_APPARTMENT;
-		self->dispatching = 1;
-	}
+	CHECK_TCL_APPARTMENT;
+	self->dispatching = 1;
 
 	quitMainLoop = 0;
 	while (Tk_GetNumMainWindows() > threshold &&
@@ -2450,7 +2402,7 @@ Tkapp_MainLoop(PyObject *selfptr, PyObject *args)
 		int result;
 
 #ifdef WITH_THREAD
-		if (self && self->threaded) {
+		if (self->threaded) {
 			/* Allow other Python threads to run. */
 			ENTER_TCL
 			result = Tcl_DoOneEvent(0);
@@ -2472,15 +2424,13 @@ Tkapp_MainLoop(PyObject *selfptr, PyObject *args)
 #endif
 
 		if (PyErr_CheckSignals() != 0) {
-			if (self)
-				self->dispatching = 0;
+			self->dispatching = 0;
 			return NULL;
 		}
 		if (result < 0)
 			break;
 	}
-	if (self)
-		self->dispatching = 0;
+	self->dispatching = 0;
 	quitMainLoop = 0;
 
 	if (errorInCmd) {
@@ -2873,14 +2823,6 @@ static PyMethodDef moduleMethods[] =
 {
 	{"_flatten",           Tkinter_Flatten, METH_VARARGS},
 	{"create",             Tkinter_Create, METH_VARARGS},
-#ifdef HAVE_CREATEFILEHANDLER
-	{"createfilehandler",  Tkapp_CreateFileHandler, METH_VARARGS},
-	{"deletefilehandler",  Tkapp_DeleteFileHandler, METH_VARARGS},
-#endif
-	{"createtimerhandler", Tkapp_CreateTimerHandler, METH_VARARGS},
-	{"mainloop",           Tkapp_MainLoop, METH_VARARGS},
-	{"dooneevent",         Tkapp_DoOneEvent, METH_VARARGS},
-	{"quit",               Tkapp_Quit, METH_VARARGS},
 	{"setbusywaitinterval",Tkinter_setbusywaitinterval, METH_VARARGS,
 	                       setbusywaitinterval_doc},
 	{"getbusywaitinterval",(PyCFunction)Tkinter_getbusywaitinterval,

@@ -587,6 +587,67 @@ class Win32ErrorTests(unittest.TestCase):
     def test_chmod(self):
         self.assertRaises(WindowsError, os.utime, support.TESTFN, 0)
 
+class TestInvalidFD(unittest.TestCase):
+    singles = ["fchdir", "dup", "fdopen", "fdatasync", "fstat",
+               "fstatvfs", "fsync", "tcgetpgrp", "ttyname"]
+    #singles.append("close")
+    #We omit close because it doesn'r raise an exception on some platforms
+    def get_single(f):
+        def helper(self):
+            if  hasattr(os, f):
+                self.check(getattr(os, f))
+        return helper
+    for f in singles:
+        locals()["test_"+f] = get_single(f)
+
+    def check(self, f, *args):
+        self.assertRaises(OSError, f, support.make_bad_fd(), *args)
+
+    def test_isatty(self):
+        if hasattr(os, "isatty"):
+            self.assertEqual(os.isatty(support.make_bad_fd()), False)
+
+    def test_closerange(self):
+        if hasattr(os, "closerange"):
+            fd = support.make_bad_fd()
+            self.assertEqual(os.closerange(fd, fd + 10), None)
+
+    def test_dup2(self):
+        if hasattr(os, "dup2"):
+            self.check(os.dup2, 20)
+
+    def test_fchmod(self):
+        if hasattr(os, "fchmod"):
+            self.check(os.fchmod, 0)
+
+    def test_fchown(self):
+        if hasattr(os, "fchown"):
+            self.check(os.fchown, -1, -1)
+
+    def test_fpathconf(self):
+        if hasattr(os, "fpathconf"):
+            self.check(os.fpathconf, "PC_NAME_MAX")
+
+    def test_ftruncate(self):
+        if hasattr(os, "ftruncate"):
+            self.check(os.ftruncate, 0)
+
+    def test_lseek(self):
+        if hasattr(os, "lseek"):
+            self.check(os.lseek, 0, 0)
+
+    def test_read(self):
+        if hasattr(os, "read"):
+            self.check(os.read, 1)
+
+    def test_tcsetpgrpt(self):
+        if hasattr(os, "tcsetpgrp"):
+            self.check(os.tcsetpgrp, 0)
+
+    def test_write(self):
+        if hasattr(os, "write"):
+            self.check(os.write, b" ")
+
 if sys.platform != 'win32':
     class Win32ErrorTests(unittest.TestCase):
         pass
@@ -601,7 +662,8 @@ def test_main():
         DevNullTests,
         URandomTests,
         ExecTests,
-        Win32ErrorTests
+        Win32ErrorTests,
+        TestInvalidFD
     )
 
 if __name__ == "__main__":

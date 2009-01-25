@@ -112,7 +112,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 		ns = PyDict_New();
 	}
 	else {
-		PyObject *pargs = Py_BuildValue("OO", name, bases);
+		PyObject *pargs = PyTuple_Pack(2, name, bases);
 		if (pargs == NULL) {
 			Py_DECREF(prep);
 			Py_DECREF(meta);
@@ -133,7 +133,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 	cell = PyObject_CallFunctionObjArgs(func, ns, NULL);
 	if (cell != NULL) {
 		PyObject *margs;
-		margs = Py_BuildValue("OOO", name, bases, ns);
+		margs = PyTuple_Pack(3, name, bases, ns);
 		if (margs != NULL) {
 			cls = PyEval_CallObjectWithKeywords(meta, margs, mkw);
 			Py_DECREF(margs);
@@ -375,7 +375,6 @@ filter_next(filterobject *lz)
 	long ok;
 	PyObject *(*iternext)(PyObject *);
 
-	assert(PyIter_Check(it));
 	iternext = *Py_TYPE(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
@@ -735,7 +734,7 @@ builtin_exec(PyObject *self, PyObject *args)
 	PyObject *prog, *globals = Py_None, *locals = Py_None;
 	int plain = 0;
 
-	if (!PyArg_ParseTuple(args, "O|OO:exec", &prog, &globals, &locals))
+	if (!PyArg_UnpackTuple(args, "exec", 1, 3, &prog, &globals, &locals))
 		return NULL;
 	
 	if (globals == Py_None) {
@@ -801,8 +800,8 @@ builtin_exec(PyObject *self, PyObject *args)
 PyDoc_STRVAR(exec_doc,
 "exec(object[, globals[, locals]])\n\
 \n\
-Read and execute code from a object, which can be a string, a code\n\
-object or a file object.\n\
+Read and execute code from a object, which can be a string or a code\n\
+object.\n\
 The globals and locals are dictionaries, defaulting to the current\n\
 globals and locals.  If only globals is given, locals defaults to it.");
 
@@ -2125,7 +2124,6 @@ zip_next(zipobject *lz)
 		Py_INCREF(result);
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
-			assert(PyIter_Check(it));
 			item = (*Py_TYPE(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);
@@ -2141,7 +2139,6 @@ zip_next(zipobject *lz)
 			return NULL;
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
-			assert(PyIter_Check(it));
 			item = (*Py_TYPE(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);

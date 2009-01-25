@@ -4,8 +4,8 @@
 
 .. module:: hashlib
    :synopsis: Secure hash and message digest algorithms.
-.. moduleauthor:: Gregory P. Smith <greg@users.sourceforge.net>
-.. sectionauthor:: Gregory P. Smith <greg@users.sourceforge.net>
+.. moduleauthor:: Gregory P. Smith <greg@krypto.org>
+.. sectionauthor:: Gregory P. Smith <greg@krypto.org>
 
 
 .. index::
@@ -34,6 +34,11 @@ to the buffer interface (normally :class:`bytes` objects) using the
 :meth:`update` method.  At any point you can ask it for the :dfn:`digest` of the
 concatenation of the data fed to it so far using the :meth:`digest` or
 :meth:`hexdigest` methods.
+
+.. note::
+
+   For better multithreading performance, the Python GIL is released for
+   strings of more than 2047 bytes at object creation or on update.
 
 .. note::
 

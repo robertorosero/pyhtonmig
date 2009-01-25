@@ -98,7 +98,7 @@ Number-theoretic and representation functions
 .. function:: isnan(x)
 
    Checks if the float *x* is a NaN (not a number). NaNs are part of the
-   IEEE 754 standards. Operation like but not limited to ``inf * 0``, 
+   IEEE 754 standards. Operation like but not limited to ``inf * 0``,
    ``inf / inf`` or any operation involving a NaN, e.g. ``nan * 1``, return
    a NaN.
 
@@ -118,7 +118,7 @@ Number-theoretic and representation functions
 .. function:: trunc(x)
 
    Return the :class:`Real` value *x* truncated to an :class:`Integral` (usually
-   a long integer). Delegates to ``x.__trunc__()``.
+   an integer). Delegates to ``x.__trunc__()``.
 
 
 Note that :func:`frexp` and :func:`modf` have a different call/return pattern

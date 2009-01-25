@@ -1361,19 +1361,7 @@ PyNumber_Long(PyObject *o)
 		}
 		return res;
 	}
-	if (m && m->nb_long) { /* This should include subclasses of long */
-		/* Classic classes always take this branch. */
-		PyObject *res = m->nb_long(o);
-		if (res && !PyLong_Check(res)) {
-			PyErr_Format(PyExc_TypeError,
-				     "__long__ returned non-long (type %.200s)",
-				     res->ob_type->tp_name);
-			Py_DECREF(res);
-			return NULL;
-		}
-		return res;
-	}
-	if (PyLong_Check(o)) /* A long subclass without nb_long */
+	if (PyLong_Check(o)) /* An int subclass without nb_int */
 		return _PyLong_Copy((PyLongObject *)o);
 	trunc_func = PyObject_GetAttr(o, trunc_name);
 	if (trunc_func) {
@@ -2730,7 +2718,6 @@ PyObject *
 PyIter_Next(PyObject *iter)
 {
 	PyObject *result;
-	assert(PyIter_Check(iter));
 	result = (*iter->ob_type->tp_iternext)(iter);
 	if (result == NULL &&
 	    PyErr_Occurred() &&

@@ -233,6 +233,17 @@ class IOTest(unittest.TestCase):
             else:
                 self.fail("1/0 didn't raise an exception")
 
+    # issue 5008
+    def test_append_mode_tell(self):
+        with io.open(support.TESTFN, "wb") as f:
+            f.write(b"xxx")
+        with io.open(support.TESTFN, "ab", buffering=0) as f:
+            self.assertEqual(f.tell(), 3)
+        with io.open(support.TESTFN, "ab") as f:
+            self.assertEqual(f.tell(), 3)
+        with io.open(support.TESTFN, "a") as f:
+            self.assert_(f.tell() > 0)
+
     def test_destructor(self):
         record = []
         class MyFileIO(io.FileIO):
@@ -260,7 +271,7 @@ class IOTest(unittest.TestCase):
 
     def test_array_writes(self):
         a = array.array('i', range(10))
-        n = len(memoryview(a))
+        n = len(a.tostring())
         f = io.open(support.TESTFN, "wb", 0)
         self.assertEqual(f.write(a), n)
         f.close()
@@ -1021,6 +1032,10 @@ class TextIOWrapperTest(unittest.TestCase):
 
     def testSeekAndTell(self):
         """Test seek/tell using the StatefulIncrementalDecoder."""
+        # Make this test faster by forcing a smaller (but large enough)
+        # chunk size. The bigger the chunker size, the slower seek() is,
+        # as it tries to replay character decoding one byte at a time.
+        CHUNK_SIZE = 256
 
         def testSeekAndTellWithData(data, min_pos=0):
             """Tell/seek to various points within a data stream and ensure
@@ -1035,6 +1050,7 @@ class TextIOWrapperTest(unittest.TestCase):
             for i in range(min_pos, len(decoded) + 1): # seek positions
                 for j in [1, 5, len(decoded) - i]: # read lengths
                     f = io.open(support.TESTFN, encoding='test_decoder')
+                    f._CHUNK_SIZE = CHUNK_SIZE
                     self.assertEquals(f.read(i), decoded[:i])
                     cookie = f.tell()
                     self.assertEquals(f.read(j), decoded[i:i + j])
@@ -1052,7 +1068,6 @@ class TextIOWrapperTest(unittest.TestCase):
                 testSeekAndTellWithData(input)
 
             # Position each test case so that it crosses a chunk boundary.
-            CHUNK_SIZE = io.TextIOWrapper._CHUNK_SIZE
             for input, _, _ in StatefulIncrementalDecoderTest.test_cases:
                 offset = CHUNK_SIZE - len(input)//2
                 prefix = b'.'*offset
@@ -1323,6 +1338,45 @@ class MiscIOTest(unittest.TestCase):
         self.assertEquals(g.raw.name, f.fileno())
         f.close()
         g.close()
+
+    def test_io_after_close(self):
+        for kwargs in [
+                {"mode": "w"},
+                {"mode": "wb"},
+                {"mode": "w", "buffering": 1},
+                {"mode": "w", "buffering": 2},
+                {"mode": "wb", "buffering": 0},
+                {"mode": "r"},
+                {"mode": "rb"},
+                {"mode": "r", "buffering": 1},
+                {"mode": "r", "buffering": 2},
+                {"mode": "rb", "buffering": 0},
+                {"mode": "w+"},
+                {"mode": "w+b"},
+                {"mode": "w+", "buffering": 1},
+                {"mode": "w+", "buffering": 2},
+                {"mode": "w+b", "buffering": 0},
+            ]:
+            f = io.open(support.TESTFN, **kwargs)
+            f.close()
+            self.assertRaises(ValueError, f.flush)
+            self.assertRaises(ValueError, f.fileno)
+            self.assertRaises(ValueError, f.isatty)
+            self.assertRaises(ValueError, f.__iter__)
+            if hasattr(f, "peek"):
+                self.assertRaises(ValueError, f.peek, 1)
+            self.assertRaises(ValueError, f.read)
+            if hasattr(f, "read1"):
+                self.assertRaises(ValueError, f.read1, 1024)
+            if hasattr(f, "readinto"):
+                self.assertRaises(ValueError, f.readinto, bytearray(1024))
+            self.assertRaises(ValueError, f.readline)
+            self.assertRaises(ValueError, f.readlines)
+            self.assertRaises(ValueError, f.seek, 0)
+            self.assertRaises(ValueError, f.tell)
+            self.assertRaises(ValueError, f.truncate)
+            self.assertRaises(ValueError, f.write, "")
+            self.assertRaises(ValueError, f.writelines, [])
 
 
 def test_main():

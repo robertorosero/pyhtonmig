@@ -1,4 +1,4 @@
-# -*- coding: Latin-1 -*-
+# -*- coding: latin-1 -*-
 
 """Heap queue algorithm (a.k.a. priority queue).
 
@@ -129,7 +129,7 @@ From all times, sorting has always been a Great Art! :-)
 __all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'merge',
            'nlargest', 'nsmallest', 'heappushpop']
 
-from itertools import islice, repeat, count, tee
+from itertools import islice, repeat, count, tee, chain
 from operator import itemgetter, neg
 import bisect
 
@@ -354,9 +354,34 @@ def nsmallest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
+    # Short-cut for n==1 is to use min() when len(iterable)>0
+    if n == 1:
+        it = iter(iterable)
+        head = list(islice(it, 1))
+        if not head:
+            return []
+        if key is None:
+            return [min(chain(head, it))]
+        return [min(chain(head, it), key=key)]
+
+    # When n>=size, it's faster to use sort()
+    try:
+        size = len(iterable)
+    except (TypeError, AttributeError):
+        pass
+    else:
+        if n >= size:
+            return sorted(iterable, key=key)[:n]
+
+    # When key is none, use simpler decoration
+    if key is None:
+        it = zip(iterable, count())                         # decorate
+        result = _nsmallest(n, it)
+        return list(map(itemgetter(0), result))             # undecorate
+
+    # General case, slowest method
     in1, in2 = tee(iterable)
-    keys = in1 if key is None else map(key, in1)
-    it = zip(keys, count(), in2)                           # decorate
+    it = zip(map(key, in1), count(), in2)                   # decorate
     result = _nsmallest(n, it)
     return list(map(itemgetter(2), result))                 # undecorate
 
@@ -366,9 +391,35 @@ def nlargest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
+
+    # Short-cut for n==1 is to use max() when len(iterable)>0
+    if n == 1:
+        it = iter(iterable)
+        head = list(islice(it, 1))
+        if not head:
+            return []
+        if key is None:
+            return [max(chain(head, it))]
+        return [max(chain(head, it), key=key)]
+
+    # When n>=size, it's faster to use sort()
+    try:
+        size = len(iterable)
+    except (TypeError, AttributeError):
+        pass
+    else:
+        if n >= size:
+            return sorted(iterable, key=key, reverse=True)[:n]
+
+    # When key is none, use simpler decoration
+    if key is None:
+        it = zip(iterable, map(neg, count()))               # decorate
+        result = _nlargest(n, it)
+        return list(map(itemgetter(0), result))             # undecorate
+
+    # General case, slowest method
     in1, in2 = tee(iterable)
-    keys = in1 if key is None else map(key, in1)
-    it = zip(keys, map(neg, count()), in2)                 # decorate
+    it = zip(map(key, in1), map(neg, count()), in2)         # decorate
     result = _nlargest(n, it)
     return list(map(itemgetter(2), result))                 # undecorate
 

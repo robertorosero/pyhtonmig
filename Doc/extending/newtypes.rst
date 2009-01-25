@@ -823,8 +823,8 @@ As you can see, the source code closely resembles the :class:`Noddy` examples in
 previous sections. We will break down the main differences between them. ::
 
    typedef struct {
-   	PyListObject list;
-   	int state;
+       PyListObject list;
+       int state;
    } Shoddy;
 
 The primary difference for derived type objects is that the base type's object
@@ -837,10 +837,10 @@ be safely cast to both *PyListObject\** and *Shoddy\**. ::
    static int
    Shoddy_init(Shoddy *self, PyObject *args, PyObject *kwds)
    {
-   	if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
-   		return -1;
-   	self->state = 0;
-   	return 0;
+       if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
+          return -1;
+       self->state = 0;
+       return 0;
    }
 
 In the :attr:`__init__` method for our type, we can see how to call through to
@@ -859,18 +859,18 @@ the module's :cfunc:`init` function. ::
    PyMODINIT_FUNC
    PyInit_shoddy(void)
    {
-        PyObject *m;
+       PyObject *m;
 
-        ShoddyType.tp_base = &PyList_Type;
-        if (PyType_Ready(&ShoddyType) < 0)
-            return NULL;
+       ShoddyType.tp_base = &PyList_Type;
+       if (PyType_Ready(&ShoddyType) < 0)
+           return NULL;
 
-        m = PyModule_Create(&shoddymodule);
-        if (m == NULL)
-            return NULL;
+       m = PyModule_Create(&shoddymodule);
+       if (m == NULL)
+           return NULL;
 
-        Py_INCREF(&ShoddyType);
-        PyModule_AddObject(m, "Shoddy", (PyObject *) &ShoddyType);
+       Py_INCREF(&ShoddyType);
+       PyModule_AddObject(m, "Shoddy", (PyObject *) &ShoddyType);
    }
 
 Before calling :cfunc:`PyType_Ready`, the type structure must have the
@@ -1113,7 +1113,7 @@ structure::
    typedef struct PyMethodDef {
        char        *ml_name;       /* method name */
        PyCFunction  ml_meth;       /* implementation function */
-       int	         ml_flags;      /* flags */
+       int          ml_flags;      /* flags */
        char        *ml_doc;        /* docstring */
    } PyMethodDef;
 
@@ -1180,7 +1180,7 @@ As with the :attr:`tp_methods` table, a sentinel entry with a :attr:`name` value
 of *NULL* is required.
 
 .. XXX Descriptors need to be explained in more detail somewhere, but not here.
-   
+
    Descriptor objects have two handler functions which correspond to the
    \member{tp_getattro} and \member{tp_setattro} handlers.  The
    \method{__get__()} handler is a function which is passed the descriptor,
@@ -1216,7 +1216,7 @@ Here is an example::
 
        PyErr_Format(PyExc_AttributeError,
                     "'%.50s' object has no attribute '%.400s'",
-		    tp->tp_name, name);
+                    tp->tp_name, name);
        return NULL;
    }
 
@@ -1233,15 +1233,15 @@ example that simply raises an exception; if this were really all you wanted, the
        return -1;
    }
 
-.. XXX tp_compare is dead; need to rewrite for tp_richcompare!  
+.. XXX tp_compare is dead; need to rewrite for tp_richcompare!
 
    Object Comparison
    -----------------
-    
+
    ::
-    
+
       cmpfunc tp_compare;
-    
+
    The :attr:`tp_compare` handler is called when comparisons are needed and the
    object does not implement the specific rich comparison method which matches the
    requested comparison.  (It is always used if defined and the
@@ -1252,18 +1252,18 @@ example that simply raises an exception; if this were really all you wanted, the
    allowed to return arbitrary negative or positive integers for less than and
    greater than, respectively; as of Python 2.2, this is no longer allowed.  In the
    future, other return values may be assigned a different meaning.)
-    
+
    A :attr:`tp_reserved` handler may raise an exception.  In this case it should
    return a negative value.  The caller has to test for the exception using
    :cfunc:`PyErr_Occurred`.
-    
+
    Here is a sample implementation::
-    
+
       static int
       newdatatype_compare(newdatatypeobject * obj1, newdatatypeobject * obj2)
       {
           long result;
-    
+
           if (obj1->obj_UnderlyingDatatypePtr->size <
               obj2->obj_UnderlyingDatatypePtr->size) {
               result = -1;

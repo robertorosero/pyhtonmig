@@ -126,7 +126,7 @@ This module defines one class called :class:`Popen`:
    Special value that can be used as the *stderr* argument to :class:`Popen` and
    indicates that standard error should go into the same handle as standard
    output.
-   
+
 
 Convenience Functions
 ^^^^^^^^^^^^^^^^^^^^^
@@ -160,11 +160,12 @@ This module also defines four shortcut functions:
 
    Run command with arguments and return its output as a byte string.
 
-   If the exit code was non-zero it raises a CalledProcessError.  The
-   CalledProcessError object will have the return code in the returncode
-   attribute and output in the output attribute.
+   If the exit code was non-zero it raises a :exc:`CalledProcessError`.  The
+   :exc:`CalledProcessError` object will have the return code in the
+   :attr:`returncode`
+   attribute and output in the :attr:`output` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example:
+   The arguments are the same as for the :class:`Popen` constructor.  Example:
 
       >>> subprocess.check_output(["ls", "-l", "/dev/null"])
       'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
@@ -346,7 +347,7 @@ The following attributes are also available:
    The child return code, set by :meth:`poll` and :meth:`wait` (and indirectly
    by :meth:`communicate`).  A ``None`` value indicates that the process
    hasn't terminated yet.
-   
+
    A negative value ``-N`` indicates that the child was terminated by signal
    ``N`` (Unix only).
 

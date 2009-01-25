@@ -284,6 +284,16 @@ class LongTest(unittest.TestCase):
 
         self.assertRaises(ValueError, int, '123\0')
         self.assertRaises(ValueError, int, '53', 40)
+        # trailing L should no longer be accepted...
+        self.assertRaises(ValueError, int, '123L')
+        self.assertRaises(ValueError, int, '123l')
+        self.assertRaises(ValueError, int, '0L')
+        self.assertRaises(ValueError, int, '-37L')
+        self.assertRaises(ValueError, int, '0x32L', 16)
+        self.assertRaises(ValueError, int, '1L', 21)
+        # ... but it's just a normal digit if base >= 22
+        self.assertEqual(int('1L', 22), 43)
+
         self.assertRaises(TypeError, int, 1, 12)
 
         # SF patch #1638879: embedded NULs were not detected with
@@ -367,7 +377,7 @@ class LongTest(unittest.TestCase):
 
 
     def test_conversion(self):
-        # Test __long__()
+        # Test __int__()
         class ClassicMissingMethods:
             pass
         self.assertRaises(TypeError, int, ClassicMissingMethods())
@@ -410,17 +420,31 @@ class LongTest(unittest.TestCase):
         class Classic:
             pass
         for base in (object, Classic):
-            class LongOverridesTrunc(base):
-                def __long__(self):
+            class IntOverridesTrunc(base):
+                def __int__(self):
                     return 42
                 def __trunc__(self):
                     return -12
-            self.assertEqual(int(LongOverridesTrunc()), 42)
+            self.assertEqual(int(IntOverridesTrunc()), 42)
 
             class JustTrunc(base):
                 def __trunc__(self):
                     return 42
             self.assertEqual(int(JustTrunc()), 42)
+
+            class JustLong(base):
+                # test that __long__ no longer used in 3.x
+                def __long__(self):
+                    return 42
+            self.assertRaises(TypeError, int, JustLong())
+
+            class LongTrunc(base):
+                # __long__ should be ignored in 3.x
+                def __long__(self):
+                    return 42
+                def __trunc__(self):
+                    return 1729
+            self.assertEqual(int(LongTrunc()), 1729)
 
             for trunc_result_base in (object, Classic):
                 class Integral(trunc_result_base):

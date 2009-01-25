@@ -18,7 +18,7 @@
 Logging package for Python. Based on PEP 282 and comments thereto in
 comp.lang.python, and influenced by Apache's log4j system.
 
-Copyright (C) 2001-2008 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2009 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
@@ -43,8 +43,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.5.0.6"
-__date__    = "03 December 2008"
+__version__ = "0.5.0.7"
+__date__    = "20 January 2009"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -97,6 +97,11 @@ raiseExceptions = 1
 # If you don't want threading information in the log, set this to zero
 #
 logThreads = 1
+
+#
+# If you don't want multiprocessing information in the log, set this to zero
+#
+logMultiprocessing = 1
 
 #
 # If you don't want process information in the log, set this to zero
@@ -263,6 +268,11 @@ class LogRecord:
         else:
             self.thread = None
             self.threadName = None
+        if logMultiprocessing:
+            from multiprocessing import current_process
+            self.processName = current_process().name
+        else:
+            self.processName = None
         if logProcesses and hasattr(os, 'getpid'):
             self.process = os.getpid()
         else:
@@ -727,7 +737,6 @@ class StreamHandler(Handler):
         if strm is None:
             strm = sys.stderr
         self.stream = strm
-        self.formatter = None
 
     def flush(self):
         """
@@ -782,10 +791,12 @@ class FileHandler(StreamHandler):
         self.mode = mode
         self.encoding = encoding
         if delay:
+            #We don't open the stream, but we still need to call the
+            #Handler constructor to set level, formatter, lock etc.
+            Handler.__init__(self)
             self.stream = None
         else:
-            stream = self._open()
-            StreamHandler.__init__(self, stream)
+            StreamHandler.__init__(self, self._open())
 
     def close(self):
         """
@@ -817,8 +828,7 @@ class FileHandler(StreamHandler):
         constructor, open it before calling the superclass's emit.
         """
         if self.stream is None:
-            stream = self._open()
-            StreamHandler.__init__(self, stream)
+            self.stream = self._open()
         StreamHandler.emit(self, record)
 
 #---------------------------------------------------------------------------

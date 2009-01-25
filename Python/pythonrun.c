@@ -23,6 +23,10 @@
 #include <signal.h>
 #endif
 
+#ifdef MS_WINDOWS
+#include "malloc.h" /* for alloca */
+#endif
+
 #ifdef HAVE_LANGINFO_H
 #include <locale.h>
 #include <langinfo.h>
@@ -84,6 +88,7 @@ int Py_UseClassExceptionsFlag = 1; /* Needed by bltinmodule.c: deprecated */
 int Py_FrozenFlag; /* Needed by getpath.c */
 int Py_IgnoreEnvironmentFlag; /* e.g. PYTHONPATH, PYTHONHOME */
 int Py_NoUserSiteDirectory = 0; /* for -s and site.py */
+int Py_UnbufferedStdioFlag = 0; /* Unbuffered binary std{in,out,err} */
 
 /* PyModule_GetWarningsModule is no longer necessary as of 2.6
 since _warnings is builtin.  This API should not be used. */
@@ -724,6 +729,83 @@ initsite(void)
 	}
 }
 
+static PyObject*
+create_stdio(PyObject* io,
+	int fd, int write_mode, char* name,
+	char* encoding, char* errors)
+{
+	PyObject *buf = NULL, *stream = NULL, *text = NULL, *raw = NULL, *res;
+	const char* mode;
+	PyObject *line_buffering;
+	int buffering, isatty;
+
+	if (Py_UnbufferedStdioFlag)
+		buffering = 0;
+	else
+		buffering = -1;
+	if (write_mode)
+		mode = "wb";
+	else
+		mode = "rb";
+	buf = PyObject_CallMethod(io, "open", "isiOOOi",
+				  fd, mode, buffering,
+				  Py_None, Py_None, Py_None, 0);
+	if (buf == NULL)
+		goto error;
+
+	if (!Py_UnbufferedStdioFlag) {
+		raw = PyObject_GetAttrString(buf, "raw");
+		if (raw == NULL)
+			goto error;
+	}
+	else {
+		raw = buf;
+		Py_INCREF(raw);
+	}
+
+	text = PyUnicode_FromString(name);
+	if (text == NULL || PyObject_SetAttrString(raw, "_name", text) < 0)
+		goto error;
+	res = PyObject_CallMethod(raw, "isatty", "");
+	if (res == NULL)
+		goto error;
+	isatty = PyObject_IsTrue(res);
+	Py_DECREF(res);
+	if (isatty == -1)
+		goto error;
+	if (isatty || Py_UnbufferedStdioFlag)
+		line_buffering = Py_True;
+	else
+		line_buffering = Py_False;
+
+	Py_CLEAR(raw);
+	Py_CLEAR(text);
+
+	stream = PyObject_CallMethod(io, "TextIOWrapper", "OsssO",
+				     buf, encoding, errors,
+				     "\n", line_buffering);
+	Py_CLEAR(buf);
+	if (stream == NULL)
+		goto error;
+
+	if (write_mode)
+		mode = "w";
+	else
+		mode = "r";
+	text = PyUnicode_FromString(mode);
+	if (!text || PyObject_SetAttrString(stream, "mode", text) < 0)
+		goto error;
+	Py_CLEAR(text);
+	return stream;
+
+error:
+	Py_XDECREF(buf);
+	Py_XDECREF(stream);
+	Py_XDECREF(text);
+	Py_XDECREF(raw);
+	return NULL;
+}
+
 /* Initialize sys.stdin, stdout, stderr and builtins.open */
 static int
 initstdio(void)
@@ -790,10 +872,9 @@ initstdio(void)
 #endif
 	}
 	else {
-		if (!(std = PyFile_FromFd(fd, "<stdin>", "r", -1, encoding, 
-					  errors, "\n", 0))) {
+		std = create_stdio(iomod, fd, 0, "<stdin>", encoding, errors);
+		if (std == NULL)
 			goto error;
-		}
 	} /* if (fd < 0) */
 	PySys_SetObject("__stdin__", std);
 	PySys_SetObject("stdin", std);
@@ -810,10 +891,9 @@ initstdio(void)
 #endif
 	}
 	else {
-		if (!(std = PyFile_FromFd(fd, "<stdout>", "w", -1, encoding, 
-					  errors, "\n", 0))) {
+		std = create_stdio(iomod, fd, 1, "<stdout>", encoding, errors);
+		if (std == NULL)
 			goto error;
-		}
 	} /* if (fd < 0) */
 	PySys_SetObject("__stdout__", std);
 	PySys_SetObject("stdout", std);
@@ -831,10 +911,9 @@ initstdio(void)
 #endif
 	}
 	else {
-		if (!(std = PyFile_FromFd(fd, "<stderr>", "w", -1, encoding,
-					  "backslashreplace", "\n", 0))) {
+		std = create_stdio(iomod, fd, 1, "<stderr>", encoding, "backslashreplace");
+		if (std == NULL)
 			goto error;
-		}
 	} /* if (fd < 0) */
 
 	/* Same as hack above, pre-import stderr's codec to avoid recursion
@@ -1918,9 +1997,21 @@ Py_FatalError(const char *msg)
 		PyErr_Print();
 	}
 #ifdef MS_WINDOWS
-	OutputDebugString("Fatal Python error: ");
-	OutputDebugString(msg);
-	OutputDebugString("\n");
+	{
+		size_t len = strlen(msg);
+		WCHAR* buffer;
+		size_t i;
+
+		/* Convert the message to wchar_t. This uses a simple one-to-one
+		conversion, assuming that the this error message actually uses ASCII
+		only. If this ceases to be true, we will have to convert. */
+		buffer = alloca( (len+1) * (sizeof *buffer));
+		for( i=0; i<=len; ++i)
+			buffer[i] = msg[i];
+		OutputDebugStringW(L"Fatal Python error: ");
+		OutputDebugStringW(buffer);
+		OutputDebugStringW(L"\n");
+	}
 #ifdef _DEBUG
 	DebugBreak();
 #endif
