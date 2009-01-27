@@ -146,10 +146,9 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
 A counter tool is provided to support convenient and rapid tallies.
 For example::
 
-    # Tally repeated words in a list
-    >>> words = ['red', 'blue', 'red', 'green', 'blue', 'blue']
+    # Tally occurrences of words in a list
     >>> cnt = Counter()
-    >>> for word in words:
+    >>> for word in ['red', 'blue', 'red', 'green', 'blue', 'blue']:
     ...     cnt[word] += 1
     >>> cnt
     Counter({'blue': 3, 'red': 2, 'green': 1})
@@ -163,7 +162,7 @@ For example::
 
 .. class:: Counter([iterable-or-mapping])
 
-   A :class:`Counter` is a :class:`dict` subclass for counting hashable items.
+   A :class:`Counter` is a :class:`dict` subclass for counting hashable objects.
    It is an unordered collection where elements are stored as dictionary keys
    and their counts are stored as dictionary values.  Counts are allowed to be
    any integer value including zero or negative counts.  The :class:`Counter`
@@ -172,27 +171,23 @@ For example::
    Elements are counted from an *iterable* or initialized from another
    *mapping* (or counter)::
 
-       >>> c = Counter()                            # a new, empty counter
-       >>> c = Counter('gallahad')                  # a new counter from an iterable
-       >>> c = Counter({'red': 4, 'blue': 2})       # a new counter from a mapping
-       >>> c = Counter(spam=8, eggs=1)              # a new counter from keyword args
+        >>> c = Counter()                           # a new, empty counter
+        >>> c = Counter('gallahad')                 # a new counter from an iterable
+        >>> c = Counter({'red': 4, 'blue': 2})      # a new counter from a mapping
+        >>> c = Counter(cats=4, dogs=8)             # a new counter from keyword args
 
-   The returned object has a dictionary style interface except that it returns
-   a zero count for missing items (instead of raising a :exc:`KeyError` like a
-   dictionary would)::
+   Counter objects have a dictionary interface except that they return a zero
+   count for missing items instead of raising a :exc:`KeyError`::
 
-        >>> c = Counter(['egg', 'ham'])
+        >>> c = Counter(['eggs', 'ham'])
         >>> c['bacon']                              # count of a missing element is zero
         0
 
-   Assigning a count of zero or reducing the count to zero leaves the
-   element in the dictionary.  Use ``del`` to remove the entry entirely:
+   Setting a count to zero does not remove an element from a counter.
+   Use ``del`` to remove it entirely:
 
-        >>> c = Counter(['arthur', 'gwain'])
-        >>> c['arthur'] = 0                         # set the count of 'arthur' to zero
-        >>> 'arthur' in c                           # but 'arthur' is still in the counter
-        True
-        >>> del c['arthur']                         # del will completely remove the entry
+        >>> c['sausage'] = 0                        # counter entry with a zero count
+        >>> del c['sausage']                        # del actually removes the entry
 
    .. versionadded:: 2.7
 
@@ -202,9 +197,9 @@ For example::
 
    .. method:: elements()
 
-      Return an iterator over elements repeating each as many times as its count.
-      Elements are returned in arbitrary order.  If an element's count has been
-      set to zero or a negative number, :meth:`elements` will ignore it.
+      Return an iterator over elements repeating each as many times as its
+      count.  Elements are returned in arbitrary order.  If an element's count
+      is less than one, :meth:`elements` will ignore it.
 
             >>> c = Counter(a=4, b=2, c=0, d=-2)
             >>> list(c.elements())
@@ -212,92 +207,81 @@ For example::
 
    .. method:: most_common([n])
 
-      Return a list of the *n* most common elements and their counts from
-      the most common to the least.  If *n* is not specified or is ``None``,
-      return a list of all element counts in decreasing order of frequency.
-      Elements with equal counts are ordered arbitrarily::
+      Return a list of the *n* most common elements and their counts from the
+      most common to the least.  If *n* not specified, :func:`most_common`
+      returns *all* elements in the counter.  Elements with equal counts are
+      ordered arbitrarily::
 
             >>> Counter('abracadabra').most_common(3)
             [('a', 5), ('r', 2), ('b', 2)]
 
-   The usual dictionary methods are available for :class:`Counter` objects.
-   All of those work the same as they do for dictionaries except for two
-   which work differently for counters.
+   The usual dictionary methods are available for :class:`Counter` objects
+   except for two which work differently for counters.
 
    .. method:: fromkeys(iterable)
 
-       There is no equivalent class method for :class:`Counter` objects.
-       Raises a :exc:`NotImplementedError` when called.
+      This class method is not implemented for :class:`Counter` objects.
 
    .. method:: update([iterable-or-mapping])
 
-       Elements are counted from an *iterable* or added-in from another
-       *mapping* (or counter).  Like :meth:`dict.update` but adds-in counts
-       instead of replacing them, and the *iterable* is expected to be a
-       sequence of elements, not a sequence of ``(key, value)`` pairs::
-
-            >>> c = Counter('which')
-            >>> c.update('witch')           # add elements from another iterable
-            >>> d = Counter('watch')
-            >>> c.update(d)                 # add elements from another counter
-            >>> c['h']                      # four 'h' in which, witch, and watch
-            4
+      Elements are counted from an *iterable* or added-in from another
+      *mapping* (or counter).  Like :meth:`dict.update` but adds counts
+      instead of replacing them.  Also, the *iterable* is expected to be a
+      sequence of elements, not a sequence of ``(key, value)`` pairs.
 
 Common patterns for working with :class:`Counter` objects::
 
-    sum(c.values())               # total of all counts
-    c.clear()                     # reset all counts
-    list(c)                       # list unique elements
-    set(c)                        # convert to a set
-    dict(c)                       # convert to a regular dictionary
-    c.items()                     # convert to a list of (elem, cnt) pairs
-    Counter(dict(list_of_pairs))  # convert from a list of (elem, cnt) pairs
-    c.most_common()[:-n:-1]       # n least common elements
+    sum(c.values())                 # total of all counts
+    c.clear()                       # reset all counts
+    list(c)                         # list unique elements
+    set(c)                          # convert to a set
+    dict(c)                         # convert to a regular dictionary
+    c.items()                       # convert to a list of (elem, cnt) pairs
+    Counter(dict(list_of_pairs))    # convert from a list of (elem, cnt) pairs
+    c.most_common()[:-n:-1]         # n least common elements
+    c += Counter()                  # remove zero and negative counts
 
 Several multiset mathematical operations are provided for combining
-:class:`Counter` objects.  Multisets are like regular sets but allowed to
+:class:`Counter` objects.  Multisets are like regular sets but are allowed to
 contain repeated elements (with counts of one or more).  Addition and
 subtraction combine counters by adding or subtracting the counts of
 corresponding elements.  Intersection and union return the minimum and maximum
-of corresponding counts::
+of corresponding counts.  All four multiset operations exclude results with
+counts less than one::
 
-    >>> c = Counter({'a': 3, 'b': 1})
-    >>> d = Counter({'a': 1, 'b': 2})
-    >>> c + d                           # add two counters together:  c[x] + d[x]
+    >>> c = Counter(a=3, b=1)
+    >>> d = Counter(a=1, b=2)
+    >>> c + d                       # add two counters together:  c[x] + d[x]
     Counter({'a': 4, 'b': 3})
-    >>> c - d                           # subtract (keeping only positive counts)
+    >>> c - d                       # subtract (keeping only positive counts)
     Counter({'a': 2})
-    >>> c & d                           # intersection:  min(c[x], d[x])
+    >>> c & d                       # intersection:  min(c[x], d[x])
     Counter({'a': 1, 'b': 1})
-    >>> c | d                           # union:  max(c[x], d[x])
+    >>> c | d                       # union:  max(c[x], d[x])
     Counter({'a': 3, 'b': 2})
 
-All four multiset operations produce only positive counts (negative and zero
-results are skipped). If inputs include negative counts, addition will sum
-both counts and then exclude non-positive results.  The other three operations
-are undefined for negative inputs::
+.. seealso::
 
-    >>> e = Counter(a=8, b=-2, c=0)
-    >>> e += Counter()                  # remove zero and negative counts
-    >>> e
-    Counter({'a': 8})
+    * `Counter class <http://code.activestate.com/recipes/576611/>`_
+      adapted for Python 2.5 and an early `Bag recipe
+      <http://code.activestate.com/recipes/259174/>`_ for Python 2.4.
 
-**References**:
+    * `Bag class <http://www.gnu.org/software/smalltalk/manual-base/html_node/Bag.html>`_
+      in Smalltalk.
 
-* Wikipedia entry for `Multisets <http://en.wikipedia.org/wiki/Multiset>`_
+    * Wikipedia entry for `Multisets <http://en.wikipedia.org/wiki/Multiset>`_\.
 
-* `Bag class <http://www.gnu.org/software/smalltalk/manual-base/html_node/Bag.html>`_
-  in Smalltalk
-* `C++ multisets <http://www.demo2s.com/Tutorial/Cpp/0380__set-multiset/Catalog0380__set-multiset.htm>`_
-  tutorial with standalone examples
+    * `C++ multisets <http://www.demo2s.com/Tutorial/Cpp/0380__set-multiset/Catalog0380__set-multiset.htm>`_
+      tutorial with examples.
 
-* An early Python `Bag <http://code.activestate.com/recipes/259174/>`_ recipe
-  for Python 2.4 and a `Counter <http://code.activestate.com/recipes/576611/>`_
-  comformant recipe for Python 2.5 and later
+    * For mathematical operations on multisets and their use cases, see
+      *Knuth, Donald. The Art of Computer Programming Volume II,
+      Section 4.6.3, Exercise 19*\.
 
-* Use cases for multisets and mathematical operations on multisets.
-   Knuth, Donald. The Art of Computer Programming Volume II,
-   Section 4.6.3, Exercise 19
+    * To enumerate all distinct multisets of a given size over a given set of
+      elements, see :func:`itertools.combinations_with_replacement`.
+
+          map(Counter, combinations_with_replacement('ABC', 2)) --> AA AB AC BB BC CC
 
 
 :class:`deque` objects

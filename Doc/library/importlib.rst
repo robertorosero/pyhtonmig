@@ -61,18 +61,64 @@ providing custom importers can be found in :pep:`302`.
 Functions
 ---------
 
-.. function:: __import__(name, globals={}, locals={}, fromlist=\[\], level=0)
+.. function:: __import__(name, globals={}, locals={}, fromlist=list(), level=0)
 
     An implementation of the built-in :func:`__import__` function. See the
     built-in function's documentation for usage instructions.
 
 .. function:: import_module(name, package=None)
 
-    Import a module. The ``name`` argument specifies what module to
+    Import a module. The *name* argument specifies what module to
     import in absolute or relative terms
     (e.g. either ``pkg.mod`` or ``..mod``). If the name is
-    specified in relative terms, then the ``package`` argument must be
+    specified in relative terms, then the *package* argument must be
     specified to the package which is to act as the anchor for resolving the
     package name (e.g. ``import_module('..mod', 'pkg.subpkg')`` will import
     ``pkg.mod``). The specified module will be inserted into
     :data:`sys.modules` and returned.
+
+
+:mod:`importlib.machinery` -- Importers and path hooks
+------------------------------------------------------
+
+.. module:: importlib.machinery
+    :synopsis: Importers and path hooks
+
+This module contains the various objects that help :keyword:`import`
+find and load modules.
+
+.. class:: BuiltinImporter
+
+    :term:`Importer` for built-in modules. All known built-in modules are
+    listed in :data:`sys.builtin_module_names`.
+
+    Only class methods are defined by this class to alleviate the need for
+    instantiation.
+
+    .. classmethod:: find_module(fullname, path=None)
+
+        Class method that allows this class to be a :term:`finder` for built-in
+        modules.
+
+    .. classmethod:: load_module(fullname)
+
+        Class method that allows this class to be a :term:`loader` for built-in
+        modules.
+
+
+.. class:: FrozenImporter
+
+    :term:`Importer` for frozen modules.
+
+    Only class methods are defined by this class to alleviate the need for
+    instantiation.
+
+    .. classmethod:: find_module(fullname, path=None)
+
+        Class method that allows this class to be a :term:`finder` for frozen
+        modules.
+
+    .. classmethod:: load_module(fullname)
+
+        Class method that allows this class to be a :term:`loader` for frozen
+        modules.

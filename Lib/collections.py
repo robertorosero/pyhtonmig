@@ -111,7 +111,7 @@ def namedtuple(typename, field_names, verbose=False):
     # where the named tuple is created.  Bypass this step in enviroments where
     # sys._getframe is not defined (Jython for example).
     if hasattr(_sys, '_getframe'):
-        result.__module__ = _sys._getframe(1).f_globals['__name__']
+        result.__module__ = _sys._getframe(1).f_globals.get('__name__', '__main__')
 
     return result
 
@@ -255,8 +255,11 @@ class Counter(dict):
 
         if iterable is not None:
             if isinstance(iterable, Mapping):
-                for elem, count in iterable.items():
-                    self[elem] += count
+                if self:
+                    for elem, count in iterable.items():
+                        self[elem] += count
+                else:
+                    dict.update(self, iterable) # fast path when counter is empty
             else:
                 for elem in iterable:
                     self[elem] += 1
@@ -282,7 +285,6 @@ class Counter(dict):
     #       Knuth TAOCP Volume II section 4.6.3 exercise 19
     #       and at http://en.wikipedia.org/wiki/Multiset
     #
-    # Results are undefined when inputs contain negative counts.
     # Outputs guaranteed to only include positive counts.
     #
     # To strip negative and zero counts, add-in an empty counter:
@@ -314,8 +316,8 @@ class Counter(dict):
         if not isinstance(other, Counter):
             return NotImplemented
         result = Counter()
-        for elem, count in self.items():
-            newcount = count - other[elem]
+        for elem in set(self) | set(other):
+            newcount = self[elem] - other[elem]
             if newcount > 0:
                 result[elem] = newcount
         return result
@@ -434,8 +436,6 @@ class UserList(MutableSequence):
     def __ge__(self, other): return self.data >= self.__cast(other)
     def __cast(self, other):
         return other.data if isinstance(other, UserList) else other
-    def __cmp__(self, other):
-        return cmp(self.data, self.__cast(other))
     def __contains__(self, item): return item in self.data
     def __len__(self): return len(self.data)
     def __getitem__(self, i): return self.data[i]

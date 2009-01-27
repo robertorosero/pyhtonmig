@@ -12,6 +12,13 @@ What's New in Python 3.1 alpha 0
 Core and Builtins
 -----------------
 
+- Issue #4753: By enabling a configure option named '--with-computed-gotos'
+  on compilers that support it (notably: gcc, SunPro, icc), the bytecode
+  evaluation loop is compiled with a new dispatch mechanism which gives
+  speedups of up to 20%, depending on the system, on various benchmarks.
+
+- Issue #4874: Most builtin decoders now reject unicode input.
+
 - Issue #4842: Don't allow trailing 'L' when constructing an integer
   from a string.
 
@@ -48,7 +55,7 @@ Core and Builtins
   Martin von Löwis at
   http://mail.python.org/pipermail/python-dev/2008-June/080579.html.
 
-- Issue #4604: Some objects of the I/O library could still be used after 
+- Issue #4604: Some objects of the I/O library could still be used after
   having been closed (for instance, a read() call could return some
   previously buffered data). Patch by Dmitry Vasiliev.
 
@@ -137,6 +144,49 @@ Core and Builtins
 Library
 -------
 
+- Removed isSequenceType(), isMappingType, and isNumberType() from the
+  operator module; use the abstract base classes instead.  Also removed
+  the repeat() function; use mul() instead.
+
+- Issue 5021:  doctest.testfile() did not create __name__ and
+  collections.namedtuple() relied on __name__ being defined.
+
+- Backport importlib from Python 3.1. Only the import_module() function has
+  been backported to help facilitate transitions from 2.7 to 3.1.
+
+- Issue #1885: distutils. When running sdist with --formats=tar,gztar
+  the tar file was overriden by the gztar one.
+
+- Issue #4863: distutils.mwerkscompiler has been removed.
+
+- Added a new itertools functions:  combinations_with_replacement()
+  and compress().
+
+- Fix and properly document the multiprocessing module's logging
+  support, expose the internal levels and provide proper usage
+  examples.
+
+- Issue #1672332: fix unpickling of subnormal floats, which was
+  producing a ValueError on some platforms.
+
+- Issue #3881: Help Tcl to load even when started through the
+  unreadable local symlink to "Program Files" on Vista.
+
+- Issue #4710: Extract directories properly in the zipfile module;
+  allow adding directories to a zipfile.
+
+- Issue #3807: _multiprocessing build fails when configure is passed 
+  --without-threads argument. When this occurs, _multiprocessing will
+  be disabled, and not compiled.
+
+- Issue #5008: When a file is opened in append mode with the new IO library,
+  do an explicit seek to the end of file (so that e.g. tell() returns the
+  file size rather than 0). This is consistent with the behaviour of the
+  traditional 2.x file object.
+
+- Issue #5013: Fixed a bug in FileHandler which occurred when the delay
+  parameter was set.
+
 - Issue #4842: Always append a trailing 'L' when pickling longs using
   pickle protocol 0.  When reading, the 'L' is optional.
 
@@ -146,7 +196,7 @@ Library
   _check_logger_class from multiprocessing.
 
 - Issue #3325: Remove python2.x try: except: imports for old cPickle from
-  multiprocessing. 
+  multiprocessing.
 
 - Issue #4959: inspect.formatargspec now works for keyword only arguments
   without defaults.
@@ -183,8 +233,8 @@ Library
 - Issue #3638: Remove functions from _tkinter module level that depend on
   TkappObject to work with multiple threads.
 
-- Issue #4718: Adapt the wsgiref package so that it actually works with 
-  Python 3.x, in accordance with the `official amendments of the spec 
+- Issue #4718: Adapt the wsgiref package so that it actually works with
+  Python 3.x, in accordance with the `official amendments of the spec
   <http://www.wsgi.org/wsgi/Amendments_1.0>`_.
 
 - Issue #4796: Added Decimal.from_float() and Context.create_decimal_from_float()
@@ -202,10 +252,10 @@ Library
 - Issue #4795: inspect.isgeneratorfunction() returns False instead of None when
   the function is not a generator.
 
-- Issue #4702: Throwing a DistutilsPlatformError instead of IOError in case 
-  no MSVC compiler is found under Windows. Original patch by Philip Jenvey. 
+- Issue #4702: Throwing a DistutilsPlatformError instead of IOError in case
+  no MSVC compiler is found under Windows. Original patch by Philip Jenvey.
 
-- Issue #4646: distutils was choking on empty options arg in the setup 
+- Issue #4646: distutils was choking on empty options arg in the setup
   function. Original patch by Thomas Heller.
 
 - Issue #3767: Convert Tk object to string in tkColorChooser.

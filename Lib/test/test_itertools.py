@@ -110,6 +110,14 @@ class TestBasicOps(unittest.TestCase):
                 if sorted(indices) == list(indices):
                     yield tuple(pool[i] for i in indices)
 
+        def combinations3(iterable, r):
+            'Pure python version from cwr()'
+            pool = tuple(iterable)
+            n = len(pool)
+            for indices in combinations_with_replacement(range(n), r):
+                if len(set(indices)) == r:
+                    yield tuple(pool[i] for i in indices)
+
         for n in range(7):
             values = [5*x-12 for x in range(n)]
             for r in range(n+2):
@@ -126,10 +134,81 @@ class TestBasicOps(unittest.TestCase):
                                      [e for e in values if e in c])      # comb is a subsequence of the input iterable
                 self.assertEqual(result, list(combinations1(values, r))) # matches first pure python version
                 self.assertEqual(result, list(combinations2(values, r))) # matches second pure python version
+                self.assertEqual(result, list(combinations3(values, r))) # matches second pure python version
 
         # Test implementation detail:  tuple re-use
         self.assertEqual(len(set(map(id, combinations('abcde', 3)))), 1)
         self.assertNotEqual(len(set(map(id, list(combinations('abcde', 3))))), 1)
+
+    def test_combinations_with_replacement(self):
+        cwr = combinations_with_replacement
+        self.assertRaises(TypeError, cwr, 'abc')       # missing r argument
+        self.assertRaises(TypeError, cwr, 'abc', 2, 1) # too many arguments
+        self.assertRaises(TypeError, cwr, None)        # pool is not iterable
+        self.assertRaises(ValueError, cwr, 'abc', -2)  # r is negative
+        self.assertEqual(list(cwr('ABC', 2)),
+                         [('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')])
+
+        def cwr1(iterable, r):
+            'Pure python version shown in the docs'
+            # number items returned:  (n+r-1)! / r! / (n-1)! when n>0
+            pool = tuple(iterable)
+            n = len(pool)
+            if not n and r:
+                return
+            indices = [0] * r
+            yield tuple(pool[i] for i in indices)
+            while 1:
+                for i in reversed(range(r)):
+                    if indices[i] != n - 1:
+                        break
+                else:
+                    return
+                indices[i:] = [indices[i] + 1] * (r - i)
+                yield tuple(pool[i] for i in indices)
+
+        def cwr2(iterable, r):
+            'Pure python version shown in the docs'
+            pool = tuple(iterable)
+            n = len(pool)
+            for indices in product(range(n), repeat=r):
+                if sorted(indices) == list(indices):
+                    yield tuple(pool[i] for i in indices)
+
+        def numcombs(n, r):
+            if not n:
+                return 0 if r else 1
+            return fact(n+r-1) / fact(r)/ fact(n-1)
+
+        for n in range(7):
+            values = [5*x-12 for x in range(n)]
+            for r in range(n+2):
+                result = list(cwr(values, r))
+
+                self.assertEqual(len(result), numcombs(n, r))           # right number of combs
+                self.assertEqual(len(result), len(set(result)))         # no repeats
+                self.assertEqual(result, sorted(result))                # lexicographic order
+
+                regular_combs = list(combinations(values, r))           # compare to combs without replacement
+                if n == 0 or r <= 1:
+                    self.assertEquals(result, regular_combs)            # cases that should be identical
+                else:
+                    self.assert_(set(result) >= set(regular_combs))     # rest should be supersets of regular combs
+
+                for c in result:
+                    self.assertEqual(len(c), r)                         # r-length combinations
+                    noruns = [k for k,v in groupby(c)]                  # combo without consecutive repeats
+                    self.assertEqual(len(noruns), len(set(noruns)))     # no repeats other than consecutive
+                    self.assertEqual(list(c), sorted(c))                # keep original ordering
+                    self.assert_(all(e in values for e in c))           # elements taken from input iterable
+                    self.assertEqual(noruns,
+                                     [e for e in values if e in c])     # comb is a subsequence of the input iterable
+                self.assertEqual(result, list(cwr1(values, r)))         # matches first pure python version
+                self.assertEqual(result, list(cwr2(values, r)))         # matches second pure python version
+
+        # Test implementation detail:  tuple re-use
+        self.assertEqual(len(set(map(id, cwr('abcde', 3)))), 1)
+        self.assertNotEqual(len(set(map(id, list(cwr('abcde', 3))))), 1)
 
     def test_permutations(self):
         self.assertRaises(TypeError, permutations)              # too few arguments
@@ -194,6 +273,54 @@ class TestBasicOps(unittest.TestCase):
         # Test implementation detail:  tuple re-use
         self.assertEqual(len(set(map(id, permutations('abcde', 3)))), 1)
         self.assertNotEqual(len(set(map(id, list(permutations('abcde', 3))))), 1)
+
+    def test_combinatorics(self):
+        # Test relationships between product(), permutations(),
+        # combinations() and combinations_with_replacement().
+
+        for n in range(6):
+            s = 'ABCDEFG'[:n]
+            for r in range(8):
+                prod = list(product(s, repeat=r))
+                cwr = list(combinations_with_replacement(s, r))
+                perm = list(permutations(s, r))
+                comb = list(combinations(s, r))
+
+                # Check size
+                self.assertEquals(len(prod), n**r)
+                self.assertEquals(len(cwr), (fact(n+r-1) / fact(r)/ fact(n-1)) if n else (not r))
+                self.assertEquals(len(perm), 0 if r>n else fact(n) / fact(n-r))
+                self.assertEquals(len(comb), 0 if r>n else fact(n) / fact(r) / fact(n-r))
+
+                # Check lexicographic order without repeated tuples
+                self.assertEquals(prod, sorted(set(prod)))
+                self.assertEquals(cwr, sorted(set(cwr)))
+                self.assertEquals(perm, sorted(set(perm)))
+                self.assertEquals(comb, sorted(set(comb)))
+
+                # Check interrelationships
+                self.assertEquals(cwr, [t for t in prod if sorted(t)==list(t)]) # cwr: prods which are sorted
+                self.assertEquals(perm, [t for t in prod if len(set(t))==r])    # perm: prods with no dups
+                self.assertEqual(comb, [t for t in perm if sorted(t)==list(t)]) # comb: perms that are sorted
+                self.assertEqual(comb, [t for t in cwr if len(set(t))==r])      # comb: cwrs without dups
+                self.assertEqual(comb, list(filter(set(cwr).__contains__, perm)))     # comb: perm that is a cwr
+                self.assertEqual(comb, list(filter(set(perm).__contains__, cwr)))     # comb: cwr that is a perm
+                self.assertEqual(comb, sorted(set(cwr) & set(perm)))            # comb: both a cwr and a perm
+
+    def test_compress(self):
+        self.assertEqual(list(compress('ABCDEF', [1,0,1,0,1,1])), list('ACEF'))
+        self.assertEqual(list(compress('ABCDEF', [0,0,0,0,0,0])), list(''))
+        self.assertEqual(list(compress('ABCDEF', [1,1,1,1,1,1])), list('ABCDEF'))
+        self.assertEqual(list(compress('ABCDEF', [1,0,1])), list('AC'))
+        self.assertEqual(list(compress('ABC', [0,1,1,1,1,1])), list('BC'))
+        n = 10000
+        data = chain.from_iterable(repeat(range(6), n))
+        selectors = chain.from_iterable(repeat((0, 1)))
+        self.assertEqual(list(compress(data, selectors)), [1,3,5] * n)
+        self.assertRaises(TypeError, compress, None, range(6))      # 1st arg not iterable
+        self.assertRaises(TypeError, compress, range(6), None)      # 2nd arg not iterable
+        self.assertRaises(TypeError, compress, range(6))            # too few args
+        self.assertRaises(TypeError, compress, range(6), None)      # too many args
 
     def test_count(self):
         self.assertEqual(lzip('abc',count()), [('a', 0), ('b', 1), ('c', 2)])
@@ -715,6 +842,13 @@ class TestExamples(unittest.TestCase):
         self.assertEqual(list(combinations(range(4), 3)),
                          [(0,1,2), (0,1,3), (0,2,3), (1,2,3)])
 
+    def test_combinations_with_replacement(self):
+        self.assertEqual(list(combinations_with_replacement('ABC', 2)),
+                         [('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')])
+
+    def test_compress(self):
+        self.assertEqual(list(compress('ABCDEF', [1,0,1,0,1,1])), list('ACEF'))
+
     def test_count(self):
         self.assertEqual(list(islice(count(10), 5)), [10, 11, 12, 13, 14])
 
@@ -794,6 +928,14 @@ class TestGC(unittest.TestCase):
     def test_combinations(self):
         a = []
         self.makecycle(combinations([1,2,a,3], 3), a)
+
+    def test_combinations_with_replacement(self):
+        a = []
+        self.makecycle(combinations_with_replacement([1,2,a,3], 3), a)
+
+    def test_compress(self):
+        a = []
+        self.makecycle(compress('ABCDEF', [1,0,1,0,1,0]), a)
 
     def test_cycle(self):
         a = []
@@ -947,6 +1089,15 @@ class TestVariousIteratorArgs(unittest.TestCase):
             self.assertRaises(TypeError, list, chain(X(s)))
             self.assertRaises(TypeError, list, chain(N(s)))
             self.assertRaises(ZeroDivisionError, list, chain(E(s)))
+
+    def test_compress(self):
+        for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
+            n = len(s)
+            for g in (G, I, Ig, S, L, R):
+                self.assertEqual(list(compress(g(s), repeat(1))), list(g(s)))
+            self.assertRaises(TypeError, compress, X(s), repeat(1))
+            self.assertRaises(TypeError, compress, N(s), repeat(1))
+            self.assertRaises(ZeroDivisionError, list, compress(E(s), repeat(1)))
 
     def test_product(self):
         for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
@@ -1144,7 +1295,7 @@ class SubclassWithKwargsTest(unittest.TestCase):
     def test_keywords_in_subclass(self):
         # count is not subclassable...
         for cls in (repeat, zip, filter, filterfalse, chain, map,
-                    starmap, islice, takewhile, dropwhile, cycle):
+                    starmap, islice, takewhile, dropwhile, cycle, compress):
             class Subclass(cls):
                 def __init__(self, newarg=None, *args):
                     cls.__init__(self, *args)
@@ -1261,7 +1412,7 @@ Samuele
 >>> def grouper(n, iterable, fillvalue=None):
 ...     "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
 ...     args = [iter(iterable)] * n
-...     return zip_longest(fillvalue=fillvalue, *args)
+...     return zip_longest(*args, fillvalue=fillvalue)
 
 >>> def roundrobin(*iterables):
 ...     "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
@@ -1277,30 +1428,9 @@ Samuele
 ...             nexts = cycle(islice(nexts, pending))
 
 >>> def powerset(iterable):
-...     "powerset('ab') --> set([]), set(['a']), set(['b']), set(['a', 'b'])"
-...     # Recipe credited to Eric Raymond
-...     pairs = [(2**i, x) for i, x in enumerate(iterable)]
-...     for n in range(2**len(pairs)):
-...         yield set(x for m, x in pairs if m&n)
-
->>> def compress(data, selectors):
-...     "compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"
-...     return (d for d, s in zip(data, selectors) if s)
-
->>> def combinations_with_replacement(iterable, r):
-...     "combinations_with_replacement('ABC', 3) --> AA AB AC BB BC CC"
-...     pool = tuple(iterable)
-...     n = len(pool)
-...     indices = [0] * r
-...     yield tuple(pool[i] for i in indices)
-...     while 1:
-...         for i in reversed(range(r)):
-...             if indices[i] != n - 1:
-...                 break
-...         else:
-...             return
-...         indices[i:] = [indices[i] + 1] * (r - i)
-...         yield tuple(pool[i] for i in indices)
+...     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+...     s = list(iterable)
+...     return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 >>> def unique_everseen(iterable, key=None):
 ...     "List unique elements, preserving order. Remember all elements ever seen."
@@ -1379,33 +1509,13 @@ perform as purported.
 >>> list(roundrobin('abc', 'd', 'ef'))
 ['a', 'd', 'e', 'b', 'f', 'c']
 
->>> list(map(sorted, powerset('ab')))
-[[], ['a'], ['b'], ['a', 'b']]
+>>> list(powerset([1,2,3]))
+[(), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
 
->>> list(compress('abcdef', [1,0,1,0,1,1]))
-['a', 'c', 'e', 'f']
-
->>> list(combinations_with_replacement('abc', 2))
-[('a', 'a'), ('a', 'b'), ('a', 'c'), ('b', 'b'), ('b', 'c'), ('c', 'c')]
-
->>> list(combinations_with_replacement('01', 3))
-[('0', '0', '0'), ('0', '0', '1'), ('0', '1', '1'), ('1', '1', '1')]
-
->>> def combinations_with_replacement2(iterable, r):
-...     'Alternate version that filters from product()'
-...     pool = tuple(iterable)
-...     n = len(pool)
-...     for indices in product(range(n), repeat=r):
-...         if sorted(indices) == list(indices):
-...             yield tuple(pool[i] for i in indices)
-
->>> list(combinations_with_replacement('abc', 2)) == list(combinations_with_replacement2('abc', 2))
+>>> all(len(list(powerset(range(n)))) == 2**n for n in range(18))
 True
 
->>> list(combinations_with_replacement('01', 3)) == list(combinations_with_replacement2('01', 3))
-True
-
->>> list(combinations_with_replacement('2310', 6)) == list(combinations_with_replacement2('2310', 6))
+>>> list(powerset('abcde')) == sorted(sorted(set(powerset('abcde'))), key=len)
 True
 
 >>> list(unique_everseen('AAAABBBCCDAABBB'))

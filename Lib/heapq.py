@@ -1,4 +1,4 @@
-# -*- coding: Latin-1 -*-
+# -*- coding: latin-1 -*-
 
 """Heap queue algorithm (a.k.a. priority queue).
 
@@ -262,7 +262,7 @@ def _siftdown(heap, startpos, pos):
 #
 # Cutting the # of comparisons is important, since these routines have no
 # way to extract "the priority" from an array element, so that intelligence
-# is likely to be hiding in custom __cmp__ methods, or in array elements
+# is likely to be hiding in custom comparison methods, or in array elements
 # storing (priority, record) tuples.  Comparisons are thus potentially
 # expensive.
 #
