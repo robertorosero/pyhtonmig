@@ -1683,7 +1683,8 @@ product_dealloc(productobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->pools);
 	Py_XDECREF(lz->result);
-	PyMem_Free(lz->indices);
+	if (lz->indices != NULL)
+		PyMem_Free(lz->indices);
 	Py_TYPE(lz)->tp_free(lz);
 }
 
@@ -1911,7 +1912,8 @@ combinations_dealloc(combinationsobject *co)
 	PyObject_GC_UnTrack(co);
 	Py_XDECREF(co->pool);
 	Py_XDECREF(co->result);
-	PyMem_Free(co->indices);
+	if (co->indices != NULL)
+		PyMem_Free(co->indices);
 	Py_TYPE(co)->tp_free(co);
 }
 
@@ -2056,6 +2058,252 @@ static PyTypeObject combinations_type = {
 	0,				/* tp_init */
 	0,				/* tp_alloc */
 	combinations_new,			/* tp_new */
+	PyObject_GC_Del,		/* tp_free */
+};
+
+
+/* combinations with replacement object *******************************************/
+
+/* Equivalent to:
+
+		def combinations_with_replacement(iterable, r):
+			"combinations_with_replacement('ABC', 2) --> AA AB AC BB BC CC"
+			# number items returned:  (n+r-1)! / r! / (n-1)!
+			pool = tuple(iterable)
+			n = len(pool)
+			indices = [0] * r
+			yield tuple(pool[i] for i in indices)   
+			while 1:
+				for i in reversed(range(r)):
+					if indices[i] != n - 1:
+						break
+				else:
+					return
+				indices[i:] = [indices[i] + 1] * (r - i)
+				yield tuple(pool[i] for i in indices)
+
+		def combinations_with_replacement2(iterable, r):
+			'Alternate version that filters from product()'
+			pool = tuple(iterable)
+			n = len(pool)
+			for indices in product(range(n), repeat=r):
+				if sorted(indices) == list(indices):
+					yield tuple(pool[i] for i in indices)
+*/
+typedef struct {
+	PyObject_HEAD
+	PyObject *pool;			/* input converted to a tuple */
+	Py_ssize_t *indices;    /* one index per result element */
+	PyObject *result;       /* most recently returned result tuple */
+	Py_ssize_t r;			/* size of result tuple */
+	int stopped;			/* set to 1 when the cwr iterator is exhausted */
+} cwrobject;
+
+static PyTypeObject cwr_type;
+
+static PyObject *
+cwr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	cwrobject *co;
+	Py_ssize_t n;
+	Py_ssize_t r;
+	PyObject *pool = NULL;
+	PyObject *iterable = NULL;
+	Py_ssize_t *indices = NULL;
+	Py_ssize_t i;
+	static char *kwargs[] = {"iterable", "r", NULL};
+ 
+ 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "On:combinations_with_replacement", kwargs, 
+					 &iterable, &r))
+		return NULL;
+
+	pool = PySequence_Tuple(iterable);
+	if (pool == NULL)
+		goto error;
+	n = PyTuple_GET_SIZE(pool);
+	if (r < 0) {
+		PyErr_SetString(PyExc_ValueError, "r must be non-negative");
+		goto error;
+	}
+
+	indices = PyMem_Malloc(r * sizeof(Py_ssize_t));
+	if (indices == NULL) {
+    		PyErr_NoMemory();
+		goto error;
+	}
+
+	for (i=0 ; i<r ; i++)
+		indices[i] = 0;
+
+	/* create cwrobject structure */
+	co = (cwrobject *)type->tp_alloc(type, 0);
+	if (co == NULL)
+		goto error;
+
+	co->pool = pool;
+	co->indices = indices;
+	co->result = NULL;
+	co->r = r;
+	co->stopped = !n && r;
+
+	return (PyObject *)co;
+
+error:
+	if (indices != NULL)
+		PyMem_Free(indices);
+	Py_XDECREF(pool);
+	return NULL;
+}
+
+static void
+cwr_dealloc(cwrobject *co)
+{
+	PyObject_GC_UnTrack(co);
+	Py_XDECREF(co->pool);
+	Py_XDECREF(co->result);
+	if (co->indices != NULL)
+		PyMem_Free(co->indices);
+	Py_TYPE(co)->tp_free(co);
+}
+
+static int
+cwr_traverse(cwrobject *co, visitproc visit, void *arg)
+{
+	Py_VISIT(co->pool);
+	Py_VISIT(co->result);
+	return 0;
+}
+
+static PyObject *
+cwr_next(cwrobject *co)
+{
+	PyObject *elem;
+	PyObject *oldelem;
+	PyObject *pool = co->pool;
+	Py_ssize_t *indices = co->indices;
+	PyObject *result = co->result;
+	Py_ssize_t n = PyTuple_GET_SIZE(pool);
+	Py_ssize_t r = co->r;
+	Py_ssize_t i, j, index;
+
+	if (co->stopped)
+		return NULL;
+
+	if (result == NULL) {
+                /* On the first pass, initialize result tuple using the indices */
+		result = PyTuple_New(r);
+		if (result == NULL)
+            		goto empty;
+		co->result = result;
+		for (i=0; i<r ; i++) {
+			index = indices[i];
+    			elem = PyTuple_GET_ITEM(pool, index);
+    			Py_INCREF(elem);
+    			PyTuple_SET_ITEM(result, i, elem);
+		}
+	} else {
+		/* Copy the previous result tuple or re-use it if available */
+		if (Py_REFCNT(result) > 1) {
+			PyObject *old_result = result;
+			result = PyTuple_New(r);
+			if (result == NULL)
+				goto empty;
+			co->result = result;
+			for (i=0; i<r ; i++) {
+				elem = PyTuple_GET_ITEM(old_result, i);
+    				Py_INCREF(elem);
+    				PyTuple_SET_ITEM(result, i, elem);
+			}
+			Py_DECREF(old_result);
+		}
+		/* Now, we've got the only copy so we can update it in-place CPython's
+		   empty tuple is a singleton and cached in PyTuple's freelist. */
+		assert(r == 0 || Py_REFCNT(result) == 1);
+
+        /* Scan indices right-to-left until finding one that is not
+         * at its maximum (n-1). */
+		for (i=r-1 ; i >= 0 && indices[i] == n-1; i--)
+			;
+
+		/* If i is negative, then the indices are all at
+           their maximum value and we're done. */
+		if (i < 0)
+			goto empty;
+
+		/* Increment the current index which we know is not at its
+           maximum.  Then set all to the right to the same value. */
+		indices[i]++;
+		for (j=i+1 ; j<r ; j++)
+			indices[j] = indices[j-1];
+
+		/* Update the result tuple for the new indices
+		   starting with i, the leftmost index that changed */
+		for ( ; i<r ; i++) {
+			index = indices[i];
+			elem = PyTuple_GET_ITEM(pool, index);
+			Py_INCREF(elem);
+			oldelem = PyTuple_GET_ITEM(result, i);
+			PyTuple_SET_ITEM(result, i, elem);
+			Py_DECREF(oldelem);
+		}
+	}
+
+	Py_INCREF(result);
+	return result;
+
+empty:
+	co->stopped = 1;
+	return NULL;
+}
+
+PyDoc_STRVAR(cwr_doc,
+"combinations_with_replacement(iterable[, r]) --> combinations_with_replacement object\n\
+\n\
+Return successive r-length combinations of elements in the iterable\n\
+allowing individual elements to have successive repeats.\n\
+combinations_with_replacement('ABC', 2) --> AA AB AC BB BC CC");
+
+static PyTypeObject cwr_type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"itertools.combinations_with_replacement",		/* tp_name */
+	sizeof(cwrobject),		/* tp_basicsize */
+	0,						/* tp_itemsize */
+	/* methods */
+	(destructor)cwr_dealloc,	/* tp_dealloc */
+	0,						/* tp_print */
+	0,						/* tp_getattr */
+	0,						/* tp_setattr */
+	0,						/* tp_compare */
+	0,						/* tp_repr */
+	0,						/* tp_as_number */
+	0,						/* tp_as_sequence */
+	0,						/* tp_as_mapping */
+	0,						/* tp_hash */
+	0,						/* tp_call */
+	0,						/* tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	0,						/* tp_setattro */
+	0,						/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+		Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	cwr_doc,				/* tp_doc */
+	(traverseproc)cwr_traverse,	/* tp_traverse */
+	0,						/* tp_clear */
+	0,						/* tp_richcompare */
+	0,						/* tp_weaklistoffset */
+	PyObject_SelfIter,		/* tp_iter */
+	(iternextfunc)cwr_next,	/* tp_iternext */
+	0,						/* tp_methods */
+	0,						/* tp_members */
+	0,						/* tp_getset */
+	0,						/* tp_base */
+	0,						/* tp_dict */
+	0,						/* tp_descr_get */
+	0,						/* tp_descr_set */
+	0,						/* tp_dictoffset */
+	0,						/* tp_init */
+	0,						/* tp_alloc */
+	cwr_new,				/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
 
@@ -2328,6 +2576,162 @@ static PyTypeObject permutations_type = {
 	0,				/* tp_alloc */
 	permutations_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
+};
+
+
+/* compress object ************************************************************/
+
+/* Equivalent to:
+
+	def compress(data, selectors):
+		"compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"
+		return (d for d, s in zip(data, selectors) if s)
+*/
+
+typedef struct {
+	PyObject_HEAD
+	PyObject *data;
+	PyObject *selectors;
+} compressobject;
+
+static PyTypeObject compress_type;
+
+static PyObject *
+compress_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *seq1, *seq2;
+	PyObject *data=NULL, *selectors=NULL;
+	compressobject *lz;
+
+	if (type == &compress_type && !_PyArg_NoKeywords("compress()", kwds))
+		return NULL;
+
+	if (!PyArg_UnpackTuple(args, "compress", 2, 2, &seq1, &seq2))
+		return NULL;
+
+	data = PyObject_GetIter(seq1);
+	if (data == NULL)
+		goto fail;
+	selectors = PyObject_GetIter(seq2);
+	if (selectors == NULL)
+		goto fail;
+
+	/* create compressobject structure */
+	lz = (compressobject *)type->tp_alloc(type, 0);
+	if (lz == NULL)
+		goto fail;
+	lz->data = data;
+	lz->selectors = selectors;
+	return (PyObject *)lz;
+
+fail:
+	Py_XDECREF(data);
+	Py_XDECREF(selectors);
+	return NULL;
+}
+
+static void
+compress_dealloc(compressobject *lz)
+{
+	PyObject_GC_UnTrack(lz);
+	Py_XDECREF(lz->data);
+	Py_XDECREF(lz->selectors);
+	Py_TYPE(lz)->tp_free(lz);
+}
+
+static int
+compress_traverse(compressobject *lz, visitproc visit, void *arg)
+{
+	Py_VISIT(lz->data);
+	Py_VISIT(lz->selectors);
+	return 0;
+}
+
+static PyObject *
+compress_next(compressobject *lz)
+{
+	PyObject *data = lz->data, *selectors = lz->selectors;
+	PyObject *datum, *selector;
+	PyObject *(*datanext)(PyObject *) = *Py_TYPE(data)->tp_iternext;
+	PyObject *(*selectornext)(PyObject *) = *Py_TYPE(selectors)->tp_iternext;
+	int ok;
+
+	while (1) {
+		/* Steps:  get datum, get selector, evaluate selector.
+		   Order is important (to match the pure python version
+		   in terms of which input gets a chance to raise an
+		   exception first).
+		*/
+
+		datum = datanext(data);
+		if (datum == NULL)
+			return NULL;
+
+		selector = selectornext(selectors);
+		if (selector == NULL) {
+			Py_DECREF(datum);
+			return NULL;
+		}
+
+		ok = PyObject_IsTrue(selector);
+		Py_DECREF(selector);
+		if (ok == 1)
+			return datum;
+		Py_DECREF(datum);
+		if (ok == -1)
+			return NULL;
+	}
+}
+
+PyDoc_STRVAR(compress_doc,
+"compress(data sequence, selector sequence) --> iterator over selected data\n\
+\n\
+Return data elements corresponding to true selector elements.\n\
+Forms a shorter iterator from selected data elements using the\n\
+selectors to choose the data elements.");
+
+static PyTypeObject compress_type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"itertools.compress",		/* tp_name */
+	sizeof(compressobject),		/* tp_basicsize */
+	0,							/* tp_itemsize */
+	/* methods */
+	(destructor)compress_dealloc,	/* tp_dealloc */
+	0,								/* tp_print */
+	0,								/* tp_getattr */
+	0,								/* tp_setattr */
+	0,								/* tp_compare */
+	0,								/* tp_repr */
+	0,								/* tp_as_number */
+	0,								/* tp_as_sequence */
+	0,								/* tp_as_mapping */
+	0,								/* tp_hash */
+	0,								/* tp_call */
+	0,								/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,								/* tp_setattro */
+	0,								/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+	compress_doc,					/* tp_doc */
+	(traverseproc)compress_traverse,	/* tp_traverse */
+	0,								/* tp_clear */
+	0,								/* tp_richcompare */
+	0,								/* tp_weaklistoffset */
+	PyObject_SelfIter,				/* tp_iter */
+	(iternextfunc)compress_next,	/* tp_iternext */
+	0,								/* tp_methods */
+	0,								/* tp_members */
+	0,								/* tp_getset */
+	0,								/* tp_base */
+	0,								/* tp_dict */
+	0,								/* tp_descr_get */
+	0,								/* tp_descr_set */
+	0,								/* tp_dictoffset */
+	0,								/* tp_init */
+	0,								/* tp_alloc */
+	compress_new,					/* tp_new */
+	PyObject_GC_Del,				/* tp_free */
 };
 
 
@@ -3035,12 +3439,14 @@ PyInit_itertools(void)
 	char *name;
 	PyTypeObject *typelist[] = {
 		&combinations_type,
+		&cwr_type,
 		&cycle_type,
 		&dropwhile_type,
 		&takewhile_type,
 		&islice_type,
 		&starmap_type,
 		&chain_type,
+		&compress_type,
 		&filterfalse_type,
 		&count_type,
 		&ziplongest_type,

@@ -5,7 +5,8 @@ import _ctypes_test
 
 lib = CDLL(_ctypes_test.__file__)
 
-def twcmp(x, y):
+def three_way_cmp(x, y):
+    """Return -1 if x < y, 0 if x == y and 1 if x > y"""
     return (x > y) - (x < y)
 
 class LibTest(unittest.TestCase):
@@ -22,7 +23,7 @@ class LibTest(unittest.TestCase):
         lib.my_qsort.restype = None
 
         def sort(a, b):
-            return twcmp(a[0], b[0])
+            return three_way_cmp(a[0], b[0])
 
         chars = create_string_buffer("spam, spam, and spam")
         lib.my_qsort(chars, len(chars)-1, sizeof(c_char), comparefunc(sort))

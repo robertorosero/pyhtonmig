@@ -144,6 +144,24 @@ Core and Builtins
 Library
 -------
 
+- Removed isSequenceType(), isMappingType, and isNumberType() from the
+  operator module; use the abstract base classes instead.  Also removed
+  the repeat() function; use mul() instead.
+
+- Issue 5021:  doctest.testfile() did not create __name__ and
+  collections.namedtuple() relied on __name__ being defined.
+
+- Backport importlib from Python 3.1. Only the import_module() function has
+  been backported to help facilitate transitions from 2.7 to 3.1.
+
+- Issue #1885: distutils. When running sdist with --formats=tar,gztar
+  the tar file was overriden by the gztar one.
+
+- Issue #4863: distutils.mwerkscompiler has been removed.
+
+- Added a new itertools functions:  combinations_with_replacement()
+  and compress().
+
 - Fix and properly document the multiprocessing module's logging
   support, expose the internal levels and provide proper usage
   examples.

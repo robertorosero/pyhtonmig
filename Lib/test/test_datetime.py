@@ -7,8 +7,9 @@ import os
 import pickle
 import unittest
 
+from operator import lt, le, gt, ge, eq, ne
+
 from test import support
-from test.support import fcmp
 
 from datetime import MINYEAR, MAXYEAR
 from datetime import timedelta
@@ -2098,9 +2099,10 @@ class TZInfoBase:
         d2 = base.replace(minute=11)
         for x in d0, d1, d2:
             for y in d0, d1, d2:
-                got = fcmp(x, y)
-                expected = fcmp(x.minute, y.minute)
-                self.assertEqual(got, expected)
+                for op in lt, le, gt, ge, eq, ne:
+                    got = op(x, y)
+                    expected = op(x.minute, y.minute)
+                    self.assertEqual(got, expected)
 
         # However, if they're different members, uctoffset is not ignored.
         # Note that a time can't actually have an operand-depedent offset,
@@ -2112,7 +2114,7 @@ class TZInfoBase:
             d2 = base.replace(minute=11, tzinfo=OperandDependentOffset())
             for x in d0, d1, d2:
                 for y in d0, d1, d2:
-                    got = fcmp(x, y)
+                    got = (x > y) - (x < y)
                     if (x is d0 or x is d1) and (y is d0 or y is d1):
                         expected = 0
                     elif x is y is d2:

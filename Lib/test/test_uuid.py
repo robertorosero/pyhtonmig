@@ -1,6 +1,5 @@
 from unittest import TestCase
 from test import support
-from test.support import fcmp
 import uuid
 
 def importable(name):
@@ -182,7 +181,12 @@ class TestUUID(TestCase):
         # Test comparison of UUIDs.
         for i in range(len(ascending)):
             for j in range(len(ascending)):
-                equal(fcmp(i, j), fcmp(ascending[i], ascending[j]))
+                equal(i < j, ascending[i] < ascending[j])
+                equal(i <= j, ascending[i] <= ascending[j])
+                equal(i == j, ascending[i] == ascending[j])
+                equal(i > j, ascending[i] > ascending[j])
+                equal(i >= j, ascending[i] >= ascending[j])
+                equal(i != j, ascending[i] != ascending[j])
 
         # Test sorting of UUIDs (above list is in ascending order).
         resorted = ascending[:]
