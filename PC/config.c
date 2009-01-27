@@ -58,8 +58,7 @@ extern PyObject* PyInit__codecs_tw(void);
 extern PyObject* PyInit__subprocess(void);
 extern PyObject* PyInit__lsprof(void);
 extern PyObject* PyInit__ast(void);
-extern PyObject* PyInit__fileio(void);
-extern PyObject* PyInit__bytesio(void);
+extern PyObject* PyInit__io(void);
 extern PyObject* PyInit__stringio(void);
 extern PyObject* PyInit__pickle(void);
 extern PyObject* PyInit_atexit(void);
@@ -150,8 +149,7 @@ struct _inittab _PyImport_Inittab[] = {
         {"sys", NULL},
         {"_warnings", _PyWarnings_Init},
 
-        {"_fileio", PyInit__fileio},
-        {"_bytesio", PyInit__bytesio},
+        {"_io", PyInit__io},
         {"_stringio", PyInit__stringio},
         {"_pickle", PyInit__pickle},
         {"atexit", PyInit_atexit},
