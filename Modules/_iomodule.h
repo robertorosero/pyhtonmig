@@ -107,6 +107,7 @@ extern PyObject *_PyIO_str_read1;
 extern PyObject *_PyIO_str_readable;
 extern PyObject *_PyIO_str_readinto;
 extern PyObject *_PyIO_str_readline;
+extern PyObject *_PyIO_str_reset;
 extern PyObject *_PyIO_str_seek;
 extern PyObject *_PyIO_str_seekable;
 extern PyObject *_PyIO_str_tell;

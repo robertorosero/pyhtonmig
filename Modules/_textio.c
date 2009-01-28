@@ -283,7 +283,7 @@ _IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self,
         Py_UNICODE *in_str;
         Py_ssize_t len;
         int seennl = self->seennl;
-        int only_lf;
+        int only_lf = 0;
 
         in_str = PyUnicode_AS_UNICODE(output);
         len = PyUnicode_GET_SIZE(output);
@@ -294,8 +294,16 @@ _IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self,
         /* If, up to now, newlines are consistently \n, do a quick check
            for the \r *byte* with the libc's optimized memchr.
            */
-        only_lf = ((seennl == SEEN_LF)
-                && !memchr(in_str, '\r', len * sizeof(Py_UNICODE)));
+        if (seennl == SEEN_LF || seennl == 0) {
+            int has_cr, has_lf;
+            has_lf = (seennl == SEEN_LF) ||
+                    (memchr(in_str, '\n', len * sizeof(Py_UNICODE)) != NULL);
+            has_cr = (memchr(in_str, '\r', len * sizeof(Py_UNICODE)) != NULL);
+            if (has_lf && !has_cr) {
+                only_lf = 1;
+                seennl = SEEN_LF;
+            }
+        }
 
         if (!self->translate) {
             Py_UNICODE *s, *end;
@@ -453,7 +461,7 @@ IncrementalNewlineDecoder_reset(PyNewLineDecoderObject *self, PyObject *args)
 {
     self->seennl = 0;
     self->pendingcr = 0;
-    return PyObject_CallMethod(self->decoder, "reset", NULL);
+    return PyObject_CallMethodObjArgs(self->decoder, _PyIO_str_reset, NULL);
 }
 
 static PyObject *
@@ -1729,7 +1737,7 @@ _TextIOWrapper_decoder_setstate(PyTextIOWrapperObject *self,
        utf-16, that we are expecting a BOM).
     */
     if (cookie->start_pos == 0 && cookie->dec_flags == 0)
-        res = PyObject_CallMethod(self->decoder, "reset", NULL);
+        res = PyObject_CallMethodObjArgs(self->decoder, _PyIO_str_reset, NULL);
     else
         res = PyObject_CallMethod(self->decoder, "setstate",
                                   "((yi))", "", cookie->dec_flags);
@@ -1742,7 +1750,7 @@ _TextIOWrapper_decoder_setstate(PyTextIOWrapperObject *self,
 static PyObject *
 TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
 {
-    PyObject *cookieObj;
+    PyObject *cookieObj, *posobj;
     CookieStruct cookie;
     int whence = 0;
     static PyObject *zero = NULL;
@@ -1835,7 +1843,7 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
         goto fail;
     }
 
-    res = PyObject_CallMethod((PyObject *)self, "flush", NULL);
+    res = PyObject_CallMethodObjArgs((PyObject *)self, _PyIO_str_flush, NULL);
     if (res == NULL)
         goto fail;
     Py_DECREF(res);
@@ -1847,8 +1855,12 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
         goto fail;
 
     /* Seek back to the safe start point. */
-    res = PyObject_CallMethod(self->buffer, "seek",
-                              "L", (PY_LONG_LONG)cookie.start_pos);
+    posobj = PyLong_FromOff_t(cookie.start_pos);
+    if (posobj == NULL)
+        goto fail;
+    res = PyObject_CallMethodObjArgs(self->buffer,
+                                     _PyIO_str_seek, posobj, NULL);
+    Py_DECREF(posobj);
     if (res == NULL)
         goto fail;
     Py_DECREF(res);

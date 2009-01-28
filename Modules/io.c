@@ -38,6 +38,7 @@ PyObject *_PyIO_str_read1;
 PyObject *_PyIO_str_readable;
 PyObject *_PyIO_str_readinto;
 PyObject *_PyIO_str_readline;
+PyObject *_PyIO_str_reset;
 PyObject *_PyIO_str_seek;
 PyObject *_PyIO_str_seekable;
 PyObject *_PyIO_str_tell;
@@ -721,6 +722,8 @@ PyInit__io(void)
     if (!(_PyIO_str_readinto = PyUnicode_InternFromString("readinto")))
         goto fail;
     if (!(_PyIO_str_readline = PyUnicode_InternFromString("readline")))
+        goto fail;
+    if (!(_PyIO_str_reset = PyUnicode_InternFromString("reset")))
         goto fail;
     if (!(_PyIO_str_seek = PyUnicode_InternFromString("seek")))
         goto fail;
