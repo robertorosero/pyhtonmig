@@ -169,6 +169,7 @@ typedef struct {
 
 
 static void parser_free(PyST_Object *st);
+static PyObject* parser_richcompare(PyObject *left, PyObject *right, int op);
 static PyObject* parser_compilest(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_isexpr(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_issuite(PyST_Object *, PyObject *, PyObject *);
@@ -222,13 +223,109 @@ PyTypeObject PyST_Type = {
     "Intermediate representation of a Python parse tree.",
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
+    parser_richcompare,                 /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
     parser_methods,                     /* tp_methods */
 };  /* PyST_Type */
 
+
+/* PyST_Type isn't subclassable, so just check ob_type */
+#define PyST_Object_Check(v) ((v)->ob_type == &PyST_Type)
+
+static int
+parser_compare_nodes(node *left, node *right)
+{
+    int j;
+
+    if (TYPE(left) < TYPE(right))
+        return (-1);
+
+    if (TYPE(right) < TYPE(left))
+        return (1);
+
+    if (ISTERMINAL(TYPE(left)))
+        return (strcmp(STR(left), STR(right)));
+
+    if (NCH(left) < NCH(right))
+        return (-1);
+
+    if (NCH(right) < NCH(left))
+        return (1);
+
+    for (j = 0; j < NCH(left); ++j) {
+        int v = parser_compare_nodes(CHILD(left, j), CHILD(right, j));
+
+        if (v != 0)
+            return (v);
+    }
+    return (0);
+}
+
+/*  parser_richcompare(PyObject* left, PyObject* right, int op)
+ *
+ *  Comparison function used by the Python operators ==, !=, <, >, <=, >=
+ *  This really just wraps a call to parser_compare_nodes() with some easy
+ *  checks and protection code.
+ *
+ */
+
+#define TEST_COND(cond) ((cond) ? Py_True : Py_False)
+
+static PyObject *
+parser_richcompare(PyObject *left, PyObject *right, int op)
+{
+    int result;
+    PyObject *v;
+
+    /* neither argument should be NULL, unless something's gone wrong */
+    if (left == NULL || right == NULL) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+
+    /* both arguments should be instances of PyST_Object */
+    if (!PyST_Object_Check(left) || !PyST_Object_Check(right)) {
+        v = Py_NotImplemented;
+        goto finished;
+    }
+
+    if (left == right)
+        /* if arguments are identical, they're equal */
+        result = 0;
+    else
+        result = parser_compare_nodes(((PyST_Object *)left)->st_node,
+                                      ((PyST_Object *)right)->st_node);
+
+    /* Convert return value to a Boolean */
+    switch (op) {
+    case Py_EQ:
+        v = TEST_COND(result == 0);
+        break;
+    case Py_NE:
+        v = TEST_COND(result != 0);
+        break;
+    case Py_LE:
+        v = TEST_COND(result <= 0);
+        break;
+    case Py_GE:
+        v = TEST_COND(result >= 0);
+        break;
+    case Py_LT:
+        v = TEST_COND(result < 0);
+        break;
+    case Py_GT:
+        v = TEST_COND(result > 0);
+        break;
+    default:
+        PyErr_BadArgument();
+        return NULL;
+    }
+  finished:
+    Py_INCREF(v);
+    return v;
+}
 
 /*  parser_newstobject(node* st)
  *
