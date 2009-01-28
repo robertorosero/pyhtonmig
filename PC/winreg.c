@@ -485,7 +485,7 @@ PyTypeObject PyHKEY_Type =
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	PyHKEY_compareFunc,		/* tp_reserved */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	&PyHKEY_NumberMethods,		/* tp_as_number */
 	0,				/* tp_as_sequence */

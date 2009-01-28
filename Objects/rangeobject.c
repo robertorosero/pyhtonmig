@@ -134,10 +134,11 @@ range_length_obj(rangeobject *r)
     PyObject *zero = PyLong_FromLong(0);
     if (zero == NULL)
         return NULL;
-    if ((cmp_result = PyObject_RichCompareBool(r->step, zero, Py_GT)) == -1) {
-        Py_DECREF(zero);
+    cmp_result = PyObject_RichCompareBool(r->step, zero, Py_GT);
+    Py_DECREF(zero);
+    if (cmp_result == -1)
         return NULL;
-    }
+
     if (cmp_result == 1) {
         lo = r->start;
         hi = r->stop;
