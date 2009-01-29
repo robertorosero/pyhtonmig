@@ -1905,16 +1905,32 @@ class MiscIOTest(unittest.TestCase):
                               b"" if "b" in kwargs['mode'] else "")
             self.assertRaises(ValueError, f.writelines, [])
 
+    def test_blockingioerror(self):
+        # Various BlockingIOError issues
+        self.assertRaises(TypeError, io.BlockingIOError)
+        self.assertRaises(TypeError, io.BlockingIOError, 1)
+        self.assertRaises(TypeError, io.BlockingIOError, 1, 2, 3, 4)
+        self.assertRaises(TypeError, io.BlockingIOError, 1, "", None)
+        b = io.BlockingIOError(1, "")
+        self.assertEqual(b.characters_written, 0)
+        class C(str):
+            pass
+        c = C("")
+        b = io.BlockingIOError(1, c)
+        c.b = b
+        b.c = c
+        wr = weakref.ref(c)
+        del c, b
+        gc.collect()
+        self.assert_(wr() is None, wr)
 
 def test_main():
-    support.run_unittest(
-        IOTest, BytesIOTest, StringIOTest,
-                              BufferedReaderTest, BufferedWriterTest,
-                              BufferedRWPairTest, BufferedRandomTest,
-                              StatefulIncrementalDecoderTest,
-                              TextIOWrapperTest, MiscIOTest
-                              )
+    support.run_unittest(IOTest, BytesIOTest, StringIOTest,
+                         BufferedReaderTest, BufferedWriterTest,
+                         BufferedRWPairTest, BufferedRandomTest,
+                         StatefulIncrementalDecoderTest,
+                         TextIOWrapperTest, MiscIOTest
+                         )
 
 if __name__ == "__main__":
     test_main()
-    #unittest.main()

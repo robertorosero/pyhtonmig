@@ -92,41 +92,29 @@ static int
 BlockingIOError_init(PyBlockingIOErrorObject *self, PyObject *args,
                      PyObject *kwds)
 {
-    PyObject *myerrno = NULL, *strerror = NULL, *written;
+    PyObject *myerrno = NULL, *strerror = NULL;
     PyObject *baseargs = NULL;
+    Py_ssize_t written = 0;
 
     assert(PyTuple_Check(args));
 
-    if (PyTuple_GET_SIZE(args) <= 1 || PyTuple_GET_SIZE(args) > 3)
-        return 0;
-
-    baseargs = PyTuple_GetSlice(args, 0, 2);
-    if (baseargs == NULL)
+    self->written = 0;
+    if (!PyArg_ParseTuple(args, "OO|n:BlockingIOError",
+                          &myerrno, &strerror, &written))
         return -1;
 
+    baseargs = PyTuple_Pack(2, myerrno, strerror);
+    if (baseargs == NULL)
+        return -1;
+    /* This will take care of initializing of myerrno and strerror members */
     if (((PyTypeObject *)PyExc_IOError)->tp_init(
                 (PyObject *)self, baseargs, kwds) == -1) {
         Py_DECREF(baseargs);
         return -1;
     }
-
     Py_DECREF(baseargs);
 
-    if (!PyArg_UnpackTuple(args, "BlockingIOError", 2, 3,
-                           &myerrno, &strerror, &written)) {
-        return -1;
-    }
-
-    Py_INCREF(myerrno);
-    self->myerrno = myerrno;
-
-    Py_INCREF(strerror);
-    self->strerror = strerror;
-
-    self->written = PyNumber_AsSsize_t(written, PyExc_ValueError);
-    if(self->written == -1 && PyErr_Occurred())
-        return -1;
-
+    self->written = written;
     return 0;
 }
 
@@ -134,7 +122,6 @@ static PyMemberDef BlockingIOError_members[] = {
     {"characters_written", T_PYSSIZET, offsetof(PyBlockingIOErrorObject, written), 0},
     {NULL}  /* Sentinel */
 };
-
 
 static PyTypeObject _PyExc_BlockingIOError = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -156,8 +143,9 @@ static PyTypeObject _PyExc_BlockingIOError = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,  /*tp_flags*/
-    PyDoc_STR("Exception raised when I/O would block on a non-blocking I/O stream"), /* tp_doc */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+    PyDoc_STR("Exception raised when I/O would block "
+              "on a non-blocking I/O stream"), /* tp_doc */
     0,                          /* tp_traverse */
     0,                          /* tp_clear */
     0,                          /* tp_richcompare */
