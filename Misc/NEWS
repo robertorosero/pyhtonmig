@@ -17,6 +17,14 @@ Core and Builtins
   the type definition cmpfunc.  The tp_compare slot is reserved for
   future usage.
 
+- Issue #4707: round(x, n) now returns an integer if x is an integer.
+  Previously it returned a float.
+
+- Issue #4753: By enabling a configure option named '--with-computed-gotos'
+  on compilers that support it (notably: gcc, SunPro, icc), the bytecode
+  evaluation loop is compiled with a new dispatch mechanism which gives
+  speedups of up to 20%, depending on the system, on various benchmarks.
+
 - Issue #4874: Most builtin decoders now reject unicode input.
 
 - Issue #4842: Don't allow trailing 'L' when constructing an integer
@@ -143,6 +151,13 @@ Core and Builtins
 
 Library
 -------
+
+- Fix a bug in the trace module where a bytes object from co_lnotab had its
+  items being passed through ord().
+
+- Issue #2047: shutil.move() could believe that its destination path was
+  inside its source path if it began with the same letters (e.g. "src" vs.
+  "src.new").
 
 - Added the ttk module. See issue #2983: Ttk support for Tkinter.
 
@@ -421,6 +436,12 @@ Extension Modules
 - Issue #4583: array.array would not always prohibit resizing when a buffer
   has been exported, resulting in an interpreter crash when accessing the
   buffer.
+
+
+Tests
+-----
+
+- Issue #5083: New 'gui' resource for regrtest.
 
 
 Docs
