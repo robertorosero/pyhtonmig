@@ -25,6 +25,8 @@ null_error(void)
 	return NULL;
 }
 
+/* Operations on any object */
+
 PyObject *
 PyObject_Type(PyObject *o)
 {
