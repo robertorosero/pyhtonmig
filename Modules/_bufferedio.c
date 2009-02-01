@@ -742,7 +742,7 @@ Buffered_read1(BufferedObject *self, PyObject *args)
        all `n` bytes asked by the caller (and possibly more, so as to fill
        our buffer for the next reads). */
 
-    have = READAHEAD(self);
+    have = Py_SAFE_DOWNCAST(READAHEAD(self), Py_off_t, Py_ssize_t);
     if (have > 0) {
         if (n > have)
             n = have;
@@ -810,7 +810,7 @@ _Buffered_readline(BufferedObject *self, Py_ssize_t limit)
     ENTER_BUFFERED(self)
 
     /* First, try to find a line in the buffer */
-    n = READAHEAD(self);
+    n = Py_SAFE_DOWNCAST(READAHEAD(self), Py_off_t, Py_ssize_t);
     if (limit >= 0 && n > limit)
         n = limit;
     start = self->buffer + self->pos;
@@ -1167,7 +1167,7 @@ _BufferedReader_fill_buffer(BufferedObject *self)
 {
     Py_ssize_t start, len, n;
     if (VALID_READ_BUFFER(self))
-        start = self->read_end;
+        start = Py_SAFE_DOWNCAST(self->read_end, Py_off_t, Py_ssize_t);
     else
         start = 0;
     len = self->buffer_size - start;
@@ -1194,7 +1194,7 @@ _BufferedReader_read_unlocked(BufferedObject *self, Py_ssize_t n)
             return NULL;
 
         /* First copy what we have in the current buffer. */
-        current_size = READAHEAD(self);
+        current_size = Py_SAFE_DOWNCAST(READAHEAD(self), Py_off_t, Py_ssize_t);
         data = NULL;
         if (current_size) {
             data = PyBytes_FromStringAndSize(
@@ -1263,7 +1263,7 @@ _BufferedReader_read_unlocked(BufferedObject *self, Py_ssize_t n)
     }
 
     /* The number of bytes to read is specified, return at most n bytes. */
-    current_size = READAHEAD(self);
+    current_size = Py_SAFE_DOWNCAST(READAHEAD(self), Py_off_t, Py_ssize_t);
     if (n <= current_size) {
         /* Fast path: the data to read is fully buffered. */
         res = PyBytes_FromStringAndSize(self->buffer + self->pos, n);
@@ -1358,7 +1358,7 @@ _BufferedReader_peek_unlocked(BufferedObject *self, Py_ssize_t n)
 {
     Py_ssize_t have, r;
 
-    have = READAHEAD(self);
+    have = Py_SAFE_DOWNCAST(READAHEAD(self), Py_off_t, Py_ssize_t);
     /* Constraints:
        1. we don't want to advance the file position.
        2. we don't want to lose block alignment, so we can't shift the buffer
@@ -1560,7 +1560,8 @@ _BufferedWriter_flush_unlocked(BufferedObject *self, int restore_pos)
     while (self->write_pos < self->write_end) {
         n = _BufferedWriter_raw_write(self,
             self->buffer + self->write_pos,
-            self->write_end - self->write_pos);
+            Py_SAFE_DOWNCAST(self->write_end - self->write_pos,
+                             Py_off_t, Py_ssize_t));
         if (n == -1) {
             Py_ssize_t *w = _Buffered_check_blocking_error();
             if (w == NULL)
@@ -1574,7 +1575,7 @@ _BufferedWriter_flush_unlocked(BufferedObject *self, int restore_pos)
         }
         self->write_pos += n;
         self->raw_pos = self->write_pos;
-        written += n;
+        written += Py_SAFE_DOWNCAST(n, Py_off_t, Py_ssize_t);
     }
 
     if (restore_pos) {
@@ -1621,7 +1622,7 @@ BufferedWriter_write(BufferedObject *self, PyObject *args)
         self->pos = 0;
         self->raw_pos = 0;
     }
-    avail = self->buffer_size - self->pos;
+    avail = Py_SAFE_DOWNCAST(self->buffer_size - self->pos, Py_off_t, Py_ssize_t);
     if (buf.len <= avail) {
         memcpy(self->buffer + self->pos, buf.buf, buf.len);
         if (!VALID_WRITE_BUFFER(self)) {
@@ -1645,12 +1646,14 @@ BufferedWriter_write(BufferedObject *self, PyObject *args)
         /* Make some place by shifting the buffer. */
         assert(VALID_WRITE_BUFFER(self));
         memmove(self->buffer, self->buffer + self->write_pos,
-                self->write_end - self->write_pos);
+                Py_SAFE_DOWNCAST(self->write_end - self->write_pos,
+                                 Py_off_t, Py_ssize_t));
         self->write_end -= self->write_pos;
         self->raw_pos -= self->write_pos;
         self->pos -= self->write_pos;
         self->write_pos = 0;
-        avail = self->buffer_size - self->write_end;
+        avail = Py_SAFE_DOWNCAST(self->buffer_size - self->write_end,
+                                 Py_off_t, Py_ssize_t);
         if (buf.len <= avail) {
             /* Everything can be buffered */
             PyErr_Clear();
