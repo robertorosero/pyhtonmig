@@ -1,13 +1,14 @@
 """Test case-sensitivity (PEP 235)."""
 import importlib
-from .. import support
+from .. import util
+from . import util as source_util
 import os
 import sys
 from test import support as test_support
 import unittest
 
 
-@support.case_insensitive_tests
+@util.case_insensitive_tests
 class CaseSensitivityTest(unittest.TestCase):
 
     """PEP 235 dictates that on case-preserving, case-insensitive file systems
@@ -25,7 +26,8 @@ class CaseSensitivityTest(unittest.TestCase):
         """Look for a module with matching and non-matching sensitivity."""
         sensitive_pkg = 'sensitive.{0}'.format(self.name)
         insensitive_pkg = 'insensitive.{0}'.format(self.name.lower())
-        with support.create_modules(insensitive_pkg, sensitive_pkg) as mapping:
+        context = source_util.create_modules(insensitive_pkg, sensitive_pkg)
+        with  context as mapping:
             sensitive_path = os.path.join(mapping['.root'], 'sensitive')
             insensitive_path = os.path.join(mapping['.root'], 'insensitive')
             return self.find(sensitive_path), self.find(insensitive_path)

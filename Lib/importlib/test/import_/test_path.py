@@ -1,6 +1,5 @@
-from ..support import (mock_modules, import_state, import_, mock_path_hook,
-                        importlib_only, uncache)
-
+from .. import util
+from . import util as import_util
 from contextlib import nested
 from imp import new_module
 import sys
@@ -32,7 +31,7 @@ class BaseTests(unittest.TestCase):
     def order_test(self, to_import, entry, search_path, path=[]):
         # [order]
         log = []
-        class LogFindModule(mock_modules):
+        class LogFindModule(util.mock_modules):
             def find_module(self, fullname):
                 log.append(self)
                 return super().find_module(fullname)
@@ -42,12 +41,12 @@ class BaseTests(unittest.TestCase):
         hitter = LogFindModule(to_import)
         with nested(misser, hitter):
             cache = dict(zip(search_path, (misser, hitter)))
-            with import_state(path=path, path_importer_cache=cache):
-                import_(to_import)
+            with util.import_state(path=path, path_importer_cache=cache):
+                import_util.import_(to_import)
         self.assertEquals(log[0], misser)
         self.assertEquals(log[1], hitter)
 
-    @importlib_only  # __import__ uses PyDict_GetItem(), bypassing log.
+    @import_util.importlib_only  # __import__ uses PyDict_GetItem(), bypassing log.
     def cache_use_test(self, to_import, entry, path=[]):
         # [cache check], [cache use]
         log = []
@@ -56,11 +55,11 @@ class BaseTests(unittest.TestCase):
                 log.append(item)
                 return super(LoggingDict, self).__getitem__(item)
 
-        with mock_modules(to_import) as importer:
+        with util.mock_modules(to_import) as importer:
             cache = LoggingDict()
             cache[entry] = importer
-            with import_state(path=[entry], path_importer_cache=cache):
-                module = import_(to_import, fromlist=['a'])
+            with util.import_state(path=[entry], path_importer_cache=cache):
+                module = import_util.import_(to_import, fromlist=['a'])
             self.assert_(module is importer[to_import])
         self.assertEquals(len(cache), 1)
         self.assertEquals([entry], log)
@@ -71,11 +70,11 @@ class BaseTests(unittest.TestCase):
         def logging_hook(entry):
             log.append(entry)
             raise ImportError
-        with mock_modules(to_import) as importer:
-            hitter = mock_path_hook(entry, importer=importer)
+        with util.mock_modules(to_import) as importer:
+            hitter = import_util.mock_path_hook(entry, importer=importer)
             path_hooks = [logging_hook, logging_hook, hitter]
-            with import_state(path_hooks=path_hooks, path=path):
-                import_(to_import)
+            with util.import_state(path_hooks=path_hooks, path=path):
+                import_util.import_(to_import)
                 self.assertEquals(sys.path_importer_cache[entry], importer)
         self.assertEquals(len(log), 2)
 
@@ -90,7 +89,7 @@ class BaseTests(unittest.TestCase):
                 raise ImportError
 
         try:
-            import_(to_import)
+            import_util.import_(to_import)
         except ImportError:
             pass
 
@@ -113,7 +112,7 @@ class PathTests(BaseTests):
 
     def test_path_argument(self):
         name = 'total junk'
-        with uncache(name):
+        with util.uncache(name):
             self.path_argument_test(name)
 
 
@@ -122,13 +121,13 @@ class __path__Tests(BaseTests):
     """Tests for __path__."""
 
     def run_test(self, test, entry, path, *args):
-        with mock_modules('pkg.__init__') as importer:
+        with util.mock_modules('pkg.__init__') as importer:
             importer['pkg'].__path__ = path
             importer.load_module('pkg')
             test('pkg.hit', entry, *args)
 
 
-    @importlib_only  # XXX Unknown reason why this fails.
+    @import_util.importlib_only  # XXX Unknown reason why this fails.
     def test_order(self):
         self.run_test(self.order_test, 'second', ('first', 'second'), ['first',
             'second'])
@@ -146,7 +145,7 @@ class __path__Tests(BaseTests):
         module.__path__ = ['random __path__']
         name = 'pkg.whatever'
         sys.modules['pkg'] = module
-        with uncache('pkg', name):
+        with util.uncache('pkg', name):
             self.path_argument_test(name)
 
 
