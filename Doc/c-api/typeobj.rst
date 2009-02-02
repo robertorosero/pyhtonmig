@@ -246,7 +246,7 @@ type objects) *must* have the :attr:`ob_size` field.
 
 .. cmember:: void* PyTypeObject.tp_reserved
 
-   Reserved slot, formaly known as tp_compare.
+   Reserved slot, formerly known as tp_compare.
 
 
 .. cmember:: reprfunc PyTypeObject.tp_repr
@@ -319,14 +319,13 @@ type objects) *must* have the :attr:`ob_size` field.
    the Python level will result in the ``tp_hash`` slot being set to
    :cfunc:`PyObject_HashNotImplemented`.
 
-   When this field is not set, two possibilities exist: if the :attr:`tp_reserved`
-   and :attr:`tp_richcompare` fields are both *NULL*, a default hash value based on
-   the object's address is returned; otherwise, a :exc:`TypeError` is raised.
+   When this field is not set, an attempt to take the hash of the
+   object raises :exc:`TypeError`.
 
-   This field is inherited by subtypes together with :attr:`tp_richcompare` and
-   :attr:`tp_reserved`: a subtypes inherits all three of :attr:`tp_reserved`,
-   :attr:`tp_richcompare`, and :attr:`tp_hash`, when the subtype's
-   :attr:`tp_reserved`, :attr:`tp_richcompare` and :attr:`tp_hash` are all *NULL*.
+   This field is inherited by subtypes together with
+   :attr:`tp_richcompare`: a subtype inherits both of
+   :attr:`tp_richcompare` and :attr:`tp_hash`, when the subtype's
+   :attr:`tp_richcompare` and :attr:`tp_hash` are both *NULL*.
 
 
 .. cmember:: ternaryfunc PyTypeObject.tp_call
@@ -586,10 +585,10 @@ type objects) *must* have the :attr:`ob_size` field.
       comparisons makes sense (e.g. ``==`` and ``!=``, but not ``<`` and
       friends), directly raise :exc:`TypeError` in the rich comparison function.
 
-   This field is inherited by subtypes together with :attr:`tp_reserved` and
-   :attr:`tp_hash`: a subtype inherits all three of :attr:`tp_reserved`,
-   :attr:`tp_richcompare`, and :attr:`tp_hash`, when the subtype's
-   :attr:`tp_reserved`, :attr:`tp_richcompare`, and :attr:`tp_hash` are all *NULL*.
+   This field is inherited by subtypes together with :attr:`tp_hash`:
+   a subtype inherits :attr:`tp_richcompare` and :attr:`tp_hash` when
+   the subtype's :attr:`tp_richcompare` and :attr:`tp_hash` are both
+   *NULL*.
 
    The following constants are defined to be used as the third argument for
    :attr:`tp_richcompare` and for :cfunc:`PyObject_RichCompare`:

@@ -1253,7 +1253,7 @@ example that simply raises an exception; if this were really all you wanted, the
    greater than, respectively; as of Python 2.2, this is no longer allowed.  In the
    future, other return values may be assigned a different meaning.)
 
-   A :attr:`tp_reserved` handler may raise an exception.  In this case it should
+   A :attr:`tp_compare` handler may raise an exception.  In this case it should
    return a negative value.  The caller has to test for the exception using
    :cfunc:`PyErr_Occurred`.
 
@@ -1484,10 +1484,10 @@ provide.  They are in :file:`object.h` in the Python include directory that
 comes with the source distribution of Python.
 
 In order to learn how to implement any specific method for your new data type,
-do the following: Download and unpack the Python source distribution.  Go the
-:file:`Objects` directory, then search the C source files for ``tp_`` plus the
-function you want (for example, ``tp_reserved``).  You will find examples of the
-function you want to implement.
+do the following: Download and unpack the Python source distribution.  Go to
+the :file:`Objects` directory, then search the C source files for ``tp_`` plus
+the function you want (for example, ``tp_richcompare``).  You will find examples
+of the function you want to implement.
 
 When you need to verify that an object is an instance of the type you are
 implementing, use the :cfunc:`PyObject_TypeCheck` function. A sample of its use
