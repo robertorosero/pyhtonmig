@@ -3662,7 +3662,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_setattr = base->tp_setattr;
 		type->tp_setattro = base->tp_setattro;
 	}
-	/* tp_reserved is ignored, see tp_richcompare */
+	/* tp_reserved is ignored */
 	COPYSLOT(tp_repr);
 	/* tp_hash see tp_richcompare */
 	COPYSLOT(tp_call);

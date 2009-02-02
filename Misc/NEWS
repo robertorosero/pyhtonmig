@@ -14,8 +14,8 @@ Core and Builtins
 
 - Issue #1717: Removed builtin cmp() function, dropped tp_compare
   slot, the C API functions PyObject_Compare and PyUnicode_Compare and
-  the type definition cmpfunc.  The tp_compare slot is reserved for
-  future usage.
+  the type definition cmpfunc.  The tp_compare slot has been renamed
+  to tp_reserved, and is reserved for future usage.
 
 - Issue #4707: round(x, n) now returns an integer if x is an integer.
   Previously it returned a float.
@@ -373,6 +373,8 @@ Tools/Demos
 
 Build
 -----
+
+- Issue #4494: Fix build with Py_NO_ENABLE_SHARED on Windows.
 
 - Issue #4895: Use _strdup on Windows CE.
 
