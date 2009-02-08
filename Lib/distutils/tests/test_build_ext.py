@@ -15,6 +15,10 @@ from test import support
 # Don't load the xx module more than once.
 ALREADY_TESTED = False
 
+def _get_source_filename():
+    srcdir = sysconfig.get_config_var('srcdir')
+    return os.path.join(srcdir, 'Modules', 'xxmodule.c')
+
 class BuildExtTestCase(unittest.TestCase):
     def setUp(self):
         # Create a simple test environment
@@ -22,9 +26,7 @@ class BuildExtTestCase(unittest.TestCase):
         self.tmp_dir = tempfile.mkdtemp(prefix="pythontest_")
         self.sys_path = sys.path[:]
         sys.path.append(self.tmp_dir)
-
-        xx_c = os.path.join(sysconfig.project_base, 'Modules', 'xxmodule.c')
-        shutil.copy(xx_c, self.tmp_dir)
+        shutil.copy(_get_source_filename(), self.tmp_dir)
 
     def test_build_ext(self):
         global ALREADY_TESTED
@@ -75,10 +77,33 @@ class BuildExtTestCase(unittest.TestCase):
         # XXX on Windows the test leaves a directory with xx module in TEMP
         shutil.rmtree(self.tmp_dir, os.name == 'nt' or sys.platform == 'cygwin')
 
+    def test_solaris_enable_shared(self):
+        dist = Distribution({'name': 'xx'})
+        cmd = build_ext(dist)
+        old = sys.platform
+
+        sys.platform = 'sunos' # fooling finalize_options
+        from distutils.sysconfig import  _config_vars
+        old_var = _config_vars.get('Py_ENABLE_SHARED')
+        _config_vars['Py_ENABLE_SHARED'] = 1
+        try:
+            cmd.ensure_finalized()
+        finally:
+            sys.platform = old
+            if old_var is None:
+                del _config_vars['Py_ENABLE_SHARED']
+            else:
+                _config_vars['Py_ENABLE_SHARED'] = old_var
+
+        # make sur we get some lobrary dirs under solaris
+        self.assert_(len(cmd.library_dirs) > 0)
+
 def test_suite():
-    if not sysconfig.python_build:
+    src = _get_source_filename()
+    if not os.path.exists(src):
         if support.verbose:
-            print('test_build_ext: The test must be run in a python build dir')
+            print('test_build_ext: Cannot find source code (test'
+                  ' must run in python build dir)')
         return unittest.TestSuite()
     else: return unittest.makeSuite(BuildExtTestCase)
 

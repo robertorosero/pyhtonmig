@@ -45,31 +45,29 @@ ABC                        Inherits               Abstract Methods        Mixin 
 :class:`Callable`                                 ``__call__``
 
 :class:`Sequence`          :class:`Sized`,        ``__getitem__``         ``__contains__``. ``__iter__``, ``__reversed__``.
-                           :class:`Iterable`,     and ``__len__``         ``index``, and ``count``
+                           :class:`Iterable`,                             ``index``, and ``count``
                            :class:`Container`
 
-:class:`MutableSequence`   :class:`Sequence`      ``__getitem__``         Inherited Sequence methods and
+:class:`MutableSequence`   :class:`Sequence`      ``__setitem__``         Inherited Sequence methods and
                                                   ``__delitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
-                                                  ``insert``,             ``remove``, and ``__iadd__``
-                                                  and ``__len__``
+                                                  and ``insert``          ``remove``, and ``__iadd__``
 
-:class:`Set`               :class:`Sized`,        ``__len__``,            ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
-                           :class:`Iterable`,     ``__iter__``, and       ``__gt__``, ``__ge__``, ``__and__``, ``__or__``
-                           :class:`Container`     ``__contains__``        ``__sub__``, ``__xor__``, and ``isdisjoint``
+:class:`Set`               :class:`Sized`,                                ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
+                           :class:`Iterable`,                             ``__gt__``, ``__ge__``, ``__and__``, ``__or__``
+                           :class:`Container`                             ``__sub__``, ``__xor__``, and ``isdisjoint``
 
 :class:`MutableSet`        :class:`Set`           ``add`` and             Inherited Set methods and
                                                   ``discard``             ``clear``, ``pop``, ``remove``, ``__ior__``,
                                                                           ``__iand__``, ``__ixor__``, and ``__isub__``
 
-:class:`Mapping`           :class:`Sized`,        ``__getitem__``,        ``__contains__``, ``keys``, ``items``, ``values``,
-                           :class:`Iterable`,     ``__len__``. and        ``get``, ``__eq__``, and ``__ne__``
-                           :class:`Container`     ``__iter__``
+:class:`Mapping`           :class:`Sized`,        ``__getitem__``         ``__contains__``, ``keys``, ``items``, ``values``,
+                           :class:`Iterable`,                             ``get``, ``__eq__``, and ``__ne__``
+                           :class:`Container`
 
-:class:`MutableMapping`    :class:`Mapping`       ``__getitem__``         Inherited Mapping methods and
-                                                  ``__setitem__``,        ``pop``, ``popitem``, ``clear``, ``update``,
-                                                  ``__delitem__``,        and ``setdefault``
-                                                  ``__iter__``, and
-                                                  ``__len__``
+:class:`MutableMapping`    :class:`Mapping`       ``__setitem__`` and     Inherited Mapping methods and
+                                                  ``__delitem__``         ``pop``, ``popitem``, ``clear``, ``update``,
+                                                                          and ``setdefault``
+
 
 :class:`MappingView`       :class:`Sized`                                 ``__len__``
 :class:`KeysView`          :class:`MappingView`,                          ``__contains__``,
@@ -146,14 +144,14 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
 A counter tool is provided to support convenient and rapid tallies.
 For example::
 
-    # Tally occurrences of words in a list
+    >>> # Tally occurrences of words in a list
     >>> cnt = Counter()
     >>> for word in ['red', 'blue', 'red', 'green', 'blue', 'blue']:
     ...     cnt[word] += 1
     >>> cnt
     Counter({'blue': 3, 'red': 2, 'green': 1})
 
-    # Find the ten most common words in Hamlet
+    >>> # Find the ten most common words in Hamlet
     >>> import re
     >>> words = re.findall('\w+', open('hamlet.txt').read().lower())
     >>> Counter(words).most_common(10)
@@ -208,7 +206,7 @@ For example::
    .. method:: most_common([n])
 
       Return a list of the *n* most common elements and their counts from the
-      most common to the least.  If *n* not specified, :func:`most_common`
+      most common to the least.  If *n* is not specified, :func:`most_common`
       returns *all* elements in the counter.  Elements with equal counts are
       ordered arbitrarily::
 
@@ -246,8 +244,8 @@ Several multiset mathematical operations are provided for combining
 contain repeated elements (with counts of one or more).  Addition and
 subtraction combine counters by adding or subtracting the counts of
 corresponding elements.  Intersection and union return the minimum and maximum
-of corresponding counts.  All four multiset operations exclude results with
-counts less than one::
+of corresponding counts.  Each operation can accept inputs with signed counts,
+but the output excludes results with counts less than one.
 
     >>> c = Counter(a=3, b=1)
     >>> d = Counter(a=1, b=2)

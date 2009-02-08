@@ -363,7 +363,7 @@ zipimporter_get_filename(PyObject *obj, PyObject *args)
     char *fullname, *modpath;
     int ispackage;
 
-    if (!PyArg_ParseTuple(args, "s:zipimporter._get_filename",
+    if (!PyArg_ParseTuple(args, "s:zipimporter.get_filename",
                          &fullname))
         return NULL;
 
@@ -543,7 +543,7 @@ contain the module, but has no source for it.");
 
 
 PyDoc_STRVAR(doc_get_filename,
-"_get_filename(fullname) -> filename string.\n\
+"get_filename(fullname) -> filename string.\n\
 \n\
 Return the filename for the specified module.");
 
@@ -558,7 +558,7 @@ static PyMethodDef zipimporter_methods[] = {
 	 doc_get_code},
 	{"get_source", zipimporter_get_source, METH_VARARGS,
 	 doc_get_source},
-	{"_get_filename", zipimporter_get_filename, METH_VARARGS,
+	{"get_filename", zipimporter_get_filename, METH_VARARGS,
 	 doc_get_filename},
 	{"is_package", zipimporter_is_package, METH_VARARGS,
 	 doc_is_package},
@@ -597,7 +597,7 @@ static PyTypeObject ZipImporter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)zipimporter_repr,		/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

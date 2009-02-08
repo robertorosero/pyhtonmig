@@ -220,9 +220,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises((OverflowError, ValueError), chr, 2**32)
 
     def test_cmp(self):
-        # uncomment the following line once cmp has been removed
-        #self.assert_(not hasattr(builtins, "cmp"))
-        pass
+        self.assert_(not hasattr(builtins, "cmp"))
 
     def test_compile(self):
         compile('print(1)\n', '', 'exec')
@@ -1068,9 +1066,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(round(8), 8)
         self.assertEqual(round(-8), -8)
         self.assertEqual(type(round(0)), int)
-        self.assertEqual(type(round(-8, -1)), float)
-        self.assertEqual(type(round(-8, 0)), float)
-        self.assertEqual(type(round(-8, 1)), float)
+        self.assertEqual(type(round(-8, -1)), int)
+        self.assertEqual(type(round(-8, 0)), int)
+        self.assertEqual(type(round(-8, 1)), int)
 
         # test new kwargs
         self.assertEqual(round(number=-8.0, ndigits=-1), -10.0)

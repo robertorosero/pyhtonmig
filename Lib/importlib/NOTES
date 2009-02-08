@@ -1,39 +1,6 @@
 to do
 /////
 
-* Use test.loader_tests
-
-    + builtin
-    + frozen
-    + extension
-    + source
-
-* Reorganize support code.
-
-    + Separate general support code and importer-specific (e.g. source) support
-      code.
-        - Create support modules for each subdirectory (as needed).
-    + Add a file loader mock that returns monotonically increasing mtime.
-        - Use in source/test_reload.
-        - Use in source/test_load_module_mixed.
-
-* API simplification?
-
-    + read_source -> get_data/source_path
-    + read_bytecode -> get_data/bytecode_path
-    + write_bytecode -> complete set of bytes for bytecode instead of
-      individual arguments.
-
-* Create meta_path importer for sys.path.
-
-* OPTIMIZE!
-
-  + Write benchmark suite.
-  + Fast path common cases.
-
-    - Absolute name from sys.path.
-    - Relative name from sys.path.
-
 * Implement PEP 302 protocol for loaders (should just be a matter of testing).
 
     + Built-in.
@@ -41,7 +8,7 @@ to do
     + Extension.
     + Source/bytecode.
 
-* Public API to expose (w/ docs!)
+* Public API left to expose (w/ docs!)
 
   + abc
 
@@ -52,6 +19,8 @@ to do
       - Loader
 
         * load_module
+
+      - (?) Importer(Finder, Loader)
 
       - ResourceLoader(Loader)
 
@@ -67,19 +36,16 @@ to do
 
         * source_path
         * bytecode_path
-        * write_bytecode
+        * write_bytecode (not abstract)
 
   + util
 
-      - get_module decorator (new name)
-      - check_name decorator (new name)
-      - resolve_name
+      - get_module decorator (rename: module_for_loader)
+      - set___package__ decorator
 
   + machinery
 
       - (?) Chained path hook/finder
-      - BuiltinImporter
-      - FrozenImporter
       - (?) FileFinder
       - Extensions importers
 
@@ -91,4 +57,19 @@ to do
           * SourceFinder
           * (?) Loader
 
+      - PathFinder
+
+* Write benchmark suite.
+
+* OPTIMIZE!
+
+  + Fast path absolute name.
+  + Fast path pulling from sys.modules.
+
 * Bootstrap importlib as implementation of builtins.__import__
+
+* Replace standard library modules.
+
+  + imp
+  + py_compile
+  + compileall

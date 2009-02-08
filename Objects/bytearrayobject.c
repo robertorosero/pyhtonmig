@@ -2616,6 +2616,10 @@ bytes_extend(PyByteArrayObject *self, PyObject *arg)
 
     /* Try to determine the length of the argument. 32 is abitrary. */
     buf_size = _PyObject_LengthHint(arg, 32);
+	if (buf_size == -1) {
+		Py_DECREF(it);
+		return NULL;
+	}
 
     bytes_obj = PyByteArray_FromStringAndSize(NULL, buf_size);
     if (bytes_obj == NULL)
@@ -3182,7 +3186,7 @@ PyTypeObject PyByteArray_Type = {
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
-    0,                                  /* tp_compare */
+    0,                                  /* tp_reserved */
     (reprfunc)bytes_repr,               /* tp_repr */
     0,                                  /* tp_as_number */
     &bytes_as_sequence,                 /* tp_as_sequence */
@@ -3291,7 +3295,7 @@ PyTypeObject PyByteArrayIter_Type = {
     0,                                 /* tp_print */
     0,                                 /* tp_getattr */
     0,                                 /* tp_setattr */
-    0,                                 /* tp_compare */
+    0,                                 /* tp_reserved */
     0,                                 /* tp_repr */
     0,                                 /* tp_as_number */
     0,                                 /* tp_as_sequence */

@@ -2584,7 +2584,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -2897,7 +2897,7 @@ same_slots_added(PyTypeObject *a, PyTypeObject *b)
 	slots_a = ((PyHeapTypeObject *)a)->ht_slots;
 	slots_b = ((PyHeapTypeObject *)b)->ht_slots;
 	if (slots_a && slots_b) {
-		if (PyObject_Compare(slots_a, slots_b) != 0)
+		if (PyObject_RichCompareBool(slots_a, slots_b, Py_EQ) != 1)
 			return 0;
 		size += sizeof(PyObject *) * PyTuple_GET_SIZE(slots_a);
 	}
@@ -3357,7 +3357,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	object_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -3662,7 +3662,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_setattr = base->tp_setattr;
 		type->tp_setattro = base->tp_setattro;
 	}
-	/* tp_compare see tp_richcompare */
+	/* tp_reserved is ignored */
 	COPYSLOT(tp_repr);
 	/* tp_hash see tp_richcompare */
 	COPYSLOT(tp_call);
@@ -3670,12 +3670,10 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	{
 		/* Copy comparison-related slots only when
 		   not overriding them anywhere */
-		if (type->tp_compare == NULL &&
-		    type->tp_richcompare == NULL &&
+		if (type->tp_richcompare == NULL &&
 		    type->tp_hash == NULL &&
 		    !overrides_hash(type))
 		{
-			type->tp_compare = base->tp_compare;
 			type->tp_richcompare = base->tp_richcompare;
 			type->tp_hash = base->tp_hash;
 		}
@@ -3885,6 +3883,21 @@ PyType_Ready(PyTypeObject *type)
 		PyObject *b = PyTuple_GET_ITEM(bases, i);
 		if (PyType_Check(b) &&
 		    add_subclass((PyTypeObject *)b, type) < 0)
+			goto error;
+	}
+
+	/* Warn for a type that implements tp_compare (now known as
+	   tp_reserved) but not tp_richcompare. */
+	if (type->tp_reserved && !type->tp_richcompare) {
+		int error;
+		char msg[240];
+		PyOS_snprintf(msg, sizeof(msg),
+			      "Type %.100s defines tp_reserved (formerly "
+			      "tp_compare) but not tp_richcompare. "
+			      "Comparisons may not behave as intended.",
+			      type->tp_name);
+		error = PyErr_WarnEx(PyExc_DeprecationWarning, msg, 1);
+		if (error == -1)
 			goto error;
 	}
 
@@ -6252,7 +6265,7 @@ PyTypeObject PySuper_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	super_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

@@ -416,7 +416,7 @@ PyTypeObject PyFilter_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -491,25 +491,6 @@ PyDoc_STR(
 )
 #endif
 ;
-
-
-static PyObject *
-builtin_cmp(PyObject *self, PyObject *args)
-{
-	PyObject *a, *b;
-	int c;
-
-	if (!PyArg_UnpackTuple(args, "cmp", 2, 2, &a, &b))
-		return NULL;
-	if (PyObject_Cmp(a, b, &c) < 0)
-		return NULL;
-	return PyLong_FromLong((long)c);
-}
-
-PyDoc_STRVAR(cmp_doc,
-"cmp(x, y) -> integer\n\
-\n\
-Return negative if x<y, zero if x==y, positive if x>y.");
 
 
 static char *
@@ -1036,7 +1017,7 @@ PyTypeObject PyMap_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1717,15 +1698,14 @@ For most object types, eval(repr(object)) == object.");
 static PyObject *
 builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 {
-#define UNDEF_NDIGITS (-0x7fffffff) /* Unlikely ndigits value */
 	static PyObject *round_str = NULL;
-	int ndigits = UNDEF_NDIGITS;
+	PyObject *ndigits = NULL;
 	static char *kwlist[] = {"number", "ndigits", 0};
 	PyObject *number, *round;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:round",
-                kwlist, &number, &ndigits))
-                return NULL;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:round",
+					 kwlist, &number, &ndigits))
+		return NULL;
 
 	if (Py_TYPE(number)->tp_dict == NULL) {
 		if (PyType_Ready(Py_TYPE(number)) < 0)
@@ -1746,15 +1726,14 @@ builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	if (ndigits == UNDEF_NDIGITS)
-                return PyObject_CallFunction(round, "O", number);
+	if (ndigits == NULL)
+		return PyObject_CallFunction(round, "O", number);
 	else
-                return PyObject_CallFunction(round, "Oi", number, ndigits);
-#undef UNDEF_NDIGITS
+		return PyObject_CallFunction(round, "OO", number, ndigits);
 }
 
 PyDoc_STRVAR(round_doc,
-"round(number[, ndigits]) -> floating point number\n\
+"round(number[, ndigits]) -> number\n\
 \n\
 Round a number to a given precision in decimal digits (default 0 digits).\n\
 This returns an int when called with one argument, otherwise the\n\
@@ -2187,7 +2166,7 @@ PyTypeObject PyZip_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -2232,7 +2211,6 @@ static PyMethodDef builtin_methods[] = {
  	{"ascii",	builtin_ascii,      METH_O, ascii_doc},
 	{"bin",		builtin_bin,	    METH_O, bin_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
- 	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},
  	{"compile",	(PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
  	{"delattr",	builtin_delattr,    METH_VARARGS, delattr_doc},
  	{"dir",		builtin_dir,        METH_VARARGS, dir_doc},

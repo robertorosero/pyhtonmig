@@ -12,6 +12,19 @@ What's New in Python 3.1 alpha 0
 Core and Builtins
 -----------------
 
+- Issue #5182: Removed memoryview.__str__.
+
+- Issue #1717: Removed builtin cmp() function, dropped tp_compare
+  slot, the C API functions PyObject_Compare and PyUnicode_Compare and
+  the type definition cmpfunc.  The tp_compare slot has been renamed
+  to tp_reserved, and is reserved for future usage.
+
+- Issue 1242657: the __len__() and __length_hint__() calls in several tools
+  were suppressing all exceptions.  These include list() and bytearray().
+
+- Issue #4707: round(x, n) now returns an integer if x is an integer.
+  Previously it returned a float.
+
 - Issue #4753: By enabling a configure option named '--with-computed-gotos'
   on compilers that support it (notably: gcc, SunPro, icc), the bytecode
   evaluation loop is compiled with a new dispatch mechanism which gives
@@ -143,6 +156,44 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #4512 (part 2): Promote ``ZipImporter._get_filename()`` to be a
+  public documented method ``ZipImporter.get_filename()``.
+
+- Issue #4195: The ``runpy`` module (and the ``-m`` switch) now support
+  the execution of packages by looking for and executing a ``__main__``
+  submodule when a package name is supplied. Initial patch by Andi
+  Vajda.
+
+- Issue #1731706: Call Tcl_ConditionFinalize for Tcl_Conditions that will
+  not be used again (this requires Tcl/Tk 8.3.1), also fix a memory leak in
+  Tkapp_Call when calling from a thread different than the one that created
+  the Tcl interpreter. Patch by Robert Hancock.
+
+- Issue #4285: Change sys.version_info to be a named tuple. Patch by
+  Ross Light.
+
+- Issue #1520877: Now distutils.sysconfig reads $AR from the 
+  environment/Makefile. Patch by Douglas Greiman.
+
+- Issue #1276768: The verbose option was not used in the code of
+  distutils.file_util and distutils.dir_util.
+
+- Issue #5132: Fixed trouble building extensions under Solaris with 
+  --enabled-shared activated. Initial patch by Dave Peterson.
+
+- Issue #1581476: Always use the Tcl global namespace when calling into Tcl.
+
+- The shelve module now defaults to pickle protocol 3.
+
+- Fix a bug in the trace module where a bytes object from co_lnotab had its
+  items being passed through ord().
+
+- Issue #2047: shutil.move() could believe that its destination path was
+  inside its source path if it began with the same letters (e.g. "src" vs.
+  "src.new").
+
+- Added the ttk module. See issue #2983: Ttk support for Tkinter.
 
 - Removed isSequenceType(), isMappingType, and isNumberType() from the
   operator module; use the abstract base classes instead.  Also removed
@@ -346,14 +397,25 @@ Library
 - Issue #4861: ctypes.util.find_library(): Robustify. Fix library detection on
   biarch systems. Try to rely on ldconfig only, without using objdump and gcc.
 
+- Issue #5104: The socket module now raises OverflowError when 16-bit port and
+  protocol numbers are supplied outside the allowed 0-65536 range on bind()
+  and getservbyport().
+
 Tools/Demos
 -----------
+
+- Issue #4704: remove use of cmp() in pybench, bump its version number to 2.1,
+  and make it 2.6-compatible.
+
+- Ttk demos added in Demo/tkinter/ttk/
 
 - Issue #4677: add two list comprehension tests to pybench.
 
 
 Build
 -----
+
+- Issue #4494: Fix build with Py_NO_ENABLE_SHARED on Windows.
 
 - Issue #4895: Use _strdup on Windows CE.
 
@@ -417,6 +479,12 @@ Extension Modules
 - Issue #4583: array.array would not always prohibit resizing when a buffer
   has been exported, resulting in an interpreter crash when accessing the
   buffer.
+
+
+Tests
+-----
+
+- Issue #5083: New 'gui' resource for regrtest.
 
 
 Docs

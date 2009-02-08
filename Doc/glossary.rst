@@ -393,7 +393,7 @@ Glossary
       also :term:`immutable`.
 
    named tuple
-      Any tuple subclass whose indexable elements are also accessible using
+      Any tuple-like class whose indexable elements are also accessible using
       named attributes (for example, :func:`time.localtime` returns a
       tuple-like object where the *year* is accessible either with an
       index such as ``t[0]`` or with a named attribute like ``t.tm_year``).
@@ -484,7 +484,7 @@ Glossary
       indices via the :meth:`__getitem__` special method and defines a
       :meth:`len` method that returns the length of the sequence.
       Some built-in sequence types are :class:`list`, :class:`str`,
-      :class:`tuple`, and :class:`unicode`. Note that :class:`dict` also
+      :class:`tuple`, and :class:`bytes`. Note that :class:`dict` also
       supports :meth:`__getitem__` and :meth:`__len__`, but is considered a
       mapping rather than a sequence because the lookups use arbitrary
       :term:`immutable` keys rather than integers.
