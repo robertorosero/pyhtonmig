@@ -750,10 +750,16 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
         /* Try os.device_encoding(fileno) */
         PyObject *fileno, *os;;
         fileno = PyObject_CallMethod(buffer, "fileno", NULL);
-        /* Ignore any error */
-        /* XXX only AttributeError and UnsupportedOperation */
-        if (fileno == NULL)
-            PyErr_Clear();
+        /* Ignore only AttributeError and UnsupportedOperation */
+        if (fileno == NULL) {
+            if (PyErr_ExceptionMatches(PyExc_AttributeError) ||
+                PyErr_ExceptionMatches(PyIOExc_UnsupportedOperation)) {
+                PyErr_Clear();
+            }
+            else {
+                goto error;
+            }
+        }
         else {
             os = PyImport_ImportModule("os");
             if (os == NULL) {
