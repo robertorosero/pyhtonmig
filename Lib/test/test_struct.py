@@ -48,7 +48,7 @@ def with_warning_restore(func):
 def deprecated_err(func, *args):
     try:
         func(*args)
-    except (struct.error, TypeError):
+    except (struct.error, OverflowError):
         pass
     except DeprecationWarning:
         if not PY_STRUCT_OVERFLOW_MASKING:
@@ -191,7 +191,7 @@ class StructTest(unittest.TestCase):
 
     def test_native_qQ(self):
         # can't pack -1 as unsigned regardless
-        self.assertRaises((struct.error, TypeError), struct.pack, "Q", -1)
+        self.assertRaises((struct.error, OverflowError), struct.pack, "Q", -1)
         # can't pack string as 'q' regardless
         self.assertRaises(struct.error, struct.pack, "q", "a")
         # ditto, but 'Q'
@@ -523,6 +523,10 @@ class StructTest(unittest.TestCase):
         small_buf = array.array('b', b' '*10)
         self.assertRaises(struct.error, s.pack_into, small_buf, 0, test_string)
         self.assertRaises(struct.error, s.pack_into, small_buf, 2, test_string)
+
+        # Test bogus offset (issue 3694)
+        sb = small_buf
+        self.assertRaises(TypeError, struct.pack_into, b'1', sb, None)
 
     def test_pack_into_fn(self):
         test_string = b'Reykjavik rocks, eow!'

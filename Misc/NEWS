@@ -12,6 +12,15 @@ What's New in Python 3.1 alpha 0
 Core and Builtins
 -----------------
 
+- Issue #5186: Reduce hash collisions for objects with no __hash__ method by
+  rotating the object pointer by 4 bits to the right.
+
+- Issue #4575: Fix Py_IS_INFINITY macro to work correctly on x87 FPUs:
+  it now forces its argument to double before testing for infinity.
+
+- Issue #5137: Make len() correctly raise a TypeError when a __len__ method
+  returns a non-number type.
+
 - Issue #5182: Removed memoryview.__str__.
 
 - Issue #1717: Removed builtin cmp() function, dropped tp_compare
@@ -157,6 +166,40 @@ Core and Builtins
 Library
 -------
 
+- Issue #5257: refactored all tests in distutils, so they use 
+  support.TempdirManager, to avoid writing in the tests directory.
+
+- Issue #4524: distutils build_script command failed with --with-suffix=3.
+  Initial patch by Amaury Forgeot d'Arc.
+
+- Issue #2461: added tests for distutils.util
+
+- Issue #4998: The memory saving effect of __slots__ had been lost on Fractions
+  which inherited from numbers.py which did not have __slots__ defined.  The
+  numbers hierarchy now has its own __slots__ declarations.
+
+- Issue #4631: Fix urlopen() result when an HTTP response uses chunked
+  encoding.
+
+- Issue #5203: Fixed ctypes segfaults when passing a unicode string to a
+  function without argtypes (only occurs if HAVE_USABLE_WCHAR_T is false).
+
+- Issue #3386: distutils.sysconfig.get_python_lib prefix argument was ignored
+  under NT and OS2. Patch by Philip Jenvey.
+
+- Issue #5128: Make compileall properly inspect bytecode to determine if needs
+  to be recreated. This avoids a timing hole thanks to the old reliance on the
+  ctime of the files involved.
+
+- Issue #5122: Synchronize tk load failure check to prevent a potential
+  deadlock.
+
+- Issue #1818: collections.namedtuple() now supports a keyword argument
+  'rename' which lets invalid fieldnames be automatically converted to
+  positional names in the form, _1, _2, ...
+
+- Issue #4890: Handle empty text search pattern in Tkinter.Text.search.
+
 - Issue #4512 (part 2): Promote ``ZipImporter._get_filename()`` to be a
   public documented method ``ZipImporter.get_filename()``.
 
@@ -212,6 +255,9 @@ Library
 
 - Added a new itertools functions:  combinations_with_replacement()
   and compress().
+
+- Issue 5032:  added a step argument to itertools.count() and
+  allowed non-integer arguments.
 
 - Fix and properly document the multiprocessing module's logging
   support, expose the internal levels and provide proper usage
@@ -415,6 +461,8 @@ Tools/Demos
 Build
 -----
 
+- Issue #5134: Silence compiler warnings when compiling sqlite with VC++.
+
 - Issue #4494: Fix build with Py_NO_ENABLE_SHARED on Windows.
 
 - Issue #4895: Use _strdup on Windows CE.
@@ -443,6 +491,9 @@ Build
 C-API
 -----
 
+- Issue #5175: PyLong_AsUnsignedLongLong now raises OverflowError
+  for negative arguments.  Previously, it raised TypeError.
+
 - Issue #4720: The format for PyArg_ParseTupleAndKeywords can begin with '|'.
 
 - Issue #3632: from the gdb debugger, the 'pyo' macro can now be called when
@@ -454,6 +505,10 @@ C-API
 
 Extension Modules
 -----------------
+
+- Issue #3745: Fix hashlib to always reject unicode and non buffer-api
+  supporting objects as input no matter how it was compiled (built in
+  implementations or external openssl library).
 
 - Issue #4397: Fix occasional test_socket failure on OS X.
 

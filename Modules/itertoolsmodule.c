@@ -1791,6 +1791,9 @@ For example, product(A, B) returns the same as:  ((x,y) for x in A for y in B).\
 The leftmost iterators are in the outermost for-loop, so the output tuples\n\
 cycle in a manner similar to an odometer (with the rightmost element changing\n\
 on every iteration).\n\n\
+To compute the product of an iterable with itself, specify the number\n\
+of repetitions with the optional repeat keyword argument. For example,\n\
+product(A, repeat=4) means the same as product(A, A, A, A).\n\n\
 product('ab', range(3)) --> ('a',0) ('a',1) ('a',2) ('b',0) ('b',1) ('b',2)\n\
 product((0,1), (0,1), (0,1)) --> (0,0,0) (0,0,1) (0,1,0) (0,1,1) (1,0,0) ...");
 
@@ -2883,8 +2886,26 @@ static PyTypeObject filterfalse_type = {
 typedef struct {
 	PyObject_HEAD
 	Py_ssize_t cnt;
-	PyObject *long_cnt;	/* Arbitrarily large count when cnt >= PY_SSIZE_T_MAX */
+	PyObject *long_cnt;
+	PyObject *long_step;
 } countobject;
+
+/* Counting logic and invariants:
+
+C_add_mode:  when cnt an integer < PY_SSIZE_T_MAX and no step is specified.
+
+	assert(cnt != PY_SSIZE_T_MAX && long_cnt == NULL && long_step==PyInt(1));
+	Advances with:  cnt += 1
+	When count hits Y_SSIZE_T_MAX, switch to Py_add_mode.
+
+Py_add_mode:  when cnt == PY_SSIZE_T_MAX, step is not int(1), or cnt is a float.
+
+	assert(cnt == PY_SSIZE_T_MAX && long_cnt != NULL && long_step != NULL);
+	All counting is done with python objects (no overflows or underflows).
+	Advances with:  long_cnt += long_step
+	Step may be zero -- effectively a slow version of repeat(cnt).
+	Either long_cnt or long_step may be a float.
+*/
 
 static PyTypeObject count_type;
 
@@ -2893,28 +2914,44 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	countobject *lz;
 	Py_ssize_t cnt = 0;
-	PyObject *cnt_arg = NULL;
 	PyObject *long_cnt = NULL;
+	PyObject *long_step = NULL;
+	static char *kwlist[] = {"start", "step", 0};
 
-	if (type == &count_type && !_PyArg_NoKeywords("count()", kwds))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO:count",
+			kwlist, &long_cnt, &long_step))
 		return NULL;
 
-	if (!PyArg_UnpackTuple(args, "count", 0, 1, &cnt_arg))
-		return NULL;
+	if (long_cnt != NULL && !PyNumber_Check(long_cnt) ||
+		long_step != NULL && !PyNumber_Check(long_step)) {
+			PyErr_SetString(PyExc_TypeError, "a number is required");
+			return NULL;
+	}
 
-	if (cnt_arg != NULL) {
-		cnt = PyLong_AsSsize_t(cnt_arg);
-		if (cnt == -1 && PyErr_Occurred()) {
+	if (long_step == NULL) {
+		/* If not specified, step defaults to 1 */
+		long_step = PyLong_FromLong(1);
+		if (long_step == NULL)
+			return NULL;
+	} else
+		Py_INCREF(long_step);
+	assert(long_step != NULL);
+
+	if (long_cnt != NULL) {
+		cnt = PyLong_AsSsize_t(long_cnt);
+		if ((cnt == -1 && PyErr_Occurred()) || 
+				!PyIndex_Check(long_cnt)  || 
+				!PyLong_Check(long_step) ||
+				PyLong_AS_LONG(long_step) != 1) {
+			/* Switch to Py_add_mode */
 			PyErr_Clear();
-			if (!PyLong_Check(cnt_arg)) {
-				PyErr_SetString(PyExc_TypeError, "an integer is required");
-				return NULL;
-			}
-			long_cnt = cnt_arg;
 			Py_INCREF(long_cnt);
 			cnt = PY_SSIZE_T_MAX;
-		}
+		} else
+			long_cnt = NULL;
 	}
+	assert(cnt != PY_SSIZE_T_MAX && long_cnt == NULL ||
+		   cnt == PY_SSIZE_T_MAX && long_cnt != NULL);
 
 	/* create countobject structure */
 	lz = (countobject *)PyObject_New(countobject, &count_type);
@@ -2924,6 +2961,7 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	lz->cnt = cnt;
 	lz->long_cnt = long_cnt;
+	lz->long_step = long_step;
 
 	return (PyObject *)lz;
 }
@@ -2931,7 +2969,8 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 count_dealloc(countobject *lz)
 {
-	Py_XDECREF(lz->long_cnt); 
+	Py_XDECREF(lz->long_cnt);
+	Py_XDECREF(lz->long_step);
 	PyObject_Del(lz);
 }
 
@@ -2939,32 +2978,29 @@ static PyObject *
 count_nextlong(countobject *lz)
 {
 	static PyObject *one = NULL;
-	PyObject *cnt;
+	PyObject *long_cnt;
 	PyObject *stepped_up;
 
-	if (lz->long_cnt == NULL) {
-		lz->long_cnt = PyLong_FromSsize_t(PY_SSIZE_T_MAX);
-		if (lz->long_cnt == NULL)
+	long_cnt = lz->long_cnt;
+	if (long_cnt == NULL) {
+		/* Switch to Py_add_mode */
+		long_cnt = PyLong_FromSsize_t(PY_SSIZE_T_MAX);
+		if (long_cnt == NULL)
 			return NULL;
 	}
-	if (one == NULL) {
-		one = PyLong_FromLong(1);
-		if (one == NULL)
-			return NULL;
-	}
-	cnt = lz->long_cnt;
-	assert(cnt != NULL);
-	stepped_up = PyNumber_Add(cnt, one);
+	assert(lz->cnt == PY_SSIZE_T_MAX && long_cnt != NULL);
+
+	stepped_up = PyNumber_Add(long_cnt, lz->long_step);
 	if (stepped_up == NULL)
 		return NULL;
 	lz->long_cnt = stepped_up;
-	return cnt;
+	return long_cnt;
 }
 
 static PyObject *
 count_next(countobject *lz)
 {
-        if (lz->cnt == PY_SSIZE_T_MAX)
+	if (lz->cnt == PY_SSIZE_T_MAX)
 		return count_nextlong(lz);
 	return PyLong_FromSsize_t(lz->cnt++);
 }
@@ -2972,17 +3008,34 @@ count_next(countobject *lz)
 static PyObject *
 count_repr(countobject *lz)
 {
-        if (lz->cnt != PY_SSIZE_T_MAX)
+	if (lz->cnt != PY_SSIZE_T_MAX)
 		return PyUnicode_FromFormat("count(%zd)", lz->cnt);
 
-	return PyUnicode_FromFormat("count(%R)", lz->long_cnt);
+	if (PyLong_Check(lz->long_step)) {
+		long step = PyLong_AsLong(lz->long_step);
+		if (step == -1 && PyErr_Occurred()) {
+			PyErr_Clear();
+		}
+		if (step == 1) {
+			/* Don't display step when it is an integer equal to 1 */
+			return PyUnicode_FromFormat("count(%R)", lz->long_cnt);
+		}
+	}
+	return PyUnicode_FromFormat("count(%R, %R)",
+								lz->long_cnt, lz->long_step);
 }
 
 PyDoc_STRVAR(count_doc,
-"count([firstval]) --> count object\n\
+			 "count([start[, step]]) --> count object\n\
 \n\
 Return a count object whose .__next__() method returns consecutive\n\
-integers starting from zero or, if specified, from firstval.");
+integers starting from zero or, if specified, from start.\n\
+If step is specified, counts by that interval.  Equivalent to:\n\n\
+    def count(firstval=0, step=1):\n\
+        x = firstval\n\
+        while 1:\n\
+            yield x\n\
+            x += step\n");
 
 static PyTypeObject count_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)

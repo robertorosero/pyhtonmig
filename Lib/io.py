@@ -493,7 +493,6 @@ class unused_IOBase(metaclass=abc.ABCMeta):
         terminator(s) recognized.
         """
         # For backwards compatibility, a (slowish) readline().
-        self._checkClosed()
         if hasattr(self, "peek"):
             def nreadahead():
                 readahead = self.peek(1)
