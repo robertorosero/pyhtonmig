@@ -1042,7 +1042,7 @@ _TextIOWrapper_writeflush(PyTextIOWrapperObject *self)
 
     if (self->pending_bytes == NULL)
         return 0;
-    b = _PyBytes_Join(PyBytes_FromStringAndSize(NULL, 0), self->pending_bytes);
+    b = _PyBytes_Join(_PyIO_empty_bytes, self->pending_bytes);
     if (b == NULL)
         return -1;
     ret = PyObject_CallMethodObjArgs(self->buffer,
@@ -1359,8 +1359,7 @@ TextIOWrapper_read(PyTextIOWrapperObject *self, PyObject *args)
             if (result != NULL && PyList_Append(chunks, result) < 0)
                 goto fail;
             Py_CLEAR(result);
-            result = PyUnicode_Join(PyUnicode_FromStringAndSize(NULL, 0),
-                                    chunks);
+            result = PyUnicode_Join(_PyIO_empty_str, chunks);
             if (result == NULL)
                 goto fail;
             Py_CLEAR(chunks);
@@ -1618,7 +1617,7 @@ _TextIOWrapper_readline(PyTextIOWrapperObject *self, Py_ssize_t limit)
         if (line != NULL && PyList_Append(chunks, line) < 0)
             goto error;
         Py_CLEAR(line);
-        line = PyUnicode_Join(PyUnicode_FromStringAndSize(NULL, 0), chunks);
+        line = PyUnicode_Join(_PyIO_empty_str, chunks);
         if (line == NULL)
             goto error;
         Py_DECREF(chunks);

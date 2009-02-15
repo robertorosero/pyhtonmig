@@ -45,6 +45,9 @@ PyObject *_PyIO_str_truncate;
 PyObject *_PyIO_str_writable;
 PyObject *_PyIO_str_write;
 
+PyObject *_PyIO_empty_str;
+PyObject *_PyIO_empty_bytes;
+
 
 PyDoc_STRVAR(module_doc,
 "The io module provides the Python interfaces to stream handling. The\n"
@@ -753,6 +756,11 @@ PyInit__io(void)
     if (!(_PyIO_str_write = PyUnicode_InternFromString("write")))
         goto fail;
     if (!(_PyIO_str_writable = PyUnicode_InternFromString("writable")))
+        goto fail;
+    
+    if (!(_PyIO_empty_str = PyUnicode_FromStringAndSize(NULL, 0)))
+        goto fail;
+    if (!(_PyIO_empty_bytes = PyBytes_FromStringAndSize(NULL, 0)))
         goto fail;
 
     return m;

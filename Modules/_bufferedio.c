@@ -898,7 +898,7 @@ found:
         goto end;
     }
     Py_CLEAR(res);
-    res = _PyBytes_Join(PyBytes_FromStringAndSize(NULL, 0), chunks);
+    res = _PyBytes_Join(_PyIO_empty_bytes, chunks);
 
 end:
     LEAVE_BUFFERED(self)
