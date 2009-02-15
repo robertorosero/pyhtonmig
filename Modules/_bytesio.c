@@ -148,10 +148,12 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
 static PyObject *
 bytesio_get_closed(BytesIOObject *self)
 {
-    if (self->buf == NULL)
+    if (self->buf == NULL) {
         Py_RETURN_TRUE;
-    else
+    }
+    else {
         Py_RETURN_FALSE;
+    }
 }
 
 /* Generic getter for the writable, readable and seekable properties */
