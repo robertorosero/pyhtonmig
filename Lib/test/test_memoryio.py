@@ -9,12 +9,6 @@ from test import support
 import io
 import sys
 
-try:
-    import _bytesio, _stringio
-    has_c_implementation = True
-except ImportError:
-    has_c_implementation = False
-
 
 class MemoryTestMixin:
 
@@ -400,18 +394,15 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     #     self.assertEqual(memio.tell(), len(buf) * 2)
     #     self.assertEqual(memio.getvalue(), buf + buf)
 
-if has_c_implementation:
-    class CBytesIOTest(PyBytesIOTest):
-        ioclass = io.BytesIO
+class CBytesIOTest(PyBytesIOTest):
+    ioclass = io.BytesIO
 
-    class CStringIOTest(PyStringIOTest):
-        ioclass = io.StringIO
+class CStringIOTest(PyStringIOTest):
+    ioclass = io.StringIO
 
 
 def test_main():
-    tests = [PyBytesIOTest, PyStringIOTest]
-    if has_c_implementation:
-        tests.extend([CBytesIOTest, CStringIOTest])
+    tests = [PyBytesIOTest, PyStringIOTest, CBytesIOTest, CStringIOTest]
     support.run_unittest(*tests)
 
 if __name__ == '__main__':
