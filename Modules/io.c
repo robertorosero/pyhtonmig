@@ -22,30 +22,6 @@
 
 PyObject *PyIOExc_UnsupportedOperation;
 
-/* Various interned strings */
-
-PyObject *_PyIO_str_close;
-PyObject *_PyIO_str_closed;
-PyObject *_PyIO_str_decode;
-PyObject *_PyIO_str_encode;
-PyObject *_PyIO_str_fileno;
-PyObject *_PyIO_str_flush;
-PyObject *_PyIO_str_getstate;
-PyObject *_PyIO_str_isatty;
-PyObject *_PyIO_str_newlines;
-PyObject *_PyIO_str_read;
-PyObject *_PyIO_str_read1;
-PyObject *_PyIO_str_readable;
-PyObject *_PyIO_str_readinto;
-PyObject *_PyIO_str_readline;
-PyObject *_PyIO_str_reset;
-PyObject *_PyIO_str_seek;
-PyObject *_PyIO_str_seekable;
-PyObject *_PyIO_str_tell;
-PyObject *_PyIO_str_truncate;
-PyObject *_PyIO_str_writable;
-PyObject *_PyIO_str_write;
-
 
 PyDoc_STRVAR(module_doc,
 "The io module provides the Python interfaces to stream handling. The\n"
@@ -572,9 +548,31 @@ iomodule_clear(_PyIO_State *mod) {
     return 0;
 }
 
-static int
-iomodule_free(_PyIO_State *mod) {
-    iomodule_clear(mod);
+static void
+iomodule_free(_PyIO_State *state) {
+    iomodule_clear(state);
+
+    Py_DECREF(state->str_close);
+    Py_DECREF(state->str_closed);
+    Py_DECREF(state->str_decode);
+    Py_DECREF(state->str_encode);
+    Py_DECREF(state->str_fileno);
+    Py_DECREF(state->str_flush);
+    Py_DECREF(state->str_getstate);
+    Py_DECREF(state->str_isatty);
+    Py_DECREF(state->str_newlines);
+    Py_DECREF(state->str_read);
+    Py_DECREF(state->str_read1);
+    Py_DECREF(state->str_readable);
+    Py_DECREF(state->str_readinto);
+    Py_DECREF(state->str_readline);
+    Py_DECREF(state->str_reset);
+    Py_DECREF(state->str_seek);
+    Py_DECREF(state->str_seekable);
+    Py_DECREF(state->str_tell);
+    Py_DECREF(state->str_truncate);
+    Py_DECREF(state->str_writable);
+    Py_DECREF(state->str_write);
 }
 
 /*
@@ -711,47 +709,47 @@ PyInit__io(void)
     PyModule_AddObject(m, "IncrementalNewlineDecoder", (PyObject *) &PyIncrementalNewlineDecoder_Type);
 
     /* Interned strings */
-    if (!(_PyIO_str_close = PyUnicode_InternFromString("close")))
+    if (!(state->str_close = PyUnicode_InternFromString("close")))
         goto fail;
-    if (!(_PyIO_str_closed = PyUnicode_InternFromString("closed")))
+    if (!(state->str_closed = PyUnicode_InternFromString("closed")))
         goto fail;
-    if (!(_PyIO_str_decode = PyUnicode_InternFromString("decode")))
+    if (!(state->str_decode = PyUnicode_InternFromString("decode")))
         goto fail;
-    if (!(_PyIO_str_encode = PyUnicode_InternFromString("encode")))
+    if (!(state->str_encode = PyUnicode_InternFromString("encode")))
         goto fail;
-    if (!(_PyIO_str_fileno = PyUnicode_InternFromString("fileno")))
+    if (!(state->str_fileno = PyUnicode_InternFromString("fileno")))
         goto fail;
-    if (!(_PyIO_str_flush = PyUnicode_InternFromString("flush")))
+    if (!(state->str_flush = PyUnicode_InternFromString("flush")))
         goto fail;
-    if (!(_PyIO_str_getstate = PyUnicode_InternFromString("getstate")))
+    if (!(state->str_getstate = PyUnicode_InternFromString("getstate")))
         goto fail;
-    if (!(_PyIO_str_isatty = PyUnicode_InternFromString("isatty")))
+    if (!(state->str_isatty = PyUnicode_InternFromString("isatty")))
         goto fail;
-    if (!(_PyIO_str_newlines = PyUnicode_InternFromString("newlines")))
+    if (!(state->str_newlines = PyUnicode_InternFromString("newlines")))
         goto fail;
-    if (!(_PyIO_str_read = PyUnicode_InternFromString("read")))
+    if (!(state->str_read = PyUnicode_InternFromString("read")))
         goto fail;
-    if (!(_PyIO_str_read1 = PyUnicode_InternFromString("read1")))
+    if (!(state->str_read1 = PyUnicode_InternFromString("read1")))
         goto fail;
-    if (!(_PyIO_str_readable = PyUnicode_InternFromString("readable")))
+    if (!(state->str_readable = PyUnicode_InternFromString("readable")))
         goto fail;
-    if (!(_PyIO_str_readinto = PyUnicode_InternFromString("readinto")))
+    if (!(state->str_readinto = PyUnicode_InternFromString("readinto")))
         goto fail;
-    if (!(_PyIO_str_readline = PyUnicode_InternFromString("readline")))
+    if (!(state->str_readline = PyUnicode_InternFromString("readline")))
         goto fail;
-    if (!(_PyIO_str_reset = PyUnicode_InternFromString("reset")))
+    if (!(state->str_reset = PyUnicode_InternFromString("reset")))
         goto fail;
-    if (!(_PyIO_str_seek = PyUnicode_InternFromString("seek")))
+    if (!(state->str_seek = PyUnicode_InternFromString("seek")))
         goto fail;
-    if (!(_PyIO_str_seekable = PyUnicode_InternFromString("seekable")))
+    if (!(state->str_seekable = PyUnicode_InternFromString("seekable")))
         goto fail;
-    if (!(_PyIO_str_tell = PyUnicode_InternFromString("tell")))
+    if (!(state->str_tell = PyUnicode_InternFromString("tell")))
         goto fail;
-    if (!(_PyIO_str_truncate = PyUnicode_InternFromString("truncate")))
+    if (!(state->str_truncate = PyUnicode_InternFromString("truncate")))
         goto fail;
-    if (!(_PyIO_str_write = PyUnicode_InternFromString("write")))
+    if (!(state->str_write = PyUnicode_InternFromString("write")))
         goto fail;
-    if (!(_PyIO_str_writable = PyUnicode_InternFromString("writable")))
+    if (!(state->str_writable = PyUnicode_InternFromString("writable")))
         goto fail;
 
     return m;

@@ -100,30 +100,31 @@ extern PyModuleDef _PyIO_Module;
 typedef struct {
     PyObject *os_module;
     PyObject *locale_module;
+
+    /* various interned strings */
+    PyObject *str_close;
+    PyObject *str_closed;
+    PyObject *str_decode;
+    PyObject *str_encode;
+    PyObject *str_fileno;
+    PyObject *str_flush;
+    PyObject *str_getstate;
+    PyObject *str_isatty;
+    PyObject *str_newlines;
+    PyObject *str_read;
+    PyObject *str_read1;
+    PyObject *str_readable;
+    PyObject *str_readinto;
+    PyObject *str_readline;
+    PyObject *str_reset;
+    PyObject *str_seek;
+    PyObject *str_seekable;
+    PyObject *str_tell;
+    PyObject *str_truncate;
+    PyObject *str_writable;
+    PyObject *str_write;
 } _PyIO_State;
 
 
 #define IO_MOD_STATE(mod) ((_PyIO_State *)PyModule_GetState(mod))
 #define IO_STATE IO_MOD_STATE(PyState_FindModule(&_PyIO_Module))
-
-extern PyObject *_PyIO_str_close;
-extern PyObject *_PyIO_str_closed;
-extern PyObject *_PyIO_str_decode;
-extern PyObject *_PyIO_str_encode;
-extern PyObject *_PyIO_str_fileno;
-extern PyObject *_PyIO_str_flush;
-extern PyObject *_PyIO_str_getstate;
-extern PyObject *_PyIO_str_isatty;
-extern PyObject *_PyIO_str_newlines;
-extern PyObject *_PyIO_str_read;
-extern PyObject *_PyIO_str_read1;
-extern PyObject *_PyIO_str_readable;
-extern PyObject *_PyIO_str_readinto;
-extern PyObject *_PyIO_str_readline;
-extern PyObject *_PyIO_str_reset;
-extern PyObject *_PyIO_str_seek;
-extern PyObject *_PyIO_str_seekable;
-extern PyObject *_PyIO_str_tell;
-extern PyObject *_PyIO_str_truncate;
-extern PyObject *_PyIO_str_writable;
-extern PyObject *_PyIO_str_write;

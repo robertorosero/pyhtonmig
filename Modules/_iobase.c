@@ -134,7 +134,7 @@ IOBase_closed(PyObject *self)
     int closed;
     /* This gets the derived attribute, which is *not* __IOBase_closed
        in most cases! */
-    res = PyObject_GetAttr(self, _PyIO_str_closed);
+    res = PyObject_GetAttr(self, IO_STATE->str_closed);
     if (res == NULL)
         return 0;
     closed = PyObject_IsTrue(res);
@@ -173,7 +173,7 @@ IOBase_close(PyObject *self, PyObject *args)
     if (IS_CLOSED(self))
         Py_RETURN_NONE;
 
-    res = PyObject_CallMethodObjArgs(self, _PyIO_str_flush, NULL);
+    res = PyObject_CallMethodObjArgs(self, IO_STATE->str_flush, NULL);
     PyObject_SetAttrString(self, "__IOBase_closed", Py_True);
     if (res == NULL) {
         /* If flush() fails, just give up */
@@ -194,13 +194,14 @@ _PyIOBase_finalize(PyObject *self)
     PyObject *res;
     PyObject *tp, *v, *tb;
     int closed = 1;
+    _PyIO_State *state = IO_STATE;
     PyErr_Fetch(&tp, &v, &tb);
     /* We need to resurrect the object as calling close() can invoke
        arbitrary code. */
     ((PyObject *) self)->ob_refcnt++;
     /* The object could already be in an usable state, so we'll take any
        error as meaning "stop, nothing to see here". */
-    res = PyObject_GetAttr(self, _PyIO_str_closed);
+    res = PyObject_GetAttr(self, state->str_closed);
     if (res == NULL)
         PyErr_Clear();
     else {
@@ -210,7 +211,7 @@ _PyIOBase_finalize(PyObject *self)
             PyErr_Clear();
     }
     if (closed == 0) {
-        res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
+        res = PyObject_CallMethodObjArgs((PyObject *) self, state->str_close,
                                           NULL);
         if (res == NULL)
             PyErr_Clear();
@@ -247,7 +248,7 @@ IOBase_seekable(PyObject *self, PyObject *args)
 PyObject *
 _PyIOBase_checkSeekable(PyObject *self, PyObject *args)
 {
-    PyObject *res  = PyObject_CallMethodObjArgs(self, _PyIO_str_seekable, NULL);
+    PyObject *res  = PyObject_CallMethodObjArgs(self, IO_STATE->str_seekable, NULL);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -276,7 +277,7 @@ IOBase_readable(PyObject *self, PyObject *args)
 PyObject *
 _PyIOBase_checkReadable(PyObject *self, PyObject *args)
 {
-    PyObject *res  = PyObject_CallMethodObjArgs(self, _PyIO_str_readable, NULL);
+    PyObject *res  = PyObject_CallMethodObjArgs(self, IO_STATE->str_readable, NULL);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -305,7 +306,7 @@ IOBase_writable(PyObject *self, PyObject *args)
 PyObject *
 _PyIOBase_checkWritable(PyObject *self, PyObject *args)
 {
-    PyObject *res  = PyObject_CallMethodObjArgs(self, _PyIO_str_writable, NULL);
+    PyObject *res  = PyObject_CallMethodObjArgs(self, IO_STATE->str_writable, NULL);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -334,7 +335,7 @@ IOBase_enter(PyObject *self, PyObject *args)
 static PyObject *
 IOBase_exit(PyObject *self, PyObject *args)
 {
-    return PyObject_CallMethodObjArgs(self, _PyIO_str_close, NULL);
+    return PyObject_CallMethodObjArgs(self, IO_STATE->str_close, NULL);
 }
 
 /* Lower-level APIs */
@@ -484,7 +485,7 @@ IOBase_iter(PyObject *self)
 static PyObject *
 IOBase_iternext(PyObject *self)
 {
-    PyObject *line = PyObject_CallMethodObjArgs(self, _PyIO_str_readline, NULL);
+    PyObject *line = PyObject_CallMethodObjArgs(self, IO_STATE->str_readline, NULL);
 
     if (line == NULL)
         return NULL;
@@ -561,6 +562,7 @@ IOBase_readlines(PyObject *self, PyObject *args)
 static PyObject *
 IOBase_writelines(PyObject *self, PyObject *args)
 {
+    _PyIO_State *state = IO_STATE;
     PyObject *lines, *iter, *res;
 
     if (!PyArg_ParseTuple(args, "O:writelines", &lines)) {
@@ -585,7 +587,7 @@ IOBase_writelines(PyObject *self, PyObject *args)
                 break; /* Stop Iteration */
         }
 
-        res = PyObject_CallMethodObjArgs(self, _PyIO_str_write, line, NULL);
+        res = PyObject_CallMethodObjArgs(self, state->str_write, line, NULL);
         Py_DECREF(line);
         if (res == NULL) {
             Py_DECREF(iter);
@@ -719,7 +721,7 @@ RawIOBase_read(PyObject *self, PyObject *args)
     if (b == NULL)
         return NULL;
 
-    res = PyObject_CallMethodObjArgs(self, _PyIO_str_readinto, b, NULL);
+    res = PyObject_CallMethodObjArgs(self, IO_STATE->str_readinto, b, NULL);
     if (res == NULL) {
         Py_DECREF(b);
         return NULL;
