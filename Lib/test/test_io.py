@@ -1561,7 +1561,7 @@ class TextIOWrapperTest(unittest.TestCase):
     def testSeekAndTell(self):
         """Test seek/tell using the StatefulIncrementalDecoder."""
         # Make test faster by doing smaller seeks
-        CHUNK_SIZE = 256
+        CHUNK_SIZE = 128
 
         def testSeekAndTellWithData(data, min_pos=0):
             """Tell/seek to various points within a data stream and ensure
@@ -1594,7 +1594,6 @@ class TextIOWrapperTest(unittest.TestCase):
                 testSeekAndTellWithData(input)
 
             # Position each test case so that it crosses a chunk boundary.
-            #CHUNK_SIZE = _default_chunk_size()
             for input, _, _ in StatefulIncrementalDecoderTest.test_cases:
                 offset = CHUNK_SIZE - len(input)//2
                 prefix = b'.'*offset
