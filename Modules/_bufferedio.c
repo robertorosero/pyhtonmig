@@ -337,45 +337,6 @@ Buffered_clear(BufferedObject *self)
  * by BufferedReader and BufferedWriter
  */
 
-/* Positioning */
-
-static PyObject *
-BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
-{
-    PyObject *pos = Py_None;
-    PyObject *res;
-
-    CHECK_INITIALIZED(self)
-    if (!PyArg_ParseTuple(args, "|O:truncate", &pos)) {
-        return NULL;
-    }
-
-    /* Flush the stream.  We're mixing buffered I/O with lower-level I/O,
-     * and a flush may be necessary to synch both views of the current
-     * file state.
-     */
-    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_flush, NULL);
-    if (res == NULL)
-        return NULL;
-    Py_DECREF(res);
-
-    if (pos == Py_None) {
-        pos = PyObject_CallMethod(self->raw, "tell", NULL);
-        if (pos == NULL)
-            return NULL;
-    }
-    else
-        Py_INCREF(pos);
-
-    /* XXX: Should seek() be used, instead of passing the position
-     * XXX  directly to truncate?
-     */
-    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_truncate, pos, NULL);
-    Py_DECREF(pos);
-
-    return res;
-}
-
 /* Flush and close */
 
 static PyObject *
@@ -1379,7 +1340,6 @@ _BufferedReader_peek_unlocked(BufferedObject *self, Py_ssize_t n)
 
 static PyMethodDef BufferedReader_methods[] = {
     /* BufferedIOMixin methods */
-    {"truncate", (PyCFunction)BufferedIOMixin_truncate, METH_VARARGS},
     {"flush", (PyCFunction)BufferedIOMixin_flush, METH_NOARGS},
     {"close", (PyCFunction)BufferedIOMixin_close, METH_NOARGS},
     {"seekable", (PyCFunction)BufferedIOMixin_seekable, METH_NOARGS},
@@ -1394,6 +1354,7 @@ static PyMethodDef BufferedReader_methods[] = {
     {"readline", (PyCFunction)Buffered_readline, METH_VARARGS},
     {"seek", (PyCFunction)Buffered_seek, METH_VARARGS},
     {"tell", (PyCFunction)Buffered_tell, METH_NOARGS},
+    {"truncate", (PyCFunction)Buffered_truncate, METH_VARARGS},
     {NULL, NULL}
 };
 
