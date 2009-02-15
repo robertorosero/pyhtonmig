@@ -193,6 +193,7 @@ _PyIOBase_finalize(PyObject *self)
 {
     PyObject *res;
     PyObject *tp, *v, *tb;
+    PyObject **dictptr;
     int closed = 1;
     PyErr_Fetch(&tp, &v, &tb);
     /* We need to resurrect the object as calling close() can invoke
@@ -217,9 +218,14 @@ _PyIOBase_finalize(PyObject *self)
         else
             Py_DECREF(res);
     }
+    /* The code above might have re-added a dict, DECREF it */
+    dictptr = _PyObject_GetDictPtr(self);
+    if (dictptr != NULL)
+        Py_CLEAR(*dictptr);
     PyErr_Restore(tp, v, tb);
-    if (--((PyObject *) self)->ob_refcnt != 0)
+    if (--((PyObject *) self)->ob_refcnt != 0) {
         return -1;
+    }
     return 0;
 }
 
@@ -670,14 +676,6 @@ PyTypeObject PyIOBase_Type = {
     0,                          /* tp_init */
     0,                          /* tp_alloc */
     PyType_GenericNew,          /* tp_new */
-    0,                          /* tp_free */
-    0,                          /* tp_is_gc */
-    0,                          /* tp_bases */
-    0,                          /* tp_mro */
-    0,                          /* tp_cache */
-    0,                          /* tp_subclasses */
-    0,                          /* tp_weaklist */
-    0,                          /* tp_del */
 };
 
 

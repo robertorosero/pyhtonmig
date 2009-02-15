@@ -536,22 +536,22 @@ PyDoc_STRVAR(write_doc,
 static PyObject *
 bytesio_write(BytesIOObject *self, PyObject *obj)
 {
-    const char *bytes;
-    Py_ssize_t size;
     Py_ssize_t n = 0;
+    Py_buffer buf;
+    PyObject *result = NULL;
 
     CHECK_CLOSED(self);
 
-    if (PyObject_AsReadBuffer(obj, (void *)&bytes, &size) < 0)
+    if (PyObject_GetBuffer(obj, &buf, PyBUF_CONTIG_RO) < 0)
         return NULL;
 
-    if (size != 0) {
-        n = write_bytes(self, bytes, size);
-        if (n < 0)
-            return NULL;
-    }
+    if (buf.len != 0)
+        n = write_bytes(self, buf.buf, buf.len);
+    if (n >= 0)
+        result = PyLong_FromSsize_t(n);
 
-    return PyLong_FromSsize_t(n);
+    PyBuffer_Release(&buf);
+    return result;
 }
 
 PyDoc_STRVAR(writelines_doc,
@@ -611,6 +611,9 @@ bytesio_dealloc(BytesIOObject *self)
         PyMem_Free(self->buf);
         self->buf = NULL;
     }
+    Py_CLEAR(self->dict);
+    if (self->weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *)self);
     Py_TYPE(self)->tp_free(self);
 }
 
