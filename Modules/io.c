@@ -556,6 +556,27 @@ PyNumber_AsOff_t(PyObject *item, PyObject *err)
     return result;
 }
 
+static int
+iomodule_traverse(_PyIO_State *mod, visitproc visit, void *arg) {
+    Py_VISIT(mod->os_module);
+    if (mod->locale_module != NULL)
+        Py_VISIT(mod->locale_module);
+    return 0;
+}
+
+static int
+iomodule_clear(_PyIO_State *mod) {
+    Py_CLEAR(mod->os_module);
+    if (mod->locale_module != NULL)
+        Py_CLEAR(mod->locale_module);
+    return 0;
+}
+
+static int
+iomodule_free(_PyIO_State *mod) {
+    iomodule_clear(mod);
+}
+
 /*
  * Module definition
  */
@@ -565,24 +586,31 @@ static PyMethodDef module_methods[] = {
     {NULL, NULL}
 };
 
-static struct PyModuleDef iomodule = {
+struct PyModuleDef _PyIO_Module = {
     PyModuleDef_HEAD_INIT,
     "io",
     module_doc,
-    -1,
+    sizeof(_PyIO_State),
     module_methods,
     NULL,
-    NULL,
-    NULL,
-    NULL
+    (traverseproc)iomodule_traverse,
+    (inquiry)iomodule_clear,
+    (freefunc)iomodule_free
 };
 
 PyMODINIT_FUNC
 PyInit__io(void)
 {
-    PyObject *m = PyModule_Create(&iomodule);
+    PyObject *m = PyModule_Create(&_PyIO_Module);
+    _PyIO_State *state;
     PyTypeObject *base;
     if (m == NULL)
+        goto fail;
+    state = IO_MOD_STATE(m);
+
+    /* put os in the module state */
+    state->os_module = PyImport_ImportModule("os");
+    if (state->os_module == NULL)
         goto fail;
 
     /* UnsupportedOperation inherits from ValueError and IOError */

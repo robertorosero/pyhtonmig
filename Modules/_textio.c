@@ -713,6 +713,7 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     char *errors = NULL;
     char *newline = NULL;
     int line_buffering = 0;
+    _PyIO_State *state = IO_STATE;
 
     PyObject *res;
     int r;
@@ -748,7 +749,7 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
 
     if (encoding == NULL) {
         /* Try os.device_encoding(fileno) */
-        PyObject *fileno, *os;;
+        PyObject *fileno;
         fileno = PyObject_CallMethod(buffer, "fileno", NULL);
         /* Ignore only AttributeError and UnsupportedOperation */
         if (fileno == NULL) {
@@ -761,14 +762,9 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
             }
         }
         else {
-            os = PyImport_ImportModule("os");
-            if (os == NULL) {
-                Py_DECREF(fileno);
-                goto error;
-            }
-            self->encoding = PyObject_CallMethod(os, "device_encoding",
+            self->encoding = PyObject_CallMethod(state->os_module,
+                                                 "device_encoding",
                                                  "N", fileno);
-            Py_DECREF(os);
             if (self->encoding == NULL)
                 goto error;
             else if (!PyUnicode_Check(self->encoding))
@@ -776,16 +772,23 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
         }
     }
     if (encoding == NULL && self->encoding == NULL) {
-        /* try locale.getpreferredencoding() */
-        PyObject *locale = PyImport_ImportModule("locale");
-        if (locale == NULL) {
-            PyErr_Clear();
-            self->encoding = PyUnicode_FromString("ascii");
+        if (state->locale_module == NULL) {
+            state->locale_module = PyImport_ImportModule("locale");
+            if (state->locale_module == NULL) {
+                if (PyErr_ExceptionMatches(PyExc_ImportError)) {
+                    PyErr_Clear();
+                    self->encoding = PyUnicode_FromString("ascii");
+                }
+                else
+                    goto error;
+            }
+            else
+                goto use_locale;
         }
         else {
+          use_locale:
             self->encoding = PyObject_CallMethod(
-                locale, "getpreferredencoding", NULL);
-            Py_DECREF(locale);
+                state->locale_module, "getpreferredencoding", NULL);
             if (self->encoding == NULL)
                 goto error;
             if (!PyUnicode_Check(self->encoding))
