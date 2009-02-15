@@ -142,7 +142,7 @@ class MemoryTestMixin:
         self.assertEqual(memio.readline(), self.EOF)
         memio.seek(0)
         self.assertEqual(type(memio.readline()), type(buf))
-        self.assertEqual(memio.readline(None), buf)
+        self.assertEqual(memio.readline(), buf)
         self.assertRaises(TypeError, memio.readline, '')
         memio.close()
         self.assertRaises(ValueError,  memio.readline)
@@ -294,7 +294,7 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
     @staticmethod
     def buftype(s):
         return s.encode("ascii")
-    ioclass = io._BytesIO
+    ioclass = io.unused_BytesIO
     EOF = b""
 
     def test_read1(self):
@@ -367,7 +367,7 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     buftype = str
-    ioclass = io._StringIO
+    ioclass = io.unused_StringIO
     EOF = ""
 
     def test_relative_seek(self):

@@ -1367,7 +1367,7 @@ class unused_IncrementalNewlineDecoder(codecs.IncrementalDecoder):
 
 
 TextIOWrapper = _io.TextIOWrapper
-class unusedTextIOWrapper(TextIOBase):
+class unused_TextIOWrapper(TextIOBase):
 
     r"""Character and line based layer over a BufferedIOBase object, buffer.
 
@@ -1847,7 +1847,7 @@ class unusedTextIOWrapper(TextIOBase):
     def newlines(self):
         return self._decoder.newlines if self._decoder else None
 
-class unused_StringIO(TextIOWrapper):
+class unused_StringIO(unused_TextIOWrapper):
     """Text I/O implementation using an in-memory buffer.
 
     The initial_value argument sets the value of object.  The newline
@@ -1857,10 +1857,10 @@ class unused_StringIO(TextIOWrapper):
     # XXX This is really slow, but fully functional
 
     def __init__(self, initial_value="", newline="\n"):
-        super(_StringIO, self).__init__(BytesIO(),
-                                        encoding="utf-8",
-                                        errors="strict",
-                                        newline=newline)
+        super(unused_StringIO, self).__init__(BytesIO(),
+                                              encoding="utf-8",
+                                              errors="strict",
+                                              newline=newline)
         if initial_value:
             if not isinstance(initial_value, str):
                 initial_value = str(initial_value)
