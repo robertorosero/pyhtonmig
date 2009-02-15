@@ -178,7 +178,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	PyFileIOObject *self = (PyFileIOObject *) oself;
 	static char *kwlist[] = {"file", "mode", "closefd", NULL};
 	const char *name = NULL;
-	PyObject *nameobj;
+	PyObject *nameobj, *stringobj = NULL;
 	char *mode = "r";
 	char *s;
 #ifdef MS_WINDOWS
@@ -233,22 +233,22 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 				return -1;
 		}
 		else {
-			PyObject *s;
 			PyObject *u = PyUnicode_FromObject(nameobj);
 
 			if (u == NULL)
 				return -1;
 
-			s = PyUnicode_AsEncodedString(
+			stringobj = PyUnicode_AsEncodedString(
 				u, Py_FileSystemDefaultEncoding, NULL);
 			Py_DECREF(u);
-			if (s == NULL)
+			if (stringobj == NULL)
 				return -1;
-			if (!PyBytes_Check(s)) {
+			if (!PyBytes_Check(stringobj)) {
 				PyErr_SetString(PyExc_TypeError,
 						"encoder failed to return bytes");
+				goto error;
 			}
-			name = PyBytes_AS_STRING(s);
+			name = PyBytes_AS_STRING(stringobj);
 		}
 	}
 
@@ -369,6 +369,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	ret = -1;
 
  done:
+	Py_CLEAR(stringobj);
 	return ret;
 }
 
