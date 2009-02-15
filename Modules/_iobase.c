@@ -586,7 +586,7 @@ IOBase_writelines(PyObject *self, PyObject *args)
 
     while (1) {
         PyObject *line = PyIter_Next(iter);
-        if(line == NULL) {
+        if (line == NULL) {
             if (PyErr_Occurred()) {
                 Py_DECREF(iter);
                 return NULL;
@@ -603,6 +603,7 @@ IOBase_writelines(PyObject *self, PyObject *args)
         }
         Py_DECREF(res);
     }
+    Py_DECREF(iter);
     Py_RETURN_NONE;
 }
 
