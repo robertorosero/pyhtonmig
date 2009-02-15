@@ -1014,9 +1014,6 @@ Buffered_truncate(BufferedObject *self, PyObject *args)
         return NULL;
     }
 
-    if (pos != Py_None)
-        Py_INCREF(pos);
-
     ENTER_BUFFERED(self)
 
     if (self->writable) {

@@ -101,7 +101,7 @@ PyDoc_STRVAR(IOBase_truncate_doc,
 static PyObject *
 IOBase_truncate(PyObject *self, PyObject *args)
 {
-    return IOBase_unsupported("seek");
+    return IOBase_unsupported("truncate");
 }
 
 /* Flush and close methods */
