@@ -544,6 +544,7 @@ iomodule_clear(_PyIO_State *mod) {
     Py_CLEAR(mod->os_module);
     if (mod->locale_module != NULL)
         Py_CLEAR(mod->locale_module);
+    Py_CLEAR(mod->unsupported_operation);
     return 0;
 }
 
@@ -616,6 +617,7 @@ PyInit__io(void)
         "UnsupportedOperation", PyExc_ValueError, PyExc_IOError);
     if (state->unsupported_operation == NULL)
         goto fail;
+    Py_INCREF(state->unsupported_operation);
     PyModule_AddObject(m, "UnsupportedOperation",
                        state->unsupported_operation);
 
