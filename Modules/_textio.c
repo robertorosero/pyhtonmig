@@ -1833,6 +1833,7 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
         }
 
         res = PyObject_CallMethod(self->buffer, "seek", "ii", 0, 2);
+        Py_XDECREF(cookieObj);
         return res;
     }
     else if (whence != 0) {
