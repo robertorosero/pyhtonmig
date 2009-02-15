@@ -27,8 +27,6 @@ extern PyObject* _PyIOBase_checkWritable(PyObject *self, PyObject *args);
 extern PyObject* _PyIOBase_checkSeekable(PyObject *self, PyObject *args);
 extern PyObject* _PyIOBase_checkClosed(PyObject *self, PyObject *args);
 
-extern PyObject* PyIOExc_UnsupportedOperation;
-
 /* Helper for finalization.
    This function will revive an object ready to be deallocated and try to
    close() it. It returns 0 if the object can be destroyed, or -1 if it
@@ -100,6 +98,8 @@ extern PyModuleDef _PyIO_Module;
 typedef struct {
     PyObject *os_module;
     PyObject *locale_module;
+
+    PyObject *unsupported_operation;
 
     /* various interned strings */
     PyObject *str_close;

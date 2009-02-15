@@ -69,7 +69,7 @@ BufferedIOBase_readinto(PyObject *self, PyObject *args)
 static PyObject *
 BufferedIOBase_unsupported(const char *message)
 {
-    PyErr_SetString(PyIOExc_UnsupportedOperation, message);
+    PyErr_SetString(IO_STATE->unsupported_operation, message);
     return NULL;
 }
 

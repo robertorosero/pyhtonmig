@@ -24,7 +24,7 @@ PyDoc_STRVAR(TextIOBase_doc,
 static PyObject *
 _unsupported(const char *message)
 {
-    PyErr_SetString(PyIOExc_UnsupportedOperation, message);
+    PyErr_SetString(IO_STATE->unsupported_operation, message);
     return NULL;
 }
 
@@ -754,7 +754,7 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
         /* Ignore only AttributeError and UnsupportedOperation */
         if (fileno == NULL) {
             if (PyErr_ExceptionMatches(PyExc_AttributeError) ||
-                PyErr_ExceptionMatches(PyIOExc_UnsupportedOperation)) {
+                PyErr_ExceptionMatches(state->unsupported_operation)) {
                 PyErr_Clear();
             }
             else {

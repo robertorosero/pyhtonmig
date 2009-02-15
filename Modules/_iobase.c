@@ -58,7 +58,7 @@ PyDoc_STRVAR(IOBase_doc,
 static PyObject *
 IOBase_unsupported(const char *message)
 {
-    PyErr_SetString(PyIOExc_UnsupportedOperation, message);
+    PyErr_SetString(IO_STATE->unsupported_operation, message);
     return NULL;
 }
 

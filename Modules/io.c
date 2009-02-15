@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #endif /* HAVE_SYS_STAT_H */
 
-PyObject *PyIOExc_UnsupportedOperation;
 
 
 PyDoc_STRVAR(module_doc,
@@ -612,13 +611,13 @@ PyInit__io(void)
         goto fail;
 
     /* UnsupportedOperation inherits from ValueError and IOError */
-    PyIOExc_UnsupportedOperation = PyObject_CallFunction(
+    state->unsupported_operation = PyObject_CallFunction(
         (PyObject *)&PyType_Type, "s(OO){}",
         "UnsupportedOperation", PyExc_ValueError, PyExc_IOError);
-    if (PyIOExc_UnsupportedOperation == NULL)
+    if (state->unsupported_operation == NULL)
         goto fail;
     PyModule_AddObject(m, "UnsupportedOperation",
-                       PyIOExc_UnsupportedOperation);
+                       state->unsupported_operation);
 
     /* BlockingIOError */
     base = (PyTypeObject *)PyExc_IOError;
