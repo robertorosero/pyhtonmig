@@ -201,6 +201,10 @@ _PyIOBase_finalize(PyObject *self)
     ((PyObject *) self)->ob_refcnt++;
     /* The object could already be in an usable state, so we'll take any
        error as meaning "stop, nothing to see here". */
+    /* XXX any Python method or property called from here may rely on
+       attributes being set in the instance __dict__, but the __dict__ has
+       already been cleared by subtype_dealloc().
+       Worse, since exceptions are silenced, the user will be unaware of it. */
     res = PyObject_GetAttr(self, _PyIO_str_closed);
     if (res == NULL)
         PyErr_Clear();
