@@ -198,7 +198,7 @@ _PyIOBase_finalize(PyObject *self)
     PyErr_Fetch(&tp, &v, &tb);
     /* We need to resurrect the object as calling close() can invoke
        arbitrary code. */
-    ((PyObject *) self)->ob_refcnt++;
+    Py_REFCNT(self)++;
     /* The object could already be in an usable state, so we'll take any
        error as meaning "stop, nothing to see here". */
     /* XXX any Python method or property called from here may rely on
@@ -227,7 +227,7 @@ _PyIOBase_finalize(PyObject *self)
     if (dictptr != NULL)
         Py_CLEAR(*dictptr);
     PyErr_Restore(tp, v, tb);
-    if (--((PyObject *) self)->ob_refcnt != 0) {
+    if (--Py_REFCNT(self) != 0) {
         return -1;
     }
     return 0;
