@@ -228,7 +228,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	if (fd < 0)
 	{
 		if (PyBytes_Check(nameobj) || PyByteArray_Check(nameobj)) {
-			if (PyObject_AsCharBuffer(nameobj, &name, NULL) < 0)
+			Py_ssize_t namelen;
+			if (PyObject_AsCharBuffer(nameobj, &name, &namelen) < 0)
 				return -1;
 		}
 		else {

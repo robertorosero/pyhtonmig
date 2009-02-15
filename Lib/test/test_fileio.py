@@ -176,6 +176,22 @@ class OtherFileTests(unittest.TestCase):
         f.close()
         os.unlink(TESTFN)
 
+    def testBytesOpen(self):
+        # Opening a bytes filename
+        try:
+            fn = TESTFN.encode("ascii")
+        except UnicodeEncodeError:
+            # Skip test
+            return
+        f = _FileIO(fn, "w")
+        try:
+            f.write(b"abc")
+            f.close()
+            with open(TESTFN, "rb") as f:
+                self.assertEquals(f.read(), b"abc")
+        finally:
+            os.unlink(TESTFN)
+
     def testInvalidFd(self):
         self.assertRaises(ValueError, _FileIO, -10)
         self.assertRaises(OSError, _FileIO, make_bad_fd())
