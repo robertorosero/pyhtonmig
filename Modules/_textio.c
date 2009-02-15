@@ -1775,9 +1775,9 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
 
     if (!PyArg_ParseTuple(args, "O|i:seek", &cookieObj, &whence))
         return NULL;
-    Py_INCREF(cookieObj);
-
     CHECK_CLOSED(self);
+
+    Py_INCREF(cookieObj);
 
     if (!self->seekable) {
         PyErr_SetString(PyExc_IOError,
@@ -1881,9 +1881,6 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
     if (self->decoder) {
         if (_TextIOWrapper_decoder_setstate(self, &cookie) < 0)
             goto fail;
-        self->snapshot = Py_BuildValue("iy", cookie.dec_flags, "");
-        if (self->snapshot == NULL)
-            goto fail;
     }
 
     if (cookie.chars_to_skip) {
@@ -1897,14 +1894,14 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
 
         assert (PyBytes_Check(input_chunk));
 
-        self->snapshot = Py_BuildValue("iO", cookie.dec_flags, input_chunk);
+        self->snapshot = Py_BuildValue("iN", cookie.dec_flags, input_chunk);
         if (self->snapshot == NULL) {
             Py_DECREF(input_chunk);
             goto fail;
         }
 
         decoded = PyObject_CallMethod(self->decoder, "decode",
-                                      "Ni", input_chunk, (int)cookie.need_eof);
+                                      "Oi", input_chunk, (int)cookie.need_eof);
 
         if (decoded == NULL)
             goto fail;
@@ -1917,6 +1914,11 @@ TextIOWrapper_seek(PyTextIOWrapperObject *self, PyObject *args)
             goto fail;
         }
         self->decoded_chars_used = cookie.chars_to_skip;
+    }
+    else {
+        self->snapshot = Py_BuildValue("iy", cookie.dec_flags, "");
+        if (self->snapshot == NULL)
+            goto fail;
     }
 
     return cookieObj;
@@ -2058,6 +2060,7 @@ TextIOWrapper_tell(PyTextIOWrapperObject *self, PyObject *args)
             goto fail;
         assert (PyUnicode_Check(decoded));
         chars_decoded += PyUnicode_GET_SIZE(decoded);
+        Py_DECREF(decoded);
         cookie.need_eof = 1;
 
         if (chars_decoded < chars_to_skip) {
