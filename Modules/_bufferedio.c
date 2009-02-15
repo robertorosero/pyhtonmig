@@ -344,7 +344,6 @@ BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
 {
     PyObject *pos = Py_None;
     PyObject *res;
-    _PyIO_State *state = IO_STATE;
 
     CHECK_INITIALIZED(self)
     if (!PyArg_ParseTuple(args, "|O:truncate", &pos)) {
@@ -355,7 +354,7 @@ BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
      * and a flush may be necessary to synch both views of the current
      * file state.
      */
-    res = PyObject_CallMethodObjArgs(self->raw, state->str_flush, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_flush, NULL);
     if (res == NULL)
         return NULL;
     Py_DECREF(res);
@@ -371,7 +370,7 @@ BufferedIOMixin_truncate(BufferedObject *self, PyObject *args)
     /* XXX: Should seek() be used, instead of passing the position
      * XXX  directly to truncate?
      */
-    res = PyObject_CallMethodObjArgs(self->raw, state->str_truncate, pos, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_truncate, pos, NULL);
     Py_DECREF(pos);
 
     return res;
@@ -383,7 +382,7 @@ static PyObject *
 BufferedIOMixin_flush(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_flush, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_flush, NULL);
 }
 
 static int
@@ -392,7 +391,7 @@ BufferedIOMixin_closed(BufferedObject *self)
     int closed;
     PyObject *res;
     CHECK_INITIALIZED_INT(self)
-    res = PyObject_GetAttr(self->raw, IO_STATE->str_closed);
+    res = PyObject_GetAttr(self->raw, _PyIO_str_closed);
     if (res == NULL)
         return -1;
     closed = PyObject_IsTrue(res);
@@ -404,7 +403,7 @@ static PyObject *
 BufferedIOMixin_closed_get(BufferedObject *self, void *context)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_GetAttr(self->raw, IO_STATE->str_closed);
+    return PyObject_GetAttr(self->raw, _PyIO_str_closed);
 }
 
 static PyObject *
@@ -412,7 +411,6 @@ BufferedIOMixin_close(BufferedObject *self, PyObject *args)
 {
     PyObject *res = NULL;
     int r;
-    _PyIO_State *state = IO_STATE;
 
     CHECK_INITIALIZED(self)
     ENTER_BUFFERED(self)
@@ -427,7 +425,7 @@ BufferedIOMixin_close(BufferedObject *self, PyObject *args)
     }
     /* flush() will most probably re-take the lock, so drop it first */
     LEAVE_BUFFERED(self)
-    res = PyObject_CallMethodObjArgs((PyObject *)self, state->str_flush, NULL);
+    res = PyObject_CallMethodObjArgs((PyObject *)self, _PyIO_str_flush, NULL);
     ENTER_BUFFERED(self)
     if (res == NULL) {
         /* If flush() fails, just give up */
@@ -438,7 +436,7 @@ BufferedIOMixin_close(BufferedObject *self, PyObject *args)
     }
     Py_XDECREF(res);
 
-    res = PyObject_CallMethodObjArgs(self->raw, state->str_close, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_close, NULL);
 
 end:
     LEAVE_BUFFERED(self)
@@ -451,21 +449,21 @@ static PyObject *
 BufferedIOMixin_seekable(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_seekable, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_seekable, NULL);
 }
 
 static PyObject *
 BufferedIOMixin_readable(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_readable, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_readable, NULL);
 }
 
 static PyObject *
 BufferedIOMixin_writable(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_writable, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_writable, NULL);
 }
 
 static PyObject *
@@ -488,14 +486,14 @@ static PyObject *
 BufferedIOMixin_fileno(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_fileno, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_fileno, NULL);
 }
 
 static PyObject *
 BufferedIOMixin_isatty(BufferedObject *self, PyObject *args)
 {
     CHECK_INITIALIZED(self)
-    return PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_isatty, NULL);
+    return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_isatty, NULL);
 }
 
 
@@ -542,7 +540,7 @@ _Buffered_raw_tell(BufferedObject *self)
 {
     PyObject *res;
     Py_off_t n;
-    res = PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_tell, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_tell, NULL);
     if (res == NULL)
         return -1;
     n = PyNumber_AsOff_t(res, PyExc_ValueError);
@@ -571,7 +569,7 @@ _Buffered_raw_seek(BufferedObject *self, Py_off_t target, int whence)
         Py_DECREF(posobj);
         return -1;
     }
-    res = PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_seek,
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_seek,
                                      posobj, whenceobj, NULL);
     Py_DECREF(posobj);
     Py_DECREF(whenceobj);
@@ -1036,7 +1034,7 @@ Buffered_truncate(BufferedObject *self, PyObject *args)
         }
         _BufferedReader_reset_buf(self);
     }
-    res = PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_truncate, pos, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_truncate, pos, NULL);
     if (res == NULL)
         goto end;
     /* Reset cached position */
@@ -1064,7 +1062,7 @@ Buffered_iternext(BufferedObject *self)
     }
     else {
         line = PyObject_CallMethodObjArgs((PyObject *)self,
-                                           IO_STATE->str_readline, NULL);
+                                           _PyIO_str_readline, NULL);
         if (line && !PyBytes_Check(line)) {
             PyErr_Format(PyExc_IOError,
                          "readline() should have returned a bytes object, "
@@ -1142,7 +1140,7 @@ _BufferedReader_raw_read(BufferedObject *self, char *start, Py_ssize_t len)
     memobj = PyMemoryView_FromBuffer(&buf);
     if (memobj == NULL)
         return -1;
-    res = PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_readinto, memobj, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_readinto, memobj, NULL);
     Py_DECREF(memobj);
     if (res == NULL)
         return -1;
@@ -1187,7 +1185,6 @@ _BufferedReader_read_unlocked(BufferedObject *self, Py_ssize_t n)
     PyObject *data, *res = NULL;
     Py_ssize_t current_size, remaining, written;
     char *out;
-    _PyIO_State *state = IO_STATE;
     static PyObject *sep = NULL;
 
     /* Special case for when the number of bytes to read is unspecified. */
@@ -1228,7 +1225,7 @@ _BufferedReader_read_unlocked(BufferedObject *self, Py_ssize_t n)
             }
 
             /* Read until EOF or until read() would block. */
-            data = PyObject_CallMethodObjArgs(self->raw, state->str_read, NULL);
+            data = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_read, NULL);
             if (data == NULL) {
                 Py_DECREF(chunks);
                 return NULL;
@@ -1524,7 +1521,7 @@ _BufferedWriter_raw_write(BufferedObject *self, char *start, Py_ssize_t len)
     memobj = PyMemoryView_FromBuffer(&buf);
     if (memobj == NULL)
         return -1;
-    res = PyObject_CallMethodObjArgs(self->raw, IO_STATE->str_write, memobj, NULL);
+    res = PyObject_CallMethodObjArgs(self->raw, _PyIO_str_write, memobj, NULL);
     Py_DECREF(memobj);
     if (res == NULL)
         return -1;
