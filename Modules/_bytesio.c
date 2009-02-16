@@ -613,9 +613,7 @@ bytesio_dealloc(BytesIOObject *self)
         PyMem_Free(self->buf);
         self->buf = NULL;
     }
-    Py_CLEAR(self->dict);
-    if (self->weakreflist != NULL)
-        PyObject_ClearWeakRefs((PyObject *)self);
+    Py_TYPE(self)->tp_clear((PyObject *)self);
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -664,6 +662,24 @@ bytesio_init(BytesIOObject *self, PyObject *args, PyObject *kwds)
 
     return 0;
 }
+
+static int
+bytesio_traverse(BytesIOObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->dict);
+    Py_VISIT(self->weakreflist);
+    return 0;
+}
+
+static int
+bytesio_clear(BytesIOObject *self)
+{
+    Py_CLEAR(self->dict);
+    if (self->weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *)self);
+    return 0;
+}
+
 
 static PyGetSetDef bytesio_getsetlist[] = {
     {"closed",  (getter)bytesio_get_closed, NULL,
@@ -718,10 +734,11 @@ PyTypeObject PyBytesIO_Type = {
     0,                                         /*tp_getattro*/
     0,                                         /*tp_setattro*/
     0,                                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    Py_TPFLAGS_HAVE_GC,                        /*tp_flags*/
     bytesio_doc,                               /*tp_doc*/
-    0,                                         /*tp_traverse*/
-    0,                                         /*tp_clear*/
+    (traverseproc)bytesio_traverse,            /*tp_traverse*/
+    (inquiry)bytesio_clear,                    /*tp_clear*/
     0,                                         /*tp_richcompare*/
     offsetof(BytesIOObject, weakreflist),      /*tp_weaklistoffset*/
     PyObject_SelfIter,                         /*tp_iter*/
