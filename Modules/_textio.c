@@ -789,9 +789,15 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
           use_locale:
             self->encoding = PyObject_CallMethod(
                 state->locale_module, "getpreferredencoding", NULL);
-            if (self->encoding == NULL)
-                goto error;
-            if (!PyUnicode_Check(self->encoding))
+            if (self->encoding == NULL) {
+                if (PyErr_ExceptionMatches(PyExc_ImportError)) {
+                    PyErr_Clear();
+                    self->encoding = PyUnicode_FromString("ascii");
+                }
+                else
+                    goto error;
+            }
+            else if (!PyUnicode_Check(self->encoding))
                 Py_CLEAR(self->encoding);
         }
     }
