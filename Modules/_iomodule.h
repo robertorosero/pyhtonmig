@@ -96,6 +96,7 @@ extern Py_off_t PyNumber_AsOff_t(PyObject *item, PyObject *err);
 extern PyModuleDef _PyIO_Module;
 
 typedef struct {
+    int initialized;
     PyObject *os_module;
     PyObject *locale_module;
 

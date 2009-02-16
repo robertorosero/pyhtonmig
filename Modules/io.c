@@ -560,14 +560,19 @@ PyNumber_AsOff_t(PyObject *item, PyObject *err)
 
 static int
 iomodule_traverse(_PyIO_State *mod, visitproc visit, void *arg) {
+    if (!mod->initialized)
+        return 0;
     Py_VISIT(mod->os_module);
     if (mod->locale_module != NULL)
         Py_VISIT(mod->locale_module);
+    Py_VISIT(mod->unsupported_operation);
     return 0;
 }
 
 static int
 iomodule_clear(_PyIO_State *mod) {
+    if (!mod->initialized)
+        return 0;
     Py_CLEAR(mod->os_module);
     if (mod->locale_module != NULL)
         Py_CLEAR(mod->locale_module);
@@ -605,7 +610,7 @@ PyMODINIT_FUNC
 PyInit__io(void)
 {
     PyObject *m = PyModule_Create(&_PyIO_Module);
-    _PyIO_State *state;
+    _PyIO_State *state = NULL;
     PyTypeObject *base;
     if (m == NULL)
         goto fail;
@@ -763,9 +768,15 @@ PyInit__io(void)
     if (!(_PyIO_empty_bytes = PyBytes_FromStringAndSize(NULL, 0)))
         goto fail;
 
+    state->initialized = 1;
+
     return m;
 
   fail:
+    if (state != NULL) {
+        Py_XDECREF(state->os_module);
+        Py_XDECREF(state->unsupported_operation);
+    }
     Py_XDECREF(m);
     return NULL;
 }
