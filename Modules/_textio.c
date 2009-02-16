@@ -774,14 +774,8 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     if (encoding == NULL && self->encoding == NULL) {
         if (state->locale_module == NULL) {
             state->locale_module = PyImport_ImportModule("locale");
-            if (state->locale_module == NULL) {
-                if (PyErr_ExceptionMatches(PyExc_ImportError)) {
-                    PyErr_Clear();
-                    self->encoding = PyUnicode_FromString("ascii");
-                }
-                else
-                    goto error;
-            }
+            if (state->locale_module == NULL)
+                goto catch_ImportError;
             else
                 goto use_locale;
         }
@@ -790,6 +784,13 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
             self->encoding = PyObject_CallMethod(
                 state->locale_module, "getpreferredencoding", NULL);
             if (self->encoding == NULL) {
+              catch_ImportError:
+                /*
+                 Importing locale can raise a ImportError because of
+                 _functools, and locale.getpreferredencoding can raise a
+                 ImportError if _locale is not available.  These will happen
+                 during module building.
+                */
                 if (PyErr_ExceptionMatches(PyExc_ImportError)) {
                     PyErr_Clear();
                     self->encoding = PyUnicode_FromString("ascii");
