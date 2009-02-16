@@ -559,29 +559,32 @@ PyNumber_AsOff_t(PyObject *item, PyObject *err)
 }
 
 static int
-iomodule_traverse(_PyIO_State *mod, visitproc visit, void *arg) {
-    if (!mod->initialized)
+iomodule_traverse(PyObject *mod, visitproc visit, void *arg) {
+    _PyIO_State *state = IO_MOD_STATE(mod);
+    if (!state->initialized)
         return 0;
-    Py_VISIT(mod->os_module);
-    if (mod->locale_module != NULL)
-        Py_VISIT(mod->locale_module);
-    Py_VISIT(mod->unsupported_operation);
+    Py_VISIT(state->os_module);
+    if (state->locale_module != NULL) {
+        Py_VISIT(state->locale_module);
+    }
+    Py_VISIT(state->unsupported_operation);
     return 0;
 }
 
 static int
-iomodule_clear(_PyIO_State *mod) {
-    if (!mod->initialized)
+iomodule_clear(PyObject *mod) {
+    _PyIO_State *state = IO_MOD_STATE(mod);
+    if (!state->initialized)
         return 0;
-    Py_CLEAR(mod->os_module);
-    if (mod->locale_module != NULL)
-        Py_CLEAR(mod->locale_module);
-    Py_CLEAR(mod->unsupported_operation);
+    Py_CLEAR(state->os_module);
+    if (state->locale_module != NULL)
+        Py_CLEAR(state->locale_module);
+    Py_CLEAR(state->unsupported_operation);
     return 0;
 }
 
 static void
-iomodule_free(_PyIO_State *mod) {
+iomodule_free(PyObject *mod) {
     iomodule_clear(mod);
 }
 
@@ -601,9 +604,9 @@ struct PyModuleDef _PyIO_Module = {
     sizeof(_PyIO_State),
     module_methods,
     NULL,
-    (traverseproc)iomodule_traverse,
-    (inquiry)iomodule_clear,
-    (freefunc)iomodule_free
+    iomodule_traverse,
+    iomodule_clear,
+    (freefunc)iomodule_free,
 };
 
 PyMODINIT_FUNC
@@ -613,8 +616,9 @@ PyInit__io(void)
     _PyIO_State *state = NULL;
     PyTypeObject *base;
     if (m == NULL)
-        goto fail;
+        return NULL;
     state = IO_MOD_STATE(m);
+    state->initialized = 0;
 
     /* put os in the module state */
     state->os_module = PyImport_ImportModule("os");
@@ -773,10 +777,8 @@ PyInit__io(void)
     return m;
 
   fail:
-    if (state != NULL) {
-        Py_XDECREF(state->os_module);
-        Py_XDECREF(state->unsupported_operation);
-    }
-    Py_XDECREF(m);
+    Py_XDECREF(state->os_module);
+    Py_XDECREF(state->unsupported_operation);
+    Py_DECREF(m);
     return NULL;
 }
