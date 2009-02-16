@@ -296,6 +296,7 @@ BufferedObject_dealloc(BufferedObject *self)
 {
     if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
         return;
+    _PyObject_GC_UNTRACK(self);
     self->ok = 0;
     if (self->weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)self);

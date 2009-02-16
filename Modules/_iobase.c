@@ -186,20 +186,22 @@ IOBase_close(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
-/* Destructor */
-
 int
 _PyIOBase_finalize(PyObject *self)
 {
     PyObject *res;
     PyObject *tp, *v, *tb;
-    PyObject **dictptr;
     int closed = 1;
+    int is_zombie;
+
     PyErr_Fetch(&tp, &v, &tb);
-    /* We need to resurrect the object as calling close() can invoke
-       arbitrary code. */
-    Py_REFCNT(self)++;
-    /* The object could already be in an usable state, so we'll take any
+    /* If _PyIOBase_finalize() is called from a destructor, we need to
+       resurrect the object as calling close() can invoke arbitrary code. */
+    is_zombie = (Py_REFCNT(self) == 0);
+    if (is_zombie) {
+        ++Py_REFCNT(self);
+    }
+    /* The object could already be in an unusable state, so we'll take any
        error as meaning "stop, nothing to see here". */
     /* XXX any Python method or property called from here may rely on
        attributes being set in the instance __dict__, but the __dict__ has
@@ -222,22 +224,52 @@ _PyIOBase_finalize(PyObject *self)
         else
             Py_DECREF(res);
     }
-    /* The code above might have re-added a dict, DECREF it */
-    dictptr = _PyObject_GetDictPtr(self);
-    if (dictptr != NULL)
-        Py_CLEAR(*dictptr);
     PyErr_Restore(tp, v, tb);
-    if (--Py_REFCNT(self) != 0) {
-        return -1;
+    if (is_zombie) {
+        if (--Py_REFCNT(self) != 0) {
+            /* The object lives again. The following code is taken from
+               slot_tp_del in typeobject.c. */
+            Py_ssize_t refcnt = Py_REFCNT(self);
+            _Py_NewReference(self);
+            Py_REFCNT(self) = refcnt;
+            /* If Py_REF_DEBUG, _Py_NewReference bumped _Py_RefTotal, so
+             * we need to undo that. */
+            _Py_DEC_REFTOTAL;
+            /* If Py_TRACE_REFS, _Py_NewReference re-added self to the object
+             * chain, so no more to do there.
+             * If COUNT_ALLOCS, the original decref bumped tp_frees, and
+             * _Py_NewReference bumped tp_allocs:  both of those need to be
+             * undone.
+             */
+#ifdef COUNT_ALLOCS
+            --Py_TYPE(self)->tp_frees;
+            --Py_TYPE(self)->tp_allocs;
+#endif
+            return -1;
+        }
+        else {
+            /* The code above might have re-added a dict, DECREF it */
+            PyObject **dictptr = _PyObject_GetDictPtr(self);
+            if (dictptr != NULL)
+                Py_CLEAR(*dictptr);
+        }
     }
     return 0;
 }
 
+/* Destructor */
+
 static void
 IOBase_dealloc(PyObject *self)
 {
-    if (_PyIOBase_finalize(self) == 0)
-        Py_TYPE(self)->tp_free(self);
+    if (_PyIOBase_finalize((PyObject *)self) < 0) {
+        /* When called from a heap type's dealloc, the type will be
+           decref'ed on return (see e.g. subtype_dealloc in typeobject.c). */
+        if (PyType_HasFeature(Py_TYPE(self), Py_TPFLAGS_HEAPTYPE))
+            Py_INCREF(Py_TYPE(self));
+        return;
+    }
+    Py_TYPE(self)->tp_free(self);
 }
 
 /* Inquiry methods */
@@ -683,7 +715,6 @@ PyTypeObject PyIOBase_Type = {
     PyType_GenericNew,          /* tp_new */
 };
 
-
 
 /*
  * RawIOBase class, Inherits from IOBase.

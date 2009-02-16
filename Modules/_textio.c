@@ -943,6 +943,7 @@ TextIOWrapper_dealloc(PyTextIOWrapperObject *self)
 {
     if (_TextIOWrapper_clear(self) < 0)
         return;
+    _PyObject_GC_UNTRACK(self);
     if (self->weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)self);
     Py_CLEAR(self->dict);
