@@ -301,6 +301,42 @@ stringio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
+static PyObject *
+stringio_seekable(StringIOObject *self, PyObject *args)
+{
+    Py_RETURN_TRUE;
+}
+
+static PyObject *
+stringio_readable(StringIOObject *self, PyObject *args)
+{
+    Py_RETURN_TRUE;
+}
+
+static PyObject *
+stringio_writable(StringIOObject *self, PyObject *args)
+{
+    Py_RETURN_TRUE;
+}
+
+static PyObject *
+stringio_encoding(StringIOObject *self, void *context)
+{
+    return PyUnicode_FromString("utf-8");
+}
+
+static PyObject *
+stringio_errors(StringIOObject *self, void *context)
+{
+    return PyUnicode_FromString("strict");
+}
+
+static PyObject *
+stringio_line_buffering(StringIOObject *self, void *context)
+{
+    Py_RETURN_FALSE;
+}
+
 static struct PyMethodDef stringio_methods[] = {
     {"getvalue",   (PyCFunction)stringio_getvalue, METH_VARARGS, NULL},
     {"read",       (PyCFunction)stringio_read,     METH_VARARGS, NULL},
@@ -308,7 +344,24 @@ static struct PyMethodDef stringio_methods[] = {
     {"truncate",   (PyCFunction)stringio_truncate, METH_VARARGS, NULL},
     {"seek",       (PyCFunction)stringio_seek,     METH_VARARGS, NULL},
     {"write",      (PyCFunction)stringio_write,    METH_O,       NULL},
+    
+    {"seekable",   (PyCFunction)stringio_seekable, METH_NOARGS},
+    {"readable",   (PyCFunction)stringio_readable, METH_NOARGS},
+    {"writable",   (PyCFunction)stringio_writable, METH_NOARGS},
     {NULL, NULL}        /* sentinel */
+};
+
+static PyGetSetDef stringio_getset[] = {
+    /*  (following comments straight off of the original Python wrapper:)
+        XXX Cruft to support the TextIOWrapper API. This would only
+        be meaningful if StringIO supported the buffer attribute.
+        Hopefully, a better solution, than adding these pseudo-attributes,
+        will be found.
+    */
+    {"encoding",       (getter)stringio_encoding,       NULL, NULL},
+    {"errors",         (getter)stringio_errors,         NULL, NULL},
+    {"line_buffering", (getter)stringio_line_buffering, NULL, NULL},
+    {0}
 };
 
 PyTypeObject PyStringIO_Type = {
@@ -341,7 +394,7 @@ PyTypeObject PyStringIO_Type = {
     0,                                         /*tp_iternext*/
     stringio_methods,                          /*tp_methods*/
     0,                                         /*tp_members*/
-    0,                                         /*tp_getset*/
+    stringio_getset,                           /*tp_getset*/
     0,                                         /*tp_base*/
     0,                                         /*tp_dict*/
     0,                                         /*tp_descr_get*/
