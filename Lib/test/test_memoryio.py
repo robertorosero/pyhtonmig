@@ -380,6 +380,15 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertRaises(IOError, memio.seek, 1, 1)
         self.assertRaises(IOError, memio.seek, 1, 2)
 
+    def test_textio_properties(self):
+        memio = self.ioclass()
+
+        # These are just dummy values but we nevertheless check them for fear
+        # of unexpected breakage.
+        self.assertEqual(memio.encoding, "utf-8")
+        self.assertEqual(memio.errors, "strict")
+        self.assertEqual(memio.line_buffering, False)
+
     # XXX: For the Python version of io.StringIO, this is highly
     # dependent on the encoding used for the underlying buffer.
     # def test_widechar(self):
