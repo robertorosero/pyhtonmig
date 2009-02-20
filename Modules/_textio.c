@@ -154,7 +154,9 @@ PyDoc_STRVAR(IncrementalNewlineDecoder_doc,
     "another incremental decoder, translating \\r\\n and \\r into \\n.  It also\n"
     "records the types of newlines encountered.  When used with\n"
     "translate=False, it ensures that the newline sequence is returned in\n"
-    "one piece.\n"
+    "one piece. When used with decoder=None, it expects unicode strings as\n"
+    "decode input and translates newlines without first invoking an external\n"
+    "decoder.\n"
     );
 
 typedef struct {
@@ -226,8 +228,15 @@ _IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self,
     }
 
     /* decode input (with the eventual \r from a previous pass) */
-    output = PyObject_CallMethodObjArgs(self->decoder, _PyIO_str_decode,
-                                        input, final ? Py_True : Py_False, NULL);
+    if (self->decoder != Py_None) {
+        output = PyObject_CallMethodObjArgs(self->decoder,
+            _PyIO_str_decode, input, final ? Py_True : Py_False, NULL);
+    }
+    else {
+        output = input;
+        Py_INCREF(output);
+    }
+
     if (output == NULL)
         return NULL;
 
@@ -421,20 +430,25 @@ IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self,
 static PyObject *
 IncrementalNewlineDecoder_getstate(PyNewLineDecoderObject *self, PyObject *args)
 {
-    PyObject *state = PyObject_CallMethodObjArgs(self->decoder,
-                                                 _PyIO_str_getstate, NULL);
     PyObject *buffer;
     unsigned PY_LONG_LONG flag;
 
-    if (state == NULL)
-        return NULL;
-
-    if (!PyArg_Parse(state, "(OK)", &buffer, &flag)) {
+    if (self->decoder != Py_None) {
+        PyObject *state = PyObject_CallMethodObjArgs(self->decoder,
+           _PyIO_str_getstate, NULL);
+        if (state == NULL)
+            return NULL;
+        if (!PyArg_Parse(state, "(OK)", &buffer, &flag)) {
+            Py_DECREF(state);
+            return NULL;
+        }
+        Py_INCREF(buffer);
         Py_DECREF(state);
-        return NULL;
     }
-    Py_INCREF(buffer);
-    Py_DECREF(state);
+    else {
+        buffer = PyBytes_FromString("");
+        flag = 0;
+    }
     flag <<= 1;
     if (self->pendingcr)
         flag |= 1;
@@ -453,7 +467,11 @@ IncrementalNewlineDecoder_setstate(PyNewLineDecoderObject *self, PyObject *state
     self->pendingcr = (int) flag & 1;
     flag >>= 1;
 
-    return PyObject_CallMethod(self->decoder, "setstate", "((OK))", buffer, flag);
+    if (self->decoder != Py_None)
+        return PyObject_CallMethod(self->decoder,
+                                   "setstate", "((OK))", buffer, flag);
+    else
+        Py_RETURN_NONE;
 }
 
 static PyObject *
@@ -461,7 +479,10 @@ IncrementalNewlineDecoder_reset(PyNewLineDecoderObject *self, PyObject *args)
 {
     self->seennl = 0;
     self->pendingcr = 0;
-    return PyObject_CallMethodObjArgs(self->decoder, _PyIO_str_reset, NULL);
+    if (self->decoder != Py_None)
+        return PyObject_CallMethodObjArgs(self->decoder, _PyIO_str_reset, NULL);
+    else
+        Py_RETURN_NONE;
 }
 
 static PyObject *

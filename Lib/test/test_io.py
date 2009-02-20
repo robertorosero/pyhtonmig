@@ -1745,7 +1745,10 @@ class TextIOWrapperTest(unittest.TestCase):
 
         self.assertEqual(buffer.seekable(), txt.seekable())
 
-    def check_newline_decoder_utf8(self, decoder):
+
+class IncrementalNewlineDecoderTest(unittest.TestCase):
+
+    def check_newline_decoding_utf8(self, decoder):
         # UTF-8 specific tests for a newline decoder
         def _check_decode(b, s, **kwargs):
             # We exercise getstate() / setstate() as well as decode()
@@ -1787,12 +1790,20 @@ class TextIOWrapperTest(unittest.TestCase):
         _check_decode(b'\xe8\xa2\x88\r', "\u8888")
         _check_decode(b'\n', "\n")
 
-    def check_newline_decoder(self, decoder, encoding):
+    def check_newline_decoding(self, decoder, encoding):
         result = []
-        encoder = codecs.getincrementalencoder(encoding)()
-        def _decode_bytewise(s):
-            for b in encoder.encode(s):
-                result.append(decoder.decode(bytes([b])))
+        if encoding is not None:
+            encoder = codecs.getincrementalencoder(encoding)()
+            def _decode_bytewise(s):
+                # Decode one byte at a time
+                for b in encoder.encode(s):
+                    result.append(decoder.decode(bytes([b])))
+        else:
+            encoder = None
+            def _decode_bytewise(s):
+                # Decode one char at a time
+                for c in s:
+                    result.append(decoder.decode(c))
         self.assertEquals(decoder.newlines, None)
         _decode_bytewise("abc\n\r")
         self.assertEquals(decoder.newlines, '\n')
@@ -1805,22 +1816,28 @@ class TextIOWrapperTest(unittest.TestCase):
         _decode_bytewise("abc\r")
         self.assertEquals("".join(result), "abc\n\nabcabc\nabcabc")
         decoder.reset()
-        self.assertEquals(decoder.decode("abc".encode(encoding)), "abc")
+        input = "abc"
+        if encoder is not None:
+            encoder.reset()
+            input = encoder.encode(input)
+        self.assertEquals(decoder.decode(input), "abc")
         self.assertEquals(decoder.newlines, None)
 
     def test_newline_decoder(self):
         encodings = (
-            'utf-8', 'latin-1',
+            # None meaning the IncrementalNewlineDecoder takes unicode input
+            # rather than bytes input
+            None, 'utf-8', 'latin-1',
             'utf-16', 'utf-16-le', 'utf-16-be',
             'utf-32', 'utf-32-le', 'utf-32-be',
         )
         for enc in encodings:
-            decoder = codecs.getincrementaldecoder(enc)()
+            decoder = enc and codecs.getincrementaldecoder(enc)()
             decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
-            self.check_newline_decoder(decoder, enc)
+            self.check_newline_decoding(decoder, enc)
         decoder = codecs.getincrementaldecoder("utf-8")()
         decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
-        self.check_newline_decoder_utf8(decoder)
+        self.check_newline_decoding_utf8(decoder)
 
 
 # XXX Tests for open()
@@ -1933,7 +1950,8 @@ def test_main():
                          BufferedReaderTest, BufferedWriterTest,
                          BufferedRWPairTest, BufferedRandomTest,
                          StatefulIncrementalDecoderTest,
-                         TextIOWrapperTest, MiscIOTest
+                         IncrementalNewlineDecoderTest,
+                         TextIOWrapperTest, MiscIOTest,
                          )
 
 if __name__ == "__main__":
