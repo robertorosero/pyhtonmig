@@ -584,12 +584,12 @@ typedef struct
     PyObject *readnl;
     PyObject *errors;
     const char *writenl; /* utf-8 encoded, NULL stands for \n */
-    int line_buffering:1;
-    int readuniversal:1;
-    int readtranslate:1;
-    int writetranslate:1;
-    int seekable:1;
-    int telling:1;
+    char line_buffering;
+    char readuniversal;
+    char readtranslate;
+    char writetranslate;
+    char seekable;
+    char telling;
     /* Specialized encoding func (see below) */
     encodefunc_t encodefunc;
 
@@ -2312,6 +2312,7 @@ static PyMethodDef TextIOWrapper_methods[] = {
 static PyMemberDef TextIOWrapper_members[] = {
     {"encoding", T_OBJECT, offsetof(PyTextIOWrapperObject, encoding), READONLY},
     {"buffer", T_OBJECT, offsetof(PyTextIOWrapperObject, buffer), READONLY},
+    {"line_buffering", T_BOOL, offsetof(PyTextIOWrapperObject, line_buffering), READONLY},
     {NULL}
 };
 
