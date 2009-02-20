@@ -1872,18 +1872,16 @@ class unused_StringIO(unused_TextIOWrapper):
         return self.buffer.getvalue().decode(self._encoding, self._errors)
 
 try:
-    import _stringio
-
     # This subclass is a reimplementation of the TextIOWrapper
     # interface without any of its text decoding facilities. All the
     # stored data is manipulated with the efficient
-    # _stringio._StringIO extension type. Also, the newline decoding
+    # _io._StringIO extension type. Also, the newline decoding
     # mechanism of IncrementalNewlineDecoder is reimplemented here for
     # efficiency. Doing otherwise, would require us to implement a
     # fake decoder which would add an additional and unnecessary layer
     # on top of the _StringIO methods.
 
-    class StringIO(_stringio._StringIO, TextIOBase):
+    class StringIO(_io._StringIO, TextIOBase):
         """Text I/O implementation using an in-memory buffer.
 
         The initial_value argument sets the value of object.  The newline
@@ -1972,12 +1970,12 @@ try:
         def seekable(self):
             return True
 
-        _read = _stringio._StringIO.read
-        _write = _stringio._StringIO.write
-        _tell = _stringio._StringIO.tell
-        _seek = _stringio._StringIO.seek
-        _truncate = _stringio._StringIO.truncate
-        _getvalue = _stringio._StringIO.getvalue
+        _read = _io._StringIO.read
+        _write = _io._StringIO.write
+        _tell = _io._StringIO.tell
+        _seek = _io._StringIO.seek
+        _truncate = _io._StringIO.truncate
+        _getvalue = _io._StringIO.getvalue
 
         def getvalue(self) -> str:
             """Retrieve the entire contents of the object."""

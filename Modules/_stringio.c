@@ -1,8 +1,6 @@
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
-
-/* This module is a stripped down version of _bytesio.c with a Py_UNICODE
-   buffer. Most of the functionality is provided by subclassing _StringIO. */
-
+#include "_iomodule.h"
 
 typedef struct {
     PyObject_HEAD
@@ -313,9 +311,9 @@ static struct PyMethodDef stringio_methods[] = {
     {NULL, NULL}        /* sentinel */
 };
 
-static PyTypeObject StringIO_Type = {
+PyTypeObject PyStringIO_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_stringio._StringIO",                     /*tp_name*/
+    "_StringIO",                               /*tp_name*/
     sizeof(StringIOObject),                    /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
     (destructor)stringio_dealloc,              /*tp_dealloc*/
@@ -353,31 +351,3 @@ static PyTypeObject StringIO_Type = {
     0,                                         /*tp_alloc*/
     stringio_new,                              /*tp_new*/
 };
-
-static struct PyModuleDef _stringiomodule = {
-	PyModuleDef_HEAD_INIT,
-	"_stringio",
-	NULL,
-	-1,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
-
-PyMODINIT_FUNC
-PyInit__stringio(void)
-{
-    PyObject *m;
-
-    if (PyType_Ready(&StringIO_Type) < 0)
-        return NULL;
-    m = PyModule_Create(&_stringiomodule);
-    if (m == NULL)
-        return NULL;
-    Py_INCREF(&StringIO_Type);
-    if (PyModule_AddObject(m, "_StringIO", (PyObject *)&StringIO_Type) < 0)
-        return NULL;
-    return m;
-}

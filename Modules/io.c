@@ -636,25 +636,38 @@ PyInit__io(void)
                        state->unsupported_operation);
 
     /* BlockingIOError */
-    base = (PyTypeObject *)PyExc_IOError;
-    _PyExc_BlockingIOError.tp_base = base;
+    _PyExc_BlockingIOError.tp_base = (PyTypeObject *) PyExc_IOError;
     if (PyType_Ready(&_PyExc_BlockingIOError) < 0)
         goto fail;
     Py_INCREF(&_PyExc_BlockingIOError);
     PyModule_AddObject(m, "BlockingIOError",
                        (PyObject *)&_PyExc_BlockingIOError);
 
+    /* IOBase */
     if (PyType_Ready(&PyIOBase_Type) < 0)
         goto fail;
     Py_INCREF(&PyIOBase_Type);
     PyModule_AddObject(m, "IOBase",
                        (PyObject *)&PyIOBase_Type);
 
+    /* RawIOBase */
     if (PyType_Ready(&PyRawIOBase_Type) < 0)
         goto fail;
     Py_INCREF(&PyRawIOBase_Type);
     PyModule_AddObject(m, "RawIOBase",
                        (PyObject *)&PyRawIOBase_Type);
+
+    /* BufferedIOBase */
+    if (PyType_Ready(&PyBufferedIOBase_Type) < 0)
+        goto fail;
+    Py_INCREF(&PyBufferedIOBase_Type);
+    PyModule_AddObject(m, "BufferedIOBase", (PyObject *) &PyBufferedIOBase_Type);
+
+    /* TextIOBase */
+    if (PyType_Ready(&PyTextIOBase_Type) < 0)
+        goto fail;
+    Py_INCREF(&PyTextIOBase_Type);
+    PyModule_AddObject(m, "TextIOBase", (PyObject *) &PyTextIOBase_Type);
 
     /* FileIO */
     PyFileIO_Type.tp_base = &PyRawIOBase_Type;
@@ -663,18 +676,19 @@ PyInit__io(void)
     Py_INCREF(&PyFileIO_Type);
     PyModule_AddObject(m, "FileIO", (PyObject *) &PyFileIO_Type);
 
-    /* BufferedIOBase */
-    if (PyType_Ready(&PyBufferedIOBase_Type) < 0)
-        goto fail;
-    Py_INCREF(&PyBufferedIOBase_Type);
-    PyModule_AddObject(m, "BufferedIOBase", (PyObject *) &PyBufferedIOBase_Type);
-
     /* BytesIO */
     PyBytesIO_Type.tp_base = &PyBufferedIOBase_Type;
     if (PyType_Ready(&PyBytesIO_Type) < 0)
         goto fail;
     Py_INCREF(&PyBytesIO_Type);
     PyModule_AddObject(m, "BytesIO", (PyObject *) &PyBytesIO_Type);
+
+    /* StringIO */
+    /* PyStringIO_Type.tp_base = &PyTextIOBase_Type; */
+    if (PyType_Ready(&PyStringIO_Type) < 0)
+        goto fail;
+    Py_INCREF(&PyStringIO_Type);
+    PyModule_AddObject(m, "_StringIO", (PyObject *) &PyStringIO_Type);
 
     /* BufferedReader */
     PyBufferedReader_Type.tp_base = &PyBufferedIOBase_Type;
@@ -704,12 +718,6 @@ PyInit__io(void)
     Py_INCREF(&PyBufferedRandom_Type);
     PyModule_AddObject(m, "BufferedRandom", (PyObject *) &PyBufferedRandom_Type);
 
-    /* BufferedIOBase */
-    if (PyType_Ready(&PyTextIOBase_Type) < 0)
-        goto fail;
-    Py_INCREF(&PyTextIOBase_Type);
-    PyModule_AddObject(m, "TextIOBase", (PyObject *) &PyTextIOBase_Type);
-
     /* TextIOWrapper */
     PyTextIOWrapper_Type.tp_base = &PyTextIOBase_Type;
     if (PyType_Ready(&PyTextIOWrapper_Type) < 0)
@@ -717,7 +725,7 @@ PyInit__io(void)
     Py_INCREF(&PyTextIOWrapper_Type);
     PyModule_AddObject(m, "TextIOWrapper", (PyObject *) &PyTextIOWrapper_Type);
 
-    /* TextIOWrapper */
+    /* IncrementalNewlineDecoder */
     if (PyType_Ready(&PyIncrementalNewlineDecoder_Type) < 0)
         goto fail;
     Py_INCREF(&PyIncrementalNewlineDecoder_Type);
