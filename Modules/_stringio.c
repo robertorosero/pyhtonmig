@@ -94,7 +94,6 @@ write_str(StringIOObject *self, PyObject *obj)
     PyObject *decoded = NULL;
     assert(self->buf != NULL);
     assert(self->pos >= 0);
-    assert(len >= 0);
 
     if (self->decoder != NULL) {
         decoded = _PyIncrementalNewlineDecoder_decode(
@@ -116,6 +115,8 @@ write_str(StringIOObject *self, PyObject *obj)
     assert(PyUnicode_Check(decoded));
     str = PyUnicode_AS_UNICODE(decoded);
     len = PyUnicode_GET_SIZE(decoded);
+
+    assert(len >= 0);
 
     /* This overflow check is not strictly necessary. However, it avoids us to
        deal with funky things like comparing an unsigned and a signed
