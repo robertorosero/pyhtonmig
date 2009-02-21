@@ -23,7 +23,9 @@ class BlockingIOError(IOError):
     """Exception raised when I/O would block on a non-blocking I/O stream."""
 
     def __init__(self, errno, strerror, characters_written=0):
-        IOError.__init__(self, errno, strerror)
+        super().__init__(errno, strerror)
+        if not isinstance(characters_written, int):
+            raise TypeError("characters_written must be a integer")
         self.characters_written = characters_written
 
 
@@ -551,6 +553,7 @@ class RawIOBase(IOBase):
 
 
 from _io import FileIO
+IOBase.register(FileIO)
 
 
 class BufferedIOBase(IOBase):

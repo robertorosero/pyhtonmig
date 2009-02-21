@@ -1969,7 +1969,6 @@ class MiscIOTest(unittest.TestCase):
             self.assertRaises(ValueError, f.fileno)
             self.assertRaises(ValueError, f.isatty)
             self.assertRaises(ValueError, f.__iter__)
-            self.assertRaises(ValueError, next, f)
             if hasattr(f, "peek"):
                 self.assertRaises(ValueError, f.peek, 1)
             self.assertRaises(ValueError, f.read)
@@ -1985,6 +1984,7 @@ class MiscIOTest(unittest.TestCase):
             self.assertRaises(ValueError, f.write,
                               b"" if "b" in kwargs['mode'] else "")
             self.assertRaises(ValueError, f.writelines, [])
+            self.assertRaises(ValueError, next, f)
 
     def test_blockingioerror(self):
         # Various BlockingIOError issues
