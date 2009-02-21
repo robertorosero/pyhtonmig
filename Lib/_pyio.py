@@ -1222,7 +1222,10 @@ class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
 
     def decode(self, input, final=False):
         # decode input (with the eventual \r from a previous pass)
-        output = self.decoder.decode(input, final=final)
+        if self.decoder is None:
+            output = input
+        else:
+            output = self.decoder.decode(input, final=final)
         if self.pendingcr and (output or final):
             output = "\r" + output
             self.pendingcr = False
@@ -1249,7 +1252,11 @@ class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
         return output
 
     def getstate(self):
-        buf, flag = self.decoder.getstate()
+        if self.decoder is None:
+            buf = b""
+            flag = 0
+        else:
+            buf, flag = self.decoder.getstate()
         flag <<= 1
         if self.pendingcr:
             flag |= 1
@@ -1258,12 +1265,14 @@ class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
     def setstate(self, state):
         buf, flag = state
         self.pendingcr = bool(flag & 1)
-        self.decoder.setstate((buf, flag >> 1))
+        if self.decoder is not None:
+            self.decoder.setstate((buf, flag >> 1))
 
     def reset(self):
         self.seennl = 0
         self.pendingcr = False
-        self.decoder.reset()
+        if self.decoder is not None:
+            self.decoder.reset()
 
     _LF = 1
     _CR = 2
