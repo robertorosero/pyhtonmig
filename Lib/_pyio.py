@@ -1111,6 +1111,8 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         BufferedWriter.__init__(self, raw, buffer_size, max_buffer_size)
 
     def seek(self, pos, whence=0):
+        if not (0 <= whence <= 2):
+            raise ValueError("invalid whence")
         self.flush()
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
