@@ -986,8 +986,9 @@ class BufferedWriter(_BufferedIOMixin):
                         # We've hit max_buffer_size. We have to accept a
                         # partial write and cut back our buffer.
                         overage = len(self._write_buf) - self.max_buffer_size
+                        written -= overage
                         self._write_buf = self._write_buf[:self.max_buffer_size]
-                        raise BlockingIOError(e.errno, e.strerror, overage)
+                        raise BlockingIOError(e.errno, e.strerror, written)
             return written
 
     def truncate(self, pos=None):
