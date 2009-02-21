@@ -391,7 +391,7 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.errors, "strict")
         self.assertEqual(memio.line_buffering, False)
 
-    def test_newlines_none(self):
+    def test_newline_none(self):
         # newline=None
         memio = self.ioclass("a\nb\r\nc\rd", newline=None)
         self.assertEqual(list(memio), ["a\n", "b\n", "c\n", "d"])
@@ -407,7 +407,7 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         memio.seek(0)
         self.assertEqual(memio.read(), "a\nb\nc\nd")
 
-    def test_newlines_empty(self):
+    def test_newline_empty(self):
         # newline=""
         memio = self.ioclass("a\nb\r\nc\rd", newline="")
         self.assertEqual(list(memio), ["a\n", "b\r\n", "c\r", "d"])
@@ -418,16 +418,17 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         memio = self.ioclass(newline="")
         self.assertEqual(2, memio.write("a\n"))
         self.assertEqual(2, memio.write("b\r"))
-        self.assertEqual(4, memio.write("\nc\rd"))
+        self.assertEqual(2, memio.write("\nc"))
+        self.assertEqual(2, memio.write("\rd"))
         memio.seek(0)
         self.assertEqual(list(memio), ["a\n", "b\r\n", "c\r", "d"])
 
-    def test_newlines_lf(self):
+    def test_newline_lf(self):
         # newline="\n"
         memio = self.ioclass("a\nb\r\nc\rd")
         self.assertEqual(list(memio), ["a\n", "b\r\n", "c\rd"])
 
-    def test_newlines_cr(self):
+    def test_newline_cr(self):
         # newline="\r"
         memio = self.ioclass("a\nb\r\nc\rd", newline="\r")
         memio.seek(0)
@@ -435,7 +436,7 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         memio.seek(0)
         self.assertEqual(list(memio), ["a\r", "b\r", "\r", "c\r", "d"])
 
-    def test_newlines_crlf(self):
+    def test_newline_crlf(self):
         # newline="\r\n"
         memio = self.ioclass("a\nb\r\nc\rd", newline="\r\n")
         memio.seek(0)
@@ -468,6 +469,17 @@ class CStringIOTest(PyStringIOTest):
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.tell(), len(buf) * 2)
         self.assertEqual(memio.getvalue(), buf + buf)
+
+    # XXX This test fails with the Python version of io.StringIO
+    def test_newlines_property(self):
+        memio = self.ioclass(newline=None)
+        self.assertEqual(memio.newlines, None)
+        memio.write("a\n")
+        self.assertEqual(memio.newlines, "\n")
+        memio.write("b\r\n")
+        self.assertEqual(memio.newlines, ("\n", "\r\n"))
+        memio.write("c\rd")
+        self.assertEqual(memio.newlines, ("\r", "\n", "\r\n"))
 
 
 def test_main():

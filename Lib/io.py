@@ -1847,6 +1847,7 @@ class unused_TextIOWrapper(TextIOBase):
     def newlines(self):
         return self._decoder.newlines if self._decoder else None
 
+StringIO = _io.StringIO
 class unused_StringIO(unused_TextIOWrapper):
     """Text I/O implementation using an in-memory buffer.
 
@@ -1871,101 +1872,6 @@ class unused_StringIO(unused_TextIOWrapper):
         self.flush()
         return self.buffer.getvalue().decode(self._encoding, self._errors)
 
-try:
-    class StringIO(_io._StringIO, TextIOBase):
-        """Text I/O implementation using an in-memory buffer.
-
-        The initial_value argument sets the value of object.  The newline
-        argument is like the one of TextIOWrapper's constructor.
-        """
-
-        _read = _io._StringIO.read
-        _readline = _io._StringIO.readline
-        _write = _io._StringIO.write
-        _tell = _io._StringIO.tell
-        _seek = _io._StringIO.seek
-        _truncate = _io._StringIO.truncate
-        _getvalue = _io._StringIO.getvalue
-
-        def getvalue(self) -> str:
-            """Retrieve the entire contents of the object."""
-            if self.closed:
-                raise ValueError("read on closed file")
-            return self._getvalue()
-
-        def write(self, s: str) -> int:
-            """Write string s to file.
-
-            Returns the number of characters written.
-            """
-            if self.closed:
-                raise ValueError("write to closed file")
-            return self._write(s)
-
-        def read(self, n: int = None) -> str:
-            """Read at most n characters, returned as a string.
-
-            If the argument is negative or omitted, read until EOF
-            is reached. Return an empty string at EOF.
-            """
-            if self.closed:
-                raise ValueError("read to closed file")
-            return self._read(n)
-
-        def tell(self) -> int:
-            """Tell the current file position."""
-            if self.closed:
-                raise ValueError("tell from closed file")
-            return self._tell()
-
-        def seek(self, pos: int = None, whence: int = 0) -> int:
-            """Change stream position.
-
-            Seek to character offset pos relative to position indicated by whence:
-                0  Start of stream (the default).  pos should be >= 0;
-                1  Current position - pos must be 0;
-                2  End of stream - pos must be 0.
-            Returns the new absolute position.
-            """
-            if self.closed:
-                raise ValueError("seek from closed file")
-            return self._seek(pos, whence)
-
-        def truncate(self, pos: int = None) -> int:
-            """Truncate size to pos.
-
-            The pos argument defaults to the current file position, as
-            returned by tell().  Imply an absolute seek to pos.
-            Returns the new absolute position.
-            """
-            if self.closed:
-                raise ValueError("truncate from closed file")
-            return self._truncate(pos)
-
-        def readline(self, limit: int = None) -> str:
-            if self.closed:
-                raise ValueError("read from closed file")
-            return self._readline(limit)
-
-        _LF = 1
-        _CR = 2
-        _CRLF = 4
-
-        @property
-        def newlines(self):
-            return (None,
-                    "\n",
-                    "\r",
-                    ("\r", "\n"),
-                    "\r\n",
-                    ("\n", "\r\n"),
-                    ("\r", "\r\n"),
-                    ("\r", "\n", "\r\n")
-                   )[self._seennl]
-
-
-except ImportError:
-    StringIO = _StringIO
 
 # make test_memoryio happy!
 _BytesIO = BytesIO

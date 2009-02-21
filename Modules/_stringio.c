@@ -13,12 +13,13 @@ typedef struct {
     Py_ssize_t string_size;
     size_t buf_size;
 
-    int ok; /* initialized? */
+    char ok; /* initialized? */
+    char closed;
+    char readuniversal;
+    char readtranslate;
     PyObject *decoder;
     PyObject *readnl;
     PyObject *writenl;
-    char readuniversal;
-    char readtranslate;
 } StringIOObject;
 
 #define CHECK_INITIALIZED(self) \
@@ -27,6 +28,20 @@ typedef struct {
             "I/O operation on uninitialized object"); \
         return NULL; \
     }
+
+#define CHECK_CLOSED(self) \
+    if (self->closed) { \
+        PyErr_SetString(PyExc_ValueError, \
+            "I/O operation on closed file"); \
+        return NULL; \
+    }
+
+PyDoc_STRVAR(stringio_doc,
+    "Text I/O implementation using an in-memory buffer.\n"
+    "\n"
+    "The initial_value argument sets the value of object.  The newline\n"
+    "argument is like the one of TextIOWrapper's constructor.");
+
 
 /* Internal routine for changing the size, in terms of characters, of the
    buffer of StringIO objects.  The caller should ensure that the 'size'
@@ -163,19 +178,33 @@ fail:
     return -1;
 }
 
+PyDoc_STRVAR(stringio_getvalue_doc,
+    "Retrieve the entire contents of the object.");
+
 static PyObject *
 stringio_getvalue(StringIOObject *self)
 {
     CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
     return PyUnicode_FromUnicode(self->buf, self->string_size);
 }
+
+PyDoc_STRVAR(stringio_tell_doc,
+    "Tell the current file position.");
 
 static PyObject *
 stringio_tell(StringIOObject *self)
 {
     CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
     return PyLong_FromSsize_t(self->pos);
 }
+
+PyDoc_STRVAR(stringio_read_doc,
+    "Read at most n characters, returned as a string.\n"
+    "\n"
+    "If the argument is negative or omitted, read until EOF\n"
+    "is reached. Return an empty string at EOF.\n");
 
 static PyObject *
 stringio_read(StringIOObject *self, PyObject *args)
@@ -187,6 +216,7 @@ stringio_read(StringIOObject *self, PyObject *args)
     CHECK_INITIALIZED(self);
     if (!PyArg_ParseTuple(args, "|O:read", &arg))
         return NULL;
+    CHECK_CLOSED(self);
 
     if (PyNumber_Check(arg)) {
         size = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
@@ -216,28 +246,12 @@ stringio_read(StringIOObject *self, PyObject *args)
     return PyUnicode_FromUnicode(output, size);
 }
 
+/* Internal helper, used by stringio_readline and stringio_iternext */
 static PyObject *
-stringio_readline(StringIOObject *self, PyObject *args)
+_stringio_readline(StringIOObject *self, Py_ssize_t limit)
 {
-    PyObject *arg = Py_None;
-    Py_ssize_t limit = -1;
     Py_UNICODE *start, *end, old_char;
     Py_ssize_t len, consumed;
-
-    CHECK_INITIALIZED(self);
-    if (!PyArg_ParseTuple(args, "|O:readline", &arg))
-        return NULL;
-
-    if (PyNumber_Check(arg)) {
-        limit = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
-        if (limit == -1 && PyErr_Occurred())
-            return NULL;
-    }
-    else if (arg != Py_None) {
-        PyErr_Format(PyExc_TypeError, "integer argument expected, got '%s'",
-                     Py_TYPE(arg)->tp_name);
-        return NULL;
-    }
 
     /* In case of overseek, return the empty string */
     if (self->pos >= self->string_size)
@@ -262,6 +276,79 @@ stringio_readline(StringIOObject *self, PyObject *args)
     return PyUnicode_FromUnicode(start, len);
 }
 
+PyDoc_STRVAR(stringio_readline_doc,
+    "Read until newline or EOF.\n"
+    "\n"
+    "Returns an empty string if EOF is hit immediately.\n");
+
+static PyObject *
+stringio_readline(StringIOObject *self, PyObject *args)
+{
+    PyObject *arg = Py_None;
+    Py_ssize_t limit = -1;
+
+    CHECK_INITIALIZED(self);
+    if (!PyArg_ParseTuple(args, "|O:readline", &arg))
+        return NULL;
+    CHECK_CLOSED(self);
+
+    if (PyNumber_Check(arg)) {
+        limit = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
+        if (limit == -1 && PyErr_Occurred())
+            return NULL;
+    }
+    else if (arg != Py_None) {
+        PyErr_Format(PyExc_TypeError, "integer argument expected, got '%s'",
+                     Py_TYPE(arg)->tp_name);
+        return NULL;
+    }
+    return _stringio_readline(self, limit);
+}
+
+static PyObject *
+stringio_iternext(StringIOObject *self)
+{
+    PyObject *line;
+
+    CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
+
+    if (Py_TYPE(self) == &PyStringIO_Type) {
+        /* Skip method call overhead for speed */
+        line = _stringio_readline(self, -1);
+    }
+    else {
+        /* XXX is subclassing StringIO really supported? */
+        line = PyObject_CallMethodObjArgs((PyObject *)self,
+                                           _PyIO_str_readline, NULL);
+        if (line && !PyUnicode_Check(line)) {
+            PyErr_Format(PyExc_IOError,
+                         "readline() should have returned an str object, "
+                         "not '%.200s'", Py_TYPE(line)->tp_name);
+            Py_DECREF(line);
+            return NULL;
+        }
+    }
+
+    if (line == NULL)
+        return NULL;
+
+    if (PyUnicode_GET_SIZE(line) == 0) {
+        /* Reached EOF */
+        Py_DECREF(line);
+        return NULL;
+    }
+
+    return line;
+}
+
+PyDoc_STRVAR(stringio_truncate_doc,
+    "Truncate size to pos.\n"
+    "\n"
+    "The pos argument defaults to the current file position, as\n"
+    "returned by tell().  Imply an absolute seek to pos.\n"
+    "Returns the new absolute position.\n");
+
 static PyObject *
 stringio_truncate(StringIOObject *self, PyObject *args)
 {
@@ -271,6 +358,7 @@ stringio_truncate(StringIOObject *self, PyObject *args)
     CHECK_INITIALIZED(self);
     if (!PyArg_ParseTuple(args, "|O:truncate", &arg))
         return NULL;
+    CHECK_CLOSED(self);
 
     if (PyNumber_Check(arg)) {
         size = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
@@ -303,6 +391,15 @@ stringio_truncate(StringIOObject *self, PyObject *args)
     return PyLong_FromSsize_t(size);
 }
 
+PyDoc_STRVAR(stringio_seek_doc,
+    "Change stream position.\n"
+    "\n"
+    "Seek to character offset pos relative to position indicated by whence:\n"
+    "    0  Start of stream (the default).  pos should be >= 0;\n"
+    "    1  Current position - pos must be 0;\n"
+    "    2  End of stream - pos must be 0.\n"
+    "Returns the new absolute position.\n");
+
 static PyObject *
 stringio_seek(StringIOObject *self, PyObject *args)
 {
@@ -312,6 +409,7 @@ stringio_seek(StringIOObject *self, PyObject *args)
     CHECK_INITIALIZED(self);
     if (!PyArg_ParseTuple(args, "n|i:seek", &pos, &mode))
         return NULL;
+    CHECK_CLOSED(self);
 
     if (mode != 0 && mode != 1 && mode != 2) {
         PyErr_Format(PyExc_ValueError,
@@ -344,6 +442,12 @@ stringio_seek(StringIOObject *self, PyObject *args)
     return PyLong_FromSsize_t(self->pos);
 }
 
+PyDoc_STRVAR(stringio_write_doc,
+    "Write string to file.\n"
+    "\n"
+    "Returns the number of characters written, which is always equal to\n"
+    "the length of the string.\n");
+
 static PyObject *
 stringio_write(StringIOObject *self, PyObject *obj)
 {
@@ -355,6 +459,7 @@ stringio_write(StringIOObject *self, PyObject *obj)
                      Py_TYPE(obj)->tp_name);
         return NULL;
     }
+    CHECK_CLOSED(self);
     size = PyUnicode_GET_SIZE(obj);
 
     if (size > 0 && write_str(self, obj) < 0)
@@ -363,13 +468,33 @@ stringio_write(StringIOObject *self, PyObject *obj)
     return PyLong_FromSsize_t(size);
 }
 
+PyDoc_STRVAR(stringio_close_doc,
+    "Close the IO object. Attempting any further operation after the\n"
+    "object is closed will raise a ValueError.\n"
+    "\n"
+    "This method has no effect if the file is already closed.\n");
+
+static PyObject *
+stringio_close(StringIOObject *self)
+{
+    self->closed = 1;
+    /* Free up some memory */
+    if (resize_buffer(self, 0) < 0)
+        return NULL;
+    Py_CLEAR(self->readnl);
+    Py_CLEAR(self->writenl);
+    Py_CLEAR(self->decoder);
+    Py_RETURN_NONE;
+}
+
 static void
 stringio_dealloc(StringIOObject *self)
 {
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->writenl);
     Py_CLEAR(self->decoder);
-    PyMem_Free(self->buf);
+    if (self->buf)
+        PyMem_Free(self->buf);
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -472,11 +597,12 @@ stringio_init(StringIOObject *self, PyObject *args, PyObject *kwds)
     }
     self->pos = 0;
 
-
+    self->closed = 0;
     self->ok = 1;
     return 0;
 }
 
+/* Properties and pseudo-properties */
 static PyObject *
 stringio_seekable(StringIOObject *self, PyObject *args)
 {
@@ -507,9 +633,17 @@ stringio_buffer(StringIOObject *self, void *context)
 }
 
 static PyObject *
+stringio_closed(StringIOObject *self, void *context)
+{
+    CHECK_INITIALIZED(self);
+    return PyBool_FromLong(self->closed);
+}
+
+static PyObject *
 stringio_encoding(StringIOObject *self, void *context)
 {
     CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
     return PyUnicode_FromString("utf-8");
 }
 
@@ -517,6 +651,7 @@ static PyObject *
 stringio_errors(StringIOObject *self, void *context)
 {
     CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
     return PyUnicode_FromString("strict");
 }
 
@@ -524,25 +659,39 @@ static PyObject *
 stringio_line_buffering(StringIOObject *self, void *context)
 {
     CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
     Py_RETURN_FALSE;
 }
 
+static PyObject *
+stringio_newlines(StringIOObject *self, void *context)
+{
+    CHECK_INITIALIZED(self);
+    CHECK_CLOSED(self);
+    if (self->decoder == NULL)
+        Py_RETURN_NONE;
+    return PyObject_GetAttr(self->decoder, _PyIO_str_newlines);
+}
+
 static struct PyMethodDef stringio_methods[] = {
-    {"getvalue",   (PyCFunction)stringio_getvalue, METH_VARARGS, NULL},
-    {"read",       (PyCFunction)stringio_read,     METH_VARARGS, NULL},
-    {"readline",   (PyCFunction)stringio_readline, METH_VARARGS, NULL},
-    {"tell",       (PyCFunction)stringio_tell,     METH_NOARGS,  NULL},
-    {"truncate",   (PyCFunction)stringio_truncate, METH_VARARGS, NULL},
-    {"seek",       (PyCFunction)stringio_seek,     METH_VARARGS, NULL},
-    {"write",      (PyCFunction)stringio_write,    METH_O,       NULL},
+    {"close",    (PyCFunction)stringio_close,    METH_NOARGS,  stringio_close_doc},
+    {"getvalue", (PyCFunction)stringio_getvalue, METH_VARARGS, stringio_getvalue_doc},
+    {"read",     (PyCFunction)stringio_read,     METH_VARARGS, stringio_read_doc},
+    {"readline", (PyCFunction)stringio_readline, METH_VARARGS, stringio_readline_doc},
+    {"tell",     (PyCFunction)stringio_tell,     METH_NOARGS,  stringio_tell_doc},
+    {"truncate", (PyCFunction)stringio_truncate, METH_VARARGS, stringio_truncate_doc},
+    {"seek",     (PyCFunction)stringio_seek,     METH_VARARGS, stringio_seek_doc},
+    {"write",    (PyCFunction)stringio_write,    METH_O,       stringio_write_doc},
     
-    {"seekable",   (PyCFunction)stringio_seekable, METH_NOARGS},
-    {"readable",   (PyCFunction)stringio_readable, METH_NOARGS},
-    {"writable",   (PyCFunction)stringio_writable, METH_NOARGS},
+    {"seekable", (PyCFunction)stringio_seekable, METH_NOARGS},
+    {"readable", (PyCFunction)stringio_readable, METH_NOARGS},
+    {"writable", (PyCFunction)stringio_writable, METH_NOARGS},
     {NULL, NULL}        /* sentinel */
 };
 
 static PyGetSetDef stringio_getset[] = {
+    {"closed",         (getter)stringio_closed,         NULL, NULL},
+    {"newlines",       (getter)stringio_newlines,       NULL, NULL},
     /*  (following comments straight off of the original Python wrapper:)
         XXX Cruft to support the TextIOWrapper API. This would only
         be meaningful if StringIO supported the buffer attribute.
@@ -558,7 +707,7 @@ static PyGetSetDef stringio_getset[] = {
 
 PyTypeObject PyStringIO_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_StringIO",                               /*tp_name*/
+    "StringIO",                                /*tp_name*/
     sizeof(StringIOObject),                    /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
     (destructor)stringio_dealloc,              /*tp_dealloc*/
@@ -577,13 +726,13 @@ PyTypeObject PyStringIO_Type = {
     0,                                         /*tp_setattro*/
     0,                                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
-    0,                                         /*tp_doc*/
+    stringio_doc,                              /*tp_doc*/
     0,                                         /*tp_traverse*/
     0,                                         /*tp_clear*/
     0,                                         /*tp_richcompare*/
     0,                                         /*tp_weaklistoffset*/
     0,                                         /*tp_iter*/
-    0,                                         /*tp_iternext*/
+    (iternextfunc)stringio_iternext,           /*tp_iternext*/
     stringio_methods,                          /*tp_methods*/
     0,                                         /*tp_members*/
     stringio_getset,                           /*tp_getset*/
