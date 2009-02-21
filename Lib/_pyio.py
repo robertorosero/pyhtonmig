@@ -643,10 +643,16 @@ class _BufferedIOMixin(BufferedIOBase):
     ### Positioning ###
 
     def seek(self, pos, whence=0):
-        return self.raw.seek(pos, whence)
+        new_position = self.raw.seek(pos, whence)
+        if new_position < 0:
+            raise IOError("seek() returned an invalid position")
+        return new_position
 
     def tell(self):
-        return self.raw.tell()
+        pos = self.raw.tell()
+        if pos < 0:
+            raise IOError("tell() returned an invalid position")
+        return pos
 
     def truncate(self, pos=None):
         # Flush the stream.  We're mixing buffered I/O with lower-level I/O,
@@ -924,7 +930,7 @@ class BufferedReader(_BufferedIOMixin):
                 min(n, len(self._read_buf) - self._read_pos))
 
     def tell(self):
-        return self.raw.tell() - len(self._read_buf) + self._read_pos
+        return super().tell() - len(self._read_buf) + self._read_pos
 
     def seek(self, pos, whence=0):
         if not (0 <= whence <= 2):
@@ -932,7 +938,7 @@ class BufferedReader(_BufferedIOMixin):
         with self._read_lock:
             if whence == 1:
                 pos -= len(self._read_buf) - self._read_pos
-            pos = self.raw.seek(pos, whence)
+            pos = super().seek(pos, whence)
             self._reset_read_buf()
             return pos
 
@@ -1009,6 +1015,8 @@ class BufferedWriter(_BufferedIOMixin):
         try:
             while self._write_buf:
                 n = self.raw.write(self._write_buf)
+                if n > len(self._write_buf) or n < 0:
+                    raise IOError("write() returned incorrect number of bytes")
                 del self._write_buf[:n]
                 written += n
         except BlockingIOError as e:
@@ -1018,14 +1026,14 @@ class BufferedWriter(_BufferedIOMixin):
             raise BlockingIOError(e.errno, e.strerror, written)
 
     def tell(self):
-        return self.raw.tell() + len(self._write_buf)
+        return super().tell() + len(self._write_buf)
 
     def seek(self, pos, whence=0):
         if not (0 <= whence <= 2):
             raise ValueError("invalid whence")
         with self._write_lock:
             self._flush_unlocked()
-            return self.raw.seek(pos, whence)
+            return super().seek(pos, whence)
 
 
 class BufferedRWPair(BufferedIOBase):
@@ -1116,14 +1124,14 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         self.flush()
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
-        pos = self.raw.seek(pos, whence)
+        pos = super().seek(pos, whence)
         with self._read_lock:
             self._reset_read_buf()
         return pos
 
     def tell(self):
         if self._write_buf:
-            return self.raw.tell() + len(self._write_buf)
+            return super().tell() + len(self._write_buf)
         else:
             return BufferedReader.tell(self)
 

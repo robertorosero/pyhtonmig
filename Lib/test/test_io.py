@@ -696,7 +696,6 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
         bufio = self.tp(rawio)
         self.assertRaises(IOError, bufio.seek, 0)
         self.assertRaises(IOError, bufio.tell)
-        self.assertRaises(IOError, bufio.read, 10)
 
     def test_garbage_collection(self):
         # BufferedReader objects are collected
@@ -725,6 +724,13 @@ class CBufferedReaderTest(BufferedReaderTest):
         self.assertRaises(ValueError, bufio.read)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
         self.assertRaises(ValueError, bufio.read)
+
+    def testMisbehavedRawIORead(self):
+        rawio = self.MisbehavedRawIO((b"abc", b"d", b"efg"))
+        bufio = self.tp(rawio)
+        # _pyio.BufferedReader seems to implement reading different, so that
+        # checking this is not so easy.
+        self.assertRaises(IOError, bufio.read, 10)
 
 class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
