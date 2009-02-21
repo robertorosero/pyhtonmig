@@ -365,7 +365,6 @@ stringio_write(StringIOObject *self, PyObject *obj)
 static void
 stringio_dealloc(StringIOObject *self)
 {
-    self->writenl = NULL;
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->writenl);
     Py_CLEAR(self->decoder);
