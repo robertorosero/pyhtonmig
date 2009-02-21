@@ -7,7 +7,52 @@ import unittest
 from test import support
 
 import io
+import _pyio as pyio
 import sys
+
+class MemorySeekTestMixin:
+
+    def testInit(self):
+        buf = self.buftype("1234567890")
+        bytesIo = self.ioclass(buf)
+
+    def testRead(self):
+        buf = self.buftype("1234567890")
+        bytesIo = self.ioclass(buf)
+
+        self.assertEquals(buf[:1], bytesIo.read(1))
+        self.assertEquals(buf[1:5], bytesIo.read(4))
+        self.assertEquals(buf[5:], bytesIo.read(900))
+        self.assertEquals(self.EOF, bytesIo.read())
+
+    def testReadNoArgs(self):
+        buf = self.buftype("1234567890")
+        bytesIo = self.ioclass(buf)
+
+        self.assertEquals(buf, bytesIo.read())
+        self.assertEquals(self.EOF, bytesIo.read())
+
+    def testSeek(self):
+        buf = self.buftype("1234567890")
+        bytesIo = self.ioclass(buf)
+
+        bytesIo.read(5)
+        bytesIo.seek(0)
+        self.assertEquals(buf, bytesIo.read())
+
+        bytesIo.seek(3)
+        self.assertEquals(buf[3:], bytesIo.read())
+        self.assertRaises(TypeError, bytesIo.seek, 0.0)
+
+    def testTell(self):
+        buf = self.buftype("1234567890")
+        bytesIo = self.ioclass(buf)
+
+        self.assertEquals(0, bytesIo.tell())
+        bytesIo.seek(5)
+        self.assertEquals(5, bytesIo.tell())
+        bytesIo.seek(10000)
+        self.assertEquals(10000, bytesIo.tell())
 
 
 class MemoryTestMixin:
@@ -290,11 +335,11 @@ class MemoryTestMixin:
         self.assertEqual(test2(), buf)
 
 
-class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
+class PyBytesIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
     @staticmethod
     def buftype(s):
         return s.encode("ascii")
-    ioclass = io.unused_BytesIO
+    ioclass = pyio.BytesIO
     EOF = b""
 
     def test_read1(self):
@@ -365,9 +410,9 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.getvalue(), buf)
 
 
-class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
+class PyStringIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
     buftype = str
-    ioclass = io.unused_StringIO
+    ioclass = pyio.StringIO
     EOF = ""
 
     # TextIO-specific behaviour.
