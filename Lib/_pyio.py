@@ -553,7 +553,7 @@ class RawIOBase(IOBase):
 
 
 from _io import FileIO
-IOBase.register(FileIO)
+RawIOBase.register(FileIO)
 
 
 class BufferedIOBase(IOBase):
