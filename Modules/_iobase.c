@@ -566,8 +566,11 @@ IOBase_readlines(PyObject *self, PyObject *args)
         return NULL;
 
     if (hint <= 0) {
+        /* XXX special-casing this made sense in the Python version in order
+           to remove the bytecode interpretation overhead, but it could
+           probably be removed here. */
         PyObject *ret = PyObject_CallMethod(result, "extend", "O", self);
-        if( ret == NULL) {
+        if (ret == NULL) {
             Py_DECREF(result);
             return NULL;
         }
@@ -583,7 +586,7 @@ IOBase_readlines(PyObject *self, PyObject *args)
                 return NULL;
             }
             else
-                break; /* SopIteration raised */
+                break; /* StopIteration raised */
         }
 
         if (PyList_Append(result, line) < 0) {

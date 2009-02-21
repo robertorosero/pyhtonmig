@@ -214,12 +214,13 @@ IncrementalNewlineDecoder_dealloc(PyNewLineDecoderObject *self)
 #define SEEN_CRLF 4
 #define SEEN_ALL (SEEN_CR | SEEN_LF | SEEN_CRLF)
 
-static PyObject *
-_IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self, 
-                                  PyObject *input, int final)
+PyObject *
+_PyIncrementalNewlineDecoder_decode(PyObject *_self, 
+                                    PyObject *input, int final)
 {
     PyObject *output;
     Py_ssize_t output_len;
+    PyNewLineDecoderObject *self = (PyNewLineDecoderObject *) _self;
 
     if (self->decoder == NULL) {
         PyErr_SetString(PyExc_ValueError,
@@ -424,7 +425,7 @@ IncrementalNewlineDecoder_decode(PyNewLineDecoderObject *self,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:IncrementalNewlineDecoder",
                                      kwlist, &input, &final))
         return NULL;
-    return _IncrementalNewlineDecoder_decode(self, input, final);
+    return _PyIncrementalNewlineDecoder_decode((PyObject *) self, input, final);
 }
 
 static PyObject *
@@ -845,8 +846,11 @@ TextIOWrapper_init(PyTextIOWrapperObject *self, PyObject *args, PyObject *kwds)
     self->readuniversal = (newline == NULL || newline[0] == '\0');
     self->line_buffering = line_buffering;
     self->readtranslate = (newline == NULL);
-    if (newline)
+    if (newline) {
         self->readnl = PyUnicode_FromString(newline);
+        if (self->readnl == NULL)
+            return -1;
+    }
     self->writetranslate = (newline == NULL || newline[0] != '\0');
     if (!self->readuniversal && self->readnl) {
         self->writenl = _PyUnicode_AsString(self->readnl);
@@ -1275,8 +1279,8 @@ TextIOWrapper_read_chunk(PyTextIOWrapperObject *self)
     eof = (PyBytes_Size(input_chunk) == 0);
 
     if (Py_TYPE(self->decoder) == &PyIncrementalNewlineDecoder_Type) {
-        decoded_chars = _IncrementalNewlineDecoder_decode(
-            (PyNewLineDecoderObject *) self->decoder, input_chunk, eof);
+        decoded_chars = _PyIncrementalNewlineDecoder_decode(
+            self->decoder, input_chunk, eof);
     }
     else {
         decoded_chars = PyObject_CallMethodObjArgs(self->decoder,
@@ -1420,22 +1424,14 @@ find_control_char(Py_UNICODE *start, Py_UNICODE *end, Py_UNICODE ch)
     }
 }
 
-/* Finds the first line ending between start and end.
-   If not found, returns -1 and sets (*consumed) to the number of characters
-   which can be safely put aside before another search.
-   If found, returns the index after the line ending and doesn't touch
-   (*consumed).
-   
-   NOTE: `end` must point to the real end of the Py_UNICODE storage,
-   that is to the NUL character. Otherwise the function will produce
-   incorrect results. */
-static Py_ssize_t
-find_line_ending(PyTextIOWrapperObject *self,
-                 Py_UNICODE *start, Py_UNICODE *end, Py_ssize_t *consumed)
+Py_ssize_t
+_PyIO_find_line_ending(
+    int translated, int universal, PyObject *readnl,
+    Py_UNICODE *start, Py_UNICODE *end, Py_ssize_t *consumed)
 {
     Py_ssize_t len = end - start;
 
-    if (self->readtranslate) {
+    if (translated) {
         /* Newlines are already translated, only search for \n */
         Py_UNICODE *pos = find_control_char(start, end, '\n');
         if (pos != NULL)
@@ -1445,7 +1441,7 @@ find_line_ending(PyTextIOWrapperObject *self,
             return -1;
         }
     }
-    else if (self->readuniversal) {
+    else if (universal) {
         /* Universal newline search. Find any of \r, \r\n, \n
          * The decoder ensures that \r\n are not split in two pieces
          */
@@ -1473,8 +1469,8 @@ find_line_ending(PyTextIOWrapperObject *self,
     }
     else {
         /* Non-universal mode. */
-        Py_ssize_t readnl_len = PyUnicode_GET_SIZE(self->readnl);
-        Py_UNICODE *nl = PyUnicode_AS_UNICODE(self->readnl);
+        Py_ssize_t readnl_len = PyUnicode_GET_SIZE(readnl);
+        Py_UNICODE *nl = PyUnicode_AS_UNICODE(readnl);
         if (readnl_len == 1) {
             Py_UNICODE *pos = find_control_char(start, end, nl[0]);
             if (pos != NULL)
@@ -1567,7 +1563,9 @@ _TextIOWrapper_readline(PyTextIOWrapperObject *self, Py_ssize_t limit)
         ptr = PyUnicode_AS_UNICODE(line);
         line_len = PyUnicode_GET_SIZE(line);
 
-        endpos = find_line_ending(self, ptr + start, ptr + line_len, &consumed);
+        endpos = _PyIO_find_line_ending(
+            self->readtranslate, self->readuniversal, self->readnl,
+            ptr + start, ptr + line_len, &consumed);
         if (endpos >= 0) {
             endpos += start;
             if (limit >= 0 && (endpos - start) + chunked >= limit)

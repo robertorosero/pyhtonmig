@@ -38,6 +38,22 @@ extern int _PyIOBase_finalize(PyObject *self);
    Doesn't check the argument type, so be careful! */
 extern int _PyFileIO_closed(PyObject *self);
 
+/* Shortcut to the core of the IncrementalNewlineDecoder.decode method */
+extern PyObject *_PyIncrementalNewlineDecoder_decode(
+    PyObject *self, PyObject *input, int final);
+
+/* Finds the first line ending between `start` and `end`.
+   If found, returns the index after the line ending and doesn't touch
+   `*consumed`.
+   If not found, returns -1 and sets `*consumed` to the number of characters
+   which can be safely put aside until another search.
+   
+   NOTE: for performance reasons, `end` must point to a NUL character ('\0'). 
+   Otherwise, the function will scan further and return garbage. */
+extern Py_ssize_t _PyIO_find_line_ending(
+    int translated, int universal, PyObject *readnl,
+    Py_UNICODE *start, Py_UNICODE *end, Py_ssize_t *consumed);
+
 
 #define DEFAULT_BUFFER_SIZE (8 * 1024)  /* bytes */
 
@@ -104,7 +120,6 @@ typedef struct {
     PyObject *unsupported_operation;
 } _PyIO_State;
 
-
 #define IO_MOD_STATE(mod) ((_PyIO_State *)PyModule_GetState(mod))
 #define IO_STATE IO_MOD_STATE(PyState_FindModule(&_PyIO_Module))
 
@@ -117,11 +132,13 @@ extern PyObject *_PyIO_str_flush;
 extern PyObject *_PyIO_str_getstate;
 extern PyObject *_PyIO_str_isatty;
 extern PyObject *_PyIO_str_newlines;
+extern PyObject *_PyIO_str_nl;
 extern PyObject *_PyIO_str_read;
 extern PyObject *_PyIO_str_read1;
 extern PyObject *_PyIO_str_readable;
 extern PyObject *_PyIO_str_readinto;
 extern PyObject *_PyIO_str_readline;
+extern PyObject *_PyIO_str_replace;
 extern PyObject *_PyIO_str_reset;
 extern PyObject *_PyIO_str_seek;
 extern PyObject *_PyIO_str_seekable;

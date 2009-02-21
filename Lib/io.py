@@ -1872,15 +1872,6 @@ class unused_StringIO(unused_TextIOWrapper):
         return self.buffer.getvalue().decode(self._encoding, self._errors)
 
 try:
-    # This subclass is a reimplementation of the TextIOWrapper
-    # interface without any of its text decoding facilities. All the
-    # stored data is manipulated with the efficient
-    # _io._StringIO extension type. Also, the newline decoding
-    # mechanism of IncrementalNewlineDecoder is reimplemented here for
-    # efficiency. Doing otherwise, would require us to implement a
-    # fake decoder which would add an additional and unnecessary layer
-    # on top of the _StringIO methods.
-
     class StringIO(_io._StringIO, TextIOBase):
         """Text I/O implementation using an in-memory buffer.
 
@@ -1888,64 +1879,8 @@ try:
         argument is like the one of TextIOWrapper's constructor.
         """
 
-        _CHUNK_SIZE = 4096
-
-        def __init__(self, initial_value="", newline="\n"):
-            if newline not in (None, "", "\n", "\r", "\r\n"):
-                raise ValueError("illegal newline value: %r" % (newline,))
-
-            self._readuniversal = not newline
-            self._readtranslate = newline is None
-            self._readnl = newline
-            self._writetranslate = newline != ""
-            self._writenl = newline or os.linesep
-            self._pending = ""
-            self._seennl = 0
-
-            # Reset the buffer first, in case __init__ is called
-            # multiple times.
-            self.truncate(0)
-            if initial_value is None:
-                initial_value = ""
-            self.write(initial_value)
-            self.seek(0)
-
-        @property
-        def buffer(self):
-            raise UnsupportedOperation("%s.buffer attribute is unsupported" %
-                                       self.__class__.__name__)
-
-        def _decode_newlines(self, input, final=False):
-            # decode input (with the eventual \r from a previous pass)
-            if self._pending:
-                input = self._pending + input
-
-            # retain last \r even when not translating data:
-            # then readline() is sure to get \r\n in one pass
-            if input.endswith("\r") and not final:
-                input = input[:-1]
-                self._pending = "\r"
-            else:
-                self._pending = ""
-
-            # Record which newlines are read
-            crlf = input.count('\r\n')
-            cr = input.count('\r') - crlf
-            lf = input.count('\n') - crlf
-            self._seennl |= (lf and self._LF) | (cr and self._CR) \
-                         | (crlf and self._CRLF)
-
-            if self._readtranslate:
-                if crlf:
-                    output = input.replace("\r\n", "\n")
-                if cr:
-                    output = input.replace("\r", "\n")
-            else:
-                output = input
-
-            return output
-
         _read = _io._StringIO.read
+        _readline = _io._StringIO.readline
         _write = _io._StringIO.write
         _tell = _io._StringIO.tell
         _seek = _io._StringIO.seek
@@ -1965,15 +1900,7 @@ try:
             """
             if self.closed:
                 raise ValueError("write to closed file")
-            if not isinstance(s, str):
-                raise TypeError("can't write %s to text stream" %
-                                s.__class__.__name__)
-            length = len(s)
-            if self._writetranslate and self._writenl != "\n":
-                s = s.replace("\n", self._writenl)
-            self._pending = ""
-            self._write(s)
-            return length
+            return self._write(s)
 
         def read(self, n: int = None) -> str:
             """Read at most n characters, returned as a string.
@@ -1983,26 +1910,13 @@ try:
             """
             if self.closed:
                 raise ValueError("read to closed file")
-            if n is None:
-                n = -1
-            res = self._pending
-            if n < 0:
-                res += self._decode_newlines(self._read(), True)
-                self._pending = ""
-                return res
-            else:
-                res = self._decode_newlines(self._read(n), True)
-                self._pending = res[n:]
-                return res[:n]
+            return self._read(n)
 
         def tell(self) -> int:
             """Tell the current file position."""
             if self.closed:
                 raise ValueError("tell from closed file")
-            if self._pending:
-                return self._tell() - len(self._pending)
-            else:
-                return self._tell()
+            return self._tell()
 
         def seek(self, pos: int = None, whence: int = 0) -> int:
             """Change stream position.
@@ -2015,7 +1929,6 @@ try:
             """
             if self.closed:
                 raise ValueError("seek from closed file")
-            self._pending = ""
             return self._seek(pos, whence)
 
         def truncate(self, pos: int = None) -> int:
@@ -2027,86 +1940,12 @@ try:
             """
             if self.closed:
                 raise ValueError("truncate from closed file")
-            self._pending = ""
             return self._truncate(pos)
 
         def readline(self, limit: int = None) -> str:
             if self.closed:
                 raise ValueError("read from closed file")
-            if limit is None:
-                limit = -1
-            if limit >= 0:
-                # XXX: Hack to support limit argument, for backwards
-                # XXX  compatibility
-                line = self.readline()
-                if len(line) <= limit:
-                    return line
-                line, self._pending = line[:limit], line[limit:] + self._pending
-                return line
-
-            line = self._pending
-            self._pending = ""
-
-            start = 0
-            pos = endpos = None
-            while True:
-                if self._readtranslate:
-                    # Newlines are already translated, only search for \n
-                    pos = line.find('\n', start)
-                    if pos >= 0:
-                        endpos = pos + 1
-                        break
-                    else:
-                        start = len(line)
-
-                elif self._readuniversal:
-                    # Universal newline search. Find any of \r, \r\n, \n
-                    # The decoder ensures that \r\n are not split in two pieces
-
-                    # In C we'd look for these in parallel of course.
-                    nlpos = line.find("\n", start)
-                    crpos = line.find("\r", start)
-                    if crpos == -1:
-                        if nlpos == -1:
-                            # Nothing found
-                            start = len(line)
-                        else:
-                            # Found \n
-                            endpos = nlpos + 1
-                            break
-                    elif nlpos == -1:
-                        # Found lone \r
-                        endpos = crpos + 1
-                        break
-                    elif nlpos < crpos:
-                        # Found \n
-                        endpos = nlpos + 1
-                        break
-                    elif nlpos == crpos + 1:
-                        # Found \r\n
-                        endpos = crpos + 2
-                        break
-                    else:
-                        # Found \r
-                        endpos = crpos + 1
-                        break
-                else:
-                    # non-universal
-                    pos = line.find(self._readnl)
-                    if pos >= 0:
-                        endpos = pos + len(self._readnl)
-                        break
-
-                # No line ending seen yet - get more data
-                more_line = self.read(self._CHUNK_SIZE)
-                if more_line:
-                    line += more_line
-                else:
-                    # end of file
-                    return line
-
-            self._pending = line[endpos:]
-            return line[:endpos]
+            return self._readline(limit)
 
         _LF = 1
         _CR = 2

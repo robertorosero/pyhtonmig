@@ -370,6 +370,8 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     ioclass = io.unused_StringIO
     EOF = ""
 
+    # TextIO-specific behaviour.
+
     def test_relative_seek(self):
         memio = self.ioclass()
 
@@ -389,25 +391,83 @@ class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(memio.errors, "strict")
         self.assertEqual(memio.line_buffering, False)
 
-    # XXX: For the Python version of io.StringIO, this is highly
-    # dependent on the encoding used for the underlying buffer.
-    # def test_widechar(self):
-    #     buf = self.buftype("\U0002030a\U00020347")
-    #     memio = self.ioclass(buf)
-    #
-    #     self.assertEqual(memio.getvalue(), buf)
-    #     self.assertEqual(memio.write(buf), len(buf))
-    #     self.assertEqual(memio.tell(), len(buf))
-    #     self.assertEqual(memio.getvalue(), buf)
-    #     self.assertEqual(memio.write(buf), len(buf))
-    #     self.assertEqual(memio.tell(), len(buf) * 2)
-    #     self.assertEqual(memio.getvalue(), buf + buf)
+    def test_newlines_none(self):
+        # newline=None
+        memio = self.ioclass("a\nb\r\nc\rd", newline=None)
+        self.assertEqual(list(memio), ["a\n", "b\n", "c\n", "d"])
+        memio.seek(0)
+        self.assertEqual(memio.read(1), "a")
+        self.assertEqual(memio.read(2), "\nb")
+        self.assertEqual(memio.read(2), "\nc")
+        self.assertEqual(memio.read(1), "\n")
+        memio = self.ioclass(newline=None)
+        self.assertEqual(2, memio.write("a\n"))
+        self.assertEqual(3, memio.write("b\r\n"))
+        self.assertEqual(3, memio.write("c\rd"))
+        memio.seek(0)
+        self.assertEqual(memio.read(), "a\nb\nc\nd")
+
+    def test_newlines_empty(self):
+        # newline=""
+        memio = self.ioclass("a\nb\r\nc\rd", newline="")
+        self.assertEqual(list(memio), ["a\n", "b\r\n", "c\r", "d"])
+        memio.seek(0)
+        self.assertEqual(memio.read(4), "a\nb\r")
+        self.assertEqual(memio.read(2), "\nc")
+        self.assertEqual(memio.read(1), "\r")
+        memio = self.ioclass(newline="")
+        self.assertEqual(2, memio.write("a\n"))
+        self.assertEqual(2, memio.write("b\r"))
+        self.assertEqual(4, memio.write("\nc\rd"))
+        memio.seek(0)
+        self.assertEqual(list(memio), ["a\n", "b\r\n", "c\r", "d"])
+
+    def test_newlines_lf(self):
+        # newline="\n"
+        memio = self.ioclass("a\nb\r\nc\rd")
+        self.assertEqual(list(memio), ["a\n", "b\r\n", "c\rd"])
+
+    def test_newlines_cr(self):
+        # newline="\r"
+        memio = self.ioclass("a\nb\r\nc\rd", newline="\r")
+        memio.seek(0)
+        self.assertEqual(memio.read(), "a\rb\r\rc\rd")
+        memio.seek(0)
+        self.assertEqual(list(memio), ["a\r", "b\r", "\r", "c\r", "d"])
+
+    def test_newlines_crlf(self):
+        # newline="\r\n"
+        memio = self.ioclass("a\nb\r\nc\rd", newline="\r\n")
+        memio.seek(0)
+        self.assertEqual(memio.read(), "a\r\nb\r\r\nc\rd")
+        memio.seek(0)
+        self.assertEqual(list(memio), ["a\r\n", "b\r\r\n", "c\rd"])
+
+    def test_issue5265(self):
+        # StringIO can duplicate newlines in universal newlines mode
+        memio = self.ioclass("a\r\nb\r\n", newline=None)
+        self.assertEqual(memio.read(5), "a\nb\n")
+
 
 class CBytesIOTest(PyBytesIOTest):
     ioclass = io.BytesIO
 
 class CStringIOTest(PyStringIOTest):
     ioclass = io.StringIO
+
+    # XXX: For the Python version of io.StringIO, this is highly
+    # dependent on the encoding used for the underlying buffer.
+    def test_widechar(self):
+        buf = self.buftype("\U0002030a\U00020347")
+        memio = self.ioclass(buf)
+
+        self.assertEqual(memio.getvalue(), buf)
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.tell(), len(buf))
+        self.assertEqual(memio.getvalue(), buf)
+        self.assertEqual(memio.write(buf), len(buf))
+        self.assertEqual(memio.tell(), len(buf) * 2)
+        self.assertEqual(memio.getvalue(), buf + buf)
 
 
 def test_main():

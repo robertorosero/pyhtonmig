@@ -32,11 +32,13 @@ PyObject *_PyIO_str_flush;
 PyObject *_PyIO_str_getstate;
 PyObject *_PyIO_str_isatty;
 PyObject *_PyIO_str_newlines;
+PyObject *_PyIO_str_nl;
 PyObject *_PyIO_str_read;
 PyObject *_PyIO_str_read1;
 PyObject *_PyIO_str_readable;
 PyObject *_PyIO_str_readinto;
 PyObject *_PyIO_str_readline;
+PyObject *_PyIO_str_replace;
 PyObject *_PyIO_str_reset;
 PyObject *_PyIO_str_seek;
 PyObject *_PyIO_str_seekable;
@@ -614,7 +616,6 @@ PyInit__io(void)
 {
     PyObject *m = PyModule_Create(&_PyIO_Module);
     _PyIO_State *state = NULL;
-    PyTypeObject *base;
     if (m == NULL)
         return NULL;
     state = IO_MOD_STATE(m);
@@ -750,6 +751,8 @@ PyInit__io(void)
         goto fail;
     if (!(_PyIO_str_newlines = PyUnicode_InternFromString("newlines")))
         goto fail;
+    if (!(_PyIO_str_nl = PyUnicode_InternFromString("\n")))
+        goto fail;
     if (!(_PyIO_str_read = PyUnicode_InternFromString("read")))
         goto fail;
     if (!(_PyIO_str_read1 = PyUnicode_InternFromString("read1")))
@@ -759,6 +762,8 @@ PyInit__io(void)
     if (!(_PyIO_str_readinto = PyUnicode_InternFromString("readinto")))
         goto fail;
     if (!(_PyIO_str_readline = PyUnicode_InternFromString("readline")))
+        goto fail;
+    if (!(_PyIO_str_replace = PyUnicode_InternFromString("replace")))
         goto fail;
     if (!(_PyIO_str_reset = PyUnicode_InternFromString("reset")))
         goto fail;
