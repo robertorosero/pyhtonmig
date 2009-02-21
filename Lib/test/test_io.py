@@ -1909,7 +1909,7 @@ class MiscIOTest(unittest.TestCase):
 
     def testImport__all__(self):
         for name in self.io.__all__:
-            obj = getattr(io, name, None)
+            obj = getattr(self.io, name, None)
             self.assert_(obj is not None, name)
             if name == "open":
                 continue
