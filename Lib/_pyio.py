@@ -1075,7 +1075,7 @@ class BufferedRWPair(BufferedIOBase):
 
     @property
     def closed(self):
-        return self.writer.closed()
+        return self.writer.closed
 
 
 class BufferedRandom(BufferedWriter, BufferedReader):
