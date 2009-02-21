@@ -820,6 +820,8 @@ class BufferedReader(_BufferedIOMixin):
         """
         raw._checkReadable()
         _BufferedIOMixin.__init__(self, raw)
+        if buffer_size <= 0:
+            raise ValueError("invalid buffer size")
         self.buffer_size = buffer_size
         self._reset_read_buf()
         self._read_lock = Lock()
@@ -836,6 +838,8 @@ class BufferedReader(_BufferedIOMixin):
         mode. If n is negative, read until EOF or until read() would
         block.
         """
+        if n is not None and n < -1:
+            raise ValueError("invalid number of bytes to read")
         with self._read_lock:
             return self._read_unlocked(n)
 
@@ -910,7 +914,9 @@ class BufferedReader(_BufferedIOMixin):
         """Reads up to n bytes, with at most one read() system call."""
         # Returns up to n bytes.  If at least one byte is buffered, we
         # only return buffered bytes.  Otherwise, we do one raw read.
-        if n <= 0:
+        if n < 0:
+            raise ValueError("number of bytes ot read must be positive")
+        if n == 0:
             return b""
         with self._read_lock:
             self._peek_unlocked(1)
@@ -921,6 +927,8 @@ class BufferedReader(_BufferedIOMixin):
         return self.raw.tell() - len(self._read_buf) + self._read_pos
 
     def seek(self, pos, whence=0):
+        if not (0 <= whence <= 2):
+            raise ValueError("invalid whence value")
         with self._read_lock:
             if whence == 1:
                 pos -= len(self._read_buf) - self._read_pos
@@ -942,6 +950,8 @@ class BufferedWriter(_BufferedIOMixin):
                  buffer_size=DEFAULT_BUFFER_SIZE, max_buffer_size=None):
         raw._checkWritable()
         _BufferedIOMixin.__init__(self, raw)
+        if buffer_size <= 0:
+            raise ValueError("invalid buffer size")
         self.buffer_size = buffer_size
         self.max_buffer_size = (2*buffer_size
                                 if max_buffer_size is None
@@ -1010,6 +1020,8 @@ class BufferedWriter(_BufferedIOMixin):
         return self.raw.tell() + len(self._write_buf)
 
     def seek(self, pos, whence=0):
+        if not (0 <= whence <= 2):
+            raise ValueError("invalid whence")
         with self._write_lock:
             self._flush_unlocked()
             return self.raw.seek(pos, whence)
@@ -1298,6 +1310,8 @@ class TextIOWrapper(TextIOBase):
 
     def __init__(self, buffer, encoding=None, errors=None, newline=None,
                  line_buffering=False):
+        if newline is not None and not isinstance(newline, str):
+            raise TypeError("illegal newline type: %r" % (type(newline),))
         if newline not in (None, "", "\n", "\r", "\r\n"):
             raise ValueError("illegal newline value: %r" % (newline,))
         if encoding is None:

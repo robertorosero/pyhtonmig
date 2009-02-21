@@ -556,11 +556,8 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
         bufio.__init__(rawio, buffer_size=16)
         self.assertEquals(b"abc", bufio.read())
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
-        self.assertRaises(ValueError, bufio.read)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
-        self.assertRaises(ValueError, bufio.read)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
-        self.assertRaises(ValueError, bufio.read)
         if sys.maxsize > 0x7FFFFFFF:
             # The allocation can succeed on 32-bit builds, e.g. with more
             # than 2GB RAM and a 64-bit kernel.
@@ -719,6 +716,16 @@ class CBufferedReaderTest(BufferedReaderTest):
     MockRawIO = CMockRawIO
     MockFileIO = CMockFileIO
 
+    def test_initialization(self):
+        rawio = self.MockRawIO([b"abc"])
+        bufio = self.tp(rawio)
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
+        self.assertRaises(ValueError, bufio.read)
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
+        self.assertRaises(ValueError, bufio.read)
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
+        self.assertRaises(ValueError, bufio.read)
+
 class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
     BlockingIOError = pyio.BlockingIOError
@@ -740,11 +747,8 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         self.assertEquals(3, bufio.write(b"abc"))
         bufio.flush()
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
-        self.assertRaises(ValueError, bufio.write, b"def")
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
-        self.assertRaises(ValueError, bufio.write, b"def")
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
-        self.assertRaises(ValueError, bufio.write, b"def")
         if sys.maxsize > 0x7FFFFFFF:
             # The allocation can succeed on 32-bit builds, e.g. with more
             # than 2GB RAM and a 64-bit kernel.
@@ -957,6 +961,17 @@ class CBufferedWriterTest(BufferedWriterTest):
     MockRawIO = CMockRawIO
     MisbehavedRawIO = CMisbehavedRawIO
     MockNonBlockWriterIO = CMockNonBlockWriterIO
+
+    def test_initialization(self):
+        rawio = self.MockRawIO()
+        bufio = self.tp(rawio)
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
+        self.assertRaises(ValueError, bufio.write, b"def")
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
+        self.assertRaises(ValueError, bufio.write, b"def")
+        self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
+        self.assertRaises(ValueError, bufio.write, b"def")
+
 
 class PyBufferedWriterTest(BufferedWriterTest):
     tp = pyio.BufferedWriter
@@ -1302,9 +1317,7 @@ class TextIOWrapperTest(unittest.TestCase):
         self.assertEquals(t.line_buffering, True)
         self.assertEquals("\xe9\n", t.readline())
         self.assertRaises(TypeError, t.__init__, b, newline=42)
-        self.assertRaises(ValueError, t.read)
         self.assertRaises(ValueError, t.__init__, b, newline='xyzzy')
-        self.assertRaises(ValueError, t.read)
 
     def testLineBuffering(self):
         r = self.BytesIO()
@@ -1791,6 +1804,15 @@ class CTextIOWrapperTest(TextIOWrapperTest):
     BufferedWriter = io.BufferedWriter
     TextIOWrapper = io.TextIOWrapper
     BytesIO = io.BytesIO
+
+    def test_initialization(self):
+        r = self.BytesIO(b"\xc3\xa9\n\n")
+        b = self.BufferedReader(r, 1000)
+        t = self.TextIOWrapper(b)
+        self.assertRaises(TypeError, t.__init__, b, newline=42)
+        self.assertRaises(ValueError, t.read)
+        self.assertRaises(ValueError, t.__init__, b, newline='xyzzy')
+        self.assertRaises(ValueError, t.read)
 
 class PyTextIOWrapperTest(TextIOWrapperTest):
     open = staticmethod(pyio.open)
