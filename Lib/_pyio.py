@@ -1124,7 +1124,9 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         self.flush()
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
-        pos = super().seek(pos, whence)
+        pos = self.raw.seek(pos, whence)
+        if pos < 0:
+            raise IOError("seek() returned invalid position")
         with self._read_lock:
             self._reset_read_buf()
         return pos
