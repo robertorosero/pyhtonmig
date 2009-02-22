@@ -464,16 +464,10 @@ class IOTest(unittest.TestCase):
             self.assertEqual(f.read(), b"abcxxx")
 
 class CIOTest(IOTest):
-    open = io.open
-    IOBase = io.IOBase
-    BytesIO = io.BytesIO
-    FileIO = io.FileIO
+    pass
 
 class PyIOTest(IOTest):
-    open = staticmethod(pyio.open)
-    IOBase = pyio.IOBase
-    BytesIO = pyio.BytesIO
-    FileIO = pyio.FileIO
+    pass
 
 
 class CommonBufferedTests:
@@ -539,7 +533,7 @@ class CommonBufferedTests:
     def testErrorThroughDestructor(self):
         # Test that the exception state is not modified by a destructor,
         # even if close() fails.
-        rawio = CloseFailureIO()
+        rawio = self.CloseFailureIO()
         def f():
             self.tp(rawio).xyzzy
         self.assertRaises(AttributeError, f)
@@ -709,11 +703,6 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
 
 class CBufferedReaderTest(BufferedReaderTest):
     tp = io.BufferedReader
-    BlockingIOError = io.BlockingIOError
-    FileIO = io.FileIO
-    MisbehavedRawIO = CMisbehavedRawIO
-    MockRawIO = CMockRawIO
-    MockFileIO = CMockFileIO
 
     def test_initialization(self):
         rawio = self.MockRawIO([b"abc"])
@@ -734,11 +723,6 @@ class CBufferedReaderTest(BufferedReaderTest):
 
 class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
-    BlockingIOError = pyio.BlockingIOError
-    FileIO = pyio.FileIO
-    MisbehavedRawIO = PyMisbehavedRawIO
-    MockRawIO = PyMockRawIO
-    MockFileIO = PyMockFileIO
 
 
 class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
@@ -962,11 +946,6 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
 
 class CBufferedWriterTest(BufferedWriterTest):
     tp = io.BufferedWriter
-    BlockingIOError = io.BlockingIOError
-    FileIO = io.FileIO
-    MockRawIO = CMockRawIO
-    MisbehavedRawIO = CMisbehavedRawIO
-    MockNonBlockWriterIO = CMockNonBlockWriterIO
 
     def test_initialization(self):
         rawio = self.MockRawIO()
@@ -981,12 +960,6 @@ class CBufferedWriterTest(BufferedWriterTest):
 
 class PyBufferedWriterTest(BufferedWriterTest):
     tp = pyio.BufferedWriter
-    BlockingIOError = pyio.BlockingIOError
-    FileIO = pyio.FileIO
-    MockRawIO = PyMockRawIO
-    MisbehavedRawIO = PyMisbehavedRawIO
-    MockNonBlockWriterIO = PyMockNonBlockWriterIO
-
 
 class BufferedRWPairTest(unittest.TestCase):
 
@@ -1000,11 +973,9 @@ class BufferedRWPairTest(unittest.TestCase):
 
 class CBufferedRWPairTest(BufferedRWPairTest):
     tp = io.BufferedRWPair
-    MockRawIO = CMockRawIO
 
 class PyBufferedRWPairTest(BufferedRWPairTest):
     tp = pyio.BufferedRWPair
-    MockRawIO = PyMockRawIO
 
 
 class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
@@ -1140,23 +1111,9 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
 
 class CBufferedRandomTest(BufferedRandomTest):
     tp = io.BufferedRandom
-    BlockingIOError = io.BlockingIOError
-    FileIO = io.FileIO
-    BytesIO = io.BytesIO
-    MockRawIO = CMockRawIO
-    MockFileIO = CMockFileIO
-    MisbehavedRawIO = CMisbehavedRawIO
-    MockNonBlockWriterIO = CMockNonBlockWriterIO
 
 class PyBufferedRandomTest(BufferedRandomTest):
     tp = pyio.BufferedRandom
-    BlockingIOError = pyio.BlockingIOError
-    FileIO = pyio.FileIO
-    BytesIO = pyio.BytesIO
-    MockRawIO = PyMockRawIO
-    MockFileIO = PyMockFileIO
-    MisbehavedRawIO = PyMisbehavedRawIO
-    MockNonBlockWriterIO = PyMockNonBlockWriterIO
 
 
 # To fully exercise seek/tell, the StatefulIncrementalDecoder has these
@@ -1502,7 +1459,7 @@ class TextIOWrapperTest(unittest.TestCase):
     def testErrorThroughDestructor(self):
         # Test that the exception state is not modified by a destructor,
         # even if close() fails.
-        rawio = CloseFailureIO()
+        rawio = self.CloseFailureIO()
         def f():
             self.TextIOWrapper(rawio).xyzzy
         self.assertRaises(AttributeError, f)
@@ -1807,11 +1764,6 @@ class TextIOWrapperTest(unittest.TestCase):
         self.assertEqual(buffer.seekable(), txt.seekable())
 
 class CTextIOWrapperTest(TextIOWrapperTest):
-    open = io.open
-    BufferedReader = io.BufferedReader
-    BufferedWriter = io.BufferedWriter
-    TextIOWrapper = io.TextIOWrapper
-    BytesIO = io.BytesIO
 
     def test_initialization(self):
         r = self.BytesIO(b"\xc3\xa9\n\n")
@@ -1823,11 +1775,7 @@ class CTextIOWrapperTest(TextIOWrapperTest):
         self.assertRaises(ValueError, t.read)
 
 class PyTextIOWrapperTest(TextIOWrapperTest):
-    open = staticmethod(pyio.open)
-    BufferedReader = pyio.BufferedReader
-    BufferedWriter = pyio.BufferedWriter
-    TextIOWrapper = pyio.TextIOWrapper
-    BytesIO = pyio.BytesIO
+    pass
 
 
 class IncrementalNewlineDecoderTest(unittest.TestCase):
@@ -1924,10 +1872,10 @@ class IncrementalNewlineDecoderTest(unittest.TestCase):
         self.check_newline_decoding_utf8(decoder)
 
 class CIncrementalNewlineDecoderTest(IncrementalNewlineDecoderTest):
-    IncrementalNewlineDecoder = io.IncrementalNewlineDecoder
+    pass
 
 class PyIncrementalNewlineDecoderTest(IncrementalNewlineDecoderTest):
-    IncrementalNewlineDecoder = pyio.IncrementalNewlineDecoder
+    pass
 
 
 # XXX Tests for open()
@@ -2037,27 +1985,42 @@ class MiscIOTest(unittest.TestCase):
 
 class CMiscIOTest(MiscIOTest):
     io = io
-    open = io.open
-    BlockingIOError = io.BlockingIOError
-    IOBase = io.IOBase
 
 class PyMiscIOTest(MiscIOTest):
     io = pyio
-    open = staticmethod(pyio.open)
-    BlockingIOError = pyio.BlockingIOError
-    IOBase = pyio.IOBase
 
 def test_main():
-    support.run_unittest(CIOTest, PyIOTest,
-                         CBufferedReaderTest, PyBufferedReaderTest,
-                         CBufferedWriterTest, PyBufferedWriterTest,
-                         CBufferedRWPairTest, PyBufferedRWPairTest,
-                         CBufferedRandomTest, PyBufferedRandomTest,
-                         StatefulIncrementalDecoderTest,
-                         CIncrementalNewlineDecoderTest, PyIncrementalNewlineDecoderTest,
-                         CTextIOWrapperTest, PyTextIOWrapperTest,
-                         CMiscIOTest, PyMiscIOTest,
-                         )
+    tests = (CIOTest, PyIOTest,
+             CBufferedReaderTest, PyBufferedReaderTest,
+             CBufferedWriterTest, PyBufferedWriterTest,
+             CBufferedRWPairTest, PyBufferedRWPairTest,
+             CBufferedRandomTest, PyBufferedRandomTest,
+             StatefulIncrementalDecoderTest,
+             CIncrementalNewlineDecoderTest, PyIncrementalNewlineDecoderTest,
+             CTextIOWrapperTest, PyTextIOWrapperTest,
+             CMiscIOTest, PyMiscIOTest,)
+
+    # Put the namespaces of the IO module we are testing and some useful mock
+    # classes in the __dict__ of each test.
+    mocks = (MockRawIO, MisbehavedRawIO, MockFileIO, CloseFailureIO,
+             MockNonBlockWriterIO)
+    all_members = io.__all__ + ["IncrementalNewlineDecoder"]
+    c_io_ns = {name : getattr(io, name) for name in all_members}
+    py_io_ns = {name : getattr(pyio, name) for name in all_members}
+    globs = globals()
+    c_io_ns.update((x.__name__, globs["C" + x.__name__]) for x in mocks)
+    py_io_ns.update((x.__name__, globs["Py" + x.__name__]) for x in mocks)
+    # Avoid turning open into a bound method.
+    py_io_ns["open"] = pyio.OpenWrapper
+    for test in tests:
+        if test.__name__.startswith("C"):
+            for name, obj in c_io_ns.items():
+                setattr(test, name, obj)
+        elif test.__name__.startswith("Py"):
+            for name, obj in py_io_ns.items():
+                setattr(test, name, obj)
+
+    support.run_unittest(*tests)
 
 if __name__ == "__main__":
     test_main()
