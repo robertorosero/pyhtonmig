@@ -8,6 +8,15 @@
 # * test_io - tests everything else in the io module
 # * test_univnewlines - tests universal newline support
 
+################################################################################
+# ATTENTION TEST WRITERS!!!
+################################################################################
+# When writing tests for io, it's important to test both the C and Python
+# implementations. This is usually done by writing a base test that refers to
+# the type it is testing as a attribute. Then it provides custom subclasses to
+# test both implementations. This file has lots of examples.
+################################################################################
+
 import os
 import sys
 import time
