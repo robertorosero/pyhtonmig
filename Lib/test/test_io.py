@@ -1,4 +1,12 @@
-"""Unit tests for io.py."""
+"""Unit tests for the io module."""
+
+# Tests of io are scattered over the test suite:
+# * test_bufio - tests file buffering
+# * test_memoryio - tests BytesIO and StringIO
+# * test_fileio - tests FileIO
+# * test_file - tests the file interface
+# * test_io - tests everything else in the io module
+# * test_univnewlines - tests universal newline support
 
 import os
 import sys
