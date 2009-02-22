@@ -315,10 +315,10 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 #endif
 
 	if (fd >= 0) {
-		self->fd = fd;
-		self->closefd = closefd;
 		if (check_fd(fd))
 			goto error;
+		self->fd = fd;
+		self->closefd = closefd;
 	}
 	else {
 		self->closefd = 1;
