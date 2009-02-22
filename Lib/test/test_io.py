@@ -1027,7 +1027,7 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
         self.assertEquals(b"dddeee", raw._write_stack[0])
 
     def testSeekAndTell(self):
-        raw = io.BytesIO(b"asdfghjkl")
+        raw = self.BytesIO(b"asdfghjkl")
         rw = self.tp(raw)
 
         self.assertEquals(b"as", rw.read(2))
@@ -1047,7 +1047,7 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
         self.assertRaises(TypeError, rw.seek, 0.0)
 
     def check_flush_and_read(self, read_func):
-        raw = io.BytesIO(b"abcdefghi")
+        raw = self.BytesIO(b"abcdefghi")
         bufio = self.tp(raw)
 
         self.assertEquals(b"ab", read_func(bufio, 2))
@@ -1086,7 +1086,7 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
         self.check_flush_and_read(_peek)
 
     def testFlushAndWrite(self):
-        raw = io.BytesIO(b"abcdefghi")
+        raw = self.BytesIO(b"abcdefghi")
         bufio = self.tp(raw)
 
         bufio.write(b"123")
@@ -1142,6 +1142,7 @@ class CBufferedRandomTest(BufferedRandomTest):
     tp = io.BufferedRandom
     BlockingIOError = io.BlockingIOError
     FileIO = io.FileIO
+    BytesIO = io.BytesIO
     MockRawIO = CMockRawIO
     MockFileIO = CMockFileIO
     MisbehavedRawIO = CMisbehavedRawIO
@@ -1151,6 +1152,7 @@ class PyBufferedRandomTest(BufferedRandomTest):
     tp = pyio.BufferedRandom
     BlockingIOError = pyio.BlockingIOError
     FileIO = pyio.FileIO
+    BytesIO = pyio.BytesIO
     MockRawIO = PyMockRawIO
     MockFileIO = PyMockFileIO
     MisbehavedRawIO = PyMisbehavedRawIO
