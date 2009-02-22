@@ -219,14 +219,16 @@ _PyIOBase_finalize(PyObject *self)
         closed = PyObject_IsTrue(res);
         Py_DECREF(res);
         if (closed == -1)
-            PyErr_WriteUnraisable(self);
+            PyErr_Clear();
     }
     if (closed == 0) {
         res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
                                           NULL);
-        /* Silencing I/O errors is bad, so we print them out on the console. */
+        /* Silencing I/O errors is bad, but printing spurious tracebacks is
+           equally as bad, and potentially more frequent (because of
+           shutdown issues). */
         if (res == NULL)
-            PyErr_WriteUnraisable(self);
+            PyErr_Clear();
         else
             Py_DECREF(res);
     }
