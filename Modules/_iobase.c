@@ -17,6 +17,13 @@
  * IOBase class, an abstract class
  */
 
+typedef struct {
+    PyObject_HEAD
+    
+    PyObject *dict;
+    PyObject *weakreflist;
+} IOBaseObject;
+
 PyDoc_STRVAR(IOBase_doc,
     "The abstract base class for all I/O classes, acting on streams of\n"
     "bytes. There is no public constructor.\n"
@@ -186,6 +193,8 @@ IOBase_close(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+/* Finalization and garbage collection support */
+
 int
 _PyIOBase_finalize(PyObject *self)
 {
@@ -194,19 +203,15 @@ _PyIOBase_finalize(PyObject *self)
     int closed = 1;
     int is_zombie;
 
-    PyErr_Fetch(&tp, &v, &tb);
     /* If _PyIOBase_finalize() is called from a destructor, we need to
        resurrect the object as calling close() can invoke arbitrary code. */
     is_zombie = (Py_REFCNT(self) == 0);
     if (is_zombie) {
         ++Py_REFCNT(self);
     }
-    /* The object could already be in an unusable state, so we'll take any
-       error as meaning "stop, nothing to see here". */
-    /* XXX any Python method or property called from here may rely on
-       attributes being set in the instance __dict__, but the __dict__ has
-       already been cleared by subtype_dealloc().
-       Worse, since exceptions are silenced, the user will be unaware of it. */
+    PyErr_Fetch(&tp, &v, &tb);
+    /* If `closed` doesn't exist or can't be evaluated as bool, then the
+       object is probably in an unusable state, so ignore. */
     res = PyObject_GetAttr(self, _PyIO_str_closed);
     if (res == NULL)
         PyErr_Clear();
@@ -214,13 +219,14 @@ _PyIOBase_finalize(PyObject *self)
         closed = PyObject_IsTrue(res);
         Py_DECREF(res);
         if (closed == -1)
-            PyErr_Clear();
+            PyErr_WriteUnraisable(self);
     }
     if (closed == 0) {
         res = PyObject_CallMethodObjArgs((PyObject *) self, _PyIO_str_close,
                                           NULL);
+        /* Silencing I/O errors is bad, so we print them out on the console. */
         if (res == NULL)
-            PyErr_Clear();
+            PyErr_WriteUnraisable(self);
         else
             Py_DECREF(res);
     }
@@ -247,29 +253,48 @@ _PyIOBase_finalize(PyObject *self)
 #endif
             return -1;
         }
-        else {
-            /* The code above might have re-added a dict, DECREF it */
-            PyObject **dictptr = _PyObject_GetDictPtr(self);
-            if (dictptr != NULL)
-                Py_CLEAR(*dictptr);
-        }
     }
+    return 0;
+}
+
+static int
+IOBase_traverse(IOBaseObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->dict);
+    return 0;
+}
+
+static int
+IOBase_clear(IOBaseObject *self)
+{
+    if (_PyIOBase_finalize((PyObject *) self) < 0)
+        return -1;
+    Py_CLEAR(self->dict);
     return 0;
 }
 
 /* Destructor */
 
 static void
-IOBase_dealloc(PyObject *self)
+IOBase_dealloc(IOBaseObject *self)
 {
-    if (_PyIOBase_finalize((PyObject *)self) < 0) {
+    /* NOTE: since IOBaseObject has its own dict, Python-defined attributes
+       are still available here for close() to use.
+       However, if the derived class declares a __slots__, those slots are
+       already gone.
+    */
+    if (_PyIOBase_finalize((PyObject *) self) < 0) {
         /* When called from a heap type's dealloc, the type will be
            decref'ed on return (see e.g. subtype_dealloc in typeobject.c). */
         if (PyType_HasFeature(Py_TYPE(self), Py_TPFLAGS_HEAPTYPE))
             Py_INCREF(Py_TYPE(self));
         return;
     }
-    Py_TYPE(self)->tp_free(self);
+    _PyObject_GC_UNTRACK(self);
+    if (self->weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *) self);
+    Py_CLEAR(self->dict);
+    Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
 /* Inquiry methods */
@@ -680,9 +705,9 @@ static PyGetSetDef IOBase_getset[] = {
 PyTypeObject PyIOBase_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "IOBase",                   /*tp_name*/
-    0,                          /*tp_basicsize*/
+    sizeof(IOBaseObject),       /*tp_basicsize*/
     0,                          /*tp_itemsize*/
-    IOBase_dealloc,             /*tp_dealloc*/
+    (destructor)IOBase_dealloc, /*tp_dealloc*/
     0,                          /*tp_print*/
     0,                          /*tp_getattr*/
     0,                          /*tp_setattr*/
@@ -697,12 +722,13 @@ PyTypeObject PyIOBase_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+        | Py_TPFLAGS_HAVE_GC,   /*tp_flags*/
     IOBase_doc,                 /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)IOBase_traverse, /* tp_traverse */
+    (inquiry)IOBase_clear,      /* tp_clear */
     0,                          /* tp_richcompare */
-    0,                          /* tp_weaklistoffset */
+    offsetof(IOBaseObject, weakreflist), /* tp_weaklistoffset */
     IOBase_iter,                /* tp_iter */
     IOBase_iternext,            /* tp_iternext */
     IOBase_methods,             /* tp_methods */
@@ -712,7 +738,7 @@ PyTypeObject PyIOBase_Type = {
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
-    0,                          /* tp_dictoffset */
+    offsetof(IOBaseObject, dict), /* tp_dictoffset */
     0,                          /* tp_init */
     0,                          /* tp_alloc */
     PyType_GenericNew,          /* tp_new */

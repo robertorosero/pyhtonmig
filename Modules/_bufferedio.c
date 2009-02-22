@@ -1780,6 +1780,7 @@ typedef struct {
     BufferedObject *reader;
     BufferedObject *writer;
     PyObject *dict;
+    PyObject *weakreflist;
 } BufferedRWPairObject;
 
 static int
@@ -1826,11 +1827,30 @@ BufferedRWPair_init(BufferedRWPairObject *self, PyObject *args,
     return 0;
 }
 
-static void
-BufferedRWPair_dealloc(BufferedRWPairObject *self)
+static int
+BufferedRWPair_traverse(BufferedRWPairObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->dict);
+    return 0;
+}
+
+static int
+BufferedRWPair_clear(BufferedRWPairObject *self)
 {
     Py_CLEAR(self->reader);
     Py_CLEAR(self->writer);
+    Py_CLEAR(self->dict);
+    return 0;
+}
+
+static void
+BufferedRWPair_dealloc(BufferedRWPairObject *self)
+{
+    _PyObject_GC_UNTRACK(self);
+    Py_CLEAR(self->reader);
+    Py_CLEAR(self->writer);
+    Py_CLEAR(self->dict);
+    Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
 static PyObject *
@@ -1955,17 +1975,18 @@ PyTypeObject PyBufferedRWPair_Type = {
     0,                          /*tp_getattro*/
     0,                          /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+        | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
     BufferedRWPair_doc,         /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
+    (traverseproc)BufferedRWPair_traverse, /* tp_traverse */
+    (inquiry)BufferedRWPair_clear, /* tp_clear */
     0,                          /* tp_richcompare */
-    offsetof(BufferedObject, weakreflist), /*tp_weaklistoffset*/
+    offsetof(BufferedRWPairObject, weakreflist), /*tp_weaklistoffset*/
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
     BufferedRWPair_methods,     /* tp_methods */
-    0,     /* tp_members */
-    0,      /* tp_getset */
+    0,                          /* tp_members */
+    0,                          /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */

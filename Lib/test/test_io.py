@@ -115,9 +115,12 @@ class PyMisbehavedRawIO(MisbehavedRawIO, pyio.RawIOBase):
 
 
 class CloseFailureIO(MockRawIO):
+    closed = 0
 
     def close(self):
-        raise IOError
+        if not self.closed:
+            self.closed = 1
+            raise IOError
 
 class CCloseFailureIO(CloseFailureIO, io.RawIOBase):
     pass
@@ -382,14 +385,22 @@ class IOTest(unittest.TestCase):
         f.write(b"xxx")
         del f
         self.assertEqual(record, [1, 2, 3])
+        f = open(support.TESTFN, "rb")
+        self.assertEqual(f.read(), b"xxx")
 
-    def test_IOBase_destructor(self):
+    def _check_base_destructor(self, base):
         record = []
-        class MyIO(self.IOBase):
+        class MyIO(base):
             def __init__(self):
-                pass
+                # This exercises the availability of attributes on object
+                # destruction.
+                # (in the C version, close() is called by the tp_dealloc
+                # function, not by __del__)
+                self.on_del = 1
+                self.on_close = 2
+                self.on_flush = 3
             def __del__(self):
-                record.append(1)
+                record.append(self.on_del)
                 try:
                     f = super().__del__
                 except AttributeError:
@@ -397,14 +408,26 @@ class IOTest(unittest.TestCase):
                 else:
                     f()
             def close(self):
-                record.append(2)
+                record.append(self.on_close)
                 super().close()
             def flush(self):
-                record.append(3)
+                record.append(self.on_flush)
                 super().flush()
         f = MyIO()
         del f
         self.assertEqual(record, [1, 2, 3])
+
+    def test_IOBase_destructor(self):
+        self._check_base_destructor(self.IOBase)
+
+    def test_RawIOBase_destructor(self):
+        self._check_base_destructor(self.RawIOBase)
+
+    def test_BufferedIOBase_destructor(self):
+        self._check_base_destructor(self.BufferedIOBase)
+
+    def test_TextIOBase_destructor(self):
+        self._check_base_destructor(self.TextIOBase)
 
     def test_close_flushes(self):
         f = self.open(support.TESTFN, "wb")
@@ -536,7 +559,14 @@ class CommonBufferedTests:
         rawio = self.CloseFailureIO()
         def f():
             self.tp(rawio).xyzzy
-        self.assertRaises(AttributeError, f)
+        with support.captured_output("stderr") as s:
+            self.assertRaises(AttributeError, f)
+        s = s.getvalue().strip()
+        if s:
+            # The destructor *may* have printed an unraisable error, check it
+            self.assertEqual(len(s.splitlines()), 1)
+            self.assert_(s.startswith("Exception IOError: "), s)
+            self.assert_(s.endswith(" ignored"), s)
 
 
 class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
@@ -1424,10 +1454,11 @@ class TextIOWrapperTest(unittest.TestCase):
 
     def testDestructor(self):
         l = []
-        class MyBytesIO(self.BytesIO):
+        base = self.BytesIO
+        class MyBytesIO(base):
             def close(self):
                 l.append(self.getvalue())
-                self.BytesIO.close(self)
+                base.close(self)
         b = MyBytesIO()
         t = self.TextIOWrapper(b, encoding="ascii")
         t.write("abc")
@@ -1462,7 +1493,14 @@ class TextIOWrapperTest(unittest.TestCase):
         rawio = self.CloseFailureIO()
         def f():
             self.TextIOWrapper(rawio).xyzzy
-        self.assertRaises(AttributeError, f)
+        with support.captured_output("stderr") as s:
+            self.assertRaises(AttributeError, f)
+        s = s.getvalue().strip()
+        if s:
+            # The destructor *may* have printed an unraisable error, check it
+            self.assertEqual(len(s.splitlines()), 1)
+            self.assert_(s.startswith("Exception IOError: "), s)
+            self.assert_(s.endswith(" ignored"), s)
 
     def test_garbage_collection(self):
         # TextIOWrapper objects are collected, and collecting them flushes

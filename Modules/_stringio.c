@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
+#include "structmember.h"
 #include "_iomodule.h"
 
 /* Implementation note: the buffer is always at least one character longer
@@ -20,6 +21,9 @@ typedef struct {
     PyObject *decoder;
     PyObject *readnl;
     PyObject *writenl;
+    
+    PyObject *dict;
+    PyObject *weakreflist;
 } StringIOObject;
 
 #define CHECK_INITIALIZED(self) \
@@ -487,14 +491,31 @@ stringio_close(StringIOObject *self)
     Py_RETURN_NONE;
 }
 
+static int
+stringio_traverse(StringIOObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->dict);
+    return 0;
+}
+
+static int
+stringio_clear(StringIOObject *self)
+{
+    Py_CLEAR(self->dict);
+    return 0;
+}
+
 static void
 stringio_dealloc(StringIOObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->writenl);
     Py_CLEAR(self->decoder);
     if (self->buf)
         PyMem_Free(self->buf);
+    if (self->weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *) self);
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -725,12 +746,13 @@ PyTypeObject PyStringIO_Type = {
     0,                                         /*tp_getattro*/
     0,                                         /*tp_setattro*/
     0,                                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+                       | Py_TPFLAGS_HAVE_GC,   /*tp_flags*/
     stringio_doc,                              /*tp_doc*/
-    0,                                         /*tp_traverse*/
-    0,                                         /*tp_clear*/
+    (traverseproc)stringio_traverse,           /*tp_traverse*/
+    (inquiry)stringio_clear,                   /*tp_clear*/
     0,                                         /*tp_richcompare*/
-    0,                                         /*tp_weaklistoffset*/
+    offsetof(StringIOObject, weakreflist),     /*tp_weaklistoffset*/
     0,                                         /*tp_iter*/
     (iternextfunc)stringio_iternext,           /*tp_iternext*/
     stringio_methods,                          /*tp_methods*/
@@ -740,7 +762,7 @@ PyTypeObject PyStringIO_Type = {
     0,                                         /*tp_dict*/
     0,                                         /*tp_descr_get*/
     0,                                         /*tp_descr_set*/
-    0,                                         /*tp_dictoffset*/
+    offsetof(StringIOObject, dict),            /*tp_dictoffset*/
     (initproc)stringio_init,                   /*tp_init*/
     0,                                         /*tp_alloc*/
     stringio_new,                              /*tp_new*/
