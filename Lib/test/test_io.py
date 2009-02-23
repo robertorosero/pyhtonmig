@@ -738,16 +738,6 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(IOError, bufio.seek, 0)
         self.assertRaises(IOError, bufio.tell)
 
-    def test_garbage_collection(self):
-        # BufferedReader objects are collected
-        rawio = self.FileIO(support.TESTFN, "w+b")
-        f = self.tp(rawio)
-        f.f = f
-        wr = weakref.ref(f)
-        del f
-        gc.collect()
-        self.assert_(wr() is None, wr)
-
 class CBufferedReaderTest(BufferedReaderTest):
     tp = io.BufferedReader
 
@@ -767,6 +757,17 @@ class CBufferedReaderTest(BufferedReaderTest):
         # _pyio.BufferedReader seems to implement reading different, so that
         # checking this is not so easy.
         self.assertRaises(IOError, bufio.read, 10)
+
+    def test_garbage_collection(self):
+        # C BufferedReader objects are collected.
+        # The Python version has __del__, so it ends into gc.garbage instead
+        rawio = self.FileIO(support.TESTFN, "w+b")
+        f = self.tp(rawio)
+        f.f = f
+        wr = weakref.ref(f)
+        del f
+        gc.collect()
+        self.assert_(wr() is None, wr)
 
 class PyBufferedReaderTest(BufferedReaderTest):
     tp = pyio.BufferedReader
@@ -977,20 +978,6 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(IOError, bufio.tell)
         self.assertRaises(IOError, bufio.write, b"abcdef")
 
-    def test_garbage_collection(self):
-        # BufferedWriter objects are collected, and collecting them flushes
-        # all data to disk.
-        rawio = self.FileIO(support.TESTFN, "w+b")
-        f = self.tp(rawio)
-        f.write(b"123xxx")
-        f.x = f
-        wr = weakref.ref(f)
-        del f
-        gc.collect()
-        self.assert_(wr() is None, wr)
-        with open(support.TESTFN, "rb") as f:
-            self.assertEqual(f.read(), b"123xxx")
-
 class CBufferedWriterTest(BufferedWriterTest):
     tp = io.BufferedWriter
 
@@ -1003,6 +990,21 @@ class CBufferedWriterTest(BufferedWriterTest):
         self.assertRaises(ValueError, bufio.write, b"def")
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
         self.assertRaises(ValueError, bufio.write, b"def")
+
+    def test_garbage_collection(self):
+        # C BufferedWriter objects are collected, and collecting them flushes
+        # all data to disk.
+        # The Python version has __del__, so it ends into gc.garbage instead
+        rawio = self.FileIO(support.TESTFN, "w+b")
+        f = self.tp(rawio)
+        f.write(b"123xxx")
+        f.x = f
+        wr = weakref.ref(f)
+        del f
+        gc.collect()
+        self.assert_(wr() is None, wr)
+        with open(support.TESTFN, "rb") as f:
+            self.assertEqual(f.read(), b"123xxx")
 
 
 class PyBufferedWriterTest(BufferedWriterTest):
@@ -1152,12 +1154,12 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
         BufferedReaderTest.testMisbehavedRawIO(self)
         BufferedWriterTest.testMisbehavedRawIO(self)
 
+class CBufferedRandomTest(BufferedRandomTest):
+    tp = io.BufferedRandom
+
     def test_garbage_collection(self):
         BufferedReaderTest.test_garbage_collection(self)
         BufferedWriterTest.test_garbage_collection(self)
-
-class CBufferedRandomTest(BufferedRandomTest):
-    tp = io.BufferedRandom
 
 class PyBufferedRandomTest(BufferedRandomTest):
     tp = pyio.BufferedRandom
@@ -1519,21 +1521,6 @@ class TextIOWrapperTest(unittest.TestCase):
             self.assert_(s.startswith("Exception IOError: "), s)
             self.assert_(s.endswith(" ignored"), s)
 
-    def test_garbage_collection(self):
-        # TextIOWrapper objects are collected, and collecting them flushes
-        # all data to disk.
-        rawio = io.FileIO(support.TESTFN, "wb")
-        b = self.BufferedWriter(rawio)
-        t = self.TextIOWrapper(b, encoding="ascii")
-        t.write("456def")
-        t.x = t
-        wr = weakref.ref(t)
-        del t
-        gc.collect()
-        self.assert_(wr() is None, wr)
-        with open(support.TESTFN, "rb") as f:
-            self.assertEqual(f.read(), b"456def")
-
     # Systematic tests of the text I/O API
 
     def testBasicIO(self):
@@ -1828,6 +1815,22 @@ class CTextIOWrapperTest(TextIOWrapperTest):
         self.assertRaises(ValueError, t.read)
         self.assertRaises(ValueError, t.__init__, b, newline='xyzzy')
         self.assertRaises(ValueError, t.read)
+
+    def test_garbage_collection(self):
+        # C TextIOWrapper objects are collected, and collecting them flushes
+        # all data to disk.
+        # The Python version has __del__, so it ends in gc.garbage instead.
+        rawio = io.FileIO(support.TESTFN, "wb")
+        b = self.BufferedWriter(rawio)
+        t = self.TextIOWrapper(b, encoding="ascii")
+        t.write("456def")
+        t.x = t
+        wr = weakref.ref(t)
+        del t
+        gc.collect()
+        self.assert_(wr() is None, wr)
+        with open(support.TESTFN, "rb") as f:
+            self.assertEqual(f.read(), b"456def")
 
 class PyTextIOWrapperTest(TextIOWrapperTest):
     pass
