@@ -1158,8 +1158,8 @@ class CBufferedRandomTest(BufferedRandomTest):
     tp = io.BufferedRandom
 
     def test_garbage_collection(self):
-        BufferedReaderTest.test_garbage_collection(self)
-        BufferedWriterTest.test_garbage_collection(self)
+        CBufferedReaderTest.test_garbage_collection(self)
+        CBufferedWriterTest.test_garbage_collection(self)
 
 class PyBufferedRandomTest(BufferedRandomTest):
     tp = pyio.BufferedRandom
