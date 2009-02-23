@@ -55,6 +55,7 @@ __all__ = ["BlockingIOError", "open", "IOBase", "RawIOBase", "FileIO",
 
 import _io
 
+DEFAULT_BUFFER_SIZE = _io.DEFAULT_BUFFER_SIZE
 BlockingIOError = _io.BlockingIOError
 UnsupportedOperation = _io.UnsupportedOperation
 open = _io.open

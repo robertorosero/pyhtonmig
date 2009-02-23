@@ -633,7 +633,10 @@ PyInit__io(void)
         Py_DECREF(type); \
         goto fail; \
     }
-        
+
+    /* DEFAULT_BUFFER_SIZE */
+    if (PyModule_AddIntMacro(m, DEFAULT_BUFFER_SIZE) < 0)
+        goto fail;
 
     /* UnsupportedOperation inherits from ValueError and IOError */
     state->unsupported_operation = PyObject_CallFunction(
