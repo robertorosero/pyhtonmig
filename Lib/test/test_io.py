@@ -2043,6 +2043,24 @@ class MiscIOTest(unittest.TestCase):
         gc.collect()
         self.assert_(wr() is None, wr)
 
+    def test_abc_inheritance(self):
+        # Test implementations inherit (even virtually) from their respective ABCs
+        f = self.open(support.TESTFN, "wb", buffering=0)
+        self.assertTrue(isinstance(f, self.IOBase))
+        self.assertTrue(isinstance(f, self.RawIOBase))
+        self.assertFalse(isinstance(f, self.BufferedIOBase))
+        self.assertFalse(isinstance(f, self.TextIOBase))
+        f = self.open(support.TESTFN, "wb")
+        self.assertTrue(isinstance(f, self.IOBase))
+        self.assertFalse(isinstance(f, self.RawIOBase))
+        self.assertTrue(isinstance(f, self.BufferedIOBase))
+        self.assertFalse(isinstance(f, self.TextIOBase))
+        f = self.open(support.TESTFN, "w")
+        self.assertTrue(isinstance(f, self.IOBase))
+        self.assertFalse(isinstance(f, self.RawIOBase))
+        self.assertFalse(isinstance(f, self.BufferedIOBase))
+        self.assertTrue(isinstance(f, self.TextIOBase))
+
 class CMiscIOTest(MiscIOTest):
     io = io
 
