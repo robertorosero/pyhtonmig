@@ -745,8 +745,10 @@ cycle_next(cycleobject *lz)
 	while (1) {
 		item = PyIter_Next(lz->it);
 		if (item != NULL) {
-			if (!lz->firstpass)
-				PyList_Append(lz->saved, item);
+			if (!lz->firstpass && PyList_Append(lz->saved, item)) {
+				Py_DECREF(item);
+				return NULL;
+			}
 			return item;
 		}
 		if (PyErr_Occurred()) {
@@ -2605,11 +2607,9 @@ compress_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *seq1, *seq2;
 	PyObject *data=NULL, *selectors=NULL;
 	compressobject *lz;
-
-	if (type == &compress_type && !_PyArg_NoKeywords("compress()", kwds))
-		return NULL;
-
-	if (!PyArg_UnpackTuple(args, "compress", 2, 2, &seq1, &seq2))
+	static char *kwargs[] = {"data", "selectors", NULL};
+ 
+ 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO:compress", kwargs, &seq1, &seq2))
 		return NULL;
 
 	data = PyObject_GetIter(seq1);
@@ -2687,7 +2687,7 @@ compress_next(compressobject *lz)
 }
 
 PyDoc_STRVAR(compress_doc,
-"compress(data sequence, selector sequence) --> iterator over selected data\n\
+"compress(data, selectors) --> iterator over selected data\n\
 \n\
 Return data elements corresponding to true selector elements.\n\
 Forms a shorter iterator from selected data elements using the\n\
@@ -2892,19 +2892,19 @@ typedef struct {
 
 /* Counting logic and invariants:
 
-C_add_mode:  when cnt an integer < PY_SSIZE_T_MAX and no step is specified.
+fast_mode:  when cnt an integer < PY_SSIZE_T_MAX and no step is specified.
 
 	assert(cnt != PY_SSIZE_T_MAX && long_cnt == NULL && long_step==PyInt(1));
 	Advances with:  cnt += 1
-	When count hits Y_SSIZE_T_MAX, switch to Py_add_mode.
+	When count hits Y_SSIZE_T_MAX, switch to slow_mode.
 
-Py_add_mode:  when cnt == PY_SSIZE_T_MAX, step is not int(1), or cnt is a float.
+slow_mode:  when cnt == PY_SSIZE_T_MAX, step is not int(1), or cnt is a float.
 
 	assert(cnt == PY_SSIZE_T_MAX && long_cnt != NULL && long_step != NULL);
 	All counting is done with python objects (no overflows or underflows).
 	Advances with:  long_cnt += long_step
 	Step may be zero -- effectively a slow version of repeat(cnt).
-	Either long_cnt or long_step may be a float.
+	Either long_cnt or long_step may be a float, Fraction, or Decimal.
 */
 
 static PyTypeObject count_type;
@@ -2913,6 +2913,7 @@ static PyObject *
 count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	countobject *lz;
+	int slow_mode = 0;
 	Py_ssize_t cnt = 0;
 	PyObject *long_cnt = NULL;
 	PyObject *long_step = NULL;
@@ -2922,39 +2923,54 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			kwlist, &long_cnt, &long_step))
 		return NULL;
 
-	if (long_cnt != NULL && !PyNumber_Check(long_cnt) ||
-		long_step != NULL && !PyNumber_Check(long_step)) {
+	if ((long_cnt != NULL && !PyNumber_Check(long_cnt)) ||
+            (long_step != NULL && !PyNumber_Check(long_step))) {
 			PyErr_SetString(PyExc_TypeError, "a number is required");
 			return NULL;
 	}
 
-	if (long_step == NULL) {
-		/* If not specified, step defaults to 1 */
-		long_step = PyLong_FromLong(1);
-		if (long_step == NULL)
-			return NULL;
-	} else
-		Py_INCREF(long_step);
-	assert(long_step != NULL);
-
 	if (long_cnt != NULL) {
 		cnt = PyLong_AsSsize_t(long_cnt);
-		if ((cnt == -1 && PyErr_Occurred()) || 
-				!PyIndex_Check(long_cnt)  || 
-				!PyLong_Check(long_step) ||
-				PyLong_AS_LONG(long_step) != 1) {
-			/* Switch to Py_add_mode */
+		if ((cnt == -1 && PyErr_Occurred()) || !PyLong_Check(long_cnt)) {
 			PyErr_Clear();
-			Py_INCREF(long_cnt);
-			cnt = PY_SSIZE_T_MAX;
-		} else
-			long_cnt = NULL;
+			slow_mode = 1;
+		}
+		Py_INCREF(long_cnt);
+	} else {
+		cnt = 0;
+		long_cnt = PyLong_FromLong(0);
 	}
-	assert(cnt != PY_SSIZE_T_MAX && long_cnt == NULL ||
-		   cnt == PY_SSIZE_T_MAX && long_cnt != NULL);
+
+	/* If not specified, step defaults to 1 */
+	if (long_step == NULL) {
+		long_step = PyLong_FromLong(1);
+		if (long_step == NULL) {
+			Py_DECREF(long_cnt);
+			return NULL;
+		}
+	} else
+		Py_INCREF(long_step);
+
+	assert(long_cnt != NULL && long_step != NULL);
+
+	/* Fast mode only works when the step is 1 */
+	if (!PyLong_Check(long_step) ||
+		PyLong_AS_LONG(long_step) != 1) {
+			slow_mode = 1;
+	}
+
+	if (slow_mode)
+		cnt = PY_SSIZE_T_MAX;
+	else
+		Py_CLEAR(long_cnt);
+
+	assert((cnt != PY_SSIZE_T_MAX && long_cnt == NULL && !slow_mode) ||
+               (cnt == PY_SSIZE_T_MAX && long_cnt != NULL && slow_mode));
+	assert(slow_mode || 
+               (PyLong_Check(long_step) && PyLong_AS_LONG(long_step) == 1));
 
 	/* create countobject structure */
-	lz = (countobject *)PyObject_New(countobject, &count_type);
+	lz = (countobject *)type->tp_alloc(type, 0);
 	if (lz == NULL) {
 		Py_XDECREF(long_cnt);
 		return NULL;
@@ -2969,21 +2985,29 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 count_dealloc(countobject *lz)
 {
+	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->long_cnt);
 	Py_XDECREF(lz->long_step);
-	PyObject_Del(lz);
+	Py_TYPE(lz)->tp_free(lz);
+}
+
+static int
+count_traverse(countobject *lz, visitproc visit, void *arg)
+{
+	Py_VISIT(lz->long_cnt);
+	Py_VISIT(lz->long_step);
+	return 0;
 }
 
 static PyObject *
 count_nextlong(countobject *lz)
 {
-	static PyObject *one = NULL;
 	PyObject *long_cnt;
 	PyObject *stepped_up;
 
 	long_cnt = lz->long_cnt;
 	if (long_cnt == NULL) {
-		/* Switch to Py_add_mode */
+		/* Switch to slow_mode */
 		long_cnt = PyLong_FromSsize_t(PY_SSIZE_T_MAX);
 		if (long_cnt == NULL)
 			return NULL;
@@ -3026,11 +3050,10 @@ count_repr(countobject *lz)
 }
 
 PyDoc_STRVAR(count_doc,
-			 "count([start[, step]]) --> count object\n\
+			 "count(start=0, step=1]) --> count object\n\
 \n\
-Return a count object whose .__next__() method returns consecutive\n\
-integers starting from zero or, if specified, from start.\n\
-If step is specified, counts by that interval.  Equivalent to:\n\n\
+Return a count object whose .__next__() method returns consecutive values.\n\
+Equivalent to:\n\n\
     def count(firstval=0, step=1):\n\
         x = firstval\n\
         while 1:\n\
@@ -3058,9 +3081,10 @@ static PyTypeObject count_type = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+		Py_TPFLAGS_BASETYPE,		/* tp_flags */
 	count_doc,			/* tp_doc */
-	0,				/* tp_traverse */
+	(traverseproc)count_traverse,				/* tp_traverse */
 	0,				/* tp_clear */
 	0,				/* tp_richcompare */
 	0,				/* tp_weaklistoffset */
@@ -3077,6 +3101,7 @@ static PyTypeObject count_type = {
 	0,				/* tp_init */
 	0,				/* tp_alloc */
 	count_new,			/* tp_new */
+	PyObject_GC_Del,		/* tp_free */
 };
 
 
@@ -3096,11 +3121,10 @@ repeat_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	repeatobject *ro;
 	PyObject *element;
 	Py_ssize_t cnt = -1;
-
-	if (type == &repeat_type && !_PyArg_NoKeywords("repeat()", kwds))
-		return NULL;
-
-	if (!PyArg_ParseTuple(args, "O|n:repeat", &element, &cnt))
+	static char *kwargs[] = {"object", "times", NULL};
+ 
+ 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|n:repeat", kwargs, 
+					 &element, &cnt))
 		return NULL;
 
 	if (PyTuple_Size(args) == 2 && cnt < 0)
@@ -3168,8 +3192,8 @@ static PyMethodDef repeat_methods[] = {
 };
 
 PyDoc_STRVAR(repeat_doc,
-"repeat(element [,times]) -> create an iterator which returns the element\n\
-for the specified number of times.  If not specified, returns the element\n\
+"repeat(object [,times]) -> create an iterator which returns the object\n\
+for the specified number of times.  If not specified, returns the object\n\
 endlessly.");
 
 static PyTypeObject repeat_type = {

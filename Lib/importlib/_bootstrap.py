@@ -136,8 +136,13 @@ class BuiltinImporter:
         """Load a built-in module."""
         if fullname not in sys.builtin_module_names:
             raise ImportError("{0} is not a built-in module".format(fullname))
-        module = imp.init_builtin(fullname)
-        return module
+        is_reload = fullname in sys.modules
+        try:
+            return imp.init_builtin(fullname)
+        except:
+            if not is_reload and fullname in sys.modules:
+                del sys.modules[fullname]
+            raise
 
 
 class FrozenImporter:
@@ -160,53 +165,50 @@ class FrozenImporter:
         """Load a frozen module."""
         if cls.find_module(fullname) is None:
             raise ImportError("{0} is not a frozen module".format(fullname))
-        module = imp.init_frozen(fullname)
-        return module
+        is_reload = fullname in sys.modules
+        try:
+            return imp.init_frozen(fullname)
+        except:
+            if not is_reload and fullname in sys.modules:
+                del sys.modules[fullname]
+            raise
 
 
-class ChainedImporter(object):
+def chained_path_hook(*path_hooks):
+    """Create a closure which sequentially checks path hooks to see which ones
+    (if any) can work with a path."""
+    def path_hook(entry):
+        """Check to see if 'entry' matches any of the enclosed path hooks."""
+        finders = []
+        for hook in path_hooks:
+            try:
+                finder = hook(entry)
+            except ImportError:
+                continue
+            else:
+                finders.append(finder)
+        if not finders:
+            raise ImportError("no finder found")
+        else:
+            return ChainedFinder(*finders)
+
+    return path_hook
+
+
+class ChainedFinder:
 
     """Finder that sequentially calls other finders."""
 
-    def __init__(self, *importers):
-        self._importers = importers
+    def __init__(self, *finders):
+        self._finders = finders
 
     def find_module(self, fullname, path=None):
-        for importer in self._importers:
-            result = importer.find_module(fullname, path)
+        for finder in self._finders:
+            result = finder.find_module(fullname, path)
             if result:
                 return result
         else:
             return None
-
-
-# XXX Don't make filesystem-specific and instead make generic for any path
-#     hooks.
-def chaining_fs_path_hook(*path_hooks):
-    """Create a closure which calls the path hooks sequentially looking for
-    which path hooks can handle a path entry.
-
-
-    Passed-in path hooks work as any other path hooks, raising ImportError if
-    they cannot handle the path, otherwise returning a finder.
-
-    """
-    def chained_fs_path_hook(path_entry):
-        """Closure which sees which of the captured path hooks can handle the
-        path entry."""
-        absolute_path = _path_absolute(path_entry)
-        if not _path_isdir(absolute_path):
-            raise ImportError("only directories are supported")
-        accepted = []
-        for path_hook in path_hooks:
-            try:
-                accepted.append(path_hook(absolute_path))
-            except ImportError:
-                continue
-        if not accepted:
-            raise ImportError("no path hooks could handle %s" % path_entry)
-        return ChainedImporter(*accepted)
-    return chained_fs_path_hook
 
 
 def check_name(method):
@@ -225,11 +227,11 @@ def check_name(method):
     return inner
 
 
-class _ExtensionFileLoader(object):
+class _ExtensionFileLoader:
 
     """Loader for extension modules.
 
-    The constructor is designed to work with FileImporter.
+    The constructor is designed to work with FileFinder.
 
     """
 
@@ -249,14 +251,13 @@ class _ExtensionFileLoader(object):
     @set___package__
     def load_module(self, fullname):
         """Load an extension module."""
-        assert self._name == fullname
+        is_reload = fullname in sys.modules
         try:
             module = imp.load_dynamic(fullname, self._path)
             module.__loader__ = self
             return module
         except:
-            # If an error occurred, don't leave a partially initialized module.
-            if fullname in sys.modules:
+            if not is_reload and fullname in sys.modules:
                 del sys.modules[fullname]
             raise
 
@@ -282,16 +283,17 @@ def suffix_list(suffix_type):
             if suffix[2] == suffix_type]
 
 
-# XXX Need a better name.
-def get_module(fxn):
-    """Decorator to handle selecting the proper module for load_module
-    implementations.
+def module_for_loader(fxn):
+    """Decorator to handle selecting the proper module for loaders.
 
     Decorated modules are passed the module to use instead of the module name.
     The module is either from sys.modules if it already exists (for reloading)
     or is a new module which has __name__ set. If any exception is raised by
-    the decorated method then __loader__, __name__, __file__, and __path__ are
-    all restored on the module to their original values.
+    the decorated method and the decorator added a module to sys.modules, then
+    the module is deleted from sys.modules.
+
+    The decorator assumes that the decorated method takes self/cls as a first
+    argument and the module as the second argument.
 
     """
     def decorated(self, fullname):
@@ -302,43 +304,135 @@ def get_module(fxn):
             # implicitly imports 'locale' and would otherwise trigger an
             # infinite loop.
             module = imp.new_module(fullname)
-            module.__name__ = fullname
             sys.modules[fullname] = module
-        else:
-            original_values = {}
-            modified_attrs = ['__loader__', '__name__', '__file__', '__path__']
-            for attr in modified_attrs:
-                try:
-                    original_values[attr] = getattr(module, attr)
-                except AttributeError:
-                    pass
         try:
             return fxn(self, module)
         except:
             if not is_reload:
                 del sys.modules[fullname]
-            else:
-                for attr in modified_attrs:
-                    if attr in original_values:
-                        setattr(module, attr, original_values[attr])
-                    elif hasattr(module, attr):
-                        delattr(module, attr)
             raise
     wrap(decorated, fxn)
     return decorated
 
 
-class _PyFileLoader(object):
-    # XXX Still smart to have this as a separate class?  Or would it work
-    # better to integrate with PyFileImporter?  Could cache _is_pkg info.
-    # FileImporter can be changed to return self instead of a specific loader
-    # call.  Otherwise _base_path can be calculated on the fly without issue if
-    # it is known whether a module should be treated as a path or package to
-    # minimize stat calls.  Could even go as far as to stat the directory the
-    # importer is in to detect changes and then cache all the info about what
-    # files were found (if stating directories is platform-dependent).
+class PyLoader:
 
-    """Load a Python source or bytecode file."""
+    """Loader base class for Python source.
+
+    Requires implementing the optional PEP 302 protocols as well as
+    source_path.
+
+    """
+
+    @module_for_loader
+    def load_module(self, module):
+        """Load a source module."""
+        return _load_module(module)
+
+    def _load_module(self, module):
+        """Initialize a module from source."""
+        name = module.__name__
+        source_path = self.source_path(name)
+        code_object = self.get_code(module.__name__)
+        if not hasattr(module, '__file__'):
+            module.__file__ = source_path
+        if self.is_package(name):
+            module.__path__  = [module.__file__.rsplit(path_sep, 1)[0]]
+        module.__package__ = module.__name__
+        if not hasattr(module, '__path__'):
+            module.__package__ = module.__package__.rpartition('.')[0]
+        exec(code_object, module.__dict__)
+        return module
+
+    def get_code(self, fullname):
+        """Get a code object from source."""
+        source_path = self.source_path(fullname)
+        source = self.get_data(source_path)
+        # Convert to universal newlines.
+        line_endings = b'\n'
+        for index, c in enumerate(source):
+            if c == ord(b'\n'):
+                break
+            elif c == ord(b'\r'):
+                line_endings = b'\r'
+                try:
+                    if source[index+1] == ord(b'\n'):
+                        line_endings += b'\n'
+                except IndexError:
+                    pass
+                break
+        if line_endings != b'\n':
+            source = source.replace(line_endings, b'\n')
+        return compile(source, source_path, 'exec', dont_inherit=True)
+
+
+class PyPycLoader(PyLoader):
+
+    """Loader base class for Python source and bytecode.
+
+    Requires implementing the methods needed for PyLoader as well as
+    source_mtime, bytecode_path, and write_bytecode.
+
+    """
+
+    @module_for_loader
+    def load_module(self, module):
+        """Load a module from source or bytecode."""
+        name = module.__name__
+        source_path = self.source_path(name)
+        bytecode_path = self.bytecode_path(name)
+        module.__file__ = source_path if source_path else bytecode_path
+        return self._load_module(module)
+
+    def get_code(self, fullname):
+        """Get a code object from source or bytecode."""
+        # XXX Care enough to make sure this call does not happen if the magic
+        #     number is bad?
+        source_timestamp = self.source_mtime(fullname)
+        # Try to use bytecode if it is available.
+        bytecode_path = self.bytecode_path(fullname)
+        if bytecode_path:
+            data = self.get_data(bytecode_path)
+            magic = data[:4]
+            pyc_timestamp = marshal._r_long(data[4:8])
+            bytecode = data[8:]
+            try:
+                # Verify that the magic number is valid.
+                if imp.get_magic() != magic:
+                    raise ImportError("bad magic number")
+                # Verify that the bytecode is not stale (only matters when
+                # there is source to fall back on.
+                if source_timestamp:
+                    if pyc_timestamp < source_timestamp:
+                        raise ImportError("bytecode is stale")
+            except ImportError:
+                # If source is available give it a shot.
+                if source_timestamp is not None:
+                    pass
+                else:
+                    raise
+            else:
+                # Bytecode seems fine, so try to use it.
+                # XXX If the bytecode is ill-formed, would it be beneficial to
+                #     try for using source if available and issue a warning?
+                return marshal.loads(bytecode)
+        elif source_timestamp is None:
+            raise ImportError("no source or bytecode available to create code "
+                                "object for {0!r}".format(fullname))
+        # Use the source.
+        code_object = super().get_code(fullname)
+        # Generate bytecode and write it out.
+        if not sys.dont_write_bytecode:
+            data = bytearray(imp.get_magic())
+            data.extend(marshal._w_long(source_timestamp))
+            data.extend(marshal.dumps(code_object))
+            self.write_bytecode(fullname, data)
+        return code_object
+
+
+class PyFileLoader(PyLoader):
+
+    """Load a Python source file."""
 
     def __init__(self, name, path, is_pkg):
         self._name = name
@@ -368,40 +462,6 @@ class _PyFileLoader(object):
         return self._find_path(imp.PY_SOURCE)
 
     @check_name
-    def bytecode_path(self, fullname):
-        """Return the path to a bytecode file, or None if one does not
-        exist."""
-        # Not a property for easy overriding.
-        return self._find_path(imp.PY_COMPILED)
-
-    @check_name
-    @get_module
-    def load_module(self, module):
-        """Load a Python source or bytecode module."""
-        name = module.__name__
-        source_path = self.source_path(name)
-        bytecode_path = self.bytecode_path(name)
-        code_object = self.get_code(module.__name__)
-        module.__file__ = source_path if source_path else bytecode_path
-        module.__loader__ = self
-        if self._is_pkg:
-            module.__path__  = [module.__file__.rsplit(path_sep, 1)[0]]
-        module.__package__ = module.__name__
-        if not hasattr(module, '__path__'):
-            module.__package__ = module.__package__.rpartition('.')[0]
-        exec(code_object, module.__dict__)
-        return module
-
-    @check_name
-    def source_mtime(self, name):
-        """Return the modification time of the source for the specified
-        module."""
-        source_path = self.source_path(name)
-        if not source_path:
-            return None
-        return int(_os.stat(source_path).st_mtime)
-
-    @check_name
     def get_source(self, fullname):
         """Return the source for the module as a string.
 
@@ -418,6 +478,42 @@ class _PyFileLoader(object):
         # XXX Will fail when passed to compile() if the encoding is
         # anything other than UTF-8.
         return open(source_path, encoding=encoding).read()
+
+
+    def get_data(self, path):
+        """Return the data from path as raw bytes."""
+        return _io.FileIO(path, 'r').read()
+
+    @check_name
+    def is_package(self, fullname):
+        """Return a boolean based on whether the module is a package.
+
+        Raises ImportError (like get_source) if the loader cannot handle the
+        package.
+
+        """
+        return self._is_pkg
+
+
+class PyPycFileLoader(PyPycLoader, PyFileLoader):
+
+    """Load a module from a source or bytecode file."""
+
+    @check_name
+    def source_mtime(self, name):
+        """Return the modification time of the source for the specified
+        module."""
+        source_path = self.source_path(name)
+        if not source_path:
+            return None
+        return int(_os.stat(source_path).st_mtime)
+
+    @check_name
+    def bytecode_path(self, fullname):
+        """Return the path to a bytecode file, or None if one does not
+        exist."""
+        # Not a property for easy overriding.
+        return self._find_path(imp.PY_COMPILED)
 
     @check_name
     def write_bytecode(self, name, data):
@@ -442,87 +538,10 @@ class _PyFileLoader(object):
             else:
                 raise
 
-    @check_name
-    def get_code(self, name):
-        """Return the code object for the module."""
-        # XXX Care enough to make sure this call does not happen if the magic
-        #     number is bad?
-        source_timestamp = self.source_mtime(name)
-        # Try to use bytecode if it is available.
-        bytecode_path = self.bytecode_path(name)
-        if bytecode_path:
-            data = self.get_data(bytecode_path)
-            magic = data[:4]
-            pyc_timestamp = marshal._r_long(data[4:8])
-            bytecode = data[8:]
-            try:
-                # Verify that the magic number is valid.
-                if imp.get_magic() != magic:
-                    raise ImportError("bad magic number")
-                # Verify that the bytecode is not stale (only matters when
-                # there is source to fall back on.
-                if source_timestamp:
-                    if pyc_timestamp < source_timestamp:
-                        raise ImportError("bytcode is stale")
-            except ImportError:
-                # If source is available give it a shot.
-                if source_timestamp is not None:
-                    pass
-                else:
-                    raise
-            else:
-                # Bytecode seems fine, so try to use it.
-                # XXX If the bytecode is ill-formed, would it be beneficial to
-                #     try for using source if available and issue a warning?
-                return marshal.loads(bytecode)
-        elif source_timestamp is None:
-            raise ImportError("no source or bytecode available to create code "
-                                "object for {0!r}".format(name))
-        # Use the source.
-        source_path = self.source_path(name)
-        source = self.get_data(source_path)
-        # Convert to universal newlines.
-        line_endings = b'\n'
-        for index, c in enumerate(source):
-            if c == ord(b'\n'):
-                break
-            elif c == ord(b'\r'):
-                line_endings = b'\r'
-                try:
-                    if source[index+1] == ord(b'\n'):
-                        line_endings += b'\n'
-                except IndexError:
-                    pass
-                break
-        if line_endings != b'\n':
-            source = source.replace(line_endings, b'\n')
-        code_object = compile(source, source_path, 'exec', dont_inherit=True)
-        # Generate bytecode and write it out.
-        if not sys.dont_write_bytecode:
-            data = bytearray(imp.get_magic())
-            data.extend(marshal._w_long(source_timestamp))
-            data.extend(marshal.dumps(code_object))
-            self.write_bytecode(name, data)
-        return code_object
 
-    def get_data(self, path):
-        """Return the data from path as raw bytes."""
-        return _io.FileIO(path, 'r').read()
+class FileFinder:
 
-    @check_name
-    def is_package(self, fullname):
-        """Return a boolean based on whether the module is a package.
-
-        Raises ImportError (like get_source) if the loader cannot handle the
-        package.
-
-        """
-        return self._is_pkg
-
-
-class FileImporter(object):
-
-    """Base class for file importers.
+    """Base class for file finders.
 
     Subclasses are expected to define the following attributes:
 
@@ -546,10 +565,13 @@ class FileImporter(object):
         Can be used as an entry on sys.path_hook.
 
         """
-        self._path_entry = path_entry
+        absolute_path = _path_absolute(path_entry)
+        if not _path_isdir(absolute_path):
+            raise ImportError("only directories are supported")
+        self._path_entry = absolute_path
 
     def find_module(self, fullname, path=None):
-        tail_module = fullname.rsplit('.', 1)[-1]
+        tail_module = fullname.rpartition('.')[2]
         package_directory = None
         if self._possible_package:
             for ext in self._suffixes:
@@ -576,7 +598,7 @@ class FileImporter(object):
             return None
 
 
-class ExtensionFileImporter(FileImporter):
+class ExtensionFileFinder(FileFinder):
 
     """Importer for extension files."""
 
@@ -587,59 +609,58 @@ class ExtensionFileImporter(FileImporter):
         # Assigning to _suffixes here instead of at the class level because
         # imp is not imported at the time of class creation.
         self._suffixes = suffix_list(imp.C_EXTENSION)
-        super(ExtensionFileImporter, self).__init__(path_entry)
+        super().__init__(path_entry)
 
 
-class PyFileImporter(FileImporter):
+class PyFileFinder(FileFinder):
 
     """Importer for source/bytecode files."""
 
     _possible_package = True
-    _loader = _PyFileLoader
+    _loader = PyFileLoader
 
     def __init__(self, path_entry):
         # Lack of imp during class creation means _suffixes is set here.
         # Make sure that Python source files are listed first!  Needed for an
         # optimization by the loader.
         self._suffixes = suffix_list(imp.PY_SOURCE)
+        super().__init__(path_entry)
+
+
+class PyPycFileFinder(PyFileFinder):
+
+    """Finder for source and bytecode files."""
+
+    _loader = PyPycFileLoader
+
+    def __init__(self, path_entry):
+        super().__init__(path_entry)
         self._suffixes += suffix_list(imp.PY_COMPILED)
-        super(PyFileImporter, self).__init__(path_entry)
 
 
 class PathFinder:
 
     """Meta path finder for sys.(path|path_hooks|path_importer_cache)."""
 
-    _default_hook = staticmethod(chaining_fs_path_hook(ExtensionFileImporter,
-                                                        PyFileImporter))
-
-    # The list of implicit hooks cannot be a class attribute because of
-    # bootstrapping issues for accessing imp.
     @classmethod
-    def _implicit_hooks(cls):
-        """Return a list of the implicit path hooks."""
-        return [cls._default_hook, imp.NullImporter]
+    def _path_hooks(cls, path, hooks=None):
+        """Search sequence of hooks for a finder for 'path'.
 
-    @classmethod
-    def _path_hooks(cls, path):
-        """Search sys.path_hooks for a finder for 'path'.
-
-        Guaranteed to return a finder for the path as NullImporter is the
-        default importer for any path that does not have an explicit finder.
+        If 'hooks' is false then use sys.path_hooks.
 
         """
-        for hook in sys.path_hooks + cls._implicit_hooks():
+        if not hooks:
+            hooks = sys.path_hooks
+        for hook in hooks:
             try:
                 return hook(path)
             except ImportError:
                 continue
         else:
-            # This point should never be reached thanks to NullImporter.
-            raise SystemError("no hook could find an importer for "
-                              "{0}".format(path))
+            raise ImportError("no path hook found for {0}".format(path))
 
     @classmethod
-    def _path_importer_cache(cls, path):
+    def _path_importer_cache(cls, path, default=None):
         """Get the finder for the path from sys.path_importer_cache.
 
         If the path is not in the cache, find the appropriate finder and cache
@@ -657,9 +678,9 @@ class PathFinder:
             finder = cls._path_hooks(path)
             sys.path_importer_cache[path] = finder
         else:
-            if finder is None:
+            if finder is None and default:
                 # Raises ImportError on failure.
-                finder = cls._default_hook(path)
+                finder = default(path)
                 sys.path_importer_cache[path] = finder
         return finder
 
@@ -680,7 +701,30 @@ class PathFinder:
             return None
 
 
-class ImportLockContext(object):
+_DEFAULT_PATH_HOOK = chained_path_hook(ExtensionFileFinder, PyPycFileFinder)
+
+class _DefaultPathFinder(PathFinder):
+
+    """Subclass of PathFinder that implements implicit semantics for
+    __import__."""
+
+    @classmethod
+    def _path_hooks(cls, path):
+        """Search sys.path_hooks as well as implicit path hooks."""
+        try:
+            return super()._path_hooks(path)
+        except ImportError:
+            implicit_hooks = [_DEFAULT_PATH_HOOK, imp.NullImporter]
+            return super()._path_hooks(path, implicit_hooks)
+
+    @classmethod
+    def _path_importer_cache(cls, path):
+        """Use the default path hook when None is stored in
+        sys.path_importer_cache."""
+        return super()._path_importer_cache(path, _DEFAULT_PATH_HOOK)
+
+
+class ImportLockContext:
 
     """Context manager for the import lock."""
 
@@ -692,6 +736,8 @@ class ImportLockContext(object):
         """Release the import lock regardless of any raised exceptions."""
         imp.release_lock()
 
+
+_IMPLICIT_META_PATH = [BuiltinImporter, FrozenImporter, _DefaultPathFinder]
 
 def _gcd_import(name, package=None, level=0):
     """Import and return the module based on its name, the package the call is
@@ -736,8 +782,7 @@ def _gcd_import(name, package=None, level=0):
             # Backwards-compatibility; be nicer to skip the dict lookup.
             parent_module = sys.modules[parent]
             path = parent_module.__path__
-        meta_path = (sys.meta_path +
-                     [BuiltinImporter, FrozenImporter, PathFinder])
+        meta_path = sys.meta_path + _IMPLICIT_META_PATH
         for finder in meta_path:
             loader = finder.find_module(name, path)
             if loader is not None:

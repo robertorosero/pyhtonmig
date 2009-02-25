@@ -2,8 +2,6 @@
 #
 # For more information about this module, see PEP 324.
 #
-# This module should remain compatible with Python 2.2, see PEP 291.
-#
 # Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
 #
 # Licensed to PSF under a Contributor Agreement.
@@ -448,9 +446,9 @@ def check_output(*popenargs, **kwargs):
     To capture standard error in the result, use stderr=subprocess.STDOUT.
 
     >>> check_output(["/bin/sh", "-c",
-                      "ls -l non_existant_file ; exit 0"],
+                      "ls -l non_existent_file ; exit 0"],
                      stderr=subprocess.STDOUT)
-    'ls: non_existant_file: No such file or directory\n'
+    'ls: non_existent_file: No such file or directory\n'
     """
     if 'stdout' in kwargs:
         raise ValueError('stdout argument not allowed, it will be overridden.')
@@ -852,7 +850,7 @@ class Popen(object):
                     # cause random failures on win9x.  Specifically a
                     # dialog: "Your program accessed mem currently in
                     # use at xxx" and a hopeful warning about the
-                    # stability of your system.  Cost is Ctrl+C wont
+                    # stability of your system.  Cost is Ctrl+C won't
                     # kill children.
                     creationflags |= CREATE_NEW_CONSOLE
 
@@ -1141,6 +1139,9 @@ class Popen(object):
             if data:
                 os.waitpid(self.pid, 0)
                 child_exception = pickle.loads(data)
+                for fd in (p2cwrite, c2pread, errread):
+                    if fd is not None:
+                        os.close(fd)
                 raise child_exception
 
 

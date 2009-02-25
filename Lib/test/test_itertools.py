@@ -310,6 +310,7 @@ class TestBasicOps(unittest.TestCase):
                 self.assertEqual(comb, sorted(set(cwr) & set(perm)))            # comb: both a cwr and a perm
 
     def test_compress(self):
+        self.assertEqual(list(compress(data='ABCDEF', selectors=[1,0,1,0,1,1])), list('ACEF'))
         self.assertEqual(list(compress('ABCDEF', [1,0,1,0,1,1])), list('ACEF'))
         self.assertEqual(list(compress('ABCDEF', [0,0,0,0,0,0])), list(''))
         self.assertEqual(list(compress('ABCDEF', [1,1,1,1,1,1])), list('ABCDEF'))
@@ -353,6 +354,10 @@ class TestBasicOps(unittest.TestCase):
 
     def test_count_with_stride(self):
         self.assertEqual(lzip('abc',count(2,3)), [('a', 2), ('b', 5), ('c', 8)])
+        self.assertEqual(lzip('abc',count(start=2,step=3)),
+                         [('a', 2), ('b', 5), ('c', 8)])
+        self.assertEqual(lzip('abc',count(step=-1)),
+                         [('a', 0), ('b', -1), ('c', -2)])
         self.assertEqual(lzip('abc',count(2,0)), [('a', 2), ('b', 2), ('c', 2)])
         self.assertEqual(lzip('abc',count(2,1)), [('a', 2), ('b', 3), ('c', 4)])
         self.assertEqual(lzip('abc',count(2,3)), [('a', 2), ('b', 5), ('c', 8)])
@@ -639,6 +644,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertNotEqual(len(set(map(id, list(product('abc', 'def'))))), 1)
 
     def test_repeat(self):
+        self.assertEqual(list(repeat(object='a', times=3)), ['a', 'a', 'a'])
         self.assertEqual(lzip(range(3),repeat('a')),
                          [(0, 'a'), (1, 'a'), (2, 'a')])
         self.assertEqual(list(repeat('a', 3)), ['a', 'a', 'a'])
@@ -978,6 +984,11 @@ class TestGC(unittest.TestCase):
     def test_compress(self):
         a = []
         self.makecycle(compress('ABCDEF', [1,0,1,0,1,0]), a)
+
+    def test_count(self):
+        a = []
+        Int = type('Int', (int,), dict(x=a))
+        self.makecycle(count(Int(0), Int(1)), a)
 
     def test_cycle(self):
         a = []
@@ -1412,9 +1423,9 @@ Samuele
 ...     "Return function(0), function(1), ..."
 ...     return map(function, count(start))
 
->>> def nth(iterable, n):
-...     "Returns the nth item or None"
-...     return next(islice(iterable, n, None), None)
+>>> def nth(iterable, n, default=None):
+...     "Returns the nth item or a default value"
+...     return next(islice(iterable, n, None), default)
 
 >>> def quantify(iterable, pred=bool):
 ...     "Count how many times the predicate is true"

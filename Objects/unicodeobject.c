@@ -1591,7 +1591,7 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
     if (restuple == NULL)
         goto onError;
     if (!PyTuple_Check(restuple)) {
-        PyErr_Format(PyExc_TypeError, &argparse[4]);
+        PyErr_SetString(PyExc_TypeError, &argparse[4]);
         goto onError;
     }
     if (!PyArg_ParseTuple(restuple, argparse, &PyUnicode_Type, &repunicode, &newpos))
@@ -1927,7 +1927,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
                 charsleft = (charsleft << 16) | ch;
                 /* out, charsleft, bitsleft = */ ENCODE(out, charsleft, bitsleft);
 
-                /* If the next character is special then we dont' need to terminate
+                /* If the next character is special then we don't need to terminate
                    the shift sequence. If the next character is not a BASE64 character
                    or '-' then the shift sequence will be terminated implicitly and we
                    don't have to insert a '-'. */
@@ -3854,7 +3854,7 @@ static PyObject *unicode_encode_call_errorhandler(const char *errors,
     if (restuple == NULL)
         return NULL;
     if (!PyTuple_Check(restuple)) {
-        PyErr_Format(PyExc_TypeError, &argparse[4]);
+        PyErr_SetString(PyExc_TypeError, &argparse[4]);
         Py_DECREF(restuple);
         return NULL;
     }
@@ -5128,7 +5128,7 @@ static PyObject *unicode_translate_call_errorhandler(const char *errors,
     if (restuple == NULL)
         return NULL;
     if (!PyTuple_Check(restuple)) {
-        PyErr_Format(PyExc_TypeError, &argparse[4]);
+        PyErr_SetString(PyExc_TypeError, &argparse[4]);
         Py_DECREF(restuple);
         return NULL;
     }

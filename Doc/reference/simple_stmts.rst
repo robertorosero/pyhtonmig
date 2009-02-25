@@ -116,7 +116,12 @@ square brackets, is recursively defined as follows.
 
 * If the target list is a single target: The object is assigned to that target.
 
-* If the target list is a comma-separated list of targets:
+* If the target list is a comma-separated list of targets: The object must be an
+  iterable with the same number of items as there are targets in the target list,
+  and the items are assigned, from left to right, to the corresponding targets.
+  (This rule is relaxed as of Python 1.5; in earlier versions, the object had to
+  be a tuple.  Since strings are sequences, an assignment like ``a, b = "xy"`` is
+  now legal as long as the string has the right length.)
 
   * If the target list contains one target prefixed with an asterisk, called a
     "starred" target: The object must be a sequence with at least as many items
@@ -152,9 +157,9 @@ Assignment of an object to a single target is recursively defined as follows.
   be deallocated and its destructor (if it has one) to be called.
 
 * If the target is a target list enclosed in parentheses or in square brackets:
-  The object must be a sequence with the same number of items as there are targets
-  in the target list, and its items are assigned, from left to right, to the
-  corresponding targets.
+  The object must be an iterable with the same number of items as there are
+  targets in the target list, and its items are assigned, from left to right,
+  to the corresponding targets.
 
   .. index:: pair: attribute; assignment
 
@@ -503,7 +508,7 @@ You can create an exception and set your own traceback in one step using the
 :meth:`with_traceback` exception method (which returns the same exception
 instance, with its traceback set to its argument), like so::
 
-   raise RuntimeError("foo occurred").with_traceback(tracebackobj)
+   raise Exception("foo occurred").with_traceback(tracebackobj)
 
 .. index:: pair: exception; chaining
            __cause__ (exception attribute)

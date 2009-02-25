@@ -3,7 +3,7 @@ builtin open function is defined in this module.
 
 At the top of the I/O hierarchy is the abstract base class IOBase. It
 defines the basic interface to a stream. Note, however, that there is no
-seperation between reading and writing to streams; implementations are
+separation between reading and writing to streams; implementations are
 allowed to throw an IOError if they do not support a given operation.
 
 Extending IOBase is RawIOBase which deals simply with the reading and
@@ -73,3 +73,5 @@ BufferedRandom = _io.BufferedRandom
 TextIOBase = _io.TextIOBase
 IncrementalNewlineDecoder = _io.IncrementalNewlineDecoder
 TextIOWrapper = _io.TextIOWrapper
+# open() uses st_blksize whenever we can
+DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes

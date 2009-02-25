@@ -380,6 +380,9 @@ are always available.  They are listed here in alphabetical order.
    not ``None`` and ``(item for item in iterable if item)`` if function is
    ``None``.
 
+   See :func:`itertools.filterfalse` for the complementary function that returns
+   elements of *iterable* for which *function* returns false.
+
 
 .. function:: float([x])
 
@@ -412,14 +415,15 @@ are always available.  They are listed here in alphabetical order.
       pair: str; format
       single: __format__
 
-   Convert a string or a number to a "formatted" representation, as controlled
-   by *format_spec*.  The interpretation of *format_spec* will depend on the
-   type of the *value* argument, however there is a standard formatting syntax
-   that is used by most built-in types: :ref:`formatspec`.
+   Convert a *value* to a "formatted" representation, as controlled by
+   *format_spec*.  The interpretation of *format_spec* will depend on the type
+   of the *value* argument, however there is a standard formatting syntax that
+   is used by most built-in types: :ref:`formatspec`.
 
    .. note::
 
-      ``format(value, format_spec)`` merely calls ``value.__format__(format_spec)``.
+      ``format(value, format_spec)`` merely calls
+      ``value.__format__(format_spec)``.
 
 
 .. function:: frozenset([iterable])
@@ -595,7 +599,8 @@ are always available.  They are listed here in alphabetical order.
    yielding the results.  If additional *iterable* arguments are passed,
    *function* must take that many arguments and is applied to the items from all
    iterables in parallel.  With multiple iterables, the iterator stops when the
-   shortest iterable is exhausted.
+   shortest iterable is exhausted.  For cases where the function inputs are
+   already arranged into argument tuples, see :func:`itertools.starmap`\.
 
 
 .. function:: max(iterable[, args...], *[, key])
@@ -953,7 +958,8 @@ are always available.  They are listed here in alphabetical order.
    default).  They have no other explicit functionality; however they are used by
    Numerical Python and other third party extensions.  Slice objects are also
    generated when extended indexing syntax is used.  For example:
-   ``a[start:stop:step]`` or ``a[start:stop, i]``.
+   ``a[start:stop:step]`` or ``a[start:stop, i]``.  See :func:`itertools.islice`
+   for an alternate version that returns an iterator.
 
 
 .. function:: sorted(iterable[, key[, reverse]])
@@ -968,6 +974,9 @@ are always available.  They are listed here in alphabetical order.
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
 
+   To convert an old-style *cmp* function to a *key* function, see the
+   `CmpToKey recipe in the ASPN cookbook
+   <http://code.activestate.com/recipes/576653/>`_\.
 
 .. function:: staticmethod(function)
 
@@ -1030,32 +1039,40 @@ are always available.  They are listed here in alphabetical order.
    Sums *start* and the items of an *iterable* from left to right and returns the
    total.  *start* defaults to ``0``. The *iterable*'s items are normally numbers,
    and are not allowed to be strings.  The fast, correct way to concatenate a
-   sequence of strings is by calling ``''.join(sequence)``.
+   sequence of strings is by calling ``''.join(sequence)``.  To add floating
+   point values with extended precision, see :func:`math.fsum`\.
 
 
 .. function:: super([type[, object-or-type]])
 
-   Return a *super* object that acts as a proxy to superclasses of *type*.
+   Return a proxy object that delegates method calls to a parent or sibling
+   class of *type*.  This is useful for accessing inherited methods that have
+   been overridden in a class. The search order is same as that used by
+   :func:`getattr` except that the *type* itself is skipped.
 
-   If the second argument is omitted the super object returned is unbound.  If
+   The :attr:`__mro__` attribute of the *type* lists the method resolution
+   search order used by both :func:`getattr` and :func:`super`.  The attribute
+   is dynamic and can change whenever the inheritance hierarchy is updated.
+
+   If the second argument is omitted, the super object returned is unbound.  If
    the second argument is an object, ``isinstance(obj, type)`` must be true.  If
-   the second argument is a type, ``issubclass(type2, type)`` must be true.
-   Calling :func:`super` without arguments is equivalent to ``super(this_class,
-   first_arg)``.
+   the second argument is a type, ``issubclass(type2, type)`` must be true (this
+   is useful for classmethods).
 
-   There are two typical use cases for :func:`super`.  In a class hierarchy with
-   single inheritance, :func:`super` can be used to refer to parent classes without
+   There are two typical use cases for *super*.  In a class hierarchy with
+   single inheritance, *super* can be used to refer to parent classes without
    naming them explicitly, thus making the code more maintainable.  This use
-   closely parallels the use of "super" in other programming languages.
+   closely parallels the use of *super* in other programming languages.
 
-   The second use case is to support cooperative multiple inheritence in a
+   The second use case is to support cooperative multiple inheritance in a
    dynamic execution environment.  This use case is unique to Python and is
    not found in statically compiled languages or languages that only support
    single inheritance.  This makes in possible to implement "diamond diagrams"
    where multiple base classes implement the same method.  Good design dictates
    that this method have the same calling signature in every case (because the
-   order of parent calls is determined at runtime and because that order adapts
-   to changes in the class hierarchy).
+   order of calls is determined at runtime, because that order adapts
+   to changes in the class hierarchy, and because that order can include
+   sibling classes that are unknown prior to runtime).
 
    For both use cases, a typical superclass call looks like this::
 
@@ -1066,12 +1083,12 @@ are always available.  They are listed here in alphabetical order.
    Note that :func:`super` is implemented as part of the binding process for
    explicit dotted attribute lookups such as ``super().__getitem__(name)``.
    It does so by implementing its own :meth:`__getattribute__` method for searching
-   parent classes in a predictable order that supports cooperative multiple inheritance.
+   classes in a predictable order that supports cooperative multiple inheritance.
    Accordingly, :func:`super` is undefined for implicit lookups using statements or
    operators such as ``super()[name]``.
 
-   Also note that :func:`super` is not limited to use inside methods.  The
-   two argument specifies the arguments exactly and makes the appropriate
+   Also note that :func:`super` is not limited to use inside methods.  The two
+   argument form specifies the arguments exactly and makes the appropriate
    references.  The zero argument form automatically searches the stack frame
    for the class (``__class__``) and the first argument.
 
@@ -1142,8 +1159,7 @@ are always available.  They are listed here in alphabetical order.
           # zip('ABCD', 'xy') --> Ax By
           iterables = map(iter, iterables)
           while iterables:
-              result = [it.next() for it in iterables]
-              yield tuple(result)
+              yield tuple(map(next, iterables))
 
    The left-to-right evaluation order of the iterables is guaranteed. This
    makes possible an idiom for clustering a data series into n-length groups
