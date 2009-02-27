@@ -28,6 +28,7 @@ import random
 import unittest
 import weakref
 import gc
+import abc
 from itertools import chain, cycle, count
 from collections import deque
 from test import support
@@ -2043,23 +2044,38 @@ class MiscIOTest(unittest.TestCase):
         gc.collect()
         self.assert_(wr() is None, wr)
 
-    def test_abc_inheritance(self):
-        # Test implementations inherit (even virtually) from their respective ABCs
+    def test_abcs(self):
+        # Test the visible base classes are ABCs.
+        self.assertTrue(isinstance(self.IOBase, abc.ABCMeta))
+        self.assertTrue(isinstance(self.RawIOBase, abc.ABCMeta))
+        self.assertTrue(isinstance(self.BufferedIOBase, abc.ABCMeta))
+        self.assertTrue(isinstance(self.TextIOBase, abc.ABCMeta))
+
+    def _check_abc_inheritance(self, abcmodule):
         f = self.open(support.TESTFN, "wb", buffering=0)
-        self.assertTrue(isinstance(f, self.IOBase))
-        self.assertTrue(isinstance(f, self.RawIOBase))
-        self.assertFalse(isinstance(f, self.BufferedIOBase))
-        self.assertFalse(isinstance(f, self.TextIOBase))
+        self.assertTrue(isinstance(f, abcmodule.IOBase))
+        self.assertTrue(isinstance(f, abcmodule.RawIOBase))
+        self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
+        self.assertFalse(isinstance(f, abcmodule.TextIOBase))
         f = self.open(support.TESTFN, "wb")
-        self.assertTrue(isinstance(f, self.IOBase))
-        self.assertFalse(isinstance(f, self.RawIOBase))
-        self.assertTrue(isinstance(f, self.BufferedIOBase))
-        self.assertFalse(isinstance(f, self.TextIOBase))
+        self.assertTrue(isinstance(f, abcmodule.IOBase))
+        self.assertFalse(isinstance(f, abcmodule.RawIOBase))
+        self.assertTrue(isinstance(f, abcmodule.BufferedIOBase))
+        self.assertFalse(isinstance(f, abcmodule.TextIOBase))
         f = self.open(support.TESTFN, "w")
-        self.assertTrue(isinstance(f, self.IOBase))
-        self.assertFalse(isinstance(f, self.RawIOBase))
-        self.assertFalse(isinstance(f, self.BufferedIOBase))
-        self.assertTrue(isinstance(f, self.TextIOBase))
+        self.assertTrue(isinstance(f, abcmodule.IOBase))
+        self.assertFalse(isinstance(f, abcmodule.RawIOBase))
+        self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
+        self.assertTrue(isinstance(f, abcmodule.TextIOBase))
+
+    def test_abc_inheritance(self):
+        # Test implementations inherit from their respective ABCs
+        self._check_abc_inheritance(self)
+
+    def test_abc_inheritance_official(self):
+        # Test implementations inherit from the official ABCs of the
+        # baseline "io" module.
+        self._check_abc_inheritance(io)
 
 class CMiscIOTest(MiscIOTest):
     io = io

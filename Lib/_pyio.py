@@ -5,17 +5,21 @@ Python implementation of the io module.
 import os
 import abc
 import codecs
-#import _fileio
 # Import _thread instead of threading to reduce startup cost
 try:
     from _thread import allocate_lock as Lock
 except ImportError:
     from _dummy_thread import allocate_lock as Lock
 
+import io
 from io import __all__
 
 # open() uses st_blksize whenever we can
 DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes
+
+# NOTE: Base classes defined here are registered with the "official" ABCs
+# defined in io.py. We don't use real inheritance though, because we don't
+# want to inherit the C implementations.
 
 
 class BlockingIOError(IOError):
@@ -496,6 +500,8 @@ class IOBase(metaclass=abc.ABCMeta):
         for line in lines:
             self.write(line)
 
+io.IOBase.register(IOBase)
+
 
 class RawIOBase(IOBase):
 
@@ -551,7 +557,7 @@ class RawIOBase(IOBase):
         """
         self._unsupported("write")
 
-
+io.RawIOBase.register(RawIOBase)
 from _io import FileIO
 RawIOBase.register(FileIO)
 
@@ -626,6 +632,8 @@ class BufferedIOBase(IOBase):
         underlying raw stream cannot accept more data at the moment.
         """
         self._unsupported("write")
+
+io.BufferedIOBase.register(BufferedIOBase)
 
 
 class _BufferedIOMixin(BufferedIOBase):
@@ -1217,6 +1225,8 @@ class TextIOBase(IOBase):
         Subclasses should override.
         """
         return None
+
+io.TextIOBase.register(TextIOBase)
 
 
 class IncrementalNewlineDecoder(codecs.IncrementalDecoder):

@@ -107,7 +107,7 @@ static PyGetSetDef TextIOBase_getset[] = {
 
 PyTypeObject PyTextIOBase_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "TextIOBase",               /*tp_name*/
+    "_io._TextIOBase",          /*tp_name*/
     0,                          /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     0,                          /*tp_dealloc*/
@@ -526,7 +526,7 @@ static PyGetSetDef IncrementalNewlineDecoder_getset[] = {
 
 PyTypeObject PyIncrementalNewlineDecoder_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "IncrementalNewlineDecoder", /*tp_name*/
+    "_io.IncrementalNewlineDecoder", /*tp_name*/
     sizeof(PyNewLineDecoderObject), /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)IncrementalNewlineDecoder_dealloc, /*tp_dealloc*/
@@ -2348,7 +2348,7 @@ static PyGetSetDef TextIOWrapper_getset[] = {
 
 PyTypeObject PyTextIOWrapper_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "TextIOWrapper",            /*tp_name*/
+    "_io.TextIOWrapper",        /*tp_name*/
     sizeof(PyTextIOWrapperObject), /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)TextIOWrapper_dealloc, /*tp_dealloc*/

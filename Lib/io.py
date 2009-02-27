@@ -54,24 +54,47 @@ __all__ = ["BlockingIOError", "open", "IOBase", "RawIOBase", "FileIO",
 
 
 import _io
+import abc
 
+# open() uses st_blksize whenever we can
 DEFAULT_BUFFER_SIZE = _io.DEFAULT_BUFFER_SIZE
 BlockingIOError = _io.BlockingIOError
 UnsupportedOperation = _io.UnsupportedOperation
 open = _io.open
 OpenWrapper = _io.open
-IOBase = _io.IOBase
-RawIOBase = _io.RawIOBase
+
+# Declaring ABCs in C is tricky so we do it here.
+# Method descriptions and default implementations are inherited from the C
+# version however.
+class IOBase(_io._IOBase, metaclass=abc.ABCMeta):
+    pass
+
+class RawIOBase(_io._RawIOBase, IOBase):
+    pass
+
+class BufferedIOBase(_io._BufferedIOBase, IOBase):
+    pass
+
+class TextIOBase(_io._TextIOBase, IOBase):
+    pass
+
 FileIO = _io.FileIO
-BufferedIOBase = _io.BufferedIOBase
 BytesIO = _io.BytesIO
 StringIO = _io.StringIO
 BufferedReader = _io.BufferedReader
 BufferedWriter = _io.BufferedWriter
 BufferedRWPair = _io.BufferedRWPair
 BufferedRandom = _io.BufferedRandom
-TextIOBase = _io.TextIOBase
 IncrementalNewlineDecoder = _io.IncrementalNewlineDecoder
 TextIOWrapper = _io.TextIOWrapper
-# open() uses st_blksize whenever we can
-DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes
+
+RawIOBase.register(FileIO)
+
+BufferedIOBase.register(BytesIO)
+BufferedIOBase.register(BufferedReader)
+BufferedIOBase.register(BufferedWriter)
+BufferedIOBase.register(BufferedRandom)
+BufferedIOBase.register(BufferedRWPair)
+
+TextIOBase.register(StringIO)
+TextIOBase.register(TextIOWrapper)

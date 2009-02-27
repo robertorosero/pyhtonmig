@@ -136,7 +136,7 @@ static PyMethodDef BufferedIOBase_methods[] = {
 
 PyTypeObject PyBufferedIOBase_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "BufferedIOBase",           /*tp_name*/
+    "_io._BufferedIOBase",      /*tp_name*/
     0,                          /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     0,                          /*tp_dealloc*/
@@ -1374,7 +1374,7 @@ static PyGetSetDef BufferedReader_getset[] = {
 
 PyTypeObject PyBufferedReader_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "BufferedReader",           /*tp_name*/
+    "_io.BufferedReader",       /*tp_name*/
     sizeof(BufferedObject),     /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)BufferedObject_dealloc,     /*tp_dealloc*/
@@ -1712,7 +1712,7 @@ static PyGetSetDef BufferedWriter_getset[] = {
 
 PyTypeObject PyBufferedWriter_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "BufferedWriter",           /*tp_name*/
+    "_io.BufferedWriter",       /*tp_name*/
     sizeof(BufferedObject),     /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)BufferedObject_dealloc,     /*tp_dealloc*/
@@ -1957,8 +1957,8 @@ static PyMethodDef BufferedRWPair_methods[] = {
 
 PyTypeObject PyBufferedRWPair_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "BufferedRWPair",           /*tp_name*/
-    sizeof(BufferedRWPairObject),     /*tp_basicsize*/
+    "_io.BufferedRWPair",       /*tp_name*/
+    sizeof(BufferedRWPairObject), /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)BufferedRWPair_dealloc,     /*tp_dealloc*/
     0,                          /*tp_print*/
@@ -2088,7 +2088,7 @@ static PyGetSetDef BufferedRandom_getset[] = {
 
 PyTypeObject PyBufferedRandom_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "BufferedRandom",           /*tp_name*/
+    "_io.BufferedRandom",       /*tp_name*/
     sizeof(BufferedObject),     /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)BufferedObject_dealloc,     /*tp_dealloc*/

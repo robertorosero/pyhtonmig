@@ -706,7 +706,7 @@ static PyGetSetDef IOBase_getset[] = {
 
 PyTypeObject PyIOBase_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "IOBase",                   /*tp_name*/
+    "_io._IOBase",              /*tp_name*/
     sizeof(IOBaseObject),       /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)IOBase_dealloc, /*tp_dealloc*/
@@ -862,7 +862,7 @@ static PyMethodDef RawIOBase_methods[] = {
 
 PyTypeObject PyRawIOBase_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "RawIOBase",                /*tp_name*/
+    "_io._RawIOBase",                /*tp_name*/
     0,                          /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     0,                          /*tp_dealloc*/

@@ -716,7 +716,7 @@ PyDoc_STRVAR(bytesio_doc,
 
 PyTypeObject PyBytesIO_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_bytesio._BytesIO",                       /*tp_name*/
+    "_io.BytesIO",                             /*tp_name*/
     sizeof(BytesIOObject),                     /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
     (destructor)bytesio_dealloc,               /*tp_dealloc*/

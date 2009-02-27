@@ -956,7 +956,7 @@ static PyGetSetDef fileio_getsetlist[] = {
 
 PyTypeObject PyFileIO_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"FileIO",
+	"_io.FileIO",
 	sizeof(PyFileIOObject),
 	0,
 	(destructor)fileio_dealloc,		/* tp_dealloc */

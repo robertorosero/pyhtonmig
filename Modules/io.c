@@ -653,18 +653,15 @@ PyInit__io(void)
     _PyExc_BlockingIOError.tp_base = (PyTypeObject *) PyExc_IOError;
     ADD_TYPE(&_PyExc_BlockingIOError, "BlockingIOError");
 
-    /* IOBase */
-    ADD_TYPE(&PyIOBase_Type, "IOBase");
+    /* Concrete base types of the IO ABCs.
+       (the ABCs themselves are declared through inheritance in io.py)
+    */
+    ADD_TYPE(&PyIOBase_Type, "_IOBase");
+    ADD_TYPE(&PyRawIOBase_Type, "_RawIOBase");
+    ADD_TYPE(&PyBufferedIOBase_Type, "_BufferedIOBase");
+    ADD_TYPE(&PyTextIOBase_Type, "_TextIOBase");
 
-    /* RawIOBase */
-    ADD_TYPE(&PyRawIOBase_Type, "RawIOBase");
-
-    /* BufferedIOBase */
-    ADD_TYPE(&PyBufferedIOBase_Type, "BufferedIOBase");
-
-    /* TextIOBase */
-    ADD_TYPE(&PyTextIOBase_Type,"TextIOBase");
-
+    /* Implementation of concrete IO objects. */
     /* FileIO */
     PyFileIO_Type.tp_base = &PyRawIOBase_Type;
     ADD_TYPE(&PyFileIO_Type, "FileIO");
