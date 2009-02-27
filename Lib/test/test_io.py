@@ -602,11 +602,6 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
-        if sys.maxsize > 0x7FFFFFFF:
-            # The allocation can succeed on 32-bit builds, e.g. with more
-            # than 2GB RAM and a 64-bit kernel.
-            self.assertRaises((OverflowError, MemoryError, ValueError),
-                bufio.__init__, rawio, sys.maxsize)
         rawio = self.MockRawIO([b"abc"])
         bufio.__init__(rawio)
         self.assertEquals(b"abc", bufio.read())
@@ -744,6 +739,16 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
 class CBufferedReaderTest(BufferedReaderTest):
     tp = io.BufferedReader
 
+    def testConstructor(self):
+        BufferedReaderTest.testConstructor(self)
+        # The allocation can succeed on 32-bit builds, e.g. with more
+        # than 2GB RAM and a 64-bit kernel.
+        if sys.maxsize > 0x7FFFFFFF:
+            rawio = self.MockRawIO()
+            bufio = self.tp(rawio)
+            self.assertRaises((OverflowError, MemoryError, ValueError),
+                bufio.__init__, rawio, sys.maxsize)
+
     def test_initialization(self):
         rawio = self.MockRawIO([b"abc"])
         bufio = self.tp(rawio)
@@ -790,11 +795,6 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=0)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-16)
         self.assertRaises(ValueError, bufio.__init__, rawio, buffer_size=-1)
-        if sys.maxsize > 0x7FFFFFFF:
-            # The allocation can succeed on 32-bit builds, e.g. with more
-            # than 2GB RAM and a 64-bit kernel.
-            self.assertRaises((OverflowError, MemoryError, ValueError),
-                bufio.__init__, rawio, sys.maxsize)
         bufio.__init__(rawio)
         self.assertEquals(3, bufio.write(b"ghi"))
         bufio.flush()
@@ -984,6 +984,16 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
 class CBufferedWriterTest(BufferedWriterTest):
     tp = io.BufferedWriter
 
+    def testConstructor(self):
+        BufferedWriterTest.testConstructor(self)
+        # The allocation can succeed on 32-bit builds, e.g. with more
+        # than 2GB RAM and a 64-bit kernel.
+        if sys.maxsize > 0x7FFFFFFF:
+            rawio = self.MockRawIO()
+            bufio = self.tp(rawio)
+            self.assertRaises((OverflowError, MemoryError, ValueError),
+                bufio.__init__, rawio, sys.maxsize)
+
     def test_initialization(self):
         rawio = self.MockRawIO()
         bufio = self.tp(rawio)
@@ -1159,6 +1169,16 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
 
 class CBufferedRandomTest(BufferedRandomTest):
     tp = io.BufferedRandom
+
+    def testConstructor(self):
+        BufferedRandomTest.testConstructor(self)
+        # The allocation can succeed on 32-bit builds, e.g. with more
+        # than 2GB RAM and a 64-bit kernel.
+        if sys.maxsize > 0x7FFFFFFF:
+            rawio = self.MockRawIO()
+            bufio = self.tp(rawio)
+            self.assertRaises((OverflowError, MemoryError, ValueError),
+                bufio.__init__, rawio, sys.maxsize)
 
     def test_garbage_collection(self):
         CBufferedReaderTest.test_garbage_collection(self)
