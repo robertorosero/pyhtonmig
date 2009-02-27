@@ -2052,21 +2052,21 @@ class MiscIOTest(unittest.TestCase):
         self.assertTrue(isinstance(self.TextIOBase, abc.ABCMeta))
 
     def _check_abc_inheritance(self, abcmodule):
-        f = self.open(support.TESTFN, "wb", buffering=0)
-        self.assertTrue(isinstance(f, abcmodule.IOBase))
-        self.assertTrue(isinstance(f, abcmodule.RawIOBase))
-        self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
-        self.assertFalse(isinstance(f, abcmodule.TextIOBase))
-        f = self.open(support.TESTFN, "wb")
-        self.assertTrue(isinstance(f, abcmodule.IOBase))
-        self.assertFalse(isinstance(f, abcmodule.RawIOBase))
-        self.assertTrue(isinstance(f, abcmodule.BufferedIOBase))
-        self.assertFalse(isinstance(f, abcmodule.TextIOBase))
-        f = self.open(support.TESTFN, "w")
-        self.assertTrue(isinstance(f, abcmodule.IOBase))
-        self.assertFalse(isinstance(f, abcmodule.RawIOBase))
-        self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
-        self.assertTrue(isinstance(f, abcmodule.TextIOBase))
+        with self.open(support.TESTFN, "wb", buffering=0) as f:
+            self.assertTrue(isinstance(f, abcmodule.IOBase))
+            self.assertTrue(isinstance(f, abcmodule.RawIOBase))
+            self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
+            self.assertFalse(isinstance(f, abcmodule.TextIOBase))
+        with self.open(support.TESTFN, "wb") as f:
+            self.assertTrue(isinstance(f, abcmodule.IOBase))
+            self.assertFalse(isinstance(f, abcmodule.RawIOBase))
+            self.assertTrue(isinstance(f, abcmodule.BufferedIOBase))
+            self.assertFalse(isinstance(f, abcmodule.TextIOBase))
+        with self.open(support.TESTFN, "w") as f:
+            self.assertTrue(isinstance(f, abcmodule.IOBase))
+            self.assertFalse(isinstance(f, abcmodule.RawIOBase))
+            self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
+            self.assertTrue(isinstance(f, abcmodule.TextIOBase))
 
     def test_abc_inheritance(self):
         # Test implementations inherit from their respective ABCs
