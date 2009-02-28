@@ -466,6 +466,72 @@ class MmapTests(unittest.TestCase):
         self.assert_(issubclass(mmap.error, EnvironmentError))
         self.assert_("mmap.error" in str(mmap.error))
 
+    def test_io_methods(self):
+        data = b"0123456789"
+        open(TESTFN, "wb").write(b"x"*len(data))
+        f = open(TESTFN, "r+b")
+        m = mmap.mmap(f.fileno(), len(data))
+        f.close()
+        # Test write_byte()
+        for i in range(len(data)):
+            self.assertEquals(m.tell(), i)
+            m.write_byte(data[i:i+1])
+            self.assertEquals(m.tell(), i+1)
+        self.assertRaises(ValueError, m.write_byte, b"x")
+        self.assertEquals(m[:], data)
+        # Test read_byte()
+        m.seek(0)
+        for i in range(len(data)):
+            self.assertEquals(m.tell(), i)
+            # XXX: Disable this test for now because it's not clear
+            # which type of object m.read_byte returns. Currently, it
+            # returns 1-length str (unicode).
+            if 0:
+                self.assertEquals(m.read_byte(), data[i:i+1])
+            else:
+                m.read_byte()
+            self.assertEquals(m.tell(), i+1)
+        self.assertRaises(ValueError, m.read_byte)
+        # Test read()
+        m.seek(3)
+        self.assertEquals(m.read(3), b"345")
+        self.assertEquals(m.tell(), 6)
+        # Test write()
+        m.seek(3)
+        m.write(b"bar")
+        self.assertEquals(m.tell(), 6)
+        self.assertEquals(m[:], b"012bar6789")
+        m.seek(8)
+        self.assertRaises(ValueError, m.write, b"bar")
+
+    if os.name == 'nt':
+        def test_tagname(self):
+            data1 = b"0123456789"
+            data2 = b"abcdefghij"
+            assert len(data1) == len(data2)
+            # Test same tag
+            m1 = mmap.mmap(-1, len(data1), tagname="foo")
+            m1[:] = data1
+            m2 = mmap.mmap(-1, len(data2), tagname="foo")
+            m2[:] = data2
+            self.assertEquals(m1[:], data2)
+            self.assertEquals(m2[:], data2)
+            # Test differnt tag
+            m1 = mmap.mmap(-1, len(data1), tagname="foo")
+            m1[:] = data1
+            m2 = mmap.mmap(-1, len(data2), tagname="boo")
+            m2[:] = data2
+            self.assertEquals(m1[:], data1)
+            self.assertEquals(m2[:], data2)
+
+        def test_tagname_crash(self):
+            # Should not crash (Issue 1733986)
+            m = mmap.mmap(-1, 1000, tagname="foo")
+            try:
+                mmap.mmap(-1, 5000, tagname="foo")[:] # same tagname, but larger size
+            except:
+                pass
+
 
 def test_main():
     run_unittest(MmapTests)
