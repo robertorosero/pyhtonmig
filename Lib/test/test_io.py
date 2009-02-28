@@ -471,7 +471,7 @@ class IOTest(unittest.TestCase):
         self.assertRaises(ValueError, self.open, support.TESTFN, 'w',
                           closefd=False)
 
-    def testReadClosed(self):
+    def test_read_closed(self):
         with self.open(support.TESTFN, "w") as f:
             f.write("egg\n")
         with self.open(support.TESTFN, "r") as f:
