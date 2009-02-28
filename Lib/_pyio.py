@@ -929,7 +929,7 @@ class BufferedReader(_BufferedIOMixin):
         # Returns up to n bytes.  If at least one byte is buffered, we
         # only return buffered bytes.  Otherwise, we do one raw read.
         if n < 0:
-            raise ValueError("number of bytes ot read must be positive")
+            raise ValueError("number of bytes to read must be positive")
         if n == 0:
             return b""
         with self._read_lock:
