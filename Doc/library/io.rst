@@ -364,6 +364,11 @@ I/O Base Classes
       A :exc:`BlockingIOError` is raised if the underlying raw stream has no
       data at the moment.
 
+   .. method:: read1([n])
+
+      Read and return up to *n* bytes, with at most one call to the underlying
+      raw stream's :meth:`~RawIOBase.read` method.
+
    .. method:: readinto(b)
 
       Read up to len(b) bytes into bytearray *b* and return the number of bytes
