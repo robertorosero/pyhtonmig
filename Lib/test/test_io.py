@@ -351,12 +351,10 @@ class IOTest(unittest.TestCase):
                 print("Use 'regrtest.py -u largefile test_io' to run it.",
                       file=sys.stderr)
                 return
-        f = self.open(support.TESTFN, "w+b", 0)
-        self.large_file_ops(f)
-        f.close()
-        f = self.open(support.TESTFN, "w+b")
-        self.large_file_ops(f)
-        f.close()
+        with self.open(support.TESTFN, "w+b", 0) as f:
+            self.large_file_ops(f)
+        with self.open(support.TESTFN, "w+b") as f:
+            self.large_file_ops(f)
 
     def test_with_open(self):
         for bufsize in (0, 1, 100):
