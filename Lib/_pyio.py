@@ -938,7 +938,7 @@ class BufferedReader(_BufferedIOMixin):
                 min(n, len(self._read_buf) - self._read_pos))
 
     def tell(self):
-        return super().tell() - len(self._read_buf) + self._read_pos
+        return _BufferedIOMixin.tell(self) - len(self._read_buf) + self._read_pos
 
     def seek(self, pos, whence=0):
         if not (0 <= whence <= 2):
@@ -946,7 +946,7 @@ class BufferedReader(_BufferedIOMixin):
         with self._read_lock:
             if whence == 1:
                 pos -= len(self._read_buf) - self._read_pos
-            pos = super().seek(pos, whence)
+            pos = _BufferedIOMixin.seek(self, pos, whence)
             self._reset_read_buf()
             return pos
 
@@ -1034,14 +1034,14 @@ class BufferedWriter(_BufferedIOMixin):
             raise BlockingIOError(e.errno, e.strerror, written)
 
     def tell(self):
-        return super().tell() + len(self._write_buf)
+        return _BufferedIOMixin.tell(self) + len(self._write_buf)
 
     def seek(self, pos, whence=0):
         if not (0 <= whence <= 2):
             raise ValueError("invalid whence")
         with self._write_lock:
             self._flush_unlocked()
-            return super().seek(pos, whence)
+            return _BufferedIOMixin.seek(self, pos, whence)
 
 
 class BufferedRWPair(BufferedIOBase):
@@ -1141,7 +1141,7 @@ class BufferedRandom(BufferedWriter, BufferedReader):
 
     def tell(self):
         if self._write_buf:
-            return super().tell() + len(self._write_buf)
+            return BufferedWriter.tell(self)
         else:
             return BufferedReader.tell(self)
 
