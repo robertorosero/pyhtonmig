@@ -916,7 +916,7 @@ class BufferedReader(_BufferedIOMixin):
     def _peek_unlocked(self, n=0):
         want = min(n, self.buffer_size)
         have = len(self._read_buf) - self._read_pos
-        if have < want:
+        if have < want or have <= 0:
             to_read = self.buffer_size - have
             current = self.raw.read(to_read)
             if current:
@@ -1130,6 +1130,10 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         if not (0 <= whence <= 2):
             raise ValueError("invalid whence")
         self.flush()
+        if self._read_buf:
+            # Undo read ahead.
+            with self._read_lock:
+                self.raw.seek(self._read_pos - len(self._read_buf), 1)
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
         pos = self.raw.seek(pos, whence)
