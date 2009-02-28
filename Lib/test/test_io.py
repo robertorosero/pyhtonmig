@@ -1710,43 +1710,6 @@ class TextIOWrapperTest(unittest.TestCase):
             self.assertEquals(f.read(), data * 2)
             self.assertEquals(buf.getvalue(), (data * 2).encode(encoding))
 
-    def timingTest(self):
-        timer = time.time
-        enc = "utf8"
-        line = "\0\x0f\xff\u0fff\uffff\U000fffff\U0010ffff"*3 + "\n"
-        nlines = 10000
-        nchars = len(line)
-        nbytes = len(line.encode(enc))
-        for chunk_size in (32, 64, 128, 256):
-            f = self.open(support.TESTFN, "w+", encoding=enc)
-            f._CHUNK_SIZE = chunk_size
-            t0 = timer()
-            for i in range(nlines):
-                f.write(line)
-            f.flush()
-            t1 = timer()
-            f.seek(0)
-            for line in f:
-                pass
-            t2 = timer()
-            f.seek(0)
-            while f.readline():
-                pass
-            t3 = timer()
-            f.seek(0)
-            while f.readline():
-                f.tell()
-            t4 = timer()
-            f.close()
-            if support.verbose:
-                print("\nTiming test: %d lines of %d characters (%d bytes)" %
-                      (nlines, nchars, nbytes))
-                print("File chunk size:          %6s" % f._CHUNK_SIZE)
-                print("Writing:                  %6.3f seconds" % (t1-t0))
-                print("Reading using iteration:  %6.3f seconds" % (t2-t1))
-                print("Reading using readline(): %6.3f seconds" % (t3-t2))
-                print("Using readline()+tell():  %6.3f seconds" % (t4-t3))
-
     def test_read_one_by_one(self):
         txt = self.TextIOWrapper(self.BytesIO(b"AA\r\nBB"))
         reads = ""
