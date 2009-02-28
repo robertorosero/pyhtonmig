@@ -599,6 +599,10 @@ class BufferedIOBase(IOBase):
         """
         self._unsupported("read")
 
+    def read1(self, n: int=None) -> bytes:
+        """Read up to n bytes with at most one read() system call."""
+        self._unsupported("read1")
+
     def readinto(self, b: bytearray) -> int:
         """Read up to len(b) bytes into b.
 
