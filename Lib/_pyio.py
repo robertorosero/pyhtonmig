@@ -1338,7 +1338,7 @@ class TextIOWrapper(TextIOBase):
     write contains a newline character.
     """
 
-    _CHUNK_SIZE = 128
+    _CHUNK_SIZE = 2048
 
     def __init__(self, buffer, encoding=None, errors=None, newline=None,
                  line_buffering=False):
