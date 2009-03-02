@@ -59,7 +59,6 @@ extern PyObject* PyInit__subprocess(void);
 extern PyObject* PyInit__lsprof(void);
 extern PyObject* PyInit__ast(void);
 extern PyObject* PyInit__io(void);
-extern PyObject* PyInit__stringio(void);
 extern PyObject* PyInit__pickle(void);
 extern PyObject* PyInit_atexit(void);
 extern PyObject* _PyWarnings_Init(void);
@@ -150,7 +149,6 @@ struct _inittab _PyImport_Inittab[] = {
         {"_warnings", _PyWarnings_Init},
 
         {"_io", PyInit__io},
-        {"_stringio", PyInit__stringio},
         {"_pickle", PyInit__pickle},
         {"atexit", PyInit_atexit},
 
