@@ -417,6 +417,25 @@ class PyStringIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
 
     # TextIO-specific behaviour.
 
+    def test_newlines_property(self):
+        memio = self.ioclass(newline=None)
+        # The C StringIO decodes newlines in write() calls, but the Python
+        # implementation only does when reading.  This function forces them to
+        # be decoded for testing.
+        def force_decode():
+            memio.seek(0)
+            memio.read()
+        self.assertEqual(memio.newlines, None)
+        memio.write("a\n")
+        force_decode()
+        self.assertEqual(memio.newlines, "\n")
+        memio.write("b\r\n")
+        force_decode()
+        self.assertEqual(memio.newlines, ("\n", "\r\n"))
+        memio.write("c\rd")
+        force_decode()
+        self.assertEqual(memio.newlines, ("\r", "\n", "\r\n"))
+
     def test_relative_seek(self):
         memio = self.ioclass()
 
@@ -514,17 +533,6 @@ class CStringIOTest(PyStringIOTest):
         self.assertEqual(memio.write(buf), len(buf))
         self.assertEqual(memio.tell(), len(buf) * 2)
         self.assertEqual(memio.getvalue(), buf + buf)
-
-    # XXX This test fails with the Python version of io.StringIO
-    def test_newlines_property(self):
-        memio = self.ioclass(newline=None)
-        self.assertEqual(memio.newlines, None)
-        memio.write("a\n")
-        self.assertEqual(memio.newlines, "\n")
-        memio.write("b\r\n")
-        self.assertEqual(memio.newlines, ("\n", "\r\n"))
-        memio.write("c\rd")
-        self.assertEqual(memio.newlines, ("\r", "\n", "\r\n"))
 
 
 def test_main():
