@@ -470,6 +470,8 @@ class PyStringIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
         self.assertEqual(3, memio.write("c\rd"))
         memio.seek(0)
         self.assertEqual(memio.read(), "a\nb\nc\nd")
+        memio = self.ioclass("a\r\nb", newline=None)
+        self.assertEqual(memio.read(3), "a\nb")
 
     def test_newline_empty(self):
         # newline=""
