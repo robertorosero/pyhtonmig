@@ -1,5 +1,5 @@
 __all__ = ['deque', 'defaultdict', 'namedtuple', 'UserDict', 'UserList',
-            'UserString', 'Counter']
+            'UserString', 'Counter', 'OrderedDict']
 # For bootstrapping reasons, the collection ABCs are defined in _abcoll.py.
 # They should however be considered an integral part of collections.py.
 from _abcoll import *
@@ -12,6 +12,79 @@ from keyword import iskeyword as _iskeyword
 import sys as _sys
 import heapq as _heapq
 from itertools import repeat as _repeat, chain as _chain, starmap as _starmap
+
+################################################################################
+### OrderedDict
+################################################################################
+
+class OrderedDict(dict, MutableMapping):
+
+    def __init__(self, *args, **kwds):
+        if len(args) > 1:
+            raise TypeError('expected at most 1 arguments, got %d' % len(args))
+        if not hasattr(self, '_keys'):
+            self._keys = []
+        self.update(*args, **kwds)
+
+    def clear(self):
+        del self._keys[:]
+        dict.clear(self)
+
+    def __setitem__(self, key, value):
+        if key not in self:
+            self._keys.append(key)
+        dict.__setitem__(self, key, value)
+
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        self._keys.remove(key)
+
+    def __iter__(self):
+        return iter(self._keys)
+
+    def __reversed__(self):
+        return reversed(self._keys)
+
+    def popitem(self):
+        if not self:
+            raise KeyError('dictionary is empty')
+        key = self._keys.pop()
+        value = dict.pop(self, key)
+        return key, value
+
+    def __reduce__(self):
+        items = [[k, self[k]] for k in self]
+        inst_dict = vars(self).copy()
+        inst_dict.pop('_keys', None)
+        return (self.__class__, (items,), inst_dict)
+
+    setdefault = MutableMapping.setdefault
+    update = MutableMapping.update
+    pop = MutableMapping.pop
+    keys = MutableMapping.keys
+    values = MutableMapping.values
+    items = MutableMapping.items
+
+    def __repr__(self):
+        if not self:
+            return '%s()' % (self.__class__.__name__,)
+        return '%s(%r)' % (self.__class__.__name__, list(self.items()))
+
+    def copy(self):
+        return self.__class__(self)
+
+    @classmethod
+    def fromkeys(cls, iterable, value=None):
+        d = cls()
+        for key in iterable:
+            d[key] = value
+        return d
+
+    def __eq__(self, other):
+        if isinstance(other, OrderedDict):
+            return len(self)==len(other) and all(p==q for p, q in  zip(self.items(), other.items()))
+        return dict.__eq__(self, other)
+
 
 
 ################################################################################
@@ -76,7 +149,6 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
     numfields = len(field_names)
     argtxt = repr(field_names).replace("'", "")[1:-1]   # tuple repr without parens or quotes
     reprtxt = ', '.join('%s=%%r' % name for name in field_names)
-    dicttxt = ', '.join('%r: t[%d]' % (name, pos) for pos, name in enumerate(field_names))
     template = '''class %(typename)s(tuple):
         '%(typename)s(%(argtxt)s)' \n
         __slots__ = () \n
@@ -92,9 +164,9 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
             return result \n
         def __repr__(self):
             return '%(typename)s(%(reprtxt)s)' %% self \n
-        def _asdict(t):
-            'Return a new dict which maps field names to their values'
-            return {%(dicttxt)s} \n
+        def _asdict(self):
+            'Return a new OrderedDict which maps field names to their values'
+            return OrderedDict(zip(self._fields, self)) \n
         def _replace(self, **kwds):
             'Return a new %(typename)s object replacing specified fields with new values'
             result = self._make(map(kwds.pop, %(field_names)r, self))
@@ -110,7 +182,8 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
 
     # Execute the template string in a temporary namespace and
     # support tracing utilities by setting a value for frame.f_globals['__name__']
-    namespace = dict(itemgetter=_itemgetter, __name__='namedtuple_%s' % typename)
+    namespace = dict(itemgetter=_itemgetter, __name__='namedtuple_%s' % typename,
+                     OrderedDict=OrderedDict)
     try:
         exec(template, namespace)
     except SyntaxError as e:

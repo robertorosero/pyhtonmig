@@ -64,8 +64,11 @@ write-back, as will be the keys within each section.
    options within a section, and for the default values. This class does not
    support the magical interpolation behavior.
 
+   .. versionchanged 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
-.. class:: ConfigParser([defaults])
+
+.. class:: ConfigParser([defaults[, dict_type]])
 
    Derived class of :class:`RawConfigParser` that implements the magical
    interpolation feature and adds optional arguments to the :meth:`get` and
@@ -80,8 +83,11 @@ write-back, as will be the keys within each section.
    option names to lower case), the values ``foo %(bar)s`` and ``foo %(BAR)s`` are
    equivalent.
 
+   .. versionchanged 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
-.. class:: SafeConfigParser([defaults])
+
+.. class:: SafeConfigParser([defaults[, dict_type]])
 
    Derived class of :class:`ConfigParser` that implements a more-sane variant of
    the magical interpolation feature.  This implementation is more predictable as
@@ -89,6 +95,9 @@ write-back, as will be the keys within each section.
    compatible with older versions of Python.
 
    .. XXX Need to explain what's safer/more predictable about it.
+
+   .. versionchanged 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
 
 .. exception:: NoSectionError
