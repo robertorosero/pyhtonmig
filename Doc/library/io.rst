@@ -508,7 +508,7 @@ Buffered Streams
 
    The constructor creates a :class:`BufferedWriter` for the given writeable
    *raw* stream.  If the *buffer_size* is not given, it defaults to
-   :data:`DEAFULT_BUFFER_SIZE`.  If *max_buffer_size* is omitted, it defaults to
+   :data:`DEFAULT_BUFFER_SIZE`.  If *max_buffer_size* is omitted, it defaults to
    twice the buffer size.
 
    :class:`BufferedWriter` provides or overrides these methods in addition to

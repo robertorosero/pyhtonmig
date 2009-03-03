@@ -263,7 +263,7 @@ class IOBase(metaclass=abc.ABCMeta):
     stream.
 
     IOBase also supports the :keyword:`with` statement. In this example,
-    fp is closed after the suite of the with statment is complete:
+    fp is closed after the suite of the with statement is complete:
 
     with open('spam.txt', 'r') as fp:
         fp.write('Spam and eggs!')
@@ -960,7 +960,7 @@ class BufferedWriter(_BufferedIOMixin):
 
     The constructor creates a BufferedWriter for the given writeable raw
     stream. If the buffer_size is not given, it defaults to
-    DEAFULT_BUFFER_SIZE. If max_buffer_size is omitted, it defaults to
+    DEFAULT_BUFFER_SIZE. If max_buffer_size is omitted, it defaults to
     twice the buffer size.
     """
 
@@ -1725,7 +1725,9 @@ class TextIOWrapper(TextIOBase):
         line = self._get_decoded_chars()
 
         start = 0
-        decoder = self._decoder or self._get_decoder()
+        # Make the decoder if it doesn't already exist.
+        if not self._decoder:
+            self._get_decoder()
 
         pos = endpos = None
         while True:
@@ -1780,8 +1782,7 @@ class TextIOWrapper(TextIOBase):
                 endpos = limit  # reached length limit
                 break
 
-            # No line ending seen yet - get more data
-            more_line = ''
+            # No line ending seen yet - get more data'
             while self._read_chunk():
                 if self._decoded_chars:
                     break
