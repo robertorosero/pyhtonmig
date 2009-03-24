@@ -1801,6 +1801,58 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
+    def test_macros(self):
+        platform = sys.platform
+        if platform == "win32":
+            macros = dict(
+                )
+        elif platform == 'darwin':          # Mac OSX
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                HAVE_BROKEN_SEM_GETVALUE=1
+                )
+        elif platform == 'cygwin':          # Cygwin
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=1,
+                HAVE_FD_TRANSFER=0,
+                HAVE_BROKEN_SEM_UNLINK=1
+                )
+        elif platform in ('freebsd4', 'freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
+            # FreeBSD's P1003.1b semaphore support is very experimental
+            # and has many known problems. (as of June 2008)
+            macros = dict(                  # FreeBSD
+                HAVE_SEM_OPEN=0,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                )
+        elif platform.startswith('openbsd'):
+            macros = dict(                  # OpenBSD
+                HAVE_SEM_OPEN=0,            # Not implemented
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                )
+        else:                                   # Linux and other unices
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=1,
+                HAVE_FD_TRANSFER=1
+                )
+        flags = ['HAVE_SEM_OPEN', 'HAVE_BROKEN_SEM_GETVALUE',
+                 'HAVE_FD_TRANSFER', 'HAVE_BROKEN_SEM_UNLINK',
+                 'HAVE_SEM_TIMEDWAIT']
+
+        for name in flags:
+            mp_flag = _multiprocessing.flags.get(name, 0)
+            plat_flag = macros.get(name, 0)
+            self.assertEqual(mp_flag, plat_flag,
+                             "%s: expected %i, got %i" %
+                             (name, mp_flag, plat_flag)
+                             )
+
+
 testcases_other = [OtherTest, TestInvalidHandle]
 
 #

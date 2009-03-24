@@ -1240,55 +1240,11 @@ class PyBuildExt(build_ext):
         self.detect_ctypes(inc_dirs, lib_dirs)
 
         # Richard Oudkerk's multiprocessing module
-        if platform == 'win32':             # Windows
-            macros = dict()
-            libraries = ['ws2_32']
-
-        elif platform == 'darwin':          # Mac OSX
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                HAVE_BROKEN_SEM_GETVALUE=1
-                )
-            libraries = []
-
-        elif platform == 'cygwin':          # Cygwin
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=1,
-                HAVE_FD_TRANSFER=0,
-                HAVE_BROKEN_SEM_UNLINK=1
-                )
-            libraries = []
-
-        elif platform in ('freebsd4', 'freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
-            # FreeBSD's P1003.1b semaphore support is very experimental
-            # and has many known problems. (as of June 2008)
-            macros = dict(                  # FreeBSD
-                HAVE_SEM_OPEN=0,
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                )
-            libraries = []
-
-        elif platform.startswith('openbsd'):
-            macros = dict(                  # OpenBSD
-                HAVE_SEM_OPEN=0,            # Not implemented
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                )
-            libraries = []
-
-        else:                                   # Linux and other unices
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=1,
-                HAVE_FD_TRANSFER=1
-                )
-            libraries = ['rt']
+        macros = {}
+        libraries = [] # some platforms may require 'rt'
 
         if platform == 'win32':
+            libraries = ['ws2_32']
             multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
                                      '_multiprocessing/semaphore.c',
                                      '_multiprocessing/pipe_connection.c',
@@ -1301,7 +1257,7 @@ class PyBuildExt(build_ext):
                                      '_multiprocessing/socket_connection.c'
                                    ]
 
-            if macros.get('HAVE_SEM_OPEN', False):
+            if sysconfig.get_config_var("HAVE_SEM_OPEN"):
                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
 
         if sysconfig.get_config_var('WITH_THREAD'):

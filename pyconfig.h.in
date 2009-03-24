@@ -73,6 +73,12 @@
 /* Define if pthread_sigmask() does not work on your system. */
 #undef HAVE_BROKEN_PTHREAD_SIGMASK
 
+/* Define if 'sem_getvalue' is broken on your platform */
+#undef HAVE_BROKEN_SEM_GETVALUE
+
+/* Define if 'sem_unlink' is broken on your platform */
+#undef HAVE_BROKEN_SEM_UNLINK
+
 /* Define this if you have the type _Bool. */
 #undef HAVE_C99_BOOL
 
@@ -185,6 +191,9 @@
 
 /* Define if you have the 'fdatasync' function. */
 #undef HAVE_FDATASYNC
+
+/* Define if you have the 'sendmsg' function for fd transfer. */
+#undef HAVE_FD_TRANSFER
 
 /* Define to 1 if you have the `finite' function. */
 #undef HAVE_FINITE
@@ -503,6 +512,12 @@
 
 /* Define to 1 if you have the `select' function. */
 #undef HAVE_SELECT
+
+/* Define if you have the 'sem_open' function. */
+#undef HAVE_SEM_OPEN
+
+/* Define if you have the 'sem_timedwait' function. */
+#undef HAVE_SEM_TIMEDWAIT
 
 /* Define to 1 if you have the `setegid' function. */
 #undef HAVE_SETEGID
