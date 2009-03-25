@@ -25384,6 +25384,8 @@ _ACEOF
 #define HAVE_SEM_TIMEDWAIT 0
 _ACEOF
 
+        { echo "$as_me:$LINENO: disable sem_open and sem_timedwait on *BSD" >&5
+echo "$as_me: disable sem_open and sem_timedwait on *BSD" >&6;}
     ;;
 esac
 
@@ -25393,12 +25395,16 @@ case $ac_sys_system in
 #define HAVE_BROKEN_SEM_UNLINK 1
 _ACEOF
 
+        { echo "$as_me:$LINENO: Cygwin has broken sem_unlink" >&5
+echo "$as_me: Cygwin has broken sem_unlink" >&6;}
         ;;
     Darwin*)
         cat >>confdefs.h <<\_ACEOF
 #define HAVE_BROKEN_SEM_GETVALUE 1
 _ACEOF
 
+        { echo "$as_me:$LINENO: Darwin has broken sem_getvalue" >&5
+echo "$as_me: Darwin has broken sem_getvalue" >&6;}
         ;;
 esac
 

@@ -1801,7 +1801,7 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
-    def test_macros(self):
+    def test_000macros(self):
         platform = sys.platform
         if platform == "win32":
             macros = dict(
@@ -1881,10 +1881,10 @@ def test_main(run=None):
     ManagerMixin.pool = ManagerMixin.manager.Pool(4)
 
     testcases = (
+        testcases_other +
         sorted(testcases_processes.values(), key=lambda tc:tc.__name__) +
         sorted(testcases_threads.values(), key=lambda tc:tc.__name__) +
         sorted(testcases_manager.values(), key=lambda tc:tc.__name__) +
-        testcases_other
         )
 
     loadTestsFromTestCase = unittest.defaultTestLoader.loadTestsFromTestCase

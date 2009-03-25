@@ -3805,16 +3805,19 @@ case $ac_sys_system/$ac_sys_release in
         # FreeBSD's P1003.1b semaphore support is very experimental
         # and has many known problems. (as of June 2008)
         AC_DEFINE(HAVE_SEM_OPEN, 0)
-        AC_DEFINE(HAVE_SEM_TIMEDWAIT, 0)  
+        AC_DEFINE(HAVE_SEM_TIMEDWAIT, 0) 
+        AC_MSG_NOTICE([disable sem_open and sem_timedwait on *BSD])
     ;;
 esac
 
 case $ac_sys_system in
     CYGWIN*)
         AC_DEFINE(HAVE_BROKEN_SEM_UNLINK, 1)
+        AC_MSG_NOTICE([Cygwin has broken sem_unlink])
         ;;
     Darwin*)
         AC_DEFINE(HAVE_BROKEN_SEM_GETVALUE, 1)
+        AC_MSG_NOTICE([Darwin has broken sem_getvalue])
         ;;
 esac
 
