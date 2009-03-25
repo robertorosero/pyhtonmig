@@ -1884,7 +1884,7 @@ def test_main(run=None):
         testcases_other +
         sorted(testcases_processes.values(), key=lambda tc:tc.__name__) +
         sorted(testcases_threads.values(), key=lambda tc:tc.__name__) +
-        sorted(testcases_manager.values(), key=lambda tc:tc.__name__) +
+        sorted(testcases_manager.values(), key=lambda tc:tc.__name__)
         )
 
     loadTestsFromTestCase = unittest.defaultTestLoader.loadTestsFromTestCase
