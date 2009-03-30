@@ -1018,14 +1018,27 @@ save_float(PicklerObject *self, PyObject *obj)
             return -1;
     }
     else {
-        char pdata[250];
-        pdata[0] = FLOAT;
-        PyOS_ascii_formatd(pdata + 1, sizeof(pdata) - 2, "%.17g", x);
-        /* Extend the formatted string with a newline character */
-        strcat(pdata, "\n");
+        int result = -1;
+        char *buf = NULL;
+        char op = FLOAT;
 
-        if (pickler_write(self, pdata, strlen(pdata)) < 0)
-            return -1;
+        if (pickler_write(self, &op, 1) < 0)
+            goto done;
+
+        buf = PyOS_double_to_string(x, 2, 'g', 17, 0, 0);
+        if (!buf)
+            goto done;
+
+        if (pickler_write(self, buf, strlen(buf)) < 0)
+            goto done;
+
+        if (pickler_write(self, "\n", 1) < 0)
+            goto done;
+
+        result = 0;
+done:
+        PyMem_Free(buf);
+        return result;
     }
 
     return 0;
