@@ -179,6 +179,21 @@
  *	used for input more than STRTOD_DIGLIM digits long (default 40).
  */
 
+/* Linking of Python's #defines to Gay's #defines starts here. */
+
+#include "Python.h"
+
+/* use WORDS_BIGENDIAN to determine float endianness.  This assumes that ints
+   and floats share the same endianness on the target machine, which appears
+   to be true for every platform that Python currently cares about.  We're
+   also assuming IEEE 754 float format for now. */
+
+#ifdef WORDS_BIGENDIAN
+#define IEEE_MC68k
+#else
+#define IEEE_8087
+#endif
+
 #ifndef Long
 #define Long long
 #endif
@@ -293,7 +308,7 @@ extern "C" {
 #endif
 
 #if defined(IEEE_8087) + defined(IEEE_MC68k) + defined(VAX) + defined(IBM) != 1
-Exactly one of IEEE_8087, IEEE_MC68k, VAX, or IBM should be defined.
+#error "Exactly one of IEEE_8087, IEEE_MC68k, VAX, or IBM should be defined."
 #endif
 
 typedef union { double d; ULong L[2]; } U;
@@ -510,12 +525,6 @@ BCinfo { int dp0, dp1, dplen, dsign, e0, inexact, nd, nd0, rounding, scale, uflc
 #endif
 
 #define Kmax 7
-
-#ifdef __cplusplus
-extern "C" double strtod(const char *s00, char **se);
-extern "C" char *dtoa(double d, int mode, int ndigits,
-			int *decpt, int *sign, char **rve);
-#endif
 
  struct
 Bigint {
@@ -2419,7 +2428,7 @@ retlow1:
 #endif /* NO_STRTOD_BIGCOMP */
 
  double
-strtod
+_Py_dg_strtod
 #ifdef KR_headers
 	(s00, se) CONST char *s00; char **se;
 #else
@@ -3515,7 +3524,7 @@ freedtoa(char *s)
  */
 
  char *
-dtoa
+_Py_dg_dtoa
 #ifdef KR_headers
 	(dd, mode, ndigits, decpt, sign, rve)
 	double dd; int mode, ndigits, *decpt, *sign; char **rve;

@@ -304,6 +304,7 @@ PYTHON_OBJS=	\
 		Python/getopt.o \
 		Python/pystrcmp.o \
 		Python/pystrtod.o \
+		Python/dtoa.o \
 		Python/formatter_unicode.o \
 		Python/$(DYNLOADFILE) \
 		$(LIBOBJS) \
