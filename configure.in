@@ -849,6 +849,32 @@ yes)
       BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
     fi
 
+    # On x86/x86-64, use the SSE2 instruction set when available.
+    AC_MSG_CHECKING(whether $CC accepts -msse2 -mfpmath=sse)
+     ac_save_cc="$CC"
+     CC="$CC -msse2 -mfpmath=sse"
+     AC_TRY_RUN([int main() { return 0; }],
+     ac_cv_msse2_ok=yes,
+     ac_cv_msse2_ok=no,
+     ac_cv_msse2_ok=no)
+     CC="$ac_save_cc"
+    AC_MSG_RESULT($ac_cv_msse2_ok)
+    AC_MSG_CHECKING(whether SSE2 instructions are already enabled for math)
+      if [[ "`$CC -dM -E - </dev/null | grep __SSE2_MATH__`" == "" ]]
+      then
+        ac_sse2_enabled=no
+      else
+        ac_sse2_enabled=yes
+      fi
+    AC_MSG_RESULT($ac_sse2_enabled)
+    if test $ac_sse2_enabled = no
+    then
+      if test $ac_cv_msse2_ok = yes
+      then
+        BASECFLAGS="$BASECFLAGS -msse2 -mfpmath=sse"
+      fi
+    fi
+
     # if using gcc on alpha, use -mieee to get (near) full IEEE 754
     # support.  Without this, treatment of subnormals doesn't follow
     # the standard.
