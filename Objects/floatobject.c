@@ -379,101 +379,6 @@ format_double(char *buf, size_t buflen, double ob_fval, int precision)
 
 }
 
-/* convert a Python float to a minimal string that evaluates back to that
-   float.  The output is minimal in the sense of having the least possible
-   number of significant digits. */
-
-static void
-format_float_short(char *buf, size_t buflen, PyFloatObject *v)
-{
-	double d;
-	char *digits, *digits_end;
-	int decpt, sign, exp_len;
-	size_t digits_len, i;
-
-	assert(PyFloat_Check(v));
-	d = PyFloat_AS_DOUBLE(v);
-
-	/* _Py_dg_dtoa returns a digit string (no decimal point
-	   or exponent) */
-	digits = _Py_dg_dtoa(d, 0, 0, &decpt, &sign, &digits_end);
-	assert(digits_end != NULL && digits_end > digits);
-	digits_len = digits_end - digits;
-
-	if (!isdigit(digits[0])) {
-		/* infinities and nans here; adapt Gay's output,
-		   so convert Infinity to inf and NaN to nan, and
-		   ignore sign of nan. */
-		if (digits[0] == 'i' || digits[0] == 'I') {
-			if (sign == 1) {
-				*buf++ = '-';
-			}
-			strncpy(buf, "inf", 3);
-			buf += 3;
-		} else {
-			assert(digits[0] == 'n' || digits[0] == 'N');
-			strncpy(buf, "nan", 3);
-			buf += 3;
-		}
-	}
-	else if (-4 < decpt && decpt <= 17) {
-		if (sign == 1) {
-			*buf++ = '-';
-		}
-		/* use fixed-point notation if 1e-4 <= value < 1e17 */
-		if (decpt <= 0) {
-			/* output: 0.00...00dd...dd */
-			*buf++ = '0';
-			*buf++ = '.';
-			for (i=0; i < -decpt; i++)
-				*buf++ = '0';
-			strncpy(buf, digits, digits_len);
-			buf += digits_len;
-		}
-		else if (decpt < digits_len) {
-			/* output: dd...dd.dd...dd */
-			strncpy(buf, digits, decpt);
-			buf += decpt;
-			*buf++ = '.';
-			strncpy(buf, digits+decpt, digits_len-decpt);
-			buf += digits_len-decpt;
-		}
-		else {
-			/* decpt >= digits_len.  output: dd...dd00...00.0 */
-			strncpy(buf, digits, digits_len);
-			buf += digits_len;
-			for (i=0; i < decpt-digits_len; i++)
-				*buf++ = '0';
-			*buf++ = '.';
-			*buf++ = '0';
-		}
-	}
-	else {
-		/* exponential notation: d[.dddd]e(+|-)ee;
-		   at least 2 digits in exponent */
-		if (sign == 1) {
-			*buf++ = '-';
-		}
-		*buf++ = digits[0];
-		if (digits_len > 1) {
-			*buf++ = '.';
-			strncpy(buf, digits+1, digits_len-1);
-			buf += digits_len-1;
-		}
-		*buf++ = 'e';
-		exp_len = sprintf(buf, "%+.02d", decpt-1);
-		buf += exp_len;
-	}
-	*buf++ = '\0';
-}
-
-static void
-format_float(char *buf, size_t buflen, PyFloatObject *v, int precision)
-{
-	assert(PyFloat_Check(v));
-	format_double(buf, buflen, PyFloat_AS_DOUBLE(v), precision);
-}
-
 /* Macro and helper that convert PyObject obj to a C double and store
    the value in dbl.  If conversion to double raises an exception, obj is
    set to NULL, and the function invoking this macro returns NULL.  If
@@ -524,20 +429,29 @@ convert_to_double(PyObject **v, double *dbl)
 #define PREC_STR	12
 
 static PyObject *
+float_str_or_repr(PyFloatObject *v, int mode, int precision)
+{
+    PyObject *result;
+    char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
+                                      mode, 'g', precision, 0, 1);
+    if (!buf)
+        return PyErr_NoMemory();
+    result = PyUnicode_FromString(buf);
+    PyMem_Free(buf);
+    return result;
+}
+
+static PyObject *
 float_repr(PyFloatObject *v)
 {
-	char buf[100];
-	format_float_short(buf, sizeof(buf), v);
-
-	return PyUnicode_FromString(buf);
+    /* XXX change PREC_REPR to 0 when mode is supported */
+    return float_str_or_repr(v, 0, PREC_REPR);
 }
 
 static PyObject *
 float_str(PyFloatObject *v)
 {
-	char buf[100];
-	format_float(buf, sizeof(buf), v, PREC_STR);
-	return PyUnicode_FromString(buf);
+    return float_str_or_repr(v, 2, PREC_STR);
 }
 
 /* Comparison is pretty much a nightmare.  When comparing float to float,
@@ -2067,7 +1981,9 @@ PyFloat_Fini(void)
 				if (PyFloat_CheckExact(p) &&
 				    Py_REFCNT(p) != 0) {
 					char buf[100];
-					format_float(buf, sizeof(buf), p, PREC_STR);
+					format_double(buf, sizeof(buf),
+                                                      PyFloat_AS_DOUBLE(p),
+                                                      PREC_STR);
 					/* XXX(twouters) cast refcount to
 					   long until %zd is universally
 					   available

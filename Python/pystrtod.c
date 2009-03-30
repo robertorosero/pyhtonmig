@@ -488,3 +488,128 @@ PyOS_ascii_atof(const char *nptr)
 {
 	return PyOS_ascii_strtod(nptr, NULL);
 }
+
+
+/* convert a Python float to a minimal string that evaluates back to that
+   float.  The output is minimal in the sense of having the least possible
+   number of significant digits. */
+
+static void
+format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
+{
+	char *digits, *digits_end;
+	int decpt, sign, exp_len;
+	size_t digits_len, i;
+
+	/* _Py_dg_dtoa returns a digit string (no decimal point
+	   or exponent) */
+	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
+	assert(digits_end != NULL && digits_end > digits);
+	digits_len = digits_end - digits;
+
+	if (!isdigit(digits[0])) {
+		/* infinities and nans here; adapt Gay's output,
+		   so convert Infinity to inf and NaN to nan, and
+		   ignore sign of nan. */
+		if (digits[0] == 'i' || digits[0] == 'I') {
+			if (sign == 1) {
+				*buf++ = '-';
+			}
+			strncpy(buf, "inf", 3);
+			buf += 3;
+		} else {
+			assert(digits[0] == 'n' || digits[0] == 'N');
+			strncpy(buf, "nan", 3);
+			buf += 3;
+		}
+	}
+	else if (-4 < decpt && decpt <= 17) {
+		if (sign == 1) {
+			*buf++ = '-';
+		}
+		/* use fixed-point notation if 1e-4 <= value < 1e17 */
+		if (decpt <= 0) {
+			/* output: 0.00...00dd...dd */
+			*buf++ = '0';
+			*buf++ = '.';
+			for (i=0; i < -decpt; i++)
+				*buf++ = '0';
+			strncpy(buf, digits, digits_len);
+			buf += digits_len;
+		}
+		else if (decpt < digits_len) {
+			/* output: dd...dd.dd...dd */
+			strncpy(buf, digits, decpt);
+			buf += decpt;
+			*buf++ = '.';
+			strncpy(buf, digits+decpt, digits_len-decpt);
+			buf += digits_len-decpt;
+		}
+		else {
+			/* decpt >= digits_len.  output: dd...dd00...00.0 */
+			strncpy(buf, digits, digits_len);
+			buf += digits_len;
+			for (i=0; i < decpt-digits_len; i++)
+				*buf++ = '0';
+			*buf++ = '.';
+			*buf++ = '0';
+		}
+	}
+	else {
+		/* exponential notation: d[.dddd]e(+|-)ee;
+		   at least 2 digits in exponent */
+		if (sign == 1) {
+			*buf++ = '-';
+		}
+		*buf++ = digits[0];
+		if (digits_len > 1) {
+			*buf++ = '.';
+			strncpy(buf, digits+1, digits_len-1);
+			buf += digits_len-1;
+		}
+		*buf++ = 'e';
+		exp_len = sprintf(buf, "%+.02d", decpt-1);
+		buf += exp_len;
+	}
+	*buf++ = '\0';
+}
+
+PyAPI_FUNC(char *) PyOS_double_to_string(double val,
+                                         int mode,
+                                         char format_code,
+                                         int precision,
+                                         int sign,
+                                         int add_dot_0_if_integer)
+{
+	char fmt[32];
+	char* buf = (char *)PyMem_Malloc(512);
+
+//	printf("in PyOS_double_to_string\n");
+	if (!buf)
+		return NULL;
+
+	/* XXX validate format_code */
+
+	format_float_short(buf, 512, val, mode, precision);
+
+	if (add_dot_0_if_integer) {
+		/* If the result was just an integer, without a decimal, then
+		   add ".0" to the end of the string. */
+		char *cp = buf;
+		if (*cp == '-')
+			cp++;
+		for (; *cp != '\0'; cp++) {
+			/* Any non-digit means it's not an integer;
+			   this takes care of NAN and INF as well. */
+			if (!isdigit(Py_CHARMASK(*cp)))
+				break;
+		}
+		if (*cp == '\0') {
+			*cp++ = '.';
+			*cp++ = '0';
+			*cp++ = '\0';
+		}
+	}
+
+	return buf;
+}
