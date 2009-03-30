@@ -1026,8 +1026,10 @@ save_float(PicklerObject *self, PyObject *obj)
             goto done;
 
         buf = PyOS_double_to_string(x, 2, 'g', 17, 0, 0);
-        if (!buf)
+        if (!buf) {
+            PyErr_NoMemory();
             goto done;
+        }
 
         if (pickler_write(self, buf, strlen(buf)) < 0)
             goto done;
