@@ -444,8 +444,7 @@ float_str_or_repr(PyFloatObject *v, int mode, int precision)
 static PyObject *
 float_repr(PyFloatObject *v)
 {
-    /* XXX change PREC_REPR to 0 when mode is supported */
-    return float_str_or_repr(v, 0, PREC_REPR);
+    return float_str_or_repr(v, 0, 0);
 }
 
 static PyObject *
@@ -1980,17 +1979,21 @@ PyFloat_Fini(void)
 			     i++, p++) {
 				if (PyFloat_CheckExact(p) &&
 				    Py_REFCNT(p) != 0) {
-					char buf[100];
-					format_double(buf, sizeof(buf),
-                                                      PyFloat_AS_DOUBLE(p),
-                                                      PREC_STR);
-					/* XXX(twouters) cast refcount to
-					   long until %zd is universally
-					   available
-					 */
-					fprintf(stderr,
+					char *buf = PyOS_double_to_string(
+						PyFloat_AS_DOUBLE(p), 0, 'g',
+						0, 0, 1);
+					if (buf) {
+						/* XXX(twouters) cast
+						   refcount to long
+						   until %zd is
+						   universally
+						   available
+						*/
+						fprintf(stderr,
 			     "#   <float at %p, refcnt=%ld, val=%s>\n",
 						p, (long)Py_REFCNT(p), buf);
+						PyMem_Free(buf);
+					}
 				}
 			}
 			list = list->next;
