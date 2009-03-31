@@ -113,6 +113,9 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(1.5e-101.__format__('e'), '1.500000e-101')
         self.assertEqual('%e' % 1.5e-101, '1.500000e-101')
 
+        self.assertEqual('%g' % 1.0, '1')
+        self.assertEqual('%#g' % 1.0, '1.00000')
+
     def test_normal_integers(self):
         # Ensure the first 256 integers are shared
         a = 256

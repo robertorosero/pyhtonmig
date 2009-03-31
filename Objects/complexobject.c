@@ -368,8 +368,7 @@ complex_format(PyComplexObject *v, int mode, int precision)
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision,
-                                        0, 0);
+            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 0);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -388,8 +387,7 @@ complex_format(PyComplexObject *v, int mode, int precision)
                 re = "-inf";
         }
         else {
-            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision,
-                                        0, 0);
+            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision, 0);
             if (!pre) {
                 PyErr_NoMemory();
                 goto done;
@@ -408,7 +406,7 @@ complex_format(PyComplexObject *v, int mode, int precision)
         }
         else {
             pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision,
-                                        1, 0);
+                                        Py_DTSF_SIGN);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;

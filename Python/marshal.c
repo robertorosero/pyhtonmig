@@ -237,7 +237,7 @@ w_object(PyObject *v, WFILE *p)
 		}
 		else {
 			char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
-				0, 'g', 0, 0, 1);
+				0, 'g', 0, Py_DTSF_ADD_DOT_0);
 			if (!buf)
                             return;
 			n = strlen(buf);
@@ -269,7 +269,7 @@ w_object(PyObject *v, WFILE *p)
 			char *buf;
 			w_byte(TYPE_COMPLEX, p);
 			buf = PyOS_double_to_string(PyComplex_RealAsDouble(v),
-				0, 'g', 0, 0, 1);
+				0, 'g', 0, Py_DTSF_ADD_DOT_0);
 			if (!buf)
                             return;
 			n = strlen(buf);
@@ -277,7 +277,7 @@ w_object(PyObject *v, WFILE *p)
 			w_string(buf, (int)n, p);
 			PyMem_Free(buf);
 			buf = PyOS_double_to_string(PyComplex_ImagAsDouble(v),
-				0, 'g', 0, 0, 1);
+				0, 'g', 0, Py_DTSF_ADD_DOT_0);
 			if (!buf)
                             return;
 			n = strlen(buf);

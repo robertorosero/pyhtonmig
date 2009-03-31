@@ -500,16 +500,36 @@ PyOS_ascii_atof(const char *nptr)
 }
 
 
+/* I'm using a lookup table here so that I don't have to invent a non-locale
+   specific way to convert to uppercase */
+#define OFS_INF 0
+#define OFS_NAN 1
+#define OFS_E 2
+
+/* The lengths of these are known to the code below, so don't change them */
+static char *lc_float_strings[] = {
+	"inf",
+	"nan",
+	"e",
+};
+static char *uc_float_strings[] = {
+	"INF",
+	"NAN",
+	"E",
+};
+
+
 /* convert a Python float to a minimal string that evaluates back to that
    float.  The output is minimal in the sense of having the least possible
    number of significant digits. */
 
 static void
-format_float_short(char *buf, size_t buflen, double d, int mode, int precision, int always_add_sign, int add_dot_0_if_integer)
+format_float_short(char *buf, size_t buflen, double d, char format_code, int mode, int precision, int always_add_sign, int add_dot_0_if_integer, char **float_strings)
 {
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
-	size_t digits_len, i;
+	Py_ssize_t digits_len, i;
+	int use_exp;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point
 	   or exponent) */
@@ -528,11 +548,11 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision, 
 			else if (always_add_sign) {
 				*buf++ = '+';
 			}
-			strncpy(buf, "inf", 3);
+			strncpy(buf, float_strings[OFS_INF], 3);
 			buf += 3;
 		}
 		else if (digits[0] == 'n' || digits[0] == 'N') {
-			strncpy(buf, "nan", 3);
+			strncpy(buf, float_strings[OFS_NAN], 3);
 			buf += 3;
 		}
 		else {
@@ -543,19 +563,55 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision, 
 			       (int)digits_len, digits);
 			assert(0);
 		}
+		*buf = '\0';
+		return;
 	}
-	else if (-4 < decpt && decpt <= 17) {
-		if (sign == 1) {
-			*buf++ = '-';
-		} else if (always_add_sign) {
-			*buf++ = '+';
-		}
-		/* use fixed-point notation if 1e-4 <= value < 1e17 */
+
+	/* this replaces the various tests in other places like:
+	    if (type == 'f' && fabs(x) >= 1e50)
+		type = 'g';
+	   over time, those tests should be deleted
+	*/
+	if (decpt > 50 && format_code == 'f')
+		format_code = 'g';
+
+	/* detect if we're using exponents or not */
+	if (format_code == 'e')
+		use_exp = 1;
+	else {
+		int min_decpt = -4;
+		int max_decpt = 17;
+		if (format_code == 'g')
+			max_decpt = 6;
+		if (min_decpt < decpt && decpt <= max_decpt)
+			use_exp = 0;
+		else
+			use_exp = 1;
+	}
+
+	/* we got digits back, format them */
+
+	if (sign == 1) {
+		*buf++ = '-';
+	} else if (always_add_sign) {
+		*buf++ = '+';
+	}
+
+	if (use_exp) {
+		/* exponential notation: d[.dddd]e(+|-)ee;
+		   at least 2 digits in exponent */
+		*buf++ = digits[0];
+		*buf++ = '.';
+		strncpy(buf, digits+1, digits_len-1);
+		buf += digits_len-1;
+
+	} else {
+		/* use fixed-point notation */
 		if (decpt <= 0) {
 			/* output: 0.00...00dd...dd */
 			*buf++ = '0';
 			*buf++ = '.';
-			for (i=0; i < -decpt; i++)
+			for (i = 0; i < -decpt; i++)
 				*buf++ = '0';
 			strncpy(buf, digits, digits_len);
 			buf += digits_len;
@@ -572,52 +628,84 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision, 
 			/* decpt >= digits_len.  output: dd...dd00...00.0 */
 			strncpy(buf, digits, digits_len);
 			buf += digits_len;
-			for (i=0; i < decpt-digits_len; i++)
+			for (i = 0; i < decpt-digits_len; i++)
 				*buf++ = '0';
-			if (add_dot_0_if_integer) {
-				*buf++ = '.';
-				*buf++ = '0';
-			}
+			*buf++ = '.';
 		}
 	}
-	else {
-		/* exponential notation: d[.dddd]e(+|-)ee;
-		   at least 2 digits in exponent */
-		if (sign == 1) {
-			*buf++ = '-';
-		} else if (always_add_sign) {
-			*buf++ = '+';
+
+	/* Add trailing non-significant zeros for non-mode 0 and non-code g */
+	if (mode != 0 && format_code != 'g') {
+		Py_ssize_t nzeros = precision - digits_len;
+
+		/* It should never be the case that nzeros is negative, but
+		   check anyway. And while we're at it, skip 0 zeros. */
+		if (nzeros > 0) {
+			for (i = 0; i < nzeros; i++)
+				*buf++ = '0';
 		}
-		*buf++ = digits[0];
-		if (digits_len > 1) {
-			*buf++ = '.';
-			strncpy(buf, digits+1, digits_len-1);
-			buf += digits_len-1;
-		}
-		*buf++ = 'e';
+	}
+
+	/* See if we want to have the trailing decimal or not */
+	if (format_code == 'g' && buf[-1] == '.')
+		buf--;
+
+	/* Now that we've done zero padding, add an exponent if needed. */
+	if (use_exp) {
+		*buf++ = float_strings[OFS_E][0];
 		exp_len = sprintf(buf, "%+.02d", decpt-1);
 		buf += exp_len;
 	}
+
 	*buf++ = '\0';
 }
+
 
 PyAPI_FUNC(char *) PyOS_double_to_string(double val,
                                          int mode,
                                          char format_code,
                                          int precision,
-                                         int always_add_sign,
-                                         int add_dot_0_if_integer)
+                                         int flags)
 {
-	char fmt[32];
 	char* buf = (char *)PyMem_Malloc(512);
+	char lc_format_code = format_code;
+	char** float_strings = lc_float_strings;
 
-//	printf("in PyOS_double_to_string\n");
+	switch (format_code) {
+	case 'e':
+	case 'f':
+	case 'g':
+		break;
+	case 'E':
+		lc_format_code = 'e';
+		break;
+	case 'F':
+		lc_format_code = 'f';
+		break;
+	case 'G':
+		lc_format_code = 'g';
+		break;
+	default:
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+
+	if (format_code != lc_format_code)
+		float_strings = uc_float_strings;
+
+	/* don't touch precision if we're in mode 0, it should stay 0. if
+	   we're not using 'g', add one to the precision because we need to
+	   include the digit before the decimal. */
+	if (mode != 0 && lc_format_code != 'g')
+		precision += 1;
+
+//	printf("in PyOS_double_to_string %c %c\n", format_code, lc_format_code);
 	if (!buf)
 		return NULL;
 
 	/* XXX validate format_code */
 
-	format_float_short(buf, 512, val, mode, precision, always_add_sign, add_dot_0_if_integer);
+	format_float_short(buf, 512, val, lc_format_code, mode, precision, flags & Py_DTSF_SIGN, flags & Py_DTSF_ADD_DOT_0, float_strings);
 
 	return buf;
 }

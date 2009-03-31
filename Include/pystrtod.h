@@ -13,10 +13,13 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
                                          int mode,
                                          char format_code,
                                          int precision,
-                                         int sign,
-                                         int add_dot_0_if_integer);
+                                         int flags);
 
 
+#define Py_DTSF_SIGN      0x01 /* always add the sign */
+#define Py_DTSF_ADD_DOT_0 0x02 /* if the result is an integer add ".0" */
+#define Py_DTSF_ALT       0x04 /* "alternate" formatting. it's format_code
+                                  specific */
 
 #ifdef __cplusplus
 }
