@@ -524,7 +524,10 @@ static char *uc_float_strings[] = {
    number of significant digits. */
 
 static void
-format_float_short(char *buf, size_t buflen, double d, char format_code, int mode, int precision, int always_add_sign, int add_dot_0_if_integer, char **float_strings)
+format_float_short(char *buf, size_t buflen, double d, char format_code,
+		   int mode, int precision, int always_add_sign,
+		   int add_dot_0_if_integer, int use_alt_formatting,
+		   char **float_strings)
 {
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
@@ -586,7 +589,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code, int mod
 	case 'g': {
 		int min_decpt = -4;
 
-		if (decpt > precision || decpt < min_decpt)
+		if ((mode != 0) && (decpt > precision || decpt < min_decpt))
 			use_exp = 1;
 		else
 			use_exp = 0;
@@ -638,8 +641,17 @@ format_float_short(char *buf, size_t buflen, double d, char format_code, int mod
 		}
 	}
 
-	/* Add trailing non-significant zeros for non-mode 0 and non-code g */
-	if (mode != 0 && format_code != 'g') {
+	/* Add trailing non-significant zeros for non-mode 0 and non-code g, unless doing alt formatting */
+	int pad = 0;
+	if (mode != 0)
+		if (format_code == 'g') {
+			if (use_alt_formatting)
+				pad = 1;
+		}
+		else
+			pad = 1;
+
+	if (pad) {
 		Py_ssize_t nzeros = precision - digits_len;
 
 		/* It should never be the case that nzeros is negative, but
@@ -709,7 +721,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 
 	/* XXX validate format_code */
 
-	format_float_short(buf, 512, val, lc_format_code, mode, precision, flags & Py_DTSF_SIGN, flags & Py_DTSF_ADD_DOT_0, float_strings);
+	format_float_short(buf, 512, val, lc_format_code, mode, precision, flags & Py_DTSF_SIGN, flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT, float_strings);
 
 	return buf;
 }
