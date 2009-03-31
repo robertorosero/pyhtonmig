@@ -183,6 +183,8 @@
 
 #include "Python.h"
 
+#define NO_HEX_FP
+
 /* use WORDS_BIGENDIAN to determine float endianness.  This assumes that ints
    and floats share the same endianness on the target machine, which appears
    to be true for every platform that Python currently cares about.  We're
@@ -1632,7 +1634,6 @@ hexnan
 #endif /*No_Hex_NaN*/
 #endif /* INFNAN_CHECK */
 
-#ifndef NO_HEX_FP /*{*/
 #ifdef Pack_32
 #define ULbits 32
 #define kshift 5
@@ -1642,6 +1643,8 @@ hexnan
 #define kshift 4
 #define kmask 15
 #endif
+
+#ifndef NO_HEX_FP /*{*/
 
  static void
 #ifdef KR_headers
