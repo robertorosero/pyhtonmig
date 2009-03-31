@@ -529,10 +529,12 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 		   int add_dot_0_if_integer, int use_alt_formatting,
 		   char **float_strings)
 {
+	char *start = buf;
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
 	Py_ssize_t digits_len, i;
 	int use_exp = 0;
+	int is_integer = 1;  /* is the output produced so far just an integer? */
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point
 	   or exponent) */
@@ -609,6 +611,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 		   at least 2 digits in exponent */
 		*buf++ = digits[0];
 		*buf++ = '.';
+		is_integer = 0;
 		strncpy(buf, digits+1, digits_len-1);
 		buf += digits_len-1;
 
@@ -618,6 +621,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 			/* output: 0.00...00dd...dd */
 			*buf++ = '0';
 			*buf++ = '.';
+			is_integer = 0;
 			for (i = 0; i < -decpt; i++)
 				*buf++ = '0';
 			strncpy(buf, digits, digits_len);
@@ -628,6 +632,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 			strncpy(buf, digits, decpt);
 			buf += decpt;
 			*buf++ = '.';
+			is_integer = 0;
 			strncpy(buf, digits+decpt, digits_len-decpt);
 			buf += digits_len-decpt;
 		}
@@ -638,18 +643,20 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 			for (i = 0; i < decpt-digits_len; i++)
 				*buf++ = '0';
 			*buf++ = '.';
+			is_integer = 0;
 		}
 	}
 
 	/* Add trailing non-significant zeros for non-mode 0 and non-code g, unless doing alt formatting */
 	int pad = 0;
-	if (mode != 0)
+	if (mode != 0) {
 		if (format_code == 'g') {
 			if (use_alt_formatting)
 				pad = 1;
 		}
 		else
 			pad = 1;
+	}
 
 	if (pad) {
 		Py_ssize_t nzeros = precision - digits_len;
@@ -663,14 +670,23 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 	}
 
 	/* See if we want to have the trailing decimal or not */
-	if (format_code == 'g' && buf[-1] == '.')
+	if (format_code == 'g' && buf[-1] == '.') {
 		buf--;
+		is_integer = 1; /* XXX not sure if this is correct, should probably change this to detect this case and not add it to begin with */
+	}
 
 	/* Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
 		*buf++ = float_strings[OFS_E][0];
 		exp_len = sprintf(buf, "%+.02d", decpt-1);
 		buf += exp_len;
+		is_integer = 0;
+	}
+
+	/* Add ".0" if we're an integer? */
+	if (add_dot_0_if_integer && is_integer) {
+		*buf++ = '.';
+		*buf++ = '0';
 	}
 
 	*buf++ = '\0';
