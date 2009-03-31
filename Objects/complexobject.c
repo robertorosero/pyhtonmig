@@ -14,20 +14,13 @@
 
 #ifndef WITHOUT_COMPLEX
 
-/* Precisions used by repr() and str(), respectively.
-
-   The repr() precision (17 significant decimal digits) is the minimal number
-   that is guaranteed to have enough precision so that if the number is read
-   back in the exact same binary value is recreated.  This is true for IEEE
-   floating point by design, and also happens to work for all other modern
-   hardware.
+/* Precision used by str().
 
    The str() precision is chosen so that in most cases, the rounding noise
    created by various operations is suppressed, while giving plenty of
    precision for practical use.
 */
 
-#define PREC_REPR	17
 #define PREC_STR	12
 
 /* elementary operations on complex numbers */
@@ -345,25 +338,24 @@ complex_dealloc(PyObject *op)
 }
 
 
-static int
-complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
-               int precision)
+static PyObject *
+complex_format(PyComplexObject *v, int mode, int precision)
 {
-    int result = -1;
-    char* p;
+    PyObject *result = NULL;
+    Py_ssize_t len;
+    char *buf;
 
     /* If these are non-NULL, they'll need to be freed. */
-    char* pre = NULL;
-    char* pim = NULL;
+    char *pre = NULL;
+    char *pim = NULL;
 
     /* These do not need to be freed. They're either aliases for pim
        and pre, or pointers to constants. */
-    char* re = NULL;
-    char* im = NULL;
-    char* lead = "";
-    char* tail = "";
+    char *re = NULL;
+    char *im = NULL;
+    char *lead = "";
+    char *tail = "";
 
-    Py_ssize_t len;
 
     if (v->cval.real == 0.) {
         re = "";
@@ -376,7 +368,8 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 0, 0);
+            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision,
+                                        0, 0);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -395,7 +388,8 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
                 re = "-inf";
         }
         else {
-            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision, 0, 0);
+            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision,
+                                        0, 0);
             if (!pre) {
                 PyErr_NoMemory();
                 goto done;
@@ -413,7 +407,8 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 1, 0);
+            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision,
+                                        1, 0);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -423,16 +418,16 @@ complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
         lead = "(";
         tail = ")";
     }
-    /* Alloc the final buffer. Add one for the "j" in the format string. */
+    /* Alloc the final buffer. Add one for the "j" in the format string, and
+       one for the trailing zero. */
     len = strlen(lead) + strlen(re) + strlen(im) + strlen(tail) + 2;
-    p = PyMem_Malloc(len);
-    if (!p) {
+    buf = PyMem_Malloc(len);
+    if (!buf) {
         PyErr_NoMemory();
         goto done;
     }
-    PyOS_snprintf(p, len, "%s%s%sj%s", lead, re, im, tail);
-    strcpy(buf, p);
-    result = 0;
+    PyOS_snprintf(buf, len, "%s%s%sj%s", lead, re, im, tail);
+    result = PyUnicode_FromString(buf);
 done:
     PyMem_Free(pim);
     PyMem_Free(pre);
@@ -443,19 +438,13 @@ done:
 static PyObject *
 complex_repr(PyComplexObject *v)
 {
-	char buf[100];
-	if (complex_to_buf(buf, sizeof(buf), v, 0, 0) < 0)
-            return PyErr_NoMemory();
-	return PyUnicode_FromString(buf);
+    return complex_format(v, 0, 0);
 }
 
 static PyObject *
 complex_str(PyComplexObject *v)
 {
-	char buf[100];
-	if (complex_to_buf(buf, sizeof(buf), v, 2, PREC_STR) < 0)
-            return PyErr_NoMemory();
-	return PyUnicode_FromString(buf);
+    return complex_format(v, 2, PREC_STR);
 }
 
 static long
