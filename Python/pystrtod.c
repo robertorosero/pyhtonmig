@@ -520,10 +520,18 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision, 
 			}
 			strncpy(buf, "inf", 3);
 			buf += 3;
-		} else {
-			assert(digits[0] == 'n' || digits[0] == 'N');
+		}
+		else if (digits[0] == 'n' || digits[0] == 'N') {
 			strncpy(buf, "nan", 3);
 			buf += 3;
+		}
+		else {
+			/* shouldn't get here: Gay's code should always return
+			   something starting with a digit, an 'I', or an
+			   'N' */
+			printf("Help! dtoa returned: %.*s\n",
+			       (int)digits_len, digits);
+			assert(0);
 		}
 	}
 	else if (-4 < decpt && decpt <= 17) {
