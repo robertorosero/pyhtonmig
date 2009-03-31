@@ -194,12 +194,22 @@
 #define IEEE_8087
 #endif
 
-#ifndef Long
-#define Long long
+#if SIZEOF_LONG==8 && SIZEOF_INT==4
+typedef int Long;
+typedef unsigned int ULong;
+#elif SIZEOF_LONG==4
+typedef long Long;
+typedef unsigned long ULong;
+#else
+#error "Failed to find an exact-width 32-bit integer type"
 #endif
-#ifndef ULong
-typedef unsigned Long ULong;
+
+#ifndef HAVE_LONG_LONG
+#define NO_LONG_LONG
 #endif
+
+/* End Python #define linking */
+
 
 #ifdef DEBUG
 #include "stdio.h"
