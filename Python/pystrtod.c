@@ -529,7 +529,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code, int mod
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
 	Py_ssize_t digits_len, i;
-	int use_exp;
+	int use_exp = 0;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point
 	   or exponent) */
@@ -576,17 +576,21 @@ format_float_short(char *buf, size_t buflen, double d, char format_code, int mod
 		format_code = 'g';
 
 	/* detect if we're using exponents or not */
-	if (format_code == 'e')
+	switch (format_code) {
+	case 'e':
 		use_exp = 1;
-	else {
+		break;
+	case 'f':
+		use_exp = 0;
+		break;
+	case 'g': {
 		int min_decpt = -4;
-		int max_decpt = 17;
-		if (format_code == 'g')
-			max_decpt = 6;
-		if (min_decpt < decpt && decpt <= max_decpt)
-			use_exp = 0;
-		else
+
+		if (decpt > precision || decpt < min_decpt)
 			use_exp = 1;
+		else
+			use_exp = 0;
+	}
 	}
 
 	/* we got digits back, format them */
