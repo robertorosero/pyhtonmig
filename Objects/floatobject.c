@@ -262,8 +262,8 @@ PyFloat_FromString(PyObject *v)
 	if (x == 0.0) {
 		/* See above -- may have been strtod being anal
 		   about denorms. */
-		PyFPE_START_PROTECT("atof", goto error)
-		x = PyOS_ascii_atof(s);
+		PyFPE_START_PROTECT("strtod", goto error)
+		x = PyOS_ascii_strtod(s, NULL);
 		PyFPE_END_PROTECT(x)
 		errno = 0;    /* whether atof ever set errno is undefined */
 	}
