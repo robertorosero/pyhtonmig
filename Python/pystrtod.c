@@ -495,7 +495,7 @@ PyOS_ascii_atof(const char *nptr)
    number of significant digits. */
 
 static void
-format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
+format_float_short(char *buf, size_t buflen, double d, int mode, int precision, int always_add_sign, int add_dot_0_if_integer)
 {
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
@@ -515,6 +515,9 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
 			if (sign == 1) {
 				*buf++ = '-';
 			}
+			else if (always_add_sign) {
+				*buf++ = '+';
+			}
 			strncpy(buf, "inf", 3);
 			buf += 3;
 		} else {
@@ -526,6 +529,8 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
 	else if (-4 < decpt && decpt <= 17) {
 		if (sign == 1) {
 			*buf++ = '-';
+		} else if (always_add_sign) {
+			*buf++ = '+';
 		}
 		/* use fixed-point notation if 1e-4 <= value < 1e17 */
 		if (decpt <= 0) {
@@ -551,8 +556,10 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
 			buf += digits_len;
 			for (i=0; i < decpt-digits_len; i++)
 				*buf++ = '0';
-			*buf++ = '.';
-			*buf++ = '0';
+			if (add_dot_0_if_integer) {
+				*buf++ = '.';
+				*buf++ = '0';
+			}
 		}
 	}
 	else {
@@ -560,6 +567,8 @@ format_float_short(char *buf, size_t buflen, double d, int mode, int precision)
 		   at least 2 digits in exponent */
 		if (sign == 1) {
 			*buf++ = '-';
+		} else if (always_add_sign) {
+			*buf++ = '+';
 		}
 		*buf++ = digits[0];
 		if (digits_len > 1) {
@@ -578,7 +587,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
                                          int mode,
                                          char format_code,
                                          int precision,
-                                         int sign,
+                                         int always_add_sign,
                                          int add_dot_0_if_integer)
 {
 	char fmt[32];
@@ -590,26 +599,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 
 	/* XXX validate format_code */
 
-	format_float_short(buf, 512, val, mode, precision);
-
-	if (add_dot_0_if_integer) {
-		/* If the result was just an integer, without a decimal, then
-		   add ".0" to the end of the string. */
-		char *cp = buf;
-		if (*cp == '-')
-			cp++;
-		for (; *cp != '\0'; cp++) {
-			/* Any non-digit means it's not an integer;
-			   this takes care of NAN and INF as well. */
-			if (!isdigit(Py_CHARMASK(*cp)))
-				break;
-		}
-		if (*cp == '\0') {
-			*cp++ = '.';
-			*cp++ = '0';
-			*cp++ = '\0';
-		}
-	}
+	format_float_short(buf, 512, val, mode, precision, always_add_sign, add_dot_0_if_integer);
 
 	return buf;
 }

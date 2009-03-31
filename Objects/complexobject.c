@@ -345,62 +345,107 @@ complex_dealloc(PyObject *op)
 }
 
 
-static void
-complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int precision)
+static int
+complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int mode,
+               int precision)
 {
-	char format[32];
-	if (v->cval.real == 0.) {
-		if (!Py_IS_FINITE(v->cval.imag)) {
-			if (Py_IS_NAN(v->cval.imag))
-				strncpy(buf, "nan*j", 6);
-			else if (copysign(1, v->cval.imag) == 1)
-				strncpy(buf, "inf*j", 6);
-			else
-				strncpy(buf, "-inf*j", 7);
-		}
-		else {
-			PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
-			PyOS_ascii_formatd(buf, bufsz - 1, format, v->cval.imag);
-			strncat(buf, "j", 1);
-		}
-	} else {
-		char re[64], im[64];
-		/* Format imaginary part with sign, real part without */
-		if (!Py_IS_FINITE(v->cval.real)) {
-			if (Py_IS_NAN(v->cval.real))
-				strncpy(re, "nan", 4);
-			/* else if (copysign(1, v->cval.real) == 1) */
-			else if (v->cval.real > 0)
-				strncpy(re, "inf", 4);
-			else
-				strncpy(re, "-inf", 5);
-		}
-		else {
-			PyOS_snprintf(format, sizeof(format), "%%.%ig", precision);
-			PyOS_ascii_formatd(re, sizeof(re), format, v->cval.real);
-		}
-		if (!Py_IS_FINITE(v->cval.imag)) {
-			if (Py_IS_NAN(v->cval.imag))
-				strncpy(im, "+nan*", 6);
-			/* else if (copysign(1, v->cval.imag) == 1) */
-			else if (v->cval.imag > 0)
-				strncpy(im, "+inf*", 6);
-			else
-				strncpy(im, "-inf*", 6);
-		}
-		else {
-			PyOS_snprintf(format, sizeof(format), "%%+.%ig", precision);
-			PyOS_ascii_formatd(im, sizeof(im), format, v->cval.imag);
-		}
-		PyOS_snprintf(buf, bufsz, "(%s%sj)", re, im);
-	}
+    int result = -1;
+    char* p;
+
+    /* If these are non-NULL, they'll need to be freed. */
+    char* pre = NULL;
+    char* pim = NULL;
+
+    /* These do not need to be freed. They're either aliases for pim
+       and pre, or pointers to constants. */
+    char* re = NULL;
+    char* im = NULL;
+    char* lead = "";
+    char* tail = "";
+
+    Py_ssize_t len;
+
+    if (v->cval.real == 0.) {
+        re = "";
+        if (!Py_IS_FINITE(v->cval.imag)) {
+            if (Py_IS_NAN(v->cval.imag))
+                im = "nan*";
+            else if (copysign(1, v->cval.imag) == 1)
+                im = "inf*";
+            else
+                im = "-inf*";
+        }
+        else {
+            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 0, 0);
+            if (!pim) {
+                PyErr_NoMemory();
+                goto done;
+            }
+            im = pim;
+        }
+    } else {
+        /* Format imaginary part with sign, real part without */
+        if (!Py_IS_FINITE(v->cval.real)) {
+            if (Py_IS_NAN(v->cval.real))
+                re = "nan";
+            /* else if (copysign(1, v->cval.real) == 1) */
+            else if (v->cval.real > 0)
+                re = "inf";
+            else
+                re = "-inf";
+        }
+        else {
+            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision, 0, 0);
+            if (!pre) {
+                PyErr_NoMemory();
+                goto done;
+            }
+            re = pre;
+        }
+
+        if (!Py_IS_FINITE(v->cval.imag)) {
+            if (Py_IS_NAN(v->cval.imag))
+                im = "+nan*";
+            /* else if (copysign(1, v->cval.imag) == 1) */
+            else if (v->cval.imag > 0)
+                im = "+inf*";
+            else
+                im = "-inf*";
+        }
+        else {
+            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 1, 0);
+            if (!pim) {
+                PyErr_NoMemory();
+                goto done;
+            }
+            im = pim;
+        }
+        lead = "(";
+        tail = ")";
+    }
+    /* Alloc the final buffer. Add one for the "j" in the format string. */
+    len = strlen(lead) + strlen(re) + strlen(im) + strlen(tail) + 2;
+    p = PyMem_Malloc(len);
+    if (!p) {
+        PyErr_NoMemory();
+        goto done;
+    }
+    PyOS_snprintf(p, len, "%s%s%sj%s", lead, re, im, tail);
+    strcpy(buf, p);
+    result = 0;
+done:
+    PyMem_Free(pim);
+    PyMem_Free(pre);
+
+    return result;
 }
 
 static PyObject *
 complex_repr(PyComplexObject *v)
 {
 	char buf[100];
-	complex_to_buf(buf, sizeof(buf), v, PREC_REPR);
+	if (complex_to_buf(buf, sizeof(buf), v, 0, 0) < 0)
+            return PyErr_NoMemory();
 	return PyUnicode_FromString(buf);
 }
 
@@ -408,7 +453,8 @@ static PyObject *
 complex_str(PyComplexObject *v)
 {
 	char buf[100];
-	complex_to_buf(buf, sizeof(buf), v, PREC_STR);
+	if (complex_to_buf(buf, sizeof(buf), v, 2, PREC_STR) < 0)
+            return PyErr_NoMemory();
 	return PyUnicode_FromString(buf);
 }
 
