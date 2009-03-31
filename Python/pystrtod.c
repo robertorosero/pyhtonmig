@@ -40,6 +40,16 @@
 double
 PyOS_ascii_strtod(const char *nptr, char **endptr)
 {
+	assert(nptr != NULL);
+	/* Set errno to zero, so that we can distinguish zero results
+	   and underflows */
+	errno = 0;
+	return _Py_dg_strtod(nptr, endptr);
+}
+
+double
+PyOS_ascii_strtod_fallback(const char *nptr, char **endptr)
+{
 	char *fail_pos;
 	double val = -1.0;
 	struct lconv *locale_data;
