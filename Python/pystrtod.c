@@ -529,15 +529,15 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 		   int add_dot_0_if_integer, int use_alt_formatting,
 		   char **float_strings)
 {
-	char *start = buf;
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
 	Py_ssize_t digits_len, i;
 	int use_exp = 0;
-	int is_integer = 1;  /* is the output produced so far just an integer? */
+	int is_integer = 1;  /* is the output produced so far
+				just an integer? */
 
-	/* _Py_dg_dtoa returns a digit string (no decimal point
-	   or exponent) */
+	/* _Py_dg_dtoa returns a digit string (no decimal point or
+	   exponent) */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
 	assert(digits_end != NULL && digits_end > digits);
 	digits_len = digits_end - digits;
@@ -703,6 +703,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	char lc_format_code = format_code;
 	char** float_strings = lc_float_strings;
 
+	/* Validate format_code, and map upper and lower case */
 	switch (format_code) {
 	case 'e':
 	case 'f':
