@@ -533,9 +533,8 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
 	int use_exp = 0;
-	int is_integer = 1;  /* is the output produced so far
-				just an integer? */
-	int add_padding = 0;
+	int is_integer;  /* is the output produced so far just an integer? */
+	int add_padding;
 	Py_ssize_t n_digits_after_decimal = 0;
 	Py_ssize_t n_digits;
 	Py_ssize_t i;
@@ -581,8 +580,8 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		type = 'g';
 	   over time, those tests should be deleted
 	*/
-	if (decpt > 50 && format_code == 'f')
-		format_code = 'g';
+/*	if (decpt > 50 && format_code == 'f')
+		format_code = 'g'; */
 
 	/* detect if we're using exponents or not */
 	switch (format_code) {
@@ -616,31 +615,30 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		n_digits_after_decimal = n_digits - 1;
 		*buf++ = digits[0];
 		*buf++ = '.';
-		is_integer = 0;
 		strncpy(buf, digits + 1, n_digits_after_decimal);
 		buf += n_digits_after_decimal;
 	} else {
 		/* Use fixed-point notation */
+
+		/* Be aware that n_digits_after_decimal can be negative! */
+		n_digits_after_decimal = n_digits - decpt;
+
 		if (decpt <= 0) {
 			/* output: 0.00-00dd-dd */
 			*buf++ = '0';
 			*buf++ = '.';
-			is_integer = 0;
 			for (i = 0; i < -decpt; i++)
 				*buf++ = '0';
 			strncpy(buf, digits, n_digits);
 			buf += n_digits;
-			n_digits_after_decimal = n_digits - decpt;
 		}
 		else if (decpt < n_digits) {
 			/* Output: dd-dd.dd-dd */
 			strncpy(buf, digits, decpt);
 			buf += decpt;
 			*buf++ = '.';
-			is_integer = 0;
 			strncpy(buf, digits + decpt, n_digits - decpt);
 			buf += n_digits - decpt;
-			n_digits_after_decimal = n_digits - decpt;
 		}
 		else {
 			/* decpt >= n_digits. Output: dd-dd00-00.0 */
@@ -649,13 +647,12 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			for (i = 0; i < decpt - n_digits; i++)
 				*buf++ = '0';
 			*buf++ = '.';
-			is_integer = 0;
-			n_digits_after_decimal = decpt - n_digits;
 		}
 	}
 
 	/* Add trailing non-significant zeros for non-mode 0 and non-code g,
 	   unless doing alt formatting */
+	add_padding = 0;
 	if (mode != 0) {
 		if (format_code == 'g') {
 			if (use_alt_formatting)
@@ -665,17 +662,17 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			add_padding = 1;
 	}
 
-	/* It should never be the case that n_trailing_zeros is negative, but
-	   if so this loop executes zero times. */
 	if (add_padding)
 		for (i = n_digits_after_decimal; i < n_wanted_digits_after_decimal; i++)
 			*buf++ = '0';
 
-	/* See if we want to have the trailing decimal or not */
-	if (format_code == 'g' && buf[-1] == '.') {
+	/* If we're at a trailing decimal, delete it. We are then just an integer. */
+	if (buf[-1] == '.') {
 		buf--;
-		is_integer = 1; /* XXX not sure if this is correct, should probably change this to detect this case and not add it to begin with */
+		is_integer = 1;
 	}
+	else
+		is_integer = 0;
 
 	/* Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
@@ -744,6 +741,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 			n_wanted_digits_after_decimal--;
 		break;
 	case 'r':
+		/* "repr" pseudo-mode */
 		mode = 0;
 		break;
 	}
