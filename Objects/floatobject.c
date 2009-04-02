@@ -365,11 +365,12 @@ convert_to_double(PyObject **v, double *dbl)
 #define PREC_STR	12
 
 static PyObject *
-float_str_or_repr(PyFloatObject *v, int mode, int precision)
+float_str_or_repr(PyFloatObject *v, char format_code, int precision)
 {
     PyObject *result;
     char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
-                                      mode, 'g', precision, Py_DTSF_ADD_DOT_0);
+                                      format_code, precision,
+                                      Py_DTSF_ADD_DOT_0);
     if (!buf)
         return PyErr_NoMemory();
     result = PyUnicode_FromString(buf);
@@ -380,13 +381,13 @@ float_str_or_repr(PyFloatObject *v, int mode, int precision)
 static PyObject *
 float_repr(PyFloatObject *v)
 {
-    return float_str_or_repr(v, 0, 0);
+    return float_str_or_repr(v, 'r', 0);
 }
 
 static PyObject *
 float_str(PyFloatObject *v)
 {
-    return float_str_or_repr(v, 2, PREC_STR);
+    return float_str_or_repr(v, 'g', PREC_STR);
 }
 
 /* Comparison is pretty much a nightmare.  When comparing float to float,
@@ -1916,7 +1917,7 @@ PyFloat_Fini(void)
 				if (PyFloat_CheckExact(p) &&
 				    Py_REFCNT(p) != 0) {
 					char *buf = PyOS_double_to_string(
-						PyFloat_AS_DOUBLE(p), 0, 'g',
+						PyFloat_AS_DOUBLE(p), 'g',
 						0, Py_DTSF_ADD_DOT_0);
 					if (buf) {
 						/* XXX(twouters) cast

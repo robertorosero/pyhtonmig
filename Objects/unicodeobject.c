@@ -8844,7 +8844,7 @@ formatfloat(Py_UNICODE *buf,
         goto done;
     }
 
-    p = PyOS_double_to_string(x, 2, type, prec,
+    p = PyOS_double_to_string(x, type, prec,
                               (flags & F_ALT) ? Py_DTSF_ALT : 0);
     len = strlen(p);
     if (len+1 >= buflen) {

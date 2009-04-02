@@ -524,23 +524,30 @@ static char *uc_float_strings[] = {
    number of significant digits. */
 
 static void
-format_float_short(char *buf, size_t buflen, double d, char format_code,
-		   int mode, int precision, int always_add_sign,
-		   int add_dot_0_if_integer, int use_alt_formatting,
-		   char **float_strings)
+format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
+		   int mode, Py_ssize_t precision,
+		   Py_ssize_t n_wanted_digits_after_decimal,
+		   int always_add_sign, int add_dot_0_if_integer,
+		   int use_alt_formatting, char **float_strings)
 {
 	char *digits, *digits_end;
 	int decpt, sign, exp_len;
-	Py_ssize_t digits_len, i;
 	int use_exp = 0;
 	int is_integer = 1;  /* is the output produced so far
 				just an integer? */
+	int add_padding = 0;
+	Py_ssize_t n_digits_after_decimal = 0;
+	Py_ssize_t n_digits;
+	Py_ssize_t i;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent) */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
+	if (!(digits_end != NULL && digits_end > digits)) {
+		printf("%f %p %p %d %c %d\n", d, digits_end, digits, mode, format_code, precision);
+	}
 	assert(digits_end != NULL && digits_end > digits);
-	digits_len = digits_end - digits;
+	n_digits = digits_end - digits;
 
 	if (!isdigit(digits[0])) {
 		/* infinities and nans here; adapt Gay's output,
@@ -565,7 +572,7 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 			   something starting with a digit, an 'I', or an
 			   'N' */
 			printf("Help! dtoa returned: %.*s\n",
-			       (int)digits_len, digits);
+			       (int)n_digits, digits);
 			assert(0);
 		}
 		*buf = '\0';
@@ -612,62 +619,60 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 		*buf++ = digits[0];
 		*buf++ = '.';
 		is_integer = 0;
-		strncpy(buf, digits+1, digits_len-1);
-		buf += digits_len-1;
+		strncpy(buf, digits + 1, n_digits - 1);
+		buf += n_digits - 1;
 
 	} else {
 		/* use fixed-point notation */
 		if (decpt <= 0) {
-			/* output: 0.00...00dd...dd */
+			/* output: 0.00-00dd-dd */
 			*buf++ = '0';
 			*buf++ = '.';
 			is_integer = 0;
 			for (i = 0; i < -decpt; i++)
 				*buf++ = '0';
-			strncpy(buf, digits, digits_len);
-			buf += digits_len;
+			strncpy(buf, digits, n_digits);
+			buf += n_digits;
+			n_digits_after_decimal = n_digits - decpt;
 		}
-		else if (decpt < digits_len) {
-			/* output: dd...dd.dd...dd */
+		else if (decpt < n_digits) {
+			/* output: dd-dd.dd-dd */
 			strncpy(buf, digits, decpt);
 			buf += decpt;
 			*buf++ = '.';
 			is_integer = 0;
-			strncpy(buf, digits+decpt, digits_len-decpt);
-			buf += digits_len-decpt;
+			strncpy(buf, digits + decpt, n_digits - decpt);
+			buf += n_digits - decpt;
+			n_digits_after_decimal = n_digits - decpt;
 		}
 		else {
-			/* decpt >= digits_len.  output: dd...dd00...00.0 */
-			strncpy(buf, digits, digits_len);
-			buf += digits_len;
-			for (i = 0; i < decpt-digits_len; i++)
+			/* decpt >= n_digits.  output: dd-dd00-00.0 */
+			strncpy(buf, digits, n_digits);
+			buf += n_digits;
+			for (i = 0; i < decpt - n_digits; i++)
 				*buf++ = '0';
 			*buf++ = '.';
 			is_integer = 0;
+			n_digits_after_decimal = decpt - n_digits;
 		}
 	}
 
-	/* Add trailing non-significant zeros for non-mode 0 and non-code g, unless doing alt formatting */
-	int pad = 0;
+	/* Add trailing non-significant zeros for non-mode 0 and non-code g,
+	   unless doing alt formatting */
 	if (mode != 0) {
 		if (format_code == 'g') {
 			if (use_alt_formatting)
-				pad = 1;
+				add_padding = 1;
 		}
 		else
-			pad = 1;
+			add_padding = 1;
 	}
 
-	if (pad) {
-		Py_ssize_t nzeros = precision - digits_len;
-
-		/* It should never be the case that nzeros is negative, but
-		   check anyway. And while we're at it, skip 0 zeros. */
-		if (nzeros > 0) {
-			for (i = 0; i < nzeros; i++)
-				*buf++ = '0';
-		}
-	}
+	/* It should never be the case that n_trailing_zeros is negative, but
+	   if so this loop executes zero times. */
+	if (add_padding)
+		for (i = n_digits_after_decimal; i < n_wanted_digits_after_decimal; i++)
+			*buf++ = '0';
 
 	/* See if we want to have the trailing decimal or not */
 	if (format_code == 'g' && buf[-1] == '.') {
@@ -694,7 +699,6 @@ format_float_short(char *buf, size_t buflen, double d, char format_code,
 
 
 PyAPI_FUNC(char *) PyOS_double_to_string(double val,
-                                         int mode,
                                          char format_code,
                                          int precision,
                                          int flags)
@@ -702,12 +706,15 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	char* buf = (char *)PyMem_Malloc(512);
 	char lc_format_code = format_code;
 	char** float_strings = lc_float_strings;
+	Py_ssize_t n_wanted_digits_after_decimal = precision;
+	int mode = 0;
 
 	/* Validate format_code, and map upper and lower case */
 	switch (format_code) {
 	case 'e':
 	case 'f':
 	case 'g':
+	case 'r':
 		break;
 	case 'E':
 		lc_format_code = 'e';
@@ -726,11 +733,21 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	if (format_code != lc_format_code)
 		float_strings = uc_float_strings;
 
-	/* don't touch precision if we're in mode 0, it should stay 0. if
-	   we're not using 'g', add one to the precision because we need to
-	   include the digit before the decimal. */
-	if (mode != 0 && lc_format_code != 'g')
+	switch (lc_format_code) {
+	case 'e':
+		mode = 2;
 		precision += 1;
+		break;
+	case 'f':
+		mode = 3;
+		break;
+	case 'g':
+		mode = 2;
+		break;
+	case 'r':
+		mode = 0;
+		break;
+	}
 
 //	printf("in PyOS_double_to_string %c %c\n", format_code, lc_format_code);
 	if (!buf)
@@ -738,7 +755,10 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 
 	/* XXX validate format_code */
 
-	format_float_short(buf, 512, val, lc_format_code, mode, precision, flags & Py_DTSF_SIGN, flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT, float_strings);
+	format_float_short(buf, 512, val, lc_format_code, mode, precision,
+			   n_wanted_digits_after_decimal, flags & Py_DTSF_SIGN,
+			   flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT,
+			   float_strings);
 
 	return buf;
 }

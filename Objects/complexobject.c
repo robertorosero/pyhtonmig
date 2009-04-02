@@ -339,7 +339,7 @@ complex_dealloc(PyObject *op)
 
 
 static PyObject *
-complex_format(PyComplexObject *v, int mode, int precision)
+complex_format(PyComplexObject *v, char format_code, int precision)
 {
     PyObject *result = NULL;
     Py_ssize_t len;
@@ -368,7 +368,8 @@ complex_format(PyComplexObject *v, int mode, int precision)
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision, 0);
+            pim = PyOS_double_to_string(v->cval.imag, format_code,
+                                        precision, 0);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -387,7 +388,8 @@ complex_format(PyComplexObject *v, int mode, int precision)
                 re = "-inf";
         }
         else {
-            pre = PyOS_double_to_string(v->cval.real, mode, 'g', precision, 0);
+            pre = PyOS_double_to_string(v->cval.real, format_code,
+                                        precision, 0);
             if (!pre) {
                 PyErr_NoMemory();
                 goto done;
@@ -405,8 +407,8 @@ complex_format(PyComplexObject *v, int mode, int precision)
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, mode, 'g', precision,
-                                        Py_DTSF_SIGN);
+            pim = PyOS_double_to_string(v->cval.imag, format_code,
+                                        precision, Py_DTSF_SIGN);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -436,13 +438,13 @@ done:
 static PyObject *
 complex_repr(PyComplexObject *v)
 {
-    return complex_format(v, 0, 0);
+    return complex_format(v, 'r', 0);
 }
 
 static PyObject *
 complex_str(PyComplexObject *v)
 {
-    return complex_format(v, 2, PREC_STR);
+    return complex_format(v, 'g', PREC_STR);
 }
 
 static long
