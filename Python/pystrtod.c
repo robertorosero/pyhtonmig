@@ -543,13 +543,10 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent) */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
-	if (!(digits_end != NULL && digits_end > digits)) {
-		printf("%f %p %p %d %c %d\n", d, digits_end, digits, mode, format_code, precision);
-	}
-	assert(digits_end != NULL && digits_end > digits);
+	assert(digits_end != NULL && digits_end >= digits);
 	n_digits = digits_end - digits;
 
-	if (!isdigit(digits[0])) {
+	if (n_digits && !isdigit(digits[0])) {
 		/* infinities and nans here; adapt Gay's output,
 		   so convert Infinity to inf and NaN to nan, and
 		   ignore sign of nan. */
@@ -614,16 +611,16 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	}
 
 	if (use_exp) {
-		/* exponential notation: d[.dddd]e(+|-)ee;
-		   at least 2 digits in exponent */
+		/* Exponential notation: d[.dddd]e(+|-)ee; at least 2 digits
+		   in exponent */
+		n_digits_after_decimal = n_digits - 1;
 		*buf++ = digits[0];
 		*buf++ = '.';
 		is_integer = 0;
-		strncpy(buf, digits + 1, n_digits - 1);
-		buf += n_digits - 1;
-
+		strncpy(buf, digits + 1, n_digits_after_decimal);
+		buf += n_digits_after_decimal;
 	} else {
-		/* use fixed-point notation */
+		/* Use fixed-point notation */
 		if (decpt <= 0) {
 			/* output: 0.00-00dd-dd */
 			*buf++ = '0';
@@ -636,7 +633,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			n_digits_after_decimal = n_digits - decpt;
 		}
 		else if (decpt < n_digits) {
-			/* output: dd-dd.dd-dd */
+			/* Output: dd-dd.dd-dd */
 			strncpy(buf, digits, decpt);
 			buf += decpt;
 			*buf++ = '.';
@@ -646,7 +643,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			n_digits_after_decimal = n_digits - decpt;
 		}
 		else {
-			/* decpt >= n_digits.  output: dd-dd00-00.0 */
+			/* decpt >= n_digits. Output: dd-dd00-00.0 */
 			strncpy(buf, digits, n_digits);
 			buf += n_digits;
 			for (i = 0; i < decpt - n_digits; i++)
@@ -711,10 +708,10 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 
 	/* Validate format_code, and map upper and lower case */
 	switch (format_code) {
-	case 'e':
-	case 'f':
-	case 'g':
-	case 'r':
+	case 'e':          /* exponent */
+	case 'f':          /* fixed */
+	case 'g':          /* general */
+	case 'r':          /* repr format */
 		break;
 	case 'E':
 		lc_format_code = 'e';
@@ -736,13 +733,15 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	switch (lc_format_code) {
 	case 'e':
 		mode = 2;
-		precision += 1;
+		precision++;
 		break;
 	case 'f':
 		mode = 3;
 		break;
 	case 'g':
 		mode = 2;
+		if (flags & Py_DTSF_ALT)
+			n_wanted_digits_after_decimal--;
 		break;
 	case 'r':
 		mode = 0;
