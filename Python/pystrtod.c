@@ -617,6 +617,14 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			use_exp = 1;
 		trailing_zeros = 0;
 		break;
+	case 's':
+		/* str: use exponent for values >= 1e11 or < 1e-4 */
+		if (-4 < decpt && decpt < precision)
+			use_exp = 0;
+		else
+			use_exp = 1;
+		trailing_zeros = 0;
+		break;
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
@@ -710,6 +718,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	case 'f':          /* fixed */
 	case 'g':          /* general */
 	case 'r':          /* repr format */
+	case 's':          /* str format */
 		break;
 	case 'E':
 		lc_format_code = 'e';
@@ -746,6 +755,9 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	case 'r':
 		/* "repr" pseudo-mode */
 		mode = 0;
+		break;
+	case 's':
+		mode = 2;
 		break;
 	}
 

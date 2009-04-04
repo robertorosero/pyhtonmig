@@ -387,7 +387,7 @@ float_repr(PyFloatObject *v)
 static PyObject *
 float_str(PyFloatObject *v)
 {
-    return float_str_or_repr(v, 'g', PREC_STR);
+    return float_str_or_repr(v, 's', PREC_STR);
 }
 
 /* Comparison is pretty much a nightmare.  When comparing float to float,
