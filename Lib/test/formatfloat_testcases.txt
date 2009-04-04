@@ -67,6 +67,19 @@
 %#.1f 1.4 -> 1.4
 %#.2f 0.375 -> 0.38
 
+-- if precision is omitted it defaults to 6
+%f 0 -> 0.000000
+%f 1230000 -> 1230000.000000
+%f 1234567 -> 1234567.000000
+%f 123.4567 -> 123.456700
+%f 1.23456789 -> 1.234568
+%f 0.00012 -> 0.000120
+%f 0.000123 -> 0.000123
+%f 0.00012345 -> 0.000123
+%f 0.000001 -> 0.000001
+%f 0.0000005001 -> 0.000001
+%f 0.0000004999 -> 0.000000
+
 -- 'e' code formatting with explicit precision (>= 0). Output should
 -- always have exactly the number of places after the point that were
 -- requested.
@@ -143,6 +156,13 @@
 %.2e 1598.76 -> 1.60e+03
 %.2e 9999 -> 1.00e+04
 
+-- omitted precision defaults to 6
+%e 0 -> 0.000000e+00
+%e 165 -> 1.650000e+02
+%e 1234567 -> 1.234567e+06
+%e 12345678 -> 1.234568e+07
+%e 1.1 -> 1.100000e+00
+
 -- alternate form always contains a decimal point.  This only makes
 -- a difference when precision is 0.
 
@@ -178,6 +198,8 @@
 %#.0e 10.5 -> 1.e+01
 %#.0e 14.999 -> 1.e+01
 %#.0e 15 -> 2.e+01
+%#.1e 123.4 -> 1.2e+02
+%#.2e 0.0001357 -> 1.36e-04
 
 -- 'g' code formatting.
 
