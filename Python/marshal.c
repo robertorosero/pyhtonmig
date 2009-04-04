@@ -237,7 +237,7 @@ w_object(PyObject *v, WFILE *p)
 		}
 		else {
 			char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
-				'g', 0, Py_DTSF_ADD_DOT_0);
+				'r', 0, Py_DTSF_ADD_DOT_0);
 			if (!buf)
                             return;
 			n = strlen(buf);
