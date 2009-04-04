@@ -568,7 +568,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			   'N' */
 			/*printf("Help! dtoa returned: %.*s\n",
 			  (int)n_digits, digits);*/
-			strncpy(buf, 'ERR', 3);
+			strncpy(buf, "ERR", 3);
 			buf += 3;
 			assert(0);
 		}
