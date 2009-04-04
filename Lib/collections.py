@@ -132,6 +132,9 @@ class OrderedDict(dict, MutableMapping):
                    all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
 
+    def __ne__(self, other):
+        return not self == other
+
 
 
 ################################################################################
@@ -174,7 +177,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
             if (not all(c.isalnum() or c=='_' for c in name) or _iskeyword(name)
                 or not name or name[0].isdigit() or name.startswith('_')
                 or name in seen):
-                names[i] = '_%d' % (i+1)
+                names[i] = '_%d' % i
             seen.add(name)
         field_names = tuple(names)
     for name in (typename,) + field_names:
@@ -461,10 +464,10 @@ class Counter(dict):
         '''
         if not isinstance(other, Counter):
             return NotImplemented
-        _max = max
         result = Counter()
         for elem in set(self) | set(other):
-            newcount = _max(self[elem], other[elem])
+            p, q = self[elem], other[elem]
+            newcount = q if p < q else p
             if newcount > 0:
                 result[elem] = newcount
         return result
@@ -478,12 +481,12 @@ class Counter(dict):
         '''
         if not isinstance(other, Counter):
             return NotImplemented
-        _min = min
         result = Counter()
         if len(self) < len(other):
             self, other = other, self
         for elem in filter(self.__contains__, other):
-            newcount = _min(self[elem], other[elem])
+            p, q = self[elem], other[elem]
+            newcount = p if p < q else q
             if newcount > 0:
                 result[elem] = newcount
         return result

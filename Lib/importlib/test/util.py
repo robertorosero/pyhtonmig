@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import imp
 import os.path
-from test.support import unlink
+from test import support
 import unittest
 import sys
 
@@ -10,6 +10,13 @@ def case_insensitive_tests(class_):
     """Class decorator that nullifies tests that require a case-insensitive
     file system."""
     if sys.platform not in ('win32', 'darwin', 'cygwin'):
+        original_name = os.listdir('.')[0]
+        if original_name.upper() != original_name:
+            changed_name = original_name.upper()
+        else:
+            changed_name = original_name.lower()
+        if os.path.exists(changed_name):
+            return class_
         return unittest.TestCase
     else:
         return class_

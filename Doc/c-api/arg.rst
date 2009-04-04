@@ -208,8 +208,12 @@ variable(s) whose address should be passed.
    Convert a Python integer to a C :ctype:`Py_ssize_t`.
 
 ``c`` (string of length 1) [char]
-   Convert a Python character, represented as a string of length 1, to a C
+   Convert a Python character, represented as a byte string of length 1, to a C
    :ctype:`char`.
+
+``C`` (string of length 1) [int]
+   Convert a Python character, represented as a unicode string of length 1, to a
+   C :ctype:`int`.
 
 ``f`` (float) [float]
    Convert a Python floating point number to a C :ctype:`float`.
@@ -507,8 +511,12 @@ and the following format units are left untouched.
       Convert a C :ctype:`Py_ssize_t` to a Python integer.
 
    ``c`` (string of length 1) [char]
-      Convert a C :ctype:`int` representing a character to a Python string of length
-      1.
+      Convert a C :ctype:`int` representing a byte to a Python byte string of
+      length 1.
+
+   ``C`` (string of length 1) [int]
+      Convert a C :ctype:`int` representing a character to Python unicode
+      string of length 1.
 
    ``d`` (float) [double]
       Convert a C :ctype:`double` to a Python floating point number.

@@ -1,11 +1,7 @@
 "Test posix functions"
 
 from test import support
-
-try:
-    import posix
-except ImportError:
-    raise unittest.SkipTest("posix is not available")
+posix = support.import_module('posix') #skip if not supported
 
 import time
 import os
@@ -13,6 +9,7 @@ import pwd
 import shutil
 import unittest
 import warnings
+
 warnings.filterwarnings('ignore', '.* potential security risk .*',
                         RuntimeWarning)
 

@@ -17,20 +17,19 @@ import copy
 import socket
 import random
 import logging
+import test.support
 
 
-# Work around broken sem_open implementations
-try:
-    import multiprocessing.synchronize
-except ImportError as e:
-    raise unittest.SkipTest(e)
+# Skip tests if _multiprocessing wasn't built.
+_multiprocessing = test.support.import_module('_multiprocessing')
+# Skip tests if sem_open implementation is broken.
+test.support.import_module('multiprocessing.synchronize')
 
 import multiprocessing.dummy
 import multiprocessing.connection
 import multiprocessing.managers
 import multiprocessing.heap
 import multiprocessing.pool
-import _multiprocessing
 
 from multiprocessing import util
 
@@ -547,6 +546,10 @@ class _TestLock(BaseTestCase):
         self.assertEqual(lock.release(), None)
         self.assertEqual(lock.release(), None)
         self.assertRaises((AssertionError, RuntimeError), lock.release)
+
+    def test_lock_context(self):
+        with self.Lock():
+            pass
 
 
 class _TestSemaphore(BaseTestCase):
@@ -1209,10 +1212,12 @@ class _TestManagerRestart(BaseTestCase):
         p.start()
         queue = manager.get_queue()
         self.assertEqual(queue.get(), 'hello world')
+        del queue
         manager.shutdown()
         manager = QueueManager(
             address=('localhost', 9999), authkey=authkey, serializer=SERIALIZER)
         manager.start()
+        manager.shutdown()
 
 #
 #

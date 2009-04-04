@@ -3023,13 +3023,21 @@ get_file(char *pathname, PyObject *fob, char *mode)
 		int fd = PyObject_AsFileDescriptor(fob);
 		if (fd == -1)
 			return NULL;
-		/* XXX This will leak a FILE struct. Fix this!!!!
-		   (But it doesn't leak a file descrioptor!) */
+		if (!_PyVerify_fd(fd))
+			goto error;
+		/* the FILE struct gets a new fd, so that it can be closed
+		 * independently of the file descriptor given
+		 */
+		fd = dup(fd);
+		if (fd == -1)
+			goto error;
 		fp = fdopen(fd, mode);
 	}
-	if (fp == NULL)
-		PyErr_SetFromErrno(PyExc_IOError);
-	return fp;
+	if (fp)
+		return fp;
+error:
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
 }
 
 static PyObject *
@@ -3040,15 +3048,19 @@ imp_load_compiled(PyObject *self, PyObject *args)
 	PyObject *fob = NULL;
 	PyObject *m;
 	FILE *fp;
-	if (!PyArg_ParseTuple(args, "ss|O:load_compiled",
-			      &name, &pathname, &fob))
+	if (!PyArg_ParseTuple(args, "ses|O:load_compiled",
+			      &name, 
+			      Py_FileSystemDefaultEncoding, &pathname, 
+			      &fob))
 		return NULL;
 	fp = get_file(pathname, fob, "rb");
-	if (fp == NULL)
+	if (fp == NULL) {
+		PyMem_Free(pathname);
 		return NULL;
+	}
 	m = load_compiled_module(name, pathname, fp);
-	if (fob == NULL)
-		fclose(fp);
+	fclose(fp);
+	PyMem_Free(pathname);
 	return m;
 }
 
@@ -3062,15 +3074,22 @@ imp_load_dynamic(PyObject *self, PyObject *args)
 	PyObject *fob = NULL;
 	PyObject *m;
 	FILE *fp = NULL;
-	if (!PyArg_ParseTuple(args, "ss|O:load_dynamic",
-			      &name, &pathname, &fob))
+	if (!PyArg_ParseTuple(args, "ses|O:load_dynamic",
+			      &name, 
+			      Py_FileSystemDefaultEncoding, &pathname, 
+			      &fob))
 		return NULL;
 	if (fob) {
 		fp = get_file(pathname, fob, "r");
-		if (fp == NULL)
+		if (fp == NULL) {
+			PyMem_Free(pathname);
 			return NULL;
+		}
 	}
 	m = _PyImport_LoadDynamicModule(name, pathname, fp);
+	PyMem_Free(pathname);
+	if (fp)
+		fclose(fp);
 	return m;
 }
 
@@ -3084,15 +3103,19 @@ imp_load_source(PyObject *self, PyObject *args)
 	PyObject *fob = NULL;
 	PyObject *m;
 	FILE *fp;
-	if (!PyArg_ParseTuple(args, "ss|O:load_source",
-			      &name, &pathname, &fob))
+	if (!PyArg_ParseTuple(args, "ses|O:load_source",
+			      &name, 
+			      Py_FileSystemDefaultEncoding, &pathname,
+			      &fob))
 		return NULL;
 	fp = get_file(pathname, fob, "r");
-	if (fp == NULL)
+	if (fp == NULL) {
+		PyMem_Free(pathname);
 		return NULL;
+	}
 	m = load_source_module(name, pathname, fp);
-	if (fob == NULL)
-		fclose(fp);
+	PyMem_Free(pathname);
+	fclose(fp);
 	return m;
 }
 
@@ -3102,13 +3125,15 @@ imp_load_module(PyObject *self, PyObject *args)
 	char *name;
 	PyObject *fob;
 	char *pathname;
+	PyObject * ret;
 	char *suffix; /* Unused */
 	char *mode;
 	int type;
 	FILE *fp;
 
-	if (!PyArg_ParseTuple(args, "sOs(ssi):load_module",
-			      &name, &fob, &pathname,
+	if (!PyArg_ParseTuple(args, "sOes(ssi):load_module",
+			      &name, &fob, 
+			      Py_FileSystemDefaultEncoding, &pathname,
 			      &suffix, &mode, &type))
 		return NULL;
 	if (*mode) {
@@ -3119,6 +3144,7 @@ imp_load_module(PyObject *self, PyObject *args)
 		if (!(*mode == 'r' || *mode == 'U') || strchr(mode, '+')) {
 			PyErr_Format(PyExc_ValueError,
 				     "invalid file open mode %.200s", mode);
+			PyMem_Free(pathname);
 			return NULL;
 		}
 	}
@@ -3126,10 +3152,16 @@ imp_load_module(PyObject *self, PyObject *args)
 		fp = NULL;
 	else {
 		fp = get_file(NULL, fob, mode);
-		if (fp == NULL)
+		if (fp == NULL) {
+			PyMem_Free(pathname);
 			return NULL;
-	}
-	return load_module(name, fp, pathname, type, NULL);
+		}
+	} 
+	ret = load_module(name, fp, pathname, type, NULL);
+	PyMem_Free(pathname);
+	if (fp)
+		fclose(fp);
+	return ret;
 }
 
 static PyObject *
@@ -3137,9 +3169,13 @@ imp_load_package(PyObject *self, PyObject *args)
 {
 	char *name;
 	char *pathname;
-	if (!PyArg_ParseTuple(args, "ss:load_package", &name, &pathname))
+	PyObject * ret;
+	if (!PyArg_ParseTuple(args, "ses:load_package", 
+			      &name, Py_FileSystemDefaultEncoding, &pathname))
 		return NULL;
-	return load_package(name, pathname);
+	ret = load_package(name, pathname);
+	PyMem_Free(pathname);
+	return ret;
 }
 
 static PyObject *
@@ -3452,13 +3488,13 @@ PyImport_ExtendInittab(struct _inittab *newtab)
 /* Shorthand to add a single entry given a name and a function */
 
 int
-PyImport_AppendInittab(char *name, PyObject* (*initfunc)(void))
+PyImport_AppendInittab(const char *name, PyObject* (*initfunc)(void))
 {
 	struct _inittab newtab[2];
 
 	memset(newtab, '\0', sizeof newtab);
 
-	newtab[0].name = name;
+	newtab[0].name = (char *)name;
 	newtab[0].initfunc = initfunc;
 
 	return PyImport_ExtendInittab(newtab);

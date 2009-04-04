@@ -51,12 +51,12 @@ class TestNamedTuple(unittest.TestCase):
 
     def test_name_fixer(self):
         for spec, renamed in [
-            [('efg', 'g%hi'),  ('efg', '_2')],                              # field with non-alpha char
-            [('abc', 'class'), ('abc', '_2')],                              # field has keyword
-            [('8efg', '9ghi'), ('_1', '_2')],                               # field starts with digit
-            [('abc', '_efg'), ('abc', '_2')],                               # field with leading underscore
-            [('abc', 'efg', 'efg', 'ghi'), ('abc', 'efg', '_3', 'ghi')],    # duplicate field
-            [('abc', '', 'x'), ('abc', '_2', 'x')],                         # fieldname is a space
+            [('efg', 'g%hi'),  ('efg', '_1')],                              # field with non-alpha char
+            [('abc', 'class'), ('abc', '_1')],                              # field has keyword
+            [('8efg', '9ghi'), ('_0', '_1')],                               # field starts with digit
+            [('abc', '_efg'), ('abc', '_1')],                               # field with leading underscore
+            [('abc', 'efg', 'efg', 'ghi'), ('abc', 'efg', '_2', 'ghi')],    # duplicate field
+            [('abc', '', 'x'), ('abc', '_1', 'x')],                         # fieldname is a space
         ]:
             self.assertEqual(namedtuple('NT', spec, rename=True)._fields, renamed)
 
@@ -327,6 +327,25 @@ class TestOneTrickPonyABCs(ABCTestCase):
             B.register(C)
             self.failUnless(issubclass(C, B))
 
+class WithSet(MutableSet):
+
+    def __init__(self, it=()):
+        self.data = set(it)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __contains__(self, item):
+        return item in self.data
+
+    def add(self, item):
+        self.data.add(item)
+
+    def discard(self, item):
+        self.data.discard(item)
 
 class TestCollectionABCs(ABCTestCase):
 
@@ -362,6 +381,12 @@ class TestCollectionABCs(ABCTestCase):
         self.failIf(issubclass(frozenset, MutableSet))
         self.validate_abstract_methods(MutableSet, '__contains__', '__iter__', '__len__',
             'add', 'discard')
+
+    def test_issue_5647(self):
+        # MutableSet.__iand__ mutated the set during iteration
+        s = WithSet('abcd')
+        s &= WithSet('cdef')            # This used to fail
+        self.assertEqual(set(s), set('cd'))
 
     def test_issue_4920(self):
         # MutableSet.pop() method did not work

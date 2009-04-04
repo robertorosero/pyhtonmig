@@ -1,6 +1,9 @@
+from test import support
+# Skip test if _tkinter wasn't built.
+support.import_module('_tkinter')
+
 import tkinter
 from tkinter.test import runtktests
-from test import support
 import unittest
 
 try:

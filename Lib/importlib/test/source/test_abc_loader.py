@@ -123,11 +123,13 @@ class PyLoaderTests(testing_abc.LoaderTests):
 
     def eq_attrs(self, ob, **kwargs):
         for attr, val in kwargs.items():
-            self.assertEqual(getattr(ob, attr), val)
+            found = getattr(ob, attr)
+            self.assertEqual(found, val,
+                    "{} attribute: {} != {}".format(attr, found, val))
 
     def test_module(self):
         name = '<module>'
-        path = 'path/to/module'
+        path = os.path.join('', 'path', 'to', 'module')
         mock = self.mocker({name: path})
         with util.uncache(name):
             module = mock.load_module(name)
@@ -139,7 +141,7 @@ class PyLoaderTests(testing_abc.LoaderTests):
 
     def test_package(self):
         name = '<pkg>'
-        path = '/path/to/<pkg>/__init__'
+        path = os.path.join('path', 'to', name, '__init__')
         mock = self.mocker({name: path})
         with util.uncache(name):
             module = mock.load_module(name)
@@ -151,7 +153,7 @@ class PyLoaderTests(testing_abc.LoaderTests):
 
     def test_lacking_parent(self):
         name = 'pkg.mod'
-        path = 'path/to/pkg/mod'
+        path = os.path.join('path', 'to', 'pkg', 'mod')
         mock = self.mocker({name: path})
         with util.uncache(name):
             module = mock.load_module(name)
@@ -163,7 +165,7 @@ class PyLoaderTests(testing_abc.LoaderTests):
 
     def test_module_reuse(self):
         name = 'mod'
-        path = 'path/to/mod'
+        path = os.path.join('path', 'to', 'mod')
         module = imp.new_module(name)
         mock = self.mocker({name: path})
         with util.uncache(name):
@@ -177,7 +179,7 @@ class PyLoaderTests(testing_abc.LoaderTests):
         name = "mod"
         module = imp.new_module(name)
         module.blah = None
-        mock = self.mocker({name: 'path/to/mod'})
+        mock = self.mocker({name: os.path.join('path', 'to', 'mod')})
         mock.source = b"1/0"
         with util.uncache(name):
             sys.modules[name] = module
@@ -188,7 +190,7 @@ class PyLoaderTests(testing_abc.LoaderTests):
 
     def test_unloadable(self):
         name = "mod"
-        mock = self.mocker({name: 'path/to/mod'})
+        mock = self.mocker({name: os.path.join('path', 'to', 'mod')})
         mock.source = b"1/0"
         with util.uncache(name):
             self.assertRaises(ZeroDivisionError, mock.load_module, name)
@@ -222,7 +224,7 @@ class PyLoaderGetSourceTests(unittest.TestCase):
     def test_default_encoding(self):
         # Should have no problems with UTF-8 text.
         name = 'mod'
-        mock = PyLoaderMock({name: 'path/to/mod'})
+        mock = PyLoaderMock({name: os.path.join('path', 'to', 'mod')})
         source = 'x = "ü"'
         mock.source = source.encode('utf-8')
         returned_source = mock.get_source(name)
@@ -231,7 +233,7 @@ class PyLoaderGetSourceTests(unittest.TestCase):
     def test_decoded_source(self):
         # Decoding should work.
         name = 'mod'
-        mock = PyLoaderMock({name: 'path/to/mod'})
+        mock = PyLoaderMock({name: os.path.join('path', 'to', 'mod')})
         source = "# coding: Latin-1\nx='ü'"
         assert source.encode('latin-1') != source.encode('utf-8')
         mock.source = source.encode('latin-1')
@@ -287,7 +289,7 @@ class SkipWritingBytecodeTests(unittest.TestCase):
     @source_util.writes_bytecode
     def run_test(self, dont_write_bytecode):
         name = 'mod'
-        mock = PyPycLoaderMock({name: 'path/to/mod'})
+        mock = PyPycLoaderMock({name: os.path.join('path', 'to', 'mod')})
         sys.dont_write_bytecode = dont_write_bytecode
         with util.uncache(name):
             mock.load_module(name)
@@ -311,8 +313,9 @@ class RegeneratedBytecodeTests(unittest.TestCase):
         name = 'mod'
         bad_magic = b'\x00\x00\x00\x00'
         assert bad_magic != imp.get_magic()
-        mock = PyPycLoaderMock({name: 'path/to/mod'},
-                                {name: {'path': 'path/to/mod.bytecode',
+        mock = PyPycLoaderMock({name: os.path.join('path', 'to', 'mod')},
+                                {name: {'path': os.path.join('path', 'to',
+                                                    'mod.bytecode'),
                                         'magic': bad_magic}})
         with util.uncache(name):
             mock.load_module(name)
@@ -325,7 +328,7 @@ class RegeneratedBytecodeTests(unittest.TestCase):
         # Bytecode with an older mtime should be regenerated.
         name = 'mod'
         old_mtime = PyPycLoaderMock.default_mtime - 1
-        mock = PyPycLoaderMock({name: 'path/to/mod'},
+        mock = PyPycLoaderMock({name: os.path.join('path', 'to', 'mod')},
                 {name: {'path': 'path/to/mod.bytecode', 'mtime': old_mtime}})
         with util.uncache(name):
             mock.load_module(name)
@@ -343,7 +346,8 @@ class BadBytecodeFailureTests(unittest.TestCase):
         # A bad magic number should lead to an ImportError.
         name = 'mod'
         bad_magic = b'\x00\x00\x00\x00'
-        mock = PyPycLoaderMock({}, {name: {'path': 'path/to/mod',
+        mock = PyPycLoaderMock({}, {name: {'path': os.path.join('path', 'to',
+                                                                'mod'),
                                             'magic': bad_magic}})
         with util.uncache(name):
             self.assertRaises(ImportError, mock.load_module, name)
@@ -351,7 +355,9 @@ class BadBytecodeFailureTests(unittest.TestCase):
     def test_bad_bytecode(self):
         # Bad code object bytecode should elad to an ImportError.
         name = 'mod'
-        mock = PyPycLoaderMock({}, {name: {'path': '/path/to/mod', 'bc': b''}})
+        mock = PyPycLoaderMock({}, {name: {'path': os.path.join('path', 'to',
+                                                                'mod'),
+                                            'bc': b''}})
         with util.uncache(name):
             self.assertRaises(ImportError, mock.load_module, name)
 
@@ -387,14 +393,15 @@ class MissingPathsTests(unittest.TestCase):
     def test_source_path_ImportError(self):
         # An ImportError from source_path should trigger an ImportError.
         name = 'mod'
-        mock = PyPycLoaderMock({}, {name: {'path': 'path/to/mod'}})
+        mock = PyPycLoaderMock({}, {name: {'path': os.path.join('path', 'to',
+                                                                'mod')}})
         with util.uncache(name):
             self.assertRaises(ImportError, mock.load_module, name)
 
     def test_bytecode_path_ImportError(self):
         # An ImportError from bytecode_path should trigger an ImportError.
         name = 'mod'
-        mock = PyPycLoaderMock({name: 'path/to/mod'})
+        mock = PyPycLoaderMock({name: os.path.join('path', 'to', 'mod')})
         bad_meth = types.MethodType(raise_ImportError, mock)
         mock.bytecode_path = bad_meth
         with util.uncache(name):

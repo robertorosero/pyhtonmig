@@ -7,12 +7,32 @@ Python News
 What's New in Python 3.1 alpha 2?
 =================================
 
-*Release date: XXX*
+*Release date: 2009-4-4*
 
 Core and Builtins
 -----------------
 
+- Implement PEP 378, Format Specifier for Thousands Separator, for
+  integers.
+
+- Issue #5666: Py_BuildValue's 'c' code should create byte strings.
+
+- Issue #5499: The 'c' code for argument parsing functions now only accepts a
+  byte, and the 'C' code only accepts a unicode character.
+
+- Issue #1665206: Remove the last eager import in _warnings.c and make it lazy.
+
+- Fix a segfault when running test_exceptions with coverage, caused by
+  insufficient checks in accessors of Exception.__context__.
+
+- Issue #5604: non-ASCII characters in module name passed to
+  imp.find_module() were converted to UTF-8 while the path is
+  converted to the default filesystem encoding, causing nonsense.
+
 - Issue #5126: str.isprintable() returned False for space characters.
+
+- Issue #4865: On MacOSX /Library/Python/2.7/site-packages is added to
+  the end sys.path, for compatibility with the system install of Python.
 
 - Issue #4688: Add a heuristic so that tuples and dicts containing only
   untrackable objects are not tracked by the garbage collector. This can
@@ -40,8 +60,42 @@ Core and Builtins
 - Issue #5392: when a very low recursion limit was set, the interpreter would
   abort with a fatal error after the recursion limit was hit twice.
 
+- Issue #3845: In PyRun_SimpleFileExFlags avoid invalid memory access with
+  short file names.
+
+- Py_DECREF: Add `do { ... } while (0)' to avoid compiler warnings.
+
 Library
 -------
+
+- Issue 2625: added missing items() call to the for loop in
+  mailbox.MH.get_message().
+
+- Issue #5640: Fix _multibytecodec so that CJK codecs don't repeat
+  error substitutions from non-strict codec error callbacks in
+  incrementalencoder and StreamWriter.
+
+- Issue #5656: Fix the coverage reporting when running the test suite with
+  the -T argument.
+
+- Issue #5647: MutableSet.__iand__() no longer mutates self during iteration.
+
+- Issue #5624: Fix the _winreg module name still used in several modules.
+
+- Issue #5628: Fix io.TextIOWrapper.read() with a unreadable buffer.
+
+- Issue #5619: Multiprocessing children disobey the debug flag and causes
+  popups on windows buildbots. Patch applied to work around this issue.
+
+- Issue #5400: Added patch for multiprocessing on netbsd compilation/support
+
+- Issue #5387: Fixed mmap.move crash by integer overflow.
+
+- Issue #5261: Patch multiprocessing's semaphore.c to support context
+  manager use: "with multiprocessing.Lock()" works now.
+
+- Issue #5236: Change time.strptime() to only take strings. Didn't work with
+  bytes already but the failure was non-obvious.
 
 - Issue #5177: Multiprocessing's SocketListener class now uses
   socket.SO_REUSEADDR on all connections so that the user no longer needs
@@ -74,6 +128,8 @@ Library
 
 Extension Modules
 -----------------
+
+- Issue #5391: mmap now deals exclusively with bytes.
 
 - Issue #5463: In struct module, remove deprecated overflow wrapping
   when packing an integer: struct.pack('=L', -1) now raises
@@ -258,6 +314,17 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #1665206 (partially): Move imports in cgitb to the top of the module
+  instead of performing them in functions. Helps prevent import deadlocking in
+  threads.
+
+- Issue #2522: locale.format now checks its first argument to ensure it has
+  been passed only one pattern, avoiding mysterious errors where it appeared
+  that it was failing to do localization.
+
+- Issue #5583: Added optional Extensions in Distutils. Initial patch by Georg
+  Brandl.
 
 - Issue #1222: locale.format() bug when the thousands separator is a space
   character.
@@ -694,8 +761,14 @@ Extension Modules
   buffer.
 
 
+- Issue #5228: Make functools.partial objects can now be pickled.
+
 Tests
 -----
+
+- regrtest no longer treats ImportError as equivalent to SkipTest.  Imports
+  that should cause a test to be skipped are now done using import_module 
+  from test support, which does the conversion.
 
 - Issue #5083: New 'gui' resource for regrtest.
 

@@ -1011,6 +1011,8 @@ static int PARSER_FLAGS(PyCompilerFlags *flags)
 		parser_flags |= PyPARSE_DONT_IMPLY_DEDENT;
 	if (flags->cf_flags & PyCF_IGNORE_COOKIE)
 		parser_flags |= PyPARSE_IGNORE_COOKIE;
+	if (flags->cf_flags & CO_FUTURE_BARRY_AS_BDFL)
+		parser_flags |= PyPARSE_BARRY_AS_BDFL;
 	return parser_flags;
 }
 
@@ -1143,7 +1145,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 {
 	PyObject *m, *d, *v;
 	const char *ext;
-	int set_file_name = 0, ret;
+	int set_file_name = 0, ret, len;
 
 	m = PyImport_AddModule("__main__");
 	if (m == NULL)
@@ -1161,7 +1163,8 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 		set_file_name = 1;
 		Py_DECREF(f);
 	}
-	ext = filename + strlen(filename) - 4;
+	len = strlen(filename);
+	ext = filename + len - (len > 4 ? 4 : 0);
 	if (maybe_pyc_file(fp, filename, ext, closeit)) {
 		/* Try to run a pyc file. First, re-open in binary */
 		if (closeit)
@@ -2006,6 +2009,7 @@ void
 Py_FatalError(const char *msg)
 {
 	fprintf(stderr, "Fatal Python error: %s\n", msg);
+	fflush(stderr); /* it helps in Windows debug build */
 	if (PyErr_Occurred()) {
 		PyErr_Print();
 	}

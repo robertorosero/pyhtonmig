@@ -14,6 +14,7 @@
 .. sectionauthor:: Jim Kerr <jbkerr@sr.hp.com>.
 .. sectionauthor:: Barry Warsaw <barry@zope.com>
 
+
 The :mod:`pickle` module implements a fundamental, but powerful algorithm for
 serializing and de-serializing a Python object structure.  "Pickling" is the
 process whereby a Python object hierarchy is converted into a byte stream, and
@@ -265,11 +266,6 @@ The :mod:`pickle` module exports two classes, :class:`Pickler` and
 
       See :ref:`pickle-persistent` for details and examples of uses.
 
-   .. method:: clear_memo()
-
-      Deprecated.  Use the :meth:`clear` method on :attr:`memo`, instead.
-      Clear the pickler's memo, useful when reusing picklers.
-
    .. attribute:: fast
 
       Deprecated. Enable fast mode if set to a true value.  The fast mode
@@ -279,26 +275,6 @@ The :mod:`pickle` module exports two classes, :class:`Pickler` and
       recurse infinitely.
 
       Use :func:`pickletools.optimize` if you need more compact pickles.
-
-   .. attribute:: memo
-
-      Dictionary holding previously pickled objects to allow shared or
-      recursive objects to pickled by reference as opposed to by value.
-
-
-.. XXX Move these comments to somewhere more appropriate.
-
-It is possible to make multiple calls to the :meth:`dump` method of the same
-:class:`Pickler` instance.  These must then be matched to the same number of
-calls to the :meth:`load` method of the corresponding :class:`Unpickler`
-instance.  If the same object is pickled by multiple :meth:`dump` calls, the
-:meth:`load` will all yield references to the same object.
-
-Please note, this is intended for pickling multiple objects without intervening
-modifications to the objects or their parts.  If you modify an object and then
-pickle it again using the same :class:`Pickler` instance, the object is not
-pickled again --- a reference to it is pickled and the :class:`Unpickler` will
-return the old value, not the modified one.
 
 
 .. class:: Unpickler(file, [\*, encoding="ASCII", errors="strict"])
@@ -593,7 +569,7 @@ reading resumes from the last location. The :meth:`__setstate__` and
            line = self.file.readline()
            if not line:
                return None
-           if line.endswith("\n"):
+           if line.endswith('\n'):
                line = line[:-1]
            return "%i: %s" % (self.lineno, line)
 
@@ -707,25 +683,24 @@ A sample usage of our unpickler working has intended::
 
 As our examples shows, you have to be careful with what you allow to be
 unpickled.  Therefore if security is a concern, you may want to consider
-alternatives such as the marshalling API in :mod:`xmlrpc.client` or third-party
-solutions.
+alternatives such as the marshalling API in :mod:`xmlrpc.client` or
+third-party solutions.
 
 
 .. _pickle-example:
 
-Usage Examples
---------------
+Examples
+--------
 
-For the simplest code, use the :func:`dump` and :func:`load` functions.  Note
-that a self-referencing list is pickled and restored correctly. ::
+For the simplest code, use the :func:`dump` and :func:`load` functions. ::
 
    import pickle
 
    # An arbitrary collection of objects supported by pickle.
    data = {
-     'a': [1, 2.0, 3, 4+6j],
-     'b': ("character string", b"byte string"),
-     'c': set([None, True, False])
+       'a': [1, 2.0, 3, 4+6j],
+       'b': ("character string", b"byte string"),
+       'c': set([None, True, False])
    }
 
    with open('data.pickle', 'wb') as f:
@@ -743,10 +718,17 @@ The following example reads the resulting pickled data. ::
        data = pickle.load(f)
 
 
+.. XXX: Add examples showing how to optimize pickles for size (like using
+.. pickletools.optimize() or the gzip module).
+
+
 .. seealso::
 
    Module :mod:`copyreg`
       Pickle interface constructor registration for extension types.
+
+   Module :mod:`pickletools`
+      Tools for working with and analyzing pickled data.
 
    Module :mod:`shelve`
       Indexed databases of objects; uses :mod:`pickle`.

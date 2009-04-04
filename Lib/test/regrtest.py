@@ -404,8 +404,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
         print("Using random seed", random_seed)
         random.shuffle(tests)
     if trace:
-        import trace
-        tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix],
+        import trace, tempfile
+        tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,
+                                         tempfile.gettempdir()],
                              trace=False, count=True)
     test_times = []
     support.verbose = verbose      # Tell tests to be moderately quiet
@@ -628,7 +629,7 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
             print(test, "skipped --", msg)
             sys.stdout.flush()
         return -2
-    except (ImportError, unittest.SkipTest) as msg:
+    except unittest.SkipTest as msg:
         if not quiet:
             print(test, "skipped --", msg)
             sys.stdout.flush()
@@ -892,6 +893,7 @@ _expectations = {
         test_fork1
         test_epoll
         test_dbm_gnu
+        test_dbm_ndbm
         test_grp
         test_ioctl
         test_largefile
