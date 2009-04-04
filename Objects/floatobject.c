@@ -1917,8 +1917,8 @@ PyFloat_Fini(void)
 				if (PyFloat_CheckExact(p) &&
 				    Py_REFCNT(p) != 0) {
 					char *buf = PyOS_double_to_string(
-						PyFloat_AS_DOUBLE(p), 'g',
-						0, Py_DTSF_ADD_DOT_0);
+						PyFloat_AS_DOUBLE(p), 'r',
+						0, 0);
 					if (buf) {
 						/* XXX(twouters) cast
 						   refcount to long
