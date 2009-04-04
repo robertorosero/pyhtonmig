@@ -531,12 +531,10 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		   int use_alt_formatting, char **float_strings)
 {
 	char *digits, *digits_end;
-	int decpt, sign, exp_len;
+	int decpt, sign, exp_len, dec_pos;
 	int use_exp = 0;
 	int is_integer;  /* is the output produced so far just an integer? */
-	int add_trailing_zeros;
-	Py_ssize_t n_digits_after_decimal = 0;
-	Py_ssize_t n_digits;
+	Py_ssize_t n_digits, trailing_zeros;
 
 	/* precision of 0 makes no sense for 'g' format; interpret as 1 */
 	if (precision == 0 && format_code == 'g')
@@ -592,15 +590,25 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 
 	/* Detect if we're using exponents or not */
 	switch (format_code) {
-	case 'e': use_exp = 1; break;
-	case 'f': use_exp = 0; break;
+	case 'e':
+		use_exp = 1;
+		trailing_zeros = precision - n_digits;
+		break;
+	case 'f':
+		use_exp = 0;
+		trailing_zeros = decpt + precision - n_digits;
+		break;
 	case 'g':
 		if ((mode != 0) && (decpt > precision || decpt <= -4))
 			use_exp = 1;
 		else {
 			use_exp = 0;
-			n_wanted_digits_after_decimal = precision - decpt;
 		}
+		if (use_alt_formatting)
+			trailing_zeros = precision - n_digits;
+		else
+			trailing_zeros = 0;
+		break;
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
@@ -609,74 +617,47 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	else if (always_add_sign)
 		*buf++ = '+';
 
-	if (use_exp) {
-		/* Exponential notation: d[.dddd]e(+|-)ee; at least 2 digits
-		   in exponent */
-		n_digits_after_decimal = n_digits - 1;
-		*buf++ = digits[0];
+	/* dec_pos = position of decimal point in buffer */
+	if (use_exp)
+		dec_pos = 1;
+	else
+		dec_pos = decpt;
+
+	/* zero padding on left of digit string */
+	if (dec_pos <= 0) {
+		*buf++ = '0';
 		*buf++ = '.';
-		strncpy(buf, digits + 1, n_digits_after_decimal);
-		buf += n_digits_after_decimal;
-
-		/* Don't add the exponent yet. That's done later after a bit
-		   more formatting. */
-	} else {
-		/* Use fixed-point notation */
-
-		/* Be aware that n_digits_after_decimal can be negative! */
-		n_digits_after_decimal = n_digits - decpt;
-
-		if (decpt <= 0) {
-			/* Output: 0.00-00dd-dd */
-			*buf++ = '0';
-			*buf++ = '.';
-			/* Add the appropriate number of zeros. */
-			memset(buf, '0', -decpt);
-			buf += -decpt;
-
-			/* Then the digits */
-			strncpy(buf, digits, n_digits);
-			buf += n_digits;
-		}
-		else if (decpt < n_digits) {
-			/* Output: dd-dd.dd-dd */
-			strncpy(buf, digits, decpt);
-			buf += decpt;
-			*buf++ = '.';
-			strncpy(buf, digits + decpt, n_digits - decpt);
-			buf += n_digits - decpt;
-		}
-		else {
-			/* decpt >= n_digits. Output: dd-dd00-00.0 */
-			strncpy(buf, digits, n_digits);     /* digits */
-			buf += n_digits;
-
-			memset(buf, '0', decpt - n_digits); /* zeros */
-			buf += decpt - n_digits;
-
-			*buf++ = '.';
-		}
+		memset(buf, '0', -dec_pos);
+		buf -= dec_pos;
 	}
 
-	/* Add trailing non-significant zeros for non-mode 0 and non-code g,
-	   unless doing alt formatting */
-	add_trailing_zeros = 0;
-	if (mode != 0) {
-		if (format_code == 'g') {
-			if (use_alt_formatting)
-				add_trailing_zeros = 1;
-		}
-		else
-			add_trailing_zeros = 1;
+	/* digits, with included decimal point */
+	if (0 < dec_pos && dec_pos <= n_digits) {
+		strncpy(buf, digits, dec_pos);
+		buf += dec_pos;
+		*buf++ = '.';
+		strncpy(buf, digits+dec_pos, n_digits-dec_pos);
+		buf += n_digits-dec_pos;
 	}
-
-	if (add_trailing_zeros) {
-		memset(buf, '0', n_wanted_digits_after_decimal - n_digits_after_decimal);
-		buf += n_wanted_digits_after_decimal - n_digits_after_decimal;
+	else {
+		strncpy(buf, digits, n_digits);
+		buf += n_digits;
+	}
+	/* and zeros on the right up to the decimal point */
+	if (n_digits < dec_pos) {
+		memset(buf, '0', dec_pos-n_digits);
+		buf += dec_pos-n_digits;
+		*buf++ = '.';
+		trailing_zeros -= dec_pos-n_digits;
+	}
+	/* and more trailing zeros, when necessary */
+	if (trailing_zeros > 0) {
+		memset(buf, '0', trailing_zeros);
+		buf += trailing_zeros;
 	}
 
 	/* If we're at a trailing decimal, delete it. We are then just an integer. */
-	if (buf[-1] == '.') {
+	if (buf[-1] == '.' && !(format_code == 'g' && use_alt_formatting)) {
 		buf--;
 		is_integer = 1;
 	}
