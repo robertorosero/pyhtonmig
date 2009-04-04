@@ -594,14 +594,13 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	switch (format_code) {
 	case 'e': use_exp = 1; break;
 	case 'f': use_exp = 0; break;
-	case 'g': {
+	case 'g':
 		if ((mode != 0) && (decpt > precision || decpt <= -4))
 			use_exp = 1;
 		else {
 			use_exp = 0;
 			n_wanted_digits_after_decimal = precision - decpt;
 		}
-	}
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
