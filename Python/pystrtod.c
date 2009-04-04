@@ -609,6 +609,14 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		else
 			trailing_zeros = 0;
 		break;
+	case 'r':
+		/* use exponent for values >= 1e16 or < 1e-4 */
+		if ((-4 < decpt) && (decpt <= 16))
+			use_exp = 0;
+		else
+			use_exp = 1;
+		trailing_zeros = 0;
+		break;
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
@@ -736,7 +744,6 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	case 'r':
 		/* "repr" pseudo-mode */
-		lc_format_code = 'g';
 		mode = 0;
 		break;
 	}
