@@ -746,9 +746,20 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	case 'r':
 		/* "repr" pseudo-mode */
 		mode = 0;
+		/* Supplied precision is unused, must be 0. */
+		if (precision != 0) {
+			PyErr_BadInternalCall();
+			return NULL;
+		}
 		break;
 	case 's':
 		mode = 2;
+		/* Supplied precision is unused, must be 0. */
+		if (precision != 0) {
+			PyErr_BadInternalCall();
+			return NULL;
+		}
+		precision = 12;
 		break;
 	}
 

@@ -354,23 +354,12 @@ convert_to_double(PyObject **v, double *dbl)
 	return 0;
 }
 
-/* Precision used by str().
-
-   The str() precision is chosen so that in most cases, the rounding noise
-   created by various operations is suppressed, while giving plenty of
-   precision for practical use.
-
-*/
-
-#define PREC_STR	12
-
 static PyObject *
-float_str_or_repr(PyFloatObject *v, char format_code, int precision)
+float_str_or_repr(PyFloatObject *v, char format_code)
 {
     PyObject *result;
     char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
-                                      format_code, precision,
-                                      Py_DTSF_ADD_DOT_0);
+                                      format_code, 0, Py_DTSF_ADD_DOT_0);
     if (!buf)
         return PyErr_NoMemory();
     result = PyUnicode_FromString(buf);
@@ -381,13 +370,13 @@ float_str_or_repr(PyFloatObject *v, char format_code, int precision)
 static PyObject *
 float_repr(PyFloatObject *v)
 {
-    return float_str_or_repr(v, 'r', 0);
+    return float_str_or_repr(v, 'r');
 }
 
 static PyObject *
 float_str(PyFloatObject *v)
 {
-    return float_str_or_repr(v, 's', PREC_STR);
+    return float_str_or_repr(v, 's');
 }
 
 /* Comparison is pretty much a nightmare.  When comparing float to float,

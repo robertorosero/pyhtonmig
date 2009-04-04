@@ -14,15 +14,6 @@
 
 #ifndef WITHOUT_COMPLEX
 
-/* Precision used by str().
-
-   The str() precision is chosen so that in most cases, the rounding noise
-   created by various operations is suppressed, while giving plenty of
-   precision for practical use.
-*/
-
-#define PREC_STR	12
-
 /* elementary operations on complex numbers */
 
 static Py_complex c_1 = {1., 0.};
@@ -339,7 +330,7 @@ complex_dealloc(PyObject *op)
 
 
 static PyObject *
-complex_format(PyComplexObject *v, char format_code, int precision)
+complex_format(PyComplexObject *v, char format_code)
 {
     PyObject *result = NULL;
     Py_ssize_t len;
@@ -368,8 +359,7 @@ complex_format(PyComplexObject *v, char format_code, int precision)
                 im = "-inf*";
         }
         else {
-            pim = PyOS_double_to_string(v->cval.imag, format_code,
-                                        precision, 0);
+            pim = PyOS_double_to_string(v->cval.imag, format_code, 0, 0);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -388,8 +378,7 @@ complex_format(PyComplexObject *v, char format_code, int precision)
                 re = "-inf";
         }
         else {
-            pre = PyOS_double_to_string(v->cval.real, format_code,
-                                        precision, 0);
+            pre = PyOS_double_to_string(v->cval.real, format_code, 0, 0);
             if (!pre) {
                 PyErr_NoMemory();
                 goto done;
@@ -408,7 +397,7 @@ complex_format(PyComplexObject *v, char format_code, int precision)
         }
         else {
             pim = PyOS_double_to_string(v->cval.imag, format_code,
-                                        precision, Py_DTSF_SIGN);
+                                        0, Py_DTSF_SIGN);
             if (!pim) {
                 PyErr_NoMemory();
                 goto done;
@@ -438,13 +427,13 @@ done:
 static PyObject *
 complex_repr(PyComplexObject *v)
 {
-    return complex_format(v, 'r', 0);
+    return complex_format(v, 'r');
 }
 
 static PyObject *
 complex_str(PyComplexObject *v)
 {
-    return complex_format(v, 's', PREC_STR);
+    return complex_format(v, 's');
 }
 
 static long
