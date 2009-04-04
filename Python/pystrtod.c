@@ -736,6 +736,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	case 'r':
 		/* "repr" pseudo-mode */
+		lc_format_code = 'g';
 		mode = 0;
 		break;
 	}
