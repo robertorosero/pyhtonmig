@@ -444,7 +444,7 @@ complex_repr(PyComplexObject *v)
 static PyObject *
 complex_str(PyComplexObject *v)
 {
-    return complex_format(v, 'g', PREC_STR);
+    return complex_format(v, 's', PREC_STR);
 }
 
 static long
