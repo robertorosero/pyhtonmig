@@ -23,7 +23,6 @@
 %.0f 1234.56 -> 1235
 %.0f 1e49 -> 9999999999999999464902769475481793196872414789632
 %.0f 9.9999999999999987e+49 -> 99999999999999986860582406952576489172979654066176
--- %.0f 1e50 -> 1e50
 
 -- precision 1
 %.1f 0.0001 -> 0.0
@@ -57,6 +56,16 @@
 %.2f 1234567.891 -> 1234567.89
 %.2f 1234567.8912 -> 1234567.89
 
+-- alternate form always includes a decimal point.  This only
+-- makes a difference when the precision is 0.
+%#.0f 0 -> 0.
+%#.1f 0 -> 0.0
+%#.0f 1.5 -> 2.
+%#.0f 2.5 -> 2.
+%#.0f 10.1 -> 10.
+%#.0f 1234.56 -> 1235.
+%#.1f 1.4 -> 1.4
+%#.2f 0.375 -> 0.38
 
 -- 'e' code formatting with explicit precision (>= 0). Output should
 -- always have exactly the number of places after the point that were
@@ -133,6 +142,42 @@
 %.2e 1598.7 -> 1.60e+03
 %.2e 1598.76 -> 1.60e+03
 %.2e 9999 -> 1.00e+04
+
+-- alternate form always contains a decimal point.  This only makes
+-- a difference when precision is 0.
+
+%#.0e 0.01 -> 1.e-02
+%#.0e 0.1 -> 1.e-01
+%#.0e 1 -> 1.e+00
+%#.0e 10 -> 1.e+01
+%#.0e 100 -> 1.e+02
+%#.0e 0.012 -> 1.e-02
+%#.0e 0.12 -> 1.e-01
+%#.0e 1.2 -> 1.e+00
+%#.0e 12 -> 1.e+01
+%#.0e 120 -> 1.e+02
+%#.0e 123.456 -> 1.e+02
+%#.0e 0.000123456 -> 1.e-04
+%#.0e 123456000 -> 1.e+08
+%#.0e 0.5 -> 5.e-01
+%#.0e 1.4 -> 1.e+00
+%#.0e 1.5 -> 2.e+00
+%#.0e 1.6 -> 2.e+00
+%#.0e 2.4999999 -> 2.e+00
+%#.0e 2.5 -> 2.e+00
+%#.0e 2.5000001 -> 3.e+00
+%#.0e 3.499999999999 -> 3.e+00
+%#.0e 3.5 -> 4.e+00
+%#.0e 4.5 -> 4.e+00
+%#.0e 5.5 -> 6.e+00
+%#.0e 6.5 -> 6.e+00
+%#.0e 7.5 -> 8.e+00
+%#.0e 8.5 -> 8.e+00
+%#.0e 9.4999 -> 9.e+00
+%#.0e 9.5 -> 1.e+01
+%#.0e 10.5 -> 1.e+01
+%#.0e 14.999 -> 1.e+01
+%#.0e 15 -> 2.e+01
 
 -- 'g' code formatting.
 
@@ -246,11 +291,14 @@
 %#.5g 234.56 -> 234.56
 %#.6g 234.56 -> 234.560
 
--- repr formatting.  Should always include a decimal point or an exponent.
+-- repr formatting.  Should always include a decimal point (and at
+-- least one digit after the point) or an exponent.  Produces the shortest
+-- string that rounds correctly.
+
 %r 0 -> 0.0
 %r 1 -> 1.0
 
--- short repr:  should produce shortest string that rounds correctly
+-- check short repr
 %r 0.01 -> 0.01
 %r 0.02 -> 0.02
 %r 0.03 -> 0.03
@@ -275,3 +323,45 @@
 %r 0.999999999999e-4 -> 9.99999999999e-05
 %r 0.999e-4 -> 9.99e-05
 %r 1e-5 -> 1e-05
+
+-- str formatting.  Result always includes decimal point and at
+-- least one digit after the point, or an exponent.
+
+%s 0 -> 0.0
+%s 1 -> 1.0
+
+%s 0.01 -> 0.01
+%s 0.02 -> 0.02
+%s 0.03 -> 0.03
+%s 0.04 -> 0.04
+%s 0.05 -> 0.05
+
+-- str truncates to 12 significant digits
+%s 1.234123412341 -> 1.23412341234
+%s 1.23412341234 -> 1.23412341234
+%s 1.2341234123 -> 1.2341234123
+
+-- values >= 1e11 get an exponent
+%s 10 -> 10.0
+%s 100 -> 100.0
+%s 1e10 -> 10000000000.0
+%s 9.999e10 -> 99990000000.0
+%s 99999999999 -> 99999999999.0
+%s 1e12 -> 1e+12
+
+-- as do values < 1e-4
+%s 1e-3 -> 0.001
+%s 1.001e-4 -> 0.0001001
+%s 1.000000000001e-4 -> 0.0001
+%s 1.00000000001e-4 -> 0.000100000000001
+%s 1.0000000001e-4 -> 0.00010000000001
+%s 1e-4 -> 0.0001
+%s 0.999999999999e-4 -> 9.99999999999e-05
+%s 0.999e-4 -> 9.99e-05
+%s 1e-5 -> 1e-05
+
+
+-- removed tests:  need to decide what to do with these
+
+-- %s 1e11 -> 1e+11
+-- %.0f 1e50 -> 1e50

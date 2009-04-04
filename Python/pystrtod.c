@@ -664,8 +664,9 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		buf += trailing_zeros;
 	}
 
-	/* If we're at a trailing decimal, delete it. We are then just an integer. */
-	if (buf[-1] == '.' && !(format_code == 'g' && use_alt_formatting)) {
+	/* If we're at a trailing decimal, delete it. We are then just an
+	   integer. */
+	if (buf[-1] == '.' && !use_alt_formatting) {
 		buf--;
 		is_integer = 1;
 	}
