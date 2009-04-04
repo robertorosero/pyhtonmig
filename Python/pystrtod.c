@@ -519,22 +519,34 @@ static char *uc_float_strings[] = {
 };
 
 
-/* Convert a Python float to a minimal string that evaluates back to that
-   float.  The output is minimal in the sense of having the fewest possible
-   number of significant digits. */
+/* Convert a double d to a string, and put the result into the buffer buf.
+
+   Arguments:
+     buflen is the length of the provided buffer
+     d is the double to be converted
+     format_code is one of 'e', 'f', 'g', 'r' or 's'.  'e', 'f' and 'g'
+       correspond to '%e', '%f' and '%g';  'r' and 's' correspond
+       to repr and str.
+     mode is one of '0', '2' or '3', and is completely determined by
+       format_code: 'e', 'g' and 's' use mode 2; 'f' mode 3, 'r' mode 0.
+     precision is the desired precision
+     always_add_sign is nonzero if a '+' sign should be included for positive
+       numbers
+     add_dot_0_if_integer is nonzero if integers in non-exponential form
+       should have ".0" added.  Only applies to format codes 'r' and 's'.
+     use_alt_formatting is nonzero if alternative formatting should be
+       used.  Only applies to format codes 'e', 'f' and 'g'.
+ */
 
 static void
 format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		   int mode, Py_ssize_t precision,
-		   Py_ssize_t n_wanted_digits_after_decimal,
 		   int always_add_sign, int add_dot_0_if_integer,
 		   int use_alt_formatting, char **float_strings)
 {
 	char *digits, *digits_end;
-	int decpt, sign, exp_len, dec_pos;
-	int use_exp = 0;
-	int is_integer;  /* is the output produced so far just an integer? */
-	Py_ssize_t n_digits, trailing_zeros;
+	int decpt, sign, exp_len, dec_pos, use_exp = 0;
+	Py_ssize_t n_digits, min_digits = 0;
 
 	/* precision of 0 makes no sense for 'g' format; interpret as 1 */
 	if (precision == 0 && format_code == 'g')
@@ -566,10 +578,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		}
 		else {
 			/* shouldn't get here: Gay's code should always return
-			   something starting with a digit, an 'I', or an
-			   'N' */
-			/*printf("Help! dtoa returned: %.*s\n",
-			  (int)n_digits, digits);*/
+			   something starting with a digit, an 'I',  or 'N' */
 			strncpy(buf, "ERR", 3);
 			buf += 3;
 			assert(0);
@@ -585,46 +594,42 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		type = 'g';
 	   over time, those tests should be deleted
 	*/
-/*	if (decpt > 50 && format_code == 'f')
-		format_code = 'g'; */
 
-	/* Detect if we're using exponents or not */
+	/* Detect if we're using exponents or not, and figure out how many
+	   additional digits we need beyond those provided by dtoa. */
 	switch (format_code) {
 	case 'e':
 		use_exp = 1;
-		trailing_zeros = precision - n_digits;
+		min_digits = precision;
 		break;
 	case 'f':
-		use_exp = 0;
-		trailing_zeros = decpt + precision - n_digits;
+		min_digits = decpt + precision;
 		break;
 	case 'g':
-		if ((mode != 0) && (decpt > precision || decpt <= -4))
+		if (decpt <= -4 || decpt > precision)
 			use_exp = 1;
-		else {
-			use_exp = 0;
-		}
 		if (use_alt_formatting)
-			trailing_zeros = precision - n_digits;
-		else
-			trailing_zeros = 0;
+			min_digits = precision;
 		break;
 	case 'r':
-		/* use exponent for values >= 1e16 or < 1e-4 */
-		if ((-4 < decpt) && (decpt <= 16))
-			use_exp = 0;
-		else
+		if (decpt <= -4 || decpt > 16)
 			use_exp = 1;
-		trailing_zeros = 0;
+		else if (add_dot_0_if_integer)
+			min_digits = decpt + 1;
 		break;
 	case 's':
-		/* str: use exponent for values >= 1e11 or < 1e-4 */
-		if (-4 < decpt && decpt < precision)
-			use_exp = 0;
-		else
+		/* if we're forcing a digit after the point, convert to
+		   exponential format at 1e11.  If not, convert at 1e12. */
+		if (decpt <= -4 ||
+		    decpt > precision - (add_dot_0_if_integer != 0))
 			use_exp = 1;
-		trailing_zeros = 0;
+		else if (add_dot_0_if_integer)
+			min_digits = decpt + 1;
 		break;
+	default:
+		PyErr_BadInternalCall();
+		*buf = '\0';
+		return;
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
@@ -659,42 +664,31 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		strncpy(buf, digits, n_digits);
 		buf += n_digits;
 	}
+	min_digits -= n_digits;
+
 	/* and zeros on the right up to the decimal point */
 	if (n_digits < dec_pos) {
 		memset(buf, '0', dec_pos-n_digits);
 		buf += dec_pos-n_digits;
 		*buf++ = '.';
-		trailing_zeros -= dec_pos-n_digits;
-	}
-	/* and more trailing zeros, when necessary */
-	if (trailing_zeros > 0) {
-		memset(buf, '0', trailing_zeros);
-		buf += trailing_zeros;
+		min_digits -= dec_pos-n_digits;
 	}
 
-	/* If we're at a trailing decimal, delete it. We are then just an
-	   integer. */
-	if (buf[-1] == '.' && !use_alt_formatting) {
-		buf--;
-		is_integer = 1;
+	/* and more trailing zeros when necessary */
+	if (min_digits > 0) {
+		memset(buf, '0', min_digits);
+		buf += min_digits;
 	}
-	else
-		/* The decimal isn't at the end, so it's somewhere else in the
-		   string. We are therefore not an integer. */
-		is_integer = 0;
+
+	/* delete a trailing decimal pt unless using alternative formatting. */
+	if (buf[-1] == '.' && !use_alt_formatting)
+		buf--;
 
 	/* Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
 		*buf++ = float_strings[OFS_E][0];
 		exp_len = sprintf(buf, "%+.02d", decpt-1);
 		buf += exp_len;
-		is_integer = 0;
-	}
-
-	/* Add ".0" if we're an integer? */
-	if (add_dot_0_if_integer && is_integer) {
-		*buf++ = '.';
-		*buf++ = '0';
 	}
 
 	*buf++ = '\0';
@@ -709,7 +703,6 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	char* buf = (char *)PyMem_Malloc(512);
 	char lc_format_code = format_code;
 	char** float_strings = lc_float_strings;
-	Py_ssize_t n_wanted_digits_after_decimal = precision;
 	int mode = 0;
 
 	/* Validate format_code, and map upper and lower case */
@@ -749,8 +742,6 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	case 'g':
 		mode = 2;
-		if (flags & Py_DTSF_ALT)
-			n_wanted_digits_after_decimal--;
 		break;
 	case 'r':
 		/* "repr" pseudo-mode */
@@ -767,7 +758,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 	/* XXX validate format_code */
 
 	format_float_short(buf, 512, val, lc_format_code, mode, precision,
-			   n_wanted_digits_after_decimal, flags & Py_DTSF_SIGN,
+			   flags & Py_DTSF_SIGN,
 			   flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT,
 			   float_strings);
 
