@@ -538,6 +538,10 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	Py_ssize_t n_digits_after_decimal = 0;
 	Py_ssize_t n_digits;
 
+	/* precision of 0 makes no sense for 'g' format; interpret as 1 */
+	if (precision == 0 && format_code == 'g')
+		precision = 1;
+
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent) */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
