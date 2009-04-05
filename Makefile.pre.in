@@ -586,8 +586,7 @@ Objects/bytesobject.o: $(srcdir)/Objects/bytesobject.c $(BYTESTR_DEPS)
 Objects/bytearrayobject.o: $(srcdir)/Objects/bytearrayobject.c $(BYTESTR_DEPS) 
 
 Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
-				$(BYTESTR_DEPS) \
-				$(srcdir)/Objects/stringlib/formatter.h
+				$(BYTESTR_DEPS)
 
 $(OPCODETARGETS_H): $(OPCODETARGETGEN_FILES)
 	$(OPCODETARGETGEN) $(OPCODETARGETS_H)
