@@ -1500,6 +1500,10 @@ _Py_dg_strtod
 			}
 		}
  dig_done:
+	if (!nd && !nz && !nz0 && (s != s0)) {
+		/* no digits, just a '.'.  Fail.  */
+		goto ret0;
+	}
 	e = 0;
 	if (c == 'e' || c == 'E') {
 		if (!nd && !nz && !nz0) {
