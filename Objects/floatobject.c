@@ -197,8 +197,7 @@ PyFloat_FromString(PyObject *v)
 	sp = s;
 	/* We don't care about overflow or underflow.  If the platform supports
 	 * them, infinities and signed zeroes (on underflow) are fine.
-	 * However, strtod can return 0 for denormalized numbers, where atof
-	 * does not.  So (alas!) we special-case a zero result.  Note that
+	 * However, strtod can return 0 for denormalized numbers.  Note that
 	 * whether strtod sets errno on underflow is not defined, so we can't
 	 * key off errno.
          */
@@ -258,14 +257,6 @@ PyFloat_FromString(PyObject *v)
 		PyErr_SetString(PyExc_ValueError,
 				"null byte in argument for float()");
 		goto error;
-	}
-	if (x == 0.0) {
-		/* See above -- may have been strtod being anal
-		   about denorms. */
-		PyFPE_START_PROTECT("strtod", goto error)
-		x = PyOS_ascii_strtod(s, NULL);
-		PyFPE_END_PROTECT(x)
-		errno = 0;    /* whether atof ever set errno is undefined */
 	}
 	result = PyFloat_FromDouble(x);
   error:
