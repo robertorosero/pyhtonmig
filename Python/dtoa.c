@@ -903,30 +903,8 @@ ulp
 	U u;
 
 	L = (word0(x) & Exp_mask) - (P-1)*Exp_msk1;
-#ifndef Avoid_Underflow
-#ifndef Sudden_Underflow
-	if (L > 0) {
-#endif
-#endif
 		word0(&u) = L;
 		word1(&u) = 0;
-#ifndef Avoid_Underflow
-#ifndef Sudden_Underflow
-		}
-	else {
-		L = -L >> Exp_shift;
-		if (L < Exp_shift) {
-			word0(&u) = 0x80000 >> L;
-			word1(&u) = 0;
-			}
-		else {
-			word0(&u) = 0;
-			L -= Exp_shift;
-			word1(&u) = L >= 31 ? 1 : 1 << 31 - L;
-			}
-		}
-#endif
-#endif
 	return dval(&u);
 	}
 
@@ -1064,12 +1042,8 @@ tens[] = {
  static CONST double
 bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
 static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
-#ifdef Avoid_Underflow
 		9007199254740992.*9007199254740992.e-256
 		/* = 2^106 * 1e-256 */
-#else
-		1e-256
-#endif
 		};
 /* The factor of 2^53 in tinytens[4] helps us avoid setting the underflow */
 /* flag unnecessarily.  It leads to a song and dance at the end of strtod. */
@@ -1238,11 +1212,7 @@ bigcomp
 			return -1;
 		p2 = Emin - P + 1;
 		bbits = 1;
-#ifdef Avoid_Underflow
 		word0(rv) = (P+2) << Exp_shift;
-#else
-		word1(rv) = 1;
-#endif
 		i = 0;
 			{
 			speccase = 1;
@@ -1258,9 +1228,7 @@ bigcomp
 		if (b == NULL)
 			return -1;
 	}
-#ifdef Avoid_Underflow
 	p2 -= bc->scale;
-#endif
 	/* floor(log2(rv)) == bbits - 1 + p2 */
 	/* Check for denormal case. */
 	i = P - bbits;
@@ -1272,11 +1240,7 @@ bigcomp
 			return -1;
 		p2 = Emin;
 		i = P - 1;
-#ifdef Avoid_Underflow
 		word0(rv) = (1 + bc->scale) << Exp_shift;
-#else
-		word0(rv) = Exp_msk1;
-#endif
 		word1(rv) = 0;
 #else
 		i = j;
@@ -1615,9 +1579,7 @@ _Py_dg_strtod
 		}
 	e1 += nd - k;
 
-#ifdef Avoid_Underflow
 	bc.scale = 0;
-#endif
 
 	/* Get starting approximation = rv * 10**e1 */
 
@@ -1660,7 +1622,6 @@ _Py_dg_strtod
 		if (e1 >>= 4) {
 			if (e1 >= 1 << n_bigtens)
 				goto undfl;
-#ifdef Avoid_Underflow
 			if (e1 & Scale_Bit)
 				bc.scale = 2*P;
 			for(j = 0; e1 > 0; j++, e1 >>= 1)
@@ -1679,31 +1640,12 @@ _Py_dg_strtod
 				else
 					word1(&rv) &= 0xffffffff << j;
 				}
-#else
-			for(j = 0; e1 > 1; j++, e1 >>= 1)
-				if (e1 & 1)
-					dval(&rv) *= tinytens[j];
-			/* The last multiplication could underflow. */
-			dval(&rv0) = dval(&rv);
-			dval(&rv) *= tinytens[j];
-			if (!dval(&rv)) {
-				dval(&rv) = 2.*dval(&rv0);
-				dval(&rv) *= tinytens[j];
-#endif
 				if (!dval(&rv)) {
  undfl:
 					dval(&rv) = 0.;
 					errno = ERANGE;
 					goto ret;
 					}
-#ifndef Avoid_Underflow
-				word0(&rv) = Tiny0;
-				word1(&rv) = Tiny1;
-				/* The refinement below will clean
-				 * this approximation up.
-				 */
-				}
-#endif
 			}
 		}
 
@@ -1762,30 +1704,15 @@ _Py_dg_strtod
 		else
 			bd2 -= bbe;
 		bs2 = bb2;
-#ifdef Avoid_Underflow
 		j = bbe - bc.scale;
 		i = j + bbbits - 1;	/* logb(rv) */
 		if (i < Emin)	/* denormal */
 			j += P - Emin;
 		else
 			j = P + 1 - bbbits;
-#else /*Avoid_Underflow*/
-#ifdef Sudden_Underflow
-		j = P + 1 - bbbits;
-#else /*Sudden_Underflow*/
-		j = bbe;
-		i = j + bbbits - 1;	/* logb(rv) */
-		if (i < Emin)	/* denormal */
-			j += P - Emin;
-		else
-			j = P + 1 - bbbits;
-#endif /*Sudden_Underflow*/
-#endif /*Avoid_Underflow*/
 		bb2 += j;
 		bd2 += j;
-#ifdef Avoid_Underflow
 		bd2 += bc.scale;
-#endif
 		i = bb2 < bd2 ? bb2 : bd2;
 		if (i > bs2)
 			i = bs2;
@@ -1826,11 +1753,7 @@ _Py_dg_strtod
 			 * special case of mantissa a power of two.
 			 */
 			if (bc.dsign || word1(&rv) || word0(&rv) & Bndry_mask
-#ifdef Avoid_Underflow
 			 || (word0(&rv) & Exp_mask) <= (2*P+1)*Exp_msk1
-#else
-			 || (word0(&rv) & Exp_mask) <= Exp_msk1
-#endif
 				) {
 				break;
 				}
@@ -1848,19 +1771,15 @@ _Py_dg_strtod
 			if (bc.dsign) {
 				if ((word0(&rv) & Bndry_mask1) == Bndry_mask1
 				 &&  word1(&rv) == (
-#ifdef Avoid_Underflow
 			(bc.scale && (y = word0(&rv) & Exp_mask) <= 2*P*Exp_msk1)
 		? (0xffffffff & (0xffffffff << (2*P+1-(y>>Exp_shift)))) :
-#endif
 						   0xffffffff)) {
 					/*boundary case -- increment exponent*/
 					word0(&rv) = (word0(&rv) & Exp_mask)
 						+ Exp_msk1
 						;
 					word1(&rv) = 0;
-#ifdef Avoid_Underflow
 					bc.dsign = 0;
-#endif
 					break;
 					}
 				}
@@ -1869,11 +1788,7 @@ _Py_dg_strtod
 				/* boundary case -- decrement exponent */
 #ifdef Sudden_Underflow /*{{*/
 				L = word0(&rv) & Exp_mask;
-#ifdef Avoid_Underflow
 				if (L <= (bc.scale ? (2*P+1)*Exp_msk1 : Exp_msk1))
-#else
-				if (L <= Exp_msk1)
-#endif /*Avoid_Underflow*/
 					{
 					if (bc.nd >nd) {
 						bc.uflchk = 1;
@@ -1883,7 +1798,6 @@ _Py_dg_strtod
 					}
 				L -= Exp_msk1;
 #else /*Sudden_Underflow}{*/
-#ifdef Avoid_Underflow
 				if (bc.scale) {
 					L = word0(&rv) & Exp_mask;
 					if (L <= (2*P+1)*Exp_msk1) {
@@ -1899,7 +1813,6 @@ _Py_dg_strtod
 						goto undfl;
 						}
 					}
-#endif /*Avoid_Underflow*/
 				L = (word0(&rv) & Exp_mask) - Exp_msk1;
 #endif /*Sudden_Underflow}}*/
 				word0(&rv) = L | Bndry_mask1;
@@ -1922,9 +1835,7 @@ _Py_dg_strtod
 					}
 #endif
 				}
-#ifdef Avoid_Underflow
 			bc.dsign = 1 - bc.dsign;
-#endif
 			break;
 			}
 		if ((aadj = ratio(delta, bs)) <= 2.) {
@@ -1992,7 +1903,6 @@ _Py_dg_strtod
 				word0(&rv) += P*Exp_msk1;
 			}
 		else {
-#ifdef Avoid_Underflow
 			if (bc.scale && y <= 2*P*Exp_msk1) {
 				if (aadj <= 0x7fffffff) {
 					if ((z = aadj) <= 0)
@@ -2006,57 +1916,10 @@ _Py_dg_strtod
 				}
 			adj.d = aadj1 * ulp(&rv);
 			dval(&rv) += adj.d;
-#else
-#ifdef Sudden_Underflow
-			if ((word0(&rv) & Exp_mask) <= P*Exp_msk1) {
-				dval(&rv0) = dval(&rv);
-				word0(&rv) += P*Exp_msk1;
-				adj.d = aadj1 * ulp(&rv);
-				dval(&rv) += adj.d;
-				if ((word0(&rv) & Exp_mask) <= P*Exp_msk1)
-					{
-					if (word0(&rv0) == Tiny0
-					 && word1(&rv0) == Tiny1) {
-						if (bc.nd >nd) {
-							bc.uflchk = 1;
-							break;
-							}
-						goto undfl;
-						}
-					word0(&rv) = Tiny0;
-					word1(&rv) = Tiny1;
-					goto cont;
-					}
-				else
-					word0(&rv) -= P*Exp_msk1;
-				}
-			else {
-				adj.d = aadj1 * ulp(&rv);
-				dval(&rv) += adj.d;
-				}
-#else /*Sudden_Underflow*/
-			/* Compute adj so that the IEEE rounding rules will
-			 * correctly round rv + adj in some half-way cases.
-			 * If rv * ulp(rv) is denormalized (i.e.,
-			 * y <= (P-1)*Exp_msk1), we must adjust aadj to avoid
-			 * trouble from bits lost to denormalization;
-			 * example: 1.2e-307 .
-			 */
-			if (y <= (P-1)*Exp_msk1 && aadj > 1.) {
-				aadj1 = (double)(int)(aadj + 0.5);
-				if (!bc.dsign)
-					aadj1 = -aadj1;
-				}
-			adj.d = aadj1 * ulp(&rv);
-			dval(&rv) += adj.d;
-#endif /*Sudden_Underflow*/
-#endif /*Avoid_Underflow*/
 			}
 		z = word0(&rv) & Exp_mask;
 		if (bc.nd == nd) {
-#ifdef Avoid_Underflow
 		if (!bc.scale)
-#endif
 		if (y == z) {
 			/* Can we stop now? */
 			L = (Long)aadj;
@@ -2083,7 +1946,6 @@ _Py_dg_strtod
 	Bfree(delta);
 	if (bc.nd > nd)
 		bigcomp(&rv, s0, &bc);
-#ifdef Avoid_Underflow
 	if (bc.scale) {
 		word0(&rv0) = Exp_1 - 2*P*Exp_msk1;
 		word1(&rv0) = 0;
@@ -2092,7 +1954,6 @@ _Py_dg_strtod
 		if (!(word0(&rv) & Exp_mask))
 			errno = ERANGE;
 		}
-#endif /* Avoid_Underflow */
  ret:
 	if (se)
 		*se = (char *)s;
