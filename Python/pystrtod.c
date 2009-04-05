@@ -533,7 +533,7 @@ static char *uc_float_strings[] = {
      always_add_sign is nonzero if a '+' sign should be included for positive
        numbers
      add_dot_0_if_integer is nonzero if integers in non-exponential form
-       should have ".0" added.  Only applies to format codes 'r' and 's'.
+       should have ".0" added.  Only applies to format codes 'r', 's', and 'g'.
      use_alt_formatting is nonzero if alternative formatting should be
        used.  Only applies to format codes 'e', 'f' and 'g'.
  */
