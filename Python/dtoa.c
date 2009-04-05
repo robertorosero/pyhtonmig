@@ -1076,34 +1076,6 @@ static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 #define Scale_Bit 0x10
 #define n_bigtens 5
 
-#undef Need_Hexdig
-#ifdef INFNAN_CHECK
-#endif
-
-#ifndef Need_Hexdig
-#endif
-
-#ifdef Need_Hexdig /*{*/
-static unsigned char hexdig[256];
-
- static void
-htinit(unsigned char *h, unsigned char *s, int inc)
-{
-	int i, j;
-	for(i = 0; (j = s[i]) !=0; i++)
-		h[j] = i + inc;
-	}
-
- static void
-hexdig_init(void)
-{
-#define USC (unsigned char *)
-	htinit(hexdig, USC "0123456789", 0x10);
-	htinit(hexdig, USC "abcdef", 0x10 + 10);
-	htinit(hexdig, USC "ABCDEF", 0x10 + 10);
-	}
-#endif /* } Need_Hexdig */
-
 #ifdef INFNAN_CHECK
 
 #ifndef NAN_WORD0
