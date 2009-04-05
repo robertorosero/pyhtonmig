@@ -595,7 +595,8 @@ $(OPCODETARGETS_H): $(OPCODETARGETGEN_FILES)
 Python/ceval.o: $(OPCODETARGETS_H)
 
 Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
-				$(BYTESTR_DEPS)
+				$(BYTESTR_DEPS) \
+				$(srcdir)/Objects/stringlib/formatter.h
 
 
 ############################################################################
