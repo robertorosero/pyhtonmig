@@ -361,11 +361,6 @@ BCinfo { int dp0, dp1, dplen, dsign, e0, inexact, nd, nd0, rounding, scale, uflc
 #endif
 #endif /* NO_LONG_LONG */
 
-#ifndef MULTIPLE_THREADS
-#define ACQUIRE_DTOA_LOCK(n)	/*nothing*/
-#define FREE_DTOA_LOCK(n)	/*nothing*/
-#endif
-
 #define Kmax 7
 
  struct
@@ -389,9 +384,6 @@ Balloc
 	unsigned int len;
 #endif
 
-	ACQUIRE_DTOA_LOCK(0);
-	/* The k > Kmax case does not need ACQUIRE_DTOA_LOCK(0), */
-	/* but this case seems very unlikely. */
 	if (k <= Kmax && (rv = freelist[k]))
 		freelist[k] = rv->next;
 	else {
@@ -418,7 +410,6 @@ Balloc
 		}
 	rv->sign = rv->wds = 0;
   error:
-	FREE_DTOA_LOCK(0);
 	return rv;
 	}
 
@@ -430,10 +421,8 @@ Bfree
 		if (v->k > Kmax)
 			FREE((void*)v);
 		else {
-			ACQUIRE_DTOA_LOCK(0);
 			v->next = freelist[v->k];
 			freelist[v->k] = v;
-			FREE_DTOA_LOCK(0);
 			}
 		}
 	}
@@ -704,17 +693,8 @@ pow5mult
 		return b;
 	if (!(p5 = p5s)) {
 		/* first time */
-#ifdef MULTIPLE_THREADS
-		ACQUIRE_DTOA_LOCK(1);
-		if (!(p5 = p5s)) {
-			p5 = p5s = i2b(625);
-			p5->next = 0;
-			}
-		FREE_DTOA_LOCK(1);
-#else
 		p5 = p5s = i2b(625);
 		p5->next = 0;
-#endif
 		}
 	for(;;) {
 		if (k & 1) {
@@ -725,17 +705,8 @@ pow5mult
 		if (!(k >>= 1))
 			break;
 		if (!(p51 = p5->next)) {
-#ifdef MULTIPLE_THREADS
-			ACQUIRE_DTOA_LOCK(1);
-			if (!(p51 = p5->next)) {
-				p51 = p5->next = mult(p5,p5);
-				p51->next = 0;
-				}
-			FREE_DTOA_LOCK(1);
-#else
 			p51 = p5->next = mult(p5,p5);
 			p51->next = 0;
-#endif
 			}
 		p5 = p51;
 		}
@@ -2062,9 +2033,7 @@ _Py_dg_strtod
 	return sign ? -dval(&rv) : dval(&rv);
 	}
 
-#ifndef MULTIPLE_THREADS
  static char *dtoa_result;
-#endif
 
  static char *
 rv_alloc(int i)
@@ -2079,9 +2048,7 @@ rv_alloc(int i)
 	r = (int*)Balloc(k);
 	*r = k;
 	return
-#ifndef MULTIPLE_THREADS
 	dtoa_result =
-#endif
 		(char *)(r+1);
 	}
 
@@ -2109,10 +2076,8 @@ freedtoa(char *s)
 	Bigint *b = (Bigint *)((int *)s - 1);
 	b->maxwds = 1 << (b->k = *(int*)b);
 	Bfree(b);
-#ifndef MULTIPLE_THREADS
 	if (s == dtoa_result)
 		dtoa_result = 0;
-#endif
 	}
 
 /* dtoa for IEEE arithmetic (dmg): convert double to ASCII string.
@@ -2200,12 +2165,10 @@ _Py_dg_dtoa
 	double ds;
 	char *s, *s0;
 
-#ifndef MULTIPLE_THREADS
 	if (dtoa_result) {
 		freedtoa(dtoa_result);
 		dtoa_result = 0;
 		}
-#endif
 
 	u.d = dd;
 	if (word0(&u) & Sign_bit) {
