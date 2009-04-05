@@ -1418,7 +1418,7 @@ retlow1:
 _Py_dg_strtod
 	(CONST char *s00, char **se)
 {
-	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1;
+	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, dp, e, e1;
 	int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
 	CONST char *s, *s0, *s1;
 	double aadj, aadj1;
@@ -1428,7 +1428,7 @@ _Py_dg_strtod
 	BCinfo bc;
 	Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
 
-	sign = nz0 = nz = bc.dplen = bc.uflchk = 0;
+	sign = nz0 = nz = dp = bc.dplen = bc.uflchk = 0;
 	dval(&rv) = 0.;
 	for(s = s00;;s++) switch(*s) {
 		case '-':
@@ -1467,6 +1467,7 @@ _Py_dg_strtod
 	nd0 = nd;
 	bc.dp0 = bc.dp1 = s - s0;
 	if (c == '.') {
+		dp = 1;
 		c = *++s;
 		bc.dp1 = s - s0;
 		bc.dplen = bc.dp1 - bc.dp0;
@@ -1538,7 +1539,7 @@ _Py_dg_strtod
 			s = s00;
 		}
 	if (!nd) {
-		if (!nz && !nz0) {
+		if (!nz && !nz0 && !dp) {
 #ifdef INFNAN_CHECK
 			/* Check for Nan and Infinity */
 			switch(c) {

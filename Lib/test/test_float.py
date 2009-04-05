@@ -24,6 +24,8 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "+-3.14")
         self.assertRaises(ValueError, float, "-+3.14")
         self.assertRaises(ValueError, float, "--3.14")
+        self.assertRaises(ValueError, float, ".nan")
+        self.assertRaises(ValueError, float, "+.inf")
         self.assertEqual(float(b"  \u0663.\u0661\u0664  ".decode('raw-unicode-escape')), 3.14)
 
     @support.run_with_locale('LC_NUMERIC', 'fr_FR', 'de_DE')
