@@ -184,6 +184,9 @@
 #include "Python.h"
 #include "float.h"
 
+#define MALLOC PyMem_Malloc
+#define FREE PyMem_Free
+
 /* use WORDS_BIGENDIAN to determine float endianness.  This assumes that ints
    and floats share the same endianness on the target machine, which appears
    to be true for every platform that Python currently cares about.  We're
@@ -218,12 +221,6 @@ typedef unsigned long ULong;
 
 #ifdef DEBUG
 #define Bug(x) {fprintf(stderr, "%s\n", x); exit(1);}
-#endif
-
-#ifdef MALLOC
-extern void *MALLOC(size_t);
-#else
-#define MALLOC malloc
 #endif
 
 #ifndef Omit_Private_Memory
@@ -401,6 +398,8 @@ Balloc
 		x = 1 << k;
 #ifdef Omit_Private_Memory
 		rv = (Bigint *)MALLOC(sizeof(Bigint) + (x-1)*sizeof(ULong));
+		if (rv == NULL)
+			goto error;
 #else
 		len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
 			/sizeof(double);
@@ -408,14 +407,18 @@ Balloc
 			rv = (Bigint*)pmem_next;
 			pmem_next += len;
 			}
-		else
+		else {
 			rv = (Bigint*)MALLOC(len*sizeof(double));
+			if (rv == NULL)
+				goto error;
+			}
 #endif
 		rv->k = k;
 		rv->maxwds = x;
 		}
-	FREE_DTOA_LOCK(0);
 	rv->sign = rv->wds = 0;
+  error:
+	FREE_DTOA_LOCK(0);
 	return rv;
 	}
 
@@ -425,11 +428,7 @@ Bfree
 {
 	if (v) {
 		if (v->k > Kmax)
-#ifdef FREE
 			FREE((void*)v);
-#else
-			free((void*)v);
-#endif
 		else {
 			ACQUIRE_DTOA_LOCK(0);
 			v->next = freelist[v->k];
