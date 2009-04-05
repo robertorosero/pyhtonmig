@@ -1216,7 +1216,9 @@ quorem
 	}
 
 
- static void
+/* return 0 on success, -1 on failure */
+
+ static int
 bigcomp
 	(U *rv, CONST char *s0, BCinfo *bc)
 {
@@ -1232,6 +1234,8 @@ bigcomp
 	if (rv->d == 0.) {	/* special case: value near underflow-to-zero */
 				/* threshold was rounded to zero */
 		b = i2b(1);
+		if (b == NULL)
+			return -1;
 		p2 = Emin - P + 1;
 		bbits = 1;
 #ifdef Avoid_Underflow
@@ -1249,7 +1253,11 @@ bigcomp
 		}
 	else
 #endif
+	{
 		b = d2b(rv, &p2, &bbits);
+		if (b == NULL)
+			return -1;
+	}
 #ifdef Avoid_Underflow
 	p2 -= bc->scale;
 #endif
@@ -1260,6 +1268,8 @@ bigcomp
 #ifdef Sudden_Underflow
 		Bfree(b);
 		b = i2b(1);
+		if (b == NULL)
+			return -1;
 		p2 = Emin;
 		i = P - 1;
 #ifdef Avoid_Underflow
@@ -1274,6 +1284,8 @@ bigcomp
 		}
 		{
 		b = lshift(b, ++i);
+		if (b == NULL)
+			return -1;
 		b->x[0] |= 1;
 		}
 #ifndef Sudden_Underflow
@@ -1281,13 +1293,27 @@ bigcomp
 #endif
 	p2 -= p5 + i;
 	d = i2b(1);
+	if (d == NULL) {
+		Bfree(b);
+		return -1;
+	}
 	/* Arrange for convenient computation of quotients:
 	 * shift left if necessary so divisor has 4 leading 0 bits.
 	 */
-	if (p5 > 0)
+	if (p5 > 0) {
 		d = pow5mult(d, p5);
-	else if (p5 < 0)
+		if (d == NULL) {
+			Bfree(b);
+			return -1;
+		}
+	}
+	else if (p5 < 0) {
 		b = pow5mult(b, -p5);
+		if (b == NULL) {
+			Bfree(d);
+			return -1;
+		}
+	}
 	if (p2 > 0) {
 		b2 = p2;
 		d2 = 0;
@@ -1297,16 +1323,30 @@ bigcomp
 		d2 = -p2;
 		}
 	i = dshift(d, d2);
-	if ((b2 += i) > 0)
+	if ((b2 += i) > 0) {
 		b = lshift(b, b2);
-	if ((d2 += i) > 0)
+		if (b == NULL) {
+			Bfree(d);
+			return -1;
+		}
+	}
+	if ((d2 += i) > 0) {
 		d = lshift(d, d2);
+		if (d == NULL) {
+			Bfree(b);
+			return -1;
+		}
+	}
 
 	/* Now b/d = exactly half-way between the two floating-point values */
 	/* on either side of the input string.  Compute first digit of b/d. */
 
 	if (!(dig = quorem(b,d))) {
 		b = multadd(b, 10, 0);	/* very unlikely */
+		if (b == NULL) {
+			Bfree(d);
+			return -1;
+		}
 		dig = quorem(b,d);
 		}
 
@@ -1321,6 +1361,10 @@ bigcomp
 			goto ret;
 			}
 		b = multadd(b, 10, 0);
+		if (b == NULL) {
+			Bfree(d);
+			return -1;
+		}
 		dig = quorem(b,d);
 		}
 	for(j = bc->dp1; i++ < nd;) {
@@ -1332,6 +1376,10 @@ bigcomp
 			goto ret;
 			}
 		b = multadd(b, 10, 0);
+		if (b == NULL) {
+			Bfree(d);
+			return -1;
+		}
 		dig = quorem(b,d);
 		}
 	if (b->x[0] || b->wds > 1)
@@ -1363,7 +1411,7 @@ retlow1:
 			}
 		}
 
-	return;
+	return 0;
 	}
 
  double
