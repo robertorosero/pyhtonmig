@@ -701,27 +701,44 @@ pow5mult
 	int i;
 	static int p05[3] = { 5, 25, 125 };
 
-	if ((i = k & 3))
+	if ((i = k & 3)) {
 		b = multadd(b, p05[i-1], 0);
+		if (b == NULL)
+			return NULL;
+	}
 
 	if (!(k >>= 2))
 		return b;
-	if (!(p5 = p5s)) {
+	p5 = p5s;
+	if (!p5) {
 		/* first time */
-		p5 = p5s = i2b(625);
+		p5 = i2b(625);
+		if (p5 == NULL) {
+			Bfree(b);
+			return NULL;
+		}
+		p5s = p5;
 		p5->next = 0;
 		}
 	for(;;) {
 		if (k & 1) {
 			b1 = mult(b, p5);
 			Bfree(b);
+			if (b1 == NULL)
+				return NULL;
 			b = b1;
 			}
 		if (!(k >>= 1))
 			break;
-		if (!(p51 = p5->next)) {
-			p51 = p5->next = mult(p5,p5);
+		p51 = p5->next;
+		if (!p51) {
+			p51 = mult(p5,p5);
+			if (p51 == NULL) {
+				Bfree(b);
+				return NULL;
+			}
 			p51->next = 0;
+			p5->next = p51;
 			}
 		p5 = p51;
 		}
