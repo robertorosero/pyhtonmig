@@ -8836,6 +8836,9 @@ formatfloat(Py_UNICODE *buf,
         goto done;
     }
 
+    if (type == 'f' && fabs(x) >= 1e50)
+        type = 'g';
+
     if (((type == 'g' || type == 'G') &&
          buflen <= (size_t)10 + (size_t)prec) ||
         ((type == 'f' || type == 'F') &&
