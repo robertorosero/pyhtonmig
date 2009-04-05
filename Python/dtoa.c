@@ -759,6 +759,10 @@ lshift
 	for(i = b->maxwds; n1 > i; i <<= 1)
 		k1++;
 	b1 = Balloc(k1);
+	if (b1 == NULL) {
+		Bfree(b);
+		return NULL;
+	}
 	x1 = b1->x;
 	for(i = 0; i < n; i++)
 		*x1++ = 0;
@@ -830,6 +834,8 @@ diff
 	i = cmp(a,b);
 	if (!i) {
 		c = Balloc(0);
+		if (c == NULL)
+			return NULL;
 		c->wds = 1;
 		c->x[0] = 0;
 		return c;
@@ -843,6 +849,8 @@ diff
 	else
 		i = 0;
 	c = Balloc(a->k);
+	if (c == NULL)
+		return NULL;
 	c->sign = i;
 	wa = a->wds;
 	xa = a->x;
@@ -976,6 +984,8 @@ d2b
 #define d1 word1(d)
 
 	b = Balloc(1);
+	if (b == NULL)
+		return NULL;
 	x = b->x;
 
 	z = d0 & Frac_mask;
