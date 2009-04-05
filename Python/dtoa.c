@@ -221,22 +221,10 @@ typedef unsigned long ULong;
 #include "stdlib.h"
 #include "string.h"
 
-#ifdef USE_LOCALE
-#include "locale.h"
-#endif
 
-#ifdef Honor_FLT_ROUNDS
-#ifndef Trust_FLT_ROUNDS
-#include <fenv.h>
-#endif
-#endif
 
 #ifdef MALLOC
-#ifdef KR_headers
-extern char *MALLOC();
-#else
 extern void *MALLOC(size_t);
-#endif
 #else
 #define MALLOC malloc
 #endif
@@ -258,50 +246,12 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 #define IEEE_Arith
 #endif
 
-#ifdef IEEE_Arith
-#ifndef NO_INFNAN_CHECK
 #undef INFNAN_CHECK
 #define INFNAN_CHECK
-#endif
-#else
-#undef INFNAN_CHECK
-#define NO_STRTOD_BIGCOMP
-#endif
 
 #include "errno.h"
 
-#ifdef Bad_float_h
-
-#ifdef IEEE_Arith
-#define DBL_DIG 15
-#define DBL_MAX_10_EXP 308
-#define DBL_MAX_EXP 1024
-#define FLT_RADIX 2
-#endif /*IEEE_Arith*/
-
-#ifdef IBM
-#define DBL_DIG 16
-#define DBL_MAX_10_EXP 75
-#define DBL_MAX_EXP 63
-#define FLT_RADIX 16
-#define DBL_MAX 7.2370055773322621e+75
-#endif
-
-#ifdef VAX
-#define DBL_DIG 16
-#define DBL_MAX_10_EXP 38
-#define DBL_MAX_EXP 127
-#define FLT_RADIX 2
-#define DBL_MAX 1.7014118346046923e+38
-#endif
-
-#ifndef LONG_MAX
-#define LONG_MAX 2147483647
-#endif
-
-#else /* ifndef Bad_float_h */
 #include "float.h"
-#endif /* Bad_float_h */
 
 #ifndef __MATH_H__
 #include "math.h"
@@ -312,11 +262,7 @@ extern "C" {
 #endif
 
 #ifndef CONST
-#ifdef KR_headers
-#define CONST /* blank */
-#else
 #define CONST const
-#endif
 #endif
 
 #if defined(IEEE_8087) + defined(IEEE_MC68k) + defined(VAX) + defined(IBM) != 1
@@ -362,7 +308,6 @@ extern int strtod_diglim;
 /* Quick_max = floor((P-1)*log(FLT_RADIX)/log(10) - 1) */
 /* Int_max = floor(P*log(FLT_RADIX)/log(10) - 1) */
 
-#ifdef IEEE_Arith
 #define Exp_shift  20
 #define Exp_shift1 20
 #define Exp_msk1    0x100000
@@ -389,11 +334,9 @@ extern int strtod_diglim;
 #define Tiny1 1
 #define Quick_max 14
 #define Int_max 14
-#ifndef NO_IEEE_Scale
 #define Avoid_Underflow
 #ifdef Flush_Denorm	/* debugging option */
 #undef Sudden_Underflow
-#endif
 #endif
 
 #ifndef Flt_Rounds
@@ -404,124 +347,25 @@ extern int strtod_diglim;
 #endif
 #endif /*Flt_Rounds*/
 
-#ifdef Honor_FLT_ROUNDS
-#undef Check_FLT_ROUNDS
-#define Check_FLT_ROUNDS
-#else
 #define Rounding Flt_Rounds
-#endif
 
-#else /* ifndef IEEE_Arith */
-#undef Check_FLT_ROUNDS
-#undef Honor_FLT_ROUNDS
-#undef SET_INEXACT
-#undef  Sudden_Underflow
-#define Sudden_Underflow
-#ifdef IBM
-#undef Flt_Rounds
-#define Flt_Rounds 0
-#define Exp_shift  24
-#define Exp_shift1 24
-#define Exp_msk1   0x1000000
-#define Exp_msk11  0x1000000
-#define Exp_mask  0x7f000000
-#define P 14
-#define Nbits 56
-#define Bias 65
-#define Emax 248
-#define Emin (-260)
-#define Exp_1  0x41000000
-#define Exp_11 0x41000000
-#define Ebits 8	/* exponent has 7 bits, but 8 is the right value in b2d */
-#define Frac_mask  0xffffff
-#define Frac_mask1 0xffffff
-#define Bletch 4
-#define Ten_pmax 22
-#define Bndry_mask  0xefffff
-#define Bndry_mask1 0xffffff
-#define LSB 1
-#define Sign_bit 0x80000000
-#define Log2P 4
-#define Tiny0 0x100000
-#define Tiny1 0
-#define Quick_max 14
-#define Int_max 15
-#else /* VAX */
-#undef Flt_Rounds
-#define Flt_Rounds 1
-#define Exp_shift  23
-#define Exp_shift1 7
-#define Exp_msk1    0x80
-#define Exp_msk11   0x800000
-#define Exp_mask  0x7f80
-#define P 56
-#define Nbits 56
-#define Bias 129
-#define Emax 126
-#define Emin (-129)
-#define Exp_1  0x40800000
-#define Exp_11 0x4080
-#define Ebits 8
-#define Frac_mask  0x7fffff
-#define Frac_mask1 0xffff007f
-#define Ten_pmax 24
-#define Bletch 2
-#define Bndry_mask  0xffff007f
-#define Bndry_mask1 0xffff007f
-#define LSB 0x10000
-#define Sign_bit 0x8000
-#define Log2P 1
-#define Tiny0 0x80
-#define Tiny1 0
-#define Quick_max 15
-#define Int_max 15
-#endif /* IBM, VAX */
-#endif /* IEEE_Arith */
 
-#ifndef IEEE_Arith
-#define ROUND_BIASED
-#endif
 
-#ifdef RND_PRODQUOT
-#define rounded_product(a,b) a = rnd_prod(a, b)
-#define rounded_quotient(a,b) a = rnd_quot(a, b)
-#ifdef KR_headers
-extern double rnd_prod(), rnd_quot();
-#else
-extern double rnd_prod(double, double), rnd_quot(double, double);
-#endif
-#else
 #define rounded_product(a,b) a *= b
 #define rounded_quotient(a,b) a /= b
-#endif
 
 #define Big0 (Frac_mask1 | Exp_msk1*(DBL_MAX_EXP+Bias-1))
 #define Big1 0xffffffff
 
-#ifndef Pack_32
-#define Pack_32
-#endif
 
 typedef struct BCinfo BCinfo;
  struct
 BCinfo { int dp0, dp1, dplen, dsign, e0, inexact, nd, nd0, rounding, scale, uflchk; };
 
-#ifdef KR_headers
-#define FFFFFFFF ((((unsigned long)0xffff)<<16)|(unsigned long)0xffff)
-#else
 #define FFFFFFFF 0xffffffffUL
-#endif
 
 #ifdef NO_LONG_LONG
 #undef ULLong
-#ifdef Just_16
-#undef Pack_32
-/* When Pack_32 is not defined, we store 16 bits per 32-bit Long.
- * This makes some inner loops simpler and sometimes saves work
- * during multiplications, but it often seems to make things slightly
- * slower.  Hence the default is now to store 32 bits per Long.
- */
-#endif
 #else	/* long long available */
 #ifndef Llong
 #define Llong long long
@@ -551,11 +395,7 @@ Bigint {
 
  static Bigint *
 Balloc
-#ifdef KR_headers
-	(k) int k;
-#else
 	(int k)
-#endif
 {
 	int x;
 	Bigint *rv;
@@ -592,11 +432,7 @@ Balloc
 
  static void
 Bfree
-#ifdef KR_headers
-	(v) Bigint *v;
-#else
 	(Bigint *v)
-#endif
 {
 	if (v) {
 		if (v->k > Kmax)
@@ -619,11 +455,7 @@ y->wds*sizeof(Long) + 2*sizeof(int))
 
  static Bigint *
 multadd
-#ifdef KR_headers
-	(b, m, a) Bigint *b; int m, a;
-#else
 	(Bigint *b, int m, int a)	/* multiply by m and add a */
-#endif
 {
 	int i, wds;
 #ifdef ULLong
@@ -631,9 +463,7 @@ multadd
 	ULLong carry, y;
 #else
 	ULong carry, *x, y;
-#ifdef Pack_32
 	ULong xi, z;
-#endif
 #endif
 	Bigint *b1;
 
@@ -647,17 +477,11 @@ multadd
 		carry = y >> 32;
 		*x++ = y & FFFFFFFF;
 #else
-#ifdef Pack_32
 		xi = *x;
 		y = (xi & 0xffff) * m + carry;
 		z = (xi >> 16) * m + (y >> 16);
 		carry = z >> 16;
 		*x++ = (z << 16) + (y & 0xffff);
-#else
-		y = *x * m + carry;
-		carry = y >> 16;
-		*x++ = y & 0xffff;
-#endif
 #endif
 		}
 		while(++i < wds);
@@ -676,11 +500,7 @@ multadd
 
  static Bigint *
 s2b
-#ifdef KR_headers
-	(s, nd0, nd, y9, dplen) CONST char *s; int nd0, nd, dplen; ULong y9;
-#else
 	(CONST char *s, int nd0, int nd, ULong y9, int dplen)
-#endif
 {
 	Bigint *b;
 	int i, k;
@@ -688,15 +508,9 @@ s2b
 
 	x = (nd + 8) / 9;
 	for(k = 0, y = 1; x > y; y <<= 1, k++) ;
-#ifdef Pack_32
 	b = Balloc(k);
 	b->x[0] = y9;
 	b->wds = 1;
-#else
-	b = Balloc(k+1);
-	b->x[0] = y9 & 0xffff;
-	b->wds = (b->x[1] = y9 >> 16) ? 2 : 1;
-#endif
 
 	i = 9;
 	if (9 < nd0) {
@@ -714,11 +528,7 @@ s2b
 
  static int
 hi0bits
-#ifdef KR_headers
-	(x) ULong x;
-#else
 	(ULong x)
-#endif
 {
 	int k = 0;
 
@@ -748,11 +558,7 @@ hi0bits
 
  static int
 lo0bits
-#ifdef KR_headers
-	(y) ULong *y;
-#else
 	(ULong *y)
-#endif
 {
 	int k;
 	ULong x = *y;
@@ -796,11 +602,7 @@ lo0bits
 
  static Bigint *
 i2b
-#ifdef KR_headers
-	(i) int i;
-#else
 	(int i)
-#endif
 {
 	Bigint *b;
 
@@ -812,11 +614,7 @@ i2b
 
  static Bigint *
 mult
-#ifdef KR_headers
-	(a, b) Bigint *a, *b;
-#else
 	(Bigint *a, Bigint *b)
-#endif
 {
 	Bigint *c;
 	int k, wa, wb, wc;
@@ -826,9 +624,7 @@ mult
 	ULLong carry, z;
 #else
 	ULong carry, z;
-#ifdef Pack_32
 	ULong z2;
-#endif
 #endif
 
 	if (a->wds < b->wds) {
@@ -866,7 +662,6 @@ mult
 			}
 		}
 #else
-#ifdef Pack_32
 	for(; xb < xbe; xb++, xc0++) {
 		if (y = *xb & 0xffff) {
 			x = xa;
@@ -898,22 +693,6 @@ mult
 			*xc = z2;
 			}
 		}
-#else
-	for(; xb < xbe; xc0++) {
-		if (y = *xb++) {
-			x = xa;
-			xc = xc0;
-			carry = 0;
-			do {
-				z = *x++ * y + *xc + carry;
-				carry = z >> 16;
-				*xc++ = z & 0xffff;
-				}
-				while(x < xae);
-			*xc = carry;
-			}
-		}
-#endif
 #endif
 	for(xc0 = c->x, xc = xc0 + wc; wc > 0 && !*--xc; --wc) ;
 	c->wds = wc;
@@ -924,11 +703,7 @@ mult
 
  static Bigint *
 pow5mult
-#ifdef KR_headers
-	(b, k) Bigint *b; int k;
-#else
 	(Bigint *b, int k)
-#endif
 {
 	Bigint *b1, *p5, *p51;
 	int i;
@@ -981,21 +756,13 @@ pow5mult
 
  static Bigint *
 lshift
-#ifdef KR_headers
-	(b, k) Bigint *b; int k;
-#else
 	(Bigint *b, int k)
-#endif
 {
 	int i, k1, n, n1;
 	Bigint *b1;
 	ULong *x, *x1, *xe, z;
 
-#ifdef Pack_32
 	n = k >> 5;
-#else
-	n = k >> 4;
-#endif
 	k1 = b->k;
 	n1 = n + b->wds + 1;
 	for(i = b->maxwds; n1 > i; i <<= 1)
@@ -1006,7 +773,6 @@ lshift
 		*x1++ = 0;
 	x = b->x;
 	xe = x + b->wds;
-#ifdef Pack_32
 	if (k &= 0x1f) {
 		k1 = 32 - k;
 		z = 0;
@@ -1018,19 +784,6 @@ lshift
 		if ((*x1 = z))
 			++n1;
 		}
-#else
-	if (k &= 0xf) {
-		k1 = 16 - k;
-		z = 0;
-		do {
-			*x1++ = *x << k  & 0xffff | z;
-			z = *x++ >> k1;
-			}
-			while(x < xe);
-		if (*x1 = z)
-			++n1;
-		}
-#endif
 	else do
 		*x1++ = *x++;
 		while(x < xe);
@@ -1041,11 +794,7 @@ lshift
 
  static int
 cmp
-#ifdef KR_headers
-	(a, b) Bigint *a, *b;
-#else
 	(Bigint *a, Bigint *b)
-#endif
 {
 	ULong *xa, *xa0, *xb, *xb0;
 	int i, j;
@@ -1075,11 +824,7 @@ cmp
 
  static Bigint *
 diff
-#ifdef KR_headers
-	(a, b) Bigint *a, *b;
-#else
 	(Bigint *a, Bigint *b)
-#endif
 {
 	Bigint *c;
 	int i, wa, wb;
@@ -1088,9 +833,7 @@ diff
 	ULLong borrow, y;
 #else
 	ULong borrow, y;
-#ifdef Pack_32
 	ULong z;
-#endif
 #endif
 
 	i = cmp(a,b);
@@ -1131,7 +874,6 @@ diff
 		*xc++ = y & FFFFFFFF;
 		}
 #else
-#ifdef Pack_32
 	do {
 		y = (*xa & 0xffff) - (*xb & 0xffff) - borrow;
 		borrow = (y & 0x10000) >> 16;
@@ -1147,19 +889,6 @@ diff
 		borrow = (z & 0x10000) >> 16;
 		Storeinc(xc, z, y);
 		}
-#else
-	do {
-		y = *xa++ - *xb++ - borrow;
-		borrow = (y & 0x10000) >> 16;
-		*xc++ = y & 0xffff;
-		}
-		while(xb < xbe);
-	while(xa < xae) {
-		y = *xa++ - borrow;
-		borrow = (y & 0x10000) >> 16;
-		*xc++ = y & 0xffff;
-		}
-#endif
 #endif
 	while(!*--xc)
 		wa--;
@@ -1169,11 +898,7 @@ diff
 
  static double
 ulp
-#ifdef KR_headers
-	(x) U *x;
-#else
 	(U *x)
-#endif
 {
 	Long L;
 	U u;
@@ -1183,9 +908,6 @@ ulp
 #ifndef Sudden_Underflow
 	if (L > 0) {
 #endif
-#endif
-#ifdef IBM
-		L |= Exp_msk1 >> 4;
 #endif
 		word0(&u) = L;
 		word1(&u) = 0;
@@ -1211,21 +933,13 @@ ulp
 
  static double
 b2d
-#ifdef KR_headers
-	(a, e) Bigint *a; int *e;
-#else
 	(Bigint *a, int *e)
-#endif
 {
 	ULong *xa, *xa0, w, y, z;
 	int k;
 	U d;
-#ifdef VAX
-	ULong d0, d1;
-#else
 #define d0 word0(&d)
 #define d1 word1(&d)
-#endif
 
 	xa0 = a->x;
 	xa = xa0 + a->wds;
@@ -1235,7 +949,6 @@ b2d
 #endif
 	k = hi0bits(y);
 	*e = 32 - k;
-#ifdef Pack_32
 	if (k < Ebits) {
 		d0 = Exp_1 | y >> (Ebits - k);
 		w = xa > xa0 ? *--xa : 0;
@@ -1252,40 +965,15 @@ b2d
 		d0 = Exp_1 | y;
 		d1 = z;
 		}
-#else
-	if (k < Ebits + 16) {
-		z = xa > xa0 ? *--xa : 0;
-		d0 = Exp_1 | y << k - Ebits | z >> Ebits + 16 - k;
-		w = xa > xa0 ? *--xa : 0;
-		y = xa > xa0 ? *--xa : 0;
-		d1 = z << k + 16 - Ebits | w << k - Ebits | y >> 16 + Ebits - k;
-		goto ret_d;
-		}
-	z = xa > xa0 ? *--xa : 0;
-	w = xa > xa0 ? *--xa : 0;
-	k -= Ebits + 16;
-	d0 = Exp_1 | y << k + 16 | z << k | w >> 16 - k;
-	y = xa > xa0 ? *--xa : 0;
-	d1 = w << k + 16 | y << k;
-#endif
  ret_d:
-#ifdef VAX
-	word0(&d) = d0 >> 16 | d0 << 16;
-	word1(&d) = d1 >> 16 | d1 << 16;
-#else
 #undef d0
 #undef d1
-#endif
 	return dval(&d);
 	}
 
  static Bigint *
 d2b
-#ifdef KR_headers
-	(d, e, bits) U *d; int *e, *bits;
-#else
 	(U *d, int *e, int *bits)
-#endif
 {
 	Bigint *b;
 	int de, k;
@@ -1293,34 +981,21 @@ d2b
 #ifndef Sudden_Underflow
 	int i;
 #endif
-#ifdef VAX
-	ULong d0, d1;
-	d0 = word0(d) >> 16 | word0(d) << 16;
-	d1 = word1(d) >> 16 | word1(d) << 16;
-#else
 #define d0 word0(d)
 #define d1 word1(d)
-#endif
 
-#ifdef Pack_32
 	b = Balloc(1);
-#else
-	b = Balloc(2);
-#endif
 	x = b->x;
 
 	z = d0 & Frac_mask;
 	d0 &= 0x7fffffff;	/* clear sign bit, which we ignore */
 #ifdef Sudden_Underflow
 	de = (int)(d0 >> Exp_shift);
-#ifndef IBM
 	z |= Exp_msk11;
-#endif
 #else
 	if ((de = (int)(d0 >> Exp_shift)))
 		z |= Exp_msk1;
 #endif
-#ifdef Pack_32
 	if ((y = d1)) {
 		if ((k = lo0bits(&y))) {
 			x[0] = y | z << (32 - k);
@@ -1342,70 +1017,16 @@ d2b
 		    b->wds = 1;
 		k += 32;
 		}
-#else
-	if (y = d1) {
-		if (k = lo0bits(&y))
-			if (k >= 16) {
-				x[0] = y | z << 32 - k & 0xffff;
-				x[1] = z >> k - 16 & 0xffff;
-				x[2] = z >> k;
-				i = 2;
-				}
-			else {
-				x[0] = y & 0xffff;
-				x[1] = y >> 16 | z << 16 - k & 0xffff;
-				x[2] = z >> k & 0xffff;
-				x[3] = z >> k+16;
-				i = 3;
-				}
-		else {
-			x[0] = y & 0xffff;
-			x[1] = y >> 16;
-			x[2] = z & 0xffff;
-			x[3] = z >> 16;
-			i = 3;
-			}
-		}
-	else {
-#ifdef DEBUG
-		if (!z)
-			Bug("Zero passed to d2b");
-#endif
-		k = lo0bits(&z);
-		if (k >= 16) {
-			x[0] = z;
-			i = 0;
-			}
-		else {
-			x[0] = z & 0xffff;
-			x[1] = z >> 16;
-			i = 1;
-			}
-		k += 32;
-		}
-	while(!x[i])
-		--i;
-	b->wds = i + 1;
-#endif
 #ifndef Sudden_Underflow
 	if (de) {
 #endif
-#ifdef IBM
-		*e = (de - Bias - (P-1) << 2) + k;
-		*bits = 4*P + 8 - k - hi0bits(word0(d) & Frac_mask);
-#else
 		*e = de - Bias - (P-1) + k;
 		*bits = P - k;
-#endif
 #ifndef Sudden_Underflow
 		}
 	else {
 		*e = de - Bias - (P-1) + 1 + k;
-#ifdef Pack_32
 		*bits = 32*i - hi0bits(x[i-1]);
-#else
-		*bits = (i+2)*16 - hi0bits(x[i]);
-#endif
 		}
 #endif
 	return b;
@@ -1415,42 +1036,20 @@ d2b
 
  static double
 ratio
-#ifdef KR_headers
-	(a, b) Bigint *a, *b;
-#else
 	(Bigint *a, Bigint *b)
-#endif
 {
 	U da, db;
 	int k, ka, kb;
 
 	dval(&da) = b2d(a, &ka);
 	dval(&db) = b2d(b, &kb);
-#ifdef Pack_32
 	k = ka - kb + 32*(a->wds - b->wds);
-#else
-	k = ka - kb + 16*(a->wds - b->wds);
-#endif
-#ifdef IBM
-	if (k > 0) {
-		word0(&da) += (k >> 2)*Exp_msk1;
-		if (k &= 3)
-			dval(&da) *= 1 << k;
-		}
-	else {
-		k = -k;
-		word0(&db) += (k >> 2)*Exp_msk1;
-		if (k &= 3)
-			dval(&db) *= 1 << k;
-		}
-#else
 	if (k > 0)
 		word0(&da) += k*Exp_msk1;
 	else {
 		k = -k;
 		word0(&db) += k*Exp_msk1;
 		}
-#endif
 	return dval(&da) / dval(&db);
 	}
 
@@ -1459,13 +1058,9 @@ tens[] = {
 		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 		1e20, 1e21, 1e22
-#ifdef VAX
-		, 1e23, 1e24
-#endif
 		};
 
  static CONST double
-#ifdef IEEE_Arith
 bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
 static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 #ifdef Avoid_Underflow
@@ -1479,40 +1074,19 @@ static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 /* flag unnecessarily.  It leads to a song and dance at the end of strtod. */
 #define Scale_Bit 0x10
 #define n_bigtens 5
-#else
-#ifdef IBM
-bigtens[] = { 1e16, 1e32, 1e64 };
-static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64 };
-#define n_bigtens 3
-#else
-bigtens[] = { 1e16, 1e32 };
-static CONST double tinytens[] = { 1e-16, 1e-32 };
-#define n_bigtens 2
-#endif
-#endif
 
 #undef Need_Hexdig
 #ifdef INFNAN_CHECK
-#ifndef No_Hex_NaN
-#define Need_Hexdig
-#endif
 #endif
 
 #ifndef Need_Hexdig
-#ifndef NO_HEX_FP
-#define Need_Hexdig
-#endif
 #endif
 
 #ifdef Need_Hexdig /*{*/
 static unsigned char hexdig[256];
 
  static void
-#ifdef KR_headers
-htinit(h, s, inc) unsigned char *h; unsigned char *s; int inc;
-#else
 htinit(unsigned char *h, unsigned char *s, int inc)
-#endif
 {
 	int i, j;
 	for(i = 0; (j = s[i]) !=0; i++)
@@ -1520,11 +1094,7 @@ htinit(unsigned char *h, unsigned char *s, int inc)
 	}
 
  static void
-#ifdef KR_headers
-hexdig_init()
-#else
 hexdig_init(void)
-#endif
 {
 #define USC (unsigned char *)
 	htinit(hexdig, USC "0123456789", 0x10);
@@ -1545,11 +1115,7 @@ hexdig_init(void)
 
  static int
 match
-#ifdef KR_headers
-	(sp, t) char **sp, *t;
-#else
 	(CONST char **sp, char *t)
-#endif
 {
 	int c, d;
 	CONST char *s = *sp;
@@ -1564,556 +1130,15 @@ match
 	return 1;
 	}
 
-#ifndef No_Hex_NaN
- static void
-hexnan
-#ifdef KR_headers
-	(rvp, sp) U *rvp; CONST char **sp;
-#else
-	(U *rvp, CONST char **sp)
-#endif
-{
-	ULong c, x[2];
-	CONST char *s;
-	int c1, havedig, udx0, xshift;
-
-	if (!hexdig['0'])
-		hexdig_init();
-	x[0] = x[1] = 0;
-	havedig = xshift = 0;
-	udx0 = 1;
-	s = *sp;
-	/* allow optional initial 0x or 0X */
-	while((c = *(CONST unsigned char*)(s+1)) && c <= ' ')
-		++s;
-	if (s[1] == '0' && (s[2] == 'x' || s[2] == 'X'))
-		s += 2;
-	while((c = *(CONST unsigned char*)++s)) {
-		if ((c1 = hexdig[c]))
-			c  = c1 & 0xf;
-		else if (c <= ' ') {
-			if (udx0 && havedig) {
-				udx0 = 0;
-				xshift = 1;
-				}
-			continue;
-			}
-#ifdef GDTOA_NON_PEDANTIC_NANCHECK
-		else if (/*(*/ c == ')' && havedig) {
-			*sp = s + 1;
-			break;
-			}
-		else
-			return;	/* invalid form: don't change *sp */
-#else
-		else {
-			do {
-				if (/*(*/ c == ')') {
-					*sp = s + 1;
-					break;
-					}
-				} while((c = *++s));
-			break;
-			}
-#endif
-		havedig = 1;
-		if (xshift) {
-			xshift = 0;
-			x[0] = x[1];
-			x[1] = 0;
-			}
-		if (udx0)
-			x[0] = (x[0] << 4) | (x[1] >> 28);
-		x[1] = (x[1] << 4) | c;
-		}
-	if ((x[0] &= 0xfffff) || x[1]) {
-		word0(rvp) = Exp_mask | x[0];
-		word1(rvp) = x[1];
-		}
-	}
-#endif /*No_Hex_NaN*/
 #endif /* INFNAN_CHECK */
 
-#ifdef Pack_32
 #define ULbits 32
 #define kshift 5
 #define kmask 31
-#else
-#define ULbits 16
-#define kshift 4
-#define kmask 15
-#endif
 
-#ifndef NO_HEX_FP /*{*/
-
- static void
-#ifdef KR_headers
-rshift(b, k) Bigint *b; int k;
-#else
-rshift(Bigint *b, int k)
-#endif
-{
-	ULong *x, *x1, *xe, y;
-	int n;
-
-	x = x1 = b->x;
-	n = k >> kshift;
-	if (n < b->wds) {
-		xe = x + b->wds;
-		x += n;
-		if (k &= kmask) {
-			n = 32 - k;
-			y = *x++ >> k;
-			while(x < xe) {
-				*x1++ = (y | (*x << n)) & 0xffffffff;
-				y = *x++ >> k;
-				}
-			if ((*x1 = y) !=0)
-				x1++;
-			}
-		else
-			while(x < xe)
-				*x1++ = *x++;
-		}
-	if ((b->wds = x1 - b->x) == 0)
-		b->x[0] = 0;
-	}
-
- static ULong
-#ifdef KR_headers
-any_on(b, k) Bigint *b; int k;
-#else
-any_on(Bigint *b, int k)
-#endif
-{
-	int n, nwds;
-	ULong *x, *x0, x1, x2;
-
-	x = b->x;
-	nwds = b->wds;
-	n = k >> kshift;
-	if (n > nwds)
-		n = nwds;
-	else if (n < nwds && (k &= kmask)) {
-		x1 = x2 = x[n];
-		x1 >>= k;
-		x1 <<= k;
-		if (x1 != x2)
-			return 1;
-		}
-	x0 = x;
-	x += n;
-	while(x > x0)
-		if (*--x)
-			return 1;
-	return 0;
-	}
-
-enum {	/* rounding values: same as FLT_ROUNDS */
-	Round_zero = 0,
-	Round_near = 1,
-	Round_up = 2,
-	Round_down = 3
-	};
-
- static Bigint *
-#ifdef KR_headers
-increment(b) Bigint *b;
-#else
-increment(Bigint *b)
-#endif
-{
-	ULong *x, *xe;
-	Bigint *b1;
-
-	x = b->x;
-	xe = x + b->wds;
-	do {
-		if (*x < (ULong)0xffffffffL) {
-			++*x;
-			return b;
-			}
-		*x++ = 0;
-		} while(x < xe);
-	{
-		if (b->wds >= b->maxwds) {
-			b1 = Balloc(b->k+1);
-			Bcopy(b1,b);
-			Bfree(b);
-			b = b1;
-			}
-		b->x[b->wds++] = 1;
-		}
-	return b;
-	}
-
- void
-#ifdef KR_headers
-gethex(sp, rvp, rounding, sign)
-	CONST char **sp; U *rvp; int rounding, sign;
-#else
-gethex( CONST char **sp, U *rvp, int rounding, int sign)
-#endif
-{
-	Bigint *b;
-	CONST unsigned char *decpt, *s0, *s, *s1;
-	Long e, e1;
-	ULong L, lostbits, *x;
-	int big, denorm, esign, havedig, k, n, nbits, up, zret;
-#ifdef IBM
-	int j;
-#endif
-	enum {
-#ifdef IEEE_Arith /*{{*/
-		emax = 0x7fe - Bias - P + 1,
-		emin = Emin - P + 1
-#else /*}{*/
-		emin = Emin - P,
-#ifdef VAX
-		emax = 0x7ff - Bias - P + 1
-#endif
-#ifdef IBM
-		emax = 0x7f - Bias - P
-#endif
-#endif /*}}*/
-		};
-#ifdef USE_LOCALE
-	int i;
-#ifdef NO_LOCALE_CACHE
-	const unsigned char *decimalpoint = (unsigned char*)
-		localeconv()->decimal_point;
-#else
-	const unsigned char *decimalpoint;
-	static unsigned char *decimalpoint_cache;
-	if (!(s0 = decimalpoint_cache)) {
-		s0 = (unsigned char*)localeconv()->decimal_point;
-		if ((decimalpoint_cache = (unsigned char*)
-				MALLOC(strlen((CONST char*)s0) + 1))) {
-			strcpy((char*)decimalpoint_cache, (CONST char*)s0);
-			s0 = decimalpoint_cache;
-			}
-		}
-	decimalpoint = s0;
-#endif
-#endif
-
-	if (!hexdig['0'])
-		hexdig_init();
-	havedig = 0;
-	s0 = *(CONST unsigned char **)sp + 2;
-	while(s0[havedig] == '0')
-		havedig++;
-	s0 += havedig;
-	s = s0;
-	decpt = 0;
-	zret = 0;
-	e = 0;
-	if (hexdig[*s])
-		havedig++;
-	else {
-		zret = 1;
-#ifdef USE_LOCALE
-		for(i = 0; decimalpoint[i]; ++i) {
-			if (s[i] != decimalpoint[i])
-				goto pcheck;
-			}
-		decpt = s += i;
-#else
-		if (*s != '.')
-			goto pcheck;
-		decpt = ++s;
-#endif
-		if (!hexdig[*s])
-			goto pcheck;
-		while(*s == '0')
-			s++;
-		if (hexdig[*s])
-			zret = 0;
-		havedig = 1;
-		s0 = s;
-		}
-	while(hexdig[*s])
-		s++;
-#ifdef USE_LOCALE
-	if (*s == *decimalpoint && !decpt) {
-		for(i = 1; decimalpoint[i]; ++i) {
-			if (s[i] != decimalpoint[i])
-				goto pcheck;
-			}
-		decpt = s += i;
-#else
-	if (*s == '.' && !decpt) {
-		decpt = ++s;
-#endif
-		while(hexdig[*s])
-			s++;
-		}/*}*/
-	if (decpt)
-		e = -(((Long)(s-decpt)) << 2);
- pcheck:
-	s1 = s;
-	big = esign = 0;
-	switch(*s) {
-	  case 'p':
-	  case 'P':
-		switch(*++s) {
-		  case '-':
-			esign = 1;
-			/* no break */
-		  case '+':
-			s++;
-		  }
-		if ((n = hexdig[*s]) == 0 || n > 0x19) {
-			s = s1;
-			break;
-			}
-		e1 = n - 0x10;
-		while((n = hexdig[*++s]) !=0 && n <= 0x19) {
-			if (e1 & 0xf8000000)
-				big = 1;
-			e1 = 10*e1 + n - 0x10;
-			}
-		if (esign)
-			e1 = -e1;
-		e += e1;
-	  }
-	*sp = (char*)s;
-	if (!havedig)
-		*sp = (char*)s0 - 1;
-	if (zret)
-		goto retz1;
-	if (big) {
-		if (esign) {
-#ifdef IEEE_Arith
-			switch(rounding) {
-			  case Round_up:
-				if (sign)
-					break;
-				goto ret_tiny;
-			  case Round_down:
-				if (!sign)
-					break;
-				goto ret_tiny;
-			  }
-#endif
-			goto retz;
-#ifdef IEEE_Arith
- ret_tiny:
-#ifndef NO_ERRNO
-			errno = ERANGE;
-#endif
-			word0(rvp) = 0;
-			word1(rvp) = 1;
-			return;
-#endif /* IEEE_Arith */
-			}
-		switch(rounding) {
-		  case Round_near:
-			goto ovfl1;
-		  case Round_up:
-			if (!sign)
-				goto ovfl1;
-			goto ret_big;
-		  case Round_down:
-			if (sign)
-				goto ovfl1;
-			goto ret_big;
-		  }
- ret_big:
-		word0(rvp) = Big0;
-		word1(rvp) = Big1;
-		return;
-		}
-	n = s1 - s0 - 1;
-	for(k = 0; n > (1 << (kshift-2)) - 1; n >>= 1)
-		k++;
-	b = Balloc(k);
-	x = b->x;
-	n = 0;
-	L = 0;
-#ifdef USE_LOCALE
-	for(i = 0; decimalpoint[i+1]; ++i);
-#endif
-	while(s1 > s0) {
-#ifdef USE_LOCALE
-		if (*--s1 == decimalpoint[i]) {
-			s1 -= i;
-			continue;
-			}
-#else
-		if (*--s1 == '.')
-			continue;
-#endif
-		if (n == ULbits) {
-			*x++ = L;
-			L = 0;
-			n = 0;
-			}
-		L |= (hexdig[*s1] & 0x0f) << n;
-		n += 4;
-		}
-	*x++ = L;
-	b->wds = n = x - b->x;
-	n = ULbits*n - hi0bits(L);
-	nbits = Nbits;
-	lostbits = 0;
-	x = b->x;
-	if (n > nbits) {
-		n -= nbits;
-		if (any_on(b,n)) {
-			lostbits = 1;
-			k = n - 1;
-			if (x[k>>kshift] & 1 << (k & kmask)) {
-				lostbits = 2;
-				if (k > 0 && any_on(b,k))
-					lostbits = 3;
-				}
-			}
-		rshift(b, n);
-		e += n;
-		}
-	else if (n < nbits) {
-		n = nbits - n;
-		b = lshift(b, n);
-		e -= n;
-		x = b->x;
-		}
-	if (e > Emax) {
- ovfl:
-		Bfree(b);
- ovfl1:
-#ifndef NO_ERRNO
-		errno = ERANGE;
-#endif
-		word0(rvp) = Exp_mask;
-		word1(rvp) = 0;
-		return;
-		}
-	denorm = 0;
-	if (e < emin) {
-		denorm = 1;
-		n = emin - e;
-		if (n >= nbits) {
-#ifdef IEEE_Arith /*{*/
-			switch (rounding) {
-			  case Round_near:
-				if (n == nbits && (n < 2 || any_on(b,n-1)))
-					goto ret_tiny;
-				break;
-			  case Round_up:
-				if (!sign)
-					goto ret_tiny;
-				break;
-			  case Round_down:
-				if (sign)
-					goto ret_tiny;
-			  }
-#endif /* } IEEE_Arith */
-			Bfree(b);
- retz:
-#ifndef NO_ERRNO
-			errno = ERANGE;
-#endif
- retz1:
-			rvp->d = 0.;
-			return;
-			}
-		k = n - 1;
-		if (lostbits)
-			lostbits = 1;
-		else if (k > 0)
-			lostbits = any_on(b,k);
-		if (x[k>>kshift] & 1 << (k & kmask))
-			lostbits |= 2;
-		nbits -= n;
-		rshift(b,n);
-		e = emin;
-		}
-	if (lostbits) {
-		up = 0;
-		switch(rounding) {
-		  case Round_zero:
-			break;
-		  case Round_near:
-			if (lostbits & 2
-			 && (lostbits & 1) | (x[0] & 1))
-				up = 1;
-			break;
-		  case Round_up:
-			up = 1 - sign;
-			break;
-		  case Round_down:
-			up = sign;
-		  }
-		if (up) {
-			k = b->wds;
-			b = increment(b);
-			x = b->x;
-			if (denorm) {
-#if 0
-				if (nbits == Nbits - 1
-				 && x[nbits >> kshift] & 1 << (nbits & kmask))
-					denorm = 0; /* not currently used */
-#endif
-				}
-			else if (b->wds > k
-			 || ((n = nbits & kmask) !=0
-			     && hi0bits(x[k-1]) < 32-n)) {
-				rshift(b,1);
-				if (++e > Emax)
-					goto ovfl;
-				}
-			}
-		}
-#ifdef IEEE_Arith
-	if (denorm)
-		word0(rvp) = b->wds > 1 ? b->x[1] & ~0x100000 : 0;
-	else
-		word0(rvp) = (b->x[1] & ~0x100000) | ((e + 0x3ff + 52) << 20);
-	word1(rvp) = b->x[0];
-#endif
-#ifdef IBM
-	if ((j = e & 3)) {
-		k = b->x[0] & ((1 << j) - 1);
-		rshift(b,j);
-		if (k) {
-			switch(rounding) {
-			  case Round_up:
-				if (!sign)
-					increment(b);
-				break;
-			  case Round_down:
-				if (sign)
-					increment(b);
-				break;
-			  case Round_near:
-				j = 1 << (j-1);
-				if (k & j && ((k & (j-1)) | lostbits))
-					increment(b);
-			  }
-			}
-		}
-	e >>= 2;
-	word0(rvp) = b->x[1] | ((e + 65 + 13) << 24);
-	word1(rvp) = b->x[0];
-#endif
-#ifdef VAX
-	/* The next two lines ignore swap of low- and high-order 2 bytes. */
-	/* word0(rvp) = (b->x[1] & ~0x800000) | ((e + 129 + 55) << 23); */
-	/* word1(rvp) = b->x[0]; */
-	word0(rvp) = ((b->x[1] & ~0x800000) >> 16) | ((e + 129 + 55) << 7) | (b->x[1] << 16);
-	word1(rvp) = (b->x[0] >> 16) | (b->x[0] << 16);
-#endif
-	Bfree(b);
-	}
-#endif /*}!NO_HEX_FP*/
 
  static int
-#ifdef KR_headers
-dshift(b, p2) Bigint *b; int p2;
-#else
 dshift(Bigint *b, int p2)
-#endif
 {
 	int rv = hi0bits(b->x[b->wds-1]) - 4;
 	if (p2 > 0)
@@ -2123,11 +1148,7 @@ dshift(Bigint *b, int p2)
 
  static int
 quorem
-#ifdef KR_headers
-	(b, S) Bigint *b, *S;
-#else
 	(Bigint *b, Bigint *S)
-#endif
 {
 	int n;
 	ULong *bx, *bxe, q, *sx, *sxe;
@@ -2135,9 +1156,7 @@ quorem
 	ULLong borrow, carry, y, ys;
 #else
 	ULong borrow, carry, y, ys;
-#ifdef Pack_32
 	ULong si, z, zs;
-#endif
 #endif
 
 	n = S->wds;
@@ -2167,7 +1186,6 @@ quorem
 			borrow = y >> 32 & (ULong)1;
 			*bx++ = y & FFFFFFFF;
 #else
-#ifdef Pack_32
 			si = *sx++;
 			ys = (si & 0xffff) * q + carry;
 			zs = (si >> 16) * q + (ys >> 16);
@@ -2177,13 +1195,6 @@ quorem
 			z = (*bx >> 16) - (zs & 0xffff) - borrow;
 			borrow = (z & 0x10000) >> 16;
 			Storeinc(bx, z, y);
-#else
-			ys = *sx++ * q + carry;
-			carry = ys >> 16;
-			y = *bx - (ys & 0xffff) - borrow;
-			borrow = (y & 0x10000) >> 16;
-			*bx++ = y & 0xffff;
-#endif
 #endif
 			}
 			while(sx <= sxe);
@@ -2208,7 +1219,6 @@ quorem
 			borrow = y >> 32 & (ULong)1;
 			*bx++ = y & FFFFFFFF;
 #else
-#ifdef Pack_32
 			si = *sx++;
 			ys = (si & 0xffff) + carry;
 			zs = (si >> 16) + (ys >> 16);
@@ -2218,13 +1228,6 @@ quorem
 			z = (*bx >> 16) - (zs & 0xffff) - borrow;
 			borrow = (z & 0x10000) >> 16;
 			Storeinc(bx, z, y);
-#else
-			ys = *sx++ + carry;
-			carry = ys >> 16;
-			y = *bx - (ys & 0xffff) - borrow;
-			borrow = (y & 0x10000) >> 16;
-			*bx++ = y & 0xffff;
-#endif
 #endif
 			}
 			while(sx <= sxe);
@@ -2239,16 +1242,10 @@ quorem
 	return q;
 	}
 
-#ifndef NO_STRTOD_BIGCOMP
 
  static void
 bigcomp
-#ifdef KR_headers
-	(rv, s0, bc)
-	U *rv; CONST char *s0; BCinfo *bc;
-#else
 	(U *rv, CONST char *s0, BCinfo *bc)
-#endif
 {
 	Bigint *b, *d;
 	int b2, bbits, d2, dd, dig, dsign, i, j, nd, nd0, p2, p5, speccase;
@@ -2270,9 +1267,6 @@ bigcomp
 		word1(rv) = 1;
 #endif
 		i = 0;
-#ifdef Honor_FLT_ROUNDS
-		if (bc->rounding == 1)
-#endif
 			{
 			speccase = 1;
 			--p2;
@@ -2305,15 +1299,6 @@ bigcomp
 		i = j;
 #endif
 		}
-#ifdef Honor_FLT_ROUNDS
-	if (bc->rounding != 1) {
-		if (i > 0)
-			b = lshift(b, i);
-		if (dsign)
-			b = increment(b);
-		}
-	else
-#endif
 		{
 		b = lshift(b, ++i);
 		b->x[0] |= 1;
@@ -2381,34 +1366,6 @@ bigcomp
  ret:
 	Bfree(b);
 	Bfree(d);
-#ifdef Honor_FLT_ROUNDS
-	if (bc->rounding != 1) {
-		if (dd < 0) {
-			if (bc->rounding == 0) {
-				if (!dsign)
-					goto retlow1;
-				}
-			else if (dsign)
-				goto rethi1;
-			}
-		else if (dd > 0) {
-			if (bc->rounding == 0) {
-				if (dsign)
-					goto rethi1;
-				goto ret1;
-				}
-			if (!dsign)
-				goto rethi1;
-			dval(rv) += 2.*ulp(rv);
-			}
-		else {
-			bc->inexact = 0;
-			if (dsign)
-				goto rethi1;
-			}
-		}
-	else
-#endif
 	if (speccase) {
 		if (dd <= 0)
 			rv->d = 0.;
@@ -2433,20 +1390,12 @@ retlow1:
 			}
 		}
 
-#ifdef Honor_FLT_ROUNDS
- ret1:
-#endif
 	return;
 	}
-#endif /* NO_STRTOD_BIGCOMP */
 
  double
 _Py_dg_strtod
-#ifdef KR_headers
-	(s00, se) CONST char *s00; char **se;
-#else
 	(CONST char *s00, char **se)
-#endif
 {
 	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1;
 	int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
@@ -2457,24 +1406,6 @@ _Py_dg_strtod
 	ULong y, z;
 	BCinfo bc;
 	Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
-#ifdef SET_INEXACT
-	int oldinexact;
-#endif
-#ifdef Honor_FLT_ROUNDS /*{*/
-#ifdef Trust_FLT_ROUNDS /*{{ only define this if FLT_ROUNDS really works! */
-	bc.rounding = Flt_Rounds;
-#else /*}{*/
-	bc.rounding = 1;
-	switch(fegetround()) {
-	  case FE_TOWARDZERO:	bc.rounding = 0; break;
-	  case FE_UPWARD:	bc.rounding = 2; break;
-	  case FE_DOWNWARD:	bc.rounding = 3;
-	  }
-#endif /*}}*/
-#endif /*}*/
-#ifdef USE_LOCALE
-	CONST char *s2;
-#endif
 
 	sign = nz0 = nz = bc.dplen = bc.uflchk = 0;
 	dval(&rv) = 0.;
@@ -2500,18 +1431,6 @@ _Py_dg_strtod
 		}
  break2:
 	if (*s == '0') {
-#ifndef NO_HEX_FP /*{*/
-		switch(s[1]) {
-		  case 'x':
-		  case 'X':
-#ifdef Honor_FLT_ROUNDS
-			gethex(&s, &rv, bc.rounding, sign);
-#else
-			gethex(&s, &rv, 1, sign);
-#endif
-			goto ret;
-		  }
-#endif /*}*/
 		nz0 = 1;
 		while(*++s == '0') ;
 		if (!*s)
@@ -2526,25 +1445,6 @@ _Py_dg_strtod
 			z = 10*z + c - '0';
 	nd0 = nd;
 	bc.dp0 = bc.dp1 = s - s0;
-#ifdef USE_LOCALE
-	s1 = localeconv()->decimal_point;
-	if (c == *s1) {
-		c = '.';
-		if (*++s1) {
-			s2 = s;
-			for(;;) {
-				if (*++s2 != *s1) {
-					c = 0;
-					break;
-					}
-				if (!*++s1) {
-					s = s2;
-					break;
-					}
-				}
-			}
-		}
-#endif
 	if (c == '.') {
 		c = *++s;
 		bc.dp1 = s - s0;
@@ -2637,10 +1537,6 @@ _Py_dg_strtod
 				if (match(&s, "an")) {
 					word0(&rv) = NAN_WORD0;
 					word1(&rv) = NAN_WORD1;
-#ifndef No_Hex_NaN
-					if (*s == '(') /*)*/
-						hexnan(&rv, &s);
-#endif
 					goto ret;
 					}
 			  }
@@ -2663,104 +1559,40 @@ _Py_dg_strtod
 	k = nd < DBL_DIG + 1 ? nd : DBL_DIG + 1;
 	dval(&rv) = y;
 	if (k > 9) {
-#ifdef SET_INEXACT
-		if (k > DBL_DIG)
-			oldinexact = get_inexact();
-#endif
 		dval(&rv) = tens[k - 9] * dval(&rv) + z;
 		}
 	bd0 = 0;
 	if (nd <= DBL_DIG
-#ifndef RND_PRODQUOT
-#ifndef Honor_FLT_ROUNDS
 		&& Flt_Rounds == 1
-#endif
-#endif
 			) {
 		if (!e)
 			goto ret;
 		if (e > 0) {
 			if (e <= Ten_pmax) {
-#ifdef VAX
-				goto vax_ovfl_check;
-#else
-#ifdef Honor_FLT_ROUNDS
-				/* round correctly FLT_ROUNDS = 2 or 3 */
-				if (sign) {
-					rv.d = -rv.d;
-					sign = 0;
-					}
-#endif
 				/* rv = */ rounded_product(dval(&rv), tens[e]);
 				goto ret;
-#endif
 				}
 			i = DBL_DIG - nd;
 			if (e <= Ten_pmax + i) {
 				/* A fancier test would sometimes let us do
 				 * this for larger i values.
 				 */
-#ifdef Honor_FLT_ROUNDS
-				/* round correctly FLT_ROUNDS = 2 or 3 */
-				if (sign) {
-					rv.d = -rv.d;
-					sign = 0;
-					}
-#endif
 				e -= i;
 				dval(&rv) *= tens[i];
-#ifdef VAX
-				/* VAX exponent range is so narrow we must
-				 * worry about overflow here...
-				 */
- vax_ovfl_check:
-				word0(&rv) -= P*Exp_msk1;
 				/* rv = */ rounded_product(dval(&rv), tens[e]);
-				if ((word0(&rv) & Exp_mask)
-				 > Exp_msk1*(DBL_MAX_EXP+Bias-1-P))
-					goto ovfl;
-				word0(&rv) += P*Exp_msk1;
-#else
-				/* rv = */ rounded_product(dval(&rv), tens[e]);
-#endif
 				goto ret;
 				}
 			}
-#ifndef Inaccurate_Divide
 		else if (e >= -Ten_pmax) {
-#ifdef Honor_FLT_ROUNDS
-			/* round correctly FLT_ROUNDS = 2 or 3 */
-			if (sign) {
-				rv.d = -rv.d;
-				sign = 0;
-				}
-#endif
 			/* rv = */ rounded_quotient(dval(&rv), tens[-e]);
 			goto ret;
 			}
-#endif
 		}
 	e1 += nd - k;
 
-#ifdef IEEE_Arith
-#ifdef SET_INEXACT
-	bc.inexact = 1;
-	if (k <= DBL_DIG)
-		oldinexact = get_inexact();
-#endif
 #ifdef Avoid_Underflow
 	bc.scale = 0;
 #endif
-#ifdef Honor_FLT_ROUNDS
-	if (bc.rounding >= 2) {
-		if (sign)
-			bc.rounding = bc.rounding == 2 ? 0 : 2;
-		else
-			if (bc.rounding != 2)
-				bc.rounding = 0;
-		}
-#endif
-#endif /*IEEE_Arith*/
 
 	/* Get starting approximation = rv * 10**e1 */
 
@@ -2770,35 +1602,10 @@ _Py_dg_strtod
 		if (e1 &= ~15) {
 			if (e1 > DBL_MAX_10_EXP) {
  ovfl:
-#ifndef NO_ERRNO
 				errno = ERANGE;
-#endif
 				/* Can't trust HUGE_VAL */
-#ifdef IEEE_Arith
-#ifdef Honor_FLT_ROUNDS
-				switch(bc.rounding) {
-				  case 0: /* toward 0 */
-				  case 3: /* toward -infinity */
-					word0(&rv) = Big0;
-					word1(&rv) = Big1;
-					break;
-				  default:
-					word0(&rv) = Exp_mask;
-					word1(&rv) = 0;
-				  }
-#else /*Honor_FLT_ROUNDS*/
 				word0(&rv) = Exp_mask;
 				word1(&rv) = 0;
-#endif /*Honor_FLT_ROUNDS*/
-#ifdef SET_INEXACT
-				/* set overflow bit */
-				dval(&rv0) = 1e300;
-				dval(&rv0) *= dval(&rv0);
-#endif
-#else /*IEEE_Arith*/
-				word0(&rv) = Big0;
-				word1(&rv) = Big1;
-#endif /*IEEE_Arith*/
 				goto ret;
 				}
 			e1 >>= 4;
@@ -2861,9 +1668,7 @@ _Py_dg_strtod
 				if (!dval(&rv)) {
  undfl:
 					dval(&rv) = 0.;
-#ifndef NO_ERRNO
 					errno = ERANGE;
-#endif
 					goto ret;
 					}
 #ifndef Avoid_Underflow
@@ -2882,7 +1687,6 @@ _Py_dg_strtod
 	/* Put digits into bd: true value = bd * 10^e */
 
 	bc.nd = nd;
-#ifndef NO_STRTOD_BIGCOMP
 	bc.nd0 = nd0;	/* Only needed if nd > strtod_diglim, but done here */
 			/* to silence an erroneous warning about bc.nd0 */
 			/* possibly not being initialized. */
@@ -2912,7 +1716,6 @@ _Py_dg_strtod
 				y = 10*y + s0[j++] - '0';
 			}
 		}
-#endif
 	bd0 = s2b(s0, nd0, nd, y, bc.dplen);
 
 	for(;;) {
@@ -2934,10 +1737,6 @@ _Py_dg_strtod
 		else
 			bd2 -= bbe;
 		bs2 = bb2;
-#ifdef Honor_FLT_ROUNDS
-		if (bc.rounding != 1)
-			bs2++;
-#endif
 #ifdef Avoid_Underflow
 		j = bbe - bc.scale;
 		i = j + bbbits - 1;	/* logb(rv) */
@@ -2947,11 +1746,7 @@ _Py_dg_strtod
 			j = P + 1 - bbbits;
 #else /*Avoid_Underflow*/
 #ifdef Sudden_Underflow
-#ifdef IBM
-		j = 1 + 4*P - 3 - bbbits + ((bbe + bbbits - 1) & 3);
-#else
 		j = P + 1 - bbbits;
-#endif
 #else /*Sudden_Underflow*/
 		j = bbe;
 		i = j + bbbits - 1;	/* logb(rv) */
@@ -2992,141 +1787,30 @@ _Py_dg_strtod
 		bc.dsign = delta->sign;
 		delta->sign = 0;
 		i = cmp(delta, bs);
-#ifndef NO_STRTOD_BIGCOMP
 		if (bc.nd > nd && i <= 0) {
 			if (bc.dsign)
 				break;	/* Must use bigcomp(). */
-#ifdef Honor_FLT_ROUNDS
-			if (bc.rounding != 1) {
-				if (i < 0)
-					break;
-				}
-			else
-#endif
 				{
 				bc.nd = nd;
 				i = -1;	/* Discarded digits make delta smaller. */
 				}
 			}
-#endif
-#ifdef Honor_FLT_ROUNDS
-		if (bc.rounding != 1) {
-			if (i < 0) {
-				/* Error is less than an ulp */
-				if (!delta->x[0] && delta->wds <= 1) {
-					/* exact */
-#ifdef SET_INEXACT
-					bc.inexact = 0;
-#endif
-					break;
-					}
-				if (bc.rounding) {
-					if (bc.dsign) {
-						adj.d = 1.;
-						goto apply_adj;
-						}
-					}
-				else if (!bc.dsign) {
-					adj.d = -1.;
-					if (!word1(&rv)
-					 && !(word0(&rv) & Frac_mask)) {
-						y = word0(&rv) & Exp_mask;
-#ifdef Avoid_Underflow
-						if (!bc.scale || y > 2*P*Exp_msk1)
-#else
-						if (y)
-#endif
-						  {
-						  delta = lshift(delta,Log2P);
-						  if (cmp(delta, bs) <= 0)
-							adj.d = -0.5;
-						  }
-						}
- apply_adj:
-#ifdef Avoid_Underflow
-					if (bc.scale && (y = word0(&rv) & Exp_mask)
-						<= 2*P*Exp_msk1)
-					  word0(&adj) += (2*P+1)*Exp_msk1 - y;
-#else
-#ifdef Sudden_Underflow
-					if ((word0(&rv) & Exp_mask) <=
-							P*Exp_msk1) {
-						word0(&rv) += P*Exp_msk1;
-						dval(&rv) += adj.d*ulp(dval(&rv));
-						word0(&rv) -= P*Exp_msk1;
-						}
-					else
-#endif /*Sudden_Underflow*/
-#endif /*Avoid_Underflow*/
-					dval(&rv) += adj.d*ulp(&rv);
-					}
-				break;
-				}
-			adj.d = ratio(delta, bs);
-			if (adj.d < 1.)
-				adj.d = 1.;
-			if (adj.d <= 0x7ffffffe) {
-				/* adj = rounding ? ceil(adj) : floor(adj); */
-				y = adj.d;
-				if (y != adj.d) {
-					if (!((bc.rounding>>1) ^ bc.dsign))
-						y++;
-					adj.d = y;
-					}
-				}
-#ifdef Avoid_Underflow
-			if (bc.scale && (y = word0(&rv) & Exp_mask) <= 2*P*Exp_msk1)
-				word0(&adj) += (2*P+1)*Exp_msk1 - y;
-#else
-#ifdef Sudden_Underflow
-			if ((word0(&rv) & Exp_mask) <= P*Exp_msk1) {
-				word0(&rv) += P*Exp_msk1;
-				adj.d *= ulp(dval(&rv));
-				if (bc.dsign)
-					dval(&rv) += adj.d;
-				else
-					dval(&rv) -= adj.d;
-				word0(&rv) -= P*Exp_msk1;
-				goto cont;
-				}
-#endif /*Sudden_Underflow*/
-#endif /*Avoid_Underflow*/
-			adj.d *= ulp(&rv);
-			if (bc.dsign) {
-				if (word0(&rv) == Big0 && word1(&rv) == Big1)
-					goto ovfl;
-				dval(&rv) += adj.d;
-				}
-			else
-				dval(&rv) -= adj.d;
-			goto cont;
-			}
-#endif /*Honor_FLT_ROUNDS*/
 
 		if (i < 0) {
 			/* Error is less than half an ulp -- check for
 			 * special case of mantissa a power of two.
 			 */
 			if (bc.dsign || word1(&rv) || word0(&rv) & Bndry_mask
-#ifdef IEEE_Arith
 #ifdef Avoid_Underflow
 			 || (word0(&rv) & Exp_mask) <= (2*P+1)*Exp_msk1
 #else
 			 || (word0(&rv) & Exp_mask) <= Exp_msk1
 #endif
-#endif
 				) {
-#ifdef SET_INEXACT
-				if (!delta->x[0] && delta->wds <= 1)
-					bc.inexact = 0;
-#endif
 				break;
 				}
 			if (!delta->x[0] && delta->wds <= 1) {
 				/* exact result */
-#ifdef SET_INEXACT
-				bc.inexact = 0;
-#endif
 				break;
 				}
 			delta = lshift(delta,Log2P);
@@ -3147,9 +1831,6 @@ _Py_dg_strtod
 					/*boundary case -- increment exponent*/
 					word0(&rv) = (word0(&rv) & Exp_mask)
 						+ Exp_msk1
-#ifdef IBM
-						| Exp_msk1 >> 4
-#endif
 						;
 					word1(&rv) = 0;
 #ifdef Avoid_Underflow
@@ -3163,15 +1844,11 @@ _Py_dg_strtod
 				/* boundary case -- decrement exponent */
 #ifdef Sudden_Underflow /*{{*/
 				L = word0(&rv) & Exp_mask;
-#ifdef IBM
-				if (L <  Exp_msk1)
-#else
 #ifdef Avoid_Underflow
 				if (L <= (bc.scale ? (2*P+1)*Exp_msk1 : Exp_msk1))
 #else
 				if (L <= Exp_msk1)
 #endif /*Avoid_Underflow*/
-#endif /*IBM*/
 					{
 					if (bc.nd >nd) {
 						bc.uflchk = 1;
@@ -3202,19 +1879,12 @@ _Py_dg_strtod
 #endif /*Sudden_Underflow}}*/
 				word0(&rv) = L | Bndry_mask1;
 				word1(&rv) = 0xffffffff;
-#ifdef IBM
-				goto cont;
-#else
 				break;
-#endif
 				}
-#ifndef ROUND_BIASED
 			if (!(word1(&rv) & LSB))
 				break;
-#endif
 			if (bc.dsign)
 				dval(&rv) += ulp(&rv);
-#ifndef ROUND_BIASED
 			else {
 				dval(&rv) -= ulp(&rv);
 #ifndef Sudden_Underflow
@@ -3229,7 +1899,6 @@ _Py_dg_strtod
 				}
 #ifdef Avoid_Underflow
 			bc.dsign = 1 - bc.dsign;
-#endif
 #endif
 			break;
 			}
@@ -3319,11 +1988,7 @@ _Py_dg_strtod
 				word0(&rv) += P*Exp_msk1;
 				adj.d = aadj1 * ulp(&rv);
 				dval(&rv) += adj.d;
-#ifdef IBM
-				if ((word0(&rv) & Exp_mask) <  P*Exp_msk1)
-#else
 				if ((word0(&rv) & Exp_mask) <= P*Exp_msk1)
-#endif
 					{
 					if (word0(&rv0) == Tiny0
 					 && word1(&rv0) == Tiny1) {
@@ -3363,7 +2028,6 @@ _Py_dg_strtod
 #endif /*Avoid_Underflow*/
 			}
 		z = word0(&rv) & Exp_mask;
-#ifndef SET_INEXACT
 		if (bc.nd == nd) {
 #ifdef Avoid_Underflow
 		if (!bc.scale)
@@ -3381,7 +2045,6 @@ _Py_dg_strtod
 				break;
 			}
 		}
-#endif
  cont:
 		Bfree(bb);
 		Bfree(bd);
@@ -3393,44 +2056,18 @@ _Py_dg_strtod
 	Bfree(bs);
 	Bfree(bd0);
 	Bfree(delta);
-#ifndef NO_STRTOD_BIGCOMP
 	if (bc.nd > nd)
 		bigcomp(&rv, s0, &bc);
-#endif
-#ifdef SET_INEXACT
-	if (bc.inexact) {
-		if (!oldinexact) {
-			word0(&rv0) = Exp_1 + (70 << Exp_shift);
-			word1(&rv0) = 0;
-			dval(&rv0) += 1.;
-			}
-		}
-	else if (!oldinexact)
-		clear_inexact();
-#endif
 #ifdef Avoid_Underflow
 	if (bc.scale) {
 		word0(&rv0) = Exp_1 - 2*P*Exp_msk1;
 		word1(&rv0) = 0;
 		dval(&rv) *= dval(&rv0);
-#ifndef NO_ERRNO
 		/* try to avoid the bug of testing an 8087 register value */
-#ifdef IEEE_Arith
 		if (!(word0(&rv) & Exp_mask))
-#else
-		if (word0(&rv) == 0 && word1(&rv) == 0)
-#endif
 			errno = ERANGE;
-#endif
 		}
 #endif /* Avoid_Underflow */
-#ifdef SET_INEXACT
-	if (bc.inexact && !(word0(&rv) & Exp_mask)) {
-		/* set underflow bit */
-		dval(&rv0) = 1e-300;
-		dval(&rv0) *= dval(&rv0);
-		}
-#endif
  ret:
 	if (se)
 		*se = (char *)s;
@@ -3442,11 +2079,7 @@ _Py_dg_strtod
 #endif
 
  static char *
-#ifdef KR_headers
-rv_alloc(i) int i;
-#else
 rv_alloc(int i)
-#endif
 {
 	int j, k, *r;
 
@@ -3465,11 +2098,7 @@ rv_alloc(int i)
 	}
 
  static char *
-#ifdef KR_headers
-nrv_alloc(s, rve, n) char *s, **rve; int n;
-#else
 nrv_alloc(char *s, char **rve, int n)
-#endif
 {
 	char *rv, *t;
 
@@ -3487,11 +2116,7 @@ nrv_alloc(char *s, char **rve, int n)
  */
 
  void
-#ifdef KR_headers
-freedtoa(s) char *s;
-#else
 freedtoa(char *s)
-#endif
 {
 	Bigint *b = (Bigint *)((int *)s - 1);
 	b->maxwds = 1 << (b->k = *(int*)b);
@@ -3538,12 +2163,7 @@ freedtoa(char *s)
 
  char *
 _Py_dg_dtoa
-#ifdef KR_headers
-	(dd, mode, ndigits, decpt, sign, rve)
-	double dd; int mode, ndigits, *decpt, *sign; char **rve;
-#else
 	(double dd, int mode, int ndigits, int *decpt, int *sign, char **rve)
-#endif
 {
  /*	Arguments ndigits, decpt, sign are similar to those
 	of ecvt and fcvt; trailing zeros are suppressed from
@@ -3591,22 +2211,6 @@ _Py_dg_dtoa
 	U d2, eps, u;
 	double ds;
 	char *s, *s0;
-#ifdef SET_INEXACT
-	int inexact, oldinexact;
-#endif
-#ifdef Honor_FLT_ROUNDS /*{*/
-	int Rounding;
-#ifdef Trust_FLT_ROUNDS /*{{ only define this if FLT_ROUNDS really works! */
-	Rounding = Flt_Rounds;
-#else /*}{*/
-	Rounding = 1;
-	switch(fegetround()) {
-	  case FE_TOWARDZERO:	Rounding = 0; break;
-	  case FE_UPWARD:	Rounding = 2; break;
-	  case FE_DOWNWARD:	Rounding = 3;
-	  }
-#endif /*}}*/
-#endif /*}*/
 
 #ifndef MULTIPLE_THREADS
 	if (dtoa_result) {
@@ -3625,42 +2229,20 @@ _Py_dg_dtoa
 		*sign = 0;
 
 #if defined(IEEE_Arith) + defined(VAX)
-#ifdef IEEE_Arith
 	if ((word0(&u) & Exp_mask) == Exp_mask)
-#else
-	if (word0(&u)  == 0x8000)
-#endif
 		{
 		/* Infinity or NaN */
 		*decpt = 9999;
-#ifdef IEEE_Arith
 		if (!word1(&u) && !(word0(&u) & 0xfffff))
 			return nrv_alloc("Infinity", rve, 8);
-#endif
 		return nrv_alloc("NaN", rve, 3);
 		}
-#endif
-#ifdef IBM
-	dval(&u) += 0; /* normalize */
 #endif
 	if (!dval(&u)) {
 		*decpt = 1;
 		return nrv_alloc("0", rve, 1);
 		}
 
-#ifdef SET_INEXACT
-	try_quick = oldinexact = get_inexact();
-	inexact = 1;
-#endif
-#ifdef Honor_FLT_ROUNDS
-	if (Rounding >= 2) {
-		if (*sign)
-			Rounding = Rounding == 2 ? 0 : 2;
-		else
-			if (Rounding != 2)
-				Rounding = 0;
-		}
-#endif
 
 	b = d2b(&u, &be, &bbits);
 #ifdef Sudden_Underflow
@@ -3671,10 +2253,6 @@ _Py_dg_dtoa
 		dval(&d2) = dval(&u);
 		word0(&d2) &= Frac_mask1;
 		word0(&d2) |= Exp_11;
-#ifdef IBM
-		if (j = 11 - hi0bits(word0(&d2) & Frac_mask))
-			dval(&d2) /= 1 << j;
-#endif
 
 		/* log(x)	~=~ log(1.5) + (x-1.5)/1.5
 		 * log10(x)	 =  log(x) / log(10)
@@ -3699,10 +2277,6 @@ _Py_dg_dtoa
 		 */
 
 		i -= Bias;
-#ifdef IBM
-		i <<= 2;
-		i += j;
-#endif
 #ifndef Sudden_Underflow
 		denorm = 0;
 		}
@@ -3750,13 +2324,11 @@ _Py_dg_dtoa
 	if (mode < 0 || mode > 9)
 		mode = 0;
 
-#ifndef SET_INEXACT
 #ifdef Check_FLT_ROUNDS
 	try_quick = Rounding == 1;
 #else
 	try_quick = 1;
 #endif
-#endif /*SET_INEXACT*/
 
 	if (mode > 5) {
 		mode -= 4;
@@ -3791,10 +2363,6 @@ _Py_dg_dtoa
 		}
 	s = s0 = rv_alloc(i);
 
-#ifdef Honor_FLT_ROUNDS
-	if (mode > 1 && Rounding != 1)
-		leftright = 0;
-#endif
 
 	if (ilim >= 0 && ilim <= Quick_max && try_quick) {
 
@@ -3848,7 +2416,6 @@ _Py_dg_dtoa
 				goto no_digits;
 			goto fast_failed;
 			}
-#ifndef No_leftright
 		if (leftright) {
 			/* Use Steele & White method of only
 			 * generating digits needed.
@@ -3869,7 +2436,6 @@ _Py_dg_dtoa
 				}
 			}
 		else {
-#endif
 			/* Generate ilim digits, then fix them up. */
 			dval(&eps) *= tens[ilim-1];
 			for(i = 1;; i++, dval(&u) *= 10.) {
@@ -3888,9 +2454,7 @@ _Py_dg_dtoa
 					break;
 					}
 				}
-#ifndef No_leftright
 			}
-#endif
  fast_failed:
 		s = s0;
 		dval(&u) = dval(&d2);
@@ -3921,19 +2485,9 @@ _Py_dg_dtoa
 #endif
 			*s++ = '0' + (int)L;
 			if (!dval(&u)) {
-#ifdef SET_INEXACT
-				inexact = 0;
-#endif
 				break;
 				}
 			if (i == ilim) {
-#ifdef Honor_FLT_ROUNDS
-				if (mode > 1)
-				switch(Rounding) {
-				  case 0: goto ret1;
-				  case 2: goto bump_up;
-				  }
-#endif
 				dval(&u) += dval(&u);
 				if (dval(&u) > ds || (dval(&u) == ds && L & 1)) {
  bump_up:
@@ -3959,11 +2513,7 @@ _Py_dg_dtoa
 #ifndef Sudden_Underflow
 			denorm ? be + (Bias + (P-1) - 1 + 1) :
 #endif
-#ifdef IBM
-			1 + 4*P - 3 - bbits + ((bbits + be - 1) & 3);
-#else
 			1 + P - bbits;
-#endif
 		b2 += i;
 		s2 += i;
 		mhi = i2b(1);
@@ -3996,9 +2546,6 @@ _Py_dg_dtoa
 
 	spec_case = 0;
 	if ((mode < 2 || leftright)
-#ifdef Honor_FLT_ROUNDS
-			&& Rounding == 1
-#endif
 				) {
 		if (!word1(&u) && !(word0(&u) & Bndry_mask)
 #ifndef Sudden_Underflow
@@ -4019,15 +2566,9 @@ _Py_dg_dtoa
 	 * and for all and pass them and a shift to quorem, so it
 	 * can do shifts and ors to compute the numerator for q.
 	 */
-#ifdef Pack_32
 	if ((i = ((s5 ? 32 - hi0bits(S->x[S->wds-1]) : 1) + s2) & 0x1f))
 		i = 32 - i;
 #define iInc 28
-#else
-	if (i = ((s5 ? 32 - hi0bits(S->x[S->wds-1]) : 1) + s2) & 0xf)
-		i = 16 - i;
-#define iInc 12
-#endif
 	i = dshift(S, s2);
 	b2 += i;
 	m2 += i;
@@ -4081,42 +2622,21 @@ _Py_dg_dtoa
 			delta = diff(S, mhi);
 			j1 = delta->sign ? 1 : cmp(b, delta);
 			Bfree(delta);
-#ifndef ROUND_BIASED
 			if (j1 == 0 && mode != 1 && !(word1(&u) & 1)
-#ifdef Honor_FLT_ROUNDS
-				&& Rounding >= 1
-#endif
 								   ) {
 				if (dig == '9')
 					goto round_9_up;
 				if (j > 0)
 					dig++;
-#ifdef SET_INEXACT
-				else if (!b->x[0] && b->wds <= 1)
-					inexact = 0;
-#endif
 				*s++ = dig;
 				goto ret;
 				}
-#endif
 			if (j < 0 || (j == 0 && mode != 1
-#ifndef ROUND_BIASED
 							&& !(word1(&u) & 1)
-#endif
 					)) {
 				if (!b->x[0] && b->wds <= 1) {
-#ifdef SET_INEXACT
-					inexact = 0;
-#endif
 					goto accept_dig;
 					}
-#ifdef Honor_FLT_ROUNDS
-				if (mode > 1)
-				 switch(Rounding) {
-				  case 0: goto accept_dig;
-				  case 2: goto keep_dig;
-				  }
-#endif /*Honor_FLT_ROUNDS*/
 				if (j1 > 0) {
 					b = lshift(b, 1);
 					j1 = cmp(b, S);
@@ -4129,10 +2649,6 @@ _Py_dg_dtoa
 				goto ret;
 				}
 			if (j1 > 0) {
-#ifdef Honor_FLT_ROUNDS
-				if (!Rounding)
-					goto accept_dig;
-#endif
 				if (dig == '9') { /* possible if i == 1 */
  round_9_up:
 					*s++ = '9';
@@ -4141,9 +2657,6 @@ _Py_dg_dtoa
 				*s++ = dig + 1;
 				goto ret;
 				}
-#ifdef Honor_FLT_ROUNDS
- keep_dig:
-#endif
 			*s++ = dig;
 			if (i == ilim)
 				break;
@@ -4160,9 +2673,6 @@ _Py_dg_dtoa
 		for(i = 1;; i++) {
 			*s++ = dig = quorem(b,S) + '0';
 			if (!b->x[0] && b->wds <= 1) {
-#ifdef SET_INEXACT
-				inexact = 0;
-#endif
 				goto ret;
 				}
 			if (i >= ilim)
@@ -4172,12 +2682,6 @@ _Py_dg_dtoa
 
 	/* Round off last digit */
 
-#ifdef Honor_FLT_ROUNDS
-	switch(Rounding) {
-	  case 0: goto trimzeros;
-	  case 2: goto roundoff;
-	  }
-#endif
 	b = lshift(b, 1);
 	j = cmp(b, S);
 	if (j > 0 || (j == 0 && dig & 1)) {
@@ -4191,9 +2695,6 @@ _Py_dg_dtoa
 		++*s++;
 		}
 	else {
-#ifdef Honor_FLT_ROUNDS
- trimzeros:
-#endif
 		while(*--s == '0');
 		s++;
 		}
@@ -4205,17 +2706,6 @@ _Py_dg_dtoa
 		Bfree(mhi);
 		}
  ret1:
-#ifdef SET_INEXACT
-	if (inexact) {
-		if (!oldinexact) {
-			word0(&u) = Exp_1 + (70 << Exp_shift);
-			word1(&u) = 0;
-			dval(&u) += 1.;
-			}
-		}
-	else if (!oldinexact)
-		clear_inexact();
-#endif
 	Bfree(b);
 	*s = 0;
 	*decpt = k + 1;
