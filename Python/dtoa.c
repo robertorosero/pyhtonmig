@@ -955,9 +955,7 @@ d2b
 	Bigint *b;
 	int de, k;
 	ULong *x, y, z;
-#ifndef Sudden_Underflow
 	int i;
-#endif
 #define d0 word0(d)
 #define d1 word1(d)
 
@@ -968,13 +966,8 @@ d2b
 
 	z = d0 & Frac_mask;
 	d0 &= 0x7fffffff;	/* clear sign bit, which we ignore */
-#ifdef Sudden_Underflow
-	de = (int)(d0 >> Exp_shift);
-	z |= Exp_msk11;
-#else
 	if ((de = (int)(d0 >> Exp_shift)))
 		z |= Exp_msk1;
-#endif
 	if ((y = d1)) {
 		if ((k = lo0bits(&y))) {
 			x[0] = y | z << (32 - k);
@@ -982,32 +975,24 @@ d2b
 			}
 		else
 			x[0] = y;
-#ifndef Sudden_Underflow
 		i =
-#endif
 		    b->wds = (x[1] = z) ? 2 : 1;
 		}
 	else {
 		k = lo0bits(&z);
 		x[0] = z;
-#ifndef Sudden_Underflow
 		i =
-#endif
 		    b->wds = 1;
 		k += 32;
 		}
-#ifndef Sudden_Underflow
 	if (de) {
-#endif
 		*e = de - Bias - (P-1) + k;
 		*bits = P - k;
-#ifndef Sudden_Underflow
 		}
 	else {
 		*e = de - Bias - (P-1) + 1 + k;
 		*bits = 32*i - hi0bits(x[i-1]);
 		}
-#endif
 	return b;
 	}
 #undef d0
@@ -1204,7 +1189,6 @@ bigcomp
 	nd0 = bc->nd0;
 	p5 = nd + bc->e0 - 1;
 	speccase = 0;
-#ifndef Sudden_Underflow
 	if (rv->d == 0.) {	/* special case: value near underflow-to-zero */
 				/* threshold was rounded to zero */
 		b = i2b(1);
@@ -1222,7 +1206,6 @@ bigcomp
 			}
 		}
 	else
-#endif
 	{
 		b = d2b(rv, &p2, &bbits);
 		if (b == NULL)
@@ -1233,18 +1216,7 @@ bigcomp
 	/* Check for denormal case. */
 	i = P - bbits;
 	if (i > (j = P - Emin - 1 + p2)) {
-#ifdef Sudden_Underflow
-		Bfree(b);
-		b = i2b(1);
-		if (b == NULL)
-			return -1;
-		p2 = Emin;
-		i = P - 1;
-		word0(rv) = (1 + bc->scale) << Exp_shift;
-		word1(rv) = 0;
-#else
 		i = j;
-#endif
 		}
 		{
 		b = lshift(b, ++i);
@@ -1252,9 +1224,7 @@ bigcomp
 			return -1;
 		b->x[0] |= 1;
 		}
-#ifndef Sudden_Underflow
  have_i:
-#endif
 	p2 -= p5 + i;
 	d = i2b(1);
 	if (d == NULL) {
@@ -1786,18 +1756,6 @@ _Py_dg_strtod
 			else if (!(word0(&rv) & Bndry_mask) && !word1(&rv)) {
  drop_down:
 				/* boundary case -- decrement exponent */
-#ifdef Sudden_Underflow /*{{*/
-				L = word0(&rv) & Exp_mask;
-				if (L <= (bc.scale ? (2*P+1)*Exp_msk1 : Exp_msk1))
-					{
-					if (bc.nd >nd) {
-						bc.uflchk = 1;
-						break;
-						}
-					goto undfl;
-					}
-				L -= Exp_msk1;
-#else /*Sudden_Underflow}{*/
 				if (bc.scale) {
 					L = word0(&rv) & Exp_mask;
 					if (L <= (2*P+1)*Exp_msk1) {
@@ -1814,7 +1772,6 @@ _Py_dg_strtod
 						}
 					}
 				L = (word0(&rv) & Exp_mask) - Exp_msk1;
-#endif /*Sudden_Underflow}}*/
 				word0(&rv) = L | Bndry_mask1;
 				word1(&rv) = 0xffffffff;
 				break;
@@ -1825,7 +1782,6 @@ _Py_dg_strtod
 				dval(&rv) += ulp(&rv);
 			else {
 				dval(&rv) -= ulp(&rv);
-#ifndef Sudden_Underflow
 				if (!dval(&rv)) {
 					if (bc.nd >nd) {
 						bc.uflchk = 1;
@@ -1833,7 +1789,6 @@ _Py_dg_strtod
 						}
 					goto undfl;
 					}
-#endif
 				}
 			bc.dsign = 1 - bc.dsign;
 			break;
@@ -1842,7 +1797,6 @@ _Py_dg_strtod
 			if (bc.dsign)
 				aadj = aadj1 = 1.;
 			else if (word1(&rv) || word0(&rv) & Bndry_mask) {
-#ifndef Sudden_Underflow
 				if (word1(&rv) == Tiny1 && !word0(&rv)) {
 					if (bc.nd >nd) {
 						bc.uflchk = 1;
@@ -1850,7 +1804,6 @@ _Py_dg_strtod
 						}
 					goto undfl;
 					}
-#endif
 				aadj = 1.;
 				aadj1 = -1.;
 				}
@@ -2083,10 +2036,8 @@ _Py_dg_dtoa
 		j, j1, k, k0, k_check, leftright, m2, m5, s2, s5,
 		spec_case, try_quick;
 	Long L;
-#ifndef Sudden_Underflow
 	int denorm;
 	ULong x;
-#endif
 	Bigint *b, *b1, *delta, *mlo, *mhi, *S;
 	U d2, eps, u;
 	double ds;
@@ -2123,11 +2074,7 @@ _Py_dg_dtoa
 
 
 	b = d2b(&u, &be, &bbits);
-#ifdef Sudden_Underflow
-	i = (int)(word0(&u) >> Exp_shift1 & (Exp_mask>>Exp_shift1));
-#else
 	if ((i = (int)(word0(&u) >> Exp_shift1 & (Exp_mask>>Exp_shift1)))) {
-#endif
 		dval(&d2) = dval(&u);
 		word0(&d2) &= Frac_mask1;
 		word0(&d2) |= Exp_11;
@@ -2155,7 +2102,6 @@ _Py_dg_dtoa
 		 */
 
 		i -= Bias;
-#ifndef Sudden_Underflow
 		denorm = 0;
 		}
 	else {
@@ -2169,7 +2115,6 @@ _Py_dg_dtoa
 		i -= (Bias + (P-1) - 1) + 1;
 		denorm = 1;
 		}
-#endif
 	ds = (dval(&d2)-1.5)*0.289529654602168 + 0.1760912590558 + i*0.301029995663981;
 	k = (int)ds;
 	if (ds < 0. && ds != k)
@@ -2388,9 +2333,7 @@ _Py_dg_dtoa
 	mhi = mlo = 0;
 	if (leftright) {
 		i =
-#ifndef Sudden_Underflow
 			denorm ? be + (Bias + (P-1) - 1 + 1) :
-#endif
 			1 + P - bbits;
 		b2 += i;
 		s2 += i;
@@ -2426,9 +2369,7 @@ _Py_dg_dtoa
 	if ((mode < 2 || leftright)
 				) {
 		if (!word1(&u) && !(word0(&u) & Bndry_mask)
-#ifndef Sudden_Underflow
 		 && word0(&u) & (Exp_mask & ~Exp_msk1)
-#endif
 				) {
 			/* The special case */
 			b2 += Log2P;
