@@ -182,8 +182,7 @@
 /* Linking of Python's #defines to Gay's #defines starts here. */
 
 #include "Python.h"
-
-#define NO_HEX_FP
+#include "float.h"
 
 /* use WORDS_BIGENDIAN to determine float endianness.  This assumes that ints
    and floats share the same endianness on the target machine, which appears
@@ -210,18 +209,16 @@ typedef unsigned long ULong;
 #define NO_LONG_LONG
 #endif
 
-/* End Python #define linking */
-
-
-#ifdef DEBUG
-#include "stdio.h"
-#define Bug(x) {fprintf(stderr, "%s\n", x); exit(1);}
+#undef DEBUG
+#ifdef Py_DEBUG
+#define DEBUG
 #endif
 
-#include "stdlib.h"
-#include "string.h"
+/* End Python #define linking */
 
-
+#ifdef DEBUG
+#define Bug(x) {fprintf(stderr, "%s\n", x); exit(1);}
+#endif
 
 #ifdef MALLOC
 extern void *MALLOC(size_t);
@@ -248,14 +245,6 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 
 #undef INFNAN_CHECK
 #define INFNAN_CHECK
-
-#include "errno.h"
-
-#include "float.h"
-
-#ifndef __MATH_H__
-#include "math.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
