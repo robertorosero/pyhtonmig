@@ -608,6 +608,10 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 	case 'g':
 		if (decpt <= -4 || decpt > precision)
 			use_exp = 1;
+		/* assumes that not both of add_dot_0_if_integer and
+		   use_alt_formatting are set */
+		else if (add_dot_0_if_integer)
+			min_digits = decpt + 1;
 		if (use_alt_formatting)
 			min_digits = precision;
 		break;
