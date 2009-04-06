@@ -101,7 +101,6 @@
  */
 
 /*
- * #define Long int on machines with 32-bit ints and 64-bit longs.
  * #define Honor_FLT_ROUNDS if FLT_ROUNDS can assume the values 2 or 3
  *	and strtod and dtoa should round accordingly.  Unless Trust_FLT_ROUNDS
  *	is also #defined, fegetround() will be queried for the rounding mode.
@@ -132,18 +131,17 @@
 #error "Exactly one of IEEE_8087 or IEEE_MC68k should be defined."
 #endif
 
-#if SIZEOF_LONG==8 && SIZEOF_INT==4
-typedef int Long;
-typedef unsigned int ULong;
-#elif SIZEOF_LONG==4
-typedef long Long;
-typedef unsigned long ULong;
+#if defined(HAVE_UINT32_T) && defined(HAVE_INT32_T)
+typedef PY_UINT32_T ULong;
+typedef PY_INT32_T Long;
 #else
 #error "Failed to find an exact-width 32-bit integer type"
 #endif
 
-#ifndef HAVE_LONG_LONG
-#define NO_LONG_LONG
+#if defined(HAVE_UINT64_T)
+#define ULLong PY_UINT64_T
+#else
+#undef ULLong
 #endif
 
 #undef DEBUG
@@ -260,17 +258,6 @@ typedef struct BCinfo BCinfo;
 BCinfo { int dp0, dp1, dplen, dsign, e0, inexact, nd, nd0, rounding, scale, uflchk; };
 
 #define FFFFFFFF 0xffffffffUL
-
-#ifdef NO_LONG_LONG
-#undef ULLong
-#else	/* long long available */
-#ifndef Llong
-#define Llong long long
-#endif
-#ifndef ULLong
-#define ULLong unsigned Llong
-#endif
-#endif /* NO_LONG_LONG */
 
 #define Kmax 7
 
