@@ -558,6 +558,11 @@ format_float_short(double d, char format_code,
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent).  Must be matched by a call to _Py_dg_freedtoa. */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
+	if (digits == NULL) {
+		/* The only failure mode is no memory. */
+		PyErr_NoMemory();
+		goto exit;
+	}
 	assert(digits_end != NULL && digits_end >= digits);
 	n_digits = digits_end - digits;
 
@@ -743,7 +748,8 @@ format_float_short(double d, char format_code,
 		   memory that isn't ours. But it's an okay debugging test. */
 		assert(p-buf < bufsize);
 	}
-	_Py_dg_freedtoa(digits);
+	if (digits)
+		_Py_dg_freedtoa(digits);
 
 	return buf;
 }
