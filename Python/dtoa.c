@@ -1994,8 +1994,6 @@ _Py_dg_strtod
 	return -1.0;
 	}
 
- static char *dtoa_result;
-
  static char *
 rv_alloc(int i)
 {
@@ -2008,9 +2006,7 @@ rv_alloc(int i)
 			k++;
 	r = (int*)Balloc(k);
 	*r = k;
-	return
-	dtoa_result =
-		(char *)(r+1);
+	return (char *)(r+1);
 	}
 
  static char *
@@ -2037,8 +2033,6 @@ _Py_dg_freedtoa(char *s)
 	Bigint *b = (Bigint *)((int *)s - 1);
 	b->maxwds = 1 << (b->k = *(int*)b);
 	Bfree(b);
-	if (s == dtoa_result)
-		dtoa_result = 0;
 	}
 
 /* dtoa for IEEE arithmetic (dmg): convert double to ASCII string.
@@ -2074,6 +2068,9 @@ _Py_dg_freedtoa(char *s)
  *	   something like 10^(k-15) that we must resort to the Long
  *	   calculation.
  */
+
+/* Note: to avoid memory leakage, a successful call to _Py_dg_dtoa should
+   always be matched by a call to _Py_dg_freedtoa. */
 
  char *
 _Py_dg_dtoa
@@ -2123,11 +2120,6 @@ _Py_dg_dtoa
 	U d2, eps, u;
 	double ds;
 	char *s, *s0;
-
-	if (dtoa_result) {
-		_Py_dg_freedtoa(dtoa_result);
-		dtoa_result = 0;
-		}
 
 	u.d = dd;
 	if (word0(&u) & Sign_bit) {
