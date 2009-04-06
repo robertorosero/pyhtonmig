@@ -1352,7 +1352,7 @@ retlow1:
 _Py_dg_strtod
 	(CONST char *s00, char **se)
 {
-	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1;
+	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1, error;
 	int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
 	CONST char *s, *s0, *s1;
 	double aadj, aadj1;
@@ -1654,12 +1654,29 @@ _Py_dg_strtod
 			}
 		}
 	bd0 = s2b(s0, nd0, nd, y, bc.dplen);
+	if (bd0 == NULL)
+		goto failed_malloc;
 
 	for(;;) {
 		bd = Balloc(bd0->k);
+		if (bd == NULL) {
+			Bfree(bd0);
+			goto failed_malloc;
+			}
 		Bcopy(bd, bd0);
 		bb = d2b(&rv, &bbe, &bbbits);	/* rv = bb * 2^bbe */
+		if (bb == NULL) {
+			Bfree(bd);
+			Bfree(bd0);
+			goto failed_malloc;
+			}
 		bs = i2b(1);
+		if (bs == NULL) {
+			Bfree(bb);
+			Bfree(bd);
+			Bfree(bd0);
+			goto failed_malloc;
+			}
 
 		if (e >= 0) {
 			bb2 = bb5 = 0;
@@ -1693,19 +1710,66 @@ _Py_dg_strtod
 			}
 		if (bb5 > 0) {
 			bs = pow5mult(bs, bb5);
+			if (bs == NULL) {
+				Bfree(bb);
+				Bfree(bd);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
 			bb1 = mult(bs, bb);
 			Bfree(bb);
+			if (bb1 == NULL) {
+				Bfree(bs);
+				Bfree(bd);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
 			bb = bb1;
 			}
-		if (bb2 > 0)
+		if (bb2 > 0) {
 			bb = lshift(bb, bb2);
-		if (bd5 > 0)
+			if (bb == NULL) {
+				Bfree(bs);
+				Bfree(bd);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
+			}
+		if (bd5 > 0) {
 			bd = pow5mult(bd, bd5);
-		if (bd2 > 0)
+			if (bd == NULL) {
+				Bfree(bb);
+				Bfree(bs);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
+			}
+		if (bd2 > 0) {
 			bd = lshift(bd, bd2);
-		if (bs2 > 0)
+			if (bd == NULL) {
+				Bfree(bb);
+				Bfree(bs);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
+			}
+		if (bs2 > 0) {
 			bs = lshift(bs, bs2);
+			if (bs == NULL) {
+				Bfree(bb);
+				Bfree(bd);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
+			}
 		delta = diff(bb, bd);
+		if (delta == NULL) {
+			Bfree(bb);
+			Bfree(bs);
+			Bfree(bd);
+			Bfree(bd0);
+			goto failed_malloc;
+			}
 		bc.dsign = delta->sign;
 		delta->sign = 0;
 		i = cmp(delta, bs);
@@ -1732,6 +1796,13 @@ _Py_dg_strtod
 				break;
 				}
 			delta = lshift(delta,Log2P);
+			if (delta == NULL) {
+				Bfree(bb);
+				Bfree(bs);
+				Bfree(bd);
+				Bfree(bd0);
+				goto failed_malloc;
+				}
 			if (cmp(delta, bs) > 0)
 				goto drop_down;
 			break;
@@ -1897,8 +1968,12 @@ _Py_dg_strtod
 	Bfree(bs);
 	Bfree(bd0);
 	Bfree(delta);
-	if (bc.nd > nd)
-		bigcomp(&rv, s0, &bc);
+	if (bc.nd > nd) {
+		error = bigcomp(&rv, s0, &bc);
+		if (error)
+			goto failed_malloc;
+		}
+
 	if (bc.scale) {
 		word0(&rv0) = Exp_1 - 2*P*Exp_msk1;
 		word1(&rv0) = 0;
@@ -1911,6 +1986,12 @@ _Py_dg_strtod
 	if (se)
 		*se = (char *)s;
 	return sign ? -dval(&rv) : dval(&rv);
+
+ failed_malloc:
+	if (se)
+		*se = (char *)s00;
+	errno = ENOMEM;
+	return 0.0;
 	}
 
  static char *dtoa_result;
