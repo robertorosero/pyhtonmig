@@ -3098,6 +3098,54 @@ fi],
 LIBS_SAVE=$LIBS
 LIBS="$LIBS $LIBM"
 
+AC_MSG_CHECKING(whether C doubles are little-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_little_endian_double, [
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x05\x04\x03\x02\x01\xff\x3f\x43", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_little_endian_double=yes,
+ac_cv_little_endian_double=no,
+ac_cv_little_endian_double=no)])
+AC_MSG_RESULT($ac_cv_little_endian_double)
+if test "$ac_cv_little_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_LITTLE_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   with the least significant byte first])
+fi
+
+AC_MSG_CHECKING(whether C doubles are big-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_big_endian_double, [
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x43\x3f\xff\x01\x02\x03\x04\x05", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_big_endian_double=yes,
+ac_cv_big_endian_double=no,
+ac_cv_big_endian_double=no)])
+AC_MSG_RESULT($ac_cv_big_endian_double)
+if test "$ac_cv_big_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_BIG_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   with the most significant byte first])
+fi
+
 # Detect whether system arithmetic is subject to x87-style double
 # rounding issues.  The result of this test has little meaning on non
 # IEEE 754 platforms.  On IEEE 754, test should return 1 if rounding
