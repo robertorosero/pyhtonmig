@@ -251,8 +251,8 @@ extern "C" {
 #define CONST const
 #endif
 
-#if defined(IEEE_8087) + defined(IEEE_MC68k) + defined(VAX) + defined(IBM) != 1
-#error "Exactly one of IEEE_8087, IEEE_MC68k, VAX, or IBM should be defined."
+#if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
+#error "Exactly one of IEEE_8087 or IEEE_MC68k should be defined."
 #endif
 
 typedef union { double d; ULong L[2]; } U;
@@ -280,7 +280,7 @@ extern int strtod_diglim;
  * An alternative that might be better on some machines is
  * #define Storeinc(a,b,c) (*a++ = b << 16 | c & 0xffff)
  */
-#if defined(IEEE_8087) + defined(VAX)
+#if defined(IEEE_8087)
 #define Storeinc(a,b,c) (((unsigned short *)a)[1] = (unsigned short)b, \
 ((unsigned short *)a)[0] = (unsigned short)c, a++)
 #else
@@ -2138,7 +2138,6 @@ _Py_dg_dtoa
 	else
 		*sign = 0;
 
-#if defined(IEEE_Arith) + defined(VAX)
 	if ((word0(&u) & Exp_mask) == Exp_mask)
 		{
 		/* Infinity or NaN */
@@ -2147,7 +2146,6 @@ _Py_dg_dtoa
 			return nrv_alloc("Infinity", rve, 8);
 		return nrv_alloc("NaN", rve, 3);
 		}
-#endif
 	if (!dval(&u)) {
 		*decpt = 1;
 		return nrv_alloc("0", rve, 1);
