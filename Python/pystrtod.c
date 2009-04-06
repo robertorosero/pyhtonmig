@@ -553,7 +553,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		precision = 1;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
-	   exponent) */
+	   exponent).  Must be matched by a call to _Py_dg_freedtoa. */
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
 	assert(digits_end != NULL && digits_end >= digits);
 	n_digits = digits_end - digits;
@@ -583,8 +583,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 			buf += 3;
 			assert(0);
 		}
-		*buf = '\0';
-		return;
+		goto exit;
 	}
 
 	/* We got digits back, format them. */
@@ -632,8 +631,7 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		break;
 	default:
 		PyErr_BadInternalCall();
-		*buf = '\0';
-		return;
+		goto exit;
 	}
 
 	/* Always add a negative sign, and a plus sign if always_add_sign. */
@@ -694,8 +692,9 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
 		exp_len = sprintf(buf, "%+.02d", decpt-1);
 		buf += exp_len;
 	}
-
-	*buf++ = '\0';
+  exit:
+	*buf = '\0';
+	_Py_dg_freedtoa(digits);
 }
 
 
