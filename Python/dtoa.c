@@ -725,9 +725,9 @@ pow5mult
 		if (k & 1) {
 			b1 = mult(b, p5);
 			Bfree(b);
-			if (b1 == NULL)
-				return NULL;
 			b = b1;
+			if (b == NULL)
+				return NULL;
 			}
 		if (!(k >>= 1))
 			break;
@@ -1719,13 +1719,13 @@ _Py_dg_strtod
 				}
 			bb1 = mult(bs, bb);
 			Bfree(bb);
-			if (bb1 == NULL) {
+			bb = bb1;
+			if (bb == NULL) {
 				Bfree(bs);
 				Bfree(bd);
 				Bfree(bd0);
 				goto failed_malloc;
 				}
-			bb = bb1;
 			}
 		if (bb2 > 0) {
 			bb = lshift(bb, bb2);
