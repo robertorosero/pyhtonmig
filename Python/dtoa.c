@@ -2005,6 +2005,8 @@ rv_alloc(int i)
 		j <<= 1)
 			k++;
 	r = (int*)Balloc(k);
+	if (r == NULL)
+		return NULL;
 	*r = k;
 	return (char *)(r+1);
 	}
@@ -2014,7 +2016,10 @@ nrv_alloc(char *s, char **rve, int n)
 {
 	char *rv, *t;
 
-	t = rv = rv_alloc(n);
+	rv = rv_alloc(n);
+	if (rv == NULL)
+		return NULL;
+	t = rv;
 	while((*t = *s++)) t++;
 	if (rve)
 		*rve = t;
