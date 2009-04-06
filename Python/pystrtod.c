@@ -536,21 +536,22 @@ static char *uc_float_strings[] = {
        should have ".0" added.  Only applies to format codes 'r', 's', and 'g'.
      use_alt_formatting is nonzero if alternative formatting should be
        used.  Only applies to format codes 'e', 'f' and 'g'.
+
+   Returns a PyMem_Malloc'd block of memory containing the resulting string,
+    or NULL on error. If NULL is returned, the Python error has been set.
  */
 
-static void
-format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
+static char *
+format_float_short(double d, char format_code,
 		   int mode, Py_ssize_t precision,
 		   int always_add_sign, int add_dot_0_if_integer,
 		   int use_alt_formatting, char **float_strings)
 {
+	char* p = (char *)PyMem_Malloc(512);
+	char* buf = p;
 	char *digits, *digits_end;
 	int decpt, sign, exp_len, dec_pos, use_exp = 0;
 	Py_ssize_t n_digits, min_digits = 0;
-
-	/* precision of 0 makes no sense for 'g' format; interpret as 1 */
-	if (precision == 0 && format_code == 'g')
-		precision = 1;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent).  Must be matched by a call to _Py_dg_freedtoa. */
@@ -695,6 +696,8 @@ format_float_short(char *buf, Py_ssize_t buflen, double d, char format_code,
   exit:
 	*buf = '\0';
 	_Py_dg_freedtoa(digits);
+
+	return p;
 }
 
 
@@ -703,7 +706,6 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
                                          int precision,
                                          int flags)
 {
-	char* buf = (char *)PyMem_Malloc(512);
 	char lc_format_code = format_code;
 	char** float_strings = lc_float_strings;
 	int mode = 0;
@@ -745,6 +747,9 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	case 'g':
 		mode = 2;
+		/* precision of 0 makes no sense for 'g' format; interpret as 1 */
+		if (precision == 0)
+			precision = 1;
 		break;
 	case 'r':
 		/* "repr" pseudo-mode */
@@ -766,15 +771,8 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	}
 
-	if (!buf)
-		return NULL;
-
-	/* XXX validate format_code */
-
-	format_float_short(buf, 512, val, lc_format_code, mode, precision,
-			   flags & Py_DTSF_SIGN,
-			   flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT,
-			   float_strings);
-
-	return buf;
+	return format_float_short(val, lc_format_code, mode, precision,
+				  flags & Py_DTSF_SIGN,
+				  flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT,
+				  float_strings);
 }
