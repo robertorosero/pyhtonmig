@@ -416,6 +416,7 @@ Balloc
 Bfree
 	(Bigint *v)
 {
+	assert(v != NULL);
 	if (v) {
 		if (v->k > Kmax)
 			FREE((void*)v);
@@ -2074,8 +2075,9 @@ _Py_dg_freedtoa(char *s)
  *	   calculation.
  */
 
-/* Note: to avoid memory leakage, a successful call to _Py_dg_dtoa should
-   always be matched by a call to _Py_dg_freedtoa. */
+/* Additional notes (METD): (1) returns NULL on failure.  (2) to avoid memory
+   leakage, a successful call to _Py_dg_dtoa should always be matched by a
+   call to _Py_dg_freedtoa. */
 
  char *
 _Py_dg_dtoa
@@ -2126,6 +2128,11 @@ _Py_dg_dtoa
 	double ds;
 	char *s, *s0;
 
+	/* set pointers to NULL, to silence gcc compiler warnings and make
+	   cleanup easier on error */
+	mlo = mhi = b = S = 0;
+	s0 = 0;
+
 	u.d = dd;
 	if (word0(&u) & Sign_bit) {
 		/* set sign for everything, including 0's and NaNs */
@@ -2150,6 +2157,8 @@ _Py_dg_dtoa
 
 
 	b = d2b(&u, &be, &bbits);
+	if (b == NULL)
+		goto failed_malloc;
 	if ((i = (int)(word0(&u) >> Exp_shift1 & (Exp_mask>>Exp_shift1)))) {
 		dval(&d2) = dval(&u);
 		word0(&d2) &= Frac_mask1;
@@ -2260,7 +2269,10 @@ _Py_dg_dtoa
 			if (i <= 0)
 				i = 1;
 		}
-	s = s0 = rv_alloc(i);
+	s0 = rv_alloc(i);
+	if (s0 == NULL)
+		goto failed_malloc;
+	s = s0;
 
 
 	if (ilim >= 0 && ilim <= Quick_max && try_quick) {
@@ -2406,7 +2418,6 @@ _Py_dg_dtoa
 
 	m2 = b2;
 	m5 = b5;
-	mhi = mlo = 0;
 	if (leftright) {
 		i =
 			denorm ? be + (Bias + (P-1) - 1 + 1) :
@@ -2414,6 +2425,8 @@ _Py_dg_dtoa
 		b2 += i;
 		s2 += i;
 		mhi = i2b(1);
+		if (mhi == NULL)
+			goto failed_malloc;
 		}
 	if (m2 > 0 && s2 > 0) {
 		i = m2 < s2 ? m2 : s2;
@@ -2425,19 +2438,34 @@ _Py_dg_dtoa
 		if (leftright) {
 			if (m5 > 0) {
 				mhi = pow5mult(mhi, m5);
+				if (mhi == NULL)
+					goto failed_malloc;
 				b1 = mult(mhi, b);
 				Bfree(b);
 				b = b1;
+				if (b == NULL)
+					goto failed_malloc;
 				}
-			if ((j = b5 - m5))
+			if ((j = b5 - m5)) {
 				b = pow5mult(b, j);
+				if (b == NULL)
+					goto failed_malloc;
+				}
 			}
-		else
+		else {
 			b = pow5mult(b, b5);
+			if (b == NULL)
+				goto failed_malloc;
+			}
 		}
 	S = i2b(1);
-	if (s5 > 0)
+	if (S == NULL)
+		goto failed_malloc;
+	if (s5 > 0) {
 		S = pow5mult(S, s5);
+		if (S == NULL)
+			goto failed_malloc;
+		}
 
 	/* Check for special case that d is a normalized power of 2. */
 
@@ -2468,25 +2496,43 @@ _Py_dg_dtoa
 	b2 += i;
 	m2 += i;
 	s2 += i;
-	if (b2 > 0)
+	if (b2 > 0) {
 		b = lshift(b, b2);
-	if (s2 > 0)
+		if (b == NULL)
+			goto failed_malloc;
+		}
+	if (s2 > 0) {
 		S = lshift(S, s2);
+		if (S == NULL)
+			goto failed_malloc;
+		}
 	if (k_check) {
 		if (cmp(b,S) < 0) {
 			k--;
 			b = multadd(b, 10, 0);	/* we botched the k estimate */
-			if (leftright)
+			if (b == NULL)
+				goto failed_malloc;
+			if (leftright) {
 				mhi = multadd(mhi, 10, 0);
+				if (mhi == NULL)
+					goto failed_malloc;
+				}
 			ilim = ilim1;
 			}
 		}
 	if (ilim <= 0 && (mode == 3 || mode == 5)) {
-		if (ilim < 0 || cmp(b,S = multadd(S,5,0)) <= 0) {
+		if (ilim < 0) {
 			/* no digits, fcvt style */
  no_digits:
 			k = -1 - ndigits;
 			goto ret;
+			}
+		else {
+			S = multadd(S, 5, 0);
+			if (S == NULL)
+				goto failed_malloc;
+			if (cmp(b, S) <= 0)
+				goto no_digits;
 			}
  one_digit:
 		*s++ = '1';
@@ -2494,8 +2540,11 @@ _Py_dg_dtoa
 		goto ret;
 		}
 	if (leftright) {
-		if (m2 > 0)
+		if (m2 > 0) {
 			mhi = lshift(mhi, m2);
+			if (mhi == NULL)
+				goto failed_malloc;
+			}
 
 		/* Compute mlo -- check for special case
 		 * that d is a normalized power of 2.
@@ -2504,8 +2553,12 @@ _Py_dg_dtoa
 		mlo = mhi;
 		if (spec_case) {
 			mhi = Balloc(mhi->k);
+			if (mhi == NULL)
+				goto failed_malloc;
 			Bcopy(mhi, mlo);
 			mhi = lshift(mhi, Log2P);
+			if (mhi == NULL)
+				goto failed_malloc;
 			}
 
 		for(i = 1;;i++) {
@@ -2515,6 +2568,8 @@ _Py_dg_dtoa
 			 */
 			j = cmp(b, mlo);
 			delta = diff(S, mhi);
+			if (delta == NULL)
+				goto failed_malloc;
 			j1 = delta->sign ? 1 : cmp(b, delta);
 			Bfree(delta);
 			if (j1 == 0 && mode != 1 && !(word1(&u) & 1)
@@ -2534,6 +2589,8 @@ _Py_dg_dtoa
 					}
 				if (j1 > 0) {
 					b = lshift(b, 1);
+					if (b == NULL)
+						goto failed_malloc;
 					j1 = cmp(b, S);
 					if ((j1 > 0 || (j1 == 0 && dig & 1))
 					&& dig++ == '9')
@@ -2556,11 +2613,20 @@ _Py_dg_dtoa
 			if (i == ilim)
 				break;
 			b = multadd(b, 10, 0);
-			if (mlo == mhi)
+			if (b == NULL)
+				goto failed_malloc;
+			if (mlo == mhi) {
 				mlo = mhi = multadd(mhi, 10, 0);
+				if (mlo == NULL)
+					goto failed_malloc;
+				}
 			else {
 				mlo = multadd(mlo, 10, 0);
+				if (mlo == NULL)
+					goto failed_malloc;
 				mhi = multadd(mhi, 10, 0);
+				if (mhi == NULL)
+					goto failed_malloc;
 				}
 			}
 		}
@@ -2573,11 +2639,15 @@ _Py_dg_dtoa
 			if (i >= ilim)
 				break;
 			b = multadd(b, 10, 0);
+			if (b == NULL)
+				goto failed_malloc;
 			}
 
 	/* Round off last digit */
 
 	b = lshift(b, 1);
+	if (b == NULL)
+		goto failed_malloc;
 	j = cmp(b, S);
 	if (j > 0 || (j == 0 && dig & 1)) {
  roundoff:
@@ -2607,6 +2677,18 @@ _Py_dg_dtoa
 	if (rve)
 		*rve = s;
 	return s0;
+ failed_malloc:
+	if (S)
+		Bfree(S);
+	if (mlo && mlo != mhi)
+		Bfree(mlo);
+	if (mhi)
+		Bfree(mhi);
+	if (b)
+		Bfree(b);
+	if (s0)
+		_Py_dg_freedtoa(s0);
+	return NULL;
 	}
 #ifdef __cplusplus
 }
