@@ -547,11 +547,13 @@ format_float_short(double d, char format_code,
 		   int always_add_sign, int add_dot_0_if_integer,
 		   int use_alt_formatting, char **float_strings)
 {
-	char* p = (char *)PyMem_Malloc(512);
-	char* buf = p;
+	char *buf = NULL;
+	char *p;
+	Py_ssize_t bufsize = 0;
 	char *digits, *digits_end;
 	int decpt, sign, exp_len, dec_pos, use_exp = 0;
 	Py_ssize_t n_digits, min_digits = 0;
+	Py_ssize_t min_digits1;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point or
 	   exponent).  Must be matched by a call to _Py_dg_freedtoa. */
@@ -563,25 +565,35 @@ format_float_short(double d, char format_code,
 		/* Infinities and nans here; adapt Gay's output,
 		   so convert Infinity to inf and NaN to nan, and
 		   ignore sign of nan. Then return. */
+
+		/* We only need 5 bytes to hold the result "+inf\0" . */
+		bufsize = 5; /* Used later in an assert. */
+		buf = (char *)PyMem_Malloc(bufsize);
+		if (buf == NULL) {
+			PyErr_NoMemory();
+			goto exit;
+		}
+		p = buf;
+
 		if (digits[0] == 'i' || digits[0] == 'I') {
 			if (sign == 1) {
-				*buf++ = '-';
+				*p++ = '-';
 			}
 			else if (always_add_sign) {
-				*buf++ = '+';
+				*p++ = '+';
 			}
-			strncpy(buf, float_strings[OFS_INF], 3);
-			buf += 3;
+			strncpy(p, float_strings[OFS_INF], 3);
+			p += 3;
 		}
 		else if (digits[0] == 'n' || digits[0] == 'N') {
-			strncpy(buf, float_strings[OFS_NAN], 3);
-			buf += 3;
+			strncpy(p, float_strings[OFS_NAN], 3);
+			p += 3;
 		}
 		else {
 			/* shouldn't get here: Gay's code should always return
 			   something starting with a digit, an 'I',  or 'N' */
-			strncpy(buf, "ERR", 3);
-			buf += 3;
+			strncpy(p, "ERR", 3);
+			p += 3;
 			assert(0);
 		}
 		goto exit;
@@ -629,69 +641,111 @@ format_float_short(double d, char format_code,
 		goto exit;
 	}
 
-	/* Always add a negative sign, and a plus sign if always_add_sign. */
-	if (sign == 1)
-		*buf++ = '-';
-	else if (always_add_sign)
-		*buf++ = '+';
-
 	/* dec_pos = position of decimal point in buffer */
 	if (use_exp)
 		dec_pos = 1;
 	else
 		dec_pos = decpt;
 
-	/* zero padding on left of digit string */
+	min_digits -= n_digits;
+	min_digits1 = (n_digits < dec_pos) ?
+		(min_digits - (dec_pos-n_digits)) : min_digits;
+
+	/* Compute an upper bound how much memory we need. This might be a few
+	   chars too long, but no big deal. */
+	bufsize =
+		/* 1: Sign */
+		1 +
+
+		/* 2: Zero padding on left of digit string */
+		(dec_pos <= 0 ? -dec_pos + 2 : 0) +
+
+		/* 3: Digits, with included decimal point */
+		(1 + n_digits) +
+
+		/* 4: And zeros on the right up to the decimal point */
+		((n_digits < dec_pos) ? dec_pos-n_digits + 1 : 0) +
+
+		/* 5: And more trailing zeros when necessary */
+		(min_digits1 > 0 ? min_digits1 : 0) +
+
+		/* 6: Exponent "e+100", max 3 numerical digits */
+		(use_exp ? 5 : 0) +
+
+		/* Trailing 0 byte */
+		1;
+
+	/* Now allocate the memory and initialize p to point to the start of
+	   it. */
+	buf = (char *)PyMem_Malloc(bufsize);
+	if (buf == NULL) {
+		PyErr_NoMemory();
+		goto exit;
+	}
+	p = buf;
+
+	/* 1: Add a negative sign if negative, and a plus sign if non-negative
+	   and always_add_sign is true. */
+	if (sign == 1)
+		*p++ = '-';
+	else if (always_add_sign)
+		*p++ = '+';
+
+	/* 2: Zero padding on left of digit string */
 	if (dec_pos <= 0) {
-		*buf++ = '0';
-		*buf++ = '.';
-		memset(buf, '0', -dec_pos);
-		buf -= dec_pos;
+		*p++ = '0';
+		*p++ = '.';
+		memset(p, '0', -dec_pos);
+		p -= dec_pos;
 	}
 
-	/* digits, with included decimal point */
+	/* 3: Digits, with included decimal point */
 	if (0 < dec_pos && dec_pos <= n_digits) {
-		strncpy(buf, digits, dec_pos);
-		buf += dec_pos;
-		*buf++ = '.';
-		strncpy(buf, digits+dec_pos, n_digits-dec_pos);
-		buf += n_digits-dec_pos;
+		strncpy(p, digits, dec_pos);
+		p += dec_pos;
+		*p++ = '.';
+		strncpy(p, digits+dec_pos, n_digits-dec_pos);
+		p += n_digits-dec_pos;
 	}
 	else {
-		strncpy(buf, digits, n_digits);
-		buf += n_digits;
+		strncpy(p, digits, n_digits);
+		p += n_digits;
 	}
-	min_digits -= n_digits;
 
-	/* and zeros on the right up to the decimal point */
+	/* 4: And zeros on the right up to the decimal point */
 	if (n_digits < dec_pos) {
-		memset(buf, '0', dec_pos-n_digits);
-		buf += dec_pos-n_digits;
-		*buf++ = '.';
+		memset(p, '0', dec_pos-n_digits);
+		p += dec_pos-n_digits;
+		*p++ = '.';
 		min_digits -= dec_pos-n_digits;
 	}
 
-	/* and more trailing zeros when necessary */
+	/* 5: And more trailing zeros when necessary */
 	if (min_digits > 0) {
-		memset(buf, '0', min_digits);
-		buf += min_digits;
+		memset(p, '0', min_digits);
+		p += min_digits;
 	}
 
-	/* delete a trailing decimal pt unless using alternative formatting. */
-	if (buf[-1] == '.' && !use_alt_formatting)
-		buf--;
+	/* Delete a trailing decimal pt unless using alternative formatting. */
+	if (p[-1] == '.' && !use_alt_formatting)
+		p--;
 
-	/* Now that we've done zero padding, add an exponent if needed. */
+	/* 6: Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
-		*buf++ = float_strings[OFS_E][0];
-		exp_len = sprintf(buf, "%+.02d", decpt-1);
-		buf += exp_len;
+		*p++ = float_strings[OFS_E][0];
+		exp_len = sprintf(p, "%+.02d", decpt-1);
+		p += exp_len;
 	}
   exit:
-	*buf = '\0';
+	if (buf) {
+		*p = '\0';
+		/* It's too late if this fails, we've already stepped on
+		   memory that isn't ours. But it's an okay debugging test. */
+		assert(p-buf < bufsize);
+	}
 	_Py_dg_freedtoa(digits);
 
-	return p;
+	return buf;
 }
 
 
