@@ -101,10 +101,6 @@
  */
 
 /*
- * #define IEEE_8087 for IEEE-arithmetic machines where the least
- *	significant byte has the lowest address.
- * #define IEEE_MC68k for IEEE-arithmetic machines where the most
- *	significant byte has the lowest address.
  * #define Long int on machines with 32-bit ints and 64-bit longs.
  * #define Honor_FLT_ROUNDS if FLT_ROUNDS can assume the values 2 or 3
  *	and strtod and dtoa should round accordingly.  Unless Trust_FLT_ROUNDS
@@ -126,15 +122,14 @@
 #define MALLOC PyMem_Malloc
 #define FREE PyMem_Free
 
-/* use WORDS_BIGENDIAN to determine float endianness.  This assumes that ints
-   and floats share the same endianness on the target machine, which appears
-   to be true for every platform that Python currently cares about.  We're
-   also assuming IEEE 754 float format for now. */
-
-#ifdef WORDS_BIGENDIAN
-#define IEEE_MC68k
-#else
+#ifdef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
 #define IEEE_8087
+#endif
+#ifdef DOUBLE_IS_BIG_ENDIAN_IEEE754
+#define IEEE_MC68k
+#endif
+#if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
+#error "Exactly one of IEEE_8087 or IEEE_MC68k should be defined."
 #endif
 
 #if SIZEOF_LONG==8 && SIZEOF_INT==4
@@ -168,20 +163,8 @@ typedef unsigned long ULong;
 #define PRIVATE_mem ((PRIVATE_MEM+sizeof(double)-1)/sizeof(double))
 static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 
-#undef IEEE_Arith
-#ifdef IEEE_MC68k
-#define IEEE_Arith
-#endif
-#ifdef IEEE_8087
-#define IEEE_Arith
-#endif
-
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
-#error "Exactly one of IEEE_8087 or IEEE_MC68k should be defined."
 #endif
 
 typedef union { double d; ULong L[2]; } U;
