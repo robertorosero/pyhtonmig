@@ -1991,7 +1991,7 @@ _Py_dg_strtod
 	if (se)
 		*se = (char *)s00;
 	errno = ENOMEM;
-	return 0.0;
+	return -1.0;
 	}
 
  static char *dtoa_result;
