@@ -2032,7 +2032,7 @@ nrv_alloc(char *s, char **rve, int n)
  */
 
  void
-freedtoa(char *s)
+_Py_dg_freedtoa(char *s)
 {
 	Bigint *b = (Bigint *)((int *)s - 1);
 	b->maxwds = 1 << (b->k = *(int*)b);
@@ -2125,7 +2125,7 @@ _Py_dg_dtoa
 	char *s, *s0;
 
 	if (dtoa_result) {
-		freedtoa(dtoa_result);
+		_Py_dg_freedtoa(dtoa_result);
 		dtoa_result = 0;
 		}
 
