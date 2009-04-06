@@ -455,7 +455,6 @@ Balloc
 Bfree
 	(Bigint *v)
 {
-	assert(v != NULL);
 	if (v) {
 		if (v->k > Kmax)
 			FREE((void*)v);
