@@ -116,17 +116,6 @@
  *	portable than using FLT_FOUNDS directly.
  * #define Check_FLT_ROUNDS if FLT_ROUNDS can assume the values 2 or 3
  *	and Honor_FLT_ROUNDS is not #defined.
- * #define Omit_Private_Memory to omit logic (added Jan. 1998) for making
- *	memory allocations from a private pool of memory when possible.
- *	When used, the private pool is PRIVATE_MEM bytes long:  2304 bytes,
- *	unless #defined to be a different length.  This default length
- *	suffices to get rid of MALLOC calls except for unusual cases,
- *	such as decimal-to-binary conversion of a very long string of
- *	digits.  The longest string dtoa can return is about 751 bytes
- *	long.  For conversions by strtod of strings of 800 digits and
- *	all dtoa conversions in single-threaded executions with 8-byte
- *	pointers, PRIVATE_MEM >= 7400 appears to suffice; with 4-byte
- *	pointers, PRIVATE_MEM >= 7112 appears adequate.
  */
 
 /* Linking of Python's #defines to Gay's #defines starts here. */
@@ -173,16 +162,13 @@ typedef unsigned long ULong;
 #define Bug(x) {fprintf(stderr, "%s\n", x); exit(1);}
 #endif
 
-#ifndef Omit_Private_Memory
 #ifndef PRIVATE_MEM
 #define PRIVATE_MEM 2304
 #endif
 #define PRIVATE_mem ((PRIVATE_MEM+sizeof(double)-1)/sizeof(double))
 static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
-#endif
 
 #undef IEEE_Arith
-#undef Avoid_Underflow
 #ifdef IEEE_MC68k
 #define IEEE_Arith
 #endif
@@ -190,15 +176,8 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 #define IEEE_Arith
 #endif
 
-#undef INFNAN_CHECK
-#define INFNAN_CHECK
-
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#ifndef CONST
-#define CONST const
 #endif
 
 #if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
@@ -270,10 +249,6 @@ extern int strtod_diglim;
 #define Tiny1 1
 #define Quick_max 14
 #define Int_max 14
-#define Avoid_Underflow
-#ifdef Flush_Denorm	/* debugging option */
-#undef Sudden_Underflow
-#endif
 
 #ifndef Flt_Rounds
 #ifdef FLT_ROUNDS
@@ -285,13 +260,16 @@ extern int strtod_diglim;
 
 #define Rounding Flt_Rounds
 
-
-
-#define rounded_product(a,b) a *= b
-#define rounded_quotient(a,b) a /= b
-
 #define Big0 (Frac_mask1 | Exp_msk1*(DBL_MAX_EXP+Bias-1))
 #define Big1 0xffffffff
+
+#ifndef NAN_WORD0
+#define NAN_WORD0 0x7ff80000
+#endif
+
+#ifndef NAN_WORD1
+#define NAN_WORD1 0
+#endif
 
 
 typedef struct BCinfo BCinfo;
@@ -330,19 +308,12 @@ Balloc
 {
 	int x;
 	Bigint *rv;
-#ifndef Omit_Private_Memory
 	unsigned int len;
-#endif
 
 	if (k <= Kmax && (rv = freelist[k]))
 		freelist[k] = rv->next;
 	else {
 		x = 1 << k;
-#ifdef Omit_Private_Memory
-		rv = (Bigint *)MALLOC(sizeof(Bigint) + (x-1)*sizeof(ULong));
-		if (rv == NULL)
-			return NULL;
-#else
 		len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
 			/sizeof(double);
 		if (pmem_next - private_mem + len <= PRIVATE_mem) {
@@ -354,7 +325,6 @@ Balloc
 			if (rv == NULL)
 				return NULL;
 			}
-#endif
 		rv->k = k;
 		rv->maxwds = x;
 		}
@@ -430,7 +400,7 @@ multadd
 
  static Bigint *
 s2b
-	(CONST char *s, int nd0, int nd, ULong y9, int dplen)
+	(const char *s, int nd0, int nd, ULong y9, int dplen)
 {
 	Bigint *b;
 	int i, k;
@@ -967,16 +937,16 @@ ratio
 	return dval(&da) / dval(&db);
 	}
 
- static CONST double
+ static const double
 tens[] = {
 		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 		1e20, 1e21, 1e22
 		};
 
- static CONST double
+ static const double
 bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
-static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
+static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 		9007199254740992.*9007199254740992.e-256
 		/* = 2^106 * 1e-256 */
 		};
@@ -985,22 +955,12 @@ static CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 #define Scale_Bit 0x10
 #define n_bigtens 5
 
-#ifdef INFNAN_CHECK
-
-#ifndef NAN_WORD0
-#define NAN_WORD0 0x7ff80000
-#endif
-
-#ifndef NAN_WORD1
-#define NAN_WORD1 0
-#endif
-
  static int
 match
-	(CONST char **sp, char *t)
+	(const char **sp, char *t)
 {
 	int c, d;
-	CONST char *s = *sp;
+	const char *s = *sp;
 
 	while((d = *t++)) {
 		if ((c = *++s) >= 'A' && c <= 'Z')
@@ -1011,8 +971,6 @@ match
 	*sp = s + 1;
 	return 1;
 	}
-
-#endif /* INFNAN_CHECK */
 
 #define ULbits 32
 #define kshift 5
@@ -1129,7 +1087,7 @@ quorem
 
  static int
 bigcomp
-	(U *rv, CONST char *s0, BCinfo *bc)
+	(U *rv, const char *s0, BCinfo *bc)
 {
 	Bigint *b, *d;
 	int b2, bbits, d2, dd, dig, dsign, i, j, nd, nd0, p2, p5, speccase;
@@ -1300,11 +1258,11 @@ retlow1:
 
  double
 _Py_dg_strtod
-	(CONST char *s00, char **se)
+	(const char *s00, char **se)
 {
 	int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1, error;
 	int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
-	CONST char *s, *s0, *s1;
+	const char *s, *s0, *s1;
 	double aadj, aadj1;
 	Long L;
 	U aadj2, adj, rv, rv0;
@@ -1427,7 +1385,6 @@ _Py_dg_strtod
 		}
 	if (!nd) {
 		if (!nz && !nz0) {
-#ifdef INFNAN_CHECK
 			/* Check for Nan and Infinity */
 			switch(c) {
 			  case 'i':
@@ -1449,7 +1406,6 @@ _Py_dg_strtod
 					goto ret;
 					}
 			  }
-#endif /* INFNAN_CHECK */
  ret0:
 			s = s00;
 			sign = 0;
@@ -1478,7 +1434,7 @@ _Py_dg_strtod
 			goto ret;
 		if (e > 0) {
 			if (e <= Ten_pmax) {
-				/* rv = */ rounded_product(dval(&rv), tens[e]);
+				dval(&rv) *= tens[e];
 				goto ret;
 				}
 			i = DBL_DIG - nd;
@@ -1488,12 +1444,12 @@ _Py_dg_strtod
 				 */
 				e -= i;
 				dval(&rv) *= tens[i];
-				/* rv = */ rounded_product(dval(&rv), tens[e]);
+				dval(&rv) *= tens[e];
 				goto ret;
 				}
 			}
 		else if (e >= -Ten_pmax) {
-			/* rv = */ rounded_quotient(dval(&rv), tens[-e]);
+			dval(&rv) /= tens[-e];
 			goto ret;
 			}
 		}
