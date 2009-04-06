@@ -17,8 +17,47 @@
  *
  ***************************************************************/
 
-/* Please send bug reports to David M. Gay (dmg at acm dot org,
- * with " at " changed at "@" and " dot " changed to ".").	*/
+/****************************************************************
+ * This is dtoa.c by David Gay, obtained from http://www.netlib.org/fp/dtoa.c
+ * on March 17, 2009 and modified for inclusion into the Python core by Mark
+ * Dickinson and Eric Smith.  The major modifications are as follows:
+ *
+ *  0. The original code has been specialized to Python's needs by removing
+ *     many of the #ifdef'd sections.  In particular, code to support VAX and
+ *     IBM floating-point formats, hex NaNs, hex floats, locale-aware
+ *     treatment of the decimal point, and setting of the inexact flag have
+ *     been removed.
+ *
+ *  1. We use PyMem_Malloc and PyMem_Free in place of malloc and free.
+ *
+ *  2. The public functions strtod, dtoa and freedtoa all now have
+ *     a _Py_dg_ prefix.
+ *
+ *  3. Instead of assuming that PyMem_Malloc always succeeds, we thread
+ *     PyMem_Malloc failures through the code.  The functions
+ *
+ *       Balloc, multadd, s2b, i2b, mult, pow5mult, lshift, diff, d2b
+ *
+ *     of return type *Bigint all return NULL to indicate a malloc failure.
+ *     Similarly, rv_alloc and nrv_alloc (return type char *) return NULL on
+ *     failure.  bigcomp now has return type int (it used to be void) and
+ *     returns -1 on failure and 0 otherwise.  _Py_dg_dtoa returns NULL
+ *     on failure.  _Py_dg_strtod indicates failure due to malloc failure
+ *     by returning -1.0, setting errno=ENOMEM and *se to s00.
+ *
+ *  4. The static variable dtoa_result has been removed.  Callers of
+ *     _Py_dg_dtoa are expected to call _Py_dg_freedtoa to free
+ *     the memory allocated by _Py_dg_dtoa.
+ *
+ *  5. A bug in the original dtoa.c code, in which '.nan' and '.inf'
+ *     were accepted as valid inputs to strtod, has been fixed.
+ *
+ ***************************************************************/
+
+/* Please send bug reports for the original dtoa.c code to David M. Gay (dmg
+ * at acm dot org, with " at " changed at "@" and " dot " changed to ".").
+ * Send bug reports for this modified version to Mark Dickinson
+ * (dickinsm@gmail.com). */
 
 /* On a machine with IEEE extended-precision registers, it is
  * necessary to specify double-precision (53-bit) rounding precision
