@@ -1164,6 +1164,8 @@ bigcomp
 
 	/* Compare b/d with s0 */
 
+	assert(nd > 0);
+	dd = 9999;  /* silence gcc compiler warning */
 	for(i = 0; i < nd0; ) {
 		if ((dd = s0[i++] - '0' - dig))
 			goto ret;
