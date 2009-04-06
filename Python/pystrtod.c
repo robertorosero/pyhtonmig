@@ -589,12 +589,6 @@ format_float_short(double d, char format_code,
 
 	/* We got digits back, format them. */
 
-	/* this replaces the various tests in other places like:
-	    if (type == 'f' && fabs(x) >= 1e50)
-		type = 'g';
-	   over time, those tests should be deleted
-	*/
-
 	/* Detect if we're using exponents or not, and figure out how many
 	   additional digits we need beyond those provided by dtoa. */
 	switch (format_code) {
