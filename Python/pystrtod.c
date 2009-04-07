@@ -519,10 +519,10 @@ static char *uc_float_strings[] = {
 };
 
 
-/* Convert a double d to a string, and put the result into the buffer buf.
+/* Convert a double d to a string, and return a PyMem_Malloc'd block of
+   memory contain the resulting string.
 
    Arguments:
-     buflen is the length of the provided buffer
      d is the double to be converted
      format_code is one of 'e', 'f', 'g', 'r' or 's'.  'e', 'f' and 'g'
        correspond to '%e', '%f' and '%g';  'r' and 's' correspond
