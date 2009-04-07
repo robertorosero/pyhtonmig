@@ -412,11 +412,12 @@ get_formatting_info(int locale, char **decimal_point, char **thousands_sep,
 /* Given a number of the form:
    [+-]digits[rest]
    where ptr points to the start and end points to the end, parse
-   the number into its integer part and then everything else (which
-   could be a decimal, an exponent, or both.
-   This is the format returned from PyOS_double_to_string().
+    the number into its integer part and then everything else (which
+    could be a decimal, an exponent, both, or neither.
+   This is compatible with the format returned from
+    PyOS_double_to_string().
    Results are undefined (but shouldn't crash) for improperly
-   formatted strings.
+    formatted strings.
    Consider moving this to pystrtod.c
 */
 static void
