@@ -346,6 +346,18 @@ calc_number_widths(NumberFieldWidths *spec, STRINGLIB_CHAR actual_sign,
             spec->n_spadding + n_digits + spec->n_rpadding;
 }
 
+/* Fill in the digit parts of a numbers's string representation,
+   as determined in calc_number_widths(). */
+static void
+fill_digits(STRINGLIB_CHAR *p_buf, const NumberFieldWidths *spec,
+            STRINGLIB_CHAR *p_digits, Py_ssize_t n_digits)
+{
+    memmove(p_buf +
+               (spec->n_lpadding + spec->n_sign + spec->n_spadding),
+            p_digits,
+            n_digits * sizeof(STRINGLIB_CHAR));
+}
+
 /* fill in the non-digit parts of a numbers's string representation,
    as determined in calc_number_widths().  returns the pointer to
    where the digits go. */
@@ -902,11 +914,13 @@ format_float_internal(PyObject *value,
         --n_digits;
     }
 
+    /* Determine the grouping, separator, and decimal point, if any. */
     get_formatting_info(use_locale, &l_decimal_point, &l_thousands_sep, &l_grouping);
 
+    /* Calculate how much space we'll need. */
     calc_number_widths(&spec, sign_char, 0, n_digits, has_decimal, 0, format);
 
-    /* allocate a string with enough space */
+    /* Allocate that space. */
     result = STRINGLIB_NEW(NULL, spec.n_total);
     if (result == NULL)
         goto done;
@@ -915,11 +929,8 @@ format_float_internal(PyObject *value,
     fill_non_digits(STRINGLIB_STR(result), &spec, NULL, n_digits,
                     format->fill_char == '\0' ? ' ' : format->fill_char);
 
-    /* fill in the digit parts */
-    memmove(STRINGLIB_STR(result) +
-               (spec.n_lpadding + spec.n_sign + spec.n_spadding),
-            p,
-            n_digits * sizeof(STRINGLIB_CHAR));
+    /* Fill in the digit parts. */
+    fill_digits(STRINGLIB_STR(result), &spec, p, n_digits);
 
 done:
     PyMem_Free(buf);
