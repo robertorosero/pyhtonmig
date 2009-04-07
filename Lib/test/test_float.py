@@ -1,6 +1,7 @@
 
 import unittest, struct
 import os
+import sys
 from test import support
 import math
 from math import isinf, isnan, copysign, ldexp
@@ -9,6 +10,14 @@ import random, fractions
 
 INF = float("inf")
 NAN = float("nan")
+
+#locate file with float format test values
+if __name__ == '__main__':
+    file = sys.argv[0]
+else:
+    file = __file__
+test_dir = os.path.dirname(file) or os.curdir
+format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
 class GeneralFloatCases(unittest.TestCase):
 
@@ -312,6 +321,23 @@ class ReprTestCase(unittest.TestCase):
             v = eval(line)
             self.assertEqual(v, eval(repr(v)))
         floats_file.close()
+
+class FormatTestCase(unittest.TestCase):
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_format_testfile(self):
+        for line in open(format_testfile):
+            if line.startswith('--'):
+                continue
+            line = line.strip()
+            if not line:
+                continue
+
+            lhs, rhs = map(str.strip, line.split('->'))
+            fmt, arg = lhs.split()
+            self.assertEqual(fmt % float(arg), rhs)
+            self.assertEqual(fmt % -float(arg), '-' + rhs)
+
 
 # Beginning with Python 2.6 float has cross platform compatible
 # ways to create and represent inf and nan
