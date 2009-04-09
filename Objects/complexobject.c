@@ -334,11 +334,11 @@ complex_format(PyComplexObject *v, char format_code)
 {
     PyObject *result = NULL;
     Py_ssize_t len;
-    char *buf;
 
     /* If these are non-NULL, they'll need to be freed. */
     char *pre = NULL;
     char *pim = NULL;
+    char *buf = NULL;
 
     /* These do not need to be freed. They're either aliases for pim
        and pre, or pointers to constants. */
@@ -420,6 +420,7 @@ complex_format(PyComplexObject *v, char format_code)
 done:
     PyMem_Free(pim);
     PyMem_Free(pre);
+    PyMem_Free(buf);
 
     return result;
 }
