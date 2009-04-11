@@ -804,7 +804,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 		break;
 	case 'g':
 		mode = 2;
-		/* precision of 0 makes no sense for 'g' format; interpret as 1 */
+		/* precision 0 makes no sense for 'g' format; interpret as 1 */
 		if (precision == 0)
 			precision = 1;
 		break;
@@ -830,6 +830,7 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 
 	return format_float_short(val, lc_format_code, mode, precision,
 				  flags & Py_DTSF_SIGN,
-				  flags & Py_DTSF_ADD_DOT_0, flags & Py_DTSF_ALT,
+				  flags & Py_DTSF_ADD_DOT_0,
+				  flags & Py_DTSF_ALT,
 				  float_strings);
 }
