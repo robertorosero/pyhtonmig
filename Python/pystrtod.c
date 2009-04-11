@@ -594,6 +594,8 @@ format_float_short(double d, char format_code,
 			p += 3;
 		}
 		else if (digits[0] == 'n' || digits[0] == 'N') {
+			/* note that we *never* add a sign for a nan,
+			   even if one has explicitly been requested */
 			strncpy(p, float_strings[OFS_NAN], 3);
 			p += 3;
 		}
