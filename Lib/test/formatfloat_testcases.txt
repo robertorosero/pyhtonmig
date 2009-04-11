@@ -347,6 +347,15 @@
 %r 0.999e-4 -> 9.99e-05
 %r 1e-5 -> 1e-05
 
+-- some values that are designed to fail if the FPU rounding
+-- precision is 64-bits.
+%r 8.72293771110361e+25 -> 8.72293771110361e+25
+%r 7.47005307342313e+26 -> 7.47005307342313e+26
+%r 2.86438000439698e+28 -> 2.86438000439698e+28
+%r 8.89142905246179e+28 -> 8.89142905246179e+28
+%r 3.08578087079232e+35 -> 3.08578087079232e+35
+
+
 -- str formatting.  Result always includes decimal point and at
 -- least one digit after the point, or an exponent.
 %s 0 -> 0.0
