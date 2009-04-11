@@ -257,6 +257,8 @@ extern int strtod_diglim;
 #endif
 
 
+/* struct BCinfo is used to pass information from _Py_dg_strtod to bigcomp */
+
 typedef struct BCinfo BCinfo;
 struct
 BCinfo {
@@ -268,6 +270,28 @@ BCinfo {
 
 #define Kmax 7
 
+/* struct Bigint is used to represent arbitrary-precision integers.  These
+   integers are stored in sign-magnitude format, with the magnitude stored as
+   an array of base 2**32 digits.  Bigints are always normalized: if x is a
+   Bigint then x->wds >= 1, and either x->wds == 1 or x[wds-1] is nonzero.
+
+   The Bigint fields are as follows:
+
+     - next is a header used by Balloc and Bfree to keep track of lists
+         of freed Bigints;  it's also used for the linked list of
+         powers of 5 of the form 5**2**i used by pow5mult.
+     - k indicates which pool this Bigint was allocated from
+     - maxwds is the maximum number of words space was allocated for
+       (usually maxwds == 2**k)
+     - sign is 1 for negative Bigints, 0 for positive.  The sign is unused
+       (ignored on inputs, set to 0 on outputs) in almost all operations
+       involving Bigints: a notable exception is the diff function, which
+       ignores signs on inputs but sets the sign of the output correctly.
+     - wds is the actual number of significant words
+     - x contains the vector of words (digits) for this Bigint, from least
+       significant (x[0]) to most significant (x[wds-1]).
+*/
+
 struct
 Bigint {
     struct Bigint *next;
@@ -277,7 +301,28 @@ Bigint {
 
 typedef struct Bigint Bigint;
 
+/* Memory management: memory is allocated from, and returned to, Kmax+1 pools
+   of memory, where pool k (0 <= k <= Kmax) is for Bigints b with b->maxwds ==
+   1 << k.  These pools are maintained as linked lists, with freelist[k]
+   pointing to the head of the list for pool k.
+
+   On allocation, if there's no free slot in the appropriate pool, MALLOC is
+   called to get more memory.  This memory is not returned to the system until
+   Python quits.  There's also a private memory pool that's allocated from
+   in preference to using MALLOC.
+
+   For Bigints with more than (1 << Kmax) digits (which implies at least 1233
+   decimal digits), memory is directly allocated using MALLOC, and freed using
+   FREE.
+
+   XXX: it would be easy to bypass this memory-management system and
+   translate each call to Balloc into a call to PyMem_Malloc, and each
+   Bfree to PyMem_Free.  Investigate whether this has any significant
+   performance on impact. */
+
 static Bigint *freelist[Kmax+1];
+
+/* Allocate space for a Bigint with up to 1<<k digits */
 
 static Bigint *
 Balloc
@@ -309,6 +354,8 @@ Balloc
     return rv;
 }
 
+/* Free a Bigint allocated with Balloc */
+
 static void
 Bfree
 (Bigint *v)
@@ -325,6 +372,10 @@ Bfree
 
 #define Bcopy(x,y) memcpy((char *)&x->sign, (char *)&y->sign,   \
                           y->wds*sizeof(Long) + 2*sizeof(int))
+
+/* Multiply a Bigint b by m and add a.  Either modifies b in place and returns
+   a pointer to the modified b, or Bfrees b and returns a pointer to a copy.
+   On failure, return NULL.  In this case, b will have been already freed. */
 
 static Bigint *
 multadd
@@ -375,6 +426,12 @@ multadd
     return b;
 }
 
+/* convert a string s containing nd decimal digits (possibly containing a
+   decimal separator at position nd0, which is ignored) to a Bigint.  This
+   function carries on where the parsing code in _Py_dg_strtod leaves off: on
+   entry, y9 contains the result of converting the first 9 digits.  Returns
+   NULL on failure. */
+
 static Bigint *
 s2b
 (const char *s, int nd0, int nd, ULong y9, int dplen)
@@ -411,6 +468,8 @@ s2b
     return b;
 }
 
+/* count leading 0 bits in the 32-bit integer x. */
+
 static int
 hi0bits
 (ULong x)
@@ -440,6 +499,9 @@ hi0bits
     }
     return k;
 }
+
+/* count trailing 0 bits in the 32-bit integer y, and shift y right by that
+   number of bits. */
 
 static int
 lo0bits
@@ -485,6 +547,8 @@ lo0bits
     return k;
 }
 
+/* convert a small nonnegative integer to a Bigint */
+
 static Bigint *
 i2b
 (int i)
@@ -498,6 +562,9 @@ i2b
     b->wds = 1;
     return b;
 }
+
+/* multiply two Bigints.  Returns a new Bigint, or NULL on failure.  Ignores
+   the signs of a and b. */
 
 static Bigint *
 mult
@@ -588,7 +655,13 @@ mult
     return c;
 }
 
+/* p5s is a linked list of powers of 5 of the form 5**(2**i), i >= 2 */
+
 static Bigint *p5s;
+
+/* multiply the Bigint b by 5**k.  Returns a pointer to the result, or NULL on
+   failure; if the returned pointer is distinct from b then the original
+   Bigint b will have been Bfree'd.   Ignores the sign of b. */
 
 static Bigint *
 pow5mult
@@ -642,6 +715,10 @@ pow5mult
     return b;
 }
 
+/* shift a Bigint b left by k bits.  Return a pointer to the shifted result,
+   or NULL on failure.  If the returned pointer is distinct from b then the
+   original b will have been Bfree'd.   Ignores the sign of b. */
+
 static Bigint *
 lshift
 (Bigint *b, int k)
@@ -684,6 +761,9 @@ lshift
     return b1;
 }
 
+/* Do a three-way compare of a and b, returning -1 if a < b, 0 if a == b and
+   1 if a > b.  Ignores signs of a and b. */
+
 static int
 cmp
 (Bigint *a, Bigint *b)
@@ -713,6 +793,10 @@ cmp
     }
     return 0;
 }
+
+/* Take the difference of Bigints a and b, returning a new Bigint.  Returns
+   NULL on failure.  The signs of a and b are ignored, but the sign of the
+   result is set appropriately. */
 
 static Bigint *
 diff
@@ -792,6 +876,9 @@ diff
     return c;
 }
 
+/* Given a positive normal double x, return the difference between x and the next
+   double up.  Doesn't give correct results for subnormals. */
+
 static double
 ulp
 (U *x)
@@ -804,6 +891,8 @@ ulp
     word1(&u) = 0;
     return dval(&u);
 }
+
+/* Convert a Bigint to a double plus an exponent */
 
 static double
 b2d
@@ -844,6 +933,8 @@ b2d
 #undef d1
     return dval(&d);
 }
+
+/* Convert a double to a Bigint plus an exponent.  Return NULL on failure. */
 
 static Bigint *
 d2b
@@ -895,6 +986,9 @@ d2b
 #undef d0
 #undef d1
 
+/* Compute the ratio of two Bigints, as a double.  The result may have an
+   error of up to 2.5 ulps. */
+
 static double
 ratio
 (Bigint *a, Bigint *b)
@@ -932,6 +1026,9 @@ static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
 #define Scale_Bit 0x10
 #define n_bigtens 5
 
+/* case insensitive string match, for recognising 'inf[inity]' and
+   'nan' strings. */
+
 static int
 match
 (const char **sp, char *t)
@@ -962,6 +1059,10 @@ dshift(Bigint *b, int p2)
         rv -= p2;
     return rv & kmask;
 }
+
+/* special case of Bigint division.  The quotient is always in the range 0 <=
+   quotient < 10, and on entry the divisor S is normalized so that its top 4
+   bits (28--31) are zero and bit 27 is set. */
 
 static int
 quorem
