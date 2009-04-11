@@ -554,22 +554,23 @@ format_float_short(double d, char format_code,
 	char *p;
 	Py_ssize_t bufsize = 0;
 	char *digits, *digits_end;
-	int decpt, sign, exp_len, dec_pos, use_exp = 0;
-	Py_ssize_t n_digits, min_digits = 0;
-	Py_ssize_t min_digits1;
+	int decpt_as_int, sign, exp_len, exp = 0, use_exp = 0;
+	Py_ssize_t decpt, digits_len, vdigits_start, vdigits_end;
 
-	/* _Py_dg_dtoa returns a digit string (no decimal point or
-	   exponent).  Must be matched by a call to _Py_dg_freedtoa. */
-	digits = _Py_dg_dtoa(d, mode, precision, &decpt, &sign, &digits_end);
+	/* _Py_dg_dtoa returns a digit string (no decimal point or exponent).
+	   Must be matched by a call to _Py_dg_freedtoa. */
+	digits = _Py_dg_dtoa(d, mode, precision, &decpt_as_int, &sign,
+			     &digits_end);
+	decpt = (Py_ssize_t)decpt_as_int;
 	if (digits == NULL) {
 		/* The only failure mode is no memory. */
 		PyErr_NoMemory();
 		goto exit;
 	}
 	assert(digits_end != NULL && digits_end >= digits);
-	n_digits = digits_end - digits;
+	digits_len = digits_end - digits;
 
-	if (n_digits && !isdigit(digits[0])) {
+	if (digits_len && !isdigit(digits[0])) {
 		/* Infinities and nans here; adapt Gay's output,
 		   so convert Infinity to inf and NaN to nan, and
 		   ignore sign of nan. Then return. */
@@ -609,81 +610,96 @@ format_float_short(double d, char format_code,
 		goto exit;
 	}
 
-	/* We got digits back, format them. */
+	/* We got digits back, format them.  We may need to pad 'digits'
+	   either on the left or right (or both) with extra zeros, so in
+	   general the resulting string has the form
 
-	/* Detect if we're using exponents or not, and figure out how many
-	   additional digits we need beyond those provided by dtoa. */
+	     [<sign>]<zeros><digits><zeros>[<exponent>]
+
+	   where either of the <zeros> pieces could be empty, and there's a
+	   decimal point that could appear either in <digits> or in the
+	   leading or trailing <zeros>.
+
+	   Imagine an infinite 'virtual' string vdigits, consisting of the
+	   string 'digits' (starting at index 0) padded on both the left and
+	   right with infinite strings of zeros.  We want to output a slice
+
+	     vdigits[vdigits_start : vdigits_end]
+
+	   of this virtual string.  Thus if vdigits_start < 0 then we'll end
+	   up producing some leading zeros; if vdigits_end > digits_len there
+	   will be trailing zeros in the output.  The next section of code
+	   determines whether to use an exponent or not, figures out the
+	   position 'decpt' of the decimal point, and computes 'vdigits_start'
+	   and 'vdigits_end'. */
+	vdigits_end = digits_len;
 	switch (format_code) {
 	case 'e':
 		use_exp = 1;
-		min_digits = precision;
+		vdigits_end = precision;
 		break;
 	case 'f':
-		min_digits = decpt + precision;
+		vdigits_end = decpt + precision;
 		break;
 	case 'g':
 		if (decpt <= -4 || decpt > precision)
 			use_exp = 1;
-		/* assumes that not both of add_dot_0_if_integer and
-		   use_alt_formatting are set */
-		else if (add_dot_0_if_integer)
-			min_digits = decpt + 1;
 		if (use_alt_formatting)
-			min_digits = precision;
+			vdigits_end = precision;
 		break;
 	case 'r':
+		/* convert to exponential format at 1e16.  We used to convert
+		   at 1e17, but that gives odd-looking results for some values
+		   when a 16-digit 'shortest' repr is padded with bogus zeros.
+		   For example, repr(2e16+8) would give 20000000000000010.0;
+		   the true value is 20000000000000008.0. */
 		if (decpt <= -4 || decpt > 16)
 			use_exp = 1;
-		else if (add_dot_0_if_integer)
-			min_digits = decpt + 1;
 		break;
 	case 's':
 		/* if we're forcing a digit after the point, convert to
 		   exponential format at 1e11.  If not, convert at 1e12. */
-		if (decpt <= -4 ||
-		    decpt > precision - (add_dot_0_if_integer != 0))
+		if (decpt <= -4 || decpt >
+		    (add_dot_0_if_integer ? precision-1 : precision))
 			use_exp = 1;
-		else if (add_dot_0_if_integer)
-			min_digits = decpt + 1;
 		break;
 	default:
 		PyErr_BadInternalCall();
 		goto exit;
 	}
 
-	/* dec_pos = position of decimal point in buffer */
-	if (use_exp)
-		dec_pos = 1;
+	/* if using an exponent, reset decimal point position to 1 and adjust
+	   exponent accordingly.*/
+	if (use_exp) {
+		exp = decpt - 1;
+		decpt = 1;
+	}
+	/* ensure vdigits_start < decpt <= vdigits_end, or vdigits_start <
+	   decpt < vdigits_end if add_dot_0_if_integer and no exponent */
+	vdigits_start = decpt <= 0 ? decpt-1 : 0;
+	if (!use_exp && add_dot_0_if_integer)
+		vdigits_end = vdigits_end > decpt ? vdigits_end : decpt + 1;
 	else
-		dec_pos = decpt;
+		vdigits_end = vdigits_end > decpt ? vdigits_end : decpt;
 
-	min_digits -= n_digits;
-	min_digits1 = (n_digits < dec_pos) ?
-		(min_digits - (dec_pos-n_digits)) : min_digits;
+	/* double check inequalities */
+	assert(vdigits_start <= 0 &&
+	       0 <= digits_len &&
+	       digits_len <= vdigits_end);
+	/* decimal point should be in (vdigits_start, vdigits_end] */
+	assert(vdigits_start < decpt && decpt <= vdigits_end);
 
 	/* Compute an upper bound how much memory we need. This might be a few
 	   chars too long, but no big deal. */
 	bufsize =
-		/* 1: Sign */
-		1 +
+		/* sign, decimal point and trailing 0 byte */
+		3 +
 
-		/* 2: Zero padding on left of digit string */
-		(dec_pos <= 0 ? -dec_pos + 2 : 0) +
+		/* total digit count (including zero padding on both sides) */
+		(vdigits_end - vdigits_start) +
 
-		/* 3: Digits, with included decimal point */
-		(1 + n_digits) +
-
-		/* 4: And zeros on the right up to the decimal point */
-		((n_digits < dec_pos) ? dec_pos-n_digits + 1 : 0) +
-
-		/* 5: And more trailing zeros when necessary */
-		(min_digits1 > 0 ? min_digits1 : 0) +
-
-		/* 6: Exponent "e+100", max 3 numerical digits */
-		(use_exp ? 5 : 0) +
-
-		/* Trailing 0 byte */
-		1;
+		/* exponent "e+100", max 3 numerical digits */
+		(use_exp ? 5 : 0);
 
 	/* Now allocate the memory and initialize p to point to the start of
 	   it. */
@@ -701,39 +717,45 @@ format_float_short(double d, char format_code,
 	else if (always_add_sign)
 		*p++ = '+';
 
+	/* note that exactly one of the three 'if' conditions is true,
+	   so we include exactly one decimal point */
 	/* 2: Zero padding on left of digit string */
-	if (dec_pos <= 0) {
-		*p++ = '0';
+	if (decpt <= 0) {
+		memset(p, '0', decpt-vdigits_start);
+		p += decpt - vdigits_start;
 		*p++ = '.';
-		memset(p, '0', -dec_pos);
-		p -= dec_pos;
+		memset(p, '0', 0-decpt);
+		p += 0-decpt;
+	}
+	else {
+		memset(p, '0', 0-vdigits_start);
+		p += 0 - vdigits_start;
 	}
 
 	/* 3: Digits, with included decimal point */
-	if (0 < dec_pos && dec_pos <= n_digits) {
-		strncpy(p, digits, dec_pos);
-		p += dec_pos;
+	if (0 < decpt && decpt <= digits_len) {
+		strncpy(p, digits, decpt-0);
+		p += decpt-0;
 		*p++ = '.';
-		strncpy(p, digits+dec_pos, n_digits-dec_pos);
-		p += n_digits-dec_pos;
+		strncpy(p, digits+decpt, digits_len-decpt);
+		p += digits_len-decpt;
 	}
 	else {
-		strncpy(p, digits, n_digits);
-		p += n_digits;
+		strncpy(p, digits, digits_len);
+		p += digits_len;
 	}
 
-	/* 4: And zeros on the right up to the decimal point */
-	if (n_digits < dec_pos) {
-		memset(p, '0', dec_pos-n_digits);
-		p += dec_pos-n_digits;
+	/* 4: And zeros on the right */
+	if (digits_len < decpt) {
+		memset(p, '0', decpt-digits_len);
+		p += decpt-digits_len;
 		*p++ = '.';
-		min_digits -= dec_pos-n_digits;
+		memset(p, '0', vdigits_end-decpt);
+		p += vdigits_end-decpt;
 	}
-
-	/* 5: And more trailing zeros when necessary */
-	if (min_digits > 0) {
-		memset(p, '0', min_digits);
-		p += min_digits;
+	else {
+		memset(p, '0', vdigits_end-digits_len);
+		p += vdigits_end-digits_len;
 	}
 
 	/* Delete a trailing decimal pt unless using alternative formatting. */
@@ -743,7 +765,7 @@ format_float_short(double d, char format_code,
 	/* 6: Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
 		*p++ = float_strings[OFS_E][0];
-		exp_len = sprintf(p, "%+.02d", decpt-1);
+		exp_len = sprintf(p, "%+.02d", exp);
 		p += exp_len;
 	}
   exit:
