@@ -104,19 +104,6 @@
  *              for 0 <= k <= 22).
  */
 
-/*
- * #define Honor_FLT_ROUNDS if FLT_ROUNDS can assume the values 2 or 3
- *      and strtod and dtoa should round accordingly.  Unless Trust_FLT_ROUNDS
- *      is also #defined, fegetround() will be queried for the rounding mode.
- *      Note that both FLT_ROUNDS and fegetround() are specified by the C99
- *      standard (and are specified to be consistent, with fesetround()
- *      affecting the value of FLT_ROUNDS), but that some (Linux) systems
- *      do not work correctly in this regard, so using fegetround() is more
- *      portable than using FLT_FOUNDS directly.
- * #define Check_FLT_ROUNDS if FLT_ROUNDS can assume the values 2 or 3
- *      and Honor_FLT_ROUNDS is not #defined.
- */
-
 /* Linking of Python's #defines to Gay's #defines starts here. */
 
 #include "Python.h"
@@ -1879,19 +1866,8 @@ _Py_dg_strtod
         else {
             aadj *= 0.5;
             aadj1 = bc.dsign ? aadj : -aadj;
-#ifdef Check_FLT_ROUNDS
-            switch(bc.rounding) {
-            case 2: /* towards +infinity */
-                aadj1 -= 0.5;
-                break;
-            case 0: /* towards 0 */
-            case 3: /* towards -infinity */
-                aadj1 += 0.5;
-            }
-#else
             if (Flt_Rounds == 0)
                 aadj1 += 0.5;
-#endif /*Check_FLT_ROUNDS*/
         }
         y = word0(&rv) & Exp_mask;
 
@@ -2219,11 +2195,7 @@ _Py_dg_dtoa
     if (mode < 0 || mode > 9)
         mode = 0;
 
-#ifdef Check_FLT_ROUNDS
-    try_quick = Rounding == 1;
-#else
     try_quick = 1;
-#endif
 
     if (mode > 5) {
         mode -= 4;
@@ -2374,13 +2346,6 @@ _Py_dg_dtoa
         for(i = 1;; i++, dval(&u) *= 10.) {
             L = (Long)(dval(&u) / ds);
             dval(&u) -= L*ds;
-#ifdef Check_FLT_ROUNDS
-            /* If FLT_ROUNDS == 2, L will usually be high by 1 */
-            if (dval(&u) < 0) {
-                L--;
-                dval(&u) += ds;
-            }
-#endif
             *s++ = '0' + (int)L;
             if (!dval(&u)) {
                 break;
