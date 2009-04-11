@@ -357,6 +357,7 @@ ensure_decimal_point(char* buffer, size_t buf_size)
 Py_LOCAL_INLINE(int)
 add_thousands_grouping(char* buffer, size_t buf_size)
 {
+#if 0
 	Py_ssize_t len = strlen(buffer);
 	struct lconv *locale_data = localeconv();
 	const char *decimal_point = locale_data->decimal_point;
@@ -379,7 +380,9 @@ add_thousands_grouping(char* buffer, size_t buf_size)
 	   want to format.  We need to add the grouping string for the
 	   characters between buffer and p. */
 	return _PyBytes_InsertThousandsGroupingLocale(buffer, len, p-buffer,
-						buf_size, NULL, 1);
+						      buf_size, NULL, 1, 1);
+#endif
+	return 1;
 }
 
 /* see FORMATBUFLEN in unicodeobject.c */
