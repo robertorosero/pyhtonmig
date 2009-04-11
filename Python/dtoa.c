@@ -1305,8 +1305,7 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
 }
 
 double
-_Py_dg_strtod
-(const char *s00, char **se)
+_Py_dg_strtod(const char *s00, char **se)
 {
     int bb2, bb5, bbe, bd2, bd5, bbbits, bs2, c, e, e1, error;
     int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
@@ -2023,8 +2022,8 @@ _Py_dg_freedtoa(char *s)
    call to _Py_dg_freedtoa. */
 
 char *
-_Py_dg_dtoa
-(double dd, int mode, int ndigits, int *decpt, int *sign, char **rve)
+_Py_dg_dtoa(double dd, int mode, int ndigits,
+            int *decpt, int *sign, char **rve)
 {
     /*  Arguments ndigits, decpt, sign are similar to those
         of ecvt and fcvt; trailing zeros are suppressed from
