@@ -312,8 +312,7 @@ static Bigint *freelist[Kmax+1];
 /* Allocate space for a Bigint with up to 1<<k digits */
 
 static Bigint *
-Balloc
-(int k)
+Balloc(int k)
 {
     int x;
     Bigint *rv;
@@ -344,8 +343,7 @@ Balloc
 /* Free a Bigint allocated with Balloc */
 
 static void
-Bfree
-(Bigint *v)
+Bfree(Bigint *v)
 {
     if (v) {
         if (v->k > Kmax)
@@ -365,8 +363,7 @@ Bfree
    On failure, return NULL.  In this case, b will have been already freed. */
 
 static Bigint *
-multadd
-(Bigint *b, int m, int a)       /* multiply by m and add a */
+multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
 {
     int i, wds;
 #ifdef ULLong
@@ -420,8 +417,7 @@ multadd
    NULL on failure. */
 
 static Bigint *
-s2b
-(const char *s, int nd0, int nd, ULong y9, int dplen)
+s2b(const char *s, int nd0, int nd, ULong y9, int dplen)
 {
     Bigint *b;
     int i, k;
@@ -458,8 +454,7 @@ s2b
 /* count leading 0 bits in the 32-bit integer x. */
 
 static int
-hi0bits
-(ULong x)
+hi0bits(ULong x)
 {
     int k = 0;
 
@@ -491,8 +486,7 @@ hi0bits
    number of bits. */
 
 static int
-lo0bits
-(ULong *y)
+lo0bits(ULong *y)
 {
     int k;
     ULong x = *y;
@@ -537,8 +531,7 @@ lo0bits
 /* convert a small nonnegative integer to a Bigint */
 
 static Bigint *
-i2b
-(int i)
+i2b(int i)
 {
     Bigint *b;
 
@@ -554,8 +547,7 @@ i2b
    the signs of a and b. */
 
 static Bigint *
-mult
-(Bigint *a, Bigint *b)
+mult(Bigint *a, Bigint *b)
 {
     Bigint *c;
     int k, wa, wb, wc;
@@ -651,8 +643,7 @@ static Bigint *p5s;
    Bigint b will have been Bfree'd.   Ignores the sign of b. */
 
 static Bigint *
-pow5mult
-(Bigint *b, int k)
+pow5mult(Bigint *b, int k)
 {
     Bigint *b1, *p5, *p51;
     int i;
@@ -707,8 +698,7 @@ pow5mult
    original b will have been Bfree'd.   Ignores the sign of b. */
 
 static Bigint *
-lshift
-(Bigint *b, int k)
+lshift(Bigint *b, int k)
 {
     int i, k1, n, n1;
     Bigint *b1;
@@ -752,8 +742,7 @@ lshift
    1 if a > b.  Ignores signs of a and b. */
 
 static int
-cmp
-(Bigint *a, Bigint *b)
+cmp(Bigint *a, Bigint *b)
 {
     ULong *xa, *xa0, *xb, *xb0;
     int i, j;
@@ -786,8 +775,7 @@ cmp
    result is set appropriately. */
 
 static Bigint *
-diff
-(Bigint *a, Bigint *b)
+diff(Bigint *a, Bigint *b)
 {
     Bigint *c;
     int i, wa, wb;
@@ -867,8 +855,7 @@ diff
    double up.  Doesn't give correct results for subnormals. */
 
 static double
-ulp
-(U *x)
+ulp(U *x)
 {
     Long L;
     U u;
@@ -882,8 +869,7 @@ ulp
 /* Convert a Bigint to a double plus an exponent */
 
 static double
-b2d
-(Bigint *a, int *e)
+b2d(Bigint *a, int *e)
 {
     ULong *xa, *xa0, w, y, z;
     int k;
@@ -924,8 +910,7 @@ b2d
 /* Convert a double to a Bigint plus an exponent.  Return NULL on failure. */
 
 static Bigint *
-d2b
-(U *d, int *e, int *bits)
+d2b(U *d, int *e, int *bits)
 {
     Bigint *b;
     int de, k;
@@ -977,8 +962,7 @@ d2b
    error of up to 2.5 ulps. */
 
 static double
-ratio
-(Bigint *a, Bigint *b)
+ratio(Bigint *a, Bigint *b)
 {
     U da, db;
     int k, ka, kb;
@@ -1017,8 +1001,7 @@ static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
    'nan' strings. */
 
 static int
-match
-(const char **sp, char *t)
+match(const char **sp, char *t)
 {
     int c, d;
     const char *s = *sp;
@@ -1052,8 +1035,7 @@ dshift(Bigint *b, int p2)
    bits (28--31) are zero and bit 27 is set. */
 
 static int
-quorem
-(Bigint *b, Bigint *S)
+quorem(Bigint *b, Bigint *S)
 {
     int n;
     ULong *bx, *bxe, q, *sx, *sxe;
@@ -1151,8 +1133,7 @@ quorem
 /* return 0 on success, -1 on failure */
 
 static int
-bigcomp
-(U *rv, const char *s0, BCinfo *bc)
+bigcomp(U *rv, const char *s0, BCinfo *bc)
 {
     Bigint *b, *d;
     int b2, bbits, d2, dd, dig, dsign, i, j, nd, nd0, p2, p5, speccase;
