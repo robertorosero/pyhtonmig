@@ -188,8 +188,8 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
     /* XXX add error checking */
     specified_width = get_integer(&ptr, end, &format->width);
 
-    /* if specified_width is 0, we didn't consume any characters for
-       the width. in that case, reset the width to -1, because
+    /* If specified_width is 0, we didn't consume any characters for
+       the width. In that case, reset the width to -1, because
        get_integer() will have set it to zero */
     if (specified_width == 0) {
         format->width = -1;
@@ -208,7 +208,7 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
         /* XXX add error checking */
         specified_width = get_integer(&ptr, end, &format->precision);
 
-        /* not having a precision after a dot is an error */
+        /* Not having a precision after a dot is an error. */
         if (specified_width == 0) {
             PyErr_Format(PyExc_ValueError,
                          "Format specifier missing precision");
@@ -217,10 +217,10 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
 
     }
 
-    /* Finally, parse the type field */
+    /* Finally, parse the type field. */
 
     if (end-ptr > 1) {
-        /* invalid conversion spec */
+        /* More than one char remain, invalid conversion spec. */
         PyErr_Format(PyExc_ValueError, "Invalid conversion specification");
         return 0;
     }
@@ -287,14 +287,14 @@ typedef struct {
     Py_ssize_t n_grouped_digits; /* Space taken up by the digits, including
                                     any grouping chars. */
     Py_ssize_t n_decimal;   /* 0 if only an integer */
-    Py_ssize_t n_remainder; /* digits in decimal and/or exponent part,
-                               excluding the decimal itself, if present */
+    Py_ssize_t n_remainder; /* Digits in decimal and/or exponent part,
+                               excluding the decimal itself, if
+                               present. */
 
-    /* These 2 are calculatable from parameters, but needed between
-       calls to calc_number_widths and fill_number in order to not
-       have to pass all of the parameters to fill_number. */
-    Py_ssize_t n_digits; /* The number of digits before a decimal or
-                            exponent. */
+    /* These 2 are not the widths of fields, but are needed by
+       STRINGLIB_GROUPING. */
+    Py_ssize_t n_digits;    /* The number of digits before a decimal
+                               or exponent. */
     Py_ssize_t n_min_width; /* The min_width we used when we computed
                                the n_grouped_digits width. */
 } NumberFieldWidths;
@@ -880,7 +880,7 @@ format_float_internal(PyObject *value,
        from a hard-code pseudo-locale */
     LocaleInfo locale;
 
-    /* alternate is not allowed on floats. */
+    /* Alternate is not allowed on floats. */
     if (format->alternate) {
         PyErr_SetString(PyExc_ValueError,
                         "Alternate form (#) not allowed in float format "
@@ -889,12 +889,15 @@ format_float_internal(PyObject *value,
     }
 
     if (type == '\0') {
-        /* Omitted type specifier, this is like 'g' but with at least
+        /* Omitted type specifier. This is like 'g' but with at least
            one digit after the decimal point. */
         type = 'g';
         flags |= Py_DTSF_ADD_DOT_0;
     }
+
     if (type == 'n')
+        /* 'n' is the same as 'g', except for the locale used to
+           format the result. We take care of that later. */
         type = 'g';
 
     /* 'F' is the same as 'f', per the PEP */
@@ -913,12 +916,12 @@ format_float_internal(PyObject *value,
 
     if (precision < 0)
         precision = 6;
-    if (type == 'f' && fabs(val) >= 1e50)
+    if ((type == 'f' || type == 'F') && fabs(val) >= 1e50)
         type = 'g';
 
-    /* cast "type", because if we're in unicode we need to pass a
-       8-bit char.  this is safe, because we've restricted what "type"
-       can be */
+    /* Cast "type", because if we're in unicode we need to pass a
+       8-bit char. This is safe, because we've restricted what "type"
+       can be. */
     buf = PyOS_double_to_string(val, (char)type, precision, flags,
                                 &float_type);
     if (buf == NULL)
