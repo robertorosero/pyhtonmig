@@ -245,7 +245,7 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
 /************************************************************************/
 
 /* Locale type codes. */
-#define LT_USE_LOCALE 0
+#define LT_CURRENT_LOCALE 0
 #define LT_DEFAULT_LOCALE 1
 #define LT_NO_LOCALE 2
 
@@ -516,14 +516,14 @@ static char no_grouping[1] = {CHAR_MAX};
 
 /* Find the decimal point character(s?), thousands_separator(s?), and
    grouping description, either for the current locale if type is
-   LT_USE_LOCALE, a hard-coded locale if LT_DEFAULT_LOCALE, or none if
-   LT_NO_LOCALE. */
+   LT_CURRENT_LOCALE, a hard-coded locale if LT_DEFAULT_LOCALE, or
+   none if LT_NO_LOCALE. */
 static void
 get_locale_info(int type, LocaleInfo *locale_info)
 {
     locale_info->type = type;
     switch (type) {
-    case LT_USE_LOCALE: {
+    case LT_CURRENT_LOCALE: {
         struct lconv *locale_data = localeconv();
         locale_info->decimal_point = locale_data->decimal_point;
         locale_info->thousands_sep = locale_data->thousands_sep;
@@ -684,7 +684,6 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
         goto done;
     }
 
-
     /* special case for character formatting */
     if (format->type == 'c') {
         /* error to specify a sign */
@@ -797,8 +796,9 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
     }
 
     /* Determine the grouping, separator, and decimal point, if any. */
-    get_locale_info(format->type == 'n' ? LT_USE_LOCALE :
-                    (format->thousands_separators ? LT_DEFAULT_LOCALE :
+    get_locale_info(format->type == 'n' ? LT_CURRENT_LOCALE :
+                    (format->thousands_separators ?
+                     LT_DEFAULT_LOCALE :
                      LT_NO_LOCALE),
                     &locale);
 
@@ -944,8 +944,9 @@ format_float_internal(PyObject *value,
     parse_number(p, n_digits, &n_remainder, &has_decimal);
 
     /* Determine the grouping, separator, and decimal point, if any. */
-    get_locale_info(type == 'n' ? LT_USE_LOCALE :
-                    (format->thousands_separators ? LT_DEFAULT_LOCALE :
+    get_locale_info(format->type == 'n' ? LT_CURRENT_LOCALE :
+                    (format->thousands_separators ?
+                     LT_DEFAULT_LOCALE :
                      LT_NO_LOCALE),
                     &locale);
 
