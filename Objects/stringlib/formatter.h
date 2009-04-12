@@ -362,17 +362,18 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
     */
 
     /* compute the various parts we're going to write */
-    if (format->sign == '+') {
+    switch (format->sign) {
+    case '+':
         /* always put a + or - */
         spec->n_sign = 1;
         spec->sign = (sign_char == '-' ? '-' : '+');
-    }
-    else if (format->sign == ' ') {
+        break;
+    case ' ':
         spec->n_sign = 1;
         spec->sign = (sign_char == '-' ? '-' : ' ');
-    }
-    else {
-        /* non specified, or the default (-) */
+        break;
+    default:
+        /* Not specified, or the default (-) */
         if (sign_char == '-') {
             spec->n_sign = 1;
             spec->sign = '-';
