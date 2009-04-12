@@ -253,11 +253,6 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
    before and including the decimal. Note that locales only support
    8-bit chars, not unicode. */
 typedef struct {
-    int type;       /* One of the LT_* codes. Having this here is just
-                       an optimization for the common case of not
-                       using any locale info (LT_NO_LOCALE). It could
-                       really be inferred just by looking at the
-                       following fields.*/
     char *decimal_point;
     char *thousands_sep;
     char *grouping;
@@ -522,7 +517,6 @@ static char no_grouping[1] = {CHAR_MAX};
 static void
 get_locale_info(int type, LocaleInfo *locale_info)
 {
-    locale_info->type = type;
     switch (type) {
     case LT_CURRENT_LOCALE: {
         struct lconv *locale_data = localeconv();
@@ -534,7 +528,9 @@ get_locale_info(int type, LocaleInfo *locale_info)
     case LT_DEFAULT_LOCALE:
         locale_info->decimal_point = ".";
         locale_info->thousands_sep = ",";
-        locale_info->grouping = "\3"; /* every 3 characters, trailing 0 means repeat */
+        locale_info->grouping = "\3"; /* Group every 3 characters,
+                                         trailing 0 means repeat
+                                         infinitely. */
         break;
     case LT_NO_LOCALE:
         locale_info->decimal_point = ".";
