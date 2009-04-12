@@ -539,6 +539,11 @@ static char *uc_float_strings[] = {
        should have ".0" added.  Only applies to format codes 'r', 's', and 'g'.
      use_alt_formatting is nonzero if alternative formatting should be
        used.  Only applies to format codes 'e', 'f' and 'g'.
+     type, if non-NULL, will be set to one of these constants to identify
+       the type of the 'd' argument:
+         Py_DTST_FINITE
+         Py_DTST_INFINITE
+         Py_DTST_NAN
 
    Returns a PyMem_Malloc'd block of memory containing the resulting string,
     or NULL on error. If NULL is returned, the Python error has been set.
@@ -548,7 +553,7 @@ static char *
 format_float_short(double d, char format_code,
 		   int mode, Py_ssize_t precision,
 		   int always_add_sign, int add_dot_0_if_integer,
-		   int use_alt_formatting, char **float_strings)
+		   int use_alt_formatting, char **float_strings, int *type)
 {
 	char *buf = NULL;
 	char *p;
@@ -593,12 +598,18 @@ format_float_short(double d, char format_code,
 			}
 			strncpy(p, float_strings[OFS_INF], 3);
 			p += 3;
+
+			if (type)
+				*type = Py_DTST_INFINITE;
 		}
 		else if (digits[0] == 'n' || digits[0] == 'N') {
 			/* note that we *never* add a sign for a nan,
 			   even if one has explicitly been requested */
 			strncpy(p, float_strings[OFS_NAN], 3);
 			p += 3;
+
+			if (type)
+				*type = Py_DTST_NAN;
 		}
 		else {
 			/* shouldn't get here: Gay's code should always return
@@ -609,6 +620,11 @@ format_float_short(double d, char format_code,
 		}
 		goto exit;
 	}
+
+	/* The result must be finite (not inf or nan). */
+	if (type)
+		*type = Py_DTST_FINITE;
+
 
 	/* We got digits back, format them.  We may need to pad 'digits'
 	   either on the left or right (or both) with extra zeros, so in
@@ -785,7 +801,8 @@ format_float_short(double d, char format_code,
 PyAPI_FUNC(char *) PyOS_double_to_string(double val,
                                          char format_code,
                                          int precision,
-                                         int flags)
+                                         int flags,
+					 int *type)
 {
 	char lc_format_code = format_code;
 	char** float_strings = lc_float_strings;
@@ -856,5 +873,5 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 				  flags & Py_DTSF_SIGN,
 				  flags & Py_DTSF_ADD_DOT_0,
 				  flags & Py_DTSF_ALT,
-				  float_strings);
+				  float_strings, type);
 }

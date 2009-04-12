@@ -350,7 +350,8 @@ float_str_or_repr(PyFloatObject *v, char format_code)
 {
     PyObject *result;
     char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
-                                      format_code, 0, Py_DTSF_ADD_DOT_0);
+                                      format_code, 0, Py_DTSF_ADD_DOT_0,
+                                      NULL);
     if (!buf)
         return PyErr_NoMemory();
     result = PyUnicode_FromString(buf);
@@ -1898,7 +1899,7 @@ PyFloat_Fini(void)
 				    Py_REFCNT(p) != 0) {
 					char *buf = PyOS_double_to_string(
 						PyFloat_AS_DOUBLE(p), 'r',
-						0, 0);
+						0, 0, NULL);
 					if (buf) {
 						/* XXX(twouters) cast
 						   refcount to long

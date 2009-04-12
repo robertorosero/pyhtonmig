@@ -8849,7 +8849,7 @@ formatfloat(Py_UNICODE *buf,
     }
 
     p = PyOS_double_to_string(x, type, prec,
-                              (flags & F_ALT) ? Py_DTSF_ALT : 0);
+                              (flags & F_ALT) ? Py_DTSF_ALT : 0, NULL);
     len = strlen(p);
     if (len+1 >= buflen) {
         /* Caller supplied buffer is not large enough. */

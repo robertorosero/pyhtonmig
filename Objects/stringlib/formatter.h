@@ -856,6 +856,7 @@ format_float_internal(PyObject *value,
     int flags = 0;
     PyObject *result = NULL;
     STRINGLIB_CHAR sign_char = '\0';
+    int float_type; /* Used to see if we have a nan, inf, or regular float. */
 
 #if STRINGLIB_IS_UNICODE
     Py_UNICODE *unicode_tmp = NULL;
@@ -904,7 +905,8 @@ format_float_internal(PyObject *value,
     /* cast "type", because if we're in unicode we need to pass a
        8-bit char.  this is safe, because we've restricted what "type"
        can be */
-    buf = PyOS_double_to_string(val, (char)type, precision, flags);
+    buf = PyOS_double_to_string(val, (char)type, precision, flags,
+                                &float_type);
     if (buf == NULL)
         goto done;
     n_digits = strlen(buf);
