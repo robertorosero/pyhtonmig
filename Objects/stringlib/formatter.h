@@ -277,9 +277,10 @@ typedef struct {
     Py_ssize_t n_decimal;   /* 0 if only an integer */
     Py_ssize_t n_remainder; /* digits in decimal and/or exponent part,
                                excluding the decimal itself, if present */
-    Py_ssize_t n_total; /* just a convenience, it's derivable from the
-                           other fields */
 
+    /* These 2 are calculatable from parameters, but needed between
+       calls to calc_number_widths and fill_number in order to not
+       have to pass all of the parameters to fill_number. */
     Py_ssize_t n_digits; /* The number of digits before a decimal or
                             exponent. */
     Py_ssize_t n_min_width; /* The min_width we used when we computed
@@ -321,7 +322,7 @@ parse_number(STRINGLIB_CHAR *ptr, Py_ssize_t len,
    unused.  should this take discrete params in order to be more clear
    about what it does?  or is passing a single format parameter easier
    and more efficient enough to justify a little obfuscation? */
-static void
+static Py_ssize_t
 calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
                    STRINGLIB_CHAR sign_char, STRINGLIB_CHAR *number,
                    Py_ssize_t n_number, Py_ssize_t n_remainder,
@@ -329,6 +330,7 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
                    const InternalFormatSpec *format)
 {
     Py_ssize_t n_non_digit_non_padding;
+    Py_ssize_t n_padding;
 
     spec->n_digits = n_number - n_remainder - (has_decimal?1:0);
     spec->n_lpadding = 0;
@@ -377,7 +379,7 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
         }
     }
 
-    /* The number of chars used for non-digit and non-padding. */
+    /* The number of chars used for non-digits and non-padding. */
     n_non_digit_non_padding = spec->n_sign + spec->n_prefix + spec->n_decimal +
         spec->n_remainder;
 
@@ -400,36 +402,32 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
                                                     locale->grouping,
                                                     locale->thousands_sep);
 
-    if (format->width == -1) {
-        /* no padding at all, nothing to do */
-    }
-    else {
-        /* see if any padding is needed */
-        if (spec->n_sign + spec->n_grouped_digits +
-                spec->n_prefix >= format->width) {
-            /* no padding needed, we're already bigger than the
-               requested width */
-        }
-        else {
-            /* determine which of left, space, or right padding is
-               needed */
-            Py_ssize_t padding = format->width -
-                (spec->n_sign + spec->n_grouped_digits + n_prefix);
-            if (format->align == '<')
-                spec->n_rpadding = padding;
-            else if (format->align == '>')
-                spec->n_lpadding = padding;
-            else if (format->align == '^') {
-                spec->n_lpadding = padding / 2;
-                spec->n_rpadding = padding - spec->n_lpadding;
-            }
-            else if (format->align == '=')
-                spec->n_spadding = padding;
-            else
-                spec->n_lpadding = padding;
+    /* Given the desired width and the total of digit and non-digit
+       space we consume, see if we need any padding. format->width can
+       be negative (meaning no padding), but this code still works in
+       that case. */
+    n_padding = format->width -
+                        (n_non_digit_non_padding + spec->n_grouped_digits);
+    if (n_padding > 0) {
+        /* Some padding is needed. Determine if it's left, space, or right. */
+        switch (format->align) {
+        case '<':
+            spec->n_rpadding = n_padding;
+            break;
+        case '^':
+            spec->n_lpadding = n_padding / 2;
+            spec->n_rpadding = n_padding - spec->n_lpadding;
+            break;
+        case '=':
+            spec->n_spadding = n_padding;
+            break;
+        default:
+            /* Handles '>', plus catch-all just in case. */
+            spec->n_lpadding = n_padding;
+            break;
         }
     }
-    spec->n_total = spec->n_lpadding + spec->n_sign + spec->n_prefix +
+    return spec->n_lpadding + spec->n_sign + spec->n_prefix +
         spec->n_spadding + spec->n_grouped_digits + spec->n_decimal +
         spec->n_remainder + spec->n_rpadding;
 }
@@ -670,6 +668,7 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
     Py_ssize_t n_remainder = 0; /* Used only for 'c' formatting, which
                                    produces non-digits */
     Py_ssize_t n_prefix = 0;   /* Count of prefix chars, (e.g., '0x') */
+    Py_ssize_t n_total;
     STRINGLIB_CHAR *prefix = NULL;
     NumberFieldWidths spec;
     long x;
@@ -804,11 +803,11 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
                     &locale);
 
     /* Calculate how much memory we'll need. */
-    calc_number_widths(&spec, n_prefix, sign_char, pnumeric_chars,
+    n_total = calc_number_widths(&spec, n_prefix, sign_char, pnumeric_chars,
                        n_digits, n_remainder, 0, &locale, format);
 
     /* Allocate the memory. */
-    result = STRINGLIB_NEW(NULL, spec.n_total);
+    result = STRINGLIB_NEW(NULL, n_total);
     if (!result)
         goto done;
 
@@ -846,6 +845,7 @@ format_float_internal(PyObject *value,
     char *buf = NULL;       /* buffer returned from PyOS_double_to_string */
     Py_ssize_t n_digits;
     Py_ssize_t n_remainder;
+    Py_ssize_t n_total;
     int has_decimal;
     double val;
     Py_ssize_t precision = format->precision;
@@ -950,11 +950,11 @@ format_float_internal(PyObject *value,
                     &locale);
 
     /* Calculate how much memory we'll need. */
-    calc_number_widths(&spec, 0, sign_char, p, n_digits, n_remainder,
-                       has_decimal, &locale, format);
+    n_total = calc_number_widths(&spec, 0, sign_char, p, n_digits,
+                                 n_remainder, has_decimal, &locale, format);
 
     /* Allocate the memory. */
-    result = STRINGLIB_NEW(NULL, spec.n_total);
+    result = STRINGLIB_NEW(NULL, n_total);
     if (result == NULL)
         goto done;
 
