@@ -665,7 +665,6 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
     STRINGLIB_CHAR *pnumeric_chars;
     STRINGLIB_CHAR numeric_char;
     STRINGLIB_CHAR sign_char = '\0';
-    STRINGLIB_CHAR *p;
     Py_ssize_t n_digits;       /* count of digits need from the computed
                                   string */
     Py_ssize_t n_remainder = 0; /* Used only for 'c' formatting, which
@@ -804,19 +803,19 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
                      LT_NO_LOCALE),
                     &locale);
 
-    /* Calculate the widths of the various leading and trailing parts */
+    /* Calculate how much memory we'll need. */
     calc_number_widths(&spec, n_prefix, sign_char, pnumeric_chars,
                        n_digits, n_remainder, 0, &locale, format);
 
-    /* Allocate a new string to hold the result */
+    /* Allocate the memory. */
     result = STRINGLIB_NEW(NULL, spec.n_total);
     if (!result)
         goto done;
-    p = STRINGLIB_STR(result);
 
-    fill_number(p, &spec, pnumeric_chars, n_digits, prefix,
-                format->fill_char == '\0' ? ' ' : format->fill_char, &locale,
-                format->type == 'X');
+    /* Populate the memory. */
+    fill_number(STRINGLIB_STR(result), &spec, pnumeric_chars, n_digits,
+                prefix, format->fill_char == '\0' ? ' ' : format->fill_char,
+                &locale, format->type == 'X');
 
 done:
     Py_XDECREF(tmp);
@@ -919,12 +918,8 @@ format_float_internal(PyObject *value,
     }
 
     /* Since there is no unicode version of PyOS_double_to_string,
-       just use the 8 bit version and then convert to unicode in a
-       separate code path. */
+       just use the 8 bit version and then convert to unicode. */
 #if STRINGLIB_IS_UNICODE
-    /* This could probably be optimized away by converting into the
-       memory returned by STRINGLIB_NEW, but that's a project for
-       another day. */
     unicode_tmp = (Py_UNICODE*)PyMem_Malloc((n_digits)*sizeof(Py_UNICODE));
     if (unicode_tmp == NULL) {
         PyErr_NoMemory();
@@ -944,26 +939,26 @@ format_float_internal(PyObject *value,
         --n_digits;
     }
 
+    /* Determine if we have any "remainder" (after the digits, might include
+       decimal or exponent or both (or neither)) */
+    parse_number(p, n_digits, &n_remainder, &has_decimal);
+
     /* Determine the grouping, separator, and decimal point, if any. */
     get_locale_info(type == 'n' ? LT_USE_LOCALE :
                     (format->thousands_separators ? LT_DEFAULT_LOCALE :
                      LT_NO_LOCALE),
                     &locale);
 
-    /* Determine if we have any "remainder" (after the digits, might include
-       decimal or exponent or both (or neither)) */
-    parse_number(p, n_digits, &n_remainder, &has_decimal);
-
-    /* Calculate how much space we'll need. */
+    /* Calculate how much memory we'll need. */
     calc_number_widths(&spec, 0, sign_char, p, n_digits, n_remainder,
                        has_decimal, &locale, format);
 
-    /* Allocate that space. */
+    /* Allocate the memory. */
     result = STRINGLIB_NEW(NULL, spec.n_total);
     if (result == NULL)
         goto done;
 
-    /* Populate the space. */
+    /* Populate the memory. */
     fill_number(STRINGLIB_STR(result), &spec, p, n_digits, NULL,
                 format->fill_char == '\0' ? ' ' : format->fill_char, &locale,
                 0);
