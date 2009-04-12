@@ -230,10 +230,27 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
         ++ptr;
     }
 
-    /* XXX other types like xobXOB also invalid */
-    if (format->type == 'n' && format->thousands_separators) {
-        PyErr_Format(PyExc_ValueError, "Cannot specify ',' with 'n'.");
-        return 0;
+    /* Do as much validating as we can, just by looking at the format
+       specifier.  Do not take into account what type of formatting
+       we're doing (int, float, string). */
+
+    if (format->thousands_separators) {
+        switch (format->type) {
+        case 'd':
+        case 'e':
+        case 'f':
+        case 'g':
+        case 'E':
+        case 'G':
+        case '%':
+        case 'F':
+            /* These are allowed. See PEP 378.*/
+            break;
+        default:
+            PyErr_Format(PyExc_ValueError,
+                         "Cannot specify ',' with '%c'.", format->type);
+            return 0;
+        }
     }
 
     return 1;
