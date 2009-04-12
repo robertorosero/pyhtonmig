@@ -726,7 +726,7 @@ format_float_short(double d, char format_code,
 	}
 	p = buf;
 
-	/* 1: Add a negative sign if negative, and a plus sign if non-negative
+	/* Add a negative sign if negative, and a plus sign if non-negative
 	   and always_add_sign is true. */
 	if (sign == 1)
 		*p++ = '-';
@@ -735,7 +735,7 @@ format_float_short(double d, char format_code,
 
 	/* note that exactly one of the three 'if' conditions is true,
 	   so we include exactly one decimal point */
-	/* 2: Zero padding on left of digit string */
+	/* Zero padding on left of digit string */
 	if (decpt <= 0) {
 		memset(p, '0', decpt-vdigits_start);
 		p += decpt - vdigits_start;
@@ -748,7 +748,7 @@ format_float_short(double d, char format_code,
 		p += 0 - vdigits_start;
 	}
 
-	/* 3: Digits, with included decimal point */
+	/* Digits, with included decimal point */
 	if (0 < decpt && decpt <= digits_len) {
 		strncpy(p, digits, decpt-0);
 		p += decpt-0;
@@ -761,7 +761,7 @@ format_float_short(double d, char format_code,
 		p += digits_len;
 	}
 
-	/* 4: And zeros on the right */
+	/* And zeros on the right */
 	if (digits_len < decpt) {
 		memset(p, '0', decpt-digits_len);
 		p += decpt-digits_len;
@@ -778,7 +778,7 @@ format_float_short(double d, char format_code,
 	if (p[-1] == '.' && !use_alt_formatting)
 		p--;
 
-	/* 6: Now that we've done zero padding, add an exponent if needed. */
+	/* Now that we've done zero padding, add an exponent if needed. */
 	if (use_exp) {
 		*p++ = float_strings[OFS_E][0];
 		exp_len = sprintf(p, "%+.02d", exp);
@@ -787,7 +787,7 @@ format_float_short(double d, char format_code,
   exit:
 	if (buf) {
 		*p = '\0';
-		/* It's too late if this fails, we've already stepped on
+		/* It's too late if this fails, as we've already stepped on
 		   memory that isn't ours. But it's an okay debugging test. */
 		assert(p-buf < bufsize);
 	}
