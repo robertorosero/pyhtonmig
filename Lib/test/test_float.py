@@ -1,7 +1,6 @@
 
 import unittest, struct
 import os
-import sys
 from test import support
 import math
 from math import isinf, isnan, copysign, ldexp
@@ -12,11 +11,7 @@ INF = float("inf")
 NAN = float("nan")
 
 #locate file with float format test values
-if __name__ == '__main__':
-    file = sys.argv[0]
-else:
-    file = __file__
-test_dir = os.path.dirname(file) or os.curdir
+test_dir = os.path.dirname(__file__) or os.curdir
 format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
 class GeneralFloatCases(unittest.TestCase):

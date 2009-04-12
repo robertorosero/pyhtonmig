@@ -874,8 +874,6 @@ b2d(Bigint *a, int *e)
     ULong *xa, *xa0, w, y, z;
     int k;
     U d;
-#define d0 word0(&d)
-#define d1 word1(&d)
 
     xa0 = a->x;
     xa = xa0 + a->wds;
@@ -886,28 +884,34 @@ b2d(Bigint *a, int *e)
     k = hi0bits(y);
     *e = 32 - k;
     if (k < Ebits) {
-        d0 = Exp_1 | y >> (Ebits - k);
+        word0(&d) = Exp_1 | y >> (Ebits - k);
         w = xa > xa0 ? *--xa : 0;
-        d1 = y << ((32-Ebits) + k) | w >> (Ebits - k);
+        word1(&d) = y << ((32-Ebits) + k) | w >> (Ebits - k);
         goto ret_d;
     }
     z = xa > xa0 ? *--xa : 0;
     if (k -= Ebits) {
-        d0 = Exp_1 | y << k | z >> (32 - k);
+        word0(&d) = Exp_1 | y << k | z >> (32 - k);
         y = xa > xa0 ? *--xa : 0;
-        d1 = z << k | y >> (32 - k);
+        word1(&d) = z << k | y >> (32 - k);
     }
     else {
-        d0 = Exp_1 | y;
-        d1 = z;
+        word0(&d) = Exp_1 | y;
+        word1(&d) = z;
     }
   ret_d:
-#undef d0
-#undef d1
     return dval(&d);
 }
 
-/* Convert a double to a Bigint plus an exponent.  Return NULL on failure. */
+/* Convert a double to a Bigint plus an exponent.  Return NULL on failure.
+
+   Given a finite nonzero double d, return an odd Bigint b and exponent *e
+   such that fabs(d) = b * 2**e.  On return, *bbits gives the number of
+   significant bits of e; that is, 2**(*bbits-1) <= b < 2**(*bbits).
+
+   If d is zero, then b == 0, *e == -1010, *bbits = 0.
+ */
+
 
 static Bigint *
 d2b(U *d, int *e, int *bits)
@@ -916,19 +920,17 @@ d2b(U *d, int *e, int *bits)
     int de, k;
     ULong *x, y, z;
     int i;
-#define d0 word0(d)
-#define d1 word1(d)
 
     b = Balloc(1);
     if (b == NULL)
         return NULL;
     x = b->x;
 
-    z = d0 & Frac_mask;
-    d0 &= 0x7fffffff;   /* clear sign bit, which we ignore */
-    if ((de = (int)(d0 >> Exp_shift)))
+    z = word0(d) & Frac_mask;
+    word0(d) &= 0x7fffffff;   /* clear sign bit, which we ignore */
+    if ((de = (int)(word0(d) >> Exp_shift)))
         z |= Exp_msk1;
-    if ((y = d1)) {
+    if ((y = word1(d))) {
         if ((k = lo0bits(&y))) {
             x[0] = y | z << (32 - k);
             z >>= k;
@@ -955,8 +957,6 @@ d2b(U *d, int *e, int *bits)
     }
     return b;
 }
-#undef d0
-#undef d1
 
 /* Compute the ratio of two Bigints, as a double.  The result may have an
    error of up to 2.5 ulps. */
@@ -2084,6 +2084,7 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
     else
         *sign = 0;
 
+    /* quick return for Infinities, NaNs and zeros */
     if ((word0(&u) & Exp_mask) == Exp_mask)
     {
         /* Infinity or NaN */
@@ -2097,7 +2098,8 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
         return nrv_alloc("0", rve, 1);
     }
 
-
+    /* compute k = floor(log10(d)).  The computation may leave k
+       one too large, but should never leave k too small. */
     b = d2b(&u, &be, &bbits);
     if (b == NULL)
         goto failed_malloc;
