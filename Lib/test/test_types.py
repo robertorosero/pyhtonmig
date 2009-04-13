@@ -619,6 +619,10 @@ class TypesTests(unittest.TestCase):
         # And may as well test both.
         self.assertRaises(ValueError, format, 0, '1'*1000 + '.' + '1'*10000 + 'd')
 
+        # Make sure commas aren't allowed with various type codes
+        for code in 'xXobns':
+            self.assertRaises(ValueError, format, 0, ',' + code)
+
 def test_main():
     run_unittest(TypesTests)
 
