@@ -404,7 +404,7 @@ multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
             Bfree(b);
             b = b1;
         }
-        b->x[wds++] = carry;
+        b->x[wds++] = (ULong)carry;
         b->wds = wds;
     }
     return b;
@@ -593,7 +593,7 @@ mult(Bigint *a, Bigint *b)
                 *xc++ = z & FFFFFFFF;
             }
             while(x < xae);
-            *xc = carry;
+            *xc = (ULong)carry;
         }
     }
 #else
@@ -1872,7 +1872,7 @@ _Py_dg_strtod(const char *s00, char **se)
         else {
             if (bc.scale && y <= 2*P*Exp_msk1) {
                 if (aadj <= 0x7fffffff) {
-                    if ((z = aadj) <= 0)
+                    if ((z = (ULong)aadj) <= 0)
                         z = 1;
                     aadj = z;
                     aadj1 = bc.dsign ? aadj : -aadj;
@@ -1944,7 +1944,7 @@ rv_alloc(int i)
 
     j = sizeof(ULong);
     for(k = 0;
-        sizeof(Bigint) - sizeof(ULong) - sizeof(int) + j <= i;
+        sizeof(Bigint) - sizeof(ULong) - sizeof(int) + j <= (unsigned)i;
         j <<= 1)
         k++;
     r = (int*)Balloc(k);
@@ -2274,7 +2274,7 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
              */
             dval(&eps) = 0.5/tens[ilim-1] - dval(&eps);
             for(i = 0;;) {
-                L = dval(&u);
+                L = (Long)dval(&u);
                 dval(&u) -= L;
                 *s++ = '0' + (int)L;
                 if (dval(&u) < dval(&eps))
