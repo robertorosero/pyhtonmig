@@ -3162,16 +3162,16 @@ parsenumber(struct compiling *c, const char *s)
 #ifndef WITHOUT_COMPLEX
     if (imflag) {
         compl.real = 0.;
-        PyFPE_START_PROTECT("strtod", return 0)
-            compl.imag = PyOS_ascii_strtod(s, NULL);
+        PyFPE_START_PROTECT("atof", return 0)
+            compl.imag = PyOS_ascii_atof(s);
         PyFPE_END_PROTECT(c)
             return PyComplex_FromCComplex(compl);
     }
     else
 #endif
     {
-        PyFPE_START_PROTECT("strtod", return 0)
-            dx = PyOS_ascii_strtod(s, NULL);
+        PyFPE_START_PROTECT("atof", return 0)
+            dx = PyOS_ascii_atof(s);
         PyFPE_END_PROTECT(dx)
             return PyFloat_FromDouble(dx);
     }
