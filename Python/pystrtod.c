@@ -40,11 +40,20 @@
 double
 PyOS_ascii_strtod(const char *nptr, char **endptr)
 {
+	double result;
+	_Py_SET_53BIT_PRECISION_HEADER;
+
 	assert(nptr != NULL);
 	/* Set errno to zero, so that we can distinguish zero results
 	   and underflows */
 	errno = 0;
-	return _Py_dg_strtod(nptr, endptr);
+
+	_Py_SET_53BIT_PRECISION_START;
+	result = _Py_dg_strtod(nptr, endptr);
+	_Py_SET_53BIT_PRECISION_END;
+
+	return result;
+
 }
 
 double
@@ -561,11 +570,15 @@ format_float_short(double d, char format_code,
 	char *digits, *digits_end;
 	int decpt_as_int, sign, exp_len, exp = 0, use_exp = 0;
 	Py_ssize_t decpt, digits_len, vdigits_start, vdigits_end;
+	_Py_SET_53BIT_PRECISION_HEADER;
 
 	/* _Py_dg_dtoa returns a digit string (no decimal point or exponent).
 	   Must be matched by a call to _Py_dg_freedtoa. */
+	_Py_SET_53BIT_PRECISION_START;
 	digits = _Py_dg_dtoa(d, mode, precision, &decpt_as_int, &sign,
 			     &digits_end);
+	_Py_SET_53BIT_PRECISION_END;
+
 	decpt = (Py_ssize_t)decpt_as_int;
 	if (digits == NULL) {
 		/* The only failure mode is no memory. */
