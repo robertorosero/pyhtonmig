@@ -12,8 +12,28 @@ What's New in Python 3.1 beta 1?
 Core and Builtins
 -----------------
 
+- The string.maketrans() function is deprecated; there is a new static method
+  maketrans() on the bytes and bytearray classes.  This removes confusion about
+  the types string.maketrans() is supposed to work with, and mirrors the
+  methods available on the str class.
+
+- Issue #2170: refactored xml.dom.minidom.normalize, increasing both
+  its clarity and its speed.
+
+- Issue #1113244: Py_XINCREF, Py_DECREF, Py_XDECREF: Add `do { ... } while (0)'
+  to avoid compiler warnings.
+
 Library
 -------
+
+- Issue #2703: SimpleXMLRPCDispatcher.__init__: Provide default values for
+  new arguments introduced in 2.5.
+
+Extension Modules
+-----------------
+
+- Issue #5359: Readd the Berkley-DB detection code to allow _dbm be built
+  using Berkley-DB.
 
 
 What's New in Python 3.1 alpha 2?
@@ -31,6 +51,9 @@ Core and Builtins
 
 - Issue #5499: The 'c' code for argument parsing functions now only accepts a
   byte, and the 'C' code only accepts a unicode character.
+
+- Fix a problem in PyErr_NormalizeException that leads to "undetected errors"
+  when hitting the recursion limit under certain circumstances.
 
 - Issue #1665206: Remove the last eager import in _warnings.c and make it lazy.
 
@@ -74,8 +97,6 @@ Core and Builtins
 
 - Issue #3845: In PyRun_SimpleFileExFlags avoid invalid memory access with
   short file names.
-
-- Py_DECREF: Add `do { ... } while (0)' to avoid compiler warnings.
 
 Library
 -------
@@ -326,6 +347,13 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #5607: fixed Distutils test_get_platform for Mac OS X fat binaries.
+
+- Issue #5732: added a new command in Distutils: check.
+
+- Issue #5731: Distutils bdist_wininst no longer worked on non-Windows 
+  platforms. Initial patch by Paul Moore.
 
 - Issue #5095: Added bdist_msi to the list of bdist supported formats.
   Initial fix by Steven Bethard.

@@ -2,8 +2,6 @@
   What's New In Python 3.1
 ****************************
 
-.. XXX Add trademark info for Apple, Microsoft.
-
 :Author: Raymond Hettinger
 :Release: |release|
 :Date: |today|
@@ -17,8 +15,7 @@
 
    * The maintainer will go through Misc/NEWS periodically and add
    changes; it's therefore more important to add your changes to
-   Misc/NEWS than to this file.  (Note: I didn't get to this for 3.0.
-   GvR.)
+   Misc/NEWS than to this file.
 
    * This is not a complete list of every single change; completeness
    is the purpose of Misc/NEWS.  Some changes I consider too small
@@ -39,8 +36,7 @@
    necessary (especially when a final release is some months away).
 
    * Credit the author of a patch or bugfix.   Just the name is
-   sufficient; the e-mail address isn't necessary.  (Due to time
-   constraints I haven't managed to do this for 3.0.  GvR.)
+   sufficient; the e-mail address isn't necessary.
 
    * It's helpful to add the bug/patch number as a comment:
 
@@ -50,20 +46,9 @@
    (Contributed by P.Y. Developer.)
 
    This saves the maintainer the effort of going through the SVN log
-   when researching a change.  (Again, I didn't get to this for 3.0.
-   GvR.)
+   when researching a change.
 
 This article explains the new features in Python 3.1, compared to 3.0.
-
-.. Compare with previous release in 2 - 3 sentences here.
-.. add hyperlink when the documentation becomes available online.
-
-.. ======================================================================
-.. Large, PEP-level features and changes should be described here.
-.. Should there be a new section here for 3k migration?
-.. Or perhaps a more general section describing module changes/deprecation?
-.. sets module deprecated
-.. ======================================================================
 
 
 PEP 372: Ordered Dictionaries
@@ -88,13 +73,14 @@ order.  The :mod:`collections` module's :meth:`namedtuple._asdict` method now
 returns an ordered dictionary with the values appearing in the same order as
 the underlying tuple indicies.  The :mod:`json` module is being built-out with
 an *object_pairs_hook* to allow OrderedDicts to be built by the decoder.
-Support was also added for third-party tools like PyYAML.
+Support was also added for third-party tools like `PyYAML <http://pyyaml.org/>`_.
 
 .. seealso::
 
    :pep:`372` - Ordered Dictionaries
       PEP written by Armin Ronacher and Raymond Hettinger.  Implementation
       written by Raymond Hettinger.
+
 
 PEP 378: Format Specifier for Thousands Separator
 =================================================
@@ -162,7 +148,6 @@ Some smaller changes made to the core Python language are:
 
   (Contributed by Mark Dickinson; :issue:`4707`.)
 
-.. ======================================================================
 
 New, Improved, and Deprecated Modules
 =====================================
@@ -179,8 +164,7 @@ New, Improved, and Deprecated Modules
   The basic idea of ttk is to separate, to the extent possible, the code
   implementing a widget's behavior from the code implementing its appearance.
 
-  (Contributed by Kevin Walzer and Guilherme Polo; :issue:`2618` and
-  :issue:`2983`.)
+  (Contributed by Guilherme Polo; :issue:`2983`.)
 
 * The :class:`gzip.GzipFile` and :class:`bz2.BZ2File` classes now support
   the context manager protocol::
@@ -191,7 +175,7 @@ New, Improved, and Deprecated Modules
 
   (Contributed by Antoine Pitrou.)
 
-* The :mod:`decimal.Decimal` module now supports methods for creating a
+* The :mod:`decimal` module now supports methods for creating a
   decimal object from a binary :class:`float`.  The conversion is
   exact but can sometimes be surprising::
 
@@ -229,7 +213,18 @@ New, Improved, and Deprecated Modules
   *rename* which lets invalid fieldnames be automatically converted to
   positional names in the form _0, _1, etc.  This is useful when
   the field names are being created by an external source such as a
-  CSV header, SQL field list, or user input.
+  CSV header, SQL field list, or user input::
+
+    >>> query = input()
+    SELECT region, dept, count(*) FROM main GROUPBY region, dept
+
+    >>> cursor.execute(query)
+    >>> query_fields = [desc[0] for desc in cursor.description]
+    >>> UserQuery = namedtuple('UserQuery', query_fields, rename=True)
+    >>> pprint.pprint([UserQuery(*row) for row in cursor])
+    [UserQuery(region='South', dept='Shipping', _2=185),
+     UserQuery(region='North', dept='Accounting', _2=37),
+     UserQuery(region='West', dept='Sales', _2=419)]
 
   (Contributed by Raymond Hettinger; :issue:`1818`.)
 
@@ -237,6 +232,16 @@ New, Improved, and Deprecated Modules
   accept a flags parameter.
 
   (Contributed by Gregory Smith.)
+
+* The :mod:`logging` module now implements a simple :class:`NullHandler`
+  class for applications that are not using logging but are calling
+  library code that does.  Setting-up a null handler will suppress
+  spurious warnings like "No handlers could be found for logger X.Y.Z"::
+
+    >>> h = logging.NullHandler()
+    >>> logging.getLogger("foo").addHandler(h)
+
+  (Contributed by Vinay Sajip; issue:`4384`).
 
 * The :mod:`runpy` module which supports the ``-m`` command line switch
   now supports the execution of packages by looking for and executing
@@ -274,7 +279,30 @@ New, Improved, and Deprecated Modules
         def test_gimzo_without_required_library(self):
             ...
 
-  (Contributed by Benjamin Peterson.)
+  Also, tests for exceptions have been builtout to work with context managers::
+
+      def test_division_by_zero(self):
+          with self.assertRaises(ZeroDivisionError):
+              x / 0
+
+  In addition, several new assertion methods were added including
+  :func:`assertSetEqual`, :func:`assertDictEqual`,
+  :func:`assertDictContainsSubset`, :func:`assertListEqual`,
+  :func:`assertTupleEqual`, :func:`assertSequenceEqual`,
+  :func:`assertRaisesRegexp`, :func:`assertIsNone`,
+  and :func:`assertIsNotNot`.
+
+  (Contributed by Benjamin Peterson and Antoine Pitrou.)
+
+* The :mod:`io` module has three new constants for the :meth:`seek`
+  method :data:`SEEK_SET`, :data:`SEEK_CUR`, and :data:`SEEK_END`.
+
+* The :attr:`sys.version_info` tuple is now a named tuple::
+
+    >>> sys.version_info
+    sys.version_info(major=3, minor=1, micro=0, releaselevel='alpha', serial=2)
+
+  (Contributed by Ross Light; :issue:`4285`.)
 
 * A new module, :mod:`importlib` was added.  It provides a complete, portable,
   pure Python reference implementation of the *import* statement and its
@@ -283,8 +311,6 @@ New, Improved, and Deprecated Modules
   imports.
 
   (Contributed by Brett Cannon.)
-
-.. ======================================================================
 
 
 Optimizations
@@ -326,7 +352,13 @@ Major performance enhancements have been added:
   its performance.  The code is expected to be added in-time for the beta
   release.
 
-  (Contributed by Bob Ippolito.)
+  (Contributed by Bob Ippolito and converted to Py3.1 by Antoine Pitrou;
+  :issue:`4136`.)
+
+Build and C API Changes
+=======================
+
+Changes to Python's build process and to the C API include:
 
 * Integers are now stored internally either in base 2**15 or in base
   2**30, the base being determined at build time.  Previously, they
@@ -349,4 +381,11 @@ Major performance enhancements have been added:
 
   (Contributed by Mark Dickinson; :issue:`4258`.)
 
-.. ======================================================================
+* The :cfunc:`PyLong_AsUnsignedLongLong()` function now handles a negative
+  *pylong* by raising :exc:`OverflowError` instead of :exc:`TypeError`.
+
+  (Contributed by Mark Dickinson and Lisandro Dalcrin; :issue:`5175`.)
+
+* Deprecated :cfunc:`PyNumber_Int`.  Use :cfunc:`PyNumber_Long` instead.
+
+  (Contributed by Mark Dickinson; :issue:`4910`.)

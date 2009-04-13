@@ -788,7 +788,7 @@ bininstall:	altbininstall
 	then rm -f $(DESTDIR)$(BINDIR)/$(PYTHON); \
 	else true; \
 	fi
-	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON))
+	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON)3)
 	-rm -f $(DESTDIR)$(BINDIR)/python-config
 	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)-config python-config)
 
@@ -842,6 +842,7 @@ LIBSUBDIRS=	tkinter site-packages test test/output test/data \
 		sqlite3 sqlite3/test \
 		logging bsddb bsddb/test csv wsgiref urllib \
 		lib2to3 lib2to3/fixes lib2to3/pgen2 lib2to3/tests \
+		lib2to3/tests/data lib2to3/tests/data/fixes lib2to3/tests/data/fixers/myfixes \
 		ctypes ctypes/test ctypes/macholib idlelib idlelib/Icons \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
 		importlib importlib/test importlib/test/builtin \
@@ -909,11 +910,13 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar' \
+		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi -O $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar' \
+		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST)/site-packages -f \
