@@ -604,6 +604,20 @@ class TypesTests(unittest.TestCase):
         self.assertRaises(ValueError, format, 0.0, '#')
         self.assertRaises(ValueError, format, 0.0, '#20f')
 
+    def test_format_spec_errors(self):
+        # int, float, and string all share the same format spec
+        # mini-language parser.
+
+        # Check that we can't ask for too many digits. This is
+        # probably a CPython specific test. It tries to put the width
+        # into a C long.
+        self.assertRaises(ValueError, format, 0, '1'*10000 + 'd')
+
+        # Similar with the precision.
+        self.assertRaises(ValueError, format, 0, '.' + '1'*10000 + 'd')
+
+        # And may as well test both.
+        self.assertRaises(ValueError, format, 0, '1'*1000 + '.' + '1'*10000 + 'd')
 
 def test_main():
     run_unittest(TypesTests)

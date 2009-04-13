@@ -140,7 +140,7 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
     /* end-ptr is used throughout this code to specify the length of
        the input string */
 
-    Py_ssize_t specified_width;
+    Py_ssize_t consumed;
 
     format->fill_char = '\0';
     format->align = '\0';
@@ -185,15 +185,17 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
         ++ptr;
     }
 
-    /* XXX add error checking */
-    specified_width = get_integer(&ptr, end, &format->width);
+    consumed = get_integer(&ptr, end, &format->width);
+    if (consumed == -1)
+        /* Overflow error. Exception already set. */
+        return 0;
 
-    /* If specified_width is 0, we didn't consume any characters for
-       the width. In that case, reset the width to -1, because
-       get_integer() will have set it to zero */
-    if (specified_width == 0) {
+    /* If consumed is 0, we didn't consume any characters for the
+       width. In that case, reset the width to -1, because
+       get_integer() will have set it to zero. -1 is how we record
+       that the width wasn't specified. */
+    if (consumed == 0)
         format->width = -1;
-    }
 
     /* Comma signifies add thousands separators */
     if (end-ptr && ptr[0] == ',') {
@@ -205,11 +207,13 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
     if (end-ptr && ptr[0] == '.') {
         ++ptr;
 
-        /* XXX add error checking */
-        specified_width = get_integer(&ptr, end, &format->precision);
+        consumed = get_integer(&ptr, end, &format->precision);
+        if (consumed == -1)
+            /* Overflow error. Exception already set. */
+            return 0;
 
         /* Not having a precision after a dot is an error. */
-        if (specified_width == 0) {
+        if (consumed == 0) {
             PyErr_Format(PyExc_ValueError,
                          "Format specifier missing precision");
             return 0;
