@@ -622,6 +622,7 @@ PYTHON_HEADERS= \
 		Include/complexobject.h \
 		Include/descrobject.h \
 		Include/dictobject.h \
+		Include/dtoa.h \
 		Include/enumobject.h \
 		Include/errcode.h \
 		Include/eval.h \

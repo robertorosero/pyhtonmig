@@ -707,7 +707,7 @@ r_object(RFILE *p)
 			buf[n] = '\0';
 			retval = NULL;
 			PyFPE_START_PROTECT("atof", break;)
-				c.real = PyOS_ascii_atof(buf);
+			c.real = PyOS_ascii_atof(buf);
 			PyFPE_END_PROTECT(c)
 			n = r_byte(p);
 			if (n == EOF || r_string(buf, (int)n, p) != n) {
@@ -718,7 +718,7 @@ r_object(RFILE *p)
 			}
 			buf[n] = '\0';
 			PyFPE_START_PROTECT("atof", break)
-				c.imag = PyOS_ascii_atof(buf);
+			c.imag = PyOS_ascii_atof(buf);
 			PyFPE_END_PROTECT(c)
 			retval = PyComplex_FromCComplex(c);
 			break;
