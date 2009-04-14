@@ -125,7 +125,7 @@ _Py_InsertThousandsGrouping(STRINGLIB_CHAR *buffer,
                               separator. They only go between
                               groups. */
     STRINGLIB_CHAR *buffer_end = NULL;
-    STRINGLIB_CHAR *digits_end;
+    STRINGLIB_CHAR *digits_end = NULL;
     Py_ssize_t l;
     Py_ssize_t n_chars;
     Py_ssize_t thousands_sep_len = strlen(thousands_sep);
