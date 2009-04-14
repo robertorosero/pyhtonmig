@@ -15,6 +15,10 @@
 /* Define if you have the Mach cthreads package */
 #undef C_THREADS
 
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored in ARM
+   mixed-endian order (byte order 45670123) */
+#undef DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754
+
 /* Define if C doubles are 64-bit IEEE 754 binary format, stored with the most
    significant byte first */
 #undef DOUBLE_IS_BIG_ENDIAN_IEEE754

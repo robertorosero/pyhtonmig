@@ -3115,6 +3115,33 @@ then
    with the most significant byte first])
 fi
 
+# Some ARM platforms use a mixed-endian representation for doubles.
+# While Python doesn't currently have full support for these platforms
+# (see e.g., issue 1762561), we can at least make sure that float <-> string
+# conversions work.
+AC_MSG_CHECKING(whether C doubles are ARM mixed-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_mixed_endian_double, [
+AC_TRY_RUN([
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x01\xff\x3f\x43\x05\x04\x03\x02", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_mixed_endian_double=yes,
+ac_cv_mixed_endian_double=no,
+ac_cv_mixed_endian_double=no)])
+AC_MSG_RESULT($ac_cv_mixed_endian_double)
+if test "$ac_cv_mixed_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   in ARM mixed-endian order (byte order 45670123)])
+fi
+
 # David Gay's code in Python/dtoa.c requires that the FPU uses 53-bit
 # rounding; this is a particular problem on x86, where the x87 FPU has
 # a default rounding precision of 64 bits.  For gcc/x86, we try to fix

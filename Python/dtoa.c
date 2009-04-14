@@ -115,7 +115,8 @@
 #ifdef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
 #define IEEE_8087
 #endif
-#ifdef DOUBLE_IS_BIG_ENDIAN_IEEE754
+
+#if defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
 #define IEEE_MC68k
 #endif
 #if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
