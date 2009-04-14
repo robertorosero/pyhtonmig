@@ -112,28 +112,31 @@
 #define MALLOC PyMem_Malloc
 #define FREE PyMem_Free
 
-/* For Apple universal PPC/Intel builds, the autoconf result will be reporting
-   the wrong endianness for one of the architectures.  Use a different
-   method for determining endianness of doubles.
-*/
-#if defined AC_APPLE_UNIVERSAL_BUILD
-#  if defined __BIG_ENDIAN__
-#    define IEEE_MC68k
-#  else
-#    define IEEE_8087
-#  endif
-#else
-#  ifdef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
-#    define IEEE_8087
-#  endif
-#  if defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) ||  \
-    defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
-#    define IEEE_MC68k
-#  endif
+/* This code should also work for ARM mixed-endian format on little-endian
+   machines, where doubles have byte order 45670123 (in increasing address
+   order, 0 being the least significant byte). */
+#ifdef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
+#  define IEEE_8087
+#endif
+#if defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) ||  \
+  defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
+#  define IEEE_MC68k
 #endif
 #if defined(IEEE_8087) + defined(IEEE_MC68k) != 1
 #error "Exactly one of IEEE_8087 or IEEE_MC68k should be defined."
 #endif
+
+/* The code below assumes that the endianness of integers matches the
+   endianness of the two 32-bit words of a double.  Check this. */
+#if defined(WORDS_BIGENDIAN) && (defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || \
+                                 defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754))
+#error "doubles and ints have incompatible endianness"
+#endif
+
+#if !defined(WORDS_BIGENDIAN) && defined(DOUBLE_IS_BIG_ENDIAN_IEEE754)
+#error "doubles and ints have incompatible endianness"
+#endif
+
 
 #if defined(HAVE_UINT32_T) && defined(HAVE_INT32_T)
 typedef PY_UINT32_T ULong;
