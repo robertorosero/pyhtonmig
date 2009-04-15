@@ -37,6 +37,9 @@
  *
  * Return value: the #gdouble value.
  **/
+
+#ifndef PY_NO_SHORT_FLOAT_REPR
+
 double
 PyOS_ascii_strtod(const char *nptr, char **endptr)
 {
@@ -56,8 +59,18 @@ PyOS_ascii_strtod(const char *nptr, char **endptr)
 
 }
 
+#else
+
+/*
+   Use system strtod;  since strtod is locale aware, we may
+   have to first fix the decimal separator.
+
+   Note that unlike _Py_dg_strtod, the system strtod may not always give
+   correctly rounded results.
+*/
+
 double
-PyOS_ascii_strtod_fallback(const char *nptr, char **endptr)
+PyOS_ascii_strtod(const char *nptr, char **endptr)
 {
 	char *fail_pos;
 	double val = -1.0;
@@ -205,6 +218,8 @@ PyOS_ascii_strtod_fallback(const char *nptr, char **endptr)
 
 	return val;
 }
+
+#endif
 
 /* Given a string that may have a decimal point in the current
    locale, change it back to a dot.  Since the string cannot get
