@@ -1,4 +1,4 @@
-#ifndef PY_SHORT_FLOAT_REPR
+#ifndef PY_NO_SHORT_FLOAT_REPR
 #ifdef __cplusplus
 extern "C" {
 #endif
