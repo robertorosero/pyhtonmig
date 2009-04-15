@@ -221,6 +221,13 @@ PyOS_ascii_strtod(const char *nptr, char **endptr)
 
 #endif
 
+double
+PyOS_ascii_atof(const char *nptr)
+{
+	return PyOS_ascii_strtod(nptr, NULL);
+}
+
+
 /* Given a string that may have a decimal point in the current
    locale, change it back to a dot.  Since the string cannot get
    longer, no need for a maximum buffer size parameter. */
@@ -519,13 +526,6 @@ PyOS_ascii_formatd(char       *buffer,
 
 	return buffer;
 }
-
-double
-PyOS_ascii_atof(const char *nptr)
-{
-	return PyOS_ascii_strtod(nptr, NULL);
-}
-
 
 /* I'm using a lookup table here so that I don't have to invent a non-locale
    specific way to convert to uppercase */
