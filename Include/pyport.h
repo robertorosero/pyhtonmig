@@ -488,6 +488,30 @@ extern "C" {
 #define _Py_SET_53BIT_PRECISION_END
 #endif
 
+/* If we can't guarantee 53-bit precision, don't use the code
+   in Python/dtoa.c, but fall back to standard code.  This
+   means that repr of a float will be long (17 sig digits).
+
+   Realistically, there are two things that could go wrong:
+
+   (1) doubles aren't IEEE 754 doubles, or
+   (2) we're on x86 with the rounding precision set to 64-bits
+       (extended precision), and we don't know how to change
+       the rounding precision.
+ */
+
+#if !defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) && \
+    !defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) && \
+    !defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
+#define PY_NO_SHORT_FLOAT_REPR
+#endif
+
+/* double rounding is symptomatic of use of extended precision on x86 */
+#ifdef X87_DOUBLE_ROUNDING
+#define PY_NO_SHORT_FLOAT_REPR
+#endif
+
+
 /* Py_DEPRECATED(version)
  * Declare a variable, type, or function deprecated.
  * Usage:
