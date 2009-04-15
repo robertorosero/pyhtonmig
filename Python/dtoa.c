@@ -19,7 +19,7 @@
 
 /****************************************************************
  * This is dtoa.c by David M. Gay, downloaded from
- * http://www.netlib.org/fp/dtoa.c on March 17, 2009 and modified for
+ * http://www.netlib.org/fp/dtoa.c on April 15, 2009 and modified for
  * inclusion into the Python core by Mark E. T. Dickinson and Eric V. Smith.
  * The major modifications are as follows:
  *
@@ -50,10 +50,7 @@
  *     _Py_dg_dtoa are expected to call _Py_dg_freedtoa to free
  *     the memory allocated by _Py_dg_dtoa.
  *
- *  5. A bug in the original dtoa.c code, in which '.nan' and '.inf'
- *     were accepted as valid inputs to strtod, has been fixed.
- *
- *  6. The code has been reformatted to better fit with Python's
+ *  5. The code has been reformatted to better fit with Python's
  *     C style guide (PEP 7).
  *
  ***************************************************************/
@@ -1405,10 +1402,6 @@ _Py_dg_strtod(const char *s00, char **se)
         }
     }
   dig_done:
-    if (!nd && !nz && !nz0 && (s != s0)) {
-        /* no digits, just a '.'.  Fail.  */
-        goto ret0;
-    }
     e = 0;
     if (c == 'e' || c == 'E') {
         if (!nd && !nz && !nz0) {
@@ -1449,26 +1442,27 @@ _Py_dg_strtod(const char *s00, char **se)
     if (!nd) {
         if (!nz && !nz0) {
             /* Check for Nan and Infinity */
-            switch(c) {
-            case 'i':
-            case 'I':
-                if (match(&s,"nf")) {
-                    --s;
-                    if (!match(&s,"inity"))
-                        ++s;
-                    word0(&rv) = 0x7ff00000;
-                    word1(&rv) = 0;
-                    goto ret;
+            if (!bc.dplen)
+                switch(c) {
+                case 'i':
+                case 'I':
+                    if (match(&s,"nf")) {
+                        --s;
+                        if (!match(&s,"inity"))
+                            ++s;
+                        word0(&rv) = 0x7ff00000;
+                        word1(&rv) = 0;
+                        goto ret;
+                    }
+                    break;
+                case 'n':
+                case 'N':
+                    if (match(&s, "an")) {
+                        word0(&rv) = NAN_WORD0;
+                        word1(&rv) = NAN_WORD1;
+                        goto ret;
+                    }
                 }
-                break;
-            case 'n':
-            case 'N':
-                if (match(&s, "an")) {
-                    word0(&rv) = NAN_WORD0;
-                    word1(&rv) = NAN_WORD1;
-                    goto ret;
-                }
-            }
           ret0:
             s = s00;
             sign = 0;
