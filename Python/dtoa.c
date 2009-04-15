@@ -104,6 +104,11 @@
 /* Linking of Python's #defines to Gay's #defines starts here. */
 
 #include "Python.h"
+
+/* if PY_NO_SHORT_FLOAT_REPR is defined, then don't even try to compile
+   the following code */
+#ifndef PY_NO_SHORT_FLOAT_REPR
+
 #include "float.h"
 
 #define MALLOC PyMem_Malloc
@@ -2637,3 +2642,5 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
 #ifdef __cplusplus
 }
 #endif
+
+#endif  /* PY_NO_SHORT_FLOAT_REPR */

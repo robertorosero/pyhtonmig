@@ -1,3 +1,4 @@
+#ifndef PY_SHORT_FLOAT_REPR
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -10,4 +11,5 @@ PyAPI_FUNC(void) _Py_dg_freedtoa(char *s);
 
 #ifdef __cplusplus
 }
+#endif
 #endif
