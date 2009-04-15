@@ -3157,35 +3157,14 @@ fi
 #       on modern machines)
 #   (2) using inline assembler to get and set the x87 FPU control word
 #       otherwise.
+#
+# On AMD64 (aka x86-64), gcc automatically enables use of SSE2
+# instructions, so we don't bother trying to detect.
 
 if test "$GCC" = yes && test -n "`$CC -dM -E - </dev/null | grep i386`"
 then
-    # try using cpuid instruction to see whether SSE2 instructions are
-    # available.  Bits 25 and 26 of edx tell us about SSE and SSE2
-    # respectively.
-    AC_MSG_CHECKING(whether SSE2 instructions are available on this CPU)
-    AC_TRY_RUN([
-        int main() {
-            unsigned int ax, bx, cx, dx, func;
-            func = 1U;
-            __asm__ __volatile__ ("pushl %%ebx\n\t"  /* don't clobber ebx */
-                                  "cpuid\n\t"
-                                  "movl %%ebx, %1\n\t"
-                                  "popl %%ebx"
-                                  : "=a" (ax), "=r" (bx), "=c" (cx), "=d" (dx)
-                                  : "a" (func));
-                    if ((dx & (1U << 26)) && (dx & (1U << 25)))
-                return 0;
-            else
-                return 1;
-        }
-    ],
-    ac_cv_cpu_has_sse2=yes,
-    ac_cv_cpu_has_sse2=no,
-    ac_cv_cpu_has_sse2=no)
-    AC_MSG_RESULT($ac_cv_cpu_has_sse2)
-
     # determine whether we're already using the SSE2 instruction set for math
+    # (e.g., this is true by default on OS X/x86)
     AC_MSG_CHECKING(whether SSE2 instructions are already enabled for math)
     if [[ "`$CC -dM -E - </dev/null | grep __SSE2_MATH__`" == "" ]]
     then
@@ -3195,9 +3174,38 @@ then
     fi
     AC_MSG_RESULT($ac_sse2_enabled)
 
-    # if not, try using gcc options to enable it
+    # if we're not using SSE2 already, we need to either enable it
+    # (when available), or use inline assembler to get and set the
+    # 387 control word.
     if test $ac_sse2_enabled = no
     then
+        # Check cpuid for SSE2 availability.  Bits 25 and 26 of edx tell
+        # us about SSE and SSE2 respectively.
+        AC_MSG_CHECKING(whether SSE2 instructions are available on this CPU)
+        AC_TRY_RUN([
+            int main() {
+                unsigned int ax, bx, cx, dx, func;
+                func = 1U;
+                __asm__ __volatile__ (
+                    "pushl %%ebx\n\t"  /* don't clobber ebx */
+                    "cpuid\n\t"
+                    "movl %%ebx, %1\n\t"
+                    "popl %%ebx"
+                    : "=a" (ax), "=r" (bx), "=c" (cx), "=d" (dx)
+                    : "a" (func)
+                    : "cc" );
+                        if ((dx & (1U << 25)) && (dx & (1U << 26)))
+                    return 0;
+                else
+                    return 1;
+            }
+        ],
+        ac_cv_cpu_has_sse2=yes,
+        ac_cv_cpu_has_sse2=no,
+        ac_cv_cpu_has_sse2=no)
+        AC_MSG_RESULT($ac_cv_cpu_has_sse2)
+
+        # determine whether gcc accepts options to turn on SSE2
         AC_MSG_CHECKING(whether $CC accepts -msse2 -mfpmath=sse)
         ac_save_cc="$CC"
         CC="$CC -msse2 -mfpmath=sse"
@@ -3208,15 +3216,15 @@ then
         CC="$ac_save_cc"
         AC_MSG_RESULT($ac_cv_msse2_ok)
 
-        if test $ac_cv_msse2_ok = yes
+        if test $ac_cv_cpu_has_sse2 = yes && test $ac_cv_msse2_ok = yes
         then
             BASECFLAGS="$BASECFLAGS -msse2 -mfpmath=sse"
         else
+            # SSE2 doesn't appear to be available.  Check that it's okay
+            # to use gcc inline assembler to get and set x87 control word
             AC_DEFINE(USING_X87_FPU, 1,
             [Define on x86 hardware if the x87 FPU is being used
              for floating-point arithmetic])
-            # SSE2 doesn't appear to be available.  Check that it's okay
-            # to use gcc inline assembler to get and set x87 control word
             AC_MSG_CHECKING(whether we can use gcc inline assembler to get and set x87 control word)
             AC_TRY_COMPILE([], [
               unsigned short cw;
@@ -3227,8 +3235,8 @@ then
             AC_MSG_RESULT($have_gcc_asm_for_x87)
             if test "$have_gcc_asm_for_x87" = yes
             then
-              AC_DEFINE(HAVE_GCC_ASM_FOR_X87, 1,
-              [Define if we can use gcc inline assembler to get and set x87 control word])
+                AC_DEFINE(HAVE_GCC_ASM_FOR_X87, 1,
+                [Define if we can use gcc inline assembler to get and set x87 control word])
             fi
         fi
     fi
