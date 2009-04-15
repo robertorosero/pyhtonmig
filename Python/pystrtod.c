@@ -527,6 +527,120 @@ PyOS_ascii_formatd(char       *buffer,
 	return buffer;
 }
 
+#ifdef PY_NO_SHORT_FLOAT_REPR
+
+/* The fallback code to use if _Py_dg_dtoa is not available. */
+
+PyAPI_FUNC(char *) PyOS_double_to_string(double val,
+                                         char format_code,
+                                         int precision,
+                                         int flags,
+                                         int *type)
+{
+	char buf[128];
+	char format[32];
+	Py_ssize_t len;
+	char *result;
+	char *p;
+	int t;
+	int upper = 0;
+
+	/* Validate format_code, and map upper and lower case */
+	switch (format_code) {
+	case 'e':          /* exponent */
+	case 'f':          /* fixed */
+	case 'g':          /* general */
+		break;
+	case 'E':
+		upper = 1;
+		format_code = 'e';
+		break;
+	case 'F':
+		upper = 1;
+		format_code = 'f';
+		break;
+	case 'G':
+		upper = 1;
+		format_code = 'g';
+		break;
+	case 'r':          /* repr format */
+		/* Supplied precision is unused, must be 0. */
+		if (precision != 0) {
+			PyErr_BadInternalCall();
+			return NULL;
+		}
+		precision = 17;
+		format_code = 'g';
+		break;
+	case 's':          /* str format */
+		/* Supplied precision is unused, must be 0. */
+		if (precision != 0) {
+			PyErr_BadInternalCall();
+			return NULL;
+		}
+		precision = 12;
+		format_code = 'g';
+		break;
+	default:
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+
+	/* Handle nan and inf. */
+	if (Py_IS_NAN(val)) {
+		strcpy(buf, "nan");
+		t = Py_DTST_NAN;
+	} else if (Py_IS_INFINITY(val)) {
+		if (copysign(1., val) == 1.)
+			strcpy(buf, "inf");
+		else
+			strcpy(buf, "-inf");
+		t = Py_DTST_INFINITE;
+	} else {
+		t = Py_DTST_FINITE;
+
+
+		if (flags & Py_DTSF_ADD_DOT_0)
+			format_code = 'Z';
+
+		PyOS_snprintf(format, 32, "%%%s.%i%c", (flags & Py_DTSF_ALT ? "#" : ""), precision, format_code);
+		PyOS_ascii_formatd(buf, sizeof(buf), format, val);
+	}
+
+	len = strlen(buf);
+
+	/* Add 1 for the trailing 0 byte.
+	   Add 1 because we might need to make room for the sign.
+	   */
+	result = PyMem_Malloc(len + 2);
+	if (result == NULL) {
+		PyErr_NoMemory();
+		return NULL;
+	}
+	p = result;
+
+	/* Never add sign for nan/inf, even if asked. */
+	if (flags & Py_DTSF_SIGN && buf[0] != '-' && t == Py_DTST_FINITE)
+		*p++ = '+';
+
+	strcpy(p, buf);
+
+	if (upper) {
+		/* Convert to upper case. */
+		char *p1;
+		for (p1 = p; *p1; p1++)
+			*p1 = toupper(*p1);
+	}
+
+	if (type)
+		*type = t;
+	return result;
+}
+
+#else
+
+/* _Py_dg_dtoa is available. */
+
 /* I'm using a lookup table here so that I don't have to invent a non-locale
    specific way to convert to uppercase */
 #define OFS_INF 0
@@ -903,3 +1017,4 @@ PyAPI_FUNC(char *) PyOS_double_to_string(double val,
 				  flags & Py_DTSF_ALT,
 				  float_strings, type);
 }
+#endif /* ifdef PY_NO_SHORT_FLOAT_REPR */
