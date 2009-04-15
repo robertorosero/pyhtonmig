@@ -4471,6 +4471,12 @@ fi
 # compiler and platform.  BASECFLAGS tweaks need to be made even if the
 # user set OPT.
 
+# tempory inclusion to output the system-specific defines that GCC knows
+if test "$GCC" = yes
+then
+    $CC -dM -E - </dev/null
+fi
+
 # tweak OPT based on compiler and platform, only if the user didn't set
 # it on the command line
 
