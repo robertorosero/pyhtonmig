@@ -15,9 +15,6 @@ NAN = float("nan")
 test_dir = os.path.dirname(__file__) or os.curdir
 format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
-# determine whether we're using short float repr or not
-short_float_repr = getattr(sys, 'float_repr_style', 'none') == 'short'
-
 class GeneralFloatCases(unittest.TestCase):
 
     def test_float(self):
