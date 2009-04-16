@@ -384,40 +384,6 @@ ensure_decimal_point(char* buffer, size_t buf_size)
 	}
 }
 
-/* Add the locale specific grouping characters to buffer.  Note
-   that any decimal point (if it's present) in buffer is already
-   locale-specific.  Return 0 on error, else 1. */
-Py_LOCAL_INLINE(int)
-add_thousands_grouping(char* buffer, size_t buf_size)
-{
-#if 0
-	Py_ssize_t len = strlen(buffer);
-	struct lconv *locale_data = localeconv();
-	const char *decimal_point = locale_data->decimal_point;
-
-	/* Find the decimal point, if any.  We're only concerned
-	   about the characters to the left of the decimal when
-	   adding grouping. */
-	char *p = strstr(buffer, decimal_point);
-	if (!p) {
-		/* No decimal, use the entire string. */
-
-		/* If any exponent, adjust p. */
-		p = strpbrk(buffer, "eE");
-		if (!p)
-			/* No exponent and no decimal.  Use the entire
-			   string. */
-			p = buffer + len;
-	}
-	/* At this point, p points just past the right-most character we
-	   want to format.  We need to add the grouping string for the
-	   characters between buffer and p. */
-	return _PyBytes_InsertThousandsGroupingLocale(buffer, len, p-buffer,
-						      buf_size, NULL, 1, 1);
-#endif
-	return 1;
-}
-
 /* see FORMATBUFLEN in unicodeobject.c */
 #define FLOAT_FORMATBUFLEN 120
 
@@ -432,9 +398,8 @@ add_thousands_grouping(char* buffer, size_t buf_size)
  * Converts a #gdouble to a string, using the '.' as
  * decimal point. To format the number you pass in
  * a printf()-style format string. Allowed conversion
- * specifiers are 'e', 'E', 'f', 'F', 'g', 'G', and 'n'.
+ * specifiers are 'e', 'E', 'f', 'F', 'g', 'G', and 'Z'.
  * 
- * 'n' is the same as 'g', except it uses the current locale.
  * 'Z' is the same as 'g', except it always has a decimal and
  *     at least one digit after the decimal.
  *
@@ -449,11 +414,6 @@ PyOS_ascii_formatd(char       *buffer,
 	char format_char;
 	size_t format_len = strlen(format);
 
-	/* For type 'n', we need to make a copy of the format string, because
-	   we're going to modify 'n' -> 'g', and format is const char*, so we
-	   can't modify it directly.  FLOAT_FORMATBUFLEN should be longer than
-	   we ever need this to be.  There's an upcoming check to ensure it's
-	   big enough. */
 	/* Issue 2264: code 'Z' requires copying the format.  'Z' is 'g', but
 	   also with at least one character past the decimal. */
 	char tmp_format[FLOAT_FORMATBUFLEN];
@@ -479,12 +439,12 @@ PyOS_ascii_formatd(char       *buffer,
 	if (!(format_char == 'e' || format_char == 'E' || 
 	      format_char == 'f' || format_char == 'F' || 
 	      format_char == 'g' || format_char == 'G' ||
-	      format_char == 'n' || format_char == 'Z'))
+	      format_char == 'Z'))
 		return NULL;
 
-	/* Map 'n' or 'Z' format_char to 'g', by copying the format string and
+	/* Map 'Z' format_char to 'g', by copying the format string and
 	   replacing the final char with a 'g' */
-	if (format_char == 'n' || format_char == 'Z') {
+	if (format_char == 'Z') {
 		if (format_len + 1 >= sizeof(tmp_format)) {
 			/* The format won't fit in our copy.  Error out.  In
 			   practice, this will never happen and will be
@@ -503,11 +463,8 @@ PyOS_ascii_formatd(char       *buffer,
 	/* Do various fixups on the return string */
 
 	/* Get the current locale, and find the decimal point string.
-	   Convert that string back to a dot.  Do not do this if using the
-	   'n' (number) format code, since we want to keep the localized
-	   decimal point in that case. */
-	if (format_char != 'n')
-		change_decimal_from_locale_to_dot(buffer);
+	   Convert that string back to a dot. */
+	change_decimal_from_locale_to_dot(buffer);
 
 	/* If an exponent exists, ensure that the exponent is at least
 	   MIN_EXPONENT_DIGITS digits, providing the buffer is large enough
@@ -520,11 +477,6 @@ PyOS_ascii_formatd(char       *buffer,
 	   after the decimal point (and make sure we have a decimal point). */
 	if (format_char == 'Z')
 		ensure_decimal_point(buffer, buf_size);
-
-	/* If format_char is 'n', add the thousands grouping. */
-	if (format_char == 'n')
-		if (!add_thousands_grouping(buffer, buf_size))
-			return NULL;
 
 	return buffer;
 }
