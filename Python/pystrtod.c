@@ -333,8 +333,9 @@ ensure_minumim_exponent_length(char* buffer, size_t buf_size)
 	}
 }
 
-/* Ensure that buffer has a decimal point in it.  The decimal point
-   will not be in the current locale, it will always be '.' */
+/* Ensure that buffer has a decimal point in it.  The decimal point will not
+   be in the current locale, it will always be '.'. Don't add a decimal if an
+   exponent is present. */
 Py_LOCAL_INLINE(void)
 ensure_decimal_point(char* buffer, size_t buf_size)
 {
@@ -363,7 +364,8 @@ ensure_decimal_point(char* buffer, size_t buf_size)
 			insert_count = 1;
 		}
 	}
-	else {
+	else if (!(*p == 'e' || *p == 'E')) {
+		/* Don't add ".0" if we have an exponent. */
 		chars_to_insert = ".0";
 		insert_count = 2;
 	}
