@@ -314,47 +314,8 @@
 %#.5g 234.56 -> 234.56
 %#.6g 234.56 -> 234.560
 
--- repr formatting.  Should always include a decimal point (and at
--- least one digit after the point) or an exponent.  Produces the shortest
--- string that rounds correctly.
-
-%r 0 -> 0.0
-%r 1 -> 1.0
-
--- check short repr
-%r 0.01 -> 0.01
-%r 0.02 -> 0.02
-%r 0.03 -> 0.03
-%r 0.04 -> 0.04
-%r 0.05 -> 0.05
-%r 1.23456789 -> 1.23456789
-%r 10 -> 10.0
-%r 100 -> 100.0
-
--- values >= 1e16 get an exponent
-%r 1e15 -> 1000000000000000.0
-%r 0.999999999999e16 -> 9999999999990000.0
-%r 1e16 -> 1e+16
-%r 1.000000000001e16 -> 1.000000000001e+16
-%r 1e17 -> 1e+17
-
--- as do values < 1e-4
-%r 1e-3 -> 0.001
-%r 1.001e-4 -> 0.0001001
-%r 1.000000000001e-4 -> 0.0001000000000001
-%r 1e-4 -> 0.0001
-%r 0.999999999999e-4 -> 9.99999999999e-05
-%r 0.999e-4 -> 9.99e-05
-%r 1e-5 -> 1e-05
-
--- some values that are designed to fail if the FPU rounding
--- precision is 64-bits.
-%r 8.72293771110361e+25 -> 8.72293771110361e+25
-%r 7.47005307342313e+26 -> 7.47005307342313e+26
-%r 2.86438000439698e+28 -> 2.86438000439698e+28
-%r 8.89142905246179e+28 -> 8.89142905246179e+28
-%r 3.08578087079232e+35 -> 3.08578087079232e+35
-
+-- for repr formatting see the separate test_short_repr test in
+-- test_float.py.  Not all platforms use short repr for floats.
 
 -- str formatting.  Result always includes decimal point and at
 -- least one digit after the point, or an exponent.
