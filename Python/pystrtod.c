@@ -648,7 +648,7 @@ format_float_short(double d, char format_code,
 		   int use_alt_formatting, char **float_strings, int *type)
 {
 	char *buf = NULL;
-	char *p;
+	char *p = NULL;
 	Py_ssize_t bufsize = 0;
 	char *digits, *digits_end;
 	int decpt_as_int, sign, exp_len, exp = 0, use_exp = 0;
