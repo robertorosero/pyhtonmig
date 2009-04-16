@@ -3160,11 +3160,11 @@ then
     # determine whether we're already using the SSE2 instruction set for math
     # (e.g., this is true by default on OS X/x86)
     AC_MSG_CHECKING(whether SSE2 instructions are already enabled for math)
-    if [[ "`$CC -dM -E - </dev/null | grep __SSE2_MATH__`" == "" ]]
+    if test -n "`$CC -dM -E - </dev/null | grep __SSE2_MATH__`"
     then
-        ac_sse2_enabled=no
-    else
         ac_sse2_enabled=yes
+    else
+        ac_sse2_enabled=no
     fi
     AC_MSG_RESULT($ac_sse2_enabled)
 
