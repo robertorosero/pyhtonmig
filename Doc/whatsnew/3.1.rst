@@ -57,8 +57,8 @@ PEP 372: Ordered Dictionaries
 Regular Python dictionaries iterate over key/value pairs in arbitrary order.
 Over the years, a number of authors have written alternative implementations
 that remember the order that the keys were originally inserted.  Based on
-the experiences from those implementations, the :mod:`collections` module
-now has an :class:`OrderedDict` class.
+the experiences from those implementations, a new
+:class:`collections.OrderedDict` class has been introduced.
 
 The OrderedDict API is substantially the same as regular dictionaries
 but will iterate over keys and values in a guaranteed order depending on
@@ -67,9 +67,9 @@ the original insertion position is left unchanged.  Deleting an entry and
 reinserting it will move it to the end.
 
 The standard library now supports use of ordered dictionaries in several
-modules.  The :mod:`ConfigParser` module uses them by default.  This lets
+modules.  The :mod:`configparser` module uses them by default.  This lets
 configuration files be read, modified, and then written back in their original
-order.  The :mod:`collections` module's :meth:`namedtuple._asdict` method now
+order.  The *_asdict()* method for :func:`collections.namedtuple` now
 returns an ordered dictionary with the values appearing in the same order as
 the underlying tuple indicies.  The :mod:`json` module is being built-out with
 an *object_pairs_hook* to allow OrderedDicts to be built by the decoder.
@@ -103,7 +103,7 @@ for thousands separators.
 .. seealso::
 
    :pep:`378` - Format Specifier for Thousands Separator
-      PEP written by Raymond Hettinger; implemented by Eric Smith and
+      PEP written by Raymond Hettinger and implemented by Eric Smith and
       Mark Dickinson.
 
 
@@ -233,15 +233,15 @@ New, Improved, and Deprecated Modules
 
   (Contributed by Gregory Smith.)
 
-* The :mod:`logging` module now implements a simple :class:`NullHandler`
+* The :mod:`logging` module now implements a simple :class:`logging.NullHandler`
   class for applications that are not using logging but are calling
   library code that does.  Setting-up a null handler will suppress
-  spurious warnings like "No handlers could be found for logger X.Y.Z"::
+  spurious warnings such as "No handlers could be found for logger foo"::
 
     >>> h = logging.NullHandler()
     >>> logging.getLogger("foo").addHandler(h)
 
-  (Contributed by Vinay Sajip; issue:`4384`).
+  (Contributed by Vinay Sajip; :issue:`4384`).
 
 * The :mod:`runpy` module which supports the ``-m`` command line switch
   now supports the execution of packages by looking for and executing
@@ -279,7 +279,8 @@ New, Improved, and Deprecated Modules
         def test_gimzo_without_required_library(self):
             ...
 
-  Also, tests for exceptions have been builtout to work with context managers::
+  Also, tests for exceptions have been builtout to work with context managers
+  using the :keyword:`with` statement::
 
       def test_division_by_zero(self):
           with self.assertRaises(ZeroDivisionError):
@@ -305,7 +306,7 @@ New, Improved, and Deprecated Modules
   (Contributed by Ross Light; :issue:`4285`.)
 
 * A new module, :mod:`importlib` was added.  It provides a complete, portable,
-  pure Python reference implementation of the *import* statement and its
+  pure Python reference implementation of the :keyword:`import` statement and its
   counterpart, the :func:`__import__` function.  It represents a substantial
   step forward in documenting and defining the actions that take place during
   imports.
