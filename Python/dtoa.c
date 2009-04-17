@@ -57,6 +57,10 @@
  *  5. The code has been reformatted to better fit with Python's
  *     C style guide (PEP 7).
  *
+ *  6. A bug in the memory allocation has been fixed: to avoid FREEing memory
+ *     that hasn't been MALLOC'ed, private_mem should only be used when k <=
+ *     Kmax.
+ *
  ***************************************************************/
 
 /* Please send bug reports for the original dtoa.c code to David M. Gay (dmg
@@ -346,7 +350,7 @@ Balloc(int k)
         x = 1 << k;
         len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
             /sizeof(double);
-        if (pmem_next - private_mem + len <= PRIVATE_mem) {
+        if (k <= Kmax && pmem_next - private_mem + len <= PRIVATE_mem) {
             rv = (Bigint*)pmem_next;
             pmem_next += len;
         }
