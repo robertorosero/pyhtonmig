@@ -899,13 +899,62 @@ float_trunc(PyObject *v)
 	return PyLong_FromDouble(wholepart);
 }
 
+/* round a C double x to the closest multiple of 10**-ndigits */
+
+static double
+double_round(double x, int ndigits) {
+	char *buf, *buf_end, shortbuf[20];
+	char *mybuf = shortbuf;
+	int decpt, sign, buflen, mybuflen = 20;
+	double rounded = -1.0;
+
+	mybuf = shortbuf;
+
+	/* first convert to decimal, as a string; then add sign, exp, and
+	extra '0 to avoid trouble when buf_end == buf, then convert back. */
+	buf = _Py_dg_dtoa(x, 3, ndigits, &decpt, &sign, &buf_end);
+	printf("buf is %p\n", buf);
+	if (buf == NULL) {
+		PyErr_NoMemory();
+		goto exit1;
+	}
+	buflen = buf_end - buf;
+
+	printf("result is %s\n", buf);
+
+	/* total buffer space needed <= (buf_end - buf) + 8: (1 extra for '0',
+	   1 for the sign, 5 for exponent, 1 for '\0') */
+	if (buflen + 8 > mybuflen) {
+		mybuflen = buflen+8;
+		mybuf = (char *)PyMem_Malloc(mybuflen);
+		if (mybuf == NULL) {
+			PyErr_NoMemory();
+			goto exit2;
+		}
+	}
+	PyOS_snprintf(mybuf, mybuflen, "%s0%se%d", (sign ? "-" : ""),
+		      buf, decpt - buflen);
+	printf("Checkpoint 1!\n");
+	rounded = _Py_dg_strtod(mybuf, NULL);
+	printf("Checkpoint 2!\n");
+
+	/* done computing value;  now clean up */
+	if (mybuf != shortbuf)
+		PyMem_Free(mybuf);
+  exit2:
+	printf("Checkpoint 3!\n");
+	printf("buf is %p\n", buf);
+	_Py_dg_freedtoa(buf);
+	printf("Checkpoint 4!\n");
+  exit1:
+	return rounded;
+}
+
 static PyObject *
 float_round(PyObject *v, PyObject *args)
 {
 #define UNDEF_NDIGITS (-0x7fffffff) /* Unlikely ndigits value */
 	double x;
-	double f = 1.0;
-	double flr, cil;
 	double rounded;
 	int ndigits = UNDEF_NDIGITS;
 
@@ -913,28 +962,13 @@ float_round(PyObject *v, PyObject *args)
 		return NULL;
 
 	x = PyFloat_AsDouble(v);
-
-	if (ndigits != UNDEF_NDIGITS) {
-		f = pow(10.0, ndigits);
-		x *= f;
+	if (ndigits == UNDEF_NDIGITS) {
+		rounded = round(x);
+		if (fabs(x-rounded) == 0.5)
+			rounded = 2.0*round(x/2.0);
+		return PyLong_FromDouble(rounded);
 	}
-
-	flr = floor(x);
-	cil = ceil(x);
-
-	if (x-flr > 0.5)
-		rounded = cil;
-	else if (x-flr == 0.5)
-		rounded = fmod(flr, 2) == 0 ? flr : cil;
-	else
-		rounded = flr;
-
-	if (ndigits != UNDEF_NDIGITS) {
-		rounded /= f;
-		return PyFloat_FromDouble(rounded);
-	}
-
-	return PyLong_FromDouble(rounded);
+	return PyFloat_FromDouble(double_round(x, ndigits));
 #undef UNDEF_NDIGITS
 }
 

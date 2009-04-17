@@ -21,7 +21,11 @@
  * This is dtoa.c by David M. Gay, downloaded from
  * http://www.netlib.org/fp/dtoa.c on April 15, 2009 and modified for
  * inclusion into the Python core by Mark E. T. Dickinson and Eric V. Smith.
- * The major modifications are as follows:
+ *
+ * Please remember to check http://www.netlib.org/fp regularly (and especially
+ * before any Python release) for bugfixes and updates.
+ *
+ * The major modifications from Gay's original code are as follows:
  *
  *  0. The original code has been specialized to Python's needs by removing
  *     many of the #ifdef'd sections.  In particular, code to support VAX and
