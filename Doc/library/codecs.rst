@@ -323,6 +323,16 @@ and implemented by all standard Python codecs:
 |                         | (only for encoding).                          |
 +-------------------------+-----------------------------------------------+
 
+In addition, the following error handlers are specific to only selected
+codecs:
+
++------------------+---------+--------------------------------------------+
+| Value            | Codec   | Meaning                                    |
++==================+=========+============================================+
+| ``'surrogates'`` | utf-8   | Allow encoding and decoding of surrogate   |
+|                  |         | codes in UTF-8.                            |
++------------------+---------+--------------------------------------------+
+
 The set of allowed values can be extended via :meth:`register_error`.
 
 
