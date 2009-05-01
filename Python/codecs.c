@@ -801,6 +801,7 @@ PyObject *PyCodec_SurrogateErrors(PyObject *exc)
 	}
 	/* Try decoding a single surrogate character. If
 	   there are more, let the codec call us again. */
+	p += start;
 	if ((p[0] & 0xf0) == 0xe0 || 
 	    (p[1] & 0xc0) == 0x80 ||
 	    (p[2] & 0xc0) == 0x80) {

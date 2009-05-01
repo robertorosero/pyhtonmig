@@ -544,8 +544,10 @@ class UTF8Test(ReadTest):
     def test_surrogates(self):
         self.assertRaises(UnicodeEncodeError, "\ud800".encode, "utf-8")
         self.assertRaises(UnicodeDecodeError, b"\xed\xa0\x80".decode, "utf-8")
-        self.assertEquals("\ud800".encode("utf-8", "surrogates"), b"\xed\xa0\x80")
-        self.assertEquals(b"\xed\xa0\x80".decode("utf-8", "surrogates"), "\ud800")
+        self.assertEquals("abc\ud800def".encode("utf-8", "surrogates"),
+                          b"abc\xed\xa0\x80def")
+        self.assertEquals(b"abc\xed\xa0\x80def".decode("utf-8", "surrogates"),
+                          "abc\ud800def")
         self.assertTrue(codecs.lookup_error("surrogates"))
 
 class UTF7Test(ReadTest):
