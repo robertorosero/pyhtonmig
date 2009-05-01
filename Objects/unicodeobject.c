@@ -1548,6 +1548,53 @@ PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
     }
 }
 
+/* Convert the argument to a bytes object, according to the file
+   system encoding */
+
+int
+PyUnicode_FSConverter(PyObject* arg, void* addr)
+{
+    PyObject *output = NULL;
+    Py_ssize_t size;
+    void *data;
+    if (PyBytes_Check(arg) || PyByteArray_Check(arg)) {
+        output = arg;
+        Py_INCREF(output);
+    }
+    else {
+        arg = PyUnicode_FromObject(arg);
+        if (!arg)
+            return 0;
+        output = PyUnicode_AsEncodedObject(arg, 
+                                           Py_FileSystemDefaultEncoding,
+                                           "utf8b");
+        Py_DECREF(arg);
+        if (!output)
+            return 0;
+        if (!PyBytes_Check(output)) {
+            Py_DECREF(output);
+            PyErr_SetString(PyExc_TypeError, "encoder failed to return bytes");
+            return 0;
+        }
+    }
+    if (PyBytes_Check(output)) {
+         size = PyBytes_GET_SIZE(output);
+         data = PyBytes_AS_STRING(output);
+    } 
+    else {
+         size = PyByteArray_GET_SIZE(output);
+         data = PyByteArray_AS_STRING(output);
+    }
+    if (size != strlen(data)) {
+        PyErr_SetString(PyExc_TypeError, "embedded NUL character");
+        Py_DECREF(output);
+        return 0;
+    }
+    *(PyObject**)addr = output;
+    return 1;
+}
+
+
 char*
 _PyUnicode_AsStringAndSize(PyObject *unicode, Py_ssize_t *psize)
 {
