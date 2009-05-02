@@ -12,6 +12,15 @@ What's New in Python 3.1 beta 1?
 Core and Builtins
 -----------------
 
+- Issue #5883: In the io module, the BufferedIOBase and TextIOBase ABCs have
+  received a new method, detach().  detach() disconnects the underlying stream
+  from the buffer or text IO and returns it.
+
+- Issue #5859: Remove switch from '%f' to '%g'-style formatting for
+  floats with absolute value over 1e50.  Also remove length
+  restrictions for float formatting: '%.67f' % 12.34 and '%.120e' %
+  12.34 no longer raise an exception.
+
 - Issue #1588: Add complex.__format__. For example, 
   format(complex(1, 2./3), '.5') now produces a sensible result.
 
@@ -97,6 +106,14 @@ Installation
 
 Library
 -------
+
+- The json module now works exclusively with str and not bytes.
+
+- Issue #3959: The ipaddr module has been added to the standard library.
+  Contributed by Google.
+
+- Issue #3002: ``shutil.copyfile()`` and ``shutil.copytree()`` now raise an
+  error when a named pipe is encountered, rather than blocking infinitely.
 
 - Issue #5857: tokenize.tokenize() now returns named tuples.
 
@@ -879,6 +896,9 @@ Tools/Demos
 
 Build
 -----
+
+- Issue #5726: Make Modules/ld_so_aix return the actual exit code of the
+  linker, rather than always exit successfully. Patch by Floris Bruynooghe.
 
 - Issue #4587: Add configure option --with-dbmliborder=db1:db2:... to specify
   the order that backends for the dbm extension are checked. 
