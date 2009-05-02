@@ -541,9 +541,11 @@ class UTF8Test(ReadTest):
         self.check_state_handling_decode(self.encoding,
                                          u, u.encode(self.encoding))
 
-    def test_surrogates(self):
+    def test_lone_surrogates(self):
         self.assertRaises(UnicodeEncodeError, "\ud800".encode, "utf-8")
         self.assertRaises(UnicodeDecodeError, b"\xed\xa0\x80".decode, "utf-8")
+
+    def test_surrogates_handler(self):
         self.assertEquals("abc\ud800def".encode("utf-8", "surrogates"),
                           b"abc\xed\xa0\x80def")
         self.assertEquals(b"abc\xed\xa0\x80def".decode("utf-8", "surrogates"),

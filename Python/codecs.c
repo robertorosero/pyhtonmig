@@ -767,8 +767,10 @@ PyObject *PyCodec_SurrogateErrors(PyObject *exc)
 	    return NULL;
 	startp = PyUnicode_AS_UNICODE(object);
 	res = PyBytes_FromStringAndSize(NULL, 3*(end-start));
-	if (!res)
+	if (!res) {
+	    Py_DECREF(object);
 	    return NULL;
+	}
 	outp = PyBytes_AsString(res);
 	for (p = startp+start; p < startp+end; p++) {
 	    Py_UNICODE ch = *p;

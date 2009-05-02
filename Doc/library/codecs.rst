@@ -323,8 +323,7 @@ and implemented by all standard Python codecs:
 |                         | (only for encoding).                          |
 +-------------------------+-----------------------------------------------+
 
-In addition, the following error handlers are specific to only selected
-codecs:
+In addition, the following error handlers are specific to a single codec:
 
 +------------------+---------+--------------------------------------------+
 | Value            | Codec   | Meaning                                    |
@@ -332,6 +331,9 @@ codecs:
 | ``'surrogates'`` | utf-8   | Allow encoding and decoding of surrogate   |
 |                  |         | codes in UTF-8.                            |
 +------------------+---------+--------------------------------------------+
+
+.. versionadded:: 3.1
+   The ``'surrogates'`` error handler.
 
 The set of allowed values can be extended via :meth:`register_error`.
 
