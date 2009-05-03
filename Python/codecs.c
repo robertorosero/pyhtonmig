@@ -880,9 +880,17 @@ PyCodec_UTF8bErrors(PyObject *exc)
 	    return NULL;
 	}
 	while (consumed < 4 && consumed < end-start) {
+	    /* Refuse to escape ASCII bytes. */
+	    if (p[start+consumed] < 128)
+		break;
 	    ch[consumed] = 0xdc00 + p[start+consumed];
 	    consumed++;
 	}
+	if (!consumed) {
+	    /* codec complained about ASCII byte. */
+	    PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
+	    return NULL;
+	}	    
 	Py_DECREF(object);
 	return Py_BuildValue("(u#n)", ch, consumed, start+consumed);
     }
