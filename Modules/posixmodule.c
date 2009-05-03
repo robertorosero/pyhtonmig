@@ -493,12 +493,14 @@ convertenviron(void)
 		char *p = strchr(*e, '=');
 		if (p == NULL)
 			continue;
-		k = PyUnicode_FromStringAndSize(*e, (int)(p-*e));
+		k = PyUnicode_Decode(*e, (int)(p-*e),
+				     Py_FileSystemDefaultEncoding, "utf8b");
 		if (k == NULL) {
 			PyErr_Clear();
 			continue;
 		}
-		v = PyUnicode_FromString(p+1);
+		v = PyUnicode_Decode(p+1, strlen(p+1),
+				     Py_FileSystemDefaultEncoding, "utf8b");
 		if (v == NULL) {
 			PyErr_Clear();
 			Py_DECREF(k);
