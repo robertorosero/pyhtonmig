@@ -826,7 +826,8 @@ PyObject *PyCodec_SurrogateErrors(PyObject *exc)
     }
 }
 
-PyObject *PyCodec_UTF8bErrors(PyObject *exc)
+static PyObject *
+PyCodec_UTF8bErrors(PyObject *exc)
 {
     PyObject *restuple;
     PyObject *object;
@@ -883,10 +884,6 @@ PyObject *PyCodec_UTF8bErrors(PyObject *exc)
 	    consumed++;
 	}
 	Py_DECREF(object);
-	if (ch == 0) {
-	    PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
-	    return NULL;
-	}
 	return Py_BuildValue("(u#n)", ch, consumed, start+consumed);
     }
     else {
