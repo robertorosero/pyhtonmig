@@ -2511,17 +2511,15 @@ posix_listdir(PyObject *self, PyObject *args)
 			w = PyUnicode_FromEncodedObject(v,
 					Py_FileSystemDefaultEncoding,
 					"utf8b");
-			if (w != NULL) {
-				Py_DECREF(v);
+			Py_DECREF(v);
+			if (w != NULL)
 				v = w;
-			}
 			else {
-				/* Ignore undecodable filenames, as discussed
-				 * in issue 3187. To include these,
-				 * use getcwdb(). */
-				PyErr_Clear();
-				Py_DECREF(v);
-				continue;
+				/* Encoding failed to decode ASCII bytes.
+				   Raise exception. */
+				Py_DECREF(d);
+				d = NULL;
+				break;
 			}
 		}
 		if (PyList_Append(d, v) != 0) {
