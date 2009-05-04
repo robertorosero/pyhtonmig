@@ -545,15 +545,16 @@ bytes2str(PyObject* o, int lock)
 	if(PyBytes_Check(o))
 		return PyBytes_AsString(o);
 	else if(PyByteArray_Check(o)) {
-		if (lock && o->ob_type->tp_as_buffer->bf_getbuffer(o, NULL, 0) < 0)
+		if (lock && PyObject_GetBuffer(o, NULL, 0) < 0)
 			/* On a bytearray, this should not fail. */
 			PyErr_BadInternalCall();
 		return PyByteArray_AsString(o);
 	} else {
 		/* The FS converter should have verified that this
 		   is either bytes or bytearray. */
-		PyErr_BadInternalCall();
-		return NULL;
+		Py_FatalError("bad object passed to bytes2str");
+		/* not reached. */
+		return "";
 	}
 }
 

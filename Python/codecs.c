@@ -846,8 +846,10 @@ PyCodec_UTF8bErrors(PyObject *exc)
 	    return NULL;
 	startp = PyUnicode_AS_UNICODE(object);
 	res = PyBytes_FromStringAndSize(NULL, end-start);
-	if (!res)
+	if (!res) {
+	    Py_DECREF(object);
 	    return NULL;
+	}
 	outp = PyBytes_AsString(res);
 	for (p = startp+start; p < startp+end; p++) {
 	    Py_UNICODE ch = *p;
@@ -886,12 +888,12 @@ PyCodec_UTF8bErrors(PyObject *exc)
 	    ch[consumed] = 0xdc00 + p[start+consumed];
 	    consumed++;
 	}
+	Py_DECREF(object);
 	if (!consumed) {
 	    /* codec complained about ASCII byte. */
 	    PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
 	    return NULL;
 	}	    
-	Py_DECREF(object);
 	return Py_BuildValue("(u#n)", ch, consumed, start+consumed);
     }
     else {
