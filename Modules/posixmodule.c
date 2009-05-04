@@ -5382,20 +5382,27 @@ posix_putenv(PyObject *self, PyObject *args)
         wchar_t *s1, *s2;
         wchar_t *newenv;
 #else
+	PyObject *os1, *os2;
         char *s1, *s2;
         char *newenv;
 #endif
 	PyObject *newstr;
 	size_t len;
 
-	if (!PyArg_ParseTuple(args,
 #ifdef MS_WINDOWS
+	if (!PyArg_ParseTuple(args,
 			      "uu:putenv",
-#else
-			      "ss:putenv",
-#endif
 			      &s1, &s2))
 		return NULL;
+#else
+	if (!PyArg_ParseTuple(args,
+			      "O&O&:putenv",
+			      PyUnicode_FSConverter, &os1, 
+			      PyUnicode_FSConverter, &os2))
+		return NULL;
+	s1 = bytes2str(os1, 1);
+	s2 = bytes2str(os2, 1);
+#endif
 
 #if defined(PYOS_OS2)
     if (stricmp(s1, "BEGINLIBPATH") == 0) {
@@ -5438,6 +5445,8 @@ posix_putenv(PyObject *self, PyObject *args)
 	PyOS_snprintf(newenv, len, "%s=%s", s1, s2);
 	if (putenv(newenv)) {
                 Py_DECREF(newstr);
+		release_bytes(os1);
+		release_bytes(os2);
                 posix_error();
                 return NULL;
 	}
@@ -5457,6 +5466,10 @@ posix_putenv(PyObject *self, PyObject *args)
 
 #if defined(PYOS_OS2)
     }
+#endif
+#ifndef MS_WINDOWS
+	release_bytes(os1);
+	release_bytes(os2);
 #endif
 	Py_INCREF(Py_None);
         return Py_None;
