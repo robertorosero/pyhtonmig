@@ -701,7 +701,7 @@ if sys.platform != 'win32':
                 self.assertRaises(OverflowError, os.setregid, 0, 1<<32)
 
     class Pep383Tests(unittest.TestCase):
-        filenames = [b'foo\xf6bar', b'foo\xf6bar']
+        filenames = [b'foo\xf6bar', 'foo\xf6bar'.encode("utf-8")]
 
         def setUp(self):
             self.fsencoding = sys.getfilesystemencoding()

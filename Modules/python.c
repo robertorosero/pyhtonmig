@@ -44,7 +44,7 @@ char2wchar(char* arg)
 	}
 	/* Conversion failed. Fall back to escaping with utf8b. */
 #ifdef HAVE_MBRTOWC
-	/* Try conversion with mbsrtwocs (C99), and escape non-decodable bytes. */
+	/* Try conversion with mbrtwoc (C99), and escape non-decodable bytes. */
 	
 	/* Overallocate; as multi-byte characters are in the argument, the
 	   actual output could use less memory. */

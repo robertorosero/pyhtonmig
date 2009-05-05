@@ -1541,7 +1541,7 @@ class Utf8bTest(unittest.TestCase):
         # bad byte: \xa5 is unmapped in iso-8859-3
         self.assertEqual(b"foo\xa5bar".decode("iso-8859-3", "utf8b"),
                          "foo\udca5bar")
-        self.assertEqual("foo\udca5bar".encode("iso-8859-4", "utf8b"),
+        self.assertEqual("foo\udca5bar".encode("iso-8859-3", "utf8b"),
                          b"foo\xa5bar")
 
 
