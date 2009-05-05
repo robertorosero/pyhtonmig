@@ -50,6 +50,7 @@ the :mod:`os` module, but using them is of course a threat to portability!
    have currently been registered: ``'posix'``, ``'nt'``, ``'mac'``, ``'os2'``,
    ``'ce'``, ``'java'``.
 
+
 .. _os-filenames:
 
 File Names, Command Line Arguments, and Environment Variables
@@ -64,12 +65,15 @@ perform this conversion (see :func:`sys.getfilesystemencoding`).
 .. versionchanged:: 3.1
    On some systems, conversion using the file system encoding may
    fail. In this case, Python uses the ``utf8b`` encoding error
-   handler.
+   handler, which means that undecodable bytes are replaced by a
+   Unicode character U+DCxx on decoding, and these are again
+   translated to the original byte on encoding.
 
 
 The file system encoding must guarantee to successfully decode all
 bytes below 128. If the file system encoding fails to provide this
 guarantee, API functions may raise UnicodeErrors.
+
 
 .. _os-procinfo:
 
@@ -709,6 +713,7 @@ Files and Directories
 .. function:: getcwd()
 
    Return a string representing the current working directory.
+   Availability: Unix, Windows.
 
 .. function:: getcwdb()
 
@@ -815,7 +820,7 @@ Files and Directories
    entries ``'.'`` and ``'..'`` even if they are present in the directory.
    Availability: Unix, Windows.
 
-   This function can be called with a bytes or string argument, and return
+   This function can be called with a bytes or string argument, and returns
    filenames of the same datatype.
 
 
