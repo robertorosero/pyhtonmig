@@ -1686,7 +1686,7 @@ posix_access(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O&i:access",
 			      PyUnicode_FSConverter, &opath, &mode))
 		return 0;
-	path = bytes2str(opath);
+	path = bytes2str(opath, 1);
 	Py_BEGIN_ALLOW_THREADS
 	attr = GetFileAttributesA(path);
 	Py_END_ALLOW_THREADS
@@ -2225,6 +2225,7 @@ posix_listdir(PyObject *self, PyObject *args)
 	HANDLE hFindFile;
 	BOOL result;
 	WIN32_FIND_DATA FileData;
+	PyObject *opath;
 	char namebuf[MAX_PATH+5]; /* Overallocate for \\*.*\0 */
 	char *bufptr = namebuf;
 	Py_ssize_t len = sizeof(namebuf)-5; /* only claim to have space for MAX_PATH */
@@ -2589,7 +2590,7 @@ posix__getfullpathname(PyObject *self, PyObject *args)
 		release_bytes(opath);
 		return NULL;
 	}
-	release_bytes(path);
+	release_bytes(opath);
 	if (PyUnicode_Check(PyTuple_GetItem(args, 0))) {
 		return PyUnicode_Decode(outbuf, strlen(outbuf),
 			Py_FileSystemDefaultEncoding, NULL);
@@ -2946,7 +2947,7 @@ posix_utime(PyObject *self, PyObject *args)
 		if (!PyArg_ParseTuple(args, "O&O:utime",
 				PyUnicode_FSConverter, &oapath, &arg))
 			return NULL;
-		apath = bytes2str(oapath);
+		apath = bytes2str(oapath, 1);
 		Py_BEGIN_ALLOW_THREADS
 		hFile = CreateFileA(apath, FILE_WRITE_ATTRIBUTES, 0,
 				    NULL, OPEN_EXISTING,
@@ -2954,7 +2955,7 @@ posix_utime(PyObject *self, PyObject *args)
 		Py_END_ALLOW_THREADS
 		if (hFile == INVALID_HANDLE_VALUE) {
 			win32_error("utime", apath);
-			release(oapath);
+			release_bytes(oapath);
 			return NULL;
 		}
 		release_bytes(oapath);
@@ -3352,7 +3353,6 @@ posix_spawnv(PyObject *self, PyObject *args)
 	PyObject *opath;
 	char *path;
 	PyObject *argv;
-	PyObject **oargvlist;
 	char **argvlist;
 	int mode, i;
 	Py_ssize_t argc;
@@ -3366,7 +3366,7 @@ posix_spawnv(PyObject *self, PyObject *args)
 			      PyUnicode_FSConverter,
 			      &opath, &argv))
 		return NULL;
-	path = bytes2str(opath);
+	path = bytes2str(opath, 1);
 	if (PyList_Check(argv)) {
 		argc = PyList_Size(argv);
 		getitem = PyList_GetItem;
@@ -3389,7 +3389,7 @@ posix_spawnv(PyObject *self, PyObject *args)
 	}
 	for (i = 0; i < argc; i++) {
 		if (!fsconvert_strdup((*getitem)(argv, i),
-				      &oargvlist[i])) {
+				      &argvlist[i])) {
 			free_string_array(argvlist, i);
 			PyErr_SetString(
 				PyExc_TypeError,
@@ -3459,7 +3459,7 @@ posix_spawnve(PyObject *self, PyObject *args)
 			      PyUnicode_FSConverter,
 			      &opath, &argv, &env))
 		return NULL;
-	path = bytes2str(opath);
+	path = bytes2str(opath, 1);
 	if (PyList_Check(argv)) {
 		argc = PyList_Size(argv);
 		getitem = PyList_GetItem;
@@ -6795,6 +6795,7 @@ the underlying Win32 ShellExecute function doesn't work if it is.");
 static PyObject *
 win32_startfile(PyObject *self, PyObject *args)
 {
+	PyObject *ofilepath;
 	char *filepath;
 	char *operation = NULL;
 	HINSTANCE rc;
@@ -6840,7 +6841,7 @@ normal:
 			      PyUnicode_FSConverter, &ofilepath, 
 			      &operation))
 		return NULL;
-	filepath = bytes2str(ofilepath);
+	filepath = bytes2str(ofilepath, 1);
 	Py_BEGIN_ALLOW_THREADS
 	rc = ShellExecute((HWND)0, operation, filepath, 
 			  NULL, NULL, SW_SHOWNORMAL);
