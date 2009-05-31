@@ -26,6 +26,7 @@ class TextTest(unittest.TestCase):
         bbox = self.text.bbox(('1.0', '-1c', '+1c'))
         self.assertTrue(isinstance(bbox, tuple))
         self.assertEqual(len(bbox), 4)
+        self.assertEqual(bbox, self.text.bbox('1.0 -1c +1c'))
 
         # The following used to raise Tkinter.TclError since text.bbox allowed
         # passing multiple args.
@@ -136,7 +137,7 @@ class TextTest(unittest.TestCase):
         self.text.insert('1.0', 'abc')
         self.text.insert('1.1', 'bcd a', 'mytag')
         self.assertEqual(self.text.get('1.0', 'end').strip(), 'abcd abc')
-        self.assertIn(self.text.tag_name(), 'mytag')
+        self.assertIn('mytag', self.text.tag_names())
 
     def test_mark(self):
         pass
