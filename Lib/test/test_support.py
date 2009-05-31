@@ -6,6 +6,7 @@ if __name__ != 'test.test_support':
 import contextlib
 import errno
 import functools
+import gc
 import socket
 import sys
 import os
@@ -378,6 +379,10 @@ else:
                 'Unicode filename tests may not be effective' \
                 % TESTFN_UNICODE_UNENCODEABLE
 
+# Disambiguate TESTFN for parallel testing, while letting it remain a valid
+# module name.
+TESTFN = "{0}_{1}_tmp".format(TESTFN, os.getpid())
+
 # Make sure we can write to TESTFN, try in /tmp if we can't
 fp = None
 try:
@@ -640,7 +645,6 @@ def gc_collect():
     longer than expected.  This function tries its best to force all garbage
     objects to disappear.
     """
-    import gc
     gc.collect()
     gc.collect()
     gc.collect()
