@@ -349,16 +349,18 @@ def tclobjs_to_py(adict):
 
     return adict
 
-def setup_master(master=None):
+def setup_master(master=None, **kw):
     """If master is not None, itself is returned. If master is None,
     the default master is returned if there is one, otherwise a new
-    master is created and returned.
+    master is created, defined as default and then returned. Any
+    other passed options will be repassed to the Tkinter.Tk class.
 
     If it is not allowed to use the default root and master is None,
     RuntimeError is raised."""
     if master is None:
         if Tkinter._support_default_root:
-            master = Tkinter._default_root or Tkinter.Tk()
+            master = Tkinter._default_root or Tkinter.Tk(**kw)
+            Tkinter._default_root = master
         else:
             raise RuntimeError(
                     "No master specified and Tkinter is "
