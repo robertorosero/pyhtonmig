@@ -115,8 +115,8 @@ class BooleanVarTest(VariableTest):
         self.assertRaises(Tkinter.TclError, self.var.get)
 
 
-tests_gui = (VariableTest, StringVarTest, IntVarTest,
+tests_nogui = (VariableTest, StringVarTest, IntVarTest,
         DoubleVarTest, BooleanVarTest)
 
 if __name__ == "__main__":
-    run_unittest(*tests_gui)
+    run_unittest(*tests_nogui)
