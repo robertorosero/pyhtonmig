@@ -28,6 +28,9 @@ class TextTest(unittest.TestCase):
         self.assertEqual(len(bbox), 4)
         self.assertEqual(bbox, self.text.bbox('1.0 -1c +1c'))
 
+        # Invalid index.
+        self.assertRaises(Tkinter.TclError, self.text.bbox, '1,0')
+
         # The following used to raise Tkinter.TclError since text.bbox allowed
         # passing multiple args.
         self.assertRaises(TypeError, self.text.bbox, '1.0', '-1c')
