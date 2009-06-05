@@ -177,11 +177,15 @@ class TextTest(unittest.TestCase):
     def test_window(self):
         pass
 
-    def test_xview(self):
-        pass
+    def test_xview(self, method='xview'):
+        view = getattr(self.text, method)()
+        self.assertTrue(isinstance(view, tuple))
+        self.assertEqual(len(view), 2)
+        for item in view:
+            self.assertTrue(isinstance(item, float))
 
     def test_yview(self):
-        pass
+        self.test_xview('yview')
 
 
 tests_gui = (TextTest, )
