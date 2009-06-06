@@ -14,6 +14,12 @@ class CanvasTest(unittest.TestCase):
     def tearDown(self):
         self.canvas.destroy()
 
+    def verify_tags(self, orig, new):
+        self.assertEqual(len(orig), len(new))
+        for tag in new:
+            orig.remove(tag)
+        self.assertFalse(orig)
+
 
     def test_addtag(self): pass
 
@@ -130,12 +136,82 @@ class CanvasTest(unittest.TestCase):
                 self.canvas.itemconfigure(t4))
         self.assertEqual(self.canvas.itemconfigure(t4), {})
 
-    def test_dtag(self): pass
+    def test_dtag(self):
+        ttags = ['a', 'b', 'c']
+        x = self.canvas.create_text(5, 5, tags=tuple(ttags))
+        self.verify_tags(ttags, self.canvas.gettags(x))
+
+        self.canvas.dtag(x, 'a')
+        ttags = ['b', 'c']
+        self.verify_tags(ttags[:], self.canvas.gettags(x))
+
+        self.canvas.dtag(x, 'd')
+        self.verify_tags(ttags, self.canvas.gettags(x))
+
+        self.canvas.dtag('b')
+        self.verify_tags(['c'], self.canvas.gettags(x))
+
     def test_find(self): pass
-    def test_focus(self): pass
-    def test_gettags(self): pass
-    def test_icursor(self): pass
-    def test_index(self): pass
+
+    def test_focus(self):
+        # XXX This used to raise Tkinter.TclError since canvas.focus allowed
+        # any amount of arguments while the focus command in Tk expects at
+        # most one.
+        self.assertRaises(TypeError, self.canvas.focus, 'a', 'b')
+
+        self.assertIs(self.canvas.focus(), None)
+
+        tid = self.canvas.create_text(10, 10, tags='a')
+        self.canvas.focus('a')
+        self.assertEqual(self.canvas.focus(), tid)
+        self.canvas.focus(10)
+        self.assertEqual(self.canvas.focus(), tid)
+        self.canvas.focus('')
+        self.assertIs(self.canvas.focus(), None)
+
+    def test_gettags(self):
+        # XXX The following used to raise Tkinter.TclError since gettags
+        # allowed multiple arguments while the gettags command in Tk
+        # accepts only one argument.
+        self.assertRaises(TypeError, self.canvas.gettags, 'a', 'b')
+
+        self.assertEqual(self.canvas.gettags('x'), ())
+        tid = self.canvas.create_text(10, 10, tags='a')
+        self.assertEqual(self.canvas.gettags(tid), ('a', ))
+
+        tid2 = self.canvas.create_text(10, 10, tags=('a', 'b', 'c'))
+        self.verify_tags(['a'], self.canvas.gettags('a'))
+        # lower tid2 so it assumes the first position in the display list
+        # (the item at the end of display list is the one that is displayed,
+        # but gettags returns the tags of the first item in this display list)
+        self.canvas.tag_lower(tid2)
+        self.verify_tags(['a', 'b', 'c'], self.canvas.gettags('a'))
+
+    def test_icursor(self):
+        # XXX This used to raise Tkinter.TclError since canvas.icursor allowed
+        # a single argument while it always requires two (not counting self).
+        self.assertRaises(TypeError, self.canvas.icursor, 1)
+
+        tid = self.canvas.create_text(5, 5, text='test')
+        self.canvas.icursor(tid, 3)
+        self.assertEqual(self.canvas.index(tid, 'insert'), 3)
+
+    def test_index(self):
+        # XXX This used to raise Tkinter.TclError since canvas.index allowed
+        # passing a single argument while it always requires two (not counting
+        # self).
+        self.assertRaises(TypeError, self.canvas.index, 0)
+
+        # won't return index of an unexisting item
+        self.assertRaises(Tkinter.TclError, self.canvas.index, 1, 1)
+
+        tid = self.canvas.create_text(5, 5, text='test')
+        self.assertEqual(self.canvas.index(tid, 'end'), 4)
+        self.assertEqual(self.canvas.index(tid, 'insert'), 0)
+
+        # no selection set
+        self.assertRaises(Tkinter.TclError, self.canvas.index, tid, 'sel.first')
+
     def test_insert(self): pass
     def test_itemcget(self): pass
     def test_itemconfigure(self): pass
