@@ -20,7 +20,6 @@ class CanvasTest(unittest.TestCase):
             orig.remove(tag)
         self.assertFalse(orig)
 
-
     def test_addtag(self): pass
 
     def test_bbox(self):
@@ -42,8 +41,18 @@ class CanvasTest(unittest.TestCase):
         for indx, item in enumerate(zip(ba[2:], bb[2:])):
             self.assertEqual(max(item), res[indx + 2])
 
-    def test_tag(self): pass
-    def test_canvasxy(self): pass
+    def test_tagbind_unbind(self):
+        # XXX Very likely to contain a leak, will test soon.
+        pass
+
+    def test_canvasx(self, meth='canvasx'):
+        x = getattr(self.canvas, meth)(832, 5)
+        self.assertTrue(isinstance(x, float))
+        self.assertEqual(x, 830)
+        self.assertEqual(getattr(self.canvas, meth)(832), 832)
+
+    def test_canvasy(self):
+        self.test_canvasx('canvasy')
 
     def test_coords(self):
         coords = self.canvas.coords('x')
@@ -97,7 +106,7 @@ class CanvasTest(unittest.TestCase):
         winid = self.canvas.create_window(1, 2)
         self.assertEqual(self.canvas.type(winid), 'window')
 
-        for key, val in locals().iteritems():
+        for key, val in locals().items():
             if key.endswith('id'):
                 self.assertTrue(isinstance(val, int))
 
@@ -151,7 +160,43 @@ class CanvasTest(unittest.TestCase):
         self.canvas.dtag('b')
         self.verify_tags(['c'], self.canvas.gettags(x))
 
-    def test_find(self): pass
+    def test_find(self):
+        self.assertEqual(self.canvas.find_withtag(1), ())
+        self.assertEqual(self.canvas.find_all(), ())
+
+        lid = self.canvas.create_line(10, 10, 20, 20, tags='a')
+        tid = self.canvas.create_text(30, 30, text='x', tags='a')
+
+        self.assertEqual(self.canvas.find_all(), (lid, tid))
+
+        self.assertEqual(self.canvas.find_withtag(tid), (tid, ))
+        atags = self.canvas.find_withtag('a')
+        self.assertEqual(len(atags), 2)
+        self.assertIn(tid, atags)
+        self.assertIn(lid, atags)
+        self.assertEqual(self.canvas.find_withtag('x'), ())
+
+        self.assertEqual(self.canvas.find_overlapping(30, 30, 30, 30), (tid, ))
+        self.assertEqual(self.canvas.find_overlapping(15, 15, 30, 30),
+                (lid, tid))
+        self.assertEqual(self.canvas.find_overlapping(5, 5, 8, 8), ())
+
+        self.assertEqual(self.canvas.find_enclosed(10, 10, 15, 15), ())
+        self.assertEqual(self.canvas.find_enclosed(8, 8, 22, 22), (lid, ))
+
+        self.assertEqual(self.canvas.find_above(lid), (tid, ))
+        self.canvas.tag_lower(tid)
+        self.assertEqual(self.canvas.find_above(lid), ())
+
+        self.assertEqual(self.canvas.find_below(lid), (tid, ))
+        self.canvas.tag_raise(tid)
+        self.assertEqual(self.canvas.find_below(lid), ())
+
+        self.assertEqual(self.canvas.find_closest(19, 19), (lid, ))
+        self.assertEqual(self.canvas.find_closest(19, 19, 10), (tid, ))
+        self.assertEqual(self.canvas.find_closest(19, 19, 10, tid), (lid, ))
+        self.canvas.tag_raise(lid)
+        self.assertEqual(self.canvas.find_closest(19, 19, 10), (lid, ))
 
     def test_focus(self):
         # XXX This used to raise Tkinter.TclError since canvas.focus allowed
@@ -212,12 +257,88 @@ class CanvasTest(unittest.TestCase):
         # no selection set
         self.assertRaises(Tkinter.TclError, self.canvas.index, tid, 'sel.first')
 
-    def test_insert(self): pass
-    def test_itemcget(self): pass
-    def test_itemconfigure(self): pass
-    def test_move(self): pass
-    def test_postscript(self): pass # XXX
-    def test_scale(self): pass
+    def test_insert(self):
+        # XXX The following used to be "supported" since canvas.insert allowed
+        # any amount of arguments, include invalid amounts.
+        self.assertRaises(TypeError, self.canvas.insert, 0)
+
+        self.assertRaises(Tkinter.TclError, self.canvas.insert, 0, 0)
+
+        tid = self.canvas.create_text(10, 10, text='hi')
+        l1 = self.canvas.create_line(5, 5, 20, 20, tags='a')
+        l2 = self.canvas.create_line(30, 30, 15, 15, tags='a')
+
+        self.canvas.insert(tid, 'end', ' there')
+        self.assertEqual(self.canvas.itemcget(tid, 'text'), 'hi there')
+
+        l1_coords = [5, 5, 20, 20]
+        l2_coords = [30, 30, 15, 15]
+        for indx, item in enumerate(self.canvas.coords(l1)):
+            self.assertAlmostEqual(item, l1_coords[indx])
+        for indx, item in enumerate(self.canvas.coords(l2)):
+            self.assertAlmostEqual(item, l2_coords[indx])
+        self.canvas.insert('a', '@20,20', (10, 10))
+        l1_coords = l1_coords[:2] + [10, 10] + l1_coords[2:]
+        l2_coords = l2_coords[:2] + [10, 10] + l2_coords[2:]
+        for indx, item in enumerate(self.canvas.coords(l1)):
+            self.assertAlmostEqual(item, l1_coords[indx])
+        for indx, item in enumerate(self.canvas.coords(l2)):
+            self.assertAlmostEqual(item, l2_coords[indx])
+
+    def test_itemcget(self):
+        x = self.canvas.create_line(1, 2, 3, 4,
+                fill='blue', activefill='yellow', state='normal')
+        self.assertEqual(self.canvas.itemcget(x, 'fill'), 'blue')
+        self.assertEqual(self.canvas.itemcget(x, 'activefill'), 'yellow')
+        self.assertEqual(self.canvas.itemcget(x, 'state'), 'normal')
+
+        self.assertRaises(Tkinter.TclError, self.canvas.itemcget, x, 'image')
+
+    def test_itemconfigure(self):
+        self.assertEqual(self.canvas.itemconfigure(0), {})
+
+        tid = self.canvas.create_text(10, 10)
+        self.assertRaises(Tkinter.TclError, self.canvas.itemconfigure,
+                tid, 'image')
+
+        self.assertEqual(self.canvas.itemconfigure(tid, 'font'),
+                self.canvas.itemconfigure(tid)['font'])
+
+        self.assertIs(self.canvas.itemconfigure(0, 'image'), None)
+
+    def test_move(self):
+        # XXX These used to raise Tkinter.TclError
+        self.assertRaises(TypeError, self.canvas.move)
+        self.assertRaises(TypeError, self.canvas.move, 1)
+        self.assertRaises(TypeError, self.canvas.move, 1, 2)
+
+        tid = self.canvas.create_text(10, 10, tags='a')
+        lid = self.canvas.create_line(50, 50, 70, 90, tags='a')
+        self.canvas.move('a', -5, 5)
+        self.assertEqual(self.canvas.coords(tid), [5, 15])
+        self.assertEqual(self.canvas.coords(lid), [45, 55, 65, 95])
+
+    def test_postscript(self):
+        ps = self.canvas.postscript()
+        self.assertTrue(isinstance(ps, basestring))
+
+        self.assertRaises(Tkinter.TclError, self.canvas.postscript,
+                invalid='val')
+        self.assertTrue(isinstance(self.canvas.postscript(x=10, y=10),
+            basestring))
+
+    def test_scale(self):
+        # XXX All these used to raise Tkinter.TclError
+        self.assertRaises(TypeError, self.canvas.scale)
+        self.assertRaises(TypeError, self.canvas.scale, 0)
+        self.assertRaises(TypeError, self.canvas.scale, 0, 1)
+        self.assertRaises(TypeError, self.canvas.scale, 0, 1, 2)
+        self.assertRaises(TypeError, self.canvas.scale, 0, 1, 2, 3)
+
+        # Supposing tagOrId is not None, can canvas.scale
+        # raise Tkinter.TclError ?
+        self.assertIs(self.canvas.scale(0, 1, 2, 3, 4), None)
+
     def test_scan(self): pass
     def test_select(self): pass
 
