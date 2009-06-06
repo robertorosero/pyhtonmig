@@ -14,7 +14,10 @@ class ListboxTest(unittest.TestCase):
     def tearDown(self):
         self.lb.destroy()
 
-    def test_activate(self): pass
+    def test_activate(self):
+        self.lb.insert(0, 'a', 'b c')
+        self.lb.activate(1)
+        self.assertEqual(self.lb.index('active'), 1)
 
     def test_bbox(self):
         self.assertRaises(Tkinter.TclError, self.lb.bbox, '@1.2')
@@ -65,7 +68,22 @@ class ListboxTest(unittest.TestCase):
         self.assertEqual(self.lb.index('2'), 2)
         # XXX how can I get a None using the index method ?
 
-    def test_nearest(self): pass
+    def test_nearest(self):
+        self.assertEqual(self.lb.nearest(10), -1)
+
+        items = [1, 2, 3]
+        self.lb.insert(0, *tuple(items))
+        self.assertTrue(isinstance(self.lb.nearest(10), int))
+        self.lb.pack()
+        self.lb.update_idletasks()
+        for i in range(0, self.lb.winfo_height(), 5):
+            item = self.lb.get(self.lb.nearest(i))
+            if item in items:
+                items.remove(item)
+            if not items:
+                break
+        self.assertFalse(items)
+
     def test_scan(self): pass
 
     def test_see(self):
