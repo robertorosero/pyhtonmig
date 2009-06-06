@@ -132,6 +132,8 @@ class CanvasTest(unittest.TestCase):
         self.assertEqual(self.canvas.type(lineid), 'line')
         ovalid = self.canvas.create_oval(1, 2, 3, 4)
         self.assertEqual(self.canvas.type(ovalid), 'oval')
+        polyid = self.canvas.create_polygon(50, 50, 90, 50, 40, 40)
+        self.assertEqual(self.canvas.type(polyid), 'polygon')
         rectid = self.canvas.create_rectangle(1, 2, 3, 4)
         self.assertEqual(self.canvas.type(rectid), 'rectangle')
         textid = self.canvas.create_text(1, 2)

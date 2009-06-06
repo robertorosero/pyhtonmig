@@ -13,7 +13,8 @@ class ToplevelTest(unittest.TestCase):
 
     def test_initialization(self):
         self.root.title('hi')
-        tl = Tkinter.Toplevel(self.root, **{'class_': 'test'})
+        tl = Tkinter.Toplevel(self.root,
+                **{'class_': 'test', 'colormap': 'new'})
         self.assertEqual(tl['class'], 'test')
         self.assertEqual(tl.title(), 'hi')
         tl.destroy()

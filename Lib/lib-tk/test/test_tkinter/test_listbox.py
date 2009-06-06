@@ -130,6 +130,13 @@ class ListboxTest(unittest.TestCase):
         self.lb.selection_clear(0, 'end')
         self.assertEqual(self.lb.curselection(), ())
 
+    def test_size(self):
+        self.assertEqual(self.lb.size(), 0)
+        self.lb.insert(0, 1, 2)
+        self.assertEqual(self.lb.size(), 2)
+        self.lb.insert(1, 1.5, 1.7)
+        self.assertEqual(self.lb.size(), 4)
+
     def test_xview(self, method='xview'):
         view = getattr(self.lb, method)()
         self.assertTrue(isinstance(view, tuple))
