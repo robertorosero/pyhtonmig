@@ -20,7 +20,34 @@ class CanvasTest(unittest.TestCase):
             orig.remove(tag)
         self.assertFalse(orig)
 
-    def test_addtag(self): pass
+    def test_addtag(self):
+        def verify_tags(a, b, c):
+            self.assertEqual(self.canvas.gettags(l1), a)
+            self.assertEqual(self.canvas.gettags(l2), b)
+            self.assertEqual(self.canvas.gettags(l3), c)
+
+        l1 = self.canvas.create_line(10, 10, 20, 20)
+        l2 = self.canvas.create_line(15, 15, 25, 25)
+        l3 = self.canvas.create_line(20, 20, 30, 30)
+
+        self.canvas.addtag_all('line')
+        verify_tags(('line', ), ('line', ), ('line', ))
+
+        self.canvas.addtag_above('l3', l2)
+        verify_tags(('line', ), ('line', ), ('line', 'l3'))
+        self.canvas.addtag_below('l1', l2)
+        verify_tags(('line', 'l1'), ('line', ), ('line', 'l3'))
+        self.canvas.addtag_closest('start', 5, 5)
+        verify_tags(('line', 'l1', 'start'), ('line', ), ('line', 'l3'))
+        self.canvas.addtag_withtag('x', 'line')
+        verify_tags(('line', 'l1', 'start', 'x'), ('line', 'x'),
+                ('line', 'l3', 'x'))
+        self.canvas.addtag_overlapping('a', 10, 10, 17, 17)
+        verify_tags(('line', 'l1', 'start', 'x', 'a'), ('line', 'x', 'a'),
+                ('line', 'l3', 'x'))
+        self.canvas.addtag_enclosed('e', 12, 12, 28, 28)
+        verify_tags(('line', 'l1', 'start', 'x', 'a'), ('line', 'x', 'a', 'e'),
+                ('line', 'l3', 'x'))
 
     def test_bbox(self):
         self.assertIs(self.canvas.bbox('a'), None)
@@ -42,8 +69,14 @@ class CanvasTest(unittest.TestCase):
             self.assertEqual(max(item), res[indx + 2])
 
     def test_tagbind_unbind(self):
-        # XXX Very likely to contain a leak, will test soon.
-        pass
+        self.assertFalse(self.canvas._tclCommands)
+        a = self.canvas.tag_bind('x', '<Enter>', lambda: None)
+        b = self.canvas.tag_bind('x', '<Enter>', lambda: None)
+        self.assertEqual(self.canvas._tclCommands, [a, b])
+        self.canvas.tag_unbind('x', '<Enter>')
+        self.canvas.tag_unbind('x', '<Enter>', b)
+        self.canvas.tag_unbind('x', '<Enter>', a)
+        self.assertFalse(self.canvas._tclCommands)
 
     def test_canvasx(self, meth='canvasx'):
         x = getattr(self.canvas, meth)(832, 5)
