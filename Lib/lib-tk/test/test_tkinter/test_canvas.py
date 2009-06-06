@@ -339,6 +339,35 @@ class CanvasTest(unittest.TestCase):
 
         self.assertIs(self.canvas.itemconfigure(0, 'image'), None)
 
+    def test_lower_raise(self):
+        # XXX These used to raise Tkinter.TclError
+        self.assertRaises(TypeError, self.canvas.tag_lower)
+        self.assertRaises(TypeError, self.canvas.tag_raise)
+
+        t1 = self.canvas.create_text(10, 10, tags='t')
+        t2 = self.canvas.create_text(10, 10, tags='t')
+        t3 = self.canvas.create_text(10, 10, tags='t')
+
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t1)
+
+        self.canvas.tag_lower(t2)
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t2)
+        self.canvas.tag_lower(t3, t1)
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t2)
+        self.canvas.tag_lower(t3)
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t3)
+
+        self.canvas.tag_raise(t3, t1)
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t2)
+        self.canvas.tag_raise(t2)
+        self.canvas.focus('t')
+        self.assertEqual(self.canvas.focus(), t1)
+
     def test_move(self):
         # XXX These used to raise Tkinter.TclError
         self.assertRaises(TypeError, self.canvas.move)
