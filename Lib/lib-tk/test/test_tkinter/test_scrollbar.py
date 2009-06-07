@@ -46,8 +46,8 @@ class ScrollbarTest(unittest.TestCase):
         y_max = self.sb.winfo_height()
 
         values = ['', 'arrow1', 'arrow2', 'slider']
-        empty = self.sb.identify(0, 0)
-        self.assertIn(empty, values)
+        empty = self.sb.identify(-1, -1)
+        self.assertEqual(empty, '')
         values.remove(empty)
         self.assertEqual(values, ['arrow1', 'arrow2', 'slider'])
         arrow1 = self.sb.identify(x_mid, 5)

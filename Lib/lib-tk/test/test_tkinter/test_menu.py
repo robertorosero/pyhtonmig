@@ -1,3 +1,4 @@
+import sys
 import unittest
 import Tkinter
 from test.test_support import requires, run_unittest
@@ -112,6 +113,9 @@ class MenuTest(unittest.TestCase):
         self.assertRaises(Tkinter.TclError, self.menu.invoke, -1)
 
     def test_post_unpost(self):
+        if sys.platform == 'win32':
+            self.skipTest("Menu post blocks on Windows.")
+
         self.menu.add_radiobutton(label='R')
         self.menu.add_checkbutton(label='C')
 

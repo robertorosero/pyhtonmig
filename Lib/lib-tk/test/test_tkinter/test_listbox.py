@@ -75,7 +75,7 @@ class ListboxTest(unittest.TestCase):
         self.lb.insert(0, *tuple(items))
         self.assertTrue(isinstance(self.lb.nearest(10), int))
         self.lb.pack()
-        self.lb.update_idletasks()
+        self.lb.wait_visibility()
         for i in range(0, self.lb.winfo_height(), 5):
             item = self.lb.get(self.lb.nearest(i))
             if item in items:
