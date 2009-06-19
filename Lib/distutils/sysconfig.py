@@ -13,7 +13,6 @@ __revision__ = "$Id$"
 
 import os
 import re
-import string
 import sys
 
 from distutils.errors import DistutilsPlatformError
@@ -285,18 +284,25 @@ def parse_makefile(fn, g=None):
 
     while 1:
         line = fp.readline()
-        if line is None:                # eof
+        if line is None:  # eof
             break
         m = _variable_rx.match(line)
         if m:
             n, v = m.group(1, 2)
-            v = string.strip(v)
-            if "$" in v:
+            v = v.strip()
+            # `$$' is a literal `$' in make
+            tmpv = v.replace('$$', '')
+
+            if "$" in tmpv:
                 notdone[n] = v
             else:
-                try: v = int(v)
-                except ValueError: pass
-                done[n] = v
+                try:
+                    v = int(v)
+                except ValueError:
+                    # insert literal `$'
+                    done[n] = v.replace('$$', '$')
+                else:
+                    done[n] = v
 
     # do variable interpolation here
     while notdone:
@@ -324,7 +330,7 @@ def parse_makefile(fn, g=None):
                     else:
                         try: value = int(value)
                         except ValueError:
-                            done[name] = string.strip(value)
+                            done[name] = value.strip()
                         else:
                             done[name] = value
                         del notdone[name]
@@ -428,7 +434,7 @@ def _init_posix():
             # relative to the srcdir, which after installation no longer makes
             # sense.
             python_lib = get_python_lib(standard_lib=1)
-            linkerscript_path = string.split(g['LDSHARED'])[0]
+            linkerscript_path = g['LDSHARED'].split()[0]
             linkerscript_name = os.path.basename(linkerscript_path)
             linkerscript = os.path.join(python_lib, 'config',
                                         linkerscript_name)

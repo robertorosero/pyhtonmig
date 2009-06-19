@@ -402,10 +402,13 @@ set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
             s = e->v.List.elts;
             break;
         case Tuple_kind:
-            if (asdl_seq_LEN(e->v.Tuple.elts) == 0) 
-                return ast_error(n, "can't assign to ()");
-            e->v.Tuple.ctx = ctx;
-            s = e->v.Tuple.elts;
+            if (asdl_seq_LEN(e->v.Tuple.elts))  {
+                e->v.Tuple.ctx = ctx;
+                s = e->v.Tuple.elts;
+            }
+            else {
+                expr_name = "()";
+            }
             break;
         case Lambda_kind:
             expr_name = "lambda";
@@ -1347,9 +1350,6 @@ ast_for_atom(struct compiling *c, const node *n)
         if (TYPE(ch) == yield_expr)
             return ast_for_expr(c, ch);
         
-        if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
-            return ast_for_genexp(c, ch);
-        
         return ast_for_testlist_gexp(c, ch);
     case LSQB: /* list (or list comprehension) */
         ch = CHILD(n, 1);
@@ -1471,14 +1471,7 @@ ast_for_slice(struct compiling *c, const node *n)
 
     ch = CHILD(n, NCH(n) - 1);
     if (TYPE(ch) == sliceop) {
-        if (NCH(ch) == 1) {
-            /* No expression, so step is None */
-            ch = CHILD(ch, 0);
-            step = Name(new_identifier("None", c->c_arena), Load,
-                        LINENO(ch), ch->n_col_offset, c->c_arena);
-            if (!step)
-                return NULL;
-        } else {
+        if (NCH(ch) != 1) {
             ch = CHILD(ch, 1);
             if (TYPE(ch) == test) {
                 step = ast_for_expr(c, ch);
@@ -2088,31 +2081,6 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         expr1 = ast_for_testlist(c, ch);
         if (!expr1)
             return NULL;
-        /* TODO(nas): Remove duplicated error checks (set_context does it) */
-        switch (expr1->kind) {
-            case GeneratorExp_kind:
-                ast_error(ch, "augmented assignment to generator "
-                          "expression not possible");
-                return NULL;
-            case Yield_kind:
-                ast_error(ch, "augmented assignment to yield "
-                          "expression not possible");
-                return NULL;
-            case Name_kind: {
-                const char *var_name = PyBytes_AS_STRING(expr1->v.Name.id);
-                if ((var_name[0] == 'N' || var_name[0] == 'T' || var_name[0] == 'F') &&
-                    !forbidden_check(c, ch, var_name))
-                    return NULL;
-                break;
-            }
-            case Attribute_kind:
-            case Subscript_kind:
-                break;
-            default:
-                ast_error(ch, "illegal expression for augmented "
-                          "assignment");
-                return NULL;
-        }
         if(!set_context(c, expr1, Store, ch))
             return NULL;
 
@@ -2179,9 +2147,9 @@ ast_for_print_stmt(struct compiling *c, const node *n)
                              | '>>' test [ (',' test)+ [','] ] )
      */
     expr_ty dest = NULL, expression;
-    asdl_seq *seq;
+    asdl_seq *seq = NULL;
     bool nl;
-    int i, j, start = 1;
+    int i, j, values_count, start = 1;
 
     REQ(n, print_stmt);
     if (NCH(n) >= 2 && TYPE(CHILD(n, 1)) == RIGHTSHIFT) {
@@ -2190,14 +2158,17 @@ ast_for_print_stmt(struct compiling *c, const node *n)
             return NULL;
             start = 4;
     }
-    seq = asdl_seq_new((NCH(n) + 1 - start) / 2, c->c_arena);
-    if (!seq)
-        return NULL;
-    for (i = start, j = 0; i < NCH(n); i += 2, ++j) {
-        expression = ast_for_expr(c, CHILD(n, i));
-        if (!expression)
+    values_count = (NCH(n) + 1 - start) / 2;
+    if (values_count) {
+        seq = asdl_seq_new(values_count, c->c_arena);
+        if (!seq)
             return NULL;
-        asdl_seq_SET(seq, j, expression);
+        for (i = start, j = 0; i < NCH(n); i += 2, ++j) {
+            expression = ast_for_expr(c, CHILD(n, i));
+            if (!expression)
+                return NULL;
+            asdl_seq_SET(seq, j, expression);
+        }
     }
     nl = (TYPE(CHILD(n, NCH(n) - 1)) == COMMA) ? false : true;
     return Print(dest, seq, nl, LINENO(n), n->n_col_offset, c->c_arena);
@@ -2329,7 +2300,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
 }
 
 static alias_ty
-alias_for_import_name(struct compiling *c, const node *n)
+alias_for_import_name(struct compiling *c, const node *n, int store)
 {
     /*
       import_as_name: NAME ['as' NAME]
@@ -2340,28 +2311,40 @@ alias_for_import_name(struct compiling *c, const node *n)
 
  loop:
     switch (TYPE(n)) {
-        case import_as_name:
+         case import_as_name: {
+            node *name_node = CHILD(n, 0);
             str = NULL;
             if (NCH(n) == 3) {
-                str = NEW_IDENTIFIER(CHILD(n, 2));
+                node *str_node = CHILD(n, 2);
+                if (store && !forbidden_check(c, str_node, STR(str_node)))
+                    return NULL;
+                str = NEW_IDENTIFIER(str_node);
                 if (!str)
                     return NULL;
             }
-            name = NEW_IDENTIFIER(CHILD(n, 0));
+            else {
+                if (!forbidden_check(c, name_node, STR(name_node)))
+                    return NULL;
+            }
+            name = NEW_IDENTIFIER(name_node);
             if (!name)
                 return NULL;
             return alias(name, str, c->c_arena);
+        }
         case dotted_as_name:
             if (NCH(n) == 1) {
                 n = CHILD(n, 0);
                 goto loop;
             }
             else {
-                alias_ty a = alias_for_import_name(c, CHILD(n, 0));
+                node *asname_node = CHILD(n, 2);
+                alias_ty a = alias_for_import_name(c, CHILD(n, 0), 0);
                 if (!a)
                     return NULL;
                 assert(!a->asname);
-                a->asname = NEW_IDENTIFIER(CHILD(n, 2));
+                if (!forbidden_check(c, asname_node, STR(asname_node)))
+                    return NULL;
+                a->asname = NEW_IDENTIFIER(asname_node);
                 if (!a->asname)
                     return NULL;
                 return a;
@@ -2369,7 +2352,10 @@ alias_for_import_name(struct compiling *c, const node *n)
             break;
         case dotted_name:
             if (NCH(n) == 1) {
-                name = NEW_IDENTIFIER(CHILD(n, 0));
+                node *name_node = CHILD(n, 0);
+                if (store && !forbidden_check(c, name_node, STR(name_node)))
+                    return NULL;
+                name = NEW_IDENTIFIER(name_node);
                 if (!name)
                     return NULL;
                 return alias(name, NULL, c->c_arena);
@@ -2443,7 +2429,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         if (!aliases)
             return NULL;
         for (i = 0; i < NCH(n); i += 2) {
-            alias_ty import_alias = alias_for_import_name(c, CHILD(n, i));
+            alias_ty import_alias = alias_for_import_name(c, CHILD(n, i), 1);
             if (!import_alias)
                 return NULL;
             asdl_seq_SET(aliases, i / 2, import_alias);
@@ -2454,13 +2440,15 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         int n_children;
         int idx, ndots = 0;
         alias_ty mod = NULL;
-        identifier modname;
+        identifier modname = NULL;
         
        /* Count the number of dots (for relative imports) and check for the
           optional module name */
         for (idx = 1; idx < NCH(n); idx++) {
             if (TYPE(CHILD(n, idx)) == dotted_name) {
-                mod = alias_for_import_name(c, CHILD(n, idx));
+                mod = alias_for_import_name(c, CHILD(n, idx), 0);
+                if (!mod)
+                    return NULL;
                 idx++;
                 break;
             } else if (TYPE(CHILD(n, idx)) != DOT) {
@@ -2501,14 +2489,14 @@ ast_for_import_stmt(struct compiling *c, const node *n)
 
         /* handle "from ... import *" special b/c there's no children */
         if (TYPE(n) == STAR) {
-            alias_ty import_alias = alias_for_import_name(c, n);
+            alias_ty import_alias = alias_for_import_name(c, n, 1);
             if (!import_alias)
                 return NULL;
                 asdl_seq_SET(aliases, 0, import_alias);
         }
         else {
             for (i = 0; i < NCH(n); i += 2) {
-                alias_ty import_alias = alias_for_import_name(c, CHILD(n, i));
+                alias_ty import_alias = alias_for_import_name(c, CHILD(n, i), 1);
                 if (!import_alias)
                     return NULL;
                     asdl_seq_SET(aliases, i / 2, import_alias);
@@ -2516,8 +2504,6 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         }
         if (mod != NULL)
             modname = mod->name;
-        else
-            modname = new_identifier("", c->c_arena);
         return ImportFrom(modname, aliases, ndots, lineno, col_offset,
                           c->c_arena);
     }
@@ -3130,7 +3116,6 @@ ast_for_stmt(struct compiling *c, const node *n)
         n = CHILD(n, 0);
     }
     if (TYPE(n) == small_stmt) {
-        REQ(n, small_stmt);
         n = CHILD(n, 0);
         /* small_stmt: expr_stmt | print_stmt  | del_stmt | pass_stmt
                      | flow_stmt | import_stmt | global_stmt | exec_stmt

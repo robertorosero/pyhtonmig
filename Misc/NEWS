@@ -12,6 +12,16 @@ What's New in Python 2.7 alpha 1
 Core and Builtins
 -----------------
 
+- Issue #6289: Encoding errors from compile() were being masked.
+
+- When no module is given in a relative import, the module field of the
+  ImportFrom AST node is now None instead of an empty string.
+
+- Assignment to None using import statements now raises a SyntaxError.
+
+- In the slice AST type, the step field will always be None if a step expression
+  is not specified.
+
 - Issue #4547: When debugging a very large function, it was not always
   possible to update the lineno attribute of the current frame.
 
@@ -317,6 +327,33 @@ Core and Builtins
 Library
 -------
 
+- Issue #6274: Fixed possible file descriptors leak in subprocess.py
+
+- Issue #6189: Restored compatibility of subprocess.py with Python 2.2.
+
+- Issue #6287: Added the license field in Distutils documentation.
+
+- Issue #6286: Now Distutils upload command is based on urllib2 instead of
+  httplib, allowing the usage of http_proxy.
+
+- Issue #6271: mmap tried to close invalid file handle (-1) when annonymous.
+  (On Unix)
+
+- Issue #6215: All bug fixes and enhancements from the Python 3.1 io library
+  (including the fast C implementation) have been backported to the standard
+  ``io`` module.
+
+- Issue #6258: Support AMD64 in bdist_msi.
+
+- Issue #5262: Fixed bug in next rollover time computation in
+  TimedRotatingFileHandler.
+
+- Issue #6263: Fixed syntax error in distutils.cygwincompiler.
+
+- Issue #5201: distutils.sysconfig.parse_makefile() now understands `$$`
+  in Makefiles. This prevents compile errors when using syntax like:
+  `LDFLAGS='-rpath=\$$LIB:/some/other/path'`. Patch by Floris Bruynooghe.
+
 - Issue #5767: Removed sgmlop support from xmlrpclib.
 
 - Issue #6131: test_modulefinder leaked when run after test_distutils.
@@ -345,7 +382,7 @@ Library
 
 - Issue #1424152: Fix for httplib, urllib2 to support SSL while working through
   proxy. Original patch by Christopher Li, changes made by Senthil Kumaran.
- 
+
 - Issue #1983: Fix functions taking or returning a process identifier to use
   the dedicated C type ``pid_t`` instead of a C ``int``. Some platforms have
   a process identifier type wider than the standard C integer type.
@@ -353,7 +390,7 @@ Library
 - Issue #4066: smtplib.SMTP_SSL._get_socket now correctly returns the socket.
   Patch by Farhan Ahmad, test by Marcin Bachry.
 
-- Issue #6062: In distutils, fixed the package option of build_ext. Feedback 
+- Issue #6062: In distutils, fixed the package option of build_ext. Feedback
   and tests on pywin32 by Tim Golden.
 
 - Issue #6053: Fixed distutils tests on win32. patch by Hirokazu Yamamoto.
@@ -361,7 +398,7 @@ Library
 - Issue #6046: Fixed the library extension when distutils build_ext is used
   inplace. Initial patch by Roumen Petrov.
 
-- Issue #6041: Now distutils `sdist` and `register` commands use `check` as a 
+- Issue #6041: Now distutils `sdist` and `register` commands use `check` as a
   subcommand.
 
 - Issue #2116: Weak references and weak dictionaries now support copy()ing and
@@ -511,8 +548,8 @@ Library
 
 - unittest.assertNotEqual() now uses the inequality operator (!=) instead
   of the equality operator.
-  
-- Issue #6001: Test discovery for unittest. Implemented in 
+
+- Issue #6001: Test discovery for unittest. Implemented in
   unittest.TestLoader.discover and from the command line.
 
 - Issue #5679: The methods unittest.TestCase.addCleanup and doCleanups were added.
@@ -522,11 +559,11 @@ Library
 
 - Issue #3379: unittest.main now takes an optional exit argument. If False main
   doesn't call sys.exit allowing it to be used from the interactive interpreter.
-  
-- Issue #5995: unittest.main now takes an optional verbosity argument allowing 
+
+- Issue #5995: unittest.main now takes an optional verbosity argument allowing
   test modules to be run with a higher than default verbosity.
-  
-- Issue #5995: A fix to allow you to run "python -m unittest test_module" or 
+
+- Issue #5995: A fix to allow you to run "python -m unittest test_module" or
   "python -m unittest test_module.TestClass" from the command line.
 
 - Issue #5728: unittest.TestResult has new startTestRun and stopTestRun methods;
@@ -1004,6 +1041,9 @@ Tools/Demos
 
 Build
 -----
+
+- Issue 5809: Specifying both --enable-framework and --enable-shared is
+  an error. Configure now explicity tells you about this.
 
 - Issue #3585: Add pkg-config support. It creates a python-2.7.pc file
   and a python.pc symlink in the $(LIBDIR)/pkgconfig directory. Patch by
