@@ -1189,7 +1189,9 @@ class Misc:
         if type(cnf) is StringType:
             x = self.tk.split(
                     self.tk.call(_flatten((self._w, cmd, '-'+cnf))))
-            return (x[0][1:],) + x[1:]
+            if x:
+                return (x[0][1:],) + x[1:]
+            return None
         self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
     # These used to be defined in Widget:
     def configure(self, cnf=None, **kw):
@@ -2128,16 +2130,20 @@ class Canvas(Widget):
         to nearest multiple of GRIDSPACING units."""
         return getdouble(self.tk.call(
             self._w, 'canvasy', screeny, gridspacing))
-    def coords(self, *args):
-        """Return a list of coordinates for the item given in ARGS."""
+    def coords(self, tagOrId, *args):
+        """Return or set the coordinates for an item.
+
+        To set the coordinates for an item, either a tuple or multiple values
+        should be passed."""
         # XXX Should use _flatten on args
+        # XXX why ?
         return map(getdouble,
                            self.tk.splitlist(
-                   self.tk.call((self._w, 'coords') + args)))
+                   self.tk.call((self._w, 'coords', tagOrId) + args)))
     def _create(self, itemType, args, kw): # Args: (val, val, ..., cnf={})
         """Internal function."""
         args = _flatten(args)
-        cnf = args[-1]
+        cnf = args[-1] if len(args) else None
         if type(cnf) in (DictionaryType, TupleType):
             args = args[:-1]
         else:
@@ -2172,17 +2178,28 @@ class Canvas(Widget):
     def create_window(self, *args, **kw):
         """Create window with coordinates x1,y1,x2,y2."""
         return self._create('window', args, kw)
-    def dchars(self, *args):
-        """Delete characters of text items identified by tag or id in ARGS (possibly
-        several times) from FIRST to LAST character (including)."""
-        self.tk.call((self._w, 'dchars') + args)
+    def dchars(self, tagOrId, first, last=None):
+        """For each item given by tagOrId, delete the characters, or
+        coordinates, in the range given by first and last, inclusive.
+        If some of the items given by tagOrId do not support indexing
+        operations then they ignore dchars. Text items interpret first
+        and last as indices to a character, line and polygon items
+        interpret them as indices to a coordinate (an x, y pair).
+
+        If last is omitted, it defaults to first.
+        """
+        self.tk.call(self._w, 'dchars', tagOrId, first, last)
     def delete(self, *args):
-        """Delete items identified by all tag or ids contained in ARGS."""
+        """Delete all items identified by the tags or ids contained in ARGS."""
         self.tk.call((self._w, 'delete') + args)
-    def dtag(self, *args):
-        """Delete tag or id given as last arguments in ARGS from items
-        identified by first argument in ARGS."""
-        self.tk.call((self._w, 'dtag') + args)
+    def dtag(self, tagOrId, tagToDelete=None):
+        """
+        For each of the items given by tagOrId, delete the tag given by
+        tagToDelete from the list of those associated with the item.
+        If an item does not have the tag tagToDelete then the item is
+        unaffected. If tagToDelete is omitted then it defaults to tagOrId.
+        """
+        self.tk.call(self._w, 'dtag', tagOrId, tagToDelete)
     def find(self, *args):
         """Internal function."""
         return self._getints(
@@ -2213,24 +2230,56 @@ class Canvas(Widget):
     def find_withtag(self, tagOrId):
         """Return all items with TAGORID."""
         return self.find('withtag', tagOrId)
-    def focus(self, *args):
-        """Set focus to the first item specified in ARGS."""
-        return self.tk.call((self._w, 'focus') + args)
-    def gettags(self, *args):
-        """Return tags associated with the first item specified in ARGS."""
-        return self.tk.splitlist(
-            self.tk.call((self._w, 'gettags') + args))
-    def icursor(self, *args):
-        """Set cursor at position POS in the item identified by TAGORID.
-        In ARGS TAGORID must be first."""
-        self.tk.call((self._w, 'icursor') + args)
-    def index(self, *args):
-        """Return position of cursor as integer in item specified in ARGS."""
-        return getint(self.tk.call((self._w, 'index') + args))
-    def insert(self, *args):
-        """Insert TEXT in item TAGORID at position POS. ARGS must
-        be TAGORID POS TEXT."""
-        self.tk.call((self._w, 'insert') + args)
+    def focus(self, tagOrId=None):
+        """Set the keyboard focus to the item given by tagOrId.
+
+        If tagOrId refers to several items, then the focus is set to the
+        first such item in the display list that supports the insertion
+        cursor.
+        If tagOrId does not refer to any items, or if none of them support
+        the insertion cursor, then the focus is not changed.
+        If tagOrId is an empty string, then the focus item is reset so
+        that no item has the focus.
+        If tagOrId is not specified then the command returns the id for the
+        item that currently has the focus, or None if no item has the focus.
+        """
+        ret = self.tk.call(self._w, 'focus', tagOrId)
+        if tagOrId is None:
+            return None if ret == '' else getint(ret)
+    def gettags(self, tagOrId):
+        """Return the tags associated with the item given by tagOrId.
+        If tagOrId refers to more than one item, then the tags are returned
+        from the first such item in the display list. If tagOrId does not
+        refer to any items, or if the item contains no tags, then an
+        empty tuple is returned."""
+        return self.tk.splitlist(self.tk.call(self._w, 'gettags', tagOrId))
+    def icursor(self, tagOrId, index):
+        """Set the positions of the insertion cursor for item(s) given by
+        tagOrId to just before the character whose position is given by
+        index.
+
+        If some or all of the items given by tagOrId do not support an
+        insertion cursor then icursor has no effect on them.
+
+        Note: the insertion cursor is only displayed in an item if that
+        item currently has the keyboard focus, but the cursor position
+        may be set even when the item does not have the focus.
+        """
+        self.tk.call(self._w, 'icursor', tagOrId, index)
+    def index(self, tagOrId, index):
+        """Return an integer giving the numerical index within tagOrId
+        corresponding to INDEX."""
+        return getint(self.tk.call(self._w, 'index', tagOrId, index))
+    def insert(self, tagOrId, pos, *args):
+        """For each of the items given by tagOrId, if the item supports
+        text or coordinate, insert args into the item's text just before
+        the character, or coordinate, whose index is POS.
+
+        Text items interpret POS as an index to a character, line and
+        polygon items interpret it as an index to a coordinate
+        (an x, y pair). For lines and polygons args must be a valid
+        coordinate sequence."""
+        self.tk.call(self._w, 'insert', tagOrId, pos, *args)
     def itemcget(self, tagOrId, option):
         """Return the resource value for an OPTION for item TAGORID."""
         return self.tk.call(
@@ -2248,29 +2297,35 @@ class Canvas(Widget):
     # so the preferred name for them is tag_lower, tag_raise
     # (similar to tag_bind, and similar to the Text widget);
     # unfortunately can't delete the old ones yet (maybe in 1.6)
-    def tag_lower(self, *args):
+    def tag_lower(self, tagOrId, belowThis=None):
         """Lower an item TAGORID given in ARGS
         (optional below another item)."""
-        self.tk.call((self._w, 'lower') + args)
+        self.tk.call(self._w, 'lower', tagOrId, belowThis)
     lower = tag_lower
-    def move(self, *args):
-        """Move an item TAGORID given in ARGS."""
-        self.tk.call((self._w, 'move') + args)
+    def move(self, tagOrId, xAmount, yAmount):
+        """Move each of the items given by tagOrId by adding xAmount to
+        the x-coordinate of each point associated with the item and yAmount
+        to the y-coordinate of each point associated with the item."""
+        self.tk.call(self._w, 'move', tagOrId, xAmount, yAmount)
     def postscript(self, cnf={}, **kw):
-        """Print the contents of the canvas to a postscript
-        file. Valid options: colormap, colormode, file, fontmap,
+        """Generate a Postscript representation for part or all of the
+        canvas. If the 'file' option is specified then the Postscript is
+        written to a file, otherwise the Postscript is returned.
+
+        Valid options: colormap, colormode, file, fontmap,
         height, pageanchor, pageheight, pagewidth, pagex, pagey,
         rotate, witdh, x, y."""
-        return self.tk.call((self._w, 'postscript') +
-                    self._options(cnf, kw))
-    def tag_raise(self, *args):
+        return self.tk.call((self._w, 'postscript') + self._options(kw))
+    def tag_raise(self, tagOrId, aboveThis=None):
         """Raise an item TAGORID given in ARGS
         (optional above another item)."""
-        self.tk.call((self._w, 'raise') + args)
+        self.tk.call(self._w, 'raise', tagOrId, aboveThis)
     lift = tkraise = tag_raise
-    def scale(self, *args):
-        """Scale item TAGORID with XORIGIN, YORIGIN, XSCALE, YSCALE."""
-        self.tk.call((self._w, 'scale') + args)
+    def scale(self, tagOrId, xOrigin, yOrigin, xScale, yScale):
+        """Scale items identified by TAGORID with XORIGIN, YORIGIN, XSCALE,
+        YSCALE."""
+        self.tk.call(self._w, 'scale', tagOrId,
+                xOrigin, yOrigin, xScale, yScale)
     def scan_mark(self, x, y):
         """Remember the current X, Y coordinates."""
         self.tk.call(self._w, 'scan', 'mark', x, y)
@@ -2402,21 +2457,26 @@ class Entry(Widget):
         self.tk.call(self._w, 'selection', 'from', index)
     select_from = selection_from
     def selection_present(self):
-        """Return whether the widget has the selection."""
+        """Return True if there are characters selected in the entry, False
+        otherwise."""
         return self.tk.getboolean(
-            self.tk.call(self._w, 'selection', 'present'))
+                self.tk.call(self._w, 'selection', 'present'))
     select_present = selection_present
     def selection_range(self, start, end):
-        """Set the selection from START to END (not included)."""
+        """Set the selection from START to END (the character at END is not
+        selected)."""
         self.tk.call(self._w, 'selection', 'range', start, end)
     select_range = selection_range
     def selection_to(self, index):
         """Set the variable end of a selection to INDEX."""
         self.tk.call(self._w, 'selection', 'to', index)
     select_to = selection_to
-    def xview(self, index):
+    def xview(self, index=None):
         """Query and change horizontal position of the view."""
-        self.tk.call(self._w, 'xview', index)
+        if index is None:
+            return self._getdoubles(self.tk.call(self._w, 'xview'))
+        else:
+            self.tk.call(self._w, 'xview', index)
     def xview_moveto(self, fraction):
         """Adjust the view in the window so that FRACTION of the
         total width of the entry is off-screen to the left."""
@@ -2479,22 +2539,19 @@ class Listbox(Widget):
     def activate(self, index):
         """Activate item identified by INDEX."""
         self.tk.call(self._w, 'activate', index)
-    def bbox(self, *args):
+    def bbox(self, index):
         """Return a tuple of X1,Y1,X2,Y2 coordinates for a rectangle
-        which encloses the item identified by index in ARGS."""
-        return self._getints(
-            self.tk.call((self._w, 'bbox') + args)) or None
+        which encloses the item identified by the given index."""
+        return self._getints(self.tk.call(self._w, 'bbox', index)) or None
     def curselection(self):
-        """Return list of indices of currently selected item."""
-        # XXX Ought to apply self._getints()...
-        return self.tk.splitlist(self.tk.call(
-            self._w, 'curselection'))
+        """Return the indices of currently selected item."""
+        return self._getints(self.tk.call(self._w, 'curselection')) or ()
     def delete(self, first, last=None):
-        """Delete items from FIRST to LAST (not included)."""
+        """Delete items from FIRST to LAST (included)."""
         self.tk.call(self._w, 'delete', first, last)
     def get(self, first, last=None):
-        """Get list of items from FIRST to LAST (not included)."""
-        if last:
+        """Get list of items from FIRST to LAST (included)."""
+        if last is not None:
             return self.tk.splitlist(self.tk.call(
                 self._w, 'get', first, last))
         else:
@@ -2523,13 +2580,16 @@ class Listbox(Widget):
         """Scroll such that INDEX is visible."""
         self.tk.call(self._w, 'see', index)
     def selection_anchor(self, index):
-        """Set the fixed end oft the selection to INDEX."""
+        """Set the selection anchor to the element given by index.
+        If index refers to a non-existent element, then the closest
+        element is used. The selection anchor is the end of the
+        selection that is fixed while dragging out a selection with
+        the mouse."""
         self.tk.call(self._w, 'selection', 'anchor', index)
     select_anchor = selection_anchor
     def selection_clear(self, first, last=None):
-        """Clear the selection from FIRST to LAST (not included)."""
-        self.tk.call(self._w,
-                 'selection', 'clear', first, last)
+        """Clear the selection from FIRST to LAST (included)."""
+        self.tk.call(self._w, 'selection', 'clear', first, last)
     select_clear = selection_clear
     def selection_includes(self, index):
         """Return 1 if INDEX is part of the selection."""
@@ -2537,7 +2597,7 @@ class Listbox(Widget):
             self._w, 'selection', 'includes', index))
     select_includes = selection_includes
     def selection_set(self, first, last=None):
-        """Set the selection from FIRST to LAST (not included) without
+        """Set the selection from FIRST to LAST (included) without
         changing the currently selected elements."""
         self.tk.call(self._w, 'selection', 'set', first, last)
     select_set = selection_set
@@ -2569,11 +2629,11 @@ class Listbox(Widget):
         """Shift the y-view according to NUMBER which is measured in "units" or "pages" (WHAT)."""
         self.tk.call(self._w, 'yview', 'scroll', number, what)
     def itemcget(self, index, option):
-        """Return the resource value for an ITEM and an OPTION."""
+        """Return the resource value for an item and an OPTION."""
         return self.tk.call(
             (self._w, 'itemcget') + (index, '-'+option))
     def itemconfigure(self, index, cnf=None, **kw):
-        """Configure resources of an ITEM.
+        """Configure resources of an item.
 
         The values for resources are specified as keyword arguments.
         To get an overview about the allowed keyword arguments
@@ -2786,10 +2846,11 @@ class Scrollbar(Widget):
         relief, repeatdelay, repeatinterval, takefocus,
         troughcolor, width."""
         Widget.__init__(self, master, 'scrollbar', cnf, kw)
-    def activate(self, index):
-        """Display the element at INDEX with activebackground and activerelief.
-        INDEX can be "arrow1","slider" or "arrow2"."""
-        self.tk.call(self._w, 'activate', index)
+    def activate(self, element=None):
+        """If element is not None and is one of "arrow1", "slider" or "arrow2"
+        then it is marked as active. Otherwise the current active element is
+        returned, or None is returned in case no element is active."""
+        return self.tk.call(self._w, 'activate', element) or None
     def delta(self, deltax, deltay):
         """Return the fractional change of the scrollbar setting if it
         would be moved by DELTAX or DELTAY pixels."""
@@ -2807,10 +2868,10 @@ class Scrollbar(Widget):
         """Return the current fractional values (upper and lower end)
         of the slider position."""
         return self._getdoubles(self.tk.call(self._w, 'get'))
-    def set(self, *args):
+    def set(self, first, last):
         """Set the fractional values of the slider position (upper and
         lower ends as value between 0 and 1)."""
-        self.tk.call((self._w, 'set') + args)
+        self.tk.call(self._w, 'set', first, last)
 
 
 
@@ -2840,11 +2901,11 @@ class Text(Widget):
 
         """
         Widget.__init__(self, master, 'text', cnf, kw)
-    def bbox(self, *args):
+    def bbox(self, index):
         """Return a tuple of (x,y,width,height) which gives the bounding
-        box of the visible part of the character at the index in ARGS."""
+        box of the visible part of the character at the given index."""
         return self._getints(
-            self.tk.call((self._w, 'bbox') + args)) or None
+                self.tk.call(self._w, 'bbox', index)) or None
     def tk_textSelectTo(self, index):
         self.tk.call('tk_textSelectTo', self._w, index)
     def tk_textBackspace(self):
@@ -2861,8 +2922,9 @@ class Text(Widget):
     def debug(self, boolean=None):
         """Turn on the internal consistency checks of the B-Tree inside the text
         widget according to BOOLEAN."""
-        return self.tk.getboolean(self.tk.call(
-            self._w, 'debug', boolean))
+        ret = self.tk.call(self._w, 'debug', boolean)
+        if boolean is None:
+            return self.tk.getboolean(ret)
     def delete(self, index1, index2=None):
         """Delete the characters between INDEX1 and INDEX2 (not included)."""
         self.tk.call(self._w, 'delete', index1, index2)
@@ -2945,19 +3007,19 @@ class Text(Widget):
         then. Generates an error when the redo stack is empty.
         Does nothing when the undo option is false.
         """
-        return self.edit("redo")
+        self.edit("redo")
 
     def edit_reset(self):
         """Clears the undo and redo stacks
         """
-        return self.edit("reset")
+        self.edit("reset")
 
     def edit_separator(self):
         """Inserts a separator (boundary) on the undo stack.
 
         Does nothing when the undo option is false
         """
-        return self.edit("separator")
+        self.edit("separator")
 
     def edit_undo(self):
         """Undoes the last edit action
@@ -2968,7 +3030,7 @@ class Text(Widget):
         an error when the undo stack is empty. Does nothing
         when the undo option is false
         """
-        return self.edit("undo")
+        self.edit("undo")
 
     def get(self, index1, index2=None):
         """Return the text from INDEX1 to INDEX2 (not included)."""
@@ -3390,7 +3452,7 @@ class Spinbox(Widget):
         bounding box may refer to a region outside the
         visible area of the window.
         """
-        return self.tk.call(self._w, 'bbox', index)
+        return self._getints(self.tk.call(self._w, 'bbox', index))
 
     def delete(self, first, last=None):
         """Delete one or more elements of the spinbox.
@@ -3399,9 +3461,9 @@ class Spinbox(Widget):
         and last is the index of the character just after
         the last one to delete. If last isn't specified it
         defaults to first+1, i.e. a single character is
-        deleted.  This command returns an empty string.
+        deleted.
         """
-        return self.tk.call(self._w, 'delete', first, last)
+        self.tk.call(self._w, 'delete', first, last)
 
     def get(self):
         """Returns the spinbox's string"""
@@ -3411,9 +3473,9 @@ class Spinbox(Widget):
         """Alter the position of the insertion cursor.
 
         The insertion cursor will be displayed just before
-        the character given by index. Returns an empty string
+        the character given by index.
         """
-        return self.tk.call(self._w, 'icursor', index)
+        self.tk.call(self._w, 'icursor', index)
 
     def identify(self, x, y):
         """Returns the name of the widget at position x, y
@@ -3423,16 +3485,12 @@ class Spinbox(Widget):
         return self.tk.call(self._w, 'identify', x, y)
 
     def index(self, index):
-        """Returns the numerical index corresponding to index
-        """
+        """Returns the numerical index corresponding to index."""
         return self.tk.call(self._w, 'index', index)
 
     def insert(self, index, s):
-        """Insert string s at index
-
-         Returns an empty string.
-        """
-        return self.tk.call(self._w, 'insert', index, s)
+        """Insert string s at index."""
+        self.tk.call(self._w, 'insert', index, s)
 
     def invoke(self, element):
         """Causes the specified element to be invoked
@@ -3440,7 +3498,7 @@ class Spinbox(Widget):
         The element could be buttondown or buttonup
         triggering the action associated with it.
         """
-        return self.tk.call(self._w, 'invoke', element)
+        self.tk.call(self._w, 'invoke', element)
 
     def scan(self, *args):
         """Internal function."""
@@ -3567,11 +3625,11 @@ class PanedWindow(Widget):
         """Identify the panedwindow component at point x, y
 
         If the point is over a sash or a sash handle, the result
-        is a two element list containing the index of the sash or
+        is a two element tuple containing the index of the sash or
         handle, and a word indicating whether it is over a sash
-        or a handle, such as {0 sash} or {2 handle}. If the point
+        or a handle, such as (0, 'sash') or (2, 'handle'). If the point
         is over any other part of the panedwindow, the result is
-        an empty list.
+        an empty string.
         """
         return self.tk.call(self._w, 'identify', x, y)
 
@@ -3586,14 +3644,12 @@ class PanedWindow(Widget):
         return self.proxy("coord")
 
     def proxy_forget(self):
-        """Remove the proxy from the display.
-        """
-        return self.proxy("forget")
+        """Remove the proxy from the display."""
+        self.proxy("forget")
 
     def proxy_place(self, x, y):
-        """Place the proxy at the given x and y coordinates.
-        """
-        return self.proxy("place", x, y)
+        """Place the proxy at the given x and y coordinates."""
+        self.proxy("place", x, y)
 
     def sash(self, *args):
         """Internal function."""
@@ -3634,30 +3690,30 @@ class PanedWindow(Widget):
         return self.tk.call(
             (self._w, 'panecget') + (child, '-'+option))
 
-    def paneconfigure(self, tagOrId, cnf=None, **kw):
+    def paneconfigure(self, window, cnf=None, **kw):
         """Query or modify the management options for window.
 
-        If no option is specified, returns a list describing all
-        of the available options for pathName.  If option is
-        specified with no value, then the command returns a list
-        describing the one named option (this list will be identical
-        to the corresponding sublist of the value returned if no
-        option is specified). If one or more option-value pairs are
-        specified, then the command modifies the given widget
-        option(s) to have the given value(s); in this case the
-        command returns an empty string. The following options
-        are supported:
+        If no option is specified, a dict describing all options and
+        the respective values for the window is returned. If cnf is
+        specified as a string, then a tuple describing this one named
+        option is returned (this tuple will be identical to the
+        corresponding value in the dict returned when no option is
+        specified). If one or more option-value pairs are specified,
+        then the specified options will have their values updated.
+        The following options-values are supported:
 
         after window
             Insert the window after the window specified. window
-            should be the name of a window already managed by pathName.
+            should be the name of a window already managed by this
+            PanedWindow.
         before window
             Insert the window before the window specified. window
-            should be the name of a window already managed by pathName.
+            should be the name of a window already managed by this
+            PanedWindow.
         height size
             Specify a height for the window. The height will be the
             outer dimension of the window including its border, if
-            any. If size is an empty string, or if -height is not
+            any. If size is an empty string, or if this option is not
             specified, then the height requested internally by the
             window will be used initially; the height may later be
             adjusted by the movement of sashes in the panedwindow.
@@ -3705,15 +3761,14 @@ class PanedWindow(Widget):
         if cnf is None and not kw:
             cnf = {}
             for x in self.tk.split(
-                self.tk.call(self._w,
-                         'paneconfigure', tagOrId)):
+                    self.tk.call(self._w, 'paneconfigure', window)):
                 cnf[x[0][1:]] = (x[0][1:],) + x[1:]
             return cnf
         if type(cnf) == StringType and not kw:
             x = self.tk.split(self.tk.call(
-                self._w, 'paneconfigure', tagOrId, '-'+cnf))
+                self._w, 'paneconfigure', window, '-'+cnf))
             return (x[0][1:],) + x[1:]
-        self.tk.call((self._w, 'paneconfigure', tagOrId) +
+        self.tk.call((self._w, 'paneconfigure', window) +
                  self._options(cnf, kw))
     paneconfig = paneconfigure
 
