@@ -379,8 +379,12 @@ class CanvasTest(unittest.TestCase):
         tid = self.canvas.create_text(10, 10, tags='a')
         lid = self.canvas.create_line(50, 50, 70, 90, tags='a')
         self.canvas.move('a', -5, 5)
-        self.assertEqual(self.canvas.coords(tid), [5, 15])
-        self.assertEqual(self.canvas.coords(lid), [45, 55, 65, 95])
+        coords = self.canvas.coords(tid)
+        for item in zip(coords, [5, 15]):
+            self.assertAlmostEqual(*item)
+        coords = self.canvas.coords(lid)
+        for item in zip(coords, [45, 55, 65, 95]):
+            self.assertAlmostEqual(*item)
 
     def test_postscript(self):
         ps = self.canvas.postscript()
