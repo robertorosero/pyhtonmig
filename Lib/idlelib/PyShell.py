@@ -11,6 +11,7 @@ import time
 import threading
 import traceback
 import types
+import subprocess
 import macosxSupport
 
 import linecache
@@ -39,11 +40,6 @@ import RemoteDebugger
 IDENTCHARS = string.ascii_letters + string.digits + "_"
 HOST = '127.0.0.1' # python execution server on localhost loopback
 PORT = 0  # someday pass in host, port for remote debug capability
-
-try:
-    from signal import SIGTERM
-except ImportError:
-    SIGTERM = 15
 
 # Override warnings module to write to warning_stream.  Initialize to send IDLE
 # internal warnings to the console.  ScriptBinding.check_syntax() will
@@ -347,13 +343,13 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.port = PORT
 
     rpcclt = None
-    rpcpid = None
+    rpcproc = None
 
     def spawn_subprocess(self):
-        if self.subprocess_arglist == None:
+        if self.subprocess_arglist is None:
             self.subprocess_arglist = self.build_subprocess_arglist()
         args = self.subprocess_arglist
-        self.rpcpid = os.spawnv(os.P_NOWAIT, sys.executable, args)
+        self.rpcproc = subprocess.Popen([sys.executable] + args[1:])
 
     def build_subprocess_arglist(self):
         assert (self.port!=0), (
@@ -433,7 +429,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
                 pass
         # Kill subprocess, spawn a new one, accept connection.
         self.rpcclt.close()
-        self.unix_terminate()
+        self.terminate_subprocess()
         console = self.tkconsole
         was_executing = console.executing
         console.executing = False
@@ -474,23 +470,14 @@ class ModifiedInterpreter(InteractiveInterpreter):
             self.rpcclt.close()
         except AttributeError:  # no socket
             pass
-        self.unix_terminate()
+        self.terminate_subprocess()
         self.tkconsole.executing = False
         self.rpcclt = None
 
-    def unix_terminate(self):
-        "UNIX: make sure subprocess is terminated and collect status"
-        if hasattr(os, 'kill'):
-            try:
-                os.kill(self.rpcpid, SIGTERM)
-            except OSError:
-                # process already terminated:
-                return
-            else:
-                try:
-                    os.waitpid(self.rpcpid, 0)
-                except OSError:
-                    return
+    def terminate_subprocess(self):
+        "Make sure subprocess is terminated and collect status."
+        self.rpcproc.kill()
+        self.rpcproc.wait()
 
     def transfer_path(self):
         self.runcommand("""if 1:
