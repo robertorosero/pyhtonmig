@@ -369,6 +369,15 @@ class IOBinding:
         self.updaterecentfileslist(filename)
         return "break"
 
+    def save_as_temp(self, prefix='IDLE_tmp_'):
+        """Save the current text content to a temp file."""
+        tfd, tempfilename = tempfile.mkstemp(prefix=prefix)
+        os.close(tfd)
+        if not self.writefile(tempfilename):
+            os.unlink(tempfilename)
+            return None
+        return tempfilename
+
     def writefile(self, filename):
         self.fixlastline()
         chars = self.encode(self.text.get("1.0", "end-1c"))
@@ -482,11 +491,8 @@ class IOBinding:
             filename = self.filename
         # shell undo is reset after every prompt, looks saved, probably isn't
         if not saved or filename is None:
-            (tfd, tempfilename) = tempfile.mkstemp(prefix='IDLE_tmp_')
-            filename = tempfilename
-            os.close(tfd)
-            if not self.writefile(tempfilename):
-                os.unlink(tempfilename)
+            tempfilename = self.save_as_temp()
+            if tempfilename is None:
                 return "break"
         platform=os.name
         printPlatform=1

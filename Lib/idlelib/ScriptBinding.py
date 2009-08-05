@@ -53,14 +53,24 @@ class ScriptBinding:
         self.flist = self.editwin.flist
         self.root = self.editwin.root
 
+    def _cleanup_temp(self, filename, is_temp):
+        if is_temp:
+            os.unlink(filename)
+
     def check_module_event(self, event):
-        filename = self.getfilename()
-        if not filename:
-            return 'break'
-        if not self.checksyntax(filename):
-            return 'break'
-        if not self.tabnanny(filename):
-            return 'break'
+        filename, is_temp = self.getfilename()
+        ret = None
+        if filename:
+            if self.checksyntax(filename):
+                if not self.tabnanny(filename):
+                    ret = 'break'
+            else:
+                ret = 'break'
+            self._cleanup_temp(filename, is_temp)
+        else:
+            ret = 'break'
+
+        return ret
 
     def tabnanny(self, filename):
         f = open(filename, 'r')
@@ -134,13 +144,15 @@ class ScriptBinding:
         add that directory to its sys.path if not already included.
 
         """
-        filename = self.getfilename()
+        filename, is_temp = self.getfilename()
         if not filename:
             return 'break'
         code = self.checksyntax(filename)
         if not code:
+            self._cleanup_temp(filename, is_temp)
             return 'break'
         if not self.tabnanny(filename):
+            self._cleanup_temp(filename, is_temp)
             return 'break'
         shell = self.shell
         interp = shell.interp
@@ -164,6 +176,7 @@ class ScriptBinding:
         #         go to __stderr__.  With subprocess, they go to the shell.
         #         Need to change streams in PyShell.ModifiedInterpreter.
         interp.runcode(code)
+        self._cleanup_temp(filename, is_temp)
         return 'break'
 
     def getfilename(self):
@@ -178,20 +191,38 @@ class ScriptBinding:
 
         """
         filename = self.editwin.io.filename
+        is_temp = False
         if not self.editwin.get_saved():
             autosave = idleConf.GetOption('main', 'General',
                                           'autosave', type='bool')
-            if autosave and filename:
-                self.editwin.io.save(None)
-            else:
+            save_before_run = idleConf.GetOption('main', 'General',
+                    'save-before-run', default=1, type='bool')
+
+            io = self.editwin.io
+            if filename and autosave:
+                # This has been saved before and IDLE is configured to not
+                # prompt before saving this file again.
+                io.save(None)
+            elif filename or save_before_run:
+                # This has been saved before and IDLE is configured to prompt
+                # before saving this file again, or, this has never been
+                # saved and the configuration tells it must be saved.
                 reply = self.ask_save_dialog()
                 self.editwin.text.focus_set()
                 if reply == "ok":
-                    self.editwin.io.save(None)
+                    io.save(None)
                     filename = self.editwin.io.filename
                 else:
                     filename = None
-        return filename
+            else:
+                # This has never been saved before but IDLE is configured
+                # to allow running the present code without explicitly
+                # saving.
+                if not save_before_run:
+                    filename = io.save_as_temp(prefix='IDLE_rtmp_')
+                    is_temp = True
+
+        return filename, is_temp
 
     def ask_save_dialog(self):
         msg = "Source Must Be Saved\n" + 5*' ' + "OK to Save?"

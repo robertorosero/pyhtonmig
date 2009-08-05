@@ -330,6 +330,7 @@ class ConfigDialog(Toplevel):
         self.paraWidth=StringVar(self)
         self.startupEdit=IntVar(self)
         self.autoSave=IntVar(self)
+        self.saveBeforeRun=BooleanVar(self)
         self.encoding=StringVar(self)
         self.userHelpBrowser=BooleanVar(self)
         self.helpBrowser=StringVar(self)
@@ -337,27 +338,33 @@ class ConfigDialog(Toplevel):
         #body
         frame=self.tabPages.pages['General'].frame
         #body section frames
-        frameRun=LabelFrame(frame,borderwidth=2,relief=GROOVE,
+        frameStartup=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                             text=' Startup Preferences ')
-        frameSave=LabelFrame(frame,borderwidth=2,relief=GROOVE,
-                             text=' Autosave Preferences ')
+        frameRun=LabelFrame(frame,borderwidth=2,relief=GROOVE,
+                             text=' Run (F5) Preferences ')
         frameWinSize=Frame(frame,borderwidth=2,relief=GROOVE)
         frameParaSize=Frame(frame,borderwidth=2,relief=GROOVE)
         frameEncoding=Frame(frame,borderwidth=2,relief=GROOVE)
         frameHelp=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                              text=' Additional Help Sources ')
-        #frameRun
-        labelRunChoiceTitle=Label(frameRun,text='At Startup')
-        radioStartupEdit=Radiobutton(frameRun,variable=self.startupEdit,
+        #frameStartup
+        labelRunChoiceTitle=Label(frameStartup,text='At Startup')
+        radioStartupEdit=Radiobutton(frameStartup,variable=self.startupEdit,
             value=1,command=self.SetKeysType,text="Open Edit Window")
-        radioStartupShell=Radiobutton(frameRun,variable=self.startupEdit,
+        radioStartupShell=Radiobutton(frameStartup,variable=self.startupEdit,
             value=0,command=self.SetKeysType,text='Open Shell Window')
-        #frameSave
-        labelRunSaveTitle=Label(frameSave,text='At Start of Run (F5)  ')
-        radioSaveAsk=Radiobutton(frameSave,variable=self.autoSave,
-            value=0,command=self.SetKeysType,text="Prompt to Save")
-        radioSaveAuto=Radiobutton(frameSave,variable=self.autoSave,
-            value=1,command=self.SetKeysType,text='No Prompt')
+        #frameRun
+        labelSaveBeforeRun=Label(frameRun,
+                text='If file has never been saved ')
+        radioSaveBefore=Radiobutton(frameRun,variable=self.saveBeforeRun,
+            value=1,text="Prompt to Save")
+        radioSaveToTemp=Radiobutton(frameRun,variable=self.saveBeforeRun,
+            value=0,text="Just run")
+        labelAutoSave=Label(frameRun, text='If file has been saved before ')
+        radioSaveAsk=Radiobutton(frameRun,variable=self.autoSave,
+            value=0,text="Prompt to Save")
+        radioSaveAuto=Radiobutton(frameRun,variable=self.autoSave,
+            value=1,text="No prompt")
         #frameWinSize
         labelWinSizeTitle=Label(frameWinSize,text='Initial Window Size'+
                 '  (in characters)')
@@ -397,20 +404,24 @@ class ConfigDialog(Toplevel):
                 state=DISABLED,width=8,command=self.HelpListItemRemove)
         #widget packing
         #body
+        frameStartup.pack(side=TOP,padx=5,pady=5,fill=X)
         frameRun.pack(side=TOP,padx=5,pady=5,fill=X)
-        frameSave.pack(side=TOP,padx=5,pady=5,fill=X)
         frameWinSize.pack(side=TOP,padx=5,pady=5,fill=X)
         frameParaSize.pack(side=TOP,padx=5,pady=5,fill=X)
         frameEncoding.pack(side=TOP,padx=5,pady=5,fill=X)
         frameHelp.pack(side=TOP,padx=5,pady=5,expand=TRUE,fill=BOTH)
-        #frameRun
+        #frameStartup
         labelRunChoiceTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
         radioStartupShell.pack(side=RIGHT,anchor=W,padx=5,pady=5)
         radioStartupEdit.pack(side=RIGHT,anchor=W,padx=5,pady=5)
-        #frameSave
-        labelRunSaveTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
-        radioSaveAuto.pack(side=RIGHT,anchor=W,padx=5,pady=5)
-        radioSaveAsk.pack(side=RIGHT,anchor=W,padx=5,pady=5)
+        #frameRun
+        commonOpts = {'sticky': W, 'padx': 5, 'pady': 5}
+        labelSaveBeforeRun.grid(row=0, column=0, **commonOpts)
+        radioSaveBefore.grid(row=0, column=1, **commonOpts)
+        radioSaveToTemp.grid(row=0, column=2, **commonOpts)
+        labelAutoSave.grid(row=1, column=0, **commonOpts)
+        radioSaveAsk.grid(row=1, column=1, **commonOpts)
+        radioSaveAuto.grid(row=1, column=2, **commonOpts)
         #frameWinSize
         labelWinSizeTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
         entryWinHeight.pack(side=RIGHT,anchor=E,padx=10,pady=5)
@@ -455,6 +466,7 @@ class ConfigDialog(Toplevel):
         self.startupEdit.trace_variable('w',self.VarChanged_startupEdit)
         self.autoSave.trace_variable('w',self.VarChanged_autoSave)
         self.encoding.trace_variable('w',self.VarChanged_encoding)
+        self.saveBeforeRun.trace_variable('w', self.VarChanged_saveBeforeRun)
 
     def VarChanged_fontSize(self,*params):
         value=self.fontSize.get()
@@ -551,6 +563,10 @@ class ConfigDialog(Toplevel):
     def VarChanged_encoding(self,*params):
         value=self.encoding.get()
         self.AddChangedItem('main','EditorWindow','encoding',value)
+
+    def VarChanged_saveBeforeRun(self,*params):
+        value = self.saveBeforeRun.get()
+        self.AddChangedItem('main','General','save-before-run',value)
 
     def ResetChangedItems(self):
         #When any config item is changed in this dialog, an entry
@@ -1036,6 +1052,9 @@ class ConfigDialog(Toplevel):
         #autosave state
         self.autoSave.set(idleConf.GetOption('main', 'General', 'autosave',
                                              default=0, type='bool'))
+        # save before run
+        self.saveBeforeRun.set(idleConf.GetOption('main', 'General',
+            'save-before-run', default=1, type='bool'))
         #initial window size
         self.winWidth.set(idleConf.GetOption('main','EditorWindow','width'))
         self.winHeight.set(idleConf.GetOption('main','EditorWindow','height'))
