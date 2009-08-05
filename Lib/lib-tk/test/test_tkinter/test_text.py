@@ -93,7 +93,7 @@ class TextTest(unittest.TestCase):
 
     def test_edit(self):
         self.text['undo'] = False
-        self.assertFalse(self.text['undo'])
+        self.assertFalse(self.text.getboolean(str(self.text['undo'])))
 
         self.text.insert('1.0', 'hi')
         self.text.edit_undo()
