@@ -15,10 +15,10 @@ if not hasattr(select, "kqueue"):
 class TestKQueue(unittest.TestCase):
     def test_create_queue(self):
         kq = select.kqueue()
-        self.assert_(kq.fileno() > 0, kq.fileno())
-        self.assert_(not kq.closed)
+        self.assertTrue(kq.fileno() > 0, kq.fileno())
+        self.assertTrue(not kq.closed)
         kq.close()
-        self.assert_(kq.closed)
+        self.assertTrue(kq.closed)
         self.assertRaises(ValueError, kq.fileno)
 
     def test_create_event(self):
@@ -34,8 +34,8 @@ class TestKQueue(unittest.TestCase):
         self.assertEqual(ev, ev)
         self.assertNotEqual(ev, other)
         self.assertEqual(cmp(ev, other), -1)
-        self.assert_(ev < other)
-        self.assert_(other >= ev)
+        self.assertTrue(ev < other)
+        self.assertTrue(other >= ev)
         self.assertRaises(TypeError, cmp, ev, None)
         self.assertRaises(TypeError, cmp, ev, 1)
         self.assertRaises(TypeError, cmp, ev, "ev")
@@ -161,6 +161,22 @@ class TestKQueue(unittest.TestCase):
         client.close()
         server.close()
         serverSocket.close()
+
+    def testPair(self):
+        kq = select.kqueue()
+        a, b = socket.socketpair()
+
+        a.send(b'foo')
+        event1 = select.kevent(a, select.KQ_FILTER_READ, select.KQ_EV_ADD | select.KQ_EV_ENABLE)
+        event2 = select.kevent(b, select.KQ_FILTER_READ, select.KQ_EV_ADD | select.KQ_EV_ENABLE)
+        r = kq.control([event1, event2], 1, 1)
+        self.assertTrue(r)
+        self.assertFalse(r[0].flags & select.KQ_EV_ERROR)
+        self.assertEquals(b.recv(r[0].data), b'foo')
+
+        a.close()
+        b.close()
+        kq.close()
 
 def test_main():
     test_support.run_unittest(TestKQueue)

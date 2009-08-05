@@ -129,7 +129,17 @@ Notes:
 Comparisons
 ===========
 
-.. index:: pair: chaining; comparisons
+.. index::
+   pair: chaining; comparisons
+   pair: operator; comparison
+   operator: ==
+   operator: <
+   operator: <=
+   operator: >
+   operator: >=
+   operator: !=
+   operator: is
+   operator: is not
 
 Comparison operations are supported by all objects.  They all have the same
 priority (which is higher than that of the Boolean operations). Comparisons can
@@ -158,17 +168,6 @@ This table summarizes the comparison operations:
 +------------+-------------------------+-------+
 | ``is not`` | negated object identity |       |
 +------------+-------------------------+-------+
-
-.. index::
-   pair: operator; comparison
-   operator: ==
-   operator: <
-   operator: <=
-   operator: >
-   operator: >=
-   operator: !=
-   operator: is
-   operator: is not
 
 Notes:
 
@@ -262,6 +261,13 @@ part.
    builtin: long
    builtin: float
    builtin: complex
+   operator: +
+   operator: -
+   operator: *
+   operator: /
+   operator: //
+   operator: %
+   operator: **
 
 Python fully supports mixed arithmetic: when a binary arithmetic operator has
 operands of different numeric types, the operand with the "narrower" type is
@@ -271,7 +277,7 @@ numbers of mixed type use the same rule. [#]_ The constructors :func:`int`,
 :func:`long`, :func:`float`, and :func:`complex` can be used to produce numbers
 of a specific type.
 
-All builtin numeric types support the following operations. See
+All built-in numeric types support the following operations. See
 :ref:`power` and later sections for the operators' priorities.
 
 +--------------------+---------------------------------+--------+
@@ -394,7 +400,15 @@ All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 Bit-string Operations on Integer Types
 --------------------------------------
 
-.. _bit-string-operations:
+.. index::
+   triple: operations on; integer; types
+   pair: bit-string; operations
+   pair: shifting; operations
+   pair: masking; operations
+   operator: ^
+   operator: &
+   operator: <<
+   operator: >>
 
 Plain and long integer types support additional operations that make sense only
 for bit-strings.  Negative numbers are treated as their 2's complement value
@@ -425,12 +439,6 @@ This table lists the bit-string operations sorted in ascending priority:
 +------------+--------------------------------+----------+
 | ``~x``     | the bits of *x* inverted       |          |
 +------------+--------------------------------+----------+
-
-.. index::
-   triple: operations on; integer; types
-   pair: bit-string; operations
-   pair: shifting; operations
-   pair: masking; operations
 
 Notes:
 
@@ -619,10 +627,18 @@ Implementations that do not obey this property are deemed broken.  (This
 constraint was added in Python 2.3; in Python 2.2, various iterators are broken
 according to this rule.)
 
+
+.. _generator-types:
+
+Generator Types
+---------------
+
 Python's :term:`generator`\s provide a convenient way to implement the iterator
 protocol.  If a container object's :meth:`__iter__` method is implemented as a
 generator, it will automatically return an iterator object (technically, a
-generator object) supplying the :meth:`__iter__` and :meth:`next` methods.
+generator object) supplying the :meth:`__iter__` and :meth:`next` methods.  More
+information about generators can be found in :ref:`the documentation for the
+yield expression <yieldexpr>`.
 
 
 .. _typesseq:
@@ -659,7 +675,7 @@ must have the enclosing parentheses, such as ``a, b, c`` or ``()``.  A
 single item tuple must have a trailing comma, such as ``(d,)``.
 
 Buffer objects are not directly supported by Python syntax, but can be created
-by calling the builtin function :func:`buffer`.  They don't support
+by calling the built-in function :func:`buffer`.  They don't support
 concatenation or repetition.
 
 Objects of type xrange are similar to buffers in that there is no specific syntax to
@@ -1616,7 +1632,7 @@ set``.  Being an unordered collection, sets do not record element position or
 order of insertion.  Accordingly, sets do not support indexing, slicing, or
 other sequence-like behavior.
 
-There are currently two builtin set types, :class:`set` and :class:`frozenset`.
+There are currently two built-in set types, :class:`set` and :class:`frozenset`.
 The :class:`set` type is mutable --- the contents can be changed using methods
 like :meth:`add` and :meth:`remove`.  Since it is mutable, it has no hash value
 and cannot be used as either a dictionary key or as an element of another set.
@@ -2163,12 +2179,12 @@ Files have the following methods:
    A file object is its own iterator, for example ``iter(f)`` returns *f* (unless
    *f* is closed).  When a file is used as an iterator, typically in a
    :keyword:`for` loop (for example, ``for line in f: print line``), the
-   :meth:`next` method is called repeatedly.  This method returns the next input
+   :meth:`.next` method is called repeatedly.  This method returns the next input
    line, or raises :exc:`StopIteration` when EOF is hit when the file is open for
    reading (behavior is undefined when the file is open for writing).  In order to
    make a :keyword:`for` loop the most efficient way of looping over the lines of a
    file (a very common operation), the :meth:`next` method uses a hidden read-ahead
-   buffer.  As a consequence of using a read-ahead buffer, combining :meth:`next`
+   buffer.  As a consequence of using a read-ahead buffer, combining :meth:`.next`
    with other file methods (like :meth:`readline`) does not work right.  However,
    using :meth:`seek` to reposition the file to an absolute position will flush the
    read-ahead buffer.

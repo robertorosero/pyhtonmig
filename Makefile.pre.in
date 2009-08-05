@@ -838,6 +838,7 @@ LIBSUBDIRS=	lib-tk site-packages test test/output test/data \
 		ctypes ctypes/test ctypes/macholib idlelib idlelib/Icons \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
 		multiprocessing multiprocessing/dummy \
+		unittest \
 		lib-old \
 		curses pydoc_data $(MACHDEPS)
 libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
@@ -1173,6 +1174,7 @@ clobber: clean profile-removal
 # remove all generated files, even Makefile[.pre]
 # Keep configure and Python-ast.[ch], it's possible they can't be generated
 distclean: clobber
+	-rm -f Lib/test/data/*
 	-rm -f core Makefile Makefile.pre config.status \
 		Modules/Setup Modules/Setup.local Modules/Setup.config
 	find $(srcdir) '(' -name '*.fdc' -o -name '*~' \

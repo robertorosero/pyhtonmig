@@ -8,7 +8,7 @@ Without you, I would've stopped working on Python long ago!
 
 	--Guido
 
-PS: In the standard Python distribution, this file is encoded in Latin-1.
+PS: In the standard Python distribution, this file is encoded in UTF-8.
 
 David Abrahams
 Jim Ahlstrom
@@ -16,10 +16,11 @@ Farhan Ahmad
 Jyrki Alakuijala
 Billy G. Allie
 Kevin Altis
+Joe Amenta
 Mark Anacker
 Anders Andersen
 John Anderson
-Erik Andersén
+Erik AndersÃ©n
 Oliver Andrich
 Ross Andrus
 Jason Asbahr
@@ -46,6 +47,7 @@ Des Barry
 Ulf Bartelt
 Nick Bastin
 Jeff Bauer
+Mike Bayer
 Michael R Bax
 Anthony Baxter
 Samuel L. Bayer
@@ -183,6 +185,7 @@ Cesar Douady
 Dean Draayer
 John DuBois
 Paul Dubois
+Graham Dumpleton
 Quinn Dunkan
 Robin Dunn
 Luke Dunstan
@@ -192,17 +195,18 @@ Gary Duzan
 Eugene Dvurechenski
 Josip Dzolonga
 Maxim Dzumanenko
-Walter Dörwald
+Walter DÃ¶rwald
 Hans Eckardt
 Grant Edwards
 John Ehresman
+Eric Eisner
 Andrew Eland
 Lance Ellinghaus
 David Ely
 Jeff Epler
 Tom Epperly
 Stoffel Erasmus
-Jürgen A. Erhard
+JÃ¼rgen A. Erhard
 Michael Ernst
 Ben Escoto
 Andy Eskilsson
@@ -225,7 +229,7 @@ Russell Finn
 Nils Fischbeck
 Frederik Fix
 Matt Fleming
-Hernán Martínez Foffani
+HernÃ¡n MartÃ­nez Foffani
 Michael Foord
 Amaury Forgeot d'Arc
 Doug Fort
@@ -239,7 +243,7 @@ Gyro Funch
 Peter Funk
 Geoff Furnish
 Ulisses Furquim
-Hagen Fürstenau
+Hagen FÃ¼rstenau
 Achim Gaedke
 Martin von Gagern
 Lele Gaifax
@@ -271,13 +275,13 @@ Eddy De Greef
 Duncan Grisby
 Dag Gruneau
 Michael Guravage
-Lars Gustäbel
-Thomas Güttler
+Lars GustÃ¤bel
+Thomas GÃ¼ttler
 Barry Haddow
 Paul ten Hagen
 Rasmus Hahn
 Peter Haight
-Václav Haisman
+VÃ¡clav Haisman
 Bob Halley
 Jesse Hallio
 Jun Hamano
@@ -301,7 +305,7 @@ Jonathan Hendry
 James Henstridge
 Chris Herborth
 Ivan Herman
-Jürgen Hermann
+JÃ¼rgen Hermann
 Gary Herron
 Thomas Herve
 Bernhard Herzog
@@ -338,7 +342,7 @@ Jim Hugunin
 Greg Humphreys
 Eric Huss
 Jeremy Hylton
-Gerhard Häring
+Gerhard HÃ¤ring
 Mihai Ibanescu
 Lars Immisch
 Tony Ingraldi
@@ -354,7 +358,7 @@ Geert Jansen
 Jack Jansen
 Bill Janssen
 Drew Jenkins
-Flemming Kjær Jensen
+Flemming KjÃ¦r Jensen
 Jiba
 Orjan Johansen
 Fredrik Johansson
@@ -421,6 +425,7 @@ Inyeol Lee
 Thomas Lee
 Christopher Lee
 Luc Lefebvre
+Vincent Legoll
 Kip Lehman
 Joerg Lehmann
 Luke Kenneth Casson Leighton
@@ -451,7 +456,7 @@ Fredrik Lundh
 Mark Lutz
 Jim Lynch
 Mikael Lyngvig
-Martin von Löwis
+Martin von LÃ¶wis
 Andrew I MacIntyre
 Tim MacKenzie
 Nick Maclaren
@@ -463,7 +468,7 @@ David Marek
 Doug Marien
 Alex Martelli
 Anthony Martin
-Sébastien Martini
+SÃ©bastien Martini
 Roger Masse
 Nick Mathewson
 Graham Matthews
@@ -479,6 +484,7 @@ Andrew McNamara
 Craig McPheeters
 Lambert Meertens
 Bill van Melle
+Lucas Prado Melo
 Luke Mewburn
 Mike Meyer
 Steven Miale
@@ -509,7 +515,7 @@ Fredrik Nehr
 Trent Nelson
 Tony Nelson
 Chad Netzer
-Max Neunhöffer
+Max NeunhÃ¶ffer
 George Neville-Neil
 Johannes Nicolai
 Samuel Nicolary
@@ -538,7 +544,7 @@ Russel Owen
 Ondrej Palkovsky
 Mike Pall
 Todd R. Palmer
-Juan David Ibáñez Palomar
+Juan David IbÃ¡Ã±ez Palomar
 Jan Palus
 M. Papillon
 Peter Parente
@@ -549,9 +555,10 @@ Randy Pausch
 Samuele Pedroni
 Marcel van der Peijl
 Steven Pemberton
-Santiago Peresón
+Santiago PeresÃ³n
 Mark Perrego
 Trevor Perrin
+Gabriel de Perthuis
 Tim Peters
 Benjamin Peterson
 Chris Petrilli
@@ -564,11 +571,11 @@ Neale Pickett
 Jim St. Pierre
 Dan Pierson
 Martijn Pieters
-François Pinard
+FranÃ§ois Pinard
 Zach Pincus
 Michael Piotrowski
 Antoine Pitrou
-Jean-François Piéronne
+Jean-FranÃ§ois PiÃ©ronne
 Guilherme Polo
 Michael Pomraning
 Iustin Pop
@@ -577,8 +584,8 @@ Amrit Prem
 Paul Prescod
 Donovan Preston
 Steve Purcell
-Fernando Pérez
-Eduardo Pérez
+Fernando PÃ©rez
+Eduardo PÃ©rez
 Brian Quinlan
 Anders Qvist
 Burton Radons
@@ -731,12 +738,13 @@ Anthony Tuininga
 Stephen Turner
 Bill Tutt
 Doobee R. Tzeck
-Eren Türkay
+Eren TÃ¼rkay
 Lionel Ulmer
 Roger Upole
 Michael Urman
 Hector Urtubia
 Andi Vajda
+Case Van Horsen
 Atul Varma
 Dmitry Vasiliev
 Alexandre Vassalotti
@@ -807,5 +815,5 @@ Artur Zaprzala
 Mike Zarnstorff
 Siebren van der Zee
 Uwe Zessin
-Tarek ZiadŽ
-Peter Åstrand
+Tarek ZiadÃ©
+Peter Ã…strand

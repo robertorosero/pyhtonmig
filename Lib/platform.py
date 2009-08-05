@@ -34,6 +34,7 @@
 #
 #    <see CVS and SVN checkin messages for history>
 #
+#    1.0.7 - added DEV_NULL
 #    1.0.6 - added linux_distribution()
 #    1.0.5 - fixed Java support to allow running the module on Jython
 #    1.0.4 - added IronPython support
@@ -91,7 +92,7 @@
 
 __copyright__ = """
     Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
-    Copyright (c) 2000-2008, eGenix.com Software GmbH; mailto:info@egenix.com
+    Copyright (c) 2000-2009, eGenix.com Software GmbH; mailto:info@egenix.com
 
     Permission to use, copy, modify, and distribute this software and its
     documentation for any purpose and without fee or royalty is hereby granted,
@@ -110,9 +111,24 @@ __copyright__ = """
 
 """
 
-__version__ = '1.0.6'
+__version__ = '1.0.7'
 
 import sys,string,os,re
+
+### Globals & Constants
+
+# Determine the platform's /dev/null device
+try:
+    DEV_NULL = os.devnull
+except AttributeError:
+    # os.devnull was added in Python 2.4, so emulate it for earlier
+    # Python versions
+    if sys.platform in ('dos','win32','win16','os2'):
+        # Use the old CP/M NUL as device name
+        DEV_NULL = 'NUL'
+    else:
+        # Standard Unix uses /dev/null
+        DEV_NULL = '/dev/null'
 
 ### Platform specific APIs
 
@@ -448,7 +464,16 @@ def _norm_version(version, build=''):
 
 _ver_output = re.compile(r'(?:([\w ]+) ([\w.]+) '
                          '.*'
-                         'Version ([\d.]+))')
+                         '\[.* ([\d.]+)\])')
+
+# Examples of VER command output:
+#
+#   Windows 2000:  Microsoft Windows 2000 [Version 5.00.2195]
+#   Windows XP:    Microsoft Windows XP [Version 5.1.2600]
+#   Windows Vista: Microsoft Windows [Version 6.0.6002]
+#
+# Note that the "Version" string gets localized on different
+# Windows versions.
 
 def _syscmd_ver(system='', release='', version='',
 
@@ -580,6 +605,7 @@ def win32_ver(release='',version='',csd='',ptype=''):
     version = '%i.%i.%i' % (maj,min,buildno & 0xFFFF)
     if csd[:13] == 'Service Pack ':
         csd = 'SP' + csd[13:]
+
     if plat == VER_PLATFORM_WIN32_WINDOWS:
         regkey = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion'
         # Try to guess the release name
@@ -594,6 +620,7 @@ def win32_ver(release='',version='',csd='',ptype=''):
                 release = 'postMe'
         elif maj == 5:
             release = '2000'
+
     elif plat == VER_PLATFORM_WIN32_NT:
         regkey = 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
         if maj <= 4:
@@ -622,8 +649,12 @@ def win32_ver(release='',version='',csd='',ptype=''):
                         release = 'Vista'
                     else:
                         release = '2008Server'
+            #elif min == 1:
+            #    # Windows 7 release candidate uses version 6.1.7100
+            #    release = '7RC'
             else:
                 release = 'post2008Server'
+
     else:
         if not release:
             # E.g. Win3.1 with win32s
@@ -926,7 +957,7 @@ def _syscmd_uname(option,default=''):
         # XXX Others too ?
         return default
     try:
-        f = os.popen('uname %s 2> /dev/null' % option)
+        f = os.popen('uname %s 2> %s' % (option, DEV_NULL))
     except (AttributeError,os.error):
         return default
     output = string.strip(f.read())
@@ -951,7 +982,7 @@ def _syscmd_file(target,default=''):
         return default
     target = _follow_symlinks(target)
     try:
-        f = os.popen('file "%s" 2> /dev/null' % target)
+        f = os.popen('file "%s" 2> %s' % (target, DEV_NULL))
     except (AttributeError,os.error):
         return default
     output = string.strip(f.read())
@@ -1098,7 +1129,7 @@ def uname():
             node = _node()
             machine = ''
 
-        use_syscmd_ver = 01
+        use_syscmd_ver = 1
 
         # Try win32_ver() on win32 platforms
         if system == 'win32':

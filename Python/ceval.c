@@ -803,10 +803,12 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define SECOND()	(stack_pointer[-2])
 #define THIRD() 	(stack_pointer[-3])
 #define FOURTH()	(stack_pointer[-4])
+#define PEEK(n)         (stack_pointer[-(n)])
 #define SET_TOP(v)	(stack_pointer[-1] = (v))
 #define SET_SECOND(v)	(stack_pointer[-2] = (v))
 #define SET_THIRD(v)	(stack_pointer[-3] = (v))
 #define SET_FOURTH(v)	(stack_pointer[-4] = (v))
+#define SET_VALUE(n, v) (stack_pointer[-(n)] = (v))
 #define BASIC_STACKADJ(n)	(stack_pointer += n)
 #define BASIC_PUSH(v)	(*stack_pointer++ = (v))
 #define BASIC_POP()	(*--stack_pointer)
@@ -1422,7 +1424,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 		case LIST_APPEND:
 			w = POP();
-			v = stack_pointer[-oparg];
+			v = PEEK(oparg);
 			err = PyList_Append(v, w);
 			Py_DECREF(w);
 			if (err == 0) {
@@ -1952,7 +1954,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				}
 			} else if (unpack_iterable(v, oparg,
 						   stack_pointer + oparg)) {
-				stack_pointer += oparg;
+				STACKADJ(oparg);
 			} else {
 				/* unpack_iterable() raised an exception */
 				why = WHY_EXCEPTION;
@@ -2804,19 +2806,19 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 fast_block_end:
 		while (why != WHY_NOT && f->f_iblock > 0) {
-			PyTryBlock *b = PyFrame_BlockPop(f);
+			/* Peek at the current block. */
+			PyTryBlock *b = &f->f_blockstack[f->f_iblock - 1];
 
 			assert(why != WHY_YIELD);
 			if (b->b_type == SETUP_LOOP && why == WHY_CONTINUE) {
-				/* For a continue inside a try block,
-				   don't pop the block for the loop. */
-				PyFrame_BlockSetup(f, b->b_type, b->b_handler,
-						   b->b_level);
 				why = WHY_NOT;
 				JUMPTO(PyInt_AS_LONG(retval));
 				Py_DECREF(retval);
 				break;
 			}
+
+			/* Now we have to pop the block. */
+			f->f_iblock--;
 
 			while (STACK_LEVEL() > b->b_level) {
 				v = POP();

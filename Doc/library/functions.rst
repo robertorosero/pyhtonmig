@@ -151,7 +151,7 @@ available.  They are listed here in alphabetical order.
    ``'exec'`` if *source* consists of a sequence of statements, ``'eval'`` if it
    consists of a single expression, or ``'single'`` if it consists of a single
    interactive statement (in the latter case, expression statements that
-   evaluate to something else than ``None`` will be printed).
+   evaluate to something other than ``None`` will be printed).
 
    The optional arguments *flags* and *dont_inherit* control which future
    statements (see :pep:`236`) affect the compilation of *source*.  If neither
@@ -291,7 +291,7 @@ available.  They are listed here in alphabetical order.
 
    Return an enumerate object. *sequence* must be a sequence, an
    :term:`iterator`, or some other object which supports iteration.  The
-   :meth:`next` method of the iterator returned by :func:`enumerate` returns a
+   :meth:`!next` method of the iterator returned by :func:`enumerate` returns a
    tuple containing a count (from *start* which defaults to 0) and the
    corresponding value obtained from iterating over *iterable*.
    :func:`enumerate` is useful for obtaining an indexed series: ``(0, seq[0])``,
@@ -595,7 +595,7 @@ available.  They are listed here in alphabetical order.
    does not support either of those protocols, :exc:`TypeError` is raised. If the
    second argument, *sentinel*, is given, then *o* must be a callable object.  The
    iterator created in this case will call *o* with no arguments for each call to
-   its :meth:`next` method; if the value returned is equal to *sentinel*,
+   its :meth:`~iterator.next` method; if the value returned is equal to *sentinel*,
    :exc:`StopIteration` will be raised, otherwise the value will be returned.
 
    One useful application of the second form of :func:`iter` is to read lines of
@@ -705,9 +705,9 @@ available.  They are listed here in alphabetical order.
 
 .. function:: next(iterator[, default])
 
-   Retrieve the next item from the *iterator* by calling its :meth:`next`
-   method.  If *default* is given, it is returned if the iterator is exhausted,
-   otherwise :exc:`StopIteration` is raised.
+   Retrieve the next item from the *iterator* by calling its
+   :meth:`~iterator.next` method.  If *default* is given, it is returned if the
+   iterator is exhausted, otherwise :exc:`StopIteration` is raised.
 
    .. versionadded:: 2.6
 
@@ -847,7 +847,7 @@ available.  They are listed here in alphabetical order.
 
    .. note::
 
-      This function is not normally available as a builtin since the name
+      This function is not normally available as a built-in since the name
       ``print`` is recognized as the :keyword:`print` statement.  To disable the
       statement and use the :func:`print` function, use this future statement at
       the top of your module::

@@ -330,6 +330,12 @@ Decimal objects
       numeric-value  ::=  decimal-part [exponent-part] | infinity
       numeric-string ::=  [sign] numeric-value | [sign] nan
 
+   If *value* is a unicode string then other Unicode decimal digits
+   are also permitted where ``digit`` appears above.  These include
+   decimal digits from various other alphabets (for example,
+   Arabic-Indic and Devanāgarī digits) along with the fullwidth digits
+   ``u'\uff10'`` through ``u'\uff19'``.
+
    If *value* is a :class:`tuple`, it should have three components, a sign
    (:const:`0` for positive or :const:`1` for negative), a :class:`tuple` of
    digits, and an integer exponent. For example, ``Decimal((0, (1, 4, 1, 4), -3))``
@@ -624,10 +630,9 @@ Decimal objects
 
       .. versionadded:: 2.6
 
-   .. method:: logical_invert(other[, context])
+   .. method:: logical_invert([context])
 
-      :meth:`logical_invert` is a logical operation.  The argument must
-      be a *logical operand* (see :ref:`logical_operands_label`).  The
+      :meth:`logical_invert` is a logical operation.  The
       result is the digit-wise inversion of the operand.
 
       .. versionadded:: 2.6
@@ -657,7 +662,7 @@ Decimal objects
 
    .. method:: max_mag(other[, context])
 
-      Similar to the :meth:`max` method, but the comparison is done using the
+      Similar to the :meth:`.max` method, but the comparison is done using the
       absolute values of the operands.
 
       .. versionadded:: 2.6
@@ -671,7 +676,7 @@ Decimal objects
 
    .. method:: min_mag(other[, context])
 
-      Similar to the :meth:`min` method, but the comparison is done using the
+      Similar to the :meth:`.min` method, but the comparison is done using the
       absolute values of the operands.
 
       .. versionadded:: 2.6

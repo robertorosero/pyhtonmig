@@ -12,6 +12,36 @@ What's New in Python 2.7 alpha 1
 Core and Builtins
 -----------------
 
+- Issue #6540: Fixed crash for bytearray.translate() with invalid parameters.
+
+- Issue #6573: set.union() stopped processing inputs if an instance of self
+  occurred in the argument chain.
+
+- Issue #1616979: Added the cp720 (Arabic DOS) encoding.
+
+- Issue #6070: On posix platforms import no longer copies the execute bit
+  from the .py file to the .pyc file if it is set.  Patch by Marco N.
+
+- Issue #4618: When unicode arguments are passed to print(), the default
+  separator and end should be unicode also.
+
+- Issue #6119: Fixed a incorrect Py3k warning about order comparisons of builtin
+  functions and methods.
+
+- Issue #6347: Include inttypes.h as well as stdint.h in pyport.h.
+  This fixes a build failure on HP-UX: int32_t and uint32_t are
+  defined in inttypes.h instead of stdint.h on that platform.
+
+- Issue #4856: Remove checks for win NT.
+
+- Issue #2016: Fixed a crash in a corner case where the dictionary of keyword
+  arguments could be modified during the function call setup.
+
+- Removed the ipaddr module.
+
+- Issue #6329: Fixed iteration for memoryview objects (it was being blocked
+  because it wasn't recognized as a sequence).
+
 - Issue #6289: Encoding errors from compile() were being masked.
 
 - When no module is given in a relative import, the module field of the
@@ -19,14 +49,11 @@ Core and Builtins
 
 - Assignment to None using import statements now raises a SyntaxError.
 
-- In the slice AST type, the step field will always be None if a step expression
-  is not specified.
-
 - Issue #4547: When debugging a very large function, it was not always
   possible to update the lineno attribute of the current frame.
 
 - Issue #5330: C functions called with keyword arguments were not reported by
-  the various profiling modules (profile, cProfile). Patch by Hagen Fürstenau.
+  the various profiling modules (profile, cProfile). Patch by Hagen FÃ¼rstenau.
 
 - Issue #5982: staticmethod and classmethod now expose the wrapped
   function with __func__.
@@ -326,6 +353,70 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #6595: The Decimal constructor now allows arbitrary Unicode
+  decimal digits in input, as recommended by the standard.  Previously
+  it was restricted to accepting [0-9].
+
+- Issue #6511: ZipFile now raises BadZipfile (instead of an IOError) when
+  opening an empty or very small file.
+
+- Issue #6553: Fixed a crash in cPickle.load(), when given a file-like object
+  containing incomplete data.
+
+- Issue #6545: Removed assert statements in distutils.Extension, so the
+  behavior is similar when used with -O.
+
+- unittest has been split up into a package.  All old names should still work.
+
+- Issue #6431: Make Fraction type return NotImplemented when it doesn't
+  know how to handle a comparison without loss of precision.  Also add
+  correct handling of infinities and nans for comparisons with float.
+
+- Issue #6415: Fixed warnings.warn segfault on bad formatted string.
+
+- Issue #6466: now distutils.cygwinccompiler and distutils.emxccompiler
+  uses the same refactored function to get gcc/ld/dllwrap versions numbers.
+  It's `distutils.util.get_compiler_versions`. Added deprecation warnings
+  for the obsolete get_versions() functions.
+
+- Issue #6433: fixed issues with multiprocessing.pool.map hanging on empty list
+
+- Issue #6314: logging: Extra checks on the "level" argument in more places.
+
+- Issue #2622: Fixed an ImportError when importing email.messsage from a
+  standalone application built with py2exe or py2app.
+
+- Issue #6455: Fixed test_build_ext under win32.
+
+- Issue #6377: Enabled the compiler option, and deprecate its usage as an
+  attribute.
+
+- Issue #6413: Fixed the log level in distutils.dist for announce.
+
+- Issue #3392: The subprocess communicate() method no longer fails in select()
+  when file descriptors are large; communicate() now uses poll() when possible.
+
+- Issue #6403: Fixed package path usage in build_ext.
+
+- Issues #5155, 5313, 5331: multiprocessing.Process._bootstrap was
+  unconditionally calling "os.close(sys.stdin.fileno())" resulting in file
+  descriptor errors
+
+- Issue #6365: Distutils build_ext inplace mode was copying the compiled
+  extension in a subdirectory if the extension name had dots.
+
+- Issue #6344: Fixed a crash of mmap.read() when passed a negative argument.
+
+- Issue #5230: pydoc would report no documentation found if a module generated
+  a 'not found' import error when loaded; it now reports the import errors.
+  Thanks to Lucas Prado Melo for initial fix and collaboration on the tests.
+
+- Issue #6314: logging.basicConfig() performs extra checks on the "level"
+  argument.
+
+- Issue #6164: Added an AIX specific linker argument in Distutils
+  unixcompiler. Original patch by Sridhar Ratnakumar.
 
 - Issue #6274: Fixed possible file descriptors leak in subprocess.py
 
@@ -1042,6 +1133,9 @@ Tools/Demos
 Build
 -----
 
+- Issue 5390: Add uninstall icon independent of whether file
+  extensions are installed.
+
 - Issue 5809: Specifying both --enable-framework and --enable-shared is
   an error. Configure now explicity tells you about this.
 
@@ -1090,6 +1184,9 @@ Build
 C-API
 -----
 
+- Issue #6624: yArg_ParseTuple with "s" format when parsing argument with 
+  NUL: Bogus TypeError detail string.
+
 - Issue #5954: Add a PyFrame_GetLineNumber() function to replace most uses of
   PyCode_Addr2Line().
 
@@ -1117,6 +1214,29 @@ C-API
 
 Extension Modules
 -----------------
+
+- Issue #6561: '\d' in a regex now matches only characters with
+  Unicode category 'Nd' (Number, Decimal Digit).  Previously it also
+  matched characters with category 'No'.
+
+- Issue #1523: Remove deprecated overflow wrapping for struct.pack
+  with an integer format code ('bBhHiIlLqQ').  Packing an out-of-range
+  integer now consistently raises struct.error.
+
+- Issues #1530559, #1741130: Fix various struct.pack inconsistencies
+  for the integer formats ('bBhHiIlLqQ').  In the following, '*'
+  represents any of '=', '<', '>'.
+
+    - Packing a float now always gives a Deprecation Warning.
+      Previously it only warned for 'I', 'L', '*B', '*H', '*I', '*L'.
+
+    - If x is not an int, long or float, then packing x will always
+      result in struct.error.  Previously an x with an __int__ method
+      could be packed by 'b', 'B', 'h', 'H', 'i', 'l', '*b', '*h'
+      ,'*i', '*l', and an x with a __long__ method could be packed by
+      'q', 'Q', '*q', '*Q'; for x with neither __int__ nor __long__,
+      TypeError used to be raised (with a confusing error message) for
+      'I', 'L', '*B', '*H', '*I', '*L', and struct.error in other cases.
 
 - Issue #4873: Fix resource leaks in error cases of pwd and grp.
 
@@ -1149,6 +1269,11 @@ Extension Modules
 Tests
 -----
 
+- Issue #5450: Moved tests involving loading tk from Lib/test/test_tcl to
+  Lib/lib-tk/test/test_tkinter/test_loadtk. With this, these tests demonstrate
+  the same behaviour as test_ttkguionly (and now also test_tk) which is to
+  skip the tests if DISPLAY is defined but can't be used.
+
 - Issue #6152: New option '-j'/'--multiprocess' for regrtest allows running
   regression tests in parallel, shortening the total runtime.
 
@@ -1173,6 +1298,8 @@ Tests
 - Issue #5837: Certain sequences of calls to set() and unset() for
   support.EnvironmentVarGuard objects restored the environment variables
   incorrectly on __exit__.
+
+- Issue #2389: Array objects are now pickled in a portable manner.
 
 
 What's New in Python 2.6 final
@@ -3774,7 +3901,7 @@ Library
 - Bug #1565661: in webbrowser, split() the command for the default
   GNOME browser in case it is a command with args.
 
-- Made the error message for time.strptime when the data data and
+- Made the error message for time.strptime when the data and
   format do match be more clear.
 
 - Fix a bug in traceback.format_exception_only() that led to an error

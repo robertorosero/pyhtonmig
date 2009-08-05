@@ -21,6 +21,9 @@ class TestPy3KWarnings(unittest.TestCase):
     def assertWarning(self, _, warning, expected_message):
         self.assertEqual(str(warning.message), expected_message)
 
+    def assertNoWarning(self, _, recorder):
+        self.assertEqual(len(recorder.warnings), 0)
+
     def test_backquote(self):
         expected = 'backquote not supported in 3.x; use repr()'
         with check_warnings() as w:
@@ -113,7 +116,7 @@ class TestPy3KWarnings(unittest.TestCase):
 
     def test_builtin_function_or_method_comparisons(self):
         expected = ('builtin_function_or_method '
-                    'inequality comparisons not supported in 3.x')
+                    'order comparisons not supported in 3.x')
         func = eval
         meth = {}.get
         with check_warnings() as w:
@@ -124,6 +127,12 @@ class TestPy3KWarnings(unittest.TestCase):
             self.assertWarning(meth <= func, w, expected)
             w.reset()
             self.assertWarning(meth >= func, w, expected)
+            w.reset()
+            self.assertNoWarning(meth == func, w)
+            self.assertNoWarning(meth != func, w)
+            lam = lambda x: x
+            self.assertNoWarning(lam == func, w)
+            self.assertNoWarning(lam != func, w)
 
     def test_frame_attributes(self):
         template = "%s has been removed in 3.x"
@@ -270,6 +279,18 @@ class TestPy3KWarnings(unittest.TestCase):
                 def __hash__(self): pass
             self.assertEqual(len(w.warnings), 0)
 
+    def test_operator(self):
+        from operator import isCallable, sequenceIncludes
+
+        callable_warn = ("operator.isCallable() is not supported in 3.x. "
+                         "Use hasattr(obj, '__call__').")
+        seq_warn = ("operator.sequenceIncludes() is not supported "
+                    "in 3.x. Use operator.contains().")
+        with check_warnings() as w:
+            self.assertWarning(isCallable(self), w, callable_warn)
+            w.reset()
+            self.assertWarning(sequenceIncludes(range(3), 2), w, seq_warn)
+
 
 class TestStdlibRemovals(unittest.TestCase):
 
@@ -317,7 +338,7 @@ class TestStdlibRemovals(unittest.TestCase):
             try:
                 __import__(module_name, level=0)
             except DeprecationWarning as exc:
-                self.assert_(module_name in exc.args[0],
+                self.assertTrue(module_name in exc.args[0],
                              "%s warning didn't contain module name"
                              % module_name)
             except ImportError:
@@ -353,17 +374,6 @@ class TestStdlibRemovals(unittest.TestCase):
             with check_warnings() as w:
                 mod.walk("crashers", dumbo, None)
             self.assertEquals(str(w.message), msg)
-
-    def test_commands_members(self):
-        import commands
-        # commands module tests may have already triggered this warning
-        reset_module_registry(commands)
-        members = {"mk2arg" : 2, "mkarg" : 1, "getstatus" : 1}
-        for name, arg_count in members.items():
-            with warnings.catch_warnings():
-                warnings.filterwarnings("error")
-                func = getattr(commands, name)
-                self.assertRaises(DeprecationWarning, func, *([None]*arg_count))
 
     def test_reduce_move(self):
         from operator import add

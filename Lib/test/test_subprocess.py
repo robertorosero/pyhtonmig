@@ -497,7 +497,7 @@ class ProcessTestCase(unittest.TestCase):
         # but, based on system scheduling we can't control, it's possible
         # poll() never returned None.  It "should be" very rare that it
         # didn't go around at least twice.
-        self.assert_(count >= 2)
+        self.assertTrue(count >= 2)
         # Subsequent invocations should just return the returncode
         self.assertEqual(p.poll(), 0)
 
@@ -652,7 +652,7 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                               "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.send_signal(signal.SIGINT)
             self.assertNotEqual(p.wait(), 0)
 
@@ -660,7 +660,7 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                             "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.kill()
             self.assertEqual(p.wait(), -signal.SIGKILL)
 
@@ -668,7 +668,7 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                             "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.terminate()
             self.assertEqual(p.wait(), -signal.SIGTERM)
 
@@ -746,7 +746,7 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                               "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.send_signal(signal.SIGTERM)
             self.assertNotEqual(p.wait(), 0)
 
@@ -754,7 +754,7 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                             "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.kill()
             self.assertNotEqual(p.wait(), 0)
 
@@ -762,12 +762,28 @@ class ProcessTestCase(unittest.TestCase):
             p = subprocess.Popen([sys.executable,
                             "-c", "input()"])
 
-            self.assert_(p.poll() is None, p.poll())
+            self.assertTrue(p.poll() is None, p.poll())
             p.terminate()
             self.assertNotEqual(p.wait(), 0)
 
+
+unit_tests = [ProcessTestCase]
+
+if getattr(subprocess, '_has_poll', False):
+    class ProcessTestCaseNoPoll(ProcessTestCase):
+        def setUp(self):
+            subprocess._has_poll = False
+            ProcessTestCase.setUp(self)
+
+        def tearDown(self):
+            subprocess._has_poll = True
+            ProcessTestCase.tearDown(self)
+
+    unit_tests.append(ProcessTestCaseNoPoll)
+
+
 def test_main():
-    test_support.run_unittest(ProcessTestCase)
+    test_support.run_unittest(*unit_tests)
     if hasattr(test_support, "reap_children"):
         test_support.reap_children()
 
