@@ -843,7 +843,7 @@ class PyShell(OutputWindow):
         self.save_stdin = sys.stdin
         import IOBinding
         self.stdout = PseudoFile(self, "stdout", IOBinding.encoding)
-        self.stderr = PseudoFile(self, "stderr", IOBinding.encoding)
+        self.stderr = PseudoStderrFile(self, encoding=IOBinding.encoding)
         self.console = PseudoFile(self, "console", IOBinding.encoding)
         if not use_subprocess:
             sys.stdout = self.stdout
@@ -1187,6 +1187,7 @@ class PyShell(OutputWindow):
         self.text.see("restart")
 
     def restart_shell(self, event=None):
+        self.stderr.signaled = False
         self.interp.restart_subprocess()
 
     def showprompt(self):
@@ -1242,6 +1243,16 @@ class PseudoFile(object):
     def isatty(self):
         return True
 
+class PseudoStderrFile(PseudoFile):
+    def __init__(self, shell, tags="stderr", encoding=None):
+        PseudoFile.__init__(self, shell, tags, encoding)
+        self.signaled = False
+
+    def write(self, s):
+        if not self.signaled:
+            self.shell.top.wakeup()
+            self.signaled = True
+        PseudoFile.write(self, s)
 
 usage_msg = """\
 
