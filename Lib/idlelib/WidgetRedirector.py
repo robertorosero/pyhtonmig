@@ -77,7 +77,6 @@ class WidgetRedirector:
         to *args to accomplish that.  For an example, see ColorDelegator.py.
 
         '''
-        operation = str(operation)
         m = self._operations.get(operation)
         try:
             if m:
