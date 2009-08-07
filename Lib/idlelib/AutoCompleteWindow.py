@@ -256,7 +256,7 @@ class AutoCompleteWindow:
     def keypress_event(self, event):
         if not self.is_active():
             return
-        keysym = event.keysym
+        keysym = str(event.keysym)
         if hasattr(event, "mc_state"):
             state = event.mc_state
         else:

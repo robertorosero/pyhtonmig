@@ -1063,6 +1063,7 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 				clen -= (nullstr + 1) - cstr;
 				cstr = nullstr + 1;
 			}
+
 			/* Convert UTF-8 to Unicode string */
 			result = PyUnicode_DecodeUTF8(s, len, "strict");
 			if (result == NULL) {
