@@ -1039,6 +1039,30 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 		if (i == value->length)
 			result = PyString_FromStringAndSize(s, len);
 		else {
+			/* Before converting from UTF-8 we must check if Tcl
+			 * didn't let some 0xC0 0x80 slip out. If we happen
+			 * to find any embedded nulls then we replace them
+			 * by a 0. */
+			int clen = len - i;
+			char *nullstr, *end, *cstr;
+
+			end = s + len;
+			cstr = s + i;
+
+			while ((nullstr = memchr(cstr, '\xC0', clen))) {
+				if (nullstr + 1 < end &&
+				    *(nullstr + 1) == '\x80') {
+					/* Found the bytes 0xC0 0x80, replace
+					 * them by a 0 */
+					nullstr[0] = '\0';
+					memmove(nullstr + 1, nullstr + 2,
+						end - (nullstr + 2));
+					len--;
+					end--;
+				}
+				clen -= (nullstr + 1) - cstr;
+				cstr = nullstr + 1;
+			}
 			/* Convert UTF-8 to Unicode string */
 			result = PyUnicode_DecodeUTF8(s, len, "strict");
 			if (result == NULL) {
@@ -2046,9 +2070,10 @@ PythonCmd_Error(Tcl_Interp *interp)
  * function or method.
  */
 static int
-PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
+PythonCmd(ClientData clientData, Tcl_Interp *interp, int objc,
+		Tcl_Obj *CONST objv[])
 {
-	PythonCmd_ClientData *data = (PythonCmd_ClientData *)clientData;
+	PythonCmd_ClientData *data = clientData;
 	PyObject *self, *func, *arg, *res;
 	int i, rv;
 	Tcl_Obj *obj_res;
@@ -2061,13 +2086,16 @@ PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
 	self = data->self;
 	func = data->func;
 
-	/* Create argument list (argv1, ..., argvN) */
-	if (!(arg = PyTuple_New(argc - 1)))
+	/* Create a tuple for holding all the objects, the first arg in obvj
+	 * is not considered since it is the command name and is not used here.
+	 */
+	objc--;
+	if (!(arg = PyTuple_New(objc)))
 		return PythonCmd_Error(interp);
 
-	for (i = 0; i < (argc - 1); i++) {
-		PyObject *s = PyString_FromString(argv[i + 1]);
-		if (!s || PyTuple_SetItem(arg, i, s)) {
+	for (i = 0; i < objc; i++) {
+		PyObject *ob = FromObj(self, objv[i + 1]);
+		if (!ob || PyTuple_SetItem(arg, i, ob)) {
 			Py_DECREF(arg);
 			return PythonCmd_Error(interp);
 		}
@@ -2127,7 +2155,7 @@ static int
 Tkapp_CommandProc(CommandEvent *ev, int flags)
 {
 	if (ev->create)
-		*ev->status = Tcl_CreateCommand(
+		*ev->status = Tcl_CreateObjCommand(
 			ev->interp, ev->name, PythonCmd,
 			ev->data, PythonCmdDelete) == NULL;
 	else
@@ -2187,7 +2215,7 @@ Tkapp_CreateCommand(PyObject *selfptr, PyObject *args)
 #endif
 	{
 		ENTER_TCL
-		err = Tcl_CreateCommand(
+		err = Tcl_CreateObjCommand(
 			Tkapp_Interp(self), cmdName, PythonCmd,
 			(ClientData)data, PythonCmdDelete) == NULL;
 		LEAVE_TCL
