@@ -1154,7 +1154,7 @@ class Misc:
         e.char = A
         try: e.send_event = getboolean(E)
         except TclError: pass
-        e.keysym = K
+        e.keysym = str(K)
         e.keysym_num = getint_event(N)
         e.type = T
         try:
