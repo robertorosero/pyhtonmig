@@ -156,7 +156,7 @@ def _tkerror(err):
 
 def _exit(code='0'):
     """Internal function. Calling it will throw the exception SystemExit."""
-    raise SystemExit, code
+    raise SystemExit, str(code)
 
 _varnum = 0
 class Variable:
@@ -1118,7 +1118,8 @@ class Misc:
 
         getint = int
         def getint_event(s):
-            """Tk changed behavior in 8.4.2, returning "??" rather more often."""
+            # Tk changed behavior in 8.4.2, returning "??" rather more often.
+            s = str(s) # XXX need to formally test this case
             try:
                 return int(s)
             except ValueError:
@@ -1151,7 +1152,7 @@ class Misc:
         e.width = getint_event(w)
         e.x = getint_event(x)
         e.y = getint_event(y)
-        e.char = A
+        e.char = unicode(A)
         try: e.send_event = getboolean(E)
         except TclError: pass
         e.keysym = str(K)
