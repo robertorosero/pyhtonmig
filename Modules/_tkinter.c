@@ -1025,12 +1025,12 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 	TkappObject *app = (TkappObject*)tkapp;
 
 	if (value->typePtr == NULL) {
-		/* If the result contains any bytes with the top bit set,
-		   it's UTF-8 and we should decode it to Unicode */
+		int len;
+		const char *s = Tcl_GetStringFromObj(value, &len);
 #ifdef Py_USING_UNICODE
 		int i;
-		char *s = value->bytes;
-		int len = value->length;
+		/* If the result contains any bytes with the top bit set,
+		   it's UTF-8 and we should decode it to Unicode */
 		for (i = 0; i < len; i++) {
 			if (value->bytes[i] & 0x80)
 				break;
@@ -1043,11 +1043,19 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 			 * didn't let some 0xC0 0x80 slip out. If we happen
 			 * to find any embedded nulls then we replace them
 			 * by a 0. */
-			int clen = len - i;
-			char *nullstr, *end, *cstr;
+			int clen;
+			char *bstr, *cstr, *nullstr, *end;
 
-			end = s + len;
-			cstr = s + i;
+			bstr = PyMem_Malloc(len);
+			if (!bstr) {
+				PyErr_NoMemory();
+				goto finally;
+			}
+			Py_MEMCPY(bstr, s, len);
+
+			clen = len - i;
+			end = bstr + len;
+			cstr = bstr + i;
 
 			while ((nullstr = memchr(cstr, '\xC0', clen))) {
 				if (nullstr + 1 < end &&
@@ -1065,14 +1073,16 @@ FromObj(PyObject* tkapp, Tcl_Obj *value)
 			}
 
 			/* Convert UTF-8 to Unicode string */
-			result = PyUnicode_DecodeUTF8(s, len, "strict");
+			result = PyUnicode_DecodeUTF8(bstr, len, "strict");
 			if (result == NULL) {
 				PyErr_Clear();
-				result = PyString_FromStringAndSize(s, len);
+				result = PyString_FromStringAndSize(bstr, len);
 			}
+finally:
+			PyMem_Free(bstr);
 		}
 #else
-		result = PyString_FromStringAndSize(value->bytes, value->length);
+		result = PyString_FromStringAndSize(s, len);
 #endif
 		return result;
 	}
