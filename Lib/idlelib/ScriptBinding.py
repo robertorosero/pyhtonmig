@@ -55,7 +55,10 @@ class ScriptBinding:
 
     def _cleanup_temp(self, filename, is_temp=True):
         if is_temp:
-            os.unlink(filename)
+            try:
+                os.unlink(filename)
+            except OSError:
+                pass
 
     def check_module_event(self, event):
         filename, is_temp = self.getfilename()
