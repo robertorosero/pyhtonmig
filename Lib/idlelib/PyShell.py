@@ -955,7 +955,6 @@ class PyShell(OutputWindow):
         self.showprompt()
 
         for func, args, kwargs in self._cleanup_funcs:
-            print func, args, kwargs
             func(*args, **kwargs)
         self._cleanup_funcs = []
 
