@@ -685,8 +685,9 @@ class ModifiedInterpreter(InteractiveInterpreter):
         else:
             return None
 
-    def showtraceback(self):
-        "Extend base class method to reset output properly"
+    def showtraceback(self, temp_filename=None):
+        """Extend base class method to reset output properly and print an
+        customized traceback."""
         self.tkconsole.resetoutput()
         self.checklinecache()
 
@@ -697,7 +698,13 @@ class ModifiedInterpreter(InteractiveInterpreter):
         tblist = traceback.extract_tb(tb)
         del tblist[:1]
         sys.stderr.write('\nTraceback (most recent call last):\n')
-        traceback
+        if temp_filename is not None:
+            # Replace the name of the temporary file by 'Untitled'
+            new_tb = []
+            for t in tblist:
+                fname = 'Untitled' if t[0] == temp_filename else t[0]
+                new_tb.append((fname, ) + t[1:])
+            tblist = new_tb
         # Highlight only topmost exception
         first, rest = [tblist[0]], tblist[1:]
         traceback.print_list(first, file=sys.stderr)
@@ -727,7 +734,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
             exec code in self.locals
         return 1
 
-    def runcode(self, code):
+    def runcode(self, code, tempname=None):
         "Override base class method"
         if self.tkconsole.executing:
             self.interp.restart_subprocess()
@@ -740,7 +747,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
             self.tkconsole.beginexecuting()
             if not debugger and self.rpcclt is not None:
                 self.active_seq = self.rpcclt.asyncqueue("exec", "runcode",
-                                                        (code,), {})
+                                                        (code, tempname), {})
             elif debugger:
                 debugger.run(code, self.locals)
             else:
@@ -768,7 +775,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
                     self.tkconsole.canceled = False
                     print >>self.tkconsole.stderr, "KeyboardInterrupt"
                 else:
-                    self.showtraceback()
+                    self.showtraceback(tempname)
         finally:
             if not use_subprocess:
                 try:

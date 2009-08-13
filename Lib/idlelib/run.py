@@ -146,7 +146,7 @@ def show_socket_error(err, address):
         tkMessageBox.showerror("IDLE Subprocess Error", "Socket Error: %s" % err[1])
     root.destroy()
 
-def print_exception():
+def print_exception(temp_filename=None):
     import linecache
     linecache.checkcache()
     flush_stdout()
@@ -158,6 +158,13 @@ def print_exception():
     exclude = ("run.py", "rpc.py", "threading.py", "Queue.py",
                "RemoteDebugger.py", "bdb.py")
     cleanup_traceback(tbe, exclude)
+    if temp_filename is not None:
+        # Replace the name of the temporary file by 'Untitled'
+        new_tbe = []
+        for t in tbe:
+            fname = 'Untitled' if t[0] == temp_filename else t[0]
+            new_tbe.append((fname, ) + t[1:])
+        tbe = new_tbe
     # Highlight only topmost exception
     first, rest = [tbe[0]], tbe[1:]
     traceback.print_list(first, file=efile)
@@ -291,7 +298,7 @@ class Executive(object):
         self.calltip = CallTips.CallTips()
         self.autocomplete = AutoComplete.AutoComplete()
 
-    def runcode(self, code):
+    def runcode(self, code, temp_filename=None):
         global interruptable
         try:
             self.usr_exc_info = None
@@ -305,7 +312,7 @@ class Executive(object):
             if quitting:
                 exit()
             # even print a user code SystemExit exception, continue
-            print_exception()
+            print_exception(temp_filename)
             jit = self.rpchandler.console.getvar("<<toggle-jit-stack-viewer>>")
             if jit:
                 self.rpchandler.interp.open_remote_stack_viewer()

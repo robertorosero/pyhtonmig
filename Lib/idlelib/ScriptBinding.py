@@ -178,9 +178,11 @@ class ScriptBinding:
         # XXX KBK 03Jul04 When run w/o subprocess, runtime warnings still
         #         go to __stderr__.  With subprocess, they go to the shell.
         #         Need to change streams in PyShell.ModifiedInterpreter.
-        interp.runcode(code)
         if is_temp:
+            interp.runcode(code, filename)
             interp.tkconsole.append_cleanup_func(self._cleanup_temp, filename)
+        else:
+            interp.runcode(code)
         return 'break'
 
     def getfilename(self):
