@@ -354,6 +354,18 @@ Core and Builtins
 Library
 -------
 
+- Issue #6629: Fix a data corruption issue in the new `io` package, which could
+  occur when writing to a BufferedRandom object (e.g. a file opened in "rb+" or
+  "wb+" mode) after having buffered a certain amount of data for reading. This
+  bug was not present in the pure Python implementation.
+
+- Issue #4660: If a multiprocessing.JoinableQueue.put() was preempted, it was
+  possible to get a spurious 'task_done() called too many times' error.
+
+- Issue #1628205: Socket file objects returned by socket.socket.makefile() now
+  properly handles EINTR within the read, readline, write & flush methods.
+  The socket.sendall() method now properly handles interrupted system calls.
+
 - Issue #6595: The Decimal constructor now allows arbitrary Unicode
   decimal digits in input, as recommended by the standard.  Previously
   it was restricted to accepting [0-9].
@@ -1214,6 +1226,9 @@ C-API
 
 Extension Modules
 -----------------
+
+- Fix a segfault in expat when given a specially crafted input lead to the
+  tokenizer not stopping.
 
 - Issue #6561: '\d' in a regex now matches only characters with
   Unicode category 'Nd' (Number, Decimal Digit).  Previously it also
