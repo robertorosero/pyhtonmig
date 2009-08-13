@@ -723,6 +723,12 @@ class ConfigDialog(Toplevel):
                                      'to delete the key set %r ?' % (keySetName),
                                      parent=self):
             return
+        #revert to default key set
+        self.keysAreBuiltin.set(idleConf.defaultCfg['main'].Get('Keys','default'))
+        self.builtinKeys.set(idleConf.defaultCfg['main'].Get('Keys','name'))
+        #user can't back out of these changes, they must be applied now
+        self.Apply()
+        self.SetKeysType()
         #remove key set from config
         idleConf.userCfg['keys'].remove_section(keySetName)
         if self.changedItems['keys'].has_key(keySetName):
@@ -737,12 +743,6 @@ class ConfigDialog(Toplevel):
             self.optMenuKeysCustom.SetMenu(itemList,'- no custom keys -')
         else:
             self.optMenuKeysCustom.SetMenu(itemList,itemList[0])
-        #revert to default key set
-        self.keysAreBuiltin.set(idleConf.defaultCfg['main'].Get('Keys','default'))
-        self.builtinKeys.set(idleConf.defaultCfg['main'].Get('Keys','name'))
-        #user can't back out of these changes, they must be applied now
-        self.Apply()
-        self.SetKeysType()
 
     def DeleteCustomTheme(self):
         themeName=self.customTheme.get()
