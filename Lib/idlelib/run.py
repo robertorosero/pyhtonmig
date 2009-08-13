@@ -158,7 +158,11 @@ def print_exception():
     exclude = ("run.py", "rpc.py", "threading.py", "Queue.py",
                "RemoteDebugger.py", "bdb.py")
     cleanup_traceback(tbe, exclude)
-    traceback.print_list(tbe, file=efile)
+    # Highlight only topmost exception
+    first, rest = [tbe[0]], tbe[1:]
+    traceback.print_list(first, file=efile)
+    if rest:
+        traceback.print_list(rest, file=sys.stdout)
     lines = traceback.format_exception_only(typ, val)
     for line in lines:
         print>>efile, line,

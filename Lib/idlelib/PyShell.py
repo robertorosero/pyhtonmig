@@ -677,7 +677,23 @@ class ModifiedInterpreter(InteractiveInterpreter):
         "Extend base class method to reset output properly"
         self.tkconsole.resetoutput()
         self.checklinecache()
-        InteractiveInterpreter.showtraceback(self)
+
+        type, value, tb = sys.exc_info()
+        sys.last_type = type
+        sys.last_value = value
+        sys.last_traceback = tb
+        tblist = traceback.extract_tb(tb)
+        del tblist[:1]
+        sys.stderr.write('\nTraceback (most recent call last):\n')
+        traceback
+        # Highlight only topmost exception
+        first, rest = [tblist[0]], tblist[1:]
+        traceback.print_list(first, file=sys.stderr)
+        if rest:
+            traceback.print_list(rest, file=sys.stdout)
+        lines = traceback.format_exception_only(typ, val)
+        map(sys.stderr.write, lines)
+
         if self.tkconsole.getvar("<<toggle-jit-stack-viewer>>"):
             self.tkconsole.open_stack_viewer()
 
