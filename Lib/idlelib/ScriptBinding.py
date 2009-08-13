@@ -53,7 +53,7 @@ class ScriptBinding:
         self.flist = self.editwin.flist
         self.root = self.editwin.root
 
-    def _cleanup_temp(self, filename, is_temp):
+    def _cleanup_temp(self, filename, is_temp=True):
         if is_temp:
             os.unlink(filename)
 
@@ -176,7 +176,8 @@ class ScriptBinding:
         #         go to __stderr__.  With subprocess, they go to the shell.
         #         Need to change streams in PyShell.ModifiedInterpreter.
         interp.runcode(code)
-        self._cleanup_temp(filename, is_temp)
+        if is_temp:
+            interp.tkconsole.append_cleanup_func(self._cleanup_temp, filename)
         return 'break'
 
     def getfilename(self):

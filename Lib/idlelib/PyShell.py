@@ -875,6 +875,11 @@ class PyShell(OutputWindow):
         self.history = self.History(self.text)
         #
         self.pollinterval = 50  # millisec
+        # Cleanup functions to be called when endexecuting is called
+        self._cleanup_funcs = []
+
+    def append_cleanup_func(self, func, *args, **kwargs):
+        self._cleanup_funcs.append((func, args, kwargs))
 
     def get_standard_extension_names(self):
         return idleConf.GetExtensions(shell_only=True)
@@ -948,6 +953,11 @@ class PyShell(OutputWindow):
         self.executing = 0
         self.canceled = 0
         self.showprompt()
+
+        for func, args, kwargs in self._cleanup_funcs:
+            print func, args, kwargs
+            func(*args, **kwargs)
+        self._cleanup_funcs = []
 
     def close(self):
         "Extend EditorWindow.close()"
