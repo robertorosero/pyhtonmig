@@ -36,25 +36,54 @@ modules.
    path.
 
 
+.. _pyclbr-object-objects:
+
+Object Objects
+--------------
+
+The class :class:`Object` is the base class for the classes :class:`Object`
+and :class:`Function`. It provides the following data members:
+
+.. attribute:: Object.module
+
+   The name of the module defining the object described.
+
+
+.. attribute:: Object.name
+
+   The name of the object.
+
+
+.. attribute:: Object.file
+
+   Name of the file in which the object was defined.
+
+
+.. attribute:: Object.lineno
+
+   The line number in the file named by :attr:`~Object.file` where
+   the definition of the object stated.
+
+
+.. attribute:: Object.parent
+
+   The parent of this object, if any.
+
+
+.. attribute:: Object.objects
+
+   A dictionary mapping object names to the objects that are defined inside the
+   namespace created by the current object.
+
+
 .. _pyclbr-class-objects:
 
 Class Objects
 -------------
 
 The :class:`Class` objects used as values in the dictionary returned by
-:func:`readmodule` and :func:`readmodule_ex` provide the following data
-members:
-
-
-.. attribute:: Class.module
-
-   The name of the module defining the class described by the class descriptor.
-
-
-.. attribute:: Class.name
-
-   The name of the class.
-
+:func:`readmodule` and :func:`readmodule_ex` provide the following extra
+data members:
 
 .. attribute:: Class.super
 
@@ -70,44 +99,11 @@ members:
    A dictionary mapping method names to line numbers.
 
 
-.. attribute:: Class.file
-
-   Name of the file containing the ``class`` statement defining the class.
-
-
-.. attribute:: Class.lineno
-
-   The line number of the ``class`` statement within the file named by
-   :attr:`~Class.file`.
-
-
 .. _pyclbr-function-objects:
 
 Function Objects
 ----------------
 
 The :class:`Function` objects used as values in the dictionary returned by
-:func:`readmodule_ex` provide the following data members:
-
-
-.. attribute:: Function.module
-
-   The name of the module defining the function described by the function
-   descriptor.
-
-
-.. attribute:: Function.name
-
-   The name of the function.
-
-
-.. attribute:: Function.file
-
-   Name of the file containing the ``def`` statement defining the function.
-
-
-.. attribute:: Function.lineno
-
-   The line number of the ``def`` statement within the file named by
-   :attr:`~Function.file`.
-
+:func:`readmodule_ex` provide only the members already defined by
+:class:`Class` objects.

@@ -15,14 +15,23 @@ instances of the class Class defined here.  One special key/value pair
 is present for packages: the key '__path__' has a list as its value
 which contains the package search path.
 
-A class is described by the class Class in this module.  Instances
-of this class have the following instance variables:
-        module -- the module name
-        name -- the name of the class
-        super -- a list of super classes (Class instances)
+Classes and functions have a common superclass in this module, the Object
+class. Every instance of this class have the following instance variables:
+        module  -- the module name
+        name    -- the name of the object
+        file    -- the file in which the object was defined
+        lineno  -- the line in the file on which the definition of the object
+                   started
+        parent  -- the parent of this object, if any
+        objects -- the other classes and function this object may contain
+The 'objects' attribute is a dictionary where each key/value pair corresponds
+to the name of the object and the object itself.
+
+A class is described by the class Class in this module. Instances
+of this class have the following instance variables (plus the ones from
+Object):
+        super   -- a list of super classes (Class instances)
         methods -- a dictionary of methods
-        file -- the file in which the class was defined
-        lineno -- the line in the file on which the class statement occurred
 The dictionary of methods uses the method names as keys and the line
 numbers on which the method was defined as values.
 If the name of a super class is not recognized, the corresponding
@@ -32,11 +41,6 @@ are recognized and imported modules are scanned as well, this
 shouldn't happen often.
 
 A function is described by the class Function in this module.
-Instances of this class have the following instance variables:
-        module -- the module name
-        name -- the name of the class
-        file -- the file in which the class was defined
-        lineno -- the line in the file on which the class statement occurred
 """
 
 import sys
@@ -45,33 +49,48 @@ import tokenize
 from token import NAME, DEDENT, OP
 from operator import itemgetter
 
-__all__ = ["readmodule", "readmodule_ex", "Class", "Function"]
+__all__ = ["readmodule", "readmodule_ex", "Object", "Class", "Function"]
 
 _modules = {}                           # cache of modules we've seen
 
-# each Python class is represented by an instance of this class
-class Class:
-    '''Class to represent a Python class.'''
-    def __init__(self, module, name, super, file, lineno):
+class Object:
+    def __init__(self, module, name, file, lineno, parent):
         self.module = module
         self.name = name
+        self.file = file
+        self.lineno = lineno
+        self.parent = parent
+        self.objects = {}
+
+    def _addobject(self, name, obj):
+        self.objects[name] = obj
+
+# each Python class is represented by an instance of this class
+class Class(Object):
+    '''Class to represent a Python class.'''
+    def __init__(self, module, name, super, file, lineno, parent=None):
+        Object.__init__(self, module, name, file, lineno, parent)
         if super is None:
             super = []
         self.super = super
         self.methods = {}
-        self.file = file
-        self.lineno = lineno
 
     def _addmethod(self, name, lineno):
         self.methods[name] = lineno
 
-class Function:
+class Function(Object):
     '''Class to represent a top-level Python function'''
-    def __init__(self, module, name, file, lineno):
-        self.module = module
-        self.name = name
-        self.file = file
-        self.lineno = lineno
+    def __init__(self, module, name, file, lineno, parent=None):
+        Object.__init__(self, module, name, file, lineno, parent)
+
+def _newfunction(ob, name, lineno):
+    '''Helper function for creating a nested function or a method.'''
+    return Function(ob.module, name, ob.file, lineno, ob)
+
+def _newclass(ob, name, super, lineno):
+    '''Helper function for creating a nested class.'''
+    return Class(ob.module, name, super, ob.file, lineno, ob)
+
 
 def readmodule(module, path=None):
     '''Backwards compatible interface.
@@ -164,17 +183,23 @@ def _readmodule(module, path, inpackage=None):
                 tokentype, meth_name, start = g.next()[0:3]
                 if tokentype != NAME:
                     continue # Syntax error
+                cur_func = None
                 if stack:
-                    cur_class = stack[-1][0]
-                    if isinstance(cur_class, Class):
+                    cur_obj = stack[-1][0]
+                    if isinstance(cur_obj, Object):
+                        # it's a nested function or a method
+                        cur_func = _newfunction(cur_obj, meth_name, lineno)
+                        cur_obj._addobject(meth_name, cur_func)
+
+                    if isinstance(cur_obj, Class):
                         # it's a method
-                        cur_class._addmethod(meth_name, lineno)
-                    # else it's a nested def
+                        cur_func = _newfunction(cur_obj, meth_name, lineno)
+                        cur_obj._addmethod(meth_name, lineno)
                 else:
                     # it's a function
-                    dict[meth_name] = Function(fullmodule, meth_name,
-                                               fname, lineno)
-                stack.append((None, thisindent)) # Marker for nested fns
+                    cur_func = Function(fullmodule, meth_name, fname, lineno)
+                    dict[meth_name] = cur_func
+                stack.append((cur_func, thisindent)) # Marker for nested fns
             elif token == 'class':
                 lineno, thisindent = start
                 # close previous nested classes and defs
@@ -225,9 +250,16 @@ def _readmodule(module, path, inpackage=None):
                             super.append(token)
                         # expressions in the base list are not supported
                     inherit = names
-                cur_class = Class(fullmodule, class_name, inherit,
-                                  fname, lineno)
-                if not stack:
+                if stack:
+                    cur_obj = stack[-1][0]
+                    if isinstance(cur_obj, (Class, Function)):
+                        # either a nested class or a class inside a function
+                        cur_class = _newclass(cur_obj, class_name, inherit,
+                                lineno)
+                        cur_obj._addobject(class_name, cur_class)
+                else:
+                    cur_class = Class(fullmodule, class_name, inherit,
+                            fname, lineno)
                     dict[class_name] = cur_class
                 stack.append((cur_class, thisindent))
             elif token == 'import' and start[1] == 0:
@@ -325,18 +357,30 @@ def _main():
     else:
         path = []
     dict = readmodule_ex(mod, path)
+    lineno_key = lambda a: getattr(a, 'lineno', 0)
     objs = dict.values()
-    objs.sort(lambda a, b: cmp(getattr(a, 'lineno', 0),
-                               getattr(b, 'lineno', 0)))
-    for obj in objs:
+    objs.sort(key=lineno_key, reverse=True)
+    indent_level = 2
+    while objs:
+        obj = objs.pop()
+        if isinstance(obj, list):
+            # Value of a __path__ key
+            continue
+        if not hasattr(obj, 'indent'):
+            obj.indent = 0
+
+        if isinstance(obj, Object):
+            new_objs = obj.objects.values()
+            new_objs.sort(key=lineno_key, reverse=True)
+            for ob in new_objs:
+                ob.indent = obj.indent + indent_level
+            objs.extend(new_objs)
+
         if isinstance(obj, Class):
-            print "class", obj.name, obj.super, obj.lineno
-            methods = sorted(obj.methods.iteritems(), key=itemgetter(1))
-            for name, lineno in methods:
-                if name != "__path__":
-                    print "  def", name, lineno
+            print "%sclass %s %s %s" % (' ' * obj.indent, obj.name,
+                    obj.super, obj.lineno)
         elif isinstance(obj, Function):
-            print "def", obj.name, obj.lineno
+            print "%sdef %s %s" % (' ' * obj.indent, obj.name, obj.lineno)
 
 if __name__ == "__main__":
     _main()
