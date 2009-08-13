@@ -1355,7 +1355,7 @@ def main():
     global flist, root, use_subprocess
 
     use_subprocess = True
-    enable_shell = True
+    enable_shell = False
     enable_edit = False
     debug = False
     cmd = None
@@ -1376,7 +1376,6 @@ def main():
             enable_shell = True
         if o == '-e':
             enable_edit = True
-            enable_shell = False
         if o == '-h':
             sys.stdout.write(usage_msg)
             sys.exit()
@@ -1427,6 +1426,7 @@ def main():
     edit_start = idleConf.GetOption('main', 'General',
                                     'editor-on-startup', type='bool')
     enable_edit = enable_edit or edit_start
+    enable_shell = enable_shell or not edit_start
     # start editor and/or shell windows:
     root = Tk(className="Idle")
 
