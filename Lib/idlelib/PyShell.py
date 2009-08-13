@@ -482,7 +482,13 @@ class ModifiedInterpreter(InteractiveInterpreter):
 
     def terminate_subprocess(self):
         "Make sure subprocess is terminated and collect status."
-        self.rpcproc.kill()
+        if sys.platform[:3] == 'win':
+            try:
+                self.rpcproc.kill()
+            except WindowsError:
+                pass
+        else:
+            self.rpcproc.kill()
         self.rpcproc.wait()
 
     def transfer_path(self):
