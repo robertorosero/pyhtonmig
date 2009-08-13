@@ -1116,7 +1116,11 @@ class Misc:
         if len(args) != len(self._subst_format): return args
         getboolean = self.tk.getboolean
 
-        getint = int
+        def getint(ob):
+            # XXX The conversion below is done since now ob might be
+            # a _tkinter.Tcl_Obj
+            return int(str(ob))
+
         def getint_event(s):
             # Tk changed behavior in 8.4.2, returning "??" rather more often.
             s = str(s) # XXX need to formally test this case
