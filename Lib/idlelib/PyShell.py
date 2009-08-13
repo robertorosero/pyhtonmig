@@ -31,6 +31,7 @@ from ColorDelegator import ColorDelegator
 from UndoDelegator import UndoDelegator
 from OutputWindow import OutputWindow
 from configHandler import idleConf
+from utils import tb_print_list
 import idlever
 
 import rpc
@@ -707,9 +708,9 @@ class ModifiedInterpreter(InteractiveInterpreter):
             tblist = new_tb
         # Highlight only topmost exception
         first, rest = [tblist[0]], tblist[1:]
-        traceback.print_list(first, file=sys.stderr)
+        tb_print_list(first, file=sys.stderr)
         if rest:
-            traceback.print_list(rest, file=sys.stdout)
+            tb_print_list(rest, file=sys.stdout)
         lines = traceback.format_exception_only(typ, value)
         map(sys.stderr.write, lines)
 
