@@ -1287,7 +1287,7 @@ class PseudoStderrFile(PseudoFile):
 
     def write(self, s):
         if not self.signaled:
-            self.shell.top.wakeup()
+            self.shell.top.wakeup(anystate=True)
             self.signaled = True
         PseudoFile.write(self, s)
 
