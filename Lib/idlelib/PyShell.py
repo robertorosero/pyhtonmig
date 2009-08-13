@@ -684,8 +684,8 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.tkconsole.resetoutput()
         self.checklinecache()
 
-        type, value, tb = sys.exc_info()
-        sys.last_type = type
+        typ, value, tb = sys.exc_info()
+        sys.last_type = typ
         sys.last_value = value
         sys.last_traceback = tb
         tblist = traceback.extract_tb(tb)
@@ -697,7 +697,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         traceback.print_list(first, file=sys.stderr)
         if rest:
             traceback.print_list(rest, file=sys.stdout)
-        lines = traceback.format_exception_only(typ, val)
+        lines = traceback.format_exception_only(typ, value)
         map(sys.stderr.write, lines)
 
         if self.tkconsole.getvar("<<toggle-jit-stack-viewer>>"):
