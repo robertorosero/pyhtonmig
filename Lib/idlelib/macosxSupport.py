@@ -20,7 +20,7 @@ def addOpenEventSupport(root, flist):
     """
     def doOpenFile(*args):
         for fn in args:
-            flist.open(fn)
+            flist.open(str(fn))
 
     # The command below is a hook in aquatk that is called whenever the app
     # receives a file open event. The callback can have multiple arguments,
