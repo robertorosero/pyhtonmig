@@ -161,16 +161,15 @@ def print_exception(temp_filename=None):
     cleanup_traceback(tbe, exclude)
     if temp_filename is not None:
         # Replace the name of the temporary file by 'Untitled'
+        main_fname = 'Untitled'
         new_tbe = []
         for t in tbe:
-            fname = 'Untitled' if t[0] == temp_filename else t[0]
+            fname = main_fname if t[0] == temp_filename else t[0]
             new_tbe.append((fname, ) + t[1:])
         tbe = new_tbe
-    # Highlight only topmost exception
-    first, rest = [tbe[0]], tbe[1:]
-    tb_print_list(first, file=efile)
-    if rest:
-        tb_print_list(rest, file=sys.stdout)
+    else:
+        main_fname = tbe[0][0]
+    tb_print_list(tbe, main_fname, sys.stdout, efile)
     lines = traceback.format_exception_only(typ, val)
     for line in lines:
         print>>efile, line,

@@ -701,16 +701,15 @@ class ModifiedInterpreter(InteractiveInterpreter):
         sys.stderr.write('\nTraceback (most recent call last):\n')
         if temp_filename is not None:
             # Replace the name of the temporary file by 'Untitled'
+            main_fname = 'Untitled'
             new_tb = []
             for t in tblist:
-                fname = 'Untitled' if t[0] == temp_filename else t[0]
+                fname = main_fname if t[0] == temp_filename else t[0]
                 new_tb.append((fname, ) + t[1:])
             tblist = new_tb
-        # Highlight only topmost exception
-        first, rest = [tblist[0]], tblist[1:]
-        tb_print_list(first, file=sys.stderr)
-        if rest:
-            tb_print_list(rest, file=sys.stdout)
+        else:
+            main_fname = tblist[0][0]
+        tb_print_list(tblist, main_fname, sys.stdout, sys.stderr)
         lines = traceback.format_exception_only(typ, value)
         map(sys.stderr.write, lines)
 
