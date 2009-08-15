@@ -245,10 +245,12 @@ class PyShellEditorWindow(EditorWindow):
         self.breakpoints = linenumber_list
 
     def ranges_to_linenumbers(self, ranges):
+        """Convert a tuple of ranges returned by Text.tag_ranges to
+        line numbers."""
         lines = []
         for index in range(0, len(ranges), 2):
-            lineno = int(float(ranges[index]))
-            end = int(float(ranges[index+1]))
+            lineno = int(float(str(ranges[index])))
+            end = int(float(str(ranges[index+1])))
             while lineno < end:
                 lines.append(lineno)
                 lineno += 1
