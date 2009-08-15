@@ -422,6 +422,10 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.poll_subprocess()
         return self.rpcclt
 
+    def get_restart_line(self):
+        halfbar = ((int(self.tkconsole.width) - 16) // 2) * '='
+        return halfbar + ' RESTART ' + halfbar
+
     def restart_subprocess(self):
         if self.restarting:
             return self.rpcclt
@@ -452,10 +456,8 @@ class ModifiedInterpreter(InteractiveInterpreter):
         if was_executing:
             console.write('\n')
             console.showprompt()
-        halfbar = ((int(console.width) - 16) // 2) * '='
-        console.write(halfbar + ' RESTART ' + halfbar)
-        console.text.mark_set("restart", "end-1c")
-        console.text.mark_gravity("restart", "left")
+        console.write(self.get_restart_line())
+        console.text.tag_add("restart", "end - 1 line")
         console.showprompt()
         # restart subprocess debugger
         if debug:
@@ -1227,8 +1229,21 @@ class PyShell(OutputWindow):
         sv = StackBrowser(self.root, self.flist)
 
     def view_restart_mark(self, event=None):
-        self.text.see("iomark")
-        self.text.see("restart")
+        text = self.text
+        text.see("iomark")
+        ranges = text.tag_ranges("restart")
+        if not ranges:
+            return
+
+        restart_line = self.interp.get_restart_line()
+        for indx in range(len(ranges), 0, -2):
+            lineno = '%s.0' % str(ranges[indx - 1]).split('.')[0]
+            start, end = ('%s +1 line' % lineno, '%s +2 lines +1c' % lineno)
+            content = text.get(start, end)[4:].rstrip()
+            if content and content[:-2] != restart_line:
+                break
+
+        text.see(lineno)
 
     def restart_shell(self, event=None):
         self.stderr.signaled = False
