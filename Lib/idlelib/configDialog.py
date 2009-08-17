@@ -359,7 +359,7 @@ class ConfigDialog(Toplevel):
         radioSaveBefore=Radiobutton(frameRun,variable=self.saveBeforeRun,
             value=1,text="Prompt to Save")
         radioSaveToTemp=Radiobutton(frameRun,variable=self.saveBeforeRun,
-            value=0,text="Just run")
+            value=0,text="No prompt")
         labelAutoSave=Label(frameRun, text='If file has been saved before ')
         radioSaveAsk=Radiobutton(frameRun,variable=self.autoSave,
             value=0,text="Prompt to Save")
