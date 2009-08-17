@@ -218,34 +218,35 @@ Python Shell window:
 	Control-d sends end-of-file; closes window if typed at >>> prompt
 		(this is Control-z on Windows).
 
-    Command history:
+	Command history:
 
-	Alt-p retrieves previous command matching what you have typed.
-	Alt-n retrieves next.
-	      (These are Control-p, Control-n on the Mac)
-	Return while cursor is on a previous command retrieves that command.
-	Expand word is also useful to reduce typing.
+		Alt-p retrieves previous command matching what you have typed.
+		Alt-n retrieves next.
+		(These are Control-p, Control-n on the Mac)
+		Return while cursor is on a previous command retrieves that
+		command.
+		Expand word is also useful to reduce typing.
 
-    Syntax colors:
+	Syntax colors:
 
-	The coloring is applied in a background "thread", so you may
-	occasionally see uncolorized text.  To change the color
-	scheme, use the Configure IDLE / Highlighting dialog.
+		The coloring is applied in a background "thread", so you may
+		occasionally see uncolorized text.  To change the color
+		scheme, use the Configure IDLE / Highlighting dialog.
 
-    Python default syntax colors:
+	Python default syntax colors:
 
-	Keywords	orange
-	Builtins	royal purple
-	Strings		green
-	Comments	red
-	Definitions	blue
+		Keywords	orange
+		Builtins	royal purple
+		Strings		green
+		Comments	red
+		Definitions	blue
 
-    Shell default colors:
+	Shell default colors:
 
-	Console output	brown
-	stdout		blue
-	stderr		red
-	stdin		black
+		Console output	brown
+		stdout		blue
+		stderr		red
+		stdin		black
 
 Other preferences:
 
