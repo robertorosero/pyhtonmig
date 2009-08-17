@@ -331,6 +331,7 @@ class ConfigDialog(Toplevel):
         self.startupEdit=IntVar(self)
         self.autoSave=IntVar(self)
         self.saveBeforeRun=BooleanVar(self)
+        self.signalOnErr = BooleanVar(self)
         self.encoding=StringVar(self)
         self.userHelpBrowser=BooleanVar(self)
         self.helpBrowser=StringVar(self)
@@ -365,6 +366,12 @@ class ConfigDialog(Toplevel):
             value=0,text="Prompt to Save")
         radioSaveAuto=Radiobutton(frameRun,variable=self.autoSave,
             value=1,text="No prompt")
+        labelSignalOnErr = Label(frameRun,
+                text="On first error")
+        signalErr = Radiobutton(frameRun, variable=self.signalOnErr,
+                value=1, text="Bring shell forward")
+        noSignalErr = Radiobutton(frameRun, variable=self.signalOnErr,
+                value=0, text="Do nothing")
         #frameWinSize
         labelWinSizeTitle=Label(frameWinSize,text='Initial Window Size'+
                 '  (in characters)')
@@ -422,6 +429,9 @@ class ConfigDialog(Toplevel):
         labelAutoSave.grid(row=1, column=0, **commonOpts)
         radioSaveAsk.grid(row=1, column=1, **commonOpts)
         radioSaveAuto.grid(row=1, column=2, **commonOpts)
+        labelSignalOnErr.grid(row=2, column=0, **commonOpts)
+        signalErr.grid(row=2, column=1, **commonOpts)
+        noSignalErr.grid(row=2, column=2, **commonOpts)
         #frameWinSize
         labelWinSizeTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
         entryWinHeight.pack(side=RIGHT,anchor=E,padx=10,pady=5)
@@ -467,6 +477,7 @@ class ConfigDialog(Toplevel):
         self.autoSave.trace_variable('w',self.VarChanged_autoSave)
         self.encoding.trace_variable('w',self.VarChanged_encoding)
         self.saveBeforeRun.trace_variable('w', self.VarChanged_saveBeforeRun)
+        self.signalOnErr.trace_variable('w', self.VarChanged_signalOnErr)
 
     def VarChanged_fontSize(self,*params):
         value=self.fontSize.get()
@@ -567,6 +578,10 @@ class ConfigDialog(Toplevel):
     def VarChanged_saveBeforeRun(self,*params):
         value = self.saveBeforeRun.get()
         self.AddChangedItem('main','General','save-before-run',value)
+
+    def VarChanged_signalOnErr(self,*params):
+        value = self.signalOnErr.get()
+        self.AddChangedItem('main','General','signal-first-error',value)
 
     def ResetChangedItems(self):
         #When any config item is changed in this dialog, an entry
@@ -1055,6 +1070,9 @@ class ConfigDialog(Toplevel):
         # save before run
         self.saveBeforeRun.set(idleConf.GetOption('main', 'General',
             'save-before-run', default=1, type='bool'))
+        # bring shell forward on first error
+        self.signalOnErr.set(idleConf.GetOption('main', 'General',
+            'signal-first-error', default=1, type='bool'))
         #initial window size
         self.winWidth.set(idleConf.GetOption('main','EditorWindow','width'))
         self.winHeight.set(idleConf.GetOption('main','EditorWindow','height'))

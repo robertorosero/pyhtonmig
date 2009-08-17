@@ -1311,7 +1311,10 @@ class PseudoStderrFile(PseudoFile):
 
     def write(self, s):
         if not self.signaled:
-            self.shell.top.wakeup(anystate=True)
+            signal_err = idleConf.GetOption('main', 'General',
+                    'signal-first-error', default=1, type='bool')
+            if signal_err:
+                self.shell.top.wakeup(anystate=True)
             self.signaled = True
         PseudoFile.write(self, s)
 
