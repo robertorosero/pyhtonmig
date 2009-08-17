@@ -50,6 +50,33 @@ def _find_module(fullname, path=None):
             raise ImportError, 'No source for module ' + module.__name__
     return file, filename, descr
 
+class _singledialog(object):
+    """Just a given dialog should be executing at any time. Trying to
+    create a new one results in bringing to front the running dialog."""
+
+    def __init__(self, meth):
+        self.meth = meth
+        self.dlg = None
+
+    def __get__(self, instance, owner):
+        self.instance = instance
+        return self
+
+    def __call__(self, *args):
+        if self.dlg: # dialog is already running
+            # bring it to front
+            self.dlg.withdraw()
+            self.dlg.deiconify()
+            self.dlg.lift()
+
+        else: # dialog not running, start it and save the instance
+            self.dlg = self.meth(self.instance, *args)
+            self.dlg.bind('<Destroy>', self._clear_dlg)
+
+    def _clear_dlg(self, *args):
+        """Dialog is being destroyed. A new dialog instance can be created."""
+        self.dlg = None
+
 class EditorWindow(object):
     from Percolator import Percolator
     from ColorDelegator import ColorDelegator
@@ -478,9 +505,10 @@ class EditorWindow(object):
     def config_dialog(self, event=None):
         configDialog.ConfigDialog(self.top,'Settings')
 
+    @_singledialog
     def help_dialog(self, event=None):
         fn=os.path.join(os.path.abspath(os.path.dirname(__file__)),'help.txt')
-        textView.view_file(self.top,'Help',fn)
+        return textView.view_file(self.top, 'Help', fn, modal=False)
 
     def python_docs(self, event=None):
         if sys.platform[:3] == 'win':
