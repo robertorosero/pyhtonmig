@@ -64,7 +64,7 @@ def view_file(parent, title, filename, encoding=None):
     try:
         if encoding:
             import codecs
-            textFile = codecs.open(filename, 'r')
+            textFile = codecs.open(filename, 'r', encoding)
         else:
             textFile = open(filename, 'r')
     except IOError:
