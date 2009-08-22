@@ -1211,6 +1211,28 @@ are sent to both destinations.
 This example uses console and file handlers, but you can use any number and
 combination of handlers you choose.
 
+.. _logging-exceptions:
+
+Exceptions raised during logging
+--------------------------------
+
+The logging package is designed to swallow exceptions which occur while logging
+in production. This is so that errors which occur while handling logging events
+- such as logging misconfiguration, network or other similar errors - do not
+cause the application using logging to terminate prematurely.
+
+:class:`SystemExit` and :class:`KeyboardInterrupt` exceptions are never
+swallowed. Other exceptions which occur during the :meth:`emit` method of a
+:class:`Handler` subclass are passed to its :meth:`handleError` method.
+
+The default implementation of :meth:`handleError` in :class:`Handler` checks
+to see if a module-level variable, `raiseExceptions`, is set. If set, a
+traceback is printed to `sys.stderr`. If not set, the exception is swallowed.
+
+**Note:** The default value of `raiseExceptions` is `True`. This is because
+during development, you typically want to be notified of any exceptions that
+occur. It's advised that you set `raiseExceptions` to `False` for production
+usage.
 
 .. _context-info:
 
@@ -1337,6 +1359,31 @@ When this script is run, the output should look something like this::
 
 The :class:`LoggerAdapter` class was not present in previous versions.
 
+.. _multiple-processes:
+
+Logging to a single file from multiple processes
+------------------------------------------------
+
+Although logging is thread-safe, and logging to a single file from multiple
+threads in a single process *is* supported, logging to a single file from
+*multiple processes* is *not* supported, because there is no standard way to
+serialize access to a single file across multiple processes in Python. If you
+need to log to a single file from multiple processes, the best way of doing
+this is to have all the processes log to a :class:`SocketHandler`, and have a
+separate process which implements a socket server which reads from the socket
+and logs to file. (If you prefer, you can dedicate one thread in one of the
+existing processes to perform this function.) The following section documents
+this approach in more detail and includes a working socket receiver which can
+be used as a starting point for you to adapt in your own applications.
+
+If you are using a recent version of Python which includes the
+:mod:`multiprocessing` module, you can write your own handler which uses the
+:class:`Lock` class from this module to serialize access to the file from
+your processes. The existing :class:`FileHandler` and subclasses do not make
+use of :mod:`multiprocessing` at present, though they may do so in the future.
+Note that at present, the :mod:`multiprocessing` module does not provide
+working lock functionality on all platforms (see
+http://bugs.python.org/issue3770).
 
 .. _network-logging:
 
