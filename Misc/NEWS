@@ -12,6 +12,13 @@ What's New in Python 2.7 alpha 1
 Core and Builtins
 -----------------
 
+- Issue #6846: Fix bug where bytearray.pop() returns negative integers.
+
+- classmethod no longer checks if its argument is callable.
+
+- Issue #6750: A text file opened with io.open() could duplicate its output
+  when writing from multiple threads at the same time.
+
 - Issue #6704: Improve the col_offset in AST for "for" statements with
   a target of tuple unpacking.
 
@@ -358,6 +365,24 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #4937: plat-mac/bundlebuilder revers to non-existing version.plist
+
+- Issue #6838: Use a list to accumulate the value instead of
+  repeatedly concatenating strings in httplib's
+  HTTPResponse._read_chunked providing a significant speed increase
+  when downloading large files servend with a Transfer-Encoding of 'chunked'.
+
+- Issue #5275: In Cookie's Cookie.load(), properly handle non-string arguments
+  as documented.
+
+- Issue #2666: Handle BROWSER environment variable properly for unknown browser
+  names in the webbrowser module.
+
+- Issue #6054: Do not normalize stored pathnames in tarfile.
+
+- Issue #6794: Fix Decimal.compare_total and Decimal.compare_total_mag: NaN
+  payloads are now ordered by integer value rather than lexicographically.
 
 - Issue #6693: New functions in site.py to get user/global site packages paths.
 
@@ -1168,6 +1193,13 @@ Tools/Demos
 Build
 -----
 
+- Add 2 new options to ``--with-universal-archs`` on MacOSX: 
+  ``intel`` builds a distribution with ``i386`` and ``x86_64`` architectures,
+  while ``3-way`` builds a distribution with the ``ppc``, ``i386`` 
+  and ``x86_64`` architectures. 
+  
+- Issue #6802: Fix build issues on MacOSX 10.6
+
 - Issue #6244: Allow detect_tkinter to look for Tcl/Tk 8.6.
 
 - Issue 5390: Add uninstall icon independent of whether file
@@ -1223,6 +1255,9 @@ Documentation
 
 - Issue #6556: Fixed the Distutils configuration files location explanation
   for Windows.
+
+- Issue #6801 : symmetric_difference_update also accepts |.
+  Thanks to Carl Chenet. 
 
 C-API
 -----
@@ -1314,6 +1349,9 @@ Extension Modules
 
 Tests
 -----
+
+- Issue #6806: test_platform failed under OS X 10.6.0 because ``sw_ver`` leaves
+  off the trailing 0 in the version number.
 
 - Issue #5450: Moved tests involving loading tk from Lib/test/test_tcl to
   Lib/lib-tk/test/test_tkinter/test_loadtk. With this, these tests demonstrate
