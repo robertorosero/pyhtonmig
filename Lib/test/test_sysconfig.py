@@ -13,8 +13,8 @@ from copy import copy, deepcopy
 from test.test_support import run_unittest, TESTFN
 
 import sysconfig
-from sysconfig import (get_paths, get_platform, get_config_vars, get_path,
-                       _INSTALL_SCHEMES)
+from sysconfig import (get_paths, get_platform, get_config_vars,
+                       get_path, get_path_names, _INSTALL_SCHEMES)
 
 class TestSysConfig(unittest.TestCase):
 
@@ -82,6 +82,9 @@ class TestSysConfig(unittest.TestCase):
             os.remove(path)
         elif os.path.isdir(path):
             shutil.rmtree(path)
+
+    def test_get_path_names(self):
+        self.assertEquals(get_path_names(), sysconfig._SCHEME_KEYS)
 
     def test_get_paths(self):
         # XXX make it os independant

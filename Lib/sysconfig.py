@@ -75,6 +75,8 @@ _INSTALL_SCHEMES = {
         },
     }
 
+_SCHEME_KEYS = ('stdlib', 'platstdlib', 'purelib', 'platlib', 'include',
+                'scripts', 'data')
 _PY_VERSION = sys.version.split()[0]
 _PY_VERSION_SHORT = sys.version[:3]
 _PY_VERSION_SHORT_NO_DOT = _PY_VERSION[0] + _PY_VERSION[2]
@@ -322,6 +324,9 @@ def _init_non_posix(vars):
 #
 # public APIs
 #
+def get_path_names():
+    return _SCHEME_KEYS
+
 def get_paths(scheme=_get_default_scheme(), vars=None):
     """Returns a mapping containing an install scheme.
 
@@ -336,7 +341,6 @@ def get_path(name, scheme=_get_default_scheme(), vars=None):
     ``scheme`` is the install scheme name.
     """
     return _expand_vars(scheme, vars)[name]
-
 
 def get_config_vars(*args):
     """With no arguments, return a dictionary of all configuration
