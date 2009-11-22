@@ -6,7 +6,7 @@ import os
 from os.path import pardir, abspath
 
 _INSTALL_SCHEMES = {
-    'unix_prefix': {
+    'posix_prefix': {
         'stdlib': '$base/lib/python$py_version_short',
         'platstdlib': '$platbase/lib/python$py_version_short',
         'purelib': '$base/lib/python$py_version_short/site-packages',
@@ -16,7 +16,7 @@ _INSTALL_SCHEMES = {
         'scripts': '$base/bin',
         'data': '$base',
         },
-    'unix_home': {
+    'posix_home': {
         'stdlib': '$base/lib/python',
         'platstdlib': '$base/lib/python',
         'purelib': '$base/lib/python',
@@ -64,7 +64,7 @@ _INSTALL_SCHEMES = {
         'scripts': '$userbase/Scripts',
         'data'   : '$userbase',
         },
-    'unix_user': {
+    'posix_user': {
         'stdlib': '$userbase/lib/python/$py_version_short',
         'platstdlib': '$userbase/lib/python/$py_version_short',
         'purelib': '$userbase/lib/python/$py_version_short/site-packages',
@@ -104,7 +104,7 @@ def _python_build():
 _PYTHON_BUILD = _python_build()
 
 if _PYTHON_BUILD:
-    for scheme in ('unix_prefix', 'unix_home'):
+    for scheme in ('posix_prefix', 'posix_home'):
         _INSTALL_SCHEMES[scheme]['include'] = '$projectbase'
         _INSTALL_SCHEMES[scheme]['platinclude'] = '$srcdir/Include'
 
@@ -121,18 +121,29 @@ def _subst_vars(s, local_vars):
     except KeyError, var:
         raise AttributeError('$%s' % var)
 
+def _extend_dict(target_dict, other_dict):
+    target_keys = target_dict.keys()
+    for key, value in other_dict.items():
+        if key in target_keys:
+            continue
+        target_dict[key] = value
+
 def _expand_vars(scheme, vars):
     res = {}
+    if vars is None:
+        vars = {}
+    _extend_dict(vars, get_config_vars())
+
     for key, value in _INSTALL_SCHEMES[scheme].items():
         if os.name in ('posix', 'nt'):
             value = os.path.expanduser(value)
-        vars = get_config_vars()
         res[key] = _subst_vars(value, vars)
     return res
 
 def _get_default_scheme():
     if os.name == 'posix':
-        return 'unix_home'
+        # see what to do here
+        return 'posix_home'
     return os.name
 
 def _getuserbase():
@@ -257,13 +268,25 @@ def _parse_config_h(fp, vars=None):
                 vars[m.group(1)] = 0
     return vars
 
+def _get_makefile_filename():
+    if _PYTHON_BUILD:
+        return os.path.join(_PROJECT_BASE, "Makefile")
+    return os.path.join(get_path('stdlib'), "config", "Makefile")
+
+def _get_config_h_filename():
+    if _PYTHON_BUILD:
+        if os.name == "nt":
+            inc_dir = os.path.join(_PROJECT_BASE, "PC")
+        else:
+            inc_dir = _PROJECT_BASE
+    else:
+        inc_dir = get_path('platinclude')
+    return os.path.join(inc_dir, 'pyconfig.h')
+
 def _init_posix(vars):
     """Initialize the module as appropriate for POSIX systems."""
     # load the installed Makefile:
-    if _PYTHON_BUILD:
-        makefile = os.path.join(_PROJECT_BASE, "Makefile")
-    else:
-        makefile = os.path.join(get_path('stdlib'), "config", "Makefile")
+    makefile = _get_makefile_filename()
     try:
         _parse_makefile(makefile, vars)
     except IOError, e:
@@ -273,14 +296,7 @@ def _init_posix(vars):
         raise IOError(msg)
 
     # load the installed pyconfig.h:
-    if _PYTHON_BUILD:
-        if os.name == "nt":
-            inc_dir = os.path.join(_PROJECT_BASE, "PC")
-        else:
-            inc_dir = _PROJECT_BASE
-    else:
-        inc_dir = get_path('platinclude')
-    config_h = os.path.join(inc_dir, 'pyconfig.h')
+    config_h = _get_config_h_filename()
     try:
         _parse_config_h(open(config_h), vars)
     except IOError, e:
@@ -619,3 +635,7 @@ def get_platform():
                 machine = 'ppc'
 
     return "%s-%s-%s" % (osname, release, machine)
+
+
+def get_python_version():
+    return _PY_VERSION_SHORT

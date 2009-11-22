@@ -138,6 +138,9 @@ class HelperFunctionsTests(unittest.TestCase):
 
         # let's set PYTHONUSERBASE and see if it uses it
         site.USER_BASE = None
+        import sysconfig
+        sysconfig._CONFIG_VARS = None
+
         with EnvironmentVarGuard() as environ:
             environ['PYTHONUSERBASE'] = 'xoxo'
             self.assertTrue(site.getuserbase().startswith('xoxo'),
