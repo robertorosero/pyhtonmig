@@ -77,26 +77,23 @@ def customize_compiler(compiler):
 # The rest of this module is deprecated. will go away
 # in Python 2.8/3.3
 #
-class _DeprecatedString(str):
-    pass
-    # XXX how do I send a deprecation warning here ??
+_DEPRECATION_MSG = ("distutils.sysconfig.%s is deprecated. "
+                    "Use the APIs provided by the sysconfig module instead")
 
 def _get_project_base():
-    return _DeprecatedString(_sysconfig._PROJECT_BASE)
+    return _sysconfig._PROJECT_BASE
 
 project_base = _get_project_base()
 
 class _DeprecatedBool(int):
-    pass
-    # XXX how do I send a deprecation warning here ??
+    def __nonzero__(self):
+        warn(_DEPRECATION_MSG % 'get_python_version', DeprecationWarning)
+        return super(_DeprecatedBool, self).__nonzero__()
 
 def _python_build():
     return _DeprecatedBool(_sysconfig._PYTHON_BUILD)
 
 python_build = _python_build()
-
-_DEPRECATION_MSG = ("distutils.sysconfig.%s is deprecated. "
-                    "Use the APIs provided by the sysconfig module instead")
 
 def get_python_version():
     """This function is deprecated.
