@@ -32,8 +32,9 @@ def customize_compiler(compiler):
     """
     if compiler.compiler_type == "unix":
         (cc, cxx, opt, cflags, ccshared, ldshared, so_ext, ar, ar_flags) = \
-            get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
-                            'CCSHARED', 'LDSHARED', 'SO', 'AR', 'ARFLAGS')
+            _sysconfig.get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
+                                       'CCSHARED', 'LDSHARED', 'SO', 'AR',
+                                       'ARFLAGS')
 
         if 'CC' in os.environ:
             cc = os.environ['CC']
@@ -91,19 +92,9 @@ class _DeprecatedBool(int):
         return super(_DeprecatedBool, self).__nonzero__()
 
 def _python_build():
-    return _DeprecatedBool(_sysconfig._PYTHON_BUILD)
+    return _DeprecatedBool(_sysconfig.is_python_build())
 
 python_build = _python_build()
-
-def get_python_version():
-    """This function is deprecated.
-
-    Return a string containing the major and minor Python version,
-    leaving off the patchlevel.  Sample return values could be '1.5'
-    or '2.2'.
-    """
-    warn(_DEPRECATION_MSG % 'get_python_version', DeprecationWarning)
-    return _sysconfig.get_python_version()
 
 def get_python_inc(plat_specific=0, prefix=None):
     """This function is deprecated.
@@ -125,7 +116,7 @@ def get_python_inc(plat_specific=0, prefix=None):
         vars = {'base': prefix}
         return get_path('include', vars=vars)
 
-    if plat_specific:
+    if not plat_specific:
         return get_path('include')
     else:
         return get_path('platinclude')
@@ -241,28 +232,3 @@ def expand_makefile_vars(s, vars):
         else:
             break
     return s
-
-def get_config_vars(*args):
-    """This function is deprecated.
-
-    With no arguments, return a dictionary of all configuration
-    variables relevant for the current platform.  Generally this includes
-    everything needed to build extensions and install both pure modules and
-    extensions.  On Unix, this means every variable defined in Python's
-    installed Makefile; on Windows and Mac OS it's a much smaller set.
-
-    With arguments, return a list of values that result from looking up
-    each argument in the configuration variable dictionary.
-    """
-    warn(_DEPRECATION_MSG % 'get_config_vars', DeprecationWarning)
-    return _sysconfig.get_config_vars(*args)
-
-def get_config_var(name):
-    """This function is deprecated.
-
-    Return the value of a single variable using the dictionary
-    returned by 'get_config_vars()'.  Equivalent to
-    get_config_vars().get(name)
-    """
-    warn(_DEPRECATION_MSG % 'get_config_var', DeprecationWarning)
-    return _sysconfig.get_config_var(name)

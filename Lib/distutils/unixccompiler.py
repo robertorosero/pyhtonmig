@@ -17,8 +17,9 @@ __revision__ = "$Id$"
 
 import os, sys
 from types import StringType, NoneType
+sysconfig = __import__('sysconfig')
+#import sysconfig
 
-from distutils import sysconfig
 from distutils.dep_util import newer
 from distutils.ccompiler import \
      CCompiler, gen_preprocess_options, gen_lib_options
@@ -75,7 +76,7 @@ def _darwin_compiler_fixup(compiler_so, cc_args):
 
     if 'ARCHFLAGS' in os.environ and not stripArch:
         # User specified different -arch flags in the environ,
-        # see also distutils.sysconfig
+        # see also sysconfig
         compiler_so = compiler_so + os.environ['ARCHFLAGS'].split()
 
     if stripSysroot:

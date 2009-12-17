@@ -56,10 +56,10 @@ _INSTALL_SCHEMES = {
         'data'   : '$userbase',
         },
     'nt_user': {
-        'stdlib': '$userbase/Python/$py_version_nodot',
-        'platstdlib': '$userbase/Python/$py_version_nodot',
-        'purelib': '$userbase/Python/$py_version_nodot/site-packages',
-        'platlib': '$userbase/Python/$py_version_nodot/site-packages',
+        'stdlib': '$userbase/Python$py_version_nodot',
+        'platstdlib': '$userbase/Python$py_version_nodot',
+        'purelib': '$userbase/Python$py_version_nodot/site-packages',
+        'platlib': '$userbase/Python$py_version_nodot/site-packages',
         'include': '$userbase/Python$py_version_nodot/Include',
         'scripts': '$userbase/Scripts',
         'data'   : '$userbase',
@@ -95,18 +95,18 @@ if os.name == "nt" and "\\pc\\v" in _PROJECT_BASE[-10:].lower():
 if os.name == "nt" and "\\pcbuild\\amd64" in _PROJECT_BASE[-14:].lower():
     _PROJECT_BASE = abspath(os.path.join(_PROJECT_BASE, pardir, pardir))
 
-def _python_build():
+def is_python_build():
     for fn in ("Setup.dist", "Setup.local"):
         if os.path.isfile(os.path.join(_PROJECT_BASE, "Modules", fn)):
             return True
     return False
 
-_PYTHON_BUILD = _python_build()
+_PYTHON_BUILD = is_python_build()
 
 if _PYTHON_BUILD:
     for scheme in ('posix_prefix', 'posix_home'):
-        _INSTALL_SCHEMES[scheme]['include'] = '$projectbase'
-        _INSTALL_SCHEMES[scheme]['platinclude'] = '$srcdir/Include'
+        _INSTALL_SCHEMES[scheme]['include'] = '$projectbase/Include'
+        _INSTALL_SCHEMES[scheme]['platinclude'] = '$srcdir'
 
 def _subst_vars(s, local_vars):
     import re

@@ -27,10 +27,12 @@ class SysconfigTestCase(support.EnvironGuard,
         elif os.path.isdir(path):
             shutil.rmtree(path)
 
+    @support.capture_warnings
     def test_get_config_h_filename(self):
         config_h = sysconfig.get_config_h_filename()
         self.assertTrue(os.path.isfile(config_h), config_h)
 
+    @support.capture_warnings
     def test_get_python_lib(self):
         lib_dir = sysconfig.get_python_lib()
         # XXX doesn't work on Linux when Python was never installed before
@@ -39,19 +41,16 @@ class SysconfigTestCase(support.EnvironGuard,
         self.assertNotEqual(sysconfig.get_python_lib(),
                             sysconfig.get_python_lib(prefix=TESTFN))
 
+    @support.capture_warnings
     def test_get_python_inc(self):
         inc_dir = sysconfig.get_python_inc()
         # This is not much of a test.  We make sure Python.h exists
         # in the directory returned by get_python_inc() but we don't know
         # it is the correct file.
+
         self.assertTrue(os.path.isdir(inc_dir), inc_dir)
         python_h = os.path.join(inc_dir, "Python.h")
         self.assertTrue(os.path.isfile(python_h), python_h)
-
-    def test_get_config_vars(self):
-        cvars = sysconfig.get_config_vars()
-        self.assertTrue(isinstance(cvars, dict))
-        self.assertTrue(cvars)
 
     def test_customize_compiler(self):
 
@@ -73,6 +72,7 @@ class SysconfigTestCase(support.EnvironGuard,
         sysconfig.customize_compiler(comp)
         self.assertEquals(comp.exes['archiver'], 'my_ar -arflags')
 
+    @support.capture_warnings
     def test_parse_makefile_base(self):
         self.makefile = test.test_support.TESTFN
         fd = open(self.makefile, 'w')

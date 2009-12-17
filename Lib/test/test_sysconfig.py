@@ -90,8 +90,8 @@ class TestSysConfig(unittest.TestCase):
         # XXX make it os independant
         scheme = get_paths()
         wanted = [('data', '/usr/local'),
-            ('include', '/Users/tarek/Dev/svn.python.org/tarek_sysconfig'),
-            ('platinclude', './Include'),
+            ('include', '/Users/tarek/Dev/svn.python.org/tarek_sysconfig/Include'),
+            ('platinclude', '.'),
             ('platlib', '/usr/local/lib/python'),
             ('platstdlib', '/usr/local/lib/python'),
             ('purelib', '/usr/local/lib/python'),

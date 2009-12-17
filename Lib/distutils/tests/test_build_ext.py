@@ -177,11 +177,10 @@ class BuildExtTestCase(support.TempdirManager,
         cmd = build_ext(dist)
         cmd.finalize_options()
 
-        from distutils import sysconfig
-        py_include = sysconfig.get_python_inc()
+        py_include = sysconfig.get_path('include')
         self.assertTrue(py_include in cmd.include_dirs)
 
-        plat_py_include = sysconfig.get_python_inc(plat_specific=1)
+        plat_py_include = sysconfig.get_path('platinclude')
         self.assertTrue(plat_py_include in cmd.include_dirs)
 
         # make sure cmd.libraries is turned into a list

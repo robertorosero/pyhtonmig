@@ -7,12 +7,12 @@ __revision__ = "$Id$"
 
 import sys, os, string
 from types import *
+from sysconfig import get_platform, get_python_version
+
 from distutils.core import Command
 from distutils.debug import DEBUG
-from distutils.util import get_platform
 from distutils.file_util import write_file
 from distutils.errors import *
-from distutils.sysconfig import get_python_version
 from distutils import log
 
 class bdist_rpm (Command):

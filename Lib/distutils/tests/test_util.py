@@ -6,15 +6,14 @@ from copy import copy
 from StringIO import StringIO
 import subprocess
 
+from sysconfig import get_config_vars, get_platform
 from distutils.errors import DistutilsPlatformError, DistutilsByteCompileError
-from distutils.util import (get_platform, convert_path, change_root,
+from distutils.util import (convert_path, change_root,
                             check_environ, split_quoted, strtobool,
                             rfc822_escape, get_compiler_versions,
                             _find_exe_version, _MAC_OS_X_LD_VERSION,
                             byte_compile)
 from distutils import util
-from distutils.sysconfig import get_config_vars
-from distutils import sysconfig
 from distutils.tests import support
 from distutils.version import LooseVersion
 

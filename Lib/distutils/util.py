@@ -18,38 +18,6 @@ from distutils.errors import DistutilsByteCompileError
 
 _sysconfig = __import__('sysconfig')
 
-def get_platform():
-    """This function is deprecated.
-
-    Return a string that identifies the current platform.
-
-    This is used mainly to distinguish platform-specific build directories and
-    platform-specific built distributions.  Typically includes the OS name
-    and version and the architecture (as supplied by 'os.uname()'),
-    although the exact information included depends on the OS; eg. for IRIX
-    the architecture isn't particularly important (IRIX only runs on SGI
-    hardware), but for Linux the kernel version isn't particularly
-    important.
-
-    Examples of returned values:
-       linux-i586
-       linux-alpha (?)
-       solaris-2.6-sun4u
-       irix-5.3
-       irix64-6.2
-
-    Windows will return one of:
-       win-amd64 (64bit Windows on AMD64 (aka x86_64, Intel64, EM64T, etc)
-       win-ia64 (64bit Windows on Itanium)
-       win32 (all others - specifically, sys.platform is returned)
-
-    For other non-POSIX platforms, currently just returns 'sys.platform'.
-    """
-    msg = ("distutils.sysconfig.get_platform is deprecated. "
-           "Use sysconfig.get_platform instead.")
-    warn(msg, DeprecationWarning)
-    return _sysconfig.get_platform()
-
 def convert_path(pathname):
     """Return 'pathname' as a name that will work on the native filesystem.
 
@@ -136,7 +104,7 @@ def check_environ():
         os.environ['HOME'] = pwd.getpwuid(os.getuid())[5]
 
     if 'PLAT' not in os.environ:
-        os.environ['PLAT'] = get_platform()
+        os.environ['PLAT'] = _sysconfig.get_platform()
 
     _environ_checked = 1
 

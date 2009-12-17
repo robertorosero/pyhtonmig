@@ -2,7 +2,7 @@
 import sys
 import unittest
 
-from distutils import sysconfig
+import sysconfig
 from distutils.unixccompiler import UnixCCompiler
 
 class UnixCCompilerTestCase(unittest.TestCase):

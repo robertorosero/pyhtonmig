@@ -7,10 +7,10 @@ __revision__ = "$Id$"
 
 import os
 from types import *
+from sysconfig import get_platform
+
 from distutils.core import Command
 from distutils.errors import *
-from distutils.util import get_platform
-
 
 def show_formats():
     """Print list of available formats (arguments to "--format" option).
