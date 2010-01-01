@@ -7,71 +7,71 @@ from os.path import pardir, abspath
 
 _INSTALL_SCHEMES = {
     'posix_prefix': {
-        'stdlib': '$base/lib/python$py_version_short',
-        'platstdlib': '$platbase/lib/python$py_version_short',
-        'purelib': '$base/lib/python$py_version_short/site-packages',
-        'platlib': '$platbase/lib/python$py_version_short/site-packages',
-        'include': '$base/include/python$py_version_short',
-        'platinclude': '$platbase/include/python$py_version_short',
-        'scripts': '$base/bin',
-        'data': '$base',
+        'stdlib': '{base}/lib/python{py_version_short}',
+        'platstdlib': '{platbase}/lib/python{py_version_short}',
+        'purelib': '{base}/lib/python{py_version_short}/site-packages',
+        'platlib': '{platbase}/lib/python{py_version_short}/site-packages',
+        'include': '{base}/include/python{py_version_short}',
+        'platinclude': '{platbase}/include/python{py_version_short}',
+        'scripts': '{base}/bin',
+        'data': '{base}',
         },
     'posix_home': {
-        'stdlib': '$base/lib/python',
-        'platstdlib': '$base/lib/python',
-        'purelib': '$base/lib/python',
-        'platlib': '$base/lib/python',
-        'include': '$base/include/python',
-        'platinclude': '$base/include/python',
-        'scripts': '$base/bin',
-        'data'   : '$base',
+        'stdlib': '{base}/lib/python',
+        'platstdlib': '{base}/lib/python',
+        'purelib': '{base}/lib/python',
+        'platlib': '{base}/lib/python',
+        'include': '{base}/include/python',
+        'platinclude': '{base}/include/python',
+        'scripts': '{base}/bin',
+        'data'   : '{base}',
         },
     'nt': {
-        'stdlib': '$base/Lib',
-        'platstdlib': '$base/Lib',
-        'purelib': '$base/Lib/site-packages',
-        'platlib': '$base/Lib/site-packages',
-        'include': '$base/include',
-        'platinclude': '$base/include',
-        'scripts': '$base/Scripts',
-        'data'   : '$base',
+        'stdlib': '{base}/Lib',
+        'platstdlib': '{base}/Lib',
+        'purelib': '{base}/Lib/site-packages',
+        'platlib': '{base}/Lib/site-packages',
+        'include': '{base}/include',
+        'platinclude': '{base}/include',
+        'scripts': '{base}/Scripts',
+        'data'   : '{base}',
         },
     'os2': {
-        'stdlib': '$base/Lib',
-        'platstdlib': '$base/Lib',
-        'purelib': '$base/Lib/site-packages',
-        'platlib': '$base/Lib/site-packages',
-        'include': '$base/Include',
-        'platinclude': '$base/Include',
-        'scripts': '$base/Scripts',
-        'data'   : '$base',
+        'stdlib': '{base}/Lib',
+        'platstdlib': '{base}/Lib',
+        'purelib': '{base}/Lib/site-packages',
+        'platlib': '{base}/Lib/site-packages',
+        'include': '{base}/Include',
+        'platinclude': '{base}/Include',
+        'scripts': '{base}/Scripts',
+        'data'   : '{base}',
         },
     'os2_home': {
-        'stdlib': '$userbase/lib/python/$py_version_short',
-        'platstdlib': '$userbase/lib/python/$py_version_short',
-        'purelib': '$userbase/lib/python/$py_version_short/site-packages',
-        'platlib': '$userbase/lib/python/$py_version_short/site-packages',
-        'include': '$userbase/include/python$py_version_short',
-        'scripts': '$userbase/bin',
-        'data'   : '$userbase',
+        'stdlib': '{userbase}/lib/python/{py_version_short}',
+        'platstdlib': '{userbase}/lib/python/{py_version_short}',
+        'purelib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'platlib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'include': '{userbase}/include/python{py_version_short}',
+        'scripts': '{userbase}/bin',
+        'data'   : '{userbase}',
         },
     'nt_user': {
-        'stdlib': '$userbase/Python$py_version_nodot',
-        'platstdlib': '$userbase/Python$py_version_nodot',
-        'purelib': '$userbase/Python$py_version_nodot/site-packages',
-        'platlib': '$userbase/Python$py_version_nodot/site-packages',
-        'include': '$userbase/Python$py_version_nodot/Include',
-        'scripts': '$userbase/Scripts',
-        'data'   : '$userbase',
+        'stdlib': '{userbase}/Python{py_version_nodot}',
+        'platstdlib': '{userbase}/Python{py_version_nodot}',
+        'purelib': '{userbase}/Python{py_version_nodot}/site-packages',
+        'platlib': '{userbase}/Python{py_version_nodot}/site-packages',
+        'include': '{userbase}/Python{py_version_nodot}/Include',
+        'scripts': '{userbase}/Scripts',
+        'data'   : '{userbase}',
         },
     'posix_user': {
-        'stdlib': '$userbase/lib/python/$py_version_short',
-        'platstdlib': '$userbase/lib/python/$py_version_short',
-        'purelib': '$userbase/lib/python/$py_version_short/site-packages',
-        'platlib': '$userbase/lib/python/$py_version_short/site-packages',
-        'include': '$userbase/include/python$py_version_short',
-        'scripts': '$userbase/bin',
-        'data'   : '$userbase',
+        'stdlib': '{userbase}/lib/python/{py_version_short}',
+        'platstdlib': '{userbase}/lib/python/{py_version_short}',
+        'purelib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'platlib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'include': '{userbase}/include/python{py_version_short}',
+        'scripts': '{userbase}/bin',
+        'data'   : '{userbase}',
         },
     }
 
@@ -105,21 +105,16 @@ _PYTHON_BUILD = is_python_build()
 
 if _PYTHON_BUILD:
     for scheme in ('posix_prefix', 'posix_home'):
-        _INSTALL_SCHEMES[scheme]['include'] = '$projectbase/Include'
-        _INSTALL_SCHEMES[scheme]['platinclude'] = '$srcdir'
+        _INSTALL_SCHEMES[scheme]['include'] = '{projectbase}/Include'
+        _INSTALL_SCHEMES[scheme]['platinclude'] = '{srcdir}'
 
 def _subst_vars(s, local_vars):
-    import re
-    def _subst(match, local_vars=local_vars):
-        var_name = match.group(1)
-        if var_name in local_vars:
-            return str(local_vars[var_name])
-        else:
-            return os.environ[var_name]
     try:
-        return re.sub(r'\$([a-zA-Z_][a-zA-Z_0-9]*)', _subst, s)
+        return s.format(**local_vars)
+    except KeyError:
+        return s.format(**os.environ)
     except KeyError, var:
-        raise AttributeError('$%s' % var)
+        raise AttributeError('{%s}' % var)
 
 def _extend_dict(target_dict, other_dict):
     target_keys = target_dict.keys()
