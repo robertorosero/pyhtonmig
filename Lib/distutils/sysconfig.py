@@ -121,7 +121,7 @@ def get_python_inc(plat_specific=0, prefix=None):
     else:
         return get_path('platinclude')
 
-def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
+def get_python_lib(plat_specific=False, standard_lib=False, prefix=None):
     """This function is deprecated.
 
     Return the directory containing the Python library (standard or
@@ -155,7 +155,7 @@ def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
             return get_path('stdlib', vars=vars)
     else:
         if plat_specific:
-            return get_path('platib', vars=vars)
+            return get_path('platlib', vars=vars)
         else:
             return get_path('purelib', vars=vars)
 

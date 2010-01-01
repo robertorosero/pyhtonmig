@@ -41,6 +41,10 @@ class SysconfigTestCase(support.EnvironGuard,
         self.assertNotEqual(sysconfig.get_python_lib(),
                             sysconfig.get_python_lib(prefix=TESTFN))
 
+        _sysconfig = __import__('sysconfig')
+        res = sysconfig.get_python_lib(True, True)
+        self.assertEquals(_sysconfig.get_path('platlib'), res)
+
     @support.capture_warnings
     def test_get_python_inc(self):
         inc_dir = sysconfig.get_python_inc()
