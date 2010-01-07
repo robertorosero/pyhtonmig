@@ -7,7 +7,7 @@ import sys, os, imp, re, optparse
 from glob import glob
 
 from distutils import log
-from distutils import sysconfig
+from distutils import sysconfig, util
 from distutils import text_file
 from distutils.errors import *
 from distutils.core import Extension, setup
@@ -1160,6 +1160,9 @@ class PyBuildExt(build_ext):
             exts.append(Extension('_codecs_%s' % loc,
                                   ['cjkcodecs/_codecs_%s.c' % loc]))
 
+        # Stefan Krah's cdecimal module
+        exts.append(self.cdecimal_ext())
+
         # Thomas Heller's _ctypes module
         self.detect_ctypes(inc_dirs, lib_dirs)
 
@@ -1596,6 +1599,58 @@ class PyBuildExt(build_ext):
             ext.libraries.append(ffi_lib)
             self.use_system_libffi = True
 
+    def cdecimal_ext(self):
+        extra_compile_args = []
+        sources = [
+          'cdecimal/cdecimal.c',
+          'cdecimal/basearith.c',
+          'cdecimal/constants.c',
+          'cdecimal/context.c',
+          'cdecimal/convolute.c',
+          'cdecimal/crt.c',
+          'cdecimal/difradix2.c',
+          'cdecimal/error.c',
+          'cdecimal/fnt.c',
+          'cdecimal/fourstep.c',
+          'cdecimal/io.c',
+          'cdecimal/memory.c',
+          'cdecimal/mpdecimal.c',
+          'cdecimal/numbertheory.c',
+          'cdecimal/sixstep.c',
+          'cdecimal/transpose.c',
+          'cdecimal/transpose3.c'
+        ]
+        extra_objects = []
+        platform = util.get_platform()
+        cc = sysconfig.get_config_var('CC')
+        size = sysconfig.get_config_var('SIZEOF_SIZE_T')
+        x87 = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
+        if size == 8:
+            define_macros = [('CONFIG_64', '1')]
+        elif size == 4:
+            define_macros = [('CONFIG_32', '1')]
+            mtune = 'ANSI'
+            if x87 and 'gcc' in cc:
+                # XXX icc >= 11.0 and clang work as well.
+                mtune = 'PPRO'
+            define_macros.append((mtune, '1'))
+        else:
+            raise DistutilsError("cdecimal: unsupported architecture")
+        # Not recommended: TLS is very slow!
+        # define_macros.append(('USE_THREAD_LOCAL_STORAGE', 1))
+        if 'linux' in platform:
+            extra_compile_args.extend(['-Wno-missing-field-initializers'])
+        elif 'solaris' in platform and cc == 'cc': # suncc
+            extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
+        ext = Extension (
+            'cdecimal',
+            define_macros=define_macros,
+            undef_macros=['NDEBUG'],
+            extra_compile_args=extra_compile_args,
+            sources=sources,
+            extra_objects=extra_objects
+        )
+        return ext
 
 class PyBuildInstall(install):
     # Suppress the warning about installation into the lib_dynload
