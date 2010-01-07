@@ -617,7 +617,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\cdecimal\cdecimal3.c"
+				RelativePath="..\Modules\cdecimal\cdecimal.c"
 				>
 			</File>
 			<File
