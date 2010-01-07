@@ -1620,6 +1620,27 @@ class PyBuildExt(build_ext):
           'cdecimal/transpose.c',
           'cdecimal/transpose3.c'
         ]
+        depends = [
+          'cdecimal/basearith.h',
+          'cdecimal/bits.h',
+          'cdecimal/constants.h',
+          'cdecimal/convolute.h',
+          'cdecimal/crt.h',
+          'cdecimal/difradix2.h',
+          'cdecimal/docstrings.h',
+          'cdecimal/fnt.h',
+          'cdecimal/fourstep.h',
+          'cdecimal/memory.h',
+          'cdecimal/mpdecimal.h',
+          'cdecimal/mpdecimal32.h',
+          'cdecimal/mpdecimal64.h',
+          'cdecimal/mptypes.h',
+          'cdecimal/numbertheory.h',
+          'cdecimal/sixstep.h',
+          'cdecimal/transpose.h',
+          'cdecimal/typearith.h',
+          'cdecimal/umodarith.h',
+        ]
         extra_objects = []
         platform = util.get_platform()
         cc = sysconfig.get_config_var('CC')
@@ -1648,7 +1669,8 @@ class PyBuildExt(build_ext):
             undef_macros=['NDEBUG'],
             extra_compile_args=extra_compile_args,
             sources=sources,
-            extra_objects=extra_objects
+            extra_objects=extra_objects,
+            depends=depends
         )
         return ext
 
