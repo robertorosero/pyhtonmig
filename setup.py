@@ -1659,9 +1659,7 @@ class PyBuildExt(build_ext):
             raise DistutilsError("cdecimal: unsupported architecture")
         # Not recommended: TLS is very slow!
         # define_macros.append(('USE_THREAD_LOCAL_STORAGE', 1))
-        if 'linux' in platform:
-            extra_compile_args.extend(['-Wno-missing-field-initializers'])
-        elif 'solaris' in platform and cc == 'cc': # suncc
+        if 'solaris' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
         ext = Extension (
             'cdecimal',
