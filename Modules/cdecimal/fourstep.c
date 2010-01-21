@@ -118,10 +118,10 @@ ppro_size3_ntt(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, mpd_uint_t w3tabl
 
 /* forward transform, sign = -1; transform length = 3 * 2^n */
 int
-four_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
+four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 {
-	size_t R = 3; /* number of rows */
-	size_t C = n / 3; /* number of columns */
+	mpd_size_t R = 3; /* number of rows */
+	mpd_size_t C = n / 3; /* number of columns */
 	mpd_uint_t w3table[3];
 	mpd_uint_t kernel, w0, w1, wstep;
 	mpd_uint_t *s, *p0, *p1, *p2;
@@ -130,7 +130,7 @@ four_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 	double dmod;
 	uint32_t dinvmod[3];
 #endif
-	size_t i, k;
+	mpd_size_t i, k;
 
 
 	assert(n >= 48);
@@ -177,10 +177,10 @@ four_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 
 /* backward transform, sign = 1; transform length = 3 * 2^n */
 int
-inv_four_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
+inv_four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 {
-	size_t R = 3; /* number of rows */
-	size_t C = n / 3; /* number of columns */
+	mpd_size_t R = 3; /* number of rows */
+	mpd_size_t C = n / 3; /* number of columns */
 	mpd_uint_t w3table[3];
 	mpd_uint_t kernel, w0, w1, wstep;
 	mpd_uint_t *s, *p0, *p1, *p2;
@@ -189,7 +189,7 @@ inv_four_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 	double dmod;
 	uint32_t dinvmod[3];
 #endif
-	size_t i, k;
+	mpd_size_t i, k;
 
 
 	assert(n >= 48);
