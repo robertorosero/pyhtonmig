@@ -18,13 +18,9 @@
 
 #if defined(_MSC_VER) && defined (CONFIG_64)
   #define _PyLong_AsMpdSsize PyLong_AsLongLong
-  #define _PyInt_AsMpdSsize PyInt_AsSsize_t
-  #define _PyInt_FromMpdSsize PyInt_FromSsize_t
   #define _PyLong_FromMpdSsize PyLong_FromSsize_t
 #else
   #define _PyLong_AsMpdSsize PyLong_AsLong
-  #define _PyInt_AsMpdSsize PyInt_AsLong
-  #define _PyInt_FromMpdSsize PyInt_FromLong
   #define _PyLong_FromMpdSsize PyLong_FromLong
 #endif
 
@@ -279,7 +275,11 @@ PyLong_AsMpdFlags(PyObject *v)
 static mpd_ssize_t
 PyLong_AsMpdSsize(PyObject *v)
 {
+#if MPD_SIZE_MAX == SIZE_MAX
 	mpd_ssize_t x;
+#else
+	int64_t x;
+#endif
 
 	if (!PyLong_Check(v)) {
 		PyErr_SetString(PyExc_TypeError, "long argument required");
@@ -290,6 +290,12 @@ PyLong_AsMpdSsize(PyObject *v)
 	if (PyErr_Occurred()) {
 		return MPD_SSIZE_MAX;
 	}
+#if MPD_SIZE_MAX < SIZE_MAX
+	if (x < MPD_SSIZE_MIN || x > MPD_SSIZE_MAX) {
+		PyErr_SetString(PyExc_ValueError, "argument out of range");
+		return MPD_SSIZE_MAX;
+	}
+#endif
 
 	return x;
 }
@@ -1846,8 +1852,13 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 	}
 
 	tmp = PyTuple_GET_ITEM(v, 0);
+	if (!PyLong_Check(tmp)) {
+		PyErr_SetString(PyExc_TypeError,
+		                "sign must be 0 or 1");
+		return NULL;
+	}
 	sign = PyLong_AsLong(tmp);
-	if (!PyLong_Check(tmp) || (sign != 0 && sign != 1)) {
+	if (sign != 0 && sign != 1) {
 		PyErr_SetString(PyExc_ValueError,
 		                "sign must be 0 or 1");
 		return NULL;
@@ -1873,7 +1884,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 		else {
 			Py_DECREF(tmp);
 			PyErr_SetString(PyExc_ValueError,
-			 	        "string argument in the third position"
+			 	        "string argument in the third position "
 			                "must be 'F', 'n' or 'N'");
 			return NULL;
 		}
@@ -1882,10 +1893,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 	else {
 		exp = PyLong_AsMpdSsize(tmp);
 		if (PyErr_Occurred()) {
-				PyErr_SetString(PyExc_ValueError,
-			 		        "exponent not an integer or "
-			                	"out of range");
-				return NULL;
+			return NULL;
 		}
 	}
 
@@ -1915,6 +1923,12 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 	}
 	for (i = 0; i < tsize; i++) {
 		tmp = PyTuple_GET_ITEM(dtuple, i);
+		if (!PyLong_Check(tmp)) {
+			PyMem_Free(decstring);
+			PyErr_SetString(PyExc_TypeError,
+			                "coefficient must be a tuple of digits");
+			return NULL;
+		}
 		l = PyLong_AsLong(tmp);
 		if (l < 0 || l > 9) {
 			PyMem_Free(decstring);
@@ -2674,7 +2688,7 @@ dec_repr(PyDecObject *self)
 	declen = strlen(cp);
 
 	err = 0;
-	cp = mpd_realloc(cp, declen+dtaglen+3, sizeof *cp, &err);
+	cp = mpd_realloc(cp, (mpd_size_t)(declen+dtaglen+3), sizeof *cp, &err);
 	if (err) {
 		mpd_free(cp);
 		PyErr_NoMemory();
@@ -2715,8 +2729,6 @@ PyDec_Round(PyObject *self, PyObject *args)
 	PyDecObject *a = (PyDecObject *)self;
 	PyDecObject *result;
 	PyObject *x = NULL;
-	mpd_uint_t dq[1] = {1};
-	mpd_t q = {MPD_STATIC|MPD_CONST_DATA,0,1,1,1,dq};
 	uint32_t status = 0;
 	mpd_context_t *ctx;
 
@@ -2727,15 +2739,24 @@ PyDec_Round(PyObject *self, PyObject *args)
 	ctx = mpd_ctx();
 
 	if (x) {
+		mpd_uint_t dq[1] = {1};
+		mpd_t q = {MPD_STATIC|MPD_CONST_DATA,0,1,1,1,dq};
+		mpd_ssize_t y;
+
 		if (!PyLong_Check(x)) {
 			PyErr_SetString(PyExc_ValueError, "optional arg must be an integer");
+			return NULL;
+		}
+
+		y = PyLong_AsMpdSsize(x);
+		if (y == MPD_SSIZE_MAX || y == MPD_SSIZE_MIN) {
 			return NULL;
 		}
 		if ((result = dec_alloc()) == NULL) {
 			return NULL;
 		}
 
-		q.exp = -_PyLong_AsMpdSsize(x);
+		q.exp = -y;
 		mpd_qquantize(result->dec, a->dec, &q, ctx, &status);
 		if (dec_addstatus(ctx, status)) {
 			Py_DECREF(result);
