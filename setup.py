@@ -1630,6 +1630,7 @@ class PyBuildExt(build_ext):
           'cdecimal/docstrings.h',
           'cdecimal/fnt.h',
           'cdecimal/fourstep.h',
+          'cdecimal/io.h',
           'cdecimal/memory.h',
           'cdecimal/mpdecimal.h',
           'cdecimal/mpdecimal32.h',
@@ -1644,17 +1645,21 @@ class PyBuildExt(build_ext):
         extra_objects = []
         platform = util.get_platform()
         cc = sysconfig.get_config_var('CC')
-        size = sysconfig.get_config_var('SIZEOF_SIZE_T')
-        x87 = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
-        if size == 8:
-            define_macros = [('CONFIG_64', '1')]
-        elif size == 4:
+        SIZEOF_SIZE_T = sysconfig.get_config_var('SIZEOF_SIZE_T')
+        HAVE_GCC_ASM_FOR_X87 = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
+        define_macros = [('CONFIG_32', '1')]
+        if SIZEOF_SIZE_T == 8:
+            if HAVE_GCC_ASM_FOR_X87: # HAVE_GCC_ASM_FOR_AMD64
+                define_macros = [('CONFIG_64', '1')]
+            else:
+                define_macros = [('CONFIG_32', '1'), ('ANSI', '1')]
+        elif SIZEOF_SIZE_T == 4:
             define_macros = [('CONFIG_32', '1')]
-            mtune = 'ANSI'
-            if x87 and 'gcc' in cc:
+            if HAVE_GCC_ASM_FOR_X87 and 'gcc' in cc:
                 # XXX icc >= 11.0 and clang work as well.
-                mtune = 'PPRO'
-            define_macros.append((mtune, '1'))
+                define_macros.append(('PPRO', '1'))
+            else:
+                define_macros.append(('ANSI', '1'))
         else:
             raise DistutilsError("cdecimal: unsupported architecture")
         # Not recommended: TLS is very slow!
