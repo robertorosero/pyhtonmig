@@ -26,6 +26,11 @@ mpd_callocfunc_em(size_t nmemb, size_t size)
 	void *ptr;
 	size_t req;
 
+#if MPD_SIZE_MAX < SIZE_MAX
+	if (size > MPD_SIZE_MAX) {
+		return NULL;
+	}
+#endif
 	req = mul_size_t(nmemb, size);
 	if ((ptr = mpd_mallocfunc(req)) == NULL) {
 		return NULL;
@@ -39,10 +44,10 @@ mpd_callocfunc_em(size_t nmemb, size_t size)
 
 /* malloc with overflow checking */
 void *
-mpd_alloc(size_t nmemb, size_t size)
+mpd_alloc(mpd_size_t nmemb, mpd_size_t size)
 {
 	void *ptr;
-	size_t req;
+	mpd_size_t req;
 
 	req = mul_size_t(nmemb, size);
 	if ((ptr = mpd_mallocfunc(req)) == NULL) {
@@ -54,7 +59,7 @@ mpd_alloc(size_t nmemb, size_t size)
 
 /* calloc with overflow checking */
 void *
-mpd_calloc(size_t nmemb, size_t size)
+mpd_calloc(mpd_size_t nmemb, mpd_size_t size)
 {
 	void *ptr;
 
@@ -67,10 +72,10 @@ mpd_calloc(size_t nmemb, size_t size)
 
 /* realloc with overflow checking */
 void *
-mpd_realloc(void *ptr, size_t nmemb, size_t size, uint8_t *err)
+mpd_realloc(void *ptr, mpd_size_t nmemb, mpd_size_t size, uint8_t *err)
 {
 	void *new;
-	size_t req;
+	mpd_size_t req;
 
 	req = mul_size_t(nmemb, size);
 	if ((new = mpd_reallocfunc(ptr, req)) == NULL) {
@@ -83,10 +88,10 @@ mpd_realloc(void *ptr, size_t nmemb, size_t size, uint8_t *err)
 
 /* struct hack malloc with overflow checking */
 void *
-mpd_sh_alloc(size_t struct_size, size_t nmemb, size_t size)
+mpd_sh_alloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size)
 {
 	void *ptr;
-	size_t req;
+	mpd_size_t req;
 
 	req = mul_size_t(nmemb, size);
 	req = add_size_t(req, struct_size);
@@ -99,10 +104,10 @@ mpd_sh_alloc(size_t struct_size, size_t nmemb, size_t size)
 
 /* mpd_callocfunc must have overflow checking */
 void *
-mpd_sh_calloc(size_t struct_size, size_t nmemb, size_t size)
+mpd_sh_calloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size)
 {
 	void *ptr;
-	size_t req;
+	mpd_size_t req;
 
 	req = mul_size_t(nmemb, size);
 	req = add_size_t(req, struct_size);
@@ -115,10 +120,10 @@ mpd_sh_calloc(size_t struct_size, size_t nmemb, size_t size)
 
 /* struct hack realloc with overflow checking */
 void *
-mpd_sh_realloc(void *ptr, size_t struct_size, size_t nmemb, size_t size, uint8_t *err)
+mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size, uint8_t *err)
 {
 	void *new;
-	size_t req;
+	mpd_size_t req;
 
 	req = mul_size_t(nmemb, size);
 	req = add_size_t(req, struct_size);
