@@ -21,8 +21,8 @@
  ** ------------------------------------------------------------
  */
 
-#if defined (CONFIG_64)
-#if defined (__GNUC__)
+#if defined(CONFIG_64)
+#if defined(__GNUC__) && defined(__x86_64__)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -52,9 +52,9 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_u
 	*q = qq;
 	*r = rr;
 }
-/* END CONFIG_64: __GNUC__ */
+/* END __GNUC__ (amd64) */
 
-#elif defined (_MSC_VER)
+#elif defined(_MSC_VER)
 #include <intrin.h>
 #pragma intrinsic(_umul128)
 
@@ -65,7 +65,7 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 void _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d);
-/* END CONFIG_64: _MSC_VER */
+/* END _MSC_VER (amd64) */
 
 #else
   #error "need platform specific 128 bit multiplication and division"
@@ -119,8 +119,8 @@ _mpd_divmod_pow10(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t v, mpd_uint_t exp)
 }
 /* END CONFIG_64 */
 
-#elif defined (CONFIG_32)
-#if defined (ANSI)
+#elif defined(CONFIG_32)
+#if defined(ANSI)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -129,7 +129,7 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 	hl = (mpd_uuint_t)a * b;
 
 	*hi = hl >> 32;
-	*lo = hl;
+	*lo = (mpd_uint_t)hl;
 }
 
 static inline void
@@ -138,12 +138,12 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_u
 	mpd_uuint_t hl;
 
 	hl = ((mpd_uuint_t)hi<<32) + lo;
-	*q = hl / d; /* quotient is known to fit */
-	*r = hl - (mpd_uuint_t)(*q) * d;
+	*q = (mpd_uint_t)(hl / d); /* quotient is known to fit */
+	*r = (mpd_uint_t)(hl - (mpd_uuint_t)(*q) * d);
 }
-/* END CONFIG_32: ANSI */
+/* END ANSI */
 
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && defined(__i386__)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -173,9 +173,9 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_u
 	*q = qq;
 	*r = rr;
 }
-/* END CONFIG_32: __GNUC__ */
+/* END __GNUC__ (i386) */
 
-#elif defined (_MSC_VER)
+#elif defined(_MSC_VER)
 static inline void __cdecl
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -208,7 +208,7 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_u
 	*q = qq;
 	*r = rr;
 }
-/* END CONFIG_32: _MSC_VER */
+/* END _MSC_VER (i386) */
 
 #else
   #error "need platform specific 64 bit multiplication and division"
@@ -265,17 +265,17 @@ _mpd_idiv_word(mpd_ssize_t *q, mpd_ssize_t *r, mpd_ssize_t v, mpd_ssize_t d)
  **              Arithmetic with overflow checking
  ** ------------------------------------------------------------
  */
-static inline size_t
-add_size_t(size_t a, size_t b)
+static inline mpd_size_t
+add_size_t(mpd_size_t a, mpd_size_t b)
 {
-	if (a > SIZE_MAX - b) {
+	if (a > MPD_SIZE_MAX - b) {
 		mpd_err_fatal("add_size_t(): overflow: check the context");
 	}
 	return a + b;
 }
 
-static inline size_t
-sub_size_t(size_t a, size_t b)
+static inline mpd_size_t
+sub_size_t(mpd_size_t a, mpd_size_t b)
 {
 	if (b > a) {
 		mpd_err_fatal("sub_size_t(): overflow: check the context");
@@ -283,12 +283,12 @@ sub_size_t(size_t a, size_t b)
 	return a - b;
 }
 
-#if SIZE_MAX != MPD_UINT_MAX
-  #error "adapt mul_size_t(), mod_mpd_ssize_t() and mulmod_size_t()"
+#if MPD_SIZE_MAX != MPD_UINT_MAX
+  #error "adapt mul_size_t() and mulmod_size_t()"
 #endif
 
-static inline size_t
-mul_size_t(size_t a, size_t b)
+static inline mpd_size_t
+mul_size_t(mpd_size_t a, mpd_size_t b)
 {
 	mpd_uint_t hi, lo;
 
@@ -306,8 +306,8 @@ mod_mpd_ssize_t(mpd_ssize_t a, mpd_ssize_t m)
 	return (r < 0) ? r + m : r;
 }
 
-static inline size_t
-mulmod_size_t(size_t a, size_t b, size_t m)
+static inline mpd_size_t
+mulmod_size_t(mpd_size_t a, mpd_size_t b, mpd_size_t m)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t q, r;
