@@ -56,7 +56,7 @@ enum {UNORDERED, ORDERED};
 
 extern const mpd_uint_t mpd_moduli[];
 extern const mpd_uint_t mpd_roots[];
-extern const size_t mpd_bits[];
+extern const mpd_size_t mpd_bits[];
 extern const mpd_uint_t mpd_pow10[];
 
 extern const mpd_uint_t INV_P1_MOD_P2;
