@@ -116,7 +116,7 @@ _crt_div3(mpd_uint_t *w, const mpd_uint_t *u, mpd_uint_t v)
  * The carries do not increase. (c_i + zmax) cannot overflow.
  */
 void
-crt3(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, size_t rsize)
+crt3(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, mpd_size_t rsize)
 {
 	mpd_uint_t p1 = mpd_moduli[P1];
 	mpd_uint_t umod;
@@ -129,7 +129,7 @@ crt3(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, size_t rsize)
 	mpd_uint_t z[3], t[3];
 	mpd_uint_t carry[3] = {0,0,0};
 	mpd_uint_t hi, lo;
-	size_t i;
+	mpd_size_t i;
 
 	for (i = 0; i < rsize; i++) {
 
