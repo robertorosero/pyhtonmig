@@ -1,4 +1,4 @@
-# Copyright (C) 2001-2007 Python Software Foundation
+# Copyright (C) 2001-2010 Python Software Foundation
 # Author: Barry Warsaw
 # Contact: email-sig@python.org
 
@@ -214,6 +214,17 @@ class Generator:
         if msg.epilogue is not None:
             print(file=self._fp)
             self._fp.write(msg.epilogue)
+
+    def _handle_multipart_signed(self, msg):
+        # The contents of signed parts has to stay unmodified in order to keep
+        # the signature intact per RFC1847 2.1, so we disable header wrapping.
+        # RDM: This isn't enough to completely preserve the part, but it helps.
+        old_maxheaderlen = self._maxheaderlen
+        try:
+            self._maxheaderlen = 0
+            self._handle_multipart(msg)
+        finally:
+            self._maxheaderlen = old_maxheaderlen
 
     def _handle_message_delivery_status(self, msg):
         # We can't just write the headers directly to self's file object

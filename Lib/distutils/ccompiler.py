@@ -9,11 +9,12 @@ import sys
 import os
 import re
 
-from distutils.errors import CompileError, LinkError, UnknownFileError
+from distutils.errors import (CompileError, LinkError, UnknownFileError,
+                              DistutilsPlatformError, DistutilsModuleError)
 from distutils.spawn import spawn
 from distutils.file_util import move_file
 from distutils.dir_util import mkpath
-from distutils.dep_util import newer_pairwise, newer_group
+from distutils.dep_util import newer_group
 from distutils.util import split_quoted, execute
 from distutils import log
 
@@ -314,10 +315,7 @@ class CCompiler:
 
     def _setup_compile(self, outdir, macros, incdirs, sources, depends,
                        extra):
-        """Process arguments and decide which source files to compile.
-
-        Merges _fix_compile_args() and _prep_compile().
-        """
+        """Process arguments and decide which source files to compile."""
         if outdir is None:
             outdir = self.output_dir
         elif not isinstance(outdir, str):
@@ -346,41 +344,6 @@ class CCompiler:
                                         output_dir=outdir)
         assert len(objects) == len(sources)
 
-        # XXX should redo this code to eliminate skip_source entirely.
-        # XXX instead create build and issue skip messages inline
-
-        if self.force:
-            skip_source = {}            # rebuild everything
-            for source in sources:
-                skip_source[source] = 0
-        elif depends is None:
-            # If depends is None, figure out which source files we
-            # have to recompile according to a simplistic check. We
-            # just compare the source and object file, no deep
-            # dependency checking involving header files.
-            skip_source = {}            # rebuild everything
-            for source in sources:      # no wait, rebuild nothing
-                skip_source[source] = 1
-
-            n_sources, n_objects = newer_pairwise(sources, objects)
-            for source in n_sources:    # no really, only rebuild what's
-                skip_source[source] = 0 # out-of-date
-        else:
-            # If depends is a list of files, then do a different
-            # simplistic check.  Assume that each object depends on
-            # its source and all files in the depends list.
-            skip_source = {}
-            # L contains all the depends plus a spot at the end for a
-            # particular source file
-            L = depends[:] + [None]
-            for i in range(len(objects)):
-                source = sources[i]
-                L[-1] = source
-                if newer_group(L, objects[i]):
-                    skip_source[source] = 0
-                else:
-                    skip_source[source] = 1
-
         pp_opts = gen_preprocess_options(macros, incdirs)
 
         build = {}
@@ -389,10 +352,7 @@ class CCompiler:
             obj = objects[i]
             ext = os.path.splitext(src)[1]
             self.mkpath(os.path.dirname(obj))
-            if skip_source[src]:
-                log.debug("skipping %s (%s up-to-date)", src, obj)
-            else:
-                build[obj] = src, ext
+            build[obj] = (src, ext)
 
         return macros, objects, extra, pp_opts, build
 
@@ -436,53 +396,6 @@ class CCompiler:
                   "'include_dirs' (if supplied) must be a list of strings")
 
         return output_dir, macros, include_dirs
-
-    def _prep_compile(self, sources, output_dir, depends=None):
-        """Decide which souce files must be recompiled.
-
-        Determine the list of object files corresponding to 'sources',
-        and figure out which ones really need to be recompiled.
-        Return a list of all object files and a dictionary telling
-        which source files can be skipped.
-        """
-        # Get the list of expected output (object) files
-        objects = self.object_filenames(sources, output_dir=output_dir)
-        assert len(objects) == len(sources)
-
-        if self.force:
-            skip_source = {}            # rebuild everything
-            for source in sources:
-                skip_source[source] = 0
-        elif depends is None:
-            # If depends is None, figure out which source files we
-            # have to recompile according to a simplistic check. We
-            # just compare the source and object file, no deep
-            # dependency checking involving header files.
-            skip_source = {}            # rebuild everything
-            for source in sources:      # no wait, rebuild nothing
-                skip_source[source] = 1
-
-            n_sources, n_objects = newer_pairwise(sources, objects)
-            for source in n_sources:    # no really, only rebuild what's
-                skip_source[source] = 0 # out-of-date
-        else:
-            # If depends is a list of files, then do a different
-            # simplistic check.  Assume that each object depends on
-            # its source and all files in the depends list.
-            skip_source = {}
-            # L contains all the depends plus a spot at the end for a
-            # particular source file
-            L = depends[:] + [None]
-            for i in range(len(objects)):
-                source = sources[i]
-                L[-1] = source
-                if newer_group(L, objects[i]):
-                    skip_source[source] = 0
-                else:
-                    skip_source[source] = 1
-
-        return objects, skip_source
-
 
     def _fix_object_args(self, objects, output_dir):
         """Typecheck and fix up some arguments supplied to various methods.
@@ -685,26 +598,15 @@ class CCompiler:
         """
         pass
 
-
     # values for target_desc parameter in link()
     SHARED_OBJECT = "shared_object"
     SHARED_LIBRARY = "shared_library"
     EXECUTABLE = "executable"
 
-    def link(self,
-             target_desc,
-             objects,
-             output_filename,
-             output_dir=None,
-             libraries=None,
-             library_dirs=None,
-             runtime_library_dirs=None,
-             export_symbols=None,
-             debug=0,
-             extra_preargs=None,
-             extra_postargs=None,
-             build_temp=None,
-             target_lang=None):
+    def link(self, target_desc, objects, output_filename, output_dir=None,
+             libraries=None, library_dirs=None, runtime_library_dirs=None,
+             export_symbols=None, debug=0, extra_preargs=None,
+             extra_postargs=None, build_temp=None, target_lang=None):
         """Link a bunch of stuff together to create an executable or
         shared library file.
 
@@ -753,19 +655,11 @@ class CCompiler:
 
     # Old 'link_*()' methods, rewritten to use the new 'link()' method.
 
-    def link_shared_lib(self,
-                        objects,
-                        output_libname,
-                        output_dir=None,
-                        libraries=None,
-                        library_dirs=None,
-                        runtime_library_dirs=None,
-                        export_symbols=None,
-                        debug=0,
-                        extra_preargs=None,
-                        extra_postargs=None,
-                        build_temp=None,
-                        target_lang=None):
+    def link_shared_lib(self, objects, output_libname, output_dir=None,
+                        libraries=None, library_dirs=None,
+                        runtime_library_dirs=None, export_symbols=None,
+                        debug=0, extra_preargs=None, extra_postargs=None,
+                        build_temp=None, target_lang=None):
         self.link(CCompiler.SHARED_LIBRARY, objects,
                   self.library_filename(output_libname, lib_type='shared'),
                   output_dir,
@@ -774,19 +668,11 @@ class CCompiler:
                   extra_preargs, extra_postargs, build_temp, target_lang)
 
 
-    def link_shared_object(self,
-                           objects,
-                           output_filename,
-                           output_dir=None,
-                           libraries=None,
-                           library_dirs=None,
-                           runtime_library_dirs=None,
-                           export_symbols=None,
-                           debug=0,
-                           extra_preargs=None,
-                           extra_postargs=None,
-                           build_temp=None,
-                           target_lang=None):
+    def link_shared_object(self, objects, output_filename, output_dir=None,
+                           libraries=None, library_dirs=None,
+                           runtime_library_dirs=None, export_symbols=None,
+                           debug=0, extra_preargs=None, extra_postargs=None,
+                           build_temp=None, target_lang=None):
         self.link(CCompiler.SHARED_OBJECT, objects,
                   output_filename, output_dir,
                   libraries, library_dirs, runtime_library_dirs,
@@ -794,17 +680,10 @@ class CCompiler:
                   extra_preargs, extra_postargs, build_temp, target_lang)
 
 
-    def link_executable(self,
-                        objects,
-                        output_progname,
-                        output_dir=None,
-                        libraries=None,
-                        library_dirs=None,
-                        runtime_library_dirs=None,
-                        debug=0,
-                        extra_preargs=None,
-                        extra_postargs=None,
-                        target_lang=None):
+    def link_executable(self, objects, output_progname, output_dir=None,
+                        libraries=None, library_dirs=None,
+                        runtime_library_dirs=None, debug=0, extra_preargs=None,
+                        extra_postargs=None, target_lang=None):
         self.link(CCompiler.EXECUTABLE, objects,
                   self.executable_filename(output_progname), output_dir,
                   libraries, library_dirs, runtime_library_dirs, None,
@@ -986,7 +865,7 @@ main (int argc, char **argv) {
     def move_file(self, src, dst):
         return move_file(src, dst, dry_run=self.dry_run)
 
-    def mkpath (self, name, mode=0o777):
+    def mkpath(self, name, mode=0o777):
         mkpath(name, mode, dry_run=self.dry_run)
 
 

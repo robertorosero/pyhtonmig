@@ -12,6 +12,31 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #7561: Operations on empty bytearrays (such as `int(bytearray())`)
+  could crash in many places because of the PyByteArray_AS_STRING() macro
+  returning NULL.  The macro now returns a statically allocated empty
+  string instead.
+
+- Issue #6690: Optimize the bytecode for expressions such as `x in {1, 2, 3}`,
+  where the right hand operand is a set of constants, by turning the set into
+  a frozenset and pre-building it as a constant.  The comparison operation
+  is made against the constant instead of building a new set each time it is
+  executed (a similar optimization already existed which turned a list of
+  constants into a pre-built tuple).  Patch and additional tests by Dave
+  Malcolm.
+
+- Issue #7622: Improve the split(), rsplit(), splitlines() and replace()
+  methods of bytes, bytearray and unicode objects by using a common
+  implementation based on stringlib's fast search.  Patch by Florent Xicluna.
+
+- Issue #7632: Fix various str -> float conversion bugs present in 2.7
+  alpha 2, including: (1) a serious 'wrong output' bug that could
+  occur for long (> 40 digit) input strings, (2) a crash in dtoa.c
+  that occurred in debug builds when parsing certain long numeric
+  strings corresponding to subnormal values, (3) a memory leak for
+  some values large enough to cause overflow, and (4) a number of
+  flaws that could lead to incorrectly rounded results.
+
 - The __complex__ method is now looked up on the class of instances to make it
   consistent with other special methods.
 
@@ -149,8 +174,18 @@ Core and Builtins
 - Issue #6687: PyBytes_FromObject() no longer accepts an integer as its
   argument to construct a null-initialized bytes object.
 
+- Issue #1023290: Add from_bytes() and to_bytes() methods to integers.
+  These methods allow the conversion of integers to bytes, and vice-versa.
+
+- Issue #7382: Fix bug in bytes.__getnewargs__ that prevented bytes
+  instances from being copied with copy.copy(), and bytes subclasses
+  from being pickled properly.
+
 C-API
 -----
+
+- Make PyUnicode_CompareWithASCIIString return not equal if the Python string
+  has '\0' at the end.
 
 - Issue #5080: The argument parsing functions PyArg_ParseTuple,
   PyArg_ParseTupleAndKeywords, PyArg_VaParse,
@@ -193,6 +228,41 @@ C-API
 
 Library
 -------
+
+- Issue #7561: Fix crashes when using bytearray objects with the posix
+  module.
+
+- Issue #1670765: Prevent email.generator.Generator from re-wrapping
+  headers in multipart/signed MIME parts, which fixes one of the sources of
+  invalid modifications to such parts by Generator.
+
+- Issue #7703: Add support for the new buffer API to `binascii.a2bhqx`.
+  Patch by Florent Xicluna, along with some additional tests.
+
+- Issue #7701: Fix crash in binascii.b2a_uu() in debug mode when given a
+  1-byte argument.  Patch by Victor Stinner.
+
+- Issue #3299: Fix possible crash in the _sre module when given bad
+  argument values in debug mode.  Patch by Victor Stinner.
+
+- Issue #2846: Add support for gzip.GzipFile reading zero-padded files.
+  Patch by Brian Curtin.
+
+- Issue #7681: Use floor division in appropiate places in the wave module.
+
+- Issue #5372: Drop the reuse of .o files in Distutils' ccompiler (since
+  Extension extra options may change the output without changing the .c
+  file). Initial patch by Collin Winter.
+
+- Issue #7617: Make sure distutils.unixccompiler.UnixCCompiler recognizes
+  gcc when it has a fully qualified configuration prefix. Initial patch
+  by Arfrever.
+
+- Issue #7105: Make WeakKeyDictionary and WeakValueDictionary robust against
+  the destruction of weakref'ed objects while iterating.
+
+- Issue #7455: Fix possible crash in cPickle on invalid input.  Patch by
+  Victor Stinner.
 
 - Issue #1628205: Socket file objects returned by socket.socket.makefile() now
   properly handles EINTR within the read, readline, write & flush methods.
@@ -543,6 +613,10 @@ Extension Modules
 Build
 -----
 
+- Issue #7632: When Py_USING_MEMORY_DEBUGGER is defined, disable the
+  private memory allocation scheme in dtoa.c and use PyMem_Malloc and
+  PyMem_Free instead.  Also disable caching of powers of 5.
+
 - Issue #6491: Allow --with-dbmliborder to specify that no dbms will be built.
 
 - Issue #6943: Use pkg-config to find the libffi headers when the
@@ -649,6 +723,13 @@ Tests
 
 - Removed importlib's custom test discovery code and switched to
     unittest.TestLoader.discover().
+
+Tools/Demos
+-----------
+
+- iobench (a file I/O benchmark) and ccbench (a concurrency benchmark) were
+  added to the `Tools/` directory.  They were previously living in the
+  sandbox.
 
 
 What's New in Python 3.1?

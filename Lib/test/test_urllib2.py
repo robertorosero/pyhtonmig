@@ -21,14 +21,17 @@ class TrivialTests(unittest.TestCase):
 
         # XXX Name hacking to get this to work on Windows.
         fname = os.path.abspath(urllib.request.__file__).replace('\\', '/')
-        if fname[1:2] == ":":
-            fname = fname[2:]
+
         # And more hacking to get it to work on MacOS. This assumes
         # urllib.pathname2url works, unfortunately...
         if os.name == 'mac':
             fname = '/' + fname.replace(':', '/')
 
-        file_url = "file://%s" % fname
+        if os.name == 'nt':
+            file_url = "file:///%s" % fname
+        else:
+            file_url = "file://%s" % fname
+
         f = urllib.request.urlopen(file_url)
 
         buf = f.read()
@@ -784,8 +787,8 @@ class HandlerTests(unittest.TestCase):
             r = MockResponse(200, "OK", {}, "")
             newreq = h.do_request_(req)
             if data is None:  # GET
-                self.assertTrue("Content-length" not in req.unredirected_hdrs)
-                self.assertTrue("Content-type" not in req.unredirected_hdrs)
+                self.assertNotIn("Content-length", req.unredirected_hdrs)
+                self.assertNotIn("Content-type", req.unredirected_hdrs)
             else:  # POST
                 self.assertEqual(req.unredirected_hdrs["Content-length"], "0")
                 self.assertEqual(req.unredirected_hdrs["Content-type"],
@@ -904,13 +907,13 @@ class HandlerTests(unittest.TestCase):
                 # now it's a GET, there should not be headers regarding content
                 # (possibly dragged from before being a POST)
                 headers = [x.lower() for x in o.req.headers]
-                self.assertTrue("content-length" not in headers)
-                self.assertTrue("content-type" not in headers)
+                self.assertNotIn("content-length", headers)
+                self.assertNotIn("content-type", headers)
 
                 self.assertEqual(o.req.headers["Nonsense"],
                                  "viking=withhold")
-                self.assertTrue("Spam" not in o.req.headers)
-                self.assertTrue("Spam" not in o.req.unredirected_hdrs)
+                self.assertNotIn("Spam", o.req.headers)
+                self.assertNotIn("Spam", o.req.unredirected_hdrs)
 
         # loop detection
         req = Request(from_url)

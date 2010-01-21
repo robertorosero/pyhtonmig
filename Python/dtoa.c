@@ -200,10 +200,11 @@ typedef union { double d; ULong L[2]; } U;
 #define STRTOD_DIGLIM 40
 #endif
 
-#ifdef DIGLIM_DEBUG
-extern int strtod_diglim;
-#else
-#define strtod_diglim STRTOD_DIGLIM
+/* maximum permitted exponent value for strtod; exponents larger than
+   MAX_ABS_EXP in absolute value get truncated to +-MAX_ABS_EXP.  MAX_ABS_EXP
+   should fit into an int. */
+#ifndef MAX_ABS_EXP
+#define MAX_ABS_EXP 19999U
 #endif
 
 /* The following definition of Storeinc is appropriate for MIPS processors.
@@ -269,8 +270,7 @@ extern int strtod_diglim;
 typedef struct BCinfo BCinfo;
 struct
 BCinfo {
-    int dp0, dp1, dplen, dsign, e0, inexact;
-    int nd, nd0, rounding, scale, uflchk;
+    int dsign, e0, nd, nd0, scale;
 };
 
 #define FFFFFFFF 0xffffffffUL
@@ -307,6 +307,8 @@ Bigint {
 };
 
 typedef struct Bigint Bigint;
+
+#ifndef Py_USING_MEMORY_DEBUGGER
 
 /* Memory management: memory is allocated from, and returned to, Kmax+1 pools
    of memory, where pool k (0 <= k <= Kmax) is for Bigints b with b->maxwds ==
@@ -375,6 +377,48 @@ Bfree(Bigint *v)
     }
 }
 
+#else
+
+/* Alternative versions of Balloc and Bfree that use PyMem_Malloc and
+   PyMem_Free directly in place of the custom memory allocation scheme above.
+   These are provided for the benefit of memory debugging tools like
+   Valgrind. */
+
+/* Allocate space for a Bigint with up to 1<<k digits */
+
+static Bigint *
+Balloc(int k)
+{
+    int x;
+    Bigint *rv;
+    unsigned int len;
+
+    x = 1 << k;
+    len = (sizeof(Bigint) + (x-1)*sizeof(ULong) + sizeof(double) - 1)
+        /sizeof(double);
+
+    rv = (Bigint*)MALLOC(len*sizeof(double));
+    if (rv == NULL)
+        return NULL;
+
+    rv->k = k;
+    rv->maxwds = x;
+    rv->sign = rv->wds = 0;
+    return rv;
+}
+
+/* Free a Bigint allocated with Balloc */
+
+static void
+Bfree(Bigint *v)
+{
+    if (v) {
+        FREE((void*)v);
+    }
+}
+
+#endif /* Py_USING_MEMORY_DEBUGGER */
+
 #define Bcopy(x,y) memcpy((char *)&x->sign, (char *)&y->sign,   \
                           y->wds*sizeof(Long) + 2*sizeof(int))
 
@@ -437,7 +481,7 @@ multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
    NULL on failure. */
 
 static Bigint *
-s2b(const char *s, int nd0, int nd, ULong y9, int dplen)
+s2b(const char *s, int nd0, int nd, ULong y9)
 {
     Bigint *b;
     int i, k;
@@ -451,18 +495,16 @@ s2b(const char *s, int nd0, int nd, ULong y9, int dplen)
     b->x[0] = y9;
     b->wds = 1;
 
-    i = 9;
-    if (9 < nd0) {
-        s += 9;
-        do {
-            b = multadd(b, 10, *s++ - '0');
-            if (b == NULL)
-                return NULL;
-        } while(++i < nd0);
-        s += dplen;
+    if (nd <= 9)
+      return b;
+
+    s += 9;
+    for (i = 9; i < nd0; i++) {
+        b = multadd(b, 10, *s++ - '0');
+        if (b == NULL)
+            return NULL;
     }
-    else
-        s += dplen + 9;
+    s++;
     for(; i < nd; i++) {
         b = multadd(b, 10, *s++ - '0');
         if (b == NULL)
@@ -654,6 +696,8 @@ mult(Bigint *a, Bigint *b)
     return c;
 }
 
+#ifndef Py_USING_MEMORY_DEBUGGER
+
 /* p5s is a linked list of powers of 5 of the form 5**(2**i), i >= 2 */
 
 static Bigint *p5s;
@@ -712,6 +756,58 @@ pow5mult(Bigint *b, int k)
     }
     return b;
 }
+
+#else
+
+/* Version of pow5mult that doesn't cache powers of 5. Provided for
+   the benefit of memory debugging tools like Valgrind. */
+
+static Bigint *
+pow5mult(Bigint *b, int k)
+{
+    Bigint *b1, *p5, *p51;
+    int i;
+    static int p05[3] = { 5, 25, 125 };
+
+    if ((i = k & 3)) {
+        b = multadd(b, p05[i-1], 0);
+        if (b == NULL)
+            return NULL;
+    }
+
+    if (!(k >>= 2))
+        return b;
+    p5 = i2b(625);
+    if (p5 == NULL) {
+        Bfree(b);
+        return NULL;
+    }
+
+    for(;;) {
+        if (k & 1) {
+            b1 = mult(b, p5);
+            Bfree(b);
+            b = b1;
+            if (b == NULL) {
+                Bfree(p5);
+                return NULL;
+            }
+        }
+        if (!(k >>= 1))
+            break;
+        p51 = mult(p5, p5);
+        Bfree(p5);
+        p5 = p51;
+        if (p5 == NULL) {
+            Bfree(b);
+            return NULL;
+        }
+    }
+    Bfree(p5);
+    return b;
+}
+
+#endif /* Py_USING_MEMORY_DEBUGGER */
 
 /* shift a Bigint b left by k bits.  Return a pointer to the shifted result,
    or NULL on failure.  If the returned pointer is distinct from b then the
@@ -1130,56 +1226,120 @@ quorem(Bigint *b, Bigint *S)
     return q;
 }
 
+/* sulp(x) is a version of ulp(x) that takes bc.scale into account.
 
-/* return 0 on success, -1 on failure */
+   Assuming that x is finite and nonnegative (positive zero is fine
+   here) and x / 2^bc.scale is exactly representable as a double,
+   sulp(x) is equivalent to 2^bc.scale * ulp(x / 2^bc.scale). */
+
+static double
+sulp(U *x, BCinfo *bc)
+{
+    U u;
+
+    if (bc->scale && 2*P + 1 > (int)((word0(x) & Exp_mask) >> Exp_shift)) {
+        /* rv/2^bc->scale is subnormal */
+        word0(&u) = (P+2)*Exp_msk1;
+        word1(&u) = 0;
+        return u.d;
+    }
+    else {
+        assert(word0(x) || word1(x)); /* x != 0.0 */
+        return ulp(x);
+    }
+}
+
+/* The bigcomp function handles some hard cases for strtod, for inputs
+   with more than STRTOD_DIGLIM digits.  It's called once an initial
+   estimate for the double corresponding to the input string has
+   already been obtained by the code in _Py_dg_strtod.
+
+   The bigcomp function is only called after _Py_dg_strtod has found a
+   double value rv such that either rv or rv + 1ulp represents the
+   correctly rounded value corresponding to the original string.  It
+   determines which of these two values is the correct one by
+   computing the decimal digits of rv + 0.5ulp and comparing them with
+   the corresponding digits of s0.
+
+   In the following, write dv for the absolute value of the number represented
+   by the input string.
+
+   Inputs:
+
+     s0 points to the first significant digit of the input string.
+
+     rv is a (possibly scaled) estimate for the closest double value to the
+        value represented by the original input to _Py_dg_strtod.  If
+        bc->scale is nonzero, then rv/2^(bc->scale) is the approximation to
+        the input value.
+
+     bc is a struct containing information gathered during the parsing and
+        estimation steps of _Py_dg_strtod.  Description of fields follows:
+
+        bc->dsign is 1 if rv < decimal value, 0 if rv >= decimal value.  In
+           normal use, it should almost always be 1 when bigcomp is entered.
+
+        bc->e0 gives the exponent of the input value, such that dv = (integer
+           given by the bd->nd digits of s0) * 10**e0
+
+        bc->nd gives the total number of significant digits of s0.  It will
+           be at least 1.
+
+        bc->nd0 gives the number of significant digits of s0 before the
+           decimal separator.  If there's no decimal separator, bc->nd0 ==
+           bc->nd.
+
+        bc->scale is the value used to scale rv to avoid doing arithmetic with
+           subnormal values.  It's either 0 or 2*P (=106).
+
+   Outputs:
+
+     On successful exit, rv/2^(bc->scale) is the closest double to dv.
+
+     Returns 0 on success, -1 on failure (e.g., due to a failed malloc call). */
 
 static int
 bigcomp(U *rv, const char *s0, BCinfo *bc)
 {
     Bigint *b, *d;
-    int b2, bbits, d2, dd, dig, dsign, i, j, nd, nd0, p2, p5, speccase;
+    int b2, bbits, d2, dd, i, nd, nd0, odd, p2, p5;
 
-    dsign = bc->dsign;
+    dd = 0; /* silence compiler warning about possibly unused variable */
     nd = bc->nd;
     nd0 = bc->nd0;
-    p5 = nd + bc->e0 - 1;
-    speccase = 0;
-    if (rv->d == 0.) {  /* special case: value near underflow-to-zero */
-        /* threshold was rounded to zero */
-        b = i2b(1);
+    p5 = nd + bc->e0;
+    if (rv->d == 0.) {
+        /* special case because d2b doesn't handle 0.0 */
+        b = i2b(0);
         if (b == NULL)
             return -1;
-        p2 = Emin - P + 1;
-        bbits = 1;
-        word0(rv) = (P+2) << Exp_shift;
-        i = 0;
-        {
-            speccase = 1;
-            --p2;
-            dsign = 0;
-            goto have_i;
-        }
+        p2 = Emin - P + 1; /* = -1074 for IEEE 754 binary64 */
+        bbits = 0;
     }
-    else
-    {
+    else {
         b = d2b(rv, &p2, &bbits);
         if (b == NULL)
             return -1;
+        p2 -= bc->scale;
     }
-    p2 -= bc->scale;
-    /* floor(log2(rv)) == bbits - 1 + p2 */
-    /* Check for denormal case. */
+    /* now rv/2^(bc->scale) = b * 2**p2, and b has bbits significant bits */
+
+    /* Replace (b, p2) by (b << i, p2 - i), with i the largest integer such
+       that b << i has at most P significant bits and p2 - i >= Emin - P +
+       1. */
     i = P - bbits;
-    if (i > (j = P - Emin - 1 + p2)) {
-        i = j;
-    }
-    {
-        b = lshift(b, ++i);
-        if (b == NULL)
-            return -1;
-        b->x[0] |= 1;
-    }
-  have_i:
+    if (i > p2 - (Emin - P + 1))
+        i = p2 - (Emin - P + 1);
+    /* increment i so that we shift b by an extra bit;  then or-ing a 1 into
+       the lsb of b gives us rv/2^(bc->scale) + 0.5ulp. */
+    b = lshift(b, ++i);
+    if (b == NULL)
+        return -1;
+    /* record whether the lsb of rv/2^(bc->scale) is odd:  in the exact halfway
+       case, this is used for round to even. */
+    odd = b->x[0] & 2;
+    b->x[0] |= 1;
+
     p2 -= p5 + i;
     d = i2b(1);
     if (d == NULL) {
@@ -1227,81 +1387,51 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
         }
     }
 
-    /* Now b/d = exactly half-way between the two floating-point values */
-    /* on either side of the input string.  Compute first digit of b/d. */
-
-    if (!(dig = quorem(b,d))) {
-        b = multadd(b, 10, 0);  /* very unlikely */
-        if (b == NULL) {
-            Bfree(d);
-            return -1;
-        }
-        dig = quorem(b,d);
+    /* if b >= d, round down */
+    if (cmp(b, d) >= 0) {
+        dd = -1;
+        goto ret;
     }
 
     /* Compare b/d with s0 */
-
-    assert(nd > 0);
-    dd = 9999;  /* silence gcc compiler warning */
-    for(i = 0; i < nd0; ) {
-        if ((dd = s0[i++] - '0' - dig))
-            goto ret;
-        if (!b->x[0] && b->wds == 1) {
-            if (i < nd)
-                dd = 1;
-            goto ret;
-        }
+    for(i = 0; i < nd0; i++) {
         b = multadd(b, 10, 0);
         if (b == NULL) {
             Bfree(d);
             return -1;
         }
-        dig = quorem(b,d);
+        dd = *s0++ - '0' - quorem(b, d);
+        if (dd)
+            goto ret;
+        if (!b->x[0] && b->wds == 1) {
+            if (i < nd - 1)
+                dd = 1;
+            goto ret;
+        }
     }
-    for(j = bc->dp1; i++ < nd;) {
-        if ((dd = s0[j++] - '0' - dig))
-            goto ret;
-        if (!b->x[0] && b->wds == 1) {
-            if (i < nd)
-                dd = 1;
-            goto ret;
-        }
+    s0++;
+    for(; i < nd; i++) {
         b = multadd(b, 10, 0);
         if (b == NULL) {
             Bfree(d);
             return -1;
         }
-        dig = quorem(b,d);
+        dd = *s0++ - '0' - quorem(b, d);
+        if (dd)
+            goto ret;
+        if (!b->x[0] && b->wds == 1) {
+            if (i < nd - 1)
+                dd = 1;
+            goto ret;
+        }
     }
     if (b->x[0] || b->wds > 1)
         dd = -1;
   ret:
     Bfree(b);
     Bfree(d);
-    if (speccase) {
-        if (dd <= 0)
-            rv->d = 0.;
-    }
-    else if (dd < 0) {
-        if (!dsign)     /* does not happen for round-near */
-          retlow1:
-            dval(rv) -= ulp(rv);
-    }
-    else if (dd > 0) {
-        if (dsign) {
-          rethi1:
-            dval(rv) += ulp(rv);
-        }
-    }
-    else {
-        /* Exact half-way case:  apply round-even rule. */
-        if (word1(rv) & 1) {
-            if (dsign)
-                goto rethi1;
-            goto retlow1;
-        }
-    }
-
+    if (dd > 0 || (dd == 0 && odd))
+        dval(rv) += sulp(rv, bc);
     return 0;
 }
 
@@ -1312,13 +1442,13 @@ _Py_dg_strtod(const char *s00, char **se)
     int esign, i, j, k, nd, nd0, nf, nz, nz0, sign;
     const char *s, *s0, *s1;
     double aadj, aadj1;
-    Long L;
     U aadj2, adj, rv, rv0;
-    ULong y, z;
+    ULong y, z, abse;
+    Long L;
     BCinfo bc;
     Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
 
-    sign = nz0 = nz = bc.dplen = bc.uflchk = 0;
+    sign = nz0 = nz = 0;
     dval(&rv) = 0.;
     for(s = s00;;s++) switch(*s) {
         case '-':
@@ -1350,18 +1480,11 @@ _Py_dg_strtod(const char *s00, char **se)
             goto ret;
     }
     s0 = s;
-    y = z = 0;
     for(nd = nf = 0; (c = *s) >= '0' && c <= '9'; nd++, s++)
-        if (nd < 9)
-            y = 10*y + c - '0';
-        else if (nd < 16)
-            z = 10*z + c - '0';
+        ;
     nd0 = nd;
-    bc.dp0 = bc.dp1 = s - s0;
     if (c == '.') {
         c = *++s;
-        bc.dp1 = s - s0;
-        bc.dplen = bc.dp1 - bc.dp0;
         if (!nd) {
             for(; c == '0'; c = *++s)
                 nz++;
@@ -1378,15 +1501,7 @@ _Py_dg_strtod(const char *s00, char **se)
             nz++;
             if (c -= '0') {
                 nf += nz;
-                for(i = 1; i < nz; i++)
-                    if (nd++ < 9)
-                        y *= 10;
-                    else if (nd <= DBL_DIG + 1)
-                        z *= 10;
-                if (nd++ < 9)
-                    y = 10*y + c;
-                else if (nd <= DBL_DIG + 1)
-                    z = 10*z + c;
+                nd += nz;
                 nz = 0;
             }
         }
@@ -1409,17 +1524,17 @@ _Py_dg_strtod(const char *s00, char **se)
             while(c == '0')
                 c = *++s;
             if (c > '0' && c <= '9') {
-                L = c - '0';
+                abse = c - '0';
                 s1 = s;
                 while((c = *++s) >= '0' && c <= '9')
-                    L = 10*L + c - '0';
-                if (s - s1 > 8 || L > 19999)
+                    abse = 10*abse + c - '0';
+                if (s - s1 > 8 || abse > MAX_ABS_EXP)
                     /* Avoid confusion from exponents
                      * so large that e might overflow.
                      */
-                    e = 19999; /* safe for 16 bit ints */
+                    e = (int)MAX_ABS_EXP; /* safe for 16 bit ints */
                 else
-                    e = (int)L;
+                    e = (int)abse;
                 if (esign)
                     e = -e;
             }
@@ -1437,15 +1552,78 @@ _Py_dg_strtod(const char *s00, char **se)
         }
         goto ret;
     }
-    bc.e0 = e1 = e -= nf;
+    e -= nf;
+    if (!nd0)
+        nd0 = nd;
+
+    /* strip trailing zeros */
+    for (i = nd; i > 0; ) {
+        /* scan back until we hit a nonzero digit.  significant digit 'i'
+           is s0[i] if i < nd0, s0[i+1] if i >= nd0. */
+        --i;
+        if (s0[i < nd0 ? i : i+1] != '0') {
+            ++i;
+            break;
+        }
+    }
+    e += nd - i;
+    nd = i;
+    if (nd0 > nd)
+        nd0 = nd;
 
     /* Now we have nd0 digits, starting at s0, followed by a
      * decimal point, followed by nd-nd0 digits.  The number we're
      * after is the integer represented by those digits times
      * 10**e */
 
-    if (!nd0)
-        nd0 = nd;
+    bc.e0 = e1 = e;
+
+    /* Summary of parsing results.  The parsing stage gives values
+     * s0, nd0, nd, e, sign, where:
+     *
+     *  - s0 points to the first significant digit of the input string s00;
+     *
+     *  - nd is the total number of significant digits (here, and
+     *    below, 'significant digits' means the set of digits of the
+     *    significand of the input that remain after ignoring leading
+     *    and trailing zeros.
+     *
+     *  - nd0 indicates the position of the decimal point (if
+     *    present): so the nd significant digits are in s0[0:nd0] and
+     *    s0[nd0+1:nd+1] using the usual Python half-open slice
+     *    notation.  (If nd0 < nd, then s0[nd0] necessarily contains
+     *    a '.' character;  if nd0 == nd, then it could be anything.)
+     *
+     *  - e is the adjusted exponent: the absolute value of the number
+     *    represented by the original input string is n * 10**e, where
+     *    n is the integer represented by the concatenation of
+     *    s0[0:nd0] and s0[nd0+1:nd+1]
+     *
+     *  - sign gives the sign of the input:  1 for negative, 0 for positive
+     *
+     *  - the first and last significant digits are nonzero
+     */
+
+    /* put first DBL_DIG+1 digits into integer y and z.
+     *
+     *  - y contains the value represented by the first min(9, nd)
+     *    significant digits
+     *
+     *  - if nd > 9, z contains the value represented by significant digits
+     *    with indices in [9, min(16, nd)).  So y * 10**(min(16, nd) - 9) + z
+     *    gives the value represented by the first min(16, nd) sig. digits.
+     */
+
+    y = z = 0;
+    for (i = 0; i < nd; i++) {
+        if (i < 9)
+            y = 10*y + s0[i < nd0 ? i : i+1] - '0';
+        else if (i < DBL_DIG+1)
+            z = 10*z + s0[i < nd0 ? i : i+1] - '0';
+        else
+            break;
+    }
+
     k = nd < DBL_DIG + 1 ? nd : DBL_DIG + 1;
     dval(&rv) = y;
     if (k > 9) {
@@ -1555,22 +1733,25 @@ _Py_dg_strtod(const char *s00, char **se)
     /* Put digits into bd: true value = bd * 10^e */
 
     bc.nd = nd;
-    bc.nd0 = nd0;       /* Only needed if nd > strtod_diglim, but done here */
+    bc.nd0 = nd0;       /* Only needed if nd > STRTOD_DIGLIM, but done here */
                         /* to silence an erroneous warning about bc.nd0 */
                         /* possibly not being initialized. */
-    if (nd > strtod_diglim) {
-        /* ASSERT(strtod_diglim >= 18); 18 == one more than the */
+    if (nd > STRTOD_DIGLIM) {
+        /* ASSERT(STRTOD_DIGLIM >= 18); 18 == one more than the */
         /* minimum number of decimal digits to distinguish double values */
         /* in IEEE arithmetic. */
-        i = j = 18;
-        if (i > nd0)
-            j += bc.dplen;
-        for(;;) {
-            if (--j <= bc.dp1 && j >= bc.dp0)
-                j = bc.dp0 - 1;
-            if (s0[j] != '0')
-                break;
+
+        /* Truncate input to 18 significant digits, then discard any trailing
+           zeros on the result by updating nd, nd0, e and y suitably. (There's
+           no need to update z; it's not reused beyond this point.) */
+        for (i = 18; i > 0; ) {
+            /* scan back until we hit a nonzero digit.  significant digit 'i'
+            is s0[i] if i < nd0, s0[i+1] if i >= nd0. */
             --i;
+            if (s0[i < nd0 ? i : i+1] != '0') {
+                ++i;
+                break;
+            }
         }
         e += nd - i;
         nd = i;
@@ -1580,11 +1761,11 @@ _Py_dg_strtod(const char *s00, char **se)
             y = 0;
             for(i = 0; i < nd0; ++i)
                 y = 10*y + s0[i] - '0';
-            for(j = bc.dp1; i < nd; ++i)
-                y = 10*y + s0[j++] - '0';
+            for(; i < nd; ++i)
+                y = 10*y + s0[i+1] - '0';
         }
     }
-    bd0 = s2b(s0, nd0, nd, y, bc.dplen);
+    bd0 = s2b(s0, nd0, nd, y);
     if (bd0 == NULL)
         goto failed_malloc;
 
@@ -1707,6 +1888,30 @@ _Py_dg_strtod(const char *s00, char **se)
         if (bc.nd > nd && i <= 0) {
             if (bc.dsign)
                 break;  /* Must use bigcomp(). */
+
+            /* Here rv overestimates the truncated decimal value by at most
+               0.5 ulp(rv).  Hence rv either overestimates the true decimal
+               value by <= 0.5 ulp(rv), or underestimates it by some small
+               amount (< 0.1 ulp(rv)); either way, rv is within 0.5 ulps of
+               the true decimal value, so it's possible to exit.
+
+               Exception: if scaled rv is a normal exact power of 2, but not
+               DBL_MIN, then rv - 0.5 ulp(rv) takes us all the way down to the
+               next double, so the correctly rounded result is either rv - 0.5
+               ulp(rv) or rv; in this case, use bigcomp to distinguish. */
+
+            if (!word1(&rv) && !(word0(&rv) & Bndry_mask)) {
+                /* rv can't be 0, since it's an overestimate for some
+                   nonzero value.  So rv is a normal power of 2. */
+                j = (int)(word0(&rv) & Exp_mask) >> Exp_shift;
+                /* rv / 2^bc.scale = 2^(j - 1023 - bc.scale); use bigcomp if
+                   rv / 2^bc.scale >= 2^-1021. */
+                if (j - bc.scale >= 2) {
+                    dval(&rv) -= 0.5 * sulp(&rv, &bc);
+                    break;
+                }
+            }
+
             {
                 bc.nd = nd;
                 i = -1; /* Discarded digits make delta smaller. */
@@ -1767,10 +1972,8 @@ _Py_dg_strtod(const char *s00, char **se)
                             /* accept rv */
                             break;
                         /* rv = smallest denormal */
-                        if (bc.nd >nd) {
-                            bc.uflchk = 1;
+                        if (bc.nd >nd)
                             break;
-                        }
                         goto undfl;
                     }
                 }
@@ -1786,10 +1989,8 @@ _Py_dg_strtod(const char *s00, char **se)
             else {
                 dval(&rv) -= ulp(&rv);
                 if (!dval(&rv)) {
-                    if (bc.nd >nd) {
-                        bc.uflchk = 1;
+                    if (bc.nd >nd)
                         break;
-                    }
                     goto undfl;
                 }
             }
@@ -1801,10 +2002,8 @@ _Py_dg_strtod(const char *s00, char **se)
                 aadj = aadj1 = 1.;
             else if (word1(&rv) || word0(&rv) & Bndry_mask) {
                 if (word1(&rv) == Tiny1 && !word0(&rv)) {
-                    if (bc.nd >nd) {
-                        bc.uflchk = 1;
+                    if (bc.nd >nd)
                         break;
-                    }
                     goto undfl;
                 }
                 aadj = 1.;
@@ -1838,8 +2037,14 @@ _Py_dg_strtod(const char *s00, char **se)
             dval(&rv) += adj.d;
             if ((word0(&rv) & Exp_mask) >=
                 Exp_msk1*(DBL_MAX_EXP+Bias-P)) {
-                if (word0(&rv0) == Big0 && word1(&rv0) == Big1)
+                if (word0(&rv0) == Big0 && word1(&rv0) == Big1) {
+                    Bfree(bb);
+                    Bfree(bd);
+                    Bfree(bs);
+                    Bfree(bd0);
+                    Bfree(delta);
                     goto ovfl;
+                }
                 word0(&rv) = Big0;
                 word1(&rv) = Big1;
                 goto cont;
