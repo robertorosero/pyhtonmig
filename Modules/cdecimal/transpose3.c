@@ -59,37 +59,37 @@
  
 
 /* Cycle start points */
-static const size_t c0[] = {SIZE_MAX};              /* 2^0 blocks */
-static const size_t c1[] = {1, SIZE_MAX};           /* 2^1 blocks */
-static const size_t c2[] = {1, 2, SIZE_MAX};        /* 2^2 blocks */
-static const size_t c3[] = {1, 5, SIZE_MAX};        /* (...)      */
-static const size_t c4[] = {1, 5, SIZE_MAX};
-static const size_t c5[] = {1, 5, 7, 19, SIZE_MAX};
-static const size_t c6[] = {1, 7, SIZE_MAX};
-static const size_t c7[] = {1, 5, SIZE_MAX};
-static const size_t c8[] = {
-  1, 2, 4, 5, 7, 8, 10, 13, 14, 26, 59, 118, 236, 413, SIZE_MAX
+static const mpd_size_t c0[] = {MPD_SIZE_MAX};              /* 2^0 blocks */
+static const mpd_size_t c1[] = {1, MPD_SIZE_MAX};           /* 2^1 blocks */
+static const mpd_size_t c2[] = {1, 2, MPD_SIZE_MAX};        /* 2^2 blocks */
+static const mpd_size_t c3[] = {1, 5, MPD_SIZE_MAX};        /* (...)      */
+static const mpd_size_t c4[] = {1, 5, MPD_SIZE_MAX};
+static const mpd_size_t c5[] = {1, 5, 7, 19, MPD_SIZE_MAX};
+static const mpd_size_t c6[] = {1, 7, MPD_SIZE_MAX};
+static const mpd_size_t c7[] = {1, 5, MPD_SIZE_MAX};
+static const mpd_size_t c8[] = {
+  1, 2, 4, 5, 7, 8, 10, 13, 14, 26, 59, 118, 236, 413, MPD_SIZE_MAX
 };
-static const size_t c9[] = {
+static const mpd_size_t c9[] = {
   1, 2, 4, 5, 7, 10, 11, 13, 14, 17, 20, 22, 23, 25, 28, 34, 35, 37, 46, 50,
-  53, 68, 70, 74, 92, 100, 140, 307, SIZE_MAX
+  53, 68, 70, 74, 92, 100, 140, 307, MPD_SIZE_MAX
 };
-static const size_t c10[] = {1, 2, 17, 34, 37, 74, 83, 166, SIZE_MAX};
-static const size_t c11[] = {1, 5, SIZE_MAX};
-static const size_t c12[] = {
+static const mpd_size_t c10[] = {1, 2, 17, 34, 37, 74, 83, 166, MPD_SIZE_MAX};
+static const mpd_size_t c11[] = {1, 5, MPD_SIZE_MAX};
+static const mpd_size_t c12[] = {
   1, 2, 4, 5, 7, 8, 11, 13, 14, 16, 17, 22, 25, 26, 32, 35, 41, 44, 49, 52,
   53, 55, 61, 65, 77, 82, 88, 103, 104, 154, 164, 176, 275, 352, 385, 539,
-  1117, 2234, SIZE_MAX
+  1117, 2234, MPD_SIZE_MAX
 };
-static const size_t c13[] = {1, 5, 11, 25, 55, 125, 983, 4915, SIZE_MAX};
-static const size_t c14[] = {
-  1, 2, 5, 7, 10, 13, 14, 23, 26, 46, 115, 230, 2137, 10685, SIZE_MAX
+static const mpd_size_t c13[] = {1, 5, 11, 25, 55, 125, 983, 4915, MPD_SIZE_MAX};
+static const mpd_size_t c14[] = {
+  1, 2, 5, 7, 10, 13, 14, 23, 26, 46, 115, 230, 2137, 10685, MPD_SIZE_MAX
 };
-static const size_t c15[] = {1, 5, 11, 17, 23, 31, 197, 499, 985, 2167, SIZE_MAX};
-static const size_t c16[] = {
-  1, 2, 4, 5, 8, 10, 11, 22, 421, 467, 842, 934, 1868, 3736, SIZE_MAX
+static const mpd_size_t c15[] = {1, 5, 11, 17, 23, 31, 197, 499, 985, 2167, MPD_SIZE_MAX};
+static const mpd_size_t c16[] = {
+  1, 2, 4, 5, 8, 10, 11, 22, 421, 467, 842, 934, 1868, 3736, MPD_SIZE_MAX
 };
-static const size_t c17[] = {
+static const mpd_size_t c17[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31,
   32, 34, 38, 40, 41, 43, 44, 46, 47, 50, 52, 53, 55, 56, 58, 59, 62, 64, 65,
   67, 68, 71, 73, 76, 77, 80, 82, 83, 85, 86, 88, 91, 92, 94, 95, 97, 100, 103,
@@ -99,15 +99,15 @@ static const size_t c17[] = {
   275, 277, 287, 295, 304, 310, 311, 320, 322, 326, 335, 337, 340, 341, 359,
   365, 380, 388, 410, 412, 442, 460, 470, 485, 502, 515, 530, 544, 548, 550,
   571, 575, 577, 589, 605, 613, 622, 644, 680, 685, 691, 715, 730, 745, 905,
-  935, 970, 1226, 1795, 78643, SIZE_MAX
+  935, 970, 1226, 1795, 78643, MPD_SIZE_MAX
 };
-static const size_t c18[] = {1, 7, SIZE_MAX};
-static const size_t c19[] = {1, 5, 7, 13, 71, 355, 22153, 155071, SIZE_MAX};
-static const size_t c20[] = {
-  1, 2, 4, 5, 7, 8, 10, 13, 14, 26, 241979, 483958, 967916, 1693853, SIZE_MAX
+static const mpd_size_t c18[] = {1, 7, MPD_SIZE_MAX};
+static const mpd_size_t c19[] = {1, 5, 7, 13, 71, 355, 22153, 155071, MPD_SIZE_MAX};
+static const mpd_size_t c20[] = {
+  1, 2, 4, 5, 7, 8, 10, 13, 14, 26, 241979, 483958, 967916, 1693853, MPD_SIZE_MAX
 };
-static const size_t c21[] = {1, 2, 4, 5, 7, 10, 14, 19, 20, 1258291, SIZE_MAX};
-static const size_t c22[] = {
+static const mpd_size_t c21[] = {1, 2, 4, 5, 7, 10, 14, 19, 20, 1258291, MPD_SIZE_MAX};
+static const mpd_size_t c22[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31,
   32, 34, 35, 37, 38, 40, 41, 43, 46, 47, 49, 50, 52, 56, 58, 61, 62, 64, 67,
   68, 70, 71, 73, 74, 76, 77, 79, 82, 83, 85, 86, 92, 94, 95, 97, 98, 100, 101,
@@ -126,16 +126,16 @@ static const size_t c22[] = {
   1445, 1463, 1723, 2299, 103991, 207982, 415964, 519955, 727937, 831928,
   1039910, 1143901, 1351883, 1663856, 1767847, 1975829, 2079820, 2287802,
   2599775, 2703766, 3223721, 3535694, 3639685, 3951658, 4159640, 6343451,
-  6967397, 7903316, SIZE_MAX
+  6967397, 7903316, MPD_SIZE_MAX
 };
-static const size_t c23[] = {
+static const mpd_size_t c23[] = {
   1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37, 43, 47, 49, 59, 61, 65, 67,
   71, 77, 83, 85, 95, 97, 101, 103, 107, 113, 119, 125, 133, 145, 151, 163, 175,
   179, 185, 187, 199, 203, 209, 217, 221, 229, 239, 247, 269, 281, 289, 319,
   341, 377, 413, 421, 475, 479, 493, 551, 587, 703, 725, 841, 1421, 1463, 1885,
-  1943, 2407, 2755, 45673, 502403, 867787, 1324517, SIZE_MAX
+  1943, 2407, 2755, 45673, 502403, 867787, 1324517, MPD_SIZE_MAX
 };
-static const size_t c24[] = {
+static const mpd_size_t c24[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31,
   32, 34, 35, 37, 38, 40, 41, 43, 44, 47, 49, 50, 52, 53, 55, 56, 58, 59, 61,
   62, 65, 67, 68, 70, 71, 73, 74, 76, 79, 80, 82, 83, 85, 86, 88, 89, 91, 94,
@@ -167,13 +167,13 @@ static const size_t c24[] = {
   76690, 84359, 99697, 105008, 107366, 130373, 131260, 144386, 168718, 176387,
   191725, 199394, 203453, 222401, 260746, 283753, 288772, 314429, 329767,
   375781, 406457, 421795, 444802, 452471, 498485, 544499, 605851, 651865,
-  659534, 682541, 751562, 904942, 1234709, 1510793, 1648835, SIZE_MAX
+  659534, 682541, 751562, 904942, 1234709, 1510793, 1648835, MPD_SIZE_MAX
 };
-static const size_t c25[] = {
+static const mpd_size_t c25[] = {
   1, 5, 7, 11, 13, 17, 23, 25, 31, 49, 67, 115, 161, 253, 391, 875333, 4376665,
-  6127331, 20132659, 21883325, SIZE_MAX
+  6127331, 20132659, 21883325, MPD_SIZE_MAX
 };
-static const size_t c26[] = {
+static const mpd_size_t c26[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31,
   32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53, 55, 56, 58, 59,
   61, 62, 64, 65, 67, 68, 70, 71, 73, 74, 76, 77, 79, 80, 82, 83, 88, 89, 91,
@@ -223,17 +223,17 @@ static const size_t c26[] = {
   164617, 173666, 217694, 329234, 658468, 823085, 1152319, 1316936, 1646170,
   1810787, 2798489, 3127723, 3292340, 3621574, 3786191, 4773893, 5761595,
   6090829, 6255446, 6584680, 6749297, 7243148, 8066233, 9053935, 9547786,
-  12675509, 13498594, 21894061, SIZE_MAX
+  12675509, 13498594, 21894061, MPD_SIZE_MAX
 };
-static const size_t c27[] = {
+static const mpd_size_t c27[] = {
   1, 2, 4, 5, 7, 10, 11, 13, 14, 17, 19, 20, 22, 23, 26, 31, 35, 37, 43, 47, 52,
   55, 59, 61, 65, 67, 70, 71, 74, 83, 85, 89, 91, 94, 130, 131, 134, 142, 163,
   182, 188, 268, 329, 335, 517, 611, 658, 670, 799, 893, 1034, 1081, 1222, 1273,
   1457, 2021, 2444, 2867, 3149, 3337, 4277, 6298, 12596, 127867, 255734, 511468,
   639335, 1278670, 1406537, 6009749, 8567089, 12019498, 24038996, 42835445,
-  SIZE_MAX
+  MPD_SIZE_MAX
 };
-static const size_t c28[] = {
+static const mpd_size_t c28[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31, 34,
   35, 37, 38, 40, 41, 43, 44, 46, 49, 50, 52, 53, 55, 56, 58, 61, 62, 65, 67,
   68, 70, 71, 73, 74, 76, 77, 79, 82, 83, 85, 86, 88, 92, 95, 98, 100, 101, 103,
@@ -267,9 +267,9 @@ static const size_t c28[] = {
   5724295, 5802710, 5818393, 5990906, 6037955, 6053638, 6147736, 6367298,
   6508445, 6759373, 6931886, 7041667, 7088716, 7167131, 7590572, 8123794,
   8829529, 9064774, 9425483, 9754826, 10335097, 11307443, 11448590, 13518746,
-  18129548, SIZE_MAX
+  18129548, MPD_SIZE_MAX
 };
-static const size_t c29[] = {
+static const mpd_size_t c29[] = {
   1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37, 41, 43, 47, 49, 53, 55, 59,
   61, 65, 67, 71, 73, 77, 79, 83, 85, 89, 91, 95, 97, 101, 103, 107, 109, 113,
   115, 119, 121, 125, 127, 131, 133, 137, 139, 143, 145, 149, 151, 155, 157,
@@ -332,9 +332,9 @@ static const size_t c29[] = {
   3700259, 4100287, 4300301, 4700329, 4900343, 5300371, 5900413, 6100427,
   7100497, 7900553, 8300581, 8500595, 10300721, 10700749, 10935295, 14301001,
   16604255, 23245957, 23501645, 36529361, 43171063, 56454467, 83021275,
-  96304679, 156079997, 176005103, 322122547, SIZE_MAX
+  96304679, 156079997, 176005103, 322122547, MPD_SIZE_MAX
 };
-static const size_t c30[] = {
+static const mpd_size_t c30[] = {
   1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31,
   32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 50, 52, 53, 55, 56, 58, 61, 62,
   64, 65, 67, 68, 70, 71, 73, 74, 76, 77, 79, 80, 82, 83, 85, 86, 88, 89, 91,
@@ -384,13 +384,13 @@ static const size_t c30[] = {
   43100, 45686, 46979, 48703, 49996, 51289, 52582, 57754, 58616, 59047,
   61633, 62926, 70253, 76718, 96113, 97406, 98699, 102578, 113353, 142661,
   153005, 7473841, 37369205, 52316887, 82212251, 97159933, 142002979,
-  171898343, 231689071, 261584435, 351270527, SIZE_MAX
+  171898343, 231689071, 261584435, 351270527, MPD_SIZE_MAX
 };
 
 #ifdef CONFIG_64
 
-#if SIZE_MAX != 18446744073709551615ULL
-  #error "transpose3: need 64 bits for SIZE_MAX"
+#if MPD_SIZE_MAX != 18446744073709551615ULL
+  #error "transpose3: need 64 bits for MPD_SIZE_MAX"
 #endif
 /* Maximum n for 3 * 2^n matrix, limited by log2(2^n/BMEMB) <= 30.
  * This limit can be raised by increasing BMEMB or by extending
@@ -401,17 +401,17 @@ static const size_t c30[] = {
 /* END CONFIG_64 */
 #else
 
-#if SIZE_MAX != 4294967295UL
-  #error "transpose3: need 32 bits for SIZE_MAX"
+#if MPD_SIZE_MAX != 4294967295UL
+  #error "transpose3: need 32 bits for MPD_SIZE_MAX"
 #endif
-#define MAXN 30        /* maximum n for 3 * 2^n matrix, limited by SIZE_MAX */
+#define MAXN 30        /* maximum n for 3 * 2^n matrix, limited by MPD_SIZE_MAX */
 #define BMEMB 4096     /* block members */
 
 #endif /* END CONFIG_32 */
 
 
 /* all cycles */
-static const size_t *start[] = {
+static const mpd_size_t *start[] = {
   c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16,
   c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30
 };
@@ -423,16 +423,16 @@ static const size_t *start[] = {
  * nprime blocks of size BMEMB, and the blocks are transposed cyclically.
  */
 static void
-_block_transpose_3xpow2(mpd_uint_t *matrix, size_t rows, size_t cols)
+_block_transpose_3xpow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols)
 {
 	mpd_uint_t buf1[BMEMB];
 	mpd_uint_t buf2[BMEMB];
 	mpd_uint_t *readbuf, *writebuf;
-	size_t nprime;  /* number of blocks per row (or column) */
-	size_t log2n;
-	size_t a, mod;
-	size_t s, next;
-	size_t i;
+	mpd_size_t nprime;  /* number of blocks per row (or column) */
+	mpd_size_t log2n;
+	mpd_size_t a, mod;
+	mpd_size_t s, next;
+	mpd_size_t i;
 
 
 	if (rows == 3) {
@@ -447,7 +447,7 @@ _block_transpose_3xpow2(mpd_uint_t *matrix, size_t rows, size_t cols)
 	log2n = BSR(nprime);
 	mod = 3 * nprime - 1;
 
-	for (i = 0; start[log2n][i] != SIZE_MAX; i++) {
+	for (i = 0; start[log2n][i] != MPD_SIZE_MAX; i++) {
 
 		s = start[log2n][i];
 
@@ -478,11 +478,11 @@ _block_transpose_3xpow2(mpd_uint_t *matrix, size_t rows, size_t cols)
  * Maximum size: 3 x 2^MAXN or 2^MAXN x 3
  */
 void
-transpose_3xpow2(mpd_uint_t *matrix, size_t rows, size_t cols)
+transpose_3xpow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols)
 {
 	mpd_uint_t buf[3*BMEMB];
 	mpd_uint_t *p;
-	size_t msize, bsize;
+	mpd_size_t msize, bsize;
 
 	msize = mul_size_t(rows, cols);
 	bsize = 3*BMEMB;
