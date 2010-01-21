@@ -15,9 +15,9 @@
 enum {FORWARD_CYCLE, BACKWARD_CYCLE};
 
 
-void std_trans(mpd_uint_t dest[], mpd_uint_t src[], size_t rows, size_t cols);
-int transpose_pow2(mpd_uint_t *matrix, size_t rows, size_t cols);
-void transpose_3xpow2(mpd_uint_t *matrix, size_t rows, size_t cols);
+void std_trans(mpd_uint_t dest[], mpd_uint_t src[], mpd_size_t rows, mpd_size_t cols);
+int transpose_pow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols);
+void transpose_3xpow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols);
 
 
 static inline void pointerswap(mpd_uint_t **a, mpd_uint_t **b)
