@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #
 # Copyright (c) 2008-2010 Stefan Krah. All Rights Reserved.
 # Licensed to PSF under a Contributor Agreement.
