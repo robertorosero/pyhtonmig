@@ -17,6 +17,7 @@
 #include "memory.h"
 #include "typearith.h"
 #include "umodarith.h"
+#include "mptest.h"
 #include "mptypes.h"
 #include "mpdecimal.h"
 
@@ -397,9 +398,9 @@ mpd_isconst_data(mpd_t *dec)
 
 /* Fill destination with zeros */
 ALWAYS_INLINE void
-mpd_uint_zero(mpd_uint_t *dest, size_t len)
+mpd_uint_zero(mpd_uint_t *dest, mpd_size_t len)
 {
-	size_t i;
+	mpd_size_t i;
 
 	for (i = 0; i < len; i++) {
 		dest[i] = 0;
@@ -995,23 +996,23 @@ mpd_seterror(mpd_t *result, uint32_t flags, uint32_t *status)
 void
 mpd_qsset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx, uint32_t *status)
 {
-	int adj = 0;
+	mpd_uint_t u;
+	uint8_t sign = MPD_POS;
 
-	mpd_clear_flags(result);
 	if (a < 0) {
 		if (a == MPD_SSIZE_MIN) {
-			adj = 1;
-			a += 1;
+			u = (mpd_uint_t)MPD_SSIZE_MAX +
+			    (-(MPD_SSIZE_MIN+MPD_SSIZE_MAX));
 		}
-		result->flags |= MPD_NEG;
-		a = -a;
+		else {
+			u = -a;
+		}
+		sign = MPD_NEG;
 	}
-	result->exp = 0;
-	_mpd_div_word(&result->data[1], &result->data[0], a, MPD_RADIX);
-	result->data[0] += adj;
-	result->len = (result->data[1] == 0) ? 1 : 2;
-	mpd_setdigits(result);
-
+	else {
+		u = a;
+	}
+	_ssettriple(result, sign, u, 0);
 	mpd_qfinalize(result, ctx, status);
 }
 
@@ -1083,21 +1084,87 @@ mpd_qset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx, uint32_t *stat
 	mpd_qset_uint(result, a, ctx, status);
 }
 
-#ifdef CONFIG_64
+#ifdef CONFIG_32
+/* set a decimal from a uint64_t */
+static void
+_c32setu64(mpd_t *result, uint64_t u, uint32_t *status)
+{
+	mpd_uint_t w[3];
+	uint64_t q;
+	int i, len;
+
+	len = 0;
+	do {
+		q = u / MPD_RADIX;
+		w[len] = (mpd_uint_t)(u - q * MPD_RADIX);
+		u = q; len++;
+	} while (u != 0);
+
+	if (!mpd_qresize(result, len, status)) {
+		return;
+	}
+	for (i = 0; i < len; i++) {
+		result->data[i] = w[i];
+	}
+
+	result->exp = 0;
+	result->len = len;
+	mpd_setdigits(result);
+}
+
+static void
+_c32_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *status)
+{
+	_c32setu64(result, a, status);
+	mpd_qfinalize(result, ctx, status);
+}
+
+/* set a decimal from an int64_t */
+static void
+_c32_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *status)
+{
+	uint64_t u;
+	uint8_t sign = MPD_POS;
+
+	if (a < 0) {
+		if (a == INT64_MAX) {
+			u = (uint64_t)INT64_MAX + (-(INT64_MIN+INT64_MAX));
+		}
+		else {
+			u = -a;
+		}
+		sign = MPD_NEG;
+	}
+	else {
+		u = a;
+	}
+	_c32setu64(result, u, status);
+	mpd_set_sign(result, sign);
+	mpd_qfinalize(result, ctx, status);
+}
+#endif /* CONFIG_32 */
+
 /* quietly set a decimal from an int64_t */
 void
 mpd_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *status)
 {
+#ifdef CONFIG_64
 	mpd_qset_ssize(result, a, ctx, status);
+#else
+	_c32_qset_i64(result, a, ctx, status);
+#endif
 }
 
 /* quietly set a decimal from a uint64_t */
 void
 mpd_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *status)
 {
+#ifdef CONFIG_64
 	mpd_qset_uint(result, a, ctx, status);
-}
+#else
+	_c32_qset_u64(result, a, ctx, status);
 #endif
+}
 
 
 /*
@@ -1704,7 +1771,7 @@ mpd_qcopy_sign(mpd_t *result, const mpd_t *a, const mpd_t *b, uint32_t *status)
  * big and small, except that no allocation for the left shift is needed.
  */ 
 static int
-_mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, size_t n, size_t m, size_t shift)
+_mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, mpd_size_t n, mpd_size_t m, mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -1729,7 +1796,7 @@ _mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, size_t n, size_t m, size_t shif
 			CMP_EQUAL_OR_RETURN(big[n], h)
 			--n;
 		}
-		for (; m != SIZE_MAX; m--,n--) {
+		for (; m != MPD_SIZE_MAX; m--,n--) {
 			_mpd_divmod_pow10(&h, &l, small[m], MPD_RDIGITS-r);
 			x = ph * lprev + h;
 			CMP_EQUAL_OR_RETURN(big[n], x)
@@ -1739,7 +1806,7 @@ _mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, size_t n, size_t m, size_t shif
 		CMP_EQUAL_OR_RETURN(big[q], x)
 	}
 	else {
-		while (--m != SIZE_MAX) {
+		while (--m != MPD_SIZE_MAX) {
 			CMP_EQUAL_OR_RETURN(big[m+q], small[m])
 		}
 	}
@@ -4347,10 +4414,10 @@ mpd_qmin_mag(mpd_t *result, const mpd_t *a, const mpd_t *b,
 }
 
 /* Minimum space needed for the result array in _karatsuba_rec(). */
-static inline size_t
-_kmul_resultsize(size_t la, size_t lb)
+static inline mpd_size_t
+_kmul_resultsize(mpd_size_t la, mpd_size_t lb)
 {
-	size_t n, m;
+	mpd_size_t n, m;
 
 	n = add_size_t(la, lb);
 	n = add_size_t(n, 1);
@@ -4362,10 +4429,10 @@ _kmul_resultsize(size_t la, size_t lb)
 }
 
 /* Work space needed in _karatsuba_rec(). lim >= 4 */
-static inline size_t
-_kmul_worksize(size_t n, size_t lim)
+static inline mpd_size_t
+_kmul_worksize(mpd_size_t n, mpd_size_t lim)
 {
-	size_t m;
+	mpd_size_t m;
 
 	if (n <= lim) {
 		return 0;
@@ -4389,9 +4456,9 @@ _kmul_worksize(size_t n, size_t lim)
  */
 static void
 _karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint_t *w,
-               size_t la, size_t lb)
+               mpd_size_t la, mpd_size_t lb)
 {
-	size_t m, lt;
+	mpd_size_t m, lt;
 
 	assert (la >= lb && lb > 0);
 
@@ -4461,10 +4528,10 @@ _karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint
  * Conditions: ulen >= vlen, ulen >= 4
  */
 mpd_uint_t *
-_mpd_kmul(const mpd_uint_t *u, const mpd_uint_t *v, size_t ulen, size_t vlen, size_t *rsize)
+_mpd_kmul(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
 {
 	mpd_uint_t *result = NULL, *w = NULL;
-	size_t m;
+	mpd_size_t m;
 
 	assert(ulen >= 4);
 	assert(ulen >= vlen);
@@ -4489,11 +4556,11 @@ _mpd_kmul(const mpd_uint_t *u, const mpd_uint_t *v, size_t ulen, size_t vlen, si
 
 
 /* Determine the minimum length for the number theoretic transform. */
-static inline size_t
-_mpd_get_transform_len(size_t rsize)
+static inline mpd_size_t
+_mpd_get_transform_len(mpd_size_t rsize)
 {
-	size_t log2rsize;
-	size_t x, step;
+	mpd_size_t log2rsize;
+	mpd_size_t x, step;
 
 	assert(rsize >= 4);
 	log2rsize = BSR(rsize);
@@ -4516,7 +4583,7 @@ _mpd_get_transform_len(size_t rsize)
 		return 3*MPD_MAXTRANSFORM_2N;
 	}
 	else {
-		return SIZE_MAX;
+		return MPD_SIZE_MAX;
 	}
 }
 
@@ -4568,10 +4635,10 @@ mpd_restore_fenv(unsigned int cw)
  * a pointer to the result or NULL in case of failure (malloc error).
  */
 mpd_uint_t *
-_mpd_fntmul(const mpd_uint_t *u, const mpd_uint_t *v, size_t ulen, size_t vlen, size_t *rsize)
+_mpd_fntmul(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
 {
 	mpd_uint_t *c1 = NULL, *c2 = NULL, *c3 = NULL, *vtmp = NULL;
-	size_t n;
+	mpd_size_t n;
 
 #ifdef PPRO
 	unsigned int cw;
@@ -4579,7 +4646,7 @@ _mpd_fntmul(const mpd_uint_t *u, const mpd_uint_t *v, size_t ulen, size_t vlen, 
 #endif
 
 	*rsize = add_size_t(ulen, vlen);
-	if ((n = _mpd_get_transform_len(*rsize)) == SIZE_MAX) {
+	if ((n = _mpd_get_transform_len(*rsize)) == MPD_SIZE_MAX) {
 		goto malloc_error;
 	}
 
@@ -4644,9 +4711,9 @@ malloc_error:
  */
 static int
 _karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint_t *w,
-                   size_t la, size_t lb)
+                   mpd_size_t la, mpd_size_t lb)
 {
-	size_t m, lt;
+	mpd_size_t m, lt;
 
 	assert (la >= lb && lb > 0);
 
@@ -4657,7 +4724,7 @@ _karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_
 		}
 		else {
 			mpd_uint_t *result;
-			size_t dummy;
+			mpd_size_t dummy;
 
 			if ((result = _mpd_fntmul(a, b, la, lb, &dummy)) == NULL) {
 				return 0;
@@ -4741,10 +4808,10 @@ _karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_
  * (malloc error). Conditions: ulen >= vlen, ulen >= 4.
  */
 mpd_uint_t *
-_mpd_kmul_fnt(const mpd_uint_t *u, const mpd_uint_t *v, size_t ulen, size_t vlen, size_t *rsize)
+_mpd_kmul_fnt(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
 {
 	mpd_uint_t *result = NULL, *w = NULL;
-	size_t m;
+	mpd_size_t m;
 
 	assert(ulen >= 4);
 	assert(ulen >= vlen);
@@ -4804,7 +4871,7 @@ _mpd_qmul(mpd_t *result, const mpd_t *a, const mpd_t *b,
 	mpd_t *big = (mpd_t *)a, *small = (mpd_t *)b;
 	mpd_uint_t *rdata = NULL;
 	mpd_uint_t rbuf[MPD_MINALLOC_MAX];
-	size_t rsize, i;
+	mpd_size_t rsize, i;
 
 
 	if (mpd_isspecial(a) || mpd_isspecial(b)) {
@@ -4825,7 +4892,7 @@ _mpd_qmul(mpd_t *result, const mpd_t *a, const mpd_t *b,
 		_mpd_singlemul(result->data, big->data[0], small->data[0]);
 		goto finish;
 	}
-	if (rsize <= (size_t)MPD_MINALLOC_MAX) {
+	if (rsize <= (mpd_size_t)MPD_MINALLOC_MAX) {
 		if (big->len == 2) {
 			_mpd_mul_2_le2(rbuf, big->data, small->data, small->len);
 		}
@@ -6703,36 +6770,36 @@ mpd_sizeinbase(mpd_t *a, uint32_t base)
 /*
  * Returns the space needed to import a base 'base' integer of length 'srclen'.
  */
-static inline size_t
+static inline mpd_ssize_t
 _mpd_importsize(size_t srclen, uint32_t base)
 {
-#ifdef CONFIG_64
+#if SIZE_MAX == UINT64_MAX
   #if defined(__x86_64__) && defined(HAVE_80BIT_LONG_DOUBLE)
-	return (long double)srclen * (log10(base)/MPD_RDIGITS) + 3;
+	long double x = (long double)srclen * (log10(base)/MPD_RDIGITS) + 3;
   #else
+	double x;
 	if (srclen > (1ULL<<53)) {
-		return SIZE_MAX;
+		return MPD_SSIZE_MAX;
 	}
-	return (double)srclen * (log10(base)/MPD_RDIGITS) + 3;
+        x = (double)srclen * (log10(base)/MPD_RDIGITS) + 3;
   #endif
-#else /* CONFIG_32 */
-{
-	double x = srclen * (log10(base) / MPD_RDIGITS) + 3;
-	return (x > SIZE_MAX) ? SIZE_MAX : x;
-}
+#else
+	double x = srclen * (log10(base)/MPD_RDIGITS) + 3;
 #endif
+	return (x > MPD_MAXIMPORT) ? MPD_SSIZE_MAX : (mpd_ssize_t)x;
 }
 
 
 static inline size_t
-_to_base_u16(uint16_t *w, size_t wlen, mpd_uint_t base, mpd_uint_t *u, mpd_ssize_t ulen)
+_to_base_u16(uint16_t *w, size_t wlen, mpd_uint_t wbase,
+             mpd_uint_t *u, mpd_ssize_t ulen)
 {
 	size_t n = 0;
 
 	assert(wlen > 0 && ulen > 0);
 
 	do {
-		w[n++] = (uint16_t)_mpd_shortdiv(u, u, ulen, base);
+		w[n++] = (uint16_t)_mpd_shortdiv(u, u, ulen, wbase);
 		/* ulen will be at least 1. u[ulen-1] can only be zero if ulen == 1 */
 		ulen = _mpd_real_size(u, ulen);
 
@@ -6745,16 +6812,17 @@ _to_base_u16(uint16_t *w, size_t wlen, mpd_uint_t base, mpd_uint_t *u, mpd_ssize
 }
 
 static inline void
-_from_base_u16(mpd_uint_t *w, size_t wlen, const mpd_uint_t *u, size_t ulen, uint16_t base)
+_from_base_u16(mpd_uint_t *w, mpd_ssize_t wlen,
+               const mpd_uint_t *u, size_t ulen, uint16_t ubase)
 {
-	size_t m = 1;
+	mpd_ssize_t m = 1;
 	mpd_uint_t carry;
 
 	assert(wlen > 0 && ulen > 0);
 
 	w[0] = u[--ulen];
 	while (--ulen != SIZE_MAX && m < wlen) {
-		_mpd_shortmul(w, w, m, base);
+		_mpd_shortmul(w, w, m, ubase);
 		m = _mpd_real_size(w, m+1);
 		carry = _mpd_shortadd(w, m, u[ulen]);
 		if (carry) w[m++] = carry;
@@ -6767,7 +6835,7 @@ _from_base_u16(mpd_uint_t *w, size_t wlen, const mpd_uint_t *u, size_t ulen, uin
 /* target base wbase <= source base ubase */
 static inline size_t
 _baseconv_to_smaller(uint32_t *w, size_t wlen, mpd_uint_t wbase,
-                     mpd_uint_t *u, size_t ulen, mpd_uint_t ubase)
+                     mpd_uint_t *u, mpd_ssize_t ulen, mpd_uint_t ubase)
 {
 	size_t n = 0;
 
@@ -6788,10 +6856,10 @@ _baseconv_to_smaller(uint32_t *w, size_t wlen, mpd_uint_t wbase,
 
 /* target base wbase >= source base ubase */
 static inline void
-_baseconv_to_larger(mpd_uint_t *w, size_t wlen, mpd_uint_t wbase,
+_baseconv_to_larger(mpd_uint_t *w, mpd_ssize_t wlen, mpd_uint_t wbase,
                     const mpd_uint_t *u, size_t ulen, mpd_uint_t ubase)
 {
-	size_t m = 1;
+	mpd_ssize_t m = 1;
 	mpd_uint_t carry;
 
 	assert(wlen > 0 && ulen > 0);
@@ -6814,20 +6882,21 @@ _baseconv_to_larger(mpd_uint_t *w, size_t wlen, mpd_uint_t wbase,
  * The least significant word of the result is rdata[0].
  */
 size_t
-mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
-                uint32_t *status)
+mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t rbase,
+                const mpd_t *src, uint32_t *status)
 {
 	mpd_t *tsrc;
 	size_t n;
 
-	assert(base <= (1U<<16));
+	assert(rbase <= (1U<<16));
+	assert(rlen <= SIZE_MAX/(sizeof *rdata));
 
 	if (mpd_isspecial(src) || !_mpd_isint(src)) {
 		*status |= MPD_Invalid_operation;
 		return SIZE_MAX;
 	}
 
-	memset(rdata, 0, mul_size_t(rlen, sizeof *rdata));
+	memset(rdata, 0, rlen * (sizeof *rdata));
 
 	if (mpd_iszero(src)) {
 		return 1;
@@ -6849,7 +6918,7 @@ mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
 		}
 	}
 
-	n = _to_base_u16(rdata, rlen, base, tsrc->data, tsrc->len);
+	n = _to_base_u16(rdata, rlen, rbase, tsrc->data, tsrc->len);
 
 	mpd_del(tsrc);
 	return n;
@@ -6860,8 +6929,8 @@ mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
  * The least significant word of the result is rdata[0].
  */
 size_t
-mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
-                uint32_t *status)
+mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t rbase,
+                const mpd_t *src, uint32_t *status)
 {
 	mpd_t *tsrc;
 	size_t n;
@@ -6870,8 +6939,15 @@ mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
 		*status |= MPD_Invalid_operation;
 		return SIZE_MAX;
 	}
+#if MPD_SIZE_MAX < SIZE_MAX
+	if (rlen > MPD_SSIZE_MAX) {
+		*status |= MPD_Invalid_operation;
+		return SIZE_MAX;
+	}
+#endif
 
-	memset(rdata, 0, mul_size_t(rlen, sizeof *rdata));
+	assert(rlen <= SIZE_MAX/(sizeof *rdata));
+	memset(rdata, 0, rlen * (sizeof *rdata));
 
 	if (mpd_iszero(src)) {
 		return 1;
@@ -6894,14 +6970,14 @@ mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
 	}
 
 #ifdef CONFIG_64
-	n = _baseconv_to_smaller(rdata, rlen, base, tsrc->data, tsrc->len, MPD_RADIX);
+	n = _baseconv_to_smaller(rdata, rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
 #else
-	if (base <= MPD_RADIX) {
-		n = _baseconv_to_smaller(rdata, rlen, base, tsrc->data, tsrc->len, MPD_RADIX);
+	if (rbase <= MPD_RADIX) {
+		n = _baseconv_to_smaller(rdata, rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
 	}
 	else {
-		_baseconv_to_larger(rdata, rlen, base, tsrc->data, tsrc->len, MPD_RADIX);
-		n = _mpd_real_size(rdata, rlen);
+		_baseconv_to_larger(rdata, (mpd_ssize_t)rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
+		n = _mpd_real_size(rdata, (mpd_ssize_t)rlen);
 	}
 #endif
 
@@ -6914,26 +6990,30 @@ mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base, const mpd_t *src,
  * Converts a multiprecision integer with base <= UINT16_MAX+1 to an mpd_t.
  * The least significant word of the source is srcdata[0].
  */
-int
-mpd_qimport_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen,
-                uint8_t srcsign, uint32_t base,
+void
+mpd_qimport_u16(mpd_t *result,
+                const uint16_t *srcdata, size_t srclen,
+                uint8_t srcsign, uint32_t srcbase,
                 const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_uint_t *usrc; /* uint16_t src copied to an mpd_uint_t array */
-	size_t rlen;      /* length of the result */
+	mpd_ssize_t rlen; /* length of the result */
 	size_t n = 0;
 
 	assert(srclen > 0);
-	assert(base <= (1U<<16));
+	assert(srcbase <= (1U<<16));
 
-	if ((rlen = _mpd_importsize(srclen, base)) == SIZE_MAX) {
-		mpd_seterror(result, MPD_Malloc_error, status);
-		return 0;
+	if ((rlen = _mpd_importsize(srclen, srcbase)) == MPD_SSIZE_MAX) {
+		mpd_seterror(result, MPD_Invalid_operation, status);
+		return;
 	}
-
-	if ((usrc = mpd_alloc(srclen, sizeof *usrc)) == NULL) {
+	if (srclen > MPD_SIZE_MAX/(sizeof *usrc)) {
+		mpd_seterror(result, MPD_Invalid_operation, status);
+		return;
+	}
+	if ((usrc = mpd_alloc((mpd_size_t)srclen, sizeof *usrc)) == NULL) {
 		mpd_seterror(result, MPD_Malloc_error, status);
-		return 0;
+		return;
 	}
 	for (n = 0; n < srclen; n++) {
 		usrc[n] = srcdata[n];
@@ -6944,7 +7024,7 @@ mpd_qimport_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen,
 		goto finish;
 	}
 
-	_from_base_u16(result->data, rlen, usrc, srclen, base);
+	_from_base_u16(result->data, rlen, usrc, srclen, srcbase);
 
 	mpd_set_flags(result, srcsign);
 	result->exp = 0;
@@ -6954,34 +7034,38 @@ mpd_qimport_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen,
 	mpd_qresize(result, result->len, status);
 	mpd_qfinalize(result, ctx, status);
 
+
 finish:
 	mpd_free(usrc);
-	return 1;
 }
 
 /*
  * Converts a multiprecision integer with base <= UINT32_MAX to an mpd_t.
  * The least significant word of the source is srcdata[0].
  */
-int
-mpd_qimport_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen,
-                uint8_t srcsign, uint32_t base,
+void
+mpd_qimport_u32(mpd_t *result,
+                const uint32_t *srcdata, size_t srclen,
+                uint8_t srcsign, uint32_t srcbase,
                 const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_uint_t *usrc; /* uint32_t src copied to an mpd_uint_t array */
-	size_t rlen;      /* length of the result */
+	mpd_ssize_t rlen; /* length of the result */
 	size_t n = 0;
 
 	assert(srclen > 0);
 
-	if ((rlen = _mpd_importsize(srclen, base)) == SIZE_MAX) {
-		mpd_seterror(result, MPD_Malloc_error, status);
-		return 0;
+	if ((rlen = _mpd_importsize(srclen, srcbase)) == MPD_SSIZE_MAX) {
+		mpd_seterror(result, MPD_Invalid_operation, status);
+		return;
 	}
-
-	if ((usrc = mpd_alloc(srclen, sizeof *usrc)) == NULL) {
+	if (srclen > MPD_SIZE_MAX/(sizeof *usrc)) {
+		mpd_seterror(result, MPD_Invalid_operation, status);
+		return;
+	}
+	if ((usrc = mpd_alloc((mpd_size_t)srclen, sizeof *usrc)) == NULL) {
 		mpd_seterror(result, MPD_Malloc_error, status);
-		return 0;
+		return;
 	}
 	for (n = 0; n < srclen; n++) {
 		usrc[n] = srcdata[n];
@@ -6993,13 +7077,13 @@ mpd_qimport_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen,
 	}
 
 #ifdef CONFIG_64
-	_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, base);
+	_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, srcbase);
 #else
-	if (base <= MPD_RADIX) {
-		_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, base);
+	if (srcbase <= MPD_RADIX) {
+		_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, srcbase);
 	}
 	else {
-		_baseconv_to_smaller(result->data, rlen, MPD_RADIX, usrc, srclen, base);
+		_baseconv_to_smaller(result->data, rlen, MPD_RADIX, usrc, (mpd_ssize_t)srclen, srcbase);
 	}
 #endif
 
@@ -7011,9 +7095,377 @@ mpd_qimport_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen,
 	mpd_qresize(result, result->len, status);
 	mpd_qfinalize(result, ctx, status);
 
+
 finish:
 	mpd_free(usrc);
-	return 1;
+}
+
+
+/*********************************************************************/
+/*                   Testcases for Newton Division                   */
+/*********************************************************************/
+
+void
+mpd_qtest_newtondiv(mpd_t *q, const mpd_t *a, const mpd_t *b,
+                    const mpd_context_t *ctx, uint32_t *status)
+{
+	MPD_NEW_STATIC(aligned,0,0,0,0);
+	mpd_uint_t ld, carry = 0;
+	mpd_ssize_t shift, exp, tz;
+	mpd_ssize_t newsize;
+	mpd_uint_t rem;
+	uint8_t sign_a = mpd_sign(a);
+	uint8_t sign_b = mpd_sign(b);
+
+
+	if (mpd_isspecial(a) || mpd_isspecial(b)) {
+		if (mpd_qcheck_nans(q, a, b, ctx, status)) {
+			return;
+		}
+		_mpd_qdiv_inf(q, a, b, ctx, status);
+		return;
+	}
+	if (mpd_iszerocoeff(b)) {
+		if (mpd_iszerocoeff(a)) {
+			mpd_seterror(q, MPD_Division_undefined, status);
+		}
+		else {
+			mpd_setspecial(q, sign_a^sign_b, MPD_INF);
+			*status |= MPD_Division_by_zero;
+		}
+		return;
+	}
+	if (mpd_iszerocoeff(a)) {
+		exp = a->exp - b->exp;
+		_settriple(q, sign_a^sign_b, 0, exp);
+		mpd_qfinalize(q, ctx, status);
+		return;
+	}
+
+	shift = (b->digits - a->digits) + ctx->prec + 1;
+	/* exp = ideal_exp - shift */
+	exp = (a->exp - b->exp) - shift;
+	if (shift > 0) {
+		if (!mpd_qshiftl(&aligned, a, shift, status)) {
+			mpd_seterror(q, MPD_Malloc_error, status);
+			goto finish;
+		}
+		a = &aligned;
+	}
+	else if (shift < 0) {
+		shift = -shift;
+		if (!mpd_qshiftl(&aligned, b, shift, status)) {
+			mpd_seterror(q, MPD_Malloc_error, status);
+			goto finish;
+		}
+		b = &aligned;
+	}
+
+
+	newsize = a->len - b->len + 1;
+	if ((q != b && q != a) || (q == b && newsize > b->len)) {
+		if (!mpd_qresize(q, newsize, status)) {
+			mpd_seterror(q, MPD_Malloc_error, status);
+			goto finish;
+		}
+	}
+
+
+	{ /* some compilers need a new block here for the declaration of r */
+		MPD_NEW_STATIC(r,0,0,0,0);
+		_mpd_qbarrett_divmod(q, &r, a, b, ctx, status);
+		rem = !mpd_iszerocoeff(&r);
+		mpd_del(&r);
+		newsize = q->len;
+	}
+
+
+	newsize = _mpd_real_size(q->data, newsize);
+	/* resize to smaller cannot fail */
+	mpd_qresize(q, newsize, status);
+	q->len = newsize;
+	mpd_setdigits(q);
+
+	if (rem) {
+		ld = mpd_lsd(q->data[0]);
+		if (ld == 0 || ld == 5) {
+			carry = _mpd_baseincr(q->data, q->len);
+			if (carry) {
+				if (!mpd_qresize(q, q->len+1, status)) {
+					mpd_seterror(q, MPD_Malloc_error, status);
+					goto finish;
+				}
+				q->data[q->len] = 1;
+			}
+		}
+	}
+	else if (1) { /* SET_IDEAL_EXP */
+		tz = mpd_trail_zeros(q);
+		/* right now: shift = ideal_exp - exp */
+		shift = (tz > shift) ? shift : tz;
+		mpd_qshiftr_inplace(q, shift);
+		exp += shift;
+	}
+
+	mpd_set_flags(q, sign_a^sign_b);
+	q->exp = exp;
+
+
+finish:
+	mpd_del(&aligned);
+	mpd_qfinalize(q, ctx, status);
+}
+
+void
+_mpd_qtest_barrett_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
+                          const mpd_context_t *ctx, uint32_t *status)
+{
+	MPD_NEW_STATIC(aligned,0,0,0,0);
+	mpd_ssize_t qsize, rsize;
+	mpd_ssize_t ideal_exp, expdiff, shift;
+	uint8_t sign_a = mpd_sign(a);
+	uint8_t sign_ab = mpd_sign(a)^mpd_sign(b);
+
+
+	ideal_exp = (a->exp > b->exp) ?  b->exp : a->exp;
+	if (mpd_iszerocoeff(a)) {
+		if (!mpd_qcopy(r, a, status)) {
+			goto nanresult;
+		}
+		r->exp = ideal_exp;
+		_settriple(q, sign_ab, 0, 0);
+		return;
+	}
+
+	expdiff = mpd_adjexp(a) - mpd_adjexp(b);
+	if (expdiff < 0) {
+		if (a->exp > b->exp) {
+			/* positive and less than b->digits - a->digits */
+			shift = a->exp - b->exp;
+			if (!mpd_qshiftl(r, a, shift, status)) {
+				goto nanresult;
+			}
+			r->exp = ideal_exp;
+		}
+		else {
+			if (!mpd_qcopy(r, a, status)) {
+				goto nanresult;
+			}
+		}
+		_settriple(q, sign_ab, 0, 0);
+		return;
+	}
+	if (expdiff > ctx->prec) {
+		*status |= MPD_Division_impossible;
+		goto nanresult;
+	}
+
+
+	/*
+	 * At this point we have:
+	 *   (1) 0 <= a->exp + a->digits - b->exp - b->digits <= prec
+	 *   (2) a->exp - b->exp >= b->digits - a->digits
+	 *   (3) a->exp - b->exp <= prec + b->digits - a->digits
+	 */
+	if (a->exp != b->exp) {
+		shift = a->exp - b->exp;
+		if (shift > 0) {
+			/* by (3), after the shift a->digits <= prec + b->digits */
+			if (!mpd_qshiftl(&aligned, a, shift, status)) {
+				goto nanresult;
+			}
+			a = &aligned;
+		}
+		else  {
+			shift = -shift;
+			/* by (2), after the shift b->digits <= a->digits */
+			if (!mpd_qshiftl(&aligned, b, shift, status)) {
+				goto nanresult;
+			}
+			b = &aligned;
+		}
+	}
+
+
+	qsize = a->len - b->len + 1;
+	if (!(q == a && qsize < a->len) && !(q == b && qsize < b->len)) {
+		if (!mpd_qresize(q, qsize, status)) {
+			goto nanresult;
+		}
+	}
+
+	rsize = b->len;
+	if (!(r == a && rsize < a->len)) {
+		if (!mpd_qresize(r, rsize, status)) {
+			goto nanresult;
+		}
+	}
+
+	_mpd_qbarrett_divmod(q, r, a, b, ctx, status);
+	if (mpd_isinfinite(q) || q->digits > ctx->prec) {
+		*status |= MPD_Division_impossible;
+		goto nanresult;
+	}
+	qsize = q->len;
+	rsize = r->len;
+
+	qsize = _mpd_real_size(q->data, qsize);
+	/* resize to smaller cannot fail */
+	mpd_qresize(q, qsize, status);
+	q->len = qsize;
+	mpd_setdigits(q);
+	mpd_set_flags(q, sign_ab);
+	q->exp = 0;
+	if (q->digits > ctx->prec) {
+		*status |= MPD_Division_impossible;
+		goto nanresult;
+	}
+
+	rsize = _mpd_real_size(r->data, rsize);
+	/* resize to smaller cannot fail */
+	mpd_qresize(r, rsize, status);
+	r->len = rsize;
+	mpd_setdigits(r);
+	mpd_set_flags(r, sign_a);
+	r->exp = ideal_exp;
+
+out:
+	mpd_del(&aligned);
+	return;
+
+nanresult:
+	mpd_setspecial(q, MPD_POS, MPD_NAN);
+	mpd_setspecial(r, MPD_POS, MPD_NAN);
+	goto out;
+}
+
+void
+mpd_qtest_newtondivint(mpd_t *q, const mpd_t *a, const mpd_t *b,
+                       const mpd_context_t *ctx, uint32_t *status)
+{
+	mpd_t *r;
+	uint8_t sign = mpd_sign(a)^mpd_sign(b);
+
+	if (mpd_isspecial(a) || mpd_isspecial(b)) {
+		if (mpd_qcheck_nans(q, a, b, ctx, status)) {
+			return;
+		}
+		if (mpd_isinfinite(a) && mpd_isinfinite(b)) {
+			mpd_seterror(q, MPD_Invalid_operation, status);
+			return;
+		}
+		if (mpd_isinfinite(a)) {
+			mpd_setspecial(q, sign, MPD_INF);
+			return;
+		}
+		if (mpd_isinfinite(b)) {
+			_settriple(q, sign, 0, 0);
+			return;
+		}
+		/* debug */
+		abort();
+	}
+	if (mpd_iszerocoeff(b)) {
+		if (mpd_iszerocoeff(a)) {
+			mpd_seterror(q, MPD_Division_undefined, status);
+		}
+		else {
+			mpd_setspecial(q, sign, MPD_INF);
+			*status |= MPD_Division_by_zero;
+		}
+		return;
+	}
+
+	r = mpd_qnew();
+	_mpd_qtest_barrett_divmod(q, r, a, b, ctx, status);
+	mpd_del(r);
+	mpd_qfinalize(q, ctx, status);
+}
+
+void
+mpd_qtest_newtonrem(mpd_t *r, const mpd_t *a, const mpd_t *b,
+                    const mpd_context_t *ctx, uint32_t *status)
+{
+	mpd_t *q;
+
+	if (mpd_isspecial(a) || mpd_isspecial(b)) {
+		if (mpd_qcheck_nans(r, a, b, ctx, status)) {
+			return;
+		}
+		if (mpd_isinfinite(a)) {
+			mpd_seterror(r, MPD_Invalid_operation, status);
+			return;
+		}
+		if (mpd_isinfinite(b)) {
+			mpd_qcopy(r, a, status);
+			return;
+		}
+		/* debug */
+		abort();
+	}
+	if (mpd_iszerocoeff(b)) {
+		if (mpd_iszerocoeff(a)) {
+			mpd_seterror(r, MPD_Division_undefined, status);
+		}
+		else {
+			mpd_seterror(r, MPD_Invalid_operation, status);
+		}
+		return;
+	}
+
+	q = mpd_qnew();
+	_mpd_qtest_barrett_divmod(q, r, a, b, ctx, status);
+	mpd_del(q);
+	mpd_qfinalize(r, ctx, status);
+}
+
+void
+mpd_qtest_newton_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
+                        const mpd_context_t *ctx, uint32_t *status)
+{
+	uint8_t sign = mpd_sign(a)^mpd_sign(b);
+
+	if (mpd_isspecial(a) || mpd_isspecial(b)) {
+		if (mpd_qcheck_nans(q, a, b, ctx, status)) {
+			mpd_qcopy(r, q, status);
+			return;
+		}
+		if (mpd_isinfinite(a)) {
+			/* decimal.py returns Inf for q if b is normal. */
+			mpd_setspecial(q, MPD_POS, MPD_NAN);
+			mpd_setspecial(r, MPD_POS, MPD_NAN);
+			*status |= MPD_Invalid_operation;
+			return;
+		}
+		if (mpd_isinfinite(b)) {
+			if (!mpd_qcopy(r, a, status)) {
+				mpd_seterror(q, MPD_Malloc_error, status);
+			}
+			else {
+				_settriple(q, sign, 0, 0);
+			}
+			return;
+		}
+		/* debug */
+		abort();
+	}
+	if (mpd_iszerocoeff(b)) {
+		if (mpd_iszerocoeff(a)) {
+			mpd_setspecial(q, MPD_POS, MPD_NAN);
+			mpd_setspecial(r, MPD_POS, MPD_NAN);
+			*status |= MPD_Division_undefined;
+		}
+		else {
+			mpd_setspecial(q, MPD_POS, MPD_NAN);
+			mpd_setspecial(r, MPD_POS, MPD_NAN);
+			*status |= (MPD_Division_by_zero|MPD_Invalid_operation);
+		}
+		return;
+	}
+
+	_mpd_qtest_barrett_divmod(q, r, a, b, ctx, status);
+	mpd_qfinalize(q, ctx, status);
+	mpd_qfinalize(r, ctx, status);
 }
 
 
