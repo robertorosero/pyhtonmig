@@ -29,10 +29,10 @@
 
 /* forward transform with sign = -1 */
 int
-six_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
+six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 {
 	struct fnt_params *tparams;
-	size_t log2n, C, R;
+	mpd_size_t log2n, C, R;
 	mpd_uint_t kernel;
 	mpd_uint_t umod;
 #ifdef PPRO
@@ -40,7 +40,7 @@ six_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 	uint32_t dinvmod[3];
 #endif
 	mpd_uint_t *x, w0, w1, wstep;
-	size_t i, k;
+	mpd_size_t i, k;
 
 
 	assert(ispower2(n));
@@ -103,10 +103,10 @@ six_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 
 /* reverse transform, sign = 1 */
 int
-inv_six_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
+inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 {
 	struct fnt_params *tparams;
-	size_t log2n, C, R;
+	mpd_size_t log2n, C, R;
 	mpd_uint_t kernel;
 	mpd_uint_t umod;
 #ifdef PPRO
@@ -114,7 +114,7 @@ inv_six_step_fnt(mpd_uint_t *a, size_t n, int modnum, int ordered)
 	uint32_t dinvmod[3];
 #endif
 	mpd_uint_t *x, w0, w1, wstep;
-	size_t i, k;
+	mpd_size_t i, k;
 
 
 	assert(ispower2(n));
