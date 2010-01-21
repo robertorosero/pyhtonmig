@@ -22,10 +22,10 @@
 
 /* Definition of the matrix transpose */
 void
-std_trans(mpd_uint_t dest[], mpd_uint_t src[], size_t rows, size_t cols)
+std_trans(mpd_uint_t dest[], mpd_uint_t src[], mpd_size_t rows, mpd_size_t cols)
 {
-	size_t idest, isrc;
-	size_t r, c;
+	mpd_size_t idest, isrc;
+	mpd_size_t r, c;
 
 	for (r = 0; r < rows; r++) {
 		isrc = r * cols;
@@ -44,17 +44,17 @@ std_trans(mpd_uint_t dest[], mpd_uint_t src[], size_t rows, size_t cols)
  * BACKWARD_CYCLE: reverse the even/odd permutation.
  */
 static int
-swap_halfrows_pow2(mpd_uint_t *matrix, size_t rows, size_t cols, int dir)
+swap_halfrows_pow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols, int dir)
 {
 	mpd_uint_t buf1[BUFSIZE];
 	mpd_uint_t buf2[BUFSIZE];
 	mpd_uint_t *readbuf, *writebuf, *hp;
-	size_t *done, dbits;
-	size_t b = BUFSIZE, stride;
-	size_t hn, hmax; /* halfrow number */
-	size_t m, r=0;
-	size_t offset;
-	size_t next;
+	mpd_size_t *done, dbits;
+	mpd_size_t b = BUFSIZE, stride;
+	mpd_size_t hn, hmax; /* halfrow number */
+	mpd_size_t m, r=0;
+	mpd_size_t offset;
+	mpd_size_t next;
 
 
 	assert(cols == mul_size_t(2, rows));
@@ -120,11 +120,11 @@ swap_halfrows_pow2(mpd_uint_t *matrix, size_t rows, size_t cols, int dir)
 
 /* In-place transpose of a square matrix */
 static inline void
-squaretrans(mpd_uint_t *buf, size_t cols)
+squaretrans(mpd_uint_t *buf, mpd_size_t cols)
 {
 	mpd_uint_t tmp;
-	size_t idest, isrc;
-	size_t r, c;
+	mpd_size_t idest, isrc;
+	mpd_size_t r, c;
 
 	for (r = 0; r < cols; r++) {
 		c = r+1;
@@ -146,14 +146,14 @@ squaretrans(mpd_uint_t *buf, size_t cols)
  * then a square tranposition is done on each individual block.
  */
 static void
-squaretrans_pow2(mpd_uint_t *matrix, size_t size)
+squaretrans_pow2(mpd_uint_t *matrix, mpd_size_t size)
 {
 	mpd_uint_t buf1[SIDE*SIDE];
 	mpd_uint_t buf2[SIDE*SIDE];
 	mpd_uint_t *to, *from;
-	size_t b = size;
-	size_t r, c;
-	size_t i;
+	mpd_size_t b = size;
+	mpd_size_t r, c;
+	mpd_size_t i;
 
 	while (b > SIDE) b >>= 1;
 
@@ -216,9 +216,9 @@ squaretrans_pow2(mpd_uint_t *matrix, size_t size)
  * or a (2*2^n) x 2^n matrix.
  */
 int
-transpose_pow2(mpd_uint_t *matrix, size_t rows, size_t cols)
+transpose_pow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols)
 {
-	size_t size = mul_size_t(rows, cols);
+	mpd_size_t size = mul_size_t(rows, cols);
 
 	assert(ispower2(rows));
 	assert(ispower2(cols));
