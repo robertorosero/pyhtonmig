@@ -44,11 +44,15 @@ extern "C" {
 #define MPD_BITS_PER_UINT 64
 typedef uint64_t mpd_uint_t;  /* unsigned mod type */
 
+/* enable CONFIG_32+ANSI on 64-bit platforms without resorting to -m32 */
+#define MPD_SIZE_MAX SIZE_MAX
+typedef size_t mpd_size_t; /* unsigned size type */
+
 /* type for exp, digits, len, prec */
 #define MPD_SSIZE_MAX INT64_MAX
 #define MPD_SSIZE_MIN INT64_MIN
 typedef int64_t mpd_ssize_t;
-#define mpd_strtossize strtoll
+#define _mpd_strtossize strtoll
 
 /* decimal arithmetic */
 #define MPD_RADIX 10000000000000000000ULL  /* 10**19 */
@@ -65,13 +69,11 @@ typedef int64_t mpd_ssize_t;
 #define MPD_MIN_ETINY (MPD_MIN_EMIN-(MPD_MAX_PREC-1))
 #define MPD_EXP_INF (MPD_ELIMIT+1)
 #define MPD_EXP_CLAMP (2*MPD_MIN_ETINY)
+#define MPD_MAXIMPORT 105263157894736842L /* (2*MPD_MAX_PREC)/MPD_RDIGITS */
 
 
-#if SIZE_MAX < MPD_SSIZE_MAX
-  #error "unsupported platform: need size_t >= mpd_ssize_t"
-#endif
-#if MPD_SSIZE_MAX > MPD_UINT_MAX
-  #error "unsupported platform: need mpd_ssize_t <= mpd_uint_t"
+#if MPD_SIZE_MAX != MPD_UINT_MAX
+  #error "unsupported platform: need mpd_size_t == mpd_uint_t"
 #endif
 
 
@@ -384,12 +386,12 @@ void mpd_qinvroot(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint3
 
 
 size_t mpd_sizeinbase(mpd_t *a, uint32_t base);
-int mpd_qimport_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen,
-                    uint8_t srcsign, uint32_t base,
-                    const mpd_context_t *ctx, uint32_t *status);
-int mpd_qimport_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen,
-                    uint8_t srcsign, uint32_t base,
-                    const mpd_context_t *ctx, uint32_t *status);
+void mpd_qimport_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen,
+                     uint8_t srcsign, uint32_t srcbase,
+                     const mpd_context_t *ctx, uint32_t *status);
+void mpd_qimport_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen,
+                     uint8_t srcsign, uint32_t srcbase,
+                     const mpd_context_t *ctx, uint32_t *status);
 size_t mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t base,
                        const mpd_t *src, uint32_t *status);
 size_t mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base,
@@ -500,19 +502,19 @@ extern void (* mpd_free)(void *ptr);
 
 void *mpd_callocfunc_em(size_t nmemb, size_t size);
 
-void *mpd_alloc(size_t nmemb, size_t size);
-void *mpd_calloc(size_t nmemb, size_t size);
-void *mpd_realloc(void *ptr, size_t nmemb, size_t size, uint8_t *err);
-void *mpd_sh_alloc(size_t struct_size, size_t nmemb, size_t size);
-void *mpd_sh_calloc(size_t struct_size, size_t nmemb, size_t size);
-void *mpd_sh_realloc(void *ptr, size_t struct_size, size_t nmemb, size_t size, uint8_t *err);
+void *mpd_alloc(mpd_size_t nmemb, mpd_size_t size);
+void *mpd_calloc(mpd_size_t nmemb, mpd_size_t size);
+void *mpd_realloc(void *ptr, mpd_size_t nmemb, mpd_size_t size, uint8_t *err);
+void *mpd_sh_alloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size);
+void *mpd_sh_calloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size);
+void *mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size, uint8_t *err);
 
 mpd_t *mpd_qnew(void);
 mpd_t *mpd_new(mpd_context_t *ctx);
 mpd_t *mpd_qnew_size(mpd_ssize_t size);
 void mpd_del(mpd_t *dec);
 
-void mpd_uint_zero(mpd_uint_t *dest, size_t len);
+void mpd_uint_zero(mpd_uint_t *dest, mpd_size_t len);
 int mpd_qresize(mpd_t *result, mpd_ssize_t size, uint32_t *status);
 int mpd_qresize_zero(mpd_t *result, mpd_ssize_t size, uint32_t *status);
 void mpd_minalloc(mpd_t *result);
