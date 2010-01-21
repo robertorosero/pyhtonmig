@@ -13,7 +13,7 @@
 #include "numbertheory.h"
 
 
-void fnt_dif2(mpd_uint_t a[], size_t n, struct fnt_params *tparams);
+void fnt_dif2(mpd_uint_t a[], mpd_size_t n, struct fnt_params *tparams);
 
 
 #endif
