@@ -28,11 +28,11 @@
  */
 mpd_uint_t
 _mpd_baseadd(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
-             size_t m, size_t n)
+             mpd_size_t m, mpd_size_t n)
 {
 	mpd_uint_t s;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0 && m >= n);
 
@@ -61,11 +61,11 @@ _mpd_baseadd(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
  * has to make sure that w is big enough.
  */
 void
-_mpd_baseaddto(mpd_uint_t *w, const mpd_uint_t *u, size_t n)
+_mpd_baseaddto(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n)
 {
 	mpd_uint_t s;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	if (n == 0) return;
 
@@ -88,11 +88,11 @@ _mpd_baseaddto(mpd_uint_t *w, const mpd_uint_t *u, size_t n)
  * final carry.
  */
 mpd_uint_t
-_mpd_shortadd(mpd_uint_t *w, size_t m, mpd_uint_t v)
+_mpd_shortadd(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v)
 {
 	mpd_uint_t s;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	/* add v to u */
 	s = w[0] + v;
@@ -111,11 +111,11 @@ _mpd_shortadd(mpd_uint_t *w, size_t m, mpd_uint_t v)
 
 /* Increment u. The calling function has to handle a possible carry. */
 mpd_uint_t
-_mpd_baseincr(mpd_uint_t *u, size_t n)
+_mpd_baseincr(mpd_uint_t *u, mpd_size_t n)
 {
 	mpd_uint_t s;
 	mpd_uint_t carry = 1;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0);
 
@@ -135,11 +135,11 @@ _mpd_baseincr(mpd_uint_t *u, size_t n)
  *     number in u >= number in v;
  */
 void
-_mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, size_t m, size_t n)
+_mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n)
 {
 	mpd_uint_t d;
 	mpd_uint_t borrow = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(m > 0 && n > 0);
 
@@ -166,11 +166,11 @@ _mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, size_t m, 
  * further, but eventually w can absorb the final borrow.
  */
 void
-_mpd_basesubfrom(mpd_uint_t *w, const mpd_uint_t *u, size_t n)
+_mpd_basesubfrom(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n)
 {
 	mpd_uint_t d;
 	mpd_uint_t borrow = 0;
-	size_t i;
+	mpd_size_t i;
 
 	if (n == 0) return;
 
@@ -190,11 +190,11 @@ _mpd_basesubfrom(mpd_uint_t *w, const mpd_uint_t *u, size_t n)
 
 /* w := product of u (len n) and v (single word) */
 void
-_mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v)
+_mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0);
 
@@ -215,11 +215,11 @@ _mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v)
  *     w must be initialized to zero
  */
 void
-_mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, size_t m, size_t n)
+_mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t carry;
-	size_t i, j;
+	mpd_size_t i, j;
 
 	assert(m > 0 && n > 0);
 
@@ -244,15 +244,15 @@ _mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, size_t m, 
  *     w := quotient of u (len n) divided by a single word v
  */
 mpd_uint_t
-_mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v)
+_mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t rem = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0);
 
-	for (i=n-1; i != SIZE_MAX; i--) {
+	for (i=n-1; i != MPD_SIZE_MAX; i--) {
 
 		_mpd_mul_words(&hi, &lo, rem, MPD_RADIX);
 		lo = u[i] + lo;
@@ -276,7 +276,7 @@ _mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v)
  */
 int
 _mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst, const mpd_uint_t *vconst,
-                size_t nplusm, size_t n)
+                mpd_size_t nplusm, mpd_size_t n)
 {
 	mpd_uint_t ustatic[MPD_MINALLOC_MAX];
 	mpd_uint_t vstatic[MPD_MINALLOC_MAX];
@@ -285,7 +285,7 @@ _mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst, const mp
 	mpd_uint_t d, qhat, rhat, w2[2];
 	mpd_uint_t hi, lo, x;
 	mpd_uint_t carry;
-	size_t i, j, m;
+	mpd_size_t i, j, m;
 	int retval = 0;
 
 	assert(n > 1 && nplusm >= n);
@@ -311,7 +311,7 @@ _mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst, const mp
 
 	/* D2: loop */
 	rhat = 0;
-	for (j=m; j != SIZE_MAX; j--) {
+	for (j=m; j != MPD_SIZE_MAX; j--) {
 
 		/* D3: calculate qhat and rhat */
 		rhat = _mpd_shortdiv(w2, u+j+n-1, 2, v[n-1]);
@@ -375,7 +375,7 @@ return retval;
 
 /* Leftshift of src by shift digits; src may equal dest. */
 void
-_mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, size_t n, size_t m, size_t shift)
+_mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n, mpd_size_t m, mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -399,7 +399,7 @@ _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, size_t n, size_t m, size_t sh
 		if (h != 0) {
 			dest[n--] = h;
 		}
-		for (; m != SIZE_MAX; m--,n--) {
+		for (; m != MPD_SIZE_MAX; m--,n--) {
 			_mpd_divmod_pow10(&h, &l, src[m], MPD_RDIGITS-r);
 			dest[n] = ph * lprev + h;
 			lprev = l;
@@ -407,7 +407,7 @@ _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, size_t n, size_t m, size_t sh
 		dest[q] = ph * lprev;
 	}
 	else {
-		while (--m != SIZE_MAX) {
+		while (--m != MPD_SIZE_MAX) {
 			dest[m+q] = src[m];
 		}
 	}
@@ -417,7 +417,7 @@ _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, size_t n, size_t m, size_t sh
 
 /* Rightshift of src by shift digits; src may equal dest. */
 mpd_uint_t
-_mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, size_t slen, size_t shift)
+_mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen, mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -427,7 +427,7 @@ _mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, size_t slen, size_t shift)
 #endif
 	mpd_uint_t rnd, rest;   /* rounding digit, rest */
 	mpd_uint_t q, r;
-	size_t i, j;
+	mpd_size_t i, j;
 	mpd_uint_t ph;
 
 	assert(slen > 0);
@@ -482,11 +482,11 @@ _mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, size_t slen, size_t shift)
  * final carry.
  */
 mpd_uint_t
-_mpd_shortadd_b(mpd_uint_t *w, size_t m, mpd_uint_t v, mpd_uint_t b)
+_mpd_shortadd_b(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v, mpd_uint_t b)
 {
 	mpd_uint_t s;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	/* add v to u */
 	s = w[0] + v;
@@ -505,11 +505,11 @@ _mpd_shortadd_b(mpd_uint_t *w, size_t m, mpd_uint_t v, mpd_uint_t b)
 
 /* w := product of u (len n) and v (single word) */
 void
-_mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v, mpd_uint_t b)
+_mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t carry = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0);
 
@@ -529,15 +529,15 @@ _mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v, mpd_
  *     w := quotient of u (len n) divided by a single word v
  */
 mpd_uint_t
-_mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, size_t n, mpd_uint_t v, mpd_uint_t b)
+_mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t rem = 0;
-	size_t i;
+	mpd_size_t i;
 
 	assert(n > 0);
 
-	for (i=n-1; i != SIZE_MAX; i--) {
+	for (i=n-1; i != MPD_SIZE_MAX; i--) {
 
 		_mpd_mul_words(&hi, &lo, rem, b);
 		lo = u[i] + lo;
