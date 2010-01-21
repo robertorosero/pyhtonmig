@@ -9,12 +9,12 @@
 
 
 #include <stdio.h>
-#include "vccompat.h"
+#include "mpdecimal.h"
 
 
 /* Check if n is a power of 2 */
 static inline int
-ispower2(size_t n)
+ispower2(mpd_size_t n)
 {
 	return n != 0 && (n & (n-1)) == 0;
 }
@@ -24,10 +24,10 @@ ispower2(size_t n)
  * Caller has to make sure that n is not 0.
  */
 static inline int
-std_bsr(size_t n)
+std_bsr(mpd_size_t n)
 {
 	int pos = 0;
-	size_t tmp;
+	mpd_size_t tmp;
 
 #ifdef CONFIG_64
 	tmp = n >> 32;
@@ -53,7 +53,7 @@ std_bsr(size_t n)
  * Caller has to make sure that n is not 0.
  */
 static inline int
-std_bsf(size_t n)
+std_bsf(mpd_size_t n)
 {
 	int pos;
 
@@ -77,15 +77,15 @@ std_bsf(size_t n)
 }
 
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 /*
  * Bit scan reverse.
  * Caller has to make sure that a is not 0.
  */
 static inline int
-x86_bsr(size_t a) 
+x86_bsr(mpd_size_t a) 
 {
-	size_t retval;
+	mpd_size_t retval;
 
 	__asm__ (
 #ifdef CONFIG_64
@@ -106,9 +106,9 @@ x86_bsr(size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int
-x86_bsf(size_t a) 
+x86_bsf(mpd_size_t a) 
 {
-	size_t retval;
+	mpd_size_t retval;
 
 	__asm__ (
 #ifdef CONFIG_64
@@ -119,11 +119,11 @@ x86_bsf(size_t a)
 		:"=r" (retval)
 		:"r" (a)
 		:"cc"
-	); 
+	);
 
 	return (int)retval;
 }
-#endif /* __GNUC__ */
+#endif /* __GNUC__ (amd64|i386) */
 
 
 #ifdef _MSC_VER
@@ -133,7 +133,7 @@ x86_bsf(size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-x86_bsr(size_t a) 
+x86_bsr(mpd_size_t a) 
 {
 	unsigned long retval;
 
@@ -151,7 +151,7 @@ x86_bsr(size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-x86_bsf(size_t a) 
+x86_bsf(mpd_size_t a) 
 {
 	unsigned long retval;
 
