@@ -17,6 +17,7 @@
 #include "memory.h"
 #include "mpdecimal.h"
 #include "typearith.h"
+#include "io.h"
 
 
 /*
@@ -53,7 +54,6 @@ strtoexp(const char *s)
 
 	return retval;
 }
-
 
 /*
  * Scan 'len' words. The most significant word contains 'r' digits,
@@ -780,6 +780,13 @@ mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt)
 	return 1;
 }
 
+/*
+ * The following functions assume that spec->min_width <= MPD_MAX_PREC, which
+ * is made sure in mpd_qformat_spec. Then, even with a spec that inserts a
+ * four-byte separator after each digit, nbytes in the following struct
+ * cannot overflow.
+ */
+
 /* Multibyte string */
 typedef struct {
 	mpd_ssize_t nbytes; /* length in bytes */
@@ -977,11 +984,12 @@ _mpd_add_pad(mpd_mbstr_t *result, mpd_spec_t *spec, uint32_t *status)
 
 		n_fill = strlen(spec->fill);
 		add_chars = (spec->min_width - result->nchars);
-		add_bytes = mul_size_t(add_chars, n_fill);
+		/* max value: MPD_MAX_PREC * 4 */
+		add_bytes = add_chars * n_fill;
 
-		cp =  result->data = mpd_realloc(result->data,
-		                                 result->nbytes+add_bytes+1,
-		                                 sizeof *result->data, &err);
+		cp = result->data = mpd_realloc(result->data,
+		                                result->nbytes+add_bytes+1,
+		                                sizeof *result->data, &err);
 		if (err) {
 			*status |= MPD_Malloc_error;
 			mpd_free(result->data);
@@ -1047,6 +1055,10 @@ mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx,
 	char *decstring;
 	int flags = 0;
 
+
+	if (spec->min_width > MPD_MAX_PREC) {
+		return NULL;
+	}
 
 	if (!mpd_qcopy(&tmp, dec, status)) {
 		return NULL;
