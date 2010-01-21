@@ -18,16 +18,16 @@
 
 /* Convolute the data in c1 and c2. Result is in c1. */
 int
-fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, size_t n, int modnum)
+fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, mpd_size_t n, int modnum)
 {
-	int (*fnt)(mpd_uint_t *, size_t, int, int);
-	int (*inv_fnt)(mpd_uint_t *, size_t, int, int);
+	int (*fnt)(mpd_uint_t *, mpd_size_t, int, int);
+	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int, int);
 #ifdef PPRO
 	double dmod;
 	uint32_t dinvmod[3];
 #endif
 	mpd_uint_t n_inv, umod;
-	size_t i;
+	mpd_size_t i;
 
 
 	SETMODULUS(modnum);
@@ -85,16 +85,16 @@ fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, size_t n, int modnum)
 
 /* Autoconvolute the data in c1. Result is in c1. */
 int
-fnt_autoconvolute(mpd_uint_t *c1, size_t n, int modnum)
+fnt_autoconvolute(mpd_uint_t *c1, mpd_size_t n, int modnum)
 {
-	int (*fnt)(mpd_uint_t *, size_t, int, int);
-	int (*inv_fnt)(mpd_uint_t *, size_t, int, int);
+	int (*fnt)(mpd_uint_t *, mpd_size_t, int, int);
+	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int, int);
 #ifdef PPRO
 	double dmod;
 	uint32_t dinvmod[3];
 #endif
 	mpd_uint_t n_inv, umod;
-	size_t i;
+	mpd_size_t i;
 
 
 	SETMODULUS(modnum);
