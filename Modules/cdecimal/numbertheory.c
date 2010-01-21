@@ -35,7 +35,7 @@ _mpd_getkernel(mpd_uint_t n, int sign, int modnum)
 
 /* initialize transform parameters */
 struct fnt_params *
-_mpd_init_fnt_params(size_t n, int sign, int modnum)
+_mpd_init_fnt_params(mpd_size_t n, int sign, int modnum)
 {
 	struct fnt_params *tparams;
 	mpd_uint_t umod;
@@ -45,7 +45,7 @@ _mpd_init_fnt_params(size_t n, int sign, int modnum)
 #endif
 	mpd_uint_t kernel, imag, w;
 	mpd_uint_t i;
-	size_t nhalf;
+	mpd_size_t nhalf;
 
 	assert(ispower2(n));
 	assert(sign == -1 || sign == 1);
