@@ -23,7 +23,7 @@ struct fnt_params {
 
 
 mpd_uint_t _mpd_getkernel(mpd_uint_t n, int sign, int modnum);
-struct fnt_params *_mpd_init_fnt_params(size_t n, int sign, int modnum);
+struct fnt_params *_mpd_init_fnt_params(mpd_size_t n, int sign, int modnum);
 void _mpd_init_w3table(mpd_uint_t w3table[3], int sign, int modnum);
 
 
