@@ -19,11 +19,11 @@
  * Chapter 1.13.4. [http://www.jjj.de/fxt/]
  */
 static inline void
-bitreverse_permute(mpd_uint_t a[], size_t n)
+bitreverse_permute(mpd_uint_t a[], mpd_size_t n)
 {
-	size_t x = 0;
-	size_t r = 0;
-	size_t t;
+	mpd_size_t x = 0;
+	mpd_size_t r = 0;
+	mpd_uint_t t;
 
 	do {
 		if (r > x) {
@@ -39,7 +39,7 @@ bitreverse_permute(mpd_uint_t a[], size_t n)
 
 /* Fast Number Theoretic Transform, decimation in frequency. */
 void
-fnt_dif2(mpd_uint_t a[], size_t n, struct fnt_params *tparams)
+fnt_dif2(mpd_uint_t a[], mpd_size_t n, struct fnt_params *tparams)
 {
 	mpd_uint_t *wtable = tparams->wtable;
 	mpd_uint_t umod;
@@ -47,10 +47,10 @@ fnt_dif2(mpd_uint_t a[], size_t n, struct fnt_params *tparams)
 	double dmod;
 	uint32_t dinvmod[3];
 #endif
-	mpd_uint_t m ,mhalf;
 	mpd_uint_t u0, u1, v0, v1;
-	mpd_uint_t j, r;
 	mpd_uint_t w, w0, w1, wstep;
+	mpd_size_t m ,mhalf;
+	mpd_size_t j, r;
 
 
 	assert(ispower2(n));
