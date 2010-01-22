@@ -19,6 +19,7 @@
   #define srandom srand
   #undef snprintf
   #define snprintf sprintf_s
+  #define HAVE_SNPRINTF
   #undef strncasecmp
   #define strncasecmp _strnicmp
   #undef strcasecmp
