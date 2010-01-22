@@ -296,9 +296,9 @@ exp_to_string(char *s, mpd_ssize_t x, int print_sign)
 		d = mpd_pow10[j];
 		q = x / d;
 		x -= d * q;
-		*s++ = '0' + q;
+		*s++ = '0' + (char)q;
 	}
-	*s++ = '0' + x;
+	*s++ = '0' + (char)x;
 
 	return s;
 }
@@ -319,9 +319,9 @@ coeff_to_string(char *s, const mpd_t *dec)
 		d = mpd_pow10[j];
 		q = x / d;
 		x -= d * q;
-		*s++ = '0' + q;
+		*s++ = '0' + (char)q;
 	}
-	*s++ = '0' + x;
+	*s++ = '0' + (char)x;
 
 	/* remaining full words */
 	for (i=dec->len-2; i >= 0; --i) {
@@ -330,9 +330,9 @@ coeff_to_string(char *s, const mpd_t *dec)
 			d = mpd_pow10[j];
 			q = x / d;
 			x -= d * q;
-			*s++ = '0' + q;
+			*s++ = '0' + (char)q;
 		}
-		*s++ = '0' + x;
+		*s++ = '0' + (char)x;
 	}
 
 	return s;
@@ -356,7 +356,7 @@ coeff_to_string_dot(char *s, char *dot, const mpd_t *dec)
 		d = mpd_pow10[j];
 		q = x / d;
 		x -= d * q;
-		*s++ = '0' + q;
+		*s++ = '0' + (char)q;
 	}
 
 	/* remaining full words */
@@ -368,7 +368,7 @@ coeff_to_string_dot(char *s, char *dot, const mpd_t *dec)
 			d = mpd_pow10[j];
 			q = x / d;
 			x -= d * q;
-			*s++ = '0' + q;
+			*s++ = '0' + (char)q;
 		}
 	}
 
