@@ -120,7 +120,8 @@ mpd_sh_calloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size)
 
 /* struct hack realloc with overflow checking */
 void *
-mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size, uint8_t *err)
+mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb,
+               mpd_size_t size, uint8_t *err)
 {
 	void *new;
 	mpd_size_t req;
@@ -154,7 +155,10 @@ mpd_qnew_size(mpd_ssize_t size)
 		return NULL;
 	}
 
-	result->flags = result->exp = result->digits = result->len = 0;
+	result->flags = 0;
+	result->exp = 0;
+	result->digits = 0;
+	result->len = 0;
 	result->alloc = size;
 
 	return result;
