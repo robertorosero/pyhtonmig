@@ -135,7 +135,8 @@ _mpd_baseincr(mpd_uint_t *u, mpd_size_t n)
  *     number in u >= number in v;
  */
 void
-_mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n)
+_mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
+             mpd_size_t m, mpd_size_t n)
 {
 	mpd_uint_t d;
 	mpd_uint_t borrow = 0;
@@ -162,8 +163,8 @@ _mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t
 }
 
 /*
- * Subtract the contents of u from w. w is larger than u. Borrows are propagated
- * further, but eventually w can absorb the final borrow.
+ * Subtract the contents of u from w. w is larger than u. Borrows are
+ * propagated further, but eventually w can absorb the final borrow.
  */
 void
 _mpd_basesubfrom(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n)
@@ -215,7 +216,8 @@ _mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v)
  *     w must be initialized to zero
  */
 void
-_mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n)
+_mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
+             mpd_size_t m, mpd_size_t n)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t carry;
@@ -275,7 +277,8 @@ _mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v)
  * false.  A return value of -1 indicates an error.
  */
 int
-_mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst, const mpd_uint_t *vconst,
+_mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r,
+                const mpd_uint_t *uconst, const mpd_uint_t *vconst,
                 mpd_size_t nplusm, mpd_size_t n)
 {
 	mpd_uint_t ustatic[MPD_MINALLOC_MAX];
@@ -375,7 +378,8 @@ return retval;
 
 /* Leftshift of src by shift digits; src may equal dest. */
 void
-_mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n, mpd_size_t m, mpd_size_t shift)
+_mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n, mpd_size_t m,
+                mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -417,7 +421,8 @@ _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n, mpd_size_t m, m
 
 /* Rightshift of src by shift digits; src may equal dest. */
 mpd_uint_t
-_mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen, mpd_size_t shift)
+_mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen,
+                mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -505,7 +510,8 @@ _mpd_shortadd_b(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v, mpd_uint_t b)
 
 /* w := product of u (len n) and v (single word) */
 void
-_mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b)
+_mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                mpd_uint_t v, mpd_uint_t b)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t carry = 0;
@@ -529,7 +535,8 @@ _mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, 
  *     w := quotient of u (len n) divided by a single word v
  */
 mpd_uint_t
-_mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b)
+_mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                mpd_uint_t v, mpd_uint_t b)
 {
 	mpd_uint_t hi, lo;
 	mpd_uint_t rem = 0;
