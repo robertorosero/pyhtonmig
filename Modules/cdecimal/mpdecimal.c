@@ -45,18 +45,18 @@
 #define MPD_NEWTONDIV_CUTOFF (8*MPD_RDIGITS)
 
 #define MPD_NEW_STATIC(name, flags, exp, digits, len) \
-	mpd_uint_t name##_data[MPD_MINALLOC_MAX];                    \
-	mpd_t name = {flags|MPD_STATIC|MPD_STATIC_DATA, exp, digits, \
-	              len, MPD_MINALLOC_MAX, name##_data}
+        mpd_uint_t name##_data[MPD_MINALLOC_MAX];                    \
+        mpd_t name = {flags|MPD_STATIC|MPD_STATIC_DATA, exp, digits, \
+                      len, MPD_MINALLOC_MAX, name##_data}
 
 #define MPD_NEW_CONST(name, flags, exp, digits, len, alloc, initval) \
-	mpd_uint_t name##_data[alloc] = {initval};                   \
-	mpd_t name = {flags|MPD_STATIC|MPD_CONST_DATA, exp, digits,  \
-	              len, alloc, name##_data}
+        mpd_uint_t name##_data[alloc] = {initval};                   \
+        mpd_t name = {flags|MPD_STATIC|MPD_CONST_DATA, exp, digits,  \
+                      len, alloc, name##_data}
 
 #define MPD_NEW_SHARED(name, a) \
-	mpd_t name = {(a->flags&~MPD_DATAFLAGS)|MPD_STATIC|MPD_SHARED_DATA, \
-                       a->exp, a->digits, a->len, a->alloc, a->data}
+        mpd_t name = {(a->flags&~MPD_DATAFLAGS)|MPD_STATIC|MPD_SHARED_DATA, \
+                      a->exp, a->digits, a->len, a->alloc, a->data}
 
 
 static mpd_uint_t data_one[1] = {1};
@@ -66,8 +66,10 @@ static const mpd_t minus_one = {MPD_NEG|MPD_STATIC|MPD_CONST_DATA, 0, 1, 1, 1,
                                 data_one};
 static const mpd_t zero = {MPD_STATIC|MPD_CONST_DATA, 0, 1, 1, 1, data_zero};
 
-static inline void _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status);
-static void _settriple(mpd_t *result, uint8_t sign, mpd_uint_t a, mpd_ssize_t exp);
+static inline void _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx,
+                                  uint32_t *status);
+static void _settriple(mpd_t *result, uint8_t sign, mpd_uint_t a,
+                       mpd_ssize_t exp);
 static inline mpd_ssize_t _mpd_real_size(mpd_uint_t *data, mpd_ssize_t size);
 
 static void _mpd_qadd(mpd_t *result, const mpd_t *a, const mpd_t *b,
@@ -472,9 +474,10 @@ mpd_qresize_zero(mpd_t *result, mpd_ssize_t size, uint32_t *status)
 }
 
 /*
- * Reduce memory size for the coefficient to MPD_MINALLOC. In theory, realloc
- * may fail even when reducing the memory size. But in that case the old memory
- * area is always big enough, so checking for MPD_Malloc_error is not imperative.
+ * Reduce memory size for the coefficient to MPD_MINALLOC. In theory,
+ * realloc may fail even when reducing the memory size. But in that case
+ * the old memory area is always big enough, so checking for MPD_Malloc_error
+ * is not imperative.
  */
 ALWAYS_INLINE void
 mpd_minalloc(mpd_t *result)
@@ -777,13 +780,15 @@ _mpd_fix_nan(mpd_t *result, const mpd_context_t *ctx)
 
 /*
  * Get n most significant digits from a decimal, where 0 < n <= MPD_UINT_DIGITS.
- * Assumes MPD_UINT_DIGITS == MPD_RDIGITS+1, which is true for 32 and 64 bit machines.
+ * Assumes MPD_UINT_DIGITS == MPD_RDIGITS+1, which is true for 32 and 64 bit
+ * machines.
  *
  * The result of the operation will be in lo. If the operation is impossible,
  * hi will be nonzero. This is used to indicate an error.
  */
 static inline void
-_mpd_get_msdigits(mpd_uint_t *hi, mpd_uint_t *lo, const mpd_t *dec, unsigned int n)
+_mpd_get_msdigits(mpd_uint_t *hi, mpd_uint_t *lo, const mpd_t *dec,
+                  unsigned int n)
 {
 	mpd_uint_t r, tmp;
 
@@ -994,7 +999,8 @@ mpd_seterror(mpd_t *result, uint32_t flags, uint32_t *status)
 
 /* quietly set a static decimal from an mpd_ssize_t */
 void
-mpd_qsset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx,
+                uint32_t *status)
 {
 	mpd_uint_t u;
 	uint8_t sign = MPD_POS;
@@ -1018,7 +1024,8 @@ mpd_qsset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx, uint32_t
 
 /* quietly set a static decimal from an mpd_uint_t */
 void
-mpd_qsset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx,
+               uint32_t *status)
 {
 	_ssettriple(result, MPD_POS, a, 0);
 	mpd_qfinalize(result, ctx, status);
@@ -1026,14 +1033,16 @@ mpd_qsset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx, uint32_t *
 
 /* quietly set a static decimal from an int32_t */
 void
-mpd_qsset_i32(mpd_t *result, int32_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_i32(mpd_t *result, int32_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	mpd_qsset_ssize(result, a, ctx, status);
 }
 
 /* quietly set a static decimal from a uint32_t */
 void
-mpd_qsset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	mpd_qsset_uint(result, a, ctx, status);
 }
@@ -1041,14 +1050,16 @@ mpd_qsset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx, uint32_t *sta
 #ifdef CONFIG_64
 /* quietly set a static decimal from an int64_t */
 void
-mpd_qsset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	mpd_qsset_ssize(result, a, ctx, status);
 }
 
 /* quietly set a static decimal from a uint64_t */
 void
-mpd_qsset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	mpd_qsset_uint(result, a, ctx, status);
 }
@@ -1056,7 +1067,8 @@ mpd_qsset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *sta
 
 /* quietly set a decimal from an mpd_ssize_t */
 void
-mpd_qset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx,
+               uint32_t *status)
 {
 	mpd_minalloc(result);
 	mpd_qsset_ssize(result, a, ctx, status);
@@ -1064,7 +1076,8 @@ mpd_qset_ssize(mpd_t *result, mpd_ssize_t a, const mpd_context_t *ctx, uint32_t 
 
 /* quietly set a decimal from an mpd_uint_t */
 void
-mpd_qset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	_settriple(result, MPD_POS, a, 0);
 	mpd_qfinalize(result, ctx, status);
@@ -1072,14 +1085,16 @@ mpd_qset_uint(mpd_t *result, mpd_uint_t a, const mpd_context_t *ctx, uint32_t *s
 
 /* quietly set a decimal from an int32_t */
 void
-mpd_qset_i32(mpd_t *result, int32_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_i32(mpd_t *result, int32_t a, const mpd_context_t *ctx,
+             uint32_t *status)
 {
 	mpd_qset_ssize(result, a, ctx, status);
 }
 
 /* quietly set a decimal from a uint32_t */
 void
-mpd_qset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_u32(mpd_t *result, uint32_t a, const mpd_context_t *ctx,
+             uint32_t *status)
 {
 	mpd_qset_uint(result, a, ctx, status);
 }
@@ -1113,7 +1128,8 @@ _c32setu64(mpd_t *result, uint64_t u, uint32_t *status)
 }
 
 static void
-_c32_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *status)
+_c32_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	_c32setu64(result, a, status);
 	mpd_qfinalize(result, ctx, status);
@@ -1121,7 +1137,8 @@ _c32_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *sta
 
 /* set a decimal from an int64_t */
 static void
-_c32_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *status)
+_c32_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx,
+              uint32_t *status)
 {
 	uint64_t u;
 	uint8_t sign = MPD_POS;
@@ -1146,7 +1163,8 @@ _c32_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *stat
 
 /* quietly set a decimal from an int64_t */
 void
-mpd_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx,
+             uint32_t *status)
 {
 #ifdef CONFIG_64
 	mpd_qset_ssize(result, a, ctx, status);
@@ -1157,7 +1175,8 @@ mpd_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx, uint32_t *statu
 
 /* quietly set a decimal from a uint64_t */
 void
-mpd_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx,
+             uint32_t *status)
 {
 #ifdef CONFIG_64
 	mpd_qset_uint(result, a, ctx, status);
@@ -1168,8 +1187,9 @@ mpd_qset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t *stat
 
 
 /*
- * Quietly get an mpd_uint_t from a decimal. Assumes MPD_UINT_DIGITS == MPD_RDIGITS+1,
- * which is true for 32 and 64 bit machines.
+ * Quietly get an mpd_uint_t from a decimal. Assumes
+ * MPD_UINT_DIGITS == MPD_RDIGITS+1, which is true for
+ * 32 and 64 bit machines.
  *
  * If the operation is impossible, MPD_Invalid_operation is set.
  */
@@ -1290,7 +1310,8 @@ mpd_qget_i32(const mpd_t *a, uint32_t *status)
  * does not fit in MPD_MINALLOC.
  */ 
 int
-mpd_qcheck_nan(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qcheck_nan(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+               uint32_t *status)
 {
 	if (mpd_isnan(a)) {
 		*status |= mpd_issnan(a) ? MPD_Invalid_operation : 0;
@@ -1309,7 +1330,7 @@ mpd_qcheck_nan(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t
  */ 
 int
 mpd_qcheck_nans(mpd_t *result, const mpd_t *a, const mpd_t *b,
-		const mpd_context_t *ctx, uint32_t *status)
+                const mpd_context_t *ctx, uint32_t *status)
 {
 	if ((a->flags|b->flags)&(MPD_NAN|MPD_SNAN)) {
 		const mpd_t *choice = b;
@@ -1404,7 +1425,8 @@ _mpd_rnd_incr(const mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx)
  * overflow.
  */
 static inline void
-_mpd_apply_round(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx, uint32_t *status)
+_mpd_apply_round(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx,
+                 uint32_t *status)
 {
 	if (_mpd_rnd_incr(dec, rnd, ctx)) {
 		/* We have a number with exactly ctx->prec digits. The increment
@@ -1437,7 +1459,8 @@ _mpd_apply_round(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx, uint32_t 
  * Apply rounding to a decimal. Allow overflow of the precision.
  */ 
 static inline void
-_mpd_apply_round_excess(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx, uint32_t *status)
+_mpd_apply_round_excess(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx,
+                        uint32_t *status)
 {
 	if (_mpd_rnd_incr(dec, rnd, ctx)) {
 		mpd_uint_t carry = _mpd_baseincr(dec->data, dec->len);
@@ -1458,7 +1481,8 @@ _mpd_apply_round_excess(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx, ui
  * overflow the precision.
  */
 static inline int
-_mpd_apply_round_fit(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx, uint32_t *status)
+_mpd_apply_round_fit(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx,
+                     uint32_t *status)
 {
 	if (_mpd_rnd_incr(dec, rnd, ctx)) {
 		mpd_uint_t carry = _mpd_baseincr(dec->data, dec->len);
@@ -1500,7 +1524,7 @@ _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
 
 		switch (ctx->round) {
 		case MPD_ROUND_HALF_UP: case MPD_ROUND_HALF_EVEN:
-	       	case MPD_ROUND_HALF_DOWN: case MPD_ROUND_UP:
+		case MPD_ROUND_HALF_DOWN: case MPD_ROUND_UP:
 		case MPD_ROUND_TRUNC:
 			mpd_setspecial(dec, mpd_sign(dec), MPD_INF);
 			break;
@@ -1758,12 +1782,12 @@ mpd_qcopy_sign(mpd_t *result, const mpd_t *a, const mpd_t *b, uint32_t *status)
 /* Convenience macro. If a and b are not equal, return from the calling
  * function with the correct comparison value. */
 #define CMP_EQUAL_OR_RETURN(a, b)  \
-	if (a != b) {              \
-		if (a < b) {       \
-			return -1; \
-		}                  \
-		return 1;          \
-	}
+        if (a != b) {              \
+                if (a < b) {       \
+                        return -1; \
+                }                  \
+                return 1;          \
+        }
 
 /*
  * Compare the data of big and small. This function does the equivalent
@@ -1771,7 +1795,8 @@ mpd_qcopy_sign(mpd_t *result, const mpd_t *a, const mpd_t *b, uint32_t *status)
  * big and small, except that no allocation for the left shift is needed.
  */ 
 static int
-_mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, mpd_size_t n, mpd_size_t m, mpd_size_t shift)
+_mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, mpd_size_t n, mpd_size_t m,
+             mpd_size_t shift)
 {
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 	/* spurious uninitialized warnings */
@@ -2471,7 +2496,8 @@ invalid_operation:
 
 /* Exponent of the magnitude of the most significant digit of the operand. */
 void
-mpd_qlogb(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qlogb(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+          uint32_t *status)
 {
 	if (mpd_isspecial(a)) {
 		if (mpd_qcheck_nan(result, a, ctx, status)) {
@@ -2883,7 +2909,8 @@ invalid_operation:
  * result of the plus operation.
  */
 void
-mpd_qabs(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qabs(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+         uint32_t *status)
 {
 	if (mpd_isspecial(a)) {
 		if (mpd_qcheck_nan(result, a, ctx, status)) {
@@ -2911,7 +2938,8 @@ _mpd_ptrswap(mpd_t **a, mpd_t **b)
 
 /* Add or subtract infinities. */
 static void
-_mpd_qaddsub_inf(mpd_t *result, const mpd_t *a, const mpd_t *b, uint8_t sign_b, uint32_t *status)
+_mpd_qaddsub_inf(mpd_t *result, const mpd_t *a, const mpd_t *b, uint8_t sign_b,
+                 uint32_t *status)
 {
 	if (mpd_isinfinite(a)) {
 		if (mpd_sign(a) != sign_b && mpd_isinfinite(b)) {
@@ -2987,7 +3015,8 @@ _mpd_qaddsub(mpd_t *result, const mpd_t *a, const mpd_t *b, uint8_t sign_b,
 
 	if (mpd_sign(a) == sign_b) {
 
-		carry = _mpd_baseadd(result->data, big->data, small->data, big->len, small->len);
+		carry = _mpd_baseadd(result->data, big->data, small->data,
+		                     big->len, small->len);
 
 		if (carry) {
 			newsize = big->len + 1;
@@ -3013,7 +3042,8 @@ _mpd_qaddsub(mpd_t *result, const mpd_t *a, const mpd_t *b, uint8_t sign_b,
 			}
 		}
 
-		_mpd_basesub(result->data, big->data, small->data, big->len, small->len);
+		_mpd_basesub(result->data, big->data, small->data,
+		             big->len, small->len);
 		newsize = _mpd_real_size(result->data, big->len);
 		/* resize to smaller cannot fail */
 		(void)mpd_qresize(result, newsize, status);
@@ -3088,8 +3118,8 @@ mpd_qsub(mpd_t *result, const mpd_t *a, const mpd_t *b,
 
 /* Add decimal and mpd_ssize_t. */
 void
-mpd_qadd_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t *ctx,
-               uint32_t *status)
+mpd_qadd_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b,
+               const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3103,8 +3133,8 @@ mpd_qadd_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t
 
 /* Add decimal and mpd_uint_t. */
 void
-mpd_qadd_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *ctx,
-              uint32_t *status)
+mpd_qadd_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b,
+              const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3118,8 +3148,8 @@ mpd_qadd_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *
 
 /* Subtract mpd_ssize_t from decimal. */
 void
-mpd_qsub_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t *ctx,
-               uint32_t *status)
+mpd_qsub_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b,
+               const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3133,8 +3163,8 @@ mpd_qsub_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t
 
 /* Subtract mpd_uint_t from decimal. */
 void
-mpd_qsub_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *ctx,
-              uint32_t *status)
+mpd_qsub_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b,
+              const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3148,16 +3178,16 @@ mpd_qsub_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *
 
 /* Add decimal and int32_t. */
 void
-mpd_qadd_i32(mpd_t *result, const mpd_t *a, int32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qadd_i32(mpd_t *result, const mpd_t *a, int32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qadd_ssize(result, a, b, ctx, status);
 }
 
 /* Add decimal and uint32_t. */
 void
-mpd_qadd_u32(mpd_t *result, const mpd_t *a, uint32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qadd_u32(mpd_t *result, const mpd_t *a, uint32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qadd_uint(result, a, b, ctx, status);
 }
@@ -3165,16 +3195,16 @@ mpd_qadd_u32(mpd_t *result, const mpd_t *a, uint32_t b, const mpd_context_t *ctx
 #ifdef CONFIG_64
 /* Add decimal and int64_t. */
 void
-mpd_qadd_i64(mpd_t *result, const mpd_t *a, int64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qadd_i64(mpd_t *result, const mpd_t *a, int64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qadd_ssize(result, a, b, ctx, status);
 }
 
 /* Add decimal and uint64_t. */
 void
-mpd_qadd_u64(mpd_t *result, const mpd_t *a, uint64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qadd_u64(mpd_t *result, const mpd_t *a, uint64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qadd_uint(result, a, b, ctx, status);
 }
@@ -3271,7 +3301,8 @@ _mpd_qdiv(int action, mpd_t *q, const mpd_t *a, const mpd_t *b,
 	if (b->len == 1) {
 		rem = _mpd_shortdiv(q->data, a->data, a->len, b->data[0]);
 	}
-	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF || b->digits < MPD_NEWTONDIV_CUTOFF) {
+	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF ||
+	         b->digits < MPD_NEWTONDIV_CUTOFF) {
 		int ret = _mpd_basedivmod(q->data, NULL, a->data, b->data,
 		                          a->len, b->len);
 		if (ret < 0) {
@@ -3326,8 +3357,8 @@ finish:
 
 /* Divide a by b. */
 void
-mpd_qdiv(mpd_t *q, const mpd_t *a, const mpd_t *b, const mpd_context_t *ctx,
-         uint32_t *status)
+mpd_qdiv(mpd_t *q, const mpd_t *a, const mpd_t *b,
+         const mpd_context_t *ctx, uint32_t *status)
 {
 	_mpd_qdiv(SET_IDEAL_EXP, q, a, b, ctx, status);
 }
@@ -3426,7 +3457,8 @@ _mpd_qdivmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
 			r->data[0] = _mpd_shortdiv(q->data, a->data, a->len, b->data[0]);
 		}
 	}
-	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF || b->digits < MPD_NEWTONDIV_CUTOFF) {
+	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF ||
+	         b->digits < MPD_NEWTONDIV_CUTOFF) {
 		int ret;
 		ret = _mpd_basedivmod(q->data, r->data, a->data, b->data,
 		                      a->len, b->len);
@@ -3574,8 +3606,8 @@ mpd_qdivint(mpd_t *q, const mpd_t *a, const mpd_t *b,
 
 /* Divide decimal by mpd_ssize_t. */
 void
-mpd_qdiv_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t *ctx,
-               uint32_t *status)
+mpd_qdiv_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b,
+               const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3589,8 +3621,8 @@ mpd_qdiv_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t
 
 /* Divide decimal by mpd_uint_t. */
 void
-mpd_qdiv_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *ctx,
-              uint32_t *status)
+mpd_qdiv_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b,
+              const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -3604,16 +3636,16 @@ mpd_qdiv_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *
 
 /* Divide decimal by int32_t. */
 void
-mpd_qdiv_i32(mpd_t *result, const mpd_t *a, int32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qdiv_i32(mpd_t *result, const mpd_t *a, int32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qdiv_ssize(result, a, b, ctx, status);
 }
 
 /* Divide decimal by uint32_t. */
 void
-mpd_qdiv_u32(mpd_t *result, const mpd_t *a, uint32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qdiv_u32(mpd_t *result, const mpd_t *a, uint32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qdiv_uint(result, a, b, ctx, status);
 }
@@ -3621,21 +3653,25 @@ mpd_qdiv_u32(mpd_t *result, const mpd_t *a, uint32_t b, const mpd_context_t *ctx
 #ifdef CONFIG_64
 /* Divide decimal by int64_t. */
 void
-mpd_qdiv_i64(mpd_t *result, const mpd_t *a, int64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qdiv_i64(mpd_t *result, const mpd_t *a, int64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qdiv_ssize(result, a, b, ctx, status);
 }
 
 /* Divide decimal by uint64_t. */
 void
-mpd_qdiv_u64(mpd_t *result, const mpd_t *a, uint64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qdiv_u64(mpd_t *result, const mpd_t *a, uint64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qdiv_uint(result, a, b, ctx, status);
 }
 #endif
 
+#if defined(_MSC_VER)
+  /* conversion from 'double' to 'mpd_ssize_t', possible loss of data */
+  #pragma warning(disable:4244)
+#endif
 /*
  * Get the number of iterations for the Horner scheme in _mpd_qexp().
  */
@@ -3652,7 +3688,8 @@ _mpd_get_exp_iterations(const mpd_t *a, mpd_ssize_t prec)
 
 #ifdef CONFIG_64
   #if defined(__x86_64__) && defined(HAVE_80BIT_LONG_DOUBLE)
-	return ceill((1.435*(long double)prec - 1.182) / log10l((long double)prec/f));
+	return ceill((1.435*(long double)prec - 1.182)
+	             / log10l((long double)prec/f));
   #else
 	/* prec > floor((1ULL<<53) / 1.435) */
 	if (prec > 6276793905742851LL) {
@@ -3662,6 +3699,9 @@ _mpd_get_exp_iterations(const mpd_t *a, mpd_ssize_t prec)
   #endif
 #else /* CONFIG_32 */
 	return ceil((1.435*(double)prec - 1.182) / log10((double)prec/f));
+	#if defined(_MSC_VER)
+	  #pragma warning(default:4244)
+	#endif
 #endif
 }
 
@@ -3680,7 +3720,8 @@ _mpd_get_exp_iterations(const mpd_t *a, mpd_ssize_t prec)
  *    ranges.
  */
 static void
-_mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+_mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+          uint32_t *status)
 {
 	mpd_context_t workctx;
 	MPD_NEW_STATIC(tmp,0,0,0,0);
@@ -3715,7 +3756,8 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *sta
 		}
 		else {
 			_settriple(result, MPD_POS, 0, mpd_etiny(ctx));
-			*status |= (MPD_Inexact|MPD_Rounded|MPD_Subnormal|MPD_Underflow|MPD_Clamped);
+			*status |= (MPD_Inexact|MPD_Rounded|MPD_Subnormal|
+                        MPD_Underflow|MPD_Clamped);
 		}
 		return;
 	}
@@ -3750,7 +3792,8 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *sta
 	}
 	else {
 		t -= MPD_MAX_POW10;
-		_mpd_qpow_uint(&tmp, &sum, mpd_pow10[MPD_MAX_POW10], MPD_POS, &workctx, status);
+		_mpd_qpow_uint(&tmp, &sum, mpd_pow10[MPD_MAX_POW10], MPD_POS,
+                       &workctx, status);
 		_mpd_qpow_uint(result, &tmp, mpd_pow10[t], MPD_POS, &workctx, status);
 	}
 
@@ -3764,7 +3807,8 @@ finish:
 
 /* exp(a) */
 void
-mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+         uint32_t *status)
 {
 	mpd_context_t workctx;
 
@@ -3804,7 +3848,8 @@ mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *stat
 		while (1) {
 			workctx.prec = prec;
 			_mpd_qexp(result, a, &workctx, status);
-			_ssettriple(&ulp, MPD_POS, 1, result->exp + result->digits-workctx.prec-1);
+			_ssettriple(&ulp, MPD_POS, 1,
+			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
 			mpd_qadd(&t1, result, &ulp, &workctx, status);
@@ -3852,7 +3897,8 @@ mpd_qfma(mpd_t *result, const mpd_t *a, const mpd_t *b, const mpd_t *c,
 }
 
 static inline int
-ln_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec, mpd_ssize_t initprec)
+ln_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec,
+                 mpd_ssize_t initprec)
 {
 	mpd_ssize_t k;
 	int i;
@@ -3874,7 +3920,9 @@ ln_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec, mpd_
 #if MPD_RDIGITS != 19
   #error "mpdecimal.c: MPD_RDIGITS must be 19."
 #endif
-static mpd_uint_t mpd_ln10data[MPD_MINALLOC_MAX] = {179914546843642076, 2302585092994045684};
+static mpd_uint_t mpd_ln10data[MPD_MINALLOC_MAX] = {
+  179914546843642076, 2302585092994045684
+};
 #else
 #if MPD_RDIGITS != 9
   #error "mpdecimal.c: MPD_RDIGITS must be 9."
@@ -4001,7 +4049,8 @@ static const uint16_t lnapprox[900] = {
 
 /* Internal ln() function that does not check for specials or zero. */
 static void
-_mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+_mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+         uint32_t *status)
 {
 	mpd_context_t varcontext, maxcontext;
 	mpd_t *z = (mpd_t *) result;
@@ -4107,7 +4156,8 @@ finish:
 
 /* ln(a) */
 void
-mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+        uint32_t *status)
 {
 	mpd_context_t workctx;
 
@@ -4150,7 +4200,8 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *statu
 		while (1) {
 			workctx.prec = prec;
 			_mpd_qln(result, a, &workctx, status);
-			_ssettriple(&ulp, MPD_POS, 1, result->exp + result->digits-workctx.prec-1);
+			_ssettriple(&ulp, MPD_POS, 1,
+			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
 			mpd_qadd(&t1, result, &ulp, &workctx, status);
@@ -4175,7 +4226,8 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *statu
 
 /* Internal log10() function that does not check for specials, zero, ... */
 static void
-_mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+_mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+            uint32_t *status)
 {
 	mpd_context_t workctx;
 
@@ -4191,7 +4243,8 @@ _mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *s
 
 /* log10(a) */
 void
-mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+           uint32_t *status)
 {
 	mpd_context_t workctx;
 
@@ -4245,7 +4298,8 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *st
 		while (1) {
 			workctx.prec = prec;
 			_mpd_qlog10(result, a, &workctx, status);
-			_ssettriple(&ulp, MPD_POS, 1, result->exp + result->digits-workctx.prec-1);
+			_ssettriple(&ulp, MPD_POS, 1,
+			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
 			mpd_qadd(&t1, result, &ulp, &workctx, status);
@@ -4455,8 +4509,8 @@ _kmul_worksize(mpd_size_t n, mpd_size_t lim)
  * Springer, 1993, ISBN 354057235X, 9783540572350.
  */
 static void
-_karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint_t *w,
-               mpd_size_t la, mpd_size_t lb)
+_karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b,
+               mpd_uint_t *w, mpd_size_t la, mpd_size_t lb)
 {
 	mpd_size_t m, lt;
 
@@ -4496,7 +4550,7 @@ _karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint
 	/* la >= lb > m */
 	memcpy(w, a, m * sizeof *w);
 	w[m] = 0;
-        _mpd_baseaddto(w, a+m, la-m);
+	_mpd_baseaddto(w, a+m, la-m);
 
 	memcpy(w+(m+1), b, m * sizeof *w);
 	w[m+1+m] = 0;
@@ -4528,7 +4582,9 @@ _karatsuba_rec(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint
  * Conditions: ulen >= vlen, ulen >= 4
  */
 mpd_uint_t *
-_mpd_kmul(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
+_mpd_kmul(const mpd_uint_t *u, const mpd_uint_t *v,
+          mpd_size_t ulen, mpd_size_t vlen,
+          mpd_size_t *rsize)
 {
 	mpd_uint_t *result = NULL, *w = NULL;
 	mpd_size_t m;
@@ -4635,7 +4691,9 @@ mpd_restore_fenv(unsigned int cw)
  * a pointer to the result or NULL in case of failure (malloc error).
  */
 mpd_uint_t *
-_mpd_fntmul(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
+_mpd_fntmul(const mpd_uint_t *u, const mpd_uint_t *v,
+            mpd_size_t ulen, mpd_size_t vlen,
+            mpd_size_t *rsize)
 {
 	mpd_uint_t *c1 = NULL, *c2 = NULL, *c3 = NULL, *vtmp = NULL;
 	mpd_size_t n;
@@ -4710,8 +4768,8 @@ malloc_error:
  * Karatsuba multiplication with FNT/basemul as the base case.
  */
 static int
-_karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_uint_t *w,
-                   mpd_size_t la, mpd_size_t lb)
+_karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b,
+                   mpd_uint_t *w, mpd_size_t la, mpd_size_t lb)
 {
 	mpd_size_t m, lt;
 
@@ -4808,7 +4866,9 @@ _karatsuba_rec_fnt(mpd_uint_t *c, const mpd_uint_t *a, const mpd_uint_t *b, mpd_
  * (malloc error). Conditions: ulen >= vlen, ulen >= 4.
  */
 mpd_uint_t *
-_mpd_kmul_fnt(const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t ulen, mpd_size_t vlen, mpd_size_t *rsize)
+_mpd_kmul_fnt(const mpd_uint_t *u, const mpd_uint_t *v,
+              mpd_size_t ulen, mpd_size_t vlen,
+              mpd_size_t *rsize)
 {
 	mpd_uint_t *result = NULL, *w = NULL;
 	mpd_size_t m;
@@ -4986,8 +5046,8 @@ mpd_qmul(mpd_t *result, const mpd_t *a, const mpd_t *b,
 
 /* Multiply decimal and mpd_ssize_t. */
 void
-mpd_qmul_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t *ctx,
-               uint32_t *status)
+mpd_qmul_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b,
+               const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -5001,8 +5061,8 @@ mpd_qmul_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, const mpd_context_t
 
 /* Multiply decimal and mpd_uint_t. */
 void
-mpd_qmul_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *ctx,
-              uint32_t *status)
+mpd_qmul_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b,
+              const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_t bb;
 	mpd_uint_t bdata[2];
@@ -5015,30 +5075,30 @@ mpd_qmul_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, const mpd_context_t *
 }
 
 void
-mpd_qmul_i32(mpd_t *result, const mpd_t *a, int32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qmul_i32(mpd_t *result, const mpd_t *a, int32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qmul_ssize(result, a, b, ctx, status);
 }
 
 void
-mpd_qmul_u32(mpd_t *result, const mpd_t *a, uint32_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qmul_u32(mpd_t *result, const mpd_t *a, uint32_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qmul_uint(result, a, b, ctx, status);
 }
 
 #ifdef CONFIG_64
 void
-mpd_qmul_i64(mpd_t *result, const mpd_t *a, int64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qmul_i64(mpd_t *result, const mpd_t *a, int64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qmul_ssize(result, a, b, ctx, status);
 }
 
 void
-mpd_qmul_u64(mpd_t *result, const mpd_t *a, uint64_t b, const mpd_context_t *ctx,
-             uint32_t *status)
+mpd_qmul_u64(mpd_t *result, const mpd_t *a, uint64_t b,
+             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_qmul_uint(result, a, b, ctx, status);
 }
@@ -5046,7 +5106,8 @@ mpd_qmul_u64(mpd_t *result, const mpd_t *a, uint64_t b, const mpd_context_t *ctx
 
 /* Like the minus operator. */
 void
-mpd_qminus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qminus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+           uint32_t *status)
 {
 	if (mpd_isspecial(a)) {
 		if (mpd_qcheck_nan(result, a, ctx, status)) {
@@ -5066,7 +5127,8 @@ mpd_qminus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *st
 
 /* Like the plus operator. */
 void
-mpd_qplus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qplus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+          uint32_t *status)
 {
 	if (mpd_isspecial(a)) {
 		if (mpd_qcheck_nan(result, a, ctx, status)) {
@@ -5292,7 +5354,8 @@ _mpd_qpow_mpd(mpd_t *result, mpd_t *tbase, mpd_t *texp, uint8_t resultsign,
  * The power function for integer exponents.
  */
 static void
-_mpd_qpow_int(mpd_t *result, const mpd_t *base, const mpd_t *exp, uint8_t resultsign,
+_mpd_qpow_int(mpd_t *result, const mpd_t *base, const mpd_t *exp,
+              uint8_t resultsign,
               const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_context_t workctx;
@@ -5370,7 +5433,8 @@ _qcheck_pow_one_inf(mpd_t *result, const mpd_t *base, uint8_t resultsign,
  * This is an internal function that does not check for specials.
  */
 static int
-_qcheck_pow_one(mpd_t *result, const mpd_t *base, const mpd_t *exp, uint8_t resultsign,
+_qcheck_pow_one(mpd_t *result, const mpd_t *base, const mpd_t *exp,
+                uint8_t resultsign,
                 const mpd_context_t *ctx, uint32_t *status)
 {
 	uint32_t workstatus = 0;
@@ -5514,7 +5578,8 @@ _qlog10_exp_bound(const mpd_t *x, uint32_t *status)
 
 /* Detect cases of certain overflow/underflow in the power function. */
 static int
-_qcheck_pow_bounds(mpd_t *result, const mpd_t *base, const mpd_t *exp, uint8_t resultsign,
+_qcheck_pow_bounds(mpd_t *result, const mpd_t *base, const mpd_t *exp,
+                   uint8_t resultsign,
                    const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_ssize_t bound;
@@ -5621,7 +5686,8 @@ mpd_qpow(mpd_t *result, const mpd_t *base, const mpd_t *exp,
 	}
 	if (mpd_isinfinite(exp)) {
 		/* power of one */
-		if ((cmp = _qcheck_pow_one_inf(result, base, resultsign, ctx, status)) == 0) {
+		cmp = _qcheck_pow_one_inf(result, base, resultsign, ctx, status);
+		if (cmp == 0) {
 			return;
 		}
 		else {
@@ -5681,7 +5747,8 @@ mpd_qpow(mpd_t *result, const mpd_t *base, const mpd_t *exp,
  * Function can fail with MPD_Malloc_error.
  */
 static inline void
-_mpd_qpowmod_uint(mpd_t *result, mpd_t *base, mpd_uint_t exp, mpd_t *mod, uint32_t *status)
+_mpd_qpowmod_uint(mpd_t *result, mpd_t *base, mpd_uint_t exp,
+                  mpd_t *mod, uint32_t *status)
 {
 	mpd_context_t maxcontext;
 
@@ -5704,7 +5771,8 @@ _mpd_qpowmod_uint(mpd_t *result, mpd_t *base, mpd_uint_t exp, mpd_t *mod, uint32
 
 /* The powmod function: (base**exp) % mod */
 void
-mpd_qpowmod(mpd_t *result, const mpd_t *base, const mpd_t *exp, const mpd_t *mod,
+mpd_qpowmod(mpd_t *result, const mpd_t *base, const mpd_t *exp,
+            const mpd_t *mod,
             const mpd_context_t *ctx, uint32_t *status)
 {
 	mpd_context_t maxcontext;
@@ -5878,7 +5946,8 @@ mpd_qquantize(mpd_t *result, const mpd_t *a, const mpd_t *b,
 		}
 	}
 
-	if (mpd_adjexp(result) > ctx->emax || mpd_adjexp(result) < mpd_etiny(ctx)) {
+	if (mpd_adjexp(result) > ctx->emax ||
+	    mpd_adjexp(result) < mpd_etiny(ctx)) {
 		mpd_seterror(result, MPD_Invalid_operation, status);
 		return;
 	}
@@ -5890,7 +5959,8 @@ mpd_qquantize(mpd_t *result, const mpd_t *a, const mpd_t *b,
 }
 
 void
-mpd_qreduce(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qreduce(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+            uint32_t *status)
 {
 	mpd_ssize_t shift, maxexp, maxshift;
 	uint8_t sign_a = mpd_sign(a);
@@ -6190,7 +6260,8 @@ mpd_same_quantum(const mpd_t *a, const mpd_t *b)
 
 /* Schedule the increase in precision for the Newton iteration. */
 static inline int
-recpr_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec, mpd_ssize_t initprec)
+recpr_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2],
+                    mpd_ssize_t maxprec, mpd_ssize_t initprec)
 {
 	mpd_ssize_t k;
 	int i;
@@ -6208,8 +6279,8 @@ recpr_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec, m
 }
 
 /*
- * Initial approximation for the reciprocal. Result has MPD_RDIGITS-2 significant
- * digits.
+ * Initial approximation for the reciprocal. Result has MPD_RDIGITS-2
+ * significant digits.
  */
 static void
 _mpd_qreciprocal_approx(mpd_t *z, const mpd_t *v, uint32_t *status)
@@ -6237,11 +6308,11 @@ _mpd_qreciprocal(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
                  uint32_t *status)
 {
 	mpd_context_t varcontext, maxcontext;
-	mpd_t *z = result;          /* current approximation */
-	mpd_t *v;                   /* a, normalized to a number between 0.1 and 1 */
-	MPD_NEW_SHARED(vtmp, a);    /* by default v will share data with a */
-	MPD_NEW_STATIC(s,0,0,0,0);  /* temporary variable */
-	MPD_NEW_STATIC(t,0,0,0,0);  /* temporary variable */
+	mpd_t *z = result;         /* current approximation */
+	mpd_t *v;                  /* a, normalized to a number between 0.1 and 1 */
+	MPD_NEW_SHARED(vtmp, a);   /* by default v will share data with a */
+	MPD_NEW_STATIC(s,0,0,0,0); /* temporary variable */
+	MPD_NEW_STATIC(t,0,0,0,0); /* temporary variable */
 	MPD_NEW_CONST(two,0,0,1,1,1,2); /* const 2 */
 	mpd_ssize_t klist[MPD_MAX_PREC_LOG2];
 	mpd_ssize_t adj, maxprec, initprec;
@@ -6301,8 +6372,9 @@ finish:
 /*
  * Integer division with remainder of the coefficients: coeff(a) / coeff(b).
  * This function is for large numbers where it is faster to divide by
- * multiplying the dividend by the reciprocal of the divisor. The inexact
- * result is fixed by a small loop, which should not take more than 2 iterations.
+ * multiplying the dividend by the reciprocal of the divisor.
+ * The inexact result is fixed by a small loop, which should not take
+ * more than 2 iterations.
  */
 static void
 _mpd_qbarrett_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
@@ -6386,7 +6458,8 @@ nanresult:
 }
 
 static inline int
-invroot_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2], mpd_ssize_t maxprec, mpd_ssize_t initprec)
+invroot_schedule_prec(mpd_ssize_t klist[MPD_MAX_PREC_LOG2],
+                      mpd_ssize_t maxprec, mpd_ssize_t initprec)
 {
 	mpd_ssize_t k;
 	int i;
@@ -6451,8 +6524,8 @@ _mpd_qinvroot(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 {
 	uint32_t workstatus = 0;
 	mpd_context_t varcontext, maxcontext;
-	mpd_t *z = result;         /* z: current approximation */
-	mpd_t *v;                  /* v: a, normalized to a number between 1 and 100 */
+	mpd_t *z = result;         /* current approximation */
+	mpd_t *v;                  /* a, normalized to a number between 1 and 100 */
 	MPD_NEW_SHARED(vtmp, a);   /* by default v will share data with a */
 	MPD_NEW_STATIC(s,0,0,0,0); /* temporary variable */
 	MPD_NEW_STATIC(t,0,0,0,0); /* temporary variable */
@@ -6608,12 +6681,13 @@ _mpd_fix_sqrt(mpd_t *result, const mpd_t *a, mpd_t *tmp,
 }
 
 void
-mpd_qsqrt(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status)
+mpd_qsqrt(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
+          uint32_t *status)
 {
 	uint32_t workstatus = 0;
 	mpd_context_t varcontext;
-	mpd_t *z = result;         /* z: current approximation */
-	MPD_NEW_STATIC(v,0,0,0,0); /* v: a, normalized to a number between 1 and 10 */
+	mpd_t *z = result;         /* current approximation */
+	MPD_NEW_STATIC(v,0,0,0,0); /* a, normalized to a number between 1 and 10 */
 	MPD_NEW_STATIC(vtmp,0,0,0,0);
 	MPD_NEW_STATIC(tmp,0,0,0,0);
 	MPD_NEW_STATIC(aa,0,0,0,0);
@@ -6762,7 +6836,7 @@ mpd_sizeinbase(mpd_t *a, uint32_t base)
 #else /* CONFIG_32 */
 {
 	double y =  x / log10(base) + 3;
-	return (y > SIZE_MAX) ? SIZE_MAX : y;
+	return (y > SIZE_MAX) ? SIZE_MAX : (size_t)y;
 }
 #endif
 }
@@ -6781,7 +6855,7 @@ _mpd_importsize(size_t srclen, uint32_t base)
 	if (srclen > (1ULL<<53)) {
 		return MPD_SSIZE_MAX;
 	}
-        x = (double)srclen * (log10(base)/MPD_RDIGITS) + 3;
+	x = (double)srclen * (log10(base)/MPD_RDIGITS) + 3;
   #endif
 #else
 	double x = srclen * (log10(base)/MPD_RDIGITS) + 3;
@@ -6878,8 +6952,9 @@ _baseconv_to_larger(mpd_uint_t *w, mpd_ssize_t wlen, mpd_uint_t wbase,
 
 
 /*
- * Converts an integer mpd_t to a multiprecision integer with base <= UINT16_MAX+1.
- * The least significant word of the result is rdata[0].
+ * Converts an integer mpd_t to a multiprecision integer with
+ * base <= UINT16_MAX+1. The least significant word of the result
+ * is rdata[0].
  */
 size_t
 mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t rbase,
@@ -6925,8 +7000,9 @@ mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t rbase,
 }
 
 /*
- * Converts an integer mpd_t to a multiprecision integer with base <= UINT32_MAX.
- * The least significant word of the result is rdata[0].
+ * Converts an integer mpd_t to a multiprecision integer with
+ * base <= UINT32_MAX. The least significant word of the result
+ * is rdata[0].
  */
 size_t
 mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t rbase,
@@ -6970,13 +7046,16 @@ mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t rbase,
 	}
 
 #ifdef CONFIG_64
-	n = _baseconv_to_smaller(rdata, rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
+	n = _baseconv_to_smaller(rdata, rlen, rbase,
+	                         tsrc->data, tsrc->len, MPD_RADIX);
 #else
 	if (rbase <= MPD_RADIX) {
-		n = _baseconv_to_smaller(rdata, rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
+		n = _baseconv_to_smaller(rdata, rlen, rbase,
+		                         tsrc->data, tsrc->len, MPD_RADIX);
 	}
 	else {
-		_baseconv_to_larger(rdata, (mpd_ssize_t)rlen, rbase, tsrc->data, tsrc->len, MPD_RADIX);
+		_baseconv_to_larger(rdata, (mpd_ssize_t)rlen, rbase,
+		                    tsrc->data, tsrc->len, MPD_RADIX);
 		n = _mpd_real_size(rdata, (mpd_ssize_t)rlen);
 	}
 #endif
@@ -7077,13 +7156,16 @@ mpd_qimport_u32(mpd_t *result,
 	}
 
 #ifdef CONFIG_64
-	_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, srcbase);
+	_baseconv_to_larger(result->data, rlen, MPD_RADIX,
+	                    usrc, srclen, srcbase);
 #else
 	if (srcbase <= MPD_RADIX) {
-		_baseconv_to_larger(result->data, rlen, MPD_RADIX, usrc, srclen, srcbase);
+		_baseconv_to_larger(result->data, rlen, MPD_RADIX,
+		                    usrc, srclen, srcbase);
 	}
 	else {
-		_baseconv_to_smaller(result->data, rlen, MPD_RADIX, usrc, (mpd_ssize_t)srclen, srcbase);
+		_baseconv_to_smaller(result->data, rlen, MPD_RADIX,
+		                     usrc, (mpd_ssize_t)srclen, srcbase);
 	}
 #endif
 
