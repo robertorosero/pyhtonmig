@@ -261,7 +261,8 @@ x64_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
 }
 
 static inline void
-x64_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1, mpd_uint_t m)
+x64_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+            mpd_uint_t m)
 {
 	*a0 = x64_mulmod(*a0, b0, m);
 	*a1 = x64_mulmod(*a1, b1, m);
@@ -334,7 +335,8 @@ ppro_mulmod(mpd_uint_t a, mpd_uint_t b, double *dmod, uint32_t *dinvmod)
 
 /* all operands < dmod */
 static inline void
-ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w, double *dmod, uint32_t *dinvmod)
+ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w,
+              double *dmod, uint32_t *dinvmod)
 {
 
 	asm(
@@ -368,7 +370,8 @@ ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w, double *dmod, uint32
 
 /* all operands < dmod */
 static inline void
-ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1, double *dmod, uint32_t *dinvmod)
+ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+             double *dmod, uint32_t *dinvmod)
 {
 
 	asm(
@@ -438,7 +441,8 @@ ppro_mulmod(mpd_uint_t a, mpd_uint_t b, double *dmod, uint32_t *dinvmod)
 
 /* all operands < dmod */
 static inline mpd_uint_t __cdecl
-ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w, double *dmod, uint32_t *dinvmod)
+ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w,
+              double *dmod, uint32_t *dinvmod)
 {
 	__asm {
 		mov	ecx, dmod
@@ -472,7 +476,8 @@ ppro_mulmod2c(mpd_uint_t *a0, mpd_uint_t *a1, mpd_uint_t w, double *dmod, uint32
 
 /* all operands < dmod */
 static inline void __cdecl
-ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1, double *dmod, uint32_t *dinvmod)
+ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+             double *dmod, uint32_t *dinvmod)
 {
 	__asm {
 		mov	ecx, dmod
