@@ -39,7 +39,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 static inline void
-_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d)
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
 {
 	mpd_uint_t qq, rr;
 
@@ -64,7 +65,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 	*lo = _umul128(a, b, hi);
 }
 
-void _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d);
+void _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+                    mpd_uint_t d);
 /* END _MSC_VER (amd64) */
 
 #else
@@ -133,7 +135,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 static inline void
-_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d)
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
 {
 	mpd_uuint_t hl;
 
@@ -160,7 +163,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 static inline void
-_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d)
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
 {
 	mpd_uint_t qq, rr;
 
@@ -193,7 +197,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 static inline void __cdecl
-_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t d)
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
 {
 	mpd_uint_t qq, rr;
 
