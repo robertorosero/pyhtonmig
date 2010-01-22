@@ -94,27 +94,27 @@ static PyObject *DecimalException = NULL;
 
 /* Exceptions that correspond to IEEE signals; inherit from DecimalException */
 static DecCondMap signal_map[] = {
-	{"InvalidOperation", "cdecimal.InvalidOperation", MPD_IEEE_Invalid_operation, NULL},
-	{"DivisionByZero", "cdecimal.DivisionByZero", MPD_Division_by_zero, NULL},
-	{"Overflow", "cdecimal.Overflow", MPD_Overflow, NULL},
-	{"Underflow", "cdecimal.Underflow", MPD_Underflow, NULL},
-	{"Subnormal", "cdecimal.Subnormal", MPD_Subnormal, NULL},
-	{"Inexact", "cdecimal.Inexact", MPD_Inexact, NULL},
-	{"Rounded", "cdecimal.Rounded", MPD_Rounded, NULL},
-	{"Clamped", "cdecimal.Clamped", MPD_Clamped, NULL},
-	{NULL}
+  {"InvalidOperation", "cdecimal.InvalidOperation", MPD_IEEE_Invalid_operation, NULL},
+  {"DivisionByZero", "cdecimal.DivisionByZero", MPD_Division_by_zero, NULL},
+  {"Overflow", "cdecimal.Overflow", MPD_Overflow, NULL},
+  {"Underflow", "cdecimal.Underflow", MPD_Underflow, NULL},
+  {"Subnormal", "cdecimal.Subnormal", MPD_Subnormal, NULL},
+  {"Inexact", "cdecimal.Inexact", MPD_Inexact, NULL},
+  {"Rounded", "cdecimal.Rounded", MPD_Rounded, NULL},
+  {"Clamped", "cdecimal.Clamped", MPD_Clamped, NULL},
+  {NULL}
 };
 
 /* Exceptions that inherit from InvalidOperation */
 static DecCondMap cond_map[] = {
-	{"InvalidOperation", "cdecimal.InvalidOperation", MPD_Invalid_operation, NULL},
-	{"ConversionSyntax", "cdecimal.ConversionSyntax", MPD_Conversion_syntax, NULL},
-	{"DivisionImpossible", "cdecimal.DivisionImpossible", MPD_Division_impossible, NULL},
-	{"DivisionUndefined", "cdecimal.DivisionUndefined", MPD_Division_undefined, NULL},
-	{"FpuError", "cdecimal.FpuError", MPD_Fpu_error, NULL},
-	{"InvalidContext", "cdecimal.InvalidContext", MPD_Invalid_context, NULL},
-	{"MallocError", "cdecimal.MallocError", MPD_Malloc_error, NULL},
-	{NULL}
+  {"InvalidOperation", "cdecimal.InvalidOperation", MPD_Invalid_operation, NULL},
+  {"ConversionSyntax", "cdecimal.ConversionSyntax", MPD_Conversion_syntax, NULL},
+  {"DivisionImpossible", "cdecimal.DivisionImpossible", MPD_Division_impossible, NULL},
+  {"DivisionUndefined", "cdecimal.DivisionUndefined", MPD_Division_undefined, NULL},
+  {"FpuError", "cdecimal.FpuError", MPD_Fpu_error, NULL},
+  {"InvalidContext", "cdecimal.InvalidContext", MPD_Invalid_context, NULL},
+  {"MallocError", "cdecimal.MallocError", MPD_Malloc_error, NULL},
+  {NULL}
 };
 
 static const char *dec_signal_string[MPD_NUM_FLAGS] = {
@@ -258,7 +258,7 @@ PyLong_AsMpdFlags(PyObject *v)
 	long x;
 
 	if (!PyLong_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "long argument required"); 
+		PyErr_SetString(PyExc_TypeError, "long argument required");
 		return UINT32_MAX;
 	}
 
@@ -436,7 +436,7 @@ signaldict_richcompare(PyObject *a, PyObject *b, int op)
 	if (PyDecSignalDict_Check(b)) {
 		signaldict_update(b);
 	}
-        return PyDict_Type.tp_richcompare(a, b, op);
+	return PyDict_Type.tp_richcompare(a, b, op);
 }
  
 static int
@@ -514,14 +514,14 @@ static int
 signaldict_print(PyObject *self, FILE *fp, int flags)
 {
 	signaldict_update(self);
-        return PyDict_Type.tp_print(self, fp, flags);
+	return PyDict_Type.tp_print(self, fp, flags);
 }
 
 static PyObject *
 signaldict_repr(PyObject *self)
 {
 	signaldict_update(self);
-        return PyDict_Type.tp_repr(self);
+	return PyDict_Type.tp_repr(self);
 }
 
 static PyObject *
@@ -533,13 +533,13 @@ signaldict_sizeof(PyObject *self)
 static int
 signaldict_ass_sub(PyObject *self, PyObject *v, PyObject *w)
 {
-        if (w == NULL) {
+	if (w == NULL) {
 		PyErr_SetString(PyExc_ValueError,
 		                "signal keys cannot be deleted");
 		return -1;
 	}
-        else {
-                return signaldict_setitem(self, v, w);
+	else {
+		return signaldict_setitem(self, v, w);
 	}
 }
 
@@ -559,22 +559,22 @@ signaldict_values(PyObject *self)
 
 
 static PyMappingMethods signaldict_as_mapping = {
-        (lenfunc)signaldict_length,        /*mp_length*/
-        (binaryfunc)signaldict_subscript,  /*mp_subscript*/
-        (objobjargproc)signaldict_ass_sub  /*mp_ass_subscript*/
+	(lenfunc)signaldict_length,        /*mp_length*/
+	(binaryfunc)signaldict_subscript,  /*mp_subscript*/
+	(objobjargproc)signaldict_ass_sub  /*mp_ass_subscript*/
 };
 
 static PySequenceMethods signaldict_as_sequence = {
-        0,                      /* sq_length */
-        0,                      /* sq_concat */
-        0,                      /* sq_repeat */
-        0,                      /* sq_item */
-        0,                      /* sq_slice */
-        0,                      /* sq_ass_item */
-        0,                      /* sq_ass_slice */
-        signaldict_contains,    /* sq_contains */
-        0,                      /* sq_inplace_concat */
-        0,                      /* sq_inplace_repeat */
+	0,                      /* sq_length */
+	0,                      /* sq_concat */
+	0,                      /* sq_repeat */
+	0,                      /* sq_item */
+	0,                      /* sq_slice */
+	0,                      /* sq_ass_item */
+	0,                      /* sq_ass_slice */
+	signaldict_contains,    /* sq_contains */
+	0,                      /* sq_inplace_concat */
+	0,                      /* sq_inplace_repeat */
 };
 
 static PyMethodDef mapp_methods[] = {
@@ -630,7 +630,7 @@ static PyTypeObject PyDecSignalDict_Type =
 	0,                                        /* tp_descr_get */
 	0,                                        /* tp_descr_set */
 	0,                                        /* tp_dictoffset */
-        (initproc)signaldict_init,                /* tp_init */
+	(initproc)signaldict_init,                /* tp_init */
 };
 
 
@@ -867,7 +867,7 @@ context_setcapitals(PyObject *self, PyObject *value, void *closure UNUSED)
 		return -1;
 	}
 
-	((PyDecContextObject *)self)->capitals = x;
+	((PyDecContextObject *)self)->capitals = (int)x;
 
 	return 0;
 }
@@ -1070,12 +1070,12 @@ context_setattr(PyObject *self, PyObject *name, PyObject *value)
 	}
 
 	if (strcmp(PyBytes_AS_STRING(s), "traps") == 0) {
-                if (context_settraps_dict(self, value) < 0) {
+		if (context_settraps_dict(self, value) < 0) {
 			retval = -1;
 		}
 	}
 	else if (strcmp(PyBytes_AS_STRING(s), "flags") == 0) {
-                if (context_setstatus_dict(self, value) < 0) {
+		if (context_setstatus_dict(self, value) < 0) {
 			retval = -1;
 		}
 	}
@@ -1152,7 +1152,7 @@ context_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	static char *kwlist[] = {
 	  "prec", "Emin", "Emax", "rounding", "capitals",
-          "traps", "flags", "_clamp", "_allcr", NULL
+	  "traps", "flags", "_clamp", "_allcr", NULL
 	};
 	PyObject *traps = NULL;
 	PyObject *status = NULL;
@@ -1225,16 +1225,17 @@ context_repr(PyDecContextObject *self)
 	mpd_context_t *ctx;
 	char s[FD_CTX_LEN];
 	char *cp;
-	ssize_t n, mem;
+	int n, mem;
 
 	assert(PyDecContext_Check(self));
 	ctx = CtxAddr(self);
 
 	cp = s; mem = FD_CTX_LEN;
-	n = snprintf(cp, mem, "Context(prec=%"PRI_mpd_ssize_t", Emin=%"PRI_mpd_ssize_t""
-	                      ", Emax=%"PRI_mpd_ssize_t", rounding=%s, capitals=%d, traps=",
-	                      ctx->prec, ctx->emin, ctx->emax, mpd_round_string[ctx->round],
-	                      self->capitals);
+	n = snprintf(cp, mem,
+	             "Context(prec=%"PRI_mpd_ssize_t", Emin=%"PRI_mpd_ssize_t""
+	             ", Emax=%"PRI_mpd_ssize_t", rounding=%s, capitals=%d, traps=",
+	             ctx->prec, ctx->emin, ctx->emax, mpd_round_string[ctx->round],
+	             self->capitals);
 	if (n < 0 || n >= mem) return NULL;
 	cp += n; mem -= n;
 
@@ -1273,7 +1274,8 @@ context_copy(PyObject *self)
 	*ctx = *CtxAddr(self);
 	ctx->status = 0;
 	ctx->newtrap = 0;
-	((PyDecContextObject *)newob)->capitals = ((PyDecContextObject *)self)->capitals;
+	((PyDecContextObject *)newob)->capitals =
+	    ((PyDecContextObject *)self)->capitals;
 
 	return newob;
 }
@@ -1295,32 +1297,32 @@ context_reduce(PyObject *self, PyObject *args UNUSED)
 
 static PyGetSetDef context_getsets [] =
 {
-	{ "prec", (getter)context_getprec, (setter)context_setprec, NULL, NULL},
-	{ "Emax", (getter)context_getemax, (setter)context_setemax, NULL, NULL},
-	{ "Emin", (getter)context_getemin, (setter)context_setemin, NULL, NULL},
-	{ "rounding", (getter)context_getround, (setter)context_setround, NULL, NULL},
-	{ "capitals", (getter)context_getcapitals, (setter)context_setcapitals, NULL, NULL},
-	{ "_clamp", (getter)context_getclamp, (setter)context_setclamp, NULL, NULL},
-	{ "_allcr", (getter)context_getallcr, (setter)context_setallcr, NULL, NULL},
-	{ "_traps", (getter)context_gettraps, (setter)context_settraps, NULL, NULL},
-	{ "_flags", (getter)context_getstatus, (setter)context_setstatus, NULL, NULL},
-	{NULL}
+  { "prec", (getter)context_getprec, (setter)context_setprec, NULL, NULL},
+  { "Emax", (getter)context_getemax, (setter)context_setemax, NULL, NULL},
+  { "Emin", (getter)context_getemin, (setter)context_setemin, NULL, NULL},
+  { "rounding", (getter)context_getround, (setter)context_setround, NULL, NULL},
+  { "capitals", (getter)context_getcapitals, (setter)context_setcapitals, NULL, NULL},
+  { "_clamp", (getter)context_getclamp, (setter)context_setclamp, NULL, NULL},
+  { "_allcr", (getter)context_getallcr, (setter)context_setallcr, NULL, NULL},
+  { "_traps", (getter)context_gettraps, (setter)context_settraps, NULL, NULL},
+  { "_flags", (getter)context_getstatus, (setter)context_setstatus, NULL, NULL},
+  {NULL}
 };
 
 
 #define CONTEXT_CHECK(obj) \
-	if (!PyDecContext_Check(obj)) {                \
-		PyErr_SetString( PyExc_TypeError,    \
-		    "argument must be a context" );  \
-		return NULL;                         \
-	}
+        if (!PyDecContext_Check(obj)) {             \
+                PyErr_SetString( PyExc_TypeError,   \
+                    "argument must be a context" ); \
+                return NULL;                        \
+        }
 
 #define CONTEXT_CHECK_VA(obj) \
-	if (!PyDecContext_Check(obj)) {                         \
-		PyErr_SetString( PyExc_TypeError,             \
-		    "optional argument must be a context" );  \
-		return NULL;                                  \
-	}
+        if (!PyDecContext_Check(obj)) {                       \
+                PyErr_SetString( PyExc_TypeError,             \
+                    "optional argument must be a context" );  \
+                return NULL;                                  \
+        }
 
 
 /******************************************************************************/
@@ -1484,7 +1486,8 @@ ctxmanager_new(PyObject *self UNUSED, PyObject *args)
 	}
 	CONTEXT_CHECK_VA(src);
 
-	ctx_mgr = PyObject_New(PyDecContextManagerObject, &PyDecContextManager_Type);
+	ctx_mgr = PyObject_New(PyDecContextManagerObject,
+	                       &PyDecContextManager_Type);
 	if (ctx_mgr == NULL) {
 		return NULL;
 	}
@@ -1521,7 +1524,8 @@ ctxmanager_set_local(PyDecContextManagerObject *self, PyObject *args UNUSED)
 }
 
 static PyObject *
-ctxmanager_restore_default(PyDecContextManagerObject *self, PyObject *args UNUSED)
+ctxmanager_restore_default(PyDecContextManagerObject *self,
+                           PyObject *args UNUSED)
 {
 	if (set_dflt_ctx(self->global) == NULL) {
 		return NULL;
@@ -1884,7 +1888,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 		else {
 			Py_DECREF(tmp);
 			PyErr_SetString(PyExc_ValueError,
-			 	        "string argument in the third position "
+			                "string argument in the third position "
 			                "must be 'F', 'n' or 'N'");
 			return NULL;
 		}
@@ -1936,7 +1940,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 		        	        "coefficient must be a tuple of digits");
 			return NULL;
 		}
-		*cp++ = l + '0';
+		*cp++ = (char)l + '0';
 	}
 	*cp = '\0';
 
@@ -2044,35 +2048,36 @@ convert_op(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
 }
 
 #define CONVERT_OP(v, a, ctx) \
-	if (!convert_op(v, a, ctx)) {     \
-		return (PyObject *) *(a); \
-	}
+        if (!convert_op(v, a, ctx)) {     \
+                return (PyObject *) *(a); \
+        }
 
 #define CONVERT_BINOP(v, w, a, b, ctx) \
-	if (!convert_op(v, a, ctx)) {     \
-		return (PyObject *) *(a); \
-	}                                 \
-	if (!convert_op(w, b, ctx)) {     \
-		Py_DECREF(*(a));          \
-		return (PyObject *) *(b); \
-	}
+        if (!convert_op(v, a, ctx)) {     \
+                return (PyObject *) *(a); \
+        }                                 \
+        if (!convert_op(w, b, ctx)) {     \
+                Py_DECREF(*(a));          \
+                return (PyObject *) *(b); \
+        }
 
 #define CONVERT_TERNOP(v, w, x, a, b, c, ctx) \
-	if (!convert_op(v, a, ctx)) {         \
-		return (PyObject *) *(a);     \
-	}                                     \
-	if (!convert_op(w, b, ctx)) {         \
-		Py_DECREF(*(a));              \
-		return (PyObject *) *(b);     \
-	}                                     \
-	if (!convert_op(x, c, ctx)) {         \
-		Py_DECREF(*(a));              \
-		Py_DECREF(*(b));              \
-		return (PyObject *) *(c);     \
-	}
+        if (!convert_op(v, a, ctx)) {         \
+                return (PyObject *) *(a);     \
+        }                                     \
+        if (!convert_op(w, b, ctx)) {         \
+                Py_DECREF(*(a));              \
+                return (PyObject *) *(b);     \
+        }                                     \
+        if (!convert_op(x, c, ctx)) {         \
+                Py_DECREF(*(a));              \
+                Py_DECREF(*(b));              \
+                return (PyObject *) *(c);     \
+        }
 
 
-/* Same as convert_op(), but set an error instead of returning NotImplemented. */
+/* Same as convert_op(), but set an error instead of returning
+ * NotImplemented. */
 static int
 convert_op_set(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
 {
@@ -2096,32 +2101,32 @@ convert_op_set(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
 }
 
 #define CONVERT_OP_SET(v, a, ctx) \
-	if (!convert_op_set(v, a, ctx)) { \
-		return NULL;              \
-	}
+        if (!convert_op_set(v, a, ctx)) { \
+                return NULL;              \
+        }
 
 #define CONVERT_BINOP_SET(v, w, a, b, ctx) \
-	if (!convert_op_set(v, a, ctx)) {  \
-		return NULL;               \
-	}                                  \
-	if (!convert_op_set(w, b, ctx)) {  \
-		Py_DECREF(*(a));           \
-		return NULL;               \
-	}
+        if (!convert_op_set(v, a, ctx)) {  \
+                return NULL;               \
+        }                                  \
+        if (!convert_op_set(w, b, ctx)) {  \
+                Py_DECREF(*(a));           \
+                return NULL;               \
+        }
 
 #define CONVERT_TERNOP_SET(v, w, x, a, b, c, ctx) \
-	if (!convert_op_set(v, a, ctx)) {         \
-		return NULL;                      \
-	}                                         \
-	if (!convert_op_set(w, b, ctx)) {         \
-		Py_DECREF(*(a));                  \
-		return NULL;                      \
-	}                                         \
-	if (!convert_op_set(x, c, ctx)) {         \
-		Py_DECREF(*(a));                  \
-		Py_DECREF(*(b));                  \
-		return NULL;                      \
-	}
+        if (!convert_op_set(v, a, ctx)) {         \
+                return NULL;                      \
+        }                                         \
+        if (!convert_op_set(w, b, ctx)) {         \
+                Py_DECREF(*(a));                  \
+                return NULL;                      \
+        }                                         \
+        if (!convert_op_set(x, c, ctx)) {         \
+                Py_DECREF(*(a));                  \
+                Py_DECREF(*(b));                  \
+                return NULL;                      \
+        }
 
 static PyObject *dec_subtype_new(PyTypeObject *type, PyObject *args,
                                  PyObject *kwds);
@@ -2744,7 +2749,8 @@ PyDec_Round(PyObject *self, PyObject *args)
 		mpd_ssize_t y;
 
 		if (!PyLong_Check(x)) {
-			PyErr_SetString(PyExc_ValueError, "optional arg must be an integer");
+			PyErr_SetString(PyExc_ValueError,
+			                "optional arg must be an integer");
 			return NULL;
 		}
 
@@ -2903,8 +2909,8 @@ finish:
 static PyObject *                                                    \
 _Dec_##MPDFUNC(PyObject *self)                                       \
 {                                                                    \
-	PyDecObject *a = (PyDecObject *) self;                       \
-	return MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
+        PyDecObject *a = (PyDecObject *) self;                       \
+        return MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
 }
 
 /* The operand is guaranteed to be a PyDecObject. */
@@ -2912,8 +2918,8 @@ _Dec_##MPDFUNC(PyObject *self)                                       \
 static PyObject *                                                    \
 _Dec_CFunc_##MPDFUNC(PyObject *self, PyObject *dummy UNUSED)         \
 {                                                                    \
-	PyDecObject *a = (PyDecObject *) self;                       \
-	return MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
+        PyDecObject *a = (PyDecObject *) self;                       \
+        return MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
 }
 
 /* Operand is a PyDecObject. Uses optional context if supplied.
@@ -2922,19 +2928,19 @@ _Dec_CFunc_##MPDFUNC(PyObject *self, PyObject *dummy UNUSED)         \
 static PyObject *                                                         \
 _DecOpt_##MPDFUNC(PyObject *self, PyObject *args)                         \
 {                                                                         \
-	PyDecObject *a = (PyDecObject *) self;                            \
-	PyObject *ctxobj;                                                 \
-	mpd_context_t *ctx;                                               \
-	                                                                  \
-	ctxobj = dflt_ctx();                                              \
-	if (!PyArg_ParseTuple(args, "|O", &ctxobj)) {                     \
-		return NULL;                                              \
-	}                                                                 \
-	                                                                  \
-	CONTEXT_CHECK_VA(ctxobj);                                         \
-	ctx = CtxAddr(ctxobj);                                            \
-	                                                                  \
-	return MPDFUNC(a->dec, ctx) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
+        PyDecObject *a = (PyDecObject *) self;                            \
+        PyObject *ctxobj;                                                 \
+        mpd_context_t *ctx;                                               \
+                                                                          \
+        ctxobj = dflt_ctx();                                              \
+        if (!PyArg_ParseTuple(args, "|O", &ctxobj)) {                     \
+                return NULL;                                              \
+        }                                                                 \
+                                                                          \
+        CONTEXT_CHECK_VA(ctxobj);                                         \
+        ctx = CtxAddr(ctxobj);                                            \
+                                                                          \
+        return MPDFUNC(a->dec, ctx) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
 }
 
 /* Operand is a PyDecObject. Uses the default module context.
@@ -2943,23 +2949,23 @@ _DecOpt_##MPDFUNC(PyObject *self, PyObject *args)                         \
 static PyObject *                                   \
 _Dec_##MPDFUNC(PyObject *self)                      \
 {                                                   \
-	PyDecObject *a = (PyDecObject *) self;      \
-	PyDecObject *result;                        \
-	uint32_t status = 0;                        \
-	mpd_context_t *ctx;                         \
-	                                            \
-	if ((result = dec_alloc()) == NULL) {       \
-		return NULL;                        \
-	}                                           \
-	                                            \
-	ctx = mpd_ctx();                            \
-	MPDFUNC(result->dec, a->dec, ctx, &status); \
-	if (dec_addstatus(ctx, status)) {           \
-		Py_DECREF(result);                  \
-		return NULL;                        \
-	}                                           \
+        PyDecObject *a = (PyDecObject *) self;      \
+        PyDecObject *result;                        \
+        uint32_t status = 0;                        \
+        mpd_context_t *ctx;                         \
                                                     \
-	return (PyObject *) result;                 \
+        if ((result = dec_alloc()) == NULL) {       \
+                return NULL;                        \
+        }                                           \
+                                                    \
+        ctx = mpd_ctx();                            \
+        MPDFUNC(result->dec, a->dec, ctx, &status); \
+        if (dec_addstatus(ctx, status)) {           \
+                Py_DECREF(result);                  \
+                return NULL;                        \
+        }                                           \
+                                                    \
+        return (PyObject *) result;                 \
 }
 
 /* Operand is a PyDecObject. Uses the default module context.
@@ -2968,23 +2974,23 @@ _Dec_##MPDFUNC(PyObject *self)                      \
 static PyObject *                                            \
 _Dec_CFunc_##MPDFUNC(PyObject *self, PyObject *dummy UNUSED) \
 {                                                            \
-	PyDecObject *a = (PyDecObject *) self;               \
-	PyDecObject *result;                                 \
-	uint32_t status = 0;                                 \
-	mpd_context_t *ctx;                                  \
-	                                                     \
-	if ((result = dec_alloc()) == NULL) {                \
-		return NULL;                                 \
-	}                                                    \
-	                                                     \
-	ctx = mpd_ctx();                                     \
-	MPDFUNC(result->dec, a->dec, ctx, &status);          \
-	if (dec_addstatus(ctx, &status)) {                   \
-		Py_DECREF(result);                           \
-		return NULL;                                 \
-	}                                                    \
-	                                                     \
-	return (PyObject *) result;                          \
+        PyDecObject *a = (PyDecObject *) self;               \
+        PyDecObject *result;                                 \
+        uint32_t status = 0;                                 \
+        mpd_context_t *ctx;                                  \
+                                                             \
+        if ((result = dec_alloc()) == NULL) {                \
+                return NULL;                                 \
+        }                                                    \
+                                                             \
+        ctx = mpd_ctx();                                     \
+        MPDFUNC(result->dec, a->dec, ctx, &status);          \
+        if (dec_addstatus(ctx, &status)) {                   \
+                Py_DECREF(result);                           \
+                return NULL;                                 \
+        }                                                    \
+                                                             \
+        return (PyObject *) result;                          \
 }
 
 /* Operand is a PyDecObject. Uses optional context if supplied.
@@ -2993,31 +2999,31 @@ _Dec_CFunc_##MPDFUNC(PyObject *self, PyObject *dummy UNUSED) \
 static PyObject *                                     \
 _DecOpt_##MPDFUNC(PyObject *self, PyObject *args)     \
 {                                                     \
-	PyDecObject *a = (PyDecObject *) self;        \
-	PyDecObject *result;                          \
-	PyObject *ctxobj;                             \
-	uint32_t status = 0;                          \
-	mpd_context_t *ctx;                           \
-	                                              \
-	ctxobj = dflt_ctx();                          \
-	if (!PyArg_ParseTuple(args, "|O", &ctxobj)) { \
-		return NULL;                          \
-	}                                             \
-	                                              \
-	CONTEXT_CHECK_VA(ctxobj);                     \
-	ctx = CtxAddr(ctxobj);                        \
-	                                              \
-	if ((result = dec_alloc()) == NULL) {         \
-		return NULL;                          \
-	}                                             \
-	                                              \
-	MPDFUNC(result->dec, a->dec, ctx, &status);   \
-	if (dec_addstatus(ctx, status)) {             \
-		Py_DECREF(result);                    \
-		return NULL;                          \
-	}                                             \
+        PyDecObject *a = (PyDecObject *) self;        \
+        PyDecObject *result;                          \
+        PyObject *ctxobj;                             \
+        uint32_t status = 0;                          \
+        mpd_context_t *ctx;                           \
                                                       \
-	return (PyObject *) result;                   \
+        ctxobj = dflt_ctx();                          \
+        if (!PyArg_ParseTuple(args, "|O", &ctxobj)) { \
+                return NULL;                          \
+        }                                             \
+                                                      \
+        CONTEXT_CHECK_VA(ctxobj);                     \
+        ctx = CtxAddr(ctxobj);                        \
+                                                      \
+        if ((result = dec_alloc()) == NULL) {         \
+                return NULL;                          \
+        }                                             \
+                                                      \
+        MPDFUNC(result->dec, a->dec, ctx, &status);   \
+        if (dec_addstatus(ctx, status)) {             \
+                Py_DECREF(result);                    \
+                return NULL;                          \
+        }                                             \
+                                                      \
+        return (PyObject *) result;                   \
 }
 
 
@@ -3027,29 +3033,29 @@ _DecOpt_##MPDFUNC(PyObject *self, PyObject *args)     \
 static PyObject *                                           \
 _Dec_##MPDFUNC(PyObject *v, PyObject *w)                    \
 {                                                           \
-	PyDecObject *a, *b;                                 \
-	PyDecObject *result;                                \
-	uint32_t status = 0;                                \
-	mpd_context_t *ctx;                                 \
-	                                                    \
-	ctx = mpd_ctx();                                    \
-	CONVERT_BINOP(v, w, &a, &b, ctx);                   \
-	                                                    \
-	if ((result = dec_alloc()) == NULL) {               \
-		Py_DECREF(a);                               \
-		Py_DECREF(b);                               \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
-	Py_DECREF(a);                                       \
-	Py_DECREF(b);                                       \
-	if (dec_addstatus(ctx, status)) {                   \
-		Py_DECREF(result);                          \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	return (PyObject *) result;                         \
+        PyDecObject *a, *b;                                 \
+        PyDecObject *result;                                \
+        uint32_t status = 0;                                \
+        mpd_context_t *ctx;                                 \
+                                                            \
+        ctx = mpd_ctx();                                    \
+        CONVERT_BINOP(v, w, &a, &b, ctx);                   \
+                                                            \
+        if ((result = dec_alloc()) == NULL) {               \
+                Py_DECREF(a);                               \
+                Py_DECREF(b);                               \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
+        Py_DECREF(a);                                       \
+        Py_DECREF(b);                                       \
+        if (dec_addstatus(ctx, status)) {                   \
+                Py_DECREF(result);                          \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        return (PyObject *) result;                         \
 }
 
 /* Operands are Python Objects. Uses optional context if supplied.
@@ -3058,37 +3064,37 @@ _Dec_##MPDFUNC(PyObject *v, PyObject *w)                    \
 static PyObject *                                           \
 _DecOpt_##MPDFUNC(PyObject *v, PyObject *args)              \
 {                                                           \
-	PyObject *w, *ctxobj;                               \
-	PyDecObject *a, *b;                                 \
-	PyDecObject *result;                                \
-	uint32_t status = 0;                                \
-	mpd_context_t *ctx;                                 \
-	                                                    \
-	ctxobj = dflt_ctx();                                \
-	if (!PyArg_ParseTuple(args, "O|O", &w, &ctxobj)) {  \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	CONTEXT_CHECK_VA(ctxobj);                           \
-	ctx = CtxAddr(ctxobj);                              \
-	                                                    \
-	CONVERT_BINOP_SET(v, w, &a, &b, ctx);               \
-	                                                    \
-	if ((result = dec_alloc()) == NULL) {               \
-		Py_DECREF(a);                               \
-		Py_DECREF(b);                               \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
-	Py_DECREF(a);                                       \
-	Py_DECREF(b);                                       \
-	if (dec_addstatus(ctx, status)) {                   \
-		Py_DECREF(result);                          \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	return (PyObject *) result;                         \
+        PyObject *w, *ctxobj;                               \
+        PyDecObject *a, *b;                                 \
+        PyDecObject *result;                                \
+        uint32_t status = 0;                                \
+        mpd_context_t *ctx;                                 \
+                                                            \
+        ctxobj = dflt_ctx();                                \
+        if (!PyArg_ParseTuple(args, "O|O", &w, &ctxobj)) {  \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        CONTEXT_CHECK_VA(ctxobj);                           \
+        ctx = CtxAddr(ctxobj);                              \
+                                                            \
+        CONVERT_BINOP_SET(v, w, &a, &b, ctx);               \
+                                                            \
+        if ((result = dec_alloc()) == NULL) {               \
+                Py_DECREF(a);                               \
+                Py_DECREF(b);                               \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
+        Py_DECREF(a);                                       \
+        Py_DECREF(b);                                       \
+        if (dec_addstatus(ctx, status)) {                   \
+                Py_DECREF(result);                          \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        return (PyObject *) result;                         \
 }
 
 /* Operands are Python Objects. Actual MPDFUNC does NOT take a context.
@@ -3097,32 +3103,32 @@ _DecOpt_##MPDFUNC(PyObject *v, PyObject *args)              \
 static PyObject *                                          \
 _DecOpt_##MPDFUNC(PyObject *v, PyObject *args)             \
 {                                                          \
-	PyObject *w, *ctxobj;                              \
-	PyDecObject *a, *b;                                \
-	PyDecObject *result;                               \
-	mpd_context_t *ctx;                                \
-	                                                   \
-	ctxobj = dflt_ctx();                               \
-	if (!PyArg_ParseTuple(args, "O|O", &w, &ctxobj)) { \
-		return NULL;                               \
-	}                                                  \
-	                                                   \
-	CONTEXT_CHECK_VA(ctxobj);                          \
-	ctx = CtxAddr(ctxobj);                             \
-	                                                   \
-	CONVERT_BINOP_SET(v, w, &a, &b, ctx);              \
-	                                                   \
-	if ((result = dec_alloc()) == NULL) {              \
-		Py_DECREF(a);                              \
-		Py_DECREF(b);                              \
-		return NULL;                               \
-	}                                                  \
-	                                                   \
-	MPDFUNC(result->dec, a->dec, b->dec);              \
-	Py_DECREF(a);                                      \
-	Py_DECREF(b);                                      \
-	                                                   \
-	return (PyObject *) result;                        \
+        PyObject *w, *ctxobj;                              \
+        PyDecObject *a, *b;                                \
+        PyDecObject *result;                               \
+        mpd_context_t *ctx;                                \
+                                                           \
+        ctxobj = dflt_ctx();                               \
+        if (!PyArg_ParseTuple(args, "O|O", &w, &ctxobj)) { \
+                return NULL;                               \
+        }                                                  \
+                                                           \
+        CONTEXT_CHECK_VA(ctxobj);                          \
+        ctx = CtxAddr(ctxobj);                             \
+                                                           \
+        CONVERT_BINOP_SET(v, w, &a, &b, ctx);              \
+                                                           \
+        if ((result = dec_alloc()) == NULL) {              \
+                Py_DECREF(a);                              \
+                Py_DECREF(b);                              \
+                return NULL;                               \
+        }                                                  \
+                                                           \
+        MPDFUNC(result->dec, a->dec, b->dec);              \
+        Py_DECREF(a);                                      \
+        Py_DECREF(b);                                      \
+                                                           \
+        return (PyObject *) result;                        \
 }
 
 
@@ -3132,39 +3138,39 @@ _DecOpt_##MPDFUNC(PyObject *v, PyObject *args)             \
 static PyObject *                                                   \
 _DecOpt_##MPDFUNC(PyObject *v, PyObject *args)                      \
 {                                                                   \
-	PyObject *w, *x, *ctxobj;                                   \
-	PyDecObject *a, *b, *c;                                     \
-	PyDecObject *result;                                        \
-	uint32_t status = 0;                                        \
-	mpd_context_t *ctx;                                         \
-	                                                            \
-	ctxobj = dflt_ctx();                                        \
-	if (!PyArg_ParseTuple(args, "OO|O", &w, &x, &ctxobj)) {     \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	CONTEXT_CHECK_VA(ctxobj);                                   \
-	ctx = CtxAddr(ctxobj);                                      \
-	                                                            \
-	CONVERT_TERNOP_SET(v, w, x, &a, &b, &c, ctx);               \
-	                                                            \
-	if ((result = dec_alloc()) == NULL) {                       \
-		Py_DECREF(a);                                       \
-		Py_DECREF(b);                                       \
-		Py_DECREF(c);                                       \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	MPDFUNC(result->dec, a->dec, b->dec, c->dec, ctx, &status); \
-	Py_DECREF(a);                                               \
-	Py_DECREF(b);                                               \
-	Py_DECREF(c);                                               \
-	if (dec_addstatus(ctx, status)) {                           \
-		Py_DECREF(result);                                  \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	return (PyObject *) result;                                 \
+        PyObject *w, *x, *ctxobj;                                   \
+        PyDecObject *a, *b, *c;                                     \
+        PyDecObject *result;                                        \
+        uint32_t status = 0;                                        \
+        mpd_context_t *ctx;                                         \
+                                                                    \
+        ctxobj = dflt_ctx();                                        \
+        if (!PyArg_ParseTuple(args, "OO|O", &w, &x, &ctxobj)) {     \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        CONTEXT_CHECK_VA(ctxobj);                                   \
+        ctx = CtxAddr(ctxobj);                                      \
+                                                                    \
+        CONVERT_TERNOP_SET(v, w, x, &a, &b, &c, ctx);               \
+                                                                    \
+        if ((result = dec_alloc()) == NULL) {                       \
+                Py_DECREF(a);                                       \
+                Py_DECREF(b);                                       \
+                Py_DECREF(c);                                       \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        MPDFUNC(result->dec, a->dec, b->dec, c->dec, ctx, &status); \
+        Py_DECREF(a);                                               \
+        Py_DECREF(b);                                               \
+        Py_DECREF(c);                                               \
+        if (dec_addstatus(ctx, status)) {                           \
+                Py_DECREF(result);                                  \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        return (PyObject *) result;                                 \
 }
 
 
@@ -3515,7 +3521,8 @@ _Dec_mpd_same_quantum(PyObject *v, PyObject *args)
 
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
-	result = mpd_same_quantum(a->dec, b->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE;
+	result = mpd_same_quantum(a->dec, b->dec) ?
+	             Dec_INCREF_TRUE : Dec_INCREF_FALSE;
 	Py_DECREF(a);
 	Py_DECREF(b);
 
@@ -3634,10 +3641,12 @@ dec_hash(PyObject *v)
 {
 #if defined(CONFIG_64)
 	mpd_uint_t data_two64m1[2] = {8446744073709551615ULL, 1ULL};
-	mpd_t two64m1 = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 20, 2, 2, data_two64m1};
+	mpd_t two64m1 = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 20, 2, 2,
+	                 data_two64m1};
 #elif defined(CONFIG_32)
 	mpd_uint_t data_two64m1[3] = {709551615UL, 446744073UL, 18UL};
-	mpd_t two64m1 = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 20, 3, 2, data_two64m1};
+	mpd_t two64m1 = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 20, 3, 2,
+	                 data_two64m1};
 #else
 	#error "CONFIG_64 or CONFIG_32 must be defined."
 #endif
@@ -3664,7 +3673,8 @@ dec_hash(PyObject *v)
 
 	if (mpd_isspecial(a->dec)) {
 		if (mpd_isnan(a->dec)) {
-			PyErr_SetString(PyExc_TypeError, "cannot hash a NaN value");
+			PyErr_SetString(PyExc_TypeError,
+			                "cannot hash a NaN value");
 			result = -1;
 		}
 		else {
@@ -3726,7 +3736,8 @@ dec_hash(PyObject *v)
 		a->dec->flags = MPD_POS;
 
 		cp = mpd_to_sci(a->dec, 1);
-		if ((obj = Py_BuildValue("(i"CONV_mpd_ssize_t"s)", sign, exp, cp)) == NULL) {
+		obj = Py_BuildValue("(i"CONV_mpd_ssize_t"s)", sign, exp, cp);
+		if (obj == NULL) {
 			result = -1;
 			goto finish;
 		}
@@ -3964,16 +3975,16 @@ static PyTypeObject PyDec_Type =
 static PyObject *                                                        \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                           \
 {                                                                        \
-	PyObject *ret;                                                   \
-	PyDecObject *a;                                                  \
-	mpd_context_t *ctx;                                              \
-	                                                                 \
-	ctx = CtxAddr(self);                                             \
-	CONVERT_OP(v, &a, ctx);                                          \
+        PyObject *ret;                                                   \
+        PyDecObject *a;                                                  \
+        mpd_context_t *ctx;                                              \
                                                                          \
-	ret = MPDFUNC(a->dec, ctx) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
-	Py_DECREF(a);                                                    \
-	return ret;                                                      \
+        ctx = CtxAddr(self);                                             \
+        CONVERT_OP(v, &a, ctx);                                          \
+                                                                         \
+        ret = MPDFUNC(a->dec, ctx) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
+        Py_DECREF(a);                                                    \
+        return ret;                                                      \
 }
 
 /*
@@ -3984,16 +3995,16 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                           \
 static PyObject *                                                   \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                      \
 {                                                                   \
-	PyObject *ret;                                              \
-	PyDecObject *a;                                             \
-	mpd_context_t *ctx;                                         \
-	                                                            \
-	ctx = CtxAddr(self);                                        \
-	CONVERT_OP(v, &a, ctx);                                     \
+        PyObject *ret;                                              \
+        PyDecObject *a;                                             \
+        mpd_context_t *ctx;                                         \
                                                                     \
-	ret = MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
-	Py_DECREF(a);                                               \
-	return ret;                                                 \
+        ctx = CtxAddr(self);                                        \
+        CONVERT_OP(v, &a, ctx);                                     \
+                                                                    \
+        ret = MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
+        Py_DECREF(a);                                               \
+        return ret;                                                 \
 }
 
 /*
@@ -4004,26 +4015,26 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                      \
 static PyObject *                                   \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)      \
 {                                                   \
-	PyDecObject *result, *a;                    \
-	mpd_context_t *ctx;                         \
-	uint32_t status = 0;                        \
-	                                            \
-	ctx = CtxAddr(self);                        \
-	CONVERT_OP(v, &a, ctx);                     \
-	                                            \
-	if ((result = dec_alloc()) == NULL) {       \
-		Py_DECREF(a);                       \
-		return NULL;                        \
-	}                                           \
-	                                            \
-	MPDFUNC(result->dec, a->dec, ctx, &status); \
-	Py_DECREF(a);                               \
-	if (dec_addstatus(ctx, status)) {           \
-		Py_DECREF(result);                  \
-		return NULL;                        \
-	}                                           \
+        PyDecObject *result, *a;                    \
+        mpd_context_t *ctx;                         \
+        uint32_t status = 0;                        \
                                                     \
-	return (PyObject *) result;                 \
+        ctx = CtxAddr(self);                        \
+        CONVERT_OP(v, &a, ctx);                     \
+                                                    \
+        if ((result = dec_alloc()) == NULL) {       \
+                Py_DECREF(a);                       \
+                return NULL;                        \
+        }                                           \
+                                                    \
+        MPDFUNC(result->dec, a->dec, ctx, &status); \
+        Py_DECREF(a);                               \
+        if (dec_addstatus(ctx, status)) {           \
+                Py_DECREF(result);                  \
+                return NULL;                        \
+        }                                           \
+                                                    \
+        return (PyObject *) result;                 \
 }
 
 /*
@@ -4034,34 +4045,34 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)      \
 static PyObject *                                           \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)           \
 {                                                           \
-	PyObject *v, *w;                                    \
-	PyDecObject *a, *b;                                 \
-	PyDecObject *result;                                \
-	uint32_t status = 0;                                \
-	mpd_context_t *ctx;                                 \
-	                                                    \
-	if (!PyArg_ParseTuple(args, "OO", &v, &w)) {        \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	ctx = CtxAddr(self);                                \
-	CONVERT_BINOP_SET(v, w, &a, &b, ctx);               \
-	                                                    \
-	if ((result = dec_alloc()) == NULL) {               \
-		Py_DECREF(a);                               \
-		Py_DECREF(b);                               \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
-	Py_DECREF(a);                                       \
-	Py_DECREF(b);                                       \
-	if (dec_addstatus(ctx, status)) {                   \
-		Py_DECREF(result);                          \
-		return NULL;                                \
-	}                                                   \
-	                                                    \
-	return (PyObject *) result;                         \
+        PyObject *v, *w;                                    \
+        PyDecObject *a, *b;                                 \
+        PyDecObject *result;                                \
+        uint32_t status = 0;                                \
+        mpd_context_t *ctx;                                 \
+                                                            \
+        if (!PyArg_ParseTuple(args, "OO", &v, &w)) {        \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        ctx = CtxAddr(self);                                \
+        CONVERT_BINOP_SET(v, w, &a, &b, ctx);               \
+                                                            \
+        if ((result = dec_alloc()) == NULL) {               \
+                Py_DECREF(a);                               \
+                Py_DECREF(b);                               \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        MPDFUNC(result->dec, a->dec, b->dec, ctx, &status); \
+        Py_DECREF(a);                                       \
+        Py_DECREF(b);                                       \
+        if (dec_addstatus(ctx, status)) {                   \
+                Py_DECREF(result);                          \
+                return NULL;                                \
+        }                                                   \
+                                                            \
+        return (PyObject *) result;                         \
 }
 
 /*
@@ -4072,29 +4083,29 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)           \
 static PyObject *                                    \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)    \
 {                                                    \
-	PyObject *v, *w;                             \
-	PyDecObject *a, *b;                          \
-	PyDecObject *result;                         \
-	mpd_context_t *ctx;                          \
-	                                             \
-	if (!PyArg_ParseTuple(args, "OO", &v, &w)) { \
-		return NULL;                         \
-	}                                            \
-	                                             \
-	ctx = CtxAddr(self);                         \
-	CONVERT_BINOP_SET(v, w, &a, &b, ctx);        \
-	                                             \
-	if ((result = dec_alloc()) == NULL) {        \
-		Py_DECREF(a);                        \
-		Py_DECREF(b);                        \
-		return NULL;                         \
-	}                                            \
-	                                             \
-	MPDFUNC(result->dec, a->dec, b->dec);        \
-	Py_DECREF(a);                                \
-	Py_DECREF(b);                                \
-	                                             \
-	return (PyObject *) result;                  \
+        PyObject *v, *w;                             \
+        PyDecObject *a, *b;                          \
+        PyDecObject *result;                         \
+        mpd_context_t *ctx;                          \
+                                                     \
+        if (!PyArg_ParseTuple(args, "OO", &v, &w)) { \
+                return NULL;                         \
+        }                                            \
+                                                     \
+        ctx = CtxAddr(self);                         \
+        CONVERT_BINOP_SET(v, w, &a, &b, ctx);        \
+                                                     \
+        if ((result = dec_alloc()) == NULL) {        \
+                Py_DECREF(a);                        \
+                Py_DECREF(b);                        \
+                return NULL;                         \
+        }                                            \
+                                                     \
+        MPDFUNC(result->dec, a->dec, b->dec);        \
+        Py_DECREF(a);                                \
+        Py_DECREF(b);                                \
+                                                     \
+        return (PyObject *) result;                  \
 }
 
 /* Operands are Python Objects. MPDFUNC is a quiet function. */
@@ -4102,36 +4113,36 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)    \
 static PyObject *                                                   \
 _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)                   \
 {                                                                   \
-	PyObject *v, *w, *x;                                        \
-	PyDecObject *a, *b, *c;                                     \
-	PyDecObject *result;                                        \
-	uint32_t status = 0;                                        \
-	mpd_context_t *ctx;                                         \
-	                                                            \
-	if (!PyArg_ParseTuple(args, "OOO", &v, &w, &x)) {           \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	ctx = CtxAddr(self);                                        \
-	CONVERT_TERNOP_SET(v, w, x, &a, &b, &c, ctx);               \
-	                                                            \
-	if ((result = dec_alloc()) == NULL) {                       \
-		Py_DECREF(a);                                       \
-		Py_DECREF(b);                                       \
-		Py_DECREF(c);                                       \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	MPDFUNC(result->dec, a->dec, b->dec, c->dec, ctx, &status); \
-	Py_DECREF(a);                                               \
-	Py_DECREF(b);                                               \
-	Py_DECREF(c);                                               \
-	if (dec_addstatus(ctx, status)) {                           \
-		Py_DECREF(result);                                  \
-		return NULL;                                        \
-	}                                                           \
-	                                                            \
-	return (PyObject *) result;                                 \
+        PyObject *v, *w, *x;                                        \
+        PyDecObject *a, *b, *c;                                     \
+        PyDecObject *result;                                        \
+        uint32_t status = 0;                                        \
+        mpd_context_t *ctx;                                         \
+                                                                    \
+        if (!PyArg_ParseTuple(args, "OOO", &v, &w, &x)) {           \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        ctx = CtxAddr(self);                                        \
+        CONVERT_TERNOP_SET(v, w, x, &a, &b, &c, ctx);               \
+                                                                    \
+        if ((result = dec_alloc()) == NULL) {                       \
+                Py_DECREF(a);                                       \
+                Py_DECREF(b);                                       \
+                Py_DECREF(c);                                       \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        MPDFUNC(result->dec, a->dec, b->dec, c->dec, ctx, &status); \
+        Py_DECREF(a);                                               \
+        Py_DECREF(b);                                               \
+        Py_DECREF(c);                                               \
+        if (dec_addstatus(ctx, status)) {                           \
+                Py_DECREF(result);                                  \
+                return NULL;                                        \
+        }                                                           \
+                                                                    \
+        return (PyObject *) result;                                 \
 }
 
 static PyObject *
@@ -4426,7 +4437,8 @@ _DecCtx_mpd_same_quantum(PyObject *self, PyObject *args)
 	ctx = CtxAddr(self);
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
-	result = mpd_same_quantum(a->dec, b->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE;
+	result = mpd_same_quantum(a->dec, b->dec) ?
+	             Dec_INCREF_TRUE : Dec_INCREF_FALSE;
 	Py_DECREF(a);
 	Py_DECREF(b);
 
@@ -4776,7 +4788,8 @@ PyInit_cdecimal(void)
 
 	/* Exceptions that correspond to IEEE signals */
 	for (cm = signal_map; cm->name != NULL; cm++) {
-		cm->dec_cond = PyErr_NewException((char *)cm->fqname, DecimalException, NULL);
+		cm->dec_cond = PyErr_NewException((char *)cm->fqname,
+		                                  DecimalException, NULL);
 		Py_INCREF(cm->dec_cond);
 		PyModule_AddObject(m, cm->name, cm->dec_cond);
 	}
@@ -4790,7 +4803,8 @@ PyInit_cdecimal(void)
 
 	/* Remaining exceptions, inherit from the InvalidOperation */
 	for (cm = cond_map+1; cm->name != NULL; cm++) {
-		cm->dec_cond = PyErr_NewException((char *)cm->fqname, signal_map[0].dec_cond , NULL);
+		cm->dec_cond = PyErr_NewException((char *)cm->fqname,
+		                                  signal_map[0].dec_cond , NULL);
 		Py_INCREF(cm->dec_cond);
 		PyModule_AddObject(m, cm->name, cm->dec_cond);
 	}
