@@ -13,21 +13,32 @@
 #include "typearith.h"
 
 
-mpd_uint_t _mpd_baseadd(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n);
+mpd_uint_t _mpd_baseadd(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
+                        mpd_size_t m, mpd_size_t n);
 void _mpd_baseaddto(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n);
 mpd_uint_t _mpd_shortadd(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v);
-mpd_uint_t _mpd_shortadd_b(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v, mpd_uint_t b);
+mpd_uint_t _mpd_shortadd_b(mpd_uint_t *w, mpd_size_t m, mpd_uint_t v,
+                           mpd_uint_t b);
 mpd_uint_t _mpd_baseincr(mpd_uint_t *u, mpd_size_t n);
-void _mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n);
+void _mpd_basesub(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
+                  mpd_size_t m, mpd_size_t n);
 void _mpd_basesubfrom(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n);
-void _mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v, mpd_size_t m, mpd_size_t n);
-void _mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v);
-void _mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b);
-mpd_uint_t _mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v);
-mpd_uint_t _mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n, mpd_uint_t v, mpd_uint_t b);
-int _mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst, const mpd_uint_t *vconst, mpd_size_t nplusm, mpd_size_t n);
-void _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n, mpd_size_t m, mpd_size_t shift);
-mpd_uint_t _mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen, mpd_size_t shift);
+void _mpd_basemul(mpd_uint_t *w, const mpd_uint_t *u, const mpd_uint_t *v,
+                  mpd_size_t m, mpd_size_t n);
+void _mpd_shortmul(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                   mpd_uint_t v);
+void _mpd_shortmul_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                     mpd_uint_t v, mpd_uint_t b);
+mpd_uint_t _mpd_shortdiv(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                         mpd_uint_t v);
+mpd_uint_t _mpd_shortdiv_b(mpd_uint_t *w, const mpd_uint_t *u, mpd_size_t n,
+                           mpd_uint_t v, mpd_uint_t b);
+int _mpd_basedivmod(mpd_uint_t *q, mpd_uint_t *r, const mpd_uint_t *uconst,
+                    const mpd_uint_t *vconst, mpd_size_t nplusm, mpd_size_t n);
+void _mpd_baseshiftl(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t n,
+                     mpd_size_t m, mpd_size_t shift);
+mpd_uint_t _mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen,
+                           mpd_size_t shift);
 
 
 
