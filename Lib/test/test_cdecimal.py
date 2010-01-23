@@ -6,7 +6,6 @@ import sys
 from test.support import import_fresh_module
 # abuse sys.modules as a communication channel
 sys.modules['have_cdecimal'] = True
-sys.modules['have_decimal'] = False
 m = import_fresh_module('test.decimal_tests')
 
 

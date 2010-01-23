@@ -38,14 +38,14 @@ except ImportError:
     threading = None
 
 
-if sys.modules['have_decimal']:
-    from decimal import *
-    HAVE_CDECIMAL = False
-    HAVE_CONFIG_64 = False
-elif sys.modules['have_cdecimal']:
+if sys.modules['have_cdecimal']:
     from cdecimal import *
     HAVE_CDECIMAL = True
     HAVE_CONFIG_64 = (MAX_EMAX == 999999999999999999)
+else:
+    from decimal import *
+    HAVE_CDECIMAL = False
+    HAVE_CONFIG_64 = False
 
 
 if HAVE_CDECIMAL and (not HAVE_CONFIG_64):
