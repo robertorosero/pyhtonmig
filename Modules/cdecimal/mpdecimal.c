@@ -3757,7 +3757,7 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		else {
 			_settriple(result, MPD_POS, 0, mpd_etiny(ctx));
 			*status |= (MPD_Inexact|MPD_Rounded|MPD_Subnormal|
-                        MPD_Underflow|MPD_Clamped);
+			            MPD_Underflow|MPD_Clamped);
 		}
 		return;
 	}
@@ -3793,7 +3793,7 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	else {
 		t -= MPD_MAX_POW10;
 		_mpd_qpow_uint(&tmp, &sum, mpd_pow10[MPD_MAX_POW10], MPD_POS,
-                       &workctx, status);
+		               &workctx, status);
 		_mpd_qpow_uint(result, &tmp, mpd_pow10[t], MPD_POS, &workctx, status);
 	}
 
@@ -7502,8 +7502,8 @@ mpd_qtest_newtonrem(mpd_t *r, const mpd_t *a, const mpd_t *b,
 }
 
 void
-mpd_qtest_newton_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
-                        const mpd_context_t *ctx, uint32_t *status)
+mpd_qtest_newtondivmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
+                       const mpd_context_t *ctx, uint32_t *status)
 {
 	uint8_t sign = mpd_sign(a)^mpd_sign(b);
 
