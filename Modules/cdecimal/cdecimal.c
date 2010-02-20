@@ -229,7 +229,8 @@ dict_as_flags(PyObject *val)
 	int x;
 
 	if (!PyDict_Check(val)) {
-		PyErr_SetString(PyExc_ValueError, "argument must be a signal dict");
+		PyErr_SetString(PyExc_TypeError,
+		                "argument must be a signal dict");
 		return -1;
 	}
 
@@ -258,7 +259,7 @@ PyLong_AsMpdFlags(PyObject *v)
 	long x;
 
 	if (!PyLong_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "long argument required");
+		PyErr_SetString(PyExc_TypeError, "integer argument required");
 		return UINT32_MAX;
 	}
 
@@ -282,7 +283,7 @@ PyLong_AsMpdSsize(PyObject *v)
 #endif
 
 	if (!PyLong_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "long argument required");
+		PyErr_SetString(PyExc_TypeError, "integer argument required");
 		return MPD_SSIZE_MAX;
 	}
 
@@ -376,7 +377,6 @@ signaldict_setitem(PyObject *self, PyObject *key, PyObject *value)
 	int x;
 
 	if ((flag = exception_as_flags(key)) == UINT_MAX) {
-		PyErr_SetString(PyExc_ValueError, "invalid signal key");
 		return -1;
 	}
 
@@ -840,7 +840,8 @@ context_setround(PyObject *self, PyObject *value, void *closure UNUSED)
 		return -1;
 	}
 	if (x < 0 || x >= MPD_ROUND_GUARD) {
-		PyErr_SetString(PyExc_TypeError, "invalid value for context.round");
+		PyErr_SetString(PyExc_ValueError,
+		                "invalid value for context.round");
 		return -1;
 	}
 
@@ -863,7 +864,8 @@ context_setcapitals(PyObject *self, PyObject *value, void *closure UNUSED)
 		return -1;
 	}
 	if (x != 0 && x != 1) {
-		PyErr_SetString(PyExc_TypeError, "invalid value for context.capitals");
+		PyErr_SetString(PyExc_ValueError,
+		                "invalid value for context.capitals");
 		return -1;
 	}
 
@@ -1318,10 +1320,10 @@ static PyGetSetDef context_getsets [] =
         }
 
 #define CONTEXT_CHECK_VA(obj) \
-        if (!PyDecContext_Check(obj)) {                       \
-                PyErr_SetString( PyExc_TypeError,             \
-                    "optional argument must be a context" );  \
-                return NULL;                                  \
+        if (!PyDecContext_Check(obj)) {                      \
+                PyErr_SetString( PyExc_TypeError,            \
+                    "optional argument must be a context" ); \
+                return NULL;                                 \
         }
 
 
@@ -1903,7 +1905,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 
 	dtuple = PyTuple_GET_ITEM(v, 1);
 	if (!PyTuple_Check(dtuple)) {
-		PyErr_SetString(PyExc_ValueError,
+		PyErr_SetString(PyExc_TypeError,
 		                "coefficient must be a tuple of digits");
 		return NULL;
 	}
@@ -1937,7 +1939,7 @@ _PyDec_FromTuple_Max(PyObject *v, mpd_context_t *ctx)
 		if (l < 0 || l > 9) {
 			PyMem_Free(decstring);
 			PyErr_SetString(PyExc_ValueError,
-		        	        "coefficient must be a tuple of digits");
+			                "coefficient must be a tuple of digits");
 			return NULL;
 		}
 		*cp++ = (char)l + '0';
@@ -2148,6 +2150,7 @@ dec_new(PyTypeObject *type, PyObject *args, PyObject *kwds UNUSED)
 
 	if (v == NULL) {
 		v = PyLong_FromLong(0);
+		Py_DECREF(v);
 	}
 
 	CONTEXT_CHECK_VA(ctxobj);
@@ -2213,6 +2216,7 @@ PyDecContext_CreateDecimal(PyObject *self, PyObject *args)
 
 	if (v == NULL) {
 		v = PyLong_FromLong(0);
+		Py_DECREF(v);
 	}
 
 	ctx = CtxAddr(self);
@@ -2496,7 +2500,7 @@ PyDec_ToIntegralValue(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 	if (!PyDecContext_Check(dctx)) {
-		PyErr_SetString(PyExc_ValueError,
+		PyErr_SetString(PyExc_TypeError,
 		                "optional second arg must be a context");
 		return NULL;
 	}
@@ -2537,7 +2541,7 @@ PyDec_ToIntegralExact(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 	if (!PyDecContext_Check(dctx)) {
-		PyErr_SetString(PyExc_ValueError,
+		PyErr_SetString(PyExc_TypeError,
 		                "optional second arg must be a context");
 		return NULL;
 	}
@@ -2749,7 +2753,7 @@ PyDec_Round(PyObject *self, PyObject *args)
 		mpd_ssize_t y;
 
 		if (!PyLong_Check(x)) {
-			PyErr_SetString(PyExc_ValueError,
+			PyErr_SetString(PyExc_TypeError,
 			                "optional arg must be an integer");
 			return NULL;
 		}
@@ -2817,7 +2821,7 @@ dec_format(PyObject *self, PyObject *args)
 	}
 	if (override) {
 		if (!PyDict_Check(override)) {
-			PyErr_SetString(PyExc_ValueError, "optional argument "
+			PyErr_SetString(PyExc_TypeError, "optional argument "
 			                "must be a dict");
 			goto finish;
 		}
@@ -3394,7 +3398,7 @@ _Dec_mpd_qcopy_sign(PyObject *v, PyObject *w)
 	mpd_context_t *ctx;
 
 	ctx = mpd_ctx();
-	CONVERT_BINOP(v, w, &a, &b, ctx);
+	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
 		Py_DECREF(a);
@@ -3673,7 +3677,7 @@ dec_hash(PyObject *v)
 
 	if (mpd_isspecial(a->dec)) {
 		if (mpd_isnan(a->dec)) {
-			PyErr_SetString(PyExc_TypeError,
+			PyErr_SetString(PyExc_ValueError,
 			                "cannot hash a NaN value");
 			result = -1;
 		}
@@ -3980,7 +3984,7 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                           \
         mpd_context_t *ctx;                                              \
                                                                          \
         ctx = CtxAddr(self);                                             \
-        CONVERT_OP(v, &a, ctx);                                          \
+        CONVERT_OP_SET(v, &a, ctx);                                      \
                                                                          \
         ret = MPDFUNC(a->dec, ctx) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
         Py_DECREF(a);                                                    \
@@ -4000,7 +4004,7 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)                      \
         mpd_context_t *ctx;                                         \
                                                                     \
         ctx = CtxAddr(self);                                        \
-        CONVERT_OP(v, &a, ctx);                                     \
+        CONVERT_OP_SET(v, &a, ctx);                                 \
                                                                     \
         ret = MPDFUNC(a->dec) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE; \
         Py_DECREF(a);                                               \
@@ -4020,7 +4024,7 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *v)      \
         uint32_t status = 0;                        \
                                                     \
         ctx = CtxAddr(self);                        \
-        CONVERT_OP(v, &a, ctx);                     \
+        CONVERT_OP_SET(v, &a, ctx);                 \
                                                     \
         if ((result = dec_alloc()) == NULL) {       \
                 Py_DECREF(a);                       \
@@ -4148,13 +4152,13 @@ _DecCtx_##MPDFUNC(PyObject *self, PyObject *args)                   \
 static PyObject *
 _DecCtx_copy_decimal(PyObject *self UNUSED, PyObject *v)
 {
-	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
-		return NULL;
-	}
+	PyDecObject *result;
+	mpd_context_t *ctx;
 
-	Py_INCREF(v);
-	return v;
+	ctx = CtxAddr(self);
+	CONVERT_OP_SET(v, &result, ctx);
+
+	return (PyObject *)result;
 }
 
 /* Arithmetic operations */
@@ -4168,6 +4172,8 @@ _DecCtx_UnaryFunc(mpd_qnext_minus)
 _DecCtx_UnaryFunc(mpd_qnext_plus)
 _DecCtx_UnaryFunc(mpd_qplus)
 _DecCtx_UnaryFunc(mpd_qreduce)
+_DecCtx_UnaryFunc(mpd_qround_to_int)
+_DecCtx_UnaryFunc(mpd_qround_to_intx)
 _DecCtx_UnaryFunc(mpd_qsqrt)
 
 _DecCtx_BinaryFunc(mpd_qadd)
@@ -4193,7 +4199,6 @@ _DecCtx_TernaryFunc(mpd_qpowmod)
 /* Miscellaneous */
 _DecCtx_BoolFunc(mpd_isnormal)
 _DecCtx_BoolFunc(mpd_issubnormal)
-_DecCtx_BoolFunc_NoCtx(mpd_iscanonical)
 _DecCtx_BoolFunc_NoCtx(mpd_isfinite)
 _DecCtx_BoolFunc_NoCtx(mpd_isinfinite)
 _DecCtx_BoolFunc_NoCtx(mpd_isnan)
@@ -4201,7 +4206,6 @@ _DecCtx_BoolFunc_NoCtx(mpd_isqnan)
 _DecCtx_BoolFunc_NoCtx(mpd_issigned)
 _DecCtx_BoolFunc_NoCtx(mpd_issnan)
 _DecCtx_BoolFunc_NoCtx(mpd_iszero)
-
 
 static PyObject *
 _DecCtx_mpd_qcopy_abs(PyObject *self, PyObject *v)
@@ -4211,7 +4215,7 @@ _DecCtx_mpd_qcopy_abs(PyObject *self, PyObject *v)
 	mpd_context_t *ctx;
 
 	ctx = CtxAddr(self);
-	CONVERT_OP(v, &a, ctx);
+	CONVERT_OP_SET(v, &a, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
 		Py_DECREF(a);
@@ -4236,7 +4240,7 @@ _DecCtx_mpd_qcopy_negate(PyObject *self, PyObject *v)
 	mpd_context_t *ctx;
 
 	ctx = CtxAddr(self);
-	CONVERT_OP(v, &a, ctx);
+	CONVERT_OP_SET(v, &a, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
 		Py_DECREF(a);
@@ -4273,7 +4277,7 @@ _DecCtx_mpd_qcopy_sign(PyObject *self, PyObject *args)
 	}
 
 	ctx = CtxAddr(self);
-	CONVERT_BINOP(v, w, &a, &b, ctx);
+	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
 		Py_DECREF(a);
@@ -4301,10 +4305,21 @@ _DecCtx_BinaryFunc(mpd_qscaleb)
 _DecCtx_BinaryFunc(mpd_qshift)
 
 static PyObject *
+_DecCtx_iscanonical(PyObject *self UNUSED, PyObject *v)
+{
+	if (!PyDec_Check(v)) {
+		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
+		return NULL;
+	}
+
+	return mpd_iscanonical(DecAddr(v)) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE;
+}
+
+static PyObject *
 _DecCtx_canonical(PyObject *self UNUSED, PyObject *v)
 {
 	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_ValueError, "argument must be a Decimal");
+		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
 		return NULL;
 	}
 
@@ -4315,16 +4330,16 @@ _DecCtx_canonical(PyObject *self UNUSED, PyObject *v)
 static PyObject *
 _DecCtx_mpd_class(PyObject *self, PyObject *v)
 {
+	PyDecObject *a;
 	mpd_context_t *ctx;
 	const char *cp;
 
-	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_ValueError, "argument must be a Decimal");
-		return NULL;
-	}
 	ctx = CtxAddr(self);
+	CONVERT_OP_SET(v, &a, ctx);
 
-	cp = mpd_class(DecAddr(v), ctx);
+	cp = mpd_class(a->dec, ctx);
+	Py_DECREF(a);
+
 	return Py_BuildValue("s", cp);
 }
 
@@ -4372,15 +4387,15 @@ static PyObject *
 _DecCtx_mpd_to_sci(PyObject *self, PyObject *v)
 {
 	PyObject *result;
+	PyDecObject *a;
+	mpd_context_t *ctx;
 	char *s;
 
-	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
-		return NULL;
-	}
+	ctx = CtxAddr(self);
+	CONVERT_OP_SET(v, &a, ctx);
 
-	s = mpd_to_sci(((PyDecObject *)v)->dec,
-	               ((PyDecContextObject *)self)->capitals);
+	s = mpd_to_sci(a->dec, ((PyDecContextObject *)self)->capitals);
+	Py_DECREF(a);
 	if (s == NULL) {
 		PyErr_NoMemory();
 		return NULL;
@@ -4396,15 +4411,15 @@ static PyObject *
 _DecCtx_mpd_to_eng(PyObject *self, PyObject *v)
 {
 	PyObject *result;
+	PyDecObject *a;
+	mpd_context_t *ctx;
 	char *s;
 
-	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
-		return NULL;
-	}
+	ctx = CtxAddr(self);
+	CONVERT_OP_SET(v, &a, ctx);
 
-	s = mpd_to_eng(((PyDecObject *)v)->dec,
-	               ((PyDecContextObject *)self)->capitals);
+	s = mpd_to_eng(a->dec, ((PyDecContextObject *)self)->capitals);
+	Py_DECREF(a);
 	if (s == NULL) {
 		PyErr_NoMemory();
 		return NULL;
@@ -4445,58 +4460,6 @@ _DecCtx_mpd_same_quantum(PyObject *self, PyObject *args)
 	return result;
 }
 
-static PyObject *
-PyDecContext_ToIntegralValue(PyObject *self, PyObject *a)
-{
-	PyDecObject *result;
-	mpd_context_t *ctx;
-	uint32_t status = 0;
-
-	if (!PyDec_Check(a)) {
-		PyErr_SetString(PyExc_ValueError, "argument must be a Decimal");
-		return NULL;
-	}
-	if ((result = dec_alloc()) == NULL) {
-		return NULL;
-	}
-
-	ctx = CtxAddr(self);
-
-	mpd_qround_to_int(result->dec, DecAddr(a), ctx, &status);
-	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
-	}
-
-	return (PyObject *)result;
-}
-
-static PyObject *
-PyDecContext_ToIntegralExact(PyObject *self, PyObject *a)
-{
-	PyDecObject *result;
-	mpd_context_t *ctx;
-	uint32_t status = 0;
-
-	if (!PyDec_Check(a)) {
-		PyErr_SetString(PyExc_ValueError, "argument must be a Decimal");
-		return NULL;
-	}
-	if ((result = dec_alloc()) == NULL) {
-		return NULL;
-	}
-
-	ctx = CtxAddr(self);
-
-	mpd_qround_to_intx(result->dec, DecAddr(a), ctx, &status);
-	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
-	}
-
-	return (PyObject *)result;
-}
-
 
 static PyMethodDef context_methods [] =
 {
@@ -4512,9 +4475,9 @@ static PyMethodDef context_methods [] =
 	{ "normalize", _DecCtx_mpd_qreduce, METH_O, doc_ctx_normalize }, /* alias for reduce */
 	{ "plus", _DecCtx_mpd_qplus, METH_O, doc_ctx_plus },
 	{ "reduce", _DecCtx_mpd_qreduce, METH_O, doc_ctx_reduce },
-	{ "to_integral", PyDecContext_ToIntegralValue, METH_O, doc_ctx_to_integral },
-	{ "to_integral_exact", PyDecContext_ToIntegralExact, METH_O, doc_ctx_to_integral_exact },
-	{ "to_integral_value", PyDecContext_ToIntegralValue, METH_O, doc_ctx_to_integral_value },
+	{ "to_integral", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral },
+	{ "to_integral_exact", _DecCtx_mpd_qround_to_intx, METH_O, doc_ctx_to_integral_exact },
+	{ "to_integral_value", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral_value },
 	{ "sqrt", _DecCtx_mpd_qsqrt, METH_O, doc_ctx_sqrt },
 
 	/* Binary arithmetic functions */
@@ -4552,7 +4515,7 @@ static PyMethodDef context_methods [] =
 	{ "radix", _DecCtx_mpd_radix, METH_NOARGS, doc_ctx_radix },
 
 	/* Boolean functions */
-	{ "is_canonical", _DecCtx_mpd_iscanonical, METH_O, doc_ctx_is_canonical },
+	{ "is_canonical", _DecCtx_iscanonical, METH_O, doc_ctx_is_canonical },
 	{ "is_finite", _DecCtx_mpd_isfinite, METH_O, doc_ctx_is_finite },
 	{ "is_infinite", _DecCtx_mpd_isinfinite, METH_O, doc_ctx_is_infinite },
 	{ "is_nan", _DecCtx_mpd_isnan, METH_O, doc_ctx_is_nan },
