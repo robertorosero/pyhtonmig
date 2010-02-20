@@ -123,6 +123,7 @@ _mpd_divmod_pow10(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t v, mpd_uint_t exp)
 
 #elif defined(CONFIG_32)
 #if defined(ANSI)
+#if !defined(LEGACY_COMPILER)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -144,6 +145,138 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 	*q = (mpd_uint_t)(hl / d); /* quotient is known to fit */
 	*r = (mpd_uint_t)(hl - (mpd_uuint_t)(*q) * d);
 }
+/* END ANSI + uint64_t */
+#else
+static inline void
+_mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
+{
+	uint16_t w[4], carry;
+	uint16_t ah, al, bh, bl;
+	uint32_t hl;
+
+	ah = (uint16_t)(a>>16); al = (uint16_t)a;
+	bh = (uint16_t)(b>>16); bl = (uint16_t)b;
+
+	hl = al * bl;
+	w[0] = (uint16_t)hl;
+	carry = (uint16_t)(hl>>16);
+
+	hl = ah * bl + carry;
+	w[1] = (uint16_t)hl;
+	w[2] = (uint16_t)(hl>>16);
+
+	hl = al * bh + w[1];
+	w[1] = (uint16_t)hl;
+	carry = (uint16_t)(hl>>16);
+
+	hl = ah * bh + w[2] + carry;
+	w[2] = (uint16_t)hl;
+	w[3] = (uint16_t)(hl>>16);
+
+	*hi = ((uint32_t)w[3]<<16) + w[2];
+	*lo = ((uint32_t)w[1]<<16) + w[0];
+}
+
+/*
+ * By Henry S. Warren: http://www.hackersdelight.org/HDcode/divlu.c
+ * http://www.hackersdelight.org/permissions.htm:
+ * "You are free to use, copy, and distribute any of the code on this web
+ *  site, whether modified by you or not. You need not give attribution."
+ *
+ * Slightly modified, comments are mine.
+ */
+static inline int
+nlz(uint32_t x)
+{
+	int n;
+
+	if (x == 0) return(32);
+
+	n = 0;
+	if (x <= 0x0000FFFF) {n = n +16; x = x <<16;}
+	if (x <= 0x00FFFFFF) {n = n + 8; x = x << 8;}
+	if (x <= 0x0FFFFFFF) {n = n + 4; x = x << 4;}
+	if (x <= 0x3FFFFFFF) {n = n + 2; x = x << 2;}
+	if (x <= 0x7FFFFFFF) {n = n + 1;}
+
+	return n;
+}
+
+static inline void
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t u1, mpd_uint_t u0,
+               mpd_uint_t v)
+{
+	const mpd_uint_t b = 65536;
+	mpd_uint_t un1, un0,
+	           vn1, vn0,
+	           q1, q0,
+	           un32, un21, un10,
+	           rhat;
+	int s;
+
+	assert(u1 < v);
+
+	s = nlz(v);
+	v = v << s;
+	vn1 = v >> 16;
+	vn0 = v & 0xFFFF;
+
+	un32 = (u1 << s) | (u0 >> (32 - s));
+	un10 = u0 << s;
+
+	un1 = un10 >> 16;
+	un0 = un10 & 0xFFFF;
+
+	q1 = un32 / vn1;
+	rhat = un32 - q1*vn1;
+again1:
+	if (q1 >= b || q1*vn0 > b*rhat + un1) {
+		q1 = q1 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b) goto again1;
+	}
+
+	/*
+	 *  Before again1 we had:
+	 *      (1) q1*vn1   + rhat         = un32
+	 *      (2) q1*vn1*b + rhat*b + un1 = un32*b + un1
+	 *
+	 *  The statements inside the if-clause do not change the value
+	 *  of the left-hand side of (2), and the loop is only exited
+	 *  if q1*vn0 <= rhat*b + un1, so:
+	 *
+	 *      (3) q1*vn1*b + q1*vn0 <= un32*b + un1
+	 *      (4)              q1*v <= un32*b + un1
+	 *      (5)                 0 <= un32*b + un1 - q1*v
+	 *
+	 *  By (5) we are certain that the possible add-back step from
+	 *  Knuth's algorithm D is never required.
+	 *
+	 *  Since the final quotient is less than 2**32, the following
+	 *  must be true:
+	 *
+	 *      (6) un32*b + un1 - q1*v <= UINT32_MAX
+	 *
+	 *  This means that in the following line, the high words
+	 *  of un32*b and q1*v can be discarded without any effect
+	 *  on the result.
+	 */
+	un21 = un32*b + un1 - q1*v;
+
+	q0 = un21 / vn1;
+	rhat = un21 - q0*vn1;
+again2:
+	if (q0 >= b || q0*vn0 > b*rhat + un0) {
+		q0 = q0 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b) goto again2;
+	}
+
+	*q = q1*b + q0;
+	*r = (un21*b + un0 - q0*v) >> s;
+}
+#endif /* END ANSI + LEGACY_COMPILER */
+
 /* END ANSI */
 
 #elif defined(__GNUC__) && defined(__i386__)
