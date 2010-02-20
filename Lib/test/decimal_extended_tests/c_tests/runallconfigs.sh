@@ -1,28 +1,44 @@
 #/bin/sh
 
-cp -f Makefile.unix Makefile
+
+VALGRIND=
+if [ "$1" == "--valgrind" ]; then
+    shift
+    VALGRIND="valgrind --tool=memcheck --leak-check=full --leak-resolution=high --db-attach=yes --show-reachable=yes"
+fi
+export VALGRIND
+
+if [ X"$@" != X"" ]; then
+    CONFIGS="$@"
+else
+    CONFIGS="x64 ansi64 ppro ansi ansi-legacy"
+fi
 
 GMAKE=`which gmake`
-if [ "$GMAKE" == "" ]; then
+if [ X"$GMAKE" = X"" ]; then
     GMAKE=make
 fi
 
 
-$GMAKE clean
-$GMAKE machine=x64-asm gmp
-./runalltests.sh
+cp -f Makefile.unix Makefile
 
-$GMAKE clean
-$GMAKE machine=x64-ansi gmp
-./runalltests.sh
-
-$GMAKE clean
-$GMAKE machine=ppro gmp
-./runalltests.sh
-
-$GMAKE clean
-$GMAKE machine=ansi gmp
-./runalltests.sh
+for config in $CONFIGS; do
+    printf "\n# ========================================================================\n"
+    printf "#                                 %s\n" $config
+    printf "# ========================================================================\n\n"
+    $GMAKE clean
+    $GMAKE MACHINE=$config gmp
+    printf "\n"
+    if [ X"$config" = X"ppro" ]; then
+        # Valgrind has no support for 80 bit long double arithmetic.
+        savevg=$VALGRIND
+        VALGRIND=
+        ./runalltests.sh
+        VALGRIND=$savevg
+    else
+        ./runalltests.sh
+    fi
+done
 
 
 

@@ -14,27 +14,33 @@ OBJS = $(OBJDIR)\basearith.obj    $(OBJDIR)\context.obj $(OBJDIR)\constants.obj 
        $(OBJDIR)\transpose3.obj
 
 
-!if "$(machine)" == "x64-asm"
+!if "$(MACHINE)" == "x64"
 CFLAGS = /DCONFIG_64 /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 OBJS = $(OBJS) $(OBJDIR)\vcdiv64.obj
 GMPLIB = "C:\Program Files\gmp\gmp.lib"
 GMPINC = "C:\Program Files\gmp"
 !endif
 
-!if "$(machine)" == "x64-ansi"
+!if "$(MACHINE)" == "ansi64"
 CFLAGS = /DCONFIG_32 /DANSI /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 GMPLIB = "C:\Program Files\gmp\gmp.lib"
 GMPINC = "C:\Program Files\gmp"
 !endif
 
-!if "$(machine)" == "ppro"
-CFLAGS = /DCONFIG_32 /DPPRO /DANSI /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
+!if "$(MACHINE)" == "ppro"
+CFLAGS = /DCONFIG_32 /DPPRO /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 GMPLIB = "C:\Program Files (x86)\gmp\gmp.lib"
 GMPINC = "C:\Program Files (x86)\gmp"
-
 !endif
-!if "$(machine)" == "ansi"
+
+!if "$(MACHINE)" == "ansi"
 CFLAGS = /DCONFIG_32 /DANSI /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
+GMPLIB = "C:\Program Files (x86)\gmp\gmp.lib"
+GMPINC = "C:\Program Files (x86)\gmp"
+!endif
+
+!if "$(MACHINE)" == "ansi-legacy"
+CFLAGS = /DCONFIG_32 /DANSI /DLEGACY_COMPILER /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 GMPLIB = "C:\Program Files (x86)\gmp\gmp.lib"
 GMPINC = "C:\Program Files (x86)\gmp"
 !endif
@@ -183,11 +189,19 @@ Makefile $(SRCDIR)\vcdiv64.asm
 	ml64 /Fo$(OBJDIR)\vcdiv64.obj /c /Cx $(SRCDIR)\vcdiv64.asm
 
 
-
 FORCE:
 
 clean: FORCE
-	del /q *.obj *.exe $(OBJDIR)\*.obj
-
+	-@if exist *.obj del *.obj
+	-@if exist obj\*.obj del obj\*.obj
+	-@if exist *.dll del *.dll
+	-@if exist *.exp del *.exp
+	-@if exist *.lib del *.lib
+	-@if exist *.ilk del *.ilk
+	-@if exist *.pdb del *.pdb
+	-@if exist *.pgc del *.pgc
+	-@if exist *.pgd del *.pgd
+	-@if exist *.manifest del *.manifest
+	-@if exist *.exe del *.exe
 
 
