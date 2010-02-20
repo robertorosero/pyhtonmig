@@ -20,31 +20,19 @@ extern "C" {
 #include <assert.h>
 
 
-#define EXTINLINE
-#ifdef _MSC_VER
-  #include "vccompat.h"
-  #ifndef UNUSED
-    #define UNUSED
-  #endif
-  #undef EXTINLINE
-  #define EXTINLINE extern inline
-#else
-  #include <stdint.h>
-  #define __GNUC_STDC_INLINE__
-  #define UNUSED __attribute__((unused))
-#endif
-
-
 /******************************************************************************/
 /*                      Types for 32 bit architectures                        */
 /******************************************************************************/
 
 /* types for modular and base arithmetic */
 #define MPD_UINT_MAX UINT32_MAX
-#define MPD_UUINT_MAX UINT64_MAX
 #define MPD_BITS_PER_UINT 32
 typedef uint32_t mpd_uint_t;  /* unsigned mod type */
+
+#ifndef LEGACY_COMPILER
+#define MPD_UUINT_MAX UINT64_MAX
 typedef uint64_t mpd_uuint_t; /* double width unsigned mod type */
+#endif
 
 /* enable CONFIG_32+ANSI on 64-bit platforms without resorting to -m32 */
 #define MPD_SIZE_MAX UINT32_MAX
