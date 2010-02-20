@@ -642,7 +642,8 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
     else {
         if (needed == 0) {
             /* Delete slice */
-            Py_ssize_t cur, i;
+            size_t cur;
+            Py_ssize_t i;
 
             if (!_canresize(self))
                 return -1;
@@ -655,7 +656,7 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
                  i < slicelen; cur += step, i++) {
                 Py_ssize_t lim = step - 1;
 
-                if (cur + step >= PyByteArray_GET_SIZE(self))
+                if (cur + step >= (size_t)PyByteArray_GET_SIZE(self))
                     lim = PyByteArray_GET_SIZE(self) - cur - 1;
 
                 memmove(self->ob_bytes + cur - i,
@@ -663,7 +664,7 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
             }
             /* Move the tail of the bytes, in one chunk */
             cur = start + slicelen*step;
-            if (cur < PyByteArray_GET_SIZE(self)) {
+            if (cur < (size_t)PyByteArray_GET_SIZE(self)) {
                 memmove(self->ob_bytes + cur - slicelen,
                         self->ob_bytes + cur,
                         PyByteArray_GET_SIZE(self) - cur);
@@ -843,13 +844,14 @@ bytearray_repr(PyByteArrayObject *self)
     const char *quote_postfix = ")";
     Py_ssize_t length = Py_SIZE(self);
     /* 14 == strlen(quote_prefix) + 2 + strlen(quote_postfix) */
-    size_t newsize = 14 + 4 * length;
+    size_t newsize;
     PyObject *v;
-    if (newsize > PY_SSIZE_T_MAX || newsize / 4 - 3 != length) {
+    if (length > (PY_SSIZE_T_MAX - 14) / 4) {
         PyErr_SetString(PyExc_OverflowError,
             "bytearray object is too large to make repr");
         return NULL;
     }
+    newsize = 14 + 4 * length;
     v = PyUnicode_FromUnicode(NULL, newsize);
     if (v == NULL) {
         return NULL;
@@ -2044,7 +2046,7 @@ bytearray_partition(PyByteArrayObject *self, PyObject *sep_obj)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-"B.rpartition(sep) -> (tail, sep, head)\n\
+"B.rpartition(sep) -> (head, sep, tail)\n\
 \n\
 Search for the separator sep in B, starting at the end of B,\n\
 and return the part before it, the separator itself, and the\n\

@@ -971,6 +971,7 @@ PyLong_AsVoidPtr(PyObject *vv)
  */
 
 #define IS_LITTLE_ENDIAN (int)*(unsigned char*)&one
+#define PY_ABS_LLONG_MIN	(0-(unsigned PY_LONG_LONG)PY_LLONG_MIN)
 
 /* Create a new long int object from a C PY_LONG_LONG int. */
 
@@ -1268,6 +1269,101 @@ PyLong_AsUnsignedLongLongMask(register PyObject *op)
 	}
 }
 #undef IS_LITTLE_ENDIAN
+
+/* Get a C long long int from a Python long or Python int object.
+   On overflow, returns -1 and sets *overflow to 1 or -1 depending
+   on the sign of the result.  Otherwise *overflow is 0.
+
+   For other errors (e.g., type error), returns -1 and sets an error
+   condition.
+*/
+
+PY_LONG_LONG
+PyLong_AsLongLongAndOverflow(PyObject *vv, int *overflow)
+{
+	/* This version by Tim Peters */
+	register PyLongObject *v;
+	unsigned PY_LONG_LONG x, prev;
+	PY_LONG_LONG res;
+	Py_ssize_t i;
+	int sign;
+	int do_decref = 0; /* if nb_int was called */
+
+	*overflow = 0;
+	if (vv == NULL) {
+		PyErr_BadInternalCall();
+		return -1;
+	}
+
+	if (!PyLong_Check(vv)) {
+		PyNumberMethods *nb;
+		nb = vv->ob_type->tp_as_number;
+		if (nb == NULL || nb->nb_int == NULL) {
+			PyErr_SetString(PyExc_TypeError,
+					"an integer is required");
+			return -1;
+		}
+		vv = (*nb->nb_int) (vv);
+		if (vv == NULL)
+			return -1;
+		do_decref = 1;
+		if (!PyLong_Check(vv)) {
+			Py_DECREF(vv);
+			PyErr_SetString(PyExc_TypeError,
+					"nb_int should return int object");
+			return -1;
+		}
+	}
+
+	res = -1;
+	v = (PyLongObject *)vv;
+	i = Py_SIZE(v);
+
+	switch (i) {
+	case -1:
+		res = -(sdigit)v->ob_digit[0];
+		break;
+	case 0:
+		res = 0;
+		break;
+	case 1:
+		res = v->ob_digit[0];
+		break;
+	default:
+		sign = 1;
+		x = 0;
+		if (i < 0) {
+			sign = -1;
+			i = -(i);
+		}
+		while (--i >= 0) {
+			prev = x;
+			x = (x << PyLong_SHIFT) + v->ob_digit[i];
+			if ((x >> PyLong_SHIFT) != prev) {
+				*overflow = sign;
+				goto exit;
+			}
+		}
+		/* Haven't lost any bits, but casting to long requires extra
+		 * care (see comment above).
+		 */
+		if (x <= (unsigned PY_LONG_LONG)PY_LLONG_MAX) {
+			res = (PY_LONG_LONG)x * sign;
+		}
+		else if (sign < 0 && x == PY_ABS_LLONG_MIN) {
+			res = PY_LLONG_MIN;
+		}
+		else {
+			*overflow = sign;
+			/* res is already set to -1 */
+		}
+	}
+ exit:
+	if (do_decref) {
+		Py_DECREF(vv);
+	}
+	return res;
+}
 
 #endif /* HAVE_LONG_LONG */
 
@@ -4297,25 +4393,6 @@ long_is_finite(PyObject *v)
 #endif
 
 
-PyDoc_STRVAR(long_to_bytes_doc,
-"int.to_bytes(length, byteorder, *, signed=False) -> bytes\n\
-\n\
-Return an array of bytes representing an integer.\n\
-\n\
-The integer is represented using length bytes.	An OverflowError is\n\
-raised if the integer is not representable with the given number of\n\
-bytes.\n\
-\n\
-The byteorder argument determines the byte order used to represent the\n\
-integer.  If byteorder is 'big', the most significant byte is at the\n\
-beginning of the byte array.  If byteorder is 'little', the most\n\
-significant byte is at the end of the byte array.  To request the native\n\
-byte order of the host system, use `sys.byteorder' as the byte order value.\n\
-\n\
-The signed keyword-only argument determines whether two's complement is\n\
-used to represent the integer.	If signed is False and a negative integer\n\
-is given, an OverflowError is raised.");
-
 static PyObject *
 long_to_bytes(PyLongObject *v, PyObject *args, PyObject *kwds)
 {
@@ -4379,14 +4456,14 @@ long_to_bytes(PyLongObject *v, PyObject *args, PyObject *kwds)
 	return bytes;
 }
 
-PyDoc_STRVAR(long_from_bytes_doc,
-"int.from_bytes(bytes, byteorder, *, signed=False) -> int\n\
+PyDoc_STRVAR(long_to_bytes_doc,
+"int.to_bytes(length, byteorder, *, signed=False) -> bytes\n\
 \n\
-Return the integer represented by the given array of bytes.\n\
+Return an array of bytes representing an integer.\n\
 \n\
-The bytes argument must either support the buffer protocol or be an\n\
-iterable object producing bytes.  Bytes and bytearray are examples of\n\
-built-in objects that support the buffer protocol.\n\
+The integer is represented using length bytes.	An OverflowError is\n\
+raised if the integer is not representable with the given number of\n\
+bytes.\n\
 \n\
 The byteorder argument determines the byte order used to represent the\n\
 integer.  If byteorder is 'big', the most significant byte is at the\n\
@@ -4394,8 +4471,9 @@ beginning of the byte array.  If byteorder is 'little', the most\n\
 significant byte is at the end of the byte array.  To request the native\n\
 byte order of the host system, use `sys.byteorder' as the byte order value.\n\
 \n\
-The signed keyword-only argument indicates whether two's complement is\n\
-used to represent the integer.");
+The signed keyword-only argument determines whether two's complement is\n\
+used to represent the integer.	If signed is False and a negative integer\n\
+is given, an OverflowError is raised.");
 
 static PyObject *
 long_from_bytes(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -4476,6 +4554,24 @@ long_from_bytes(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	return long_obj;
 }
+
+PyDoc_STRVAR(long_from_bytes_doc,
+"int.from_bytes(bytes, byteorder, *, signed=False) -> int\n\
+\n\
+Return the integer represented by the given array of bytes.\n\
+\n\
+The bytes argument must either support the buffer protocol or be an\n\
+iterable object producing bytes.  Bytes and bytearray are examples of\n\
+built-in objects that support the buffer protocol.\n\
+\n\
+The byteorder argument determines the byte order used to represent the\n\
+integer.  If byteorder is 'big', the most significant byte is at the\n\
+beginning of the byte array.  If byteorder is 'little', the most\n\
+significant byte is at the end of the byte array.  To request the native\n\
+byte order of the host system, use `sys.byteorder' as the byte order value.\n\
+\n\
+The signed keyword-only argument indicates whether two's complement is\n\
+used to represent the integer.");
 
 static PyMethodDef long_methods[] = {
 	{"conjugate",	(PyCFunction)long_long,	METH_NOARGS,

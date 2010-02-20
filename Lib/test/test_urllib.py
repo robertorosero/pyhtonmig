@@ -85,8 +85,7 @@ class urlopen_FileTests(unittest.TestCase):
 
     def test_fileno(self):
         file_num = self.returned_obj.fileno()
-        self.assertTrue(isinstance(file_num, int),
-                     "fileno() did not return an int")
+        self.assertIsInstance(file_num, int, "fileno() did not return an int")
         self.assertEqual(os.read(file_num, len(self.text)), self.text,
                          "Reading on the file descriptor returned by fileno() "
                          "did not return the expected text")
@@ -97,7 +96,7 @@ class urlopen_FileTests(unittest.TestCase):
         self.returned_obj.close()
 
     def test_info(self):
-        self.assertTrue(isinstance(self.returned_obj.info(), email.message.Message))
+        self.assertIsInstance(self.returned_obj.info(), email.message.Message)
 
     def test_geturl(self):
         self.assertEqual(self.returned_obj.geturl(), self.pathname)
@@ -250,9 +249,9 @@ class urlretrieve_FileTests(unittest.TestCase):
         # a headers value is returned.
         result = urllib.request.urlretrieve("file:%s" % support.TESTFN)
         self.assertEqual(result[0], support.TESTFN)
-        self.assertTrue(isinstance(result[1], email.message.Message),
-                     "did not get a email.message.Message instance as second "
-                     "returned value")
+        self.assertIsInstance(result[1], email.message.Message,
+                              "did not get a email.message.Message instance "
+                              "as second returned value")
 
     def test_copy(self):
         # Test that setting the filename argument works.
@@ -275,9 +274,9 @@ class urlretrieve_FileTests(unittest.TestCase):
     def test_reporthook(self):
         # Make sure that the reporthook works.
         def hooktester(count, block_size, total_size, count_holder=[0]):
-            self.assertTrue(isinstance(count, int))
-            self.assertTrue(isinstance(block_size, int))
-            self.assertTrue(isinstance(total_size, int))
+            self.assertIsInstance(count, int)
+            self.assertIsInstance(block_size, int)
+            self.assertIsInstance(total_size, int)
             self.assertEqual(count, count_holder[0])
             count_holder[0] = count_holder[0] + 1
         second_temp = "%s.2" % support.TESTFN
@@ -731,7 +730,7 @@ class urlencode_Tests(unittest.TestCase):
         expect_somewhere = ["1st=1", "2nd=2", "3rd=3"]
         result = urllib.parse.urlencode(given)
         for expected in expect_somewhere:
-            self.assertTrue(expected in result,
+            self.assertIn(expected, result,
                          "testing %s: %s not found in %s" %
                          (test_type, expected, result))
         self.assertEqual(result.count('&'), 2,
@@ -778,8 +777,7 @@ class urlencode_Tests(unittest.TestCase):
         result = urllib.parse.urlencode(given, True)
         for value in given["sequence"]:
             expect = "sequence=%s" % value
-            self.assertTrue(expect in result,
-                         "%s not found in %s" % (expect, result))
+            self.assertIn(expect, result)
         self.assertEqual(result.count('&'), 2,
                          "Expected 2 '&'s, got %s" % result.count('&'))
 

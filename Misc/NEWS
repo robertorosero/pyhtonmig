@@ -12,6 +12,17 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #7385: Fix a crash in `MemoryView_FromObject` when
+  `PyObject_GetBuffer` fails.  Patch by Florent Xicluna.
+
+- Issue #7788: Fix an interpreter crash produced by deleting a list
+  slice with very large step value.
+
+- Issue #7766: Change sys.getwindowsversion() return value to a named
+  tuple and add the additional members returned in an OSVERSIONINFOEX
+  structure. The new members are service_pack_major, service_pack_minor,
+  suite_mask, and product_type.
+
 - Issue #7561: Operations on empty bytearrays (such as `int(bytearray())`)
   could crash in many places because of the PyByteArray_AS_STRING() macro
   returning NULL.  The macro now returns a statically allocated empty
@@ -184,6 +195,9 @@ Core and Builtins
 C-API
 -----
 
+- Issue #7767: New function PyLong_AsLongLongAndOverflow added,
+  analogous to PyLong_AsLongAndOverflow.
+
 - Make PyUnicode_CompareWithASCIIString return not equal if the Python string
   has '\0' at the end.
 
@@ -220,7 +234,6 @@ C-API
 - Issue #1419652: Change the first argument to PyImport_AppendInittab() to
   ``const char *`` as the string is stored beyond the call.
 
-
 - Issue #2422: When compiled with the ``--with-valgrind`` option, the
   pymalloc allocator will be automatically disabled when running under
   Valgrind.  This gives improved memory leak detection when running
@@ -228,6 +241,61 @@ C-API
 
 Library
 -------
+
+- Issue #7361: Importlib was not properly checking the number of bytes in
+  bytecode file when it was less then 8 bytes.
+
+- Issue #7633: In the decimal module, Context class methods (with the
+  exception of canonical and is_canonical) now accept instances of int
+  and long wherever a Decimal instance is accepted, and implicitly
+  convert that argument to Decimal.  Previously only some arguments
+  were converted.
+
+- Issue #7835: shelve should no longer produce mysterious warnings during
+  interpreter shutdown.
+
+- Issue #2746: Don't escape ampersands and angle brackets ("&", "<", ">")
+  in XML processing instructions and comments.  These raw characters are
+  allowed by the XML specification, and are necessary when outputting e.g.
+  PHP code in a processing instruction.  Patch by Neil Muller.
+
+- Issue #6233: ElementTree failed converting unicode characters to XML
+  entities when they could't be represented in the requested output
+  encoding.  Patch by Jerry Chen.
+
+- Issue #6003: add an argument to ``zipfile.Zipfile.writestr`` to
+  specify the compression type.
+
+- Issue #4772: Raise a ValueError when an unknown Bluetooth protocol is
+  specified, rather than fall through to AF_PACKET (in the `socket` module).
+  Also, raise ValueError rather than TypeError when an unknown TIPC address
+  type is specified.  Patch by Brian Curtin.
+
+- Issue #6939: Fix file I/O objects in the `io` module to keep the original
+  file position when calling `truncate()`.  It would previously change the
+  file position to the given argument, which goes against the tradition of
+  ftruncate() and other truncation APIs.  Patch by Pascal Chambon.
+
+- Issue #7610: Reworked implementation of the internal
+  :class:`zipfile.ZipExtFile` class used to represent files stored inside
+  an archive.  The new implementation is significantly faster and can
+  be wrapped in a :class:`io.BufferedReader` object for more speedups.
+  It also solves an issue where interleaved calls to `read()` and
+  `readline()` give wrong results.  Patch by Nir Aides.
+
+- Issue #6963: Added "maxtasksperchild" argument to multiprocessing.Pool,
+  allowing for a maximum number of tasks within the pool to be completed by
+  the worker before that worker is terminated, and a new one created to
+  replace it.
+
+- Issue #7792: Registering non-classes to ABCs raised an obscure error.
+
+- Issue #7785: Don't accept bytes in FileIO.write().
+
+- Removed the functions 'verify' and 'vereq' from Lib/test/support.py.
+
+- Issue #7773: Fix an UnboundLocalError in platform.linux_distribution() when
+  the release file is empty.
 
 - Issue #7561: Fix crashes when using bytearray objects with the posix
   module.
@@ -390,6 +458,13 @@ Library
 - Issue #7197: Allow unittest.TextTestRunner objects to be pickled and
   unpickled. This fixes crashes under Windows when trying to run
   test_multiprocessing in verbose mode.
+
+- Issue #7893: ``unittest.TextTestResult`` is made public and a ``resultclass``
+  argument added to the TextTestRunner constructor allowing a different result
+  class to be used without having to subclass.
+  
+- Issue 7588: ``unittest.TextTestResult.getDescription`` now includes the test
+  name in failure reports even if the test has a docstring.
 
 - Issue #3001: Add a C implementation of recursive locks which is used by
   default when instantiating a `threading.RLock` object. This makes 
@@ -587,6 +662,9 @@ Library
 Extension Modules
 -----------------
 
+- Stop providing crtassem.h symbols when compiling with Visual Studio 2010, as
+  msvcr100.dll is not a platform assembly anymore.
+
 - Issue #6508: Add posix.{getresuid,getresgid,setresuid,setresgid}.
 
 - Issue #7078: Set struct.__doc__ from _struct.__doc__.
@@ -610,8 +688,13 @@ Extension Modules
 
 - Issue #2389: Array objects are now pickled in a portable manner.
 
+- Expat: Fix DoS via XML document with malformed UTF-8 sequences
+  (CVE_2009_3560).
+
 Build
 -----
+
+- Issue #3920, #7903: Define _BSD_SOURCE on OpenBSD 4.4 through 4.9.
 
 - Issue #7632: When Py_USING_MEMORY_DEBUGGER is defined, disable the
   private memory allocation scheme in dtoa.c and use PyMem_Malloc and
@@ -654,14 +737,32 @@ Build
 Documentation
 ------------
 
+- Updating `Using Python` documentation to include description of CPython's
+  -J and -X options.
+
 - Document that importing a module that has None in sys.modules triggers an
   ImportError.
 
 - Issue #6556: Fixed the Distutils configuration files location explanation
   for Windows.
+ 
+- Update python manual page (options -B, -O0, -s, environment variables
+  PYTHONDONTWRITEBYTECODE, PYTHONNOUSERSITE).
 
 Tests
 -----
+
+- Issue #7712: test.support gained a new `temp_cwd` context manager which is
+  now also used by regrtest to run all the tests in a temporary directory.
+  The original CWD is saved in `support.SAVEDCWD`.
+  Thanks to Florent Xicluna who helped with the patch.
+
+- Issue #7924: Fix an intermittent 'XXX undetected error' failure in
+  test_capi (only seen so far on platforms where the curses module
+  wasn't built), due to an uncleared exception.
+
+- issue #7728: test_timeout was changed to use test_support.bind_port
+  instead of a hard coded port.
 
 - Issue #7376: instead of running a self-test (which was failing) when called
   with no arguments, doctest.py now gives a usage message.

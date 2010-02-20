@@ -78,6 +78,9 @@ class AutoFileTests(unittest.TestCase):
         self.assertEqual(self.f.readline(None), b"hi\n")
         self.assertEqual(self.f.readlines(None), [b"bye\n", b"abc"])
 
+    def test_reject(self):
+        self.assertRaises(TypeError, self.f.write, "Hello!")
+
     def testRepr(self):
         self.assertEquals(repr(self.f), "<_io.FileIO name=%r mode=%r>"
                                         % (self.f.name, self.f.mode))
@@ -168,7 +171,7 @@ class AutoFileTests(unittest.TestCase):
 
     @ClosedFDRaises
     def testErrnoOnClosedWrite(self, f):
-        f.write('a')
+        f.write(b'a')
 
     @ClosedFDRaises
     def testErrnoOnClosedSeek(self, f):
@@ -324,6 +327,17 @@ class OtherFileTests(unittest.TestCase):
         else:
             f.close()
             self.fail("no error for invalid mode: %s" % bad_mode)
+
+    def testTruncate(self):
+        f = _FileIO(TESTFN, 'w')
+        f.write(bytes(bytearray(range(10))))
+        self.assertEqual(f.tell(), 10)
+        f.truncate(5)
+        self.assertEqual(f.tell(), 10)
+        self.assertEqual(f.seek(0, os.SEEK_END), 5)
+        f.truncate(15)
+        self.assertEqual(f.tell(), 5)
+        self.assertEqual(f.seek(0, os.SEEK_END), 15)
 
     def testTruncateOnWindows(self):
         def bug801631():

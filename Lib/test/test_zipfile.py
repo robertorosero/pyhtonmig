@@ -168,6 +168,45 @@ class TestsWithSourceFile(unittest.TestCase):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
             self.zip_random_open_test(f, zipfile.ZIP_STORED)
 
+    def test_univeral_readaheads(self):
+        f = io.BytesIO()
+
+        data = b'a\r\n' * 16 * 1024
+        zipfp = zipfile.ZipFile(f, 'w', zipfile.ZIP_STORED)
+        zipfp.writestr(TESTFN, data)
+        zipfp.close()
+
+        data2 = b''
+        zipfp = zipfile.ZipFile(f, 'r')
+        zipopen = zipfp.open(TESTFN, 'rU')
+        for line in zipopen:
+            data2 += line
+        zipfp.close()
+
+        self.assertEqual(data, data2.replace(b'\n', b'\r\n'))
+
+    def zip_readline_read_test(self, f, compression):
+        self.make_test_archive(f, compression)
+
+        # Read the ZIP archive
+        zipfp = zipfile.ZipFile(f, "r")
+        zipopen = zipfp.open(TESTFN)
+
+        data = b''
+        while True:
+            read = zipopen.readline()
+            if not read:
+                break
+            data += read
+
+            read = zipopen.read(100)
+            if not read:
+                break
+            data += read
+
+        self.assertEqual(data, self.data)
+        zipfp.close()
+
     def zip_readline_test(self, f, compression):
         self.make_test_archive(f, compression)
 
@@ -194,6 +233,11 @@ class TestsWithSourceFile(unittest.TestCase):
         with zipfile.ZipFile(f, "r") as zipfp:
             for line, zipline in zip(self.line_gen, zipfp.open(TESTFN)):
                 self.assertEqual(zipline, line + '\n')
+
+    def test_readline_read_stored(self):
+        # Issue #7610: calls to readline() interleaved with calls to read().
+        for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
+            self.zip_readline_read_test(f, zipfile.ZIP_STORED)
 
     def test_readline_stored(self):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
@@ -222,6 +266,12 @@ class TestsWithSourceFile(unittest.TestCase):
     def test_random_open_deflated(self):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
             self.zip_random_open_test(f, zipfile.ZIP_DEFLATED)
+
+    @skipUnless(zlib, "requires zlib")
+    def test_readline_read_deflated(self):
+        # Issue #7610: calls to readline() interleaved with calls to read().
+        for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
+            self.zip_readline_read_test(f, zipfile.ZIP_DEFLATED)
 
     @skipUnless(zlib, "requires zlib")
     def test_readline_deflated(self):
@@ -356,6 +406,20 @@ class TestsWithSourceFile(unittest.TestCase):
 
         # remove the test file subdirectories
         shutil.rmtree(os.path.join(os.getcwd(), 'ziptest2dir'))
+
+    def test_writestr_compression(self):
+        zipfp = zipfile.ZipFile(TESTFN2, "w")
+        zipfp.writestr("a.txt", "hello world", compress_type=zipfile.ZIP_STORED)
+        if zlib:
+            zipfp.writestr("b.txt", "hello world", compress_type=zipfile.ZIP_DEFLATED)
+
+        info = zipfp.getinfo('a.txt')
+        self.assertEqual(info.compress_type, zipfile.ZIP_STORED)
+
+        if zlib:
+            info = zipfp.getinfo('b.txt')
+            self.assertEqual(info.compress_type, zipfile.ZIP_DEFLATED)
+
 
     def zip_test_writestr_permissions(self, f, compression):
         # Make sure that writestr creates files with mode 0600,
@@ -595,6 +659,7 @@ class OtherTests(unittest.TestCase):
         with zipfile.ZipFile(TESTFN, "w") as zf:
             zf.writestr("foo.txt", "Test for unicode filename")
             zf.writestr("\xf6.txt", "Test for unicode filename")
+            self.assertIsInstance(zf.infolist()[0].filename, str)
 
         with zipfile.ZipFile(TESTFN, "r") as zf:
             self.assertEqual(zf.filelist[0].filename, "foo.txt")
@@ -1066,6 +1131,29 @@ class UniversalNewlineTests(unittest.TestCase):
                 zipdata = zipfp.open(fn, "rU").read()
                 self.assertEqual(self.arcdata[sep], zipdata)
 
+    def readline_read_test(self, f, compression):
+        self.make_test_archive(f, compression)
+
+        # Read the ZIP archive
+        zipfp = zipfile.ZipFile(f, "r")
+        for sep, fn in self.arcfiles.items():
+            zipopen = zipfp.open(fn, "rU")
+            data = b''
+            while True:
+                read = zipopen.readline()
+                if not read:
+                    break
+                data += read
+
+                read = zipopen.read(5)
+                if not read:
+                    break
+                data += read
+
+            self.assertEqual(data, self.arcdata['\n'])
+
+        zipfp.close()
+
     def readline_test(self, f, compression):
         self.make_test_archive(f, compression)
 
@@ -1100,6 +1188,11 @@ class UniversalNewlineTests(unittest.TestCase):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
             self.read_test(f, zipfile.ZIP_STORED)
 
+    def test_readline_read_stored(self):
+        # Issue #7610: calls to readline() interleaved with calls to read().
+        for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
+            self.readline_read_test(f, zipfile.ZIP_STORED)
+
     def test_readline_stored(self):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
             self.readline_test(f, zipfile.ZIP_STORED)
@@ -1116,6 +1209,12 @@ class UniversalNewlineTests(unittest.TestCase):
     def test_read_deflated(self):
         for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
             self.read_test(f, zipfile.ZIP_DEFLATED)
+
+    @skipUnless(zlib, "requires zlib")
+    def test_readline_read_deflated(self):
+        # Issue #7610: calls to readline() interleaved with calls to read().
+        for f in (TESTFN2, TemporaryFile(), io.BytesIO()):
+            self.readline_read_test(f, zipfile.ZIP_DEFLATED)
 
     @skipUnless(zlib, "requires zlib")
     def test_readline_deflated(self):

@@ -231,8 +231,7 @@ class BaseBytesTest(unittest.TestCase):
         b = self.type2test(b"abc")
         self.assertIn(ord('a'), b)
         self.assertIn(int(ord('a')), b)
-        self.assertFalse(200 in b)
-        self.assertFalse(200 in b)
+        self.assertNotIn(200, b)
         self.assertRaises(ValueError, lambda: 300 in b)
         self.assertRaises(ValueError, lambda: -1 in b)
         self.assertRaises(TypeError, lambda: None in b)
@@ -246,10 +245,10 @@ class BaseBytesTest(unittest.TestCase):
             self.assertIn(f(b"ab"), b)
             self.assertIn(f(b"bc"), b)
             self.assertIn(f(b"abc"), b)
-            self.assertFalse(f(b"ac") in b)
-            self.assertFalse(f(b"d") in b)
-            self.assertFalse(f(b"dab") in b)
-            self.assertFalse(f(b"abd") in b)
+            self.assertNotIn(f(b"ac"), b)
+            self.assertNotIn(f(b"d"), b)
+            self.assertNotIn(f(b"dab"), b)
+            self.assertNotIn(f(b"abd"), b)
 
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
@@ -601,7 +600,7 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, bytearray([0, 1, 2, 42, 42, 42, 3, 4, 5, 6, 7, 8, 9]))
 
     def test_extended_set_del_slice(self):
-        indices = (0, None, 1, 3, 19, 300, -1, -2, -31, -300)
+        indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
         for start in indices:
             for stop in indices:
                 # Skip invalid step 0
@@ -1018,7 +1017,7 @@ class SubclassTest(unittest.TestCase):
 
     def test_basic(self):
         self.assertTrue(issubclass(self.subclass2test, self.type2test))
-        self.assertTrue(isinstance(self.subclass2test(), self.type2test))
+        self.assertIsInstance(self.subclass2test(), self.type2test)
 
         a, b = b"abcd", b"efgh"
         _a, _b = self.subclass2test(a), self.subclass2test(b)

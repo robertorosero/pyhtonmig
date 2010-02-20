@@ -9,9 +9,6 @@
 .. sectionauthor:: Raymond Hettinger <python@rcn.com>
 
 
-.. versionchanged:: 3.1
-   Added test :ref:`skipping and expected failures <unittest-skipping>`.
-
 The Python unit testing framework, sometimes referred to as "PyUnit," is a
 Python language version of JUnit, by Kent Beck and Erich Gamma. JUnit is, in
 turn, a Java version of Kent's Smalltalk testing framework.  Each is the de
@@ -107,13 +104,13 @@ qualified class or method names.
 
 You can run tests with more detail (higher verbosity) by passing in the -v flag::
 
-   python-m unittest -v test_module
+   python -m unittest -v test_module
 
 For a list of all the command line options::
 
    python -m unittest -h
 
-..  versionchanged:: 2.7
+.. versionchanged:: 3.2
    In earlier versions it was only possible to run individual test methods and
    not modules or classes.
 
@@ -126,7 +123,7 @@ tests in a project or just a subset.
 Test Discovery
 --------------
 
-.. versionadded:: 2.7
+.. versionadded:: 3.2
 
 unittest supports simple test discovery. For a project's tests to be
 compatible with test discovery they must all be importable from the top level
@@ -149,8 +146,8 @@ The ``discover`` sub-command has the following options:
 The -s, -p, & -t options can be passsed in as positional arguments. The
 following two command lines are equivalent::
 
-   python -m unittest -s project_directory -p '*_test.py'
-   python -m unittest project_directory '*_test.py'
+   python -m unittest discover -s project_directory -p '*_test.py'
+   python -m unittest discover project_directory '*_test.py'
 
 Test modules and packages can customize test loading and discovery by through
 the `load_tests protocol`_.
@@ -182,12 +179,12 @@ Here is a short script to test three functions from the :mod:`random` module::
 
        def test_choice(self):
            element = random.choice(self.seq)
-           self.assert_(element in self.seq)
+           self.assertIn(element, self.seq)
 
        def test_sample(self):
            self.assertRaises(ValueError, random.sample, self.seq, 20)
            for element in random.sample(self.seq, 5):
-               self.assert_(element in self.seq)
+               self.assertIn(element, self.seq)
 
    if __name__ == '__main__':
        unittest.main()
@@ -198,7 +195,7 @@ individual tests are defined with methods whose names start with the letters
 represent tests.
 
 The crux of each test is a call to :meth:`~TestCase.assertEqual` to check for an
-expected result; :meth:`~TestCase.assert_` to verify a condition; or
+expected result; :meth:`~TestCase.assertTrue` to verify a condition; or
 :meth:`~TestCase.assertRaises` to verify that an expected exception gets raised.
 These methods are used instead of the :keyword:`assert` statement so the test
 runner can accumulate all test results and produce a report.
@@ -301,14 +298,14 @@ us when we run the test::
 
    class DefaultWidgetSizeTestCase(SimpleWidgetTestCase):
        def runTest(self):
-           self.assertTrue(self.widget.size() == (50,50),
-                           'incorrect default size')
+           self.assertEqual(self.widget.size(), (50,50),
+                            'incorrect default size')
 
    class WidgetResizeTestCase(SimpleWidgetTestCase):
        def runTest(self):
            self.widget.resize(100,150)
-           self.assertTrue(self.widget.size() == (100,150),
-                           'wrong size after resize')
+           self.assertEqual(self.widget.size(), (100,150),
+                            'wrong size after resize')
 
 If the :meth:`~TestCase.setUp` method raises an exception while the test is
 running, the framework will consider the test to have suffered an error, and the
@@ -349,13 +346,13 @@ mechanism::
            self.widget = None
 
        def testDefaultSize(self):
-           self.assertTrue(self.widget.size() == (50,50),
-                           'incorrect default size')
+           self.assertEqual(self.widget.size(), (50,50),
+                            'incorrect default size')
 
        def testResize(self):
            self.widget.resize(100,150)
-           self.assertTrue(self.widget.size() == (100,150),
-                           'wrong size after resize')
+           self.assertEqual(self.widget.size(), (100,150),
+                            'wrong size after resize')
 
 Here we have not provided a :meth:`~TestCase.runTest` method, but have instead
 provided two different test methods.  Class instances will now each run one of
@@ -492,6 +489,8 @@ automatically build :class:`unittest.TestSuite` instances from the existing
 
 Skipping tests and expected failures
 ------------------------------------
+
+.. versionadded:: 3.1
 
 Unittest supports skipping individual test methods and even whole classes of
 tests.  In addition, it supports marking a test as a "expected failure," a test
@@ -678,6 +677,7 @@ Test cases
 
       .. deprecated:: 3.1
          :meth:`failUnless`.
+         :meth:`assert_`; use :meth:`assertTrue`.
 
 
    .. method:: assertEqual(first, second, msg=None)
@@ -691,12 +691,17 @@ Test cases
       *second*.
 
       In addition, if *first* and *second* are the exact same type and one of
-      list, tuple, dict, set, or frozenset or any type that a subclass
-      registers :meth:`addTypeEqualityFunc` the type specific equality function
-      will be called in order to generate a more useful default error message.
+      list, tuple, dict, set, frozenset or str or any type that a subclass
+      registers with :meth:`addTypeEqualityFunc` the type specific equality
+      function will be called in order to generate a more useful default
+      error message.
 
       .. versionchanged:: 3.1
          Added the automatic calling of type specific equality function.
+
+      .. versionchanged:: 3.2
+         :meth:`assertMultiLineEqual` added as the default type equality
+         function for comparing strings.
 
       .. deprecated:: 3.1
          :meth:`failUnlessEqual`.
@@ -773,7 +778,8 @@ Test cases
 
       Test that the multiline string *first* is equal to the string *second*.
       When not equal a diff of the two strings highlighting the differences
-      will be included in the error message.
+      will be included in the error message. This method is used by default
+      when comparing strings with :meth:`assertEqual`.
 
       If specified *msg* will be used as the error message on failure.
 
@@ -801,11 +807,15 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertSameElements(expected, actual, msg=None)
+   .. method:: assertSameElements(actual, expected, msg=None)
 
-      Test that sequence *expected* contains the same elements as *actual*.
-      When they don't an error message listing the differences between the
-      sequences will be generated.
+      Test that sequence *expected* contains the same elements as *actual*,
+      regardless of their order. When they don't, an error message listing
+      the differences between the sequences will be generated.
+
+      Duplicate elements are ignored when comparing *actual* and *expected*.
+      It is the equivalent of ``assertEqual(set(expected), set(actual))``
+      but it works with sequences of unhashable objects as well.
 
       If specified *msg* will be used as the error message on failure.
 
@@ -815,7 +825,8 @@ Test cases
    .. method:: assertSetEqual(set1, set2, msg=None)
 
       Tests that two sets are equal.  If not, an error message is constructed
-      that lists the differences between the sets.
+      that lists the differences between the sets.  This method is used by
+      default when comparing sets or frozensets with :meth:`assertEqual`.
 
       Fails if either of *set1* or *set2* does not have a :meth:`set.difference`
       method.
@@ -828,7 +839,9 @@ Test cases
    .. method:: assertDictEqual(expected, actual, msg=None)
 
       Test that two dictionaries are equal.  If not, an error message is
-      constructed that shows the differences in the dictionaries.
+      constructed that shows the differences in the dictionaries. This
+      method will be used by default to compare dictionaries in
+      calls to :meth:`assertEqual`.
 
       If specified *msg* will be used as the error message on failure.
 
@@ -852,6 +865,8 @@ Test cases
       Tests that two lists or tuples are equal.  If not an error message is
       constructed that shows only the differences between the two.  An error
       is also raised if either of the parameters are of the wrong type.
+      These methods are used by default when comparing lists or tuples with
+      :meth:`assertEqual`.
 
       If specified *msg* will be used as the error message on failure.
 
@@ -888,21 +903,27 @@ Test cases
       If only the *exception* argument is given, returns a context manager so
       that the code under test can be written inline rather than as a function::
 
-         with self.failUnlessRaises(some_error_class):
+         with self.assertRaises(SomeException):
              do_something()
 
       The context manager will store the caught exception object in its
-      :attr:`exc_value` attribute.  This can be useful if the intention
-      is to perform additional checks on the exception raised.
+      :attr:`exception` attribute.  This can be useful if the intention
+      is to perform additional checks on the exception raised::
+
+        with self.assertRaises(SomeException) as cm:
+            do_something()
+
+        the_exception = cm.exception
+        self.assertEqual(the_exception.error_code, 3)
 
       .. versionchanged:: 3.1
          Added the ability to use :meth:`assertRaises` as a context manager.
 
+      .. versionchanged:: 3.2
+         Added the :attr:`exception` attribute.
+
       .. deprecated:: 3.1
          :meth:`failUnlessRaises`.
-
-      .. versionchanged:: 3.2
-         Added the :attr:`exc_value` attribute.
 
 
    .. method:: assertRaisesRegexp(exception, regexp[, callable, ...])
@@ -1047,14 +1068,13 @@ Test cases
       Returns a description of the test, or :const:`None` if no description
       has been provided.  The default implementation of this method
       returns the first line of the test method's docstring, if available,
-      along with the method name.
+      or :const:`None`.
 
-      .. versionchanged:: 3.1
-         In earlier versions this only returned the first line of the test
-         method's docstring, if available or the :const:`None`.  That led to
-         undesirable behavior of not printing the test name when someone was
-         thoughtful enough to write a docstring.
-
+      .. versionchanged:: 3.1,3.2
+         In 3.1 this was changed to add the test name to the short description
+         even in the presence of a docstring. This caused compatibility issues
+         with unittest extensions and adding the test name was moved to the
+         :class:`TextTestResult`.
 
    .. method:: addTypeEqualityFunc(typeobj, function)
 
@@ -1084,7 +1104,7 @@ Test cases
       If :meth:`setUp` fails, meaning that :meth:`tearDown` is not called,
       then any cleanup functions added will still be called.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: doCleanups()
@@ -1100,7 +1120,7 @@ Test cases
       :meth:`doCleanups` pops methods off the stack of cleanup
       functions one at a time, so it can be called at any time.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
 .. class:: FunctionTestCase(testFunc, setUp=None, tearDown=None, description=None)
@@ -1179,7 +1199,7 @@ Grouping tests
       (for example when counting tests or comparing for equality)
       so the tests returned must be the same for repeated iterations.
 
-      .. versionchanged:: 2.7
+      .. versionchanged:: 3.2
          In earlier versions the :class:`TestSuite` accessed tests directly rather
          than through iteration, so overriding :meth:`__iter__` wasn't sufficient
          for providing tests.
@@ -1227,7 +1247,7 @@ Loading and running tests
       load the tests. This allows modules to customize test loading.
       This is the `load_tests protocol`_.
 
-      .. versionchanged:: 2.7
+      .. versionchanged:: 3.2
          Support for ``load_tests`` added.
 
 
@@ -1297,7 +1317,8 @@ Loading and running tests
       ``load_tests`` does not need to pass this argument in to
       ``loader.discover()``.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
+
 
    The following attributes of a :class:`TestLoader` can be configured either by
    subclassing or assignment on an instance:
@@ -1431,14 +1452,14 @@ Loading and running tests
 
       Called once before any tests are executed.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: stopTestRun(test)
 
-      Called once before any tests are executed.
+      Called once after all tests are executed.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: addError(test, err)
@@ -1496,6 +1517,14 @@ Loading and running tests
       The default implementation appends the test to the instance's
       :attr:`unexpectedSuccesses` attribute.
 
+.. class:: TextTestResult(stream, descriptions, verbosity)
+
+    A concrete implementation of :class:`TestResult` used by the
+    :class:`TextTestRunner`.
+
+    .. versionadded:: 3.2
+        This class was previously named ``_TextTestResult``. The old name still
+        exists as an alias but is deprecated.
 
 .. data:: defaultTestLoader
 
@@ -1504,7 +1533,7 @@ Loading and running tests
    instead of repeatedly creating new instances.
 
 
-.. class:: TextTestRunner(stream=sys.stderr, descriptions=True, verbosity=1)
+.. class:: TextTestRunner(stream=sys.stderr, descriptions=True, verbosity=1, runnerclass=None)
 
    A basic test runner implementation which prints results on standard error.  It
    has a few configurable parameters, but is essentially very simple.  Graphical
@@ -1516,6 +1545,12 @@ Loading and running tests
       It is not intended to be called directly, but can be overridden in
       subclasses to provide a custom ``TestResult``.
 
+      ``_makeResult()`` instantiates the class or callable passed in the
+      ``TextTestRunner`` constructor as the ``resultclass`` argument. It
+      defaults to :class::`TextTestResult` if no ``resultclass`` is provided.
+      The result class is instantiated with the following arguments::
+
+        stream, descriptions, verbosity
 
 .. function:: main(module='__main__', defaultTest=None, argv=None, testRunner=None, testLoader=unittest.loader.defaultTestLoader, exit=True, verbosity=1)
 
@@ -1546,7 +1581,7 @@ Loading and running tests
    Calling ``main`` actually returns an instance of the ``TestProgram`` class.
    This stores the result of the tests run as the ``result`` attribute.
 
-   .. versionchanged:: 2.7
+   .. versionchanged:: 3.2
       The ``exit`` and ``verbosity`` parameters were added.
 
 
@@ -1554,7 +1589,7 @@ load_tests Protocol
 ###################
 
 
-.. versionadded:: 2.7
+.. versionadded:: 3.2
 
 
 Modules or packages can customize how tests are loaded from them during normal

@@ -229,6 +229,11 @@ class IOTest(unittest.TestCase):
 
     def write_ops(self, f):
         self.assertEqual(f.write(b"blah."), 5)
+        f.truncate(0)
+        self.assertEqual(f.tell(), 5)
+        f.seek(0)
+
+        self.assertEqual(f.write(b"blah."), 5)
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(b"Hello."), 6)
         self.assertEqual(f.tell(), 6)
@@ -239,8 +244,9 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.write(b"h"), 1)
         self.assertEqual(f.seek(-1, 2), 13)
         self.assertEqual(f.tell(), 13)
+
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 12)
+        self.assertEqual(f.tell(), 13)
         self.assertRaises(TypeError, f.seek, 0.0)
 
     def read_ops(self, f, buffered=False):
@@ -285,7 +291,7 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.tell(), self.LARGE + 2)
         self.assertEqual(f.seek(0, 2), self.LARGE + 2)
         self.assertEqual(f.truncate(self.LARGE + 1), self.LARGE + 1)
-        self.assertEqual(f.tell(), self.LARGE + 1)
+        self.assertEqual(f.tell(), self.LARGE + 2)
         self.assertEqual(f.seek(0, 2), self.LARGE + 1)
         self.assertEqual(f.seek(-1, 2), self.LARGE)
         self.assertEqual(f.read(2), b"x")
@@ -980,7 +986,7 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
             bufio = self.tp(raw, 8)
             bufio.write(b"abcdef")
             self.assertEqual(bufio.truncate(3), 3)
-            self.assertEqual(bufio.tell(), 3)
+            self.assertEqual(bufio.tell(), 6)
         with self.open(support.TESTFN, "rb", buffering=0) as f:
             self.assertEqual(f.read(), b"abc")
 
@@ -1365,6 +1371,14 @@ class BufferedRandomTest(BufferedReaderTest, BufferedWriterTest):
             s = raw.getvalue()
             self.assertEqual(s,
                 b"A" + b"B" * overwrite_size + b"A" * (9 - overwrite_size))
+
+    def test_truncate_after_read_or_write(self):
+        raw = self.BytesIO(b"A" * 10)
+        bufio = self.tp(raw, 100)
+        self.assertEqual(bufio.read(2), b"AA") # the read buffer gets filled
+        self.assertEqual(bufio.truncate(), 2)
+        self.assertEqual(bufio.write(b"BB"), 2) # the write buffer increases
+        self.assertEqual(bufio.truncate(), 4)
 
     def test_misbehaved_io(self):
         BufferedReaderTest.test_misbehaved_io(self)
@@ -2351,27 +2365,27 @@ class MiscIOTest(unittest.TestCase):
 
     def test_abcs(self):
         # Test the visible base classes are ABCs.
-        self.assertTrue(isinstance(self.IOBase, abc.ABCMeta))
-        self.assertTrue(isinstance(self.RawIOBase, abc.ABCMeta))
-        self.assertTrue(isinstance(self.BufferedIOBase, abc.ABCMeta))
-        self.assertTrue(isinstance(self.TextIOBase, abc.ABCMeta))
+        self.assertIsInstance(self.IOBase, abc.ABCMeta)
+        self.assertIsInstance(self.RawIOBase, abc.ABCMeta)
+        self.assertIsInstance(self.BufferedIOBase, abc.ABCMeta)
+        self.assertIsInstance(self.TextIOBase, abc.ABCMeta)
 
     def _check_abc_inheritance(self, abcmodule):
         with self.open(support.TESTFN, "wb", buffering=0) as f:
-            self.assertTrue(isinstance(f, abcmodule.IOBase))
-            self.assertTrue(isinstance(f, abcmodule.RawIOBase))
-            self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
-            self.assertFalse(isinstance(f, abcmodule.TextIOBase))
+            self.assertIsInstance(f, abcmodule.IOBase)
+            self.assertIsInstance(f, abcmodule.RawIOBase)
+            self.assertNotIsInstance(f, abcmodule.BufferedIOBase)
+            self.assertNotIsInstance(f, abcmodule.TextIOBase)
         with self.open(support.TESTFN, "wb") as f:
-            self.assertTrue(isinstance(f, abcmodule.IOBase))
-            self.assertFalse(isinstance(f, abcmodule.RawIOBase))
-            self.assertTrue(isinstance(f, abcmodule.BufferedIOBase))
-            self.assertFalse(isinstance(f, abcmodule.TextIOBase))
+            self.assertIsInstance(f, abcmodule.IOBase)
+            self.assertNotIsInstance(f, abcmodule.RawIOBase)
+            self.assertIsInstance(f, abcmodule.BufferedIOBase)
+            self.assertNotIsInstance(f, abcmodule.TextIOBase)
         with self.open(support.TESTFN, "w") as f:
-            self.assertTrue(isinstance(f, abcmodule.IOBase))
-            self.assertFalse(isinstance(f, abcmodule.RawIOBase))
-            self.assertFalse(isinstance(f, abcmodule.BufferedIOBase))
-            self.assertTrue(isinstance(f, abcmodule.TextIOBase))
+            self.assertIsInstance(f, abcmodule.IOBase)
+            self.assertNotIsInstance(f, abcmodule.RawIOBase)
+            self.assertNotIsInstance(f, abcmodule.BufferedIOBase)
+            self.assertIsInstance(f, abcmodule.TextIOBase)
 
     def test_abc_inheritance(self):
         # Test implementations inherit from their respective ABCs

@@ -12,6 +12,7 @@ overview:
 .. toctree::
 
    sys.rst
+   sysconfig.rst
    builtins.rst
    __main__.rst
    warnings.rst
@@ -24,3 +25,4 @@ overview:
    inspect.rst
    site.rst
    fpectl.rst
+   distutils.rst

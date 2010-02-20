@@ -284,6 +284,95 @@ test_lazy_hash_inheritance(PyObject* self)
 }
 
 
+/* Issue #7385: Check that memoryview() does not crash
+ *   when bf_getbuffer returns an error
+ */
+
+static int
+broken_buffer_getbuffer(PyObject *self, Py_buffer *view, int flags)
+{
+	PyErr_SetString(
+		TestError,
+		"test_broken_memoryview: expected error in bf_getbuffer");
+	return -1;
+}
+
+static PyBufferProcs memoryviewtester_as_buffer = {
+	(getbufferproc)broken_buffer_getbuffer,	/* bf_getbuffer */
+	0,	/* bf_releasebuffer */
+};
+
+static PyTypeObject _MemoryViewTester_Type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"memoryviewtester",	/* Name of this type */
+	sizeof(PyObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)PyObject_Del, /* tp_dealloc */
+	0,			/* tp_print */
+	0,			/* tp_getattr */
+	0,			/* tp_setattr */
+	0,			/* tp_compare */
+	0,			/* tp_repr */
+	0,			/* tp_as_number */
+	0,			/* tp_as_sequence */
+	0,			/* tp_as_mapping */
+	0,			/* tp_hash */
+	0,			/* tp_call */
+	0,			/* tp_str */
+	PyObject_GenericGetAttr,  /* tp_getattro */
+	0,			/* tp_setattro */
+	&memoryviewtester_as_buffer,			/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,	/* tp_flags */
+	0,			/* tp_doc */
+	0,			/* tp_traverse */
+	0,			/* tp_clear */
+	0,			/* tp_richcompare */
+	0,			/* tp_weaklistoffset */
+	0,			/* tp_iter */
+	0,			/* tp_iternext */
+	0,			/* tp_methods */
+	0,			/* tp_members */
+	0,			/* tp_getset */
+	0,			/* tp_base */
+	0,			/* tp_dict */
+	0,			/* tp_descr_get */
+	0,			/* tp_descr_set */
+	0,			/* tp_dictoffset */
+	0,			/* tp_init */
+	0,			/* tp_alloc */
+	PyType_GenericNew,		/* tp_new */
+};
+
+static PyObject*
+test_broken_memoryview(PyObject* self)
+{
+	PyObject *obj = PyObject_New(PyObject, &_MemoryViewTester_Type);
+	PyObject *res;
+
+	if (obj == NULL) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_broken_memoryview: failed to create object");
+		return NULL;
+	}
+
+	res = PyMemoryView_FromObject(obj);
+	if (res || !PyErr_Occurred()){
+		PyErr_SetString(
+			TestError,
+			"test_broken_memoryview: memoryview() didn't raise an Exception");
+		Py_XDECREF(res);
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	PyErr_Clear();
+	Py_DECREF(obj);
+	Py_RETURN_NONE;
+}
+
+
 /* Tests of PyLong_{As, From}{Unsigned,}Long(), and (#ifdef HAVE_LONG_LONG)
    PyLong_{As, From}{Unsigned,}LongLong().
 
@@ -518,6 +607,171 @@ test_long_and_overflow(PyObject *self)
 			"expected return value LONG_MIN");
 	if (overflow != 0)
 		return raiseTestError("test_long_and_overflow",
+			"overflow was not cleared");
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+/* Test the PyLong_AsLongLongAndOverflow API. General conversion to
+   PY_LONG_LONG is tested by test_long_api_inner. This test will
+   concentrate on proper handling of overflow.
+*/
+
+static PyObject *
+test_long_long_and_overflow(PyObject *self)
+{
+	PyObject *num, *one, *temp;
+	PY_LONG_LONG value;
+	int overflow;
+
+	/* Test that overflow is set properly for a large value. */
+	/* num is a number larger than PY_LLONG_MAX on a typical machine. */
+	num = PyLong_FromString("FFFFFFFFFFFFFFFFFFFFFFFF", NULL, 16);
+	if (num == NULL)
+		return NULL;
+	overflow = 1234;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"return value was not set to -1");
+	if (overflow != 1)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not set to 1");
+
+	/* Same again, with num = PY_LLONG_MAX + 1 */
+	num = PyLong_FromLongLong(PY_LLONG_MAX);
+	if (num == NULL)
+		return NULL;
+	one = PyLong_FromLong(1L);
+	if (one == NULL) {
+		Py_DECREF(num);
+		return NULL;
+	}
+	temp = PyNumber_Add(num, one);
+	Py_DECREF(one);
+	Py_DECREF(num);
+	num = temp;
+	if (num == NULL)
+		return NULL;
+	overflow = 0;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"return value was not set to -1");
+	if (overflow != 1)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not set to 1");
+
+	/* Test that overflow is set properly for a large negative value. */
+	/* num is a number smaller than PY_LLONG_MIN on a typical platform */
+	num = PyLong_FromString("-FFFFFFFFFFFFFFFFFFFFFFFF", NULL, 16);
+	if (num == NULL)
+		return NULL;
+	overflow = 1234;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"return value was not set to -1");
+	if (overflow != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not set to -1");
+
+	/* Same again, with num = PY_LLONG_MIN - 1 */
+	num = PyLong_FromLongLong(PY_LLONG_MIN);
+	if (num == NULL)
+		return NULL;
+	one = PyLong_FromLong(1L);
+	if (one == NULL) {
+		Py_DECREF(num);
+		return NULL;
+	}
+	temp = PyNumber_Subtract(num, one);
+	Py_DECREF(one);
+	Py_DECREF(num);
+	num = temp;
+	if (num == NULL)
+		return NULL;
+	overflow = 0;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"return value was not set to -1");
+	if (overflow != -1)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not set to -1");
+
+ 	/* Test that overflow is cleared properly for small values. */
+	num = PyLong_FromString("FF", NULL, 16);
+	if (num == NULL)
+		return NULL;
+	overflow = 1234;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != 0xFF)
+		return raiseTestError("test_long_long_and_overflow",
+			"expected return value 0xFF");
+	if (overflow != 0)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not cleared");
+
+	num = PyLong_FromString("-FF", NULL, 16);
+	if (num == NULL)
+		return NULL;
+	overflow = 0;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != -0xFF)
+		return raiseTestError("test_long_long_and_overflow",
+			"expected return value 0xFF");
+	if (overflow != 0)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was set incorrectly");
+
+	num = PyLong_FromLongLong(PY_LLONG_MAX);
+	if (num == NULL)
+		return NULL;
+	overflow = 1234;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != PY_LLONG_MAX)
+		return raiseTestError("test_long_long_and_overflow",
+			"expected return value PY_LLONG_MAX");
+	if (overflow != 0)
+		return raiseTestError("test_long_long_and_overflow",
+			"overflow was not cleared");
+
+	num = PyLong_FromLongLong(PY_LLONG_MIN);
+	if (num == NULL)
+		return NULL;
+	overflow = 0;
+	value = PyLong_AsLongLongAndOverflow(num, &overflow);
+	Py_DECREF(num);
+	if (value == -1 && PyErr_Occurred())
+		return NULL;
+	if (value != PY_LLONG_MIN)
+		return raiseTestError("test_long_long_and_overflow",
+			"expected return value PY_LLONG_MIN");
+	if (overflow != 0)
+		return raiseTestError("test_long_long_and_overflow",
 			"overflow was not cleared");
 
 	Py_INCREF(Py_None);
@@ -1108,21 +1362,32 @@ raise_exception(PyObject *self, PyObject *args)
 	return NULL;
 }
 
-#ifdef WITH_THREAD
+
+static int test_run_counter = 0;
 
 static PyObject *
 test_datetime_capi(PyObject *self, PyObject *args) {
 	if (PyDateTimeAPI) {
-		PyErr_SetString(PyExc_AssertionError,
-				"PyDateTime_CAPI somehow initialized");
-		return NULL;
+		if (test_run_counter) {
+			/* Probably regrtest.py -R */
+			Py_RETURN_NONE;
+		}
+		else {
+			PyErr_SetString(PyExc_AssertionError,
+					"PyDateTime_CAPI somehow initialized");
+			return NULL;
+		}
 	}
+	test_run_counter++;
 	PyDateTime_IMPORT;
         if (PyDateTimeAPI)
 		Py_RETURN_NONE;
 	else
 		return NULL;
 }
+
+
+#ifdef WITH_THREAD
 
 /* test_thread_state spawns a thread of its own, and that thread releases
  * `thread_done` when it's finished.  The driver code has to know when the
@@ -1498,27 +1763,14 @@ test_capsule(PyObject *self, PyObject *args)
 			Py_DECREF(object);
 			Py_DECREF(module);
 		}
+		else
+			PyErr_Clear();
 	}
 
   exit:
 	if (error) {
 		return raiseTestError("test_capsule", error);
 	}
-	/* 13/12/2009: something is causing test_capi to fail occasionally on
-	   the Solaris buildbot, with the output:
-
-		internal test_L_code
-		internal test_Z_code
-		internal test_bug_7414
-		internal test_capsule
-		XXX undetected error
-		internaltest test_capi crashed -- <class 'ImportError'>: No module named datetime
-
-	   It seems possible that test_capsule is raising an exception but
-	   failing to return NULL.  Do a PyErr_Occurred check to find out.
-	*/
-	if (PyErr_Occurred())
-		return NULL;
 	Py_RETURN_NONE;
 #undef FAIL
 }
@@ -1761,6 +2013,7 @@ static PyMethodDef TestMethods[] = {
 	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
 	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
 	{"test_lazy_hash_inheritance",	(PyCFunction)test_lazy_hash_inheritance,METH_NOARGS},
+	{"test_broken_memoryview",	(PyCFunction)test_broken_memoryview,METH_NOARGS},
 	{"test_long_api",	(PyCFunction)test_long_api,	 METH_NOARGS},
 	{"test_long_and_overflow", (PyCFunction)test_long_and_overflow,
 	 METH_NOARGS},
@@ -1791,6 +2044,8 @@ static PyMethodDef TestMethods[] = {
 	{"getargs_L",		getargs_L,			 METH_VARARGS},
 	{"getargs_K",		getargs_K,			 METH_VARARGS},
 	{"test_longlong_api",	test_longlong_api,		 METH_NOARGS},
+	{"test_long_long_and_overflow",
+		(PyCFunction)test_long_long_and_overflow, METH_NOARGS},
 	{"test_L_code",		(PyCFunction)test_L_code,	 METH_NOARGS},
 	{"codec_incrementalencoder",
 	 (PyCFunction)codec_incrementalencoder,	 METH_VARARGS},
@@ -1977,6 +2232,7 @@ PyInit__testcapi(void)
 		return NULL;
 
 	Py_TYPE(&_HashInheritanceTester_Type)=&PyType_Type;
+	Py_TYPE(&_MemoryViewTester_Type)=&PyType_Type;
 
 	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);

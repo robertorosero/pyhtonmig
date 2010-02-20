@@ -192,8 +192,8 @@ if 1:
             self.fail("How many bits *does* this machine have???")
         # Verify treatment of contant folding on -(sys.maxsize+1)
         # i.e. -2147483648 on 32 bit platforms.  Should return int, not long.
-        self.assertTrue(isinstance(eval("%s" % (-sys.maxsize - 1)), int))
-        self.assertTrue(isinstance(eval("%s" % (-sys.maxsize - 2)), int))
+        self.assertIsInstance(eval("%s" % (-sys.maxsize - 1)), int)
+        self.assertIsInstance(eval("%s" % (-sys.maxsize - 2)), int)
 
     if sys.maxsize == 9223372036854775807:
         def test_32_63_bit_values(self):
@@ -208,7 +208,7 @@ if 1:
 
             for variable in self.test_32_63_bit_values.__code__.co_consts:
                 if variable is not None:
-                    self.assertTrue(isinstance(variable, int))
+                    self.assertIsInstance(variable, int)
 
     def test_sequence_unpacking_error(self):
         # Verify sequence packing/unpacking with "or".  SF bug #757818
@@ -317,56 +317,56 @@ if 1:
         d[1] += 1
         self.assertEqual(d[1], 2)
         del d[1]
-        self.assertEqual(1 in d, False)
+        self.assertNotIn(1, d)
         # Tuple of indices
         d[1, 1] = 1
         self.assertEqual(d[1, 1], 1)
         d[1, 1] += 1
         self.assertEqual(d[1, 1], 2)
         del d[1, 1]
-        self.assertEqual((1, 1) in d, False)
+        self.assertNotIn((1, 1), d)
         # Simple slice
         d[1:2] = 1
         self.assertEqual(d[1:2], 1)
         d[1:2] += 1
         self.assertEqual(d[1:2], 2)
         del d[1:2]
-        self.assertEqual(slice(1, 2) in d, False)
+        self.assertNotIn(slice(1, 2), d)
         # Tuple of simple slices
         d[1:2, 1:2] = 1
         self.assertEqual(d[1:2, 1:2], 1)
         d[1:2, 1:2] += 1
         self.assertEqual(d[1:2, 1:2], 2)
         del d[1:2, 1:2]
-        self.assertEqual((slice(1, 2), slice(1, 2)) in d, False)
+        self.assertNotIn((slice(1, 2), slice(1, 2)), d)
         # Extended slice
         d[1:2:3] = 1
         self.assertEqual(d[1:2:3], 1)
         d[1:2:3] += 1
         self.assertEqual(d[1:2:3], 2)
         del d[1:2:3]
-        self.assertEqual(slice(1, 2, 3) in d, False)
+        self.assertNotIn(slice(1, 2, 3), d)
         # Tuple of extended slices
         d[1:2:3, 1:2:3] = 1
         self.assertEqual(d[1:2:3, 1:2:3], 1)
         d[1:2:3, 1:2:3] += 1
         self.assertEqual(d[1:2:3, 1:2:3], 2)
         del d[1:2:3, 1:2:3]
-        self.assertEqual((slice(1, 2, 3), slice(1, 2, 3)) in d, False)
+        self.assertNotIn((slice(1, 2, 3), slice(1, 2, 3)), d)
         # Ellipsis
         d[...] = 1
         self.assertEqual(d[...], 1)
         d[...] += 1
         self.assertEqual(d[...], 2)
         del d[...]
-        self.assertEqual(Ellipsis in d, False)
+        self.assertNotIn(Ellipsis, d)
         # Tuple of Ellipses
         d[..., ...] = 1
         self.assertEqual(d[..., ...], 1)
         d[..., ...] += 1
         self.assertEqual(d[..., ...], 2)
         del d[..., ...]
-        self.assertEqual((Ellipsis, Ellipsis) in d, False)
+        self.assertNotIn((Ellipsis, Ellipsis), d)
 
     def test_annotation_limit(self):
         # 16 bits are available for # of annotations, but only 8 bits are

@@ -186,7 +186,7 @@ class Test_TestLoader(TestCase):
         self.assertFalse('runTest'.startswith(loader.testMethodPrefix))
 
         suite = loader.loadTestsFromTestCase(Foo)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [Foo('runTest')])
 
     ################################################################
@@ -205,7 +205,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromModule(m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         expected = [loader.suiteClass([MyTestCase('test')])]
         self.assertEqual(list(suite), expected)
@@ -218,7 +218,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromModule(m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [])
 
     # "This method searches `module` for classes derived from TestCase"
@@ -232,7 +232,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromModule(m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         self.assertEqual(list(suite), [loader.suiteClass()])
 
@@ -272,12 +272,14 @@ class Test_TestLoader(TestCase):
 
         load_tests_args = []
         def load_tests(loader, tests, pattern):
+            self.assertIsInstance(tests, unittest.TestSuite)
             load_tests_args.extend((loader, tests, pattern))
             return tests
         m.load_tests = load_tests
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromModule(m)
+        self.assertIsInstance(suite, unittest.TestSuite)
         self.assertEquals(load_tests_args, [loader, suite, None])
 
         load_tests_args = []
@@ -468,7 +470,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromName('testcase_1', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [MyTestCase('test')])
 
     # "The specifier name is a ``dotted name'' that may resolve either to
@@ -484,7 +486,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromName('testsuite', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         self.assertEqual(list(suite), [MyTestCase('test')])
 
@@ -499,7 +501,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromName('testcase_1.test', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         self.assertEqual(list(suite), [MyTestCase('test')])
 
@@ -538,7 +540,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromName('return_TestSuite', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [testcase_1, testcase_2])
 
     # "The specifier name is a ``dotted name'' that may resolve ... to
@@ -552,7 +554,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromName('return_TestCase', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [testcase_1])
 
     # "The specifier name is a ``dotted name'' that may resolve ... to
@@ -572,7 +574,7 @@ class Test_TestLoader(TestCase):
         loader = unittest.TestLoader()
         loader.suiteClass = SubTestSuite
         suite = loader.loadTestsFromName('return_TestCase', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [testcase_1])
 
     # "The specifier name is a ``dotted name'' that may resolve ... to
@@ -592,7 +594,7 @@ class Test_TestLoader(TestCase):
         loader = unittest.TestLoader()
         loader.suiteClass=SubTestSuite
         suite = loader.loadTestsFromName('testcase_1.test', m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         self.assertEqual(list(suite), [MyTestCase('test')])
 
@@ -624,7 +626,6 @@ class Test_TestLoader(TestCase):
         # a good chance that it won't be imported when this test is run
         module_name = 'audioop'
 
-        import sys
         if module_name in sys.modules:
             del sys.modules[module_name]
 
@@ -632,7 +633,7 @@ class Test_TestLoader(TestCase):
         try:
             suite = loader.loadTestsFromName(module_name)
 
-            self.assertTrue(isinstance(suite, loader.suiteClass))
+            self.assertIsInstance(suite, loader.suiteClass)
             self.assertEqual(list(suite), [])
 
             # audioop should now be loaded, thanks to loadTestsFromName()
@@ -655,7 +656,7 @@ class Test_TestLoader(TestCase):
         loader = unittest.TestLoader()
 
         suite = loader.loadTestsFromNames([])
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [])
 
     # "Similar to loadTestsFromName(), but takes a sequence of names rather
@@ -670,7 +671,7 @@ class Test_TestLoader(TestCase):
         loader = unittest.TestLoader()
 
         suite = loader.loadTestsFromNames([], unittest)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
         self.assertEqual(list(suite), [])
 
     # "The specifier name is a ``dotted name'' that may resolve either to
@@ -871,7 +872,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['testcase_1'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         expected = loader.suiteClass([MyTestCase('test')])
         self.assertEqual(list(suite), [expected])
@@ -887,7 +888,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['testsuite'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         self.assertEqual(list(suite), [m.testsuite])
 
@@ -902,7 +903,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['testcase_1.test'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         ref_suite = unittest.TestSuite([MyTestCase('test')])
         self.assertEqual(list(suite), [ref_suite])
@@ -939,7 +940,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['return_TestSuite'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         expected = unittest.TestSuite([testcase_1, testcase_2])
         self.assertEqual(list(suite), [expected])
@@ -955,7 +956,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['return_TestCase'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         ref_suite = unittest.TestSuite([testcase_1])
         self.assertEqual(list(suite), [ref_suite])
@@ -979,7 +980,7 @@ class Test_TestLoader(TestCase):
 
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromNames(['Foo.foo'], m)
-        self.assertTrue(isinstance(suite, loader.suiteClass))
+        self.assertIsInstance(suite, loader.suiteClass)
 
         ref_suite = unittest.TestSuite([testcase_1])
         self.assertEqual(list(suite), [ref_suite])
@@ -1012,7 +1013,6 @@ class Test_TestLoader(TestCase):
         # a good chance that it won't be imported when this test is run
         module_name = 'audioop'
 
-        import sys
         if module_name in sys.modules:
             del sys.modules[module_name]
 
@@ -1020,7 +1020,7 @@ class Test_TestLoader(TestCase):
         try:
             suite = loader.loadTestsFromNames([module_name])
 
-            self.assertTrue(isinstance(suite, loader.suiteClass))
+            self.assertIsInstance(suite, loader.suiteClass)
             self.assertEqual(list(suite), [unittest.TestSuite()])
 
             # audioop should now be loaded, thanks to loadTestsFromName()
@@ -1808,7 +1808,7 @@ class Test_FunctionTestCase(TestCase):
     def test_id(self):
         test = unittest.FunctionTestCase(lambda: None)
 
-        self.assertTrue(isinstance(test.id(), str))
+        self.assertIsInstance(test.id(), str)
 
     # "Returns a one-line description of the test, or None if no description
     # has been provided. The default implementation of this method returns
@@ -1970,8 +1970,6 @@ class Test_TestResult(TestCase):
     # methods. Contains formatted tracebacks instead
     # of sys.exc_info() results."
     def test_addFailure(self):
-        import sys
-
         class Foo(unittest.TestCase):
             def test_1(self):
                 pass
@@ -1996,7 +1994,7 @@ class Test_TestResult(TestCase):
 
         test_case, formatted_exc = result.failures[0]
         self.assertTrue(test_case is test)
-        self.assertTrue(isinstance(formatted_exc, str))
+        self.assertIsInstance(formatted_exc, str)
 
     # "addError(test, err)"
     # ...
@@ -2020,8 +2018,6 @@ class Test_TestResult(TestCase):
     # methods. Contains formatted tracebacks instead
     # of sys.exc_info() results."
     def test_addError(self):
-        import sys
-
         class Foo(unittest.TestCase):
             def test_1(self):
                 pass
@@ -2046,7 +2042,36 @@ class Test_TestResult(TestCase):
 
         test_case, formatted_exc = result.errors[0]
         self.assertTrue(test_case is test)
-        self.assertTrue(isinstance(formatted_exc, str))
+        self.assertIsInstance(formatted_exc, str)
+
+    def testGetDescriptionWithoutDocstring(self):
+        result = unittest.TextTestResult(None, True, 1)
+        self.assertEqual(
+                result.getDescription(self),
+                'testGetDescriptionWithoutDocstring (' + __name__ +
+                '.Test_TestResult)')
+
+    def testGetDescriptionWithOneLineDocstring(self):
+        """Tests getDescription() for a method with a docstring."""
+        result = unittest.TextTestResult(None, True, 1)
+        self.assertEqual(
+                result.getDescription(self),
+               ('testGetDescriptionWithOneLineDocstring '
+                '(' + __name__ + '.Test_TestResult)\n'
+                'Tests getDescription() for a method with a docstring.'))
+
+    def testGetDescriptionWithMultiLineDocstring(self):
+        """Tests getDescription() for a method with a longer docstring.
+        The second line of the docstring.
+        """
+        result = unittest.TextTestResult(None, True, 1)
+        self.assertEqual(
+                result.getDescription(self),
+               ('testGetDescriptionWithMultiLineDocstring '
+                '(' + __name__ + '.Test_TestResult)\n'
+                'Tests getDescription() for a method with a longer '
+                'docstring.'))
+
 
 ### Support code for Test_TestCase
 ################################################################
@@ -2437,7 +2462,8 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
             def runTest(self):
                 pass
 
-        self.assertTrue(isinstance(Foo().id(), str))
+        self.assertIsInstance(Foo().id(), str)
+
 
     # "If result is omitted or None, a temporary result object is created
     # and used, but is not made available to the caller. As TestCase owns the
@@ -2461,18 +2487,13 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         self.assertEqual(events, expected)
 
     def testShortDescriptionWithoutDocstring(self):
-        self.assertEqual(
-                self.shortDescription(),
-                'testShortDescriptionWithoutDocstring (' + __name__ +
-                '.Test_TestCase)')
+        self.assertIsNone(self.shortDescription())
 
     def testShortDescriptionWithOneLineDocstring(self):
         """Tests shortDescription() for a method with a docstring."""
         self.assertEqual(
                 self.shortDescription(),
-                ('testShortDescriptionWithOneLineDocstring '
-                 '(' + __name__ + '.Test_TestCase)\n'
-                 'Tests shortDescription() for a method with a docstring.'))
+                'Tests shortDescription() for a method with a docstring.')
 
     def testShortDescriptionWithMultiLineDocstring(self):
         """Tests shortDescription() for a method with a longer docstring.
@@ -2483,10 +2504,8 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         """
         self.assertEqual(
                 self.shortDescription(),
-                ('testShortDescriptionWithMultiLineDocstring '
-                 '(' + __name__ + '.Test_TestCase)\n'
                  'Tests shortDescription() for a method with a longer '
-                 'docstring.'))
+                 'docstring.')
 
     def testAddTypeEqualityFunc(self):
         class SadSnake(object):
@@ -2798,8 +2817,9 @@ test case
         try:
             self.assertMultiLineEqual(sample_text, revised_sample_text)
         except self.failureException as e:
-            # no fair testing ourself with ourself, use assertEqual..
-            self.assertEqual(sample_text_error, str(e))
+            # no fair testing ourself with ourself, and assertEqual is used for strings
+            # so can't use assertEqual either. Just use assertTrue.
+            self.assertTrue(sample_text_error == str(e))
 
     def testAssertIsNone(self):
         self.assertIsNone(None)
@@ -2858,8 +2878,8 @@ test case
         ctx = self.assertRaises(ExceptionMock)
         with ctx:
             Stub(v)
-        e = ctx.exc_value
-        self.assertTrue(isinstance(e, ExceptionMock))
+        e = ctx.exception
+        self.assertIsInstance(e, ExceptionMock)
         self.assertEqual(e.args[0], v)
 
     def testSynonymAssertMethodNames(self):
@@ -3035,7 +3055,7 @@ class Test_Assertions(TestCase):
         try:
             self.assertRaises(KeyError, lambda: None)
         except self.failureException as e:
-            self.assert_("KeyError not raised" in str(e), str(e))
+            self.assertIn("KeyError not raised", str(e))
         else:
             self.fail("assertRaises() didn't fail")
         try:
@@ -3044,15 +3064,21 @@ class Test_Assertions(TestCase):
             pass
         else:
             self.fail("assertRaises() didn't let exception pass through")
-        with self.assertRaises(KeyError):
-            raise KeyError
+        with self.assertRaises(KeyError) as cm:
+            try:
+                raise KeyError
+            except Exception as e:
+                exc = e
+                raise
+        self.assertIs(cm.exception, exc)
+
         with self.assertRaises(KeyError):
             raise KeyError("key")
         try:
             with self.assertRaises(KeyError):
                 pass
         except self.failureException as e:
-            self.assert_("KeyError not raised" in str(e), str(e))
+            self.assertIn("KeyError not raised", str(e))
         else:
             self.fail("assertRaises() didn't fail")
         try:
@@ -3467,6 +3493,19 @@ class Test_TextTestRunner(TestCase):
             obj = pickle.loads(s)
             # StringIO objects never compare equal, a cheap test instead.
             self.assertEqual(obj.stream.getvalue(), stream.getvalue())
+
+    def test_resultclass(self):
+        def MockResultClass(*args):
+            return args
+        STREAM = object()
+        DESCRIPTIONS = object()
+        VERBOSITY = object()
+        runner = unittest.TextTestRunner(STREAM, DESCRIPTIONS, VERBOSITY,
+                                         resultclass=MockResultClass)
+        self.assertEqual(runner.resultclass, MockResultClass)
+
+        expectedresult = (runner.stream, DESCRIPTIONS, VERBOSITY)
+        self.assertEqual(runner._makeResult(), expectedresult)
 
 
 class TestDiscovery(TestCase):

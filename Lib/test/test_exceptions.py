@@ -319,18 +319,18 @@ class ExceptionTests(unittest.TestCase):
             tb = sys.exc_info()[2]
 
         e = BaseException().with_traceback(tb)
-        self.assertTrue(isinstance(e, BaseException))
+        self.assertIsInstance(e, BaseException)
         self.assertEqual(e.__traceback__, tb)
 
         e = IndexError(5).with_traceback(tb)
-        self.assertTrue(isinstance(e, IndexError))
+        self.assertIsInstance(e, IndexError)
         self.assertEqual(e.__traceback__, tb)
 
         class MyException(Exception):
             pass
 
         e = MyException().with_traceback(tb)
-        self.assertTrue(isinstance(e, MyException))
+        self.assertIsInstance(e, MyException)
         self.assertEqual(e.__traceback__, tb)
 
     def testInvalidTraceback(self):
@@ -413,7 +413,7 @@ class ExceptionTests(unittest.TestCase):
         except Exception as e:
             self.assertTrue(e)
             del e
-        self.assertFalse('e' in locals())
+        self.assertNotIn('e', locals())
 
     def testExceptionCleanupState(self):
         # Make sure exception state is cleaned up as soon as the except

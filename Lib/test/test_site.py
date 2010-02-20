@@ -11,6 +11,9 @@ import os
 import sys
 import encodings
 import subprocess
+import sysconfig
+from copy import copy
+
 # Need to make sure to not import 'site' if someone specified ``-S`` at the
 # command-line.  Detect this by just making sure 'site' has not been imported
 # already.
@@ -38,6 +41,7 @@ class HelperFunctionsTests(unittest.TestCase):
         self.old_base = site.USER_BASE
         self.old_site = site.USER_SITE
         self.old_prefixes = site.PREFIXES
+        self.old_vars = copy(sysconfig._CONFIG_VARS)
 
     def tearDown(self):
         """Restore sys.path"""
@@ -45,6 +49,7 @@ class HelperFunctionsTests(unittest.TestCase):
         site.USER_BASE = self.old_base
         site.USER_SITE = self.old_site
         site.PREFIXES = self.old_prefixes
+        sysconfig._CONFIG_VARS = self.old_vars
 
     def test_makepath(self):
         # Test makepath() have an absolute path for its first return value
@@ -63,14 +68,14 @@ class HelperFunctionsTests(unittest.TestCase):
         dir_set = site._init_pathinfo()
         for entry in [site.makepath(path)[1] for path in sys.path
                         if path and os.path.isdir(path)]:
-            self.assertTrue(entry in dir_set,
-                            "%s from sys.path not found in set returned "
-                            "by _init_pathinfo(): %s" % (entry, dir_set))
+            self.assertIn(entry, dir_set,
+                          "%s from sys.path not found in set returned "
+                          "by _init_pathinfo(): %s" % (entry, dir_set))
 
     def pth_file_tests(self, pth_file):
         """Contain common code for testing results of reading a .pth file"""
-        self.assertTrue(pth_file.imported in sys.modules,
-                "%s not in sys.modules" % pth_file.imported)
+        self.assertIn(pth_file.imported, sys.modules,
+                      "%s not in sys.modules" % pth_file.imported)
         self.assertIn(site.makepath(pth_file.good_dir_path)[0], sys.path)
         self.assertFalse(os.path.exists(pth_file.bad_dir_path))
 
@@ -137,6 +142,9 @@ class HelperFunctionsTests(unittest.TestCase):
 
         # let's set PYTHONUSERBASE and see if it uses it
         site.USER_BASE = None
+        import sysconfig
+        sysconfig._CONFIG_VARS = None
+
         with EnvironmentVarGuard() as environ:
             environ['PYTHONUSERBASE'] = 'xoxo'
             self.assertTrue(site.getuserbase().startswith('xoxo'),

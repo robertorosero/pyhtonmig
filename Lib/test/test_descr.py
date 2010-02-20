@@ -384,11 +384,11 @@ class ClassPropertiesAndMethods(unittest.TestCase):
     def test_python_dicts(self):
         # Testing Python subclass of dict...
         self.assertTrue(issubclass(dict, dict))
-        self.assertTrue(isinstance({}, dict))
+        self.assertIsInstance({}, dict)
         d = dict()
         self.assertEqual(d, {})
         self.assertTrue(d.__class__ is dict)
-        self.assertTrue(isinstance(d, dict))
+        self.assertIsInstance(d, dict)
         class C(dict):
             state = -1
             def __init__(self_local, *a, **kw):
@@ -401,7 +401,7 @@ class ClassPropertiesAndMethods(unittest.TestCase):
             def __getitem__(self, key):
                 return self.get(key, 0)
             def __setitem__(self_local, key, value):
-                self.assertTrue(isinstance(key, type(0)))
+                self.assertIsInstance(key, type(0))
                 dict.__setitem__(self_local, key, value)
             def setstate(self, state):
                 self.state = state
@@ -1095,7 +1095,7 @@ order (MRO) for bases """
         MyABC.register(Unrelated)
 
         u = Unrelated()
-        self.assertTrue(isinstance(u, MyABC))
+        self.assertIsInstance(u, MyABC)
 
         # This used to crash
         self.assertRaises(TypeError, MyABC.a.__set__, u, 3)
@@ -1654,7 +1654,7 @@ order (MRO) for bases """
         self.assertNotIn(-1, c1)
         for i in range(10):
             self.assertIn(i, c1)
-        self.assertFalse(10 in c1)
+        self.assertNotIn(10, c1)
         # Test the default behavior for dynamic classes
         class D(object):
             def __getitem__(self, i):
@@ -1677,7 +1677,7 @@ order (MRO) for bases """
         self.assertNotIn(-1, d1)
         for i in range(10):
             self.assertIn(i, d1)
-        self.assertFalse(10 in d1)
+        self.assertNotIn(10, d1)
         # Test overridden behavior
         class Proxy(object):
             def __init__(self, x):
@@ -1721,10 +1721,10 @@ order (MRO) for bases """
         self.assertEqual(str(p0), "Proxy:0")
         self.assertEqual(repr(p0), "Proxy(0)")
         p10 = Proxy(range(10))
-        self.assertFalse(-1 in p10)
+        self.assertNotIn(-1, p10)
         for i in range(10):
             self.assertIn(i, p10)
-        self.assertFalse(10 in p10)
+        self.assertNotIn(10, p10)
 
     def test_weakrefs(self):
         # Testing weak references...
@@ -1781,7 +1781,7 @@ order (MRO) for bases """
         self.assertFalse(hasattr(a, "x"))
 
         raw = C.__dict__['x']
-        self.assertTrue(isinstance(raw, property))
+        self.assertIsInstance(raw, property)
 
         attrs = dir(raw)
         self.assertIn("__doc__", attrs)
@@ -3407,10 +3407,10 @@ order (MRO) for bases """
         d = D(None)
         self.assertEqual(d.foo, None)
         d = C(1)
-        self.assertEqual(isinstance(d, D), True)
+        self.assertIsInstance(d, D)
         self.assertEqual(d.foo, 1)
         d = D(1)
-        self.assertEqual(isinstance(d, D), True)
+        self.assertIsInstance(d, D)
         self.assertEqual(d.foo, 1)
 
     def test_imul_bug(self):
@@ -3902,29 +3902,29 @@ order (MRO) for bases """
             pass
         a = C()
         pa = Proxy(a)
-        self.assertTrue(isinstance(a, C))  # Baseline
-        self.assertTrue(isinstance(pa, C)) # Test
+        self.assertIsInstance(a, C)  # Baseline
+        self.assertIsInstance(pa, C) # Test
         # Test with a classic subclass
         class D(C):
             pass
         a = D()
         pa = Proxy(a)
-        self.assertTrue(isinstance(a, C))  # Baseline
-        self.assertTrue(isinstance(pa, C)) # Test
+        self.assertIsInstance(a, C)  # Baseline
+        self.assertIsInstance(pa, C) # Test
         # Test with a new-style class
         class C(object):
             pass
         a = C()
         pa = Proxy(a)
-        self.assertTrue(isinstance(a, C))  # Baseline
-        self.assertTrue(isinstance(pa, C)) # Test
+        self.assertIsInstance(a, C)  # Baseline
+        self.assertIsInstance(pa, C) # Test
         # Test with a new-style subclass
         class D(C):
             pass
         a = D()
         pa = Proxy(a)
-        self.assertTrue(isinstance(a, C))  # Baseline
-        self.assertTrue(isinstance(pa, C)) # Test
+        self.assertIsInstance(a, C)  # Baseline
+        self.assertIsInstance(pa, C) # Test
 
     def test_proxy_super(self):
         # Testing super() for a proxy object...
@@ -4146,6 +4146,26 @@ order (MRO) for bases """
         c = C()
         c[1:2] = 3
         self.assertEqual(c.value, 3)
+
+    def test_set_and_no_get(self):
+        # See
+        # http://mail.python.org/pipermail/python-dev/2010-January/095637.html
+        class Descr(object):
+
+            def __init__(self, name):
+                self.name = name
+
+            def __set__(self, obj, value):
+                obj.__dict__[self.name] = value
+        descr = Descr("a")
+
+        class X(object):
+            a = descr
+
+        x = X()
+        self.assertIs(x.a, descr)
+        x.a = 42
+        self.assertEqual(x.a, 42)
 
     def test_getattr_hooks(self):
         # issue 4230

@@ -99,7 +99,7 @@ class _AssertRaisesContext(object):
         self.expected_regex = expected_regexp
 
     def __enter__(self):
-        pass
+        return self
 
     def __exit__(self, exc_type, exc_value, tb):
         if exc_type is None:
@@ -116,8 +116,8 @@ class _AssertRaisesContext(object):
         if not issubclass(exc_type, self.expected):
             # let unexpected exceptions pass through
             return False
-        #store exception, without traceback, for later retrieval
-        self.exc_value = exc_value.with_traceback(None)
+        # store exception, without traceback, for later retrieval
+        self.exception = exc_value.with_traceback(None)
         if self.expected_regex is None:
             return True
 
@@ -189,6 +189,7 @@ class TestCase(object):
         self.addTypeEqualityFunc(tuple, self.assertTupleEqual)
         self.addTypeEqualityFunc(set, self.assertSetEqual)
         self.addTypeEqualityFunc(frozenset, self.assertSetEqual)
+        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
 
     def addTypeEqualityFunc(self, typeobj, function):
         """Add a type specific assertEqual style function to compare a type.
@@ -228,22 +229,15 @@ class TestCase(object):
         return result.TestResult()
 
     def shortDescription(self):
-        """Returns both the test method name and first line of its docstring.
+        """Returns a one-line description of the test, or None if no
+        description has been provided.
 
-        If no docstring is given, only returns the method name.
-
-        This method overrides unittest.TestCase.shortDescription(), which
-        only returns the first line of the docstring, obscuring the name
-        of the test upon failure.
+        The default implementation of this method returns the first line of
+        the specified test method's docstring.
         """
-        desc = str(self)
-        doc_first_line = None
+        doc = self._testMethodDoc
+        return doc and doc.split("\n")[0].strip() or None
 
-        if self._testMethodDoc:
-            doc_first_line = self._testMethodDoc.split("\n")[0].strip()
-        if doc_first_line:
-            desc = '\n'.join((desc, doc_first_line))
-        return desc
 
     def id(self):
         return "%s.%s" % (util.strclass(self.__class__), self._testMethodName)
@@ -397,8 +391,17 @@ class TestCase(object):
            If called with callableObj omitted or None, will return a
            context object used like this::
 
-                with self.assertRaises(some_error_class):
+                with self.assertRaises(SomeException):
                     do_something()
+
+           The context manager keeps a reference to the exception as
+           the 'exception' attribute. This allows you to inspect the
+           exception after the assertion::
+
+               with self.assertRaises(SomeException) as cm:
+                   do_something()
+               the_exception = cm.exception
+               self.assertEqual(the_exception.error_code, 3)
         """
         context = _AssertRaisesContext(excClass, self, callableObj)
         if callableObj is None:
@@ -518,7 +521,7 @@ class TestCase(object):
     def assertSequenceEqual(self, seq1, seq2, msg=None, seq_type=None):
         """An equality assertion for ordered sequences (like lists and tuples).
 
-        For the purposes of this function, a valid orderd sequence type is one
+        For the purposes of this function, a valid ordered sequence type is one
         which can be indexed, has a length, and has an equality operator.
 
         Args:
@@ -746,6 +749,11 @@ class TestCase(object):
 
         Raises with an error message listing which elements of expected_seq
         are missing from actual_seq and vice versa if any.
+
+        Duplicate elements are ignored when comparing *expected_seq* and
+        *actual_seq*. It is the equivalent of ``assertEqual(set(expected),
+        set(actual))`` but it works with sequences of unhashable objects as
+        well.
         """
         try:
             expected = set(expected_seq)

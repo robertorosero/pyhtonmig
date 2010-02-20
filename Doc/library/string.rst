@@ -248,7 +248,7 @@ Some examples::
 
 The *format_spec* field contains a specification of how the value should be
 presented, including such details as field width, alignment, padding, decimal
-precision and so on.  Each value type can define it's own "formatting
+precision and so on.  Each value type can define its own "formatting
 mini-language" or interpretation of the *format_spec*.
 
 Most built-in types support a common formatting mini-language, which is
@@ -470,8 +470,6 @@ The available presentation types for floating point and decimal values are:
 
 Template strings
 ----------------
-
-.. versionadded:: 2.4
 
 Templates provide simpler string substitutions as described in :pep:`292`.
 Instead of the normal ``%``\ -based substitutions, Templates support ``$``\
