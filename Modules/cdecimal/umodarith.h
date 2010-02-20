@@ -93,7 +93,9 @@ dw_submod(mpd_uint_t a, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t m)
 }
 
 
-#ifdef ANSI /* compiler has type mpd_uuint_t */
+#if defined(ANSI)
+#if !defined(LEGACY_COMPILER)
+/* HAVE_UINT64_T */
 static inline
 mpd_uint_t std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 {
@@ -108,11 +110,39 @@ std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
 }
 
 static inline void
-std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1, mpd_uint_t m)
+std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+            mpd_uint_t m)
 {
 	*a0 = ((mpd_uuint_t) *a0 * b0) % m;
 	*a1 = ((mpd_uuint_t) *a1 * b1) % m;
 }
+/* END HAVE_UINT64_T */
+#else
+/* LEGACY_COMPILER */
+static inline
+mpd_uint_t std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
+{
+	mpd_uint_t hi, lo, q, r;
+	_mpd_mul_words(&hi, &lo, a, b);
+	_mpd_div_words(&q, &r, hi, lo, m);
+	return r;
+}
+
+static inline void
+std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
+{
+	*a = std_mulmod(*a, w, m);
+	*b = std_mulmod(*b, w, m);
+}
+
+static inline void
+std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+            mpd_uint_t m)
+{
+	*a0 = std_mulmod(*a0, b0, m);
+	*a1 = std_mulmod(*a1, b1, m);
+}
+#endif /* LEGACY_COMPILER */
 
 static inline
 mpd_uint_t std_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
@@ -128,7 +158,7 @@ mpd_uint_t std_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
 
 	return r;
 }
-#endif
+#endif /* ANSI */
 
 
 /**************************************************************************/
