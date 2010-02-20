@@ -8,9 +8,6 @@
 #define MPDECIMAL_H
 
 
-#include "pyconfig.h"
-
-
 #ifdef _MSC_VER
   #include "vccompat.h"
   #ifndef UNUSED
@@ -18,6 +15,7 @@
   #endif
   #define EXTINLINE extern inline
 #else
+  #include "pyconfig.h"
   #if HAVE_STDINT_H
     #include <stdint.h>
   #endif
