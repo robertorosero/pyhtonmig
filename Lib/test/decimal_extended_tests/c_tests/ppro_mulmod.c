@@ -10,6 +10,8 @@
 
 #ifdef PPRO
 
+#define ANSI
+
 #include <stdlib.h>
 #include <time.h>
 #include "constants.h"
