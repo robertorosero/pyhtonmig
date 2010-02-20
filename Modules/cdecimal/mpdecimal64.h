@@ -20,21 +20,6 @@ extern "C" {
 #include <assert.h>
 
 
-#define EXTINLINE
-#ifdef _MSC_VER
-  #include "vccompat.h"
-  #ifndef UNUSED
-    #define UNUSED
-  #endif
-  #undef EXTINLINE
-  #define EXTINLINE extern inline
-#else
-  #include <stdint.h>
-  #define __GNUC_STDC_INLINE__
-  #define UNUSED __attribute__((unused))
-#endif
-
-
 /******************************************************************************/
 /*                      Types for 64 bit architectures                        */
 /******************************************************************************/
