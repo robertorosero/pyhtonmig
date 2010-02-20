@@ -2912,13 +2912,13 @@ doit(char *filename)
 		/* Binary function with binary result */
 		else if (eqtoken(token[1], "divmod")) {
 			_Binres_Binop_Ctx(token, mpd_qdivmod, &ctx);
-			_Binres_Binop_Ctx(token, mpd_qtest_newton_divmod, &ctx);
+			_Binres_Binop_Ctx(token, mpd_qtest_newtondivmod, &ctx);
 		}
 
 		/* Binary function with binary result, equal operands */
 		else if (eqtoken(token[1], "divmod_eq")) {
 			_Binres_EqualBinop_Ctx(token, mpd_qdivmod, &ctx);
-			_Binres_EqualBinop_Ctx(token, mpd_qtest_newton_divmod, &ctx);
+			_Binres_EqualBinop_Ctx(token, mpd_qtest_newtondivmod, &ctx);
 		}
 
 
