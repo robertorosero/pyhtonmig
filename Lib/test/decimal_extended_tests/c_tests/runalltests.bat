@@ -27,12 +27,23 @@ echo Running transpose tests ...
 echo.
 test_transpose.exe
 
+
+if exist ..\..\..\..\PCbuild\python.exe (
+  set PYTHON=..\..\..\..\PCbuild\python.exe
+) else (
+  if exist ..\..\..\..\PCbuild\amd64\python.exe (
+    set PYTHON=..\..\..\..\PCbuild\amd64\python.exe
+  ) else (
+    goto :eof
+  )
+)
+
 echo.
 echo Running locale and format tests ...
 echo.
-..\..\..\..\python ..\genrandlocale.py | runtest.exe -
-..\..\..\..\python ..\genrandformat.py | runtest.exe -
-..\..\..\..\python ..\genlocale.py | runtest.exe -
+%PYTHON% ..\genrandlocale.py | runtest.exe -
+%PYTHON% ..\genrandformat.py | runtest.exe -
+%PYTHON% ..\genlocale.py | runtest.exe -
 
 
 
