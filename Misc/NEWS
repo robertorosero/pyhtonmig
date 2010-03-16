@@ -12,6 +12,19 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8014: Setting a T_UINT or T_PYSSIZET attribute of an object with
+  PyMemberDefs could produce an internal error;  raise TypeError instead.
+
+- Issue #7845: Rich comparison methods on the complex type now return
+  NotImplemented rather than raising a TypeError when comparing with an
+  incompatible type; this allows user-defined classes to implement their own
+  comparisons with complex.
+
+- Issue #3137: Don't ignore errors at startup, especially a keyboard interrupt
+  (SIGINT). If an error occurs while importing the site module, the error is
+  printed and Python exits. Initialize the GIL before importing the site
+  module.
+
 - Issue #7173: Generator finalization could invalidate sys.exc_info().
 
 - Issue #7544: Preallocate thread memory before creating the thread to avoid
@@ -270,14 +283,42 @@ C-API
 Library
 -------
 
+- Issue #6716/2: Backslash-replace error output in compilall.
+
+- Issue #4961: Inconsistent/wrong result of askyesno function in tkMessageBox
+  with Tcl/Tk-8.5.
+
+- Issue #8140: extend compileall to compile single files. Add -i option.
+
+- Issue #7356: ctypes.util: Make parsing of ldconfig output independent of
+  the locale.
+
+- The internals of the subprocess module on POSIX systems have been replaced
+  by an extension module (_posixsubprocess) so that the fork()+exec() can be
+  done safely without the possibility of deadlock in multithreaded applications.
+
+- subprocess.Popen now has restore_signals and start_new_session features.
+  The default of restore_signals=True is a new behavior compared to earlier
+  Python versions.  This means that signals such as SIGPIPE are not ignored
+  by default in subprocesses launched by Python (Issue #1652).
+
+- Issue #6472: The xml.etree package is updated to ElementTree 1.3.  The
+  cElementTree module is updated too.
+
+- Issue #7774: Set sys.executable to an empty string if argv[0] has been set to
+  an non existent program name and Python is unable to retrieve the real
+  program name
+
+- Issue #7880: Fix sysconfig when the python executable is a symbolic link.
+
 - Issue #6509: fix re.sub to work properly when the pattern, the string, and
   the replacement were all bytes. Patch by Antoine Pitrou.
 
 - The sqlite3 module was updated to pysqlite 2.6.0. This fixes several obscure
   bugs and allows loading SQLite extensions from shared libraries.
 
-- Issue #1054943: Fix unicodedata.normalize('NFC', text) for the Public Review
-  Issue #29
+- Issue #1054943: Fix ``unicodedata.normalize('NFC', text)`` for the Public
+  Review Issue #29 (http://unicode.org/review/pr-29.html).
 
 - Issue #7494: fix a crash in _lsprof (cProfile) after clearing the profiler,
   reset also the pointer to the current pointer context.
@@ -750,6 +791,13 @@ Library
 Extension Modules
 -----------------
 
+- Issue #8142: Update libffi to the 3.0.9 release.
+
+- Issue #6949: Allow the _dbm extension to be built with db 4.8.x.
+
+- Issue #6544: fix a reference leak in the kqueue implementation's error
+  handling.
+
 - Stop providing crtassem.h symbols when compiling with Visual Studio 2010, as
   msvcr100.dll is not a platform assembly anymore.
 
@@ -788,6 +836,9 @@ Extension Modules
 
 Build
 -----
+
+- Issue #6716: Quote -x arguments of compileall in MSI installer.
+  Exclude 2to3 tests from compileall.
 
 - Issue #3920, #7903: Define _BSD_SOURCE on OpenBSD 4.4 through 4.9.
 
@@ -849,6 +900,9 @@ Documentation
 
 Tests
 -----
+
+- Issue #7849: Now the utility ``check_warnings`` verifies if the warnings are
+  effectively raised.
 
 - The four path modules (genericpath, macpath, ntpath, posixpath) share a
   common TestCase for some tests: test_genericpath.CommonTest.

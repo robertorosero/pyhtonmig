@@ -1,11 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # test_multibytecodec.py
 #   Unit test for multibytecodec itself
 #
 
 from test import support
-from test import test_multibytecodec_support
 from test.support import TESTFN
 import unittest, io, codecs, sys, os
 import _multibytecodec

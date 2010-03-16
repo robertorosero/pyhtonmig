@@ -1,12 +1,12 @@
 # Python test set -- built-in functions
 
 import platform
-import test.support, unittest
-from test.support import fcmp, TESTFN, unlink,  run_unittest, \
-                              run_with_locale
+import unittest
+from test.support import fcmp, TESTFN, unlink,  run_unittest
 from operator import neg
 
-import sys, warnings, random, collections, io, fractions
+import sys, warnings, random, collections, io
+
 warnings.filterwarnings("ignore", "hex../oct.. of negative int",
                         FutureWarning, __name__)
 warnings.filterwarnings("ignore", "integer argument expected",
@@ -479,6 +479,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, getattr, sys, 1, "foo")
         self.assertRaises(TypeError, getattr)
         self.assertRaises(AttributeError, getattr, sys, chr(sys.maxunicode))
+        # unicode surrogates are not encodable to the default encoding (utf8)
+        self.assertRaises(AttributeError, getattr, 1, "\uDAD1\uD51E")
 
     def test_hasattr(self):
         import sys

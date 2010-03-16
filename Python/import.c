@@ -2691,8 +2691,8 @@ PyImport_ReloadModule(PyObject *m)
 		parent = PyDict_GetItem(modules, parentname);
 		if (parent == NULL) {
 			PyErr_Format(PyExc_ImportError,
-			    "reload(): parent %.200s not in sys.modules",
-			     _PyUnicode_AsString(parentname));
+			    "reload(): parent %U not in sys.modules",
+			     parentname);
 			Py_DECREF(parentname);
 			imp_modules_reloading_clear();
 			return NULL;
@@ -2774,8 +2774,6 @@ PyImport_Import(PyObject *module_name)
 	}
 	else {
 		/* No globals -- use standard builtins, and fake globals */
-		PyErr_Clear();
-
 		builtins = PyImport_ImportModuleLevel("builtins",
 						      NULL, NULL, NULL, 0);
 		if (builtins == NULL)

@@ -303,23 +303,6 @@ extern int lstat(const char *, struct stat *);
 #define WAIT_STATUS_INT(s) (s)
 #endif /* UNION_WAIT */
 
-/* Issue #1983: pid_t can be longer than a C long on some systems */
-#if !defined(SIZEOF_PID_T) || SIZEOF_PID_T == SIZEOF_INT
-#define PARSE_PID "i"
-#define PyLong_FromPid PyLong_FromLong
-#define PyLong_AsPid PyLong_AsLong
-#elif SIZEOF_PID_T == SIZEOF_LONG
-#define PARSE_PID "l"
-#define PyLong_FromPid PyLong_FromLong
-#define PyLong_AsPid PyLong_AsLong
-#elif defined(SIZEOF_LONG_LONG) && SIZEOF_PID_T == SIZEOF_LONG_LONG
-#define PARSE_PID "L"
-#define PyLong_FromPid PyLong_FromLongLong
-#define PyLong_AsPid PyLong_AsLongLong
-#else
-#error "sizeof(pid_t) is neither sizeof(int), sizeof(long) or sizeof(long long)"
-#endif /* SIZEOF_PID_T */
-
 /* Don't use the "_r" form if we don't need it (also, won't have a
    prototype for it, at least on Solaris -- maybe others as well?). */
 #if defined(HAVE_CTERMID_R) && defined(WITH_THREAD)
@@ -4029,7 +4012,7 @@ static PyObject *
 posix_getpgid(PyObject *self, PyObject *args)
 {
 	pid_t pid, pgid;
-	if (!PyArg_ParseTuple(args, PARSE_PID ":getpgid", &pid))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID ":getpgid", &pid))
 		return NULL;
 	pgid = getpgid(pid);
 	if (pgid < 0)
@@ -4141,7 +4124,7 @@ posix_kill(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int sig;
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:kill", &pid, &sig))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:kill", &pid, &sig))
 		return NULL;
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
     if (sig == XCPT_SIGNAL_INTR || sig == XCPT_SIGNAL_BREAK) {
@@ -4179,7 +4162,7 @@ posix_killpg(PyObject *self, PyObject *args)
 	   a pid_t. Since getpgrp() returns a pid_t, we assume killpg should
 	   take the same type. Moreover, pid_t is always at least as wide as
 	   int (else compilation of this module fails), which is safe. */
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:killpg", &pgid, &sig))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:killpg", &pgid, &sig))
 		return NULL;
 	if (killpg(pgid, sig) == -1)
 		return posix_error();
@@ -4536,7 +4519,7 @@ posix_wait4(PyObject *self, PyObject *args)
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:wait4", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:wait4", &pid, &options))
 		return NULL;
 
 	Py_BEGIN_ALLOW_THREADS
@@ -4560,7 +4543,7 @@ posix_waitpid(PyObject *self, PyObject *args)
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:waitpid", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:waitpid", &pid, &options))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	pid = waitpid(pid, &status, options);
@@ -4584,7 +4567,7 @@ posix_waitpid(PyObject *self, PyObject *args)
 	Py_intptr_t pid;
 	int status, options;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:waitpid", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:waitpid", &pid, &options))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	pid = _cwait(&status, pid, options);
@@ -4800,7 +4783,7 @@ posix_getsid(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int sid;
-	if (!PyArg_ParseTuple(args, PARSE_PID ":getsid", &pid))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID ":getsid", &pid))
 		return NULL;
 	sid = getsid(pid);
 	if (sid < 0)
@@ -4835,7 +4818,7 @@ posix_setpgid(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int pgrp;
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:setpgid", &pid, &pgrp))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:setpgid", &pid, &pgrp))
 		return NULL;
 	if (setpgid(pid, pgrp) < 0)
 		return posix_error();
@@ -4875,7 +4858,7 @@ posix_tcsetpgrp(PyObject *self, PyObject *args)
 {
 	int fd;
 	pid_t pgid;
-	if (!PyArg_ParseTuple(args, "i" PARSE_PID ":tcsetpgrp", &fd, &pgid))
+	if (!PyArg_ParseTuple(args, "i" _Py_PARSE_PID ":tcsetpgrp", &fd, &pgid))
 		return NULL;
 	if (tcsetpgrp(fd, pgid) < 0)
 		return posix_error();

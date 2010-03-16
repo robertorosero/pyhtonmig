@@ -1,14 +1,14 @@
+import sys
 import compileall
 import imp
 import os
 import py_compile
 import shutil
 import struct
-import sys
 import tempfile
-import time
 from test import support
 import unittest
+import io
 
 
 class CompileallTests(unittest.TestCase):
@@ -19,6 +19,9 @@ class CompileallTests(unittest.TestCase):
         self.bc_path = self.source_path + ('c' if __debug__ else 'o')
         with open(self.source_path, 'w') as file:
             file.write('x = 123\n')
+        self.source_path2 = os.path.join(self.directory, '_test2.py')
+        self.bc_path2 = self.source_path2 + ('c' if __debug__ else 'o')
+        shutil.copyfile(self.source_path, self.source_path2)
 
     def tearDown(self):
         shutil.rmtree(self.directory)
@@ -54,9 +57,47 @@ class CompileallTests(unittest.TestCase):
         # Test a change in mtime leads to a new .pyc.
         self.recreation_check(b'\0\0\0\0')
 
+    def test_compile_files(self):
+        # Test compiling a single file, and complete directory
+        for fn in (self.bc_path, self.bc_path2):
+            try:
+                os.unlink(fn)
+            except:
+                pass
+        compileall.compile_file(self.source_path, force=False, quiet=True)
+        self.assertTrue(os.path.isfile(self.bc_path) \
+                        and not os.path.isfile(self.bc_path2))
+        os.unlink(self.bc_path)
+        compileall.compile_dir(self.directory, force=False, quiet=True)
+        self.assertTrue(os.path.isfile(self.bc_path) \
+                        and os.path.isfile(self.bc_path2))
+        os.unlink(self.bc_path)
+        os.unlink(self.bc_path2)
+
+class EncodingTest(unittest.TestCase):
+    'Issue 6716: compileall should escape source code when printing errors to stdout.'
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp()
+        self.source_path = os.path.join(self.directory, '_test.py')
+        with open(self.source_path, 'w', encoding='utf-8') as file:
+            file.write('# -*- coding: utf-8 -*-\n')
+            file.write('print u"\u20ac"\n')
+
+    def tearDown(self):
+        shutil.rmtree(self.directory)
+
+    def test_error(self):
+        try:
+            orig_stdout = sys.stdout
+            sys.stdout = io.TextIOWrapper(io.BytesIO(),encoding='ascii')
+            compileall.compile_dir(self.directory)
+        finally:
+            sys.stdout = orig_stdout
 
 def test_main():
-    support.run_unittest(CompileallTests)
+    support.run_unittest(CompileallTests,
+                         EncodingTest)
 
 
 if __name__ == "__main__":

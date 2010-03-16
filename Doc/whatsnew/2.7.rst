@@ -539,7 +539,7 @@ changes, or look through the Subversion logs for all the details.
 
   Contributed by Raymond Hettinger; :issue:`1696199`.
 
-  The new `OrderedDict` class is described in the earlier section
+  The new `~collections.OrderedDict` class is described in the earlier section
   :ref:`pep-0372`.
 
   The :class:`namedtuple` class now has an optional *rename* parameter.
@@ -830,8 +830,8 @@ changes, or look through the Subversion logs for all the details.
   Light; :issue:`4285`.)
 
   :func:`sys.getwindowsversion` also returns a named tuple,
-   with attributes named :attr:`major`, :attr:`minor`, :attr:`build`,
-  :attr:`platform`:, :attr:`service_pack`, :attr:`service_pack_major`,
+  with attributes named :attr:`major`, :attr:`minor`, :attr:`build`,
+  :attr:`platform`, :attr:`service_pack`, :attr:`service_pack_major`,
   :attr:`service_pack_minor`, :attr:`suite_mask`, and
   :attr:`product_type`.  (Contributed by Brian Curtin; :issue:`7766`.)
 

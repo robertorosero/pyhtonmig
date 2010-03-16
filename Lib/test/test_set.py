@@ -5,7 +5,6 @@ import weakref
 import operator
 import copy
 import pickle
-import os
 from random import randrange, shuffle
 import sys
 import warnings
@@ -607,7 +606,7 @@ class TestSet(TestJointOps):
     # C API test only available in a debug build
     if hasattr(set, "test_c_api"):
         def test_c_api(self):
-            self.assertEqual(set('abc').test_c_api(), True)
+            self.assertEqual(set().test_c_api(), True)
 
 class SetSubclass(set):
     pass

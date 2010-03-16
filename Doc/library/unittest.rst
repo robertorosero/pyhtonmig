@@ -177,14 +177,18 @@ Here is a short script to test three functions from the :mod:`random` module::
            self.seq.sort()
            self.assertEqual(self.seq, list(range(10)))
 
+           # should raise an exception for an immutable sequence
+           self.assertRaises(TypeError, random.shuffle, (1,2,3))
+
        def test_choice(self):
            element = random.choice(self.seq)
-           self.assertIn(element, self.seq)
+           self.assertTrue(element in self.seq)
 
        def test_sample(self):
-           self.assertRaises(ValueError, random.sample, self.seq, 20)
+           with self.assertRaises(ValueError):
+               random.sample(self.seq, 20)
            for element in random.sample(self.seq, 5):
-               self.assertIn(element, self.seq)
+               self.assertTrue(element in self.seq)
 
    if __name__ == '__main__':
        unittest.main()
@@ -676,7 +680,7 @@ Test cases
       will be *msg* if given, otherwise it will be :const:`None`.
 
       .. deprecated:: 3.1
-         :meth:`failUnless`.
+         :meth:`failUnless`; use one of the ``assert`` variants.
          :meth:`assert_`; use :meth:`assertTrue`.
 
 
@@ -704,7 +708,7 @@ Test cases
          function for comparing strings.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessEqual`.
+         :meth:`failUnlessEqual`; use :meth:`assertEqual`.
 
 
    .. method:: assertNotEqual(first, second, msg=None)
@@ -718,7 +722,7 @@ Test cases
       *first* and *second*.
 
       .. deprecated:: 3.1
-         :meth:`failIfEqual`.
+         :meth:`failIfEqual`; use :meth:`assertNotEqual`.
 
 
    .. method:: assertAlmostEqual(first, second, *, places=7, msg=None)
@@ -737,7 +741,7 @@ Test cases
          Objects that compare equal are automatically almost equal.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessAlmostEqual`.
+         :meth:`failUnlessAlmostEqual`; use :meth:`assertAlmostEqual`.
 
 
    .. method:: assertNotAlmostEqual(first, second, *, places=7, msg=None)
@@ -756,7 +760,7 @@ Test cases
          Objects that compare equal automatically fail.
 
       .. deprecated:: 3.1
-         :meth:`failIfAlmostEqual`.
+         :meth:`failIfAlmostEqual`; use :meth:`assertNotAlmostEqual`.
 
 
    .. method:: assertGreater(first, second, msg=None)
@@ -923,7 +927,7 @@ Test cases
          Added the :attr:`exception` attribute.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessRaises`.
+         :meth:`failUnlessRaises`; use :meth:`assertRaises`.
 
 
    .. method:: assertRaisesRegexp(exception, regexp[, callable, ...])
@@ -1000,7 +1004,7 @@ Test cases
       for the error message.
 
       .. deprecated:: 3.1
-         :meth:`failIf`.
+         :meth:`failIf`; use :meth:`assertFalse`.
 
 
    .. method:: fail(msg=None)

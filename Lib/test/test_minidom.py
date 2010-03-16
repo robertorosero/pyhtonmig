@@ -1,9 +1,7 @@
 # test for xml.dom.minidom
 
-import os
-import sys
 import pickle
-from test.support import verbose, run_unittest
+from test.support import verbose, run_unittest, findfile
 import unittest
 
 import xml.dom
@@ -14,12 +12,8 @@ from xml.dom.minidom import parse, Node, Document, parseString
 from xml.dom.minidom import getDOMImplementation
 
 
-if __name__ == "__main__":
-    base = sys.argv[0]
-else:
-    base = __file__
-tstfile = os.path.join(os.path.dirname(base), "test.xml")
-del base
+tstfile = findfile("test.xml", subdir="xmltestdata")
+
 
 # The tests of DocumentType importing use these helpers to construct
 # the documents to work with, since not all DOM builders actually
@@ -1455,12 +1449,13 @@ class MinidomTest(unittest.TestCase):
                 self.confirm(len(n1.entities) == len(n2.entities)
                         and len(n1.notations) == len(n2.notations))
                 for i in range(len(n1.notations)):
+                    # XXX this loop body doesn't seem to be executed?
                     no1 = n1.notations.item(i)
                     no2 = n1.notations.item(i)
                     self.confirm(no1.name == no2.name
                             and no1.publicId == no2.publicId
                             and no1.systemId == no2.systemId)
-                    statck.append((no1, no2))
+                    stack.append((no1, no2))
                 for i in range(len(n1.entities)):
                     e1 = n1.entities.item(i)
                     e2 = n2.entities.item(i)

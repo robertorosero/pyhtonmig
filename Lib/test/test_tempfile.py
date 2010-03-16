@@ -3,7 +3,6 @@ import tempfile
 import os
 import sys
 import re
-import errno
 import warnings
 
 import unittest
@@ -127,7 +126,7 @@ class test__RandomNameSequence(TC):
                 if i == 20:
                     break
         except:
-            failOnException("iteration")
+            self.failOnException("iteration")
 
 test_classes.append(test__RandomNameSequence)
 
