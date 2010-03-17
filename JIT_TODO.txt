@@ -18,7 +18,6 @@ TODO:
     - r636
     - r301
     - r246
-    - r142
     Some of these should go into trunk, then py3k, then py3k-jit. Some of
     these may have already been committed. This is just a rough worklist.
 - Import changes designed to improve startup time:
