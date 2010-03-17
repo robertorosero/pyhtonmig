@@ -9,7 +9,6 @@ PEP 3146: http://www.python.org/dev/peps/pep-3146/
 TODO:
 - Import non-JIT related revisions into py3k, merge to py3k-jit:
     Relevant revisions:
-    - r1017
     - r900
     - r834
     - r823
@@ -42,6 +41,7 @@ TODO:
 DONE:
 - Import non-JIT related revisions into py3k, merge to py3k-jit:
     Relevant revisions:
+    - r1017 (r79038, r79041)
     - r953 (r79027)
     - r888 (r79016, r79019; r79020)
     - r835 (r79013, r79014)
