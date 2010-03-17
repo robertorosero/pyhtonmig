@@ -1,0 +1,50 @@
+This branch exists to implement PEP 3146, merging Unladen Swallow into the
+Python 3 development series. This file is intended as a non-exhaustive,
+granular list of tasks needed to accomplish that.
+
+Unladen Swallow: http://code.google.com/p/unladen-swallow/
+PEP 3146: http://www.python.org/dev/peps/pep-3146/
+
+
+TODO:
+- Import non-JIT related revisions into py3k, merge to py3k-jit:
+    Relevant revisions:
+    - r1017
+    - r953
+    - r900
+    - r888
+    - r835
+    - r834
+    - r823
+    - r799
+    - r754
+    - r642, r644, r645
+    - r636
+    - r563
+    - r301
+    - r268
+    - r246
+    - r142
+    Some of these should go into trunk, then py3k, then py3k-jit. Some of
+    these may have already been committed. This is just a rough worklist.
+- Import changes designed to improve startup time:
+    - r675
+    - r676
+    - r688
+    Some of these may need public discussion.
+- Add support to configure/Makefile.pre.in for building against installed LLVM.
+- Add C/C++ unittests:
+    - Create a Unittests/ directory.
+    - Import googletest 1.4.0.
+    - Start writing tests.
+- Import general-purpose utility code:
+    - Stats.{h,cc}
+    - PySmallPtrSet
+- Adapt JIT compiler to Python 3.
+- Cure cancer.
+
+
+DONE:
+- Import non-JIT related revisions into py3k, merge to py3k-jit:
+    Relevant revisions:
+    - r815 (Lib/test/test_dynamic.py, Lib/test/support.py)
