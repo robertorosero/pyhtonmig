@@ -13,7 +13,6 @@ TODO:
     - r953
     - r900
     - r888
-    - r835
     - r834
     - r823
     - r799
@@ -45,6 +44,7 @@ TODO:
 DONE:
 - Import non-JIT related revisions into py3k, merge to py3k-jit:
     Relevant revisions:
+    - r835 (r79013, r79014)
     - r815 (Lib/test/test_dynamic.py, Lib/test/support.py; r79009)
     - r563 (r72777, r72778)
     - r268 (r70672, r70673)
