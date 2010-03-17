@@ -21,7 +21,6 @@ TODO:
     - r642, r644, r645
     - r636
     - r301
-    - r268
     - r246
     - r142
     Some of these should go into trunk, then py3k, then py3k-jit. Some of
@@ -48,3 +47,4 @@ DONE:
     Relevant revisions:
     - r815 (Lib/test/test_dynamic.py, Lib/test/support.py; r79009)
     - r563 (r72777, r72778)
+    - r268 (r70672, r70673)
