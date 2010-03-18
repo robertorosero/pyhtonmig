@@ -9,6 +9,7 @@ Without you, I would've stopped working on Python long ago!
 
 PS: In the standard Python distribution, this file is encoded in UTF-8.
 
+James Abbatiello
 Joaquin Cuenca Abela
 David Abrahams
 Jim Ahlstrom
@@ -273,6 +274,7 @@ Lars Marius Garshol
 Dan Gass
 Andrew Gaul
 Stephen M. Gava
+Alex Gaynor
 Harry Henry Gebel
 Marius Gedminas
 Thomas Gellekum
@@ -375,6 +377,7 @@ Kjetil Jacobsen
 Geert Jansen
 Jack Jansen
 Bill Janssen
+Dmitry Jemerov
 Drew Jenkins
 Flemming Kjær Jensen
 Jiba
@@ -410,6 +413,7 @@ Paul Kippes
 Steve Kirsch
 Sebastian Kirsche
 Ron Klatchko
+Reid Kleckner
 Bastian Kleineidam
 Bob Kline
 Matthias Klose
@@ -428,6 +432,7 @@ Hannu Krosing
 Ivan Krstić
 Andrew Kuchling
 Vladimir Kushnir
+David Laing
 Cameron Laird
 Tino Lange
 Andrew Langmead
@@ -454,6 +459,7 @@ John Lenton
 Christopher Tur Lesniewski-Laas
 Mark Levinson
 William Lewis
+Nick Lewycky
 Robert van Liere
 Ross Light
 Shawn Ligocki
@@ -845,6 +851,7 @@ Thomas Wouters
 Heiko Wundram
 Doug Wyatt
 Florent Xicluna
+Jeffrey Yasskin
 Ka-Ping Yee
 Bob Yodlowski
 Danny Yoo
