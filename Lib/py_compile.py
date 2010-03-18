@@ -7,8 +7,8 @@ import builtins
 import imp
 import marshal
 import os
-import re
 import sys
+import tokenize
 import traceback
 
 MAGIC = imp.get_magic()
@@ -62,36 +62,12 @@ class PyCompileError(Exception):
         return self.msg
 
 
-# Define an internal helper according to the platform
-if os.name == "mac":
-    import MacOS
-    def set_creator_type(file):
-        MacOS.SetCreatorAndType(file, 'Pyth', 'PYC ')
-else:
-    def set_creator_type(file):
-        pass
-
 def wr_long(f, x):
     """Internal; write a 32-bit int to a file in little-endian order."""
     f.write(bytes([x        & 0xff,
                    (x >> 8)  & 0xff,
                    (x >> 16) & 0xff,
                    (x >> 24) & 0xff]))
-
-def read_encoding(file, default):
-    """Read the first two lines of the file looking for coding: xyzzy."""
-    f = open(file, "rb")
-    try:
-        for i in range(2):
-            line = f.readline()
-            if not line:
-                break
-            m = re.match(br".*\bcoding:\s*(\S+)\b", line)
-            if m:
-                return m.group(1).decode("ascii")
-        return default
-    finally:
-        f.close()
 
 def compile(file, cfile=None, dfile=None, doraise=False):
     """Byte-compile one Python source file to Python bytecode.
@@ -128,16 +104,14 @@ def compile(file, cfile=None, dfile=None, doraise=False):
     directories).
 
     """
-    encoding = read_encoding(file, "utf-8")
-    f = open(file, 'U', encoding=encoding)
-    try:
-        timestamp = int(os.fstat(f.fileno()).st_mtime)
-    except AttributeError:
-        timestamp = int(os.stat(file).st_mtime)
-    codestring = f.read()
-    f.close()
-    if codestring and codestring[-1] != '\n':
-        codestring = codestring + '\n'
+    with open(file, "rb") as f:
+        encoding = tokenize.detect_encoding(f.readline)[0]
+    with open(file, encoding=encoding) as f:
+        try:
+            timestamp = int(os.fstat(f.fileno()).st_mtime)
+        except AttributeError:
+            timestamp = int(os.stat(file).st_mtime)
+        codestring = f.read()
     try:
         codeobject = builtins.compile(codestring, dfile or file,'exec')
     except Exception as err:
@@ -149,15 +123,13 @@ def compile(file, cfile=None, dfile=None, doraise=False):
             return
     if cfile is None:
         cfile = file + (__debug__ and 'c' or 'o')
-    fc = open(cfile, 'wb')
-    fc.write(b'\0\0\0\0')
-    wr_long(fc, timestamp)
-    marshal.dump(codeobject, fc)
-    fc.flush()
-    fc.seek(0, 0)
-    fc.write(MAGIC)
-    fc.close()
-    set_creator_type(cfile)
+    with open(cfile, 'wb') as fc:
+        fc.write(b'\0\0\0\0')
+        wr_long(fc, timestamp)
+        marshal.dump(codeobject, fc)
+        fc.flush()
+        fc.seek(0, 0)
+        fc.write(MAGIC)
 
 def main(args=None):
     """Compile several source files.

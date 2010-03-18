@@ -835,7 +835,8 @@ PLATDIR=	plat-$(MACHDEP)
 EXTRAPLATDIR= @EXTRAPLATDIR@
 MACHDEPS=	$(PLATDIR) $(EXTRAPLATDIR)
 XMLLIBSUBDIRS=  xml xml/dom xml/etree xml/parsers xml/sax
-LIBSUBDIRS=	tkinter site-packages test test/output test/data \
+LIBSUBDIRS=	tkinter tkinter/test tkinter/test/test_tkinter \
+                tkinter/test/test_ttk site-packages test test/data \
 		test/decimaltestdata test/xmltestdata \
 		encodings \
 		email email/mime email/test email/test/data \
@@ -912,12 +913,12 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar|crlf|different_encoding' \
+		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
 		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi -O $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar|crlf|different_encoding' \
+		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
 		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
