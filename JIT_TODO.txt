@@ -17,7 +17,6 @@ TODO:
     - r642, r644, r645
     - r636
     - r301
-    - r246
     Some of these should go into trunk, then py3k, then py3k-jit. Some of
     these may have already been committed. This is just a rough worklist.
 - Import changes designed to improve startup time:
@@ -47,3 +46,4 @@ DONE:
     - r815 (Lib/test/test_dynamic.py, Lib/test/support.py; r79009)
     - r563 (r72777, r72778)
     - r268 (r70672, r70673)
+    - r246 (r79044, r79045)
