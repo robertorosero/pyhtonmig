@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="_ctypes"
 	ProjectGUID="{0E9791DB-593A-465F-98BC-681011311618}"
 	RootNamespace="_ctypes"
@@ -42,7 +42,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc"
+				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc;..\Modules\_ctypes\libffi\include;..\Modules\_ctypes\libffi\src\x86"
+				PreprocessorDefinitions="X86_WIN32"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -164,7 +165,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc"
+				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc;..\Modules\_ctypes\libffi\include;..\Modules\_ctypes\libffi\src\x86"
+				PreprocessorDefinitions="X86_WIN32"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -291,7 +293,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc"
+				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc;..\Modules\_ctypes\libffi\include;..\Modules\_ctypes\libffi\src\x86"
+				PreprocessorDefinitions="X86_WIN32"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -419,7 +422,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc"
+				AdditionalIncludeDirectories="..\Modules\_ctypes\libffi_msvc;..\Modules\_ctypes\libffi\include;..\Modules\_ctypes\libffi\src\x86"
+				PreprocessorDefinitions="X86_WIN32"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -575,15 +579,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\_ctypes\libffi_msvc\ffi.c"
+				RelativePath="..\Modules\_ctypes\libffi\src\closures.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\_ctypes\malloc_closure.c"
+				RelativePath="..\Modules\_ctypes\libffi\src\x86\ffi.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\_ctypes\libffi_msvc\prep_cif.c"
+				RelativePath="..\Modules\_ctypes\libffi\src\prep_cif.c"
 				>
 			</File>
 			<File
@@ -591,97 +595,53 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\_ctypes\libffi_msvc\win32.c"
-				>
-				<FileConfiguration
-					Name="Debug|x64"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|x64"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="PGInstrument|x64"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="PGUpdate|x64"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\Modules\_ctypes\libffi_msvc\win64.asm"
+				RelativePath="..\Modules\_ctypes\libffi\src\x86\win32.S"
 				>
 				<FileConfiguration
 					Name="Debug|Win32"
-					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
+						CommandLine="cl /nologo /EP /I ..\Modules\_ctypes\libffi_msvc /I ..\Modules\_ctypes\libffi\src\x86 $(InputPath) &gt; $(IntDir)$(InputName).asm&#x0D;&#x0A;ml /nologo /Zi /c /Fo $(IntDir)$(InputName).obj $(IntDir)$(InputName).asm"
+						Outputs="$(IntDir)$(InputName).obj"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug|x64"
+					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\win64.obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\win64.obj"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|Win32"
-					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
+						CommandLine="cl /nologo /EP /I ..\Modules\_ctypes\libffi_msvc /I ..\Modules\_ctypes\libffi\src\x86 $(InputPath) &gt; $(IntDir)$(InputName).asm&#x0D;&#x0A;ml /nologo /c /Fo $(IntDir)$(InputName).obj $(IntDir)$(InputName).asm"
+						Outputs="$(IntDir)$(InputName).obj"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Release|x64"
+					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="ml64 /nologo /c /Fo &quot;$(IntDir)\win64.obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\win64.obj"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="PGInstrument|Win32"
-					ExcludedFromBuild="true"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
+						CommandLine="cl /nologo /EP /I ..\Modules\_ctypes\libffi_msvc /I ..\Modules\_ctypes\libffi\src\x86 $(InputPath) &gt; $(IntDir)$(InputName).asm&#x0D;&#x0A;ml /nologo /Zi /c /Fo $(IntDir)$(InputName).obj $(IntDir)$(InputName).asm"
+						Outputs="$(IntDir)$(InputName).obj"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
 					Name="PGInstrument|x64"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="ml64 /nologo /c /Fo &quot;$(IntDir)\win64.obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\win64.obj"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="PGUpdate|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -689,12 +649,20 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
-					Name="PGUpdate|x64"
+					Name="PGUpdate|Win32"
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="ml64 /nologo /c /Fo &quot;$(IntDir)\win64.obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
-						Outputs="$(IntDir)\win64.obj"
+						CommandLine="cl /nologo /EP /I ..\Modules\_ctypes\libffi_msvc /I ..\Modules\_ctypes\libffi\src\x86 $(InputPath) &gt; $(IntDir)$(InputName).asm&#x0D;&#x0A;ml /nologo /Zi /c /Fo $(IntDir)$(InputName).obj $(IntDir)$(InputName).asm"
+						Outputs="$(IntDir)$(InputName).obj"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="PGUpdate|x64"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
 					/>
 				</FileConfiguration>
 			</File>

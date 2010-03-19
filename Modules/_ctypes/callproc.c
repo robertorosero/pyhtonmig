@@ -807,7 +807,11 @@ static int _call_function_pointer(int flags,
 #ifndef DONT_USE_SEH
 	__try {
 #endif
+/*
+  XXX THIS CODE MUST BE ENABLED LATER AGAIN, AFTER libffi is patched for X86_WIN32!
 		delta =
+*/
+		delta = 0;
 #endif
 			ffi_call(&cif, (void *)pProc, resmem, avalues);
 #ifdef MS_WIN32
