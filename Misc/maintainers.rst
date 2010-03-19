@@ -276,6 +276,7 @@ GUI
 i18n                lemburg
 import machinery    brett.cannon, ncoghlan
 io                  pitrou, benjamin.peterson
+jit compiler/llvm   collin.winter, jeffrey.yasskin
 locale              lemburg, loewis
 mathematics         mark.dickinson, eric.smith, lemburg
 memory management   tim_one, lemburg
