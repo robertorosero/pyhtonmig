@@ -5,7 +5,7 @@ dnl Process this with autoconf to create configure
 
 AC_PREREQ(2.63)
 
-AC_INIT([libffi], [3.0.9], [http://gcc.gnu.org/bugs.html])
+AC_INIT([libffi], [3.0.10rc0], [http://gcc.gnu.org/bugs.html])
 AC_CONFIG_HEADERS([fficonfig.h])
 
 AC_CANONICAL_SYSTEM
@@ -57,6 +57,10 @@ case "$host" in
   amd64-*-freebsd* | amd64-*-openbsd*)
 	TARGET=X86_64; TARGETDIR=x86
   	;;
+
+  amd64-*-freebsd*)
+	TARGET=X86_64; TARGETDIR=x86
+	;;
 
   avr32*-*-*)
 	TARGET=AVR32; TARGETDIR=avr32
@@ -405,7 +409,7 @@ test -d src/$TARGETDIR || mkdir src/$TARGETDIR
 
 AC_CONFIG_LINKS(include/ffitarget.h:src/$TARGETDIR/ffitarget.h)
 
-AC_CONFIG_FILES(include/ffi.h)
+AC_CONFIG_FILES(include/Makefile include/ffi.h Makefile testsuite/Makefile man/Makefile libffi.pc)
 
 AC_CONFIG_LINKS(include/ffi_common.h:include/ffi_common.h)
 

@@ -285,12 +285,12 @@ C-API
 Library
 -------
 
+- Issue #8024: Update the Unicode database to 5.2.
+
 - Issue #8168: py_compile now handles files with utf-8 BOMS.
 
 - ``tokenize.detect_encoding`` now returns ``'utf-8-sig'`` when a UTF-8 BOM is
   detected.
-
-- Issue #8024: Update the Unicode database to 5.2.
 
 - Issue #6716/2: Backslash-replace error output in compilall.
 
@@ -886,8 +886,10 @@ Build
 - Issue 5390: Add uninstall icon independent of whether file
   extensions are installed.
 
-- Issue #7541: when using ``python-config`` with a framework install the compiler might
-  use the wrong library.
+- Issue #7541: when using ``python-config`` with a framework install the
+  compiler might use the wrong library.
+
+- python-config now supports multiple options on the same command line.
 
 Documentation
 ------------
@@ -903,12 +905,15 @@ Documentation
 
 - Issue #6556: Fixed the Distutils configuration files location explanation
   for Windows.
- 
+
 - Update python manual page (options -B, -O0, -s, environment variables
   PYTHONDONTWRITEBYTECODE, PYTHONNOUSERSITE).
 
 Tests
 -----
+
+- Issue #7783: test.support.open_urlresource invalidates the outdated files
+  from the local cache.
 
 - Issue #7849: Now the utility ``check_warnings`` verifies if the warnings are
   effectively raised.
@@ -934,8 +939,8 @@ Tests
   test_capi (only seen so far on platforms where the curses module
   wasn't built), due to an uncleared exception.
 
-- issue #7728: test_timeout was changed to use test_support.bind_port
-  instead of a hard coded port.
+- Issue #7728: test_timeout was changed to use support.bind_port instead of a
+  hard coded port.
 
 - Issue #7376: instead of running a self-test (which was failing) when called
   with no arguments, doctest.py now gives a usage message.
