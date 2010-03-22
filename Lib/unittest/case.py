@@ -11,6 +11,8 @@ from . import result
 from .util import (strclass, safe_repr, sorted_list_difference,
                    unorderable_list_difference)
 
+__unittest = True
+
 
 class SkipTest(Exception):
     """
@@ -700,10 +702,9 @@ class TestCase(object):
             msg: Optional message to use on failure instead of a list of
                     differences.
 
-        For more general containership equality, assertSameElements will work
-        with things other than sets.    This uses ducktyping to support
-        different types of sets, and is optimized for sets specifically
-        (parameters must support a difference method).
+        assertSetEqual uses ducktyping to support different types of sets, and
+        is optimized for sets specifically (parameters must support a
+        difference method).
         """
         try:
             difference1 = set1.difference(set2)
@@ -809,6 +810,8 @@ class TestCase(object):
         set(actual))`` but it works with sequences of unhashable objects as
         well.
         """
+        warnings.warn('assertSameElements is deprecated',
+                      DeprecationWarning)
         try:
             expected = set(expected_seq)
             actual = set(actual_seq)
@@ -834,6 +837,44 @@ class TestCase(object):
         if unexpected:
             errors.append('Unexpected, but present:\n    %s' %
                           safe_repr(unexpected))
+        if errors:
+            standardMsg = '\n'.join(errors)
+            self.fail(self._formatMessage(msg, standardMsg))
+
+
+    def assertItemsEqual(self, expected_seq, actual_seq, msg=None):
+        """An unordered sequence / set specific comparison. It asserts that
+        expected_seq and actual_seq contain the same elements. It is
+        the equivalent of::
+
+            self.assertEqual(sorted(expected_seq), sorted(actual_seq))
+
+        Raises with an error message listing which elements of expected_seq
+        are missing from actual_seq and vice versa if any.
+
+        Asserts that each element has the same count in both sequences.
+        Example:
+            - [0, 1, 1] and [1, 0, 1] compare equal.
+            - [0, 0, 1] and [0, 1] compare unequal.
+        """
+        try:
+            expected = sorted(expected_seq)
+            actual = sorted(actual_seq)
+        except TypeError:
+            # Unsortable items (example: set(), complex(), ...)
+            expected = list(expected_seq)
+            actual = list(actual_seq)
+            missing, unexpected = unorderable_list_difference(expected, actual)
+        else:
+            return self.assertSequenceEqual(expected, actual, msg=msg)
+
+        errors = []
+        if missing:
+            errors.append('Expected, but missing:\n    %s' %
+                           safe_repr(missing))
+        if unexpected:
+            errors.append('Unexpected, but present:\n    %s' %
+                           safe_repr(unexpected))
         if errors:
             standardMsg = '\n'.join(errors)
             self.fail(self._formatMessage(msg, standardMsg))

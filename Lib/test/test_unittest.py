@@ -291,6 +291,21 @@ class Test_TestLoader(TestCase):
         suite = loader.loadTestsFromModule(m, use_load_tests=False)
         self.assertEquals(load_tests_args, [])
 
+    def test_loadTestsFromModule__faulty_load_tests(self):
+        m = types.ModuleType('m')
+
+        def load_tests(loader, tests, pattern):
+            raise TypeError('some failure')
+        m.load_tests = load_tests
+
+        loader = unittest.TestLoader()
+        suite = loader.loadTestsFromModule(m)
+        self.assertIsInstance(suite, unittest.TestSuite)
+        self.assertEqual(suite.countTestCases(), 1)
+        test = list(suite)[0]
+
+        self.assertRaisesRegexp(TypeError, "some failure", test.m)
+
     ################################################################
     ### /Tests for TestLoader.loadTestsFromModule()
 
@@ -2081,6 +2096,42 @@ class Test_TestResult(TestCase):
                 'Tests getDescription() for a method with a longer '
                 'docstring.'))
 
+    def testStackFrameTrimming(self):
+        class Frame(object):
+            class tb_frame(object):
+                f_globals = {}
+        result = unittest.TestResult()
+        self.assertFalse(result._is_relevant_tb_level(Frame))
+
+        Frame.tb_frame.f_globals['__unittest'] = True
+        self.assertTrue(result._is_relevant_tb_level(Frame))
+
+    def testFailFast(self):
+        result = unittest.TestResult()
+        result._exc_info_to_string = lambda *_: ''
+        result.failfast = True
+        result.addError(None, None)
+        self.assertTrue(result.shouldStop)
+
+        result = unittest.TestResult()
+        result._exc_info_to_string = lambda *_: ''
+        result.failfast = True
+        result.addFailure(None, None)
+        self.assertTrue(result.shouldStop)
+
+        result = unittest.TestResult()
+        result._exc_info_to_string = lambda *_: ''
+        result.failfast = True
+        result.addUnexpectedSuccess(None)
+        self.assertTrue(result.shouldStop)
+
+    def testFailFastSetByRunner(self):
+        runner = unittest.TextTestRunner(stream=io.StringIO(), failfast=True)
+        def test(result):
+            self.assertTrue(result.failfast)
+        result = runner.run(test)
+
+
 classDict = dict(unittest.TestResult.__dict__)
 for m in ('addSkip', 'addExpectedFailure', 'addUnexpectedSuccess',
            '__init__'):
@@ -2156,21 +2207,23 @@ class Foo(unittest.TestCase):
 class Bar(Foo):
     def test2(self): pass
 
-class LoggingTestCase(unittest.TestCase):
-    """A test case which logs its calls."""
+def getLoggingTestCase():
+    class LoggingTestCase(unittest.TestCase):
+        """A test case which logs its calls."""
 
-    def __init__(self, events):
-        super(LoggingTestCase, self).__init__('test')
-        self.events = events
+        def __init__(self, events):
+            super(LoggingTestCase, self).__init__('test')
+            self.events = events
 
-    def setUp(self):
-        self.events.append('setUp')
+        def setUp(self):
+            self.events.append('setUp')
 
-    def test(self):
-        self.events.append('test')
+        def test(self):
+            self.events.append('test')
 
-    def tearDown(self):
-        self.events.append('tearDown')
+        def tearDown(self):
+            self.events.append('tearDown')
+    return LoggingTestCase
 
 class ResultWithNoStartTestRunStopTestRun(object):
     """An object honouring TestResult before startTestRun/stopTestRun."""
@@ -2297,7 +2350,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         events = []
         result = LoggingResult(events)
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def setUp(self):
                 super(Foo, self).setUp()
                 raise RuntimeError('raised by Foo.setUp')
@@ -2310,7 +2363,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
     def test_run_call_order__error_in_setUp_default_result(self):
         events = []
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def defaultTestResult(self):
                 return LoggingResult(self.events)
 
@@ -2334,7 +2387,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         events = []
         result = LoggingResult(events)
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def test(self):
                 super(Foo, self).test()
                 raise RuntimeError('raised by Foo.test')
@@ -2349,7 +2402,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
     def test_run_call_order__error_in_test_default_result(self):
         events = []
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def defaultTestResult(self):
                 return LoggingResult(self.events)
 
@@ -2373,7 +2426,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         events = []
         result = LoggingResult(events)
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def test(self):
                 super(Foo, self).test()
                 self.fail('raised by Foo.test')
@@ -2386,7 +2439,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
     # "When a test fails with a default result stopTestRun is still called."
     def test_run_call_order__failure_in_test_default_result(self):
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def defaultTestResult(self):
                 return LoggingResult(self.events)
             def test(self):
@@ -2410,7 +2463,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         events = []
         result = LoggingResult(events)
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def tearDown(self):
                 super(Foo, self).tearDown()
                 raise RuntimeError('raised by Foo.tearDown')
@@ -2423,7 +2476,7 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
     # "When tearDown errors with a default result stopTestRun is still called."
     def test_run_call_order__error_in_tearDown_default_result(self):
 
-        class Foo(LoggingTestCase):
+        class Foo(getLoggingTestCase()):
             def defaultTestResult(self):
                 return LoggingResult(self.events)
             def tearDown(self):
@@ -2758,22 +2811,45 @@ class Test_TestCase(TestCase, TestEquality, TestHashing):
         self.assertRaises(self.failureException, self.assertDictEqual, [], d)
         self.assertRaises(self.failureException, self.assertDictEqual, 1, 1)
 
-        self.assertSameElements([1, 2, 3], [3, 2, 1])
-        self.assertSameElements([1, 2] + [3] * 100, [1] * 100 + [2, 3])
-        self.assertSameElements(['foo', 'bar', 'baz'], ['bar', 'baz', 'foo'])
-        self.assertRaises(self.failureException, self.assertSameElements,
+    def testAssertItemsEqual(self):
+        a = object()
+        self.assertItemsEqual([1, 2, 3], [3, 2, 1])
+        self.assertItemsEqual(['foo', 'bar', 'baz'], ['bar', 'baz', 'foo'])
+        self.assertItemsEqual([a, a, 2, 2, 3], (a, 2, 3, a, 2))
+        self.assertItemsEqual([1, "2", "a", "a"], ["a", "2", True, "a"])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [1, 2] + [3] * 100, [1] * 100 + [2, 3])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [1, "2", "a", "a"], ["a", "2", True, 1])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
                           [10], [10, 11])
-        self.assertRaises(self.failureException, self.assertSameElements,
+        self.assertRaises(self.failureException, self.assertItemsEqual,
                           [10, 11], [10])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [10, 11, 10], [10, 11])
 
         # Test that sequences of unhashable objects can be tested for sameness:
-        self.assertSameElements([[1, 2], [3, 4]], [[3, 4], [1, 2]])
+        self.assertItemsEqual([[1, 2], [3, 4], 0], [False, [3, 4], [1, 2]])
 
-        self.assertSameElements([{'a': 1}, {'b': 2}], [{'b': 2}, {'a': 1}])
-        self.assertRaises(self.failureException, self.assertSameElements,
+        # hashable types, but not orderable
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [], [divmod, 'x', 1, 5j, 2j, frozenset()])
+        # comparing dicts raises a py3k warning
+        self.assertItemsEqual([{'a': 1}, {'b': 2}], [{'b': 2}, {'a': 1}])
+        # comparing heterogenous non-hashable sequences raises a py3k warning
+        self.assertItemsEqual([1, 'x', divmod, []], [divmod, [], 'x', 1])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [], [divmod, [], 'x', 1, 5j, 2j, set()])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
                           [[1]], [[2]])
-        self.assertRaises(self.failureException, self.assertSameElements,
-                          [{'a': 1}, {'b': 2}], [{'b': 2}, {'a': 2}])
+
+        # Same elements, but not same sequence length
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [1, 1, 2], [2, 1])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [1, 1, "2", "a", "a"], ["2", "2", True, "a"])
+        self.assertRaises(self.failureException, self.assertItemsEqual,
+                          [1, {'b': 2}, None, True], [{'b': 2}, True, None])
 
     def testAssertSetEqual(self):
         set1 = set()
@@ -2991,7 +3067,8 @@ test case
             (self.failIfAlmostEqual, (3.0, 5.0)),
             (self.failUnless, (True,)),
             (self.failUnlessRaises, (TypeError, lambda _: 3.14 + 'spam')),
-            (self.failIf, (False,))
+            (self.failIf, (False,)),
+            (self.assertSameElements, ([1, 1, 2, 3], [1, 2, 3]))
         )
         for meth, args in old:
             with warnings.catch_warnings(record=True) as w:
@@ -3338,8 +3415,8 @@ class TestLongMessage(TestCase):
                              "^Missing: 'key'$",
                              "^Missing: 'key' : oops$"])
 
-    def testAssertSameElements(self):
-        self.assertMessages('assertSameElements', ([], [None]),
+    def testAssertItemsEqual(self):
+        self.assertMessages('assertItemsEqual', ([], [None]),
                             [r"\[None\]$", "^oops$",
                              r"\[None\]$",
                              r"\[None\] : oops$"])
@@ -3908,13 +3985,15 @@ class TestDiscovery(TestCase):
         program._do_discovery(['-p', 'fish'], Loader=Loader)
         self.assertEqual(program.test, 'tests')
         self.assertEqual(Loader.args, [('.', 'fish', None)])
+        self.assertFalse(program.failfast)
 
         Loader.args = []
         program = object.__new__(TestProgram)
-        program._do_discovery(['-p', 'eggs', '-s', 'fish', '-v'], Loader=Loader)
+        program._do_discovery(['-p', 'eggs', '-s', 'fish', '-v', '-f'], Loader=Loader)
         self.assertEqual(program.test, 'tests')
         self.assertEqual(Loader.args, [('fish', 'eggs', None)])
         self.assertEqual(program.verbosity, 2)
+        self.assertTrue(program.failfast)
 
 
 class TestSetups(unittest.TestCase):

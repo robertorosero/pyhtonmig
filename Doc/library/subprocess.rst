@@ -210,7 +210,7 @@ This module also defines four shortcut functions:
    Run command with arguments.  Wait for command to complete, then return the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
       >>> retcode = subprocess.call(["ls", "-l"])
 
@@ -229,7 +229,7 @@ This module also defines four shortcut functions:
    :exc:`CalledProcessError` object will have the return code in the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
       >>> subprocess.check_call(["ls", "-l"])
       0
@@ -422,6 +422,9 @@ The following attributes are also available:
 .. attribute:: Popen.pid
 
    The process ID of the child process.
+
+   Note that if you set the *shell* argument to ``True``, this is the process ID
+   of the spawned shell.
 
 
 .. attribute:: Popen.returncode

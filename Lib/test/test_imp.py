@@ -104,7 +104,14 @@ class ImportTests(unittest.TestCase):
             'cp1258' : b'\xc0',
             }
 
-        special_char = known_locales.get(fs_encoding)
+        if sys.platform == 'darwin':
+            self.assertEqual(fs_encoding, 'utf-8')
+            # Mac OS X uses the Normal Form D decomposition
+            # http://developer.apple.com/mac/library/qa/qa2001/qa1173.html
+            special_char = b'a\xcc\x88'
+        else:
+            special_char = known_locales.get(fs_encoding)
+
         if not special_char:
             self.skipTest("can't run this test with %s as filesystem encoding"
                           % fs_encoding)
@@ -155,7 +162,7 @@ class ReloadTests(unittest.TestCase):
     reload()."""
 
     def test_source(self):
-        # XXX (ncoghlan): It would be nice to use test_support.CleanImport
+        # XXX (ncoghlan): It would be nice to use test.support.CleanImport
         # here, but that breaks because the os module registers some
         # handlers in copy_reg on import. Since CleanImport doesn't
         # revert that registration, the module is left in a broken
