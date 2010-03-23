@@ -696,6 +696,36 @@ $(LIBRARY_OBJS) $(MODOBJS) Modules/python.o: $(PYTHON_HEADERS)
 
 ######################################################################
 
+# The C/C++ unittests are optional, that is, 'make test' should still work
+# even without a C++ compiler. All commands are prefixed with - to make this
+# happen.
+
+UNITTEST_SRCS := $(LIBRARY) \
+		$(srcdir)/Unittests/DatetimeTest.cc \
+		$(srcdir)/Unittests/DictTest.cc \
+		$(srcdir)/Unittests/GetArgsTest.cc \
+		$(srcdir)/Unittests/ListTest.cc \
+		$(srcdir)/Unittests/ObjectTest.cc \
+		$(srcdir)/Unittests/UnicodeTest.cc \
+		$(srcdir)/Unittests/pytest_main.cc \
+		Unittests/googletest/gtest.o
+
+Unittests/googletest/gtest.o:
+	-$(CXX) -c $(PY_CXXFLAGS) -I$(srcdir)/Unittests/googletest \
+		-I$(srcdir)/Unittests/googletest/include -o $@ \
+		$(srcdir)/Unittests/googletest/src/gtest-all.cc
+
+# The python-config line needs to come last, or this will be broken on Linux.
+AllUnitTests: $(UNITTEST_SRCS) $(srcdir)/Unittests/*.h build_all python-config
+	-$(CXX) $(CPPFLAGS) -I$(srcdir)/Unittests/googletest/include -o $@ \
+	 	$(UNITTEST_SRCS) -L. $(LDFLAGS) \
+		`$(RUNSHARED) ./$(BUILDPYTHON) ./python-config --cflags --libs`
+
+
+ctest: AllUnitTests
+	-$(RUNSHARED) ./AllUnitTests
+
+
 # Test the interpreter (twice, once without .pyc files, once with)
 # In the past, we've had problems where bugs in the marshalling or
 # elsewhere caused bytecode read from .pyc files to behave differently
@@ -707,12 +737,12 @@ $(LIBRARY_OBJS) $(MODOBJS) Modules/python.o: $(PYTHON_HEADERS)
 TESTOPTS=	-l $(EXTRATESTOPTS)
 TESTPROG=	$(srcdir)/Lib/test/regrtest.py
 TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -E -bb
-test:		all platform
+test:		all platform ctest
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
 
-testall:	all platform
+testall:	all platform ctest
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		$(TESTPYTHON) $(srcdir)/Lib/compileall.py
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
@@ -721,7 +751,7 @@ testall:	all platform
 
 #  Run the unitests for both architectures in a Universal build on OSX
 #  Must be run on an Intel box.
-testuniversal:	all platform
+testuniversal:	all platform ctest
 		if [ `arch` != 'i386' ];then \
 			echo "This can only be used on OSX/i386" ;\
 			exit 1 ;\
@@ -734,7 +764,7 @@ testuniversal:	all platform
 
 # Like testall, but with a single pass only
 # run an optional script to include some information about the build environment
-buildbottest:	all platform
+buildbottest:	all platform ctest
 		-@if which pybuildbot.identify >/dev/null 2>&1; then \
 			pybuildbot.identify "CC='$(CC)'" "CXX='$(CXX)'"; \
 		fi
@@ -744,14 +774,14 @@ QUICKTESTOPTS=	$(TESTOPTS) -x test_subprocess test_io test_lib2to3 \
 		test_multibytecodec test_urllib2_localnet test_itertools \
 		test_multiprocessing test_mailbox test_socket test_poll \
 		test_select test_zipfile
-quicktest:	all platform
+quicktest:	all platform ctest
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(QUICKTESTOPTS)
 		$(TESTPYTHON) $(TESTPROG) $(QUICKTESTOPTS)
 
 MEMTESTOPTS=    $(QUICKTESTOPTS) -x test_dl test___all__ test_fork1 \
 		test_longexp
-memtest:	all platform
+memtest:	all platform ctest
 		-rm -f $(srcdir)/Lib/test/*.py[co]
 		-$(TESTPYTHON) $(TESTPROG) $(MEMTESTOPTS)
 		$(TESTPYTHON) $(TESTPROG) $(MEMTESTOPTS)

@@ -24,10 +24,6 @@ TODO:
     - r688
     Some of these may need public discussion.
 - Add support to configure/Makefile.pre.in for building against installed LLVM.
-- Add C/C++ unittests:
-    - Create a Unittests/ directory.
-    - Import googletest 1.4.0.
-    - Start writing tests.
 - Import general-purpose utility code:
     - Stats.{h,cc}
     - PySmallPtrSet
@@ -47,3 +43,7 @@ DONE:
     - r563 (r72777, r72778)
     - r268 (r70672, r70673)
     - r246 (r79044, r79045)
+- Add C/C++ unittests:
+    - Create a Unittests/ directory.
+    - Import googletest 1.4.0.
+    - Start writing tests.

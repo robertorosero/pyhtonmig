@@ -10,7 +10,6 @@
 #include "Python.h"
 #include <float.h>
 #include "structmember.h"
-#include "datetime.h"
 
 #ifdef WITH_THREAD
 #include "pythread.h"
@@ -68,108 +67,6 @@ test_config(PyObject *self)
 #endif
 
 #undef CHECK_SIZEOF
-
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-static PyObject*
-test_list_api(PyObject *self)
-{
-	PyObject* list;
-	int i;
-
-	/* SF bug 132008:  PyList_Reverse segfaults */
-#define NLIST 30
-	list = PyList_New(NLIST);
-	if (list == (PyObject*)NULL)
-		return (PyObject*)NULL;
-	/* list = range(NLIST) */
-	for (i = 0; i < NLIST; ++i) {
-		PyObject* anint = PyLong_FromLong(i);
-		if (anint == (PyObject*)NULL) {
-			Py_DECREF(list);
-			return (PyObject*)NULL;
-		}
-		PyList_SET_ITEM(list, i, anint);
-	}
-	/* list.reverse(), via PyList_Reverse() */
-	i = PyList_Reverse(list);   /* should not blow up! */
-	if (i != 0) {
-		Py_DECREF(list);
-		return (PyObject*)NULL;
-	}
-	/* Check that list == range(29, -1, -1) now */
-	for (i = 0; i < NLIST; ++i) {
-		PyObject* anint = PyList_GET_ITEM(list, i);
-		if (PyLong_AS_LONG(anint) != NLIST-1-i) {
-			PyErr_SetString(TestError,
-			                "test_list_api: reverse screwed up");
-			Py_DECREF(list);
-			return (PyObject*)NULL;
-		}
-	}
-	Py_DECREF(list);
-#undef NLIST
-
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-static int
-test_dict_inner(int count)
-{
-	Py_ssize_t pos = 0, iterations = 0;
-	int i;
-	PyObject *dict = PyDict_New();
-	PyObject *v, *k;
-
-	if (dict == NULL)
-		return -1;
-
-	for (i = 0; i < count; i++) {
-		v = PyLong_FromLong(i);
-		PyDict_SetItem(dict, v, v);
-		Py_DECREF(v);
-	}
-
-	while (PyDict_Next(dict, &pos, &k, &v)) {
-		PyObject *o;
-		iterations++;
-
-		i = PyLong_AS_LONG(v) + 1;
-		o = PyLong_FromLong(i);
-		if (o == NULL)
-			return -1;
-		if (PyDict_SetItem(dict, k, o) < 0) {
-			Py_DECREF(o);
-			return -1;
-		}
-		Py_DECREF(o);
-	}
-
-	Py_DECREF(dict);
-
-	if (iterations != count) {
-		PyErr_SetString(
-			TestError,
-			"test_dict_iteration: dict iteration went wrong ");
-		return -1;
-	} else {
-		return 0;
-	}
-}
-
-static PyObject*
-test_dict_iteration(PyObject* self)
-{
-	int i;
-
-	for (i = 0; i < 200; i++) {
-		if (test_dict_inner(i) < 0) {
-			return NULL;
-		}
-	}
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -778,52 +675,6 @@ test_long_long_and_overflow(PyObject *self)
 	return Py_None;
 }
 
-/* Test the L code for PyArg_ParseTuple.  This should deliver a PY_LONG_LONG
-   for both long and int arguments.  The test may leak a little memory if
-   it fails.
-*/
-static PyObject *
-test_L_code(PyObject *self)
-{
-	PyObject *tuple, *num;
-	PY_LONG_LONG value;
-
-        tuple = PyTuple_New(1);
-        if (tuple == NULL)
-        	return NULL;
-
-        num = PyLong_FromLong(42);
-        if (num == NULL)
-        	return NULL;
-
-        PyTuple_SET_ITEM(tuple, 0, num);
-
-        value = -1;
-        if (PyArg_ParseTuple(tuple, "L:test_L_code", &value) < 0)
-        	return NULL;
-        if (value != 42)
-        	return raiseTestError("test_L_code",
-			"L code returned wrong value for long 42");
-
-	Py_DECREF(num);
-        num = PyLong_FromLong(42);
-        if (num == NULL)
-        	return NULL;
-
-        PyTuple_SET_ITEM(tuple, 0, num);
-
-	value = -1;
-        if (PyArg_ParseTuple(tuple, "L:test_L_code", &value) < 0)
-        	return NULL;
-        if (value != 42)
-        	return raiseTestError("test_L_code",
-			"L code returned wrong value for int 42");
-
-	Py_DECREF(tuple);
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
 #endif	/* ifdef HAVE_LONG_LONG */
 
 /* Test tuple argument processing */
@@ -956,239 +807,6 @@ getargs_K(PyObject *self, PyObject *args)
 }
 #endif
 
-/* This function not only tests the 'k' getargs code, but also the
-   PyLong_AsUnsignedLongMask() and PyLong_AsUnsignedLongMask() functions. */
-static PyObject *
-test_k_code(PyObject *self)
-{
-	PyObject *tuple, *num;
-	unsigned long value;
-
-        tuple = PyTuple_New(1);
-        if (tuple == NULL)
-        	return NULL;
-
-	/* a number larger than ULONG_MAX even on 64-bit platforms */
-        num = PyLong_FromString("FFFFFFFFFFFFFFFFFFFFFFFF", NULL, 16);
-        if (num == NULL)
-        	return NULL;
-
-	value = PyLong_AsUnsignedLongMask(num);
-	if (value != ULONG_MAX)
-        	return raiseTestError("test_k_code",
-	    "PyLong_AsUnsignedLongMask() returned wrong value for long 0xFFF...FFF");
-
-        PyTuple_SET_ITEM(tuple, 0, num);
-
-        value = 0;
-        if (PyArg_ParseTuple(tuple, "k:test_k_code", &value) < 0)
-        	return NULL;
-        if (value != ULONG_MAX)
-        	return raiseTestError("test_k_code",
-			"k code returned wrong value for long 0xFFF...FFF");
-
-	Py_DECREF(num);
-        num = PyLong_FromString("-FFFFFFFF000000000000000042", NULL, 16);
-        if (num == NULL)
-        	return NULL;
-
-	value = PyLong_AsUnsignedLongMask(num);
-	if (value != (unsigned long)-0x42)
-        	return raiseTestError("test_k_code",
-	    "PyLong_AsUnsignedLongMask() returned wrong value for long 0xFFF...FFF");
-
-        PyTuple_SET_ITEM(tuple, 0, num);
-
-	value = 0;
-        if (PyArg_ParseTuple(tuple, "k:test_k_code", &value) < 0)
-        	return NULL;
-        if (value != (unsigned long)-0x42)
-        	return raiseTestError("test_k_code",
-			"k code returned wrong value for long -0xFFF..000042");
-
-	Py_DECREF(tuple);
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-
-/* Test the s and z codes for PyArg_ParseTuple.
-*/
-static PyObject *
-test_s_code(PyObject *self)
-{
-    /* Unicode strings should be accepted */
-    PyObject *tuple, *obj;
-    char *value;
-
-    tuple = PyTuple_New(1);
-    if (tuple == NULL)
-        return NULL;
-
-    obj = PyUnicode_Decode("t\xeate", strlen("t\xeate"),
-			   "latin-1", NULL);
-    if (obj == NULL)
-	return NULL;
-
-    PyTuple_SET_ITEM(tuple, 0, obj);
-
-    /* These two blocks used to raise a TypeError:
-     * "argument must be string without null bytes, not str" 
-     */
-    if (PyArg_ParseTuple(tuple, "s:test_s_code1", &value) < 0)
-    	return NULL;
-
-    if (PyArg_ParseTuple(tuple, "z:test_s_code2", &value) < 0)
-    	return NULL;
-
-    Py_DECREF(tuple);
-    Py_RETURN_NONE;
-}
-
-static PyObject *
-test_bug_7414(PyObject *self)
-{
-	/* Issue #7414: for PyArg_ParseTupleAndKeywords, 'C' code wasn't being
-	   skipped properly in skipitem() */
-	int a = 0, b = 0, result;
-	char *kwlist[] = {"a", "b", NULL};
-	PyObject *tuple = NULL, *dict = NULL, *b_str;
-
-	tuple = PyTuple_New(0);
-	if (tuple == NULL)
-		goto failure;
-	dict = PyDict_New();
-	if (dict == NULL)
-		goto failure;
-	b_str = PyUnicode_FromString("b");
-	if (b_str == NULL)
-		goto failure;
-	result = PyDict_SetItemString(dict, "b", b_str);
-	Py_DECREF(b_str);
-	if (result < 0)
-		goto failure;
-
-	result = PyArg_ParseTupleAndKeywords(tuple, dict, "|CC",
-					     kwlist, &a, &b);
-	if (!result)
-		goto failure;
-
-	if (a != 0)
-		return raiseTestError("test_bug_7414",
-			"C format code not skipped properly");
-	if (b != 'b')
-		return raiseTestError("test_bug_7414",
-			"C format code returned wrong value");
-
-	Py_DECREF(dict);
-	Py_DECREF(tuple);
-	Py_RETURN_NONE;
-
-  failure:
-	Py_XDECREF(dict);
-	Py_XDECREF(tuple);
-	return NULL;
-}
-
-
-static volatile int x;
-
-/* Test the u and u# codes for PyArg_ParseTuple. May leak memory in case
-   of an error.
-*/
-static PyObject *
-test_u_code(PyObject *self)
-{
-	PyObject *tuple, *obj;
-	Py_UNICODE *value;
-	Py_ssize_t len;
-
-	/* issue4122: Undefined reference to _Py_ascii_whitespace on Windows */
-	/* Just use the macro and check that it compiles */
-	x = Py_UNICODE_ISSPACE(25);
-
-        tuple = PyTuple_New(1);
-        if (tuple == NULL)
-        	return NULL;
-
-        obj = PyUnicode_Decode("test", strlen("test"),
-			       "ascii", NULL);
-        if (obj == NULL)
-        	return NULL;
-
-        PyTuple_SET_ITEM(tuple, 0, obj);
-
-        value = 0;
-        if (PyArg_ParseTuple(tuple, "u:test_u_code", &value) < 0)
-        	return NULL;
-        if (value != PyUnicode_AS_UNICODE(obj))
-        	return raiseTestError("test_u_code",
-			"u code returned wrong value for u'test'");
-        value = 0;
-        if (PyArg_ParseTuple(tuple, "u#:test_u_code", &value, &len) < 0)
-        	return NULL;
-        if (value != PyUnicode_AS_UNICODE(obj) ||
-	    len != PyUnicode_GET_SIZE(obj))
-        	return raiseTestError("test_u_code",
-			"u# code returned wrong values for u'test'");
-
-	Py_DECREF(tuple);
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-/* Test Z and Z# codes for PyArg_ParseTuple */
-static PyObject *
-test_Z_code(PyObject *self)
-{
-	PyObject *tuple, *obj;
-	Py_UNICODE *value1, *value2;
-	Py_ssize_t len1, len2;
-
-        tuple = PyTuple_New(2);
-        if (tuple == NULL)
-        	return NULL;
-
-	obj = PyUnicode_FromString("test");
-	PyTuple_SET_ITEM(tuple, 0, obj);
-	Py_INCREF(Py_None);
-	PyTuple_SET_ITEM(tuple, 1, Py_None);
-
-	/* swap values on purpose */
-        value1 = NULL;
-	value2 = PyUnicode_AS_UNICODE(obj);
-
-	/* Test Z for both values */
-        if (PyArg_ParseTuple(tuple, "ZZ:test_Z_code", &value1, &value2) < 0)
-		return NULL;
-        if (value1 != PyUnicode_AS_UNICODE(obj))
-        	return raiseTestError("test_Z_code",
-			"Z code returned wrong value for 'test'");
-        if (value2 != NULL)
-        	return raiseTestError("test_Z_code",
-			"Z code returned wrong value for None");
-
-        value1 = NULL;
-	value2 = PyUnicode_AS_UNICODE(obj);
-	len1 = -1;
-	len2 = -1;
-
-	/* Test Z# for both values */
-        if (PyArg_ParseTuple(tuple, "Z#Z#:test_Z_code", &value1, &len1, 
-			     &value2, &len2) < 0)
-        	return NULL;
-        if (value1 != PyUnicode_AS_UNICODE(obj) ||
-	    len1 != PyUnicode_GET_SIZE(obj))
-        	return raiseTestError("test_Z_code",
-			"Z# code returned wrong values for 'test'");
-        if (value2 != NULL ||
-	    len2 != 0)
-        	return raiseTestError("test_Z_code",
-			"Z# code returned wrong values for None'");
-
-	Py_DECREF(tuple);
-	Py_RETURN_NONE;
-}
 
 static PyObject *
 test_widechar(PyObject *self)
@@ -1232,32 +850,6 @@ test_widechar(PyObject *self)
 	Py_DECREF(wide);
 	Py_DECREF(utf8);
 	Py_RETURN_NONE;
-}
-
-static PyObject *
-test_empty_argparse(PyObject *self)
-{
-	/* Test that formats can begin with '|'. See issue #4720. */
-	PyObject *tuple, *dict = NULL;
-	static char *kwlist[] = {NULL};
-	int result;
-	tuple = PyTuple_New(0);
-	if (!tuple)
-		return NULL;
-	if ((result = PyArg_ParseTuple(tuple, "|:test_empty_argparse")) < 0)
-		goto done;
-	dict = PyDict_New();
-	if (!dict)
-		goto done;
-	result = PyArg_ParseTupleAndKeywords(tuple, dict, "|:test_empty_argparse", kwlist);
-  done:
-	Py_DECREF(tuple);
-	Py_XDECREF(dict);
-	if (result < 0)
-		return NULL;
-	else {
-		Py_RETURN_NONE;
-	}
 }
 
 static PyObject *
@@ -1323,18 +915,6 @@ test_long_numbits(PyObject *self)
 	return Py_None;
 }
 
-/* Example passing NULLs to PyObject_Str(NULL). */
-
-static PyObject *
-test_null_strings(PyObject *self)
-{
-	PyObject *o1 = PyObject_Str(NULL), *o2 = PyObject_Str(NULL);
-	PyObject *tuple = PyTuple_Pack(2, o1, o2);
-	Py_XDECREF(o1);
-	Py_XDECREF(o2);
-	return tuple;
-}
-
 static PyObject *
 raise_exception(PyObject *self, PyObject *args)
 {
@@ -1360,30 +940,6 @@ raise_exception(PyObject *self, PyObject *args)
 	PyErr_SetObject(exc, exc_args);
 	Py_DECREF(exc_args);
 	return NULL;
-}
-
-
-static int test_run_counter = 0;
-
-static PyObject *
-test_datetime_capi(PyObject *self, PyObject *args) {
-	if (PyDateTimeAPI) {
-		if (test_run_counter) {
-			/* Probably regrtest.py -R */
-			Py_RETURN_NONE;
-		}
-		else {
-			PyErr_SetString(PyExc_AssertionError,
-					"PyDateTime_CAPI somehow initialized");
-			return NULL;
-		}
-	}
-	test_run_counter++;
-	PyDateTime_IMPORT;
-        if (PyDateTimeAPI)
-		Py_RETURN_NONE;
-	else
-		return NULL;
 }
 
 
@@ -1552,22 +1108,6 @@ test_string_from_format(PyObject *self, PyObject *args)
 #undef CHECK_1_FORMAT
 }
 
-
-static PyObject *
-test_unicode_compare_with_ascii(PyObject *self) {
-	PyObject *py_s = PyUnicode_FromStringAndSize("str\0", 4);
-	int result;
-	if (py_s == NULL)
-		return NULL;
-	result = PyUnicode_CompareWithASCIIString(py_s, "str");
-	Py_DECREF(py_s);
-	if (!result) {
-		PyErr_SetString(TestError, "Python string ending in NULL "
-				"should not compare equal to c string.");
-		return NULL;
-	}
-	Py_RETURN_NONE;
-};
 
 /* This is here to provide a docstring for test_descr. */
 static PyObject *
@@ -2009,24 +1549,16 @@ static PyMethodDef TestMethods[] = {
 	{"raise_exception",	raise_exception,		 METH_VARARGS},
 	{"raise_memoryerror",   (PyCFunction)raise_memoryerror,  METH_NOARGS},
 	{"test_config",		(PyCFunction)test_config,	 METH_NOARGS},
-	{"test_datetime_capi",  test_datetime_capi,              METH_NOARGS},
-	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
-	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
 	{"test_lazy_hash_inheritance",	(PyCFunction)test_lazy_hash_inheritance,METH_NOARGS},
 	{"test_broken_memoryview",	(PyCFunction)test_broken_memoryview,METH_NOARGS},
 	{"test_long_api",	(PyCFunction)test_long_api,	 METH_NOARGS},
 	{"test_long_and_overflow", (PyCFunction)test_long_and_overflow,
 	 METH_NOARGS},
 	{"test_long_numbits",	(PyCFunction)test_long_numbits,	 METH_NOARGS},
-	{"test_k_code",		(PyCFunction)test_k_code,	 METH_NOARGS},
-	{"test_empty_argparse", (PyCFunction)test_empty_argparse,METH_NOARGS},
-	{"test_bug_7414", (PyCFunction)test_bug_7414, METH_NOARGS},
-	{"test_null_strings",	(PyCFunction)test_null_strings,	 METH_NOARGS},
 	{"test_string_from_format", (PyCFunction)test_string_from_format, METH_NOARGS},
 	{"test_with_docstring", (PyCFunction)test_with_docstring, METH_NOARGS,
 	 PyDoc_STR("This is a pretty normal docstring.")},
 	{"test_string_to_double", (PyCFunction)test_string_to_double, METH_NOARGS},
-	{"test_unicode_compare_with_ascii", (PyCFunction)test_unicode_compare_with_ascii, METH_NOARGS},
 	{"test_capsule", (PyCFunction)test_capsule, METH_NOARGS},
 	{"getargs_tuple",	getargs_tuple,			 METH_VARARGS},
 	{"getargs_keywords", (PyCFunction)getargs_keywords, 
@@ -2046,15 +1578,11 @@ static PyMethodDef TestMethods[] = {
 	{"test_longlong_api",	test_longlong_api,		 METH_NOARGS},
 	{"test_long_long_and_overflow",
 		(PyCFunction)test_long_long_and_overflow, METH_NOARGS},
-	{"test_L_code",		(PyCFunction)test_L_code,	 METH_NOARGS},
 	{"codec_incrementalencoder",
 	 (PyCFunction)codec_incrementalencoder,	 METH_VARARGS},
 	{"codec_incrementaldecoder",
 	 (PyCFunction)codec_incrementaldecoder,	 METH_VARARGS},
 #endif
-	{"test_s_code",		(PyCFunction)test_s_code,	 METH_NOARGS},
-	{"test_u_code",		(PyCFunction)test_u_code,	 METH_NOARGS},
-	{"test_Z_code",		(PyCFunction)test_Z_code,	 METH_NOARGS},
  	{"test_widechar",	(PyCFunction)test_widechar,	 METH_NOARGS},
 #ifdef WITH_THREAD
 	{"_test_thread_state",  test_thread_state, 		 METH_VARARGS},
