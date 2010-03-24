@@ -111,6 +111,7 @@ TEST_F(GetArgsTest, FormatCode_u)
     Py_DECREF(tuple);
 }
 
+#ifdef HAVE_LONG_LONG
 // Test the L code for PyArg_ParseTuple. This should deliver a PY_LONG_LONG
 // for both long and int arguments.
 TEST_F(GetArgsTest, FormatCode_L)
@@ -141,6 +142,8 @@ TEST_F(GetArgsTest, FormatCode_L)
 
     Py_DECREF(tuple);
 }
+#endif  // HAVE_LONG_LONG
+
 
 // Test the K code for PyArg_ParseTuple.
 TEST_F(GetArgsTest, FormatCode_K)
