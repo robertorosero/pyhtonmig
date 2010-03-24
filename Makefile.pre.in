@@ -719,7 +719,7 @@ Unittests/googletest/gtest.o:
 AllUnitTests: $(UNITTEST_SRCS) $(srcdir)/Unittests/*.h build_all python-config
 	-$(CXX) $(CPPFLAGS) -I$(srcdir)/Unittests/googletest/include -o $@ \
 	 	$(UNITTEST_SRCS) -L. $(LDFLAGS) \
-		`$(RUNSHARED) ./$(BUILDPYTHON) ./python-config --cflags --libs`
+		`$(RUNSHARED) ./$(BUILDPYTHON) ./python-config --cflags --ldflags`
 
 
 ctest: AllUnitTests
