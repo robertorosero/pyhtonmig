@@ -177,14 +177,18 @@ Here is a short script to test three functions from the :mod:`random` module::
            self.seq.sort()
            self.assertEqual(self.seq, list(range(10)))
 
+           # should raise an exception for an immutable sequence
+           self.assertRaises(TypeError, random.shuffle, (1,2,3))
+
        def test_choice(self):
            element = random.choice(self.seq)
-           self.assertIn(element, self.seq)
+           self.assertTrue(element in self.seq)
 
        def test_sample(self):
-           self.assertRaises(ValueError, random.sample, self.seq, 20)
+           with self.assertRaises(ValueError):
+               random.sample(self.seq, 20)
            for element in random.sample(self.seq, 5):
-               self.assertIn(element, self.seq)
+               self.assertTrue(element in self.seq)
 
    if __name__ == '__main__':
        unittest.main()
@@ -226,9 +230,9 @@ command line.  For example, the last two lines may be replaced with::
 Running the revised script from the interpreter or another script produces the
 following output::
 
-   testchoice (__main__.TestSequenceFunctions) ... ok
-   testsample (__main__.TestSequenceFunctions) ... ok
-   testshuffle (__main__.TestSequenceFunctions) ... ok
+   test_choice (__main__.TestSequenceFunctions) ... ok
+   test_sample (__main__.TestSequenceFunctions) ... ok
+   test_shuffle (__main__.TestSequenceFunctions) ... ok
 
    ----------------------------------------------------------------------
    Ran 3 tests in 0.110s
@@ -345,32 +349,32 @@ mechanism::
            self.widget.dispose()
            self.widget = None
 
-       def testDefaultSize(self):
+       def test_default_size(self):
            self.assertEqual(self.widget.size(), (50,50),
                             'incorrect default size')
 
-       def testResize(self):
+       def test_resize(self):
            self.widget.resize(100,150)
            self.assertEqual(self.widget.size(), (100,150),
                             'wrong size after resize')
 
 Here we have not provided a :meth:`~TestCase.runTest` method, but have instead
 provided two different test methods.  Class instances will now each run one of
-the :meth:`test\*` methods, with ``self.widget`` created and destroyed
+the :meth:`test_\*` methods, with ``self.widget`` created and destroyed
 separately for each instance.  When creating an instance we must specify the
 test method it is to run.  We do this by passing the method name in the
 constructor::
 
-   defaultSizeTestCase = WidgetTestCase('testDefaultSize')
-   resizeTestCase = WidgetTestCase('testResize')
+   defaultSizeTestCase = WidgetTestCase('test_default_size')
+   resizeTestCase = WidgetTestCase('test_resize')
 
 Test case instances are grouped together according to the features they test.
 :mod:`unittest` provides a mechanism for this: the :dfn:`test suite`,
 represented by :mod:`unittest`'s :class:`TestSuite` class::
 
    widgetTestSuite = unittest.TestSuite()
-   widgetTestSuite.addTest(WidgetTestCase('testDefaultSize'))
-   widgetTestSuite.addTest(WidgetTestCase('testResize'))
+   widgetTestSuite.addTest(WidgetTestCase('test_default_size'))
+   widgetTestSuite.addTest(WidgetTestCase('test_resize'))
 
 For the ease of running tests, as we will see later, it is a good idea to
 provide in each test module a callable object that returns a pre-built test
@@ -378,14 +382,14 @@ suite::
 
    def suite():
        suite = unittest.TestSuite()
-       suite.addTest(WidgetTestCase('testDefaultSize'))
-       suite.addTest(WidgetTestCase('testResize'))
+       suite.addTest(WidgetTestCase('test_default_size'))
+       suite.addTest(WidgetTestCase('test_resize'))
        return suite
 
 or even::
 
    def suite():
-       tests = ['testDefaultSize', 'testResize']
+       tests = ['test_default_size', 'test_resize']
 
        return unittest.TestSuite(map(WidgetTestCase, tests))
 
@@ -396,8 +400,8 @@ populating it with individual tests. For example, ::
 
    suite = unittest.TestLoader().loadTestsFromTestCase(WidgetTestCase)
 
-will create a test suite that will run ``WidgetTestCase.testDefaultSize()`` and
-``WidgetTestCase.testResize``. :class:`TestLoader` uses the ``'test'`` method
+will create a test suite that will run ``WidgetTestCase.test_default_size()`` and
+``WidgetTestCase.test_resize``. :class:`TestLoader` uses the ``'test'`` method
 name prefix to identify test methods automatically.
 
 Note that the order in which the various test cases will be run is
@@ -605,8 +609,8 @@ Test cases
 
       def suite():
           suite = unittest.TestSuite()
-          suite.addTest(WidgetTestCase('testDefaultSize'))
-          suite.addTest(WidgetTestCase('testResize'))
+          suite.addTest(WidgetTestCase('test_default_size'))
+          suite.addTest(WidgetTestCase('test_resize'))
           return suite
 
    Here, we create two instances of :class:`WidgetTestCase`, each of which runs a
@@ -676,7 +680,7 @@ Test cases
       will be *msg* if given, otherwise it will be :const:`None`.
 
       .. deprecated:: 3.1
-         :meth:`failUnless`.
+         :meth:`failUnless`; use one of the ``assert`` variants.
          :meth:`assert_`; use :meth:`assertTrue`.
 
 
@@ -704,7 +708,7 @@ Test cases
          function for comparing strings.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessEqual`.
+         :meth:`failUnlessEqual`; use :meth:`assertEqual`.
 
 
    .. method:: assertNotEqual(first, second, msg=None)
@@ -718,7 +722,7 @@ Test cases
       *first* and *second*.
 
       .. deprecated:: 3.1
-         :meth:`failIfEqual`.
+         :meth:`failIfEqual`; use :meth:`assertNotEqual`.
 
 
    .. method:: assertAlmostEqual(first, second, *, places=7, msg=None)
@@ -737,7 +741,7 @@ Test cases
          Objects that compare equal are automatically almost equal.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessAlmostEqual`.
+         :meth:`failUnlessAlmostEqual`; use :meth:`assertAlmostEqual`.
 
 
    .. method:: assertNotAlmostEqual(first, second, *, places=7, msg=None)
@@ -756,7 +760,7 @@ Test cases
          Objects that compare equal automatically fail.
 
       .. deprecated:: 3.1
-         :meth:`failIfAlmostEqual`.
+         :meth:`failIfAlmostEqual`; use :meth:`assertNotAlmostEqual`.
 
 
    .. method:: assertGreater(first, second, msg=None)
@@ -781,7 +785,7 @@ Test cases
       will be included in the error message. This method is used by default
       when comparing strings with :meth:`assertEqual`.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -802,7 +806,7 @@ Test cases
       Tests that *first* is or is not in *second* with an explanatory error
       message as appropriate.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -815,12 +819,31 @@ Test cases
 
       Duplicate elements are ignored when comparing *actual* and *expected*.
       It is the equivalent of ``assertEqual(set(expected), set(actual))``
-      but it works with sequences of unhashable objects as well.
+      but it works with sequences of unhashable objects as well. Because
+      duplicates are ignored, this method has been deprecated in favour of
+      :meth:`assertItemsEqual`.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
+      .. deprecated:: 3.2
+
+   .. method:: assertItemsEqual(actual, expected, msg=None)
+
+      Test that sequence *expected* contains the same elements as *actual*,
+      regardless of their order. When they don't, an error message listing the
+      differences between the sequences will be generated.
+
+      Duplicate elements are *not* ignored when comparing *actual* and
+      *expected*. It verifies if each element has the same count in both
+      sequences. It is the equivalent of ``assertEqual(sorted(expected),
+      sorted(actual))`` but it works with sequences of unhashable objects as
+      well.
+
+      If specified, *msg* will be used as the error message on failure.
+
+      .. versionadded:: 3.2
 
    .. method:: assertSetEqual(set1, set2, msg=None)
 
@@ -831,7 +854,7 @@ Test cases
       Fails if either of *set1* or *set2* does not have a :meth:`set.difference`
       method.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -843,7 +866,7 @@ Test cases
       method will be used by default to compare dictionaries in
       calls to :meth:`assertEqual`.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -854,7 +877,7 @@ Test cases
       superset of those in *expected*.  If not, an error message listing
       the missing keys and mismatched values is generated.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -868,7 +891,7 @@ Test cases
       These methods are used by default when comparing lists or tuples with
       :meth:`assertEqual`.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       .. versionadded:: 3.1
 
@@ -880,7 +903,7 @@ Test cases
       be raised.  If the sequences are different an error message is
       constructed that shows the difference between the two.
 
-      If specified *msg* will be used as the error message on failure.
+      If specified, *msg* will be used as the error message on failure.
 
       This method is used to implement :meth:`assertListEqual` and
       :meth:`assertTupleEqual`.
@@ -923,7 +946,7 @@ Test cases
          Added the :attr:`exception` attribute.
 
       .. deprecated:: 3.1
-         :meth:`failUnlessRaises`.
+         :meth:`failUnlessRaises`; use :meth:`assertRaises`.
 
 
    .. method:: assertRaisesRegexp(exception, regexp[, callable, ...])
@@ -1000,7 +1023,7 @@ Test cases
       for the error message.
 
       .. deprecated:: 3.1
-         :meth:`failIf`.
+         :meth:`failIf`; use :meth:`assertFalse`.
 
 
    .. method:: fail(msg=None)
@@ -1221,7 +1244,7 @@ Loading and running tests
 
    :class:`TestLoader` objects have the following methods:
 
-
+a
    .. method:: loadTestsFromTestCase(testCaseClass)
 
       Return a suite of all tests cases contained in the :class:`TestCase`\ -derived

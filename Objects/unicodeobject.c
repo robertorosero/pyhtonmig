@@ -126,9 +126,9 @@ static const char unicode_default_encoding[] = "utf-8";
 /* Fast detection of the most frequent whitespace characters */
 const unsigned char _Py_ascii_whitespace[] = {
     0, 0, 0, 0, 0, 0, 0, 0,
-/*     case 0x0009: * HORIZONTAL TABULATION */
+/*     case 0x0009: * CHARACTER TABULATION */
 /*     case 0x000A: * LINE FEED */
-/*     case 0x000B: * VERTICAL TABULATION */
+/*     case 0x000B: * LINE TABULATION */
 /*     case 0x000C: * FORM FEED */
 /*     case 0x000D: * CARRIAGE RETURN */
     0, 1, 1, 1, 1, 1, 0, 0,
@@ -163,8 +163,10 @@ static PyObject *unicode_encode_call_errorhandler(const char *errors,
 static unsigned char ascii_linebreak[] = {
     0, 0, 0, 0, 0, 0, 0, 0,
 /*         0x000A, * LINE FEED */
+/*         0x000B, * LINE TABULATION */
+/*         0x000C, * FORM FEED */
 /*         0x000D, * CARRIAGE RETURN */
-    0, 0, 1, 0, 0, 1, 0, 0,
+    0, 0, 1, 1, 1, 1, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
 /*         0x001C, * FILE SEPARATOR */
 /*         0x001D, * GROUP SEPARATOR */
@@ -1609,7 +1611,8 @@ PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
 }
 
 /* Convert the argument to a bytes object, according to the file
-   system encoding */
+   system encoding.  The addr param must be a PyObject**.
+   This is designed to be used with "O&" in PyArg_Parse APIs. */
 
 int
 PyUnicode_FSConverter(PyObject* arg, void* addr)
@@ -9123,7 +9126,7 @@ PyObject *PyUnicode_Format(PyObject *format,
             case 's':
             case 'r':
             case 'a':
-                if (PyUnicode_Check(v) && c == 's') {
+                if (PyUnicode_CheckExact(v) && c == 's') {
                     temp = v;
                     Py_INCREF(temp);
                 }

@@ -31,18 +31,11 @@ def search_function(encoding):
         return None
 codecs.register(search_function)
 
-class UnicodeTest(
-    string_tests.CommonTest,
-    string_tests.MixinStrUnicodeUserStringTest,
-    string_tests.MixinStrUnicodeTest,
-    ):
+class UnicodeTest(string_tests.CommonTest,
+        string_tests.MixinStrUnicodeUserStringTest,
+        string_tests.MixinStrUnicodeTest):
+
     type2test = str
-
-    def setUp(self):
-        self.warning_filters = warnings.filters[:]
-
-    def tearDown(self):
-        warnings.filters = self.warning_filters
 
     def checkequalnofix(self, result, object, methodname, *args):
         method = getattr(object, methodname)
@@ -283,11 +276,12 @@ class UnicodeTest(
         self.assertRaises(TypeError, 'replace'.replace, "r", 42)
 
     def test_bytes_comparison(self):
-        warnings.simplefilter('ignore', BytesWarning)
-        self.assertEqual('abc' == b'abc', False)
-        self.assertEqual('abc' != b'abc', True)
-        self.assertEqual('abc' == bytearray(b'abc'), False)
-        self.assertEqual('abc' != bytearray(b'abc'), True)
+        with support.check_warnings():
+            warnings.simplefilter('ignore', BytesWarning)
+            self.assertEqual('abc' == b'abc', False)
+            self.assertEqual('abc' != b'abc', True)
+            self.assertEqual('abc' == bytearray(b'abc'), False)
+            self.assertEqual('abc' != bytearray(b'abc'), True)
 
     def test_comparison(self):
         # Comparisons:
@@ -1226,6 +1220,14 @@ class UnicodeTest(
         alloc = lambda: "a" * (sys.maxsize // charwidth * 2)
         self.assertRaises(MemoryError, alloc)
         self.assertRaises(MemoryError, alloc)
+
+    def test_format_subclass(self):
+        class S(str):
+            def __str__(self):
+                return '__str__ overridden'
+        s = S('xxx')
+        self.assertEquals("%s" % s, '__str__ overridden')
+        self.assertEquals("{}".format(s), '__str__ overridden')
 
 
 def test_main():

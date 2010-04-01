@@ -795,7 +795,7 @@ class AbstractBasicAuthHandler:
             auth = "Basic " + base64.b64encode(raw.encode()).decode("ascii")
             if req.headers.get(self.auth_header, None) == auth:
                 return None
-            req.add_header(self.auth_header, auth)
+            req.add_unredirected_header(self.auth_header, auth)
             return self.parent.open(req, timeout=req.timeout)
         else:
             return None
@@ -1426,7 +1426,7 @@ class URLopener:
     def open(self, fullurl, data=None):
         """Use URLopener().open(file) instead of open(file, 'r')."""
         fullurl = unwrap(to_bytes(fullurl))
-        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]")
+        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]|")
         if self.tempcache and fullurl in self.tempcache:
             filename, headers = self.tempcache[fullurl]
             fp = open(filename, 'rb')

@@ -77,7 +77,7 @@ It defines the following functions:
    * ``'xmlcharrefreplace'``: replace with the appropriate XML character
      reference (for encoding only)
    * ``'backslashreplace'``: replace with backslashed escape sequences (for
-     encoding only
+     encoding only)
    * ``'surrogateescape'``: replace with surrogate U+DCxx, see :pep:`383`
 
    as well as any other error handling name defined via :func:`register_error`.
@@ -1065,11 +1065,13 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_10      | iso-8859-10, latin6, L6        | Nordic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_13      | iso-8859-13                    | Baltic languages               |
+| iso8859_13      | iso-8859-13, latin7, L7        | Baltic languages               |
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_14      | iso-8859-14, latin8, L8        | Celtic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_15      | iso-8859-15                    | Western Europe                 |
+| iso8859_15      | iso-8859-15, latin9, L9        | Western Europe                 |
++-----------------+--------------------------------+--------------------------------+
+| iso8859_16      | iso-8859-16, latin10, L10      | South-Eastern Europe           |
 +-----------------+--------------------------------+--------------------------------+
 | johab           | cp1361, ms1361                 | Korean                         |
 +-----------------+--------------------------------+--------------------------------+

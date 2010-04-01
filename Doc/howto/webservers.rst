@@ -38,7 +38,7 @@ The low-level view
 When a user enters a web site, his browser makes a connection to the site's
 webserver (this is called the *request*).  The server looks up the file in the
 file system and sends it back to the user's browser, which displays it (this is
-the *response*).  This is roughly how the unterlying protocol, HTTP works.
+the *response*).  This is roughly how the underlying protocol, HTTP, works.
 
 Now, dynamic web sites are not files in the file system, but rather programs
 which are run by the web server when a request comes in.  They can do all sorts
@@ -677,7 +677,7 @@ project called `Grok <http://grok.zope.org/>`_ which makes it possible for
 "normal" Python programmers use the very mature Zope components.
 
 Another framework that's already been mentioned is `Pylons`_.  Pylons is much
-like TurboGears with ab even stronger emphasis on flexibility, which is bought
+like TurboGears with an even stronger emphasis on flexibility, which is bought
 at the cost of being more difficult to use.  Nearly every component can be
 exchanged, which makes it necessary to use the documentation of every single
 component, because there are so many Pylons combinations possible that can

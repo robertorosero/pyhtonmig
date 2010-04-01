@@ -7,9 +7,9 @@ from collections import namedtuple, Counter, OrderedDict
 from test import mapping_tests
 import pickle, copy
 from random import randrange, shuffle
-import operator
 import keyword
 import re
+import sys
 from collections import Hashable, Iterable, Iterator
 from collections import Sized, Container, Callable
 from collections import Set, MutableSet
@@ -24,7 +24,6 @@ class TestNamedTuple(unittest.TestCase):
     def test_factory(self):
         Point = namedtuple('Point', 'x y')
         self.assertEqual(Point.__name__, 'Point')
-        self.assertEqual(Point.__doc__, 'Point(x, y)')
         self.assertEqual(Point.__slots__, ())
         self.assertEqual(Point.__module__, __name__)
         self.assertEqual(Point.__getitem__, tuple.__getitem__)
@@ -50,6 +49,12 @@ class TestNamedTuple(unittest.TestCase):
 
         self.assertRaises(TypeError, Point._make, [11])                     # catch too few args
         self.assertRaises(TypeError, Point._make, [11, 22, 33])             # catch too many args
+
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
+    def test_factory_doc_attr(self):
+        Point = namedtuple('Point', 'x y')
+        self.assertEqual(Point.__doc__, 'Point(x, y)')
 
     def test_name_fixer(self):
         for spec, renamed in [
@@ -229,6 +234,17 @@ class ABCTestCase(unittest.TestCase):
             C = type('C', (abc,), stubs)
             self.assertRaises(TypeError, C, name)
 
+    def validate_isinstance(self, abc, name):
+        stub = lambda s, *args: 0
+
+        C = type('C', (object,), {'__hash__': None})
+        setattr(C, name, stub)
+        self.assertIsInstance(C(), abc)
+        self.assertTrue(issubclass(C, abc))
+
+        C = type('C', (object,), {'__hash__': None})
+        self.assertNotIsInstance(C(), abc)
+        self.assertFalse(issubclass(C, abc))
 
 class TestOneTrickPonyABCs(ABCTestCase):
 
@@ -256,6 +272,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
         self.assertEqual(hash(H()), 0)
         self.assertFalse(issubclass(int, H))
         self.validate_abstract_methods(Hashable, '__hash__')
+        self.validate_isinstance(Hashable, '__hash__')
 
     def test_Iterable(self):
         # Check some non-iterables
@@ -280,6 +297,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
         self.assertEqual(list(I()), [])
         self.assertFalse(issubclass(str, I))
         self.validate_abstract_methods(Iterable, '__iter__')
+        self.validate_isinstance(Iterable, '__iter__')
 
     def test_Iterator(self):
         non_samples = [None, 42, 3.14, 1j, b"", "", (), [], {}, set()]
@@ -298,6 +316,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
             self.assertIsInstance(x, Iterator)
             self.assertTrue(issubclass(type(x), Iterator), repr(type(x)))
         self.validate_abstract_methods(Iterator, '__next__')
+        self.validate_isinstance(Iterator, '__next__')
 
     def test_Sized(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -315,6 +334,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
             self.assertIsInstance(x, Sized)
             self.assertTrue(issubclass(type(x), Sized), repr(type(x)))
         self.validate_abstract_methods(Sized, '__len__')
+        self.validate_isinstance(Sized, '__len__')
 
     def test_Container(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -332,6 +352,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
             self.assertIsInstance(x, Container)
             self.assertTrue(issubclass(type(x), Container), repr(type(x)))
         self.validate_abstract_methods(Container, '__contains__')
+        self.validate_isinstance(Container, '__contains__')
 
     def test_Callable(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -351,6 +372,7 @@ class TestOneTrickPonyABCs(ABCTestCase):
             self.assertIsInstance(x, Callable)
             self.assertTrue(issubclass(type(x), Callable), repr(type(x)))
         self.validate_abstract_methods(Callable, '__call__')
+        self.validate_isinstance(Callable, '__call__')
 
     def test_direct_subclassing(self):
         for B in Hashable, Iterable, Iterator, Sized, Container, Callable:

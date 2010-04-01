@@ -28,9 +28,8 @@ import random
 import unittest
 import warnings
 import weakref
-import gc
 import abc
-from itertools import chain, cycle, count
+from itertools import cycle, count
 from collections import deque
 from test import support
 
@@ -1047,14 +1046,9 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         self.assertRaises(IOError, bufio.write, b"abcdef")
 
     def test_max_buffer_size_deprecation(self):
-        with support.check_warnings() as w:
-            warnings.simplefilter("always", DeprecationWarning)
+        with support.check_warnings(("max_buffer_size is deprecated",
+                                     DeprecationWarning)):
             self.tp(self.MockRawIO(), 8, 12)
-            self.assertEqual(len(w.warnings), 1)
-            warning = w.warnings[0]
-            self.assertTrue(warning.category is DeprecationWarning)
-            self.assertEqual(str(warning.message),
-                             "max_buffer_size is deprecated")
 
 
 class CBufferedWriterTest(BufferedWriterTest):
@@ -1110,14 +1104,9 @@ class BufferedRWPairTest(unittest.TestCase):
         self.assertRaises(self.UnsupportedOperation, pair.detach)
 
     def test_constructor_max_buffer_size_deprecation(self):
-        with support.check_warnings() as w:
-            warnings.simplefilter("always", DeprecationWarning)
+        with support.check_warnings(("max_buffer_size is deprecated",
+                                     DeprecationWarning)):
             self.tp(self.MockRawIO(), self.MockRawIO(), 8, 12)
-            self.assertEqual(len(w.warnings), 1)
-            warning = w.warnings[0]
-            self.assertTrue(warning.category is DeprecationWarning)
-            self.assertEqual(str(warning.message),
-                             "max_buffer_size is deprecated")
 
     def test_constructor_with_not_readable(self):
         class NotReadable(MockRawIO):

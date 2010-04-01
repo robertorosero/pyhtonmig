@@ -5,7 +5,6 @@ import weakref
 import operator
 import copy
 import pickle
-import os
 from random import randrange, shuffle
 import sys
 import warnings
@@ -607,7 +606,7 @@ class TestSet(TestJointOps):
     # C API test only available in a debug build
     if hasattr(set, "test_c_api"):
         def test_c_api(self):
-            self.assertEqual(set('abc').test_c_api(), True)
+            self.assertEqual(set().test_c_api(), True)
 
 class SetSubclass(set):
     pass
@@ -908,7 +907,8 @@ class TestBasicOpsBytes(TestBasicOps):
 
 class TestBasicOpsMixedStringBytes(TestBasicOps):
     def setUp(self):
-        self.warning_filters = warnings.filters[:]
+        self._warning_filters = support.check_warnings()
+        self._warning_filters.__enter__()
         warnings.simplefilter('ignore', BytesWarning)
         self.case   = "string and bytes set"
         self.values = ["a", "b", b"a", b"b"]
@@ -918,7 +918,7 @@ class TestBasicOpsMixedStringBytes(TestBasicOps):
         self.repr   = "{'a', b'a', 'b', b'b'}"
 
     def tearDown(self):
-        warnings.filters = self.warning_filters
+        self._warning_filters.__exit__(None, None, None)
 
 #==============================================================================
 

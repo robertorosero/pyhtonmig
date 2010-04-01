@@ -3,7 +3,17 @@
 import traceback
 
 from . import util
+from functools import wraps
 
+__unittest = True
+
+def failfast(method):
+    @wraps(method)
+    def inner(self, *args, **kw):
+        if getattr(self, 'failfast', False):
+            self.stop()
+        return method(self, *args, **kw)
+    return inner
 
 class TestResult(object):
     """Holder for test result information.
@@ -16,7 +26,10 @@ class TestResult(object):
     contain tuples of (testcase, exceptioninfo), where exceptioninfo is the
     formatted traceback of the error that occurred.
     """
-    def __init__(self):
+    _previousTestClass = None
+    _moduleSetUpFailed = False
+    def __init__(self, stream=None, descriptions=None, verbosity=None):
+        self.failfast = False
         self.failures = []
         self.errors = []
         self.testsRun = 0
@@ -24,6 +37,9 @@ class TestResult(object):
         self.expectedFailures = []
         self.unexpectedSuccesses = []
         self.shouldStop = False
+
+    def printErrors(self):
+        "Called by TestRunner after test run"
 
     def startTest(self, test):
         "Called when the given test is about to be run"
@@ -44,12 +60,14 @@ class TestResult(object):
         See stopTest for a method called after each test.
         """
 
+    @failfast
     def addError(self, test, err):
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info().
         """
         self.errors.append((test, self._exc_info_to_string(err, test)))
 
+    @failfast
     def addFailure(self, test, err):
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info()."""
@@ -68,6 +86,7 @@ class TestResult(object):
         self.expectedFailures.append(
             (test, self._exc_info_to_string(err, test)))
 
+    @failfast
     def addUnexpectedSuccess(self, test):
         """Called when a test was expected to fail, but succeed."""
         self.unexpectedSuccesses.append(test)
@@ -93,11 +112,7 @@ class TestResult(object):
         return ''.join(traceback.format_exception(exctype, value, tb))
 
     def _is_relevant_tb_level(self, tb):
-        globs = tb.tb_frame.f_globals
-        is_relevant =  '__name__' in globs and \
-            globs["__name__"].startswith("unittest")
-        del globs
-        return is_relevant
+        return '__unittest' in tb.tb_frame.f_globals
 
     def _count_relevant_tb_levels(self, tb):
         length = 0
@@ -107,6 +122,6 @@ class TestResult(object):
         return length
 
     def __repr__(self):
-        return "<%s run=%i errors=%i failures=%i>" % \
+        return ("<%s run=%i errors=%i failures=%i>" %
                (util.strclass(self.__class__), self.testsRun, len(self.errors),
-                len(self.failures))
+                len(self.failures)))

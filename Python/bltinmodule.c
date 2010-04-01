@@ -29,7 +29,7 @@ int Py_HasFileSystemDefaultEncoding = 0;
 int
 _Py_SetFileSystemEncoding(PyObject *s)
 {
-	PyObject *defenc;
+	PyObject *defenc, *codec;
 	if (!PyUnicode_Check(s)) {
 		PyErr_BadInternalCall();
 		return -1;
@@ -37,6 +37,10 @@ _Py_SetFileSystemEncoding(PyObject *s)
 	defenc = _PyUnicode_AsDefaultEncodedString(s, NULL);
 	if (!defenc)
 		return -1;
+	codec = _PyCodec_Lookup(PyBytes_AsString(defenc));
+	if (codec == NULL)
+		return -1;
+	Py_DECREF(codec);
 	if (!Py_HasFileSystemDefaultEncoding && Py_FileSystemDefaultEncoding)
 		/* A file system encoding was set at run-time */
 		free((char*)Py_FileSystemDefaultEncoding);
@@ -108,8 +112,16 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	prep = PyObject_GetAttrString(meta, "__prepare__");
 	if (prep == NULL) {
-		PyErr_Clear();
-		ns = PyDict_New();
+		if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			PyErr_Clear();
+			ns = PyDict_New();
+		}
+		else {
+			Py_DECREF(meta);
+			Py_XDECREF(mkw);
+			Py_DECREF(bases);
+			return NULL;
+		}
 	}
 	else {
 		PyObject *pargs = PyTuple_Pack(2, name, bases);
@@ -123,12 +135,12 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 		ns = PyEval_CallObjectWithKeywords(prep, pargs, mkw);
 		Py_DECREF(pargs);
 		Py_DECREF(prep);
-		if (ns == NULL) {
-			Py_DECREF(meta);
-			Py_XDECREF(mkw);
-			Py_DECREF(bases);
-			return NULL;
-		}
+	}
+	if (ns == NULL) {
+		Py_DECREF(meta);
+		Py_XDECREF(mkw);
+		Py_DECREF(bases);
+		return NULL;
 	}
 	cell = PyObject_CallFunctionObjArgs(func, ns, NULL);
 	if (cell != NULL) {

@@ -1,8 +1,8 @@
-:mod:`optparse` --- More powerful command line option parser
-============================================================
+:mod:`optparse` --- Parser for command line options
+===================================================
 
 .. module:: optparse
-   :synopsis: More convenient, flexible, and powerful command-line parsing library.
+   :synopsis: Command-line option parsing library.
 .. moduleauthor:: Greg Ward <gward@python.net>
 .. sectionauthor:: Greg Ward <gward@python.net>
 
@@ -762,7 +762,8 @@ The first step in using :mod:`optparse` is to create an OptionParser instance.
       The string to use when expanding ``"%prog"`` in ``usage`` and ``version``
       instead of ``os.path.basename(sys.argv[0])``.
 
-
+   ``epilog`` (default: ``None``)
+      A paragraph of help text to print after the option help.
 
 .. _optparse-populating-parser:
 

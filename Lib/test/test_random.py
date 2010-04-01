@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
 import random
 import time
 import pickle
 import warnings
-from math import log, exp, sqrt, pi, fsum, sin
+from math import log, exp, pi, fsum, sin
 from test import support
 
 class TestBasicOps(unittest.TestCase):

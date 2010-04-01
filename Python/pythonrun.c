@@ -180,7 +180,7 @@ Py_InitializeEx(int install_sigs)
 		return;
 	initialized = 1;
 
-#ifdef HAVE_SETLOCALE
+#if defined(HAVE_LANGINFO_H) && defined(HAVE_SETLOCALE)
 	/* Set up the LC_CTYPE locale, so we can obtain
 	   the locale's charset without having to switch
 	   locales. */
@@ -296,13 +296,14 @@ Py_InitializeEx(int install_sigs)
 	if (initstdio() < 0)
 		Py_FatalError(
 		    "Py_Initialize: can't initialize sys standard streams");
-	if (!Py_NoSiteFlag)
-		initsite(); /* Module site */
 
 	/* auto-thread-state API, if available */
 #ifdef WITH_THREAD
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
+
+	if (!Py_NoSiteFlag)
+		initsite(); /* Module site */
 }
 
 void
@@ -711,22 +712,12 @@ initmain(void)
 static void
 initsite(void)
 {
-	PyObject *m, *f;
+	PyObject *m;
 	m = PyImport_ImportModule("site");
 	if (m == NULL) {
-		f = PySys_GetObject("stderr");
-		if (f == NULL || f == Py_None)
-			return;
-		if (Py_VerboseFlag) {
-			PyFile_WriteString(
-				"'import site' failed; traceback:\n", f);
-			PyErr_Print();
-		}
-		else {
-			PyFile_WriteString(
-			  "'import site' failed; use -v for traceback\n", f);
-			PyErr_Clear();
-		}
+		PyErr_Print();
+		Py_Finalize();
+		exit(1);
 	}
 	else {
 		Py_DECREF(m);
@@ -1907,6 +1898,8 @@ err_input(perrdetail *err)
 	char *msg = NULL;
 	errtype = PyExc_SyntaxError;
 	switch (err->error) {
+	case E_ERROR:
+		return;
 	case E_SYNTAX:
 		errtype = PyExc_IndentationError;
 		if (err->expected == INDENT)
@@ -2137,6 +2130,27 @@ initsigs(void)
 }
 
 
+/* Restore signals that the interpreter has called SIG_IGN on to SIG_DFL.
+ *
+ * All of the code in this function must only use async-signal-safe functions,
+ * listed at `man 7 signal` or
+ * http://www.opengroup.org/onlinepubs/009695399/functions/xsh_chap02_04.html.
+ */
+void
+_Py_RestoreSignals(void)
+{
+#ifdef SIGPIPE
+	PyOS_setsig(SIGPIPE, SIG_DFL);
+#endif
+#ifdef SIGXFZ
+	PyOS_setsig(SIGXFZ, SIG_DFL);
+#endif
+#ifdef SIGXFSZ
+	PyOS_setsig(SIGXFSZ, SIG_DFL);
+#endif
+}
+
+
 /*
  * The file descriptor fd is considered ``interactive'' if either
  *   a) isatty(fd) is TRUE, or
@@ -2230,6 +2244,11 @@ PyOS_getsig(int sig)
 #endif
 }
 
+/*
+ * All of the code in this function must only use async-signal-safe functions,
+ * listed at `man 7 signal` or
+ * http://www.opengroup.org/onlinepubs/009695399/functions/xsh_chap02_04.html.
+ */
 PyOS_sighandler_t
 PyOS_setsig(int sig, PyOS_sighandler_t handler)
 {

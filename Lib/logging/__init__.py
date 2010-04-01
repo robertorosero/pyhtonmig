@@ -1,4 +1,4 @@
-# Copyright 2001-2009 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2010 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -46,8 +46,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.5.1.1"
-__date__    = "25 November 2009"
+__version__ = "0.5.1.2"
+__date__    = "07 February 2010"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -432,6 +432,12 @@ class Formatter(object):
             s = s[:-1]
         return s
 
+    def usesTime(self):
+        """
+        Check if the format uses the creation time of the record.
+        """
+        return self._fmt.find("%(asctime)") >= 0
+
     def format(self, record):
         """
         Format the specified record as text.
@@ -440,13 +446,13 @@ class Formatter(object):
         string formatting operation which yields the returned string.
         Before formatting the dictionary, a couple of preparatory steps
         are carried out. The message attribute of the record is computed
-        using LogRecord.getMessage(). If the formatting string contains
-        "%(asctime)", formatTime() is called to format the event time.
-        If there is exception information, it is formatted using
-        formatException() and appended to the message.
+        using LogRecord.getMessage(). If the formatting string uses the
+        time (as determined by a call to usesTime(), formatTime() is
+        called to format the event time. If there is exception information,
+        it is formatted using formatException() and appended to the message.
         """
         record.message = record.getMessage()
-        if self._fmt.find("%(asctime)") >= 0:
+        if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
         s = self._fmt % record.__dict__
         if record.exc_info:
@@ -767,7 +773,10 @@ class Handler(Filterer):
         if raiseExceptions:
             ei = sys.exc_info()
             try:
-                traceback.print_exception(ei[0], ei[1], ei[2], None, sys.stderr)
+                traceback.print_exception(ei[0], ei[1], ei[2],
+                                          None, sys.stderr)
+                sys.stderr.write('Logged from file %s, line %s\n' % (
+                                 record.filename, record.lineno))
             except IOError:
                 pass    # see issue 5971
             finally:
@@ -960,6 +969,7 @@ class Manager(object):
         self.disable = 0
         self.emittedNoHandlerWarning = 0
         self.loggerDict = {}
+        self.loggerClass = None
 
     def getLogger(self, name):
         """
@@ -979,19 +989,29 @@ class Manager(object):
                 rv = self.loggerDict[name]
                 if isinstance(rv, PlaceHolder):
                     ph = rv
-                    rv = _loggerClass(name)
+                    rv = (self.loggerClass or _loggerClass)(name)
                     rv.manager = self
                     self.loggerDict[name] = rv
                     self._fixupChildren(ph, rv)
                     self._fixupParents(rv)
             else:
-                rv = _loggerClass(name)
+                rv = (self.loggerClass or _loggerClass)(name)
                 rv.manager = self
                 self.loggerDict[name] = rv
                 self._fixupParents(rv)
         finally:
             _releaseLock()
         return rv
+
+    def setLoggerClass(self, klass):
+        """
+        Set the class to be used when instantiating a logger with this Manager.
+        """
+        if klass != Logger:
+            if not issubclass(klass, Logger):
+                raise TypeError("logger not derived from logging.Logger: "
+                                + klass.__name__)
+        self.loggerClass = klass
 
     def _fixupParents(self, alogger):
         """
@@ -1535,7 +1555,7 @@ def log(level, msg, *args, **kwargs):
 
 def disable(level):
     """
-    Disable all logging calls less severe than 'level'.
+    Disable all logging calls of severity 'level' and below.
     """
     root.manager.disable = level
 

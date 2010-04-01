@@ -493,6 +493,9 @@ class PyBuildExt(build_ext):
         do_readline = self.compiler_obj.find_library_file(lib_dirs, 'readline')
         if platform == 'darwin':
             os_release = int(os.uname()[2].split('.')[0])
+            dep_target = sysconfig.get_config_var('MACOSX_DEPLOYMENT_TARGET')
+            if dep_target and dep_target.split('.') < ['10', '5']:
+                os_release = 8
             if os_release < 9:
                 # MacOSX 10.4 has a broken readline. Don't try to build
                 # the readline module unless the user has installed a fixed
@@ -543,6 +546,9 @@ class PyBuildExt(build_ext):
 
         # CSV files
         exts.append( Extension('_csv', ['_csv.c']) )
+
+        # POSIX subprocess module helper.
+        exts.append( Extension('_posixsubprocess', ['_posixsubprocess.c']) )
 
         # socket(2)
         exts.append( Extension('_socket', ['socketmodule.c'],
@@ -646,7 +652,7 @@ class PyBuildExt(build_ext):
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 7)
+        max_db_ver = (4, 8)
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -877,6 +883,8 @@ class PyBuildExt(build_ext):
             else:
                 sqlite_defines.append(('MODULE_NAME', '\\"sqlite3\\"'))
 
+            # Comment this out if you want the sqlite3 module to be able to load extensions.
+            sqlite_defines.append(("SQLITE_OMIT_LOAD_EXTENSION", "1"))
 
             if sys.platform == 'darwin':
                 # In every directory on the search path search for a dynamic

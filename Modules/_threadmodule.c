@@ -27,14 +27,15 @@ typedef struct {
 static void
 lock_dealloc(lockobject *self)
 {
-	assert(self->lock_lock);
 	if (self->in_weakreflist != NULL)
 		PyObject_ClearWeakRefs((PyObject *) self);
-	/* Unlock the lock so it's safe to free it */
-	PyThread_acquire_lock(self->lock_lock, 0);
-	PyThread_release_lock(self->lock_lock);
-	
-	PyThread_free_lock(self->lock_lock);
+	if (self->lock_lock != NULL) {
+		/* Unlock the lock so it's safe to free it */
+		PyThread_acquire_lock(self->lock_lock, 0);
+		PyThread_release_lock(self->lock_lock);
+		
+		PyThread_free_lock(self->lock_lock);
+	}
 	PyObject_Del(self);
 }
 
@@ -432,9 +433,9 @@ newlockobject(void)
 	self->lock_lock = PyThread_allocate_lock();
 	self->in_weakreflist = NULL;
 	if (self->lock_lock == NULL) {
-		PyObject_Del(self);
-		self = NULL;
+		Py_DECREF(self);
 		PyErr_SetString(ThreadError, "can't allocate lock");
+		return NULL;
 	}
 	return self;
 }
@@ -694,6 +695,7 @@ struct bootstate {
 	PyObject *func;
 	PyObject *args;
 	PyObject *keyw;
+	PyThreadState *tstate;
 };
 
 static void
@@ -703,8 +705,9 @@ t_bootstrap(void *boot_raw)
 	PyThreadState *tstate;
 	PyObject *res;
 
-	tstate = PyThreadState_New(boot->interp);
-
+	tstate = boot->tstate;
+	tstate->thread_id = PyThread_get_thread_ident();
+	_PyThreadState_Init(tstate);
 	PyEval_AcquireThread(tstate);
 	nb_threads++;
 	res = PyEval_CallObjectWithKeywords(
@@ -769,6 +772,11 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
 	boot->func = func;
 	boot->args = args;
 	boot->keyw = keyw;
+	boot->tstate = _PyThreadState_Prealloc(boot->interp);
+	if (boot->tstate == NULL) {
+		PyMem_DEL(boot);
+		return PyErr_NoMemory();
+	}
 	Py_INCREF(func);
 	Py_INCREF(args);
 	Py_XINCREF(keyw);
@@ -779,6 +787,7 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
 		Py_DECREF(func);
 		Py_DECREF(args);
 		Py_XDECREF(keyw);
+		PyThreadState_Clear(boot->tstate);
 		PyMem_DEL(boot);
 		return NULL;
 	}
@@ -824,18 +833,6 @@ PyDoc_STRVAR(interrupt_doc,
 Raise a KeyboardInterrupt in the main thread.\n\
 A subthread can use this function to interrupt the main thread."
 );
-
-#ifndef NO_EXIT_PROG
-static PyObject *
-thread_PyThread_exit_prog(PyObject *self, PyObject *args)
-{
-	int sts;
-	if (!PyArg_ParseTuple(args, "i:exit_prog", &sts))
-		return NULL;
-	Py_Exit(sts); /* Calls PyThread_exit_prog(sts) or _PyThread_exit_prog(sts) */
-	for (;;) { } /* Should not be reached */
-}
-#endif
 
 static lockobject *newlockobject(void);
 
@@ -970,10 +967,6 @@ static PyMethodDef thread_methods[] = {
 	{"stack_size",		(PyCFunction)thread_stack_size,
 				METH_VARARGS,
 				stack_size_doc},
-#ifndef NO_EXIT_PROG
-	{"exit_prog",		(PyCFunction)thread_PyThread_exit_prog,
-	 METH_VARARGS},
-#endif
 	{NULL,			NULL}		/* sentinel */
 };
 

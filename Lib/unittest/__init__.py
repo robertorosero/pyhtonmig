@@ -47,21 +47,23 @@ SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 __all__ = ['TestResult', 'TestCase', 'TestSuite',
            'TextTestRunner', 'TestLoader', 'FunctionTestCase', 'main',
            'defaultTestLoader', 'SkipTest', 'skip', 'skipIf', 'skipUnless',
-           'expectedFailure', 'TextTestResult']
+           'expectedFailure', 'TextTestResult', 'installHandler',
+           'registerResult', 'removeResult']
 
 # Expose obsolete functions for backwards compatibility
 __all__.extend(['getTestCaseNames', 'makeSuite', 'findTestCases'])
-__all__.append('_TextTestResult')
 
+__unittest = True
 
 from .result import TestResult
 from .case import (TestCase, FunctionTestCase, SkipTest, skip, skipIf,
                    skipUnless, expectedFailure)
-from .suite import TestSuite
+from .suite import BaseTestSuite, TestSuite
 from .loader import (TestLoader, defaultTestLoader, makeSuite, getTestCaseNames,
                      findTestCases)
 from .main import TestProgram, main
 from .runner import TextTestRunner, TextTestResult
+from .signals import installHandler, registerResult, removeResult
 
 # deprecated
 _TextTestResult = TextTestResult

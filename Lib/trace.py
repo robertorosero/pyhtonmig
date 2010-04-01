@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # portions copyright 2001, Autonomous Zones Industries, Inc., all rights...
 # err...  reserved and offered to the public under the terms of the
@@ -117,7 +117,7 @@ class Ignore:
         self._mods = modules or []
         self._dirs = dirs or []
 
-        self._dirs = map(os.path.normpath, self._dirs)
+        self._dirs = list(map(os.path.normpath, self._dirs))
         self._ignore = { '<string>': 1 }
 
     def names(self, filename, modulename):

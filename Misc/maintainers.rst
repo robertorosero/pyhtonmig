@@ -45,6 +45,7 @@ _dummy_thread       brett.cannon
 _thread
 abc
 aifc                r.david.murray
+argparse            bethard
 array
 ast
 asynchat            josiahcarlson
@@ -206,7 +207,7 @@ termios
 test
 textwrap
 threading
-time                brett.cannon
+time
 timeit
 tkinter             gpolo
 token               georg.brandl

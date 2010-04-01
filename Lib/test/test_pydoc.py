@@ -8,11 +8,16 @@ import pydoc
 import inspect
 import unittest
 import test.support
+import xml.etree
 from contextlib import contextmanager
 from test.support import (
     TESTFN, forget, rmtree, EnvironmentVarGuard, reap_children)
 
 from test import pydoc_mod
+
+# Just in case sys.modules["test"] has the optional attribute __loader__.
+if hasattr(pydoc_mod, "__loader__"):
+    del pydoc_mod.__loader__
 
 expected_text_pattern = \
 """
@@ -236,6 +241,8 @@ def print_diffs(text1, text2):
 
 class PyDocDocTest(unittest.TestCase):
 
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
     def test_html_doc(self):
         result, doc_loc = get_pydoc_html(pydoc_mod)
         mod_file = inspect.getabsfile(pydoc_mod)
@@ -249,6 +256,8 @@ class PyDocDocTest(unittest.TestCase):
             print_diffs(expected_html, result)
             self.fail("outputs are not equal, see diff above")
 
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
     def test_text_doc(self):
         result, doc_loc = get_pydoc_text(pydoc_mod)
         expected_text = expected_text_pattern % \
@@ -256,6 +265,11 @@ class PyDocDocTest(unittest.TestCase):
         if result != expected_text:
             print_diffs(expected_text, result)
             self.fail("outputs are not equal, see diff above")
+
+    def test_issue8225(self):
+        # Test issue8225 to ensure no doc link appears for xml.etree
+        result, doc_loc = get_pydoc_text(xml.etree)
+        self.assertEqual(doc_loc, "", "MODULE DOCS incorrectly includes a link")
 
     def test_not_here(self):
         missing_module = "test.i_am_not_here"

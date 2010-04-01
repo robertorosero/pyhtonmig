@@ -129,7 +129,7 @@ static wchar_t prefix[MAXPATHLEN+1];
 static wchar_t exec_prefix[MAXPATHLEN+1];
 static wchar_t progpath[MAXPATHLEN+1];
 static wchar_t *module_search_path = NULL;
-static wchar_t lib_python[] = L"lib/python" VERSION;
+static wchar_t *lib_python = L"lib/python" VERSION;
 
 /* In principle, this should use HAVE__WSTAT, and _wstat
    should be detected by autoconf. However, no current
@@ -522,7 +522,7 @@ calculate_path(void)
 	}
 	else
 		progpath[0] = '\0';
-	if (progpath[0] != SEP)
+	if (progpath[0] != SEP && progpath[0] != '\0')
 		absolutize(progpath);
 	wcsncpy(argv0_path, progpath, MAXPATHLEN);
 	argv0_path[MAXPATHLEN] = '\0';

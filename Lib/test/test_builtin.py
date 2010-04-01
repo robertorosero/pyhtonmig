@@ -1,16 +1,12 @@
 # Python test set -- built-in functions
 
 import platform
-import test.support, unittest
-from test.support import fcmp, TESTFN, unlink,  run_unittest, \
-                              run_with_locale
+import unittest
+from test.support import fcmp, TESTFN, unlink,  run_unittest, check_warnings
 from operator import neg
 
-import sys, warnings, random, collections, io, fractions
-warnings.filterwarnings("ignore", "hex../oct.. of negative int",
-                        FutureWarning, __name__)
-warnings.filterwarnings("ignore", "integer argument expected",
-                        DeprecationWarning, "unittest")
+import sys, warnings, random, collections, io
+
 import builtins
 
 class Squares:
@@ -427,9 +423,10 @@ class BuiltinTest(unittest.TestCase):
         g = {}
         l = {}
 
-        import warnings
-        warnings.filterwarnings("ignore", "global statement", module="<string>")
-        exec('global a; a = 1; b = 2', g, l)
+        with check_warnings():
+            warnings.filterwarnings("ignore", "global statement",
+                    module="<string>")
+            exec('global a; a = 1; b = 2', g, l)
         if '__builtins__' in g:
             del g['__builtins__']
         if '__builtins__' in l:
@@ -479,6 +476,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, getattr, sys, 1, "foo")
         self.assertRaises(TypeError, getattr)
         self.assertRaises(AttributeError, getattr, sys, chr(sys.maxunicode))
+        # unicode surrogates are not encodable to the default encoding (utf8)
+        self.assertRaises(AttributeError, getattr, 1, "\uDAD1\uD51E")
 
     def test_hasattr(self):
         import sys

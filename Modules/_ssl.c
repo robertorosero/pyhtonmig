@@ -9,8 +9,6 @@
    directly.
 
    XXX should partial writes be enabled, SSL_MODE_ENABLE_PARTIAL_WRITE?
-
-   XXX what about SSL_MODE_AUTO_RETRY?
 */
 
 #include "Python.h"
@@ -371,6 +369,7 @@ newPySSLObject(PySocketSockObject *Sock, char *key_file, char *cert_file,
 	self->ssl = SSL_new(self->ctx); /* New ssl struct */
 	PySSL_END_ALLOW_THREADS
 	SSL_set_fd(self->ssl, Sock->sock_fd);	/* Set the socket for SSL */
+	SSL_set_mode(self->ssl, SSL_MODE_AUTO_RETRY);
 
 	/* If the socket is in non-blocking mode or timeout mode, set the BIO
 	 * to non-blocking mode (blocking is the default)
@@ -658,7 +657,12 @@ _get_peer_alt_names (X509 *certificate) {
 	char buf[2048];
 	char *vptr;
 	int len;
+	/* Issue #2973: ASN1_item_d2i() API changed in OpenSSL 0.9.6m */
+#if OPENSSL_VERSION_NUMBER >= 0x009060dfL
+	const unsigned char *p;
+#else
 	unsigned char *p;
+#endif
 
 	if (certificate == NULL)
 		return peer_alt_names;

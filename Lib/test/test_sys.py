@@ -461,7 +461,7 @@ class SysModuleTest(unittest.TestCase):
         sys._clear_type_cache()
 
     def test_ioencoding(self):
-        import subprocess,os
+        import subprocess
         env = dict(os.environ)
 
         # Test character: cent sign, encoded as 0x4A (ASCII J) in CP424,
@@ -478,6 +478,23 @@ class SysModuleTest(unittest.TestCase):
                              stdout = subprocess.PIPE, env=env)
         out = p.communicate()[0].strip()
         self.assertEqual(out, b'?')
+
+    def test_executable(self):
+        # Issue #7774: Ensure that sys.executable is an empty string if argv[0]
+        # has been set to an non existent program name and Python is unable to
+        # retrieve the real program name
+        import subprocess
+        # For a normal installation, it should work without 'cwd'
+        # argument. For test runs in the build directory, see #7774.
+        python_dir = os.path.dirname(os.path.realpath(sys.executable))
+        p = subprocess.Popen(
+            ["nonexistent", "-c",
+             'import sys; print(sys.executable.encode("ascii", "backslashreplace"))'],
+            executable=sys.executable, stdout=subprocess.PIPE, cwd=python_dir)
+        stdout = p.communicate()[0]
+        executable = stdout.strip().decode("ASCII")
+        p.wait()
+        self.assertIn(executable, ["b''", repr(sys.executable.encode("ascii", "backslashreplace"))])
 
 
 class SizeofTest(unittest.TestCase):
@@ -571,7 +588,7 @@ class SizeofTest(unittest.TestCase):
             return inner
         check(get_cell().__closure__[0], size(h + 'P'))
         # code
-        check(get_cell().__code__, size(h + '5i8Pi2P'))
+        check(get_cell().__code__, size(h + '5i8Pi3P'))
         # complex
         check(complex(0,1), size(h + '2d'))
         # method_descriptor (descriptor object)
@@ -780,9 +797,15 @@ class SizeofTest(unittest.TestCase):
 
     def test_setfilesystemencoding(self):
         old = sys.getfilesystemencoding()
-        sys.setfilesystemencoding("iso-8859-1")
-        self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
-        sys.setfilesystemencoding(old)
+        try:
+            sys.setfilesystemencoding("iso-8859-1")
+            self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
+        finally:
+            sys.setfilesystemencoding(old)
+        try:
+            self.assertRaises(LookupError, sys.setfilesystemencoding, "xxx")
+        finally:
+            sys.setfilesystemencoding(old)
 
 def test_main():
     test.support.run_unittest(SysModuleTest, SizeofTest)

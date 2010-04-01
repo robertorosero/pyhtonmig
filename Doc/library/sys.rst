@@ -127,13 +127,12 @@ always available.
 
    .. index:: object: traceback
 
-   If no exception is being handled anywhere on the stack, a tuple containing three
-   ``None`` values is returned.  Otherwise, the values returned are ``(type, value,
-   traceback)``.  Their meaning is: *type* gets the exception type of the exception
-   being handled (a class object); *value* gets the exception parameter (its
-   :dfn:`associated value` or the second argument to :keyword:`raise`, which is
-   always a class instance if the exception type is a class object); *traceback*
-   gets a traceback object (see the Reference Manual) which encapsulates the call
+   If no exception is being handled anywhere on the stack, a tuple containing
+   three ``None`` values is returned.  Otherwise, the values returned are
+   ``(type, value, traceback)``.  Their meaning is: *type* gets the type of the
+   exception being handled (a subclass of :exc:`BaseException`); *value* gets
+   the exception instance (an instance of the exception type); *traceback* gets
+   a traceback object (see the Reference Manual) which encapsulates the call
    stack at the point where the exception originally occurred.
 
    .. warning::
@@ -339,7 +338,7 @@ always available.
    specific.
 
    If given, *default* will be returned if the object does not provide means to
-   retrieve the size.  Otherwise a `TypeError` will be raised.
+   retrieve the size.  Otherwise a :exc:`TypeError` will be raised.
 
    :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
    additional garbage collector overhead if the object is managed by the garbage
@@ -508,9 +507,7 @@ always available.
    more information.)
 
    The meaning of the variables is the same as that of the return values from
-   :func:`exc_info` above.  (Since there is only one interactive thread,
-   thread-safety is not a concern for these variables, unlike for ``exc_type``
-   etc.)
+   :func:`exc_info` above.
 
 
 .. data:: maxsize
@@ -818,6 +815,10 @@ always available.
    *on_flag* is true. Deactivate these dumps if *on_flag* is off. The function is
    available only if Python was compiled with :option:`--with-tsc`. To understand
    the output of this dump, read :file:`Python/ceval.c` in the Python sources.
+
+   .. impl-detail::
+      This function is intimately bound to CPython implementation details and
+      thus not likely to be implemented elsewhere.
 
 
 .. data:: stdin

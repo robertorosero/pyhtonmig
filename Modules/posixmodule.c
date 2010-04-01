@@ -303,23 +303,6 @@ extern int lstat(const char *, struct stat *);
 #define WAIT_STATUS_INT(s) (s)
 #endif /* UNION_WAIT */
 
-/* Issue #1983: pid_t can be longer than a C long on some systems */
-#if !defined(SIZEOF_PID_T) || SIZEOF_PID_T == SIZEOF_INT
-#define PARSE_PID "i"
-#define PyLong_FromPid PyLong_FromLong
-#define PyLong_AsPid PyLong_AsLong
-#elif SIZEOF_PID_T == SIZEOF_LONG
-#define PARSE_PID "l"
-#define PyLong_FromPid PyLong_FromLong
-#define PyLong_AsPid PyLong_AsLong
-#elif defined(SIZEOF_LONG_LONG) && SIZEOF_PID_T == SIZEOF_LONG_LONG
-#define PARSE_PID "L"
-#define PyLong_FromPid PyLong_FromLongLong
-#define PyLong_AsPid PyLong_AsLongLong
-#else
-#error "sizeof(pid_t) is neither sizeof(int), sizeof(long) or sizeof(long long)"
-#endif /* SIZEOF_PID_T */
-
 /* Don't use the "_r" form if we don't need it (also, won't have a
    prototype for it, at least on Solaris -- maybe others as well?). */
 #if defined(HAVE_CTERMID_R) && defined(WITH_THREAD)
@@ -3723,14 +3706,18 @@ static PyObject *
 posix_fork1(PyObject *self, PyObject *noargs)
 {
 	pid_t pid;
-	int result;
+	int result = 0;
 	_PyImport_AcquireLock();
 	pid = fork1();
-	result = _PyImport_ReleaseLock();
+	if (pid == 0) {
+		/* child: this clobbers and resets the import lock. */
+		PyOS_AfterFork();
+	} else {
+		/* parent: release the import lock. */
+		result = _PyImport_ReleaseLock();
+	}
 	if (pid == -1)
 		return posix_error();
-	if (pid == 0)
-		PyOS_AfterFork();
 	if (result < 0) {
 		/* Don't clobber the OSError if the fork failed. */
 		PyErr_SetString(PyExc_RuntimeError,
@@ -3752,14 +3739,18 @@ static PyObject *
 posix_fork(PyObject *self, PyObject *noargs)
 {
 	pid_t pid;
-	int result;
+	int result = 0;
 	_PyImport_AcquireLock();
 	pid = fork();
-	result = _PyImport_ReleaseLock();
+	if (pid == 0) {
+		/* child: this clobbers and resets the import lock. */
+		PyOS_AfterFork();
+	} else {
+		/* parent: release the import lock. */
+		result = _PyImport_ReleaseLock();
+	}
 	if (pid == -1)
 		return posix_error();
-	if (pid == 0)
-		PyOS_AfterFork();
 	if (result < 0) {
 		/* Don't clobber the OSError if the fork failed. */
 		PyErr_SetString(PyExc_RuntimeError,
@@ -3872,16 +3863,20 @@ To both, return fd of newly opened pseudo-terminal.\n");
 static PyObject *
 posix_forkpty(PyObject *self, PyObject *noargs)
 {
-	int master_fd = -1, result;
+	int master_fd = -1, result = 0;
 	pid_t pid;
 
 	_PyImport_AcquireLock();
 	pid = forkpty(&master_fd, NULL, NULL, NULL);
-	result = _PyImport_ReleaseLock();
+	if (pid == 0) {
+		/* child: this clobbers and resets the import lock. */
+		PyOS_AfterFork();
+	} else {
+		/* parent: release the import lock. */
+		result = _PyImport_ReleaseLock();
+	}
 	if (pid == -1)
 		return posix_error();
-	if (pid == 0)
-		PyOS_AfterFork();
 	if (result < 0) {
 		/* Don't clobber the OSError if the fork failed. */
 		PyErr_SetString(PyExc_RuntimeError,
@@ -4017,7 +4012,7 @@ static PyObject *
 posix_getpgid(PyObject *self, PyObject *args)
 {
 	pid_t pid, pgid;
-	if (!PyArg_ParseTuple(args, PARSE_PID ":getpgid", &pid))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID ":getpgid", &pid))
 		return NULL;
 	pgid = getpgid(pid);
 	if (pgid < 0)
@@ -4129,7 +4124,7 @@ posix_kill(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int sig;
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:kill", &pid, &sig))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:kill", &pid, &sig))
 		return NULL;
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
     if (sig == XCPT_SIGNAL_INTR || sig == XCPT_SIGNAL_BREAK) {
@@ -4167,7 +4162,7 @@ posix_killpg(PyObject *self, PyObject *args)
 	   a pid_t. Since getpgrp() returns a pid_t, we assume killpg should
 	   take the same type. Moreover, pid_t is always at least as wide as
 	   int (else compilation of this module fails), which is safe. */
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:killpg", &pgid, &sig))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:killpg", &pgid, &sig))
 		return NULL;
 	if (killpg(pgid, sig) == -1)
 		return posix_error();
@@ -4288,9 +4283,16 @@ posix_setreuid (PyObject *self, PyObject *args)
 	uid_t ruid, euid;
 	if (!PyArg_ParseTuple(args, "ll", &ruid_arg, &euid_arg))
 		return NULL;
-	ruid = ruid_arg;
-	euid = euid_arg;
-	if (euid != euid_arg || ruid != ruid_arg) {
+	if (ruid_arg == -1)
+		ruid = (uid_t)-1;  /* let the compiler choose how -1 fits */
+	else
+		ruid = ruid_arg;  /* otherwise, assign from our long */
+	if (euid_arg == -1)
+		euid = (uid_t)-1;
+	else
+		euid = euid_arg;
+	if ((euid_arg != -1 && euid != euid_arg) || 
+	    (ruid_arg != -1 && ruid != ruid_arg)) {
 		PyErr_SetString(PyExc_OverflowError, "user id too big");
 		return NULL;
 	}
@@ -4315,9 +4317,16 @@ posix_setregid (PyObject *self, PyObject *args)
 	gid_t rgid, egid;
 	if (!PyArg_ParseTuple(args, "ll", &rgid_arg, &egid_arg))
 		return NULL;
-	rgid = rgid_arg;
-	egid = egid_arg;
-	if (egid != egid_arg || rgid != rgid_arg) {
+	if (rgid_arg == -1)
+		rgid = (gid_t)-1;  /* let the compiler choose how -1 fits */
+	else
+		rgid = rgid_arg;  /* otherwise, assign from our long */
+	if (egid_arg == -1)
+		egid = (gid_t)-1;
+	else
+		egid = egid_arg;
+	if ((egid_arg != -1 && egid != egid_arg) || 
+	    (rgid_arg != -1 && rgid != rgid_arg)) {
 		PyErr_SetString(PyExc_OverflowError, "group id too big");
 		return NULL;
 	}
@@ -4510,7 +4519,7 @@ posix_wait4(PyObject *self, PyObject *args)
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:wait4", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:wait4", &pid, &options))
 		return NULL;
 
 	Py_BEGIN_ALLOW_THREADS
@@ -4534,7 +4543,7 @@ posix_waitpid(PyObject *self, PyObject *args)
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:waitpid", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:waitpid", &pid, &options))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	pid = waitpid(pid, &status, options);
@@ -4558,7 +4567,7 @@ posix_waitpid(PyObject *self, PyObject *args)
 	Py_intptr_t pid;
 	int status, options;
 
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:waitpid", &pid, &options))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:waitpid", &pid, &options))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	pid = _cwait(&status, pid, options);
@@ -4774,7 +4783,7 @@ posix_getsid(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int sid;
-	if (!PyArg_ParseTuple(args, PARSE_PID ":getsid", &pid))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID ":getsid", &pid))
 		return NULL;
 	sid = getsid(pid);
 	if (sid < 0)
@@ -4809,7 +4818,7 @@ posix_setpgid(PyObject *self, PyObject *args)
 {
 	pid_t pid;
 	int pgrp;
-	if (!PyArg_ParseTuple(args, PARSE_PID "i:setpgid", &pid, &pgrp))
+	if (!PyArg_ParseTuple(args, _Py_PARSE_PID "i:setpgid", &pid, &pgrp))
 		return NULL;
 	if (setpgid(pid, pgrp) < 0)
 		return posix_error();
@@ -4849,7 +4858,7 @@ posix_tcsetpgrp(PyObject *self, PyObject *args)
 {
 	int fd;
 	pid_t pgid;
-	if (!PyArg_ParseTuple(args, "i" PARSE_PID ":tcsetpgrp", &fd, &pgid))
+	if (!PyArg_ParseTuple(args, "i" _Py_PARSE_PID ":tcsetpgrp", &fd, &pgid))
 		return NULL;
 	if (tcsetpgrp(fd, pgid) < 0)
 		return posix_error();

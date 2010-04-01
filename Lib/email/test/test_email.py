@@ -178,6 +178,18 @@ class TestMessageAPI(TestEmailBase):
         self.assertRaises(errors.HeaderParseError,
                           msg.set_boundary, 'BOUNDARY')
 
+    def test_message_rfc822_only(self):
+        # Issue 7970: message/rfc822 not in multipart parsed by
+        # HeaderParser caused an exception when flattened.
+        fp = openfile(findfile('msg_46.txt'))
+        msgdata = fp.read()
+        parser = HeaderParser()
+        msg = parser.parsestr(msgdata)
+        out = StringIO()
+        gen = Generator(out, True, 0)
+        gen.flatten(msg, False)
+        self.assertEqual(out.getvalue(), msgdata)
+
     def test_get_decoded_payload(self):
         eq = self.assertEqual
         msg = self._msgobj('msg_10.txt')
@@ -192,8 +204,12 @@ class TestMessageAPI(TestEmailBase):
         # Subpart 3 is base64
         eq(msg.get_payload(2).get_payload(decode=True),
            b'This is a Base64 encoded message.')
-        # Subpart 4 has no Content-Transfer-Encoding: header.
+        # Subpart 4 is base64 with a trailing newline, which
+        # used to be stripped (issue 7143).
         eq(msg.get_payload(3).get_payload(decode=True),
+           b'This is a Base64 encoded message.\n')
+        # Subpart 5 has no Content-Transfer-Encoding: header.
+        eq(msg.get_payload(4).get_payload(decode=True),
            b'This has no Content-Transfer-Encoding: header.\n')
 
     def test_get_decoded_uu_payload(self):

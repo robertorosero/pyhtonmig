@@ -16,6 +16,7 @@ import warnings
 import unittest
 import importlib
 import collections
+import re
 
 __all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
            "verbose", "use_resources", "max_memuse", "record_original_stdout",
@@ -29,7 +30,9 @@ __all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
            "run_with_locale",
            "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
            "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
-           "reap_children", "cpython_only", "check_impl_detail", "get_attribute"]
+           "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
+           "swap_item", "swap_attr"]
+
 
 class Error(Exception):
     """Base class for regression test exceptions."""
@@ -401,12 +404,14 @@ def temp_cwd(name='tempcwd', quiet=False):
             rmtree(name)
 
 
-def findfile(file, here=__file__):
+def findfile(file, here=__file__, subdir=None):
     """Try to find a file on sys.path and the working directory.  If it is not
     found the argument passed to the function is returned (this does not
     necessarily signal failure; could still be the legitimate path)."""
     if os.path.isabs(file):
         return file
+    if subdir is not None:
+        file = os.path.join(subdir, file)
     path = sys.path
     path = [os.path.dirname(here)] + path
     for dn in path:
@@ -440,12 +445,29 @@ def check_syntax_error(testcase, statement):
 def open_urlresource(url, *args, **kw):
     import urllib.request, urllib.parse
 
-    requires('urlfetch')
+    check = kw.pop('check', None)
+
     filename = urllib.parse.urlparse(url)[2].split('/')[-1] # '/': it's URL!
 
     fn = os.path.join(os.path.dirname(__file__), "data", filename)
+
+    def check_valid_file(fn):
+        f = open(fn, *args, **kw)
+        if check is None:
+            return f
+        elif check(f):
+            f.seek(0)
+            return f
+        f.close()
+
     if os.path.exists(fn):
-        return open(fn, *args, **kw)
+        f = check_valid_file(fn)
+        if f is not None:
+            return f
+        unlink(fn)
+
+    # Verify the requirement before downloading the file
+    requires('urlfetch')
 
     print('\tfetching %s ...' % url, file=get_original_stdout())
     f = urllib.request.urlopen(url, timeout=15)
@@ -457,29 +479,97 @@ def open_urlresource(url, *args, **kw):
                 s = f.read()
     finally:
         f.close()
-    return open(fn, *args, **kw)
+
+    f = check_valid_file(fn)
+    if f is not None:
+        return f
+    raise TestFailed('invalid resource "%s"' % fn)
+
 
 class WarningsRecorder(object):
     """Convenience wrapper for the warnings list returned on
        entry to the warnings.catch_warnings() context manager.
     """
     def __init__(self, warnings_list):
-        self.warnings = warnings_list
+        self._warnings = warnings_list
+        self._last = 0
 
     def __getattr__(self, attr):
-        if self.warnings:
-            return getattr(self.warnings[-1], attr)
+        if len(self._warnings) > self._last:
+            return getattr(self._warnings[-1], attr)
         elif attr in warnings.WarningMessage._WARNING_DETAILS:
             return None
         raise AttributeError("%r has no attribute %r" % (self, attr))
 
+    @property
+    def warnings(self):
+        return self._warnings[self._last:]
+
     def reset(self):
-        del self.warnings[:]
+        self._last = len(self._warnings)
+
+
+def _filterwarnings(filters, quiet=False):
+    """Catch the warnings, then check if all the expected
+    warnings have been raised and re-raise unexpected warnings.
+    If 'quiet' is True, only re-raise the unexpected warnings.
+    """
+    # Clear the warning registry of the calling module
+    # in order to re-raise the warnings.
+    frame = sys._getframe(2)
+    registry = frame.f_globals.get('__warningregistry__')
+    if registry:
+        registry.clear()
+    with warnings.catch_warnings(record=True) as w:
+        # Set filter "always" to record all warnings.  Because
+        # test_warnings swap the module, we need to look up in
+        # the sys.modules dictionary.
+        sys.modules['warnings'].simplefilter("always")
+        yield WarningsRecorder(w)
+    # Filter the recorded warnings
+    reraise = [warning.message for warning in w]
+    missing = []
+    for msg, cat in filters:
+        seen = False
+        for exc in reraise[:]:
+            message = str(exc)
+            # Filter out the matching messages
+            if (re.match(msg, message, re.I) and
+                issubclass(exc.__class__, cat)):
+                seen = True
+                reraise.remove(exc)
+        if not seen and not quiet:
+            # This filter caught nothing
+            missing.append((msg, cat.__name__))
+    if reraise:
+        raise AssertionError("unhandled warning %r" % reraise[0])
+    if missing:
+        raise AssertionError("filter (%r, %s) did not catch any warning" %
+                             missing[0])
+
 
 @contextlib.contextmanager
-def check_warnings():
-    with warnings.catch_warnings(record=True) as w:
-        yield WarningsRecorder(w)
+def check_warnings(*filters, **kwargs):
+    """Context manager to silence warnings.
+
+    Accept 2-tuples as positional arguments:
+        ("message regexp", WarningCategory)
+
+    Optional argument:
+     - if 'quiet' is True, it does not fail if a filter catches nothing
+        (default True without argument,
+         default False if some filters are defined)
+
+    Without argument, it defaults to:
+        check_warnings(("", Warning), quiet=True)
+    """
+    quiet = kwargs.get('quiet')
+    if not filters:
+        filters = (("", Warning),)
+        # Preserve backward compatibility
+        if quiet is None:
+            quiet = True
+    return _filterwarnings(filters, quiet)
 
 
 class CleanImport(object):
@@ -714,7 +804,6 @@ _4G = 4 * _1G
 MAX_Py_ssize_t = sys.maxsize
 
 def set_memlimit(limit):
-    import re
     global max_memuse
     global real_max_memuse
     sizes = {
@@ -1014,3 +1103,57 @@ def reap_children():
                     break
             except:
                 break
+
+@contextlib.contextmanager
+def swap_attr(obj, attr, new_val):
+    """Temporary swap out an attribute with a new object.
+
+    Usage:
+        with swap_attr(obj, "attr", 5):
+            ...
+
+        This will set obj.attr to 5 for the duration of the with: block,
+        restoring the old value at the end of the block. If `attr` doesn't
+        exist on `obj`, it will be created and then deleted at the end of the
+        block.
+    """
+    if hasattr(obj, attr):
+        real_val = getattr(obj, attr)
+        setattr(obj, attr, new_val)
+        try:
+            yield
+        finally:
+            setattr(obj, attr, real_val)
+    else:
+        setattr(obj, attr, new_val)
+        try:
+            yield
+        finally:
+            delattr(obj, attr)
+
+@contextlib.contextmanager
+def swap_item(obj, item, new_val):
+    """Temporary swap out an item with a new object.
+
+    Usage:
+        with swap_item(obj, "item", 5):
+            ...
+
+        This will set obj["item"] to 5 for the duration of the with: block,
+        restoring the old value at the end of the block. If `item` doesn't
+        exist on `obj`, it will be created and then deleted at the end of the
+        block.
+    """
+    if item in obj:
+        real_val = obj[item]
+        obj[item] = new_val
+        try:
+            yield
+        finally:
+            obj[item] = real_val
+    else:
+        obj[item] = new_val
+        try:
+            yield
+        finally:
+            del obj[item]

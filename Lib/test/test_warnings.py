@@ -27,11 +27,15 @@ def warnings_state(module):
     except NameError:
         pass
     original_warnings = warning_tests.warnings
+    original_filters = module.filters
     try:
+        module.filters = original_filters[:]
+        module.simplefilter("once")
         warning_tests.warnings = module
         yield
     finally:
         warning_tests.warnings = original_warnings
+        module.filters = original_filters
 
 
 class BaseTest(unittest.TestCase):
@@ -194,6 +198,7 @@ class WarnTests(unittest.TestCase):
     def test_message(self):
         with original_warnings.catch_warnings(record=True,
                 module=self.module) as w:
+            self.module.simplefilter("once")
             for i in range(4):
                 text = 'multi %d' %i  # Different text on each call.
                 self.module.warn(text)
@@ -206,6 +211,7 @@ class WarnTests(unittest.TestCase):
         for ob in (Warning, None, 42):
             with original_warnings.catch_warnings(record=True,
                     module=self.module) as w:
+                self.module.simplefilter("once")
                 self.module.warn(ob)
                 # Don't directly compare objects since
                 # ``Warning() != Warning()``.
@@ -644,18 +650,33 @@ class CatchWarningTests(BaseTest):
     def test_check_warnings(self):
         # Explicit tests for the test.support convenience wrapper
         wmod = self.module
-        if wmod is sys.modules['warnings']:
-            with support.check_warnings() as w:
-                self.assertEqual(w.warnings, [])
-                wmod.simplefilter("always")
+        if wmod is not sys.modules['warnings']:
+            return
+        with support.check_warnings(quiet=False) as w:
+            self.assertEqual(w.warnings, [])
+            wmod.simplefilter("always")
+            wmod.warn("foo")
+            self.assertEqual(str(w.message), "foo")
+            wmod.warn("bar")
+            self.assertEqual(str(w.message), "bar")
+            self.assertEqual(str(w.warnings[0].message), "foo")
+            self.assertEqual(str(w.warnings[1].message), "bar")
+            w.reset()
+            self.assertEqual(w.warnings, [])
+
+        with support.check_warnings():
+            # defaults to quiet=True without argument
+            pass
+        with support.check_warnings(('foo', UserWarning)):
+            wmod.warn("foo")
+
+        with self.assertRaises(AssertionError):
+            with support.check_warnings(('', RuntimeWarning)):
+                # defaults to quiet=False with argument
+                pass
+        with self.assertRaises(AssertionError):
+            with support.check_warnings(('foo', RuntimeWarning)):
                 wmod.warn("foo")
-                self.assertEqual(str(w.message), "foo")
-                wmod.warn("bar")
-                self.assertEqual(str(w.message), "bar")
-                self.assertEqual(str(w.warnings[0].message), "foo")
-                self.assertEqual(str(w.warnings[1].message), "bar")
-                w.reset()
-                self.assertEqual(w.warnings, [])
 
 class CCatchWarningTests(CatchWarningTests):
     module = c_warnings

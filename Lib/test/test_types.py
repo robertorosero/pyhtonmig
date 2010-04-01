@@ -18,7 +18,6 @@ class TypesTests(unittest.TestCase):
         if not {'x': 1}: self.fail('{\'x\': 1} is false instead of true')
         def f(): pass
         class C: pass
-        import sys
         x = C()
         if not f: self.fail('f is false instead of true')
         if not C: self.fail('C is false instead of true')
@@ -357,6 +356,17 @@ class TypesTests(unittest.TestCase):
                 self.assertEqual(value.__format__(format_spec),
                                  float(value).__format__(format_spec))
 
+        # Issue 6902
+        test(123456, "0<20", '12345600000000000000')
+        test(123456, "1<20", '12345611111111111111')
+        test(123456, "*<20", '123456**************')
+        test(123456, "0>20", '00000000000000123456')
+        test(123456, "1>20", '11111111111111123456')
+        test(123456, "*>20", '**************123456')
+        test(123456, "0=20", '00000000000000123456')
+        test(123456, "1=20", '11111111111111123456')
+        test(123456, "*=20", '**************123456')
+
     @run_with_locale('LC_NUMERIC', 'en_US.UTF8')
     def test_float__format__locale(self):
         # test locale support for __format__ code 'n'
@@ -509,6 +519,17 @@ class TypesTests(unittest.TestCase):
         # Alternate formatting is not supported
         self.assertRaises(ValueError, format, 0.0, '#')
         self.assertRaises(ValueError, format, 0.0, '#20f')
+
+        # Issue 6902
+        test(12345.6, "0<20", '12345.60000000000000')
+        test(12345.6, "1<20", '12345.61111111111111')
+        test(12345.6, "*<20", '12345.6*************')
+        test(12345.6, "0>20", '000000000000012345.6')
+        test(12345.6, "1>20", '111111111111112345.6')
+        test(12345.6, "*>20", '*************12345.6')
+        test(12345.6, "0=20", '000000000000012345.6')
+        test(12345.6, "1=20", '111111111111112345.6')
+        test(12345.6, "*=20", '*************12345.6')
 
     def test_format_spec_errors(self):
         # int, float, and string all share the same format spec

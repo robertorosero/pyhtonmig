@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 #
 # Class for profiling python code. rev 1.0  6/2/94
 #
@@ -602,11 +602,8 @@ def main():
     if (len(args) > 0):
         sys.argv[:] = args
         sys.path.insert(0, os.path.dirname(sys.argv[0]))
-        fp = open(sys.argv[0])
-        try:
+        with open(sys.argv[0], 'rb') as fp:
             script = fp.read()
-        finally:
-            fp.close()
         run('exec(%r)' % script, options.outfile, options.sort)
     else:
         parser.print_usage()

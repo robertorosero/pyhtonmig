@@ -39,6 +39,8 @@ class BaseTestCase(unittest.TestCase):
         self.assertEqual(-7 .__index__(), -7)
         self.assertEqual(self.o.__index__(), 4)
         self.assertEqual(self.n.__index__(), 5)
+        self.assertEqual(True.__index__(), 1)
+        self.assertEqual(False.__index__(), 0)
 
     def test_subclasses(self):
         r = list(range(10))
@@ -154,7 +156,7 @@ class ListTestCase(SeqTestCase):
 
         lst = [5, 6, 7, 8, 9, 11]
         l2 = lst.__imul__(self.n)
-        self.assertTrue(l2 is lst)
+        self.assertIs(l2, lst)
         self.assertEqual(lst, [5, 6, 7, 8, 9, 11] * 3)
 
 

@@ -72,7 +72,7 @@ three`` at the command line::
 
 The :mod:`getopt` module processes *sys.argv* using the conventions of the Unix
 :func:`getopt` function.  More powerful and flexible command line processing is
-provided by the :mod:`optparse` module.
+provided by the :mod:`argparse` module.
 
 
 .. _tut-stderr:
@@ -152,6 +152,7 @@ from urls and :mod:`smtplib` for sending mail::
 
    >>> from urllib.request import urlopen
    >>> for line in urlopen('http://tycho.usno.navy.mil/cgi-bin/timer.pl'):
+   ...     line = line.decode('utf-8')  # Decoding the binary data to text.
    ...     if 'EST' in line or 'EDT' in line:  # look for Eastern Time
    ...         print(line)
 

@@ -12,6 +12,55 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8211: Save/restore CFLAGS around AC_PROG_CC in configure.in, compiler
+  optimizations are disabled when --with-pydebug is used.
+
+- Issue #8226: sys.setfilesystemencoding() raises a LookupError if the encoding
+  is unknown
+
+- Issue #1583863: An str subclass can now override the __str__ method
+
+- Issue #8014: Setting a T_UINT or T_PYSSIZET attribute of an object with
+  PyMemberDefs could produce an internal error;  raise TypeError instead.
+
+- Issue #7845: Rich comparison methods on the complex type now return
+  NotImplemented rather than raising a TypeError when comparing with an
+  incompatible type; this allows user-defined classes to implement their own
+  comparisons with complex.
+
+- Issue #3137: Don't ignore errors at startup, especially a keyboard interrupt
+  (SIGINT). If an error occurs while importing the site module, the error is
+  printed and Python exits. Initialize the GIL before importing the site
+  module.
+
+- Issue #7173: Generator finalization could invalidate sys.exc_info().
+
+- Issue #7544: Preallocate thread memory before creating the thread to avoid
+  a fatal error in low memory condition.
+
+- Issue #7820: The parser tokenizer restores all bytes in the right if
+  the BOM check fails.
+
+- Handle errors from looking up __prepare__ correctly.
+
+- Issue #5939: Add additional runtime checking to ensure a valid capsule
+  in Modules/_ctypes/callproc.c.
+
+- Issue #7309: Fix unchecked attribute access when converting
+  UnicodeEncodeError, UnicodeDecodeError, and UnicodeTranslateError to
+  strings.
+
+- Issue #6902: Fix problem with built-in types format incorrectly with
+  0 padding.
+
+- Issue #7988: Fix default alignment to be right aligned for
+  complex.__format__. Now it matches other numeric types.
+
+- Issue #5988: Remove deprecated functions PyOS_ascii_formatd,
+  PyOS_ascii_strtod, and PyOS_ascii_atof. Use PyOS_double_to_string
+  and PyOS_string_to_double instead. See issue #5835 for the original
+  deprecations.
+
 - Issue #7385: Fix a crash in `MemoryView_FromObject` when
   `PyObject_GetBuffer` fails.  Patch by Florent Xicluna.
 
@@ -192,6 +241,8 @@ Core and Builtins
   instances from being copied with copy.copy(), and bytes subclasses
   from being pickled properly.
 
+- Code objects now support weak references.
+
 C-API
 -----
 
@@ -241,6 +292,127 @@ C-API
 
 Library
 -------
+
+- Issue #8233: When run as a script, py_compile.py optionally takes a single
+  argument `-` which tells it to read files to compile from stdin.  Each line
+  is read on demand and the named file is compiled immediately.  (Original
+  patch by Piotr Ożarowski).
+
+- Backwards incompatible change: Unicode codepoints line tabulation (0x0B) and
+  form feed (0x0C) are now considered linebreaks, as specified in Unicode
+  Standard Annex #14.  See issue #7643.
+  http://www.unicode.org/reports/tr14/
+
+- Comparisons using one of <, <=, >, >= between a complex instance and
+  a Fractions instance now raise TypeError instead of returning
+  True/False.  This makes Fraction <=> complex comparisons consistent with
+  int <=> complex, float <=> complex, and complex <=> complex comparisons.
+
+- Issue #8139: ossaudiodev didn't initialize its types properly, therefore
+  some methods (such as oss_mixer_device.fileno()) were not available.
+  Initial patch by Bertrand Janin.
+
+- Issue #8205: Remove the "Modules" directory from sys.path when Python is
+  running from the build directory (POSIX only).
+
+- Issue #7512: shutil.copystat() could raise an OSError when the filesystem
+  didn't support chflags() (for example ZFS under FreeBSD).  The error is
+  now silenced.
+
+- Issue #7860: platform.uname now reports the correct 'machine' type
+  when Python is running in WOW64 mode on 64 bit Windows.
+
+- Issue #3890, #8222: Fix recv() and recv_into() on non-blocking SSL sockets.
+  Also, enable the SSL_MODE_AUTO_RETRY flag on SSL sockets, so that blocking
+  reads and writes are always retried by OpenSSL itself.
+
+- Issue #4282: Fix the main function of the profile module for a non-ASCII
+  script, open the file in binary mode and not in text mode with the default
+  (utf8) encoding.
+
+- Issue #8179: Fix macpath.realpath() on a non-existing path.
+
+- Issue #8024: Update the Unicode database to 5.2.
+
+- Issue #8168: py_compile now handles files with utf-8 BOMS.
+
+- ``tokenize.detect_encoding`` now returns ``'utf-8-sig'`` when a UTF-8 BOM is
+  detected.
+
+- Issue #6716/2: Backslash-replace error output in compilall.
+
+- Issue #4961: Inconsistent/wrong result of askyesno function in tkMessageBox
+  with Tcl/Tk-8.5.
+
+- Issue #8140: extend compileall to compile single files. Add -i option.
+
+- Issue #7356: ctypes.util: Make parsing of ldconfig output independent of
+  the locale.
+
+- The internals of the subprocess module on POSIX systems have been replaced
+  by an extension module (_posixsubprocess) so that the fork()+exec() can be
+  done safely without the possibility of deadlock in multithreaded applications.
+
+- subprocess.Popen now has restore_signals and start_new_session features.
+  The default of restore_signals=True is a new behavior compared to earlier
+  Python versions.  This means that signals such as SIGPIPE are not ignored
+  by default in subprocesses launched by Python (Issue #1652).
+
+- Issue #6472: The xml.etree package is updated to ElementTree 1.3.  The
+  cElementTree module is updated too.
+
+- Issue #7774: Set sys.executable to an empty string if argv[0] has been set to
+  an non existent program name and Python is unable to retrieve the real
+  program name
+
+- Issue #7880: Fix sysconfig when the python executable is a symbolic link.
+
+- Issue #6509: fix re.sub to work properly when the pattern, the string, and
+  the replacement were all bytes. Patch by Antoine Pitrou.
+
+- The sqlite3 module was updated to pysqlite 2.6.0. This fixes several obscure
+  bugs and allows loading SQLite extensions from shared libraries.
+
+- Issue #1054943: Fix ``unicodedata.normalize('NFC', text)`` for the Public
+  Review Issue #29 (http://unicode.org/review/pr-29.html).
+
+- Issue #7494: fix a crash in _lsprof (cProfile) after clearing the profiler,
+  reset also the pointer to the current pointer context.
+
+- Issue #7232: Add support for the context manager protocol to the TarFile
+  class.
+
+- Issue #7250: Fix info leak of os.environ across multi-run uses of
+  wsgiref.handlers.CGIHandler.
+
+- Issue #1729305: Fix doctest to handle encode error with "backslashreplace".
+
+- Issue #691291: codecs.open() should not convert end of lines on reading and
+  writing.
+
+- Issue #7869: logging: improved diagnostic for format-time errors.
+
+- Issue #7868: logging: added loggerClass attribute to Manager.
+
+- logging: Implemented PEP 391.
+
+- Issue #1537721: Add a writeheader() method to csv.DictWriter.
+
+- Issue #7959: ctypes callback functions are now registered correctly
+  with the cycle garbage collector.
+
+- Issue #5801: removed spurious empty lines in wsgiref.
+
+- Issue #6666: fix bug in trace.py that applied the list of directories
+  to be ignored only to the first file.  Noted by Bogdan Opanchuk.
+
+- Issue #7597: curses.use_env() can now be called before initscr().
+  Noted by Kan-Ru Chen.
+
+- Issue #7310: fix the __repr__ of os.environ to show the environment variables.
+
+- Issue #7970: email.Generator.flatten now correctly flattens message/rfc822
+  messages parsed by email.Parser.HeaderParser.
 
 - Issue #7361: Importlib was not properly checking the number of bytes in
   bytecode file when it was less then 8 bytes.
@@ -659,8 +831,28 @@ Library
 
 - Issue #6218: io.StringIO and io.BytesIO instances are now picklable.
 
+- The os.get_exec_path() function to return the list of directories that will
+  be searched for an executable when launching a subprocess was added.
+
+- Issue #7481: When a threading.Thread failed to start it would leave the
+  instance stuck in initial state and present in threading.enumerate().
+
+- Issue #1068268: The subprocess module now handles EINTR in internal
+  os.waitpid and os.read system calls where appropriate.
+
+- Issue #6729: Added ctypes.c_ssize_t to represent ssize_t.
+
+- Issue #6247: The argparse module has been added to the standard library.
+
 Extension Modules
 -----------------
+
+- Issue #8142: Update libffi to the 3.0.9 release.
+
+- Issue #6949: Allow the _dbm extension to be built with db 4.8.x.
+
+- Issue #6544: fix a reference leak in the kqueue implementation's error
+  handling.
 
 - Stop providing crtassem.h symbols when compiling with Visual Studio 2010, as
   msvcr100.dll is not a platform assembly anymore.
@@ -691,8 +883,25 @@ Extension Modules
 - Expat: Fix DoS via XML document with malformed UTF-8 sequences
   (CVE_2009_3560).
 
+- Issue #7242: On Solaris 9 and earlier calling os.fork() from within a
+  thread could raise an incorrect RuntimeError about not holding the import
+  lock.  The import lock is now reinitialized after fork.
+
+- Issue #7999: os.setreuid() and os.setregid() would refuse to accept a -1
+  parameter on some platforms such as OS X.
+
 Build
 -----
+
+- Issue #3326: Build Python without -fno-strict-aliasing when the gcc does not
+  give false warnings.
+
+- Issue #1628484: The Makefile doesn't ignore the CFLAGS environment
+  variable anymore.  It also forwards the LDFLAGS settings to the linker
+  when building a shared library.
+
+- Issue #6716: Quote -x arguments of compileall in MSI installer.
+  Exclude 2to3 tests from compileall.
 
 - Issue #3920, #7903: Define _BSD_SOURCE on OpenBSD 4.4 through 4.9.
 
@@ -731,11 +940,16 @@ Build
 - Issue 5390: Add uninstall icon independent of whether file
   extensions are installed.
 
-- Issue #7541: when using ``python-config`` with a framework install the compiler might
-  use the wrong library.
+- Issue #7541: when using ``python-config`` with a framework install the
+  compiler might use the wrong library.
+
+- python-config now supports multiple options on the same command line.
 
 Documentation
 ------------
+
+- A small wsgi server was added as Tools/scripts/serve.py, and is used to
+  implement a local documentation server via 'make serve' in the doc directory.
 
 - Updating `Using Python` documentation to include description of CPython's
   -J and -X options.
@@ -745,12 +959,38 @@ Documentation
 
 - Issue #6556: Fixed the Distutils configuration files location explanation
   for Windows.
- 
+
 - Update python manual page (options -B, -O0, -s, environment variables
   PYTHONDONTWRITEBYTECODE, PYTHONNOUSERSITE).
 
 Tests
 -----
+
+- Issue #8248: Add some tests for the bool type.  Patch by Gregory Nofi.
+
+- Issue #8263: Now regrtest.py will report a failure if it receives a
+  KeyboardInterrupt (SIGINT).
+
+- Issue #8180 and #8207: Fix test_pep277 on OS X and add more tests for special
+  Unicode normalization cases.
+
+- Issue #7783: test.support.open_urlresource invalidates the outdated files
+  from the local cache.
+
+- Issue #7849: Now the utility ``check_warnings`` verifies if the warnings are
+  effectively raised.
+
+- The four path modules (genericpath, macpath, ntpath, posixpath) share a
+  common TestCase for some tests: test_genericpath.CommonTest.
+
+- Print platform information when running the whole test suite, or using
+  the --verbose flag.
+
+- Issue #767675: enable test_pep277 on POSIX platforms with Unicode-friendly
+  filesystem encoding.
+
+- Issue #6292: for the moment at least, the test suite runs cleanly if python
+  is run with the -OO flag.  Tests requiring docstrings are skipped.
 
 - Issue #7712: test.support gained a new `temp_cwd` context manager which is
   now also used by regrtest to run all the tests in a temporary directory.
@@ -761,8 +1001,8 @@ Tests
   test_capi (only seen so far on platforms where the curses module
   wasn't built), due to an uncleared exception.
 
-- issue #7728: test_timeout was changed to use test_support.bind_port
-  instead of a hard coded port.
+- Issue #7728: test_timeout was changed to use support.bind_port instead of a
+  hard coded port.
 
 - Issue #7376: instead of running a self-test (which was failing) when called
   with no arguments, doctest.py now gives a usage message.

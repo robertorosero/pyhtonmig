@@ -8,7 +8,6 @@
 
 import array
 import hashlib
-from io import StringIO
 import itertools
 import sys
 try:
@@ -101,6 +100,11 @@ class HashLibTestCase(unittest.TestCase):
         for cons in itertools.chain.from_iterable(constructors):
             c = cons(a)
             c.hexdigest()
+
+    def test_algorithms_attribute(self):
+        self.assertEqual(hashlib.algorithms,
+            tuple(_algo for _algo in self.supported_hash_names
+                  if _algo.islower()))
 
     def test_unknown_hash(self):
         try:

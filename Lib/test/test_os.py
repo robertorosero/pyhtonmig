@@ -154,7 +154,6 @@ class TemporaryFileTests(unittest.TestCase):
         self.assertTrue(s == "foobar")
 
     def test_tmpnam(self):
-        import sys
         if not hasattr(os, "tmpnam"):
             return
         warnings.filterwarnings("ignore", "tmpnam", RuntimeWarning,
@@ -214,8 +213,6 @@ class StatAttributeTests(unittest.TestCase):
         # Make sure direct access works
         self.assertEquals(result[stat.ST_SIZE], 3)
         self.assertEquals(result.st_size, 3)
-
-        import sys
 
         # Make sure all the attributes are there
         members = dir(result)
@@ -399,6 +396,35 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
     def test_items(self):
         for key, value in self._reference().items():
             self.assertEqual(os.environ.get(key), value)
+
+    # Issue 7310
+    def test___repr__(self):
+        """Check that the repr() of os.environ looks like environ({...})."""
+        env = os.environ
+        self.assertTrue(isinstance(env.data, dict))
+        self.assertEqual(repr(env), 'environ({!r})'.format(env.data))
+
+    def test_get_exec_path(self):
+        defpath_list = os.defpath.split(os.pathsep)
+        test_path = ['/monty', '/python', '', '/flying/circus']
+        test_env = {'PATH': os.pathsep.join(test_path)}
+
+        saved_environ = os.environ
+        try:
+            os.environ = dict(test_env)
+            # Test that defaulting to os.environ works.
+            self.assertSequenceEqual(test_path, os.get_exec_path())
+            self.assertSequenceEqual(test_path, os.get_exec_path(env=None))
+        finally:
+            os.environ = saved_environ
+
+        # No PATH environment variable
+        self.assertSequenceEqual(defpath_list, os.get_exec_path({}))
+        # Empty PATH environment variable
+        self.assertSequenceEqual(('',), os.get_exec_path({'PATH':''}))
+        # Supplied PATH environment variable
+        self.assertSequenceEqual(test_path, os.get_exec_path(test_env))
+
 
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
@@ -710,12 +736,28 @@ if sys.platform != 'win32':
                 self.assertRaises(OverflowError, os.setreuid, 1<<32, 0)
                 self.assertRaises(OverflowError, os.setreuid, 0, 1<<32)
 
+            def test_setreuid_neg1(self):
+                # Needs to accept -1.  We run this in a subprocess to avoid
+                # altering the test runner's process state (issue8045).
+                import subprocess
+                subprocess.check_call([
+                        sys.executable, '-c',
+                        'import os,sys;os.setreuid(-1,-1);sys.exit(0)'])
+
         if hasattr(os, 'setregid'):
             def test_setregid(self):
                 if os.getuid() != 0:
                     self.assertRaises(os.error, os.setregid, 0, 0)
                 self.assertRaises(OverflowError, os.setregid, 1<<32, 0)
                 self.assertRaises(OverflowError, os.setregid, 0, 1<<32)
+
+            def test_setregid_neg1(self):
+                # Needs to accept -1.  We run this in a subprocess to avoid
+                # altering the test runner's process state (issue8045).
+                import subprocess
+                subprocess.check_call([
+                        sys.executable, '-c',
+                        'import os,sys;os.setregid(-1,-1);sys.exit(0)'])
 
     @unittest.skipIf(sys.platform == 'darwin', "tests don't apply to OS X")
     class Pep383Tests(unittest.TestCase):

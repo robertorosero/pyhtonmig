@@ -420,6 +420,13 @@ You can see that the config file approach has a few advantages over the Python
 code approach, mainly separation of configuration and code and the ability of
 noncoders to easily modify the logging properties.
 
+Note that the class names referenced in config files need to be either relative
+to the logging module, or absolute values which can be resolved using normal
+import mechanisms. Thus, you could use either `handlers.WatchedFileHandler`
+(relative to the logging module) or `mypackage.mymodule.MyHandler` (for a
+class defined in package `mypackage` and module `mymodule`, where `mypackage`
+is available on the Python import path).
+
 .. _library-config:
 
 Configuring Logging for a Library
@@ -727,7 +734,11 @@ functions.
 
    Provides an overriding level *lvl* for all loggers which takes precedence over
    the logger's own level. When the need arises to temporarily throttle logging
-   output down across the whole application, this function can be useful.
+   output down across the whole application, this function can be useful. Its
+   effect is to disable all logging calls of severity *lvl* and below, so that
+   if you call it with a value of INFO, then all INFO and DEBUG events would be
+   discarded, whereas those of severity WARNING and above would be processed
+   according to the logger's effective level.
 
 
 .. function:: addLevelName(lvl, levelName)
@@ -1210,12 +1221,12 @@ swallowed. Other exceptions which occur during the :meth:`emit` method of a
 :class:`Handler` subclass are passed to its :meth:`handleError` method.
 
 The default implementation of :meth:`handleError` in :class:`Handler` checks
-to see if a module-level variable, `raiseExceptions`, is set. If set, a
-traceback is printed to `sys.stderr`. If not set, the exception is swallowed.
+to see if a module-level variable, :data:`raiseExceptions`, is set. If set, a
+traceback is printed to :data:`sys.stderr`. If not set, the exception is swallowed.
 
-**Note:** The default value of `raiseExceptions` is `True`. This is because
+**Note:** The default value of :data:`raiseExceptions` is ``True``. This is because
 during development, you typically want to be notified of any exceptions that
-occur. It's advised that you set `raiseExceptions` to `False` for production
+occur. It's advised that you set :data:`raiseExceptions` to ``False`` for production
 usage.
 
 .. _context-info:
@@ -1849,6 +1860,11 @@ timed intervals.
    The extensions are date-and-time based, using the strftime format
    ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on the
    rollover interval.
+
+   When computing the next rollover time for the first time (when the handler
+   is created), the last modification time of an existing log file, or else
+   the current time, is used to compute when the next rotation will occur.
+
    If the *utc* argument is true, times in UTC will be used; otherwise
    local time is used.
 
@@ -2400,6 +2416,28 @@ If you are implementing asynchronous signal handlers using the :mod:`signal`
 module, you may not be able to use logging from within such handlers. This is
 because lock implementations in the :mod:`threading` module are not always
 re-entrant, and so cannot be invoked from such signal handlers.
+
+
+Integration with the warnings module
+------------------------------------
+
+The :func:`captureWarnings` function can be used to integrate :mod:`logging`
+with the :mod:`warnings` module.
+
+.. function:: captureWarnings(capture)
+
+   This function is used to turn the capture of warnings by logging on and
+   off.
+
+   If `capture` is `True`, warnings issued by the :mod:`warnings` module
+   will be redirected to the logging system. Specifically, a warning will be
+   formatted using :func:`warnings.formatwarning` and the resulting string
+   logged to a logger named "py.warnings" with a severity of `WARNING`.
+
+   If `capture` is `False`, the redirection of warnings to the logging system
+   will stop, and warnings will be redirected to their original destinations
+   (i.e. those in effect before `captureWarnings(True)` was called).
+
 
 Configuration
 -------------

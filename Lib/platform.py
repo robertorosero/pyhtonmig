@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ This module tries to retrieve as much platform-identifying data as
     possible. It makes this information available via function APIs.
@@ -1103,7 +1103,11 @@ def uname():
             # http://support.microsoft.com/kb/888731 and
             # http://www.geocities.com/rick_lively/MANUALS/ENV/MSWIN/PROCESSI.HTM
             if not machine:
-                machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
+                # WOW64 processes mask the native architecture
+                if "PROCESSOR_ARCHITEW6432" in os.environ:
+                    machine = os.environ.get("PROCESSOR_ARCHITEW6432", '')
+                else:
+                    machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
             if not processor:
                 processor = os.environ.get('PROCESSOR_IDENTIFIER', machine)
 

@@ -218,8 +218,8 @@ def _load_testfile(filename, package, module_relative, encoding):
 
 def _indent(s, indent=4):
     """
-    Add the given number of space characters to the beginning every
-    non-blank line in `s`, and return the result.
+    Add the given number of space characters to the beginning of
+    every non-blank line in `s`, and return the result.
     """
     # This regexp matches the start of non-blank lines:
     return re.sub('(?m)^(?!$)', indent*' ', s)
@@ -1354,7 +1354,14 @@ class DocTestRunner:
 
         save_stdout = sys.stdout
         if out is None:
-            out = save_stdout.write
+            encoding = save_stdout.encoding
+            if encoding is None or encoding.lower() == 'utf-8':
+                out = save_stdout.write
+            else:
+                # Use backslashreplace error handling on write
+                def out(s):
+                    s = str(s.encode(encoding, 'backslashreplace'), encoding)
+                    save_stdout.write(s)
         sys.stdout = self._fakeout
 
         # Patch pdb.set_trace to restore sys.stdout during interactive
@@ -2192,6 +2199,19 @@ class DocTestCase(unittest.TestCase):
     def shortDescription(self):
         return "Doctest: " + self._dt_test.name
 
+class SkipDocTestCase(DocTestCase):
+    def __init__(self):
+        DocTestCase.__init__(self, None)
+
+    def setUp(self):
+        self.skipTest("DocTestSuite will not work with -O2 and above")
+
+    def test_skip(self):
+        pass
+
+    def shortDescription(self):
+        return "Skipping tests from %s" % module.__name__
+
 def DocTestSuite(module=None, globs=None, extraglobs=None, test_finder=None,
                  **options):
     """
@@ -2234,13 +2254,20 @@ def DocTestSuite(module=None, globs=None, extraglobs=None, test_finder=None,
 
     module = _normalize_module(module)
     tests = test_finder.find(module, globs=globs, extraglobs=extraglobs)
-    if not tests:
+
+    if not tests and sys.flags.optimize >=2:
+        # Skip doctests when running with -O2
+        suite = unittest.TestSuite()
+        suite.addTest(SkipDocTestCase())
+        return suite
+    elif not tests:
         # Why do we want to do this? Because it reveals a bug that might
         # otherwise be hidden.
         raise ValueError(module, "has no tests")
 
     tests.sort()
     suite = unittest.TestSuite()
+
     for test in tests:
         if len(test.examples) == 0:
             continue

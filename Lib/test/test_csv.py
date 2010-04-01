@@ -488,10 +488,10 @@ hammer and saw"
     def test_null(self):
         self.writerAssertEqual([], '')
 
-    def test_single(self):
+    def test_single_writer(self):
         self.writerAssertEqual([['abc']], 'abc\r\n')
 
-    def test_simple(self):
+    def test_simple_writer(self):
         self.writerAssertEqual([[1, 2, 'abc', 3, 4]], '1,2,abc,3,4\r\n')
 
     def test_quotes(self):
@@ -535,8 +535,12 @@ class TestDictFields(unittest.TestCase):
     def test_write_simple_dict(self):
         with TemporaryFile("w+", newline='') as fileobj:
             writer = csv.DictWriter(fileobj, fieldnames = ["f1", "f2", "f3"])
+            writer.writeheader()
+            fileobj.seek(0)
+            self.assertEqual(fileobj.readline(), "f1,f2,f3\r\n")
             writer.writerow({"f1": 10, "f3": "abc"})
             fileobj.seek(0)
+            fileobj.readline() # header
             self.assertEqual(fileobj.read(), "10,,abc\r\n")
 
     def test_write_no_fields(self):

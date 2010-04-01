@@ -31,8 +31,6 @@
  *   PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* CVS: $Id$ */
-
 /*
 
 A number of SysV or ncurses functions don't have wrappers yet; if you
@@ -215,7 +213,7 @@ PyCurses_ConvertToChtype(PyObject *obj, chtype *ch)
   return 1;
 }
 
-/* Function versions of the 3 functions for tested whether curses has been
+/* Function versions of the 3 functions for testing whether curses has been
    initialised or not. */
    
 static int func_PyCursesSetupTermCalled(void)
@@ -458,14 +456,14 @@ PyCursesWindow_AddStr(PyCursesWindowObject *self, PyObject *args)
 
   if (use_attr == TRUE) {
     attr_old = getattrs(self->win);
-    wattrset(self->win,attr);
+    (void)wattrset(self->win,attr);
   }
   if (use_xy == TRUE)
     rtn = mvwaddstr(self->win,y,x,str);
   else
     rtn = waddstr(self->win,str);
   if (use_attr == TRUE)
-    wattrset(self->win,attr_old);
+    (void)wattrset(self->win,attr_old);
   return PyCursesCheckERR(rtn, "addstr");
 }
 
@@ -507,14 +505,14 @@ PyCursesWindow_AddNStr(PyCursesWindowObject *self, PyObject *args)
 
   if (use_attr == TRUE) {
     attr_old = getattrs(self->win);
-    wattrset(self->win,attr);
+    (void)wattrset(self->win,attr);
   }
   if (use_xy == TRUE)
     rtn = mvwaddnstr(self->win,y,x,str,n);
   else
     rtn = waddnstr(self->win,str,n);
   if (use_attr == TRUE)
-    wattrset(self->win,attr_old);
+    (void)wattrset(self->win,attr_old);
   return PyCursesCheckERR(rtn, "addnstr");
 }
 
@@ -1148,14 +1146,14 @@ PyCursesWindow_InsStr(PyCursesWindowObject *self, PyObject *args)
 
   if (use_attr == TRUE) {
     attr_old = getattrs(self->win);
-    wattrset(self->win,attr);
+    (void)wattrset(self->win,attr);
   }
   if (use_xy == TRUE)
     rtn = mvwinsstr(self->win,y,x,str);
   else
     rtn = winsstr(self->win,str);
   if (use_attr == TRUE)
-    wattrset(self->win,attr_old);
+    (void)wattrset(self->win,attr_old);
   return PyCursesCheckERR(rtn, "insstr");
 }
 
@@ -1197,14 +1195,14 @@ PyCursesWindow_InsNStr(PyCursesWindowObject *self, PyObject *args)
 
   if (use_attr == TRUE) {
     attr_old = getattrs(self->win);
-    wattrset(self->win,attr);
+    (void)wattrset(self->win,attr);
   }
   if (use_xy == TRUE)
     rtn = mvwinsnstr(self->win,y,x,str,n);
   else
     rtn = winsnstr(self->win,str,n);
   if (use_attr == TRUE)
-    wattrset(self->win,attr_old);
+    (void)wattrset(self->win,attr_old);
   return PyCursesCheckERR(rtn, "insnstr");
 }
 
@@ -2545,7 +2543,7 @@ PyCurses_tigetflag(PyObject *self, PyObject *args)
 
 	PyCursesSetupTermCalled;
 		
-	if (!PyArg_ParseTuple(args, "z", &capname))
+	if (!PyArg_ParseTuple(args, "s", &capname))
 		return NULL;
 
 	return PyLong_FromLong( (long) tigetflag( capname ) );
@@ -2558,7 +2556,7 @@ PyCurses_tigetnum(PyObject *self, PyObject *args)
 
 	PyCursesSetupTermCalled;
 		
-	if (!PyArg_ParseTuple(args, "z", &capname))
+	if (!PyArg_ParseTuple(args, "s", &capname))
 		return NULL;
 
 	return PyLong_FromLong( (long) tigetnum( capname ) );
@@ -2571,7 +2569,7 @@ PyCurses_tigetstr(PyObject *self, PyObject *args)
 
 	PyCursesSetupTermCalled;
 		
-	if (!PyArg_ParseTuple(args, "z", &capname))
+	if (!PyArg_ParseTuple(args, "s", &capname))
 		return NULL;
 
 	capname = tigetstr( capname );
@@ -2658,8 +2656,6 @@ static PyObject *
 PyCurses_Use_Env(PyObject *self, PyObject *args)
 {
   int flag;
-
-  PyCursesInitialised
 
   switch(PyTuple_Size(args)) {
   case 1:

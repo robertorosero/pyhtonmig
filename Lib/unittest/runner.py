@@ -4,6 +4,9 @@ import sys
 import time
 
 from . import result
+from .signals import registerResult
+
+__unittest = True
 
 
 class _WritelnDecorator(object):
@@ -122,10 +125,11 @@ class TextTestRunner(object):
     resultclass = TextTestResult
 
     def __init__(self, stream=sys.stderr, descriptions=True, verbosity=1,
-                 resultclass=None):
+                 failfast=False, resultclass=None):
         self.stream = _WritelnDecorator(stream)
         self.descriptions = descriptions
         self.verbosity = verbosity
+        self.failfast = failfast
         if resultclass is not None:
             self.resultclass = resultclass
 
@@ -135,6 +139,8 @@ class TextTestRunner(object):
     def run(self, test):
         "Run the given test case or test suite."
         result = self._makeResult()
+        registerResult(result)
+        result.failfast = self.failfast
         startTime = time.time()
         startTestRun = getattr(result, 'startTestRun', None)
         if startTestRun is not None:
@@ -148,15 +154,22 @@ class TextTestRunner(object):
         stopTime = time.time()
         timeTaken = stopTime - startTime
         result.printErrors()
-        self.stream.writeln(result.separator2)
+        if hasattr(result, 'separator2'):
+            self.stream.writeln(result.separator2)
         run = result.testsRun
         self.stream.writeln("Ran %d test%s in %.3fs" %
                             (run, run != 1 and "s" or "", timeTaken))
         self.stream.writeln()
-        results = map(len, (result.expectedFailures,
-                            result.unexpectedSuccesses,
-                            result.skipped))
-        expectedFails, unexpectedSuccesses, skipped = results
+
+        expectedFails = unexpectedSuccesses = skipped = 0
+        try:
+            results = map(len, (result.expectedFailures,
+                                result.unexpectedSuccesses,
+                                result.skipped))
+            expectedFails, unexpectedSuccesses, skipped = results
+        except AttributeError:
+            pass
+
         infos = []
         if not result.wasSuccessful():
             self.stream.write("FAILED")

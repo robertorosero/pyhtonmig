@@ -1,4 +1,5 @@
 import functools
+import sys
 import unittest
 from test import support
 from weakref import proxy
@@ -44,9 +45,17 @@ class TestPartial(unittest.TestCase):
         # attributes should not be writable
         if not isinstance(self.thetype, type):
             return
-        self.assertRaises(TypeError, setattr, p, 'func', map)
-        self.assertRaises(TypeError, setattr, p, 'args', (1, 2))
-        self.assertRaises(TypeError, setattr, p, 'keywords', dict(a=1, b=2))
+        self.assertRaises(AttributeError, setattr, p, 'func', map)
+        self.assertRaises(AttributeError, setattr, p, 'args', (1, 2))
+        self.assertRaises(AttributeError, setattr, p, 'keywords', dict(a=1, b=2))
+
+        p = self.thetype(hex)
+        try:
+            del p.__dict__
+        except TypeError:
+            pass
+        else:
+            self.fail('partial object allowed __dict__ to be deleted')
 
     def test_argument_checking(self):
         self.assertRaises(TypeError, self.thetype)     # need at least a func arg
@@ -122,15 +131,6 @@ class TestPartial(unittest.TestCase):
         self.assertRaises(ZeroDivisionError, self.thetype(f), 1, 0)
         self.assertRaises(ZeroDivisionError, self.thetype(f, y=0), 1)
 
-    def test_attributes(self):
-        p = self.thetype(hex)
-        try:
-            del p.__dict__
-        except TypeError:
-            pass
-        else:
-            self.fail('partial object allowed __dict__ to be deleted')
-
     def test_weakref(self):
         f = self.thetype(int, base=16)
         p = proxy(f)
@@ -180,7 +180,7 @@ class TestUpdateWrapper(unittest.TestCase):
             for key in wrapped_attr:
                 self.assertTrue(wrapped_attr[key] is wrapper_attr[key])
 
-    def test_default_update(self):
+    def _default_update(self):
         def f():
             """This is a test"""
             pass
@@ -188,10 +188,19 @@ class TestUpdateWrapper(unittest.TestCase):
         def wrapper():
             pass
         functools.update_wrapper(wrapper, f)
+        return wrapper, f
+
+    def test_default_update(self):
+        wrapper, f = self._default_update()
         self.check_wrapper(wrapper, f)
         self.assertEqual(wrapper.__name__, 'f')
-        self.assertEqual(wrapper.__doc__, 'This is a test')
         self.assertEqual(wrapper.attr, 'This is also a test')
+
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
+    def test_default_update_doc(self):
+        wrapper, f = self._default_update()
+        self.assertEqual(wrapper.__doc__, 'This is a test')
 
     def test_no_update(self):
         def f():
@@ -233,7 +242,7 @@ class TestUpdateWrapper(unittest.TestCase):
 
 class TestWraps(TestUpdateWrapper):
 
-    def test_default_update(self):
+    def _default_update(self):
         def f():
             """This is a test"""
             pass
@@ -242,9 +251,18 @@ class TestWraps(TestUpdateWrapper):
         def wrapper():
             pass
         self.check_wrapper(wrapper, f)
+        return wrapper
+
+    def test_default_update(self):
+        wrapper = self._default_update()
         self.assertEqual(wrapper.__name__, 'f')
-        self.assertEqual(wrapper.__doc__, 'This is a test')
         self.assertEqual(wrapper.attr, 'This is also a test')
+
+    @unittest.skipIf(not sys.flags.optimize <= 1,
+                     "Docstrings are omitted with -O2 and above")
+    def test_default_update_doc(self):
+        wrapper = self._default_update()
+        self.assertEqual(wrapper.__doc__, 'This is a test')
 
     def test_no_update(self):
         def f():
@@ -350,7 +368,6 @@ class TestReduce(unittest.TestCase):
 
 
 def test_main(verbose=None):
-    import sys
     test_classes = (
         TestPartial,
         TestPartialSubclass,

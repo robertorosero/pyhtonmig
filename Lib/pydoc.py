@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: latin-1 -*-
 """Generate Python documentation in HTML or text for interactive use.
 
@@ -349,7 +349,8 @@ class Doc:
                                  'marshal', 'posix', 'signal', 'sys',
                                  '_thread', 'zipimport') or
              (file.startswith(basedir) and
-              not file.startswith(os.path.join(basedir, 'site-packages'))))):
+              not file.startswith(os.path.join(basedir, 'site-packages')))) and
+            object.__name__ not in ('xml.etree', 'test.pydoc_mod')):
             if docloc.startswith("http://"):
                 docloc = "%s/%s" % (docloc.rstrip("/"), object.__name__)
             else:
