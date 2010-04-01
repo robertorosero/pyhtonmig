@@ -12,6 +12,12 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8211: Save/restore CFLAGS around AC_PROG_CC in configure.in, compiler
+  optimizations are disabled when --with-pydebug is used.
+
+- Issue #8226: sys.setfilesystemencoding() raises a LookupError if the encoding
+  is unknown
+
 - Issue #1583863: An str subclass can now override the __str__ method
 
 - Issue #8014: Setting a T_UINT or T_PYSSIZET attribute of an object with
@@ -240,6 +246,10 @@ Core and Builtins
 C-API
 -----
 
+- Issue #8276: PyEval_CallObject() is now only available in macro form.  The
+  function declaration, which was kept for backwards compatibility reasons,
+  is now removed (the macro was introduced in 1997!).
+
 - Issue #7767: New function PyLong_AsLongLongAndOverflow added,
   analogous to PyLong_AsLongAndOverflow.
 
@@ -287,6 +297,28 @@ C-API
 Library
 -------
 
+- Issue #8233: When run as a script, py_compile.py optionally takes a single
+  argument `-` which tells it to read files to compile from stdin.  Each line
+  is read on demand and the named file is compiled immediately.  (Original
+  patch by Piotr Ożarowski).
+
+- Backwards incompatible change: Unicode codepoints line tabulation (0x0B) and
+  form feed (0x0C) are now considered linebreaks, as specified in Unicode
+  Standard Annex #14.  See issue #7643.
+  http://www.unicode.org/reports/tr14/
+
+- Comparisons using one of <, <=, >, >= between a complex instance and
+  a Fractions instance now raise TypeError instead of returning
+  True/False.  This makes Fraction <=> complex comparisons consistent with
+  int <=> complex, float <=> complex, and complex <=> complex comparisons.
+
+- Issue #8139: ossaudiodev didn't initialize its types properly, therefore
+  some methods (such as oss_mixer_device.fileno()) were not available.
+  Initial patch by Bertrand Janin.
+
+- Issue #8205: Remove the "Modules" directory from sys.path when Python is
+  running from the build directory (POSIX only).
+
 - Issue #7512: shutil.copystat() could raise an OSError when the filesystem
   didn't support chflags() (for example ZFS under FreeBSD).  The error is
   now silenced.
@@ -294,7 +326,9 @@ Library
 - Issue #7860: platform.uname now reports the correct 'machine' type
   when Python is running in WOW64 mode on 64 bit Windows.
 
-- Issue #3890: Fix recv() and recv_into() on non-blocking SSL sockets.
+- Issue #3890, #8222: Fix recv() and recv_into() on non-blocking SSL sockets.
+  Also, enable the SSL_MODE_AUTO_RETRY flag on SSL sockets, so that blocking
+  reads and writes are always retried by OpenSSL itself.
 
 - Issue #4282: Fix the main function of the profile module for a non-ASCII
   script, open the file in binary mode and not in text mode with the default
@@ -863,6 +897,9 @@ Extension Modules
 Build
 -----
 
+- Issue #3326: Build Python without -fno-strict-aliasing when the gcc does not
+  give false warnings.
+
 - Issue #1628484: The Makefile doesn't ignore the CFLAGS environment
   variable anymore.  It also forwards the LDFLAGS settings to the linker
   when building a shared library.
@@ -933,8 +970,13 @@ Documentation
 Tests
 -----
 
-- Issue #8180: Fix test_pep277 on OS X and add more tests for special Unicode
-  normalization cases.
+- Issue #8248: Add some tests for the bool type.  Patch by Gregory Nofi.
+
+- Issue #8263: Now regrtest.py will report a failure if it receives a
+  KeyboardInterrupt (SIGINT).
+
+- Issue #8180 and #8207: Fix test_pep277 on OS X and add more tests for special
+  Unicode normalization cases.
 
 - Issue #7783: test.support.open_urlresource invalidates the outdated files
   from the local cache.
