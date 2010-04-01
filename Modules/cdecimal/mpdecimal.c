@@ -6204,7 +6204,7 @@ _mpd_qround_to_integral(int action, mpd_t *result, const mpd_t *a,
 	result->exp = 0;
 
 	if (action == TO_INT_EXACT || action == TO_INT_SILENT) {
-		_mpd_apply_round(result, rnd, ctx, status);
+		_mpd_apply_round_excess(result, rnd, ctx, status);
 		if (action == TO_INT_EXACT) {
 			*status |= MPD_Rounded;
 			if (rnd) {
