@@ -281,12 +281,16 @@ class dHandlerCdec:
     def __pow__(self, result, operands):
         """See DIFFERENCES.txt"""
         if operands[2] is not None: # three argument __pow__
+            # issue7049: third arg must fit into precision
             if (operands[0].mpd.is_zero() != operands[1].mpd.is_zero()):
                 if (result.mpd == 0 or result.mpd == 1) and result.dec.is_nan():
                     if (not context.f.flags[cdecimal.InvalidOperation]) and \
                        context.d.flags[decimal.InvalidOperation]:
                         self.powmod_zeros += 1
                         return True
+            # issue7049: ideal exponent
+            if decimal.Decimal(str(result.mpd)) == result.dec:
+                return True
         elif context.f.flags[cdecimal.Rounded] and \
              context.f.flags[cdecimal.Inexact] and \
              context.d.flags[decimal.Rounded] and \
