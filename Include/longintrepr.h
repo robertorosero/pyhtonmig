@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 
-/* This is published for the benefit of "friend" marshal.c only. */
+/* This is published for the benefit of "friends" marshal.c and cdecimal.c. */
 
 /* Parameters of the long integer representation.  There are two different
    sets of parameters: one set for 30-bit digits, stored in an unsigned 32-bit
