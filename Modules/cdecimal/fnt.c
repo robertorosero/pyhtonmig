@@ -4,12 +4,12 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include "bits.h"
 #include "difradix2.h"
-#include "mpdecimal.h"
 #include "numbertheory.h"
 #include "fnt.h"
 

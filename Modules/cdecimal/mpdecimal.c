@@ -4,6 +4,7 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,6 @@
 #include "umodarith.h"
 #include "mptest.h"
 #include "mptypes.h"
-#include "mpdecimal.h"
 
 #ifdef PPRO
   #if defined(_MSC_VER)

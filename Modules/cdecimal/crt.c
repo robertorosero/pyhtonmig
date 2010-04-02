@@ -4,9 +4,9 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <assert.h>
-#include "mpdecimal.h"
 #include "numbertheory.h"
 #include "umodarith.h"
 #include "crt.h"

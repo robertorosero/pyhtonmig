@@ -4,12 +4,12 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include "bits.h"
 #include "constants.h"
 #include "fnt.h"
 #include "fourstep.h"
-#include "mpdecimal.h"
 #include "numbertheory.h"
 #include "sixstep.h"
 #include "umodarith.h"

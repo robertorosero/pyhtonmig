@@ -4,11 +4,9 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <stdarg.h>
-
-
-#include "mpdecimal.h"
 
 
 void mpd_err_doit(int action, const char *fmt, ...)

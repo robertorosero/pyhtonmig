@@ -8,8 +8,9 @@
 #define FNT_H
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
+
 
 int std_fnt(mpd_uint_t a[], mpd_size_t n, int modnum, int ordered UNUSED);
 int std_inv_fnt(mpd_uint_t a[], mpd_size_t n, int modnum, int ordered UNUSED);

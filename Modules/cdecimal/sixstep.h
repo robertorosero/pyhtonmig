@@ -8,8 +8,8 @@
 #define SIX_STEP_H
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
 
 
 int six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered);

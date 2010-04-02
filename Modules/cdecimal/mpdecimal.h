@@ -16,19 +16,26 @@
   #define EXTINLINE extern inline
 #else
   #include "pyconfig.h"
-  #if HAVE_STDINT_H
+  #ifdef HAVE_STDINT_H
     #include <stdint.h>
+  #endif
+  #ifdef HAVE_INTTYPES_H
+    #include <inttypes.h>
   #endif
   #define __GNUC_STDC_INLINE__
   #define UNUSED __attribute__((unused))
   #define EXTINLINE
 #endif
 
+
 #if !defined(LEGACY_COMPILER)
   #if !defined(UINT64_MAX)
+    /* XXX: This warning is temporary and can be removed at some point. */
+    #error "Warning: Compiler without uint64_t. Comment out this line."
     #define LEGACY_COMPILER
   #endif
 #endif
+
 
 #if defined(CONFIG_64)
   #include "mpdecimal64.h"

@@ -4,11 +4,10 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include "mpdecimal.h"
-
 
 
 static void

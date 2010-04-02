@@ -4,13 +4,13 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <assert.h>
 #include "bits.h"
 #include "constants.h"
-#include "mpdecimal.h"
 #include "typearith.h"
 #include "transpose.h"
 

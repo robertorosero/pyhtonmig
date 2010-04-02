@@ -8,8 +8,8 @@
 #define TRANSPOSE_H
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
 
 
 enum {FORWARD_CYCLE, BACKWARD_CYCLE};

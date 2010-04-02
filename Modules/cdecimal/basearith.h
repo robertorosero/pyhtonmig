@@ -8,8 +8,8 @@
 #define BASEARITH_H
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
 #include "typearith.h"
 
 

@@ -8,8 +8,8 @@
 #define BITS_H
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
 
 
 /* Check if n is a power of 2 */

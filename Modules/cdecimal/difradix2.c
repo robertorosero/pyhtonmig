@@ -4,10 +4,10 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <assert.h>
 #include "bits.h"
-#include "mpdecimal.h"
 #include "numbertheory.h"
 #include "umodarith.h"
 #include "difradix2.h"

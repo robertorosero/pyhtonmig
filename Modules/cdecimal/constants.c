@@ -4,8 +4,8 @@
  */
 
 
-#include <stdio.h>
 #include "mpdecimal.h"
+#include <stdio.h>
 #include "constants.h"
 
 

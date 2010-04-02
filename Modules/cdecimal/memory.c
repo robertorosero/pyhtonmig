@@ -4,9 +4,9 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpdecimal.h"
 #include "typearith.h"
 #include "memory.h"
 

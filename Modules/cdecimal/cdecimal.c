@@ -5,14 +5,15 @@
 
 
 #include <Python.h>
-#include <stdlib.h>
 #include "longintrepr.h"
 #include "pythread.h"
 #include "structmember.h"
+#include "mpdecimal.h"
+
+#include <stdlib.h>
 
 #include "docstrings.h"
 #include "memory.h"
-#include "mpdecimal.h"
 #include "mptypes.h"
 
 

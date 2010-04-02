@@ -4,6 +4,7 @@
  */
 
 
+#include "mpdecimal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,6 @@
 #include <assert.h>
 #include "bits.h"
 #include "constants.h"
-#include "mpdecimal.h"
 #include "typearith.h"
 #include "transpose.h"
 

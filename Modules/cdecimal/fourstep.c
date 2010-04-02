@@ -4,8 +4,8 @@
  */
 
 
-#include <assert.h>
 #include "mpdecimal.h"
+#include <assert.h>
 #include "numbertheory.h"
 #include "sixstep.h"
 #include "transpose.h"
