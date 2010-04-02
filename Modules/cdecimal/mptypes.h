@@ -9,7 +9,7 @@
 
 
 #if defined(CONFIG_64)
-  #if defined(_MSC_VER)
+  #if defined(_MSC_VER) || defined(__OpenBSD__)
     #define PRI_mpd_size_t "llu"
     #define PRI_mpd_ssize_t "lld"
   #else
@@ -20,21 +20,17 @@
   #define CONV_mpd_ssize_t "L"
   #define ONE_UM 1ULL
 #elif defined(CONFIG_32)
+  #define PRI_mpd_size_t "u"
+  #define PRI_mpd_ssize_t "d"
   #if defined (__OpenBSD__)
-    #define PRI_mpd_size_t "u"
-    #define PRI_mpd_ssize_t "d"
     #define PRI_time_t "d"
   #elif defined(__FreeBSD__)
-    #define PRI_mpd_size_t "u"
-    #define PRI_mpd_ssize_t "d"
     #if defined(__x86_64__)
       #define PRI_time_t "ld"
     #else
       #define PRI_time_t "d"
     #endif
   #else
-    #define PRI_mpd_size_t "u"
-    #define PRI_mpd_ssize_t "d"
     #define PRI_time_t "ld"
   #endif
   #if MPD_SSIZE_MAX != INT_MAX
