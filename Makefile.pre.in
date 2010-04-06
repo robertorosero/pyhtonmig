@@ -107,6 +107,7 @@ LIBP=		$(LIBDIR)/python$(VERSION)
 SO=		@SO@
 LDSHARED=	@LDSHARED@
 BLDSHARED=	@BLDSHARED@
+LDCXXSHARED=	@LDCXXSHARED@
 DESTSHARED=	$(BINLIBDEST)/lib-dynload
 
 # Executable suffix (.exe on Windows and Mac OS X)
@@ -238,6 +239,7 @@ PARSER_OBJS=	$(POBJS) Parser/myreadline.o Parser/tokenizer.o
 PGOBJS=		\
 		Objects/obmalloc.o \
 		Python/mysnprintf.o \
+		Python/pyctype.o \
 		Parser/tokenizer_pgen.o \
 		Parser/printgrammar.o \
 		Parser/pgenmain.o
@@ -736,7 +738,7 @@ ctest: AllUnitTests
 
 TESTOPTS=	-l $(EXTRATESTOPTS)
 TESTPROG=	$(srcdir)/Lib/test/regrtest.py
-TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -E -bb
+TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -Wd -E -bb
 test:		all platform ctest
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)

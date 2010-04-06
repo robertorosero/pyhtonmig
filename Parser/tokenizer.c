@@ -245,7 +245,7 @@ get_coding_spec(const char *s, Py_ssize_t size)
 			} while (t[0] == '\x20' || t[0] == '\t');
 
 			begin = t;
-			while (isalnum(Py_CHARMASK(t[0])) ||
+			while (Py_ISALNUM(t[0]) ||
 			       t[0] == '-' || t[0] == '_' || t[0] == '.')
 				t++;
 

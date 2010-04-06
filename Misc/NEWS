@@ -12,6 +12,12 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Ensure that tokenization of identifiers is not affected by locale.
+
+- Issue #1222585: Added LDCXXSHARED for C++ support. Patch by Arfrever.
+
+- Raise a TypeError when trying to delete a T_STRING_INPLACE struct member.
+
 - Issue #8211: Save/restore CFLAGS around AC_PROG_CC in configure.in, compiler
   optimizations are disabled when --with-pydebug is used.
 
@@ -297,6 +303,33 @@ C-API
 Library
 -------
 
+- Issue #8321: Give access to OpenSSL version numbers from the `ssl` module,
+  using the new attributes `ssl.OPENSSL_VERSION`, `ssl.OPENSSL_VERSION_INFO`
+  and `ssl.OPENSSL_VERSION_NUMBER`.
+
+- Add functools.total_ordering() and functools.cmp_to_key().
+
+- Issue #8257: The Decimal construct now accepts a float instance
+  directly, converting that float to a Decimal of equal value:
+
+     >>> Decimal(1.1)
+     Decimal('1.100000000000000088817841970012523233890533447265625')
+
+- Issue #8294: The Fraction constructor now accepts Decimal and float
+  instances directly.
+
+- Issue #7279: Comparisons involving a Decimal signaling NaN now
+  signal InvalidOperation instead of returning False.  (Comparisons
+  involving a quiet NaN are unchanged.)  Also, Decimal quiet NaNs
+  are now hashable;  Decimal signaling NaNs remain unhashable.
+
+- Issue #2531: Comparison operations between floats and Decimal
+  instances now return a result based on the numeric values of the
+  operands;  previously they returned an arbitrary result based on
+  the relative ordering of id(float) and id(Decimal).
+
+- Added a subtract() method to collections.Counter().
+
 - Issue #8233: When run as a script, py_compile.py optionally takes a single
   argument `-` which tells it to read files to compile from stdin.  Each line
   is read on demand and the named file is compiled immediately.  (Original
@@ -549,7 +582,7 @@ Library
 - Issue #5949: added check for correct lineends in input from IMAP server
   in imaplib.
 
-- Add a reverse() method to collections.deque().
+- Add count() and reverse() methods to collections.deque().
 
 - Fix variations of extending deques:  d.extend(d)  d.extendleft(d)  d+=d
 
@@ -848,8 +881,16 @@ Library
 
 - Issue #6247: The argparse module has been added to the standard library.
 
+- Issue #8235: _socket: Add the constant ``SO_SETFIB``.  SO_SETFIB is
+  a socket option available on FreeBSD 7.1 and newer.
+
 Extension Modules
 -----------------
+
+- Issue #8300: When passing a non-integer argument to struct.pack with any
+  integer format code, struct.pack first attempts to convert the non-integer
+  using its __index__ method.  If that method is non-existent or raises
+  TypeError it goes on to try the __int__ method, as described below.
 
 - Issue #8142: Update libffi to the 3.0.9 release.
 

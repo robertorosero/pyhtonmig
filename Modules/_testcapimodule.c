@@ -1668,6 +1668,7 @@ typedef struct {
 	Py_ssize_t pyssizet_member;
 	float float_member;
 	double double_member;
+	char inplace_member[6];
 #ifdef HAVE_LONG_LONG
 	PY_LONG_LONG longlong_member;
 	unsigned PY_LONG_LONG ulonglong_member;
@@ -1692,6 +1693,7 @@ static struct PyMemberDef test_members[] = {
 	{"T_PYSSIZET", T_PYSSIZET, offsetof(test_structmembers, structmembers.pyssizet_member), 0, NULL},
 	{"T_FLOAT", T_FLOAT, offsetof(test_structmembers, structmembers.float_member), 0, NULL},
 	{"T_DOUBLE", T_DOUBLE, offsetof(test_structmembers, structmembers.double_member), 0, NULL},
+	{"T_STRING_INPLACE", T_STRING_INPLACE, offsetof(test_structmembers, structmembers.inplace_member), 0, NULL},
 #ifdef HAVE_LONG_LONG
 	{"T_LONGLONG", T_LONGLONG, offsetof(test_structmembers, structmembers.longlong_member), 0, NULL},
 	{"T_ULONGLONG", T_ULONGLONG, offsetof(test_structmembers, structmembers.ulonglong_member), 0, NULL},
@@ -1706,17 +1708,19 @@ test_structmembers_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 	static char *keywords[] = {
 		"T_BOOL", "T_BYTE", "T_UBYTE", "T_SHORT", "T_USHORT",
 		"T_INT", "T_UINT", "T_LONG", "T_ULONG", "T_PYSSIZET",
-		"T_FLOAT", "T_DOUBLE",
+		"T_FLOAT", "T_DOUBLE", "T_STRING_INPLACE",
 #ifdef HAVE_LONG_LONG
 		"T_LONGLONG", "T_ULONGLONG",
 #endif
 		NULL};
-	static char *fmt = "|bbBhHiIlknfd"
+	static char *fmt = "|bbBhHiIlknfds#"
 #ifdef HAVE_LONG_LONG
 		"LK"
 #endif
 		;
 	test_structmembers *ob;
+	const char *s = NULL;
+	Py_ssize_t string_len = 0;
 	ob = PyObject_New(test_structmembers, type);
 	if (ob == NULL)
 		return NULL;
@@ -1733,7 +1737,8 @@ test_structmembers_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 					 &ob->structmembers.ulong_member,
 					 &ob->structmembers.pyssizet_member,
 					 &ob->structmembers.float_member,
-					 &ob->structmembers.double_member
+					 &ob->structmembers.double_member,
+					 &s, &string_len
 #ifdef HAVE_LONG_LONG
 					 , &ob->structmembers.longlong_member,
 					 &ob->structmembers.ulonglong_member
@@ -1741,6 +1746,17 @@ test_structmembers_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 		)) {
 		Py_DECREF(ob);
 		return NULL;
+	}
+	if (s != NULL) {
+		if (string_len > 5) {
+			Py_DECREF(ob);
+			PyErr_SetString(PyExc_ValueError, "string too long");
+			return NULL;
+		}
+		strcpy(ob->structmembers.inplace_member, s);
+	}
+	else {
+		strcpy(ob->structmembers.inplace_member, "");
 	}
 	return (PyObject *)ob;
 }
@@ -1820,7 +1836,9 @@ PyInit__testcapi(void)
 
 	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);
-	PyModule_AddObject(m, "test_structmembersType", (PyObject *)&test_structmembersType);
+	/* don't use a name starting with "test", since we don't want
+	   test_capi to automatically call this */
+	PyModule_AddObject(m, "_test_structmembersType", (PyObject *)&test_structmembersType);
 
 	PyModule_AddObject(m, "CHAR_MAX", PyLong_FromLong(CHAR_MAX));
 	PyModule_AddObject(m, "CHAR_MIN", PyLong_FromLong(CHAR_MIN));

@@ -191,7 +191,7 @@ For example::
    .. versionadded:: 3.1
 
 
-   Counter objects support two methods beyond those available for all
+   Counter objects support three methods beyond those available for all
    dictionaries:
 
    .. method:: elements()
@@ -213,6 +213,19 @@ For example::
 
             >>> Counter('abracadabra').most_common(3)
             [('a', 5), ('r', 2), ('b', 2)]
+
+   .. method:: subtract([iterable-or-mapping])
+
+      Elements are subtracted from an *iterable* or from another *mapping*
+      (or counter).  Like :meth:`dict.update` but subtracts counts instead
+      of replacing them.  Both inputs and outputs may be zero or negative.
+
+            >>> c = Counter(a=4, b=2, c=0, d=-2)
+            >>> d = Counter(a=1, b=2, c=3, d=4)
+            >>> c.subtract(d)
+            Counter({'a': 3, 'b': 0, 'c': -3, 'd': -6})
+
+      .. versionadded:: 3.2
 
    The usual dictionary methods are available for :class:`Counter` objects
    except for two which work differently for counters.
@@ -326,6 +339,12 @@ counts, but the output will exclude results with counts of zero or less.
 
       Remove all elements from the deque leaving it with length 0.
 
+
+   .. method:: count(x)
+
+      Count the number of deque elements equal to *x*.
+
+      .. versionadded:: 3.2
 
    .. method:: extend(iterable)
 
@@ -653,6 +672,7 @@ Example:
            _fields = ('x', 'y')
    <BLANKLINE>
            def __new__(_cls, x, y):
+               'Create a new instance of Point(x, y)'
                return _tuple.__new__(_cls, (x, y))
    <BLANKLINE>
            @classmethod
@@ -664,6 +684,7 @@ Example:
                return result
    <BLANKLINE>
            def __repr__(self):
+               'Return a nicely formatted representation string'
                return 'Point(x=%r, y=%r)' % self
    <BLANKLINE>
            def _asdict(self):
@@ -678,10 +699,11 @@ Example:
                return result
    <BLANKLINE>
            def __getnewargs__(self):
+               'Return self as a plain tuple.   Used by copy and pickle.'
                return tuple(self)
    <BLANKLINE>
-           x = _property(_itemgetter(0))
-           y = _property(_itemgetter(1))
+           x = _property(_itemgetter(0), doc='Alias for field number 0')
+           y = _property(_itemgetter(1), doc='Alias for field number 1')
 
    >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
    >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)

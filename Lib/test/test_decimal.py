@@ -26,6 +26,7 @@ with the corresponding argument.
 
 import math
 import os, sys
+import operator
 import pickle, copy
 import unittest
 from decimal import *
@@ -51,6 +52,11 @@ def init():
         traps = dict.fromkeys(Signals, 0)
         )
     setcontext(DefaultTestContext)
+
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
 
 TESTDATADIR = 'decimaltestdata'
 if __name__ == '__main__':
@@ -503,6 +509,27 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         e = Decimal(d)
         self.assertEqual(str(e), '0')
         self.assertNotEqual(id(d), id(e))
+
+    @requires_IEEE_754
+    def test_explicit_from_float(self):
+        r = Decimal(0.1)
+        self.assertEqual(type(r), Decimal)
+        self.assertEqual(str(r),
+                '0.1000000000000000055511151231257827021181583404541015625')
+        self.assertTrue(Decimal(float('nan')).is_qnan())
+        self.assertTrue(Decimal(float('inf')).is_infinite())
+        self.assertTrue(Decimal(float('-inf')).is_infinite())
+        self.assertEqual(str(Decimal(float('nan'))),
+                         str(Decimal('NaN')))
+        self.assertEqual(str(Decimal(float('inf'))),
+                         str(Decimal('Infinity')))
+        self.assertEqual(str(Decimal(float('-inf'))),
+                         str(Decimal('-Infinity')))
+        self.assertEqual(str(Decimal(float('-0.0'))),
+                         str(Decimal('-0')))
+        for i in range(200):
+            x = random.expovariate(0.01) * (random.random() * 2.0 - 1.0)
+            self.assertEqual(x, float(Decimal(x))) # roundtrip
 
     def test_explicit_context_create_decimal(self):
 
@@ -1070,18 +1097,56 @@ class DecimalArithmeticOperatorsTest(unittest.TestCase):
         self.assertEqual(abs(Decimal(45)), abs(Decimal(-45)))  # abs
 
     def test_nan_comparisons(self):
+        # comparisons involving signaling nans signal InvalidOperation
+
+        # order comparisons (<, <=, >, >=) involving only quiet nans
+        # also signal InvalidOperation
+
+        # equality comparisons (==, !=) involving only quiet nans
+        # don't signal, but return False or True respectively.
+
         n = Decimal('NaN')
         s = Decimal('sNaN')
         i = Decimal('Inf')
         f = Decimal('2')
-        for x, y in [(n, n), (n, i), (i, n), (n, f), (f, n),
-                     (s, n), (n, s), (s, i), (i, s), (s, f), (f, s), (s, s)]:
-            self.assertTrue(x != y)
-            self.assertTrue(not (x == y))
-            self.assertTrue(not (x < y))
-            self.assertTrue(not (x <= y))
-            self.assertTrue(not (x > y))
-            self.assertTrue(not (x >= y))
+
+        qnan_pairs = (n, n), (n, i), (i, n), (n, f), (f, n)
+        snan_pairs = (s, n), (n, s), (s, i), (i, s), (s, f), (f, s), (s, s)
+        order_ops = operator.lt, operator.le, operator.gt, operator.ge
+        equality_ops = operator.eq, operator.ne
+
+        # results when InvalidOperation is not trapped
+        for x, y in qnan_pairs + snan_pairs:
+            for op in order_ops + equality_ops:
+                got = op(x, y)
+                expected = True if op is operator.ne else False
+                self.assertIs(expected, got,
+                              "expected {0!r} for operator.{1}({2!r}, {3!r}); "
+                              "got {4!r}".format(
+                        expected, op.__name__, x, y, got))
+
+        # repeat the above, but this time trap the InvalidOperation
+        with localcontext() as ctx:
+            ctx.traps[InvalidOperation] = 1
+
+            for x, y in qnan_pairs:
+                for op in equality_ops:
+                    got = op(x, y)
+                    expected = True if op is operator.ne else False
+                    self.assertIs(expected, got,
+                                  "expected {0!r} for "
+                                  "operator.{1}({2!r}, {3!r}); "
+                                  "got {4!r}".format(
+                            expected, op.__name__, x, y, got))
+
+            for x, y in snan_pairs:
+                for op in equality_ops:
+                    self.assertRaises(InvalidOperation, operator.eq, x, y)
+                    self.assertRaises(InvalidOperation, operator.ne, x, y)
+
+            for x, y in qnan_pairs + snan_pairs:
+                for op in order_ops:
+                    self.assertRaises(InvalidOperation, op, x, y)
 
     def test_copy_sign(self):
         d = Decimal(1).copy_sign(Decimal(-2))
@@ -1160,18 +1225,18 @@ class DecimalUsabilityTest(unittest.TestCase):
         dc = Decimal('45')
 
         #two Decimals
-        self.assertTrue(dc > da)
-        self.assertTrue(dc >= da)
-        self.assertTrue(da < dc)
-        self.assertTrue(da <= dc)
+        self.assertGreater(dc, da)
+        self.assertGreaterEqual(dc, da)
+        self.assertLess(da, dc)
+        self.assertLessEqual(da, dc)
         self.assertEqual(da, db)
-        self.assertTrue(da != dc)
-        self.assertTrue(da <= db)
-        self.assertTrue(da >= db)
+        self.assertNotEqual(da, dc)
+        self.assertLessEqual(da, db)
+        self.assertGreaterEqual(da, db)
 
         #a Decimal and an int
-        self.assertTrue(dc > 23)
-        self.assertTrue(23 < dc)
+        self.assertGreater(dc, 23)
+        self.assertLess(23, dc)
         self.assertEqual(dc, 45)
 
         #a Decimal and uncomparable
@@ -1187,6 +1252,23 @@ class DecimalUsabilityTest(unittest.TestCase):
         a.sort()
         self.assertEqual(a, b)
 
+    def test_decimal_float_comparison(self):
+        da = Decimal('0.25')
+        db = Decimal('3.0')
+        self.assertLess(da, 3.0)
+        self.assertLessEqual(da, 3.0)
+        self.assertGreater(db, 0.25)
+        self.assertGreaterEqual(db, 0.25)
+        self.assertNotEqual(da, 1.5)
+        self.assertEqual(da, 0.25)
+        self.assertGreater(3.0, da)
+        self.assertGreaterEqual(3.0, da)
+        self.assertLess(0.25, db)
+        self.assertLessEqual(0.25, db)
+        self.assertNotEqual(0.25, db)
+        self.assertEqual(3.0, db)
+        self.assertNotEqual(0.1, Decimal('0.1'))
+
     def test_copy_and_deepcopy_methods(self):
         d = Decimal('43.24')
         c = copy.copy(d)
@@ -1197,6 +1279,10 @@ class DecimalUsabilityTest(unittest.TestCase):
     def test_hash_method(self):
         #just that it's hashable
         hash(Decimal(23))
+        hash(Decimal('Infinity'))
+        hash(Decimal('-Infinity'))
+        hash(Decimal('nan123'))
+        hash(Decimal('-NaN'))
 
         test_values = [Decimal(sign*(2**m + n))
                        for m in [0, 14, 15, 16, 17, 30, 31,
@@ -1231,9 +1317,18 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         #the same hash that to an int
         self.assertEqual(hash(Decimal(23)), hash(23))
-        self.assertRaises(TypeError, hash, Decimal('NaN'))
+        self.assertRaises(TypeError, hash, Decimal('sNaN'))
         self.assertTrue(hash(Decimal('Inf')))
         self.assertTrue(hash(Decimal('-Inf')))
+
+        # check that the hashes of a Decimal float match when they
+        # represent exactly the same values
+        test_strings = ['inf', '-Inf', '0.0', '-.0e1',
+                        '34.0', '2.5', '112390.625', '-0.515625']
+        for s in test_strings:
+            f = float(s)
+            d = Decimal(s)
+            self.assertEqual(hash(f), hash(d))
 
         # check that the value of the hash doesn't depend on the
         # current context (issue #1757)
@@ -1260,16 +1355,16 @@ class DecimalUsabilityTest(unittest.TestCase):
         l2 = 28
 
         #between Decimals
-        self.assertTrue(min(d1,d2) is d1)
-        self.assertTrue(min(d2,d1) is d1)
-        self.assertTrue(max(d1,d2) is d2)
-        self.assertTrue(max(d2,d1) is d2)
+        self.assertIs(min(d1,d2), d1)
+        self.assertIs(min(d2,d1), d1)
+        self.assertIs(max(d1,d2), d2)
+        self.assertIs(max(d2,d1), d2)
 
         #between Decimal and long
-        self.assertTrue(min(d1,l2) is d1)
-        self.assertTrue(min(l2,d1) is d1)
-        self.assertTrue(max(l1,d2) is d2)
-        self.assertTrue(max(d2,l1) is d2)
+        self.assertIs(min(d1,l2), d1)
+        self.assertIs(min(l2,d1), d1)
+        self.assertIs(max(l1,d2), d2)
+        self.assertIs(max(d2,l1), d2)
 
     def test_as_nonzero(self):
         #as false
@@ -1526,10 +1621,10 @@ class DecimalUsabilityTest(unittest.TestCase):
         d1 = MyDecimal(1)
         d2 = MyDecimal(2)
         d = d1 + d2
-        self.assertTrue(type(d) is Decimal)
+        self.assertIs(type(d), Decimal)
 
         d = d1.max(d2)
-        self.assertTrue(type(d) is Decimal)
+        self.assertIs(type(d), Decimal)
 
     def test_implicit_context(self):
         # Check results when context given implicitly.  (Issue 2478)
@@ -1589,7 +1684,7 @@ class DecimalPythonAPItests(unittest.TestCase):
 
     def test_abc(self):
         self.assertTrue(issubclass(Decimal, numbers.Number))
-        self.assertTrue(not issubclass(Decimal, numbers.Real))
+        self.assertFalse(issubclass(Decimal, numbers.Real))
         self.assertIsInstance(Decimal(0), numbers.Number)
         self.assertNotIsInstance(Decimal(0), numbers.Real)
 
@@ -2137,9 +2232,9 @@ class WithStatementTest(unittest.TestCase):
         with localcontext() as enter_ctx:
             set_ctx = getcontext()
         final_ctx = getcontext()
-        self.assertTrue(orig_ctx is final_ctx, 'did not restore context correctly')
-        self.assertTrue(orig_ctx is not set_ctx, 'did not copy the context')
-        self.assertTrue(set_ctx is enter_ctx, '__enter__ returned wrong context')
+        self.assertIs(orig_ctx, final_ctx, 'did not restore context correctly')
+        self.assertIsNot(orig_ctx, set_ctx, 'did not copy the context')
+        self.assertIs(set_ctx, enter_ctx, '__enter__ returned wrong context')
 
     def test_localcontextarg(self):
         # Use a copy of the supplied context in the block
@@ -2148,10 +2243,10 @@ class WithStatementTest(unittest.TestCase):
         with localcontext(new_ctx) as enter_ctx:
             set_ctx = getcontext()
         final_ctx = getcontext()
-        self.assertTrue(orig_ctx is final_ctx, 'did not restore context correctly')
-        self.assertTrue(set_ctx.prec == new_ctx.prec, 'did not set correct context')
-        self.assertTrue(new_ctx is not set_ctx, 'did not copy the context')
-        self.assertTrue(set_ctx is enter_ctx, '__enter__ returned wrong context')
+        self.assertIs(orig_ctx, final_ctx, 'did not restore context correctly')
+        self.assertEqual(set_ctx.prec, new_ctx.prec, 'did not set correct context')
+        self.assertIsNot(new_ctx, set_ctx, 'did not copy the context')
+        self.assertIs(set_ctx, enter_ctx, '__enter__ returned wrong context')
 
 class ContextFlags(unittest.TestCase):
     def test_flags_irrelevant(self):
