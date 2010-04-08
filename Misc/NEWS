@@ -12,6 +12,15 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #7301: Add environment variable $PYTHONWARNINGS.
+
+- Issue #8329: Don't return the same lists from select.select when no fds are
+  changed.
+
+- Issue #8259: 1L << (2**31) no longer produces an 'outrageous shift error'
+  on 64-bit machines.  The shift count for either left or right shift is
+  permitted to be up to sys.maxsize.
+
 - Ensure that tokenization of identifiers is not affected by locale.
 
 - Issue #1222585: Added LDCXXSHARED for C++ support. Patch by Arfrever.
@@ -302,6 +311,12 @@ C-API
 
 Library
 -------
+
+- Issue #8321: Give access to OpenSSL version numbers from the `ssl` module,
+  using the new attributes `ssl.OPENSSL_VERSION`, `ssl.OPENSSL_VERSION_INFO`
+  and `ssl.OPENSSL_VERSION_NUMBER`.
+
+- Add functools.total_ordering() and functools.cmp_to_key().
 
 - Issue #8257: The Decimal construct now accepts a float instance
   directly, converting that float to a Decimal of equal value:
@@ -1004,6 +1019,8 @@ Documentation
 
 Tests
 -----
+
+- Issue #8193: Fix test_zlib failure with zlib 1.2.4.
 
 - Issue #8248: Add some tests for the bool type.  Patch by Gregory Nofi.
 

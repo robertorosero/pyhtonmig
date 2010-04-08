@@ -656,15 +656,18 @@ _Py_HashDouble(double v)
 	 * of mapping keys will turn out weird.
 	 */
 
+	if (!Py_IS_FINITE(v)) {
+		if (Py_IS_INFINITY(v))
+			return v < 0 ? -271828 : 314159;
+		else
+			return 0;
+	}
 	fractpart = modf(v, &intpart);
 	if (fractpart == 0.0) {
 		/* This must return the same hash as an equal int or long. */
 		if (intpart > LONG_MAX/2 || -intpart > LONG_MAX/2) {
 			/* Convert to long and use its hash. */
 			PyObject *plong;	/* converted to Python long */
-			if (Py_IS_INFINITY(intpart))
-				/* can't convert to long int -- arbitrary */
-				v = v < 0 ? -271828.0 : 314159.0;
 			plong = PyLong_FromDouble(v);
 			if (plong == NULL)
 				return -1;

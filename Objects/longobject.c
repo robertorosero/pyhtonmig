@@ -1111,7 +1111,7 @@ PyLong_FromSize_t(size_t ival)
 	int ndigits = 0;
 
 	if (ival < PyLong_BASE)
-		return PyLong_FromLong(ival);
+		return PyLong_FromLong((long)ival);
 	/* Count the number of Python digits. */
 	t = ival;
 	while (t) {
@@ -2405,7 +2405,7 @@ _PyLong_Frexp(PyLongObject *a, Py_ssize_t *e)
 		while (x_size < shift_digits)
 			x_digits[x_size++] = 0;
 		rem = v_lshift(x_digits + x_size, a->ob_digit, a_size,
-			       shift_bits);
+			       (int)shift_bits);
 		x_size += a_size;
 		x_digits[x_size++] = rem;
 	}
@@ -2413,7 +2413,7 @@ _PyLong_Frexp(PyLongObject *a, Py_ssize_t *e)
 		shift_digits = (a_bits - DBL_MANT_DIG - 2) / PyLong_SHIFT;
 		shift_bits = (a_bits - DBL_MANT_DIG - 2) % PyLong_SHIFT;
 		rem = v_rshift(x_digits, a->ob_digit + shift_digits,
-			       a_size - shift_digits, shift_bits);
+			       a_size - shift_digits, (int)shift_bits);
 		x_size = a_size - shift_digits;
 		/* For correct rounding below, we need the least significant
 		   bit of x to be 'sticky' for this shift: if any of the bits
@@ -2428,7 +2428,7 @@ _PyLong_Frexp(PyLongObject *a, Py_ssize_t *e)
 					break;
 				}
 	}
-	assert(1 <= x_size && x_size <= sizeof(x_digits)/sizeof(digit));
+	assert(1 <= x_size && x_size <= (Py_ssize_t)(sizeof(x_digits)/sizeof(digit)));
 
 	/* Round, and convert to double. */
 	x_digits[0] += half_even_correction[x_digits[0] & 7];
@@ -2475,7 +2475,7 @@ PyLong_AsDouble(PyObject *v)
 				"long int too large to convert to float");
 		return -1.0;
 	}
-	return ldexp(x, exponent);
+	return ldexp(x, (int)exponent);
 }
 
 /* Methods */
@@ -3492,9 +3492,9 @@ long_true_divide(PyObject *v, PyObject *w)
 
 	/* Check whether ldexp result will overflow a double. */
 	if (shift + x_bits >= DBL_MAX_EXP &&
-	    (shift + x_bits > DBL_MAX_EXP || dx == ldexp(1.0, x_bits)))
+	    (shift + x_bits > DBL_MAX_EXP || dx == ldexp(1.0, (int)x_bits)))
 		goto overflow;
-	result = ldexp(dx, shift);
+	result = ldexp(dx, (int)shift);
 
   success:
 	return PyFloat_FromDouble(negate ? -result : result);
@@ -3779,8 +3779,7 @@ static PyObject *
 long_rshift(PyLongObject *a, PyLongObject *b)
 {
 	PyLongObject *z = NULL;
-	long shiftby;
-	Py_ssize_t newsize, wordshift, loshift, hishift, i, j;
+	Py_ssize_t shiftby, newsize, wordshift, loshift, hishift, i, j;
 	digit lomask, himask;
 
 	CHECK_BINOP(a, b);
@@ -3799,8 +3798,7 @@ long_rshift(PyLongObject *a, PyLongObject *b)
 		Py_DECREF(a2);
 	}
 	else {
-
-		shiftby = PyLong_AsLong((PyObject *)b);
+		shiftby = PyLong_AsSsize_t((PyObject *)b);
 		if (shiftby == -1L && PyErr_Occurred())
 			goto rshift_error;
 		if (shiftby < 0) {
@@ -3841,27 +3839,21 @@ long_lshift(PyObject *v, PyObject *w)
 	PyLongObject *a = (PyLongObject*)v;
 	PyLongObject *b = (PyLongObject*)w;
 	PyLongObject *z = NULL;
-	long shiftby;
-	Py_ssize_t oldsize, newsize, wordshift, remshift, i, j;
+	Py_ssize_t shiftby, oldsize, newsize, wordshift, remshift, i, j;
 	twodigits accum;
 
 	CHECK_BINOP(a, b);
 
-	shiftby = PyLong_AsLong((PyObject *)b);
+	shiftby = PyLong_AsSsize_t((PyObject *)b);
 	if (shiftby == -1L && PyErr_Occurred())
 		goto lshift_error;
 	if (shiftby < 0) {
 		PyErr_SetString(PyExc_ValueError, "negative shift count");
 		goto lshift_error;
 	}
-	if ((long)(int)shiftby != shiftby) {
-		PyErr_SetString(PyExc_ValueError,
-				"outrageous left shift count");
-		goto lshift_error;
-	}
 	/* wordshift, remshift = divmod(shiftby, PyLong_SHIFT) */
-	wordshift = (int)shiftby / PyLong_SHIFT;
-	remshift  = (int)shiftby - wordshift * PyLong_SHIFT;
+	wordshift = shiftby / PyLong_SHIFT;
+	remshift  = shiftby - wordshift * PyLong_SHIFT;
 
 	oldsize = ABS(Py_SIZE(a));
 	newsize = oldsize + wordshift;
@@ -4370,7 +4362,7 @@ long_bit_length(PyLongObject *v)
 	Py_DECREF(result);
 	result = y;
 
-	x = (PyLongObject *)PyLong_FromLong(msd_bits);
+	x = (PyLongObject *)PyLong_FromLong((long)msd_bits);
 	if (x == NULL)
 		goto error;
 	y = (PyLongObject *)long_add(result, x);
