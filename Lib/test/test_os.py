@@ -859,20 +859,20 @@ class Win32KillTests(unittest.TestCase):
 
 def test_main():
     support.run_unittest(
-        #ArgTests,
-        #FileTests,
-        #StatAttributeTests,
-        #EnvironTests,
-        #WalkTests,
-        #MakedirTests,
-        #DevNullTests,
-        #URandomTests,
+        ArgTests,
+        FileTests,
+        StatAttributeTests,
+        EnvironTests,
+        WalkTests,
+        MakedirTests,
+        DevNullTests,
+        URandomTests,
         ExecTests,
-        #Win32ErrorTests,
-        #TestInvalidFD,
-        #PosixUidGidTests,
-        #Pep383Tests,
-        #Win32KillTests
+        Win32ErrorTests,
+        TestInvalidFD,
+        PosixUidGidTests,
+        Pep383Tests,
+        Win32KillTests
     )
 
 if __name__ == "__main__":
