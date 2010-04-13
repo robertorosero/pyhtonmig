@@ -867,7 +867,7 @@ def test_main():
         #MakedirTests,
         #DevNullTests,
         #URandomTests,
-        ExecTests,
+        #ExecTests,
         #Win32ErrorTests,
         TestInvalidFD,
         #PosixUidGidTests,
