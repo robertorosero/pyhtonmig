@@ -260,8 +260,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
              'runleaks', 'huntrleaks=', 'memlimit=', 'randseed=',
              'multiprocess=', 'slaveargs=', 'forever', 'debug', 'start=',
              'nowindows'])
-        # Issue #4970: pretend that args were test_os and test_wait3
-        args = ['test_os', 'test_wait3']
     except getopt.error as msg:
         usage(msg)
 
@@ -272,8 +270,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         use_resources = []
     debug = False
     start = None
-    # Issue #4970: always give verbose output
-    verbose = 1
     for o, a in opts:
         if o in ('-h', '--help'):
             print(__doc__)
@@ -298,9 +294,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         elif o in ('-S', '--slow'):
             print_slow = True
         elif o in ('-r', '--randomize'):
-            # Issue 4970: don't randomize
-            # randomize = True
-            pass
+            randomize = True
         elif o == '--randseed':
             random_seed = int(a)
         elif o in ('-f', '--fromfile'):
