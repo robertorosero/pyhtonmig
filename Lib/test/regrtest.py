@@ -260,6 +260,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
              'runleaks', 'huntrleaks=', 'memlimit=', 'randseed=',
              'multiprocess=', 'slaveargs=', 'forever', 'debug', 'start=',
              'nowindows'])
+        # Issue #4970: pretend that args were test_os and test_wait3
+        args = ['test_os', 'test_wait3']
     except getopt.error as msg:
         usage(msg)
 
@@ -294,7 +296,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         elif o in ('-S', '--slow'):
             print_slow = True
         elif o in ('-r', '--randomize'):
-            randomize = True
+            # Issue 4970: don't randomize
+            # randomize = True
+            pass
         elif o == '--randseed':
             random_seed = int(a)
         elif o in ('-f', '--fromfile'):
