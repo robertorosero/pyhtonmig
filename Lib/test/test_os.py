@@ -859,18 +859,18 @@ class Win32KillTests(unittest.TestCase):
 
 def test_main():
     support.run_unittest(
-        ArgTests,
-        FileTests,
-        StatAttributeTests,
-        EnvironTests,
-        WalkTests,
-        MakedirTests,
-        DevNullTests,
-        #URandomTests,
-        #ExecTests,
+        #ArgTests,
+        #FileTests,
+        #StatAttributeTests,
+        #EnvironTests,
+        #WalkTests,
+        #MakedirTests,
+        #DevNullTests,
+        URandomTests,
+        ExecTests,
         #Win32ErrorTests,
-        #TestInvalidFD,
-        #PosixUidGidTests,
+        TestInvalidFD,
+        PosixUidGidTests,
         #Pep383Tests,
         #Win32KillTests
     )
