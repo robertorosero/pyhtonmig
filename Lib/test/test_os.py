@@ -589,13 +589,10 @@ class URandomTests(unittest.TestCase):
 
 class ExecTests(unittest.TestCase):
     def test_execvpe_with_bad_program(self):
-        for dir in os.environ.get('PATH', os.defpath).split(os.pathsep):
-            fullname = os.path.join(dir, 'no such app-')
-            try:
-                print("os.execv({!r}, ['no such app-'])".format(fullname))
-                os.execv(fullname, ['no such app-'])
-            except OSError:
-                pass
+        try:
+            os.execv('/usr/bin/dorothyq', ['dorothyq'])
+        except OSError:
+            pass
 
     def XXXtest_execvpe_with_bad_arglist(self):
         self.assertRaises(ValueError, os.execvpe, 'notepad', [], None)
