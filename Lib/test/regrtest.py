@@ -272,6 +272,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         use_resources = []
     debug = False
     start = None
+    # Issue #4970: always give verbose output
+    verbose = 1
     for o, a in opts:
         if o in ('-h', '--help'):
             print(__doc__)
