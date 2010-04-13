@@ -588,10 +588,16 @@ class URandomTests(unittest.TestCase):
             pass
 
 class ExecTests(unittest.TestCase):
-    def XXXtest_execvpe_with_bad_program(self):
-        self.assertRaises(OSError, os.execvpe, 'no such app-', ['no such app-'], None)
+    def test_execvpe_with_bad_program(self):
+        for dir in os.environ.get('PATH', os.defpath).split(os.pathsep):
+            fullname = os.path.join(dir, 'no such app-')
+            try:
+                print("os.execv({!r}, ['no such app-'])".format(fullname))
+                os.execv(fullname, ['no such app-'])
+            except OSError:
+                pass
 
-    def test_execvpe_with_bad_arglist(self):
+    def XXXtest_execvpe_with_bad_arglist(self):
         self.assertRaises(ValueError, os.execvpe, 'notepad', [], None)
 
 class ArgTests(unittest.TestCase):
@@ -859,20 +865,20 @@ class Win32KillTests(unittest.TestCase):
 
 def test_main():
     support.run_unittest(
-        ArgTests,
-        FileTests,
-        StatAttributeTests,
-        EnvironTests,
-        WalkTests,
-        MakedirTests,
-        DevNullTests,
-        URandomTests,
+        #ArgTests,
+        #FileTests,
+        #StatAttributeTests,
+        #EnvironTests,
+        #WalkTests,
+        #MakedirTests,
+        #DevNullTests,
+        #URandomTests,
         ExecTests,
-        Win32ErrorTests,
-        TestInvalidFD,
-        PosixUidGidTests,
-        Pep383Tests,
-        Win32KillTests
+        #Win32ErrorTests,
+        #TestInvalidFD,
+        #PosixUidGidTests,
+        #Pep383Tests,
+        #Win32KillTests
     )
 
 if __name__ == "__main__":
