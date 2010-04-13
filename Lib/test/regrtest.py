@@ -260,8 +260,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
              'runleaks', 'huntrleaks=', 'memlimit=', 'randseed=',
              'multiprocess=', 'slaveargs=', 'forever', 'debug', 'start=',
              'nowindows'])
-        # Issue #4970: pretend that args were test_os and test_wait3
-        args = ['test_os', 'test_wait3']
+        # Issue #4970: pretend that the only non-option arg was test_wait3
+        args = ['test_wait3']
     except getopt.error as msg:
         usage(msg)
 

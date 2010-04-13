@@ -8,6 +8,11 @@ from test.fork_wait import ForkWait
 from test.support import run_unittest, reap_children
 
 try:
+    os.execv('/usr/bin/dorothyq', ['dorothyq'])
+except OSError:
+    pass
+
+try:
     os.fork
 except AttributeError:
     raise unittest.SkipTest("os.fork not defined -- skipping test_wait3")
