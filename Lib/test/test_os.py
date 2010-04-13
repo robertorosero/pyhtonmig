@@ -866,11 +866,11 @@ def test_main():
         #WalkTests,
         #MakedirTests,
         #DevNullTests,
-        URandomTests,
+        #URandomTests,
         ExecTests,
         #Win32ErrorTests,
         TestInvalidFD,
-        PosixUidGidTests,
+        #PosixUidGidTests,
         #Pep383Tests,
         #Win32KillTests
     )
