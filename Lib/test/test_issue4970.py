@@ -7,6 +7,9 @@ import time
 import _thread
 
 pprint.pprint(os.confstr_names)
+print(os.confstr('CS_GNU_LIBC_VERSION'))
+print(os.confstr('CS_GNU_LIBPTHREAD_VERSION'))
+
 
 try:
     os.execv('/usr/bin/dorothyq', ['dorothyq'])
