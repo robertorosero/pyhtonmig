@@ -5981,6 +5981,9 @@ static struct constdef posix_constants_confstr[] = {
 #ifdef _CS_ARCHITECTURE
     {"CS_ARCHITECTURE",	_CS_ARCHITECTURE},
 #endif
+#ifdef _CS_GNU_LIBPTHREAD_VERSION
+    {"CS_GNU_LIBPTHREAD_VERSION", _CS_GNU_LIBPTHREAD_VERSION},
+#endif
 #ifdef _CS_HOSTNAME
     {"CS_HOSTNAME",	_CS_HOSTNAME},
 #endif
