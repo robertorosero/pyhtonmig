@@ -372,23 +372,9 @@ class TestBuggyCases(GetSourceBase):
         self.assertRaises(IOError, inspect.getsource, unicodedata)
         self.assertRaises(IOError, inspect.findsource, unicodedata)
 
-
-
-class _BrokenDescriptor(object):
-    """
-    A descriptor which raises an exception when it is accessed as an attribute
-    of the class it is on.  This is used to test inspect's handling of such
-    descriptors.
-    """
-    def __get__(self, *args):
-        raise RuntimeError("This descriptor cannot be gotten.")
-
-
-
 # Helper for testing classify_class_attrs.
 def attrs_wo_objs(cls):
     return [t[:3] for t in inspect.classify_class_attrs(cls)]
-
 
 class TestClassesAndFunctions(unittest.TestCase):
     def test_classic_mro(self):
@@ -475,8 +461,6 @@ class TestClassesAndFunctions(unittest.TestCase):
             def m1(self): pass
 
             datablob = '1'
-
-            broken_data = _BrokenDescriptor()
 
         attrs = attrs_wo_objs(A)
         self.assertIn(('s', 'static method', A), attrs, 'missing static method')
