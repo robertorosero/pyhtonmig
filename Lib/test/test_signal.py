@@ -395,9 +395,161 @@ class ItimerTest(unittest.TestCase):
         # and the handler should have been called
         self.assertEqual(self.hndl_called, True)
 
+
+
+class SomeException(Exception):
+    """
+    A unique exception class to be raised by a signal handler to verify that the
+    signal handler was invoked.
+    """
+
+
+
+def raiser(*args):
+    """A signal handler which raises SomeException.
+    """
+    raise SomeException()
+
+
+
+class SigprocmaskTests(unittest.TestCase):
+    """
+    Tests for sigprocmask.
+    """
+    def _handle_sigusr1(self):
+        old_handler = signal.signal(signal.SIGUSR1, raiser)
+        self.addCleanup(signal.signal, signal.SIGUSR1, old_handler)
+        return SomeException
+
+
+    def test_signature(self):
+        """When invoked with other than two arguments, sigprocmask raises
+        TypeError.
+        """
+        self.assertRaises(TypeError, signal.sigprocmask)
+        self.assertRaises(TypeError, signal.sigprocmask, 1)
+        self.assertRaises(TypeError, signal.sigprocmask, 1, 2, 3)
+
+
+    def test_invalid_how(self):
+        """If a valid other than SIG_BLOCK, SIG_UNBLOCK, or SIG_SETMASK is
+        passed for the how argument to sigprocmask, ValueError is raised.
+        """
+        with self.assertRaises(ValueError) as cm:
+            signal.sigprocmask(1700, [])
+        exc = cm.exception
+        self.assertTrue(isinstance(exc, ValueError))
+        self.assertEquals(str(exc), "value specified for how (1700) invalid")
+
+
+    def test_return_previous_mask(self):
+        """sigprocmask returns a list of the signals previously masked.
+        """
+        previous = signal.sigprocmask(signal.SIG_BLOCK, [1, 3, 5])
+        result = signal.sigprocmask(signal.SIG_BLOCK, previous)
+        self.assertEquals(result, [1, 3, 5])
+
+
+    def test_block(self):
+        """When invoked with SIG_BLOCK, sigprocmask blocks the signals in the
+        sigmask list.
+        """
+        self._handle_sigusr1()
+        previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR1])
+        os.kill(os.getpid(), signal.SIGUSR1)
+        try:
+            signal.sigprocmask(signal.SIG_SETMASK, previous)
+        except SomeException:
+            pass
+        else:
+            self.fail("Expected to receive SIGUSR1 after unblocking it.")
+
+
+    def test_unblock(self):
+        """When invoked with SIG_UNBLOCK, sigprocmask unblocks the signals in
+        the sigmask list.
+        """
+        self._handle_sigusr1()
+        previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR1])
+        self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, previous)
+        signal.sigprocmask(signal.SIG_UNBLOCK, [signal.SIGUSR1])
+        try:
+            os.kill(os.getpid(), signal.SIGUSR1)
+            time.sleep(1)
+        except SomeException:
+            pass
+        else:
+            self.fail("SomeException was expected but not raised")
+
+
+class SignalfdTests(unittest.TestCase):
+    """
+    Tests for signal.signalfd.
+    """
+    def test_signature(self):
+        """When invoked with fewer than two arguments or more than three,
+        signalfd raises TypeError.
+        """
+        self.assertRaises(TypeError, signal.signalfd)
+        self.assertRaises(TypeError, signal.signalfd, 1)
+        self.assertRaises(TypeError, signal.signalfd, 1, 2, 3, 4)
+
+
+    def test_create_signalfd(self):
+        """When invoked with a file descriptor of -1, signalfd allocates a new
+        file descriptor for signal information delivery and returns it.
+        """
+        fd = signal.signalfd(-1, [])
+        self.assertTrue(isinstance(fd, int))
+        os.close(fd)
+
+
+    def test_non_iterable_signals(self):
+        """If an object which is not iterable is passed for the sigmask list
+        argument to signalfd, the exception raised by trying to iterate over
+        that object is raised.
+        """
+        self.assertRaises(TypeError, signal.signalfd, -1, object())
+
+
+    def test_non_integer_signals(self):
+        """If any non-integer values are included in the sigmask list argument
+        to signalfd, the exception raised by the attempt to convert them to an
+        integer is raised.
+        """
+        self.assertRaises(TypeError, signal.signalfd, -1, [object()])
+
+
+    def test_out_of_range_signal(self):
+        """If a signal number that is out of the valid range is included in the
+        sigmask list argument to signalfd, ValueError is raised.
+        """
+        with self.assertRaises(ValueError) as cm:
+            signal.signalfd(-1, [-2])
+        exc = cm.exception
+        self.assertTrue(isinstance(exc, ValueError))
+        self.assertEquals(str(exc), "signal number -2 out of range")
+
+
+    def test_handle_signals(self):
+        """After signalfd is called, if a signal is received which was in the
+        sigmask list passed to that call, information about the signal can be
+        read from the fd returned by that call.
+        """
+        fd = signal.signalfd(-1, [signal.SIGUSR2])
+        self.addCleanup(os.close, fd)
+        previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR2])
+        self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, previous)
+        os.kill(os.getpid(), signal.SIGUSR2)
+        bytes = os.read(fd, 128)
+        self.assertTrue(bytes)
+
+
 def test_main():
-    test_support.run_unittest(BasicSignalTests, InterProcessSignalTests,
-        WakeupSignalTests, SiginterruptTest, ItimerTest)
+    test_support.run_unittest(
+        BasicSignalTests, InterProcessSignalTests,
+        WakeupSignalTests, SiginterruptTest, ItimerTest, SignalfdTests,
+        SigprocmaskTests)
 
 
 if __name__ == "__main__":
