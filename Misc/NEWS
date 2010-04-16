@@ -12,6 +12,11 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #7301: Add environment variable $PYTHONWARNINGS.
+
+- Issue #8329: Don't return the same lists from select.select when no fds are
+  changed.
+
 - Issue #8259: 1L << (2**31) no longer produces an 'outrageous shift error'
   on 64-bit machines.  The shift count for either left or right shift is
   permitted to be up to sys.maxsize.
@@ -306,6 +311,31 @@ C-API
 
 Library
 -------
+
+- Issue #5277: Fix quote counting when parsing RFC 2231 encoded parameters.
+
+- Issue #7316: the acquire() method of lock objects in the :mod:`threading`
+  module now takes an optional timeout argument in seconds.  Timeout support
+  relies on the system threading library, so as to avoid a semi-busy wait
+  loop.
+
+- Issue #8383: pickle and pickletools use surrogatepass error handler when
+  encoding unicode as utf8 to support lone surrogates and stay compatible with
+  Python 2.x and 3.0
+
+- Issue #7585: difflib context and unified diffs now place a tab between
+  filename and date, conforming to the 'standards' they were originally
+  designed to follow.  This improves compatibility with patch tools.
+
+- Issue #7472: Fixed typo in email.encoders module; messages using ISO-2022
+  character sets will now consistently use a Content-Transfer-Encoding of
+  7bit rather than sometimes being marked as 8bit.
+
+- Issue #8375: test_distutils now checks if the temporary directory are still
+  present before it cleans them.
+
+- Issue #8374: Update the internal alias table in the :mod:`locale` module
+  to cover recent locale changes and additions.
 
 - Issue #8321: Give access to OpenSSL version numbers from the `ssl` module,
   using the new attributes `ssl.OPENSSL_VERSION`, `ssl.OPENSSL_VERSION_INFO`

@@ -244,16 +244,16 @@ With the logger object configured, the following methods create log messages:
   methods listed above, but this is how to log at custom log levels.
 
 :func:`getLogger` returns a reference to a logger instance with the specified
-if it it is provided, or ``root`` if not.  The names are period-separated
+if it is provided, or ``root`` if not.  The names are period-separated
 hierarchical structures.  Multiple calls to :func:`getLogger` with the same name
 will return a reference to the same logger object.  Loggers that are further
 down in the hierarchical list are children of loggers higher up in the list.
 For example, given a logger with a name of ``foo``, loggers with names of
-``foo.bar``, ``foo.bar.baz``, and ``foo.bam`` are all children of ``foo``.
-Child loggers propagate messages up to their parent loggers.  Because of this,
-it is unnecessary to define and configure all the loggers an application uses.
-It is sufficient to configure a top-level logger and create child loggers as
-needed.
+``foo.bar``, ``foo.bar.baz``, and ``foo.bam`` are all descendants of ``foo``.
+Child loggers propagate messages up to the handlers associated with their
+ancestor loggers.  Because of this, it is unnecessary to define and configure
+handlers for all the loggers an application uses. It is sufficient to
+configure handlers for a top-level logger and create child loggers as needed.
 
 
 Handlers
@@ -281,15 +281,16 @@ custom handlers) are the following configuration methods:
   are there two :func:`setLevel` methods?  The level set in the logger
   determines which severity of messages it will pass to its handlers.  The level
   set in each handler determines which messages that handler will send on.
-  :func:`setFormatter` selects a Formatter object for this handler to use.
+
+* :func:`setFormatter` selects a Formatter object for this handler to use.
 
 * :func:`addFilter` and :func:`removeFilter` respectively configure and
   deconfigure filter objects on handlers.
 
-Application code should not directly instantiate and use handlers.  Instead, the
-:class:`Handler` class is a base class that defines the interface that all
-Handlers should have and establishes some default behavior that child classes
-can use (or override).
+Application code should not directly instantiate and use instances of
+:class:`Handler`.  Instead, the :class:`Handler` class is a base class that
+defines the interface that all handlers should have and establishes some
+default behavior that child classes can use (or override).
 
 
 Formatters
@@ -521,7 +522,9 @@ support desk staff, system administrators, developers). Handlers are passed
 can have zero, one or more handlers associated with it (via the
 :meth:`addHandler` method of :class:`Logger`). In addition to any handlers
 directly associated with a logger, *all handlers associated with all ancestors
-of the logger* are called to dispatch the message.
+of the logger* are called to dispatch the message (unless the *propagate* flag
+for a logger is set to a false value, at which point the passing to ancestor
+handlers stops).
 
 Just as for loggers, handlers can have levels associated with them. A handler's
 level acts as a filter in the same way as a logger's level does. If a handler
@@ -849,8 +852,8 @@ instantiated directly, but always through the module-level function
 .. attribute:: Logger.propagate
 
    If this evaluates to false, logging messages are not passed by this logger or by
-   child loggers to higher level (ancestor) loggers. The constructor sets this
-   attribute to 1.
+   its child loggers to the handlers of higher level (ancestor) loggers. The
+   constructor sets this attribute to 1.
 
 
 .. method:: Logger.setLevel(lvl)
@@ -888,6 +891,16 @@ instantiated directly, but always through the module-level function
    the hierarchy is traversed towards the root until a value other than
    :const:`NOTSET` is found, and that value is returned.
 
+
+.. method:: Logger.getChild(suffix)
+
+   Returns a logger which is a descendant to this logger, as determined by the suffix.
+   Thus, ``logging.getLogger('abc').getChild('def.ghi')`` would return the same
+   logger as would be returned by ``logging.getLogger('abc.def.ghi')``. This is a
+   convenience method, useful when the parent logger is named using e.g. ``__name__``
+   rather than a literal string.
+
+   .. versionadded:: 3.2
 
 .. method:: Logger.debug(msg, *args, **kwargs)
 
@@ -2012,6 +2025,87 @@ supports sending logging messages to a remote or local Unix syslog.
       or integers - if strings are passed, internal mapping dictionaries are
       used to convert them to integers.
 
+      The symbolic ``LOG_`` values are defined in :class:`SysLogHandler` and
+      mirror the values defined in the ``sys/syslog.h`` header file.
+
+      +------------------------------------------+
+      | Priorities                               |
+      +--------------------------+---------------+
+      | Name (string)            | Symbolic value|
+      +==========================+===============+
+      | ``alert``                | LOG_ALERT     |
+      +--------------------------+---------------+
+      | ``crit`` or ``critical`` | LOG_CRIT      |
+      +--------------------------+---------------+
+      | ``debug``                | LOG_DEBUG     |
+      +--------------------------+---------------+
+      | ``emerg`` or ``panic``   | LOG_EMERG     |
+      +--------------------------+---------------+
+      | ``err`` or ``error``     | LOG_ERR       |
+      +--------------------------+---------------+
+      | ``info``                 | LOG_INFO      |
+      +--------------------------+---------------+
+      | ``notice``               | LOG_NOTICE    |
+      +--------------------------+---------------+
+      | ``warn`` or ``warning``  | LOG_WARNING   |
+      +--------------------------+---------------+
+
+      +-------------------------------+
+      | Facilities                    |
+      +---------------+---------------+
+      | Name (string) | Symbolic value|
+      +===============+===============+
+      | ``auth``      | LOG_AUTH      |
+      +---------------+---------------+
+      | ``authpriv``  | LOG_AUTHPRIV  |
+      +---------------+---------------+
+      | ``cron``      | LOG_CRON      |
+      +---------------+---------------+
+      | ``daemon``    | LOG_DAEMON    |
+      +---------------+---------------+
+      | ``ftp``       | LOG_FTP       |
+      +---------------+---------------+
+      | ``kern``      | LOG_KERN      |
+      +---------------+---------------+
+      | ``lpr``       | LOG_LPR       |
+      +---------------+---------------+
+      | ``mail``      | LOG_MAIL      |
+      +---------------+---------------+
+      | ``news``      | LOG_NEWS      |
+      +---------------+---------------+
+      | ``syslog``    | LOG_SYSLOG    |
+      +---------------+---------------+
+      | ``user``      | LOG_USER      |
+      +---------------+---------------+
+      | ``uucp``      | LOG_UUCP      |
+      +---------------+---------------+
+      | ``local0``    | LOG_LOCAL0    |
+      +---------------+---------------+
+      | ``local1``    | LOG_LOCAL1    |
+      +---------------+---------------+
+      | ``local2``    | LOG_LOCAL2    |
+      +---------------+---------------+
+      | ``local3``    | LOG_LOCAL3    |
+      +---------------+---------------+
+      | ``local4``    | LOG_LOCAL4    |
+      +---------------+---------------+
+      | ``local5``    | LOG_LOCAL5    |
+      +---------------+---------------+
+      | ``local6``    | LOG_LOCAL6    |
+      +---------------+---------------+
+      | ``local7``    | LOG_LOCAL7    |
+      +---------------+---------------+
+
+   .. method:: mapPriority(levelname)
+
+      Maps a logging level name to a syslog priority name.
+      You may need to override this if you are using custom levels, or
+      if the default algorithm is not suitable for your needs. The
+      default algorithm maps ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR`` and
+      ``CRITICAL`` to the equivalent syslog names, and all other level
+      names to "warning".
+
+.. _nt-eventlog-handler:
 
 NTEventLogHandler
 ^^^^^^^^^^^^^^^^^
@@ -2402,6 +2496,11 @@ methods of :class:`Logger`, i.e. :meth:`debug`, :meth:`info`, :meth:`warning`,
 :meth:`error`, :meth:`exception`, :meth:`critical` and :meth:`log`. These
 methods have the same signatures as their counterparts in :class:`Logger`, so
 you can use the two types of instances interchangeably.
+
+.. versionchanged:: 2.7
+
+The :meth:`isEnabledFor` method was added to :class:`LoggerAdapter`. This method
+delegates to the underlying logger.
 
 
 Thread Safety

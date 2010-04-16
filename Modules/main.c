@@ -82,6 +82,7 @@ static char *usage_3 = "\
          can be supplied multiple times to increase verbosity\n\
 -V     : print the Python version number and exit (also --version)\n\
 -W arg : warning control; arg is action:message:category:module:lineno\n\
+         also PYTHONWARNINGS=arg\n\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
 ";
 static char *usage_4 = "\
@@ -265,6 +266,9 @@ Py_Main(int argc, wchar_t **argv)
 	wchar_t *module = NULL;
 	FILE *fp = stdin;
 	char *p;
+#ifdef MS_WINDOWS
+	wchar_t *wp;
+#endif
 	int skipfirstline = 0;
 	int stdin_is_interactive = 0;
 	int help = 0;
@@ -400,6 +404,49 @@ Py_Main(int argc, wchar_t **argv)
 	if (!Py_NoUserSiteDirectory &&
 	    (p = Py_GETENV("PYTHONNOUSERSITE")) && *p != '\0')
 		Py_NoUserSiteDirectory = 1;
+
+#ifdef MS_WINDOWS
+	if (!Py_IgnoreEnvironmentFlag && (wp = _wgetenv(L"PYTHONWARNINGS")) &&
+	    *wp != L'\0') {
+		wchar_t *buf, *warning;
+
+		buf = (wchar_t *)malloc((wcslen(wp) + 1) * sizeof(wchar_t));
+		if (buf == NULL)
+			Py_FatalError(
+			   "not enough memory to copy PYTHONWARNINGS");
+		wcscpy(buf, wp);
+		for (warning = wcstok(buf, L",");
+		     warning != NULL;
+		     warning = wcstok(NULL, L",")) {
+			PySys_AddWarnOption(warning);
+		}
+		free(buf);
+	}
+#else
+	if ((p = Py_GETENV("PYTHONWARNINGS")) && *p != '\0') {
+		char *buf, *oldloc;
+		wchar_t *warning;
+
+		/* settle for strtok here as there's no one standard
+		   C89 wcstok */
+		buf = (char *)malloc(strlen(p) + 1);
+		if (buf == NULL)
+			Py_FatalError(
+			   "not enough memory to copy PYTHONWARNINGS");
+		strcpy(buf, p);
+		oldloc = strdup(setlocale(LC_ALL, NULL));
+		setlocale(LC_ALL, "");
+		for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
+			if ((warning = _Py_char2wchar(p)) != NULL) {
+				PySys_AddWarnOption(warning);
+				PyMem_Free(warning);
+			}
+		}
+		setlocale(LC_ALL, oldloc);
+		free(oldloc);
+		free(buf);
+	}
+#endif
 
 	if (command == NULL && module == NULL && _PyOS_optind < argc &&
 	    wcscmp(argv[_PyOS_optind], L"-") != 0)
