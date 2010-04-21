@@ -1,7 +1,29 @@
 """Parse (absolute and relative) URLs.
 
-See RFC 1808: "Relative Uniform Resource Locators", by R. Fielding,
-UC Irvine, June 1995.
+urlparse module is based upon the following RFC specifications.
+
+RFC 3986 (STD66): "Uniform Resource Identifiers" by T. Berners-Lee, R. Fielding
+and L.  Masinter, January 2005.
+
+RFC 2732 : "Format for Literal IPv6 Addresses in URL's by R.Hinden, B.Carpenter
+and L.Masinter, December 1999.
+
+RFC2396:  "Uniform Resource Identifiers (URI)": Generic Syntax by T.
+Berners-Lee, R. Fielding, and L. Masinter, August 1998.
+
+RFC2368: "The mailto URL scheme", by P.Hoffman , L Masinter, J. Zwinski, July 1998.
+
+RFC 1808: "Relative Uniform Resource Locators", by R. Fielding, UC Irvine, June
+1995.
+
+RFC1738: "Uniform Resource Locators (URL)" by T. Berners-Lee, L. Masinter, M.
+McCahill, December 1994
+
+RFC 3986 is considered the current standard and any changes to urlparse module
+should conform to this.  urlparse module is not entirely compliant with this.
+The defacto scenarios of parsing are considered sometimes and for backward
+compatiblity purposes, older RFC uses of parsing are retained. The testcases in
+test_urlparse.py provides a good indicator of parsing behavior.
 """
 
 import sys
@@ -70,22 +92,24 @@ class ResultMixin(object):
 
     @property
     def hostname(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            netloc = netloc.split(":", 1)[0]
-        return netloc.lower() or None
+        netloc = self.netloc.split('@')[-1]
+        if '[' in netloc and ']' in netloc:
+            return netloc.split(']')[0][1:].lower()
+        elif ':' in netloc:
+            return netloc.split(':')[0].lower()
+        elif netloc == '':
+            return None
+        else:
+            return netloc.lower()
 
     @property
     def port(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            port = netloc.split(":", 1)[1]
+        netloc = self.netloc.split('@')[-1].split(']')[-1]
+        if ':' in netloc:
+            port = netloc.split(':')[1]
             return int(port, 10)
-        return None
+        else:
+            return None
 
 from collections import namedtuple
 
@@ -157,6 +181,10 @@ def urlsplit(url, scheme='', allow_fragments=True):
             url = url[i+1:]
             if url[:2] == '//':
                 netloc, url = _splitnetloc(url, 2)
+                if '[' in netloc :
+                    if not ']' in netloc: raise ValueError("Invalid IPv6 URL")
+                if ']' in netloc:
+                    if not '[' in netloc: raise ValueError("Invalid IPv6 URL")
             if allow_fragments and '#' in url:
                 url, fragment = url.split('#', 1)
             if '?' in url:
@@ -171,6 +199,10 @@ def urlsplit(url, scheme='', allow_fragments=True):
             scheme, url = url[:i].lower(), url[i+1:]
     if url[:2] == '//':
         netloc, url = _splitnetloc(url, 2)
+        if '[' in netloc:
+            if not ']' in netloc: raise ValueError("Invalid IPv6 URL")
+        if ']' in netloc:
+            if not '[' in netloc: raise ValueError("Invalid IPv6 URL")
     if allow_fragments and scheme in uses_fragment and '#' in url:
         url, fragment = url.split('#', 1)
     if scheme in uses_query and '?' in url:

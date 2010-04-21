@@ -99,7 +99,7 @@ fnmatch
 formatter
 fpectl
 fractions           mark.dickinson, rhettinger
-ftplib
+ftplib              giampaolo.rodola
 functools
 gc                  pitrou
 getopt
@@ -113,7 +113,7 @@ heapq               rhettinger
 hmac
 html
 http
-idlelib             kurt.kaiser
+idlelib             kbk
 imaplib
 imghdr
 imp
@@ -198,7 +198,7 @@ symbol
 symtable            benjamin.peterson
 sys
 sysconfig           tarek
-syslog
+syslog              jafo
 tabnanny            tim_one
 tarfile             lars.gustaebel
 telnetlib
@@ -289,7 +289,7 @@ time and dates      lemburg
 testing             michael.foord, pitrou
 threads
 tracker
-unicode             lemburg, ezio.melotti
+unicode             lemburg, ezio.melotti, haypo
 version control
 windows
 ==================  ===========

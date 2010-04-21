@@ -437,6 +437,10 @@ process will then be assigned 3, 4, 5, and so forth.  The name "file descriptor"
 is slightly deceptive; on Unix platforms, sockets and pipes are also referenced
 by file descriptors.
 
+The :meth:`~file.fileno` method can be used to obtain the file descriptor
+associated with a file object when required.  Note that using the file
+descriptor directly will bypass the file object methods, ignoring aspects such
+as internal buffering of data.
 
 .. function:: close(fd)
 
@@ -1487,7 +1491,16 @@ written in Python, such as a mail server's external command delivery program.
 
    Send signal *sig* to the process *pid*.  Constants for the specific signals
    available on the host platform are defined in the :mod:`signal` module.
-   Availability: Unix.
+
+   Windows: The :data:`signal.CTRL_C_EVENT` and
+   :data:`signal.CTRL_BREAK_EVENT` signals are special signals which can
+   only be sent to console processes which share a common console window,
+   e.g., some subprocesses. Any other value for *sig* will cause the process
+   to be unconditionally killed by the TerminateProcess API, and the exit code
+   will be set to *sig*. The Windows version of :func:`kill` additionally takes
+   process handles to be killed.
+
+   .. versionadded:: 3.2 Windows support
 
 
 .. function:: killpg(pgid, sig)

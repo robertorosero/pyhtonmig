@@ -12,6 +12,9 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8417: Raise an OverflowError when an integer larger than sys.maxsize is
+  passed to bytes or bytearray.
+
 - Issue #7301: Add environment variable $PYTHONWARNINGS.
 
 - Issue #8329: Don't return the same lists from select.select when no fds are
@@ -258,6 +261,9 @@ Core and Builtins
 
 - Code objects now support weak references.
 
+- Issue #7072: isspace(0xa0) is true on Mac OS X
+
+
 C-API
 -----
 
@@ -311,6 +317,70 @@ C-API
 
 Library
 -------
+
+- Issues #8279, #8330, #8437: Fix test_gdb failures, patch written by Dave Malcolm
+
+- Issue #6547: Added the ignore_dangling_symlinks option to shutil.copytree.
+
+- Issue #1540112: Now allowing the choice of a copy function in 
+  shutil.copytree.
+
+- Issue #4814: timeout parameter is now applied also for connections resulting
+  from PORT/EPRT commands.
+
+- Issue #8463: added missing reference to bztar in shutil's documentation.
+
+- Issue #7154: urllib.request can now detect the proxy settings on OSX 10.6
+  (as long as the user didn't specify 'automatic proxy configuration').
+
+- Issue #3817: ftplib.FTP.abort() method now considers 225 a valid response
+  code as stated in RFC-959 at chapter 5.4.
+
+- Issue #8394: _ctypes.dlopen() accepts bytes, bytearray and str with
+  surrogates.
+
+- Issue #850728: Add a *timeout* parameter to the `acquire()` method of
+  `threading.Semaphore` objects.  Original patch by Torsten Landschoff.
+
+- Issue #8322: Add a *ciphers* argument to SSL sockets, so as to change the
+  available cipher list.  Helps fix test_ssl with OpenSSL 1.0.0.
+
+- Issue #8393: subprocess accepts bytes, bytearray and str with surrogates for
+  the current working directory.
+
+- Issue #7606: XML-RPC traceback stored in X-traceback is now encoded to ASCII
+  using backslashreplace error handler
+
+- Issue #8412: os.system() now accepts bytes, bytearray and str with
+  surrogates.
+
+- Issue #2987: RFC2732 support for urlparse (IPv6 addresses). Patch by Tony
+  Locke and Hans Ulrich Niedermann.
+
+- Issue #5277: Fix quote counting when parsing RFC 2231 encoded parameters.
+
+- Issue #7316: the acquire() method of lock objects in the :mod:`threading`
+  module now takes an optional timeout argument in seconds.  Timeout support
+  relies on the system threading library, so as to avoid a semi-busy wait
+  loop.
+
+- Issue #8383: pickle and pickletools use surrogatepass error handler when
+  encoding unicode as utf8 to support lone surrogates and stay compatible with
+  Python 2.x and 3.0
+
+- Issue #7585: difflib context and unified diffs now place a tab between
+  filename and date, conforming to the 'standards' they were originally
+  designed to follow.  This improves compatibility with patch tools.
+
+- Issue #7472: Fixed typo in email.encoders module; messages using ISO-2022
+  character sets will now consistently use a Content-Transfer-Encoding of
+  7bit rather than sometimes being marked as 8bit.
+
+- Issue #8375: test_distutils now checks if the temporary directory are still
+  present before it cleans them.
+
+- Issue #8374: Update the internal alias table in the :mod:`locale` module
+  to cover recent locale changes and additions.
 
 - Issue #8321: Give access to OpenSSL version numbers from the `ssl` module,
   using the new attributes `ssl.OPENSSL_VERSION`, `ssl.OPENSSL_VERSION_INFO`
@@ -896,6 +966,12 @@ Library
 Extension Modules
 -----------------
 
+- Issue #2706: Allow division of a timedelta by another timedelta:
+  timedelta / timedelta, timedelta % timedelta, timedelta // timedelta
+  and divmod(timedelta, timedelta) are all supported.
+
+- Issue #8314: Fix unsigned long long bug in libffi on Sparc v8.
+
 - Issue #8300: When passing a non-integer argument to struct.pack with any
   integer format code, struct.pack first attempts to convert the non-integer
   using its __index__ method.  If that method is non-existent or raises
@@ -1019,6 +1095,9 @@ Documentation
 
 Tests
 -----
+
+- Issue #3864: Skip three test_signal tests on freebsd6 because they fail
+  if any thread was previously started, most likely due to a platform bug.
 
 - Issue #8193: Fix test_zlib failure with zlib 1.2.4.
 

@@ -694,7 +694,8 @@ class EnvironmentVariableTests(BaseTest):
         p = subprocess.Popen([sys.executable,
                 "-c", "import sys; sys.stdout.write(str(sys.warnoptions))"],
                 stdout=subprocess.PIPE, env=newenv)
-        self.assertEqual(p.stdout.read(), b"['ignore::DeprecationWarning']")
+        self.assertEqual(p.communicate()[0], b"['ignore::DeprecationWarning']")
+        self.assertEqual(p.wait(), 0)
 
     def test_comma_separated_warnings(self):
         newenv = os.environ.copy()
@@ -703,8 +704,9 @@ class EnvironmentVariableTests(BaseTest):
         p = subprocess.Popen([sys.executable,
                 "-c", "import sys; sys.stdout.write(str(sys.warnoptions))"],
                 stdout=subprocess.PIPE, env=newenv)
-        self.assertEqual(p.stdout.read(),
+        self.assertEqual(p.communicate()[0],
                 b"['ignore::DeprecationWarning', 'ignore::UnicodeWarning']")
+        self.assertEqual(p.wait(), 0)
 
     def test_envvar_and_command_line(self):
         newenv = os.environ.copy()
@@ -712,8 +714,22 @@ class EnvironmentVariableTests(BaseTest):
         p = subprocess.Popen([sys.executable, "-W" "ignore::UnicodeWarning",
                 "-c", "import sys; sys.stdout.write(str(sys.warnoptions))"],
                 stdout=subprocess.PIPE, env=newenv)
-        self.assertEqual(p.stdout.read(),
+        self.assertEqual(p.communicate()[0],
                 b"['ignore::UnicodeWarning', 'ignore::DeprecationWarning']")
+        self.assertEqual(p.wait(), 0)
+
+    @unittest.skipUnless(sys.getfilesystemencoding() != 'ascii',
+                         'requires non-ascii filesystemencoding')
+    def test_nonascii(self):
+        newenv = os.environ.copy()
+        newenv["PYTHONWARNINGS"] = "ignore:DeprecaciónWarning"
+        newenv["PYTHONIOENCODING"] = "utf-8"
+        p = subprocess.Popen([sys.executable,
+                "-c", "import sys; sys.stdout.write(str(sys.warnoptions))"],
+                stdout=subprocess.PIPE, env=newenv)
+        self.assertEqual(p.communicate()[0],
+                "['ignore:DeprecaciónWarning']".encode('utf-8'))
+        self.assertEqual(p.wait(), 0)
 
 class CEnvironmentVariableTests(EnvironmentVariableTests):
     module = c_warnings

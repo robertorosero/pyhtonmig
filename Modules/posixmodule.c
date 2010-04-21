@@ -2688,18 +2688,23 @@ posix_system(PyObject *self, PyObject *args)
 	wchar_t *command;
 	if (!PyArg_ParseTuple(args, "u:system", &command))
 		return NULL;
-#else
-	char *command;
-	if (!PyArg_ParseTuple(args, "s:system", &command))
-		return NULL;
-#endif
+
 	Py_BEGIN_ALLOW_THREADS
-#ifdef MS_WINDOWS
 	sts = _wsystem(command);
-#else
-	sts = system(command);
-#endif
 	Py_END_ALLOW_THREADS
+#else
+	PyObject *command_obj;
+	char *command;
+	if (!PyArg_ParseTuple(args, "O&:system",
+	                      PyUnicode_FSConverter, &command_obj))
+		return NULL;
+
+	command = bytes2str(command_obj, 1);
+	Py_BEGIN_ALLOW_THREADS
+	sts = system(command);
+	Py_END_ALLOW_THREADS
+	release_bytes(command_obj);
+#endif
 	return PyLong_FromLong(sts);
 }
 #endif
@@ -4170,6 +4175,53 @@ posix_killpg(PyObject *self, PyObject *args)
 	return Py_None;
 }
 #endif
+
+#ifdef MS_WINDOWS
+PyDoc_STRVAR(win32_kill__doc__,
+"kill(pid, sig)\n\n\
+Kill a process with a signal.");
+
+static PyObject *
+win32_kill(PyObject *self, PyObject *args)
+{
+	PyObject *result, handle_obj;
+	DWORD pid, sig, err;
+	HANDLE handle;
+
+	if (!PyArg_ParseTuple(args, "kk:kill", &pid, &sig))
+		return NULL;
+
+	/* Console processes which share a common console can be sent CTRL+C or
+	   CTRL+BREAK events, provided they handle said events. */
+	if (sig == CTRL_C_EVENT || sig == CTRL_BREAK_EVENT) {
+		if (GenerateConsoleCtrlEvent(sig, pid) == 0) {
+			err = GetLastError();
+			PyErr_SetFromWindowsErr(err);
+		}
+		else
+			Py_RETURN_NONE;
+	}
+
+	/* If the signal is outside of what GenerateConsoleCtrlEvent can use,
+	   attempt to open and terminate the process. */
+	handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+	if (handle == NULL) {
+		err = GetLastError();
+		return PyErr_SetFromWindowsErr(err);
+	}
+
+	if (TerminateProcess(handle, sig) == 0) {
+		err = GetLastError();
+		result = PyErr_SetFromWindowsErr(err);
+	} else {
+		Py_INCREF(Py_None);
+		result = Py_None;
+	}
+
+	CloseHandle(handle);
+	return result;
+}
+#endif /* MS_WINDOWS */
 
 #ifdef HAVE_PLOCK
 
@@ -5934,6 +5986,12 @@ static struct constdef posix_constants_confstr[] = {
 #ifdef _CS_ARCHITECTURE
     {"CS_ARCHITECTURE",	_CS_ARCHITECTURE},
 #endif
+#ifdef _CS_GNU_LIBC_VERSION
+    {"CS_GNU_LIBC_VERSION",	_CS_GNU_LIBC_VERSION},
+#endif
+#ifdef _CS_GNU_LIBPTHREAD_VERSION
+    {"CS_GNU_LIBPTHREAD_VERSION",	_CS_GNU_LIBPTHREAD_VERSION},
+#endif
 #ifdef _CS_HOSTNAME
     {"CS_HOSTNAME",	_CS_HOSTNAME},
 #endif
@@ -7200,6 +7258,7 @@ static PyMethodDef posix_methods[] = {
 #endif /* HAVE_PLOCK */
 #ifdef MS_WINDOWS
 	{"startfile",	win32_startfile, METH_VARARGS, win32_startfile__doc__},
+	{"kill",    win32_kill, METH_VARARGS, win32_kill__doc__},
 #endif
 #ifdef HAVE_SETUID
 	{"setuid",	posix_setuid, METH_VARARGS, posix_setuid__doc__},

@@ -87,7 +87,7 @@ Directory and files operations
    match one of the glob-style *patterns* provided.  See the example below.
 
 
-.. function:: copytree(src, dst, symlinks=False, ignore=None)
+.. function:: copytree(src, dst, symlinks=False, ignore=None, copy_function=copy2, ignore_dangling_symlinks=False)
 
    Recursively copy an entire directory tree rooted at *src*.  The destination
    directory, named by *dst*, must not already exist; it will be created as well
@@ -98,6 +98,12 @@ Directory and files operations
    If *symlinks* is true, symbolic links in the source tree are represented as
    symbolic links in the new tree; if false or omitted, the contents of the
    linked files are copied to the new tree.
+
+   When *symlinks* is false, if the file pointed by the symlink doesn't
+   exist, a exception will be added in the list of errors raised in
+   a :exc:`Error` exception at the end of the copy process.
+   You can set the optional *ignore_dangling_symlinks* flag to true if you
+   want to silence this exception.
 
    If *ignore* is given, it must be a callable that will receive as its
    arguments the directory being visited by :func:`copytree`, and a list of its
@@ -111,8 +117,18 @@ Directory and files operations
 
    If exception(s) occur, an :exc:`Error` is raised with a list of reasons.
 
-   The source code for this should be considered an example rather than the
-   ultimate tool.
+   If *copy_function* is given, it must be a callable that will be used
+   to copy each file. It will be called with the source path and the
+   destination path as arguments. By default, :func:`copy2` is used, but any
+   function that supports the same signature (like :func:`copy`) can be used.
+
+   .. versionchanged:: 3.2
+      Added the *copy_function* argument to be able to provide a custom copy
+      function.
+
+   .. versionchanged:: 3.2
+      Added the *ignore_dangling_symlinks* argument to silent dangling symlinks
+      errors when *symlinks* is false.
 
 
 .. function:: rmtree(path, ignore_errors=False, onerror=None)
@@ -217,18 +233,18 @@ Archives operations
 
 .. function:: make_archive(base_name, format, [root_dir, [base_dir, [verbose, [dry_run, [owner, [group, [logger]]]]]]])
 
-   Create an archive file (eg. zip or tar) and returns its name.
+   Create an archive file (e.g. zip or tar) and returns its name.
 
    *base_name* is the name of the file to create, including the path, minus
    any format-specific extension. *format* is the archive format: one of
-   "zip", "tar", "ztar", or "gztar".
+   "zip", "tar", "bztar" or "gztar".
 
    *root_dir* is a directory that will be the root directory of the
-   archive; ie. we typically chdir into *root_dir* before creating the
+   archive; i.e. we typically chdir into *root_dir* before creating the
    archive.
 
    *base_dir* is the directory where we start archiving from;
-   ie. *base_dir* will be the common prefix of all files and
+   i.e. *base_dir* will be the common prefix of all files and
    directories in the archive.
 
    *root_dir* and *base_dir* both default to the current directory.
@@ -248,7 +264,6 @@ Archives operations
 
    - *gztar*: gzip'ed tar-file
    - *bztar*: bzip2'ed tar-file
-   - *ztar*: compressed tar file
    - *tar*: uncompressed tar file
    - *zip*: ZIP file
 
