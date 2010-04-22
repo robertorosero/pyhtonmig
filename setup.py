@@ -1632,7 +1632,6 @@ class PyBuildExt(build_ext):
 
     def cdecimal_ext(self):
         extra_compile_args = []
-        extra_link_args = []
         sources = [
           'cdecimal/cdecimal.c',
           'cdecimal/basearith.c',
@@ -1699,13 +1698,12 @@ class PyBuildExt(build_ext):
         if 'sunos' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
         if platform == 'darwin':
-            extra_link_args.extend(['-lcc_dynamic'])
+            extra_compile_args.extend(['-fPIC'])
         ext = Extension (
             'cdecimal',
             define_macros=define_macros,
             undef_macros=['NDEBUG'],
             extra_compile_args=extra_compile_args,
-            extra_link_args=extra_link_args,
             sources=sources,
             extra_objects=extra_objects,
             depends=depends
