@@ -1686,8 +1686,9 @@ class PyBuildExt(build_ext):
                 define_macros = [('CONFIG_32', '1'), ('ANSI', '1')]
         elif SIZEOF_SIZE_T == 4:
             define_macros = [('CONFIG_32', '1')]
-            if HAVE_GCC_ASM_FOR_X87 and 'gcc' in cc:
+            if HAVE_GCC_ASM_FOR_X87 and 'gcc' in cc and platform != 'darwin':
                 # XXX icc >= 11.0 and clang work as well.
+                # XXX link errors on darwin.
                 define_macros.append(('PPRO', '1'))
             else:
                 define_macros.append(('ANSI', '1'))
@@ -1697,8 +1698,6 @@ class PyBuildExt(build_ext):
         # define_macros.append(('USE_THREAD_LOCAL_STORAGE', 1))
         if 'sunos' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
-        if platform == 'darwin':
-            extra_compile_args.extend(['-fPIC'])
         ext = Extension (
             'cdecimal',
             define_macros=define_macros,
