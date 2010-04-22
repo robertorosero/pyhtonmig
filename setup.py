@@ -494,7 +494,7 @@ class PyBuildExt(build_ext):
         readline_curses_library = ""
         curses_library = ""
         # Determine if readline is already linked against curses:
-        if do_readline:
+        if do_readline and platform != 'darwin': # OS X does not have ldd.
             # Cannot use os.popen here in py3k.
             tmpfile = os.path.join(self.build_temp, 'readline_curses_lib')
             if not os.path.exists(self.build_temp):
