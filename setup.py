@@ -8,7 +8,6 @@ from glob import glob
 import sysconfig
 
 from distutils import log
-from distutils import util
 from distutils import text_file
 from distutils.errors import *
 from distutils.core import Extension, setup
@@ -1676,7 +1675,7 @@ class PyBuildExt(build_ext):
           'cdecimal/umodarith.h',
         ]
         extra_objects = []
-        platform = util.get_platform()
+        platform = self.get_platform()
         cc = sysconfig.get_config_var('CC')
         SIZEOF_SIZE_T = sysconfig.get_config_var('SIZEOF_SIZE_T')
         HAVE_GCC_ASM_FOR_X87 = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
@@ -1697,7 +1696,7 @@ class PyBuildExt(build_ext):
             raise DistutilsError("cdecimal: unsupported architecture")
         # Not recommended: TLS is very slow!
         # define_macros.append(('USE_THREAD_LOCAL_STORAGE', 1))
-        if 'solaris' in platform and cc == 'cc': # suncc
+        if 'sunos' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
         if platform == 'darwin':
             extra_link_args.extend(['-lcc_dynamic'])
