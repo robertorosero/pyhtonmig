@@ -460,9 +460,11 @@ class BaseTestAPI(unittest.TestCase):
     def tearDown(self):
         asyncore.close_all()
 
-    def loop_waiting_for_flag(self, instance, timeout=0.01, count=100):
+    def loop_waiting_for_flag(self, instance, timeout=5):
+        timeout = float(timeout) / 100
+        count = 100
         while asyncore.socket_map and count > 0:
-            asyncore.loop(timeout=timeout, count=1, use_poll=self.use_poll)
+            asyncore.loop(timeout=0.01, count=1, use_poll=self.use_poll)
             if instance.flag:
                 return
             count -= 1
@@ -572,7 +574,7 @@ class BaseTestAPI(unittest.TestCase):
 
         class TestClient(BaseClient):
             def handle_connect(self):
-                1 / 0
+                1.0 / 0
             def handle_error(self):
                 self.flag = True
                 try:
