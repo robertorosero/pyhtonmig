@@ -601,10 +601,8 @@ set_repr(PySetObject *so)
 
 	listrepr = PyObject_Repr(keys);
 	Py_DECREF(keys);
-	if (listrepr == NULL) {
-		Py_DECREF(keys);
+	if (listrepr == NULL)
 		goto done;
-	}
 	newsize = PyUnicode_GET_SIZE(listrepr);
 	result = PyUnicode_FromUnicode(NULL, newsize);
 	if (result) {
@@ -1979,6 +1977,8 @@ set_init(PySetObject *self, PyObject *args, PyObject *kwds)
 	PyObject *iterable = NULL;
 
 	if (!PyAnySet_Check(self))
+		return -1;
+	if (PySet_Check(self) && !_PyArg_NoKeywords("set()", kwds))
 		return -1;
 	if (!PyArg_UnpackTuple(args, Py_TYPE(self)->tp_name, 0, 1, &iterable))
 		return -1;

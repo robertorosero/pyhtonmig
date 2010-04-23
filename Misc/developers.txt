@@ -20,6 +20,12 @@ for details.  When the agreement is signed, please note it in this log.
 Permissions History
 -------------------
 
+- Tim Golden was given commit access on April 21 2010 by MvL,
+  at suggestion of Michael Foord.
+
+- Giampaolo Rodolà was given commit access on April 17 2010 by
+  MvL, at suggestion of R. David Murray.
+
 - Jean-Paul Calderone was given commit access on April 6 2010 by
   GFB, at suggestion of Michael Foord and others.
 

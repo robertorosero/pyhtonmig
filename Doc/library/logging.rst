@@ -2028,8 +2028,8 @@ supports sending logging messages to a remote or local Unix syslog.
       The symbolic ``LOG_`` values are defined in :class:`SysLogHandler` and
       mirror the values defined in the ``sys/syslog.h`` header file.
 
-      +------------------------------------------+
-      | Priorities                               |
+      **Priorities**
+
       +--------------------------+---------------+
       | Name (string)            | Symbolic value|
       +==========================+===============+
@@ -2050,8 +2050,8 @@ supports sending logging messages to a remote or local Unix syslog.
       | ``warn`` or ``warning``  | LOG_WARNING   |
       +--------------------------+---------------+
 
-      +-------------------------------+
-      | Facilities                    |
+      **Facilities**
+
       +---------------+---------------+
       | Name (string) | Symbolic value|
       +===============+===============+
@@ -2497,7 +2497,7 @@ methods of :class:`Logger`, i.e. :meth:`debug`, :meth:`info`, :meth:`warning`,
 methods have the same signatures as their counterparts in :class:`Logger`, so
 you can use the two types of instances interchangeably.
 
-.. versionchanged:: 2.7
+.. versionchanged:: 3.2
 
 The :meth:`isEnabledFor` method was added to :class:`LoggerAdapter`. This method
 delegates to the underlying logger.

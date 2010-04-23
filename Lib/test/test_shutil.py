@@ -13,7 +13,7 @@ from os.path import splitdrive
 from distutils.spawn import find_executable, spawn
 from shutil import (_make_tarball, _make_zipfile, make_archive,
                     register_archive_format, unregister_archive_format,
-                    get_archive_formats)
+                    get_archive_formats, Error)
 import tarfile
 import warnings
 
@@ -74,6 +74,7 @@ class TestShutil(unittest.TestCase):
         d = tempfile.mkdtemp()
         self.tempdirs.append(d)
         return d
+
     def test_rmtree_errors(self):
         # filename is guaranteed not to exist
         filename = tempfile.mktemp()
@@ -140,11 +141,12 @@ class TestShutil(unittest.TestCase):
         self.assertRaises(OSError, shutil.rmtree, path)
         os.remove(path)
 
+    def _write_data(self, path, data):
+        f = open(path, "w")
+        f.write(data)
+        f.close()
+
     def test_copytree_simple(self):
-        def write_data(path, data):
-            f = open(path, "w")
-            f.write(data)
-            f.close()
 
         def read_data(path):
             f = open(path)
@@ -154,11 +156,9 @@ class TestShutil(unittest.TestCase):
 
         src_dir = tempfile.mkdtemp()
         dst_dir = os.path.join(tempfile.mkdtemp(), 'destination')
-
-        write_data(os.path.join(src_dir, 'test.txt'), '123')
-
+        self._write_data(os.path.join(src_dir, 'test.txt'), '123')
         os.mkdir(os.path.join(src_dir, 'test_dir'))
-        write_data(os.path.join(src_dir, 'test_dir', 'test.txt'), '456')
+        self._write_data(os.path.join(src_dir, 'test_dir', 'test.txt'), '456')
 
         try:
             shutil.copytree(src_dir, dst_dir)
@@ -187,11 +187,6 @@ class TestShutil(unittest.TestCase):
 
     def test_copytree_with_exclude(self):
 
-        def write_data(path, data):
-            f = open(path, "w")
-            f.write(data)
-            f.close()
-
         def read_data(path):
             f = open(path)
             data = f.read()
@@ -204,16 +199,18 @@ class TestShutil(unittest.TestCase):
         src_dir = tempfile.mkdtemp()
         try:
             dst_dir = join(tempfile.mkdtemp(), 'destination')
-            write_data(join(src_dir, 'test.txt'), '123')
-            write_data(join(src_dir, 'test.tmp'), '123')
+            self._write_data(join(src_dir, 'test.txt'), '123')
+            self._write_data(join(src_dir, 'test.tmp'), '123')
             os.mkdir(join(src_dir, 'test_dir'))
-            write_data(join(src_dir, 'test_dir', 'test.txt'), '456')
+            self._write_data(join(src_dir, 'test_dir', 'test.txt'), '456')
             os.mkdir(join(src_dir, 'test_dir2'))
-            write_data(join(src_dir, 'test_dir2', 'test.txt'), '456')
+            self._write_data(join(src_dir, 'test_dir2', 'test.txt'), '456')
             os.mkdir(join(src_dir, 'test_dir2', 'subdir'))
             os.mkdir(join(src_dir, 'test_dir2', 'subdir2'))
-            write_data(join(src_dir, 'test_dir2', 'subdir', 'test.txt'), '456')
-            write_data(join(src_dir, 'test_dir2', 'subdir2', 'test.py'), '456')
+            self._write_data(join(src_dir, 'test_dir2', 'subdir', 'test.txt'),
+                             '456')
+            self._write_data(join(src_dir, 'test_dir2', 'subdir2', 'test.py'),
+                             '456')
 
 
             # testing glob-like patterns
@@ -339,6 +336,41 @@ class TestShutil(unittest.TestCase):
                 shutil.rmtree(TESTFN, ignore_errors=True)
                 shutil.rmtree(TESTFN2, ignore_errors=True)
 
+    def test_copytree_special_func(self):
+
+        src_dir = self.mkdtemp()
+        dst_dir = os.path.join(self.mkdtemp(), 'destination')
+        self._write_data(os.path.join(src_dir, 'test.txt'), '123')
+        os.mkdir(os.path.join(src_dir, 'test_dir'))
+        self._write_data(os.path.join(src_dir, 'test_dir', 'test.txt'), '456')
+
+        copied = []
+        def _copy(src, dst):
+            copied.append((src, dst))
+
+        shutil.copytree(src_dir, dst_dir, copy_function=_copy)
+        self.assertEquals(len(copied), 2)
+
+    def test_copytree_dangling_symlinks(self):
+
+        # a dangling symlink raises an error at the end
+        src_dir = self.mkdtemp()
+        dst_dir = os.path.join(self.mkdtemp(), 'destination')
+        os.symlink('IDONTEXIST', os.path.join(src_dir, 'test.txt'))
+        os.mkdir(os.path.join(src_dir, 'test_dir'))
+        self._write_data(os.path.join(src_dir, 'test_dir', 'test.txt'), '456')
+        self.assertRaises(Error, shutil.copytree, src_dir, dst_dir)
+
+        # a dangling symlink is ignored with the proper flag
+        dst_dir = os.path.join(self.mkdtemp(), 'destination2')
+        shutil.copytree(src_dir, dst_dir, ignore_dangling_symlinks=True)
+        self.assertNotIn('test.txt', os.listdir(dst_dir))
+
+        # a dangling symlink is copied if symlinks=True
+        dst_dir = os.path.join(self.mkdtemp(), 'destination3')
+        shutil.copytree(src_dir, dst_dir, symlinks=True)
+        self.assertIn('test.txt', os.listdir(dst_dir))
+
     @unittest.skipUnless(zlib, "requires zlib")
     def test_make_tarball(self):
         # creating something to tar
@@ -454,36 +486,6 @@ class TestShutil(unittest.TestCase):
             os.chdir(old_dir)
         tarball = base_name + '.tar'
         self.assertTrue(os.path.exists(tarball))
-
-    @unittest.skipUnless(find_executable('compress'),
-                         'The compress program is required')
-    def test_compress_deprecated(self):
-        tmpdir, tmpdir2, base_name =  self._create_files()
-
-        # using compress and testing the PendingDeprecationWarning
-        old_dir = os.getcwd()
-        os.chdir(tmpdir)
-        try:
-            with captured_stdout() as s, check_warnings(quiet=False) as w:
-                _make_tarball(base_name, 'dist', compress='compress')
-        finally:
-            os.chdir(old_dir)
-        tarball = base_name + '.tar.Z'
-        self.assertTrue(os.path.exists(tarball))
-        self.assertEqual(len(w.warnings), 1)
-
-        # same test with dry_run
-        os.remove(tarball)
-        old_dir = os.getcwd()
-        os.chdir(tmpdir)
-        try:
-            with captured_stdout() as s, check_warnings(quiet=False) as w:
-                _make_tarball(base_name, 'dist', compress='compress',
-                              dry_run=True)
-        finally:
-            os.chdir(old_dir)
-        self.assertFalse(os.path.exists(tarball))
-        self.assertEqual(len(w.warnings), 1)
 
     @unittest.skipUnless(zlib, "Requires zlib")
     @unittest.skipUnless(ZIP_SUPPORT, 'Need zip support to run')
@@ -727,6 +729,7 @@ class TestMove(unittest.TestCase):
                             'dst (%s) is in src (%s)' % (dst, src))
         finally:
             shutil.rmtree(TESTFN, ignore_errors=True)
+
 
 def test_main():
     support.run_unittest(TestShutil, TestMove)

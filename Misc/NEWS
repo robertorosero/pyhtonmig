@@ -12,6 +12,17 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8092: Fix PyUnicode_EncodeUTF8() to support error handler producing
+  unicode string (eg. backslashreplace)
+
+- Issue #8485: PyUnicode_FSConverter() doesn't accept bytearray object anymore,
+  you have to convert your bytearray filenames to bytes
+
+- Issue #7332: Remove the 16KB stack-based buffer in
+  PyMarshal_ReadLastObjectFromFile, which doesn't bring any noticeable
+  benefit compared to the dynamic memory allocation fallback.  Patch by
+  Charles-François Natali.
+
 - Issue #8417: Raise an OverflowError when an integer larger than sys.maxsize is
   passed to bytes or bytearray.
 
@@ -261,6 +272,9 @@ Core and Builtins
 
 - Code objects now support weak references.
 
+- Issue #7072: isspace(0xa0) is true on Mac OS X
+
+
 C-API
 -----
 
@@ -314,6 +328,41 @@ C-API
 
 Library
 -------
+
+- Issue #8496: make mailcap.lookup() always return a list, rather than an
+  iterator.  Patch by Gregory Nofi.
+
+- Issue #8195: Fix a crash in sqlite Connection.create_collation() if the
+  collation name contains a surrogate character.
+
+- Issue #8484: Load all ciphers and digest algorithms when initializing
+  the _ssl extension, such that verification of some SSL certificates
+  doesn't fail because of an "unknown algorithm".
+
+- Issue #6547: Added the ignore_dangling_symlinks option to shutil.copytree.
+
+- Issue #1540112: Now allowing the choice of a copy function in 
+  shutil.copytree.
+
+- Issue #4814: timeout parameter is now applied also for connections resulting
+  from PORT/EPRT commands.
+
+- Issue #8463: added missing reference to bztar in shutil's documentation.
+
+- Issue #7154: urllib.request can now detect the proxy settings on OSX 10.6
+  (as long as the user didn't specify 'automatic proxy configuration').
+
+- Issue #3817: ftplib.FTP.abort() method now considers 225 a valid response
+  code as stated in RFC-959 at chapter 5.4.
+
+- Issue #8394: _ctypes.dlopen() accepts bytes, bytearray and str with
+  surrogates.
+
+- Issue #850728: Add a *timeout* parameter to the `acquire()` method of
+  `threading.Semaphore` objects.  Original patch by Torsten Landschoff.
+
+- Issue #8322: Add a *ciphers* argument to SSL sockets, so as to change the
+  available cipher list.  Helps fix test_ssl with OpenSSL 1.0.0.
 
 - Issue #8393: subprocess accepts bytes, bytearray and str with surrogates for
   the current working directory.
@@ -936,6 +985,10 @@ Library
 Extension Modules
 -----------------
 
+- Issue #2706: Allow division of a timedelta by another timedelta:
+  timedelta / timedelta, timedelta % timedelta, timedelta // timedelta
+  and divmod(timedelta, timedelta) are all supported.
+
 - Issue #8314: Fix unsigned long long bug in libffi on Sparc v8.
 
 - Issue #8300: When passing a non-integer argument to struct.pack with any
@@ -985,6 +1038,11 @@ Extension Modules
 
 - Issue #7999: os.setreuid() and os.setregid() would refuse to accept a -1
   parameter on some platforms such as OS X.
+
+- Build the ossaudio extension on GNU/kFreeBSD.
+
+- Issue #7347: winreg: Add CreateKeyEx and DeleteKeyEx, as well as fix a
+  bug in the return value of QueryReflectionKey.
 
 Build
 -----
@@ -1061,6 +1119,12 @@ Documentation
 
 Tests
 -----
+
+- Issues #8279, #8330, #8437, #8480: Fix test_gdb failures, patch written by
+  Dave Malcolm
+
+- Issue #3864: Skip three test_signal tests on freebsd6 because they fail
+  if any thread was previously started, most likely due to a platform bug.
 
 - Issue #8193: Fix test_zlib failure with zlib 1.2.4.
 
