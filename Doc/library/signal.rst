@@ -14,9 +14,6 @@ rules for working with signals and their handlers:
   underlying implementation), with the exception of the handler for
   :const:`SIGCHLD`, which follows the underlying implementation.
 
-* There is no way to "block" signals temporarily from critical sections (since
-  this is not supported by all Unix flavors).
-
 * Although Python signal handlers are called asynchronously as far as the Python
   user is concerned, they can only occur between the "atomic" instructions of the
   Python interpreter.  This means that signals arriving during long calculations
@@ -111,6 +108,35 @@ The variables defined in the :mod:`signal` module are:
    system is executing on behalf of the process. Coupled with ITIMER_VIRTUAL,
    this timer is usually used to profile the time spent by the application
    in user and kernel space. SIGPROF is delivered upon expiration.
+
+
+.. data:: SIG_BLOCK
+
+   A possible value for the *how* parameter to :func:`sigprocmask`
+   indicating that signals are to be blocked.
+
+
+.. data:: SIG_UNBLOCK
+
+   A possible value for the *how* parameter to :func:`sigprocmask`
+   indicating that signals are to be unblocked.
+
+
+.. data:: SIG_SETMASK
+
+   A possible value for the *how* parameter to :func:`sigprocmask`
+   indicating that the signal mask is to be replaced.
+
+
+.. data:: SFD_CLOEXEC
+
+   A possible flag in the *flags* parameter to :func:`signalfd` which causes
+   the new file descriptor to be marked as close-on-exec.
+
+.. data:: SFD_NONBLOCK
+
+   A possible flag in the *flags* parameter to :func:`signalfd` which causes
+   the new file description to be set non-blocking.
 
 
 The :mod:`signal` module defines one exception:
@@ -229,6 +255,46 @@ The :mod:`signal` module defines the following functions:
    stack frame (``None`` or a frame object; for a description of frame objects,
    see the :ref:`description in the type hierarchy <frame-objects>` or see the
    attribute descriptions in the :mod:`inspect` module).
+
+
+.. function:: signalfd(fd, mask[, flags])
+
+   Create a new file descriptor on which to receive signals or modify the
+   mask of such a file descriptor previously created by this function.
+   Availability: Linux (See the manpage :manpage:`signalfd(2)` for further
+   information).
+
+   If *fd* is ``-1``, a new file descriptor will be created.  Otherwise,
+   *fd* must be a file descriptor previously returned by this function.
+
+   *mask* is a list of signal numbers which will trigger data on this file
+   descriptor.
+
+   *flags* is a bitvector which may include any :const:`signal.SFD_*` flag.
+
+   .. versionadded:: X.Y
+
+
+.. function:: sigprocmask(how, mask)
+
+   Set the signal mask for the process.  The old signal mask is returned.
+   Availability: Unix (See the Unix man page :manpage:`sigprocmask(2)`.)
+
+   If *how* is :const:`signal.SIG_BLOCK`, the signals in the mask are added
+   to the set of blocked signals.
+
+   If *how* is :const:`signal.SIG_UNBLOCK`, the signals in the mask are
+   removed from the set of blocked signals.
+
+   If *how* is :const:`signal.SIG_SETMASK`, the signals in the mask are set
+   as blocked and the signals not in the mask are set as unblocked.
+
+   *mask* is a list of signal numbers (eg :const:`signal.SIGUSR1`).
+
+   The behavior of this function in a multi-threaded program is unspecified.
+   See :func:`thread.sigmask` for multi-threaded uses. XXX
+
+  .. versionadded:: X.Y
 
 
 .. _signal-example:

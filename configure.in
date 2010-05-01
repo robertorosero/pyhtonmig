@@ -2662,7 +2662,7 @@ AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
  setlocale setregid setreuid setresuid setresgid \
  setsid setpgid setpgrp setuid setvbuf snprintf \
- sigaction siginterrupt sigrelse strftime \
+ sigaction siginterrupt signalfd sigprocmask sigrelse strftime \
  sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
  truncate uname unsetenv utimes waitpid wait3 wait4 wcscoll _getpty)
 

@@ -946,6 +946,18 @@ initsignal(void)
     Py_DECREF(x);
 #endif
 
+#ifdef SFD_CLOEXEC
+    x = PyLong_FromLong(SFD_CLOEXEC);
+    PyDict_SetItemString(d, "SFD_CLOEXEC", x);
+    Py_DECREF(x);
+#endif
+
+#ifdef SFD_NONBLOCK
+    x = PyLong_FromLong(SFD_NONBLOCK);
+    PyDict_SetItemString(d, "SFD_NONBLOCK", x);
+    Py_DECREF(x);
+#endif
+
 #ifdef CTRL_C_EVENT
     x = PyInt_FromLong(CTRL_C_EVENT);
     PyDict_SetItemString(d, "CTRL_C_EVENT", x);
