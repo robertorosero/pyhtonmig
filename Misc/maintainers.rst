@@ -48,8 +48,8 @@ aifc                r.david.murray
 argparse            bethard
 array
 ast
-asynchat            josiahcarlson
-asyncore            josiahcarlson
+asynchat            josiahcarlson, giampaolo.rodola
+asyncore            josiahcarlson, giampaolo.rodola
 atexit
 audioop
 base64
@@ -187,7 +187,7 @@ socket
 socketserver
 spwd
 sqlite3             ghaering
-ssl                 janssen, pitrou
+ssl                 janssen, pitrou, giampaolo.rodola
 stat
 string
 stringprep
@@ -281,7 +281,7 @@ jit compiler/llvm   collin.winter, jeffrey.yasskin
 locale              lemburg, loewis
 mathematics         mark.dickinson, eric.smith, lemburg
 memory management   tim_one, lemburg
-networking
+networking          giampaolo.rodola
 packaging           tarek, lemburg
 py3 transition      benjamin.peterson
 release management  tarek, lemburg, benjamin.peterson, barry, loewis,

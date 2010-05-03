@@ -782,6 +782,51 @@ class POSIXProcessTestCase(BaseTestCase):
         self.assertStderrEqual(stderr, b'')
         self.assertEqual(p.wait(), -signal.SIGTERM)
 
+    def test_surrogates_error_message(self):
+        def prepare():
+            raise ValueError("surrogate:\uDCff")
+
+        try:
+            subprocess.call(
+                [sys.executable, "-c", "pass"],
+                preexec_fn=prepare)
+        except ValueError as err:
+            # Pure Python implementations keeps the message
+            self.assertIsNone(subprocess._posixsubprocess)
+            self.assertEqual(str(err), "surrogate:\uDCff")
+        except RuntimeError as err:
+            # _posixsubprocess uses a default message
+            self.assertIsNotNone(subprocess._posixsubprocess)
+            self.assertEqual(str(err), "Exception occurred in preexec_fn.")
+        else:
+            self.fail("Expected ValueError or RuntimeError")
+
+    def test_undecodable_env(self):
+        for key, value in (('test', 'abc\uDCFF'), ('test\uDCFF', '42')):
+            value_repr = repr(value).encode("ascii")
+
+            # test str with surrogates
+            script = "import os; print(repr(os.getenv(%s)))" % repr(key)
+            env = os.environ.copy()
+            env[key] = value
+            stdout = subprocess.check_output(
+                [sys.executable, "-c", script],
+                env=env)
+            stdout = stdout.rstrip(b'\n\r')
+            self.assertEquals(stdout, value_repr)
+
+            # test bytes
+            key = key.encode("ascii", "surrogateescape")
+            value = value.encode("ascii", "surrogateescape")
+            script = "import os; print(repr(os.getenv(%s)))" % repr(key)
+            env = os.environ.copy()
+            env[key] = value
+            stdout = subprocess.check_output(
+                [sys.executable, "-c", script],
+                env=env)
+            stdout = stdout.rstrip(b'\n\r')
+            self.assertEquals(stdout, value_repr)
+
 
 @unittest.skipUnless(mswindows, "Windows specific tests")
 class Win32ProcessTestCase(BaseTestCase):

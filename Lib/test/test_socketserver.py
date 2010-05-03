@@ -9,12 +9,15 @@ import select
 import signal
 import socket
 import tempfile
-import threading
 import unittest
 import socketserver
 
 import test.support
 from test.support import reap_children, reap_threads, verbose
+try:
+    import threading
+except ImportError:
+    threading = None
 
 test.support.requires("network")
 
@@ -119,6 +122,7 @@ class SocketServerTest(unittest.TestCase):
         self.assertEquals(server.server_address, server.socket.getsockname())
         return server
 
+    @unittest.skipUnless(threading, 'Threading required for this test.')
     @reap_threads
     def run_server(self, svrcls, hdlrbase, testfunc):
         server = self.make_server(self.pickaddr(svrcls.address_family),
@@ -240,6 +244,31 @@ class SocketServerTest(unittest.TestCase):
     #             self.run_server(socketserver.ForkingUnixDatagramServer,
     #                             socketserver.DatagramRequestHandler,
     #                             self.dgram_examine)
+
+    @reap_threads
+    def test_shutdown(self):
+        # Issue #2302: shutdown() should always succeed in making an
+        # other thread leave serve_forever().
+        class MyServer(socketserver.TCPServer):
+            pass
+
+        class MyHandler(socketserver.StreamRequestHandler):
+            pass
+
+        threads = []
+        for i in range(20):
+            s = MyServer((HOST, 0), MyHandler)
+            t = threading.Thread(
+                name='MyServer serving',
+                target=s.serve_forever,
+                kwargs={'poll_interval':0.01})
+            t.daemon = True  # In case this function raises.
+            threads.append((t, s))
+        for t, s in threads:
+            t.start()
+            s.shutdown()
+        for t, s in threads:
+            t.join()
 
 
 def test_main():

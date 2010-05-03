@@ -458,6 +458,21 @@ lookdict_unicode(PyDictObject *mp, PyObject *key, register long hash)
 	return 0;
 }
 
+int
+_PyDict_HasOnlyStringKeys(PyObject *dict)
+{
+	Py_ssize_t pos = 0;
+	PyObject *key, *value;
+	assert(PyDict_CheckExact(dict));
+	/* Shortcut */
+	if (((PyDictObject *)dict)->ma_lookup == lookdict_unicode)
+		return 1;
+	while (PyDict_Next(dict, &pos, &key, &value))
+		if (!PyUnicode_Check(key))
+			return 0;
+	return 1;
+}
+
 #ifdef SHOW_TRACK_COUNT
 #define INCREASE_TRACK_COUNT \
 	(count_tracked++, count_untracked--);
@@ -719,7 +734,8 @@ PyDict_GetItem(PyObject *op, PyObject *key)
 	   Let's just hope that no exception occurs then...  This must be
 	   _PyThreadState_Current and not PyThreadState_GET() because in debug
 	   mode, the latter complains if tstate is NULL. */
-	tstate = _PyThreadState_Current;
+	tstate = (PyThreadState*)_Py_atomic_load_relaxed(
+		&_PyThreadState_Current);
 	if (tstate != NULL && tstate->curexc_type != NULL) {
 		/* preserve the existing exception */
 		PyObject *err_type, *err_value, *err_tb;
@@ -1386,8 +1402,12 @@ dict_update_common(PyObject *self, PyObject *args, PyObject *kwds, char *methnam
 		else
 			result = PyDict_MergeFromSeq2(self, arg, 1);
 	}
-	if (result == 0 && kwds != NULL)
-		result = PyDict_Merge(self, kwds, 1);
+	if (result == 0 && kwds != NULL) {
+		if (PyArg_ValidateKeywordArguments(kwds))
+			result = PyDict_Merge(self, kwds, 1);
+		else
+			result = -1;
+	}
 	return result;
 }
 

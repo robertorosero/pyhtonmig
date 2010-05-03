@@ -12,6 +12,19 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- PyFile_FromFd() uses PyUnicode_DecodeFSDefault() instead of
+  PyUnicode_FromString() to support surrogates in the filename and use the
+  right encoding
+
+- PyUnicode_DecodeFSDefaultAndSize() uses surrogateescape error handler
+
+- Issue #8419: Prevent the dict constructor from accepting non-string keyword
+  arguments.
+
+- Issue #8124: PySys_WriteStdout() and PySys_WriteStderr() don't execute
+  indirectly Python signal handlers anymore because mywrite() ignores
+  exceptions (KeyboardInterrupt)
+
 - Issue #8092: Fix PyUnicode_EncodeUTF8() to support error handler producing
   unicode string (eg. backslashreplace)
 
@@ -191,6 +204,9 @@ Core and Builtins
   libraries are: Mach C threads, SunOS LWP, GNU pth, Irix threads. Support code
   will be entirely removed in 3.3.
 
+- Support for OSF* has been disabled. If nobody stands up, support will be
+  removed in 3.3. See http://bugs.python.org/issue8606 .
+
 - Peephole constant folding had missed UNARY_POSITIVE.
 
 - Issue #1722344: threading._shutdown() is now called in Py_Finalize(), which
@@ -278,6 +294,9 @@ Core and Builtins
 C-API
 -----
 
+- Add PyArg_ValidateKeywordArguments, which checks if all keyword arguments are
+  strings in an efficient manner.
+
 - Issue #8276: PyEval_CallObject() is now only available in macro form.  The
   function declaration, which was kept for backwards compatibility reasons,
   is now removed (the macro was introduced in 1997!).
@@ -328,6 +347,68 @@ C-API
 
 Library
 -------
+
+- Issue #7865: The close() method of :mod:`io` objects should not swallow
+  exceptions raised by the implicit flush().  Also ensure that calling
+  close() several times is supported.  Patch by Pascal Chambon.
+
+- Issue #4687: Fix accuracy of garbage collection runtimes displayed with
+  gc.DEBUG_STATS.
+
+- Issue #7192: webbrowser.get("firefox") now wors on Mac OS X, as does
+  webbrowser.get("safari").
+
+- Issue #8464: tarfile no longer creates files with execute permissions set
+  when mode="w|" is used.
+
+- Issue #7834: Fix connect() of Bluetooth L2CAP sockets with recent versions
+  of the Linux kernel.  Patch by Yaniv Aknin.
+
+- Issue #8295: Added shutil.unpack_archive.
+
+- Issue #6312: Fixed http HEAD request when the transfer encoding is chunked.
+  It should correctly return an empty response now.
+
+- Issue #8546: Reject None given as the buffering argument to _pyio.open.
+
+- Issue #8549: Fix compiling the _ssl extension under AIX.  Patch by
+  Sridhar Ratnakumar.
+
+- Issue #6656: fix locale.format_string to handle escaped percents
+  and mappings.
+
+- Issue #2302: Fix a race condition in SocketServer.BaseServer.shutdown,
+  where the method could block indefinitely if called just before the
+  event loop started running.  This also fixes the occasional freezes
+  witnessed in test_httpservers.
+
+- Issue #8524: When creating an SSL socket, the timeout value of the
+  original socket wasn't retained (instead, a socket with a positive timeout
+  would be turned into a non-blocking SSL socket).
+
+- Issue #5103: SSL handshake would ignore the socket timeout and block
+  indefinitely if the other end didn't respond.
+
+- The do_handshake() method of SSL objects now adjusts the blocking mode of
+  the SSL structure if necessary (as other methods already do).
+
+- Issue #8391: os.execvpe() and os.getenv() supports unicode with surrogates
+  and bytes strings for environment keys and values
+
+- Issue #8467: Pure Python implementation of subprocess encodes the error
+  message using surrogatepass error handler to support surrogates in the
+  message
+
+- Issue #8468: bz2.BZ2File() accepts str with surrogates and bytes filenames
+
+- Issue #8451: Syslog module now uses basename(sys.argv[0]) instead of
+  the string "python" as the *ident*.  openlog() arguments are all optional
+  and keywords.
+
+- Issue #8108: Fix the unwrap() method of SSL objects when the socket has
+  a non-infinite timeout.  Also make that method friendlier with applications
+  wanting to continue using the socket in clear-text mode, by disabling
+  OpenSSL's internal readahead.  Thanks to Darryl Miles for guidance.
 
 - Issue #8496: make mailcap.lookup() always return a list, rather than an
   iterator.  Patch by Gregory Nofi.
@@ -1047,6 +1128,11 @@ Extension Modules
 Build
 -----
 
+- Issue #3646: It is now easily possible to install a Python framework into
+  your home directory on MacOSX, see Mac/README for more information.
+
+- Issue #3928: os.mknod() now available in Solaris, also.
+
 - Issue #3326: Build Python without -fno-strict-aliasing when the gcc does not
   give false warnings.
 
@@ -1099,6 +1185,11 @@ Build
 
 - python-config now supports multiple options on the same command line.
 
+- Issue #8509: Fix quoting in help strings and code snippets in configure.in.
+
+- Issue #8510: Update to autoconf2.65.
+
+
 Documentation
 ------------
 
@@ -1120,8 +1211,20 @@ Documentation
 Tests
 -----
 
-- Issues #8279, #8330, #8437, #8480: Fix test_gdb failures, patch written by
-  Dave Malcolm
+- Issue #8533: regrtest uses backslashreplace error handler for stdout to avoid
+  UnicodeEncodeError (write non-ASCII character to stdout using ASCII encoding)
+
+- Issue #8576: Remove use of find_unused_port() in test_smtplib and
+  test_multiprocessing.  Patch by Paul Moore.
+
+- Issue #7449: Fix many tests to support Python compiled without thread
+  support. Patches written by Jerry Seutter.
+
+- Issue #8108: test_ftplib's non-blocking SSL server now has proper handling
+  of SSL shutdowns.
+
+- Issues #8279, #8330, #8437, #8480, #8495: Fix test_gdb failures, patch
+  written by Dave Malcolm
 
 - Issue #3864: Skip three test_signal tests on freebsd6 because they fail
   if any thread was previously started, most likely due to a platform bug.

@@ -75,6 +75,18 @@ class CompileallTests(unittest.TestCase):
         os.unlink(self.bc_path)
         os.unlink(self.bc_path2)
 
+    def test_no_pycache_in_non_package(self):
+        # Bug 8563 reported that __pycache__ directories got created by
+        # compile_file() for non-.py files.
+        data_dir = os.path.join(self.directory, 'data')
+        data_file = os.path.join(data_dir, 'file')
+        os.mkdir(data_dir)
+        # touch data/file
+        with open(data_file, 'w'):
+            pass
+        compileall.compile_file(data_file)
+        self.assertFalse(os.path.exists(os.path.join(data_dir, '__pycache__')))
+
 
 class EncodingTest(unittest.TestCase):
     """Issue 6716: compileall should escape source code when printing errors
@@ -97,6 +109,7 @@ class EncodingTest(unittest.TestCase):
             compileall.compile_dir(self.directory)
         finally:
             sys.stdout = orig_stdout
+
 
 class CommandLineTests(unittest.TestCase):
     """Test some aspects of compileall's CLI."""
@@ -149,6 +162,24 @@ class CommandLineTests(unittest.TestCase):
         expected.extend(['__init__.py', 'bar.py'])
         expected.sort()
         self.assertEqual(sorted(os.listdir(self.pkgdir)), expected)
+
+    def test_multiple_runs(self):
+        # Bug 8527 reported that multiple calls produced empty
+        # __pycache__/__pycache__ directories.
+        retcode = subprocess.call(
+            (sys.executable, '-m', 'compileall', '-q', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        # Verify the __pycache__ directory contents.
+        cachedir = os.path.join(self.pkgdir, '__pycache__')
+        self.assertTrue(os.path.exists(cachedir))
+        cachecachedir = os.path.join(cachedir, '__pycache__')
+        self.assertFalse(os.path.exists(cachecachedir))
+        # Call compileall again.
+        retcode = subprocess.call(
+            (sys.executable, '-m', 'compileall', '-q', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        self.assertTrue(os.path.exists(cachedir))
+        self.assertFalse(os.path.exists(cachecachedir))
 
 
 def test_main():

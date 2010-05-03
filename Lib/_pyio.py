@@ -13,8 +13,7 @@ except ImportError:
     from _dummy_thread import allocate_lock as Lock
 
 import io
-from io import __all__
-from io import SEEK_SET, SEEK_CUR, SEEK_END
+from io import (__all__, SEEK_SET, SEEK_CUR, SEEK_END)
 
 # open() uses st_blksize whenever we can
 DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes
@@ -35,7 +34,7 @@ class BlockingIOError(IOError):
         self.characters_written = characters_written
 
 
-def open(file: (str, bytes), mode: str = "r", buffering: int = None,
+def open(file: (str, bytes), mode: str = "r", buffering: int = -1,
          encoding: str = None, errors: str = None,
          newline: str = None, closefd: bool = True) -> "IOBase":
 
@@ -150,7 +149,7 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
         raise TypeError("invalid file: %r" % file)
     if not isinstance(mode, str):
         raise TypeError("invalid mode: %r" % mode)
-    if buffering is not None and not isinstance(buffering, int):
+    if not isinstance(buffering, int):
         raise TypeError("invalid buffering: %r" % buffering)
     if encoding is not None and not isinstance(encoding, str):
         raise TypeError("invalid encoding: %r" % encoding)
@@ -187,8 +186,6 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
                  (appending and "a" or "") +
                  (updating and "+" or ""),
                  closefd)
-    if buffering is None:
-        buffering = -1
     line_buffering = False
     if buffering == 1 or buffering < 0 and raw.isatty():
         buffering = -1
@@ -228,7 +225,7 @@ class DocDescriptor:
     """
     def __get__(self, obj, typ):
         return (
-            "open(file, mode='r', buffering=None, encoding=None, "
+            "open(file, mode='r', buffering=-1, encoding=None, "
                  "errors=None, newline=None, closefd=True)\n\n" +
             open.__doc__)
 
@@ -325,6 +322,7 @@ class IOBase(metaclass=abc.ABCMeta):
 
         This is not implemented for read-only and non-blocking streams.
         """
+        self._checkClosed()
         # XXX Should this return the number of bytes written???
 
     __closed = False
@@ -335,10 +333,7 @@ class IOBase(metaclass=abc.ABCMeta):
         This method has no effect if the file is already closed.
         """
         if not self.__closed:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+            self.flush()
             self.__closed = True
 
     def __del__(self) -> None:
@@ -705,14 +700,13 @@ class _BufferedIOMixin(BufferedIOBase):
     ### Flush and close ###
 
     def flush(self):
+        if self.closed:
+            raise ValueError("flush of closed file")
         self.raw.flush()
 
     def close(self):
-        if not self.closed and self.raw is not None:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+        if self.raw is not None and not self.closed:
+            self.flush()
             self.raw.close()
 
     def detach(self):
@@ -1524,11 +1518,8 @@ class TextIOWrapper(TextIOBase):
         self._telling = self._seekable
 
     def close(self):
-        if self.buffer is not None:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+        if self.buffer is not None and not self.closed:
+            self.flush()
             self.buffer.close()
 
     @property

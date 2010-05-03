@@ -45,6 +45,8 @@ def compile_dir(dir, maxlevels=10, ddir=None,
     names.sort()
     success = 1
     for name in names:
+        if name == '__pycache__':
+            continue
         fullname = os.path.join(dir, name)
         if ddir is not None:
             dfile = os.path.join(ddir, name)
@@ -89,13 +91,14 @@ def compile_file(fullname, ddir=None, force=0, rx=None, quiet=False,
         else:
             cfile = imp.cache_from_source(fullname)
             cache_dir = os.path.dirname(cfile)
-            try:
-                os.mkdir(cache_dir)
-            except OSError as error:
-                if error.errno != errno.EEXIST:
-                    raise
         head, tail = name[:-3], name[-3:]
         if tail == '.py':
+            if not legacy:
+                try:
+                    os.mkdir(cache_dir)
+                except OSError as error:
+                    if error.errno != errno.EEXIST:
+                        raise
             if not force:
                 try:
                     mtime = int(os.stat(fullname).st_mtime)
