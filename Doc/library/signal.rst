@@ -115,11 +115,15 @@ The variables defined in the :mod:`signal` module are:
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that signals are to be blocked.
 
+   .. versionadded:: 2.7
+
 
 .. data:: SIG_UNBLOCK
 
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that signals are to be unblocked.
+
+   .. versionadded:: 2.7
 
 
 .. data:: SIG_SETMASK
@@ -127,16 +131,23 @@ The variables defined in the :mod:`signal` module are:
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that the signal mask is to be replaced.
 
+   .. versionadded:: 2.7
+
 
 .. data:: SFD_CLOEXEC
 
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
    the new file descriptor to be marked as close-on-exec.
 
+   .. versionadded:: 2.7
+
+
 .. data:: SFD_NONBLOCK
 
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
    the new file description to be set non-blocking.
+
+   .. versionadded:: 2.7
 
 
 The :mod:`signal` module defines one exception:
@@ -272,7 +283,7 @@ The :mod:`signal` module defines the following functions:
 
    *flags* is a bitvector which may include any :const:`signal.SFD_*` flag.
 
-   .. versionadded:: X.Y
+   .. versionadded:: 2.7
 
 
 .. function:: sigprocmask(how, mask)
@@ -291,10 +302,7 @@ The :mod:`signal` module defines the following functions:
 
    *mask* is a list of signal numbers (eg :const:`signal.SIGUSR1`).
 
-   The behavior of this function in a multi-threaded program is unspecified.
-   See :func:`thread.sigmask` for multi-threaded uses. XXX
-
-  .. versionadded:: X.Y
+  .. versionadded:: 2.7
 
 
 .. _signal-example:
