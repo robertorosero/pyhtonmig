@@ -468,28 +468,36 @@ _iterable_to_mask(PyObject *iterable, sigset_t *mask)
 {
     static const char* range_format = "signal number %d out of range";
     char range_buffer[1024];
+    int result = 0;
 
-    PyObject *item, *iterator;
+    PyObject *item, *iterator = NULL;
 
     sigemptyset(mask);
 
     iterator = PyObject_GetIter(iterable);
     if (iterator == NULL) {
-        return -1;
+        result = -1;
+        goto error;
     }
 
-    for (item = PyIter_Next(iterator); item; item = PyIter_Next(iterator)) {
+    while ((item = PyIter_Next(iterator))) {
         int signum = PyInt_AsLong(item);
+        Py_DECREF(item);
         if (signum == -1 && PyErr_Occurred()) {
-            return -1;
+	    result = -1;
+	    goto error;
         }
         if (sigaddset(mask, signum) == -1) {
             PyOS_snprintf(range_buffer, sizeof(range_buffer), range_format, signum);
             PyErr_SetString(PyExc_ValueError, range_buffer);
-            return -1;
+            result = -1;
+            goto error;
         }
     }
-    return 0;
+
+error:
+    Py_XDECREF(iterator);
+    return result;
 }
 
 #if defined(HAVE_PTHREAD_SIGMASK) && !defined(HAVE_BROKEN_PTHREAD_SIGMASK)
@@ -506,7 +514,6 @@ signal_sigprocmask(PyObject *self, PyObject *args)
     char how_buffer[1024];
 
     int how, sig;
-    int valid;
     PyObject *signals, *result, *signum;
     sigset_t mask, previous;
 
@@ -518,12 +525,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    /*
-     * It seems that invalid values of how are not always discovered.
-     */
-    valid = (how == SIG_BLOCK || how == SIG_UNBLOCK || how == SIG_SETMASK);
-    
-    if (!valid || PY_SIGMASK(how, &mask, &previous) == -1) {
+    if (PY_SIGMASK(how, &mask, &previous) != 0) {
         PyOS_snprintf(how_buffer, sizeof(how_buffer), how_format, how);
         PyErr_SetString(PyExc_ValueError, how_buffer);
         return NULL;
@@ -551,6 +553,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
                 Py_DECREF(result);
                 return NULL;
             }
+            Py_DECREF(signum);
         }
     }
     return result;

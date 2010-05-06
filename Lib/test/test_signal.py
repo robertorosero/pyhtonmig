@@ -406,20 +406,16 @@ class SomeException(Exception):
 
 
 def raiser(*args):
-    """A signal handler which raises SomeException.
-    """
+    """A signal handler which raises SomeException."""
     raise SomeException()
 
 
 
 class SigprocmaskTests(unittest.TestCase):
-    """
-    Tests for sigprocmask.
-    """
+    """Tests for sigprocmask."""
     def _handle_sigusr1(self):
         old_handler = signal.signal(signal.SIGUSR1, raiser)
         self.addCleanup(signal.signal, signal.SIGUSR1, old_handler)
-        return SomeException
 
 
     def test_signature(self):
@@ -432,14 +428,30 @@ class SigprocmaskTests(unittest.TestCase):
 
 
     def test_invalid_how(self):
-        """If a valid other than SIG_BLOCK, SIG_UNBLOCK, or SIG_SETMASK is
+        """If a value other than SIG_BLOCK, SIG_UNBLOCK, or SIG_SETMASK is
         passed for the how argument to sigprocmask, ValueError is raised.
         """
-        with self.assertRaises(ValueError) as cm:
+        message = "value specified for how \(1700\) invalid"
+        with self.assertRaisesRegexp(ValueError, message):
             signal.sigprocmask(1700, [])
-        exc = cm.exception
-        self.assertTrue(isinstance(exc, ValueError))
-        self.assertEquals(str(exc), "value specified for how (1700) invalid")
+
+
+    def test_invalid_signal_iterable(self):
+        """If iterating over the value passed for the signals parameter to
+        sigprocmask raises an exception, sigprocmask raises that exception.
+        """
+        class BrokenIter(object):
+            def __iter__(self):
+                raise RuntimeError("my __iter__ is broken")
+        with self.assertRaisesRegexp(RuntimeError, "my __iter__ is broken"):
+            signal.sigprocmask(signal.SIG_BLOCK, BrokenIter())
+
+
+    def test_invalid_signal(self):
+        """If an object in the iterable passed for the signals parameter to
+        sigprocmask isn't an integer, TypeError is raised."""
+        with self.assertRaisesRegexp(TypeError, "an integer is required"):
+            signal.sigprocmask(signal.SIG_BLOCK, [object()])
 
 
     def test_return_previous_mask(self):
@@ -457,12 +469,9 @@ class SigprocmaskTests(unittest.TestCase):
         self._handle_sigusr1()
         previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR1])
         os.kill(os.getpid(), signal.SIGUSR1)
-        try:
+        with self.assertRaises(SomeException):
+            # Expect to receive SIGUSR1 after unblocking it.
             signal.sigprocmask(signal.SIG_SETMASK, previous)
-        except SomeException:
-            pass
-        else:
-            self.fail("Expected to receive SIGUSR1 after unblocking it.")
 
 
     def test_unblock(self):
@@ -473,13 +482,18 @@ class SigprocmaskTests(unittest.TestCase):
         previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR1])
         self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, previous)
         signal.sigprocmask(signal.SIG_UNBLOCK, [signal.SIGUSR1])
-        try:
+
+        with self.assertRaises(SomeException):
             os.kill(os.getpid(), signal.SIGUSR1)
-            time.sleep(1)
-        except SomeException:
-            pass
-        else:
-            self.fail("SomeException was expected but not raised")
+
+
+    def test_long_signals(self):
+        """sigprocmask accepts signal numbers as instances of long."""
+        previous = signal.sigprocmask(
+            signal.SIG_SETMASK, [long(signal.SIGUSR1), long(signal.SIGUSR2)])
+        masked = signal.sigprocmask(signal.SIG_SETMASK, previous)
+        self.assertEquals(masked, [signal.SIGUSR1, signal.SIGUSR2])
+
 
 
 class SignalfdTests(unittest.TestCase):
@@ -524,11 +538,9 @@ class SignalfdTests(unittest.TestCase):
         """If a signal number that is out of the valid range is included in the
         sigmask list argument to signalfd, ValueError is raised.
         """
-        with self.assertRaises(ValueError) as cm:
+        message = "signal number -2 out of range"
+        with self.assertRaisesRegexp(ValueError, message):
             signal.signalfd(-1, [-2])
-        exc = cm.exception
-        self.assertTrue(isinstance(exc, ValueError))
-        self.assertEquals(str(exc), "signal number -2 out of range")
 
 
     def test_handle_signals(self):

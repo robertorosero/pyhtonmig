@@ -281,7 +281,7 @@ The :mod:`signal` module defines the following functions:
    *mask* is a list of signal numbers which will trigger data on this file
    descriptor.
 
-   *flags* is a bitvector which may include any :const:`signal.SFD_*` flag.
+   *flags* is a bit mask which may include any :const:`signal.SFD_*` flag.
 
    .. versionadded:: 2.7
 
