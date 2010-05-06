@@ -552,6 +552,7 @@ class BaseTestAPI(unittest.TestCase):
         client = TestClient(server.address)
         self.loop_waiting_for_flag(client)
 
+    @unittest.skipIf(sys.platform.startswith("solaris"), "OOB support is broken")
     def test_handle_expt(self):
         # Make sure handle_expt is called on OOB data received.
         # Note: this might fail on some platforms as OOB data is
@@ -573,7 +574,7 @@ class BaseTestAPI(unittest.TestCase):
     def test_handle_error(self):
 
         class TestClient(BaseClient):
-            def handle_connect(self):
+            def handle_write(self):
                 1.0 / 0
             def handle_error(self):
                 self.flag = True
@@ -595,7 +596,10 @@ class BaseTestAPI(unittest.TestCase):
         # we start disconnected
         self.assertFalse(server.connected)
         self.assertTrue(server.accepting)
-        self.assertFalse(client.connected)
+        # solaris seems to connect() immediately even without starting
+        # the poller
+        if not sys.platform.startswith("solaris"):
+            self.assertFalse(client.connected)
         self.assertFalse(client.accepting)
 
         # execute some loops so that client connects to server
