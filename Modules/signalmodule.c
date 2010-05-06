@@ -506,6 +506,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
     char how_buffer[1024];
 
     int how, sig;
+    int valid;
     PyObject *signals, *result, *signum;
     sigset_t mask, previous;
 
@@ -517,7 +518,12 @@ signal_sigprocmask(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    if (PY_SIGMASK(how, &mask, &previous) == -1) {
+    /*
+     * It seems that invalid values of how are not always discovered.
+     */
+    valid = (how == SIG_BLOCK || how == SIG_UNBLOCK || how == SIG_SETMASK);
+    
+    if (!valid || PY_SIGMASK(how, &mask, &previous) == -1) {
         PyOS_snprintf(how_buffer, sizeof(how_buffer), how_format, how);
         PyErr_SetString(PyExc_ValueError, how_buffer);
         return NULL;
