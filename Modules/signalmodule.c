@@ -492,8 +492,13 @@ _iterable_to_mask(PyObject *iterable, sigset_t *mask)
     return 0;
 }
 
+#if defined(HAVE_PTHREAD_SIGMASK) && !defined(HAVE_BROKEN_PTHREAD_SIGMASK)
+# define PY_SIGMASK pthread_sigmask
+#elif defined(HAVE_SIGPROCMASK)
+# define PY_SIGMASK sigprocmask
+#endif
 
-#ifdef HAVE_SIGPROCMASK
+#ifdef PY_SIGMASK
 static PyObject *
 signal_sigprocmask(PyObject *self, PyObject *args)
 {
@@ -512,7 +517,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    if (sigprocmask(how, &mask, &previous) == -1) {
+    if (PY_SIGMASK(how, &mask, &previous) == -1) {
         PyOS_snprintf(how_buffer, sizeof(how_buffer), how_format, how);
         PyErr_SetString(PyExc_ValueError, how_buffer);
         return NULL;
@@ -601,8 +606,10 @@ static PyMethodDef signal_methods[] = {
 	{"signal",	        signal_signal, METH_VARARGS, signal_doc},
 	{"getsignal",	        signal_getsignal, METH_VARARGS, getsignal_doc},
 	{"set_wakeup_fd",	signal_set_wakeup_fd, METH_VARARGS, set_wakeup_fd_doc},
-#ifdef HAVE_SIGPROCMASK
+#ifdef PY_SIGMASK
         {"sigprocmask",         signal_sigprocmask, METH_VARARGS, sigprocmask_doc},
+/* It's no longer needed, so clean up the namespace. */
+#undef PY_SIGMASK
 #endif
 #ifdef HAVE_SIGNALFD
         {"signalfd",            signal_signalfd, METH_VARARGS, signalfd_doc},
