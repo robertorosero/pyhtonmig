@@ -289,7 +289,8 @@ The :mod:`signal` module defines the following functions:
 .. function:: sigprocmask(how, mask)
 
    Set the signal mask for the process.  The old signal mask is returned.
-   Availability: Unix (See the Unix man page :manpage:`sigprocmask(2)`.)
+   Availability: Unix (See the Unix man page :manpage:`sigprocmask(2)` and
+   :manpage:`pthread_sigmask(2)`.)
 
    If *how* is :const:`signal.SIG_BLOCK`, the signals in the mask are added
    to the set of blocked signals.
