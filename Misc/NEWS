@@ -54,8 +54,8 @@ Core and Builtins
 
 - Raise a TypeError when trying to delete a T_STRING_INPLACE struct member.
 
-- Issue #8211: Save/restore CFLAGS around AC_PROG_CC in configure.in, compiler
-  optimizations are disabled when --with-pydebug is used.
+- Issue #8211: Save/restore CFLAGS around AC_PROG_CC in configure.in, in
+  case it is set.
 
 - Issue #8226: sys.setfilesystemencoding() raises a LookupError if the encoding
   is unknown
@@ -347,6 +347,30 @@ C-API
 
 Library
 -------
+
+- Issue #8573: asyncore _strerror() function might throw ValueError.
+
+- Issue #8483: asyncore.dispatcher's __getattr__ method produced confusing 
+  error messages when accessing undefined class attributes because of the cheap 
+  inheritance with the underlying socket object. 
+  The cheap inheritance has been deprecated.
+
+- Issue #4265: shutil.copyfile() was leaking file descriptors when disk fills.
+  Patch by Tres Seaver.
+
+- Issue #8390: tarfile uses surrogateespace as the default error handler
+  (instead of replace in read mode or strict in write mode)
+
+- Issue #7755: Use an unencumbered audio file for tests.
+
+- Issue #8621: uuid.uuid4() returned the same sequence of values in the
+  parent and any children created using ``os.fork`` on MacOS X 10.6.
+
+- Issue #8567: Fix precedence of signals in Decimal module: when a
+  Decimal operation raises multiple signals and more than one of those
+  signals is trapped, the specification determines the order in which
+  the signals should be handled.  In many cases this order wasn't
+  being followed, leading to the wrong Python exception being raised.
 
 - Issue #7865: The close() method of :mod:`io` objects should not swallow
   exceptions raised by the implicit flush().  Also ensure that calling
@@ -1127,6 +1151,12 @@ Extension Modules
 
 Build
 -----
+
+- Issue #8625: Turn off optimization in --with-pydebug builds with
+  gcc.  (Optimization was unintentionally turned on in gcc
+  --with-pydebug builds as a result of the issue #1628484 fix,
+  combined with autoconf's strange choice of default CFLAGS produced
+  by AC_PROG_CC for gcc.)
 
 - Issue #3646: It is now easily possible to install a Python framework into
   your home directory on MacOSX, see Mac/README for more information.
