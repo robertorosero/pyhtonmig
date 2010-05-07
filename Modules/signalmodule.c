@@ -201,7 +201,7 @@ signal_handler(int sig_num)
 #ifndef HAVE_SIGACTION
 	/* If the handler was not set up with sigaction, reinstall it.  See
 	 * Python/pythonrun.c for the implementation of PyOS_setsig which
-	 * makes this true.  */
+	 * makes this true.  See also issue8354. */
 	PyOS_setsig(sig_num, signal_handler);
 #endif
 }
