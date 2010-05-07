@@ -264,7 +264,7 @@ class SiginterruptTest(unittest.TestCase):
         oldhandler = signal.signal(self.signum, lambda x,y: None)
         self.addCleanup(signal.signal, self.signum, oldhandler)
 
-    def readpipe_interrupted(self, cb):
+    def readpipe_interrupted(self):
         """Perform a read during which a signal will arrive.  Return True if the
         read is interrupted by the signal and raises an exception.  Return False
         if it returns normally.
@@ -274,10 +274,6 @@ class SiginterruptTest(unittest.TestCase):
         # the write end).
         r, w = os.pipe()
         self.addCleanup(os.close, r)
-
-        # Give the test-method supplied function a chance to perhaps change
-        # the disposition of the handler.
-        cb()
 
         # Create another process which can send a signal to this one to try
         # to interrupt the read.
@@ -327,10 +323,10 @@ class SiginterruptTest(unittest.TestCase):
         at all, when that signal arrives, it interrupts a syscall that's in
         progress.
         """
-        i = self.readpipe_interrupted(lambda: None)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, True)
         # Arrival of the signal shouldn't have changed anything.
-        i = self.readpipe_interrupted(lambda: None)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, True)
 
     def test_siginterrupt_on(self):
@@ -338,10 +334,11 @@ class SiginterruptTest(unittest.TestCase):
         a true value for the second argument, when that signal arrives, it
         interrupts a syscall that's in progress.
         """
-        i = self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 1))
+        signal.siginterrupt(self.signum, 1)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, True)
         # Arrival of the signal shouldn't have changed anything.
-        i = self.readpipe_interrupted(lambda: None)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, True)
 
     def test_siginterrupt_off(self):
@@ -349,10 +346,11 @@ class SiginterruptTest(unittest.TestCase):
         a false value for the second argument, when that signal arrives, it
         does not interrupt a syscall that's in progress.
         """
-        i = self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 0))
+        signal.siginterrupt(self.signum, 0)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, False)
         # Arrival of the signal shouldn't have changed anything.
-        i = self.readpipe_interrupted(lambda: None)
+        i = self.readpipe_interrupted()
         self.assertEquals(i, False)
 
 
