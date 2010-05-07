@@ -552,7 +552,7 @@ class BaseTestAPI(unittest.TestCase):
         client = TestClient(server.address)
         self.loop_waiting_for_flag(client)
 
-    @unittest.skipIf(sys.platform.startswith("solaris"), "OOB support is broken")
+    @unittest.skipIf(sys.platform.startswith("sunos"), "OOB support is broken")
     def test_handle_expt(self):
         # Make sure handle_expt is called on OOB data received.
         # Note: this might fail on some platforms as OOB data is
@@ -598,7 +598,7 @@ class BaseTestAPI(unittest.TestCase):
         self.assertTrue(server.accepting)
         # solaris seems to connect() immediately even without starting
         # the poller
-        if not sys.platform.startswith("solaris"):
+        if not sys.platform.startswith("sunos"):
             self.assertFalse(client.connected)
         self.assertFalse(client.accepting)
 
