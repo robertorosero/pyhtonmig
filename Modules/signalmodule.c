@@ -569,13 +569,13 @@ Examine and change blocked signals.");
 static PyObject *
 signal_signalfd(PyObject *self, PyObject *args)
 {
-    int result;
+    int result, flags = 0;
     sigset_t mask;
 
     int fd;
     PyObject *signals;
 
-    if (!PyArg_ParseTuple(args, "iO:signalfd", &fd, &signals)) {
+    if (!PyArg_ParseTuple(args, "iO|i:signalfd", &fd, &signals, &flags)) {
         return NULL;
     }
 
@@ -583,7 +583,7 @@ signal_signalfd(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    result = signalfd(-1, &mask, 0);
+    result = signalfd(-1, &mask, flags);
 
     if (result == -1) {
         PyErr_SetFromErrno(PyExc_OSError);

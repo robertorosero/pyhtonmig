@@ -557,6 +557,43 @@ class SignalfdTests(unittest.TestCase):
         self.assertTrue(bytes)
 
 
+    def test_close_on_exec(self):
+        """If the bit mask passed as the 3rd argument to signalfd includes
+        SFD_CLOEXEC, the returned file descriptor has FD_CLOEXEC set on it.
+        """
+        import fcntl
+        fd = signal.signalfd(-1, [], signal.SFD_CLOEXEC)
+        self.addCleanup(os.close, fd)
+        flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+        self.assertTrue(flags & fcntl.FD_CLOEXEC)
+
+
+    def test_nonblocking(self):
+        """If the bit mask passed as the 3rd argument to signalfd includes
+        SFD_NOBLOCK, the file description referenced by the returned file
+        descriptor has O_NONBLOCK set on it.
+        """
+        import fcntl
+        fd = signal.signalfd(-1, [], signal.SFD_NONBLOCK)
+        self.addCleanup(os.close, fd)
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        self.assertTrue(flags & os.O_NONBLOCK)
+
+
+    def test_default_flags(self):
+        """If an empty bit mask is passed as the 3rd argument to signalfd,
+        neither FD_CLOEXEC nor O_NONBLOCK is set on the resulting file
+        descriptor/description.
+        """
+        import fcntl
+        fd = signal.signalfd(-1, [])
+        self.addCleanup(os.close, fd)
+        flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+        self.assertFalse(flags & fcntl.FD_CLOEXEC)
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        self.assertFalse(flags & os.O_NONBLOCK)
+
+
 def test_main():
     test_support.run_unittest(
         BasicSignalTests, InterProcessSignalTests,
