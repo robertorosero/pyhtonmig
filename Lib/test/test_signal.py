@@ -264,7 +264,6 @@ class SiginterruptTest(unittest.TestCase):
         oldhandler = signal.signal(self.signum, lambda x,y: None)
         self.addCleanup(signal.signal, self.signum, oldhandler)
 
-
     def readpipe_interrupted(self, cb):
         """Perform a read during which a signal will arrive.  Return True if
         the read is interrupted by the signal and raises an exception, False
@@ -323,7 +322,6 @@ class SiginterruptTest(unittest.TestCase):
                     raise
                 return True
 
-
     def test_without_siginterrupt(self):
         """If a signal handler is installed and siginterrupt is not called
         at all, when that signal arrives, it interrupts a syscall that's in
@@ -335,7 +333,6 @@ class SiginterruptTest(unittest.TestCase):
         i = self.readpipe_interrupted(lambda: None)
         self.assertEquals(i, True)
 
-
     def test_siginterrupt_on(self):
         """If a signal handler is installed and siginterrupt is called with
         a true value for the second argument, when that signal arrives, it
@@ -346,7 +343,6 @@ class SiginterruptTest(unittest.TestCase):
         # Arrival of the signal shouldn't have changed anything.
         i = self.readpipe_interrupted(lambda: None)
         self.assertEquals(i, True)
-
 
     def test_siginterrupt_off(self):
         """If a signal handler is installed and siginterrupt is called with
