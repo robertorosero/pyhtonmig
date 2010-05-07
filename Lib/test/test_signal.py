@@ -324,10 +324,10 @@ class SiginterruptTest(unittest.TestCase):
         progress.
         """
         i = self.readpipe_interrupted()
-        self.assertEquals(i, True)
+        self.assertTrue(i)
         # Arrival of the signal shouldn't have changed anything.
         i = self.readpipe_interrupted()
-        self.assertEquals(i, True)
+        self.assertTrue(i)
 
     def test_siginterrupt_on(self):
         """If a signal handler is installed and siginterrupt is called with
@@ -336,10 +336,10 @@ class SiginterruptTest(unittest.TestCase):
         """
         signal.siginterrupt(self.signum, 1)
         i = self.readpipe_interrupted()
-        self.assertEquals(i, True)
+        self.assertTrue(i)
         # Arrival of the signal shouldn't have changed anything.
         i = self.readpipe_interrupted()
-        self.assertEquals(i, True)
+        self.assertTrue(i)
 
     def test_siginterrupt_off(self):
         """If a signal handler is installed and siginterrupt is called with
@@ -348,10 +348,10 @@ class SiginterruptTest(unittest.TestCase):
         """
         signal.siginterrupt(self.signum, 0)
         i = self.readpipe_interrupted()
-        self.assertEquals(i, False)
+        self.assertFalse(i)
         # Arrival of the signal shouldn't have changed anything.
         i = self.readpipe_interrupted()
-        self.assertEquals(i, False)
+        self.assertFalse(i)
 
 
 
