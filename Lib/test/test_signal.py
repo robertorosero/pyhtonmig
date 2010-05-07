@@ -265,8 +265,8 @@ class SiginterruptTest(unittest.TestCase):
         self.addCleanup(signal.signal, self.signum, oldhandler)
 
     def readpipe_interrupted(self, cb):
-        """Perform a read during which a signal will arrive.  Return True if
-        the read is interrupted by the signal and raises an exception, False
+        """Perform a read during which a signal will arrive.  Return True if the
+        read is interrupted by the signal and raises an exception.  Return False
         if it returns normally.
         """
         # Create a pipe that can be used for the read.  Also clean it up
