@@ -351,6 +351,9 @@ C-API
 Library
 -------
 
+- Issue #4972: Add support for the context manager protocol to the ftplib.FTP
+  class.
+
 - Issue #8664: In py_compile, create __pycache__ when the compiled path is
   given.
 
@@ -1110,6 +1113,9 @@ Library
 
 Extension Modules
 -----------------
+
+- Issue #8674: Fixed a number of incorrect or undefined-behaviour-inducing
+  overflow checks in the audioop module.
 
 - Issue #8644: The accuracy of td.total_seconds() has been improved (by
   calculating with integer arithmetic instead of float arithmetic internally):
