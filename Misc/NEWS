@@ -290,6 +290,9 @@ Core and Builtins
 
 - Issue #7072: isspace(0xa0) is true on Mac OS X
 
+- Issue #8084: PEP 370 now conforms to system conventions for framework
+  builds on MacOS X. That is, "python setup.py install --user" will install
+    into "~/Library/Python/2.7" instead of "~/.local".
 
 C-API
 -----
@@ -348,6 +351,21 @@ C-API
 Library
 -------
 
+- Issue #8664: In py_compile, create __pycache__ when the compiled path is
+  given.
+
+- Issue #8514: Add os.fsencode() function (Unix only): encode a string to bytes
+  for use in the file system, environment variables or the command line.
+
+- Issue #8571: Fix an internal error when compressing or decompressing a
+  chunk larger than 1GB with the zlib module's compressor and decompressor
+  objects.
+
+- Issue #8603: Support bytes environmental variables on Unix: Add os.environb
+  mapping and os.getenvb() function. os.unsetenv() encodes str argument to the
+  file system encoding with the surrogateescape error handler (instead of
+  utf8/strict) and accepts bytes. posix.environ keys and values are now bytes.
+
 - Issue #8573: asyncore _strerror() function might throw ValueError.
 
 - Issue #8483: asyncore.dispatcher's __getattr__ method produced confusing 
@@ -378,6 +396,9 @@ Library
 
 - Issue #4687: Fix accuracy of garbage collection runtimes displayed with
   gc.DEBUG_STATS.
+
+- Issue #8354: The siginterrupt setting is now preserved for all signals,
+  not just SIGCHLD.
 
 - Issue #7192: webbrowser.get("firefox") now wors on Mac OS X, as does
   webbrowser.get("safari").
@@ -1089,6 +1110,11 @@ Library
 
 Extension Modules
 -----------------
+
+- Issue #8644: The accuracy of td.total_seconds() has been improved (by
+  calculating with integer arithmetic instead of float arithmetic internally):
+  the result is now always correctly rounded, and is equivalent to td /
+  timedelta(seconds=1).
 
 - Issue #2706: Allow division of a timedelta by another timedelta:
   timedelta / timedelta, timedelta % timedelta, timedelta // timedelta
