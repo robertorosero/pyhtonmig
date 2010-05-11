@@ -266,26 +266,52 @@ def _get_makefile_filename():
     return os.path.join(get_path('stdlib'), "config", "Makefile")
 
 
+def _get_sysconfig_filename():
+    """Return absolute pathname of the installed sysconfig file."""
+    if _PYTHON_BUILD:
+        return os.path.join(_PROJECT_BASE, "sysconfig")
+    return os.path.join(get_path("stdlib"), "config", "sysconfig")
+
+
+# Simple wrapper around parse_config_h() to simplify _parse_config_file().
+def _parse_config_h_filename(filename, g=None):
+    with open(filename) as fp:
+        return parse_config_h(fp, g)
+
+
+def _parse_config_file(filename, parse_func, config_dict):
+    """Parse a config file into a common dict.
+
+    Args:
+        filename: name of the config file.
+        parse_func: function to use to parse the file. This will be given
+            `filename` and `config_dict` as arguments, and should update
+            `config_dict` in-place.
+        config_dict: dictionary to update in-place.
+
+    Raises:
+        IOError: if the file could not be opened.
+    """
+    try:
+        parse_func(filename, config_dict)
+    except IOError as e:
+        msg = "invalid Python installation: unable to open %s" % filename
+        if hasattr(e, "strerror"):
+            msg = msg + " (%s)" % e.strerror
+        raise IOError(msg)
+
+
 def _init_posix(vars):
     """Initialize the module as appropriate for POSIX systems."""
-    # load the installed Makefile:
-    makefile = _get_makefile_filename()
-    try:
-        _parse_makefile(makefile, vars)
-    except IOError as e:
-        msg = "invalid Python installation: unable to open %s" % makefile
-        if hasattr(e, "strerror"):
-            msg = msg + " (%s)" % e.strerror
-        raise IOError(msg)
-    # load the installed pyconfig.h:
-    config_h = get_config_h_filename()
-    try:
-        parse_config_h(open(config_h), vars)
-    except IOError as e:
-        msg = "invalid Python installation: unable to open %s" % config_h
-        if hasattr(e, "strerror"):
-            msg = msg + " (%s)" % e.strerror
-        raise IOError(msg)
+    # Load the installed Makefile.
+    _parse_config_file(_get_makefile_filename(), _parse_makefile, vars)
+
+    # Load the installed pyconfig.h.
+    _parse_config_file(get_config_h_filename(), _parse_config_h_filename, vars)
+
+    # Load the installed sysconfig file.
+    _parse_config_file(_get_sysconfig_filename(), _parse_makefile, vars)
+
     # On MacOSX we need to check the setting of the environment variable
     # MACOSX_DEPLOYMENT_TARGET: configure bases some choices on it so
     # it needs to be compatible.

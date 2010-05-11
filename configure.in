@@ -26,7 +26,7 @@ dnl can cause trouble.
 dnl Last slash shouldn't be stripped if prefix=/
 if test "$prefix" != "/"; then
     prefix=`echo "$prefix" | sed -e 's/\/$//g'`
-fi    
+fi
 
 dnl This is for stuff that absolutely must end up in pyconfig.h.
 dnl Please use pyport.h instead, if possible.
@@ -478,6 +478,82 @@ then
 (it is also a good idea to do 'make clean' before compiling)])
 fi
 
+# Check for --with-llvm=DIRECTORY or --without-llvm.
+#
+# Check for this really early so we can use it to toggle LINKCC.
+#
+# Expected behaviour:
+#   - Omit --with-llvm: use llvm-config we find in the path or $LLVM_CONFIG
+#   - --with-llvm (no DIRECTORY): Same
+#   - --with-llvm=DIRECTORY: use the LLVM installed in DIRECTORY
+#   - --without-llvm: disable everything that requires LLVM
+dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
+AC_ARG_VAR(LLVM_CONFIG, [LLVM configuration script])
+AC_MSG_CHECKING(for --with(out)-llvm)
+AC_ARG_WITH(llvm,
+            AS_HELP_STRING([--with(out)-llvm@<:@=DIRECTORY@:>@],
+                           [build against a preinstalled LLVM
+                            or disable LLVM integration entirely. Note that
+                            Python built with --without-llvm cannot load
+                            extension modules built with --with-llvm or
+                            vice-versa.]),
+            [with_llvm=$withval],
+            [with_llvm=yes])
+
+if test "$with_llvm" = "no"
+then
+    AC_MSG_RESULT(disabled)
+    WITH_LLVM=0
+    LLVM_PYTHON_OBJS="EMPTY"
+    LLVM_UNITTEST_SRCS="EMPTY"
+else
+    AC_MSG_RESULT($with_llvm)
+    WITH_LLVM=1
+    LLVM_PYTHON_OBJS="LLVM_PYTHON_OBJS"
+    LLVM_UNITTEST_SRCS="LLVM_UNITTEST_SRCS"
+    if test "$with_llvm" = "yes"
+    then
+        AC_PATH_PROG(LLVM_CONFIG, llvm-config)
+        if test -z "$LLVM_CONFIG"
+        then
+            AC_MSG_ERROR([cannot find llvm-config on the PATH])
+        fi
+    else
+        AC_PATH_PROG(LLVM_CONFIG, llvm-config, [], [$with_llvm/bin])
+        if test -z "$LLVM_CONFIG"
+        then
+            AC_MSG_ERROR([cannot find llvm-config in $with_llvm/bin])
+        fi
+    fi
+
+    LLVM_INC_DIR=`$LLVM_CONFIG --includedir`
+    LLVM_BIN_DIR=`$LLVM_CONFIG --bindir`
+    LLVM_CXXFLAGS=`$LLVM_CONFIG jit bitreader backend --cxxflags`
+    LLVM_LDFLAGS=`$LLVM_CONFIG jit bitreader backend --ldflags --libs | awk '{ORS=" "} {print $0}'`
+    LLVM_LIB_PATHS=`$LLVM_CONFIG jit bitreader backend --libfiles`
+
+    AC_CHECK_FILE("$LLVM_BIN_DIR/clang",
+        [], [AC_MSG_ERROR([Did not find clang in $LLVM_BIN_DIR])])
+    AC_CHECK_FILE("$LLVM_BIN_DIR/opt",
+        [], [AC_MSG_ERROR([Did not find opt in $LLVM_BIN_DIR])])
+    AC_CHECK_FILE("$LLVM_BIN_DIR/llvm-link",
+        [], [AC_MSG_ERROR([Did not find llvm-link in $LLVM_BIN_DIR])])
+    AC_CHECK_FILE("$LLVM_BIN_DIR/llvm-dis",
+        [], [AC_MSG_ERROR([Did not find llvm-dis in $LLVM_BIN_DIR])])
+
+    AC_DEFINE(WITH_LLVM, 1,
+        [Use LLVM for code generation. This makes things fast.])
+fi
+AC_SUBST(WITH_LLVM)
+AC_SUBST(LLVM_PYTHON_OBJS)
+AC_SUBST(LLVM_UNITTEST_SRCS)
+AC_SUBST(LLVM_INC_DIR)
+AC_SUBST(LLVM_BIN_DIR)
+AC_SUBST(LLVM_CXXFLAGS)
+AC_SUBST(LLVM_LDFLAGS)
+AC_SUBST(LLVM_LIB_PATHS)
+
+
 # If the user set CFLAGS, use this instead of the automatically
 # determined setting
 preset_cflags="$CFLAGS"
@@ -506,12 +582,27 @@ AC_ARG_WITH(cxx_main,
 		then
 			CXX=$withval
 		fi;;
-	esac], [
-	with_cxx_main=no
-	MAINCC='$(CC)'
+	esac
+], [
+	case "$with_llvm" in
+	no)	with_cxx_main=no
+		MAINCC='$(CC)';;
+	*)	with_cxx_main=yes
+		MAINCC='$(CXX)';;
+	esac
 ])
 AC_MSG_RESULT($with_cxx_main)
 
+if test "$with_cxx_main" = "no"
+then
+	if test "$with_llvm" != "no"
+	then
+		AC_MSG_ERROR("Cannot specify both --without-cxx-main and --with-llvm");
+	fi
+fi
+
+# Use this in preference to AC_PROG_CXX, since --with-cxx-main=foo will override
+# CXX.
 preset_cxx="$CXX"
 if test -z "$CXX"
 then
@@ -632,10 +723,9 @@ DLLLIBRARY=''
 LDLIBRARYDIR=''
 RUNSHARED=''
 
-# LINKCC is the command that links the python executable -- default is $(CC).
-# If CXX is set, and if it is needed to link a main function that was
-# compiled with CXX, LINKCC is CXX instead. Always using CXX is undesirable:
-# python might then depend on the C++ runtime
+# LINKCC is the command that links the python executable -- this depends on
+# the values of --with-llvm and --with-cxx-main.
+# Always using CXX is undesirable: python might then depend on the C++ runtime
 # This is altered for AIX in order to build the export list before 
 # linking.
 AC_SUBST(LINKCC)
@@ -723,7 +813,7 @@ AC_MSG_CHECKING(LDLIBRARY)
 if test "$enable_framework"
 then
   LDLIBRARY='$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
-  RUNSHARED=DYLD_FRAMEWORK_PATH="`pwd`:$DYLD_FRAMEWORK_PATH"
+  RUNSHARED=DYLD_FRAMEWORK_PATH="$(shell pwd):$DYLD_FRAMEWORK_PATH"
   BLDLIBRARY=''
 else
   BLDLIBRARY='$(LDLIBRARY)'
@@ -740,13 +830,13 @@ if test $enable_shared = "yes"; then
     SunOS*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
+	  RUNSHARED='LD_LIBRARY_PATH=$(shell pwd):${LD_LIBRARY_PATH}'
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
           ;;
     Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
+	  RUNSHARED='LD_LIBRARY_PATH=$(shell pwd):${LD_LIBRARY_PATH}'
 	  case $ac_sys_system in
 	      FreeBSD*)
 		SOVERSION=`echo $SOVERSION|cut -d "." -f 1`
@@ -764,17 +854,17 @@ if test $enable_shared = "yes"; then
 			;;
 	  esac
 	  BLDLIBRARY='-Wl,+b,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=SHLIB_PATH=`pwd`:${SHLIB_PATH}
+	  RUNSHARED='SHLIB_PATH=$(shell pwd):${SHLIB_PATH}'
 	  ;;
     OSF*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-rpath $(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
+	  RUNSHARED='LD_LIBRARY_PATH=$(shell pwd):${LD_LIBRARY_PATH}'
 	  ;;
     Darwin*)
     	LDLIBRARY='libpython$(VERSION).dylib'
 	BLDLIBRARY='-L. -lpython$(VERSION)'
-	RUNSHARED='DYLD_LIBRARY_PATH=`pwd`:${DYLD_LIBRARY_PATH}'
+	RUNSHARED='DYLD_LIBRARY_PATH=$(shell pwd):${DYLD_LIBRARY_PATH}'
 	;;
 
   esac
@@ -843,6 +933,23 @@ else AC_MSG_RESULT(no); Py_DEBUG='false'
 fi],
 [AC_MSG_RESULT(no)])
 
+if test "$with_llvm" != "no"
+then
+    LLVM_BUILD_MODE=`$LLVM_CONFIG --build-mode`
+    if echo $LLVM_BUILD_MODE | grep -e -Asserts &>/dev/null
+    then
+        if test "$Py_DEBUG" = "true"
+        then
+            AC_MSG_ERROR([--with-pydebug requires +Asserts LLVM. Got "$LLVM_BUILD_MODE"])
+        fi
+    else
+        if test "$Py_DEBUG" != "true"
+        then
+            AC_MSG_ERROR([--without-pydebug requires -Asserts LLVM. Got "$LLVM_BUILD_MODE"])
+        fi
+    fi
+fi
+
 # XXX Shouldn't the code above that fiddles with BASECFLAGS and OPT be
 # merged with this chunk of code?
 
@@ -863,25 +970,18 @@ if test "${OPT-unset}" = "unset"
 then
     case $GCC in
     yes)
-        if test "$CC" != 'g++' ; then
-	    STRICT_PROTO="-Wstrict-prototypes"
-	fi
-        # For gcc 4.x we need to use -fwrapv so lets check if its supported
-        if "$CC" -v --help 2>/dev/null |grep -- -fwrapv > /dev/null; then
-           WRAP="-fwrapv"
-        fi
 	case $ac_cv_prog_cc_g in
 	yes)
 	    if test "$Py_DEBUG" = 'true' ; then
 		# Optimization messes up debuggers, so turn it off for
 		# debug builds.
-		OPT="-g -O0 -Wall $STRICT_PROTO"
+		OPT="-g -O0 -Wall"
 	    else
-		OPT="-g $WRAP -O3 -Wall $STRICT_PROTO"
+		OPT="-g $WRAP -O3 -Wall"
 	    fi
 	    ;;
 	*)
-	    OPT="-O3 -Wall $STRICT_PROTO"
+	    OPT="-O3 -Wall"
 	    ;;
 	esac
 	case $ac_sys_system in
@@ -938,6 +1038,29 @@ yes)
     if test $ac_cv_no_strict_aliasing = yes
     then
       BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
+    fi
+
+    # Python violates C99 rules by treating signed overflow as
+    # 2s-compliment. GCC 4+ can generate bad code because of that, so
+    # use -fwrapv if it's supported
+    AC_MSG_CHECKING(whether $CC accepts -fwrapv)
+     ac_save_cc="$CC"
+     CC="$CC -fwrapv"
+     AC_TRY_RUN([int main() { return 0; }],
+     ac_cv_fwrapv_ok=yes,
+     ac_cv_fwrapv_ok=no,
+     ac_cv_fwrapv_ok=no)
+     CC="$ac_save_cc"
+    AC_MSG_RESULT($ac_cv_fwrapv_ok)
+    if test $ac_cv_fwrapv_ok = yes
+    then
+      BASECFLAGS="$BASECFLAGS -fwrapv"
+    fi
+
+    BASECFLAGS="$BASECFLAGS -Wall"
+
+    if test "$CC" != 'g++' ; then
+        STRICT_PROTO="-Wstrict-prototypes"
     fi
 
     # if using gcc on alpha, use -mieee to get (near) full IEEE 754
@@ -1652,6 +1775,22 @@ case $ac_sys_system/$ac_sys_release in
 	AC_MSG_RESULT(no)
 	;;
 esac
+
+AC_SUBST(BASECXXFLAGS)
+# Only add -Wstrict-prototypes to the C flags, not C++.  We do this
+# after BASECFLAGS is fully set up.
+BASECXXFLAGS="$BASECFLAGS"
+BASECFLAGS="$BASECFLAGS $STRICT_PROTO"
+
+# We force C compilation for some files so that we don't have to rename them.
+# Otherwise when configured --without-llvm, gcc will see the .cc extension and
+# compile the file as C++, which creates a dependency on libstdc++.
+AC_SUBST(FORCE_C)
+FORCE_C=""
+if test "$GCC" == "yes"
+then
+	FORCE_C="-x c"
+fi
 
 # Set info about shared libraries.
 AC_SUBST(SO)
@@ -2385,7 +2524,7 @@ yes
 				ipv6type=$i
 				ipv6lib=inet6
 				ipv6libdir=/usr/inet6/lib
-				BASECFLAGS="-I/usr/inet6/include $BASECFLAGS"
+				CPPFLAGS="-I/usr/inet6/include $CPPFLAGS"
 			fi
 			;;
 		solaris)
@@ -2415,7 +2554,7 @@ yes
 				[ipv6type=$i;
 				ipv6lib=v6;
 				ipv6libdir=/usr/local/v6/lib;
-				BASECFLAGS="-I/usr/local/v6/include $BASECFLAGS"])
+				CPPFLAGS="-I/usr/local/v6/include $CPPFLAGS"])
 			;;
 		zeta)
 			AC_EGREP_CPP(yes, [
@@ -2475,19 +2614,6 @@ then
       [Define if you want documentation strings in extension modules])
 fi
 AC_MSG_RESULT($with_doc_strings)
-
-# Check for Python-specific malloc support
-AC_MSG_CHECKING(for --with-tsc)
-AC_ARG_WITH(tsc,
-	    AS_HELP_STRING([--with(out)-tsc],[enable/disable timestamp counter profile]),[
-if test "$withval" != no
-then 
-  AC_DEFINE(WITH_TSC, 1, 
-    [Define to profile with the Pentium timestamp counter]) 
-    AC_MSG_RESULT(yes)
-else AC_MSG_RESULT(no)
-fi],
-[AC_MSG_RESULT(no)])
 
 # Check for Python-specific malloc support
 AC_MSG_CHECKING(for --with-pymalloc)
@@ -4149,21 +4275,52 @@ AC_ARG_WITH(computed-gotos,
                            [Use computed gotos / threaded dispatch in evaluation loop (not available on all compilers)]),
 [
 if test "$withval" != no
-then 
+then
   AC_DEFINE(USE_COMPUTED_GOTOS, 1,
-  [Define if you want to use computed gotos in ceval.c.]) 
+  [Define if you want to use computed gotos in ceval.c.])
   AC_MSG_RESULT(yes)
 else AC_MSG_RESULT(no)
 fi],
 [AC_MSG_RESULT(no)])
 
+# Check for --with-instrumentation
+AC_MSG_CHECKING(for --with-instrumentation)
+AC_ARG_WITH(instrumentation,
+            AS_HELP_STRING([--with-instrumentation],
+                           [Compile in a bunch of runtime instrumentation useful
+                            for optimizing Python itself. Requires --with-llvm.]))
 
+if test "$with_instrumentation" = yes
+then
+    AC_DEFINE(Py_WITH_INSTRUMENTATION, 1,
+        [Compile in a bunch of runtime instrumentation useful for optimizing
+         Python itself.])
+	AC_MSG_RESULT(yes);
+    if test "WITH_LLVM" = "0"
+	then
+		AC_MSG_ERROR([--with-instrumentation requires --with-llvm])
+	fi
+else
+	AC_MSG_RESULT(no);
+fi
 
-case $ac_sys_system in
-  OSF*) AC_MSG_ERROR(OSF* systems are deprecated unless somebody volunteers. Check http://bugs.python.org/issue8606) ;;
-esac
-
-
+# Check fine-grained interpreter profiling using hardware counters.
+AC_MSG_CHECKING(for --with-tsc)
+AC_ARG_WITH(tsc,
+	    AS_HELP_STRING([--with(out)-tsc],
+	                   [enable/disable timestamp counter profile]), [
+if test "$withval" != no
+then
+	AC_DEFINE(WITH_TSC, 1,
+	          [Define to profile with the Pentium timestamp counter])
+	AC_MSG_RESULT(yes)
+	if test "WITH_LLVM" = "0"
+	then
+		AC_MSG_ERROR([--with-tsc requires --with-llvm])
+	fi
+else AC_MSG_RESULT(no)
+fi],
+[AC_MSG_RESULT(no)])
 
 AC_SUBST(THREADHEADERS)
 
@@ -4173,7 +4330,7 @@ do
 done
 
 AC_SUBST(SRCDIRS)
-SRCDIRS="Parser Grammar Objects Python Modules Mac Unittests Unittests/googletest"
+SRCDIRS="Parser Grammar Objects Python Modules Mac Unittests Unittests/googletest Util"
 AC_MSG_CHECKING(for build directories)
 for dir in $SRCDIRS; do
     if test ! -d $dir; then

@@ -35,6 +35,7 @@ LINKCC=		@LINKCC@
 AR=		@AR@
 RANLIB=		@RANLIB@
 SVNVERSION=	@SVNVERSION@
+FORCE_C=	@FORCE_C@
 
 GNULD=          @GNULD@
 
@@ -60,10 +61,11 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 OPT=		@OPT@
 BASECFLAGS=	@BASECFLAGS@
 CFLAGS=		$(BASECFLAGS) @CFLAGS@ $(OPT) $(EXTRA_CFLAGS)
+CXXFLAGS=	$(BASECXXFLAGS) $(OPT) $(EXTRA_CXXFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include @CPPFLAGS@
+CPPFLAGS=	-I. -IInclude -I$(srcdir) -I$(srcdir)/Include @CPPFLAGS@
 LDFLAGS=	@LDFLAGS@
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
@@ -74,6 +76,16 @@ ARFLAGS=	@ARFLAGS@
 CFLAGSFORSHARED=@CFLAGSFORSHARED@
 # C flags used for building the interpreter object files
 PY_CFLAGS=	$(CFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE
+PY_CXXFLAGS=	$(CXXFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE -Wno-write-strings
+
+# LLVM integration options
+WITH_LLVM=	@WITH_LLVM@
+LLVM_CONFIG=	@LLVM_CONFIG@
+LLVM_INC_DIR=	@LLVM_INC_DIR@
+LLVM_BIN_DIR=	@LLVM_BIN_DIR@
+LLVM_CXXFLAGS=	@LLVM_CXXFLAGS@
+LLVM_LDFLAGS=	@LLVM_LDFLAGS@
+LLVM_LIB_PATHS=	@LLVM_LIB_PATHS@
 
 
 # Machine-dependent subdirectories
@@ -322,6 +334,12 @@ PYTHON_OBJS=	\
 		$(MACHDEP_OBJS) \
 		$(THREADOBJ)
 
+# configure will do a LLVM_PYTHON_OBJS substitution that will expand
+# to one of these. This convolution is done to support BSD make.
+EMPTY=
+LLVM_PYTHON_OBJS=	\
+		Util/PySmallPtrSet.o \
+		Util/Stats.o
 
 ##########################################################################
 # Objects
@@ -371,6 +389,7 @@ LIBRARY_OBJS=	\
 		$(PARSER_OBJS) \
 		$(OBJECT_OBJS) \
 		$(PYTHON_OBJS) \
+		$(@LLVM_PYTHON_OBJS@) \
 		$(MODULE_OBJS) \
 		$(SIGNAL_OBJS) \
 		$(MODOBJS)
@@ -408,12 +427,16 @@ coverage:
 	$(MAKE) clean
 	$(MAKE) all CFLAGS="$(CFLAGS) -O0 -pg -fprofile-arcs -ftest-coverage" LIBS="$(LIBS) -lgcov"
 
+sysconfig:
+	@case $(WITH_LLVM) in \
+	1) ( echo "LLVM_CXXFLAGS=$(LLVM_CXXFLAGS)"; echo "LLVM_LDFLAGS=$(LLVM_LDFLAGS)" ) > sysconfig;; \
+	0) touch sysconfig;; \
+	esac
 
 # Build the interpreter
-$(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY)
-		$(LINKCC) $(LDFLAGS) $(LINKFORSHARED) -o $@ \
-			Modules/python.o \
-			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
+$(BUILDPYTHON):	sysconfig Modules/python.o $(LIBRARY) $(LDLIBRARY)
+		$(LINKCC) $(LDFLAGS) $(LINKFORSHARED) -o $@ Modules/python.o \
+			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LLVM_LDFLAGS) $(LDLAST)
 
 platform: $(BUILDPYTHON)
 	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from sysconfig import get_platform ; print(get_platform()+"-"+sys.version[0:3])' >platform
@@ -433,25 +456,25 @@ $(LIBRARY): $(LIBRARY_OBJS)
 	$(AR) $(ARFLAGS) $@ Modules/getbuildinfo.o
 	$(AR) $(ARFLAGS) $@ $(PARSER_OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJECT_OBJS)
-	$(AR) $(ARFLAGS) $@ $(PYTHON_OBJS)
+	$(AR) $(ARFLAGS) $@ $(PYTHON_OBJS) $(@LLVM_PYTHON_OBJS@)
 	$(AR) $(ARFLAGS) $@ $(MODULE_OBJS) $(SIGNAL_OBJS)
 	$(AR) $(ARFLAGS) $@ $(MODOBJS)
 	$(RANLIB) $@
 
 libpython$(VERSION).so: $(LIBRARY_OBJS)
 	if test $(INSTSONAME) != $(LDLIBRARY); then \
-		$(LDSHARED) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		$(LDSHARED) $(LLVM_LDFLAGS) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 		$(LN) -f $(INSTSONAME) $@; \
 	else \
-		$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		$(LDSHARED) $(LLVM_LDFLAGS) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 	fi
 
 libpython$(VERSION).dylib: $(LIBRARY_OBJS)
-	 $(CC) -dynamiclib -Wl,-single_module $(LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+	 $(CC) -dynamiclib -Wl,-single_module $(LLVM_LDFLAGS) $(LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 		 
 
 libpython$(VERSION).sl: $(LIBRARY_OBJS)
-	$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
+	$(LDSHARED) $(LLVM_LDFLAGS) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
 
 # Copy up the gdb python hooks into a position where they can be automatically
 # loaded by gdb during Lib/test/test_gdb.py
@@ -497,7 +520,7 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 # for a shared core library; otherwise, this rule is a noop.
 $(DLLLIBRARY) libpython$(VERSION).dll.a: $(LIBRARY_OBJS)
 	if test -n "$(DLLLIBRARY)"; then \
-		$(LDSHARED) $(LDFLAGS) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
+		$(LDSHARED) $(LLVM_LDFLAGS) $(LDFLAGS) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
 			$(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST); \
 	else true; \
 	fi
@@ -537,6 +560,7 @@ Modules/Setup: $(srcdir)/Modules/Setup.dist
 Modules/getbuildinfo.o: $(PARSER_OBJS) \
 		$(OBJECT_OBJS) \
 		$(PYTHON_OBJS) \
+		$(@LLVM_PYTHON_OBJS@) \
 		$(MODULE_OBJS) \
 		$(SIGNAL_OBJS) \
 		$(MODOBJS) \
@@ -717,6 +741,10 @@ $(LIBRARY_OBJS) $(MODOBJS) Modules/python.o: $(PYTHON_HEADERS)
 # even without a C++ compiler. All commands are prefixed with - to make this
 # happen.
 
+LLVM_UNITTEST_SRCS := \
+		$(srcdir)/Unittests/PySmallPtrSetTest.cc \
+		$(srcdir)/Unittests/StatsTest.cc
+
 UNITTEST_SRCS := $(LIBRARY) \
 		$(srcdir)/Unittests/DatetimeTest.cc \
 		$(srcdir)/Unittests/DictTest.cc \
@@ -725,7 +753,8 @@ UNITTEST_SRCS := $(LIBRARY) \
 		$(srcdir)/Unittests/ObjectTest.cc \
 		$(srcdir)/Unittests/UnicodeTest.cc \
 		$(srcdir)/Unittests/pytest_main.cc \
-		Unittests/googletest/gtest.o
+		$(@LLVM_UNITTEST_SRCS@) \
+		Unittests/googletest/gtest.o \
 
 Unittests/googletest/gtest.o:
 	-$(CXX) -c $(PY_CXXFLAGS) -I$(srcdir)/Unittests/googletest \
@@ -733,9 +762,13 @@ Unittests/googletest/gtest.o:
 		$(srcdir)/Unittests/googletest/src/gtest-all.cc
 
 # The python-config line needs to come last, or this will be broken on Linux.
+#
+# gcc's TR1 <tuple> header depends on RTTI, so force googletest to use
+# its own tuple implementation.
 AllUnitTests: $(UNITTEST_SRCS) $(srcdir)/Unittests/*.h build_all python-config
 	-$(CXX) $(CPPFLAGS) -I$(srcdir)/Unittests/googletest/include -o $@ \
 	 	$(UNITTEST_SRCS) -L. $(LDFLAGS) \
+		-DGTEST_HAS_RTTI=0 -DGTEST_HAS_TR1_TUPLE=0 \
 		`$(RUNSHARED) ./$(BUILDPYTHON) ./python-config --cflags --ldflags`
 
 
@@ -1162,6 +1195,9 @@ config.status:	$(srcdir)/configure
 .c.o:
 	$(CC) -c $(PY_CFLAGS) -o $@ $<
 
+.cc.o:
+	$(CXX) -c $(LLVM_CXXFLAGS) $(PY_CXXFLAGS) -o $@ $<
+
 # Run reindent on the library
 reindent:
 	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
@@ -1213,6 +1249,7 @@ clean: pycremoval
 	find . -name '*.s[ol]' -exec rm -f {} ';'
 	find build -name 'fficonfig.h' -exec rm -f {} ';' || true
 	find build -name 'fficonfig.py' -exec rm -f {} ';' || true
+	rm -f sysconfig
 	-rm -f Lib/lib2to3/*Grammar*.pickle
 
 profile-removal:
