@@ -24,7 +24,7 @@ export MACOSX_DEPLOYMENT_TARGET
 
 # These are normally glimpsed from the previous set
 bindir=$(prefix)/bin
-PYTHONAPPSDIR=/Applications/$(PYTHONFRAMEWORK) $(VERSION)
+PYTHONAPPSDIR=@FRAMEWORKINSTALLAPPSPREFIX@/$(PYTHONFRAMEWORK) $(VERSION)
 APPINSTALLDIR=$(prefix)/Resources/Python.app
 
 # Variables for installing the "normal" unix binaries
@@ -58,8 +58,8 @@ install_pythonw: pythonw
 ifneq ($(LIPO_32BIT_FLAGS),)
 	lipo $(LIPO_32BIT_FLAGS) -output $(DESTDIR)$(prefix)/bin/python$(VERSION)-32 pythonw
 	lipo $(LIPO_32BIT_FLAGS) -output $(DESTDIR)$(prefix)/bin/pythonw$(VERSION)-32 pythonw
-	ln -sf pythonw$(VERSION)-32	"$(DESTDIR)$(prefix)/bin/pythonw$(VERSION)"
-	ln -sf python$(VERSION)-32	"$(DESTDIR)$(prefix)/bin/python$(VERSION)"
+	ln -sf pythonw$(VERSION)-32	"$(DESTDIR)$(prefix)/bin/pythonw3-32"
+	ln -sf python$(VERSION)-32	"$(DESTDIR)$(prefix)/bin/python3-32"
 endif
 
 #

@@ -369,12 +369,17 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
 
     def setUp(self):
         self.__save = dict(os.environ)
+        if os.name not in ('os2', 'nt'):
+            self.__saveb = dict(os.environb)
         for key, value in self._reference().items():
             os.environ[key] = value
 
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self.__save)
+        if os.name not in ('os2', 'nt'):
+            os.environb.clear()
+            os.environb.update(self.__saveb)
 
     def _reference(self):
         return {"KEY1":"VALUE1", "KEY2":"VALUE2", "KEY3":"VALUE3"}
@@ -439,6 +444,27 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         # Supplied PATH environment variable
         self.assertSequenceEqual(test_path, os.get_exec_path(test_env))
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX specific test")
+    def test_environb(self):
+        # os.environ -> os.environb
+        value = 'euro\u20ac'
+        try:
+            value_bytes = value.encode(sys.getfilesystemencoding(),
+                                       'surrogateescape')
+        except UnicodeEncodeError:
+            msg = "U+20AC character is not encodable to %s" % (
+                sys.getfilesystemencoding(),)
+            self.skipTest(msg)
+        os.environ['unicode'] = value
+        self.assertEquals(os.environ['unicode'], value)
+        self.assertEquals(os.environb[b'unicode'], value_bytes)
+
+        # os.environb -> os.environ
+        value = b'\xff'
+        os.environb[b'bytes'] = value
+        self.assertEquals(os.environb[b'bytes'], value)
+        value_str = value.decode(sys.getfilesystemencoding(), 'surrogateescape')
+        self.assertEquals(os.environ['bytes'], value_str)
 
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
@@ -606,6 +632,58 @@ class ExecTests(unittest.TestCase):
 
     def test_execvpe_with_bad_arglist(self):
         self.assertRaises(ValueError, os.execvpe, 'notepad', [], None)
+
+    class _stub_out_for_execvpe_test(object):
+        """
+        Stubs out execv, execve and get_exec_path functions when
+        used as context manager.  Records exec calls.  The mock execv
+        and execve functions always raise an exception as they would
+        normally never return.
+        """
+        def __init__(self):
+            # A list of tuples containing (function name, first arg, args)
+            # of calls to execv or execve that have been made.
+            self.calls = []
+        def _mock_execv(self, name, *args):
+            self.calls.append(('execv', name, args))
+            raise RuntimeError("execv called")
+
+        def _mock_execve(self, name, *args):
+            self.calls.append(('execve', name, args))
+            raise OSError(errno.ENOTDIR, "execve called")
+
+        def _mock_get_exec_path(self, env=None):
+            return [os.sep+'p', os.sep+'pp']
+
+        def __enter__(self):
+            self.orig_execv = os.execv
+            self.orig_execve = os.execve
+            self.orig_get_exec_path = os.get_exec_path
+            os.execv = self._mock_execv
+            os.execve = self._mock_execve
+            os.get_exec_path = self._mock_get_exec_path
+
+        def __exit__(self, type, value, tb):
+            os.execv = self.orig_execv
+            os.execve = self.orig_execve
+            os.get_exec_path = self.orig_get_exec_path
+
+    @unittest.skipUnless(hasattr(os, '_execvpe'),
+                         "No internal os._execvpe function to test.")
+    def test_internal_execvpe(self):
+        exec_stubbed = self._stub_out_for_execvpe_test()
+        with exec_stubbed:
+            self.assertRaises(RuntimeError, os._execvpe, os.sep+'f', ['-a'])
+            self.assertEqual([('execv', os.sep+'f', (['-a'],))],
+                             exec_stubbed.calls)
+            exec_stubbed.calls = []
+            self.assertRaises(OSError, os._execvpe, 'f', ['-a'],
+                              env={'spam': 'beans'})
+            self.assertEqual([('execve', os.sep+'p'+os.sep+'f',
+                               (['-a'], {'spam': 'beans'})),
+                              ('execve', os.sep+'pp'+os.sep+'f',
+                               (['-a'], {'spam': 'beans'}))],
+                             exec_stubbed.calls)
 
 class Win32ErrorTests(unittest.TestCase):
     def test_rename(self):
@@ -862,6 +940,14 @@ class Win32KillTests(unittest.TestCase):
         self._kill_with_event(signal.CTRL_BREAK_EVENT, "CTRL_BREAK_EVENT")
 
 
+class MiscTests(unittest.TestCase):
+
+    @unittest.skipIf(os.name == "nt", "POSIX specific test")
+    def test_fsencode(self):
+        self.assertEquals(os.fsencode(b'ab\xff'), b'ab\xff')
+        self.assertEquals(os.fsencode('ab\uDCFF'), b'ab\xff')
+
+
 def test_main():
     support.run_unittest(
         FileTests,
@@ -876,7 +962,8 @@ def test_main():
         TestInvalidFD,
         PosixUidGidTests,
         Pep383Tests,
-        Win32KillTests
+        Win32KillTests,
+        MiscTests,
     )
 
 if __name__ == "__main__":

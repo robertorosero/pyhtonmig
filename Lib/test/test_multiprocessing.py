@@ -5,7 +5,6 @@
 #
 
 import unittest
-import threading
 import queue as pyqueue
 import time
 import io
@@ -25,6 +24,10 @@ import test.support
 _multiprocessing = test.support.import_module('_multiprocessing')
 # Skip tests if sem_open implementation is broken.
 test.support.import_module('multiprocessing.synchronize')
+# import threading after _multiprocessing to raise a more revelant error
+# message: "No module named _multiprocessing". _multiprocessing is not compiled
+# without thread support.
+import threading
 
 import multiprocessing.dummy
 import multiprocessing.connection
@@ -1253,9 +1256,9 @@ class _TestManagerRestart(BaseTestCase):
 
     def test_rapid_restart(self):
         authkey = os.urandom(32)
-        port = test.support.find_unused_port()
         manager = QueueManager(
-            address=('localhost', port), authkey=authkey, serializer=SERIALIZER)
+            address=('localhost', 0), authkey=authkey, serializer=SERIALIZER)
+        addr = manager.get_server().address
         manager.start()
 
         p = self.Process(target=self._putter, args=(manager.address, authkey))
@@ -1265,7 +1268,7 @@ class _TestManagerRestart(BaseTestCase):
         del queue
         manager.shutdown()
         manager = QueueManager(
-            address=('localhost', port), authkey=authkey, serializer=SERIALIZER)
+            address=addr, authkey=authkey, serializer=SERIALIZER)
         manager.start()
         manager.shutdown()
 

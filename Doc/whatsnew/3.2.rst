@@ -66,6 +66,9 @@ Some smaller changes made to the core Python language are:
 New, Improved, and Deprecated Modules
 =====================================
 
+* The :class:`ftplib.FTP` class now supports the context manager protocol
+  (Contributed by Tarek Ziadé and Giampaolo Rodolà; :issue:`4972`.)
+
 * The previously deprecated :func:`string.maketrans` function has been
   removed in favor of the static methods, :meth:`bytes.maketrans` and
   :meth:`bytearray.maketrans`.  This change solves the confusion around which
@@ -122,6 +125,11 @@ Multi-threading
   between 10x and 15x faster than their previous pure Python implementation.
 
   (Contributed by Antoine Pitrou; :issue:`3001`.)
+
+* Regular and recursive locks now accept an optional *timeout* argument
+  to their ``acquire`` method. (Contributed by Antoine Pitrou; :issue:`7316`)
+  Similarly, :meth:`threading.Semaphore.acquire` also gains a *timeout*
+  argument. (Contributed by Torsten Landschoff; :issue:`850728`.)
 
 
 Optimizations

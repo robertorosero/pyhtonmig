@@ -13,12 +13,20 @@ from os.path import splitdrive
 from distutils.spawn import find_executable, spawn
 from shutil import (_make_tarball, _make_zipfile, make_archive,
                     register_archive_format, unregister_archive_format,
-                    get_archive_formats, Error)
+                    get_archive_formats, Error, unpack_archive,
+                    register_unpack_format, RegistryError,
+                    unregister_unpack_format, get_unpack_formats)
 import tarfile
 import warnings
 
 from test import support
 from test.support import TESTFN, check_warnings, captured_stdout
+
+try:
+    import bz2
+    BZ2_SUPPORTED = True
+except ImportError:
+    BZ2_SUPPORTED = False
 
 TESTFN2 = TESTFN + "2"
 
@@ -263,35 +271,36 @@ class TestShutil(unittest.TestCase):
             shutil.rmtree(src_dir)
             shutil.rmtree(os.path.dirname(dst_dir))
 
-    if hasattr(os, "symlink"):
-        def test_dont_copy_file_onto_link_to_itself(self):
-            # bug 851123.
-            os.mkdir(TESTFN)
-            src = os.path.join(TESTFN, 'cheese')
-            dst = os.path.join(TESTFN, 'shop')
+    @unittest.skipUnless(hasattr(os, 'symlink'), 'requires os.symlink')
+    def test_dont_copy_file_onto_link_to_itself(self):
+        # bug 851123.
+        os.mkdir(TESTFN)
+        src = os.path.join(TESTFN, 'cheese')
+        dst = os.path.join(TESTFN, 'shop')
+        try:
+            f = open(src, 'w')
+            f.write('cheddar')
+            f.close()
+
+            os.link(src, dst)
+            self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
+            self.assertEqual(open(src,'r').read(), 'cheddar')
+            os.remove(dst)
+
+            # Using `src` here would mean we end up with a symlink pointing
+            # to TESTFN/TESTFN/cheese, while it should point at
+            # TESTFN/cheese.
+            os.symlink('cheese', dst)
+            self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
+            self.assertEqual(open(src,'r').read(), 'cheddar')
+            os.remove(dst)
+        finally:
             try:
-                f = open(src, 'w')
-                f.write('cheddar')
-                f.close()
+                shutil.rmtree(TESTFN)
+            except OSError:
+                pass
 
-                os.link(src, dst)
-                self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
-                self.assertEqual(open(src,'r').read(), 'cheddar')
-                os.remove(dst)
-
-                # Using `src` here would mean we end up with a symlink pointing
-                # to TESTFN/TESTFN/cheese, while it should point at
-                # TESTFN/cheese.
-                os.symlink('cheese', dst)
-                self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
-                self.assertEqual(open(src,'r').read(), 'cheddar')
-                os.remove(dst)
-            finally:
-                try:
-                    shutil.rmtree(TESTFN)
-                except OSError:
-                    pass
-
+        @unittest.skipUnless(hasattr(os, 'symlink'), 'requires os.symlink')
         def test_rmtree_on_symlink(self):
             # bug 1669.
             os.mkdir(TESTFN)
@@ -304,37 +313,38 @@ class TestShutil(unittest.TestCase):
             finally:
                 shutil.rmtree(TESTFN, ignore_errors=True)
 
-    if hasattr(os, "mkfifo"):
-        # Issue #3002: copyfile and copytree block indefinitely on named pipes
-        def test_copyfile_named_pipe(self):
-            os.mkfifo(TESTFN)
-            try:
-                self.assertRaises(shutil.SpecialFileError,
-                                  shutil.copyfile, TESTFN, TESTFN2)
-                self.assertRaises(shutil.SpecialFileError,
-                                  shutil.copyfile, __file__, TESTFN)
-            finally:
-                os.remove(TESTFN)
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'requires os.mkfifo')
+    # Issue #3002: copyfile and copytree block indefinitely on named pipes
+    def test_copyfile_named_pipe(self):
+        os.mkfifo(TESTFN)
+        try:
+            self.assertRaises(shutil.SpecialFileError,
+                                shutil.copyfile, TESTFN, TESTFN2)
+            self.assertRaises(shutil.SpecialFileError,
+                                shutil.copyfile, __file__, TESTFN)
+        finally:
+            os.remove(TESTFN)
 
-        def test_copytree_named_pipe(self):
-            os.mkdir(TESTFN)
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'requires os.mkfifo')
+    def test_copytree_named_pipe(self):
+        os.mkdir(TESTFN)
+        try:
+            subdir = os.path.join(TESTFN, "subdir")
+            os.mkdir(subdir)
+            pipe = os.path.join(subdir, "mypipe")
+            os.mkfifo(pipe)
             try:
-                subdir = os.path.join(TESTFN, "subdir")
-                os.mkdir(subdir)
-                pipe = os.path.join(subdir, "mypipe")
-                os.mkfifo(pipe)
-                try:
-                    shutil.copytree(TESTFN, TESTFN2)
-                except shutil.Error as e:
-                    errors = e.args[0]
-                    self.assertEqual(len(errors), 1)
-                    src, dst, error_msg = errors[0]
-                    self.assertEqual("`%s` is a named pipe" % pipe, error_msg)
-                else:
-                    self.fail("shutil.Error should have been raised")
-            finally:
-                shutil.rmtree(TESTFN, ignore_errors=True)
-                shutil.rmtree(TESTFN2, ignore_errors=True)
+                shutil.copytree(TESTFN, TESTFN2)
+            except shutil.Error as e:
+                errors = e.args[0]
+                self.assertEqual(len(errors), 1)
+                src, dst, error_msg = errors[0]
+                self.assertEqual("`%s` is a named pipe" % pipe, error_msg)
+            else:
+                self.fail("shutil.Error should have been raised")
+        finally:
+            shutil.rmtree(TESTFN, ignore_errors=True)
+            shutil.rmtree(TESTFN2, ignore_errors=True)
 
     def test_copytree_special_func(self):
 
@@ -351,6 +361,7 @@ class TestShutil(unittest.TestCase):
         shutil.copytree(src_dir, dst_dir, copy_function=_copy)
         self.assertEquals(len(copied), 2)
 
+    @unittest.skipUnless(hasattr(os, 'symlink'), 'requires os.symlink')
     def test_copytree_dangling_symlinks(self):
 
         # a dangling symlink raises an error at the end
@@ -535,6 +546,7 @@ class TestShutil(unittest.TestCase):
                            owner='kjhkjhkjg', group='oihohoh')
         self.assertTrue(os.path.exists(res))
 
+
     @unittest.skipUnless(zlib, "Requires zlib")
     @unittest.skipUnless(UID_GID_SUPPORT, "Requires grp and pwd support")
     def test_tarfile_root_owner(self):
@@ -591,6 +603,61 @@ class TestShutil(unittest.TestCase):
         unregister_archive_format('xxx')
         formats = [name for name, params in get_archive_formats()]
         self.assertNotIn('xxx', formats)
+
+    def _compare_dirs(self, dir1, dir2):
+        # check that dir1 and dir2 are equivalent,
+        # return the diff
+        diff = []
+        for root, dirs, files in os.walk(dir1):
+            for file_ in files:
+                path = os.path.join(root, file_)
+                target_path = os.path.join(dir2, os.path.split(path)[-1])
+                if not os.path.exists(target_path):
+                    diff.append(file_)
+        return diff
+
+    @unittest.skipUnless(zlib, "Requires zlib")
+    def test_unpack_archive(self):
+        formats = ['tar', 'gztar', 'zip']
+        if BZ2_SUPPORTED:
+            formats.append('bztar')
+
+        for format in formats:
+            tmpdir = self.mkdtemp()
+            base_dir, root_dir, base_name =  self._create_files()
+            tmpdir2 = self.mkdtemp()
+            filename = make_archive(base_name, format, root_dir, base_dir)
+
+            # let's try to unpack it now
+            unpack_archive(filename, tmpdir2)
+            diff = self._compare_dirs(tmpdir, tmpdir2)
+            self.assertEquals(diff, [])
+
+    def test_unpack_registery(self):
+
+        formats = get_unpack_formats()
+
+        def _boo(filename, extract_dir, extra):
+            self.assertEquals(extra, 1)
+            self.assertEquals(filename, 'stuff.boo')
+            self.assertEquals(extract_dir, 'xx')
+
+        register_unpack_format('Boo', ['.boo', '.b2'], _boo, [('extra', 1)])
+        unpack_archive('stuff.boo', 'xx')
+
+        # trying to register a .boo unpacker again
+        self.assertRaises(RegistryError, register_unpack_format, 'Boo2',
+                          ['.boo'], _boo)
+
+        # should work now
+        unregister_unpack_format('Boo')
+        register_unpack_format('Boo2', ['.boo'], _boo)
+        self.assertIn(('Boo2', ['.boo'], ''), get_unpack_formats())
+        self.assertNotIn(('Boo', ['.boo'], ''), get_unpack_formats())
+
+        # let's leave a clean state
+        unregister_unpack_format('Boo2')
+        self.assertEquals(get_unpack_formats(), formats)
 
 
 class TestMove(unittest.TestCase):
@@ -731,8 +798,112 @@ class TestMove(unittest.TestCase):
             shutil.rmtree(TESTFN, ignore_errors=True)
 
 
+class TestCopyFile(unittest.TestCase):
+
+    _delete = False
+
+    class Faux(object):
+        _entered = False
+        _exited_with = None
+        _raised = False
+        def __init__(self, raise_in_exit=False, suppress_at_exit=True):
+            self._raise_in_exit = raise_in_exit
+            self._suppress_at_exit = suppress_at_exit
+        def read(self, *args):
+            return ''
+        def __enter__(self):
+            self._entered = True
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self._exited_with = exc_type, exc_val, exc_tb
+            if self._raise_in_exit:
+                self._raised = True
+                raise IOError("Cannot close")
+            return self._suppress_at_exit
+
+    def tearDown(self):
+        if self._delete:
+            del shutil.open
+
+    def _set_shutil_open(self, func):
+        shutil.open = func
+        self._delete = True
+
+    def test_w_source_open_fails(self):
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                raise IOError('Cannot open "srcfile"')
+            assert 0  # shouldn't reach here.
+
+        self._set_shutil_open(_open)
+
+        self.assertRaises(IOError, shutil.copyfile, 'srcfile', 'destfile')
+
+    def test_w_dest_open_fails(self):
+
+        srcfile = self.Faux()
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                raise IOError('Cannot open "destfile"')
+            assert 0  # shouldn't reach here.
+
+        self._set_shutil_open(_open)
+
+        shutil.copyfile('srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(srcfile._exited_with[0] is IOError)
+        self.assertEqual(srcfile._exited_with[1].args,
+                         ('Cannot open "destfile"',))
+
+    def test_w_dest_close_fails(self):
+
+        srcfile = self.Faux()
+        destfile = self.Faux(True)
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                return destfile
+            assert 0  # shouldn't reach here.
+
+        self._set_shutil_open(_open)
+
+        shutil.copyfile('srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(destfile._entered)
+        self.assertTrue(destfile._raised)
+        self.assertTrue(srcfile._exited_with[0] is IOError)
+        self.assertEqual(srcfile._exited_with[1].args,
+                         ('Cannot close',))
+
+    def test_w_source_close_fails(self):
+
+        srcfile = self.Faux(True)
+        destfile = self.Faux()
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                return destfile
+            assert 0  # shouldn't reach here.
+
+        self._set_shutil_open(_open)
+
+        self.assertRaises(IOError,
+                          shutil.copyfile, 'srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(destfile._entered)
+        self.assertFalse(destfile._raised)
+        self.assertTrue(srcfile._exited_with[0] is None)
+        self.assertTrue(srcfile._raised)
+
+
 def test_main():
-    support.run_unittest(TestShutil, TestMove)
+    support.run_unittest(TestShutil, TestMove, TestCopyFile)
 
 if __name__ == '__main__':
     test_main()

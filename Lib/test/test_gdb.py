@@ -59,7 +59,7 @@ class DebuggerTests(unittest.TestCase):
         out, err = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             ).communicate()
-        return out.decode('utf-8'), err.decode('utf-8')
+        return out.decode('utf-8', 'replace'), err.decode('utf-8', 'replace')
 
     def get_stack_trace(self, source=None, script=None,
                         breakpoint=BREAKPOINT_FN,
@@ -121,6 +121,11 @@ class DebuggerTests(unittest.TestCase):
 
         # Ignore some noise on stderr due to the pending breakpoint:
         err = err.replace('Function "%s" not defined.\n' % breakpoint, '')
+        # Ignore some other noise on stderr (http://bugs.python.org/issue8600)
+        err = err.replace("warning: Unable to find libthread_db matching"
+                          " inferior's thread library, thread debugging will"
+                          " not be available.\n",
+                          '')
 
         # Ensure no unexpected error messages:
         self.assertEquals(err, '')

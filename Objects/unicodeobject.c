@@ -1600,19 +1600,19 @@ PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
     if (Py_FileSystemDefaultEncoding) {
 #if defined(MS_WINDOWS) && defined(HAVE_USABLE_WCHAR_T)
         if (strcmp(Py_FileSystemDefaultEncoding, "mbcs") == 0) {
-            return PyUnicode_DecodeMBCS(s, size, "replace");
+            return PyUnicode_DecodeMBCS(s, size, "surrogateescape");
         }
 #elif defined(__APPLE__)
         if (strcmp(Py_FileSystemDefaultEncoding, "utf-8") == 0) {
-            return PyUnicode_DecodeUTF8(s, size, "replace");
+            return PyUnicode_DecodeUTF8(s, size, "surrogateescape");
         }
 #endif
         return PyUnicode_Decode(s, size,
                                 Py_FileSystemDefaultEncoding,
-                                "replace");
+                                "surrogateescape");
     }
     else {
-        return PyUnicode_DecodeUTF8(s, size, "replace");
+        return PyUnicode_DecodeUTF8(s, size, "surrogateescape");
     }
 }
 
@@ -1638,7 +1638,7 @@ PyUnicode_FSConverter(PyObject* arg, void* addr)
         arg = PyUnicode_FromObject(arg);
         if (!arg)
             return 0;
-        output = PyUnicode_AsEncodedObject(arg, 
+        output = PyUnicode_AsEncodedObject(arg,
                                            Py_FileSystemDefaultEncoding,
                                            "surrogateescape");
         Py_DECREF(arg);
@@ -1650,14 +1650,8 @@ PyUnicode_FSConverter(PyObject* arg, void* addr)
             return 0;
         }
     }
-    if (PyBytes_Check(output)) {
-         size = PyBytes_GET_SIZE(output);
-         data = PyBytes_AS_STRING(output);
-    } 
-    else {
-         size = PyByteArray_GET_SIZE(output);
-         data = PyByteArray_AS_STRING(output);
-    }
+    size = PyBytes_GET_SIZE(output);
+    data = PyBytes_AS_STRING(output);
     if (size != strlen(data)) {
         PyErr_SetString(PyExc_TypeError, "embedded NUL character");
         Py_DECREF(output);
@@ -6784,10 +6778,7 @@ PyUnicode_CompareWithASCIIString(PyObject* uni, const char* str)
             return ((int)id[i] < (int)str[i]) ? -1 : 1;
     /* This check keeps Python strings that end in '\0' from comparing equal
      to C strings identical up to that point. */
-    if (PyUnicode_GET_SIZE(uni) != i)
-        /* We'll say the Python string is longer. */
-        return 1;
-    if (id[i])
+    if (PyUnicode_GET_SIZE(uni) != i || id[i])
         return 1; /* uni is longer */
     if (str[i])
         return -1; /* str is longer */

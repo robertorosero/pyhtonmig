@@ -1,7 +1,6 @@
 import asyncore
 import email.utils
 import socket
-import threading
 import smtpd
 import smtplib
 import io
@@ -9,8 +8,13 @@ import sys
 import time
 import select
 
-from unittest import TestCase
+import unittest
 from test import support
+
+try:
+    import threading
+except ImportError:
+    threading = None
 
 HOST = support.HOST
 
@@ -44,7 +48,8 @@ def server(evt, buf, serv):
         serv.close()
         evt.set()
 
-class GeneralTests(TestCase):
+@unittest.skipUnless(threading, 'Threading required for this test.')
+class GeneralTests(unittest.TestCase):
 
     def setUp(self):
         self._threads = support.threading_setup()
@@ -146,7 +151,8 @@ MSG_END = '------------ END MESSAGE ------------\n'
 # test server times out, causing the test to fail.
 
 # Test behavior of smtpd.DebuggingServer
-class DebuggingServerTests(TestCase):
+@unittest.skipUnless(threading, 'Threading required for this test.')
+class DebuggingServerTests(unittest.TestCase):
 
     def setUp(self):
         # temporarily replace sys.stdout to capture DebuggingServer output
@@ -157,8 +163,10 @@ class DebuggingServerTests(TestCase):
         self._threads = support.threading_setup()
         self.serv_evt = threading.Event()
         self.client_evt = threading.Event()
-        self.port = support.find_unused_port()
-        self.serv = smtpd.DebuggingServer((HOST, self.port), ('nowhere', -1))
+        # Pick a random unused port by passing 0 for the port number
+        self.serv = smtpd.DebuggingServer((HOST, 0), ('nowhere', -1))
+        # Keep a note of what port was assigned
+        self.port = self.serv.socket.getsockname()[1]
         serv_args = (self.serv, self.serv_evt, self.client_evt)
         self.thread = threading.Thread(target=debugging_server, args=serv_args)
         self.thread.start()
@@ -241,7 +249,7 @@ class DebuggingServerTests(TestCase):
         self.assertEqual(self.output.getvalue(), mexpect)
 
 
-class NonConnectingTests(TestCase):
+class NonConnectingTests(unittest.TestCase):
 
     def testNotConnected(self):
         # Test various operations on an unconnected SMTP object that
@@ -262,7 +270,8 @@ class NonConnectingTests(TestCase):
 
 
 # test response of client to a non-successful HELO message
-class BadHELOServerTests(TestCase):
+@unittest.skipUnless(threading, 'Threading required for this test.')
+class BadHELOServerTests(unittest.TestCase):
 
     def setUp(self):
         self.old_stdout = sys.stdout
@@ -365,6 +374,9 @@ class SimSMTPChannel(smtpd.SMTPChannel):
         else:
             self.push('550 No access for you!')
 
+    def handle_error(self):
+        raise
+
 
 class SimSMTPServer(smtpd.SMTPServer):
 
@@ -383,17 +395,23 @@ class SimSMTPServer(smtpd.SMTPServer):
     def add_feature(self, feature):
         self._extra_features.append(feature)
 
+    def handle_error(self):
+        raise
+
 
 # Test various SMTP & ESMTP commands/behaviors that require a simulated server
 # (i.e., something with more features than DebuggingServer)
-class SMTPSimTests(TestCase):
+@unittest.skipUnless(threading, 'Threading required for this test.')
+class SMTPSimTests(unittest.TestCase):
 
     def setUp(self):
         self._threads = support.threading_setup()
         self.serv_evt = threading.Event()
         self.client_evt = threading.Event()
-        self.port = support.find_unused_port()
-        self.serv = SimSMTPServer((HOST, self.port), ('nowhere', -1))
+        # Pick a random unused port by passing 0 for the port number
+        self.serv = SimSMTPServer((HOST, 0), ('nowhere', -1))
+        # Keep a note of what port was assigned
+        self.port = self.serv.socket.getsockname()[1]
         serv_args = (self.serv, self.serv_evt, self.client_evt)
         self.thread = threading.Thread(target=debugging_server, args=serv_args)
         self.thread.start()

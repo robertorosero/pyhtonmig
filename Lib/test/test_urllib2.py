@@ -22,11 +22,6 @@ class TrivialTests(unittest.TestCase):
         # XXX Name hacking to get this to work on Windows.
         fname = os.path.abspath(urllib.request.__file__).replace('\\', '/')
 
-        # And more hacking to get it to work on MacOS. This assumes
-        # urllib.pathname2url works, unfortunately...
-        if os.name == 'mac':
-            fname = '/' + fname.replace(':', '/')
-
         if os.name == 'nt':
             file_url = "file:///%s" % fname
         else:
@@ -689,7 +684,7 @@ class HandlerTests(unittest.TestCase):
                 try:
                     data = r.read()
                     headers = r.info()
-                    newurl = r.geturl()
+                    respurl = r.geturl()
                 finally:
                     r.close()
                 stats = os.stat(TESTFN)
@@ -700,6 +695,7 @@ class HandlerTests(unittest.TestCase):
             self.assertEqual(headers["Content-type"], "text/plain")
             self.assertEqual(headers["Content-length"], "13")
             self.assertEqual(headers["Last-modified"], modified)
+            self.assertEqual(respurl, url)
 
         for url in [
             "file://localhost:80%s" % urlpath,

@@ -95,40 +95,6 @@ need to derive from a specific class.
       A special-interest-group for discussion of testing, and testing tools,
       in Python.
 
-.. _unittest-test-discovery:
-
-Test Discovery
---------------
-
-.. versionadded:: 3.2
-
-unittest supports simple test discovery. For a project's tests to be
-compatible with test discovery they must all be importable from the top level
-directory of the project; i.e. they must all be in Python packages.
-
-Test discovery is implemented in :meth:`TestLoader.discover`, but can also be
-used from the command line. The basic command line usage is::
-
-   cd project_directory
-   python -m unittest discover
-
-The ``discover`` sub-command has the following options:
-
-   -v, --verbose    Verbose output
-   -s directory     Directory to start discovery ('.' default)
-   -p pattern       Pattern to match test files ('test*.py' default)
-   -t directory     Top level directory of project (default to
-                    start directory)
-
-The -s, -p, & -t options can be passsed in as positional arguments. The
-following two command lines are equivalent::
-
-   python -m unittest discover -s project_directory -p '*_test.py'
-   python -m unittest discover project_directory '*_test.py'
-
-Test modules and packages can customize test loading and discovery by through
-the `load_tests protocol`_.
-
 .. _unittest-minimal-example:
 
 Basic example
@@ -309,6 +275,27 @@ following two command lines are equivalent::
 
    python -m unittest discover -s project_directory -p '*_test.py'
    python -m unittest discover project_directory '*_test.py'
+
+As well as being a path it is possible to pass a package name, for example
+``myproject.subpackage.test``, as the start directory. The package name you
+supply will then be imported and its location on the filesystem will be used
+as the start directory.
+
+.. caution::
+
+    Test discovery loads tests by importing them. Once test discovery has
+    found all the test files from the start directory you specify it turns the
+    paths into package names to import. For example `foo/bar/baz.py` will be
+    imported as ``foo.bar.baz``.
+
+    If you have a package installed globally and attempt test discovery on
+    a different copy of the package then the import *could* happen from the
+    wrong place. If this happens test discovery will warn you and exit.
+
+    If you supply the start directory as a package name rather than a
+    path to a directory then discover assumes that whichever location it
+    imports from is the location you intended, so you will not get the
+    warning.
 
 Test modules and packages can customize test loading and discovery by through
 the `load_tests protocol`_.
@@ -916,9 +903,9 @@ Test cases
    .. method:: assertNotRegexpMatches(text, regexp, msg=None)
 
       Verifies that a *regexp* search does not match *text*.  Fails with an error
-      message including the pattern and the *text*.  *regexp* may be
-      a regular expression object or a string containing a regular expression
-      suitable for use by :func:`re.search`.
+      message including the pattern and the part of *text* that matches.  *regexp*
+      may be a regular expression object or a string containing a regular
+      expression suitable for use by :func:`re.search`.
 
       .. versionadded:: 3.2
 
@@ -1904,8 +1891,17 @@ allow the currently running test to complete, and the test run will then end
 and report all the results so far. A second control-c will raise a
 ``KeyboardInterrupt`` in the usual way.
 
-There are a few utility functions for framework authors to enable this
-functionality within test frameworks.
+The control-c handling signal handler attempts to remain compatible with code or
+tests that install their own :const:`signal.SIGINT` handler. If the ``unittest``
+handler is called but *isn't* the installed :const:`signal.SIGINT` handler,
+i.e. it has been replaced by the system under test and delegated to, then it
+calls the default handler. This will normally be the expected behavior by code
+that replaces an installed handler and delegates to it. For individual tests
+that need ``unittest`` control-c handling disabled the :func:`removeHandler`
+decorator can be used.
+
+There are a few utility functions for framework authors to enable control-c
+handling functionality within test frameworks.
 
 .. function:: installHandler()
 
@@ -1913,15 +1909,37 @@ functionality within test frameworks.
    (usually in response to the user pressing control-c) all registered results
    have :meth:`~TestResult.stop` called.
 
+   .. versionadded:: 3.2
+
 .. function:: registerResult(result)
 
    Register a :class:`TestResult` object for control-c handling. Registering a
    result stores a weak reference to it, so it doesn't prevent the result from
    being garbage collected.
 
+   Registering a :class:`TestResult` object has no side-effects if control-c
+   handling is not enabled, so test frameworks can unconditionally register
+   all results they create independently of whether or not handling is enabled.
+
+   .. versionadded:: 3.2
+
 .. function:: removeResult(result)
 
    Remove a registered result. Once a result has been removed then
    :meth:`~TestResult.stop` will no longer be called on that result object in
    response to a control-c.
+
+   .. versionadded:: 3.2
+
+.. function:: removeHandler(function=None)
+
+   When called without arguments this function removes the control-c handler
+   if it has been installed. This function can also be used as a test decorator
+   to temporarily remove the handler whilst the test is being executed::
+
+      @unittest.removeHandler
+      def test_signal_handling(self):
+          ...
+
+   .. versionadded:: 3.2
 

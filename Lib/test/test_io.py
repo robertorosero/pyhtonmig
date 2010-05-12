@@ -23,7 +23,6 @@ import os
 import sys
 import time
 import array
-import threading
 import random
 import unittest
 import weakref
@@ -35,6 +34,10 @@ from test import support
 import codecs
 import io  # C implementation of io
 import _pyio as pyio # Python implementation of io
+try:
+    import threading
+except ImportError:
+    threading = None
 
 
 def _default_chunk_size():
@@ -533,6 +536,20 @@ class IOTest(unittest.TestCase):
         with self.open(zero, "r") as f:
             self.assertRaises(OverflowError, f.read)
 
+    def test_flush_error_on_close(self):
+        f = self.open(support.TESTFN, "wb", buffering=0)
+        def bad_flush():
+            raise IOError()
+        f.flush = bad_flush
+        self.assertRaises(IOError, f.close) # exception not swallowed
+
+    def test_multi_close(self):
+        f = self.open(support.TESTFN, "wb", buffering=0)
+        f.close()
+        f.close()
+        f.close()
+        self.assertRaises(ValueError, f.flush)
+
 class CIOTest(IOTest):
     pass
 
@@ -631,6 +648,22 @@ class CommonBufferedTests:
         self.assertEqual(repr(b), "<%s name='dummy'>" % clsname)
         raw.name = b"dummy"
         self.assertEqual(repr(b), "<%s name=b'dummy'>" % clsname)
+
+    def test_flush_error_on_close(self):
+        raw = self.MockRawIO()
+        def bad_flush():
+            raise IOError()
+        raw.flush = bad_flush
+        b = self.tp(raw)
+        self.assertRaises(IOError, b.close) # exception not swallowed
+
+    def test_multi_close(self):
+        raw = self.MockRawIO()
+        b = self.tp(raw)
+        b.close()
+        b.close()
+        b.close()
+        self.assertRaises(ValueError, b.flush)
 
 
 class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
@@ -742,6 +775,7 @@ class BufferedReaderTest(unittest.TestCase, CommonBufferedTests):
 
         self.assertEquals(b"abcdefg", bufio.read())
 
+    @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_threads(self):
         try:
             # Write out many bytes with exactly the same number of 0's,
@@ -988,6 +1022,7 @@ class BufferedWriterTest(unittest.TestCase, CommonBufferedTests):
         with self.open(support.TESTFN, "rb", buffering=0) as f:
             self.assertEqual(f.read(), b"abc")
 
+    @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_threads(self):
         try:
             # Write out many bytes from many threads and test they were
@@ -2080,7 +2115,7 @@ class TextIOWrapperTest(unittest.TestCase):
         with self.open(support.TESTFN, "w", errors="replace") as f:
             self.assertEqual(f.errors, "replace")
 
-
+    @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_threads_write(self):
         # Issue6750: concurrent writes could duplicate data
         event = threading.Event()
@@ -2101,6 +2136,20 @@ class TextIOWrapperTest(unittest.TestCase):
             content = f.read()
             for n in range(20):
                 self.assertEquals(content.count("Thread%03d\n" % n), 1)
+
+    def test_flush_error_on_close(self):
+        txt = self.TextIOWrapper(self.BytesIO(self.testdata), encoding="ascii")
+        def bad_flush():
+            raise IOError()
+        txt.flush = bad_flush
+        self.assertRaises(IOError, txt.close) # exception not swallowed
+
+    def test_multi_close(self):
+        txt = self.TextIOWrapper(self.BytesIO(self.testdata), encoding="ascii")
+        txt.close()
+        txt.close()
+        txt.close()
+        self.assertRaises(ValueError, txt.flush)
 
 class CTextIOWrapperTest(TextIOWrapperTest):
 
