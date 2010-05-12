@@ -7,12 +7,11 @@
 #ifndef UTIL_PYSMALLPTRSET_H
 #define UTIL_PYSMALLPTRSET_H
 
+#include "Python.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "Python.h"
-
 
 typedef struct PySmallPtrSet PySmallPtrSet;
 typedef void(*PySmallPtrSetCallback)(PyObject *, void *);
