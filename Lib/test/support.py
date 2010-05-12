@@ -38,7 +38,7 @@ __all__ = [
     "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
     "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
     "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
-    "swap_item", "swap_attr",
+    "swap_item", "swap_attr", "WITH_LLVM"
     ]
 
 
@@ -1222,3 +1222,8 @@ def swap_item(obj, item, new_val):
             yield
         finally:
             del obj[item]
+
+# WITH_LLVM is true if Python was compiled with LLVM support.
+def foo(): pass
+WITH_LLVM = hasattr(foo.__code__, "co_hotness")
+del foo

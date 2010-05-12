@@ -28,6 +28,11 @@ typedef struct {
 				   Objects/lnotab_notes.txt for details. */
     void *co_zombieframe;     /* for optimization only (see frameobject.c) */
     PyObject *co_weakreflist;   /* to support weakrefs to code objects */
+#ifdef WITH_LLVM
+    /* Measure of how hot this code object is. This will be used to
+       decide which code objects are worth sending through LLVM. */
+    long co_hotness;
+#endif  /* WITH_LLVM */
 } PyCodeObject;
 
 /* Masks for co_flags above */

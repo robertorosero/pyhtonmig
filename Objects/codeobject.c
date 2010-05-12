@@ -109,6 +109,9 @@ PyCode_New(int argcount, int kwonlyargcount,
         co->co_lnotab = lnotab;
         co->co_zombieframe = NULL;
         co->co_weakreflist = NULL;
+#ifdef WITH_LLVM
+        co->co_hotness = 0;
+#endif  /* WITH_LLVM */
     }
     return co;
 }
@@ -179,6 +182,9 @@ static PyMemberDef code_memberlist[] = {
     {"co_name",         T_OBJECT,       OFF(co_name),           READONLY},
     {"co_firstlineno", T_INT,           OFF(co_firstlineno),    READONLY},
     {"co_lnotab",       T_OBJECT,       OFF(co_lnotab),         READONLY},
+#ifdef WITH_LLVM
+    {"co_hotness",      T_INT,          OFF(co_hotness),        READONLY},
+#endif
     {NULL}      /* Sentinel */
 };
 

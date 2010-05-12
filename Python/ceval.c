@@ -116,6 +116,11 @@ static PyObject * update_keyword_args(PyObject *, int, PyObject ***,
                                       PyObject *);
 static PyObject * update_star_args(int, int, PyObject *, PyObject ***);
 static PyObject * load_args(PyObject ***, int);
+
+#ifdef WITH_LLVM
+static inline void mark_called(PyCodeObject *co);
+#endif  /* WITH_LLVM */
+
 #define CALL_FLAG_VAR 1
 #define CALL_FLAG_KW 2
 
@@ -962,6 +967,14 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define PEEKARG()       ((next_instr[2]<<8) + next_instr[1])
 #define JUMPTO(x)       (next_instr = first_instr + (x))
 #define JUMPBY(x)       (next_instr += (x))
+
+/* Feedback-gathering macros */
+#ifdef WITH_LLVM
+#define UPDATE_HOTNESS_JABS() \
+    do { if (oparg <= f->f_lasti) ++co->co_hotness; } while (0)
+#else
+#define UPDATE_HOTNESS_JABS()
+#endif  /* WITH_LLVM */
 
 /* OpCode prediction macros
     Some opcodes tend to come in pairs thus making it possible to
@@ -2373,6 +2386,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             }
             if (w == Py_False) {
                 Py_DECREF(w);
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
                 FAST_DISPATCH();
             }
@@ -2380,8 +2394,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_DECREF(w);
             if (err > 0)
                 err = 0;
-            else if (err == 0)
+            else if (err == 0) {
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
+            }
             else
                 break;
             DISPATCH();
@@ -2395,6 +2411,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             }
             if (w == Py_True) {
                 Py_DECREF(w);
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
                 FAST_DISPATCH();
             }
@@ -2402,6 +2419,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_DECREF(w);
             if (err > 0) {
                 err = 0;
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
             }
             else if (err == 0)
@@ -2418,6 +2436,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 FAST_DISPATCH();
             }
             if (w == Py_False) {
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
                 FAST_DISPATCH();
             }
@@ -2427,8 +2446,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 Py_DECREF(w);
                 err = 0;
             }
-            else if (err == 0)
+            else if (err == 0) {
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
+            }
             else
                 break;
             DISPATCH();
@@ -2441,12 +2462,14 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 FAST_DISPATCH();
             }
             if (w == Py_True) {
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
                 FAST_DISPATCH();
             }
             err = PyObject_IsTrue(w);
             if (err > 0) {
                 err = 0;
+                UPDATE_HOTNESS_JABS();
                 JUMPTO(oparg);
             }
             else if (err == 0) {
@@ -2459,6 +2482,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
         PREDICTED_WITH_ARG(JUMP_ABSOLUTE);
         TARGET(JUMP_ABSOLUTE)
+            UPDATE_HOTNESS_JABS();
             JUMPTO(oparg);
 #if FAST_LOOPS
             /* Enabling this path speeds-up all while and for-loops by bypassing
@@ -2514,6 +2538,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             goto fast_block_end;
 
         TARGET(CONTINUE_LOOP)
+#ifdef WITH_LLVM
+            ++co->co_hotness;
+#endif
             retval = PyLong_FromLong(oparg);
             if (!retval) {
                 x = NULL;
@@ -3079,6 +3106,13 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
     f = PyFrame_New(tstate, co, globals, locals);
     if (f == NULL)
         return NULL;
+
+#ifdef WITH_LLVM
+    /* This is where a code object is considered "called". Doing it here
+     * instead of PyEval_EvalFrame() makes support for generators somewhat
+     * cleaner. */
+    mark_called(co);
+#endif  /* WITH_LLVM */
 
     fastlocals = f->f_localsplus;
     freevars = f->f_localsplus + co->co_nlocals;
@@ -3793,6 +3827,14 @@ err_args(PyObject *func, int flags, int nargs)
                      nargs);
 }
 
+#ifdef WITH_LLVM
+static inline void
+mark_called(PyCodeObject *co)
+{
+    co->co_hotness += 10;
+}
+#endif  /* WITH_LLVM */
+
 #define C_TRACE(x, call) \
 if (tstate->use_tracing && tstate->c_profilefunc) { \
     if (call_trace(tstate->c_profilefunc, \
@@ -3947,6 +3989,9 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
         f = PyFrame_New(tstate, co, globals, NULL);
         if (f == NULL)
             return NULL;
+#ifdef WITH_LLVM
+        mark_called(co);
+#endif
 
         fastlocals = f->f_localsplus;
         stack = (*pp_stack) - n;

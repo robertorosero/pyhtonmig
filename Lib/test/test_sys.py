@@ -6,6 +6,7 @@ import subprocess
 import textwrap
 import warnings
 import operator
+from test.support import WITH_LLVM
 
 # count the number of test runs, used to create unique
 # strings to intern in test_intern()
@@ -593,7 +594,10 @@ class SizeofTest(unittest.TestCase):
             return inner
         check(get_cell().__closure__[0], size(h + 'P'))
         # code
-        check(get_cell().__code__, size(h + '5i8Pi3P'))
+        if WITH_LLVM:
+            check(get_cell().__code__, size(h + '5i8Pi3Pl'))
+        else:
+            check(get_cell().__code__, size(h + '5i8Pi3P'))
         # complex
         check(complex(0,1), size(h + '2d'))
         # method_descriptor (descriptor object)
