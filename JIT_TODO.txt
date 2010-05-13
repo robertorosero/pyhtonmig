@@ -23,10 +23,6 @@ TODO:
     - r676
     - r688
     Some of these may need public discussion.
-- Add support to configure/Makefile.pre.in for building against installed LLVM.
-- Import general-purpose utility code:
-    - Stats.{h,cc}
-    - PySmallPtrSet
 - Adapt JIT compiler to Python 3.
 - Cure cancer.
 
@@ -47,3 +43,7 @@ DONE:
     - Create a Unittests/ directory.
     - Import googletest 1.4.0.
     - Start writing tests.
+- Add support for building against installed LLVM (r81093).
+- Import general-purpose utility code (r81093):
+    - Stats.{h,cc}
+    - PySmallPtrSet
