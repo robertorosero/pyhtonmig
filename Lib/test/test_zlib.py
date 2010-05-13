@@ -140,6 +140,13 @@ class CompressTestCase(BaseCompressTestCase, unittest.TestCase):
         for ob in x, bytearray(x):
             self.assertEqual(zlib.decompress(ob), data)
 
+    def test_incomplete_stream(self):
+        # An useful error message is given
+        x = zlib.compress(HAMLET_SCENE)
+        self.assertRaisesRegexp(zlib.error,
+            "Error -5 while decompressing data: incomplete or truncated stream",
+            zlib.decompress, x[:-1])
+
     # Memory use of the following functions takes into account overallocation
 
     @precisionbigmemtest(size=_1G + 1024 * 1024, memuse=3)
@@ -378,6 +385,19 @@ class CompressObjectTestCase(BaseCompressTestCase, unittest.TestCase):
         self.assertTrue(co.flush())  # Returns a zlib header
         dco = zlib.decompressobj()
         self.assertEqual(dco.flush(), b"") # Returns nothing
+
+    def test_decompress_incomplete_stream(self):
+        # This is 'foo', deflated
+        x = b'x\x9cK\xcb\xcf\x07\x00\x02\x82\x01E'
+        # For the record
+        self.assertEqual(zlib.decompress(x), b'foo')
+        self.assertRaises(zlib.error, zlib.decompress, x[:-5])
+        # Omitting the stream end works with decompressor objects
+        # (see issue #8672).
+        dco = zlib.decompressobj()
+        y = dco.decompress(x[:-5])
+        y += dco.flush()
+        self.assertEqual(y, b'foo')
 
     if hasattr(zlib.compressobj(), "copy"):
         def test_compresscopy(self):
