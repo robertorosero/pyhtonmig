@@ -27,17 +27,16 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Modified for Python to pass the name of this program.
+// Modified from gtest_main for Python to pass the name of this program.
 
 #include <iostream>
-#include <string>
 
 #include <gtest/gtest.h>
 
 #include "Python.h"
 
 int main(int argc, char **argv) {
-  std::cout << "Running main() from gtest_main.cc\n";
+  std::cout << "Running main() from pytest_main.cc\n";
 
   wchar_t *argv0_copy = _Py_char2wchar(argv[0]);
   Py_SetProgramName(argv0_copy);
