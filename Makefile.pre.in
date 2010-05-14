@@ -767,7 +767,8 @@ Unittests/googletest/gtest.o:
 # gcc's TR1 <tuple> header depends on RTTI, so force googletest to use
 # its own tuple implementation.
 AllUnitTests: $(UNITTEST_SRCS) $(srcdir)/Unittests/*.h build_all python-config
-	-$(CXX) $(CPPFLAGS) -I$(srcdir)/Unittests/googletest/include -o $@ \
+	-$(CXX) $(CPPFLAGS) -DPY_SSIZE_T_CLEAN \
+		-I$(srcdir)/Unittests/googletest/include -o $@ \
 	 	$(UNITTEST_SRCS) -L. $(LDFLAGS) \
 		-DGTEST_HAS_RTTI=0 -DGTEST_HAS_TR1_TUPLE=0 \
 		`$(RUNSHARED) ./$(BUILDPYTHON) ./python-config --cflags --ldflags`

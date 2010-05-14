@@ -30,6 +30,7 @@
 // Modified for Python to pass the name of this program.
 
 #include <iostream>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -38,8 +39,11 @@
 int main(int argc, char **argv) {
   std::cout << "Running main() from gtest_main.cc\n";
 
-  Py_SetProgramName((wchar_t *)argv[0]);
+  wchar_t *argv0_copy = _Py_char2wchar(argv[0]);
+  Py_SetProgramName(argv0_copy);
 
   testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  int result = RUN_ALL_TESTS();
+  PyMem_Free(argv0_copy);
+  return result;
 }
