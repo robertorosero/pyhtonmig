@@ -183,3 +183,42 @@ TEST_F(GetArgsTest, FormatCode_K)
 
     Py_DECREF(tuple);
 }
+
+
+// Test the Z and Z# codes for PyArg_ParseTuple.
+TEST_F(GetArgsTest, FormatCode_Z)
+{
+    PyObject *tuple = PyTuple_New(2);
+    ASSERT_TRUE(tuple != NULL);
+
+    PyObject *obj = PyUnicode_FromString("test");
+    PyTuple_SET_ITEM(tuple, 0, obj);
+    Py_INCREF(Py_None);
+    PyTuple_SET_ITEM(tuple, 1, Py_None);
+
+    // Swap values on purpose.
+    Py_UNICODE *value1 = NULL;
+    Py_UNICODE *value2 = PyUnicode_AS_UNICODE(obj);
+
+    /* Test Z for both values. */
+    EXPECT_GE(PyArg_ParseTuple(tuple, "ZZ:FormatCode_Z", &value1, &value2), 0);
+    EXPECT_EQ(value1, PyUnicode_AS_UNICODE(obj))
+            << "Z code returned wrong value for 'test'";
+    EXPECT_TRUE(value2 == NULL) << "Z code returned wrong value for None";
+
+    value1 = NULL;
+    value2 = PyUnicode_AS_UNICODE(obj);
+    Py_ssize_t len1 = -1;
+    Py_ssize_t len2 = -1;
+
+    // Test Z# for both values.
+    EXPECT_GE(PyArg_ParseTuple(tuple, "Z#Z#:FormatCode_Z", &value1, &len1,
+                               &value2, &len2), 0);
+    EXPECT_EQ(PyUnicode_AS_UNICODE(obj), value1);
+    EXPECT_EQ(PyUnicode_GET_SIZE(obj), len1);
+    EXPECT_TRUE(value2 == NULL);
+    EXPECT_EQ(0, len2);
+
+    Py_DECREF(tuple);
+
+}
