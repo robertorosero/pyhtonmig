@@ -389,6 +389,16 @@ PyEval_ReInitThreads(void)
     Py_DECREF(threading);
 }
 
+/* This function is called from Py_Finalize to destroy the gil.  No
+   other threads may be running when it is called. */
+void
+PyEval_UnInitThreads(void)
+{
+    if (!gil_created())
+        return;
+    destroy_gil();
+}
+
 #else
 static _Py_atomic_int eval_breaker = {0};
 static _Py_atomic_int gil_drop_request = {0};

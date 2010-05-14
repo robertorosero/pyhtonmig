@@ -751,6 +751,7 @@ UNITTEST_SRCS := $(LIBRARY) \
 		$(srcdir)/Unittests/GetArgsTest.cc \
 		$(srcdir)/Unittests/ListTest.cc \
 		$(srcdir)/Unittests/ObjectTest.cc \
+		$(srcdir)/Unittests/ThreadTest.cc \
 		$(srcdir)/Unittests/UnicodeTest.cc \
 		$(srcdir)/Unittests/pytest_main.cc \
 		$(@LLVM_UNITTEST_SRCS@) \

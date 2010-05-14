@@ -165,6 +165,7 @@ PyAPI_FUNC(void) PyEval_ReleaseLock(void);
 PyAPI_FUNC(void) PyEval_AcquireThread(PyThreadState *tstate);
 PyAPI_FUNC(void) PyEval_ReleaseThread(PyThreadState *tstate);
 PyAPI_FUNC(void) PyEval_ReInitThreads(void);
+PyAPI_FUNC(void) PyEval_UnInitThreads(void);
 
 PyAPI_FUNC(void) _PyEval_SetSwitchInterval(unsigned long microseconds);
 PyAPI_FUNC(unsigned long) _PyEval_GetSwitchInterval(void);

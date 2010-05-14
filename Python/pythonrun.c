@@ -478,6 +478,7 @@ Py_Finalize(void)
     /* Delete current thread */
     PyThreadState_Swap(NULL);
     PyInterpreterState_Delete(interp);
+    PyEval_UnInitThreads();
 
     /* Sundry finalizers */
     PyMethod_Fini();

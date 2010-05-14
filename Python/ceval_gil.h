@@ -95,6 +95,9 @@ do { \
 #define MUTEX_INIT(mut) \
     if (pthread_mutex_init(&mut, NULL)) { \
         Py_FatalError("pthread_mutex_init(" #mut ") failed"); };
+#define MUTEX_DESTROY(mut) \
+    if (pthread_mutex_destroy(&mut)) { \
+        Py_FatalError("pthread_mutex_destroy(" #mut ") failed"); };
 #define MUTEX_LOCK(mut) \
     if (pthread_mutex_lock(&mut)) { \
         Py_FatalError("pthread_mutex_lock(" #mut ") failed"); };
@@ -106,6 +109,9 @@ do { \
 #define COND_INIT(cond) \
     if (pthread_cond_init(&cond, NULL)) { \
         Py_FatalError("pthread_cond_init(" #cond ") failed"); };
+#define COND_DESTROY(cond) \
+    if (pthread_cond_destroy(&cond)) { \
+        Py_FatalError("pthread_cond_destroy(" #cond ") failed"); };
 #define COND_RESET(cond)
 #define COND_SIGNAL(cond) \
     if (pthread_cond_signal(&cond)) { \
@@ -145,6 +151,9 @@ do { \
 #define MUTEX_INIT(mut) \
     if (!(mut = CreateMutex(NULL, FALSE, NULL))) { \
         Py_FatalError("CreateMutex(" #mut ") failed"); };
+#define MUTEX_DESTROY(mut) \
+    if (!CloseHandle(mut)) { \
+        Py_FatalError("CloseHandle(" #mut ") failed to destroy mutex"); };
 #define MUTEX_LOCK(mut) \
     if (WaitForSingleObject(mut, INFINITE) != WAIT_OBJECT_0) { \
         Py_FatalError("WaitForSingleObject(" #mut ") failed"); };
@@ -172,6 +181,9 @@ do { \
     /* auto-reset, non-signalled */ \
     if (!(cond = CreateEvent(NULL, FALSE, FALSE, NULL))) { \
         Py_FatalError("CreateMutex(" #cond ") failed"); };
+#define COND_DESTROY(cond) \
+    if (!CloseHandle(cond)) { \
+        Py_FatalError("CloseHandle(" #cond ") failed to destroy event"); };
 #define COND_RESET(cond) \
     if (!ResetEvent(cond)) { \
         Py_FatalError("ResetEvent(" #cond ") failed"); };
@@ -254,6 +266,21 @@ static void recreate_gil(void)
 {
     _Py_ANNOTATE_RWLOCK_DESTROY(&gil_locked);
     create_gil();
+}
+
+/* Requires that no other threads are running anymore. */
+static void destroy_gil(void)
+{
+    MUTEX_DESTROY(gil_mutex);
+#ifdef FORCE_SWITCHING
+    MUTEX_DESTROY(switch_mutex);
+#endif
+    COND_DESTROY(gil_cond);
+#ifdef FORCE_SWITCHING
+    COND_DESTROY(switch_cond);
+#endif
+    _Py_atomic_store_relaxed(&gil_locked, -1);
+    _Py_ANNOTATE_RWLOCK_DESTROY(&gil_locked);
 }
 
 static void drop_gil(PyThreadState *tstate)
