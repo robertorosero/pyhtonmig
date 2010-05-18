@@ -61,6 +61,10 @@ def can_clear_options():
     # 0.9.8m or higher
     return ssl.OPENSSL_VERSION_INFO >= (0, 9, 8, 13, 15)
 
+def no_sslv2_implies_sslv3_hello():
+    # 0.9.7h or higher
+    return ssl.OPENSSL_VERSION_INFO >= (0, 9, 7, 8, 15)
+
 
 class BasicSocketTests(unittest.TestCase):
 
@@ -1047,8 +1051,10 @@ else:
             try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv3, False)
             try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_TLSv1, False)
             # SSLv23 client with specific SSL options
-            try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv23, False,
-                               client_options=ssl.OP_NO_SSLv2)
+            if no_sslv2_implies_sslv3_hello():
+                # No SSLv2 => client will use an SSLv3 hello on recent OpenSSLs
+                try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv23, False,
+                                   client_options=ssl.OP_NO_SSLv2)
             try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv23, True,
                                client_options=ssl.OP_NO_SSLv3)
             try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv23, True,
@@ -1098,9 +1104,10 @@ else:
             try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv2, False)
             try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv23, False)
             try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_TLSv1, False)
-            # No SSLv2 => client will use an SSLv3 hello
-            try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv23, True,
-                               client_options=ssl.OP_NO_SSLv2)
+            if no_sslv2_implies_sslv3_hello():
+                # No SSLv2 => client will use an SSLv3 hello on recent OpenSSLs
+                try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv23, True,
+                                   client_options=ssl.OP_NO_SSLv2)
 
         def test_protocol_tlsv1(self):
             """Connecting to a TLSv1 server with various client options"""
