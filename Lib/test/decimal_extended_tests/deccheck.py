@@ -341,6 +341,18 @@ class dHandlerObj():
     def __init__(self):
         pass
 
+    if py_minor >= 2:
+        def __hash__(self, result, operands):
+            c = operands[0]
+            if c.mpd.is_infinite():
+                # Hashing infinities changed in 3.2
+                return True
+            # If a Decimal instance is exactly representable as a float
+            # then (in 3.2) its hash matches that of the float.
+            f = float(c.dec)
+            if Decimal.from_float(f) == c.dec:
+                return True
+
     def default(self, result, operands):
         return False
 
@@ -349,9 +361,9 @@ dhandler_cdec = dHandlerCdec()
 def cdec_known_disagreement(result, funcname, operands):
     return getattr(dhandler_cdec, funcname, dhandler_cdec.default)(result, operands)
 
-#dhandler_obj = dHandlerObj()
-#def obj_known_disagreement(result, funcname, operands):
-#    return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
+dhandler_obj = dHandlerObj()
+def obj_known_disagreement(result, funcname, operands):
+    return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
 
 
 
@@ -360,8 +372,8 @@ def verify(result, funcname, operands):
        result[0] and result[1] as well as the context flags have the same
        values."""
     if result[0] != result[1] or not context.assert_eq_status():
-        #if obj_known_disagreement(result, funcname, operands):
-        #    return # skip known disagreements
+        if obj_known_disagreement(result, funcname, operands):
+            return # skip known disagreements
         raise CdecException(result, funcname, operands)
 
 
