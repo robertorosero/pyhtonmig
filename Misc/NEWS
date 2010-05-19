@@ -12,6 +12,9 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- PyObject_Dump() encodes unicode objects to utf8 with backslashreplace
+  (instead of strict) error handler to escape surrogates
+
 - Issue #8715: Create PyUnicode_EncodeFSDefault() function: Encode a Unicode
   object to Py_FileSystemDefaultEncoding with the "surrogateescape" error
   handler, and return bytes. If Py_FileSystemDefaultEncoding is not set, fall
@@ -362,6 +365,24 @@ C-API
 
 Library
 -------
+
+- Issue #8513: os.get_exec_path() supports b'PATH' key and bytes value.
+  subprocess.Popen() and os._execvpe() support bytes program name. Add
+  os.supports_bytes_environ flag: True if the native OS type of the environment
+  is bytes (eg. False on Windows).
+
+- Issue #8633: tarfile is now able to read and write archives with "raw" binary
+  pax headers as described in POSIX.1-2008.
+
+- Issue #1285086: Speed up urllib.parse functions: quote, quote_from_bytes,
+  unquote, unquote_to_bytes.
+
+- Issue #8688: Distutils now recalculates MANIFEST everytime.
+
+- Issue #8477: ssl.RAND_egd() and ssl._test_decode_cert() support str with
+  surrogates and bytes for the filename
+
+- Issue #8550: Add first class ``SSLContext`` objects to the ssl module.
 
 - Issue #8681: Make the zlib module's error messages more informative when
   the zlib itself doesn't give any detailed explanation.

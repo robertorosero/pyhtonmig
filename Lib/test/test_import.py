@@ -153,23 +153,23 @@ class ImportTests(unittest.TestCase):
                 f.write('"",\n')
             f.write(']')
 
-        # Compile & remove .py file, we only need .pyc (or .pyo), but that
-        # must be relocated to the PEP 3147 bytecode-only location.
-        with open(filename, 'r') as f:
-            py_compile.compile(filename)
+        # Compile & remove .py file; we only need .pyc (or .pyo).
+        # Bytecode must be relocated from the PEP 3147 bytecode-only location.
+        py_compile.compile(filename)
         unlink(filename)
         make_legacy_pyc(filename)
 
         # Need to be able to load from current dir.
         sys.path.append('')
 
-        # This used to crash.
-        exec('import ' + module)
-
-        # Cleanup.
-        del sys.path[-1]
-        unlink(filename + 'c')
-        unlink(filename + 'o')
+        try:
+            # This used to crash.
+            exec('import ' + module)
+        finally:
+            # Cleanup.
+            del sys.path[-1]
+            unlink(filename + 'c')
+            unlink(filename + 'o')
 
     def test_failing_import_sticks(self):
         source = TESTFN + ".py"
