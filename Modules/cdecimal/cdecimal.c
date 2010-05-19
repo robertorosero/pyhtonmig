@@ -3599,20 +3599,27 @@ dec_richcompare(PyObject *v, PyObject *w, int op)
         PyDecObject *b;
 	uint32_t status = 0;
 	mpd_context_t *ctx;
+	int a_issnan, b_issnan;
 	int r;
 
 	ctx = mpd_ctx();
 	CONVERT_BINOP(v, w, &a, &b, ctx);
 
+	a_issnan = mpd_issnan(a->dec);
+	b_issnan = mpd_issnan(b->dec);
+
 	r = mpd_qcmp(a->dec, b->dec, &status);
 	Py_DECREF(a);
 	Py_DECREF(b);
-	/* NaNs always signal, except for Py_EQ and Py_NE. */
-	if (op != Py_EQ && op != Py_NE && dec_addstatus(ctx, status)) {
-		return NULL;
-	}
-	/* NaN comparison with Py_EQ, Py_NE, or InvalidOperation disabled. */
 	if (r == INT_MAX) {
+		/* sNaNs or op={le,ge,lt,gt} always signal. */
+		if (a_issnan || b_issnan || (op != Py_EQ && op != Py_NE)) {
+			if (dec_addstatus(ctx, status)) {
+				return NULL;
+			}
+		}
+		/* qNaN comparison with op={eq,ne} or comparison
+		 * with InvalidOperation disabled. */
 		return (op == Py_NE) ? Dec_INCREF_TRUE : Dec_INCREF_FALSE;
 	}
 
