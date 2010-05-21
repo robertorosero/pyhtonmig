@@ -303,6 +303,8 @@ class dHandlerObj():
 
     def default(self, result, operands):
         return False
+    __eq__ = __ne__ = __ge__ =  __gt__ = __le__ = __lt__ = \
+    __repr__ = __str__ = default
 
 
 dhandler_cdec = dHandlerCdec()
@@ -312,7 +314,6 @@ def cdec_known_disagreement(result, funcname, operands):
 #dhandler_obj = dHandlerObj()
 #def obj_known_disagreement(result, funcname, operands):
 #    return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
-
 
 
 def verify(result, funcname, operands):
