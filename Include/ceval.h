@@ -170,6 +170,16 @@ PyAPI_FUNC(void) PyEval_UnInitThreads(void);
 PyAPI_FUNC(void) _PyEval_SetSwitchInterval(unsigned long microseconds);
 PyAPI_FUNC(unsigned long) _PyEval_GetSwitchInterval(void);
 
+PyAPI_FUNC(void) _PyEval_AssertLockHeld(void);
+
+// Hide this assertion function behind a macro to avoid extra calls in release
+// builds.
+#ifndef NDEBUG
+#define PyEval_AssertLockHeld() _PyEval_AssertLockHeld()
+#else
+#define PyEval_AssertLockHeld()
+#endif /* NDEBUG */
+
 #define Py_BEGIN_ALLOW_THREADS { \
                         PyThreadState *_save; \
                         _save = PyEval_SaveThread();
@@ -189,7 +199,7 @@ PyAPI_FUNC(unsigned long) _PyEval_GetSwitchInterval(void);
 
 PyAPI_FUNC(int) _PyEval_SliceIndex(PyObject *, Py_ssize_t *);
 PyAPI_FUNC(void) _PyEval_SignalAsyncExc(void);
-
+PyAPI_FUNC(void) _PyEval_SetBackgroundJobAvailable(int);
 
 #ifdef __cplusplus
 }

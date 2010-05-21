@@ -27,6 +27,13 @@ typedef struct _is {
     PyObject *codec_search_path;
     PyObject *codec_search_cache;
     PyObject *codec_error_registry;
+#ifdef WITH_LLVM
+    /* NULL if no thread has been started yet.  The low bit is set to
+       1 after a fork to mark the thread as disabled until the user
+       explicitly re-enables it with
+       PyBackgroundThread_ReenableAfterFork(). */
+    struct PyBackgroundThread *background_thread;
+#endif
     int codecs_initialized;
 
 #ifdef HAVE_DLOPEN

@@ -292,6 +292,7 @@ PYTHON_OBJS=	\
 		Python/Python-ast.o \
 		Python/asdl.o \
 		Python/ast.o \
+		Python/bg_thread.o \
 		Python/bltinmodule.o \
 		Python/ceval.o \
 		Python/compile.o \
@@ -654,11 +655,12 @@ PYTHON_HEADERS= \
 		Include/abstract.h \
 		Include/asdl.h \
 		Include/ast.h \
-                Include/bltinmodule.h \
+		Include/bg_thread.h \
 		Include/bitset.h \
+		Include/bltinmodule.h \
 		Include/boolobject.h \
-		Include/bytes_methods.h \
 		Include/bytearrayobject.h \
+		Include/bytes_methods.h \
 		Include/bytesobject.h \
 		Include/cellobject.h \
 		Include/ceval.h \
@@ -746,6 +748,7 @@ LLVM_UNITTEST_SRCS := \
 		$(srcdir)/Unittests/StatsTest.cc
 
 UNITTEST_SRCS := $(LIBRARY) \
+		$(srcdir)/Unittests/BgThreadTest.cc \
 		$(srcdir)/Unittests/DatetimeTest.cc \
 		$(srcdir)/Unittests/DictTest.cc \
 		$(srcdir)/Unittests/GetArgsTest.cc \

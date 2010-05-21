@@ -3590,21 +3590,12 @@ posix_fork1(PyObject *self, PyObject *noargs)
 {
     pid_t pid;
     int result = 0;
-    _PyImport_AcquireLock();
+    PyOS_BeforeFork();
     pid = fork1();
-    if (pid == 0) {
-        /* child: this clobbers and resets the import lock. */
-        PyOS_AfterFork();
-    } else {
-        /* parent: release the import lock. */
-        result = _PyImport_ReleaseLock();
-    }
+    result = PyOS_AfterFork(pid == 0);
     if (pid == -1)
         return posix_error();
     if (result < 0) {
-        /* Don't clobber the OSError if the fork failed. */
-        PyErr_SetString(PyExc_RuntimeError,
-                        "not holding the import lock");
         return NULL;
     }
     return PyLong_FromPid(pid);
@@ -3623,21 +3614,12 @@ posix_fork(PyObject *self, PyObject *noargs)
 {
     pid_t pid;
     int result = 0;
-    _PyImport_AcquireLock();
+    PyOS_BeforeFork();
     pid = fork();
-    if (pid == 0) {
-        /* child: this clobbers and resets the import lock. */
-        PyOS_AfterFork();
-    } else {
-        /* parent: release the import lock. */
-        result = _PyImport_ReleaseLock();
-    }
+    result = PyOS_AfterFork(pid == 0);
     if (pid == -1)
         return posix_error();
     if (result < 0) {
-        /* Don't clobber the OSError if the fork failed. */
-        PyErr_SetString(PyExc_RuntimeError,
-                        "not holding the import lock");
         return NULL;
     }
     return PyLong_FromPid(pid);
@@ -3749,21 +3731,12 @@ posix_forkpty(PyObject *self, PyObject *noargs)
     int master_fd = -1, result = 0;
     pid_t pid;
 
-    _PyImport_AcquireLock();
+    PyOS_BeforeFork();
     pid = forkpty(&master_fd, NULL, NULL, NULL);
-    if (pid == 0) {
-        /* child: this clobbers and resets the import lock. */
-        PyOS_AfterFork();
-    } else {
-        /* parent: release the import lock. */
-        result = _PyImport_ReleaseLock();
-    }
+    result = PyOS_AfterFork(pid == 0);
     if (pid == -1)
         return posix_error();
     if (result < 0) {
-        /* Don't clobber the OSError if the fork failed. */
-        PyErr_SetString(PyExc_RuntimeError,
-                        "not holding the import lock");
         return NULL;
     }
     return Py_BuildValue("(Ni)", PyLong_FromPid(pid), master_fd);

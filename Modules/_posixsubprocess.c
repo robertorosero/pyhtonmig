@@ -265,7 +265,7 @@ subprocess_fork_exec(PyObject* self, PyObject *args)
         preexec_fn_args_tuple = PyTuple_New(0);
         if (!preexec_fn_args_tuple)
             goto cleanup;
-        _PyImport_AcquireLock();
+        PyOS_BeforeFork();
     }
 
     if (cwd_obj != Py_None) {
@@ -291,7 +291,7 @@ subprocess_fork_exec(PyObject* self, PyObject *args)
              * This call may not be async-signal-safe but neither is calling
              * back into Python.  The user asked us to use hope as a strategy
              * to avoid deadlock... */
-            PyOS_AfterFork();
+            PyOS_AfterFork(/*is_child=*/1);
         }
 
         child_exec(exec_array, argv, envp, cwd,
@@ -308,11 +308,9 @@ subprocess_fork_exec(PyObject* self, PyObject *args)
         /* Capture the errno exception before errno can be clobbered. */
         PyErr_SetFromErrno(PyExc_OSError);
     }
-    if (preexec_fn != Py_None &&
-        _PyImport_ReleaseLock() < 0 && !PyErr_Occurred()) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "not holding the import lock");
-    }
+
+    if (preexec_fn != Py_None)
+        PyOS_AfterFork(/*is_child=*/0);
 
     /* Parent process */
     if (envp)

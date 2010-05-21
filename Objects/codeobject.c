@@ -111,6 +111,7 @@ PyCode_New(int argcount, int kwonlyargcount,
         co->co_weakreflist = NULL;
 #ifdef WITH_LLVM
         co->co_hotness = 0;
+        co->co_being_compiled = 0;
 #endif  /* WITH_LLVM */
     }
     return co;

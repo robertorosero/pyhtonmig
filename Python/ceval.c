@@ -11,6 +11,7 @@
 
 #include "Python.h"
 
+#include "bg_thread.h"
 #include "code.h"
 #include "frameobject.h"
 #include "eval.h"
@@ -119,6 +120,8 @@ static PyObject * load_args(PyObject ***, int);
 
 #ifdef WITH_LLVM
 static inline void mark_called(PyCodeObject *co);
+static inline void maybe_compile(PyInterpreterState *interp,
+                                 PyCodeObject *co, PyFrameObject *f);
 #endif  /* WITH_LLVM */
 
 #define CALL_FLAG_VAR 1
@@ -229,6 +232,7 @@ PyEval_GetCallStats(PyObject *self)
         &eval_breaker, \
         _Py_atomic_load_relaxed(&gil_drop_request) | \
         _Py_atomic_load_relaxed(&pendingcalls_to_do) | \
+        _Py_atomic_load_relaxed(&background_job_ready) | \
         pending_async_exc)
 
 #define SET_GIL_DROP_REQUEST() \
@@ -265,6 +269,18 @@ PyEval_GetCallStats(PyObject *self)
 #define UNSIGNAL_ASYNC_EXC() \
     do { pending_async_exc = 0; COMPUTE_EVAL_BREAKER(); } while (0)
 
+#define SIGNAL_BACKGROUND_JOB_READY() \
+    do { \
+        _Py_atomic_store_relaxed(&background_job_ready, 1); \
+        _Py_atomic_store_relaxed(&eval_breaker, 1); \
+    } while (0)
+
+#define UNSIGNAL_BACKGROUND_JOB_READY() \
+    do { \
+        _Py_atomic_store_relaxed(&background_job_ready, 0); \
+        COMPUTE_EVAL_BREAKER(); \
+    } while (0)
+
 
 #ifdef WITH_THREAD
 
@@ -285,6 +301,8 @@ static _Py_atomic_int pendingcalls_to_do = {0};
 /* Request for looking at the `async_exc` field of the current thread state.
    Guarded by the GIL. */
 static int pending_async_exc = 0;
+/* Request for applying background jobs. */
+static _Py_atomic_int background_job_ready = {0};
 
 #include "ceval_gil.h"
 
@@ -325,6 +343,18 @@ PyEval_ReleaseLock(void)
     drop_gil((PyThreadState*)_Py_atomic_load_relaxed(
         &_PyThreadState_Current));
 }
+
+#ifndef NDEBUG
+// Assert that the calling thread holds the GIL.  To do this we ask Python what
+// thread it thinks is currently running and compare its identity with our own.
+void
+_PyEval_AssertLockHeld()
+{
+    PyThreadState *tstate = PyThreadState_GET();
+    assert(tstate && tstate->thread_id == PyThread_get_thread_ident() &&
+           "Caller must hold the GIL!");
+}
+#endif // NDEBUG
 
 void
 PyEval_AcquireThread(PyThreadState *tstate)
@@ -403,6 +433,7 @@ PyEval_UnInitThreads(void)
 static _Py_atomic_int eval_breaker = {0};
 static _Py_atomic_int gil_drop_request = {0};
 static int pending_async_exc = 0;
+static _Py_atomic_int background_job_ready = {0};
 #endif /* WITH_THREAD */
 
 /* This function is used to signal that async exceptions are waiting to be
@@ -412,6 +443,17 @@ void
 _PyEval_SignalAsyncExc(void)
 {
     SIGNAL_ASYNC_EXC();
+}
+
+/* Lets the eval loop know that a background job is or isn't ready to
+   apply. */
+void
+_PyEval_SetBackgroundJobAvailable(int available)
+{
+    if (available)
+        SIGNAL_BACKGROUND_JOB_READY();
+    else
+        UNSIGNAL_BACKGROUND_JOB_READY();
 }
 
 /* Functions save_thread and restore_thread are always defined so
@@ -1144,6 +1186,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         return NULL;
 
     tstate->frame = f;
+    co = f->f_code;
+
+#ifdef WITH_LLVM
+    maybe_compile(tstate->interp, co, f);
+#endif  /* WITH_LLVM */
 
     if (tstate->use_tracing) {
         if (tstate->c_tracefunc != NULL) {
@@ -1179,7 +1226,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         }
     }
 
-    co = f->f_code;
     names = co->co_names;
     consts = co->co_consts;
     fastlocals = f->f_localsplus;
@@ -1280,6 +1326,28 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     why = WHY_EXCEPTION;
                     goto on_error;
                 }
+            }
+            if (_Py_atomic_load_relaxed(&background_job_ready)) {
+#ifdef WITH_LLVM
+                if (tstate->interp->background_thread == NULL ||
+                    PyBackgroundThread_Disabled(
+                        tstate->interp->background_thread)) {
+                    /* No interpreter background thread, so it can't
+                       have a job ready, but there could be other
+                       instances that signal the interpreter
+                       spuriously. */
+                    UNSIGNAL_BACKGROUND_JOB_READY();
+                }
+                else {
+                    /* No need to block. If we can't acquire the lock,
+                       we'll try again on the next iteration. */
+                    PyBackgroundThread_ApplyFinishedJobs(
+                        tstate->interp->background_thread,
+                        Py_NO_BLOCK);
+                }
+#else  /* !WITH_LLVM */
+                UNSIGNAL_BACKGROUND_JOB_READY();
+#endif  /* WITH_LLVM */
             }
             if (_Py_atomic_load_relaxed(&gil_drop_request)) {
 #ifdef WITH_THREAD
@@ -3843,6 +3911,28 @@ mark_called(PyCodeObject *co)
 {
     co->co_hotness += 10;
 }
+
+/* For now, if the code object is hot, starts the background thread if
+   necessary and sends a dummy job to it.  TODO: flesh this out to
+   actually compile. */
+static inline void
+maybe_compile(PyInterpreterState *interp, PyCodeObject *co, PyFrameObject *f)
+{
+    int is_hot = 0, should_compile;
+    if (co->co_hotness > PY_HOTNESS_THRESHOLD)
+        is_hot = 1;
+    should_compile = is_hot;
+    if (PyBackgroundThread_Disabled(interp->background_thread))
+        should_compile = 0;
+    if (co->co_being_compiled)
+        should_compile = 0;
+    if (should_compile) {
+        co->co_being_compiled = 1;
+        PyBackgroundThread_RunJob(PyThreadState_GET()->interp,
+                                  PyBackgroundThread_NewDummyJob());
+    }
+}
+
 #endif  /* WITH_LLVM */
 
 #define C_TRACE(x, call) \

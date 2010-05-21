@@ -25,6 +25,7 @@ the expense of doing their own locking).
 
 #ifdef WITH_THREAD
 #include "pythread.h"
+#include "bg_thread.h"
 static PyThread_type_lock head_mutex = NULL; /* Protects interp->tstate_head */
 #define HEAD_INIT() (void)(head_mutex || (head_mutex = PyThread_allocate_lock()))
 #define HEAD_LOCK() PyThread_acquire_lock(head_mutex, WAIT_LOCK)
@@ -79,6 +80,9 @@ PyInterpreterState_New(void)
         interp->codec_search_cache = NULL;
         interp->codec_error_registry = NULL;
         interp->codecs_initialized = 0;
+#ifdef WITH_LLVM
+        interp->background_thread = NULL;
+#endif  /* WITH_LLVM */
 #ifdef HAVE_DLOPEN
 #ifdef RTLD_NOW
         interp->dlopenflags = RTLD_NOW;
@@ -116,6 +120,10 @@ PyInterpreterState_Clear(PyInterpreterState *interp)
     Py_CLEAR(interp->modules_reloading);
     Py_CLEAR(interp->sysdict);
     Py_CLEAR(interp->builtins);
+#ifdef WITH_LLVM
+    PyBackgroundThread_Free(interp->background_thread);
+    interp->background_thread = NULL;
+#endif  /* WITH_LLVM */
 }
 
 

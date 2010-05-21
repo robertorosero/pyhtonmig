@@ -633,7 +633,7 @@ class SizeofTest(unittest.TestCase):
         check(get_cell().__closure__[0], size(h + 'P'))
         # code
         if WITH_LLVM:
-            check(get_cell().__code__, size(h + '5i8Pi3Pl'))
+            check(get_cell().__code__, size(h + '5i8Pi3Plc'))
         else:
             check(get_cell().__code__, size(h + '5i8Pi3P'))
         # complex

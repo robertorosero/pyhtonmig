@@ -7,7 +7,8 @@ extern "C" {
 
 PyAPI_FUNC(int) PyOS_InterruptOccurred(void);
 PyAPI_FUNC(void) PyOS_InitInterrupts(void);
-PyAPI_FUNC(void) PyOS_AfterFork(void);
+PyAPI_FUNC(void) PyOS_BeforeFork(void);
+PyAPI_FUNC(int) PyOS_AfterFork(int);  /* Preserves errno. */
 
 #ifdef __cplusplus
 }

@@ -32,8 +32,13 @@ typedef struct {
     /* Measure of how hot this code object is. This will be used to
        decide which code objects are worth sending through LLVM. */
     long co_hotness;
+    /* True if the code object is being compiled by the background thread. */
+    char co_being_compiled;
 #endif  /* WITH_LLVM */
 } PyCodeObject;
+
+/* The threshold for co_hotness before the code object is considered "hot". */
+#define PY_HOTNESS_THRESHOLD 100000
 
 /* Masks for co_flags above */
 #define CO_OPTIMIZED	0x0001

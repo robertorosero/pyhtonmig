@@ -5,6 +5,7 @@
 
 #include "Python.h"
 #include "intrcheck.h"
+#include "bg_thread.h"
 
 #ifdef MS_WINDOWS
 #include <Windows.h>
@@ -957,14 +958,51 @@ PyOS_InterruptOccurred(void)
     return 0;
 }
 
+/* TODO: Move these other PyOS functions to a better place.  */
+
 void
-PyOS_AfterFork(void)
+PyOS_BeforeFork(void)
 {
+    _PyImport_AcquireLock();
 #ifdef WITH_THREAD
-    PyEval_ReInitThreads();
-    main_thread = PyThread_get_thread_ident();
-    main_pid = getpid();
-    _PyImport_ReInitLock();
-    PyThread_ReInitTLS();
+#ifdef WITH_LLVM
+    PyBackgroundThread_Pause(PyThreadState_GET()->interp->background_thread);
 #endif
+#endif
+}
+
+/* Returns -1 if there was an error. Preserves errno. */
+int
+PyOS_AfterFork(int is_child)
+{
+    int result = 0;
+    int saved_errno = errno;
+#ifdef WITH_THREAD
+    PyInterpreterState *interp = PyThreadState_GET()->interp;
+    if (is_child) {
+#ifdef WITH_LLVM
+        PyBackgroundThread_DisableAfterFork(interp);
+#endif
+        PyEval_ReInitThreads();
+        main_thread = PyThread_get_thread_ident();
+        main_pid = getpid();
+        _PyImport_ReInitLock();
+        PyThread_ReInitTLS();
+    } else {
+#ifdef WITH_LLVM
+        PyBackgroundThread_Unpause(interp->background_thread);
+#endif
+    }
+#endif
+    if (!is_child) {
+        /* parent-only: release the import lock. */
+        result = _PyImport_ReleaseLock();
+        if (result < 0 && !PyErr_Occurred()) {
+            /* Don't clobber any other errors someone set. */
+            PyErr_SetString(PyExc_RuntimeError,
+                            "not holding the import lock");
+        }
+    }
+    errno = saved_errno;
+    return result;
 }
