@@ -335,11 +335,15 @@ class dHandlerCdec:
 class dHandlerObj():
     """For non-decimal return values:
 
-       Handle known disagreements between decimal.py and cdecimal.so.
-       Currently there are none."""
+       Handle known disagreements between decimal.py and cdecimal.so."""
 
     def __init__(self):
         pass
+
+    def default(self, result, operands):
+        return False
+    __ge__ =  __gt__ = __le__ = __lt__ =  __repr__ = __str__ = \
+    __ne__ = __eq__ = default
 
     if py_minor >= 2:
         def __hash__(self, result, operands):
@@ -350,11 +354,8 @@ class dHandlerObj():
             # If a Decimal instance is exactly representable as a float
             # then (in 3.2) its hash matches that of the float.
             f = float(c.dec)
-            if Decimal.from_float(f) == c.dec:
+            if decimal.Decimal.from_float(f) == c.dec:
                 return True
-
-    def default(self, result, operands):
-        return False
 
 
 dhandler_cdec = dHandlerCdec()
@@ -364,7 +365,6 @@ def cdec_known_disagreement(result, funcname, operands):
 dhandler_obj = dHandlerObj()
 def obj_known_disagreement(result, funcname, operands):
     return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
-
 
 
 def verify(result, funcname, operands):
