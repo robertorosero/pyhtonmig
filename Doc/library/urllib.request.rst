@@ -126,26 +126,6 @@ The :mod:`urllib.request` module defines the following functions:
    of the data it has downloaded, and just returns it.  In this case you just have
    to assume that the download was successful.
 
-
-.. data:: _urlopener
-
-   The public functions :func:`urlopen` and :func:`urlretrieve` create an instance
-   of the :class:`FancyURLopener` class and use it to perform their requested
-   actions.  To override this functionality, programmers can create a subclass of
-   :class:`URLopener` or :class:`FancyURLopener`, then assign an instance of that
-   class to the ``urllib.request._urlopener`` variable before calling the
-   desired function.  For example, applications may want to specify a different
-   :mailheader:`User-Agent` header than :class:`URLopener` defines.
-   This can be accomplished with the following code::
-
-      import urllib.request
-
-      class AppURLopener(urllib.request.FancyURLopener):
-          version = "App/1.7"
-
-      urllib.request._urlopener = AppURLopener()
-
-
 .. function:: urlcleanup()
 
    Clear the cache that may have been built up by previous calls to
@@ -624,7 +604,7 @@ OpenerDirector Objects
    method on the currently installed global :class:`OpenerDirector`).  The
    optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
-   timeout setting will be usedi). The timeout feature actually works only for
+   timeout setting will be used). The timeout feature actually works only for
    HTTP, HTTPS, FTP and FTPS connections).
 
 
@@ -1099,7 +1079,7 @@ will use same for decoding the bytes object. ::
 
    >>> import urllib.request
    >>> f = urllib.request.urlopen('http://www.python.org/')
-   >>> print(fp.read(100).decode('utf-8'))
+   >>> print(f.read(100).decode('utf-8'))
    <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
    "http://www.w3.org/TR/xhtml1/DTD/xhtm
 

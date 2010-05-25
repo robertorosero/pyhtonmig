@@ -142,7 +142,8 @@ process and user.
    synchronized (modify :data:`environb` updates :data:`environ`, and vice
    versa).
 
-   Availability: Unix.
+   :data:`environb` is only available if :data:`supports_bytes_environ` is
+   True.
 
    .. versionadded:: 3.2
 
@@ -457,6 +458,14 @@ process and user.
    Availability: Unix, Windows.
 
 
+.. data:: supports_bytes_environ
+
+   True if the native OS type of the environment is bytes (eg. False on
+   Windows).
+
+   .. versionadded:: 3.2
+
+
 .. function:: umask(mask)
 
    Set the current numeric umask and return the previous umask.
@@ -688,6 +697,14 @@ as internal buffering of data.
    Availability: Unix, Windows.
 
 
+.. data:: SEEK_SET
+          SEEK_CUR
+          SEEK_END
+
+   Parameters to the :func:`lseek` function. Their values are 0, 1, and 2,
+   respectively. Availability: Windows, Unix.
+
+
 .. function:: open(file, flags[, mode])
 
    Open the file *file* and set various flags according to *flags* and possibly
@@ -697,7 +714,8 @@ as internal buffering of data.
 
    For a description of the flag and mode values, see the C run-time documentation;
    flag constants (like :const:`O_RDONLY` and :const:`O_WRONLY`) are defined in
-   this module too (see below).
+   this module too (see :ref:`open-constants`).  In particular, on Windows adding
+   :const:`O_BINARY` is needed to open files in binary mode.
 
    Availability: Unix, Windows.
 
@@ -785,6 +803,12 @@ as internal buffering of data.
       :func:`fdopen`, or :data:`sys.stdout` or :data:`sys.stderr`, use its
       :meth:`~file.write` method.
 
+
+.. _open-constants:
+
+``open()`` flag constants
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The following constants are options for the *flags* parameter to the
 :func:`~os.open` function.  They can be combined using the bitwise OR operator
 ``|``.  Some of them are not available on all platforms.  For descriptions of
@@ -834,14 +858,6 @@ or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Window
 
    These constants are GNU extensions and not present if they are not defined by
    the C library.
-
-
-.. data:: SEEK_SET
-          SEEK_CUR
-          SEEK_END
-
-   Parameters to the :func:`lseek` function. Their values are 0, 1, and 2,
-   respectively. Availability: Windows, Unix.
 
 
 .. _os-file-dir:
@@ -2178,8 +2194,8 @@ Higher-level operations on pathnames are defined in the :mod:`os.path` module.
 
 .. data:: devnull
 
-   The file path of the null device. For example: ``'/dev/null'`` for POSIX.
-   Also available via :mod:`os.path`.
+   The file path of the null device. For example: ``'/dev/null'`` for
+   POSIX, ``'nul'`` for Windows.  Also available via :mod:`os.path`.
 
 
 .. _os-miscfunc:

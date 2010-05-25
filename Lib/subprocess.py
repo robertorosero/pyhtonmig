@@ -843,7 +843,7 @@ class Popen(object):
             # Process startup details
             if startupinfo is None:
                 startupinfo = STARTUPINFO()
-            if None not in (p2cread, c2pwrite, errwrite):
+            if -1 not in (p2cread, c2pwrite, errwrite):
                 startupinfo.dwFlags |= _subprocess.STARTF_USESTDHANDLES
                 startupinfo.hStdInput = p2cread
                 startupinfo.hStdOutput = c2pwrite
@@ -1096,15 +1096,14 @@ class Popen(object):
                                         for k, v in env.items()]
                         else:
                             env_list = None  # Use execv instead of execve.
+                        executable = os.fsencode(executable)
                         if os.path.dirname(executable):
-                            executable_list = (os.fsencode(executable),)
+                            executable_list = (executable,)
                         else:
                             # This matches the behavior of os._execvpe().
-                            path_list = os.get_exec_path(env)
-                            executable_list = (os.path.join(dir, executable)
-                                               for dir in path_list)
-                            executable_list = tuple(os.fsencode(exe)
-                                                    for exe in executable_list)
+                            executable_list = tuple(
+                                os.path.join(os.fsencode(dir), executable)
+                                for dir in os.get_exec_path(env))
                         self.pid = _posixsubprocess.fork_exec(
                                 args, executable_list,
                                 close_fds, cwd, env_list,

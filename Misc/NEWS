@@ -31,6 +31,25 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8188: Introduce a new scheme for computing hashes of numbers
+  (instances of int, float, complex, decimal.Decimal and
+  fractions.Fraction) that makes it easy to maintain the invariant
+  that hash(x) == hash(y) whenever x and y have equal value.
+
+- Issue #8748: Fix two issues with comparisons between complex and integer
+  objects.  (1) The comparison could incorrectly return True in some cases
+  (2**53+1 == complex(2**53) == 2**53), breaking transivity of equality.
+  (2) The comparison raised an OverflowError for large integers, leading
+  to unpredictable exceptions when combining integers and complex objects
+  in sets or dicts.
+
+- Issue #8766: Initialize _warnings module before importing the first module.
+  Fix a crash if an empty directory called "encodings" exists in sys.path.
+
+- Issue #8589: Decode PYTHONWARNINGS environment variable with the file system
+  encoding and surrogateespace error handler instead of the locale encoding to
+  be consistent with os.environ. Add PySys_AddWarnOptionUnicode() function.
+
 - PyObject_Dump() encodes unicode objects to utf8 with backslashreplace
   (instead of strict) error handler to escape surrogates
 
@@ -49,6 +68,8 @@ Core and Builtins
 - PyFile_FromFd() uses PyUnicode_DecodeFSDefault() instead of
   PyUnicode_FromString() to support surrogates in the filename and use the
   right encoding
+
+- Issue #7507: Quote "!" in pipes.quote(); it is special to some shells.
 
 - PyUnicode_DecodeFSDefaultAndSize() uses surrogateescape error handler
 
@@ -331,6 +352,11 @@ Core and Builtins
 C-API
 -----
 
+- Issue #5753: A new C API function, :cfunc:`PySys_SetArgvEx`, allows
+  embedders of the interpreter to set sys.argv without also modifying
+  sys.path.  This helps fix `CVE-2008-5983
+  <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2008-5983>`_.
+
 - Add PyArg_ValidateKeywordArguments, which checks if all keyword arguments are
   strings in an efficient manner.
 
@@ -384,6 +410,42 @@ C-API
 
 Library
 -------
+
+- Issue #8540: Decimal module: rename the Context._clamp attribute to
+  Context.clamp and make it public.  This is useful in creating
+  contexts that correspond to the decimal interchange formats
+  specified in IEEE 754.
+
+- Issue #6268: Fix seek() method of codecs.open(), don't read or write the BOM
+  twice after seek(0). Fix also reset() method of codecs, UTF-16, UTF-32 and
+  StreamWriter classes.
+
+- Issue #3798: sys.exit(message) writes the message to sys.stderr file, instead
+  of the C file stderr, to use stderr encoding and error handler
+
+- Issue #8782: Add a trailing newline in linecache.updatecache to the last line
+  of files without one.
+
+- Issue #8729: Return NotImplemented from collections.Mapping.__eq__ when
+  comparing to a non-mapping.
+
+- Issue #8774: tabnanny uses the encoding cookie (#coding:...) to use the
+  correct encoding
+
+- Issue #4870: Add an `options` attribute to SSL contexts, as well as
+  several ``OP_*`` constants to the `ssl` module.  This allows to selectively
+  disable protocol versions, when used in combination with `PROTOCOL_SSLv23`.
+
+- Issue #8759: Fixed user paths in sysconfig for posix and os2 schemes.
+
+- Issue #8663: distutils.log emulates backslashreplace error handler. Fix
+  compilation in a non-ASCII directory if stdout encoding is ASCII (eg. if
+  stdout is not a TTY).
+
+- Issue #8513: os.get_exec_path() supports b'PATH' key and bytes value.
+  subprocess.Popen() and os._execvpe() support bytes program name. Add
+  os.supports_bytes_environ flag: True if the native OS type of the environment
+  is bytes (eg. False on Windows).
 
 - Issue #8633: tarfile is now able to read and write archives with "raw" binary
   pax headers as described in POSIX.1-2008.
@@ -456,7 +518,7 @@ Library
 - Issue #8354: The siginterrupt setting is now preserved for all signals,
   not just SIGCHLD.
 
-- Issue #7192: webbrowser.get("firefox") now wors on Mac OS X, as does
+- Issue #7192: webbrowser.get("firefox") now works on Mac OS X, as does
   webbrowser.get("safari").
 
 - Issue #8464: tarfile no longer creates files with execute permissions set

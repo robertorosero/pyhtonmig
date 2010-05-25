@@ -138,8 +138,8 @@ add_flag(int flag, const char *envs)
 static char*
 get_codeset(void)
 {
-    char* codeset;
-    PyObject *codec, *name;
+    char* codeset, *name_str;
+    PyObject *codec, *name = NULL;
 
     codeset = nl_langinfo(CODESET);
     if (!codeset || codeset[0] == '\0')
@@ -154,12 +154,16 @@ get_codeset(void)
     if (!name)
         goto error;
 
-    codeset = strdup(_PyUnicode_AsString(name));
+    name_str = _PyUnicode_AsString(name);
+    if (name == NULL)
+        goto error;
+    codeset = strdup(name_str);
     Py_DECREF(name);
     return codeset;
 
 error:
     Py_XDECREF(codec);
+    Py_XDECREF(name);
     return NULL;
 }
 #endif
@@ -261,13 +265,15 @@ Py_InitializeEx(int install_sigs)
 
     _PyImportHooks_Init();
 
+    /* Initialize _warnings. */
+    _PyWarnings_Init();
+
     initfsencoding();
 
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
     /* Initialize warnings. */
-    _PyWarnings_Init();
     if (PySys_HasWarnOptions()) {
         PyObject *warnings_module = PyImport_ImportModule("warnings");
         if (!warnings_module)
@@ -1061,22 +1067,34 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
         if (!oenc)
             return -1;
         enc = _PyUnicode_AsString(oenc);
+        if (enc == NULL)
+            return -1;
     }
     v = PySys_GetObject("ps1");
     if (v != NULL) {
         v = PyObject_Str(v);
         if (v == NULL)
             PyErr_Clear();
-        else if (PyUnicode_Check(v))
+        else if (PyUnicode_Check(v)) {
             ps1 = _PyUnicode_AsString(v);
+            if (ps1 == NULL) {
+                PyErr_Clear();
+                ps1 = "";
+            }
+        }
     }
     w = PySys_GetObject("ps2");
     if (w != NULL) {
         w = PyObject_Str(w);
         if (w == NULL)
             PyErr_Clear();
-        else if (PyUnicode_Check(w))
+        else if (PyUnicode_Check(w)) {
             ps2 = _PyUnicode_AsString(w);
+            if (ps2 == NULL) {
+                PyErr_Clear();
+                ps2 = "";
+            }
+        }
     }
     arena = PyArena_New();
     if (arena == NULL) {
@@ -1369,10 +1387,12 @@ handle_system_exit(void)
         exitcode = (int)PyLong_AsLong(value);
     else {
         PyObject *sys_stderr = PySys_GetObject("stderr");
-        if (sys_stderr != NULL)
-            PyObject_CallMethod(sys_stderr, "flush", NULL);
-        PyObject_Print(value, stderr, Py_PRINT_RAW);
-        fflush(stderr);
+        if (sys_stderr != NULL && sys_stderr != Py_None) {
+            PyFile_WriteObject(value, sys_stderr, Py_PRINT_RAW);
+        } else {
+            PyObject_Print(value, stderr, Py_PRINT_RAW);
+            fflush(stderr);
+        }
         PySys_WriteStderr("\n");
         exitcode = 1;
     }

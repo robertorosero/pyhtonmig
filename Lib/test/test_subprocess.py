@@ -535,6 +535,17 @@ class ProcessTestCase(BaseTestCase):
             if c.exception.errno != 2:  # ignore "no such file"
                 raise c.exception
 
+    def test_issue8780(self):
+        # Ensure that stdout is inherited from the parent
+        # if stdout=PIPE is not used
+        code = ';'.join((
+            'import subprocess, sys',
+            'retcode = subprocess.call('
+                "[sys.executable, '-c', 'print(\"Hello World!\")'])",
+            'assert retcode == 0'))
+        output = subprocess.check_output([sys.executable, '-c', code])
+        self.assert_(output.startswith(b'Hello World!'), ascii(output))
+
 
 # context manager
 class _SuppressCoreFiles(object):
@@ -824,6 +835,27 @@ class POSIXProcessTestCase(BaseTestCase):
                 env=env)
             stdout = stdout.rstrip(b'\n\r')
             self.assertEquals(stdout.decode('ascii'), repr(value))
+
+    def test_bytes_program(self):
+        abs_program = os.fsencode(sys.executable)
+        path, program = os.path.split(sys.executable)
+        program = os.fsencode(program)
+
+        # absolute bytes path
+        exitcode = subprocess.call([abs_program, "-c", "pass"])
+        self.assertEquals(exitcode, 0)
+
+        # bytes program, unicode PATH
+        env = os.environ.copy()
+        env["PATH"] = path
+        exitcode = subprocess.call([program, "-c", "pass"], env=env)
+        self.assertEquals(exitcode, 0)
+
+        # bytes program, bytes PATH
+        envb = os.environb.copy()
+        envb[b"PATH"] = os.fsencode(path)
+        exitcode = subprocess.call([program, "-c", "pass"], env=envb)
+        self.assertEquals(exitcode, 0)
 
 
 @unittest.skipUnless(mswindows, "Windows specific tests")
