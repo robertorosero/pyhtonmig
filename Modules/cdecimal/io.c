@@ -665,7 +665,7 @@ error:
 }
 
 int
-mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt)
+mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt, int caps)
 {
 	char *cp = (char *)fmt;
 	int have_align = 0, n;
@@ -673,7 +673,7 @@ mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt)
 	/* defaults */
 	spec->min_width = 0;
 	spec->prec = -1;
-	spec->type = 'G';
+	spec->type = caps ? 'G' : 'g';
 	spec->align = '>';
 	spec->sign = '-';
 	spec->dot = "";
@@ -1081,8 +1081,8 @@ mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx,
 		flags |= MPD_FMT_SIGN_PLUS;
 	}
 
-	workctx = *ctx;
-	workctx.traps = workctx.status = 0;
+	mpd_maxcontext(&workctx);
+	workctx.round = ctx->round;
 	if (mpd_isspecial(&tmp)) {
 		/* no percent formatting */
 		flags |= MPD_FMT_TOSCI;
@@ -1165,7 +1165,7 @@ mpd_qformat(const mpd_t *dec, const char *fmt, const mpd_context_t *ctx,
 {
 	mpd_spec_t spec;
 
-	if (!mpd_parse_fmt_str(&spec, fmt)) {
+	if (!mpd_parse_fmt_str(&spec, fmt, 1)) {
 		*status |= MPD_Invalid_operation;
 		return NULL;
 	}
