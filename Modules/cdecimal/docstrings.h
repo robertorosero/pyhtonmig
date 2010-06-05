@@ -34,6 +34,13 @@ context when exiting the with-statement. If no context is specified, a copy of\n
 the current default context is used.\n\
 \n");
 
+PyDoc_STRVAR(doc_ieee_context,"\n\
+IEEEContext(bits) - Return a context object initialized to the proper values for\n\
+one of the IEEE interchange formats. The argument must be a multiple of 32 and\n\
+less than IEEE_CONTEXT_MAX_BITS. For the most common values, the constants\n\
+DECIMAL32, DECIMAL64 and DECIMAL128 are provided.\n\
+\n");
+
 
 /******************************************************************************/
 /*                       Decimal Object and Methods                           */
@@ -552,10 +559,11 @@ The context affects almost all operations and controls rounding,\n\
 Over/Underflow, raising of exceptions and much more. A new context\n\
 can be constructed as follows:\n\
 \n\
-    >>> c = Context(prec=28, Emin=-425000000, Emax=425000000, \n\
-                    rounding=ROUND_HALF_EVEN, capitals=1,\n\
-                    traps=[InvalidOperation, DivisionByZero, Overflow],\n\
-                    flags=[], _clamp=0, _allcr=1)\n\
+    >>> c = Context(prec=28, Emin=-425000000, Emax=425000000,\n\
+    ...             rounding=ROUND_HALF_EVEN, capitals=1, clamp=1,\n\
+    ...             traps=[InvalidOperation, DivisionByZero, Overflow],\n\
+    ...             flags=[], _allcr=1)\n\
+    >>>\n\
 \n\
 \n");
 
