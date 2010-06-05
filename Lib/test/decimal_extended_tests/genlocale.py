@@ -141,7 +141,7 @@ if __name__ == '__main__':
             testno += 1
             printit(testno, s, fmt)
         for x in range(100):
-            s = randint(20, 425)
+            s = randint(20)
             testno += 1
             printit(testno, s, fmt)
 
