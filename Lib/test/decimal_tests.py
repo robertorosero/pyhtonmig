@@ -1299,28 +1299,68 @@ def thfunc1(cls):
     d1 = Decimal(1)
     d3 = Decimal(3)
     test1 = d1/d3
-    cls.synchro.wait()
-    test2 = d1/d3
+
     cls.finish1.set()
+    cls.synchro.wait()
+
+    test2 = d1/d3
+    with localcontext() as c2:
+        cls.assertTrue(c2.flags[Inexact])
+        cls.assertRaises(DivisionByZero, c2.divide, d1, 0)
+        cls.assertTrue(c2.flags[DivisionByZero])
+        with localcontext() as c3:
+            cls.assertTrue(c3.flags[Inexact])
+            cls.assertTrue(c3.flags[DivisionByZero])
+            cls.assertRaises(InvalidOperation, c3.compare, d1, Decimal('sNaN'))
+            cls.assertTrue(c3.flags[InvalidOperation])
+            del c3
+        cls.assertFalse(c2.flags[InvalidOperation])
+        del c2
 
     cls.assertEqual(test1, Decimal('0.333333333333333333333333'))
     cls.assertEqual(test2, Decimal('0.333333333333333333333333'))
+
+    c1 = getcontext()
+    cls.assertTrue(c1.flags[Inexact])
+    for sig in Overflow, Underflow, DivisionByZero, InvalidOperation:
+        cls.assertFalse(c1.flags[sig])
     return
 
 def thfunc2(cls):
     d1 = Decimal(1)
     d3 = Decimal(3)
     test1 = d1/d3
+
     thiscontext = getcontext()
     thiscontext.prec = 18
     test2 = d1/d3
+
+    with localcontext() as c2:
+        cls.assertTrue(c2.flags[Inexact])
+        cls.assertRaises(Overflow, c2.multiply, Decimal('1e425000000'), 999)
+        cls.assertTrue(c2.flags[Overflow])
+        with localcontext(thiscontext) as c3:
+            cls.assertTrue(c3.flags[Inexact])
+            cls.assertFalse(c3.flags[Overflow])
+            c3.traps[Underflow] = True
+            cls.assertRaises(Underflow, c3.divide, Decimal('1e-425000000'), 999)
+            cls.assertTrue(c3.flags[Underflow])
+            del c3
+        cls.assertFalse(c2.flags[Underflow])
+        cls.assertFalse(c2.traps[Underflow])
+        del c2
+
     cls.synchro.set()
     cls.finish2.set()
 
     cls.assertEqual(test1, Decimal('0.333333333333333333333333'))
     cls.assertEqual(test2, Decimal('0.333333333333333333'))
-    return
 
+    cls.assertFalse(thiscontext.traps[Underflow])
+    cls.assertTrue(thiscontext.flags[Inexact])
+    for sig in Overflow, Underflow, DivisionByZero, InvalidOperation:
+        cls.assertFalse(thiscontext.flags[sig])
+    return
 
 class DecimalUseOfContextTest(unittest.TestCase):
     '''Unit tests for Use of Context cases in Decimal.'''
@@ -1328,21 +1368,23 @@ class DecimalUseOfContextTest(unittest.TestCase):
     try:
         import threading
     except ImportError:
-        threading = None
+        self.skipTest("importing threading failed")
 
     # Take care executing this test from IDLE, there's an issue in threading
     # that hangs IDLE and I couldn't find it
 
     def test_threading(self):
+        if HAVE_CDECIMAL and not HAVE_THREADS:
+            self.skipTest("compiled without threading")
         # Test the "threading isolation" of a Context. Also test changing
         # the DefaultContext, which acts as a template for the thread-local
         # contexts.
-
-        # XXX Must re-enable if compiled with USE_THREAD_LOCAL_STORAGE!
-        if HAVE_CDECIMAL: return
-
-        saveprec = DefaultContext.prec
+        save_prec = DefaultContext.prec
+        save_emax = DefaultContext.Emax
+        save_emin = DefaultContext.Emin
         DefaultContext.prec = 24
+        DefaultContext.Emax = 425000000
+        DefaultContext.Emin = -425000000
 
         self.synchro = threading.Event()
         self.finish1 = threading.Event()
@@ -1357,12 +1399,14 @@ class DecimalUseOfContextTest(unittest.TestCase):
         self.finish1.wait()
         self.finish2.wait()
 
-        DefaultContext.prec = saveprec
+        for sig in (Inexact, Overflow, Underflow, DivisionByZero,
+                    InvalidOperation):
+            self.assertFalse(DefaultContext.flags[sig])
+
+        DefaultContext.prec = save_prec
+        DefaultContext.Emax = save_emax
+        DefaultContext.Emin = save_emin
         return
-
-    if threading is None:
-        del test_threading
-
 
 class DecimalUsabilityTest(unittest.TestCase):
     '''Unit tests for Usability cases of Decimal.'''
@@ -1462,6 +1506,9 @@ class DecimalUsabilityTest(unittest.TestCase):
                 Decimal("56531E100"),
                 ])
 
+        if HAVE_CDECIMAL:
+            self.skipTest("new hashing scheme and float comparisons not "
+                          "implemented yet")
         # check that hash(d) == hash(int(d)) for integral values
         for value in test_values:
             self.assertEqual(hash(value), hash(int(value)))
@@ -1472,15 +1519,14 @@ class DecimalUsabilityTest(unittest.TestCase):
         self.assertTrue(hash(Decimal('Inf')))
         self.assertTrue(hash(Decimal('-Inf')))
 
-        if not HAVE_CDECIMAL: # XXX float comparisons not implemented yet.
-            # check that the hashes of a Decimal float match when they
-            # represent exactly the same values
-            test_strings = ['inf', '-Inf', '0.0', '-.0e1',
-                            '34.0', '2.5', '112390.625', '-0.515625']
-            for s in test_strings:
-                f = float(s)
-                d = Decimal(s)
-                self.assertEqual(hash(f), hash(d))
+        # check that the hashes of a Decimal float match when they
+        # represent exactly the same values
+        test_strings = ['inf', '-Inf', '0.0', '-.0e1',
+                        '34.0', '2.5', '112390.625', '-0.515625']
+        for s in test_strings:
+            f = float(s)
+            d = Decimal(s)
+            self.assertEqual(hash(f), hash(d))
 
         # check that the value of the hash doesn't depend on the
         # current context (issue #1757)
@@ -1957,6 +2003,7 @@ class ContextAPItests(unittest.TestCase):
         self.assertNotEqual(id(c), id(d))
         self.assertNotEqual(id(c.flags), id(d.flags))
         self.assertNotEqual(id(c.traps), id(d.traps))
+        self.assertEqual(c.flags, d.flags)
 
     def test_abs(self):
         c = Context()
@@ -2416,6 +2463,81 @@ class WithStatementTest(unittest.TestCase):
         self.assertIsNot(new_ctx, set_ctx, 'did not copy the context')
         self.assertIs(set_ctx, enter_ctx, '__enter__ returned wrong context')
 
+    def test_nested_with_statements(self):
+        # Use a copy of the supplied context in the block
+        orig_ctx = getcontext()
+        orig_ctx.clear_flags()
+        new_ctx = Context(Emax=384)
+        with localcontext() as c1:
+            self.assertEqual(c1.flags, orig_ctx.flags)
+            self.assertEqual(c1.traps, orig_ctx.traps)
+            c1.traps[Clamped] = True
+            c1.Emin = -383
+            self.assertRaises(Clamped, c1.create_decimal, '0e-999')
+            self.assertTrue(c1.flags[Clamped])
+            with localcontext(new_ctx) as c2:
+                self.assertEqual(c2.flags, new_ctx.flags)
+                self.assertEqual(c2.traps, new_ctx.traps)
+                self.assertRaises(Overflow, c2.power, Decimal('3.4e200'), 2)
+                self.assertFalse(c2.flags[Clamped])
+                self.assertTrue(c2.flags[Overflow])
+                del c2
+            self.assertFalse(c1.flags[Overflow])
+            del c1
+        self.assertNotEqual(orig_ctx.Emin, -383)
+        self.assertFalse(orig_ctx.flags[Clamped])
+        self.assertFalse(orig_ctx.flags[Overflow])
+        self.assertFalse(new_ctx.flags[Clamped])
+        self.assertFalse(new_ctx.flags[Overflow])
+
+    def test_with_statements_gc1(self):
+        with localcontext() as c1:
+            del c1
+            with localcontext() as c2:
+                del c2
+                with localcontext() as c3:
+                    del c3
+                    with localcontext() as c4:
+                        del c4
+
+    def test_with_statements_gc2(self):
+        with localcontext() as c1:
+            with localcontext(c1) as c2:
+                del c1
+                with localcontext(c2) as c3:
+                    del c2
+                    with localcontext(c3) as c4:
+                        del c3
+                        del c4
+
+    def test_with_statements_gc3(self):
+        with localcontext() as c1:
+            del c1
+            n1 = Context(prec=1)
+            setcontext(n1)
+            with localcontext(n1) as c2:
+                del n1
+                self.assertEqual(c2.prec, 1)
+                del c2
+                n2 = Context(prec=2)
+                setcontext(n2)
+                del n2
+                self.assertEqual(getcontext().prec, 2)
+                n3 = Context(prec=3)
+                setcontext(n3)
+                self.assertEqual(getcontext().prec, 3)
+                with localcontext(n3) as c3:
+                    del n3
+                    self.assertEqual(c3.prec, 3)
+                    del c3
+                    n4 = Context(prec=4)
+                    setcontext(n4)
+                    del n4
+                    self.assertEqual(getcontext().prec, 4)
+                    with localcontext() as c4:
+                        self.assertEqual(c4.prec, 4)
+                        del c4
+
 class ContextFlags(unittest.TestCase):
     def test_flags_irrelevant(self):
         # check that the result (numeric result + flags raised) of an
@@ -2468,6 +2590,65 @@ class ContextFlags(unittest.TestCase):
                                   "operation raises different flags depending on flags set: " +
                                   "expected %s, got %s" % (expected_flags, new_flags))
 
+class SpecialContexts(unittest.TestCase):
+    def test_context_templates(self):
+        basic_context_prec = BasicContext.prec
+        extended_context_prec = ExtendedContext.prec
+
+        BasicContext.prec = ExtendedContext.prec = 441
+
+        for template in BasicContext, ExtendedContext:
+            setcontext(template)
+            c = getcontext()
+            self.assertIsNot(c, template)
+            self.assertEqual(c.prec, 441)
+
+        BasicContext.prec = basic_context_prec
+        ExtendedContext.prec = extended_context_prec
+
+    def test_default_context(self):
+        default_context_prec = DefaultContext.prec
+
+        c = getcontext()
+        saveprec = c.prec
+
+        DefaultContext.prec = 961
+        c = getcontext()
+        self.assertEqual(c.prec, saveprec)
+
+        setcontext(DefaultContext)
+        c = getcontext()
+        self.assertIsNot(c, DefaultContext)
+        self.assertEqual(c.prec, 961)
+
+        DefaultContext.prec = default_context_prec
+
+    def test_ieee_context(self):
+        def assert_rest(self, context):
+            self.assertEqual(context.clamp, 1)
+            for v in context.traps:
+                self.assertFalse(v)
+            for v in context.flags:
+                self.assertFalse(v)
+
+        c = IEEEContext(DECIMAL32)
+        self.assertEqual(c.prec, 7)
+        self.assertEqual(c.Emax, 96)
+        self.assertEqual(c.Emin, -95)
+        assert_rest(self, c)
+
+        c = IEEEContext(DECIMAL64)
+        self.assertEqual(c.prec, 16)
+        self.assertEqual(c.Emax, 384)
+        self.assertEqual(c.Emin, -383)
+        assert_rest(self, c)
+
+        c = IEEEContext(DECIMAL128)
+        self.assertEqual(c.prec, 34)
+        self.assertEqual(c.Emax, 6144)
+        self.assertEqual(c.Emin, -6143)
+        assert_rest(self, c)
+
 def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
     """ Execute the tests.
 
@@ -2492,7 +2673,8 @@ def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
             ContextAPItests,
             DecimalTest,
             WithStatementTest,
-            ContextFlags
+            ContextFlags,
+            SpecialContexts
         ]
     else:
         test_classes = [DecimalTest]
@@ -2514,7 +2696,10 @@ def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
     try:
         run_unittest(*test_classes)
         if todo_tests is None:
-            import decimal as DecimalModule
+            if HAVE_CDECIMAL:
+                import cdecimal as DecimalModule
+            else:
+                import decimal as DecimalModule
             run_doctest(DecimalModule, verbose)
     finally:
         setcontext(ORIGINAL_CONTEXT)
