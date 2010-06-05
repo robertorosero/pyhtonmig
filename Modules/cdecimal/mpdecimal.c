@@ -7323,9 +7323,9 @@ mpd_qtest_newtondiv(mpd_t *q, const mpd_t *a, const mpd_t *b,
 	}
 
 
-	{ /* some compilers need a new block here for the declaration of r */
+	{
 		MPD_NEW_STATIC(r,0,0,0,0);
-		_mpd_qbarrett_divmod(q, &r, a, b, ctx, status);
+		_mpd_qbarrett_divmod(q, &r, a, b, status);
 		rem = !mpd_iszerocoeff(&r);
 		mpd_del(&r);
 		newsize = q->len;
@@ -7453,7 +7453,7 @@ _mpd_qtest_barrett_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
 		}
 	}
 
-	_mpd_qbarrett_divmod(q, r, a, b, ctx, status);
+	_mpd_qbarrett_divmod(q, r, a, b, status);
 	if (mpd_isinfinite(q) || q->digits > ctx->prec) {
 		*status |= MPD_Division_impossible;
 		goto nanresult;
