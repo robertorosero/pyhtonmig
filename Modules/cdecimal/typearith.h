@@ -22,13 +22,13 @@
  */
 
 #if defined(CONFIG_64)
-#if defined(__GNUC__) && defined(__x86_64__)
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(TEST_UINT128_T)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
 	mpd_uint_t h, l;
 
-	asm(	"mulq %3\n\t"\
+	asm (	"mulq %3\n\t"\
 		: "=d" (h), "=a" (l)\
 		: "%a" (a), "rm" (b)\
 		: "cc"
@@ -54,7 +54,29 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 	*r = rr;
 }
 /* END __GNUC__ (amd64) */
+#elif defined(HAVE_UINT128_T)
+static inline void
+_mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
+{
+	__uint128_t hl;
 
+	hl = (__uint128_t)a * b;
+
+	*hi = hl >> 64;
+	*lo = (mpd_uint_t)hl;
+}
+
+static inline void
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
+{
+	__uint128_t hl;
+
+	hl = ((__uint128_t)hi<<64) + lo;
+	*q = (mpd_uint_t)(hl / d); /* quotient is known to fit */
+	*r = (mpd_uint_t)(hl - (__uint128_t)(*q) * d);
+}
+/* END HAVE_UINT128_T */
 #elif defined(_MSC_VER)
 #include <intrin.h>
 #pragma intrinsic(_umul128)
