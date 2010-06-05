@@ -15,8 +15,11 @@
 
 import cdecimal, decimal
 import sys, inspect
-import platform
+import array
+
 from copy import copy
+from randdec import *
+from randfloat import *
 
 
 py_minor = sys.version_info[1]
@@ -109,8 +112,7 @@ class Context(object):
         self.d.Emax = val
 
     def getround(self):
-        assert(self.f.rounding == self.d.rounding)
-        return self.f.rounding
+        return self.d.rounding
 
     def setround(self, val):
         self.f.rounding = val
@@ -133,9 +135,9 @@ class Context(object):
         self.d._clamp = val
 
     prec = property(getprec, setprec)
-    emin = property(getemin, setemin)
-    emax = property(getemax, setemax)
-    round = property(getround, setround)
+    Emin = property(getemin, setemin)
+    Emax = property(getemax, setemax)
+    rounding = property(getround, setround)
     clamp = property(getclamp, setclamp)
     capitals = property(getcapitals, setcapitals)
 
@@ -170,6 +172,8 @@ class Context(object):
 
 # We don't want exceptions so that we can compare the status flags.
 context = Context()
+context.Emin = cdecimal.MIN_EMIN
+context.Emax = cdecimal.MAX_EMAX
 context.clear_traps()
 
 # When creating decimals, cdecimal is ultimately limited by the maximum
@@ -209,7 +213,7 @@ cdecimal: %s\n\
 decimal:  %s\n\n"
 
 class CdecException(ArithmeticError):
-    def __init__(self, result, funcname, operands):
+    def __init__(self, result, funcname, operands, fctxstr, dctxstr):
         self.errstring = "Error in %s(%s" % (funcname, operands[0])
         for op in operands[1:]:
             self.errstring += ", %s" % op
@@ -226,7 +230,7 @@ class CdecException(ArithmeticError):
                                                     str(dec_tuple))
         else:
             self.errstring += _exc_fmt_obj % (str(result[0]), str(result[1]))
-        self.errstring += "%s\n%s\n\n" % (str(context.f), str(context.d))
+        self.errstring += "%s\n%s\n\n" % (fctxstr, dctxstr)
     def __str__(self):
         return self.errstring
 
@@ -255,6 +259,32 @@ class dHandlerCdec:
         b = dec.next_minus()
         return abs(a - b)
 
+    def un_resolve_ulp(self, result, funcname, operands):
+        """Results of cdecimal's power function are currently not always
+           correctly rounded. Check if the cdecimal result differs by less
+           than 1 ULP from the correctly rounded decimal.py result."""
+        mpdstr = str(result.mpd)
+        mpdresult = decimal.Decimal(mpdstr)
+        decresult = result.dec
+        deculp = self.ulp(decresult)
+        op = operands[0].dec
+        tmpctx = context.d.copy()
+        tmpctx.prec *= 2
+        # result, recalculated at double precision
+        dpresult = getattr(op, funcname)(context=tmpctx)
+        mpddiff = abs(dpresult - mpdresult)
+        if mpddiff >= deculp:
+            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+                  (deculp, dpresult, mpdresult))
+            return False # not simply a disagreement, but wrong
+        decdiff = abs(dpresult - decresult)
+        if decdiff >= deculp:
+            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+                  (deculp, dpresult, mpdresult))
+            return False # not simply a disagreement, but wrong
+        self.ulpdiff += 1
+        return True
+
     def bin_resolve_ulp(self, result, funcname, operands):
         """Results of cdecimal's power function are currently not always
            correctly rounded. Check if the cdecimal result differs by less
@@ -271,12 +301,28 @@ class dHandlerCdec:
         dpresult = getattr(op1, funcname)(op2, context=tmpctx)
         mpddiff = abs(dpresult - mpdresult)
         if mpddiff >= deculp:
+            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+                  (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         decdiff = abs(dpresult - decresult)
         if decdiff >= deculp:
+            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+                  (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         self.ulpdiff += 1
         return True
+
+    def exp(self, result, operands):
+        if context.f.allcr: return False
+        return self.un_resolve_ulp(result, "exp", operands)
+
+    def log10(self, result, operands):
+        if context.f.allcr: return False
+        return self.un_resolve_ulp(result, "log10", operands)
+
+    def ln(self, result, operands):
+        if context.f.allcr: return False
+        return self.un_resolve_ulp(result, "ln", operands)
 
     def __pow__(self, result, operands):
         """See DIFFERENCES.txt"""
@@ -342,19 +388,29 @@ class dHandlerObj():
 
     def default(self, result, operands):
         return False
-    __ge__ =  __gt__ = __le__ = __lt__ =  __repr__ = __str__ = \
-    __ne__ = __eq__ = default
+    __ge__ =  __gt__ = __le__ = __lt__ =  __repr__ = __str__ = default
 
     if py_minor >= 2:
         def __hash__(self, result, operands):
-            c = operands[0]
-            if c.mpd.is_infinite():
-                # Hashing infinities changed in 3.2
+            # New hashing scheme in r81486 is not yet implemented.
+            return True
+        __ne__ = __eq__ = default
+
+    if py_minor <= 2:
+        # Actually <= 1, but this is quite recent in 3.2, so
+        # not all installed 3.2 versions have it.
+        def __eq__(self, result, operands):
+            """cdecimal raises for all sNaN comparisons"""
+            if operands[0].mpd.is_snan() or operands[1].mpd.is_snan():
                 return True
-            # If a Decimal instance is exactly representable as a float
-            # then (in 3.2) its hash matches that of the float.
-            f = float(c.dec)
-            if decimal.Decimal.from_float(f) == c.dec:
+        __ne__ = __eq__
+
+    if py_minor <= 1:
+        # Fixed in release31-maint, but a lot of distributed
+        # versions do not have the fix yet.
+        def is_normal(self, result, operands):
+            # Issue7099
+            if operands[0].mpd.is_normal():
                 return True
 
 
@@ -374,7 +430,8 @@ def verify(result, funcname, operands):
     if result[0] != result[1] or not context.assert_eq_status():
         if obj_known_disagreement(result, funcname, operands):
             return # skip known disagreements
-        raise CdecException(result, funcname, operands)
+        raise CdecException(result, funcname, operands,
+                            str(context.f), str(context.d))
 
 
 class cdec(object):
@@ -416,7 +473,8 @@ class cdec(object):
            or not context.assert_eq_status():
             if cdec_known_disagreement(self, funcname, operands):
                 return # skip known disagreements
-            raise CdecException(self, funcname, operands)
+            raise CdecException(self, funcname, operands,
+                                str(context.f), str(context.d))
 
     def unaryfunc(self, funcname):
         "unary function returning a cdec"
@@ -437,7 +495,7 @@ class cdec(object):
         return c
 
     def obj_unaryfunc(self, funcname):
-        "unary function returning a cdec"
+        "unary function returning an object other than a cdec"
         context.clear_status()
         r_mpd = getattr(self.mpd, funcname)()
         r_dec = getattr(self.dec, funcname)()
@@ -834,11 +892,8 @@ class cdec(object):
         if isinstance(third, cdec):
             third_mpd = third.mpd
             third_dec = third.dec
-        if (third is not None):
-            c.mpd = getattr(self.mpd, 'powmod')(other_mpd, third_mpd)
-        else:
-            c.mpd = getattr(self.mpd, 'pow')(other_mpd)
-        c.dec = getattr(context.d, 'power')(self.dec, other_dec, third_dec)
+        c.mpd = pow(self.mpd, other_mpd, third_mpd)
+        c.dec = pow(self.dec, other_dec, third_dec)
         c.verify('power', (self, other, third))
         return c
 
@@ -908,333 +963,363 @@ def log(fmt, args=None):
         sys.stdout.write(''.join((str(fmt), '\n')))
     sys.stdout.flush()
 
-def test_unary(method, prec_lst, iter):
+def test_method(method, testspecs, testfunc):
     log("testing %s ...", method)
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            rprec = 10**prec
-            exprange = cdecimal.MAX_EMAX
-            if method in ['__int__', '__long__', '__trunc__', 'to_integral', \
-                          'to_integral_value', 'to_integral_value']:
-                exprange = 9999
-            for a in un_close_to_pow10(prec, exprange, iter):
-                try:
-                    x = cdec(a)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-            for a in un_close_numbers(prec, exprange, -exprange, iter):
-                try:
-                    x = cdec(a)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-            for a in un_incr_digits_tuple(prec, exprange, iter):
-                try:
-                    x = cdec(a)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-            for i in range(1000):
-                try:
-                    s = randdec(prec, exprange)
-                    x = cdec(s)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-                except OverflowError:
-                    pass
-                try:
-                    s = randtuple(prec, exprange)
-                    x = cdec(s)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-                except OverflowError:
-                    pass
+    for spec in testspecs:
+        if 'samples' in spec:
+            spec['prec'] = sorted(random.sample(range(1, 101), spec['samples']))
+        for prec in spec['prec']:
+            context.prec = prec
+            for expts in spec['expts']:
+                emin, emax = expts
+                if emin == 'rand':
+                    context.Emin = random.randrange(-1000, 0)
+                    context.Emax = random.randrange(prec, 1000)
+                else:
+                    context.Emin, context.Emax = emin, emax
+                if prec > context.Emax: continue
+                log("    prec: %d  emin: %d  emax: %d",
+                    (context.prec, context.Emin, context.Emax))
+                restr_range = 9999 if context.Emax > 9999 else context.Emax+99
+                for rounding in sorted(decround):
+                    context.rounding = rounding
+                    context.capitals = random.randrange(2)
+                    if spec['clamp'] == 2:
+                        context.clamp = random.randrange(2)
+                    else:
+                        context.clamp = spec['clamp']
+                    exprange = context.f.Emax
+                    testfunc(method, prec, exprange, restr_range, spec['iter'])
 
-def test_un_logical(method, prec_lst, iter):
-    log("testing %s ...", method)
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            for a in logical_un_incr_digits(prec, iter):
-                try:
-                    x = cdec(a)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-            for i in range(1000):
-                try:
-                    s = randdec(prec, 999999)
-                    x = cdec(s)
-                    getattr(x, method)()
-                except CdecException as err:
-                    log(err)
-                except OverflowError:
-                    pass
+def test_unary(method, prec, exprange, restr_range, iter):
+    if method in ['__int__', '__long__', '__trunc__', 'to_integral',
+                  'to_integral_value', 'to_integral_value']:
+        exprange = restr_range
+    for a in un_close_to_pow10(prec, exprange, iter):
+        try:
+            x = cdec(a)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+    for a in un_close_numbers(prec, exprange, -exprange, iter):
+        try:
+            x = cdec(a)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+    for a in un_incr_digits_tuple(prec, exprange, iter):
+        try:
+            x = cdec(a)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+    for a in un_randfloat():
+        try:
+            x = cdec(a)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+    for i in range(1000):
+        try:
+            s = randdec(prec, exprange)
+            x = cdec(s)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+        except OverflowError:
+            pass
+        try:
+            s = randtuple(prec, exprange)
+            x = cdec(s)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+        except OverflowError:
+            pass
 
-def test_binary(method, prec_lst, iter):
-    log("testing %s ...", method)
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            exprange = cdecimal.MAX_EMAX
-            if method in ['__pow__', '__rpow__', 'power']:
-                exprange = 99999
-            for a, b in bin_close_to_pow10(prec, exprange, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
-            for a, b in bin_close_numbers(prec, exprange, -exprange, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
-            for a, b in bin_incr_digits(prec, exprange, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
-            for i in range(1000):
-                s1 = randdec(prec, exprange)
-                s2 = randdec(prec, exprange)
-                try:
-                    x = cdec(s1)
-                    y = cdec(s2)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
+def test_un_logical(method, prec, exprange, restr_range, iter):
+    for a in logical_un_incr_digits(prec, iter):
+        try:
+            x = cdec(a)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+    for i in range(1000):
+        try:
+            s = randdec(prec, restr_range)
+            x = cdec(s)
+            getattr(x, method)()
+        except CdecException as err:
+            log(err)
+        except OverflowError:
+            pass
 
-def test_bin_logical(method, prec_lst, iter):
-    log("testing %s ...", method)
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            for a, b in logical_bin_incr_digits(prec, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
-            for i in range(1000):
-                s1 = randdec(prec, 999999)
-                s2 = randdec(prec, 999999)
-                try:
-                    x = cdec(s1)
-                    y = cdec(s2)
-                    getattr(x, method)(y)
-                except CdecException as err:
-                    log(err)
+def test_binary(method, prec, exprange, restr_range, iter):
+    if method in ['__pow__', '__rpow__', 'power']:
+        exprange = restr_range
+    for a, b in bin_close_to_pow10(prec, exprange, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
+    for a, b in bin_close_numbers(prec, exprange, -exprange, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
+    for a, b in bin_incr_digits(prec, exprange, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
+    for a, b in bin_randfloat():
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
+    for i in range(1000):
+        s1 = randdec(prec, exprange)
+        s2 = randdec(prec, exprange)
+        try:
+            x = cdec(s1)
+            y = cdec(s2)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
 
-def test_ternary(method, prec_lst, iter):
-    log("testing %s ...", method)
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            exprange = cdecimal.MAX_EMAX
-            if method in ['__pow__', 'power']:
-                exprange = 99999
-            for a, b, c in tern_close_numbers(prec, exprange, -exprange, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    z = cdec(c)
-                    getattr(x, method)(y, z)
-                except CdecException as err:
-                    log(err)
-            for a, b, c in tern_incr_digits(prec, exprange, iter):
-                try:
-                    x = cdec(a)
-                    y = cdec(b)
-                    z = cdec(c)
-                    getattr(x, method)(y, z)
-                except CdecException as err:
-                    log(err)
-            for i in range(1000):
-                s1 = randdec(prec, 2*exprange)
-                s2 = randdec(prec, 2*exprange)
-                s3 = randdec(prec, 2*exprange)
-                try:
-                    x = cdec(s1)
-                    y = cdec(s2)
-                    z = cdec(s3)
-                    getattr(x, method)(y, z)
-                except CdecException as err:
-                    log(err)
+def test_bin_logical(method, prec, exprange, restr_range, iter):
+    for a, b in logical_bin_incr_digits(prec, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
+    for i in range(1000):
+        s1 = randdec(prec, restr_range)
+        s2 = randdec(prec, restr_range)
+        try:
+            x = cdec(s1)
+            y = cdec(s2)
+            getattr(x, method)(y)
+        except CdecException as err:
+            log(err)
 
-def test_format(prec_lst, iter):
-    log("testing format")
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            for a in un_incr_digits_tuple(prec, 9999, iter):
-                try:
-                    fmt = rand_format(chr(random.randrange(32, 128)))
-                    x = format(context.f.create_decimal(a), fmt)
-                    y = format(context.d.create_decimal(a), fmt)
-                except Exception as err:
-                    print(err, fmt)
-                    continue
-                if x != y:
-                    print(context.f)
-                    print(context.d)
-                    print("\n%s  %s" % (a, fmt))
-                    print("%s  %s\n" % (x, y))
-            for i in range(1000):
-                try:
-                    a = randdec(99, 9999)
-                    fmt = rand_format(chr(random.randrange(32, 128)))
-                    x = format(context.f.create_decimal(a), fmt)
-                    y = format(context.d.create_decimal(a), fmt)
-                except Exception as err:
-                    print(err, fmt)
-                    continue
-                if x != y:
-                    print(context.f)
-                    print(context.d)
-                    print("\n%s  %s" % (a, fmt))
-                    print("%s  %s\n" % (x, y))
+def test_ternary(method, prec, exprange, restr_range, iter):
+    if method in ['__pow__', 'power']:
+        exprange = restr_range
+    for a, b, c in tern_close_numbers(prec, exprange, -exprange, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            z = cdec(c)
+            getattr(x, method)(y, z)
+        except CdecException as err:
+            log(err)
+    for a, b, c in tern_incr_digits(prec, exprange, iter):
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            z = cdec(c)
+            getattr(x, method)(y, z)
+        except CdecException as err:
+            log(err)
+    for a, b, c in tern_randfloat():
+        try:
+            x = cdec(a)
+            y = cdec(b)
+            z = cdec(c)
+            getattr(x, method)(y, z)
+        except CdecException as err:
+            log(err)
+    for i in range(1000):
+        s1 = randdec(prec, 2*exprange)
+        s2 = randdec(prec, 2*exprange)
+        s3 = randdec(prec, 2*exprange)
+        try:
+            x = cdec(s1)
+            y = cdec(s2)
+            z = cdec(s3)
+            getattr(x, method)(y, z)
+        except CdecException as err:
+            log(err)
 
-def test_locale(prec_lst, iter):
-    import array
-    log("testing locale")
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            for a in un_incr_digits_tuple(prec, 9999, iter):
-                try:
-                    fmt = rand_locale()
-                    x = format(context.f.create_decimal(a), fmt)
-                    y = format(context.d.create_decimal(a), fmt)
-                except Exception as err:
-                    print(err, fmt)
-                    continue
-                if x != y:
-                    print(context.f)
-                    print(context.d)
-                    print(locale.setlocale(locale.LC_NUMERIC))
-                    print("%s  %s" % (a, fmt))
-                    print(list(array.array('u', x)))
-                    print(list(array.array('u', y)))
-            for i in range(1000):
-                try:
-                    a = randdec(99, 9999)
-                    fmt = rand_locale()
-                    x = format(context.f.create_decimal(a), fmt)
-                    y = format(context.d.create_decimal(a), fmt)
-                except Exception as err:
-                    print(err, fmt)
-                    continue
-                if x != y:
-                    print(context.f)
-                    print(context.d)
-                    print(locale.setlocale(locale.LC_NUMERIC))
-                    print("%s  %s" % (a, fmt))
-                    print(list(array.array('u', x)))
-                    print(list(array.array('u', y)))
+def test_format(method, prec, exprange, restr_range, iter):
+    for a in un_incr_digits_tuple(prec, restr_range, iter):
+        context.clear_status()
+        try:
+            fmt = rand_format(chr(random.randrange(32, 128)))
+            x = format(context.f.create_decimal(a), fmt)
+            y = format(context.d.create_decimal(a), fmt)
+        except Exception as err:
+            print(err, fmt)
+            continue
+        if x != y:
+            print(context.f)
+            print(context.d)
+            print("\n%s  %s" % (a, fmt))
+            print("%s  %s\n" % (x, y))
+    for i in range(1000):
+        context.clear_status()
+        try:
+            a = randdec(99, 9999)
+            fmt = rand_format(chr(random.randrange(32, 128)))
+            x = format(context.f.create_decimal(a), fmt)
+            y = format(context.d.create_decimal(a), fmt)
+        except Exception as err:
+            print(err, fmt)
+            continue
+        if x != y:
+            print(context.f)
+            print(context.d)
+            print("\n%s  %s" % (a, fmt))
+            print("%s  %s\n" % (x, y))
 
-def test_round(prec_lst, iter):
-    log("testing round")
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = 99
-        for round in sorted(decround):
-            context.round = round
-            for a in un_incr_digits_tuple(prec, 9999, 1):
-                try:
-                    n = random.randrange(10)
-                    x = (context.f.create_decimal(a)).__round__(n)
-                    y = (context.d.create_decimal(a)).__round__(n)
-                except Exception as err:
-                    print(err)
-                    continue
-                if str(x) != str(y):
-                    print(context.f)
-                    print(context.d)
-                    print("\n%s  %s" % (a, n))
-                    print("%s  %s\n" % (x, y))
-                    exit(1)
-            for i in range(1000):
-                try:
-                    a = randdec(99, 9999)
-                    n = random.randrange(10)
-                    x = context.f.create_decimal(a).__round__(n)
-                    y = context.d.create_decimal(a).__round__(n)
-                except Exception as err:
-                    print(err)
-                    continue
-                if str(x) != str(y):
-                    print(context.f)
-                    print(context.d)
-                    print("\n%s  %s" % (a, n))
-                    print("%s  %s\n" % (x, y))
+def test_locale(method, prec, exprange, restr_range, iter):
+    for a in un_incr_digits_tuple(prec, restr_range, iter):
+        context.clear_status()
+        try:
+            fmt = rand_locale()
+            x = format(context.f.create_decimal(a), fmt)
+            y = format(context.d.create_decimal(a), fmt)
+        except Exception as err:
+            print(err, fmt)
+            continue
+        if x != y:
+            print(context.f)
+            print(context.d)
+            print(locale.setlocale(locale.LC_NUMERIC))
+            print("%s  %s" % (a, fmt))
+            print(list(array.array('u', x)))
+            print(list(array.array('u', y)))
+    for i in range(1000):
+        context.clear_status()
+        try:
+            a = randdec(99, 9999)
+            fmt = rand_locale()
+            x = format(context.f.create_decimal(a), fmt)
+            y = format(context.d.create_decimal(a), fmt)
+        except Exception as err:
+            print(err, fmt)
+            continue
+        if x != y:
+            print(context.f)
+            print(context.d)
+            print(locale.setlocale(locale.LC_NUMERIC))
+            print("%s  %s" % (a, fmt))
+            print(list(array.array('u', x)))
+            print(list(array.array('u', y)))
 
-def test_from_float(prec_lst):
-    log("testing from_float ...")
-    for prec in prec_lst:
-        log("    prec: %d", prec)
-        context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            exprange = 384
-            for i in range(1000):
-                intpart = str(random.randrange(100000000000000000000000000000000000000))
-                fracpart = str(random.randrange(100000000000000000000000000000000000000))
-                exp = str(random.randrange(-384, 384))
-                fstring = intpart + '.' + fracpart + 'e' + exp
-                f = float(fstring)
-                try:
-                    c = cdec(f)
-                except CdecException as err:
-                    log(err)
+def test_round(method, prec, exprange, restr_range, iter):
+    for a in un_incr_digits_tuple(prec, restr_range, 1):
+        context.clear_status()
+        try:
+            n = random.randrange(10)
+            x = (context.f.create_decimal(a)).__round__(n)
+            y = (context.d.create_decimal(a)).__round__(n)
+        except Exception as err:
+            print(err)
+            continue
+        if str(x) != str(y):
+            print(context.f)
+            print(context.d)
+            print("\n%s  %s" % (a, n))
+            print("%s  %s\n" % (x, y))
+            exit(1)
+    for i in range(1000):
+        context.clear_status()
+        try:
+            a = randdec(99, 9999)
+            n = random.randrange(10)
+            x = context.f.create_decimal(a).__round__(n)
+            y = context.d.create_decimal(a).__round__(n)
+        except Exception as err:
+            print(err)
+            continue
+        if str(x) != str(y):
+            print(context.f)
+            print(context.d)
+            print("\n%s  %s" % (a, n))
+            print("%s  %s\n" % (x, y))
+
+def test_from_float(method, prec, exprange, restr_range, iter):
+    for rounding in sorted(decround):
+        context.rounding = rounding
+        exprange = 384
+        for i in range(1000):
+            intpart = str(random.randrange(100000000000000000000000000000000000000))
+            fracpart = str(random.randrange(100000000000000000000000000000000000000))
+            exp = str(random.randrange(-384, 384))
+            fstring = intpart + '.' + fracpart + 'e' + exp
+            f = float(fstring)
+            try:
+                c = cdec(f)
+            except CdecException as err:
+                log(err)
 
 
 if __name__ == '__main__':
 
-    from randdec import *
     import time
-    import sys
 
+    randseed = int(time.time())
+    random.seed(randseed)
 
-    samples = 1
-    iter = 1
+    base_expts = [(cdecimal.MIN_EMIN, cdecimal.MAX_EMAX)]
+    if cdecimal.MAX_EMAX == 999999999999999999:
+        base_expts.append((-999999999, 999999999))
 
-    if '--short' in sys.argv:
-        samples = 1
-        iter  = 1
-    elif '--medium' in sys.argv:
-        samples = 1
-        iter = None
-    elif '--long' in sys.argv:
-        samples = 5
-        iter = None
+    base = {
+        'name': 'base',
+        'expts': base_expts,
+        'prec': [],
+        'clamp': 2,
+        'iter': None,
+        'samples': None,
+    }
+    small = {
+        'name': 'small',
+        'prec': [1, 2, 3, 4, 5],
+        'expts': [(-1,1), (-2,2), (-3,3), (-4,4), (-5,5)],
+        'clamp': 2,
+        'iter': None
+    }
+    ieee = [
+        {'name': 'decimal32', 'prec': [7], 'expts': [(-95, 96)], 'clamp': 1, 'iter': None},
+        {'name': 'decimal64', 'prec': [16], 'expts': [(-383, 384)], 'clamp': 1, 'iter': None},
+        {'name': 'decimal128', 'prec': [34], 'expts': [(-6143, 6144)], 'clamp': 1, 'iter': None}
+    ]
+
+    if '--medium' in sys.argv:
+        base['expts'].append(('rand', 'rand'))
+        base['samples'] = None
+        testspecs = [small, ieee, base]
+    if '--long' in sys.argv:
+        base['expts'].append(('rand', 'rand'))
+        base['samples'] = 5
+        testspecs = [small, ieee, base]
     elif '--all' in sys.argv:
-        samples = 100
-        iter = None
+        base['expts'].append(('rand', 'rand'))
+        base['samples'] = 100
+        testspecs = [small, ieee, base]
+    else: # --short
+        rand_ieee = random.choice(ieee)
+        base['iter'] = small['iter'] = rand_ieee['iter'] = 1
+        base['samples'] = 1
+        base['expts'] = [random.choice(base_expts)]
+        prec = random.randrange(1, 6)
+        small['prec'] = [prec]
+        small['expts'] = [(-prec, prec)]
+        testspecs = [small, rand_ieee, base]
+
 
     all_decimal_methods = set(dir(cdecimal.Decimal) + dir(decimal.Decimal))
     all_cdec_methods = [m for m in dir(cdec) if m in all_decimal_methods]
@@ -1273,37 +1358,30 @@ if __name__ == '__main__':
     ternary_methods.sort()
 
 
-    x = int(time.time())
-    random.seed(x)
-    log("\nRandom seed: %d\n\n", x)
+    log("\nRandom seed: %d\n\n", randseed)
     log("Skipping tests: \n\n%s\n", untested_methods)
 
 
     for method in unary_methods:
-        prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_unary(method, prec_lst, iter)
+        test_method(method, testspecs, test_unary)
 
     for method in binary_methods:
-        prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_binary(method, prec_lst, iter)
+        test_method(method, testspecs, test_binary)
 
     for method in ternary_methods:
-        prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_ternary(method, prec_lst, iter)
+        test_method(method, testspecs, test_ternary)
 
-    prec_lst = sorted(random.sample(range(1, 101), samples))
-    test_un_logical('logical_invert', prec_lst, iter)
+    test_method('logical_invert', testspecs, test_un_logical)
 
     for method in ['logical_and', 'logical_or', 'logical_xor']:
-        prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_bin_logical(method, prec_lst, iter)
+        test_method(method, testspecs, test_bin_logical)
+
 
     if py_minor >= 2:
         # Some tests will fail with 3.1, since alignment has been changed
         # in decimal.py 3.2.
         from genlocale import *
-        prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_format(prec_lst, iter)
-        test_locale(prec_lst, iter)
-        test_round(prec_lst, iter)
-        test_from_float(prec_lst)
+        test_method('format', testspecs, test_format)
+        test_method('locale', testspecs, test_locale)
+        test_method('round', testspecs, test_round)
+        test_method('from_float', testspecs, test_from_float)
