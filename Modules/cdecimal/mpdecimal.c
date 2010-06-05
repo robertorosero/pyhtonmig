@@ -42,7 +42,7 @@
   #define ALWAYS_INLINE inline __attribute__ ((always_inline))
 #endif
 
-#define MPD_NEWTONDIV_CUTOFF (8*MPD_RDIGITS)
+#define MPD_NEWTONDIV_CUTOFF 1024L
 
 #define MPD_NEW_STATIC(name, flags, exp, digits, len) \
         mpd_uint_t name##_data[MPD_MINALLOC_MAX];                    \
@@ -77,7 +77,7 @@ static void _mpd_qadd(mpd_t *result, const mpd_t *a, const mpd_t *b,
 static inline void _mpd_qmul(mpd_t *result, const mpd_t *a, const mpd_t *b,
                              const mpd_context_t *ctx, uint32_t *status);
 static void _mpd_qbarrett_divmod(mpd_t *q, mpd_t *r, const mpd_t *a,
-                const mpd_t *b, const mpd_context_t *ctx, uint32_t *status);
+                                 const mpd_t *b, uint32_t *status);
 static inline void _mpd_qpow_uint(mpd_t *result, mpd_t *base, mpd_uint_t exp,
                 uint8_t resultsign, const mpd_context_t *ctx, uint32_t *status);
 
@@ -731,14 +731,13 @@ _mpd_cap(mpd_t *result, const mpd_context_t *ctx)
 		_mpd_idiv_word(&len, &r, ctx->prec, MPD_RDIGITS);
 		len = (r == 0) ? len : len+1;
 
-		/* resize to fewer words cannot fail */
-		mpd_qresize(result, len, &dummy);
-
 		if (r != 0) {
 			result->data[len-1] %= mpd_pow10[r];
 		}
 
 		len = _mpd_real_size(result->data, len);
+		/* resize to fewer words cannot fail */
+		mpd_qresize(result, len, &dummy);
 		result->len = len;
 		mpd_setdigits(result);
 	}
@@ -749,31 +748,38 @@ _mpd_cap(mpd_t *result, const mpd_context_t *ctx)
 
 /*
  * Cut off the most significant digits of a NaN payload so that the rest
- * fits in ctx->prec. Cannot fail.
+ * fits in ctx->prec - ctx->clamp. Cannot fail.
  */
 static void
 _mpd_fix_nan(mpd_t *result, const mpd_context_t *ctx)
 {
 	uint32_t dummy;
+	mpd_ssize_t prec;
 	mpd_ssize_t len, r;
 
-	if (result->len > 0 && result->digits > ctx->prec-ctx->clamp) {
-		_mpd_idiv_word(&len, &r, ctx->prec, MPD_RDIGITS);
-		len = (r == 0) ? len : len+1;
-
-		/* resize to fewer words cannot fail */
-		mpd_qresize(result, len, &dummy);
-
-		if (r != 0) {
-			 result->data[len-1] %= mpd_pow10[r];
-		}
-
-		len = _mpd_real_size(result->data, len);
-		result->len = len;
-		mpd_setdigits(result);
-		if (mpd_iszerocoeff(result)) {
-			/* NaN0 is not a valid representation */
+	prec = ctx->prec - ctx->clamp;
+	if (result->len > 0 && result->digits > prec) {
+		if (prec == 0) {
+			mpd_minalloc(result);
 			result->len = result->digits = 0;
+		}
+		else {
+			_mpd_idiv_word(&len, &r, prec, MPD_RDIGITS);
+			len = (r == 0) ? len : len+1;
+
+			if (r != 0) {
+				 result->data[len-1] %= mpd_pow10[r];
+			}
+
+			len = _mpd_real_size(result->data, len);
+			/* resize to fewer words cannot fail */
+			mpd_qresize(result, len, &dummy);
+			result->len = len;
+			mpd_setdigits(result);
+			if (mpd_iszerocoeff(result)) {
+				/* NaN0 is not a valid representation */
+				result->len = result->digits = 0;
+			}
 		}
 	}
 }
@@ -1220,7 +1226,8 @@ mpd_qget_uint(const mpd_t *a, uint32_t *status)
 			*status |= MPD_Invalid_operation;
 			return MPD_UINT_MAX;
 		}
-		/* at this point a->digits+a->exp <= MPD_RDIGITS+1, so the shift fits */
+		/* At this point a->digits+a->exp <= MPD_RDIGITS+1,
+		 * so the shift fits. */
 		tmp.data = tmp_data;
 		tmp.flags = MPD_STATIC|MPD_CONST_DATA;
 		mpd_qsshiftr(&tmp, a, -a->exp);
@@ -2486,6 +2493,7 @@ mpd_qinvert(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	mpd_clear_flags(result);
 	result->exp = 0;
 	result->len = _mpd_real_size(result->data, len);
+	mpd_qresize(result, result->len, status);
 	mpd_setdigits(result);
 	_mpd_cap(result, ctx);
 	return;
@@ -2598,6 +2606,7 @@ mpd_qor(mpd_t *result, const mpd_t *a, const mpd_t *b,
 	mpd_clear_flags(result);
 	result->exp = 0;
 	result->len = _mpd_real_size(result->data, big->len);
+	mpd_qresize(result, result->len, status);
 	mpd_setdigits(result);
 	_mpd_cap(result, ctx);
 	return;
@@ -2890,6 +2899,7 @@ mpd_qxor(mpd_t *result, const mpd_t *a, const mpd_t *b,
 	mpd_clear_flags(result);
 	result->exp = 0;
 	result->len = _mpd_real_size(result->data, big->len);
+	mpd_qresize(result, result->len, status);
 	mpd_setdigits(result);
 	_mpd_cap(result, ctx);
 	return;
@@ -3301,8 +3311,8 @@ _mpd_qdiv(int action, mpd_t *q, const mpd_t *a, const mpd_t *b,
 	if (b->len == 1) {
 		rem = _mpd_shortdiv(q->data, a->data, a->len, b->data[0]);
 	}
-	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF ||
-	         b->digits < MPD_NEWTONDIV_CUTOFF) {
+	else if (a->len < 2*MPD_NEWTONDIV_CUTOFF &&
+	         b->len < MPD_NEWTONDIV_CUTOFF) {
 		int ret = _mpd_basedivmod(q->data, NULL, a->data, b->data,
 		                          a->len, b->len);
 		if (ret < 0) {
@@ -3313,7 +3323,7 @@ _mpd_qdiv(int action, mpd_t *q, const mpd_t *a, const mpd_t *b,
 	}
 	else {
 		MPD_NEW_STATIC(r,0,0,0,0);
-		_mpd_qbarrett_divmod(q, &r, a, b, ctx, status);
+		_mpd_qbarrett_divmod(q, &r, a, b, status);
 		rem = !mpd_iszerocoeff(&r);
 		mpd_del(&r);
 		newsize = q->len;
@@ -3457,8 +3467,8 @@ _mpd_qdivmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
 			r->data[0] = _mpd_shortdiv(q->data, a->data, a->len, b->data[0]);
 		}
 	}
-	else if (ctx->prec < MPD_NEWTONDIV_CUTOFF ||
-	         b->digits < MPD_NEWTONDIV_CUTOFF) {
+	else if (a->len < 2*MPD_NEWTONDIV_CUTOFF &&
+	         b->len < MPD_NEWTONDIV_CUTOFF) {
 		int ret;
 		ret = _mpd_basedivmod(q->data, r->data, a->data, b->data,
 		                      a->len, b->len);
@@ -3468,7 +3478,7 @@ _mpd_qdivmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
 		}
 	}
 	else {
-		_mpd_qbarrett_divmod(q, r, a, b, ctx, status);
+		_mpd_qbarrett_divmod(q, r, a, b, status);
 		if (mpd_isinfinite(q) || q->digits > ctx->prec) {
 			*status |= MPD_Division_impossible;
 			goto nanresult;
@@ -3763,9 +3773,9 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	}
 
 	mpd_maxcontext(&workctx);
-	workctx.round = MPD_ROUND_HALF_EVEN;
-	workctx.prec = (ctx->prec > a->digits ? ctx->prec : a->digits) + t + 2;
+	workctx.prec = ctx->prec + t + 2;
 	workctx.prec = (workctx.prec < 9) ? 9 : workctx.prec;
+	workctx.round = MPD_ROUND_HALF_EVEN;
 
 	if ((n = _mpd_get_exp_iterations(a, workctx.prec)) == MPD_SSIZE_MAX) {
 		mpd_seterror(result, MPD_Invalid_operation, status);
@@ -3844,6 +3854,7 @@ mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			a = &aa;
 		}
 
+		workctx.clamp = 0;
 		prec = ctx->prec + 3;
 		while (1) {
 			workctx.prec = prec;
@@ -3852,10 +3863,11 @@ mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
-			mpd_qadd(&t1, result, &ulp, &workctx, status);
-			mpd_qsub(&t2, result, &ulp, &workctx, status);
+			mpd_qadd(&t1, result, &ulp, &workctx, &workctx.status);
+			mpd_qsub(&t2, result, &ulp, &workctx, &workctx.status);
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
+				workctx.clamp = ctx->clamp;
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -3949,13 +3961,13 @@ mpd_update_ln10(mpd_ssize_t maxprec, uint32_t *status)
 	mpd_ssize_t klist[MPD_MAX_PREC_LOG2];
 	int i;
 
-	if (mpd_ln10.digits > maxprec) {
+	if (mpd_ln10.digits > maxprec+2*MPD_RDIGITS) {
 		/* shift to smaller cannot fail */
 		mpd_qshiftr_inplace(&mpd_ln10, mpd_ln10.digits-maxprec);
 		mpd_ln10.exp = -(mpd_ln10.digits-1);
 		return;
 	}
-	else if (mpd_ln10.digits == maxprec) {
+	else if (mpd_ln10.digits >= maxprec) {
 		return;
 	}
 
@@ -4047,7 +4059,7 @@ static const uint16_t lnapprox[900] = {
   18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
 };
 
-/* Internal ln() function that does not check for specials or zero. */
+/* Internal ln() function that does not check for specials, zero or one. */
 static void
 _mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
          uint32_t *status)
@@ -4062,11 +4074,6 @@ _mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	mpd_ssize_t a_digits, a_exp;
 	mpd_uint_t dummy, x;
 	int i;
-
-	if (_mpd_cmp(a, &one) == 0) {
-		_settriple(result, MPD_POS, 0, 0);
-		return;
-	}
 
 	/*
 	 * We are calculating ln(a) = ln(v * 10^t) = ln(v) + t*ln(10),
@@ -4104,22 +4111,42 @@ _mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		mpd_set_negative(z);
 	}
 
-
 	mpd_maxcontext(&maxcontext);
 	mpd_maxcontext(&varcontext);
 	varcontext.round = MPD_ROUND_TRUNC;
 
-	maxprec = (a->digits > ctx->prec) ? a->digits : ctx->prec;
-	maxprec += 2;
+	maxprec = ctx->prec + 2;
 	if (x <= 10 || x >= 805) {
-		/* v is close to 1: We estimate the magnitude of
-		 * the logarithm and adjust the precision upwards.
-		 * x/10 < x/(1+x) < ln(1+x), for 0 < x < 1
-		 * ln(1+x) < x, for -1 < x < 0
+		/* v is close to 1: Estimate the magnitude of the logarithm.
+		 * If v = 1 or ln(v) will underflow, skip the loop. Otherwise,
+		 * adjust the precision upwards in order to obtain a sufficient
+		 * number of significant digits.
+		 *
+		 *   1) x/(1+x) < ln(1+x) < x, for x > -1, x != 0
+		 *
+		 *   2) (v-1)/v < ln(v) < v-1
 		 */
-		mpd_qsub(&tmp, &one, &v, &varcontext, &varcontext.status);
-		maxprec -= (tmp.exp < 0) ? tmp.exp : 0;
-		maxprec++;
+		mpd_t *lower = &tmp;
+		mpd_t *upper = &vtmp;
+		int cmp = _mpd_cmp(&v, &one);
+
+		varcontext.round = MPD_ROUND_CEILING;
+		varcontext.prec = maxprec;
+		mpd_qsub(upper, &v, &one, &varcontext, &varcontext.status);
+		varcontext.round = MPD_ROUND_FLOOR;
+		mpd_qdiv(lower, upper, &v, &varcontext, &varcontext.status);
+		varcontext.round = MPD_ROUND_TRUNC;
+
+		if (cmp < 0) {
+			_mpd_ptrswap(&upper, &lower);
+		}
+		if (mpd_adjexp(upper) < mpd_etiny(ctx)) {
+			_settriple(z, (cmp<0), 1, mpd_etiny(ctx)-1);
+			goto postloop;
+		}
+		if (mpd_adjexp(lower) < 0) {
+			maxprec = maxprec - mpd_adjexp(lower);
+		}
 	}
 
 	i = ln_schedule_prec(klist, maxprec, 2);
@@ -4143,9 +4170,11 @@ _mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		mpd_qadd(z, z, &tmp, &maxcontext, status);
 	}
 
+postloop:
 	mpd_update_ln10(maxprec+2, status);
 	mpd_qmul_ssize(&tmp, &mpd_ln10, t, &maxcontext, status);
-	mpd_qadd(result, &tmp, z, &maxcontext, status);
+	varcontext.prec = maxprec+2;
+	mpd_qadd(result, &tmp, z, &varcontext, status);
 
 
 finish:
@@ -4160,6 +4189,7 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
         uint32_t *status)
 {
 	mpd_context_t workctx;
+	mpd_ssize_t adjexp, t;
 
 	if (mpd_isspecial(a)) {
 		if (mpd_qcheck_nan(result, a, ctx, status)) {
@@ -4180,6 +4210,27 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		mpd_seterror(result, MPD_Invalid_operation, status);
 		return;
 	}
+	if (_mpd_cmp(a, &one) == 0) {
+		_settriple(result, MPD_POS, 0, 0);
+		return;
+	}
+	/* Check if the result will overflow.
+	 *
+	 * 1) adjexp(a) + 1 > log10(a) >= adjexp(a)
+	 *
+	 * 2) |log10(a)| >= adjexp(a), if adjexp(a) >= 0
+	 *    |log10(a)| > -adjexp(a)-1, if adjexp(a) < 0
+	 * 
+	 * 3) |log(a)| > 2*|log10(a)|
+	 */
+	adjexp = mpd_adjexp(a);
+	t = (adjexp < 0) ? -adjexp-1 : adjexp;
+	t *= 2;
+	if (mpd_exp_digits(t)-1 > ctx->emax) {
+		*status |= MPD_Overflow|MPD_Inexact|MPD_Rounded;
+		mpd_setspecial(result, (adjexp<0), MPD_INF);
+		return;
+	}
 
 	workctx = *ctx;
 	workctx.round = MPD_ROUND_HALF_EVEN;
@@ -4196,6 +4247,7 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			a = &aa;
 		}
 
+		workctx.clamp = 0;
 		prec = ctx->prec + 3;
 		while (1) {
 			workctx.prec = prec;
@@ -4204,10 +4256,11 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
-			mpd_qadd(&t1, result, &ulp, &workctx, status);
-			mpd_qsub(&t2, result, &ulp, &workctx, status);
+			mpd_qadd(&t1, result, &ulp, &workctx, &workctx.status);
+			mpd_qsub(&t2, result, &ulp, &workctx, &workctx.status);
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
+				workctx.clamp = ctx->clamp;
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -4232,9 +4285,9 @@ _mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	mpd_context_t workctx;
 
 	mpd_maxcontext(&workctx);
-	workctx.prec = ctx->prec + a->digits + 3;
+	workctx.prec = ctx->prec + 3;
 	_mpd_qln(result, a, &workctx, status);
-	mpd_update_ln10(ctx->prec + 3, status);
+	mpd_update_ln10(workctx.prec, status);
 
 	workctx = *ctx;
 	workctx.round = MPD_ROUND_HALF_EVEN;
@@ -4247,6 +4300,7 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
            uint32_t *status)
 {
 	mpd_context_t workctx;
+	mpd_ssize_t adjexp, t;
 
 	workctx = *ctx;
 	workctx.round = MPD_ROUND_HALF_EVEN;
@@ -4281,6 +4335,20 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		mpd_qfinalize(result, &workctx, status);
 		return;
 	}
+	/* Check if the result will overflow.
+	 *
+	 * 1) adjexp(a) + 1 > log10(a) >= adjexp(a)
+	 *
+	 * 2) |log10(a)| >= adjexp(a), if adjexp(a) >= 0
+	 *    |log10(a)| > -adjexp(a)-1, if adjexp(a) < 0
+	 */
+	adjexp = mpd_adjexp(a);
+	t = (adjexp < 0) ? -adjexp-1 : adjexp;
+	if (mpd_exp_digits(t)-1 > ctx->emax) {
+		*status |= MPD_Overflow|MPD_Inexact|MPD_Rounded;
+		mpd_setspecial(result, (adjexp<0), MPD_INF);
+		return;
+	}
 
 	if (ctx->allcr) {
 		MPD_NEW_STATIC(t1, 0,0,0,0);
@@ -4294,6 +4362,7 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			a = &aa;
 		}
 
+		workctx.clamp = 0;
 		prec = ctx->prec + 3;
 		while (1) {
 			workctx.prec = prec;
@@ -4302,10 +4371,11 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			            result->exp + result->digits-workctx.prec-1);
 
 			workctx.prec = ctx->prec;
-			mpd_qadd(&t1, result, &ulp, &workctx, status);
-			mpd_qsub(&t2, result, &ulp, &workctx, status);
+			mpd_qadd(&t1, result, &ulp, &workctx, &workctx.status);
+			mpd_qsub(&t2, result, &ulp, &workctx, &workctx.status);
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
+				workctx.clamp = ctx->clamp;
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -5367,6 +5437,7 @@ _mpd_qpow_int(mpd_t *result, const mpd_t *base, const mpd_t *exp,
 	mpd_workcontext(&workctx, ctx);
 	workctx.prec += (exp->digits + exp->exp + 2);
 	workctx.round = MPD_ROUND_HALF_EVEN;
+	workctx.clamp = 0;
 	if (mpd_isnegative(exp)) {
 		mpd_qdiv(&tbase, &one, base, &workctx, status);
 		if (*status&MPD_Errors) {
@@ -5637,6 +5708,7 @@ _mpd_qpow_real(mpd_t *result, const mpd_t *base, const mpd_t *exp,
 	workctx.prec = (base->digits > ctx->prec) ? base->digits : ctx->prec;
 	workctx.prec += (4 + MPD_EXPDIGITS);
 	workctx.round = MPD_ROUND_HALF_EVEN;
+	workctx.allcr = ctx->allcr;
 
 	mpd_qln(result, base, &workctx, &workctx.status);
 	mpd_qmul(result, result, &texp, &workctx, &workctx.status);
@@ -5952,10 +6024,8 @@ mpd_qquantize(mpd_t *result, const mpd_t *a, const mpd_t *b,
 		return;
 	}
 
-	if (mpd_issubnormal(result, ctx)) {
-		*status |= MPD_Subnormal;
-	}
 	*status |= workstatus;
+	mpd_qfinalize(result, ctx, status);
 }
 
 void
@@ -6378,14 +6448,14 @@ finish:
  */
 static void
 _mpd_qbarrett_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b,
-		     const mpd_context_t *ctx, uint32_t *status)
+                     uint32_t *status)
 {
 	mpd_context_t workctx;
 	mpd_t *qq = q, *rr = r;
 	mpd_t aa, bb;
 	int k;
 
-	workctx = *ctx;
+	mpd_maxcontext(&workctx);
 	_mpd_copy_shared(&aa, a);
 	_mpd_copy_shared(&bb, b);
 
