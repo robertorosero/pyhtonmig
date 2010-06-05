@@ -142,6 +142,12 @@ typedef struct {
 
 /* Official name */
 #define MPD_Insufficient_storage MPD_Malloc_error
+ 
+/* IEEE 754 interchange format contexts */
+#define MPD_IEEE_CONTEXT_MAX_BITS 512 /* 16*(log2(MPD_MAX_EMAX / 3)-3) */
+#define MPD_DECIMAL32 32
+#define MPD_DECIMAL64 64
+#define MPD_DECIMAL128 128
 
 
 #define MPD_MINALLOC_MIN 2
@@ -149,12 +155,13 @@ typedef struct {
 extern mpd_ssize_t MPD_MINALLOC;
 extern void (* mpd_traphandler)(mpd_context_t *);
 
+void mpd_setminalloc(mpd_ssize_t n);
 void mpd_init(mpd_context_t *ctx, mpd_ssize_t prec);
 
 void mpd_maxcontext(mpd_context_t *ctx);
 void mpd_defaultcontext(mpd_context_t *ctx);
 void mpd_basiccontext(mpd_context_t *ctx);
-void mpd_extcontext(mpd_context_t *ctx);
+int mpd_ieee_context(mpd_context_t *ctx, int bits);
 
 mpd_ssize_t mpd_getprec(const mpd_context_t *ctx);
 mpd_ssize_t mpd_getemax(const mpd_context_t *ctx);
@@ -228,7 +235,7 @@ typedef struct {
 /* output to a string */
 char *mpd_to_sci(const mpd_t *dec, int fmt);
 char *mpd_to_eng(const mpd_t *dec, int fmt);
-int mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt);
+int mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt, int caps);
 char * mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx, uint32_t *status);
 char *mpd_qformat(const mpd_t *dec, const char *fmt, const mpd_context_t *ctx, uint32_t *status);
 
