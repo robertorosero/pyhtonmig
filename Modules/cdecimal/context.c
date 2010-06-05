@@ -19,7 +19,7 @@ mpd_dflt_traphandler(mpd_context_t *ctx UNUSED)
 void (* mpd_traphandler)(mpd_context_t *) = mpd_dflt_traphandler;
 
 
-static void
+void
 mpd_setminalloc(mpd_ssize_t n)
 {
 	static int minalloc_is_set = 0;
@@ -97,20 +97,25 @@ mpd_basiccontext(mpd_context_t *ctx)
 	ctx->allcr=1;
 }
 
-void
-mpd_extcontext(mpd_context_t *ctx)
+int
+mpd_ieee_context(mpd_context_t *ctx, int bits)
 {
-	ctx->prec=9;
-	ctx->emax=MPD_MAX_EMAX;
-	ctx->emin=MPD_MIN_EMIN;
+	if (bits <= 0 || bits > MPD_IEEE_CONTEXT_MAX_BITS || bits % 32) {
+		return -1;
+	}
+
+	ctx->prec = 9 * (bits/32) - 2;
+	ctx->emax = 3 * ((mpd_ssize_t)1<<(bits/16+3));
+	ctx->emin = 1 - ctx->emax;
 	ctx->round=MPD_ROUND_HALF_EVEN;
 	ctx->traps=0;
 	ctx->status=0;
 	ctx->newtrap=0;
-	ctx->clamp=0;
+	ctx->clamp=1;
 	ctx->allcr=1;
-}
 
+	return 0;
+}
 
 mpd_ssize_t
 mpd_getprec(const mpd_context_t *ctx)
