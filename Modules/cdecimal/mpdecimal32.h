@@ -142,7 +142,7 @@ typedef struct {
 
 /* Official name */
 #define MPD_Insufficient_storage MPD_Malloc_error
- 
+
 /* IEEE 754 interchange format contexts */
 #define MPD_IEEE_CONTEXT_MAX_BITS 512 /* 16*(log2(MPD_MAX_EMAX / 3)-3) */
 #define MPD_DECIMAL32 32
