@@ -9,6 +9,7 @@
 import cdecimal, decimal
 import sys, inspect
 from copy import copy
+from randdec import *
 
 
 py_minor = sys.version_info[1]
@@ -101,8 +102,7 @@ class Context(object):
         self.d.Emax = val
 
     def getround(self):
-        assert(self.f.rounding == self.d.rounding)
-        return self.f.rounding
+        return self.d.rounding
 
     def setround(self, val):
         self.f.rounding = val
@@ -125,9 +125,9 @@ class Context(object):
         self.d._clamp = val
 
     prec = property(getprec, setprec)
-    emin = property(getemin, setemin)
-    emax = property(getemax, setemax)
-    round = property(getround, setround)
+    Emin = property(getemin, setemin)
+    Emax = property(getemax, setemax)
+    rounding = property(getround, setround)
     clamp = property(getclamp, setclamp)
     capitals = property(getcapitals, setcapitals)
 
@@ -162,6 +162,8 @@ class Context(object):
 
 # We don't want exceptions so that we can compare the status flags.
 context = Context()
+context.Emin = cdecimal.MIN_EMIN
+context.Emax = cdecimal.MAX_EMAX
 context.clear_traps()
 
 
@@ -180,7 +182,7 @@ cdecimal: %s\n\
 decimal:  %s\n\n"
 
 class CdecException(ArithmeticError):
-    def __init__(self, result, funcname, operands):
+    def __init__(self, result, funcname, operands, fctxstr, dctxstr):
         self.errstring = "Error in %s(%s" % (funcname, operands[0])
         for op in operands[1:]:
             self.errstring += ", %s" % op
@@ -197,7 +199,7 @@ class CdecException(ArithmeticError):
                                                     str(dec_tuple))
         else:
             self.errstring += _exc_fmt_obj % (str(result[0]), str(result[1]))
-        self.errstring += "%s\n%s\n\n" % (str(context.f), str(context.d))
+        self.errstring += "%s\n%s\n\n" % (fctxstr, dctxstr)
     def __str__(self):
         return self.errstring
 
@@ -306,14 +308,22 @@ class dHandlerObj():
     __eq__ = __ne__ = __ge__ =  __gt__ = __le__ = __lt__ = \
     __repr__ = __str__ = default
 
+    if py_minor <= 1:
+        # Fixed in release31-maint, but a lot of distributed
+        # versions do not have the fix yet.
+        def is_normal(self, result, operands):
+            # Issue7099
+            if operands[0].mpd.is_normal():
+                return True
+
 
 dhandler_cdec = dHandlerCdec()
 def cdec_known_disagreement(result, funcname, operands):
     return getattr(dhandler_cdec, funcname, dhandler_cdec.default)(result, operands)
 
-#dhandler_obj = dHandlerObj()
-#def obj_known_disagreement(result, funcname, operands):
-#    return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
+dhandler_obj = dHandlerObj()
+def obj_known_disagreement(result, funcname, operands):
+    return getattr(dhandler_obj, funcname, dhandler_obj.default)(result, operands)
 
 
 def verify(result, funcname, operands):
@@ -321,9 +331,10 @@ def verify(result, funcname, operands):
        result[0] and result[1] as well as the context flags have the same
        values."""
     if result[0] != result[1] or not context.assert_eq_status():
-        #if obj_known_disagreement(result, funcname, operands):
-        #    return # skip known disagreements
-        raise CdecException(result, funcname, operands)
+        if obj_known_disagreement(result, funcname, operands):
+            return # skip known disagreements
+        raise CdecException(result, funcname, operands,
+                            str(context.f), str(context.d))
 
 
 class cdec(object):
@@ -361,7 +372,8 @@ class cdec(object):
            not context.assert_eq_status():
             if cdec_known_disagreement(self, funcname, operands):
                 return # skip known disagreements
-            raise CdecException(self, funcname, operands)
+            raise CdecException(self, funcname, operands,
+                                str(context.f), str(context.d))
 
     def unaryfunc(self, funcname):
         "unary function returning a cdec, uses the context methods"
@@ -419,9 +431,9 @@ class cdec(object):
             third_dec = third.dec
         if funcname == 'power':
             if (third is not None):
-                c.mpd = getattr(context.f, 'powmod')(self.mpd, other_mpd, third_mpd)
+                c.mpd = context.f.powmod(self.mpd, other_mpd, third_mpd)
             else:
-                c.mpd = getattr(context.f, 'pow')(self.mpd, other_mpd)
+                c.mpd = context.f.pow(self.mpd, other_mpd)
         else:
             c.mpd = getattr(context.f, funcname)(self.mpd, other_mpd, third_mpd)
         c.dec = getattr(context.d, funcname)(self.dec, other_dec, third_dec)
@@ -650,10 +662,10 @@ def test_unary(method, prec_lst, iter):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
+        for rounding in sorted(decround):
+            context.rounding = rounding
             rprec = 10**prec
-            exprange = cdecimal.MAX_EMAX
+            exprange = context.f.Emax
             if method in ['__int__', '__long__', '__trunc__', 'to_integral', \
                           'to_integral_value', 'to_integral_value']:
                 exprange = 9999
@@ -698,8 +710,8 @@ def test_un_logical(method, prec_lst, iter):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
+        for rounding in sorted(decround):
+            context.rounding = rounding
             for a in logical_un_incr_digits(prec, iter):
                 try:
                     x = cdec(a)
@@ -721,11 +733,11 @@ def test_binary(method, prec_lst, iter):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            exprange = cdecimal.MAX_EMAX
+        for rounding in sorted(decround):
+            context.rounding = rounding
+            exprange = context.f.Emax
             if method in ['__pow__', '__rpow__', 'power']:
-                exprange = 99999
+                exprange = 9999
             for a, b in bin_close_to_pow10(prec, exprange, iter):
                 try:
                     x = cdec(a)
@@ -762,8 +774,8 @@ def test_bin_logical(method, prec_lst, iter):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
+        for rounding in sorted(decround):
+            context.rounding = rounding
             for a, b in logical_bin_incr_digits(prec, iter):
                 try:
                     x = cdec(a)
@@ -786,11 +798,11 @@ def test_ternary(method, prec_lst, iter):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
-            exprange = cdecimal.MAX_EMAX
+        for rounding in sorted(decround):
+            context.rounding = rounding
+            exprange = context.f.Emax
             if method in ['__pow__', 'power']:
-                exprange = 99999
+                exprange = 9999
             for a, b, c in tern_close_numbers(prec, exprange, -exprange, iter):
                 try:
                     x = cdec(a)
@@ -824,8 +836,8 @@ def test_from_float(prec_lst):
     for prec in prec_lst:
         log("    prec: %d", prec)
         context.prec = prec
-        for round in sorted(decround):
-            context.round = round
+        for rounding in sorted(decround):
+            context.rounding = rounding
             exprange = 384
             for i in range(1000):
                 intpart = str(random.randrange(100000000000000000000000000000000000000))
@@ -841,26 +853,23 @@ def test_from_float(prec_lst):
 
 if __name__ == '__main__':
 
-    from randdec import *
     import time
-    import sys
-
 
     samples = 1
-    iter = 1
+    iterations = 1
 
     if '--short' in sys.argv:
         samples = 1
-        iter  = 1
+        iterations  = 1
     elif '--medium' in sys.argv:
         samples = 1
-        iter = None
+        iterations = None
     elif '--long' in sys.argv:
         samples = 5
-        iter = None
+        iterations = None
     elif '--all' in sys.argv:
         samples = 100
-        iter = None
+        iterations = None
 
     all_context_methods = set(dir(cdecimal.getcontext()) + dir(decimal.getcontext()))
     all_cdec_methods = [m for m in dir(cdec) if m in all_context_methods]
@@ -907,22 +916,22 @@ if __name__ == '__main__':
 
     for method in unary_methods:
         prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_unary(method, prec_lst, iter)
+        test_unary(method, prec_lst, iterations)
 
     for method in binary_methods:
         prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_binary(method, prec_lst, iter)
+        test_binary(method, prec_lst, iterations)
 
     for method in ternary_methods:
         prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_ternary(method, prec_lst, iter)
+        test_ternary(method, prec_lst, iterations)
 
     prec_lst = sorted(random.sample(range(1, 101), samples))
-    test_un_logical('logical_invert', prec_lst, iter)
+    test_un_logical('logical_invert', prec_lst, iterations)
 
     for method in ['logical_and', 'logical_or', 'logical_xor']:
         prec_lst = sorted(random.sample(range(1, 101), samples))
-        test_bin_logical(method, prec_lst, iter)
+        test_bin_logical(method, prec_lst, iterations)
 
     prec_lst = sorted(random.sample(range(1, 101), samples))
     test_from_float(prec_lst)
