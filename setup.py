@@ -1662,8 +1662,8 @@ class PyBuildExt(build_ext):
                 define_macros.append(('ANSI', '1'))
         else:
             raise DistutilsError("cdecimal: unsupported architecture")
-        # Not recommended: TLS is very slow!
-        # define_macros.append(('USE_THREAD_LOCAL_STORAGE', 1))
+        # Faster version without thread local contexts:
+        # define_macros.append(('WITHOUT_THREADS', 1))
         if 'sunos' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
         ext = Extension (
