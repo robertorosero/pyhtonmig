@@ -1606,6 +1606,20 @@ _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
 	}
 }
 
+/* Transcendental functions do not always set Underflow reliably,
+ * since they only use as much precision as is necessary for correct
+ * rounding. If a result like 1.0000000000e-101 is finalized, there
+ * is no rounding digit that would trigger Underflow. But we can
+ * assume Inexact, so a short check suffices. */
+static inline void
+mpd_check_underflow(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
+{
+	if (mpd_adjexp(dec) < ctx->emin && !mpd_iszero(dec) &&
+	    dec->exp < mpd_etiny(ctx)) {
+		*status |= MPD_Underflow;
+	}
+}
+
 /* Check if a normal number must be rounded after the exponent has been checked. */
 static inline void
 _mpd_check_round(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
@@ -3868,6 +3882,7 @@ mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
 				workctx.clamp = ctx->clamp;
+				mpd_check_underflow(result, &workctx, status);
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -3880,6 +3895,7 @@ mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	}
 	else {
 		_mpd_qexp(result, a, &workctx, status);
+		mpd_check_underflow(result, &workctx, status);
 		mpd_qfinalize(result, &workctx, status);
 	}
 }
@@ -4261,6 +4277,7 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
 				workctx.clamp = ctx->clamp;
+				mpd_check_underflow(result, &workctx, status);
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -4273,6 +4290,7 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	}
 	else {
 		_mpd_qln(result, a, &workctx, status);
+		mpd_check_underflow(result, &workctx, status);
 		mpd_qfinalize(result, &workctx, status);
 	}
 }
@@ -4376,6 +4394,7 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 			if (mpd_isspecial(result) || mpd_iszerocoeff(result) ||
 			    mpd_qcmp(&t1, &t2, status) == 0) {
 				workctx.clamp = ctx->clamp;
+				mpd_check_underflow(result, &workctx, status);
 				mpd_qfinalize(result, &workctx, status);
 				break;
 			}
@@ -4388,6 +4407,7 @@ mpd_qlog10(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	}
 	else {
 		_mpd_qlog10(result, a, &workctx, status);
+		mpd_check_underflow(result, &workctx, status);
 	}
 }
 
