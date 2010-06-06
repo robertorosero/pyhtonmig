@@ -313,15 +313,15 @@ class dHandlerCdec:
         return True
 
     def exp(self, result, operands):
-        if context.f.allcr: return False
+        if context.f._allcr: return False
         return self.un_resolve_ulp(result, "exp", operands)
 
     def log10(self, result, operands):
-        if context.f.allcr: return False
+        if context.f._allcr: return False
         return self.un_resolve_ulp(result, "log10", operands)
 
     def ln(self, result, operands):
-        if context.f.allcr: return False
+        if context.f._allcr: return False
         return self.un_resolve_ulp(result, "ln", operands)
 
     def __pow__(self, result, operands):
@@ -615,19 +615,10 @@ class cdec(object):
         return self.obj_binaryfunc(other, '__gt__')
 
     def __hash__(self):
-        global PY25_HASH_HAVE_WARNED
         if self.mpd.is_nan():
-            return cdec(0) # for testing
+            return None # for testing
             raise TypeError('Cannot hash a NaN value.')
-        ret = None
-        try: # Python 2.5 can use exorbitant amounts of memory
-            ret = self.obj_unaryfunc('__hash__')
-        except MemoryError:
-            if not PY25_HASH_HAVE_WARNED:
-                sys.stderr.write("Out of memory while hashing %s: upgrade to Python 2.6\n"
-                                 % str(self.mpd))
-                PY25_HASH_HAVE_WARNED = 1
-        return ret
+        return self.obj_unaryfunc('__hash__')
 
     def __int__(self):
         # ValueError or OverflowError
@@ -1301,15 +1292,15 @@ if __name__ == '__main__':
     if '--medium' in sys.argv:
         base['expts'].append(('rand', 'rand'))
         base['samples'] = None
-        testspecs = [small, ieee, base]
+        testspecs = [small] + ieee + [base]
     if '--long' in sys.argv:
         base['expts'].append(('rand', 'rand'))
         base['samples'] = 5
-        testspecs = [small, ieee, base]
+        testspecs = [small] + ieee + [base]
     elif '--all' in sys.argv:
         base['expts'].append(('rand', 'rand'))
         base['samples'] = 100
-        testspecs = [small, ieee, base]
+        testspecs = [small] + ieee + [base]
     else: # --short
         rand_ieee = random.choice(ieee)
         base['iter'] = small['iter'] = rand_ieee['iter'] = 1
