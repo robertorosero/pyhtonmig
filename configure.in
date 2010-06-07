@@ -1417,6 +1417,8 @@ AC_TYPE_INT32_T
 AC_TYPE_INT64_T
 AC_CHECK_TYPE(ssize_t,
   AC_DEFINE(HAVE_SSIZE_T, 1, [Define if your compiler provides ssize_t]),,)
+AC_CHECK_TYPE(__uint128_t,
+  AC_DEFINE(HAVE_GCC_UINT128_T, 1, [Define if your compiler provides __uint128_t]),,)
 
 # Sizes of various common basic types
 # ANSI C requires sizeof(char) == 1, so no need to check it
@@ -3257,6 +3259,22 @@ then LIBC=$withval
 else AC_MSG_ERROR([proper usage is --with-libc=STRING])
 fi],
 [AC_MSG_RESULT(default LIBC="$LIBC")])
+
+# **************************************
+# * Check for gcc x64 inline assembler *
+# **************************************
+
+AC_MSG_CHECKING(for x64 gcc inline assembler)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
+  unsigned long long b;
+  __asm__ __volatile__ ("mulq %0" : : "m" (b));
+]])],[have_gcc_asm_for_x64=yes],[have_gcc_asm_for_x64=no])
+AC_MSG_RESULT($have_gcc_asm_for_x64)
+if test "$have_gcc_asm_for_x64" = yes
+then
+    AC_DEFINE(HAVE_GCC_ASM_FOR_X64, 1,
+    [Define if we can use x64 gcc inline assembler])
+fi
 
 # **************************************************
 # * Check for various properties of floating point *

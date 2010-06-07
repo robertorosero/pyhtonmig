@@ -1730,19 +1730,21 @@ class PyBuildExt(build_ext):
         extra_objects = []
         platform = self.get_platform()
         cc = sysconfig.get_config_var('CC')
-        SIZEOF_SIZE_T = sysconfig.get_config_var('SIZEOF_SIZE_T')
-        HAVE_GCC_ASM_FOR_X87 = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
-        define_macros = [('CONFIG_32', '1')]
-        if SIZEOF_SIZE_T == 8:
-            if HAVE_GCC_ASM_FOR_X87: # HAVE_GCC_ASM_FOR_AMD64
+        sizeof_size_t = sysconfig.get_config_var('SIZEOF_SIZE_T')
+        if sizeof_size_t == 8:
+            if sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X64'):
                 define_macros = [('CONFIG_64', '1')]
+            elif sysconfig.get_config_var('HAVE_GCC_UINT128_T'):
+                define_macros = [('CONFIG_64', '1'), ('HAVE_UINT128_T', '1')]
             else:
                 define_macros = [('CONFIG_32', '1'), ('ANSI', '1')]
-        elif SIZEOF_SIZE_T == 4:
+        elif sizeof_size_t == 4:
             define_macros = [('CONFIG_32', '1')]
-            if HAVE_GCC_ASM_FOR_X87 and 'gcc' in cc and platform != 'darwin':
-                # XXX icc >= 11.0 and clang work as well.
-                # XXX link errors on darwin.
+            ppro = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
+            if ppro and ('gcc' in cc or 'clang' in cc) and \
+               platform != 'darwin':
+                # XXX icc >= 11.0 works as well.
+                # XXX darwin: problems with global constant in inline asm.
                 define_macros.append(('PPRO', '1'))
             else:
                 define_macros.append(('ANSI', '1'))
@@ -1751,7 +1753,7 @@ class PyBuildExt(build_ext):
         # Faster version without thread local contexts:
         # define_macros.append(('WITHOUT_THREADS', 1))
         if 'sunos' in platform and cc == 'cc': # suncc
-            extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH'])
+            extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH']) # [sic]
         ext = Extension (
             'cdecimal',
             define_macros=define_macros,

@@ -253,9 +253,15 @@
 /* Define to 1 if you have the `gamma' function. */
 #undef HAVE_GAMMA
 
+/* Define if we can use x64 gcc inline assembler */
+#undef HAVE_GCC_ASM_FOR_X64
+
 /* Define if we can use gcc inline assembler to get and set x87 control word
    */
 #undef HAVE_GCC_ASM_FOR_X87
+
+/* Define if your compiler provides __uint128_t */
+#undef HAVE_GCC_UINT128_T
 
 /* Define if you have the getaddrinfo function. */
 #undef HAVE_GETADDRINFO
