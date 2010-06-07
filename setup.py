@@ -1751,7 +1751,7 @@ class PyBuildExt(build_ext):
         else:
             raise DistutilsError("cdecimal: unsupported architecture")
         # Faster version without thread local contexts:
-        if '--without-threads' in sysconfig.get_config_var('CONFIG_ARGS'):
+        if not sysconfig.get_config_var('WITH_THREAD'):
             define_macros.append(('WITHOUT_THREADS', 1))
         if 'sunos' in platform and cc == 'cc': # suncc
             extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH']) # [sic]
