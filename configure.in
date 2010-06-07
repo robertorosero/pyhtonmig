@@ -2079,7 +2079,6 @@ AC_ARG_WITH(thread,
 if test -z "$with_threads"
 then with_threads="yes"
 fi
-with_threads="no"
 AC_MSG_RESULT($with_threads)
 
 AC_SUBST(THREADOBJ)
