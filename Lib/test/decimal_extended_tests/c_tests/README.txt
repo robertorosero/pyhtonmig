@@ -10,7 +10,7 @@ Some tests require a working gmp installation.
 1. Tests that do not require gmp:
 
    # Use gmake on *BSD
-   make MACHINE=[x64|ansi64|ppro|ansi|ansi-legacy] && ./runalltests.sh
+   make MACHINE=[x64|ansi64|ansi64c32|ppro|ansi32|ansi-legacy] && ./runalltests.sh
 
    This runs:
 
@@ -24,7 +24,7 @@ Some tests require a working gmp installation.
 2. Tests that require gmp:
 
    # Use gmake on *BSD
-   make MACHINE=[x64|ansi64|ppro|ansi|ansi-legacy] gmp && ./runalltests.sh
+   make MACHINE=[x64|ansi64|ansi64c32|ppro|ansi32|ansi-legacy] gmp && ./runalltests.sh
 
    This runs all the above tests and:
 

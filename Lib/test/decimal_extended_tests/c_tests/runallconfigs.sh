@@ -2,7 +2,7 @@
 
 
 VALGRIND=
-if [ "$1" == "--valgrind" ]; then
+if [ X"$1" = X"--valgrind" ]; then
     shift
     VALGRIND="valgrind --tool=memcheck --leak-check=full --leak-resolution=high --db-attach=yes --show-reachable=yes"
 fi
@@ -11,7 +11,7 @@ export VALGRIND
 if [ X"$@" != X"" ]; then
     CONFIGS="$@"
 else
-    CONFIGS="x64 ansi64 ppro ansi ansi-legacy"
+    CONFIGS="x64 ansi64 ansi64c32 ppro ansi32 ansi-legacy"
 fi
 
 GMAKE=`which gmake`

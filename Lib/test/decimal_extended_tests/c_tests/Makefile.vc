@@ -21,7 +21,7 @@ GMPLIB = "C:\Program Files\gmp\gmp.lib"
 GMPINC = "C:\Program Files\gmp"
 !endif
 
-!if "$(MACHINE)" == "ansi64"
+!if "$(MACHINE)" == "ansi64c32"
 CFLAGS = /DCONFIG_32 /DANSI /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 GMPLIB = "C:\Program Files\gmp\gmp.lib"
 GMPINC = "C:\Program Files\gmp"
@@ -33,7 +33,7 @@ GMPLIB = "C:\Program Files (x86)\gmp\gmp.lib"
 GMPINC = "C:\Program Files (x86)\gmp"
 !endif
 
-!if "$(MACHINE)" == "ansi"
+!if "$(MACHINE)" == "ansi32"
 CFLAGS = /DCONFIG_32 /DANSI /W3 /D_CRT_SECURE_NO_WARNINGS /nologo /MT /Ox /GS /EHsc
 GMPLIB = "C:\Program Files (x86)\gmp\gmp.lib"
 GMPINC = "C:\Program Files (x86)\gmp"

@@ -7,6 +7,10 @@ CFLAGS = -DCONFIG_64 -Wall -W -O2 -fomit-frame-pointer -s
 endif
 
 ifeq ($(MACHINE), ansi64)
+CFLAGS = -DCONFIG_64 -DHAVE_UINT128_T -DTEST_UINT128_T -Wall -W -O2 -fomit-frame-pointer -s
+endif
+
+ifeq ($(MACHINE), ansi64c32)
 CFLAGS = -DCONFIG_32 -DANSI -Wall -W -O2 -fomit-frame-pointer -s
 endif
 
@@ -14,12 +18,12 @@ ifeq ($(MACHINE), ppro)
 CFLAGS = -m32 -DCONFIG_32 -DPPRO -Wall -W -O2 -fomit-frame-pointer -s
 endif
 
-ifeq ($(MACHINE), ansi)
+ifeq ($(MACHINE), ansi32)
 CFLAGS = -m32 -DCONFIG_32 -DANSI -Wall -W -O2 -fomit-frame-pointer -s
 endif
 
 ifeq ($(MACHINE), ansi-legacy)
-CFLAGS = -m32 -DCONFIG_32 -DANSI -DLEGACY_COMPILER -Wall -W -O2 -fomit-frame-pointer -s
+CFLAGS = -DCONFIG_32 -DANSI -DLEGACY_COMPILER -Wall -W -O2 -fomit-frame-pointer -s
 endif
 
 

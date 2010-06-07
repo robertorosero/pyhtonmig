@@ -16,11 +16,11 @@ call runalltests.bat
 
 echo.
 echo # ========================================================================
-echo #                                 ansi64
+echo #                               ansi64c32
 echo # ========================================================================
 echo.
 nmake clean
-nmake MACHINE=ansi64 gmp
+nmake MACHINE=ansi64c32 gmp
 call runalltests.bat
 
 
@@ -37,11 +37,11 @@ call runalltests.bat
 
 echo.
 echo # ========================================================================
-echo #                                  ansi
+echo #                                 ansi32
 echo # ========================================================================
 echo.
 nmake clean
-nmake MACHINE=ansi gmp
+nmake MACHINE=ansi32 gmp
 call runalltests.bat
 
 echo.
