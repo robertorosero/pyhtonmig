@@ -21,8 +21,13 @@
   #define SETMODULUS(modnum) std_setmodulus(modnum, &umod)
   #define SIZE3_NTT(x0, x1, x2, w3table) std_size3_ntt(x0, x1, x2, w3table, umod)
 
-  #define BSR(a) x86_bsr(a)
-  #define BSF(a) x86_bsf(a)
+  #if defined(__x86_64__)
+    #define BSR(a) x86_bsr(a)
+    #define BSF(a) x86_bsf(a)
+  #else
+    #define BSR(a) std_bsr(a)
+    #define BSF(a) std_bsf(a)
+  #endif
 #elif defined(PPRO)
 /* PentiumPro (or later) gcc inline asm */
   #define MULMOD(a, b) ppro_mulmod(a, b, &dmod, dinvmod)
