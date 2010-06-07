@@ -133,6 +133,26 @@ class UstarReadTest(ReadTest):
                      "read() after readline() failed")
         fobj.close()
 
+    # Test if symbolic and hard links are resolved by extractfile().  The
+    # test link members each point to a regular member whose data is
+    # supposed to be exported.
+    def _test_fileobj_link(self, lnktype, regtype):
+        a = self.tar.extractfile(lnktype)
+        b = self.tar.extractfile(regtype)
+        self.assertEqual(a.name, b.name)
+
+    def test_fileobj_link1(self):
+        self._test_fileobj_link("ustar/lnktype", "ustar/regtype")
+
+    def test_fileobj_link2(self):
+        self._test_fileobj_link("./ustar/linktest2/lnktype", "ustar/linktest1/regtype")
+
+    def test_fileobj_symlink1(self):
+        self._test_fileobj_link("ustar/symtype", "ustar/regtype")
+
+    def test_fileobj_symlink2(self):
+        self._test_fileobj_link("./ustar/linktest2/symtype", "ustar/linktest1/regtype")
+
 
 class CommonReadTest(ReadTest):
 
@@ -661,10 +681,14 @@ class WriteTest(WriteTestBase):
         if hasattr(os, "link"):
             link = os.path.join(TEMPDIR, "link")
             target = os.path.join(TEMPDIR, "link_target")
-            open(target, "wb").close()
+            fobj = open(target, "wb")
+            fobj.write(b"aaa")
+            fobj.close()
             os.link(target, link)
             try:
                 tar = tarfile.open(tmpname, self.mode)
+                # Record the link target in the inodes list.
+                tar.gettarinfo(target)
                 tarinfo = tar.gettarinfo(link)
                 self.assertEqual(tarinfo.size, 0)
             finally:
@@ -1374,6 +1398,29 @@ class ContextManagerTest(unittest.TestCase):
         fobj.close()
 
 
+class LinkEmulationTest(ReadTest):
+
+    # Test for issue #8741 regression. On platforms that do not support
+    # symbolic or hard links tarfile tries to extract these types of members as
+    # the regular files they point to.
+    def _test_link_extraction(self, name):
+        self.tar.extract(name, TEMPDIR)
+        data = open(os.path.join(TEMPDIR, name), "rb").read()
+        self.assertEqual(md5sum(data), md5_regtype)
+
+    def test_hardlink_extraction1(self):
+        self._test_link_extraction("ustar/lnktype")
+
+    def test_hardlink_extraction2(self):
+        self._test_link_extraction("./ustar/linktest2/lnktype")
+
+    def test_symlink_extraction1(self):
+        self._test_link_extraction("ustar/symtype")
+
+    def test_symlink_extraction2(self):
+        self._test_link_extraction("./ustar/linktest2/symtype")
+
+
 class GzipMiscReadTest(MiscReadTest):
     tarname = gzipname
     mode = "r:gz"
@@ -1459,6 +1506,8 @@ def test_main():
 
     if hasattr(os, "link"):
         tests.append(HardlinkTest)
+    else:
+        tests.append(LinkEmulationTest)
 
     fobj = open(tarname, "rb")
     data = fobj.read()

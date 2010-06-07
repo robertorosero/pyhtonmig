@@ -164,7 +164,7 @@ class DecimalException(ArithmeticError):
     anything, though.
 
     handle  -- Called when context._raise_error is called and the
-               trap_enabler is set.  First argument is self, second is the
+               trap_enabler is not set.  First argument is self, second is the
                context.  More arguments can be given, those being after
                the explanation in _raise_error (For example,
                context._raise_error(NewError, '(-x)!', self._sign) would
@@ -862,7 +862,7 @@ class Decimal(object):
     # that specified by IEEE 754.
 
     def __eq__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         if self._check_nans(other, context):
@@ -870,7 +870,7 @@ class Decimal(object):
         return self._cmp(other) == 0
 
     def __ne__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         if self._check_nans(other, context):
@@ -879,7 +879,7 @@ class Decimal(object):
 
 
     def __lt__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         ans = self._compare_check_nans(other, context)
@@ -888,7 +888,7 @@ class Decimal(object):
         return self._cmp(other) < 0
 
     def __le__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         ans = self._compare_check_nans(other, context)
@@ -897,7 +897,7 @@ class Decimal(object):
         return self._cmp(other) <= 0
 
     def __gt__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         ans = self._compare_check_nans(other, context)
@@ -906,7 +906,7 @@ class Decimal(object):
         return self._cmp(other) > 0
 
     def __ge__(self, other, context=None):
-        other = _convert_other(other, allow_float=True)
+        other = _convert_other(other, allow_float = True)
         if other is NotImplemented:
             return other
         ans = self._compare_check_nans(other, context)
@@ -935,55 +935,28 @@ class Decimal(object):
 
     def __hash__(self):
         """x.__hash__() <==> hash(x)"""
-        # Decimal integers must hash the same as the ints
-        #
-        # The hash of a nonspecial noninteger Decimal must depend only
-        # on the value of that Decimal, and not on its representation.
-        # For example: hash(Decimal('100E-1')) == hash(Decimal('10')).
 
-        # Equality comparisons involving signaling nans can raise an
-        # exception; since equality checks are implicitly and
-        # unpredictably used when checking set and dict membership, we
-        # prevent signaling nans from being used as set elements or
-        # dict keys by making __hash__ raise an exception.
+        # In order to make sure that the hash of a Decimal instance
+        # agrees with the hash of a numerically equal integer, float
+        # or Fraction, we follow the rules for numeric hashes outlined
+        # in the documentation.  (See library docs, 'Built-in Types').
         if self._is_special:
             if self.is_snan():
                 raise TypeError('Cannot hash a signaling NaN value.')
             elif self.is_nan():
-                # 0 to match hash(float('nan'))
-                return 0
+                return _PyHASH_NAN
             else:
-                # values chosen to match hash(float('inf')) and
-                # hash(float('-inf')).
                 if self._sign:
-                    return -271828
+                    return -_PyHASH_INF
                 else:
-                    return 314159
+                    return _PyHASH_INF
 
-        # In Python 2.7, we're allowing comparisons (but not
-        # arithmetic operations) between floats and Decimals;  so if
-        # a Decimal instance is exactly representable as a float then
-        # its hash should match that of the float.
-        self_as_float = float(self)
-        if Decimal.from_float(self_as_float) == self:
-            return hash(self_as_float)
-
-        if self._isinteger():
-            op = _WorkRep(self.to_integral_value())
-            # to make computation feasible for Decimals with large
-            # exponent, we use the fact that hash(n) == hash(m) for
-            # any two nonzero integers n and m such that (i) n and m
-            # have the same sign, and (ii) n is congruent to m modulo
-            # 2**64-1.  So we can replace hash((-1)**s*c*10**e) with
-            # hash((-1)**s*c*pow(10, e, 2**64-1).
-            return hash((-1)**op.sign*op.int*pow(10, op.exp, 2**64-1))
-        # The value of a nonzero nonspecial Decimal instance is
-        # faithfully represented by the triple consisting of its sign,
-        # its adjusted exponent, and its coefficient with trailing
-        # zeros removed.
-        return hash((self._sign,
-                     self._exp+len(self._int),
-                     self._int.rstrip('0')))
+        if self._exp >= 0:
+            exp_hash = pow(10, self._exp, _PyHASH_MODULUS)
+        else:
+            exp_hash = pow(_PyHASH_10INV, -self._exp, _PyHASH_MODULUS)
+        hash_ = int(self._int) * exp_hash % _PyHASH_MODULUS
+        return hash_ if self >= 0 else -hash_
 
     def as_tuple(self):
         """Represents the number as a triple tuple.
@@ -1611,9 +1584,9 @@ class Decimal(object):
         """Decapitate the payload of a NaN to fit the context"""
         payload = self._int
 
-        # maximum length of payload is precision if _clamp=0,
-        # precision-1 if _clamp=1.
-        max_payload_len = context.prec - context._clamp
+        # maximum length of payload is precision if clamp=0,
+        # precision-1 if clamp=1.
+        max_payload_len = context.prec - context.clamp
         if len(payload) > max_payload_len:
             payload = payload[len(payload)-max_payload_len:].lstrip('0')
             return _dec_from_triple(self._sign, payload, self._exp, True)
@@ -1638,11 +1611,11 @@ class Decimal(object):
                 return Decimal(self)
 
         # if self is zero then exponent should be between Etiny and
-        # Emax if _clamp==0, and between Etiny and Etop if _clamp==1.
+        # Emax if clamp==0, and between Etiny and Etop if clamp==1.
         Etiny = context.Etiny()
         Etop = context.Etop()
         if not self:
-            exp_max = [context.Emax, Etop][context._clamp]
+            exp_max = [context.Emax, Etop][context.clamp]
             new_exp = min(max(self._exp, Etiny), exp_max)
             if new_exp != self._exp:
                 context._raise_error(Clamped)
@@ -1702,8 +1675,8 @@ class Decimal(object):
         if self_is_subnormal:
             context._raise_error(Subnormal)
 
-        # fold down if _clamp == 1 and self has too few digits
-        if context._clamp == 1 and self._exp > Etop:
+        # fold down if clamp == 1 and self has too few digits
+        if context.clamp == 1 and self._exp > Etop:
             context._raise_error(Clamped)
             self_padded = self._int + '0'*(self._exp - Etop)
             return _dec_from_triple(self._sign, self_padded, Etop)
@@ -2451,7 +2424,7 @@ class Decimal(object):
 
         if not dup:
             return _dec_from_triple(dup._sign, '0', 0)
-        exp_max = [context.Emax, context.Etop()][context._clamp]
+        exp_max = [context.Emax, context.Etop()][context.clamp]
         end = len(dup._int)
         exp = dup._exp
         while dup._int[end-1] == '0' and exp < exp_max:
@@ -3828,13 +3801,13 @@ class Context(object):
     Emax -   Maximum exponent
     capitals -      If 1, 1*10^1 is printed as 1E+1.
                     If 0, printed as 1e1
-    _clamp - If 1, change exponents if too high (Default 0)
+    clamp -  If 1, change exponents if too high (Default 0)
     """
 
     def __init__(self, prec=None, rounding=None,
                  traps=None, flags=None,
                  Emin=None, Emax=None,
-                 capitals=None, _clamp=0,
+                 capitals=None, clamp=None,
                  _ignored_flags=None):
         if flags is None:
             flags = []
@@ -3855,7 +3828,8 @@ class Context(object):
         """Show the current context."""
         s = []
         s.append('Context(prec=%(prec)d, rounding=%(rounding)s, '
-                 'Emin=%(Emin)d, Emax=%(Emax)d, capitals=%(capitals)d'
+                 'Emin=%(Emin)d, Emax=%(Emax)d, capitals=%(capitals)d, '
+                 'clamp=%(clamp)d'
                  % vars(self))
         names = [f.__name__ for f, v in self.flags.items() if v]
         s.append('flags=[' + ', '.join(names) + ']')
@@ -3872,23 +3846,45 @@ class Context(object):
         """Returns a shallow copy from self."""
         nc = Context(self.prec, self.rounding, self.traps,
                      self.flags, self.Emin, self.Emax,
-                     self.capitals, self._clamp, self._ignored_flags)
+                     self.capitals, self.clamp, self._ignored_flags)
         return nc
 
     def copy(self):
         """Returns a deep copy from self."""
         nc = Context(self.prec, self.rounding, self.traps.copy(),
                      self.flags.copy(), self.Emin, self.Emax,
-                     self.capitals, self._clamp, self._ignored_flags)
+                     self.capitals, self.clamp, self._ignored_flags)
         return nc
     __copy__ = copy
+
+    # _clamp is provided for backwards compatibility with third-party
+    # code.  May be removed in Python >= 3.3.
+    def _get_clamp(self):
+        "_clamp mirrors the clamp attribute.  Its use is deprecated."
+        import warnings
+        warnings.warn('Use of the _clamp attribute is deprecated. '
+                      'Please use clamp instead.',
+                      DeprecationWarning)
+        return self.clamp
+
+    def _set_clamp(self, clamp):
+        "_clamp mirrors the clamp attribute.  Its use is deprecated."
+        import warnings
+        warnings.warn('Use of the _clamp attribute is deprecated. '
+                      'Please use clamp instead.',
+                      DeprecationWarning)
+        self.clamp = clamp
+
+    # don't bother with _del_clamp;  no sane 3rd party code should
+    # be deleting the _clamp attribute
+    _clamp = property(_get_clamp, _set_clamp)
 
     def _raise_error(self, condition, explanation = None, *args):
         """Handles an error
 
         If the flag is in _ignored_flags, returns the default response.
         Otherwise, it sets the flag, then, if the corresponding
-        trap_enabler is set, it reaises the exception.  Otherwise, it returns
+        trap_enabler is set, it reraises the exception.  Otherwise, it returns
         the default value after setting the flag.
         """
         error = _condition_map.get(condition, condition)
@@ -3965,7 +3961,7 @@ class Context(object):
                                      "permitted.")
 
         d = Decimal(num, context=self)
-        if d._isnan() and len(d._int) > self.prec - self._clamp:
+        if d._isnan() and len(d._int) > self.prec - self.clamp:
             return self._raise_error(ConversionSyntax,
                                      "diagnostic info too long in NaN")
         return d._fix(self)
@@ -5875,7 +5871,8 @@ DefaultContext = Context(
         flags=[],
         Emax=999999999,
         Emin=-999999999,
-        capitals=1
+        capitals=1,
+        clamp=0
 )
 
 # Pre-made alternate contexts offered by the specification
@@ -6194,6 +6191,17 @@ _NegativeOne = Decimal(-1)
 # _SignedInfinity[sign] is infinity w/ that sign
 _SignedInfinity = (_Infinity, _NegativeInfinity)
 
+# Constants related to the hash implementation;  hash(x) is based
+# on the reduction of x modulo _PyHASH_MODULUS
+import sys
+_PyHASH_MODULUS = sys.hash_info.modulus
+# hash values to use for positive and negative infinities, and nans
+_PyHASH_INF = sys.hash_info.inf
+_PyHASH_NAN = sys.hash_info.nan
+del sys
+
+# _PyHASH_10INV is the inverse of 10 modulo the prime _PyHASH_MODULUS
+_PyHASH_10INV = pow(10, _PyHASH_MODULUS - 2, _PyHASH_MODULUS)
 
 
 if __name__ == '__main__':

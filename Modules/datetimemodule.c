@@ -30,6 +30,7 @@
 
 #define MINYEAR 1
 #define MAXYEAR 9999
+#define MAXORDINAL 3652059 /* date(9999,12,31).toordinal() */
 
 /* Nine decimal digits is easy to communicate, and leaves enough room
  * so that two delta days can be added w/o fear of overflowing a signed
@@ -149,6 +150,25 @@ round_to_long(double x)
     else
         x = ceil(x - 0.5);
     return (long)x;
+}
+
+/* Nearest integer to m / n for integers m and n. Half-integer results
+ * are rounded to even.
+ */
+static PyObject *
+divide_nearest(PyObject *m, PyObject *n)
+{
+    PyObject *result;
+    PyObject *temp;
+
+    temp = _PyLong_Divmod_Near(m, n);
+    if (temp == NULL)
+        return NULL;
+    result = PyTuple_GET_ITEM(temp, 0);
+    Py_INCREF(result);
+    Py_DECREF(temp);
+
+    return result;
 }
 
 /* ---------------------------------------------------------------------------
@@ -480,7 +500,7 @@ normalize_d_s_us(int *d, int *s, int *us)
  * The input values must be such that the internals don't overflow.
  * The way this routine is used, we don't get close.
  */
-static void
+static int
 normalize_y_m_d(int *y, int *m, int *d)
 {
     int dim;            /* # of days in month */
@@ -534,11 +554,23 @@ normalize_y_m_d(int *y, int *m, int *d)
         else {
             int ordinal = ymd_to_ord(*y, *m, 1) +
                                       *d - 1;
-            ord_to_ymd(ordinal, y, m, d);
+            if (ordinal < 1 || ordinal > MAXORDINAL) {
+                goto error;
+            } else {
+                ord_to_ymd(ordinal, y, m, d);
+                return 0;
+            }
         }
     }
     assert(*m > 0);
     assert(*d > 0);
+    if (MINYEAR <= *y && *y <= MAXYEAR)
+        return 0;
+ error:
+    PyErr_SetString(PyExc_OverflowError,
+            "date value out of range");
+    return -1;
+
 }
 
 /* Fiddle out-of-bounds months and days so that the result makes some kind
@@ -548,17 +580,7 @@ normalize_y_m_d(int *y, int *m, int *d)
 static int
 normalize_date(int *year, int *month, int *day)
 {
-    int result;
-
-    normalize_y_m_d(year, month, day);
-    if (MINYEAR <= *year && *year <= MAXYEAR)
-        result = 0;
-    else {
-        PyErr_SetString(PyExc_OverflowError,
-                        "date value out of range");
-        result = -1;
-    }
-    return result;
+    return normalize_y_m_d(year, month, day);
 }
 
 /* Force all the datetime fields into range.  The parameters are both
@@ -1645,6 +1667,37 @@ multiply_int_timedelta(PyObject *intobj, PyDateTime_Delta *delta)
 }
 
 static PyObject *
+multiply_float_timedelta(PyObject *floatobj, PyDateTime_Delta *delta)
+{
+    PyObject *result = NULL;
+    PyObject *pyus_in = NULL, *temp, *pyus_out;
+    PyObject *ratio = NULL;
+
+    pyus_in = delta_to_microseconds(delta);
+    if (pyus_in == NULL)
+        return NULL;
+    ratio = PyObject_CallMethod(floatobj, "as_integer_ratio", NULL);
+    if (ratio == NULL)
+        goto error;
+    temp = PyNumber_Multiply(pyus_in, PyTuple_GET_ITEM(ratio, 0));
+    Py_DECREF(pyus_in);
+    pyus_in = NULL;
+    if (temp == NULL)
+        goto error;
+    pyus_out = divide_nearest(temp, PyTuple_GET_ITEM(ratio, 1));
+    Py_DECREF(temp);
+    if (pyus_out == NULL)
+        goto error;
+    result = microseconds_to_delta(pyus_out);
+    Py_DECREF(pyus_out);
+ error:
+    Py_XDECREF(pyus_in);
+    Py_XDECREF(ratio);
+
+    return result;
+}
+
+static PyObject *
 divide_timedelta_int(PyDateTime_Delta *delta, PyObject *intobj)
 {
     PyObject *pyus_in;
@@ -1708,6 +1761,55 @@ truedivide_timedelta_timedelta(PyDateTime_Delta *left, PyDateTime_Delta *right)
     result = PyNumber_TrueDivide(pyus_left, pyus_right);
     Py_DECREF(pyus_left);
     Py_DECREF(pyus_right);
+    return result;
+}
+
+static PyObject *
+truedivide_timedelta_float(PyDateTime_Delta *delta, PyObject *f)
+{
+    PyObject *result = NULL;
+    PyObject *pyus_in = NULL, *temp, *pyus_out;
+    PyObject *ratio = NULL;
+
+    pyus_in = delta_to_microseconds(delta);
+    if (pyus_in == NULL)
+        return NULL;
+    ratio = PyObject_CallMethod(f, "as_integer_ratio", NULL);
+    if (ratio == NULL)
+        goto error;
+    temp = PyNumber_Multiply(pyus_in, PyTuple_GET_ITEM(ratio, 1));
+    Py_DECREF(pyus_in);
+    pyus_in = NULL;
+    if (temp == NULL)
+        goto error;
+    pyus_out = divide_nearest(temp, PyTuple_GET_ITEM(ratio, 0));
+    Py_DECREF(temp);
+    if (pyus_out == NULL)
+        goto error;
+    result = microseconds_to_delta(pyus_out);
+    Py_DECREF(pyus_out);
+ error:
+    Py_XDECREF(pyus_in);
+    Py_XDECREF(ratio);
+
+    return result;
+}
+
+static PyObject *
+truedivide_timedelta_int(PyDateTime_Delta *delta, PyObject *i)
+{
+    PyObject *result;
+    PyObject *pyus_in, *pyus_out;
+    pyus_in = delta_to_microseconds(delta);
+    if (pyus_in == NULL)
+        return NULL;
+    pyus_out = divide_nearest(pyus_in, i);
+    Py_DECREF(pyus_in);
+    if (pyus_out == NULL)
+        return NULL;
+    result = microseconds_to_delta(pyus_out);
+    Py_DECREF(pyus_out);
+
     return result;
 }
 
@@ -1835,10 +1937,16 @@ delta_multiply(PyObject *left, PyObject *right)
         if (PyLong_Check(right))
             result = multiply_int_timedelta(right,
                             (PyDateTime_Delta *) left);
+        else if (PyFloat_Check(right))
+            result = multiply_float_timedelta(right,
+                            (PyDateTime_Delta *) left);
     }
     else if (PyLong_Check(left))
         result = multiply_int_timedelta(left,
-                                        (PyDateTime_Delta *) right);
+                        (PyDateTime_Delta *) right);
+    else if (PyFloat_Check(left))
+        result = multiply_float_timedelta(left,
+                        (PyDateTime_Delta *) right);
 
     if (result == Py_NotImplemented)
         Py_INCREF(result);
@@ -1877,6 +1985,12 @@ delta_truedivide(PyObject *left, PyObject *right)
             result = truedivide_timedelta_timedelta(
                             (PyDateTime_Delta *)left,
                             (PyDateTime_Delta *)right);
+        else if (PyFloat_Check(right))
+            result = truedivide_timedelta_float(
+                            (PyDateTime_Delta *)left, right);
+        else if (PyLong_Check(right))
+            result = truedivide_timedelta_int(
+                            (PyDateTime_Delta *)left, right);
     }
 
     if (result == Py_NotImplemented)
@@ -3109,8 +3223,8 @@ static PyMethodDef tzinfo_methods[] = {
      PyDoc_STR("datetime -> string name of time zone.")},
 
     {"utcoffset",       (PyCFunction)tzinfo_utcoffset,          METH_O,
-     PyDoc_STR("datetime -> minutes east of UTC (negative for "
-               "west of UTC).")},
+     PyDoc_STR("datetime -> timedelta showing offset from UTC, negative "
+           "values indicating West of UTC")},
 
     {"dst",             (PyCFunction)tzinfo_dst,                METH_O,
      PyDoc_STR("datetime -> DST offset in minutes east of UTC.")},

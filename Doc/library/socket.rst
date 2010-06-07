@@ -89,8 +89,9 @@ All errors raise exceptions.  The normal exceptions for invalid argument types
 and out-of-memory conditions can be raised; errors related to socket or address
 semantics raise the error :exc:`socket.error`.
 
-Non-blocking mode is supported through :meth:`setblocking`.  A generalization of
-this based on timeouts is supported through :meth:`settimeout`.
+Non-blocking mode is supported through :meth:`~socket.setblocking`.  A
+generalization of this based on timeouts is supported through
+:meth:`~socket.settimeout`.
 
 The module :mod:`socket` exports the following constants and functions:
 
@@ -210,27 +211,44 @@ The module :mod:`socket` exports the following constants and functions:
       *source_address* was added.
 
 
-.. function:: getaddrinfo(host, port[, family[, socktype[, proto[, flags]]]])
+.. function:: getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0)
 
-   Resolves the *host*/*port* argument, into a sequence of 5-tuples that contain
-   all the necessary arguments for creating the corresponding socket. *host* is a domain
-   name, a string representation of an IPv4/v6 address or ``None``. *port* is a string
-   service name such as ``'http'``, a numeric port number or ``None``.
-   The rest of the arguments are optional and must be numeric if specified.
-   By passing ``None`` as the value of *host* and *port*, , you can pass ``NULL`` to the C API.
+   Translate the *host*/*port* argument into a sequence of 5-tuples that contain
+   all the necessary arguments for creating a socket connected to that service.
+   *host* is a domain name, a string representation of an IPv4/v6 address
+   or ``None``. *port* is a string service name such as ``'http'``, a numeric
+   port number or ``None``.  By passing ``None`` as the value of *host*
+   and *port*, you can pass ``NULL`` to the underlying C API.
 
-   The :func:`getaddrinfo` function returns a list of 5-tuples with the following
-   structure:
+   The *family*, *socktype* and *proto* arguments can be optionally specified
+   in order to narrow the list of addresses returned.  Passing zero as a
+   value for each of these arguments selects the full range of results.
+   The *flags* argument can be one or several of the ``AI_*`` constants,
+   and will influence how results are computed and returned.
+   For example, :const:`AI_NUMERICHOST` will disable domain name resolution
+   and will raise an error if *host* is a domain name.
+
+   The function returns a list of 5-tuples with the following structure:
 
    ``(family, socktype, proto, canonname, sockaddr)``
 
-   *family*, *socktype*, *proto* are all integers and are meant to be passed to the
-   :func:`socket` function. *canonname* is a string representing the canonical name
-   of the *host*. It can be a numeric IPv4/v6 address when :const:`AI_CANONNAME` is
-   specified for a numeric *host*. *sockaddr* is a tuple describing a socket
-   address, as described above. See the source for :mod:`socket` and other
-   library modules for a typical usage of the function.
+   In these tuples, *family*, *socktype*, *proto* are all integers and are
+   meant to be passed to the :func:`socket` function.  *canonname* will be
+   a string representing the canonical name of the *host* if
+   :const:`AI_CANONNAME` is part of the *flags* argument; else *canonname*
+   will be empty.  *sockaddr* is a tuple describing a socket address, whose
+   format depends on the returned *family* (a ``(address, port)`` 2-tuple for
+   :const:`AF_INET`, a ``(address, port, flow info, scope id)`` 4-tuple for
+   :const:`AF_INET6`), and is meant to be passed to the :meth:`socket.connect`
+   method.
 
+   The following example fetches address information for a hypothetical TCP
+   connection to ``www.python.org`` on port 80 (results may differ on your
+   system if IPv6 isn't enabled)::
+
+      >>> socket.getaddrinfo("www.python.org", 80, 0, 0, socket.SOL_TCP)
+      [(2, 1, 6, '', ('82.94.164.162', 80)),
+       (10, 1, 6, '', ('2001:888:2000:d::a2', 80, 0, 0))]
 
 .. function:: getfqdn([name])
 
@@ -559,7 +577,9 @@ correspond to Unix system calls applicable to sockets.
    :platform: Windows
 
    The :meth:`ioctl` method is a limited interface to the WSAIoctl system
-   interface. Please refer to the MSDN documentation for more information.
+   interface.  Please refer to the `Win32 documentation
+   <http://msdn.microsoft.com/en-us/library/ms741621%28VS.85%29.aspx>`_ for more
+   information.
 
    On other platforms, the generic :func:`fcntl.fcntl` and :func:`fcntl.ioctl`
    functions may be used; they accept a socket object as their first argument.
@@ -662,7 +682,7 @@ correspond to Unix system calls applicable to sockets.
    blocking mode.  In non-blocking mode, if a :meth:`recv` call doesn't find any
    data, or if a :meth:`send` call can't immediately dispose of the data, a
    :exc:`error` exception is raised; in blocking mode, the calls block until they
-   can proceed. ``s.setblocking(0)`` is equivalent to ``s.settimeout(0)``;
+   can proceed. ``s.setblocking(0)`` is equivalent to ``s.settimeout(0.0)``;
    ``s.setblocking(1)`` is equivalent to ``s.settimeout(None)``.
 
 
@@ -691,21 +711,21 @@ the system returns an error (such as connection timed out).  In
 non-blocking mode, operations fail (with an error that is unfortunately
 system-dependent) if they cannot be completed immediately.  In timeout mode,
 operations fail if they cannot be completed within the timeout specified for the
-socket or if the system returns an error.  The :meth:`setblocking` method is simply
-a shorthand for certain :meth:`settimeout` calls.
+socket or if the system returns an error.  The :meth:`~socket.setblocking`
+method is simply a shorthand for certain :meth:`~socket.settimeout` calls.
 
 Timeout mode internally sets the socket in non-blocking mode.  The blocking and
 timeout modes are shared between file descriptors and socket objects that refer
 to the same network endpoint.  A consequence of this is that file objects
-returned by the :meth:`makefile` method must only be used when the socket is in
-blocking mode; in timeout or non-blocking mode file operations that cannot be
-completed immediately will fail.
+returned by the :meth:`~socket.makefile` method must only be used when the
+socket is in blocking mode; in timeout or non-blocking mode file operations
+that cannot be completed immediately will fail.
 
-Note that the :meth:`connect` operation is subject to the timeout setting, and
-in general it is recommended to call :meth:`settimeout` before calling
-:meth:`connect` or pass a timeout parameter to :meth:`create_connection`.
-The system network stack may return a connection timeout error
-of its own regardless of any Python socket timeout setting.
+Note that the :meth:`~socket.connect` operation is subject to the timeout
+setting, and in general it is recommended to call :meth:`~socket.settimeout`
+before calling :meth:`~socket.connect` or pass a timeout parameter to
+:meth:`create_connection`.  The system network stack may return a connection
+timeout error of its own regardless of any Python socket timeout setting.
 
 
 .. method:: socket.setsockopt(level, optname, value)
@@ -727,8 +747,8 @@ of its own regardless of any Python socket timeout setting.
    are disallowed.  If *how* is :const:`SHUT_RDWR`, further sends and receives are
    disallowed.
 
-Note that there are no methods :meth:`read` or :meth:`write`; use :meth:`recv`
-and :meth:`send` without *flags* argument instead.
+Note that there are no methods :meth:`read` or :meth:`write`; use
+:meth:`~socket.recv` and :meth:`~socket.send` without *flags* argument instead.
 
 Socket objects also have these (read-only) attributes that correspond to the
 values given to the :class:`socket` constructor.
@@ -757,11 +777,12 @@ Example
 Here are four minimal example programs using the TCP/IP protocol: a server that
 echoes all data that it receives back (servicing only one client), and a client
 using it.  Note that a server must perform the sequence :func:`socket`,
-:meth:`bind`, :meth:`listen`, :meth:`accept` (possibly repeating the
-:meth:`accept` to service more than one client), while a client only needs the
-sequence :func:`socket`, :meth:`connect`.  Also note that the server does not
-:meth:`send`/:meth:`recv` on the  socket it is listening on but on the new
-socket returned by :meth:`accept`.
+:meth:`~socket.bind`, :meth:`~socket.listen`, :meth:`~socket.accept` (possibly
+repeating the :meth:`~socket.accept` to service more than one client), while a
+client only needs the sequence :func:`socket`, :meth:`~socket.connect`.  Also
+note that the server does not :meth:`~socket.send`/:meth:`~socket.recv` on the
+socket it is listening on but on the new socket returned by
+:meth:`~socket.accept`.
 
 The first two examples support IPv4 only. ::
 

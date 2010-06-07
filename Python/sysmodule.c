@@ -570,6 +570,57 @@ sys_setrecursionlimit(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+static PyTypeObject Hash_InfoType;
+
+PyDoc_STRVAR(hash_info_doc,
+"hash_info\n\
+\n\
+A struct sequence providing parameters used for computing\n\
+numeric hashes.  The attributes are read only.");
+
+static PyStructSequence_Field hash_info_fields[] = {
+    {"width", "width of the type used for hashing, in bits"},
+    {"modulus", "prime number giving the modulus on which the hash "
+                "function is based"},
+    {"inf", "value to be used for hash of a positive infinity"},
+    {"nan", "value to be used for hash of a nan"},
+    {"imag", "multiplier used for the imaginary part of a complex number"},
+    {NULL, NULL}
+};
+
+static PyStructSequence_Desc hash_info_desc = {
+    "sys.hash_info",
+    hash_info_doc,
+    hash_info_fields,
+    5,
+};
+
+PyObject *
+get_hash_info(void)
+{
+    PyObject *hash_info;
+    int field = 0;
+    hash_info = PyStructSequence_New(&Hash_InfoType);
+    if (hash_info == NULL)
+        return NULL;
+    PyStructSequence_SET_ITEM(hash_info, field++,
+                              PyLong_FromLong(8*sizeof(long)));
+    PyStructSequence_SET_ITEM(hash_info, field++,
+                              PyLong_FromLong(_PyHASH_MODULUS));
+    PyStructSequence_SET_ITEM(hash_info, field++,
+                              PyLong_FromLong(_PyHASH_INF));
+    PyStructSequence_SET_ITEM(hash_info, field++,
+                              PyLong_FromLong(_PyHASH_NAN));
+    PyStructSequence_SET_ITEM(hash_info, field++,
+                              PyLong_FromLong(_PyHASH_IMAG));
+    if (PyErr_Occurred()) {
+        Py_CLEAR(hash_info);
+        return NULL;
+    }
+    return hash_info;
+}
+
+
 PyDoc_STRVAR(setrecursionlimit_doc,
 "setrecursionlimit(n)\n\
 \n\
@@ -1048,21 +1099,26 @@ PySys_ResetWarnOptions(void)
 }
 
 void
-PySys_AddWarnOption(const wchar_t *s)
+PySys_AddWarnOptionUnicode(PyObject *unicode)
 {
-    PyObject *str;
-
     if (warnoptions == NULL || !PyList_Check(warnoptions)) {
         Py_XDECREF(warnoptions);
         warnoptions = PyList_New(0);
         if (warnoptions == NULL)
             return;
     }
-    str = PyUnicode_FromWideChar(s, -1);
-    if (str != NULL) {
-        PyList_Append(warnoptions, str);
-        Py_DECREF(str);
-    }
+    PyList_Append(warnoptions, unicode);
+}
+
+void
+PySys_AddWarnOption(const wchar_t *s)
+{
+    PyObject *unicode;
+    unicode = PyUnicode_FromWideChar(s, -1);
+    if (unicode == NULL)
+        return;
+    PySys_AddWarnOptionUnicode(unicode);
+    Py_DECREF(unicode);
 }
 
 int
@@ -1477,6 +1533,11 @@ _PySys_Init(void)
                         PyFloat_GetInfo());
     SET_SYS_FROM_STRING("int_info",
                         PyLong_GetInfo());
+    /* initialize hash_info */
+    if (Hash_InfoType.tp_name == 0)
+        PyStructSequence_InitType(&Hash_InfoType, &hash_info_desc);
+    SET_SYS_FROM_STRING("hash_info",
+                        get_hash_info());
     SET_SYS_FROM_STRING("maxunicode",
                         PyLong_FromLong(PyUnicode_GetMax()));
     SET_SYS_FROM_STRING("builtin_module_names",
@@ -1663,7 +1724,7 @@ _wrealpath(const wchar_t *path, wchar_t *resolved_path)
 #endif
 
 void
-PySys_SetArgv(int argc, wchar_t **argv)
+PySys_SetArgvEx(int argc, wchar_t **argv, int updatepath)
 {
 #if defined(HAVE_REALPATH)
     wchar_t fullpath[MAXPATHLEN];
@@ -1676,7 +1737,7 @@ PySys_SetArgv(int argc, wchar_t **argv)
         Py_FatalError("no mem for sys.argv");
     if (PySys_SetObject("argv", av) != 0)
         Py_FatalError("can't assign sys.argv");
-    if (path != NULL) {
+    if (updatepath && path != NULL) {
         wchar_t *argv0 = argv[0];
         wchar_t *p = NULL;
         Py_ssize_t n = 0;
@@ -1761,6 +1822,12 @@ PySys_SetArgv(int argc, wchar_t **argv)
         Py_DECREF(a);
     }
     Py_DECREF(av);
+}
+
+void
+PySys_SetArgv(int argc, wchar_t **argv)
+{
+    PySys_SetArgvEx(argc, argv, 1);
 }
 
 /* Reimplementation of PyFile_WriteString() no calling indirectly

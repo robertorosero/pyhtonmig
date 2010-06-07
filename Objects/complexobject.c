@@ -403,12 +403,12 @@ complex_str(PyComplexObject *v)
 static long
 complex_hash(PyComplexObject *v)
 {
-    long hashreal, hashimag, combined;
-    hashreal = _Py_HashDouble(v->cval.real);
-    if (hashreal == -1)
+    unsigned long hashreal, hashimag, combined;
+    hashreal = (unsigned long)_Py_HashDouble(v->cval.real);
+    if (hashreal == (unsigned long)-1)
         return -1;
-    hashimag = _Py_HashDouble(v->cval.imag);
-    if (hashimag == -1)
+    hashimag = (unsigned long)_Py_HashDouble(v->cval.imag);
+    if (hashimag == (unsigned long)-1)
         return -1;
     /* Note:  if the imaginary part is 0, hashimag is 0 now,
      * so the following returns hashreal unchanged.  This is
@@ -416,10 +416,10 @@ complex_hash(PyComplexObject *v)
      * compare equal must have the same hash value, so that
      * hash(x + 0*j) must equal hash(x).
      */
-    combined = hashreal + 1000003 * hashimag;
-    if (combined == -1)
-        combined = -2;
-    return combined;
+    combined = hashreal + _PyHASH_IMAG * hashimag;
+    if (combined == (unsigned long)-1)
+        combined = (unsigned long)-2;
+    return (long)combined;
 }
 
 /* This macro may return! */
@@ -620,22 +620,58 @@ static PyObject *
 complex_richcompare(PyObject *v, PyObject *w, int op)
 {
     PyObject *res;
-    Py_complex i, j;
-    TO_COMPLEX(v, i);
-    TO_COMPLEX(w, j);
+    Py_complex i;
+    int equal;
 
     if (op != Py_EQ && op != Py_NE) {
-        Py_INCREF(Py_NotImplemented);
-        return Py_NotImplemented;
+        goto Unimplemented;
     }
 
-    if ((i.real == j.real && i.imag == j.imag) == (op == Py_EQ))
-        res = Py_True;
+    assert(PyComplex_Check(v));
+    TO_COMPLEX(v, i);
+
+    if (PyLong_Check(w)) {
+        /* Check for 0.0 imaginary part first to avoid the rich
+         * comparison when possible.
+         */
+        if (i.imag == 0.0) {
+            PyObject *j, *sub_res;
+            j = PyFloat_FromDouble(i.real);
+            if (j == NULL)
+                return NULL;
+
+            sub_res = PyObject_RichCompare(j, w, op);
+            Py_DECREF(j);
+            return sub_res;
+        }
+        else {
+            equal = 0;
+        }
+    }
+    else if (PyFloat_Check(w)) {
+        equal = (i.real == PyFloat_AsDouble(w) && i.imag == 0.0);
+    }
+    else if (PyComplex_Check(w)) {
+        Py_complex j;
+
+        TO_COMPLEX(w, j);
+        equal = (i.real == j.real && i.imag == j.imag);
+    }
+    else {
+        goto Unimplemented;
+    }
+
+    if (equal == (op == Py_EQ))
+         res = Py_True;
     else
-        res = Py_False;
+         res = Py_False;
 
     Py_INCREF(res);
     return res;
+
+Unimplemented:
+    Py_INCREF(Py_NotImplemented);
+    return Py_NotImplemented;
 }
 
 static PyObject *

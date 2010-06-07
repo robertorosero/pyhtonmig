@@ -198,6 +198,18 @@ class TestReversed(unittest.TestCase):
                 self.fail("non-callable __reversed__ didn't raise!")
         self.assertEqual(rc, sys.getrefcount(r))
 
+    def test_objmethods(self):
+        # Objects must have __len__() and __getitem__() implemented.
+        class NoLen(object):
+            def __getitem__(self): return 1
+        nl = NoLen()
+        self.assertRaises(TypeError, reversed, nl)
+
+        class NoGetItem(object):
+            def __len__(self): return 2
+        ngi = NoGetItem()
+        self.assertRaises(TypeError, reversed, ngi)
+
 
 class EnumerateStartTestCase(EnumerateTestCase):
 
@@ -227,7 +239,7 @@ def test_main(verbose=None):
     if verbose and hasattr(sys, "gettotalrefcount"):
         counts = [None] * 5
         for i in range(len(counts)):
-            support.run_unittest(*testclasses)
+            support.run_unittest(__name__)
             counts[i] = sys.gettotalrefcount()
         print(counts)
 

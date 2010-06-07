@@ -1594,6 +1594,62 @@ class SurrogateEscapeTest(unittest.TestCase):
                          b"\xe4\xeb\xef\xf6\xfc")
 
 
+class BomTest(unittest.TestCase):
+    def test_seek0(self):
+        data = "1234567890"
+        tests = ("utf-16",
+                 "utf-16-le",
+                 "utf-16-be",
+                 "utf-32",
+                 "utf-32-le",
+                 "utf-32-be")
+        for encoding in tests:
+            # Check if the BOM is written only once
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # Check that the BOM is written after a seek(0)
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data[0])
+                self.assertNotEquals(f.tell(), 0)
+                f.seek(0)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # (StreamWriter) Check that the BOM is written after a seek(0)
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data[0])
+                self.assertNotEquals(f.writer.tell(), 0)
+                f.writer.seek(0)
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # Check that the BOM is not written after a seek() at a position
+            # different than the start
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.seek(f.tell())
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # (StreamWriter) Check that the BOM is not written after a seek()
+            # at a position different than the start
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data)
+                f.writer.seek(f.writer.tell())
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+
 def test_main():
     support.run_unittest(
         UTF32Test,
@@ -1621,6 +1677,7 @@ def test_main():
         WithStmtTest,
         TypesTest,
         SurrogateEscapeTest,
+        BomTest,
     )
 
 

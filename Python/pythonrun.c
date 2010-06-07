@@ -265,13 +265,15 @@ Py_InitializeEx(int install_sigs)
 
     _PyImportHooks_Init();
 
+    /* Initialize _warnings. */
+    _PyWarnings_Init();
+
     initfsencoding();
 
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
     /* Initialize warnings. */
-    _PyWarnings_Init();
     if (PySys_HasWarnOptions()) {
         PyObject *warnings_module = PyImport_ImportModule("warnings");
         if (!warnings_module)
@@ -1384,10 +1386,12 @@ handle_system_exit(void)
         exitcode = (int)PyLong_AsLong(value);
     else {
         PyObject *sys_stderr = PySys_GetObject("stderr");
-        if (sys_stderr != NULL)
-            PyObject_CallMethod(sys_stderr, "flush", NULL);
-        PyObject_Print(value, stderr, Py_PRINT_RAW);
-        fflush(stderr);
+        if (sys_stderr != NULL && sys_stderr != Py_None) {
+            PyFile_WriteObject(value, sys_stderr, Py_PRINT_RAW);
+        } else {
+            PyObject_Print(value, stderr, Py_PRINT_RAW);
+            fflush(stderr);
+        }
         PySys_WriteStderr("\n");
         exitcode = 1;
     }

@@ -5,6 +5,10 @@ import sys
 import os
 from os.path import pardir, realpath
 
+__all__ = ['parse_config_h', 'get_config_h_filename', 'get_scheme_names',
+           'get_path_names', 'get_paths', 'get_path', 'get_config_vars',
+           'get_config_var', 'get_platform', 'get_python_version']
+
 _INSTALL_SCHEMES = {
     'posix_prefix': {
         'stdlib': '{base}/lib/python{py_version_short}',
@@ -47,10 +51,10 @@ _INSTALL_SCHEMES = {
         'data'   : '{base}',
         },
     'os2_home': {
-        'stdlib': '{userbase}/lib/python/{py_version_short}',
-        'platstdlib': '{userbase}/lib/python/{py_version_short}',
-        'purelib': '{userbase}/lib/python/{py_version_short}/site-packages',
-        'platlib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'stdlib': '{userbase}/lib/python{py_version_short}',
+        'platstdlib': '{userbase}/lib/python{py_version_short}',
+        'purelib': '{userbase}/lib/python{py_version_short}/site-packages',
+        'platlib': '{userbase}/lib/python{py_version_short}/site-packages',
         'include': '{userbase}/include/python{py_version_short}',
         'scripts': '{userbase}/bin',
         'data'   : '{userbase}',
@@ -65,10 +69,10 @@ _INSTALL_SCHEMES = {
         'data'   : '{userbase}',
         },
     'posix_user': {
-        'stdlib': '{userbase}/lib/python/{py_version_short}',
-        'platstdlib': '{userbase}/lib/python/{py_version_short}',
-        'purelib': '{userbase}/lib/python/{py_version_short}/site-packages',
-        'platlib': '{userbase}/lib/python/{py_version_short}/site-packages',
+        'stdlib': '{userbase}/lib/python{py_version_short}',
+        'platstdlib': '{userbase}/lib/python{py_version_short}',
+        'purelib': '{userbase}/lib/python{py_version_short}/site-packages',
+        'platlib': '{userbase}/lib/python{py_version_short}/site-packages',
         'include': '{userbase}/include/python{py_version_short}',
         'scripts': '{userbase}/bin',
         'data'   : '{userbase}',
@@ -686,3 +690,22 @@ def get_platform():
 
 def get_python_version():
     return _PY_VERSION_SHORT
+
+def _print_dict(title, data):
+    for index, (key, value) in enumerate(sorted(data.items())):
+        if index == 0:
+            print('{0}: '.format(title))
+        print('\t{0} = "{1}"'.format(key, value))
+
+def _main():
+    """Displays all information sysconfig detains."""
+    print('Platform: "{0}"'.format(get_platform()))
+    print('Python version: "{0}"'.format(get_python_version()))
+    print('Current installation scheme: "{0}"'.format(_get_default_scheme()))
+    print('')
+    _print_dict('Paths', get_paths())
+    print('')
+    _print_dict('Variables', get_config_vars())
+
+if __name__ == '__main__':
+    _main()

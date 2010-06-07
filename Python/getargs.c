@@ -1029,18 +1029,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
             else
                 return converterr("string or None",
                                   arg, msgbuf, bufsize);
-            if (*format == '#') {
-                FETCH_SIZE;
-                assert(0); /* XXX redundant with if-case */
-                if (arg == Py_None) {
-                    STORE_SIZE(0);
-                }
-                else {
-                    STORE_SIZE(PyBytes_Size(arg));
-                }
-                format++;
-            }
-            else if (*p != NULL && uarg != NULL &&
+            if (*p != NULL && uarg != NULL &&
                 (Py_ssize_t) strlen(*p) != PyBytes_GET_SIZE(uarg))
                 return converterr(
                     "string without null bytes or None",
@@ -1183,6 +1172,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
                 *buffer = PyMem_NEW(char, size + 1);
                 if (*buffer == NULL) {
                     Py_DECREF(s);
+                    PyErr_NoMemory();
                     return converterr(
                         "(memory error)",
                         arg, msgbuf, bufsize);
@@ -1226,6 +1216,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
             *buffer = PyMem_NEW(char, size + 1);
             if (*buffer == NULL) {
                 Py_DECREF(s);
+                PyErr_NoMemory();
                 return converterr("(memory error)",
                                   arg, msgbuf, bufsize);
             }
@@ -1291,17 +1282,6 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
                 *p = arg;
             else
                 return converterr(type->tp_name, arg, msgbuf, bufsize);
-
-        }
-        else if (*format == '?') {
-            inquiry pred = va_arg(*p_va, inquiry);
-            p = va_arg(*p_va, PyObject **);
-            format++;
-            if ((*pred)(arg))
-                *p = arg;
-            else
-                return converterr("(unspecified)",
-                                  arg, msgbuf, bufsize);
 
         }
         else if (*format == '&') {
@@ -1432,7 +1412,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 static Py_ssize_t
 convertbuffer(PyObject *arg, void **p, char **errmsg)
 {
-    PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
+    PyBufferProcs *pb = Py_TYPE(arg)->tp_as_buffer;
     Py_ssize_t count;
     Py_buffer view;
 
@@ -1460,31 +1440,23 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 static int
 getbuffer(PyObject *arg, Py_buffer *view, char **errmsg)
 {
-    void *buf;
-    Py_ssize_t count;
-    PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
+    PyBufferProcs *pb = Py_TYPE(arg)->tp_as_buffer;
     if (pb == NULL) {
         *errmsg = "bytes or buffer";
         return -1;
     }
-    if (pb->bf_getbuffer) {
-        if (PyObject_GetBuffer(arg, view, 0) < 0) {
-            *errmsg = "convertible to a buffer";
-            return -1;
-        }
-        if (!PyBuffer_IsContiguous(view, 'C')) {
-            *errmsg = "contiguous buffer";
-            return -1;
-        }
-        return 0;
-    }
-
-    count = convertbuffer(arg, &buf, errmsg);
-    if (count < 0) {
+    if (pb->bf_getbuffer == NULL) {
         *errmsg = "convertible to a buffer";
-        return count;
+        return -1;
     }
-    PyBuffer_FillInfo(view, NULL, buf, count, 1, 0);
+    if (PyObject_GetBuffer(arg, view, 0) < 0) {
+        *errmsg = "convertible to a buffer";
+        return -1;
+    }
+    if (!PyBuffer_IsContiguous(view, 'C')) {
+        *errmsg = "contiguous buffer";
+        return -1;
+    }
     return 0;
 }
 
