@@ -1362,17 +1362,11 @@ def thfunc2(cls):
         cls.assertFalse(thiscontext.flags[sig])
     return
 
+@unittest.skipUnless(threading, 'threading required')
 class DecimalUseOfContextTest(unittest.TestCase):
-    '''Unit tests for Use of Context cases in Decimal.'''
-
-    try:
-        import threading
-    except ImportError:
-        self.skipTest("importing threading failed")
 
     # Take care executing this test from IDLE, there's an issue in threading
     # that hangs IDLE and I couldn't find it
-
     def test_threading(self):
         if HAVE_CDECIMAL and not HAVE_THREADS:
             self.skipTest("compiled without threading")
@@ -1507,8 +1501,7 @@ class DecimalUsabilityTest(unittest.TestCase):
                 ])
 
         if HAVE_CDECIMAL:
-            self.skipTest("new hashing scheme and float comparisons not "
-                          "implemented yet")
+            self.skipTest("new hashing scheme: not yet implemented")
         # check that hash(d) == hash(int(d)) for integral values
         for value in test_values:
             self.assertEqual(hash(value), hash(int(value)))
