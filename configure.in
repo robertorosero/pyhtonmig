@@ -3266,8 +3266,7 @@ fi],
 
 AC_MSG_CHECKING(for x64 gcc inline assembler)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
-  unsigned long long b;
-  __asm__ __volatile__ ("mulq %0" : : "m" (b));
+  __asm__ __volatile__ ("movq %rcx, %rax");
 ]])],[have_gcc_asm_for_x64=yes],[have_gcc_asm_for_x64=no])
 AC_MSG_RESULT($have_gcc_asm_for_x64)
 if test "$have_gcc_asm_for_x64" = yes
