@@ -2585,6 +2585,13 @@ class ContextFlags(unittest.TestCase):
 
 class SpecialContexts(unittest.TestCase):
     def test_context_templates(self):
+        if HAVE_CDECIMAL:
+            self.assertEqual(
+                BasicContext._traps,
+                DecIEEEInvalidOperation|DecDivisionByZero|DecOverflow|
+                DecUnderflow|DecClamped
+            )
+
         basic_context_prec = BasicContext.prec
         extended_context_prec = ExtendedContext.prec
 
@@ -2600,6 +2607,12 @@ class SpecialContexts(unittest.TestCase):
         ExtendedContext.prec = extended_context_prec
 
     def test_default_context(self):
+        if HAVE_CDECIMAL:
+            self.assertEqual(
+                DefaultContext._traps,
+                DecIEEEInvalidOperation|DecDivisionByZero|DecOverflow
+            )
+
         default_context_prec = DefaultContext.prec
 
         c = getcontext()
