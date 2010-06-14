@@ -1143,16 +1143,19 @@ getentry(int c, const formatdef *f)
 }
 
 
-/* Align a size according to a format code */
+/* Align a size according to a format code.  Return -1 on overflow. */
 
-static int
+static Py_ssize_t
 align(Py_ssize_t size, char c, const formatdef *e)
 {
+    Py_ssize_t extra;
+
     if (e->format == c) {
-        if (e->alignment) {
-            size = ((size + e->alignment - 1)
-                / e->alignment)
-                * e->alignment;
+        if (e->alignment && size > 0) {
+            extra = (e->alignment - 1) - (size - 1) % (e->alignment);
+            if (extra > PY_SSIZE_T_MAX - size)
+                return -1;
+            size += extra;
         }
     }
     return size;
@@ -1171,7 +1174,7 @@ prepare_s(PyStructObject *self)
     const char *s;
     const char *fmt;
     char c;
-    Py_ssize_t size, len, num, itemsize, x;
+    Py_ssize_t size, len, num, itemsize;
 
     fmt = PyBytes_AS_STRING(self->s_format);
 
@@ -1186,17 +1189,19 @@ prepare_s(PyStructObject *self)
         if ('0' <= c && c <= '9') {
             num = c - '0';
             while ('0' <= (c = *s++) && c <= '9') {
-                x = num*10 + (c - '0');
-                if (x/10 != num) {
-                    PyErr_SetString(
-                        StructError,
-                        "overflow in item count");
-                    return -1;
-                }
-                num = x;
+                /* overflow-safe version of
+                   if (num*10 + (c - '0') > PY_SSIZE_T_MAX) { ... } */
+                if (num >= PY_SSIZE_T_MAX / 10 && (
+                        num > PY_SSIZE_T_MAX / 10 ||
+                        (c - '0') > PY_SSIZE_T_MAX % 10))
+                    goto overflow;
+                num = num*10 + (c - '0');
             }
-            if (c == '\0')
-                break;
+            if (c == '\0') {
+                PyErr_SetString(StructError,
+                                "repeat count given without format specifier");
+                return -1;
+            }
         }
         else
             num = 1;
@@ -1214,13 +1219,13 @@ prepare_s(PyStructObject *self)
 
         itemsize = e->size;
         size = align(size, c, e);
-        x = num * itemsize;
-        size += x;
-        if (x/itemsize != num || size < 0) {
-            PyErr_SetString(StructError,
-                            "total struct size too long");
-            return -1;
-        }
+        if (size == -1)
+            goto overflow;
+
+        /* if (size + num * itemsize > PY_SSIZE_T_MAX) { ... } */
+        if (num > (PY_SSIZE_T_MAX - size) / itemsize)
+            goto overflow;
+        size += num * itemsize;
     }
 
     /* check for overflow */
@@ -1279,6 +1284,11 @@ prepare_s(PyStructObject *self)
     codes->size = 0;
 
     return 0;
+
+  overflow:
+    PyErr_SetString(StructError,
+                    "total struct size too long");
+    return -1;
 }
 
 static PyObject *
@@ -1388,9 +1398,9 @@ fail:
 PyDoc_STRVAR(s_unpack__doc__,
 "S.unpack(buffer) -> (v1, v2, ...)\n\
 \n\
-Return tuple containing values unpacked according to this Struct's format.\n\
-Requires len(buffer) == self.size. See struct.__doc__ for more on format\n\
-strings.");
+Return a tuple containing values unpacked according to the format\n\
+string S.format.  Requires len(buffer) == S.size.  See help(struct)\n\
+for more on format strings.");
 
 static PyObject *
 s_unpack(PyObject *self, PyObject *input)
@@ -1416,12 +1426,11 @@ s_unpack(PyObject *self, PyObject *input)
 }
 
 PyDoc_STRVAR(s_unpack_from__doc__,
-"S.unpack_from(buffer[, offset]) -> (v1, v2, ...)\n\
+"S.unpack_from(buffer, offset=0) -> (v1, v2, ...)\n\
 \n\
-Return tuple containing values unpacked according to this Struct's format.\n\
-Unlike unpack, unpack_from can unpack values from any object supporting\n\
-the buffer API, not just str. Requires len(buffer[offset:]) >= self.size.\n\
-See struct.__doc__ for more on format strings.");
+Return a tuple containing values unpacked according to the format\n\
+string S.format.  Requires len(buffer[offset:]) >= S.size.  See\n\
+help(struct) for more on format strings.");
 
 static PyObject *
 s_unpack_from(PyObject *self, PyObject *args, PyObject *kwds)
@@ -1556,8 +1565,9 @@ s_pack_internal(PyStructObject *soself, PyObject *args, int offset, char* buf)
 PyDoc_STRVAR(s_pack__doc__,
 "S.pack(v1, v2, ...) -> bytes\n\
 \n\
-Return a bytes containing values v1, v2, ... packed according to this\n\
-Struct's format. See struct.__doc__ for more on format strings.");
+Return a bytes object containing values v1, v2, ... packed according\n\
+to the format string S.format.  See help(struct) for more on format\n\
+strings.");
 
 static PyObject *
 s_pack(PyObject *self, PyObject *args)
@@ -1593,10 +1603,10 @@ s_pack(PyObject *self, PyObject *args)
 PyDoc_STRVAR(s_pack_into__doc__,
 "S.pack_into(buffer, offset, v1, v2, ...)\n\
 \n\
-Pack the values v1, v2, ... according to this Struct's format, write \n\
-the packed bytes into the writable buffer buf starting at offset.  Note\n\
-that the offset is not an optional argument.  See struct.__doc__ for \n\
-more on format strings.");
+Pack the values v1, v2, ... according to the format string S.format\n\
+and write the packed bytes into the writable buffer buf starting at\n\
+offset.  Note that the offset is a required argument.  See\n\
+help(struct) for more on format strings.");
 
 static PyObject *
 s_pack_into(PyObject *self, PyObject *args)
@@ -1673,7 +1683,11 @@ static struct PyMethodDef s_methods[] = {
     {NULL,       NULL}          /* sentinel */
 };
 
-PyDoc_STRVAR(s__doc__, "Compiled struct object");
+PyDoc_STRVAR(s__doc__, 
+"Struct(fmt) --> compiled struct object\n"
+"\n"
+"Return a new Struct object which writes and reads binary data according to\n"
+"the format string fmt.  See help(struct) for more on format strings.");
 
 #define OFF(x) offsetof(PyStructObject, x)
 
@@ -1771,7 +1785,9 @@ clearcache(PyObject *self)
 }
 
 PyDoc_STRVAR(calcsize_doc,
-"Return size of C struct described by format string fmt.");
+"calcsize(fmt) -> integer\n\
+\n\
+Return size in bytes of the struct described by the format string fmt.");
 
 static PyObject *
 calcsize(PyObject *self, PyObject *fmt)
@@ -1786,7 +1802,10 @@ calcsize(PyObject *self, PyObject *fmt)
 }
 
 PyDoc_STRVAR(pack_doc,
-"Return bytes containing values v1, v2, ... packed according to fmt.");
+"pack(fmt, v1, v2, ...) -> bytes\n\
+\n\
+Return a bytes object containing the values v1, v2, ... packed according\n\
+to the format string fmt.  See help(struct) for more on format strings.");
 
 static PyObject *
 pack(PyObject *self, PyObject *args)
@@ -1815,8 +1834,12 @@ pack(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(pack_into_doc,
-"Pack the values v1, v2, ... according to fmt.\n\
-Write the packed bytes into the writable buffer buf starting at offset.");
+"pack_into(fmt, buffer, offset, v1, v2, ...)\n\
+\n\
+Pack the values v1, v2, ... according to the format string fmt and write\n\
+the packed bytes into the writable buffer buf starting at offset.  Note\n\
+that the offset is a required argument.  See help(struct) for more\n\
+on format strings.");
 
 static PyObject *
 pack_into(PyObject *self, PyObject *args)
@@ -1845,8 +1868,11 @@ pack_into(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(unpack_doc,
-"Unpack the bytes containing packed C structure data, according to fmt.\n\
-Requires len(bytes) == calcsize(fmt).");
+"unpack(fmt, buffer) -> (v1, v2, ...)\n\
+\n\
+Return a tuple containing values unpacked according to the format string\n\
+fmt.  Requires len(buffer) == calcsize(fmt). See help(struct) for more\n\
+on format strings.");
 
 static PyObject *
 unpack(PyObject *self, PyObject *args)
@@ -1865,8 +1891,11 @@ unpack(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(unpack_from_doc,
-"Unpack the buffer, containing packed C structure data, according to\n\
-fmt, starting at offset. Requires len(buffer[offset:]) >= calcsize(fmt).");
+"unpack_from(fmt, buffer, offset=0) -> (v1, v2, ...)\n\
+\n\
+Return a tuple containing values unpacked according to the format string\n\
+fmt.  Requires len(buffer[offset:]) >= calcsize(fmt).  See help(struct)\n\
+for more on format strings.");
 
 static PyObject *
 unpack_from(PyObject *self, PyObject *args, PyObject *kwds)
@@ -1953,11 +1982,7 @@ static struct PyModuleDef _structmodule = {
 PyMODINIT_FUNC
 PyInit__struct(void)
 {
-    PyObject *ver, *m;
-
-    ver = PyBytes_FromString("0.3");
-    if (ver == NULL)
-        return NULL;
+    PyObject *m;
 
     m = PyModule_Create(&_structmodule);
     if (m == NULL)
@@ -2018,8 +2043,6 @@ PyInit__struct(void)
 
     Py_INCREF((PyObject*)&PyStructType);
     PyModule_AddObject(m, "Struct", (PyObject*)&PyStructType);
-
-    PyModule_AddObject(m, "__version__", ver);
 
     return m;
 }

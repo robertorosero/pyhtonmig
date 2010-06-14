@@ -72,7 +72,6 @@ class ReadTest(unittest.TestCase, MixInCheckStateHandling):
         # check that there's nothing left in the buffers
         self.assertEqual(r.read(), "")
         self.assertEqual(r.bytebuffer, b"")
-        self.assertEqual(r.charbuffer, "")
 
         # do the check again, this time using a incremental decoder
         d = codecs.getincrementaldecoder(self.encoding)()
@@ -354,6 +353,16 @@ class UTF32Test(ReadTest):
         self.check_state_handling_decode(self.encoding,
                                          "spamspam", self.spambe)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded_le = b'\xff\xfe\x00\x00' + b'\x00\x00\x01\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_le)[0])
+        encoded_be = b'\x00\x00\xfe\xff' + b'\x00\x01\x00\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_be)[0])
+
 class UTF32LETest(ReadTest):
     encoding = "utf-32-le"
 
@@ -387,6 +396,13 @@ class UTF32LETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_le_decode,
                           b"\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = b'\x00\x00\x01\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_le_decode(encoded)[0])
+
 class UTF32BETest(ReadTest):
     encoding = "utf-32-be"
 
@@ -419,6 +435,14 @@ class UTF32BETest(ReadTest):
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_be_decode,
                           b"\xff", "strict", True)
+
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = b'\x00\x01\x00\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_be_decode(encoded)[0])
+
 
 class UTF16Test(ReadTest):
     encoding = "utf-16"
@@ -627,18 +651,6 @@ class ReadBufferTest(unittest.TestCase):
     def test_bad_args(self):
         self.assertRaises(TypeError, codecs.readbuffer_encode)
         self.assertRaises(TypeError, codecs.readbuffer_encode, 42)
-
-class CharBufferTest(unittest.TestCase):
-
-    def test_string(self):
-        self.assertEqual(codecs.charbuffer_encode(b"spam"), (b"spam", 4))
-
-    def test_empty(self):
-        self.assertEqual(codecs.charbuffer_encode(b""), (b"", 0))
-
-    def test_bad_args(self):
-        self.assertRaises(TypeError, codecs.charbuffer_encode)
-        self.assertRaises(TypeError, codecs.charbuffer_encode, 42)
 
 class UTF8SigTest(ReadTest):
     encoding = "utf-8-sig"
@@ -1663,7 +1675,6 @@ def test_main():
         UTF7Test,
         UTF16ExTest,
         ReadBufferTest,
-        CharBufferTest,
         RecodingTest,
         PunycodeTest,
         UnicodeInternalTest,
