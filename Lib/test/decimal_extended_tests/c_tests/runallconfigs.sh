@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 
 
 VALGRIND=
@@ -8,7 +8,7 @@ if [ X"$1" = X"--valgrind" ]; then
 fi
 export VALGRIND
 
-if [ X"$@" != X"" ]; then
+if [ -n "$1" ]; then
     CONFIGS="$@"
 else
     CONFIGS="x64 ansi64 ansi64c32 ppro ansi32 ansi-legacy"
