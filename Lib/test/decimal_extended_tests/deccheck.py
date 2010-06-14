@@ -274,12 +274,12 @@ class dHandlerCdec:
         dpresult = getattr(op, funcname)(context=tmpctx)
         mpddiff = abs(dpresult - mpdresult)
         if mpddiff >= deculp:
-            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+            print("deculp: %s  dpresult: %s  mpdresult: %s" %
                   (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         decdiff = abs(dpresult - decresult)
         if decdiff >= deculp:
-            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+            print("deculp: %s  dpresult: %s  mpdresult: %s" %
                   (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         self.ulpdiff += 1
@@ -301,12 +301,12 @@ class dHandlerCdec:
         dpresult = getattr(op1, funcname)(op2, context=tmpctx)
         mpddiff = abs(dpresult - mpdresult)
         if mpddiff >= deculp:
-            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+            print("deculp: %s  dpresult: %s  mpdresult: %s" %
                   (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         decdiff = abs(dpresult - decresult)
         if decdiff >= deculp:
-            print("deculp: %d  dpresult: %s  mpdresult: %s" %
+            print("deculp: %s  dpresult: %s  mpdresult: %s" %
                   (deculp, dpresult, mpdresult))
             return False # not simply a disagreement, but wrong
         self.ulpdiff += 1
