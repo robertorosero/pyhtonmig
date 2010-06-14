@@ -1172,7 +1172,7 @@ context_dealloc(PyDecContextObject *self)
 
 static mpd_context_t dflt_ctx = {
   28, DEC_DFLT_EMAX, DEC_DFLT_EMIN,
-  MPD_Invalid_operation|MPD_Division_by_zero|MPD_Overflow,
+  MPD_IEEE_Invalid_operation|MPD_Division_by_zero|MPD_Overflow,
   0, 0, MPD_ROUND_HALF_EVEN, 0, 1
 };
 
@@ -1212,13 +1212,12 @@ context_init(PyObject *self, PyObject *args, PyObject *kwds)
 	    !mpd_qsetstatus(ctx, t.status) ||
 	    !mpd_qsetclamp(ctx, t.clamp) ||
 	    !mpd_qsetcr(ctx, t.allcr)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		PyErr_SetString(PyExc_ValueError, "invalid context");
+		return -1;
 	}
 
 	if (capitals != 0 && capitals != 1) {
-		PyErr_SetString(PyExc_ValueError, "invalid value for capitals");
+		PyErr_SetString(PyExc_ValueError, "invalid context");
 		return -1;
 	}
 	CtxCaps(self) = capitals;
@@ -1481,7 +1480,7 @@ PyDec_SetCurrentContext(PyObject *self UNUSED, PyObject *v)
 		Py_INCREF(v);
 	}
 
-	Py_DECREF(module_context);
+	Py_XDECREF(module_context);
 	module_context = v;
 	module_context_set = 1;
 	Py_RETURN_NONE;
