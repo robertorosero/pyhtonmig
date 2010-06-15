@@ -1150,7 +1150,7 @@ _c32_qset_i64(mpd_t *result, int64_t a, const mpd_context_t *ctx,
 	uint8_t sign = MPD_POS;
 
 	if (a < 0) {
-		if (a == INT64_MAX) {
+		if (a == INT64_MIN) {
 			u = (uint64_t)INT64_MAX + (-(INT64_MIN+INT64_MAX));
 		}
 		else {
