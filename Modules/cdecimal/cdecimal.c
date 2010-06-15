@@ -211,7 +211,7 @@ list_as_flags(PyObject *list)
 	ssize_t n, j;
 
 	if (!PyList_Check(list)) {
-		PyErr_Format(PyExc_TypeError, "argument must be a signal list");
+		PyErr_SetString(PyExc_TypeError, "argument must be a signal list");
 		return UINT32_MAX;
 	}
 
@@ -274,7 +274,7 @@ PyLong_AsMpdFlags(PyObject *v)
 	overflow = 0;
 	x = PyLong_AsLongAndOverflow(v, &overflow);
 	if (overflow != 0 || x < 0 || x > (long)MPD_Max_status) {
-		PyErr_Format(PyExc_ValueError, "invalid flag value");
+		PyErr_SetString(PyExc_ValueError, "invalid flag value");
 		return UINT32_MAX;
 	}
 
@@ -803,7 +803,7 @@ context_setemax(PyObject *self, PyObject *value, void *closure UNUSED)
 }
 
 static PyObject *
-context_unsafe_setprec(PyObject *self, PyObject *value, void *closure UNUSED)
+context_unsafe_setprec(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
@@ -815,7 +815,7 @@ context_unsafe_setprec(PyObject *self, PyObject *value, void *closure UNUSED)
 }
 
 static PyObject *
-context_unsafe_setemin(PyObject *self, PyObject *value, void *closure UNUSED)
+context_unsafe_setemin(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
@@ -827,7 +827,7 @@ context_unsafe_setemin(PyObject *self, PyObject *value, void *closure UNUSED)
 }
 
 static PyObject *
-context_unsafe_setemax(PyObject *self, PyObject *value, void *closure UNUSED)
+context_unsafe_setemax(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
@@ -1384,6 +1384,24 @@ context_reduce(PyObject *self, PyObject *args UNUSED)
 	        Py_TYPE(self), ctx->prec, ctx->round, ctx->emin, ctx->emax,
 	        CtxCaps(self), ctx->clamp, ctx->status, ctx->traps, ctx->allcr
 	);
+}
+
+static PyObject *
+PyDec_SetStatusFromList(PyObject *self, PyObject *value)
+{
+	if (context_setstatus_list(self, value) < 0) {
+		return NULL;
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *
+PyDec_SetTrapsFromList(PyObject *self, PyObject *value)
+{
+	if (context_settraps_list(self, value) < 0) {
+		return NULL;
+	}
+	Py_RETURN_NONE;
 }
 
 
@@ -4723,15 +4741,15 @@ static PyMethodDef context_methods [] =
 	{ "shift", _DecCtx_mpd_qshift, METH_VARARGS, doc_ctx_shift },
 
 	/* Set context values */
-	{ "setflags", (PyCFunction)context_setstatus_list, METH_O, doc_ctx_setflags },
-	{ "settraps", (PyCFunction)context_settraps_list, METH_O, doc_ctx_settraps },
+	{ "setflags", PyDec_SetStatusFromList, METH_O, doc_ctx_setflags },
+	{ "settraps", PyDec_SetTrapsFromList, METH_O, doc_ctx_settraps },
 	{ "clear_flags", context_clear_flags, METH_NOARGS, doc_ctx_clear_flags },
 	{ "clear_traps", context_clear_traps, METH_NOARGS, doc_ctx_clear_traps },
 
 	/* Unsafe set functions with no range checks */
-	{ "unsafe_setprec", (PyCFunction)context_unsafe_setprec, METH_O, NULL },
-	{ "unsafe_setemin", (PyCFunction)context_unsafe_setemin, METH_O, NULL },
-	{ "unsafe_setemax", (PyCFunction)context_unsafe_setemax, METH_O, NULL },
+	{ "unsafe_setprec", context_unsafe_setprec, METH_O, NULL },
+	{ "unsafe_setemin", context_unsafe_setemin, METH_O, NULL },
+	{ "unsafe_setemax", context_unsafe_setemax, METH_O, NULL },
 
 	/* Miscellaneous */
 	{ "__copy__", (PyCFunction)context_copy, METH_NOARGS, NULL },
