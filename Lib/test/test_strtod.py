@@ -145,6 +145,63 @@ class StrtodTests(unittest.TestCase):
                     digits *= 5
                     exponent -= 1
 
+    def test_twopower_boundaries(self):
+        # bit pattern for the value just under a normal power of 2
+        for k in range(1, 2048):
+            bits = k * 2**52 - 1
+
+            # convert bit pattern to a number of the form m * 2**e
+            e, m = divmod(bits, 2**52)
+            if e:
+                m, e = m + 2**52, e - 1
+            e -= 1074
+
+            # add 0.5 ulps
+            m, e = 2*m + 1, e - 1
+
+            # convert to a decimal string
+            if e >= 0:
+                digits = m << e
+                exponent = 0
+            else:
+                # m * 2**e = (m * 5**-e) * 10**e
+                digits = m * 5**-e
+                exponent = e
+            s = '{}e{}'.format(digits, exponent)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**20 - 1, exponent - 20)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**20 + 1, exponent - 20)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**40 - 1, exponent - 40)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**40 + 1, exponent - 40)
+            self.check_strtod(s)
+
+            # same again, but for exact value, not halfway case
+            e, m = divmod(bits, 2**52)
+            if e:
+                m, e = m + 2**52, e - 1
+            e -= 1074
+
+            if e >= 0:
+                digits = m << e
+                exponent = 0
+            else:
+                # m * 2**e = (m * 5**-e) * 10**e
+                digits = m * 5**-e
+                exponent = e
+            s = '{}e{}'.format(digits, exponent)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**20 - 1, exponent - 20)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**20 + 1, exponent - 20)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**40 - 1, exponent - 40)
+            self.check_strtod(s)
+            s = '{}e{}'.format(digits * 10**40 + 1, exponent - 40)
+            self.check_strtod(s)
+
     def test_halfway_cases(self):
         # test halfway cases for the round-half-to-even rule
         for i in range(100 * TEST_SIZE):
@@ -246,6 +303,20 @@ class StrtodTests(unittest.TestCase):
                         pass
                     else:
                         assert False, "expected ValueError"
+
+    def test_extra_long_significand(self):
+        for n in 1000, 10000, 100000, 1000000:
+            s = '1{}e{}'.format('0'*n, -n)
+            self.assertEqual(float(s), 1.0)
+
+            s = '0.{}1e{}'.format('0'*(n-1), n)
+            self.assertEqual(float(s), 1.0)
+
+            s = '1.00000000000000000000000{}e{}'.format('0'*n, 23)
+            self.assertEqual(float(s), 1e23)
+
+            s = '1.00000000000000000000000{}1e{}'.format('0'*n, 23)
+            self.assertEqual(float(s), float(10**23 + 1))
 
     def test_particular(self):
         # inputs that produced crashes or incorrectly rounded results with
