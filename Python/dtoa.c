@@ -1384,7 +1384,7 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
 
     nd = bc->nd;
     nd0 = bc->nd0;
-    p5 = nd + bc->e0;
+    p5 = bc->e0;
     b = sd2b(rv, bc->scale, &p2);
     if (b == NULL)
         return -1;
@@ -1600,7 +1600,7 @@ _Py_dg_strtod(const char *s00, char **se)
     }
 
     /* Adjust exponent to take into account position of the point. */
-    e -= nd - nd0;
+    e += nd0;
     if (nd0 <= 0)
         nd0 = nd;
 
@@ -1619,7 +1619,6 @@ _Py_dg_strtod(const char *s00, char **se)
             break;
         }
     }
-    e += nd - i;
     nd = i;
     if (nd0 > nd)
         nd0 = nd;
@@ -1641,7 +1640,7 @@ _Py_dg_strtod(const char *s00, char **se)
      *    nd0 == nd, then s0[nd0] could be any non-digit character.)
      *
      *  - e is the adjusted exponent: the absolute value of the number
-     *    represented by the original input string is n * 10**e, where
+     *    represented by the original input string is n * 10**(e - nd), where
      *    n is the integer represented by the concatenation of
      *    s0[0:nd0] and s0[nd0+1:nd+1]
      *
@@ -1660,7 +1659,7 @@ _Py_dg_strtod(const char *s00, char **se)
      *    gives the value represented by the first min(16, nd) sig. digits.
      */
 
-    bc.e0 = e1 = e;
+    bc.e0 = e;
     y = z = 0;
     for (i = 0; i < nd; i++) {
         if (i < 9)
@@ -1677,33 +1676,32 @@ _Py_dg_strtod(const char *s00, char **se)
         dval(&rv) = tens[k - 9] * dval(&rv) + z;
     }
     bd0 = 0;
+    e1 = e - k;
     if (nd <= DBL_DIG
         && Flt_Rounds == 1
         ) {
-        if (!e)
+        if (!e1)
             goto ret;
-        if (e > 0) {
-            if (e <= Ten_pmax) {
-                dval(&rv) *= tens[e];
+        if (e1 > 0) {
+            if (e1 <= Ten_pmax) {
+                dval(&rv) *= tens[e1];
                 goto ret;
             }
             i = DBL_DIG - nd;
-            if (e <= Ten_pmax + i) {
+            if (e1 - i <= Ten_pmax) {
                 /* A fancier test would sometimes let us do
                  * this for larger i values.
                  */
-                e -= i;
                 dval(&rv) *= tens[i];
-                dval(&rv) *= tens[e];
+                dval(&rv) *= tens[e1 - i];
                 goto ret;
             }
         }
-        else if (e >= -Ten_pmax) {
-            dval(&rv) /= tens[-e];
+        else if (-e1 <= -Ten_pmax) {
+            dval(&rv) /= tens[-e1];
             goto ret;
         }
     }
-    e1 += nd - k;
 
     bc.scale = 0;
 
@@ -1800,7 +1798,6 @@ _Py_dg_strtod(const char *s00, char **se)
                 break;
             }
         }
-        e += nd - i;
         nd = i;
         if (nd0 > nd)
             nd0 = nd;
@@ -1869,12 +1866,12 @@ _Py_dg_strtod(const char *s00, char **se)
             goto failed_malloc;
         }
 
-        if (e >= 0) {
+        if (e >= nd) {
             bb2 = bb5 = 0;
-            bd2 = bd5 = e;
+            bd2 = bd5 = e - nd;
         }
         else {
-            bb2 = bb5 = -e;
+            bb2 = bb5 = nd - e;
             bd2 = bd5 = 0;
         }
         if (bbe >= 0)
