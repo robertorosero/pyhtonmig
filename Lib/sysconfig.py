@@ -123,8 +123,8 @@ _PYTHON_BUILD = is_python_build()
 
 if _PYTHON_BUILD:
     for scheme in ('posix_prefix', 'posix_home'):
-        _INSTALL_SCHEMES[scheme]['include'] = '{projectbase}/Include'
-        _INSTALL_SCHEMES[scheme]['platinclude'] = '{srcdir}'
+        _INSTALL_SCHEMES[scheme]['include'] = '{srcdir}/Include'
+        _INSTALL_SCHEMES[scheme]['platinclude'] = '{projectbase}/.'
 
 def _subst_vars(s, local_vars):
     try:
@@ -458,6 +458,8 @@ def get_config_vars(*args):
 
         if 'srcdir' not in _CONFIG_VARS:
             _CONFIG_VARS['srcdir'] = _PROJECT_BASE
+        else:
+            _CONFIG_VARS['srcdir'] = realpath(_CONFIG_VARS['srcdir'])
 
 
         # Convert srcdir into an absolute path if it appears necessary.
