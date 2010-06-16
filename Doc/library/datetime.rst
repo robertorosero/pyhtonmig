@@ -28,11 +28,14 @@ For applications requiring more, :class:`datetime` and :class:`time` objects
 have an optional time zone information member, :attr:`tzinfo`, that can contain
 an instance of a subclass of the abstract :class:`tzinfo` class.  These
 :class:`tzinfo` objects capture information about the offset from UTC time, the
-time zone name, and whether Daylight Saving Time is in effect.  Note that no
-concrete :class:`tzinfo` classes are supplied by the :mod:`datetime` module.
-Supporting timezones at whatever level of detail is required is up to the
-application.  The rules for time adjustment across the world are more political
-than rational, and there is no standard suitable for every application.
+time zone name, and whether Daylight Saving Time is in effect.  Note that only
+one concrete :class:`tzinfo` class, the :class:`timezone` class, is supplied by the
+:mod:`datetime` module.  The :class:`timezone` class can reprsent simple
+timezones with fixed offset from UTC such as UTC itself or North American EST and
+EDT timezones.  Supporting timezones at whatever level of detail is
+required is up to the application.  The rules for time adjustment across the
+world are more political than rational, change frequently, and there is no
+standard suitable for every application aside from UTC.
 
 The :mod:`datetime` module exports the following constants:
 
@@ -99,6 +102,14 @@ Available Types
    time adjustment (for example, to account for time zone and/or daylight saving
    time).
 
+.. class:: timezone
+
+   A class that implements the :class:`tzinfo` abstract base class as a
+   fixed offset from the UTC.
+
+   .. versionadded:: 3.2
+
+
 Objects of these types are immutable.
 
 Objects of the :class:`date` type are always naive.
@@ -116,6 +127,7 @@ Subclass relationships::
    object
        timedelta
        tzinfo
+           timezone
        time
        date
            datetime
@@ -220,12 +232,20 @@ Supported operations:
 |                                | In general, *t1* \* i == *t1* \* (i-1) + *t1* |
 |                                | is true. (1)                                  |
 +--------------------------------+-----------------------------------------------+
+| ``t1 = t2 * f or t1 = f * t2`` | Delta multiplied by a float. The result is    |
+|                                | rounded to the nearest multiple of            |
+|                                | timedelta.resolution using round-half-to-even.|
++--------------------------------+-----------------------------------------------+
 | ``f = t2 / t3``                | Division (3) of *t2* by *t3*.  Returns a      |
 |                                | :class:`float` object.                        |
 +--------------------------------+-----------------------------------------------+
+| ``t1 = t2 / f or t1 = t2 / i`` | Delta divided by a float or an int. The result|
+|                                | is rounded to the nearest multiple of         |
+|                                | timedelta.resolution using round-half-to-even.|
++--------------------------------+-----------------------------------------------+
 | ``t1 = t2 // i`` or            | The floor is computed and the remainder (if   |
 | ``t1 = t2 // t3``              | any) is thrown away.  In the second case, an  |
-|                                | integer is returned (3)                       |
+|                                | integer is returned. (3)                      |
 +--------------------------------+-----------------------------------------------+
 | ``t1 = t2 % t3``               | The remainder is computed as a                |
 |                                | :class:`timedelta` object. (3)                |
@@ -267,7 +287,9 @@ objects (see below).
 .. versionadded:: 3.2
    Floor division and true division of a :class:`timedelta` object by
    another :class:`timedelta` object are now supported, as are
-   remainder operations and the :func:`divmod` function.
+   remainder operations and the :func:`divmod` function.  True
+   division and multiplication of a :class:`timedelta` object by
+   a :class:`float` object are now supported.
 
 
 Comparisons of :class:`timedelta` objects are supported with the
@@ -470,7 +492,9 @@ Instance methods:
    Return a :class:`time.struct_time` such as returned by :func:`time.localtime`.
    The hours, minutes and seconds are 0, and the DST flag is -1. ``d.timetuple()``
    is equivalent to ``time.struct_time((d.year, d.month, d.day, 0, 0, 0,
-   d.weekday(), d.toordinal() - date(d.year, 1, 1).toordinal() + 1, -1))``
+   d.weekday(), yday, -1))``, where ``yday = d.toordinal() - date(d.year, 1,
+   1).toordinal() + 1`` is the day number within the current year starting with
+   ``1`` for January 1st.
 
 
 .. method:: date.toordinal()
@@ -648,8 +672,8 @@ Other constructors, all class methods:
 
    Return the current UTC date and time, with :attr:`tzinfo` ``None``. This is like
    :meth:`now`, but returns the current UTC date and time, as a naive
-   :class:`datetime` object. See also :meth:`now`.
-
+   :class:`datetime` object.  An aware current UTC datetime can be obtained by
+   calling ``datetime.now(timezone.utc)``.  See also :meth:`now`.
 
 .. classmethod:: datetime.fromtimestamp(timestamp, tz=None)
 
@@ -934,12 +958,13 @@ Instance methods:
 
    Return a :class:`time.struct_time` such as returned by :func:`time.localtime`.
    ``d.timetuple()`` is equivalent to ``time.struct_time((d.year, d.month, d.day,
-   d.hour, d.minute, d.second, d.weekday(), d.toordinal() - date(d.year, 1,
-   1).toordinal() + 1, dst))`` The :attr:`tm_isdst` flag of the result is set
-   according to the :meth:`dst` method:  :attr:`tzinfo` is ``None`` or :meth:`dst`
-   returns ``None``, :attr:`tm_isdst` is set to  ``-1``; else if :meth:`dst`
-   returns a non-zero value, :attr:`tm_isdst` is set to ``1``; else ``tm_isdst`` is
-   set to ``0``.
+   d.hour, d.minute, d.second, d.weekday(), yday, dst))``, where ``yday =
+   d.toordinal() - date(d.year, 1, 1).toordinal() + 1`` is the day number within
+   the current year starting with ``1`` for January 1st. The :attr:`tm_isdst` flag
+   of the result is set according to the :meth:`dst` method: :attr:`tzinfo` is
+   ``None`` or :meth:`dst`` returns ``None``, :attr:`tm_isdst` is set to ``-1``;
+   else if :meth:`dst` returns a non-zero value, :attr:`tm_isdst` is set to ``1``;
+   else :attr:`tm_isdst` is set to ``0``.
 
 
 .. method:: datetime.utctimetuple()
@@ -1305,8 +1330,10 @@ Example:
 :class:`tzinfo` is an abstract base class, meaning that this class should not be
 instantiated directly.  You need to derive a concrete subclass, and (at least)
 supply implementations of the standard :class:`tzinfo` methods needed by the
-:class:`datetime` methods you use.  The :mod:`datetime` module does not supply
-any concrete subclasses of :class:`tzinfo`.
+:class:`datetime` methods you use.  The :mod:`datetime` module supplies
+a simple concrete subclass of :class:`tzinfo` :class:`timezone` which can reprsent
+timezones with fixed offset from UTC such as UTC itself or North American EST and
+EDT.
 
 An instance of (a concrete subclass of) :class:`tzinfo` can be passed to the
 constructors for :class:`datetime` and :class:`time` objects. The latter objects
@@ -1507,9 +1534,65 @@ arranged, as in the example, by expressing DST switch times in the time zone's
 standard local time.
 
 Applications that can't bear such ambiguities should avoid using hybrid
-:class:`tzinfo` subclasses; there are no ambiguities when using UTC, or any
-other fixed-offset :class:`tzinfo` subclass (such as a class representing only
-EST (fixed offset -5 hours), or only EDT (fixed offset -4 hours)).
+:class:`tzinfo` subclasses; there are no ambiguities when using :class:`timezone`,
+or any other fixed-offset :class:`tzinfo` subclass (such as a class representing
+only EST (fixed offset -5 hours), or only EDT (fixed offset -4 hours)).
+
+
+.. _datetime-timezone:
+
+:class:`timezone` Objects
+--------------------------
+
+A :class:`timezone` object represents a timezone that is defined by a
+fixed offset from UTC.  Note that objects of this class cannot be used
+to represent timezone information in the locations where different
+offsets are used in different days of the year or where historical
+changes have been made to civil time.
+
+
+.. class:: timezone(offset[, name])
+
+  The ``offset`` argument must be specified as a :class:`timedelta`
+  object representing the difference between the local time and UTC.  It must
+  be within the range [``-timedelta(hours=23, minutes=59),
+  ``timedelta(hours=23, minutes=59)``] and represent whole number of minutes,
+  otherwise :exc:`ValueError` is raised.
+
+  The ``name`` argument is optional.  If specified it must be a string that
+  used as the value returned by the ``tzname(dt)`` method.  Otherwise,
+  ``tzname(dt)`` returns a string 'UTCsHH:MM', where s is the sign of
+  ``offset``, HH and MM are two digits of ``offset.hours`` and
+  ``offset.minutes`` respectively.
+
+.. method:: timezone.utcoffset(self, dt)
+
+  Returns the fixed value specified when the :class:`timezone` instance is
+  constructed.  The ``dt`` argument is ignored.  The return value is a
+  :class:`timedelta` instance equal to the difference between the
+  local time and UTC.
+
+.. method:: timezone.tzname(self, dt)
+
+  Returns the fixed value specified when the :class:`timezone` instance is
+  constructed or a string 'UTCsHH:MM', where s is the sign of
+  ``offset``, HH and MM are two digits of ``offset.hours`` and
+  ``offset.minutes`` respectively.  The ``dt`` argument is ignored.
+
+.. method:: timezone.dst(self, dt)
+
+  Always returns ``None``.
+
+.. method:: timezone.fromutc(self, dt)
+
+  Returns ``dt + offset``.  The ``dt`` argument must be aware with ``tzinfo``
+  set to ``self``.
+
+Class attributes:
+
+.. attribute:: timezone.utc
+
+   The UTC timezone, ``timezone(0, 'UTC')``.
 
 
 .. _strftime-strptime-behavior:

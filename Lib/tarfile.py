@@ -159,9 +159,10 @@ TOEXEC  = 0o001           # execute/search by other
 #---------------------------------------------------------
 # initialization
 #---------------------------------------------------------
-ENCODING = sys.getfilesystemencoding()
-if ENCODING is None:
-    ENCODING = "ascii"
+if os.name in ("nt", "ce"):
+    ENCODING = "utf-8"
+else:
+    ENCODING = sys.getfilesystemencoding()
 
 #---------------------------------------------------------
 # Some useful functions
@@ -1920,7 +1921,7 @@ class TarFile(object):
         tarinfo.mode = stmd
         tarinfo.uid = statres.st_uid
         tarinfo.gid = statres.st_gid
-        if stat.S_ISREG(stmd):
+        if type == REGTYPE:
             tarinfo.size = statres.st_size
         else:
             tarinfo.size = 0
@@ -2163,8 +2164,7 @@ class TarFile(object):
                 raise StreamError("cannot extract (sym)link as file object")
             else:
                 # A (sym)link's file object is its target's file object.
-                return self.extractfile(self._getmember(tarinfo.linkname,
-                                                        tarinfo))
+                return self.extractfile(self._find_link_target(tarinfo))
         else:
             # If there's no data associated with the member (directory, chrdev,
             # blkdev, etc.), return None instead of a file object.
@@ -2273,27 +2273,21 @@ class TarFile(object):
           (platform limitation), we try to make a copy of the referenced file
           instead of a link.
         """
-        try:
+        if hasattr(os, "symlink") and hasattr(os, "link"):
+            # For systems that support symbolic and hard links.
             if tarinfo.issym():
                 os.symlink(tarinfo.linkname, targetpath)
             else:
                 # See extract().
-                os.link(tarinfo._link_target, targetpath)
-        except AttributeError:
-            if tarinfo.issym():
-                linkpath = os.path.dirname(tarinfo.name) + "/" + \
-                                        tarinfo.linkname
-            else:
-                linkpath = tarinfo.linkname
-
+                if os.path.exists(tarinfo._link_target):
+                    os.link(tarinfo._link_target, targetpath)
+                else:
+                    self._extract_member(self._find_link_target(tarinfo), targetpath)
+        else:
             try:
-                self._extract_member(self.getmember(linkpath), targetpath)
-            except (EnvironmentError, KeyError) as e:
-                linkpath = linkpath.replace("/", os.sep)
-                try:
-                    shutil.copy2(linkpath, targetpath)
-                except EnvironmentError as e:
-                    raise IOError("link could not be created")
+                self._extract_member(self._find_link_target(tarinfo), targetpath)
+            except KeyError:
+                raise ExtractError("unable to resolve link inside archive")
 
     def chown(self, tarinfo, targetpath):
         """Set owner of targetpath according to tarinfo.
@@ -2392,21 +2386,28 @@ class TarFile(object):
     #--------------------------------------------------------------------------
     # Little helper methods:
 
-    def _getmember(self, name, tarinfo=None):
+    def _getmember(self, name, tarinfo=None, normalize=False):
         """Find an archive member by name from bottom to top.
            If tarinfo is given, it is used as the starting point.
         """
         # Ensure that all members have been loaded.
         members = self.getmembers()
 
-        if tarinfo is None:
-            end = len(members)
-        else:
-            end = members.index(tarinfo)
+        # Limit the member search list up to tarinfo.
+        if tarinfo is not None:
+            members = members[:members.index(tarinfo)]
 
-        for i in range(end - 1, -1, -1):
-            if name == members[i].name:
-                return members[i]
+        if normalize:
+            name = os.path.normpath(name)
+
+        for member in reversed(members):
+            if normalize:
+                member_name = os.path.normpath(member.name)
+            else:
+                member_name = member.name
+
+            if name == member_name:
+                return member
 
     def _load(self):
         """Read through the entire archive file and look for readable
@@ -2426,6 +2427,25 @@ class TarFile(object):
             raise IOError("%s is closed" % self.__class__.__name__)
         if mode is not None and self.mode not in mode:
             raise IOError("bad operation for mode %r" % self.mode)
+
+    def _find_link_target(self, tarinfo):
+        """Find the target member of a symlink or hardlink member in the
+           archive.
+        """
+        if tarinfo.issym():
+            # Always search the entire archive.
+            linkname = os.path.dirname(tarinfo.name) + "/" + tarinfo.linkname
+            limit = None
+        else:
+            # Search the archive before the link, because a hard link is
+            # just a reference to an already archived file.
+            linkname = tarinfo.linkname
+            limit = tarinfo
+
+        member = self._getmember(linkname, tarinfo=limit, normalize=True)
+        if member is None:
+            raise KeyError("linkname %r not found" % linkname)
+        return member
 
     def __iter__(self):
         """Provide an iterator object.

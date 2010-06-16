@@ -31,6 +31,46 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8592: PyArg_Parse*() functions raise a TypeError for "y", "u" and "Z"
+  formats if the string contains a null byte/character. Write unit tests for
+  string formats.
+
+- Issue #7490: to facilitate sharing of doctests between 2.x and 3.x test
+  suites, the IGNORE_EXCEPTION_DETAIL directive now also ignores the module
+  location of the raised exception.
+
+- Issue #8969: On Windows, use mbcs codec in strict mode to encode and decode
+  filenames and enable os.fsencode().
+
+- Issue #8941: decoding big endian UTF-32 data in UCS-2 builds could crash
+  the interpreter with characters outside the Basic Multilingual Plane
+  (higher than 0x10000).
+
+- Issue #8950: (See also issue #5080).  Py_ArgParse*() functions now
+  raise TypeError instead of giving a DeprecationWarning when a float
+  is parsed using the 'L' code (for long long).  (All other integer
+  codes already raise TypeError in this case.)
+
+- Issue #8922: Normalize the encoding name in PyUnicode_AsEncodedString() to
+  enable shortcuts for upper case encoding name. Add also a shortcut for
+  "iso-8859-1" in PyUnicode_AsEncodedString() and PyUnicode_Decode().
+
+- Issue #8838: Remove codecs.charbuffer_encode() function. The buffer protocol
+  doesn't support "char buffer" anymore in Python3.
+
+- Issue #8339: Remove "t#" format of PyArg_Parse*() functions, use "s#" or "s*"
+  instead. codecs.charbuffer_encode() now accepts modifiable buffer objects
+  like bytearray.
+
+- Issue #8837: Remove "O?" format of PyArg_Parse*() functions. The format is no
+  used anymore and it was never documented.
+
+- In the str.format(), raise a ValueError when indexes to arguments are too
+  large.
+
+- Issue #2844: Make int('42', n) consistently raise ValueError for
+  invalid integers n (including n = -909).
+
 - Issue #8188: Introduce a new scheme for computing hashes of numbers
   (instances of int, float, complex, decimal.Decimal and
   fractions.Fraction) that makes it easy to maintain the invariant
@@ -411,6 +451,61 @@ C-API
 Library
 -------
 
+- Issue #8986: math.erfc was incorrectly raising OverflowError for
+  values between -27.3 and -30.0 on some platforms.
+
+- Issue #8784: Set tarfile default encoding to 'utf-8' on Windows.
+
+- Issue #8966: If a ctypes structure field is an array of c_char, convert its
+  value to bytes instead of str (as done for c_char and c_char_p).
+
+- Issue #8188: Comparisons between Decimal and Fraction objects are
+  now permitted, returning a result based on the exact numerical
+  values of the operands.  This builds on issue #2531, which allowed
+  Decimal-to-float comparisons;  all comparisons involving numeric
+  types (bool, int, float, complex, Decimal, Fraction) should now
+  act as expected.
+
+- Issue #8897: Fix sunau module, use bytes to write the header. Patch written
+  by Thomas Jollans.
+
+- Issue #8899: time.struct_time now has class and atribute docstrings.
+
+- Issue #6470: Drop UNC prefix in FixTk.
+
+- Issue #4768: base64 encoded email body parts were incorrectly stored as
+  binary strings.  They are now correctly converted to strings.
+
+- Issue #8833: tarfile created hard link entries with a size field != 0 by
+  mistake.
+
+- Charset.body_encode now correctly handles base64 encoding by encoding
+  with the output_charset before calling base64mime.encode.  Passes the
+  tests from 2.x issue 1368247.
+
+- Issue #8845: sqlite3 Connection objects now have a read-only in_transaction
+  attribute that is True iff there are uncommitted changes.
+
+- Issue #1289118: datetime.timedelta objects can now be multiplied by float
+  and divided by float and int objects.  Results are rounded to the nearest
+  multiple of timedelta.resolution with ties resolved using round-half-to-even
+  method.
+
+- Issue #7150: Raise OverflowError if the result of adding or subtracting
+  timedelta from date or datetime falls outside of the MINYEAR:MAXYEAR range.
+
+- Issue #8806: add SSL contexts support to ftplib.
+
+- Issue #4769: Fix main() function of the base64 module, use sys.stdin.buffer
+  and sys.stdout.buffer (instead of sys.stdin and sys.stdout) to use the bytes
+  API
+
+- Issue #8770: now sysconfig displays information when it's called as
+  a script. Initial idea by Sridhar Ratnakumar.
+
+- Issue #6662: Fix parsing of malformatted charref (&#bad;), patch written by
+  Fredrik Håård
+
 - Issue #8540: Decimal module: rename the Context._clamp attribute to
   Context.clamp and make it public.  This is useful in creating
   contexts that correspond to the decimal interchange formats
@@ -668,7 +763,8 @@ Library
 - Issue #2531: Comparison operations between floats and Decimal
   instances now return a result based on the numeric values of the
   operands;  previously they returned an arbitrary result based on
-  the relative ordering of id(float) and id(Decimal).
+  the relative ordering of id(float) and id(Decimal).  See also
+  issue #8188, which adds Decimal-to-Fraction comparisons.
 
 - Added a subtract() method to collections.Counter().
 
@@ -1229,6 +1325,28 @@ Library
 Extension Modules
 -----------------
 
+- Issue #5094: The ``datetime`` module now has a simple concrete class
+  implementing ``datetime.tzinfo`` interface.  Instances of the new
+  class, ``datetime.timezone``, return fixed name and UTC offset from
+  their ``tzname(dt)`` and ``utcoffset(dt)`` methods.  The ``dst(dt)``
+  method always returns ``None``.  A class attribute, ``utc`` contains
+  an instance representing the UTC timezone.  Original patch by Rafe
+  Kaplan.
+
+- Issue #8973: Add __all__ to struct module; this ensures that
+  help(struct) includes documentation for the struct.Struct class.
+
+- Issue #3129: Trailing digits in struct format string are no longer ignored.
+  For example, "1" or "ilib123" are now invalid formats and cause
+  ``struct.error`` to be raised.  Patch by Caleb Deveraux.
+
+- Issue #7384: If the system readline library is linked against ncurses,
+  the curses module must be linked against ncurses as well. Otherwise it
+  is not safe to load both the readline and curses modules in an application.
+
+- Issue #2810: Fix cases where the Windows registry API returns
+  ERROR_MORE_DATA, requiring a re-try in order to get the complete result.
+
 - Issue #8692: Optimize math.factorial: replace the previous naive
   algorithm with an improved 'binary-split' algorithm that uses fewer
   multiplications and allows many of the multiplications to be
@@ -1304,6 +1422,9 @@ Extension Modules
 
 Build
 -----
+
+- Issue #1759169, #8864: Drop _XOPEN_SOURCE on Solaris, define it for
+  multiprocessing only.
 
 - Issue #8625: Turn off optimization in --with-pydebug builds with
   gcc.  (Optimization was unintentionally turned on in gcc
@@ -1391,8 +1512,13 @@ Documentation
 - Update python manual page (options -B, -O0, -s, environment variables
   PYTHONDONTWRITEBYTECODE, PYTHONNOUSERSITE).
 
+- Issue #8909: Added the size of the bitmap used in the installer created by
+  distutils' bdist_wininst. Patch by Anatoly Techtonik.
+
 Tests
 -----
+
+- Issue #7449: Skip test_socketserver if threading support is disabled
 
 - Issue #8672: Add a zlib test ensuring that an incomplete stream can be
   handled by a decompressor object without errors (it returns incomplete
@@ -1519,6 +1645,8 @@ Tests
 
 Tools/Demos
 -----------
+
+- Issue #5464: Implement plural forms in msgfmt.py.
 
 - iobench (a file I/O benchmark) and ccbench (a concurrency benchmark) were
   added to the `Tools/` directory.  They were previously living in the

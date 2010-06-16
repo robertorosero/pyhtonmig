@@ -111,7 +111,7 @@ class TestSetups(unittest.TestCase):
         self.assertEqual(len(result.errors), 1)
         error, _ = result.errors[0]
         self.assertEqual(str(error),
-                    'classSetUp (%s.BrokenTest)' % __name__)
+                    'setUpClass (%s.BrokenTest)' % __name__)
 
     def test_error_in_teardown_class(self):
         class Test(unittest.TestCase):
@@ -144,7 +144,7 @@ class TestSetups(unittest.TestCase):
 
         error, _ = result.errors[0]
         self.assertEqual(str(error),
-                    'classTearDown (%s.Test)' % __name__)
+                    'tearDownClass (%s.Test)' % __name__)
 
     def test_class_not_torndown_when_setup_fails(self):
         class Test(unittest.TestCase):
@@ -398,3 +398,110 @@ class TestSetups(unittest.TestCase):
         self.assertEqual(len(result.errors), 1)
         error, _ = result.errors[0]
         self.assertEqual(str(error), 'tearDownModule (Module)')
+
+    def test_skiptest_in_setupclass(self):
+        class Test(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):
+                raise unittest.SkipTest('foo')
+            def test_one(self):
+                pass
+            def test_two(self):
+                pass
+
+        result = self.runTests(Test)
+        self.assertEqual(result.testsRun, 0)
+        self.assertEqual(len(result.errors), 0)
+        self.assertEqual(len(result.skipped), 1)
+        skipped = result.skipped[0][0]
+        self.assertEqual(str(skipped), 'setUpClass (%s.Test)' % __name__)
+
+    def test_skiptest_in_setupmodule(self):
+        class Test(unittest.TestCase):
+            def test_one(self):
+                pass
+            def test_two(self):
+                pass
+
+        class Module(object):
+            @staticmethod
+            def setUpModule():
+                raise unittest.SkipTest('foo')
+
+        Test.__module__ = 'Module'
+        sys.modules['Module'] = Module
+
+        result = self.runTests(Test)
+        self.assertEqual(result.testsRun, 0)
+        self.assertEqual(len(result.errors), 0)
+        self.assertEqual(len(result.skipped), 1)
+        skipped = result.skipped[0][0]
+        self.assertEqual(str(skipped), 'setUpModule (Module)')
+
+    def test_suite_debug_executes_setups_and_teardowns(self):
+        ordering = []
+
+        class Module(object):
+            @staticmethod
+            def setUpModule():
+                ordering.append('setUpModule')
+            @staticmethod
+            def tearDownModule():
+                ordering.append('tearDownModule')
+
+        class Test(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):
+                ordering.append('setUpClass')
+            @classmethod
+            def tearDownClass(cls):
+                ordering.append('tearDownClass')
+            def test_something(self):
+                ordering.append('test_something')
+
+        Test.__module__ = 'Module'
+        sys.modules['Module'] = Module
+
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
+        suite.debug()
+        expectedOrder = ['setUpModule', 'setUpClass', 'test_something', 'tearDownClass', 'tearDownModule']
+        self.assertEqual(ordering, expectedOrder)
+
+    def test_suite_debug_propagates_exceptions(self):
+        class Module(object):
+            @staticmethod
+            def setUpModule():
+                if phase == 0:
+                    raise Exception('setUpModule')
+            @staticmethod
+            def tearDownModule():
+                if phase == 1:
+                    raise Exception('tearDownModule')
+
+        class Test(unittest.TestCase):
+            @classmethod
+            def setUpClass(cls):
+                if phase == 2:
+                    raise Exception('setUpClass')
+            @classmethod
+            def tearDownClass(cls):
+                if phase == 3:
+                    raise Exception('tearDownClass')
+            def test_something(self):
+                if phase == 4:
+                    raise Exception('test_something')
+
+        Test.__module__ = 'Module'
+        sys.modules['Module'] = Module
+
+        _suite = unittest.defaultTestLoader.loadTestsFromTestCase(Test)
+        suite = unittest.TestSuite()
+        suite.addTest(_suite)
+
+        messages = ('setUpModule', 'tearDownModule', 'setUpClass', 'tearDownClass', 'test_something')
+        for phase, msg in enumerate(messages):
+            with self.assertRaisesRegexp(Exception, msg):
+                suite.debug()
+
+if __name__ == '__main__':
+    unittest.main()

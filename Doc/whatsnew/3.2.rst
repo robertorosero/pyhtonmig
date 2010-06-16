@@ -100,6 +100,18 @@ New, Improved, and Deprecated Modules
 
   (Contributed by Tarek Ziade.)
 
+* The *sqlite3* module has some new features:
+
+  * XXX *enable_load_extension*
+
+  * XXX *load_extension*
+
+  * New :class:`~sqlite3.Connection` attribute
+    :attr:`~sqlite3.Connection.in_transaction` is :const:`True` when there
+    are uncommitted changes, and :const:`False` otherwise.  (Contributed
+    by R. David Murray and Shashwat Anand, :issue:`8845`.)
+
+
 Multi-threading
 ===============
 
@@ -160,5 +172,8 @@ This section lists previously described changes and other bugfixes
 that may require changes to your code:
 
 * bytearray objects cannot be used anymore as filenames: convert them to bytes
+
+* "t#" format of PyArg_Parse*() functions has been removed: use "s#" or "s*"
+  instead
 
 * Stub
