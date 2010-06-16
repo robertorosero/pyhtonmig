@@ -474,39 +474,27 @@ multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
     return b;
 }
 
-/* convert a string s containing nd decimal digits (possibly containing a
-   decimal separator at position nd0, which is ignored) to a Bigint.  This
-   function carries on where the parsing code in _Py_dg_strtod leaves off: on
-   entry, y9 contains the result of converting the first 9 digits.  Returns
-   NULL on failure. */
+/* Convert a string s0 containing nd decimal digits (and possibly a decimal
+   separator at position nd0, which is ignored) to a Bigint.  Returns NULL on
+   failure.  Assumes that nd >= 1 and that the first digit is nonzero. */
 
 static Bigint *
-s2b(const char *s, int nd0, int nd, ULong y9)
+s2b(const char *s0, int nd0, int nd)
 {
     Bigint *b;
     int i, k;
     Long x, y;
 
     x = (nd + 8) / 9;
-    for(k = 0, y = 1; x > y; y <<= 1, k++) ;
+    for (k = 0, y = 1; x > y; y <<= 1, k++) ;
     b = Balloc(k);
     if (b == NULL)
         return NULL;
-    b->x[0] = y9;
+    b->x[0] = 0;
     b->wds = 1;
 
-    if (nd <= 9)
-      return b;
-
-    s += 9;
-    for (i = 9; i < nd0; i++) {
-        b = multadd(b, 10, *s++ - '0');
-        if (b == NULL)
-            return NULL;
-    }
-    s++;
-    for(; i < nd; i++) {
-        b = multadd(b, 10, *s++ - '0');
+    for (i = 0; i < nd; i++) {
+        b = multadd(b, 10, s0[i < nd0 ? i : i + 1] - '0');
         if (b == NULL)
             return NULL;
     }
@@ -1809,7 +1797,7 @@ _Py_dg_strtod(const char *s00, char **se)
                 y = 10*y + s0[i+1] - '0';
         }
     }
-    bd0 = s2b(s0, nd0, nd, y);
+    bd0 = s2b(s0, nd0, nd);
     if (bd0 == NULL)
         goto failed_malloc;
 
