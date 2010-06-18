@@ -1734,7 +1734,7 @@ _Py_dg_strtod(const char *s00, char **se)
                 goto ret;
             }
         }
-        else if (-e1 <= -Ten_pmax) {
+        else if (-e1 <= Ten_pmax) {
             dval(&rv) /= tens[-e1];
             goto ret;
         }
