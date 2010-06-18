@@ -242,6 +242,8 @@ typedef union { double d; ULong L[2]; } U;
 #define Frac_mask  0xfffff
 #define Frac_mask1 0xfffff
 #define Ten_pmax 22
+#define Big_10_exp 309      /* Values >= 10**Big_10_exp overflow. */
+#define Tiny_10_exp -324    /* Values < 10**Tiny_10_exp underflow to zero. */
 #define Bletch 0x10
 #define Bndry_mask  0xfffff
 #define Bndry_mask1 0xfffff
@@ -270,7 +272,8 @@ typedef union { double d; ULong L[2]; } U;
 typedef struct BCinfo BCinfo;
 struct
 BCinfo {
-    int e0, nd, nd0, scale;
+    Py_ssize_t nd, nd0;
+    int e0, scale;
 };
 
 #define FFFFFFFF 0xffffffffUL
@@ -479,13 +482,13 @@ multadd(Bigint *b, int m, int a)       /* multiply by m and add a */
    failure.  Assumes that nd >= 1 and that the first digit is nonzero. */
 
 static Bigint *
-s2b(const char *s0, int nd0, int nd)
+s2b(const char *s0, Py_ssize_t nd0, Py_ssize_t nd)
 {
     Bigint *b;
-    int i, k;
-    Long x, y;
+    int k;
+    Py_ssize_t i, x, y;
 
-    x = (nd + 8) / 9;
+    x = 1 + (nd - 1) / 9;
     for (k = 0, y = 1; x > y; y <<= 1, k++) ;
     b = Balloc(k);
     if (b == NULL)
@@ -1318,6 +1321,212 @@ sulp(U *x, BCinfo *bc)
     }
 }
 
+/* parse_numeric_string: Parse and validate a finite numeric string.
+
+   Inputs:
+
+      A NUL-terminated string s00 with an initial portion that represents a
+      finite decimal value.  Valid numeric strings are described by the
+      following pseudo-grammar:
+
+         sign = '+' | '-'
+         digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+         point = '.'
+         indicator = 'e' | 'E'
+         digits = digit [digits]
+         significand = digits [point [digits]] | point digits
+         exponent = indicator [sign] digits
+         numeric-string = [sign] significand [exponent]
+
+      NaNs, infinities and hex literals are not accepted, and leading
+      whitespace is not permitted.
+
+   Outputs:
+
+      Any nonzero finite decimal value as above can be uniquely expressed in
+      the form
+
+         (-1)**sign * 0.<digits> * 10**exp
+
+      where sign is 0 or 1, exp is an integer, and <digits> is a string of one
+      ore more digits with both the first and last digit in the string nonzero.
+      The following return values from parse_numeric_string provide access to
+      these values:
+
+         *sign gives the sign of the input: 1 for negative, 0 for positive.
+
+         *pnd is the length of <digits>
+
+         *ps0 is a pointer into the input string s00, and *pnd0 is an integer;
+         their values are such that for each i in the range 0 <= i < *pnd, the
+         ith digit <digits>[i] can be retrieved as:
+
+            (*ps0)[i < *pnd0 ? i : i + 1]
+
+         [ In the current implementation, *ps0 points just past the last
+         leading zero in the input string, so will either point to a nonzero
+         digit or to the decimal point.  *pnd0 gives the position of the
+         decimal point, or of the end of the digit string if no decimal point
+         is present, relative to ps0.  Note that *pnd0 may be larger than *pnd,
+         or smaller than 0. ]
+
+         *exp is the exponent in the formula above, clipped to lie in the range
+         [INT_MIN, INT_MAX].
+
+      For an input representing zero, *pnd will be 0.
+
+      *se points at the first character past the largest initial sequence
+      of s00 that gives a valid numeric string.  If the entire string
+      s00 is a valid numeric string, *se will point to its terminating NUL
+      character.  If no initial portion of s00 gives a valid numeric
+      string then *se will be equal to s00.
+
+      Returns 0 for a successful parse, and a nonzero value on failure.
+*/
+
+static int
+parse_numeric_string(const char *s00, char **se, char **ps0,
+                     Py_ssize_t *pnd, Py_ssize_t *pnd0,
+                     int *exp, int *sign)
+{
+    char c;
+    const char *s, *s0, *s1;
+    int esign, rv;
+    unsigned int dig;
+    Py_ssize_t e, nd, nd0, nz;
+    size_t abs_exp;
+
+    s = s00;
+    c = *s;
+
+    /* Parse optional sign, if present. */
+    *sign = 0;
+    switch (c) {
+    case '-':
+        *sign = 1;
+        /* no break */
+    case '+':
+        c = *++s;
+    }
+
+    /* Skip (and count) leading zeros. */
+    s0 = s;
+    while (c == '0')
+        c = *++s;
+    nz = s - s0;
+
+    /* Parse any remaining digits before the point. */
+    while ('0' <= c && c <= '9')
+        c = *++s;
+    nd0 = nd = s - s0;
+
+    /* Parse decimal point and following digits. */
+    if (c == '.') {
+        c = *++s;
+        s1 = s;
+        /* If all digits so far are zeros, continue to count leading zeros. */
+        if (nd == nz) {
+            while (c == '0')
+                c = *++s;
+            nz += s - s1;
+        }
+        while ('0' <= c && c <= '9')
+            c = *++s;
+        nd += s - s1;
+    }
+
+    if (!nd) {
+        /* No digits in the significand, so we've got an invalid numeric
+           string and a parse failure. */
+        rv = 1;
+        *exp = 0; /* Silence a gcc 'may be used uninitialized' warning. */
+        goto exit;
+    }
+
+    /* We've got at least one digit, so the string up to this point is a
+       valid numeric string and the parse is successful. */
+    rv = 0;
+    s00 = s;
+
+    /* Adjust s0, nd, nd0 for leading zeros. */
+    s0 += nz;
+    nd -= nz;
+    nd0 -= nz;
+
+    /* The ith digit of the significand can now be retrieved as s0[i < nd0 ? i
+       : i + 1].  Discard any trailing zeros. */
+    while (nd > 0 && s0[nd - 1 < nd0 ? nd - 1 : nd] == '0')
+        nd--;
+
+    /* Parse exponent. */
+    esign = 0;
+    abs_exp = 0U;
+    if (c == 'e' || c == 'E') {
+        c = *++s;
+
+        /* Exponent sign. */
+        esign = 0;
+        switch (c) {
+        case '-':
+            esign = 1;
+            /* no break */
+        case '+':
+            c = *++s;
+        }
+
+       /* Get absolute value abs_exp for the exponent; cap at SIZE_T_MAX.  */
+        s1 = s;
+        while ('0' <= c && c <= '9') {
+            dig = (unsigned int)(c - '0');
+            /* Safe version of: if (10U * abs_exp + dig > SIZE_T_MAX) {...} */
+            if (abs_exp >= SIZE_T_MAX / 10U && (abs_exp > SIZE_T_MAX / 10U ||
+                                                dig > SIZE_T_MAX % 10U)) {
+                abs_exp = SIZE_T_MAX;
+                break;
+            }
+            abs_exp = 10U * abs_exp + dig;
+            c = *++s;
+        }
+        /* A valid exponent must have at least one digit. */
+        if (s != s1)
+            s00 = s;
+    }
+
+    /* Find e = nd0 + (-1)**esign * abs_exp, avoiding underflow/overflow and
+       clipping the result to the range [PY_SSIZE_T_MIN, PY_SSIZE_T_MAX].
+       Note that if the 'true' absolute exponent (i.e., without the SIZE_T_MAX
+       cap) is greater than SIZE_T_MAX then either e >= PY_SSIZE_T_MAX or e <=
+       PY_SSIZE_T_MIN, so we still end up doing the right thing here. */
+    if (esign) {
+        if (nd0 - (size_t)PY_SSIZE_T_MIN < abs_exp)
+            e = PY_SSIZE_T_MIN;
+        else
+            e = nd0 - abs_exp;
+    }
+    else {
+        if ((size_t)PY_SSIZE_T_MAX - nd0 < abs_exp)
+            e = PY_SSIZE_T_MAX;
+        else
+            e = nd0 + abs_exp;
+    }
+
+    /* Clip further to [INT_MIN, INT_MAX]. */
+    if (e < INT_MIN)
+        *exp = INT_MIN;
+    else if (e > INT_MAX)
+        *exp = INT_MAX;
+    else
+        *exp = e;
+
+  exit:
+    if (se)
+        *se = (char *)s00;
+    *pnd = nd;
+    *pnd0 = nd0;
+    *ps0 = (char *)s0;
+    return rv;
+}
+
 /* The bigcomp function handles some hard cases for strtod, for inputs
    with more than STRTOD_DIGLIM digits.  It's called once an initial
    estimate for the double corresponding to the input string has
@@ -1345,15 +1554,8 @@ sulp(U *x, BCinfo *bc)
      bc is a struct containing information gathered during the parsing and
         estimation steps of _Py_dg_strtod.  Description of fields follows:
 
-        bc->e0 gives the exponent of the input value, such that dv = (integer
-           given by the bd->nd digits of s0) * 10**e0
-
-        bc->nd gives the total number of significant digits of s0.  It will
-           be at least 1.
-
-        bc->nd0 gives the number of significant digits of s0 before the
-           decimal separator.  If there's no decimal separator, bc->nd0 ==
-           bc->nd.
+        bc->e0, bc->nd and bc->nd0 correspond to the values returned by
+           parse_numeric_string.
 
         bc->scale is the value used to scale rv to avoid doing arithmetic with
            subnormal values.  It's either 0 or 2*P (=106).
@@ -1368,7 +1570,8 @@ static int
 bigcomp(U *rv, const char *s0, BCinfo *bc)
 {
     Bigint *b, *d;
-    int b2, d2, dd, i, nd, nd0, odd, p2, p5;
+    int b2, d2, dd, i, odd, p2, p5;
+    Py_ssize_t nd, nd0;
 
     nd = bc->nd;
     nd0 = bc->nd0;
@@ -1443,7 +1646,7 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
         /* b/d >= 1 */
         dd = -1;
     else {
-        i = 0;
+        Py_ssize_t i = 0;
         for(;;) {
             b = multadd(b, 10, 0);
             if (b == NULL) {
@@ -1477,165 +1680,31 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
 double
 _Py_dg_strtod(const char *s00, char **se)
 {
-    int bb2, bb5, bbe, bd2, bd5, bs2, c, dsign, e, e1, error;
-    int esign, i, j, k, lz, nd, nd0, odd, sign;
-    const char *s, *s0, *s1;
+    int bb2, bb5, bbe, bd2, bd5, bs2, dsign, e, e1, error, i, j, k, odd, sign;
+    Py_ssize_t nd, nd0, pos;
+    char *s0;
     double aadj, aadj1;
     U aadj2, adj, rv, rv0;
-    ULong y, z, abs_exp;
+    ULong y, z;
     Long L;
     BCinfo bc;
     Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
 
     dval(&rv) = 0.;
 
-    /* Start parsing. */
-    c = *(s = s00);
-
-    /* Parse optional sign, if present. */
-    sign = 0;
-    switch (c) {
-    case '-':
-        sign = 1;
-        /* no break */
-    case '+':
-        c = *++s;
-    }
-
-    /* Skip leading zeros: lz is true iff there were leading zeros. */
-    s1 = s;
-    while (c == '0')
-        c = *++s;
-    lz = s != s1;
-
-    /* Point s0 at the first nonzero digit (if any).  nd0 will be the position
-       of the point relative to s0.  nd will be the total number of digits
-       ignoring leading zeros. */
-    s0 = s1 = s;
-    while ('0' <= c && c <= '9')
-        c = *++s;
-    nd0 = nd = s - s1;
-
-    /* Parse decimal point and following digits. */
-    if (c == '.') {
-        c = *++s;
-        if (!nd) {
-            s1 = s;
-            while (c == '0')
-                c = *++s;
-            lz = lz || s != s1;
-            nd0 -= s - s1;
-            s0 = s;
-        }
-        s1 = s;
-        while ('0' <= c && c <= '9')
-            c = *++s;
-        nd += s - s1;
-    }
-
-    /* Now lz is true if and only if there were leading zero digits, and nd
-       gives the total number of digits ignoring leading zeros.  A valid input
-       must have at least one digit. */
-    if (!nd && !lz) {
-        if (se)
-            *se = (char *)s00;
+    error = parse_numeric_string(s00, se, &s0, &nd, &nd0, &e, &sign);
+    if (error)
         goto parse_error;
-    }
 
-    /* Parse exponent. */
-    e = 0;
-    if (c == 'e' || c == 'E') {
-        s00 = s;
-        c = *++s;
-
-        /* Exponent sign. */
-        esign = 0;
-        switch (c) {
-        case '-':
-            esign = 1;
-            /* no break */
-        case '+':
-            c = *++s;
-        }
-
-        /* Skip zeros.  lz is true iff there are leading zeros. */
-        s1 = s;
-        while (c == '0')
-            c = *++s;
-        lz = s != s1;
-
-        /* Get absolute value of the exponent. */
-        s1 = s;
-        abs_exp = 0;
-        while ('0' <= c && c <= '9') {
-            abs_exp = 10*abs_exp + (c - '0');
-            c = *++s;
-        }
-
-        /* abs_exp will be correct modulo 2**32.  But 10**9 < 2**32, so if
-           there are at most 9 significant exponent digits then overflow is
-           impossible. */
-        if (s - s1 > 9 || abs_exp > MAX_ABS_EXP)
-            e = (int)MAX_ABS_EXP;
-        else
-            e = (int)abs_exp;
-        if (esign)
-            e = -e;
-
-        /* A valid exponent must have at least one digit. */
-        if (s == s1 && !lz)
-            s = s00;
-    }
-
-    /* Adjust exponent to take into account position of the point. */
-    e += nd0;
-    if (nd0 <= 0)
-        nd0 = nd;
-
-    /* Finished parsing.  Set se to indicate how far we parsed */
-    if (se)
-        *se = (char *)s;
-
-    /* If all digits were zero, exit with return value +-0.0.  Otherwise,
-       strip trailing zeros: scan back until we hit a nonzero digit. */
+    /* If all digits were zero, exit with return value +-0.0. */
     if (!nd)
         goto ret;
-    for (i = nd; i > 0; ) {
-        --i;
-        if (s0[i < nd0 ? i : i+1] != '0') {
-            ++i;
-            break;
-        }
-    }
-    nd = i;
-    if (nd0 > nd)
-        nd0 = nd;
 
-    /* Summary of parsing results.  After parsing, and dealing with zero
-     * inputs, we have values s0, nd0, nd, e, sign, where:
-     *
-     *  - s0 points to the first significant digit of the input string
-     *
-     *  - nd is the total number of significant digits (here, and
-     *    below, 'significant digits' means the set of digits of the
-     *    significand of the input that remain after ignoring leading
-     *    and trailing zeros).
-     *
-     *  - nd0 indicates the position of the decimal point, if present; it
-     *    satisfies 1 <= nd0 <= nd.  The nd significant digits are in
-     *    s0[0:nd0] and s0[nd0+1:nd+1] using the usual Python half-open slice
-     *    notation.  (If nd0 < nd, then s0[nd0] contains a '.'  character; if
-     *    nd0 == nd, then s0[nd0] could be any non-digit character.)
-     *
-     *  - e is the adjusted exponent: the absolute value of the number
-     *    represented by the original input string is n * 10**(e - nd), where
-     *    n is the integer represented by the concatenation of
-     *    s0[0:nd0] and s0[nd0+1:nd+1]
-     *
-     *  - sign gives the sign of the input:  1 for negative, 0 for positive
-     *
-     *  - the first and last significant digits are nonzero
-     */
+    /* Overflow and underflow. */
+    if (e > Big_10_exp)
+        goto ovfl;
+    else if (e <= Tiny_10_exp)
+        goto undfl;
 
     /* put first DBL_DIG+1 digits into integer y and z.
      *
@@ -1649,11 +1718,11 @@ _Py_dg_strtod(const char *s00, char **se)
 
     bc.e0 = e;
     y = z = 0;
-    for (i = 0; i < nd; i++) {
-        if (i < 9)
-            y = 10*y + s0[i < nd0 ? i : i+1] - '0';
-        else if (i < DBL_DIG+1)
-            z = 10*z + s0[i < nd0 ? i : i+1] - '0';
+    for (pos = 0; pos < nd; pos++) {
+        if (pos < 9)
+            y = 10*y + s0[pos < nd0 ? pos : pos+1] - '0';
+        else if (pos < DBL_DIG+1)
+            z = 10*z + s0[pos < nd0 ? pos : pos+1] - '0';
         else
             break;
     }
@@ -1775,27 +1844,10 @@ _Py_dg_strtod(const char *s00, char **se)
         /* in IEEE arithmetic. */
 
         /* Truncate input to 18 significant digits, then discard any trailing
-           zeros on the result by updating nd, nd0, e and y suitably. (There's
-           no need to update z; it's not reused beyond this point.) */
-        for (i = 18; i > 0; ) {
-            /* scan back until we hit a nonzero digit.  significant digit 'i'
-            is s0[i] if i < nd0, s0[i+1] if i >= nd0. */
-            --i;
-            if (s0[i < nd0 ? i : i+1] != '0') {
-                ++i;
-                break;
-            }
-        }
-        nd = i;
-        if (nd0 > nd)
-            nd0 = nd;
-        if (nd < 9) { /* must recompute y */
-            y = 0;
-            for(i = 0; i < nd0; ++i)
-                y = 10*y + s0[i] - '0';
-            for(; i < nd; ++i)
-                y = 10*y + s0[i+1] - '0';
-        }
+           zeros on the result. */
+        nd = 18;
+        while (nd > 0 && s0[nd - 1  < nd0 ? nd - 1 : nd] == '0')
+            nd--;
     }
     bd0 = s2b(s0, nd0, nd);
     if (bd0 == NULL)
