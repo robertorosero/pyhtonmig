@@ -1707,37 +1707,16 @@ _Py_dg_strtod(const char *s00, char **se)
     else if (e <= Tiny_10_exp)
         goto undfl;
 
-    /* put first DBL_DIG+1 digits into integer y and z.
-     *
-     *  - y contains the value represented by the first min(9, nd)
-     *    significant digits
-     *
-     *  - if nd > 9, z contains the value represented by significant digits
-     *    with indices in [9, min(16, nd)).  So y * 10**(min(16, nd) - 9) + z
-     *    gives the value represented by the first min(16, nd) sig. digits.
-     */
-
-    bc.e0 = e;
-    y = z = 0;
-    for (pos = 0; pos < nd; pos++) {
-        if (pos < 9)
-            y = 10*y + s0[pos < nd0 ? pos : pos+1] - '0';
-        else if (pos < DBL_DIG+1)
-            z = 10*z + s0[pos < nd0 ? pos : pos+1] - '0';
-        else
-            break;
-    }
-
+    /* Initial approximation based on first DBL_DIG+1 digits of the input. */
     k = nd < DBL_DIG + 1 ? nd : DBL_DIG + 1;
-    dval(&rv) = y;
-    if (k > 9) {
-        dval(&rv) = tens[k - 9] * dval(&rv) + z;
-    }
-    bd0 = 0;
+    for (pos = 0; pos < k; pos++)
+        dval(&rv) = 10.0 * dval(&rv) + (s0[pos < nd0 ? pos : pos + 1] - '0');
     e1 = e - k;
-    if (nd <= DBL_DIG
-        && Flt_Rounds == 1
-        ) {
+
+   /* If there are at most Dbl_dig significant digits in the input, then rv
+       is exact and there's a chance to compute the exact result with a single
+       floating-point multiplication or division. */
+    if (nd <= DBL_DIG) {
         if (!e1)
             goto ret;
         if (e1 > 0) {
@@ -1835,6 +1814,7 @@ _Py_dg_strtod(const char *s00, char **se)
 
     /* Put digits into bd: true value = bd * 10^e */
 
+    bc.e0 = e;
     bc.nd = nd;
     bc.nd0 = nd0;       /* Only needed if nd > STRTOD_DIGLIM, but done here */
                         /* to silence an erroneous warning about bc.nd0 */
