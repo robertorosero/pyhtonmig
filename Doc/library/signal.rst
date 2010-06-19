@@ -147,7 +147,7 @@ The variables defined in the :mod:`signal` module are:
 .. data:: SFD_NONBLOCK
 
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
-   the new file description to be set non-blocking.
+   the new file *description* (**not** *descriptor*) to be set non-blocking.
 
    .. versionadded:: 3.2
 
@@ -268,8 +268,8 @@ The :mod:`signal` module defines the following functions:
 
    Create a new file descriptor on which to receive signals or modify the
    mask of such a file descriptor previously created by this function.
-   Availability: Linux (See the manpage :manpage:`signalfd(2)` for further
-   information).
+   Availability: :platform: Linux (See the manpage :manpage:`signalfd(2)`
+   for further information).
 
    If *fd* is ``-1``, a new file descriptor will be created.  Otherwise,
    *fd* must be a file descriptor previously returned by this function.
