@@ -472,7 +472,6 @@ static int
 _iterable_to_mask(PyObject *iterable, sigset_t *mask)
 {
     static const char* range_format = "signal number %d out of range";
-    char range_buffer[1024];
     int result = 0;
 
     PyObject *item, *iterator = NULL;
@@ -493,8 +492,7 @@ _iterable_to_mask(PyObject *iterable, sigset_t *mask)
 	    goto error;
         }
         if (sigaddset(mask, signum) == -1) {
-            PyOS_snprintf(range_buffer, sizeof(range_buffer), range_format, signum);
-            PyErr_SetString(PyExc_ValueError, range_buffer);
+            PyErr_Format(PyExc_ValueError, range_format, signum);
             result = -1;
             goto error;
         }
@@ -516,7 +514,6 @@ static PyObject *
 signal_sigprocmask(PyObject *self, PyObject *args)
 {
     static const char* how_format = "value specified for how (%d) invalid";
-    char how_buffer[1024];
 
     int how, sig;
     PyObject *signals, *result, *signum;
@@ -531,8 +528,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
     }
 
     if (PY_SIGMASK(how, &mask, &previous) != 0) {
-        PyOS_snprintf(how_buffer, sizeof(how_buffer), how_format, how);
-        PyErr_SetString(PyExc_ValueError, how_buffer);
+        PyErr_Format(PyExc_ValueError, how_format, how);
         return NULL;
     }
 
