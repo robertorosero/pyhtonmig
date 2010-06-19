@@ -268,8 +268,8 @@ The :mod:`signal` module defines the following functions:
 
    Create a new file descriptor on which to receive signals or modify the
    mask of such a file descriptor previously created by this function.
-   Availability: :platform: Linux (See the manpage :manpage:`signalfd(2)`
-   for further information).
+   Availability: Linux (See the manpage :manpage:`signalfd(2)` for further
+   information).
 
    If *fd* is ``-1``, a new file descriptor will be created.  Otherwise,
    *fd* must be a file descriptor previously returned by this function.
