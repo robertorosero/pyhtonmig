@@ -554,15 +554,10 @@ class SigprocmaskTests(unittest.TestCase):
             os.kill(os.getpid(), signal.SIGUSR1)
 
 
-    def test_long_signals(self):
-        """sigprocmask accepts signal numbers as instances of long."""
-        previous = signal.sigprocmask(
-            signal.SIG_SETMASK, [long(signal.SIGUSR1), long(signal.SIGUSR2)])
-        masked = signal.sigprocmask(signal.SIG_SETMASK, previous)
-        self.assertEquals(masked, [signal.SIGUSR1, signal.SIGUSR2])
 
-
-
+@unittest.skipIf(sys.platform != 'linux2'
+                 or os.uname()[2].split('.') < ['2', '6', '22'],
+                 'signalfd(2) only available on Linux >=2.6.22')
 class SignalfdTests(unittest.TestCase):
     """
     Tests for signal.signalfd.
