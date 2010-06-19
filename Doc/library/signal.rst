@@ -117,7 +117,7 @@ The variables defined in the :mod:`signal` module are:
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that signals are to be blocked.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 .. data:: SIG_UNBLOCK
@@ -125,7 +125,7 @@ The variables defined in the :mod:`signal` module are:
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that signals are to be unblocked.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 .. data:: SIG_SETMASK
@@ -133,7 +133,7 @@ The variables defined in the :mod:`signal` module are:
    A possible value for the *how* parameter to :func:`sigprocmask`
    indicating that the signal mask is to be replaced.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 .. data:: SFD_CLOEXEC
@@ -141,7 +141,7 @@ The variables defined in the :mod:`signal` module are:
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
    the new file descriptor to be marked as close-on-exec.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 .. data:: SFD_NONBLOCK
@@ -149,7 +149,7 @@ The variables defined in the :mod:`signal` module are:
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
    the new file description to be set non-blocking.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 The :mod:`signal` module defines one exception:
