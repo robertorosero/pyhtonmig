@@ -985,41 +985,19 @@ ulp(U *x)
     return dval(&u);
 }
 
-/* Convert a Bigint to a double plus an exponent */
+/* Convert a Bigint a to a double giving the value a / 2**(32 * a->wds).
+   Error < 0.75 ulps.  This function is currently used only by ratio. */
 
 static double
-b2d(Bigint *a, int *e)
+b2d(Bigint *a)
 {
-    ULong *xa, *xa0, w, y, z;
-    int k;
-    U d;
-
-    xa0 = a->x;
-    xa = xa0 + a->wds;
-    y = *--xa;
-#ifdef DEBUG
-    if (!y) Bug("zero y in b2d");
-#endif
-    k = hi0bits(y);
-    *e = 32 - k;
-    if (k < Ebits) {
-        word0(&d) = Exp_1 | y >> (Ebits - k);
-        w = xa > xa0 ? *--xa : 0;
-        word1(&d) = y << ((32-Ebits) + k) | w >> (Ebits - k);
-        goto ret_d;
-    }
-    z = xa > xa0 ? *--xa : 0;
-    if (k -= Ebits) {
-        word0(&d) = Exp_1 | y << k | z >> (32 - k);
-        y = xa > xa0 ? *--xa : 0;
-        word1(&d) = z << k | y >> (32 - k);
-    }
-    else {
-        word0(&d) = Exp_1 | y;
-        word1(&d) = z;
-    }
-  ret_d:
-    return dval(&d);
+    int i, wds;
+    double d;
+    wds = a->wds;
+    d = 0.0;
+    for (i = wds > 3 ? wds - 3 : 0; i < wds; i++)
+        d = (d + a->x[i]) * (1.0 / 4294967296.0);
+    return d;
 }
 
 /* Convert a scaled double to a Bigint plus an exponent.  Similar to d2b,
@@ -1147,23 +1125,26 @@ d2b(U *d, int *e, int *bits)
 }
 
 /* Compute the ratio of two Bigints, as a double.  The result may have an
-   error of up to 2.5 ulps. */
+   error of up to 3.5 ulps. */
 
 static double
 ratio(Bigint *a, Bigint *b)
 {
     U da, db;
-    int k, ka, kb;
+    int k;
 
-    dval(&da) = b2d(a, &ka);
-    dval(&db) = b2d(b, &kb);
-    k = ka - kb + 32*(a->wds - b->wds);
-    if (k > 0)
-        word0(&da) += k*Exp_msk1;
-    else {
-        k = -k;
-        word0(&db) += k*Exp_msk1;
-    }
+#ifdef DEBUG
+    if (!b->x[0] && b->wds == 1)
+        Bug("zero divisor in ratio");
+#endif
+
+    dval(&da) = b2d(a);
+    dval(&db) = b2d(b);
+    k = a->wds - b->wds;
+    if (k >= 0)
+        word0(&da) += 32*Exp_msk1*k;
+    else
+        word0(&db) += 32*Exp_msk1*-k;
     return dval(&da) / dval(&db);
 }
 
