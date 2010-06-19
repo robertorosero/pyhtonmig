@@ -266,6 +266,7 @@ The :mod:`signal` module defines the following functions:
 
 .. function:: signalfd(fd, mask[, flags])
 
+   :platform: Linux
    Create a new file descriptor on which to receive signals or modify the
    mask of such a file descriptor previously created by this function.
    Availability: Linux (See the manpage :manpage:`signalfd(2)` for further
