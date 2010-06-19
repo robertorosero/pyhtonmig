@@ -565,8 +565,7 @@ class SigprocmaskTests(unittest.TestCase):
 
 
 
-@unittest.skipIf(sys.platform != 'linux2'
-                 or os.uname()[2].split('.') < ['2', '6', '22'],
+@unittest.skipIf(getattr(signal, 'signalfd', None) is None,
                  'signalfd(2) only available on Linux >=2.6.22')
 class SignalfdTests(unittest.TestCase):
     """
