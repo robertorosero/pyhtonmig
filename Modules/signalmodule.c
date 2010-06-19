@@ -468,6 +468,7 @@ Returns current value of given itimer.");
 #endif
 
 
+#ifdef HAVE_SIGPROCMASK
 static int
 _iterable_to_mask(PyObject *iterable, sigset_t *mask)
 {
@@ -502,6 +503,7 @@ error:
     Py_XDECREF(iterator);
     return result;
 }
+#endif
 
 #if defined(HAVE_PTHREAD_SIGMASK) && !defined(HAVE_BROKEN_PTHREAD_SIGMASK)
 # define PY_SIGMASK pthread_sigmask
