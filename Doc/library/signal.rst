@@ -279,7 +279,7 @@ The :mod:`signal` module defines the following functions:
 
    *flags* is a bit mask which may include any :const:`signal.SFD_*` flag.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.2
 
 
 .. function:: sigprocmask(how, mask)
@@ -299,7 +299,7 @@ The :mod:`signal` module defines the following functions:
 
    *mask* is a list of signal numbers (eg :const:`signal.SIGUSR1`).
 
-  .. versionadded:: 2.7
+  .. versionadded:: 3.2
 
 
 .. _signal-example:
