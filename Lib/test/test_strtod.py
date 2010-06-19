@@ -80,7 +80,7 @@ def strtod(s, mant_dig=53, min_exp = -1021, max_exp = 1024):
         hexdigs,
         e + 4*hexdigs)
 
-TEST_SIZE = 10
+TEST_SIZE = 1000
 
 class StrtodTests(unittest.TestCase):
     def check_strtod(self, s):
