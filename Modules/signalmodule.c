@@ -486,7 +486,7 @@ _iterable_to_mask(PyObject *iterable, sigset_t *mask)
     }
 
     while ((item = PyIter_Next(iterator))) {
-        int signum = PyInt_AsLong(item);
+        int signum = PyLong_AsLong(item);
         Py_DECREF(item);
         if (signum == -1 && PyErr_Occurred()) {
 	    result = -1;
@@ -548,7 +548,7 @@ signal_sigprocmask(PyObject *self, PyObject *args)
                signal isn't a member of the mask or the signal was invalid,
                and an invalid signal must have been our fault in constructing
                the loop boundaries. */
-            signum = PyInt_FromLong(sig);
+            signum = PyLong_FromLong(sig);
             if (signum == NULL) {
                 Py_DECREF(result);
                 return NULL;
@@ -595,7 +595,7 @@ signal_signalfd(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    return PyInt_FromLong(result);
+    return PyLong_FromLong(result);
 }
 
 PyDoc_STRVAR(signalfd_doc,
