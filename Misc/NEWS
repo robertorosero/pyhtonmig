@@ -1026,7 +1026,7 @@ Library
   in imaplib.
 
 - Issue #8407: The signal module gains the ``signalfd()`` and
-  ``sigprocmask(2)`` functions providing access to the signalfd(2) and
+  ``sigprocmask()`` functions providing access to the signalfd(2) and
   sigprocmask(2) system calls respectively on Linux systems which implement
   them.
 
