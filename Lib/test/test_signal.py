@@ -484,6 +484,16 @@ class SigprocmaskTests(unittest.TestCase):
         old_handler = signal.signal(signal.SIGUSR1, raiser)
         self.addCleanup(signal.signal, signal.SIGUSR1, old_handler)
 
+        # This depends on sigprocmask working a bit.  If it doesn't, then
+        # this won't succeed in keeping the signal mask state sane.  But
+        # there's nothing else we can do in that case.  This is necessary at
+        # all because some environments start off with certain signals
+        # masked for obscure reasons.  The intent is to provide the tests
+        # with a consistent, predictable starting state and then restore the
+        # environment's expectations after the test.
+        old_mask = signal.sigprocmask(signal.SIG_SETMASK, [])
+        self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, old_mask)
+
 
     def test_signature(self):
         """When invoked with other than two arguments, sigprocmask raises
