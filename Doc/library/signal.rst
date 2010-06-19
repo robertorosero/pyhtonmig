@@ -147,7 +147,7 @@ The variables defined in the :mod:`signal` module are:
 .. data:: SFD_NONBLOCK
 
    A possible flag in the *flags* parameter to :func:`signalfd` which causes
-   the new file *description* (**not** *descriptor*) to be set non-blocking.
+   the new :term:`file description` to be set non-blocking.
 
    .. versionadded:: 3.2
 

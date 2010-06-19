@@ -179,6 +179,16 @@ Glossary
       A module written in C or C++, using Python's C API to interact with the core and
       with user code.
 
+   file description
+      The data structure (usually in the kernel) containing the details of
+      an open file.  A file description is referred to by one or more
+      :term:`file descriptors <file descriptor>`.
+
+   file descriptor
+      An abstract reference to a file, socket, or other file-like entity.
+      For example, the integer returned by :func:`os.open`, :func:`os.dup`,
+      or :meth:`io.IOBase.fileno`.
+
    finder
       An object that tries to find the :term:`loader` for a module. It must
       implement a method named :meth:`find_module`. See :pep:`302` for
