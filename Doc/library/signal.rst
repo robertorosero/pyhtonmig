@@ -266,11 +266,10 @@ The :mod:`signal` module defines the following functions:
 
 .. function:: signalfd(fd, mask[, flags])
 
-   :platform: Linux
    Create a new file descriptor on which to receive signals or modify the
    mask of such a file descriptor previously created by this function.
-   Availability: Linux (See the manpage :manpage:`signalfd(2)` for further
-   information).
+   Availability: Linux.  See the manpage :manpage:`signalfd(2)` for further
+   information.
 
    If *fd* is ``-1``, a new file descriptor will be created.  Otherwise,
    *fd* must be a file descriptor previously returned by this function.
@@ -286,8 +285,8 @@ The :mod:`signal` module defines the following functions:
 .. function:: sigprocmask(how, mask)
 
    Set the signal mask for the process.  The old signal mask is returned.
-   Availability: Unix (See the Unix man page :manpage:`sigprocmask(2)` and
-   :manpage:`pthread_sigmask(2)`.)
+   Availability: Unix.  See the man page :manpage:`sigprocmask(2)` and
+   :manpage:`pthread_sigmask(2)`.
 
    If *how* is :const:`signal.SIG_BLOCK`, the signals in the mask are added
    to the set of blocked signals.
