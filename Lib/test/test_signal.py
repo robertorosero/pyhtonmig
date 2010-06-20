@@ -628,7 +628,7 @@ class SignalfdTests(unittest.TestCase):
         self.assertTrue(bytes)
 
 
-    @unittest.skipIf(getattr('signal', 'SFD_CLOEXEC', None) is None,
+    @unittest.skipIf(getattr(signal, 'SFD_CLOEXEC', None) is None,
                      "signal.SFD_CLOEXEC only available on Linux >=2.6.27")
     def test_close_on_exec(self):
         """If the bit mask passed as the 3rd argument to signalfd includes
@@ -641,7 +641,7 @@ class SignalfdTests(unittest.TestCase):
         self.assertTrue(flags & fcntl.FD_CLOEXEC)
 
 
-    @unittest.skipIf(getattr('signal', 'SFD_NONBLOCK', None) is None,
+    @unittest.skipIf(getattr(signal, 'SFD_NONBLOCK', None) is None,
                      "signal.SFD_NONBLOCK only available on Linux >=2.6.27")
     def test_nonblocking(self):
         """If the bit mask passed as the 3rd argument to signalfd includes
