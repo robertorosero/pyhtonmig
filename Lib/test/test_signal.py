@@ -571,6 +571,14 @@ class SignalfdTests(unittest.TestCase):
     """
     Tests for signal.signalfd.
     """
+    def signalfd(self, *a, **kw):
+        try:
+            return signal.signalfd(*a, **kw)
+        except OSError as e:
+            if e.errno == errno.ENOSYS:
+                raise unittest.Skip("signalfd() not implemented on this platform")
+
+
     def test_signature(self):
         """When invoked with fewer than two arguments or more than three,
         signalfd raises TypeError.
