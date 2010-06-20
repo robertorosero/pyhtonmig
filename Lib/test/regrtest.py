@@ -231,7 +231,7 @@ def usage(msg):
     sys.exit(2)
 
 
-def main(tests=None, testdir=None, verbose=0, quiet=False,
+def main(tests=None, testdir=None, verbose=1, quiet=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
          runleaks=False, huntrleaks=False, verbose2=False, print_slow=False,
