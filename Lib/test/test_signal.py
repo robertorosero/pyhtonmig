@@ -583,16 +583,16 @@ class SignalfdTests(unittest.TestCase):
         """When invoked with fewer than two arguments or more than three,
         signalfd raises TypeError.
         """
-        self.assertRaises(TypeError, signal.signalfd)
-        self.assertRaises(TypeError, signal.signalfd, 1)
-        self.assertRaises(TypeError, signal.signalfd, 1, 2, 3, 4)
+        self.assertRaises(TypeError, self.signalfd)
+        self.assertRaises(TypeError, self.signalfd, 1)
+        self.assertRaises(TypeError, self.signalfd, 1, 2, 3, 4)
 
 
     def test_create_signalfd(self):
         """When invoked with a file descriptor of -1, signalfd allocates a new
         file descriptor for signal information delivery and returns it.
         """
-        fd = signal.signalfd(-1, [])
+        fd = self.signalfd(-1, [])
         self.assertTrue(isinstance(fd, int))
         os.close(fd)
 
@@ -602,7 +602,7 @@ class SignalfdTests(unittest.TestCase):
         argument to signalfd, the exception raised by trying to iterate over
         that object is raised.
         """
-        self.assertRaises(TypeError, signal.signalfd, -1, object())
+        self.assertRaises(TypeError, self.signalfd, -1, object())
 
 
     def test_non_integer_signals(self):
@@ -610,7 +610,7 @@ class SignalfdTests(unittest.TestCase):
         to signalfd, the exception raised by the attempt to convert them to an
         integer is raised.
         """
-        self.assertRaises(TypeError, signal.signalfd, -1, [object()])
+        self.assertRaises(TypeError, self.signalfd, -1, [object()])
 
 
     def test_out_of_range_signal(self):
@@ -619,7 +619,7 @@ class SignalfdTests(unittest.TestCase):
         """
         message = "signal number -2 out of range"
         with self.assertRaisesRegexp(ValueError, message):
-            signal.signalfd(-1, [-2])
+            self.signalfd(-1, [-2])
 
 
     def test_handle_signals(self):
@@ -627,7 +627,7 @@ class SignalfdTests(unittest.TestCase):
         sigmask list passed to that call, information about the signal can be
         read from the fd returned by that call.
         """
-        fd = signal.signalfd(-1, [signal.SIGUSR2])
+        fd = self.signalfd(-1, [signal.SIGUSR2])
         self.addCleanup(os.close, fd)
         previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR2])
         self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, previous)
@@ -643,7 +643,7 @@ class SignalfdTests(unittest.TestCase):
         SFD_CLOEXEC, the returned file descriptor has FD_CLOEXEC set on it.
         """
         import fcntl
-        fd = signal.signalfd(-1, [], signal.SFD_CLOEXEC)
+        fd = self.signalfd(-1, [], signal.SFD_CLOEXEC)
         self.addCleanup(os.close, fd)
         flags = fcntl.fcntl(fd, fcntl.F_GETFD)
         self.assertTrue(flags & fcntl.FD_CLOEXEC)
@@ -657,7 +657,7 @@ class SignalfdTests(unittest.TestCase):
         descriptor has O_NONBLOCK set on it.
         """
         import fcntl
-        fd = signal.signalfd(-1, [], signal.SFD_NONBLOCK)
+        fd = self.signalfd(-1, [], signal.SFD_NONBLOCK)
         self.addCleanup(os.close, fd)
         flags = fcntl.fcntl(fd, fcntl.F_GETFL)
         self.assertTrue(flags & os.O_NONBLOCK)
@@ -669,7 +669,7 @@ class SignalfdTests(unittest.TestCase):
         descriptor/description.
         """
         import fcntl
-        fd = signal.signalfd(-1, [])
+        fd = self.signalfd(-1, [])
         self.addCleanup(os.close, fd)
         flags = fcntl.fcntl(fd, fcntl.F_GETFD)
         self.assertFalse(flags & fcntl.FD_CLOEXEC)
