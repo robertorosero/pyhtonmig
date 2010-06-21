@@ -627,13 +627,21 @@ class SignalfdTests(unittest.TestCase):
         sigmask list passed to that call, information about the signal can be
         read from the fd returned by that call.
         """
+        print 'a'
         fd = self.signalfd(-1, [signal.SIGUSR2])
+        print 'b'
         self.addCleanup(os.close, fd)
+        print 'c'
         previous = signal.sigprocmask(signal.SIG_BLOCK, [signal.SIGUSR2])
+        print 'd'
         self.addCleanup(signal.sigprocmask, signal.SIG_SETMASK, previous)
+        print 'e'
         os.kill(os.getpid(), signal.SIGUSR2)
+        print 'f'
         bytes = os.read(fd, 128)
+        print 'g'
         self.assertTrue(bytes)
+        print 'h'
 
 
     @unittest.skipIf(getattr(signal, 'SFD_CLOEXEC', None) is None,
