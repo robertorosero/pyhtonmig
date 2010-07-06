@@ -755,10 +755,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Include\intobject.h"
-				>
-			</File>
-			<File
 				RelativePath="..\Include\intrcheck.h"
 				>
 			</File>
@@ -1037,6 +1033,14 @@
 			</File>
 			<File
 				RelativePath="..\Modules\_struct.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Modules\_time.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Modules\_time.h"
 				>
 			</File>
 			<File

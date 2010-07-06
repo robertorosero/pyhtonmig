@@ -841,19 +841,17 @@ FUNC1(atanh, m_atanh, 0,
 
 static PyObject * math_ceil(PyObject *self, PyObject *number) {
     static PyObject *ceil_str = NULL;
-    PyObject *method;
+    PyObject *method, *result;
 
-    if (ceil_str == NULL) {
-        ceil_str = PyUnicode_InternFromString("__ceil__");
-        if (ceil_str == NULL)
+    method = _PyObject_LookupSpecial(number, "__ceil__", &ceil_str);
+    if (method == NULL) {
+        if (PyErr_Occurred())
             return NULL;
-    }
-
-    method = _PyType_Lookup(Py_TYPE(number), ceil_str);
-    if (method == NULL)
         return math_1_to_int(number, ceil, 0);
-    else
-        return PyObject_CallFunction(method, "O", number);
+    }
+    result = PyObject_CallFunctionObjArgs(method, NULL);
+    Py_DECREF(method);
+    return result;
 }
 
 PyDoc_STRVAR(math_ceil_doc,
@@ -881,19 +879,17 @@ FUNC1(fabs, fabs, 0,
 
 static PyObject * math_floor(PyObject *self, PyObject *number) {
     static PyObject *floor_str = NULL;
-    PyObject *method;
+    PyObject *method, *result;
 
-    if (floor_str == NULL) {
-        floor_str = PyUnicode_InternFromString("__floor__");
-        if (floor_str == NULL)
+    method = _PyObject_LookupSpecial(number, "__floor__", &floor_str);
+    if (method == NULL) {
+        if (PyErr_Occurred())
             return NULL;
-    }
-
-    method = _PyType_Lookup(Py_TYPE(number), floor_str);
-    if (method == NULL)
         return math_1_to_int(number, floor, 0);
-    else
-        return PyObject_CallFunction(method, "O", number);
+    }
+    result = PyObject_CallFunctionObjArgs(method, NULL);
+    Py_DECREF(method);
+    return result;
 }
 
 PyDoc_STRVAR(math_floor_doc,
@@ -989,17 +985,17 @@ _fsum_realloc(double **p_ptr, Py_ssize_t  n,
    def msum(iterable):
        partials = []  # sorted, non-overlapping partial sums
        for x in iterable:
-       i = 0
-       for y in partials:
-           if abs(x) < abs(y):
-           x, y = y, x
-           hi = x + y
-           lo = y - (hi - x)
-           if lo:
-           partials[i] = lo
-           i += 1
-           x = hi
-       partials[i:] = [x]
+           i = 0
+           for y in partials:
+               if abs(x) < abs(y):
+                   x, y = y, x
+               hi = x + y
+               lo = y - (hi - x)
+               if lo:
+                   partials[i] = lo
+                   i += 1
+               x = hi
+           partials[i:] = [x]
        return sum_exact(partials)
 
    Rounded x+y stored in hi with the roundoff stored in lo.  Together hi+lo
@@ -1420,27 +1416,24 @@ static PyObject *
 math_trunc(PyObject *self, PyObject *number)
 {
     static PyObject *trunc_str = NULL;
-    PyObject *trunc;
+    PyObject *trunc, *result;
 
     if (Py_TYPE(number)->tp_dict == NULL) {
         if (PyType_Ready(Py_TYPE(number)) < 0)
             return NULL;
     }
 
-    if (trunc_str == NULL) {
-        trunc_str = PyUnicode_InternFromString("__trunc__");
-        if (trunc_str == NULL)
-            return NULL;
-    }
-
-    trunc = _PyType_Lookup(Py_TYPE(number), trunc_str);
+    trunc = _PyObject_LookupSpecial(number, "__trunc__", &trunc_str);
     if (trunc == NULL) {
-        PyErr_Format(PyExc_TypeError,
-                     "type %.100s doesn't define __trunc__ method",
-                     Py_TYPE(number)->tp_name);
+        if (!PyErr_Occurred())
+            PyErr_Format(PyExc_TypeError,
+                         "type %.100s doesn't define __trunc__ method",
+                         Py_TYPE(number)->tp_name);
         return NULL;
     }
-    return PyObject_CallFunctionObjArgs(trunc, number, NULL);
+    result = PyObject_CallFunctionObjArgs(trunc, NULL);
+    Py_DECREF(trunc);
+    return result;
 }
 
 PyDoc_STRVAR(math_trunc_doc,

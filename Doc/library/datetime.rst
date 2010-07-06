@@ -974,10 +974,10 @@ Instance methods:
    ``d.dst()`` returns.  DST is never in effect for a UTC time.
 
    If *d* is aware, *d* is normalized to UTC time, by subtracting
-   ``d.utcoffset()``, and a :class:`time.struct_time` for the normalized time is
-   returned.  :attr:`tm_isdst` is forced to 0. Note that the result's
-   :attr:`tm_year` member may be :const:`MINYEAR`\ -1 or :const:`MAXYEAR`\ +1, if
-   *d*.year was ``MINYEAR`` or ``MAXYEAR`` and UTC adjustment spills over a year
+   ``d.utcoffset()``, and a :class:`time.struct_time` for the
+   normalized time is returned.  :attr:`tm_isdst` is forced to 0. Note
+   that an :exc:`OverflowError` may be raised if *d*.year was
+   ``MINYEAR`` or ``MAXYEAR`` and UTC adjustment spills over a year
    boundary.
 
 
@@ -1760,3 +1760,10 @@ Notes:
 (5)
    For example, if :meth:`utcoffset` returns ``timedelta(hours=-3, minutes=-30)``,
    ``%z`` is replaced with the string ``'-0330'``.
+
+.. versionadded:: 3.2
+
+   When the ``%z`` directive is provided to the :meth:`strptime`
+   method, an aware :class:`datetime` object will be produced.  The
+   ``tzinfo`` of the result will be set to a :class:`timezone`
+   instance.

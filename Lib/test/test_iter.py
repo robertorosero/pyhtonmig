@@ -1,7 +1,7 @@
 # Test iterators.
 
 import unittest
-from test.support import run_unittest, TESTFN, unlink
+from test.support import run_unittest, TESTFN, unlink, cpython_only
 
 # Test result of triple loop (too big to inline)
 TRIPLETS = [(0, 0, 0), (0, 0, 1), (0, 0, 2),
@@ -761,8 +761,9 @@ class TestCase(unittest.TestCase):
         (a, b), (c,) = IteratingSequenceClass(2), {42: 24}
         self.assertEqual((a, b, c), (0, 1, 42))
 
-        # Test reference count behavior
 
+    @cpython_only
+    def test_ref_counting_behavior(self):
         class C(object):
             count = 0
             def __new__(cls):

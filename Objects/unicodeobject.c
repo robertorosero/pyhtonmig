@@ -1273,7 +1273,7 @@ PyObject *PyUnicode_FromEncodedObject(register PyObject *obj,
            case of a TypeError. */
         if (PyErr_ExceptionMatches(PyExc_TypeError))
             PyErr_Format(PyExc_TypeError,
-                         "coercing to str: need string or buffer, "
+                         "coercing to str: need bytes, bytearray or char buffer, "
                          "%.80s found",
                          Py_TYPE(obj)->tp_name);
         goto onError;
@@ -1767,6 +1767,33 @@ int PyUnicode_SetDefaultEncoding(const char *encoding)
     return 0;
 }
 
+/* create or adjust a UnicodeDecodeError */
+static void
+make_decode_exception(PyObject **exceptionObject,
+                      const char *encoding,
+                      const char *input, Py_ssize_t length,
+                      Py_ssize_t startpos, Py_ssize_t endpos,
+                      const char *reason)
+{
+    if (*exceptionObject == NULL) {
+        *exceptionObject = PyUnicodeDecodeError_Create(
+            encoding, input, length, startpos, endpos, reason);
+    }
+    else {
+        if (PyUnicodeDecodeError_SetStart(*exceptionObject, startpos))
+            goto onError;
+        if (PyUnicodeDecodeError_SetEnd(*exceptionObject, endpos))
+            goto onError;
+        if (PyUnicodeDecodeError_SetReason(*exceptionObject, reason))
+            goto onError;
+    }
+    return;
+
+onError:
+    Py_DECREF(*exceptionObject);
+    *exceptionObject = NULL;
+}
+
 /* error handling callback helper:
    build arguments, call the callback and check the arguments,
    if no exception occurred, copy the replacement to the output
@@ -1800,20 +1827,13 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
             goto onError;
     }
 
-    if (*exceptionObject == NULL) {
-        *exceptionObject = PyUnicodeDecodeError_Create(
-            encoding, *input, *inend-*input, *startinpos, *endinpos, reason);
-        if (*exceptionObject == NULL)
-            goto onError;
-    }
-    else {
-        if (PyUnicodeDecodeError_SetStart(*exceptionObject, *startinpos))
-            goto onError;
-        if (PyUnicodeDecodeError_SetEnd(*exceptionObject, *endinpos))
-            goto onError;
-        if (PyUnicodeDecodeError_SetReason(*exceptionObject, reason))
-            goto onError;
-    }
+    make_decode_exception(exceptionObject,
+        encoding,
+        *input, *inend - *input,
+        *startinpos, *endinpos,
+        reason);
+    if (*exceptionObject == NULL)
+        goto onError;
 
     restuple = PyObject_CallFunctionObjArgs(*errorHandler, *exceptionObject, NULL);
     if (restuple == NULL)
@@ -2265,24 +2285,24 @@ encode_char:
 
 static
 char utf8_code_length[256] = {
-    /* Map UTF-8 encoded prefix byte to sequence length.  zero means
-       illegal prefix.  see RFC 2279 for details */
+    /* Map UTF-8 encoded prefix byte to sequence length.  Zero means
+       illegal prefix.  See RFC 3629 for details */
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 00-0F */
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 70-7F */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 80-8F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* B0-BF */
+    0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* C0-C1 + C2-CF */
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* D0-DF */
+    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, /* E0-EF */
+    4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  /* F0-F4 + F5-FF */
 };
 
 PyObject *PyUnicode_DecodeUTF8(const char *s,
@@ -2312,6 +2332,7 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
 {
     const char *starts = s;
     int n;
+    int k;
     Py_ssize_t startinpos;
     Py_ssize_t endinpos;
     Py_ssize_t outpos;
@@ -2395,7 +2416,9 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
             else {
                 errmsg = "unexpected end of data";
                 startinpos = s-starts;
-                endinpos = size;
+                endinpos = startinpos+1;
+                for (k=1; (k < size-startinpos) && ((s[k]&0xC0) == 0x80); k++)
+                    endinpos++;
                 goto utf8Error;
             }
         }
@@ -2403,7 +2426,7 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
         switch (n) {
 
         case 0:
-            errmsg = "unexpected code byte";
+            errmsg = "invalid start byte";
             startinpos = s-starts;
             endinpos = startinpos+1;
             goto utf8Error;
@@ -2416,63 +2439,67 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
 
         case 2:
             if ((s[1] & 0xc0) != 0x80) {
-                errmsg = "invalid data";
+                errmsg = "invalid continuation byte";
                 startinpos = s-starts;
-                endinpos = startinpos+2;
+                endinpos = startinpos + 1;
                 goto utf8Error;
             }
             ch = ((s[0] & 0x1f) << 6) + (s[1] & 0x3f);
-            if (ch < 0x80) {
-                startinpos = s-starts;
-                endinpos = startinpos+2;
-                errmsg = "illegal encoding";
-                goto utf8Error;
-            }
-            else
-                *p++ = (Py_UNICODE)ch;
+            assert ((ch > 0x007F) && (ch <= 0x07FF));
+            *p++ = (Py_UNICODE)ch;
             break;
 
         case 3:
+            /* Decoding UTF-8 sequences in range \xed\xa0\x80-\xed\xbf\xbf
+               will result in surrogates in range d800-dfff. Surrogates are
+               not valid UTF-8 so they are rejected.
+               See http://www.unicode.org/versions/Unicode5.2.0/ch03.pdf
+               (table 3-7) and http://www.rfc-editor.org/rfc/rfc3629.txt */
             if ((s[1] & 0xc0) != 0x80 ||
-                (s[2] & 0xc0) != 0x80) {
-                errmsg = "invalid data";
+                (s[2] & 0xc0) != 0x80 ||
+                ((unsigned char)s[0] == 0xE0 &&
+                 (unsigned char)s[1] < 0xA0) ||
+                ((unsigned char)s[0] == 0xED &&
+                 (unsigned char)s[1] > 0x9F)) {
+                errmsg = "invalid continuation byte";
                 startinpos = s-starts;
-                endinpos = startinpos+3;
+                endinpos = startinpos + 1;
+
+                /* if s[1] first two bits are 1 and 0, then the invalid
+                   continuation byte is s[2], so increment endinpos by 1,
+                   if not, s[1] is invalid and endinpos doesn't need to
+                   be incremented. */
+                if ((s[1] & 0xC0) == 0x80)
+                    endinpos++;
                 goto utf8Error;
             }
             ch = ((s[0] & 0x0f) << 12) + ((s[1] & 0x3f) << 6) + (s[2] & 0x3f);
-            if (ch < 0x0800 || (ch >= 0xd800 && ch <= 0xDFFF)) {
-                errmsg = "illegal encoding";
-                startinpos = s-starts;
-                endinpos = startinpos+3;
-                goto utf8Error;
-            }
-            else
-                *p++ = (Py_UNICODE)ch;
+            assert ((ch > 0x07FF) && (ch <= 0xFFFF));
+            *p++ = (Py_UNICODE)ch;
             break;
 
         case 4:
             if ((s[1] & 0xc0) != 0x80 ||
                 (s[2] & 0xc0) != 0x80 ||
-                (s[3] & 0xc0) != 0x80) {
-                errmsg = "invalid data";
+                (s[3] & 0xc0) != 0x80 ||
+                ((unsigned char)s[0] == 0xF0 &&
+                 (unsigned char)s[1] < 0x90) ||
+                ((unsigned char)s[0] == 0xF4 &&
+                 (unsigned char)s[1] > 0x8F)) {
+                errmsg = "invalid continuation byte";
                 startinpos = s-starts;
-                endinpos = startinpos+4;
+                endinpos = startinpos + 1;
+                if ((s[1] & 0xC0) == 0x80) {
+                    endinpos++;
+                    if ((s[2] & 0xC0) == 0x80)
+                        endinpos++;
+                }
                 goto utf8Error;
             }
             ch = ((s[0] & 0x7) << 18) + ((s[1] & 0x3f) << 12) +
-                ((s[2] & 0x3f) << 6) + (s[3] & 0x3f);
-            /* validate and convert to UTF-16 */
-            if ((ch < 0x10000)        /* minimum value allowed for 4
-                                         byte encoding */
-                || (ch > 0x10ffff))   /* maximum value allowed for
-                                         UTF-16 */
-            {
-                errmsg = "illegal encoding";
-                startinpos = s-starts;
-                endinpos = startinpos+4;
-                goto utf8Error;
-            }
+                 ((s[2] & 0x3f) << 6) + (s[3] & 0x3f);
+            assert ((ch > 0xFFFF) && (ch <= 0x10ffff));
+
 #ifdef Py_UNICODE_WIDE
             *p++ = (Py_UNICODE)ch;
 #else
@@ -2488,13 +2515,6 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
             *p++ = (Py_UNICODE)(0xDC00 + (ch & 0x03FF));
 #endif
             break;
-
-        default:
-            /* Other sizes are only needed for UCS-4 */
-            errmsg = "unsupported Unicode code range";
-            startinpos = s-starts;
-            endinpos = startinpos+n;
-            goto utf8Error;
         }
         s += n;
         continue;
@@ -4552,13 +4572,27 @@ static int is_dbcs_lead_byte(const char *s, int offset)
 static int decode_mbcs(PyUnicodeObject **v,
                        const char *s, /* MBCS string */
                        int size, /* sizeof MBCS string */
-                       int final)
+                       int final,
+                       const char *errors)
 {
     Py_UNICODE *p;
-    Py_ssize_t n = 0;
-    int usize = 0;
+    Py_ssize_t n;
+    DWORD usize;
+    DWORD flags;
 
     assert(size >= 0);
+
+    /* check and handle 'errors' arg */
+    if (errors==NULL || strcmp(errors, "strict")==0)
+        flags = MB_ERR_INVALID_CHARS;
+    else if (strcmp(errors, "ignore")==0)
+        flags = 0;
+    else {
+        PyErr_Format(PyExc_ValueError,
+                     "mbcs encoding does not support errors='%s'",
+                     errors);
+        return -1;
+    }
 
     /* Skip trailing lead-byte unless 'final' is set */
     if (!final && size >= 1 && is_dbcs_lead_byte(s, size - 1))
@@ -4566,18 +4600,18 @@ static int decode_mbcs(PyUnicodeObject **v,
 
     /* First get the size of the result */
     if (size > 0) {
-        usize = MultiByteToWideChar(CP_ACP, 0, s, size, NULL, 0);
-        if (usize == 0) {
-            PyErr_SetFromWindowsErrWithFilename(0, NULL);
-            return -1;
-        }
-    }
+        usize = MultiByteToWideChar(CP_ACP, flags, s, size, NULL, 0);
+        if (usize==0)
+            goto mbcs_decode_error;
+    } else
+        usize = 0;
 
     if (*v == NULL) {
         /* Create unicode object */
         *v = _PyUnicode_New(usize);
         if (*v == NULL)
             return -1;
+        n = 0;
     }
     else {
         /* Extend unicode object */
@@ -4587,15 +4621,35 @@ static int decode_mbcs(PyUnicodeObject **v,
     }
 
     /* Do the conversion */
-    if (size > 0) {
+    if (usize > 0) {
         p = PyUnicode_AS_UNICODE(*v) + n;
-        if (0 == MultiByteToWideChar(CP_ACP, 0, s, size, p, usize)) {
-            PyErr_SetFromWindowsErrWithFilename(0, NULL);
-            return -1;
+        if (0 == MultiByteToWideChar(CP_ACP, flags, s, size, p, usize)) {
+            goto mbcs_decode_error;
         }
     }
-
     return size;
+
+mbcs_decode_error:
+    /* If the last error was ERROR_NO_UNICODE_TRANSLATION, then
+       we raise a UnicodeDecodeError - else it is a 'generic'
+       windows error
+     */
+    if (GetLastError()==ERROR_NO_UNICODE_TRANSLATION) {
+        /* Ideally, we should get reason from FormatMessage - this
+           is the Windows 2000 English version of the message
+        */
+        PyObject *exc = NULL;
+        const char *reason = "No mapping for the Unicode character exists "
+                             "in the target multi-byte code page.";
+        make_decode_exception(&exc, "mbcs", s, size, 0, 0, reason);
+        if (exc != NULL) {
+            PyCodec_StrictErrors(exc);
+            Py_DECREF(exc);
+        }
+    } else {
+        PyErr_SetFromWindowsErrWithFilename(0, NULL);
+    }
+    return -1;
 }
 
 PyObject *PyUnicode_DecodeMBCSStateful(const char *s,
@@ -4612,10 +4666,10 @@ PyObject *PyUnicode_DecodeMBCSStateful(const char *s,
 #ifdef NEED_RETRY
   retry:
     if (size > INT_MAX)
-        done = decode_mbcs(&v, s, INT_MAX, 0);
+        done = decode_mbcs(&v, s, INT_MAX, 0, errors);
     else
 #endif
-        done = decode_mbcs(&v, s, (int)size, !consumed);
+        done = decode_mbcs(&v, s, (int)size, !consumed, errors);
 
     if (done < 0) {
         Py_XDECREF(v);
@@ -4649,20 +4703,45 @@ PyObject *PyUnicode_DecodeMBCS(const char *s,
  */
 static int encode_mbcs(PyObject **repr,
                        const Py_UNICODE *p, /* unicode */
-                       int size) /* size of unicode */
+                       int size, /* size of unicode */
+                       const char* errors)
 {
-    int mbcssize = 0;
-    Py_ssize_t n = 0;
+    BOOL usedDefaultChar = FALSE;
+    BOOL *pusedDefaultChar;
+    int mbcssize;
+    Py_ssize_t n;
+    PyObject *exc = NULL;
+    DWORD flags;
 
     assert(size >= 0);
 
+    /* check and handle 'errors' arg */
+    if (errors==NULL || strcmp(errors, "strict")==0) {
+        flags = WC_NO_BEST_FIT_CHARS;
+        pusedDefaultChar = &usedDefaultChar;
+    } else if (strcmp(errors, "replace")==0) {
+        flags = 0;
+        pusedDefaultChar = NULL;
+    } else {
+         PyErr_Format(PyExc_ValueError,
+                      "mbcs encoding does not support errors='%s'",
+                      errors);
+         return -1;
+    }
+
     /* First get the size of the result */
     if (size > 0) {
-        mbcssize = WideCharToMultiByte(CP_ACP, 0, p, size, NULL, 0, NULL, NULL);
+        mbcssize = WideCharToMultiByte(CP_ACP, flags, p, size, NULL, 0,
+                                       NULL, pusedDefaultChar);
         if (mbcssize == 0) {
             PyErr_SetFromWindowsErrWithFilename(0, NULL);
             return -1;
         }
+        /* If we used a default char, then we failed! */
+        if (pusedDefaultChar && *pusedDefaultChar)
+            goto mbcs_encode_error;
+    } else {
+        mbcssize = 0;
     }
 
     if (*repr == NULL) {
@@ -4670,6 +4749,7 @@ static int encode_mbcs(PyObject **repr,
         *repr = PyBytes_FromStringAndSize(NULL, mbcssize);
         if (*repr == NULL)
             return -1;
+        n = 0;
     }
     else {
         /* Extend string object */
@@ -4681,13 +4761,20 @@ static int encode_mbcs(PyObject **repr,
     /* Do the conversion */
     if (size > 0) {
         char *s = PyBytes_AS_STRING(*repr) + n;
-        if (0 == WideCharToMultiByte(CP_ACP, 0, p, size, s, mbcssize, NULL, NULL)) {
+        if (0 == WideCharToMultiByte(CP_ACP, flags, p, size, s, mbcssize,
+                                     NULL, pusedDefaultChar)) {
             PyErr_SetFromWindowsErrWithFilename(0, NULL);
             return -1;
         }
+        if (pusedDefaultChar && *pusedDefaultChar)
+            goto mbcs_encode_error;
     }
-
     return 0;
+
+mbcs_encode_error:
+    raise_encode_exception(&exc, "mbcs", p, size, 0, 0, "invalid character");
+    Py_XDECREF(exc);
+    return -1;
 }
 
 PyObject *PyUnicode_EncodeMBCS(const Py_UNICODE *p,
@@ -4700,10 +4787,10 @@ PyObject *PyUnicode_EncodeMBCS(const Py_UNICODE *p,
 #ifdef NEED_RETRY
   retry:
     if (size > INT_MAX)
-        ret = encode_mbcs(&repr, p, INT_MAX);
+        ret = encode_mbcs(&repr, p, INT_MAX, errors);
     else
 #endif
-        ret = encode_mbcs(&repr, p, (int)size);
+        ret = encode_mbcs(&repr, p, (int)size, errors);
 
     if (ret < 0) {
         Py_XDECREF(repr);
@@ -6618,7 +6705,7 @@ PyDoc_STRVAR(capitalize__doc__,
              "S.capitalize() -> str\n\
 \n\
 Return a capitalized version of S, i.e. make the first character\n\
-have upper case.");
+have upper case and the rest lower case.");
 
 static PyObject*
 unicode_capitalize(PyUnicodeObject *self)
@@ -7890,7 +7977,7 @@ PyObject *PyUnicode_Replace(PyObject *obj,
 }
 
 PyDoc_STRVAR(replace__doc__,
-             "S.replace (old, new[, count]) -> str\n\
+             "S.replace(old, new[, count]) -> str\n\
 \n\
 Return a copy of S with all occurrences of substring\n\
 old replaced by new.  If the optional argument count is\n\

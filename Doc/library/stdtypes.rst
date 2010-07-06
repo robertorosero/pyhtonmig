@@ -452,7 +452,7 @@ Additional Methods on Integer Types
     Equivalent to::
 
         def bit_length(self):
-            s = bin(x)          # binary representation:  bin(-37) --> '-0b100101'
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
             s = s.lstrip('-0b') # remove leading zeros and minus sign
             return len(s)       # len('100101') --> 6
 
@@ -966,7 +966,8 @@ functions based on regular expressions.
 
 .. method:: str.capitalize()
 
-   Return a copy of the string with only its first character capitalized.
+   Return a copy of the string with its first character capitalized and the
+   rest lowercased.
 
 
 .. method:: str.center(width[, fillchar])
@@ -1328,6 +1329,10 @@ functions based on regular expressions.
 
    You can use :meth:`str.maketrans` to create a translation map from
    character-to-character mappings in different formats.
+
+   You can use the :func:`~string.maketrans` helper function in the :mod:`string`
+   module to create a translation table. For string objects, set the *table*
+   argument to ``None`` for translations that only delete characters:
 
    .. note::
 
@@ -2295,7 +2300,7 @@ is generally interpreted as simple bytes.
       File "<stdin>", line 1, in <module>
       ValueError: cannot modify size of memoryview object
 
-   Notice how the size of the memoryview object can not be changed.
+   Notice how the size of the memoryview object cannot be changed.
 
 
    :class:`memoryview` has two methods:
