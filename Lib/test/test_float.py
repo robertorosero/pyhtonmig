@@ -16,6 +16,11 @@ requires_getformat = unittest.skipUnless(have_getformat,
                                          "requires __getformat__")
 requires_setformat = unittest.skipUnless(hasattr(float, "__setformat__"),
                                          "requires __setformat__")
+
+have_setround = hasattr(float, "__setround__")
+requires_setround = unittest.skipUnless(have_setround,
+                                        "requires __setround__")
+
 # decorator for skipping tests on non-IEEE 754 platforms
 requires_IEEE_754 = unittest.skipUnless(have_getformat and
     float.__getformat__("double").startswith("IEEE"),
@@ -380,6 +385,17 @@ class GeneralFloatCases(unittest.TestCase):
             #self.assertTrue(0.0 < pow_op(-2.0, -1048) < 1e-315)
             #self.assertTrue(0.0 < pow_op(2.0, -1047) < 1e-315)
             #self.assertTrue(0.0 > pow_op(-2.0, -1047) > -1e-315)
+
+
+@requires_setround
+class RoundingModeTestCase(unittest.TestCase):
+    def test_roundtrip(self):
+        # just check that we can use __setround__ and __getround__
+        # to set and get rounding mode
+        modes = "tonearest", "upward", "downward", "towardzero"
+        for mode in modes:
+            float.__setround__(mode)
+            self.assertEqual(float.__getround__(), mode)
 
 
 @requires_setformat
@@ -1264,6 +1280,7 @@ def test_main():
         RoundTestCase,
         InfNanTest,
         HexFloatTestCase,
+        RoundingModeTestCase,
         )
 
 if __name__ == '__main__':

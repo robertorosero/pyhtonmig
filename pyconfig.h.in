@@ -208,6 +208,15 @@
 /* Define if you have the 'fdatasync' function. */
 #undef HAVE_FDATASYNC
 
+/* Define to 1 if you have the `fegetround' function. */
+#undef HAVE_FEGETROUND
+
+/* Define to 1 if you have the <fenv.h> header file. */
+#undef HAVE_FENV_H
+
+/* Define to 1 if you have the `fesetround' function. */
+#undef HAVE_FESETROUND
+
 /* Define to 1 if you have the `finite' function. */
 #undef HAVE_FINITE
 

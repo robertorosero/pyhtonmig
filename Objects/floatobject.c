@@ -9,6 +9,10 @@
 
 #include <ctype.h>
 #include <float.h>
+#if defined(HAVE_FESETROUND) && defined(HAVE_FEGETROUND) && \
+    defined(HAVE_FENV_H)
+#include <fenv.h>
+#endif
 
 #undef MAX
 #undef MIN
@@ -1745,6 +1749,77 @@ PyDoc_STRVAR(float_setformat_doc,
 "Overrides the automatic determination of C-level floating point type.\n"
 "This affects how floats are converted to and from binary strings.");
 
+#if defined(HAVE_FESETROUND) && defined(HAVE_FEGETROUND) && \
+    defined(HAVE_FENV_H)
+
+static PyObject *
+float_setround(PyTypeObject *v, PyObject* arg)
+{
+    int mode, result;
+
+    if (!PyUnicode_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError,
+            "mode should be a string");
+        return NULL;
+    }
+
+    if (!PyUnicode_CompareWithASCIIString(arg, "tonearest"))
+        mode = FE_TONEAREST;
+    else if (!PyUnicode_CompareWithASCIIString(arg, "downward"))
+        mode = FE_DOWNWARD;
+    else if (!PyUnicode_CompareWithASCIIString(arg, "upward"))
+        mode = FE_UPWARD;
+    else if (!PyUnicode_CompareWithASCIIString(arg, "towardzero"))
+        mode = FE_TOWARDZERO;
+    else {
+        PyErr_SetString(PyExc_ValueError,
+                        "mode should be one of 'tonearest', 'downward', "
+                        "'upward', or 'towardzero'");
+        return NULL;
+    }
+    result = fesetround(mode);
+    if (result) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Failed to set rounding mode");
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(float_setround_doc,
+"float.__setround__(mode) -> None\n"
+"\n"
+"You probably don't want to use this function.  It exists mainly to be\n"
+"used in Python's test suite.\n");
+
+static PyObject *
+float_getround(PyTypeObject *v)
+{
+    int i;
+    i = fegetround();
+
+    switch(i) {
+    case FE_TONEAREST:
+        return PyUnicode_FromString("tonearest");
+    case FE_DOWNWARD:
+        return PyUnicode_FromString("downward");
+    case FE_UPWARD:
+        return PyUnicode_FromString("upward");
+    case FE_TOWARDZERO:
+        return PyUnicode_FromString("towardzero");
+    default:
+        return PyUnicode_FromString("unknown");
+    }
+}
+
+PyDoc_STRVAR(float_getround_doc,
+"float.__getround__() -> str\n"
+"\n"
+"You probably don't want to use this function.  It exists mainly to be\n"
+"used in Python's test suite.\n");
+
+#endif  /* defined(HAVE_FESETROUND) && defined(HAVE_FEGETROUND) && ... */
+
 static PyObject *
 float_getzero(PyObject *v, void *closure)
 {
@@ -1798,6 +1873,13 @@ static PyMethodDef float_methods[] = {
      METH_O|METH_CLASS,                 float_getformat_doc},
     {"__setformat__",           (PyCFunction)float_setformat,
      METH_VARARGS|METH_CLASS,           float_setformat_doc},
+#if defined(HAVE_FESETROUND) && defined(HAVE_FEGETROUND) && \
+    defined(HAVE_FENV_H)
+    {"__setround__", (PyCFunction)float_setround,
+     METH_O|METH_CLASS,           float_setround_doc},
+    {"__getround__", (PyCFunction)float_getround,
+     METH_NOARGS|METH_CLASS,           float_getround_doc},
+#endif
     {"__format__",          (PyCFunction)float__format__,
      METH_VARARGS,                  float__format__doc},
     {NULL,              NULL}           /* sentinel */
