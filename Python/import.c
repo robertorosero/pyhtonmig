@@ -1078,12 +1078,15 @@ read_compiled_module(char *cpathname, FILE *fp)
    module object WITH INCREMENTED REFERENCE COUNT */
 
 static PyObject *
-load_compiled_module(char *name, char *cpathname, FILE *fp)
+load_compiled_module(char *name, PyObject *cpathobj, FILE *fp)
 {
     long magic;
     PyCodeObject *co;
     PyObject *m;
-    PyObject *cpathobj;
+    char *cpathname;
+
+    /* FIXME: don't use _PyUnicode_AsString */
+    cpathname = _PyUnicode_AsString(cpathobj);
 
     magic = PyMarshal_ReadLongFromFile(fp);
     if (magic != pyc_magic) {
@@ -1098,10 +1101,8 @@ load_compiled_module(char *name, char *cpathname, FILE *fp)
     if (Py_VerboseFlag)
         PySys_WriteStderr("import %s # precompiled from %s\n",
             name, cpathname);
-    cpathobj = PyUnicode_DecodeFSDefault(cpathname);
     m = PyImport_ExecCodeModuleWithUnicodePathnames(
         name, (PyObject *)co, cpathobj, cpathobj);
-    Py_DECREF(cpathobj);
     Py_DECREF(co);
 
     return m;
@@ -2120,9 +2121,14 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         break;
     }
 
-    case PY_COMPILED:
-        m = load_compiled_module(name, pathname, fp);
+    case PY_COMPILED: {
+        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
+            return NULL;
+        m = load_compiled_module(name, pathobj, fp);
+        Py_DECREF(pathobj);
         break;
+    }
 
 #ifdef HAVE_DYNAMIC_LOADING
     case C_EXTENSION: {
@@ -3390,23 +3396,20 @@ static PyObject *
 imp_load_compiled(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject *fob = NULL;
     PyObject *m;
     FILE *fp;
-    if (!PyArg_ParseTuple(args, "ses|O:load_compiled",
-                          &name,
-                          Py_FileSystemDefaultEncoding, &pathname,
-                          &fob))
+    if (!PyArg_ParseTuple(args, "sU|O:load_compiled",
+                          &name, &pathname, &fob))
         return NULL;
-    fp = get_file(pathname, fob, "rb");
+                  /* FIXME: don't use _PyUnicode_AsString */
+    fp = get_file(_PyUnicode_AsString(pathname), fob, "rb");
     if (fp == NULL) {
-        PyMem_Free(pathname);
         return NULL;
     }
     m = load_compiled_module(name, pathname, fp);
     fclose(fp);
-    PyMem_Free(pathname);
     return m;
 }
 
