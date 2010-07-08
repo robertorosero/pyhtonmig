@@ -972,12 +972,18 @@ make_compiled_pathname(PyObject *pathobj, int debug)
 {
     /* FIXME: use Py_UNICODE* instead of char* */
     char buf[MAXPATHLEN+1];
+    PyObject *pathbytes;
     char *pathname, *cpathname;
 
-    /* FIXME: don't use _PyUnicode_AsString */
-    pathname = _PyUnicode_AsString(pathobj);
+    pathbytes = PyUnicode_EncodeFSDefault(pathobj);
+    if (pathbytes == NULL)
+        return NULL;
+
+    pathname = strdup(PyBytes_AsString(pathbytes));
+    Py_DECREF(pathbytes);
 
     cpathname = _make_compiled_pathname(pathname, buf, sizeof(buf), debug);
+    free(pathname);
     if (cpathname != NULL)
         return PyUnicode_DecodeFSDefault(cpathname);
     else
@@ -1044,12 +1050,20 @@ make_source_pathname(PyObject *pathobj)
 {
     /* FIXME: use Py_UNICODE* instead of char* */
     char buf[MAXPATHLEN + 1];
+    PyObject *pathbytes;
     char *pathname, *cpathname;
 
-    /* FIXME: don't use _PyUnicode_AsString */
-    pathname = _PyUnicode_AsString(pathobj);
+    pathbytes = PyUnicode_EncodeFSDefault(pathobj);
+    if (pathbytes == NULL)
+        return NULL;
+
+    pathname = strdup(PyBytes_AsString(pathbytes));
+    Py_DECREF(pathbytes);
+    if (pathname == NULL)
+        return NULL;
 
     cpathname = _make_source_pathname(pathname, buf);
+    free(pathname);
     if (cpathname != NULL)
         return PyUnicode_DecodeFSDefault(cpathname);
     else
