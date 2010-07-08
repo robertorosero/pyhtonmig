@@ -60,26 +60,31 @@ static PyObject *get_module_code(ZipImporter *self, char *fullname,
 static int
 zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 {
+    PyObject *pathbytes;
     char *path, *p, *prefix, buf[MAXPATHLEN+2];
     size_t len;
 
     if (!_PyArg_NoKeywords("zipimporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "s:zipimporter", &path))
+    if (!PyArg_ParseTuple(args, "O&:zipimporter", PyUnicode_FSConverter, &pathbytes))
         return -1;
 
-    len = strlen(path);
+    len = PyBytes_GET_SIZE(pathbytes);
     if (len == 0) {
         PyErr_SetString(ZipImportError, "archive path is empty");
+        Py_DECREF(pathbytes);
         return -1;
     }
+    path = PyBytes_AsString(pathbytes);
     if (len >= MAXPATHLEN) {
         PyErr_SetString(ZipImportError,
                         "archive path too long");
+        Py_DECREF(pathbytes);
         return -1;
     }
     strcpy(buf, path);
+    Py_DECREF(pathbytes);
 
 #ifdef ALTSEP
     for (p = buf; *p; p++) {
