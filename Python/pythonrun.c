@@ -696,6 +696,118 @@ initmain(void)
     }
 }
 
+static PyObject*
+reencode_filename(PyObject *module, PyObject *file, const char *new_encoding)
+{
+    PyObject *file_bytes = NULL;
+    PyObject *new_file = NULL;
+
+    file_bytes = PyUnicode_AsEncodedString(
+            file,
+            Py_FileSystemDefaultEncoding,
+            "surrogateescape");
+    if (file_bytes == NULL)
+        return NULL;
+    new_file = PyUnicode_Decode(
+            PyBytes_AsString(file_bytes),
+            PyBytes_GET_SIZE(file_bytes),
+            new_encoding,
+            "surrogateescape");
+    Py_DECREF(file_bytes);
+    return new_file;
+}
+
+static int
+reencode_module_path(PyObject *module, PyObject *path, const char *new_encoding)
+{
+    PyObject *filename;
+    PyObject *new_filename;
+    Py_ssize_t i, size;
+
+    size = PyList_Size(path);
+    for (i=0; i<size; i++) {
+        filename = PyList_GetItem(path, i);
+        if (filename == NULL)
+            return 1;
+
+        new_filename = reencode_filename(module, filename, new_encoding);
+        if (new_filename == NULL)
+            return 1;
+        if (PyList_SetItem(path, i, new_filename))
+            return 1;
+    }
+    return 0;
+}
+
+static int
+reencode_modules_path(const char *new_encoding)
+{
+    PyInterpreterState *interp = PyThreadState_GET()->interp;
+    PyObject *modules = interp->modules;
+    PyObject *values;
+    PyObject *iter = NULL;
+    PyObject *module = NULL;
+    PyObject *module_dict = NULL;
+    PyObject *file;
+    PyObject *path;
+    int ret = 1;
+
+    /* FIXME: Re-encode PySys_GetObject("path_importer_cache") keys? */
+    /* FIXME: Re-encode co_filename of all code objects! */
+
+    if (strcmp(new_encoding, PyUnicode_GetDefaultEncoding()) == 0)
+        return 0;
+
+
+    values = PyObject_CallMethod(modules, "values", "");
+    if (values == NULL)
+        return 1;
+
+    iter = PyObject_GetIter(values);
+    Py_DECREF(values);
+    if (iter == NULL)
+        return 1;
+
+    for (module = PyIter_Next(iter); module != NULL; module = PyIter_Next(iter)) {
+        file = PyModule_GetFilenameObject(module);
+        if (file != NULL) {
+            PyObject *new_file = reencode_filename(module, file, new_encoding);
+            if (new_file == NULL)
+                goto error;
+            if (PyObject_SetAttrString(module, "__file__", new_file)) {
+                Py_DECREF(new_file);
+                goto error;
+            }
+            Py_DECREF(new_file);
+        } else {
+            PyErr_Clear();
+        }
+
+        module_dict = PyModule_GetDict(module);
+        if (module_dict == NULL)
+            goto error;
+        path = PyDict_GetItemString(module_dict, "__path__");
+        if (path != NULL) {
+            if (reencode_module_path(module, path, new_encoding))
+                goto error;
+        } else {
+            PyErr_Clear();
+        }
+
+        Py_CLEAR(module);
+    }
+
+    ret = 0;
+    goto finally;
+
+error:
+    ret = 1;
+finally:
+    Py_XDECREF(iter);
+    Py_XDECREF(module);
+    return ret;
+}
+
 static void
 initfsencoding(void)
 {
@@ -711,6 +823,10 @@ initfsencoding(void)
            stdin and stdout if these are terminals.  */
         codeset = get_codeset();
         if (codeset != NULL) {
+            if (reencode_modules_path(codeset))
+                Py_FatalError(
+                        "Py_Initialize: can't reencode paths");
+
             Py_FileSystemDefaultEncoding = codeset;
             Py_HasFileSystemDefaultEncoding = 0;
             return;
