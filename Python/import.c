@@ -970,6 +970,7 @@ _make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
 static PyObject*
 make_compiled_pathname(PyObject *pathobj, int debug)
 {
+    /* FIXME: use Py_UNICODE* instead of char* */
     char buf[MAXPATHLEN+1];
     char *pathname, *cpathname;
 
@@ -2521,6 +2522,7 @@ static PyObject *
 import_module_level(char *name, PyObject *globals, PyObject *locals,
                     PyObject *fromlist, int level)
 {
+    /* FIXME: use unicode */
     char buf[MAXPATHLEN+1];
     Py_ssize_t buflen = 0;
     PyObject *parent, *head, *next, *tail;
