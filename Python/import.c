@@ -1237,15 +1237,18 @@ update_compiled_module(PyCodeObject *co, PyObject *newname)
    byte-compiled file, use that instead. */
 
 static PyObject *
-load_source_module(char *name, char *pathname, FILE *fp)
+load_source_module(char *name, PyObject *pathobj, FILE *fp)
 {
     struct stat st;
     FILE *fpc;
     char buf[MAXPATHLEN+1];
+    char *pathname;
     char *cpathname;
     PyCodeObject *co;
     PyObject *m;
-    PyObject *pathobj;
+
+    /* FIXME: don't use _PyUnicode_AsString */
+    pathname = _PyUnicode_AsString(pathobj);
 
     if (fstat(fileno(fp), &st) != 0) {
         PyErr_Format(PyExc_RuntimeError,
@@ -1266,21 +1269,21 @@ load_source_module(char *name, char *pathname, FILE *fp)
 #endif
     cpathname = make_compiled_pathname(
         pathname, buf, (size_t)MAXPATHLEN + 1, !Py_OptimizeFlag);
-    if (cpathname != NULL &&
-        (fpc = check_compiled_module(pathname, st.st_mtime, cpathname))) {
+    if (cpathname != NULL)
+        fpc = check_compiled_module(pathname, st.st_mtime, cpathname);
+    else
+        fpc = NULL;
+    if (fpc) {
         co = read_compiled_module(cpathname, fpc);
         fclose(fpc);
         if (co == NULL)
             return NULL;
-        pathobj = PyUnicode_DecodeFSDefault(pathname);
-        if (pathobj == NULL)
-            return NULL;
         if (update_compiled_module(co, pathobj) < 0)
             return NULL;
-        Py_DECREF(pathobj);
         if (Py_VerboseFlag)
             PySys_WriteStderr("import %s # precompiled from %s\n",
                 name, cpathname);
+        pathobj = NULL;
         pathname = cpathname;
     }
     else {
@@ -2035,9 +2038,14 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 
     switch (type) {
 
-    case PY_SOURCE:
-        m = load_source_module(name, pathname, fp);
+    case PY_SOURCE: {
+        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
+            return NULL;
+        m = load_source_module(name, pathobj, fp);
+        Py_DECREF(pathobj);
         break;
+    }
 
     case PY_COMPILED:
         m = load_compiled_module(name, pathname, fp);
@@ -3343,22 +3351,18 @@ static PyObject *
 imp_load_source(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject *fob = NULL;
     PyObject *m;
     FILE *fp;
-    if (!PyArg_ParseTuple(args, "ses|O:load_source",
-                          &name,
-                          Py_FileSystemDefaultEncoding, &pathname,
-                          &fob))
+    if (!PyArg_ParseTuple(args, "sU|O:load_source",
+                          &name, &pathname, &fob))
         return NULL;
-    fp = get_file(pathname, fob, "r");
-    if (fp == NULL) {
-        PyMem_Free(pathname);
+                  /* FIXME: don't use _PyUnicode_AsString */
+    fp = get_file(_PyUnicode_AsString(pathname), fob, "r");
+    if (fp == NULL)
         return NULL;
-    }
     m = load_source_module(name, pathname, fp);
-    PyMem_Free(pathname);
     fclose(fp);
     return m;
 }
