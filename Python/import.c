@@ -736,8 +736,8 @@ static char *make_compiled_pathname(char *pathname, char *buf, size_t buflen,
 PyObject *
 PyImport_ExecCodeModule(char *name, PyObject *co)
 {
-    return PyImport_ExecCodeModuleWithPathnames(
-        name, co, (char *)NULL, (char *)NULL);
+    return PyImport_ExecCodeModuleWithUnicodePathnames(
+        name, co, NULL, NULL);
 }
 
 PyObject *
@@ -748,8 +748,8 @@ PyImport_ExecCodeModuleEx(char *name, PyObject *co, char *pathname)
 }
 
 PyObject *
-PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
-                                     char *cpathname)
+PyImport_ExecCodeModuleWithUnicodePathnames(char *name, PyObject *co,
+                                            PyObject *pathobj, PyObject *cpathobj)
 {
     PyObject *modules = PyImport_GetModuleDict();
     PyObject *m, *d, *v;
@@ -767,11 +767,8 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
     }
     /* Remember the filename as the __file__ attribute */
     v = NULL;
-    if (pathname != NULL) {
-        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
-        /* FIXME: check pathobj != NULL */
+    if (pathobj != NULL) {
         v = get_sourcefile(pathobj);
-        Py_DECREF(pathobj);
         if (v == NULL)
             PyErr_Clear();
     }
@@ -784,18 +781,12 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
     Py_DECREF(v);
 
     /* Remember the pyc path name as the __cached__ attribute. */
-    if (cpathname == NULL) {
+    if (cpathobj != NULL)
+        v = cpathobj;
+    else
         v = Py_None;
-        Py_INCREF(v);
-    }
-    else if ((v = PyUnicode_FromString(cpathname)) == NULL) {
-        PyErr_Clear(); /* Not important enough to report */
-        v = Py_None;
-        Py_INCREF(v);
-    }
     if (PyDict_SetItemString(d, "__cached__", v) != 0)
         PyErr_Clear(); /* Not important enough to report */
-    Py_DECREF(v);
 
     v = PyEval_EvalCode((PyCodeObject *)co, d, d);
     if (v == NULL)
@@ -816,6 +807,29 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
   error:
     remove_module(name);
     return NULL;
+}
+
+PyObject *
+PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
+                                     char *cpathname)
+{
+    PyObject *m, *pathobj, *cpathobj;
+    if (pathname != NULL) {
+        pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
+            return NULL;
+    } else
+        pathobj = NULL;
+    if (cpathname != NULL) {
+        cpathobj = PyUnicode_DecodeFSDefault(cpathname);
+        if (cpathobj == NULL)
+            PyErr_Clear(); /* Not important enough to report */
+    } else
+        cpathobj = NULL;
+    m = PyImport_ExecCodeModuleWithUnicodePathnames(name, co, pathobj, cpathobj);
+    Py_XDECREF(pathobj);
+    Py_XDECREF(cpathobj);
+    return m;
 }
 
 
@@ -1068,6 +1082,7 @@ load_compiled_module(char *name, char *cpathname, FILE *fp)
     long magic;
     PyCodeObject *co;
     PyObject *m;
+    PyObject *cpathobj;
 
     magic = PyMarshal_ReadLongFromFile(fp);
     if (magic != pyc_magic) {
@@ -1082,8 +1097,10 @@ load_compiled_module(char *name, char *cpathname, FILE *fp)
     if (Py_VerboseFlag)
         PySys_WriteStderr("import %s # precompiled from %s\n",
             name, cpathname);
-    m = PyImport_ExecCodeModuleWithPathnames(
-        name, (PyObject *)co, cpathname, cpathname);
+    cpathobj = PyUnicode_DecodeFSDefault(cpathname);
+    m = PyImport_ExecCodeModuleWithUnicodePathnames(
+        name, (PyObject *)co, cpathobj, cpathobj);
+    Py_DECREF(cpathobj);
     Py_DECREF(co);
 
     return m;

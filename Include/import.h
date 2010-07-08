@@ -17,6 +17,11 @@ PyAPI_FUNC(PyObject *) PyImport_ExecCodeModuleWithPathnames(
     PyObject *co,
     char *pathname,
     char *cpathname);
+PyAPI_FUNC(PyObject *) PyImport_ExecCodeModuleWithUnicodePathnames(
+    char *name,
+    PyObject *co,
+    PyObject *pathname,
+    PyObject *cpathname);
 PyAPI_FUNC(PyObject *) PyImport_GetModuleDict(void);
 PyAPI_FUNC(PyObject *) PyImport_AddModule(const char *name);
 PyAPI_FUNC(PyObject *) PyImport_ImportModule(const char *name);
