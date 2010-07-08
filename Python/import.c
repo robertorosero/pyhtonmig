@@ -1630,12 +1630,12 @@ static int case_ok(PyObject *, Py_ssize_t, Py_ssize_t, char *);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 
 static struct filedescr *
-_find_module(char *fullname, char *subname, PyObject *search_path,
-            char *buf, size_t buflen, PyObject **path,
+find_module(char *fullname, char *subname, PyObject *search_path,
+            PyObject **path,
             FILE **p_fp, PyObject **p_loader)
 {
     Py_ssize_t i, npath;
-    size_t len, namelen;
+    size_t namelen;
     struct filedescr *fdp = NULL;
     char *filemode;
     FILE *fp = NULL;
@@ -1646,11 +1646,11 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
     static struct filedescr fd_package = {"", "", PKG_DIRECTORY};
     char name[MAXPATHLEN+1];
 #if defined(PYOS_OS2)
-    size_t saved_len;
+    PyObject *unicode_saved;
     size_t saved_namelen;
-    char *saved_buf = NULL;
 #endif
     PyObject *unicode;
+    PyObject *unicode_without_suffix;
 
     *path = NULL;
     if (p_loader != NULL)
@@ -1752,40 +1752,25 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
     npath = PyList_Size(search_path);
     namelen = strlen(name);
     for (i = 0; i < npath; i++) {
-        PyObject *v = PyList_GetItem(search_path, i);
-        PyObject *origv = v;
-        const char *base;
-        Py_ssize_t size;
-        if (!v)
+        PyObject *v;
+        Py_UNICODE *unicode_buf;
+        Py_ssize_t unicode_len;
+
+        v = PyList_GetItem(search_path, i);
+        if (v == NULL)
             return NULL;
-        if (PyUnicode_Check(v)) {
-            v = PyUnicode_EncodeFSDefault(v);
-            if (v == NULL)
-                return NULL;
-        }
-        else
+        if (!PyUnicode_Check(v))
             continue;
 
-        base = PyBytes_AS_STRING(v);
-        size = PyBytes_GET_SIZE(v);
-        len = size;
-        if (len + 2 + namelen + MAXSUFFIXSIZE >= buflen) {
-            Py_DECREF(v);
-            continue; /* Too long */
-        }
-        strcpy(buf, base);
-        Py_DECREF(v);
-
-        if (strlen(buf) != len) {
-            continue; /* v contains '\0' */
-        }
+        unicode_buf = PyUnicode_AS_UNICODE(v);
+        unicode_len = PyUnicode_GET_SIZE(v);
 
         /* sys.path_hooks import hook */
         if (p_loader != NULL) {
             PyObject *importer;
 
             importer = get_path_importer(path_importer_cache,
-                                         path_hooks, origv);
+                                         path_hooks, v);
             if (importer == NULL) {
                 return NULL;
             }
@@ -1808,21 +1793,20 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
         }
         /* no hook was found, use builtin import */
 
-        if (len > 0 && buf[len-1] != SEP
+        if (unicode_len > 0 && unicode_buf[unicode_len-1] != SEP
 #ifdef ALTSEP
-            && buf[len-1] != ALTSEP
+            && unicode_buf[unicode_len-1] != ALTSEP
 #endif
             )
-            buf[len++] = SEP;
-        strcpy(buf+len, name);
-        len += namelen;
+            unicode = PyUnicode_FromFormat("%U%c%s", v, SEP, name);
+        else
+            unicode = PyUnicode_FromFormat("%U%s", v, name);
+        if (unicode == NULL)
+            return NULL;
 
         /* Check for package import (buf holds a directory name,
            and there's an __init__ module in that directory */
 #ifdef HAVE_STAT
-        unicode = PyUnicode_DecodeFSDefault(buf);
-        if (unicode == NULL)
-            return NULL;
         if (stat_unicode(unicode, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(unicode, 0, namelen, name)) { /* case matches */
@@ -1841,16 +1825,18 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
                 }
             }
         }
-        Py_DECREF(unicode);
 #endif
+        Py_INCREF(unicode);
+        unicode_without_suffix = unicode;
 #if defined(PYOS_OS2)
         /* take a snapshot of the module spec for restoration
          * after the 8 character DLL hackery
          */
-        saved_buf = strdup(buf);
-        saved_len = len;
+        Py_INCREF(unicode_without_suffix);
+        saved_unicode = unicode_without_suffix;
         saved_namelen = namelen;
 #endif /* PYOS_OS2 */
+        Py_CLEAR(unicode);
         for (fdp = _PyImport_Filetab; fdp->suffix != NULL; fdp++) {
 #if defined(PYOS_OS2) && defined(HAVE_DYNAMIC_LOADING)
             /* OS/2 limits DLLs to 8 character names (w/o
@@ -1870,15 +1856,18 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
                         scan++;
                 }
                 if (scan->suffix != NULL) {
+                    PyObject* truncated;
                     /* yes, so truncate the name */
                     namelen = 8;
-                    len -= strlen(subname) - namelen;
-                    buf[len] = '\0';
+                    truncated = PyUnicode_FromUnicode(
+                        PyUnicode_AS_UNICODE(unicode_without_suffix);
+                        PyUnicode_GET_SIZE(unicode_without_suffix) - (strlen(subname) - namelen));
+                    Py_DECREF(unicode_without_suffix);
+                    unicode_without_suffix = truncated;
                 }
             }
 #endif /* PYOS_OS2 */
-            strcpy(buf+len, fdp->suffix);
-            unicode = PyUnicode_DecodeFSDefault(buf);
+            unicode = PyUnicode_FromFormat("%U%s", unicode_without_suffix, fdp->suffix);
             if (Py_VerboseFlag > 1)
                 PySys_FormatStderr("# trying %U\n", unicode);
             filemode = fdp->mode;
@@ -1887,57 +1876,37 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
             fp = fopen_unicode(unicode, filemode);
             if (fp != NULL) {
                 if (case_ok(unicode, strlen(fdp->suffix), namelen, name)) {
-                    Py_DECREF(unicode);
                     break;
                 } else {                   /* continue search */
                     fclose(fp);
                     fp = NULL;
                 }
             }
-            Py_DECREF(unicode);
 #if defined(PYOS_OS2)
             /* restore the saved snapshot */
-            strcpy(buf, saved_buf);
-            len = saved_len;
+            Py_DECREF(unicode_without_suffix);
+            Py_INCREF(saved_unicode);
+            unicode_without_suffix = saved_unicode;
             namelen = saved_namelen;
 #endif
         }
+        Py_CLEAR(unicode_without_suffix);
 #if defined(PYOS_OS2)
-        /* don't need/want the module name snapshot anymore */
-        if (saved_buf)
-        {
-            free(saved_buf);
-            saved_buf = NULL;
-        }
+        Py_DECREF(saved_unicode);
 #endif
         if (fp != NULL)
             break;
+        Py_DECREF(unicode);
     }
+    Py_XDECREF(unicode_without_suffix);
     if (fp == NULL) {
         PyErr_Format(PyExc_ImportError,
                      "No module named %.200s", name);
         return NULL;
     }
-    *path = PyUnicode_DecodeFSDefault(buf);
-    if (*path == NULL) {
-        fclose(fp);
-        return NULL;
-    }
+    *path = unicode;
     *p_fp = fp;
     return fdp;
-}
-
-static struct filedescr *
-find_module(char *fullname, char *subname, PyObject *search_path, PyObject **path,
-            FILE **p_fp, PyObject **p_loader)
-{
-    char buf[MAXPATHLEN+1];
-    struct filedescr *fd;
-    buf[0] = '\0';
-    fd = _find_module(fullname, subname, search_path,
-                      buf, sizeof(buf), path,
-                      p_fp, p_loader);
-    return fd;
 }
 
 /* Helpers for main.c
