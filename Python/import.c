@@ -1655,6 +1655,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
     size_t saved_namelen;
     char *saved_buf = NULL;
 #endif
+    PyObject *unicode;
 
     *path = NULL;
     if (p_loader != NULL)
@@ -1827,24 +1828,28 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
         /* Check for package import (buf holds a directory name,
            and there's an __init__ module in that directory */
 #ifdef HAVE_STAT
+        unicode = PyUnicode_DecodeFSDefault(buf);
+        if (unicode == NULL)
+            return NULL;
         if (stat(buf, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(buf, len, namelen, name)) { /* case matches */
             if (find_init_module(buf)) { /* and has __init__.py */
-                *path = PyUnicode_DecodeFSDefault(buf);
-                if (*path == NULL)
-                    return NULL;
+                *path = unicode;
                 return &fd_package;
             }
             else {
                 int warnerr;
                 warnerr = PyErr_WarnFormat(PyExc_ImportWarning, 1,
-                    "Not importing directory '%s': missing __init__.py",
-                    buf);
-                if (warnerr)
+                    "Not importing directory '%U': missing __init__.py",
+                    unicode);
+                if (warnerr) {
+                    Py_DECREF(unicode);
                     return NULL;
+                }
             }
         }
+        Py_DECREF(unicode);
 #endif
 #if defined(PYOS_OS2)
         /* take a snapshot of the module spec for restoration
