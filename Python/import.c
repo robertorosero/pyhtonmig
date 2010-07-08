@@ -720,8 +720,8 @@ remove_module(const char *name)
 
 static PyObject * get_sourcefile(PyObject *file);
 static char *make_source_pathname(char *pathname, char *buf);
-static char *make_compiled_pathname(char *pathname, char *buf, size_t buflen,
-                                    int debug);
+static PyObject *make_compiled_pathname(PyObject *pathname, char *buf,
+                                        size_t buflen, int debug);
 
 /* Execute a code object in a module and return the module object
  * WITH INCREMENTED REFERENCE COUNT.  If an error occurs, name is
@@ -861,7 +861,7 @@ rightmost_sep(char *s)
 
 /* FIXME: use Py_UNICODE*, not char* */
 static char *
-make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
+_make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
 {
     /* foo.py -> __pycache__/foo.<tag>.pyc */
     size_t len = strlen(pathname);
@@ -961,6 +961,21 @@ make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
     strcat(buf, debug ? ".pyc" : ".pyo");
     assert(strlen(buf) < buflen);
     return buf;
+}
+
+static PyObject*
+make_compiled_pathname(PyObject *pathobj, char *buf, size_t buflen, int debug)
+{
+    char *pathname, *cpathname;
+
+    /* FIXME: don't use _PyUnicode_AsString */
+    pathname = _PyUnicode_AsString(pathobj);
+
+    cpathname = _make_compiled_pathname(pathname, buf, buflen, debug);
+    if (cpathname != NULL)
+        return PyUnicode_DecodeFSDefault(cpathname);
+    else
+        return NULL;
 }
 
 
@@ -1315,16 +1330,21 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
         return NULL;
     }
 #endif
-    cpathname = make_compiled_pathname(
-        pathname, buf, sizeof(buf), !Py_OptimizeFlag);
-    if (cpathname != NULL) {
-        cpathobj = PyUnicode_DecodeFSDefault(cpathname);
-        if (cpathobj == NULL)
+    cpathobj = make_compiled_pathname(
+        pathobj, buf, sizeof(buf), !Py_OptimizeFlag);
+    if (cpathobj != NULL) {
+        /* FIXME: don't use _PyUnicode_AsString */
+        cpathname = _PyUnicode_AsString(cpathobj);
+        if (cpathobj == NULL) {
+            Py_DECREF(cpathobj);
             return NULL;
+        }
         fpc = check_compiled_module(pathname, st.st_mtime, cpathname);
     }
     else {
-        cpathobj = NULL;
+        if (PyErr_Occurred())
+            return NULL;
+        cpathname = NULL;
         fpc = NULL;
     }
     if (fpc) {
@@ -3554,13 +3574,14 @@ imp_cache_from_source(PyObject *self, PyObject *args, PyObject *kws)
     static char *kwlist[] = {"path", "debug_override", NULL};
 
     char buf[MAXPATHLEN+1];
-    char *pathname, *cpathname;
+    PyObject *pathname;
     PyObject *debug_override = Py_None;
     int debug = !Py_OptimizeFlag;
+    PyObject *cpathname;
 
     if (!PyArg_ParseTupleAndKeywords(
-                args, kws, "es|O", kwlist,
-                Py_FileSystemDefaultEncoding, &pathname, &debug_override))
+                args, kws, "U|O", kwlist,
+                &pathname, &debug_override))
         return NULL;
 
     if (debug_override != Py_None)
@@ -3568,13 +3589,11 @@ imp_cache_from_source(PyObject *self, PyObject *args, PyObject *kws)
             return NULL;
 
     cpathname = make_compiled_pathname(pathname, buf, sizeof(buf), debug);
-    PyMem_Free(pathname);
-
     if (cpathname == NULL) {
         PyErr_Format(PyExc_SystemError, "path buffer too short");
         return NULL;
     }
-    return PyUnicode_FromString(buf);
+    return cpathname;
 }
 
 PyDoc_STRVAR(doc_cache_from_source,
