@@ -1819,14 +1819,12 @@ _find_module(char *fullname, char *subname, PyObject *path, char *buf,
                 return &fd_package;
             }
             else {
-                char warnstr[MAXPATHLEN+80];
-                sprintf(warnstr, "Not importing directory "
-                    "'%.*s': missing __init__.py",
-                    MAXPATHLEN, buf);
-                if (PyErr_WarnEx(PyExc_ImportWarning,
-                                 warnstr, 1)) {
+                int warnerr;
+                warnerr = PyErr_WarnFormat(PyExc_ImportWarning, 1,
+                    "Not importing directory '%s': missing __init__.py",
+                    buf);
+                if (warnerr)
                     return NULL;
-                }
             }
         }
 #endif
@@ -1866,7 +1864,7 @@ _find_module(char *fullname, char *subname, PyObject *path, char *buf,
 #endif /* PYOS_OS2 */
             strcpy(buf+len, fdp->suffix);
             if (Py_VerboseFlag > 1)
-                PySys_WriteStderr("# trying %s\n", buf);
+                PySys_FormatStderr("# trying %s\n", buf);
             filemode = fdp->mode;
             if (filemode[0] == 'U')
                 filemode = "r" PY_STDIOTEXTMODE;
