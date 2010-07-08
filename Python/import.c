@@ -136,6 +136,13 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
     {0, 0}
 };
 
+/* Forward */
+static FILE* fopen_unicode(PyObject *unicode, const char *mode);
+#ifdef HAVE_STAT
+static int stat_unicode(PyObject *unicode, struct stat *statbuf);
+static int find_init_module(char *);
+#endif
+
 
 /* Initialize things */
 
@@ -1061,14 +1068,8 @@ check_compiled_module(PyObject *pathobj, time_t mtime, PyObject *cpathobj)
     FILE *fp;
     long magic;
     long pyc_mtime;
-    char *cpathname;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    cpathname = _PyUnicode_AsString(cpathobj);
-    if (cpathname == NULL)
-        return NULL;
-
-    fp = fopen(cpathname, "rb");
+    fp = fopen_unicode(cpathobj, "rb");
     if (fp == NULL)
         return NULL;
     magic = PyMarshal_ReadLongFromFile(fp);
@@ -1411,7 +1412,6 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 static PyObject *
 get_sourcefile(PyObject *fileobj)
 {
-    char *py;
     PyObject *pyobj;
     Py_UNICODE *file;
     Py_ssize_t len;
@@ -1448,11 +1448,7 @@ get_sourcefile(PyObject *fileobj)
             return NULL;
     }
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    py = _PyUnicode_AsString(pyobj);
-    if (py == NULL)
-        return NULL;
-    if (stat(py, &statbuf) == 0 &&
+    if (stat_unicode(pyobj, &statbuf) == 0 &&
         S_ISREG(statbuf.st_mode)) {
         return pyobj;
     }
@@ -1631,8 +1627,6 @@ extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
 #endif
 
 static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
-static int find_init_module(char *); /* Forward */
-static int stat_unicode(PyObject *unicode, struct stat *statbuf);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 
 static struct filedescr *
@@ -1887,20 +1881,23 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
             }
 #endif /* PYOS_OS2 */
             strcpy(buf+len, fdp->suffix);
+            unicode = PyUnicode_DecodeFSDefault(buf);
             if (Py_VerboseFlag > 1)
-                PySys_FormatStderr("# trying %s\n", buf);
+                PySys_FormatStderr("# trying %U\n", unicode);
             filemode = fdp->mode;
             if (filemode[0] == 'U')
                 filemode = "r" PY_STDIOTEXTMODE;
-            fp = fopen(buf, filemode);
+            fp = fopen_unicode(unicode, filemode);
             if (fp != NULL) {
-                if (case_ok(buf, len, namelen, name))
+                if (case_ok(buf, len, namelen, name)) {
+                    Py_DECREF(unicode);
                     break;
-                else {                   /* continue search */
+                } else {                   /* continue search */
                     fclose(fp);
                     fp = NULL;
                 }
             }
+            Py_DECREF(unicode);
 #if defined(PYOS_OS2)
             /* restore the saved snapshot */
             strcpy(buf, saved_buf);
@@ -2108,11 +2105,22 @@ case_ok(char *buf, Py_ssize_t len, Py_ssize_t namelen, char *name)
 #endif
 }
 
+static FILE*
+fopen_unicode(PyObject *unicode, const char *mode)
+{
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    char *pathstr = _PyUnicode_AsString(unicode);
+    if (pathstr == NULL)
+        return NULL;
+    return fopen(pathstr, mode);
+}
+
 
 #ifdef HAVE_STAT
 static int
 stat_unicode(PyObject *unicode, struct stat *statbuf)
 {
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
     char *pathstr = _PyUnicode_AsString(unicode);
     if (pathstr == NULL)
         return 1;
@@ -2127,6 +2135,7 @@ find_init_module(char *buf)
     size_t i = save_len;
     char *pname;  /* pointer to start of __init__ */
     struct stat statbuf;
+    PyObject *unicode;
 
 /*      For calling case_ok(buf, len, namelen, name):
  *      /a/b/c/d/e/f/g/h/i/j/k/some_long_module_name.py\0
@@ -2141,26 +2150,32 @@ find_init_module(char *buf)
     buf[i++] = SEP;
     pname = buf + i;
     strcpy(pname, "__init__.py");
-    if (stat(buf, &statbuf) == 0) {
+    unicode = PyUnicode_DecodeFSDefault(buf);
+    if (stat_unicode(unicode, &statbuf) == 0) {
         if (case_ok(buf,
                     save_len + 9,               /* len("/__init__") */
                 8,                              /* len("__init__") */
                 pname)) {
             buf[save_len] = '\0';
+            Py_DECREF(unicode);
             return 1;
         }
     }
+    Py_DECREF(unicode);
     i += strlen(pname);
     strcpy(buf+i, Py_OptimizeFlag ? "o" : "c");
-    if (stat(buf, &statbuf) == 0) {
+    unicode = PyUnicode_DecodeFSDefault(buf);
+    if (stat_unicode(unicode, &statbuf) == 0) {
         if (case_ok(buf,
                     save_len + 9,               /* len("/__init__") */
                 8,                              /* len("__init__") */
                 pname)) {
             buf[save_len] = '\0';
+            Py_DECREF(unicode);
             return 1;
         }
     }
+    Py_DECREF(unicode);
     buf[save_len] = '\0';
     return 0;
 }
@@ -3445,15 +3460,10 @@ static FILE *
 get_file(PyObject *pathobj, PyObject *fob, char *mode)
 {
     FILE *fp;
-    char *pathname;
     if (mode[0] == 'U')
         mode = "r" PY_STDIOTEXTMODE;
     if (fob == NULL) {
-        /* FIXME: don't use _PyUnicode_AsString */
-        pathname = _PyUnicode_AsString(pathobj);
-        if (pathname == NULL)
-            return NULL;
-        fp = fopen(pathname, mode);
+        fp = fopen_unicode(pathobj, mode);
     }
     else {
         int fd = PyObject_AsFileDescriptor(fob);
