@@ -1211,7 +1211,8 @@ open_exclusive(char *filename, mode_t mode)
    remove the file. */
 
 static void
-write_compiled_module(PyCodeObject *co, char *cpathname, struct stat *srcstat)
+write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
+                      struct stat *srcstat)
 {
     FILE *fp;
     char *dirpath;
@@ -1228,6 +1229,14 @@ write_compiled_module(PyCodeObject *co, char *cpathname, struct stat *srcstat)
                       S_IWUSR | S_IWGRP | S_IWOTH);
 #endif
     int saved;
+    char *cpathname;
+
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    cpathname = _PyUnicode_AsString(cpathobj);
+    if (cpathname == NULL) {
+        PyErr_Clear();
+        return;
+    }
 
     /* Ensure that the __pycache__ directory exists. */
     dirpath = rightmost_sep(cpathname);
@@ -1327,7 +1336,6 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 {
     struct stat st;
     FILE *fpc;
-    char *cpathname;
     PyObject *cpathobj;
     PyCodeObject *co;
     PyObject *m;
@@ -1350,19 +1358,11 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
     }
 #endif
     cpathobj = make_compiled_pathname(pathobj, !Py_OptimizeFlag);
-    if (cpathobj != NULL) {
-        /* FIXME: don't use _PyUnicode_AsString */
-        cpathname = _PyUnicode_AsString(cpathobj);
-        if (cpathobj == NULL) {
-            Py_DECREF(cpathobj);
-            return NULL;
-        }
+    if (cpathobj != NULL)
         fpc = check_compiled_module(pathobj, st.st_mtime, cpathobj);
-    }
     else {
         if (PyErr_Occurred())
             return NULL;
-        cpathname = NULL;
         fpc = NULL;
     }
     if (fpc) {
@@ -1390,10 +1390,10 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
         }
         if (Py_VerboseFlag)
             PySys_FormatStderr("import %s # from %U\n", name, pathobj);
-        if (cpathname) {
+        if (cpathobj != NULL) {
             PyObject *ro = PySys_GetObject("dont_write_bytecode");
             if (ro == NULL || !PyObject_IsTrue(ro))
-                write_compiled_module(co, cpathname, &st);
+                write_compiled_module(co, cpathobj, &st);
         }
         m = PyImport_ExecCodeModuleWithUnicodePathnames(
             name, (PyObject *)co, pathobj, cpathobj);
