@@ -1381,7 +1381,7 @@ static struct _frozen * find_frozen(char *);
    REFERENCE COUNT */
 
 static PyObject *
-load_package(char *name, char *pathname)
+load_package(char *name, PyObject *pathobj)
 {
     PyObject *m, *d;
     PyObject *file = NULL;
@@ -1390,6 +1390,10 @@ load_package(char *name, char *pathname)
     char buf[MAXPATHLEN+1];
     FILE *fp = NULL;
     struct filedescr *fdp;
+    char *pathname;
+
+    /* FIXME: don't use _PyUnicode_AsString */
+    pathname = _PyUnicode_AsString(pathobj);
 
     m = PyImport_AddModule(name);
     if (m == NULL)
@@ -2087,9 +2091,14 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
     }
 #endif
 
-    case PKG_DIRECTORY:
-        m = load_package(name, pathname);
+    case PKG_DIRECTORY: {
+        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
+            return NULL;
+        m = load_package(name, pathobj);
+        Py_DECREF(pathobj);
         break;
+    }
 
     case C_BUILTIN:
     case PY_FROZEN:
@@ -3455,14 +3464,11 @@ static PyObject *
 imp_load_package(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
-    PyObject * ret;
-    if (!PyArg_ParseTuple(args, "ses:load_package",
-                          &name, Py_FileSystemDefaultEncoding, &pathname))
+    PyObject *pathname;
+    if (!PyArg_ParseTuple(args, "sU:load_package",
+                          &name, &pathname))
         return NULL;
-    ret = load_package(name, pathname);
-    PyMem_Free(pathname);
-    return ret;
+    return load_package(name, pathname);
 }
 
 static PyObject *
