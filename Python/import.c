@@ -1232,14 +1232,15 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
                       S_IWUSR | S_IWGRP | S_IWOTH);
 #endif
     int saved;
+    PyObject *cpathbytes;
     char *cpathname;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    cpathname = _PyUnicode_AsString(cpathobj);
-    if (cpathname == NULL) {
+    cpathbytes = PyUnicode_EncodeFSDefault(cpathobj);
+    if (cpathbytes == NULL) {
         PyErr_Clear();
         return;
     }
+    cpathname = PyBytes_AS_STRING(cpathbytes);
 
     /* Ensure that the __pycache__ directory exists. */
     dirpath = rightmost_sep(cpathname);
@@ -1248,6 +1249,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
             PySys_WriteStderr(
                 "# no %s path found %s\n",
                 CACHEDIR, cpathname);
+        Py_DECREF(cpathbytes);
         return;
     }
     saved = *dirpath;
@@ -1258,6 +1260,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
         if (Py_VerboseFlag)
             PySys_WriteStderr(
                 "# cannot create cache dir %s\n", cpathname);
+        Py_DECREF(cpathbytes);
         return;
     }
     *dirpath = saved;
@@ -1267,6 +1270,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
         if (Py_VerboseFlag)
             PySys_WriteStderr(
                 "# can't create %s\n", cpathname);
+        Py_DECREF(cpathbytes);
         return;
     }
     PyMarshal_WriteLongToFile(pyc_magic, fp, Py_MARSHAL_VERSION);
@@ -1279,6 +1283,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
         /* Don't keep partial file */
         fclose(fp);
         (void) unlink(cpathname);
+        Py_DECREF(cpathbytes);
         return;
     }
     /* Now write the true mtime */
@@ -1289,6 +1294,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     fclose(fp);
     if (Py_VerboseFlag)
         PySys_WriteStderr("# wrote %s\n", cpathname);
+    Py_DECREF(cpathbytes);
 }
 
 static void
