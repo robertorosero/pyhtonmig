@@ -22,14 +22,11 @@ PyObject *
 _PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
 {
     PyObject *m;
-    char *pathname;
+    PyObject *pathbytes;
     char *lastdot, *shortname, *packagecontext, *oldcontext;
     dl_funcptr p0;
     PyObject* (*p)(void);
     struct PyModuleDef *def;
-
-    /* FIXME: don't use _PyUnicode_AsString */
-    pathname = _PyUnicode_AsString(path);
 
     if ((m = _PyImport_FindExtensionUnicode(name, path)) != NULL) {
         Py_INCREF(m);
@@ -45,7 +42,12 @@ _PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
         shortname = lastdot+1;
     }
 
-    p0 = _PyImport_GetDynLoadFunc(name, shortname, pathname, fp);
+    /* FIXME: pass path, not pathname, at least to the Windows implementation */
+    pathbytes = PyUnicode_EncodeFSDefault(path);
+    if (pathbytes == NULL)
+        return NULL;
+    p0 = _PyImport_GetDynLoadFunc(name, shortname, PyBytes_AsString(pathbytes), fp);
+    Py_DECREF(pathbytes);
     p = (PyObject*(*)(void))p0;
     if (PyErr_Occurred())
         return NULL;
@@ -84,9 +86,9 @@ _PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
     if (_PyImport_FixupExtensionUnicode(m, name, path) < 0)
         return NULL;
     if (Py_VerboseFlag)
-        PySys_WriteStderr(
-            "import %s # dynamically loaded from %s\n",
-            name, pathname);
+        PySys_FormatStderr(
+            "import %s # dynamically loaded from %U\n",
+            name, path);
     return m;
 }
 
