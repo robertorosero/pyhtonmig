@@ -1963,30 +1963,27 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 static int
 case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *name)
 {
-#if defined(MS_WINDOWS) || defined(DJGPP) || (defined(__MACH__) && defined(__APPLE__) \
-    || defined(__CYGWIN__)) && defined(HAVE_DIRENT_H) || defined(PYOS_OS2)
-    /* FIXME: don't use _PyUnicode_AsString */
-    char *buf = _PyUnicode_AsString(bufobj);
-    Py_ssize_t len = strlen(buf) - lendelta;
-#endif
-
 /* Pick a platform-specific implementation; the sequence of #if's here should
  * match the sequence just above.
  */
 
 /* MS_WINDOWS */
 #if defined(MS_WINDOWS)
+    char *buf;
     WIN32_FIND_DATA data;
     HANDLE h;
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
+    /* FIXME: use PyUnicode_AsWideChar() and FindFirstFileW() */
+    buf = _PyUnicode_AsString(bufobj);
+
     h = FindFirstFile(buf, &data);
     if (h == INVALID_HANDLE_VALUE) {
         PyErr_Format(PyExc_NameError,
-          "Can't find file for module %.100s\n(filename %.300s)",
-          name, buf);
+          "Can't find file for module %.100s\n(filename %U)",
+          name, bufobj);
         return 0;
     }
     FindClose(h);
@@ -1994,30 +1991,41 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 
 /* DJGPP */
 #elif defined(DJGPP)
+    char *buf;
     struct ffblk ffblk;
     int done;
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    buf = _PyUnicode_AsString(bufobj);
+
     done = findfirst(buf, &ffblk, FA_ARCH|FA_RDONLY|FA_HIDDEN|FA_DIREC);
     if (done) {
         PyErr_Format(PyExc_NameError,
-          "Can't find file for module %.100s\n(filename %.300s)",
-          name, buf);
+          "Can't find file for module %.100s\n(filename %U)",
+          name, bufobj);
         return 0;
     }
     return strncmp(ffblk.ff_name, name, namelen) == 0;
 
 /* new-fangled macintosh (macosx) or Cygwin */
 #elif (defined(__MACH__) && defined(__APPLE__) || defined(__CYGWIN__)) && defined(HAVE_DIRENT_H)
+    char *buf;
+    Py_ssize_t len;
     DIR *dirp;
     struct dirent *dp;
     char dirname[MAXPATHLEN + 1];
-    const int dirlen = len - namelen - 1; /* don't want trailing SEP */
+    int dirlen;
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
+
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    buf = _PyUnicode_AsString(bufobj);
+    len = strlen(buf) - lendelta;
+    dirlen = len - namelen - 1; /* don't want trailing SEP */
 
     /* Copy the dir component into dirname; substitute "." if empty */
     if (dirlen <= 0) {
@@ -2052,6 +2060,7 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 
 /* OS/2 */
 #elif defined(PYOS_OS2)
+    char *buf;
     HDIR hdir = 1;
     ULONG srchcnt = 1;
     FILEFINDBUF3 ffbuf;
@@ -2059,6 +2068,9 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
+
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    buf = _PyUnicode_AsString(bufobj);
 
     rc = DosFindFirst(buf,
                       &hdir,
@@ -2080,11 +2092,13 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 static FILE*
 fopen_unicode(PyObject *unicode, const char *mode)
 {
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    char *pathstr = _PyUnicode_AsString(unicode);
-    if (pathstr == NULL)
+    FILE *f;
+    PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (bytes == NULL)
         return NULL;
-    return fopen(pathstr, mode);
+    f = fopen(PyBytes_AS_STRING(bytes), mode);
+    Py_DECREF(bytes);
+    return f;
 }
 
 
@@ -2092,11 +2106,13 @@ fopen_unicode(PyObject *unicode, const char *mode)
 static int
 stat_unicode(PyObject *unicode, struct stat *statbuf)
 {
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    char *pathstr = _PyUnicode_AsString(unicode);
-    if (pathstr == NULL)
-        return 1;
-    return stat(pathstr, statbuf);
+    int ret;
+    PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (bytes == NULL)
+        return -1;
+    ret = stat(PyBytes_AS_STRING(bytes), statbuf);
+    Py_DECREF(bytes);
+    return ret;
 }
 
 /* Helper to look for __init__.py or __init__.py[co] in potential package */
