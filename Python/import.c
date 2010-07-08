@@ -1055,11 +1055,17 @@ make_source_pathname(PyObject *pathobj)
    Doesn't set an exception. */
 
 static FILE *
-check_compiled_module(char *pathname, time_t mtime, char *cpathname)
+check_compiled_module(PyObject *pathobj, time_t mtime, PyObject *cpathobj)
 {
     FILE *fp;
     long magic;
     long pyc_mtime;
+    char *cpathname;
+
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    cpathname = _PyUnicode_AsString(cpathobj);
+    if (cpathname == NULL)
+        return NULL;
 
     fp = fopen(cpathname, "rb");
     if (fp == NULL)
@@ -1067,19 +1073,19 @@ check_compiled_module(char *pathname, time_t mtime, char *cpathname)
     magic = PyMarshal_ReadLongFromFile(fp);
     if (magic != pyc_magic) {
         if (Py_VerboseFlag)
-            PySys_WriteStderr("# %s has bad magic\n", cpathname);
+            PySys_FormatStderr("# %U has bad magic\n", cpathobj);
         fclose(fp);
         return NULL;
     }
     pyc_mtime = PyMarshal_ReadLongFromFile(fp);
     if (pyc_mtime != mtime) {
         if (Py_VerboseFlag)
-            PySys_WriteStderr("# %s has bad mtime\n", cpathname);
+            PySys_FormatStderr("# %s has bad mtime\n", cpathobj);
         fclose(fp);
         return NULL;
     }
     if (Py_VerboseFlag)
-        PySys_WriteStderr("# %s matches %s\n", cpathname, pathname);
+        PySys_FormatStderr("# %U matches %U\n", cpathobj, pathobj);
     return fp;
 }
 
@@ -1087,7 +1093,7 @@ check_compiled_module(char *pathname, time_t mtime, char *cpathname)
 /* Read a code object from a file and check it for validity */
 
 static PyCodeObject *
-read_compiled_module(char *cpathname, FILE *fp)
+read_compiled_module(PyObject *cpathobj, FILE *fp)
 {
     PyObject *co;
 
@@ -1096,7 +1102,7 @@ read_compiled_module(char *cpathname, FILE *fp)
         return NULL;
     if (!PyCode_Check(co)) {
         PyErr_Format(PyExc_ImportError,
-                     "Non-code object in %.200s", cpathname);
+                     "Non-code object in %U", cpathobj);
         Py_DECREF(co);
         return NULL;
     }
@@ -1113,19 +1119,15 @@ load_compiled_module(char *name, PyObject *cpathobj, FILE *fp)
     long magic;
     PyCodeObject *co;
     PyObject *m;
-    char *cpathname;
-
-    /* FIXME: don't use _PyUnicode_AsString */
-    cpathname = _PyUnicode_AsString(cpathobj);
 
     magic = PyMarshal_ReadLongFromFile(fp);
     if (magic != pyc_magic) {
         PyErr_Format(PyExc_ImportError,
-                     "Bad magic number in %.200s", cpathname);
+                     "Bad magic number in %U", cpathobj);
         return NULL;
     }
     (void) PyMarshal_ReadLongFromFile(fp);
-    co = read_compiled_module(cpathname, fp);
+    co = read_compiled_module(cpathobj, fp);
     if (co == NULL)
         return NULL;
     if (Py_VerboseFlag)
@@ -1325,16 +1327,10 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 {
     struct stat st;
     FILE *fpc;
-    char *pathname;
     char *cpathname;
     PyObject *cpathobj;
     PyCodeObject *co;
     PyObject *m;
-
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    pathname = _PyUnicode_AsString(pathobj);
-    if (pathname == NULL)
-        return NULL;
 
     if (fstat(fileno(fp), &st) != 0) {
         PyErr_Format(PyExc_RuntimeError,
@@ -1361,7 +1357,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
             Py_DECREF(cpathobj);
             return NULL;
         }
-        fpc = check_compiled_module(pathname, st.st_mtime, cpathname);
+        fpc = check_compiled_module(pathobj, st.st_mtime, cpathobj);
     }
     else {
         if (PyErr_Occurred())
@@ -1370,7 +1366,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
         fpc = NULL;
     }
     if (fpc) {
-        co = read_compiled_module(cpathname, fpc);
+        co = read_compiled_module(cpathobj, fpc);
         fclose(fpc);
         if (co == NULL) {
             Py_XDECREF(cpathobj);
