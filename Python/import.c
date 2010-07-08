@@ -859,6 +859,7 @@ rightmost_sep(char *s)
    for the compiled file, or NULL if there's no space in the buffer.
    Doesn't set an exception. */
 
+/* FIXME: use Py_UNICODE*, not char* */
 static char *
 make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
 {
@@ -1289,6 +1290,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
     char buf[MAXPATHLEN+1];
     char *pathname;
     char *cpathname;
+    PyObject *cpathobj;
     PyCodeObject *co;
     PyObject *m;
 
@@ -1313,28 +1315,40 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
     }
 #endif
     cpathname = make_compiled_pathname(
-        pathname, buf, (size_t)MAXPATHLEN + 1, !Py_OptimizeFlag);
-    if (cpathname != NULL)
+        pathname, buf, sizeof(buf), !Py_OptimizeFlag);
+    if (cpathname != NULL) {
+        cpathobj = PyUnicode_DecodeFSDefault(cpathname);
+        if (cpathobj == NULL)
+            return NULL;
         fpc = check_compiled_module(pathname, st.st_mtime, cpathname);
-    else
+    }
+    else {
+        cpathobj = NULL;
         fpc = NULL;
+    }
     if (fpc) {
         co = read_compiled_module(cpathname, fpc);
         fclose(fpc);
-        if (co == NULL)
+        if (co == NULL) {
+            Py_XDECREF(cpathobj);
             return NULL;
-        if (update_compiled_module(co, pathobj) < 0)
+        }
+        if (update_compiled_module(co, pathobj) < 0) {
+            Py_XDECREF(cpathobj);
             return NULL;
+        }
         if (Py_VerboseFlag)
             PySys_WriteStderr("import %s # precompiled from %s\n",
                 name, cpathname);
-        pathobj = NULL;
-        pathname = cpathname;
+        m = PyImport_ExecCodeModuleWithUnicodePathnames(
+            name, (PyObject *)co, cpathobj, cpathobj);
     }
     else {
         co = parse_source_module(pathname, fp);
-        if (co == NULL)
+        if (co == NULL) {
+            Py_XDECREF(cpathobj);
             return NULL;
+        }
         if (Py_VerboseFlag)
             PySys_WriteStderr("import %s # from %s\n",
                 name, pathname);
@@ -1343,9 +1357,10 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
             if (ro == NULL || !PyObject_IsTrue(ro))
                 write_compiled_module(co, cpathname, &st);
         }
+        m = PyImport_ExecCodeModuleWithUnicodePathnames(
+            name, (PyObject *)co, pathobj, cpathobj);
     }
-    m = PyImport_ExecCodeModuleWithPathnames(
-        name, (PyObject *)co, pathname, cpathname);
+    Py_XDECREF(cpathobj);
     Py_DECREF(co);
 
     return m;
@@ -3539,7 +3554,7 @@ imp_cache_from_source(PyObject *self, PyObject *args, PyObject *kws)
         if ((debug = PyObject_IsTrue(debug_override)) < 0)
             return NULL;
 
-    cpathname = make_compiled_pathname(pathname, buf, MAXPATHLEN+1, debug);
+    cpathname = make_compiled_pathname(pathname, buf, sizeof(buf), debug);
     PyMem_Free(pathname);
 
     if (cpathname == NULL) {
