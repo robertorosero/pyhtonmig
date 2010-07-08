@@ -188,8 +188,8 @@ PyModule_GetName(PyObject *m)
     return _PyUnicode_AsString(nameobj);
 }
 
-static PyObject*
-module_getfilename(PyObject *m)
+PyObject*
+PyModule_GetFilenameObject(PyObject *m)
 {
     PyObject *d;
     PyObject *fileobj;
@@ -212,7 +212,7 @@ const char *
 PyModule_GetFilename(PyObject *m)
 {
     PyObject *fileobj;
-    fileobj = module_getfilename(m);
+    fileobj = PyModule_GetFilenameObject(m);
     if (fileobj == NULL)
         return NULL;
     return _PyUnicode_AsString(fileobj);
@@ -353,7 +353,7 @@ module_repr(PyModuleObject *m)
         PyErr_Clear();
         name = "?";
     }
-    filename = module_getfilename((PyObject *)m);
+    filename = PyModule_GetFilenameObject((PyObject *)m);
     if (filename == NULL) {
         PyErr_Clear();
         return PyUnicode_FromFormat("<module '%s' (built-in)>", name);
