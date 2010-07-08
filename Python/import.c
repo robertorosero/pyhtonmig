@@ -718,7 +718,7 @@ remove_module(const char *name)
                       "sys.modules failed");
 }
 
-static PyObject * get_sourcefile(char *file);
+static PyObject * get_sourcefile(PyObject *file);
 static char *make_source_pathname(char *pathname, char *buf);
 static char *make_compiled_pathname(char *pathname, char *buf, size_t buflen,
                                     int debug);
@@ -768,7 +768,10 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
     /* Remember the filename as the __file__ attribute */
     v = NULL;
     if (pathname != NULL) {
-        v = get_sourcefile(pathname);
+        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
+        /* FIXME: check pathobj != NULL */
+        v = get_sourcefile(pathobj);
+        Py_DECREF(pathobj);
         if (v == NULL)
             PyErr_Clear();
     }
@@ -1335,12 +1338,20 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
  * Returns the path to the py file if available, else the given path
  */
 static PyObject *
-get_sourcefile(char *file)
+get_sourcefile(PyObject *fileobj)
 {
+    /* FIXME: use Py_UNICODE* instead of char* */
     char py[MAXPATHLEN + 1];
     Py_ssize_t len;
-    PyObject *u;
     struct stat statbuf;
+    char *file;
+
+    if (!fileobj) {
+        Py_RETURN_NONE;
+    }
+
+    /* FIXME: don't use _PyUnicode_AsString */
+    file = _PyUnicode_AsString(fileobj);
 
     if (!file || !*file) {
         Py_RETURN_NONE;
@@ -1349,7 +1360,8 @@ get_sourcefile(char *file)
     len = strlen(file);
     /* match '*.py?' */
     if (len > MAXPATHLEN || PyOS_strnicmp(&file[len-4], ".py", 3) != 0) {
-        return PyUnicode_DecodeFSDefault(file);
+        Py_INCREF(fileobj);
+        return fileobj;
     }
 
     /* Start by trying to turn PEP 3147 path into source path.  If that
@@ -1363,12 +1375,12 @@ get_sourcefile(char *file)
 
     if (stat(py, &statbuf) == 0 &&
         S_ISREG(statbuf.st_mode)) {
-        u = PyUnicode_DecodeFSDefault(py);
+        return PyUnicode_DecodeFSDefault(py);
     }
     else {
-        u = PyUnicode_DecodeFSDefault(file);
+        Py_INCREF(fileobj);
+        return fileobj;
     }
-    return u;
 }
 
 /* Forward */
@@ -1402,7 +1414,7 @@ load_package(char *name, PyObject *pathobj)
         PySys_WriteStderr("import %s # directory %s\n",
             name, pathname);
     d = PyModule_GetDict(m);
-    file = get_sourcefile(pathname);
+    file = get_sourcefile(pathobj);
     if (file == NULL)
         goto error;
     path = Py_BuildValue("[O]", file);
