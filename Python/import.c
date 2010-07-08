@@ -3363,12 +3363,17 @@ imp_is_frozen(PyObject *self, PyObject *args)
 }
 
 static FILE *
-get_file(char *pathname, PyObject *fob, char *mode)
+get_file(PyObject *pathobj, PyObject *fob, char *mode)
 {
     FILE *fp;
+    char *pathname;
     if (mode[0] == 'U')
         mode = "r" PY_STDIOTEXTMODE;
     if (fob == NULL) {
+        /* FIXME: don't use _PyUnicode_AsString */
+        pathname = _PyUnicode_AsString(pathobj);
+        if (pathname == NULL)
+            return NULL;
         fp = fopen(pathname, mode);
     }
     else {
@@ -3403,8 +3408,7 @@ imp_load_compiled(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "sU|O:load_compiled",
                           &name, &pathname, &fob))
         return NULL;
-                  /* FIXME: don't use _PyUnicode_AsString */
-    fp = get_file(_PyUnicode_AsString(pathname), fob, "rb");
+    fp = get_file(pathname, fob, "rb");
     if (fp == NULL) {
         return NULL;
     }
@@ -3429,8 +3433,7 @@ imp_load_dynamic(PyObject *self, PyObject *args)
                           &fob))
         return NULL;
     if (fob) {
-                      /* FIXME: don't use _PyUnicode_AsString */
-        fp = get_file(_PyUnicode_AsString(pathname), fob, "r");
+        fp = get_file(pathname, fob, "r");
         if (fp == NULL)
             return NULL;
     }
@@ -3453,8 +3456,7 @@ imp_load_source(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "sU|O:load_source",
                           &name, &pathname, &fob))
         return NULL;
-                  /* FIXME: don't use _PyUnicode_AsString */
-    fp = get_file(_PyUnicode_AsString(pathname), fob, "r");
+    fp = get_file(pathname, fob, "r");
     if (fp == NULL)
         return NULL;
     m = load_source_module(name, pathname, fp);
