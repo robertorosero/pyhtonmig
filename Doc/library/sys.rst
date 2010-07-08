@@ -599,9 +599,9 @@ always available.
 
    .. index:: triple: module; search; path
 
-   A list of strings that specifies the search path for modules. Initialized from
-   the environment variable :envvar:`PYTHONPATH`, plus an installation-dependent
-   default.
+   A list of unicode strings that specifies the search path for modules.
+   Initialized from the environment variable :envvar:`PYTHONPATH`, plus an
+   installation-dependent default.
 
    As initialized upon program startup, the first item of this list, ``path[0]``,
    is the directory containing the script that was used to invoke the Python
