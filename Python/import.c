@@ -1151,16 +1151,17 @@ parse_source_module(PyObject *pathobj, FILE *fp)
     PyCodeObject *co = NULL;
     mod_ty mod;
     PyCompilerFlags flags;
+    PyObject *pathbytes;
     char *pathname;
 
     PyArena *arena = PyArena_New();
     if (arena == NULL)
         return NULL;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    pathname = _PyUnicode_AsString(pathobj);
-    if (pathname == NULL)
+    pathbytes = PyUnicode_EncodeFSDefault(pathobj);
+    if (pathbytes == NULL)
         return NULL;
+    pathname = PyBytes_AS_STRING(pathbytes);
 
     flags.cf_flags = 0;
     mod = PyParser_ASTFromFile(fp, pathname, NULL,
@@ -1169,6 +1170,7 @@ parse_source_module(PyObject *pathobj, FILE *fp)
     if (mod) {
         co = PyAST_Compile(mod, pathname, NULL, arena);
     }
+    Py_DECREF(pathbytes);
     PyArena_Free(arena);
     return co;
 }
