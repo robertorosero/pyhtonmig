@@ -983,6 +983,7 @@ make_compiled_pathname(PyObject *pathobj, int debug)
    3147 style, NULL is returned.  buf must be at least as big as pathname;
    the resulting path will always be shorter. */
 
+/* FIXME: use Py_UNICODE* instead of char* */
 static char *
 _make_source_pathname(char *pathname, char *buf)
 {
@@ -1914,14 +1915,6 @@ find_module(char *fullname, char *subname, PyObject *path, char *buf,
 /* Helpers for main.c
  *  Find the source file corresponding to a named module
  */
-struct filedescr *
-_PyImport_FindModule(const char *name, PyObject *path, char *buf,
-            size_t buflen, FILE **p_fp, PyObject **p_loader)
-{
-    return find_module((char *) name, (char *) name, path,
-                       buf, buflen, p_fp, p_loader);
-}
-
 PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 {
     return fd->type == PY_SOURCE || fd->type == PY_COMPILED;
