@@ -1834,17 +1834,13 @@ PySys_SetArgv(int argc, wchar_t **argv)
    PyErr_CheckSignals(): avoid the call to PyObject_Str(). */
 
 static int
-sys_pyfile_write(const char *text, PyObject *file)
+sys_pyfile_write_unicode(PyObject *unicode, PyObject *file)
 {
-    PyObject *unicode = NULL, *writer = NULL, *args = NULL, *result = NULL;
+    PyObject *writer = NULL, *args = NULL, *result = NULL;
     int err;
 
     if (file == NULL)
         return -1;
-
-    unicode = PyUnicode_FromString(text);
-    if (unicode == NULL)
-        goto error;
 
     writer = PyObject_GetAttrString(file, "write");
     if (writer == NULL)
@@ -1865,13 +1861,29 @@ sys_pyfile_write(const char *text, PyObject *file)
 error:
     err = -1;
 finally:
-    Py_XDECREF(unicode);
     Py_XDECREF(writer);
     Py_XDECREF(args);
     Py_XDECREF(result);
     return err;
 }
 
+static int
+sys_pyfile_write(const char *text, PyObject *file)
+{
+    PyObject *unicode = NULL;
+    int err;
+
+    if (file == NULL)
+        return -1;
+
+    unicode = PyUnicode_FromString(text);
+    if (unicode == NULL)
+        return -1;
+
+    err = sys_pyfile_write_unicode(unicode, file);
+    Py_DECREF(unicode);
+    return err;
+}
 
 /* APIs to write to sys.stdout or sys.stderr using a printf-like interface.
    Adapted from code submitted by Just van Rossum.
@@ -1918,10 +1930,28 @@ mywrite(char *name, FILE *fp, const char *format, va_list va)
     }
     if (written < 0 || (size_t)written >= sizeof(buffer)) {
         const char *truncated = "... truncated";
-        if (sys_pyfile_write(truncated, file) != 0) {
-            PyErr_Clear();
+        if (sys_pyfile_write(truncated, file) != 0)
             fputs(truncated, fp);
-        }
+    }
+    PyErr_Restore(error_type, error_value, error_traceback);
+}
+
+static void
+myformat(char *name, FILE *fp, const char *format, va_list va)
+{
+    PyObject *file;
+    PyObject *error_type, *error_value, *error_traceback;
+    PyObject *unicode;
+    char *str;
+
+    PyErr_Fetch(&error_type, &error_value, &error_traceback);
+    file = PySys_GetObject(name);
+    unicode = PyUnicode_FromFormatV(format, va);
+    if (sys_pyfile_write_unicode(unicode, file) != 0) {
+        PyErr_Clear();
+        str = _PyUnicode_AsString(unicode);
+        if (str != NULL)
+            fputs(str, fp);
     }
     PyErr_Restore(error_type, error_value, error_traceback);
 }
@@ -1943,5 +1973,15 @@ PySys_WriteStderr(const char *format, ...)
 
     va_start(va, format);
     mywrite("stderr", stderr, format, va);
+    va_end(va);
+}
+
+void
+PySys_FormatStderr(const char *format, ...)
+{
+    va_list va;
+
+    va_start(va, format);
+    myformat("stderr", stderr, format, va);
     va_end(va);
 }
