@@ -542,7 +542,9 @@ source_as_string(PyObject *cmd, char *funcname, char *what, PyCompilerFlags *cf)
 static PyObject *
 builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 {
+    PyObject *code;
     char *str;
+    PyObject *fileobj;
     char *filename;
     char *startstr;
     int mode = -1;
@@ -555,10 +557,12 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
                              "dont_inherit", NULL};
     int start[] = {Py_file_input, Py_eval_input, Py_single_input};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oss|ii:compile",
-                                     kwlist, &cmd, &filename, &startstr,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&s|ii:compile", kwlist,
+                                     &cmd, PyUnicode_FSConverter, &fileobj, &startstr,
                                      &supplied_flags, &dont_inherit))
         return NULL;
+
+    filename = PyBytes_AsString(fileobj);
 
     cf.cf_flags = supplied_flags | PyCF_SOURCE_IS_UTF8;
 
@@ -567,6 +571,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     {
         PyErr_SetString(PyExc_ValueError,
                         "compile(): unrecognised flags");
+        Py_DECREF(fileobj);
         return NULL;
     }
     /* XXX Warn if (supplied_flags & PyCF_MASK_OBSOLETE) != 0? */
@@ -584,12 +589,15 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     else {
         PyErr_SetString(PyExc_ValueError,
                         "compile() arg 3 must be 'exec', 'eval' or 'single'");
+        Py_DECREF(fileobj);
         return NULL;
     }
 
     is_ast = PyAST_Check(cmd);
-    if (is_ast == -1)
+    if (is_ast == -1) {
+        Py_DECREF(fileobj);
         return NULL;
+    }
     if (is_ast) {
         PyObject *result;
         if (supplied_flags & PyCF_ONLY_AST) {
@@ -604,20 +612,26 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
             mod = PyAST_obj2mod(cmd, arena, mode);
             if (mod == NULL) {
                 PyArena_Free(arena);
+                Py_DECREF(fileobj);
                 return NULL;
             }
             result = (PyObject*)PyAST_Compile(mod, filename,
                                               &cf, arena);
             PyArena_Free(arena);
         }
+        Py_DECREF(fileobj);
         return result;
     }
 
     str = source_as_string(cmd, "compile", "string, bytes, AST or code", &cf);
-    if (str == NULL)
+    if (str == NULL) {
+        Py_DECREF(fileobj);
         return NULL;
+    }
 
-    return Py_CompileStringFlags(str, filename, start[mode], &cf);
+    code = Py_CompileStringFlags(str, filename, start[mode], &cf);
+    Py_DECREF(fileobj);
+    return code;
 }
 
 PyDoc_STRVAR(compile_doc,
