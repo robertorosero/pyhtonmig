@@ -1461,9 +1461,9 @@ get_sourcefile(PyObject *fileobj)
 
 /* Forward */
 static PyObject *load_module(char *, FILE *, PyObject *, int, PyObject *);
-static struct filedescr *find_module(char *, char *, PyObject *,
+static struct filedescr *find_module(const char *, const char *, PyObject *,
                                      PyObject **, FILE **, PyObject **);
-static struct _frozen * find_frozen(char *);
+static struct _frozen * find_frozen(const char *);
 
 /* Load a package and return its module object WITH INCREMENTED
    REFERENCE COUNT */
@@ -1524,7 +1524,7 @@ load_package(char *name, PyObject *pathobj)
 /* Helper to test for built-in module */
 
 static int
-is_builtin(char *name)
+is_builtin(const char *name)
 {
     int i;
     for (i = 0; PyImport_Inittab[i].name != NULL; i++) {
@@ -1626,11 +1626,11 @@ extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
                                         PyObject **);
 #endif
 
-static int case_ok(PyObject *, Py_ssize_t, Py_ssize_t, char *);
+static int case_ok(PyObject *, Py_ssize_t, Py_ssize_t, const char *);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 
 static struct filedescr *
-find_module(char *fullname, char *subname, PyObject *search_path,
+find_module(const char *fullname, const char *name, PyObject *search_path,
             PyObject **path,
             FILE **p_fp, PyObject **p_loader)
 {
@@ -1644,7 +1644,6 @@ find_module(char *fullname, char *subname, PyObject *search_path,
     static struct filedescr fd_frozen = {"", "", PY_FROZEN};
     static struct filedescr fd_builtin = {"", "", C_BUILTIN};
     static struct filedescr fd_package = {"", "", PKG_DIRECTORY};
-    char name[MAXPATHLEN+1];
 #if defined(PYOS_OS2)
     PyObject *unicode_saved;
     size_t saved_namelen;
@@ -1656,12 +1655,11 @@ find_module(char *fullname, char *subname, PyObject *search_path,
     if (p_loader != NULL)
         *p_loader = NULL;
 
-    if (strlen(subname) > MAXPATHLEN) {
+    if (strlen(name) > MAXPATHLEN) {
         PyErr_SetString(PyExc_OverflowError,
                         "module name is too long");
         return NULL;
     }
-    strcpy(name, subname);
 
     /* sys.meta_path import hook */
     if (p_loader != NULL) {
@@ -1845,7 +1843,7 @@ find_module(char *fullname, char *subname, PyObject *search_path,
              * dynamically loaded module we're going to try,
              * truncate the name before trying
              */
-            if (strlen(subname) > 8) {
+            if (strlen(name) > 8) {
                 /* is this an attempt to load a C extension? */
                 const struct filedescr *scan;
                 scan = _PyImport_DynLoadFiletab;
@@ -1861,7 +1859,7 @@ find_module(char *fullname, char *subname, PyObject *search_path,
                     namelen = 8;
                     truncated = PyUnicode_FromUnicode(
                         PyUnicode_AS_UNICODE(unicode_without_suffix);
-                        PyUnicode_GET_SIZE(unicode_without_suffix) - (strlen(subname) - namelen));
+                        PyUnicode_GET_SIZE(unicode_without_suffix) - (strlen(name) - namelen));
                     Py_DECREF(unicode_without_suffix);
                     unicode_without_suffix = truncated;
                 }
@@ -1962,7 +1960,7 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 #endif
 
 static int
-case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, char *name)
+case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *name)
 {
 #if defined(MS_WINDOWS) || defined(DJGPP) || (defined(__MACH__) && defined(__APPLE__) \
     || defined(__CYGWIN__)) && defined(HAVE_DIRENT_H) || defined(PYOS_OS2)
@@ -2306,7 +2304,7 @@ init_builtin(char *name)
 /* Frozen modules */
 
 static struct _frozen *
-find_frozen(char *name)
+find_frozen(const char *name)
 {
     struct _frozen *p;
 
@@ -2685,6 +2683,7 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
             int error;
 
             modname_str = _PyUnicode_AsStringAndSize(modname, &len);
+            /* FIXME: don't use _PyUnicode_AsStringAndSize or check that modname_str is not NULL */
             if (len > MAXPATHLEN) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Module name too long");
