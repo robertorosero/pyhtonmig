@@ -720,8 +720,7 @@ remove_module(const char *name)
 
 static PyObject * get_sourcefile(PyObject *file);
 static PyObject *make_source_pathname(PyObject *pathname);
-static PyObject *make_compiled_pathname(PyObject *pathname, char *buf,
-                                        size_t buflen, int debug);
+static PyObject *make_compiled_pathname(PyObject *pathname, int debug);
 
 /* Execute a code object in a module and return the module object
  * WITH INCREMENTED REFERENCE COUNT.  If an error occurs, name is
@@ -964,14 +963,15 @@ _make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
 }
 
 static PyObject*
-make_compiled_pathname(PyObject *pathobj, char *buf, size_t buflen, int debug)
+make_compiled_pathname(PyObject *pathobj, int debug)
 {
+    char buf[MAXPATHLEN+1];
     char *pathname, *cpathname;
 
     /* FIXME: don't use _PyUnicode_AsString */
     pathname = _PyUnicode_AsString(pathobj);
 
-    cpathname = _make_compiled_pathname(pathname, buf, buflen, debug);
+    cpathname = _make_compiled_pathname(pathname, buf, sizeof(buf), debug);
     if (cpathname != NULL)
         return PyUnicode_DecodeFSDefault(cpathname);
     else
@@ -1347,8 +1347,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
         return NULL;
     }
 #endif
-    cpathobj = make_compiled_pathname(
-        pathobj, buf, sizeof(buf), !Py_OptimizeFlag);
+    cpathobj = make_compiled_pathname(pathobj, !Py_OptimizeFlag);
     if (cpathobj != NULL) {
         /* FIXME: don't use _PyUnicode_AsString */
         cpathname = _PyUnicode_AsString(cpathobj);
@@ -3598,8 +3597,6 @@ static PyObject *
 imp_cache_from_source(PyObject *self, PyObject *args, PyObject *kws)
 {
     static char *kwlist[] = {"path", "debug_override", NULL};
-
-    char buf[MAXPATHLEN+1];
     PyObject *pathname;
     PyObject *debug_override = Py_None;
     int debug = !Py_OptimizeFlag;
@@ -3614,7 +3611,7 @@ imp_cache_from_source(PyObject *self, PyObject *args, PyObject *kws)
         if ((debug = PyObject_IsTrue(debug_override)) < 0)
             return NULL;
 
-    cpathname = make_compiled_pathname(pathname, buf, sizeof(buf), debug);
+    cpathname = make_compiled_pathname(pathname, debug);
     if (cpathname == NULL) {
         PyErr_Format(PyExc_SystemError, "path buffer too short");
         return NULL;
