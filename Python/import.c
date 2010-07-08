@@ -719,7 +719,7 @@ remove_module(const char *name)
 }
 
 static PyObject * get_sourcefile(PyObject *file);
-static PyObject *make_source_pathname(PyObject *pathname, char *buf);
+static PyObject *make_source_pathname(PyObject *pathname);
 static PyObject *make_compiled_pathname(PyObject *pathname, char *buf,
                                         size_t buflen, int debug);
 
@@ -1033,8 +1033,10 @@ _make_source_pathname(char *pathname, char *buf)
 }
 
 static PyObject*
-make_source_pathname(PyObject *pathobj, char *buf)
+make_source_pathname(PyObject *pathobj)
 {
+    /* FIXME: use Py_UNICODE* instead of char* */
+    char buf[MAXPATHLEN + 1];
     char *pathname, *cpathname;
 
     /* FIXME: don't use _PyUnicode_AsString */
@@ -1408,27 +1410,26 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 static PyObject *
 get_sourcefile(PyObject *fileobj)
 {
-    /* FIXME: use Py_UNICODE* instead of char* */
-    char buf[MAXPATHLEN + 1];
     char *py;
     PyObject *pyobj;
+    Py_UNICODE *file;
     Py_ssize_t len;
     struct stat statbuf;
-    char *file;
 
     if (fileobj == NULL) {
         Py_RETURN_NONE;
     }
 
-    /* FIXME: don't use _PyUnicode_AsString */
-    file = _PyUnicode_AsString(fileobj);
-    if (file == NULL || !*file) {
+    len = PyUnicode_GET_SIZE(fileobj);
+    if (len == 0)
         Py_RETURN_NONE;
-    }
+    file = PyUnicode_AS_UNICODE(fileobj);
 
-    len = strlen(file);
     /* match '*.py?' */
-    if (len > MAXPATHLEN || PyOS_strnicmp(&file[len-4], ".py", 3) != 0) {
+    if (4 <= len
+        && file[len-3] == '.'
+        && (file[len-2] == 'p' || file[len-2] == 'P')
+        && (file[len-1] == 'y' || file[len-1] == 'Y')) {
         Py_INCREF(fileobj);
         return fileobj;
     }
@@ -1437,11 +1438,11 @@ get_sourcefile(PyObject *fileobj)
      * fails, just chop off the trailing character, i.e. legacy pyc path
      * to py.
      */
-    pyobj = make_source_pathname(fileobj, buf);
+    pyobj = make_source_pathname(fileobj);
     if (pyobj == NULL) {
         if (PyErr_Occurred())
             return NULL;
-        pyobj = PyUnicode_FromStringAndSize(file, len - 1);
+        pyobj = PyUnicode_FromUnicode(file, len - 1);
         if (pyobj == NULL)
             return NULL;
     }
@@ -3637,7 +3638,6 @@ imp_source_from_cache(PyObject *self, PyObject *args, PyObject *kws)
     static char *kwlist[] = {"path", NULL};
 
     PyObject *pathname;
-    char buf[MAXPATHLEN+1];
     PyObject *result;
 
     if (!PyArg_ParseTupleAndKeywords(
@@ -3645,7 +3645,7 @@ imp_source_from_cache(PyObject *self, PyObject *args, PyObject *kws)
                 &pathname))
         return NULL;
 
-    result = make_source_pathname(pathname, buf);
+    result = make_source_pathname(pathname);
     if (result == NULL) {
         if (!PyErr_Occurred())
             PyErr_Format(PyExc_ValueError, "Not a PEP 3147 pyc path: %U",
