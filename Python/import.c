@@ -565,7 +565,7 @@ PyImport_GetMagicTag(void)
 */
 
 int
-_PyImport_FixupExtension(PyObject *mod, char *name, char *filename)
+_PyImport_FixupExtensionUnicode(PyObject *mod, char *name, PyObject *filename)
 {
     PyObject *modules, *dict;
     struct PyModuleDef *def;
@@ -605,18 +605,32 @@ _PyImport_FixupExtension(PyObject *mod, char *name, char *filename)
         if (def->m_base.m_copy == NULL)
             return -1;
     }
-    PyDict_SetItemString(extensions, filename, (PyObject*)def);
+    PyDict_SetItem(extensions, filename, (PyObject*)def);
     return 0;
 }
 
+int
+_PyImport_FixupExtension(PyObject *mod, char *name, char *filename)
+{
+    PyObject *fileobj;
+    int result;
+    fileobj = PyUnicode_FromString(filename);
+    if (fileobj == NULL)
+        return -1;
+    result = _PyImport_FixupExtensionUnicode(mod, name, fileobj);
+    Py_DECREF(fileobj);
+    return result;
+}
+
+
 PyObject *
-_PyImport_FindExtension(char *name, char *filename)
+_PyImport_FindExtensionUnicode(char *name, PyObject *filename)
 {
     PyObject *mod, *mdict;
     PyModuleDef* def;
     if (extensions == NULL)
         return NULL;
-    def = (PyModuleDef*)PyDict_GetItemString(extensions, filename);
+    def = (PyModuleDef*)PyDict_GetItem(extensions, filename);
     if (def == NULL)
         return NULL;
     if (def->m_size == -1) {
@@ -648,9 +662,20 @@ _PyImport_FindExtension(char *name, char *filename)
     }
     if (Py_VerboseFlag)
         PySys_WriteStderr("import %s # previously loaded (%s)\n",
-                          name, filename);
+                          name,
+                          /* FIXME: don't use _PyUnicode_AsString */
+                          _PyUnicode_AsString(filename));
     return mod;
+}
 
+PyObject *
+_PyImport_FindExtension(char *name, char *filename)
+{
+    PyObject *fileobj, *mod;
+    fileobj = PyUnicode_DecodeFSDefault(filename);
+    mod = _PyImport_FindExtensionUnicode(name, fileobj);
+    Py_DECREF(fileobj);
+    return mod;
 }
 
 
@@ -2052,9 +2077,14 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         break;
 
 #ifdef HAVE_DYNAMIC_LOADING
-    case C_EXTENSION:
-        m = _PyImport_LoadDynamicModule(name, pathname, fp);
+    case C_EXTENSION: {
+        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
+            return NULL;
+        m = _PyImport_LoadDynamicModule(name, pathobj, fp);
+        Py_DECREF(pathobj);
         break;
+    }
 #endif
 
     case PKG_DIRECTORY:
@@ -2123,9 +2153,13 @@ static int
 init_builtin(char *name)
 {
     struct _inittab *p;
+    PyObject *path;
 
-    if (_PyImport_FindExtension(name, name) != NULL)
+    path = PyUnicode_FromString(name);
+    if (_PyImport_FindExtensionUnicode(name, path) != NULL) {
+        Py_DECREF(path);
         return 1;
+    }
 
     for (p = PyImport_Inittab; p->name != NULL; p++) {
         PyObject *mod;
@@ -2134,21 +2168,28 @@ init_builtin(char *name)
                 PyErr_Format(PyExc_ImportError,
                     "Cannot re-init internal module %.200s",
                     name);
+                Py_DECREF(path);
                 return -1;
             }
             if (Py_VerboseFlag)
                 PySys_WriteStderr("import %s # builtin\n", name);
             mod = (*p->initfunc)();
-            if (mod == 0)
+            if (mod == 0) {
+                Py_DECREF(path);
                 return -1;
-            if (_PyImport_FixupExtension(mod, name, name) < 0)
+            }
+            if (_PyImport_FixupExtensionUnicode(mod, name, path) < 0) {
+                Py_DECREF(path);
                 return -1;
+            }
+            Py_DECREF(path);
             /* FixupExtension has put the module into sys.modules,
                so we can release our own reference. */
             Py_DECREF(mod);
             return 1;
         }
     }
+    Py_DECREF(path);
     return 0;
 }
 
@@ -3322,24 +3363,22 @@ static PyObject *
 imp_load_dynamic(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject *fob = NULL;
     PyObject *m;
     FILE *fp = NULL;
-    if (!PyArg_ParseTuple(args, "ses|O:load_dynamic",
+    if (!PyArg_ParseTuple(args, "sU|O:load_dynamic",
                           &name,
-                          Py_FileSystemDefaultEncoding, &pathname,
+                          &pathname,
                           &fob))
         return NULL;
     if (fob) {
-        fp = get_file(pathname, fob, "r");
-        if (fp == NULL) {
-            PyMem_Free(pathname);
+                      /* FIXME: don't use _PyUnicode_AsString */
+        fp = get_file(_PyUnicode_AsString(pathname), fob, "r");
+        if (fp == NULL)
             return NULL;
-        }
     }
     m = _PyImport_LoadDynamicModule(name, pathname, fp);
-    PyMem_Free(pathname);
     if (fp)
         fclose(fp);
     return m;

@@ -19,16 +19,19 @@ extern dl_funcptr _PyImport_GetDynLoadFunc(const char *name,
 
 
 PyObject *
-_PyImport_LoadDynamicModule(char *name, char *pathname, FILE *fp)
+_PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
 {
     PyObject *m;
-    PyObject *path;
+    char *pathname;
     char *lastdot, *shortname, *packagecontext, *oldcontext;
     dl_funcptr p0;
     PyObject* (*p)(void);
     struct PyModuleDef *def;
 
-    if ((m = _PyImport_FindExtension(name, pathname)) != NULL) {
+    /* FIXME: don't use _PyUnicode_AsString */
+    pathname = _PyUnicode_AsString(path);
+
+    if ((m = _PyImport_FindExtensionUnicode(name, path)) != NULL) {
         Py_INCREF(m);
         return m;
     }
@@ -72,11 +75,13 @@ _PyImport_LoadDynamicModule(char *name, char *pathname, FILE *fp)
     def->m_base.m_init = p;
 
     /* Remember the filename as the __file__ attribute */
-    path = PyUnicode_DecodeFSDefault(pathname);
-    if (PyModule_AddObject(m, "__file__", path) < 0)
+    Py_INCREF(path);
+    if (PyModule_AddObject(m, "__file__", path) < 0) {
         PyErr_Clear(); /* Not important enough to report */
+        Py_DECREF(path);
+    }
 
-    if (_PyImport_FixupExtension(m, name, pathname) < 0)
+    if (_PyImport_FixupExtensionUnicode(m, name, path) < 0)
         return NULL;
     if (Py_VerboseFlag)
         PySys_WriteStderr(
