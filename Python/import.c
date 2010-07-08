@@ -2756,19 +2756,16 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
     parent = PyDict_GetItemString(modules, buf);
     if (parent == NULL) {
         if (orig_level < 1) {
-            PyObject *err_msg = PyBytes_FromFormat(
+            int err;
+            err = PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                 "Parent module '%.200s' not found "
-                "while handling absolute import", buf);
-            if (err_msg == NULL) {
-                return NULL;
-            }
-            if (!PyErr_WarnEx(PyExc_RuntimeWarning,
-                              PyBytes_AsString(err_msg), 1)) {
+                "while handling absolute import",
+                buf);
+            if (!err) {
                 *buf = '\0';
                 *p_buflen = 0;
                 parent = Py_None;
             }
-            Py_DECREF(err_msg);
         } else {
             PyErr_Format(PyExc_SystemError,
                 "Parent module '%.200s' not loaded, "

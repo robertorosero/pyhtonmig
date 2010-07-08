@@ -710,26 +710,59 @@ warnings_warn_explicit(PyObject *self, PyObject *args, PyObject *kwds)
                                 registry, NULL);
 }
 
-
 /* Function to issue a warning message; may raise an exception. */
+
 int
-PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+PyErr_WarnUnicode(PyObject *category, PyObject *message,
+                  Py_ssize_t stack_level)
 {
     PyObject *res;
-    PyObject *message = PyUnicode_FromString(text);
-    if (message == NULL)
-        return -1;
 
     if (category == NULL)
         category = PyExc_RuntimeWarning;
 
     res = do_warn(message, category, stack_level);
-    Py_DECREF(message);
     if (res == NULL)
         return -1;
     Py_DECREF(res);
 
     return 0;
+}
+
+int
+PyErr_WarnFormat(PyObject *category, Py_ssize_t stack_level,
+                 const char *format, ...)
+{
+    int ret;
+    PyObject *unicode;
+    va_list vargs;
+
+#ifdef HAVE_STDARG_PROTOTYPES
+    va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
+    unicode = PyUnicode_FromFormatV(format, vargs);
+    if (unicode != NULL) {
+        ret = PyErr_WarnUnicode(category, unicode, stack_level);
+        Py_DECREF(unicode);
+    }
+    else
+        ret = -1;
+    va_end(vargs);
+    return ret;
+}
+
+int
+PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+{
+    int ret;
+    PyObject *message = PyUnicode_FromString(text);
+    if (message == NULL)
+        return -1;
+    ret = PyErr_WarnUnicode(category, message, stack_level);
+    Py_DECREF(message);
+    return ret;
 }
 
 /* PyErr_Warn is only for backwards compatability and will be removed.

@@ -1558,12 +1558,13 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
 
     /* If the codec returns a buffer, raise a warning and convert to bytes */
     if (PyByteArray_Check(v)) {
-        char msg[100];
+        int error;
         PyObject *b;
-        PyOS_snprintf(msg, sizeof(msg),
-                      "encoder %s returned buffer instead of bytes",
-                      encoding);
-        if (PyErr_WarnEx(PyExc_RuntimeWarning, msg, 1) < 0) {
+
+        error = PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+            "encoder %s returned buffer instead of bytes",
+            encoding);
+        if (error) {
             Py_DECREF(v);
             return NULL;
         }
