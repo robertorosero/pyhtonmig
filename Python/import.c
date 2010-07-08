@@ -1218,24 +1218,17 @@ update_code_filenames(PyCodeObject *co, PyObject *oldname, PyObject *newname)
 }
 
 static int
-update_compiled_module(PyCodeObject *co, char *pathname)
+update_compiled_module(PyCodeObject *co, PyObject *newname)
 {
-    PyObject *oldname, *newname;
+    PyObject *oldname;
 
-    newname = PyUnicode_DecodeFSDefault(pathname);
-    if (newname == NULL)
-        return -1;
-
-    if (!PyUnicode_Compare(co->co_filename, newname)) {
-        Py_DECREF(newname);
+    if (!PyUnicode_Compare(co->co_filename, newname))
         return 0;
-    }
 
     oldname = co->co_filename;
     Py_INCREF(oldname);
     update_code_filenames(co, oldname, newname);
     Py_DECREF(oldname);
-    Py_DECREF(newname);
     return 1;
 }
 
@@ -1252,6 +1245,7 @@ load_source_module(char *name, char *pathname, FILE *fp)
     char *cpathname;
     PyCodeObject *co;
     PyObject *m;
+    PyObject *pathobj;
 
     if (fstat(fileno(fp), &st) != 0) {
         PyErr_Format(PyExc_RuntimeError,
@@ -1278,8 +1272,12 @@ load_source_module(char *name, char *pathname, FILE *fp)
         fclose(fpc);
         if (co == NULL)
             return NULL;
-        if (update_compiled_module(co, pathname) < 0)
+        pathobj = PyUnicode_DecodeFSDefault(pathname);
+        if (pathobj == NULL)
             return NULL;
+        if (update_compiled_module(co, pathobj) < 0)
+            return NULL;
+        Py_DECREF(pathobj);
         if (Py_VerboseFlag)
             PySys_WriteStderr("import %s # precompiled from %s\n",
                 name, cpathname);
