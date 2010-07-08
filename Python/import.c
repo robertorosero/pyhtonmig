@@ -1141,13 +1141,20 @@ load_compiled_module(char *name, PyObject *cpathobj, FILE *fp)
 /* Parse a source file and return the corresponding code object */
 
 static PyCodeObject *
-parse_source_module(const char *pathname, FILE *fp)
+parse_source_module(PyObject *pathobj, FILE *fp)
 {
     PyCodeObject *co = NULL;
     mod_ty mod;
     PyCompilerFlags flags;
+    char *pathname;
+
     PyArena *arena = PyArena_New();
     if (arena == NULL)
+        return NULL;
+
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
+    pathname = _PyUnicode_AsString(pathobj);
+    if (pathname == NULL)
         return NULL;
 
     flags.cf_flags = 0;
@@ -1324,8 +1331,10 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
     PyCodeObject *co;
     PyObject *m;
 
-    /* FIXME: don't use _PyUnicode_AsString */
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
     pathname = _PyUnicode_AsString(pathobj);
+    if (pathname == NULL)
+        return NULL;
 
     if (fstat(fileno(fp), &st) != 0) {
         PyErr_Format(PyExc_RuntimeError,
@@ -1378,7 +1387,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
             name, (PyObject *)co, cpathobj, cpathobj);
     }
     else {
-        co = parse_source_module(pathname, fp);
+        co = parse_source_module(pathobj, fp);
         if (co == NULL) {
             Py_XDECREF(cpathobj);
             return NULL;
@@ -1442,7 +1451,7 @@ get_sourcefile(PyObject *fileobj)
             return NULL;
     }
 
-    /* FIXME: don't use _PyUnicode_AsString */
+    /* FIXME: use PyUnicode_EncodeFSDefault() */
     py = _PyUnicode_AsString(pyobj);
     if (py == NULL)
         return NULL;
@@ -1476,11 +1485,7 @@ load_package(char *name, PyObject *pathobj)
     char buf[MAXPATHLEN+1];
     FILE *fp = NULL;
     struct filedescr *fdp;
-    char *pathname;
     PyObject *bufobj;
-
-    /* FIXME: don't use _PyUnicode_AsString */
-    pathname = _PyUnicode_AsString(pathobj);
 
     m = PyImport_AddModule(name);
     if (m == NULL)
