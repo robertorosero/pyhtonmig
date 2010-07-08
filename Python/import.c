@@ -1329,8 +1329,8 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 
     if (fstat(fileno(fp), &st) != 0) {
         PyErr_Format(PyExc_RuntimeError,
-                     "unable to get file status from '%s'",
-                     pathname);
+                     "unable to get file status from '%U'",
+                     pathobj);
         return NULL;
     }
 #if SIZEOF_TIME_T > 4
