@@ -105,20 +105,21 @@ PYTHONIOENCODING: Encoding[:errors] used for stdin/stdout/stderr.\n\
 static FILE*
 _wfopen(const wchar_t *path, const wchar_t *mode)
 {
-    char cpath[PATH_MAX];
+    FILE *f;
+    char *cpath;
     char cmode[10];
     size_t r;
-    r = wcstombs(cpath, path, PATH_MAX);
-    if (r == (size_t)-1 || r >= PATH_MAX) {
-        errno = EINVAL;
+    cpath = _Py_wchar2char(path);
+    if (cpath == NULL)
         return NULL;
-    }
     r = wcstombs(cmode, mode, 10);
     if (r == (size_t)-1 || r >= 10) {
         errno = EINVAL;
         return NULL;
     }
-    return fopen(cpath, cmode);
+    f = fopen(cpath, cmode);
+    PyMem_Free(cpath);
+    return f;
 }
 #endif
 
@@ -711,6 +712,43 @@ Py_GetArgcArgv(int *argc, wchar_t ***argv)
     *argv = orig_argv;
 }
 
+char*
+_Py_wchar2char(const wchar_t *text)
+{
+    char *result, *bytes;
+    size_t i, len, converted, size;
+    wchar_t c;
+
+    len = wcslen(text);
+    /* FIXME: use better heuristic for the buffer size */
+    size = len * 10 + 1; /* +1 for the nul byte at the end */
+    result = PyMem_Malloc(size);
+    if (result == NULL)
+        return NULL;
+
+    bytes = result;
+    for (i=0; i < len; i++) {
+        c = text[i];
+        if (c >= 0xd800 && c <= 0xdfff) {
+            /* Surrogate character */
+            *bytes++ = c - 0xdc00;
+            size--;
+            continue;
+        } else {
+            wchar_t buf[2];
+            buf[0] = c;
+            buf[1] = 0;
+            converted = wcstombs(bytes, buf, size);
+            if (converted == (size_t)-1 || converted == 0) {
+                PyMem_Free(result);
+                return NULL;
+            }
+            bytes += converted;
+            size -= converted;
+        }
+    }
+    return result;
+}
 
 wchar_t*
 _Py_char2wchar(char* arg)
