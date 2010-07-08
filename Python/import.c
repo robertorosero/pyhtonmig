@@ -1623,7 +1623,7 @@ PyImport_GetImporter(PyObject *path) {
 
 #ifdef MS_COREDLL
 extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
-                                        char *, Py_ssize_t);
+                                        PyObject **);
 #endif
 
 static int case_ok(PyObject *, Py_ssize_t, Py_ssize_t, char *);
@@ -1707,8 +1707,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
 
     if (search_path == NULL) {
 #ifdef MS_COREDLL
-        /* FIXME: use buf buffer */
-        char bbuf[MAXPATHLEN+1];
+        PyObject *winpath;
 #endif
         if (is_builtin(name)) {
             *path = PyUnicode_DecodeFSDefault(name);
@@ -1717,16 +1716,14 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
             return &fd_builtin;
         }
 #ifdef MS_COREDLL
-        fp = PyWin_FindRegisteredModule(name, &fdp, bbuf, sizeof(bbuf));
+        fp = PyWin_FindRegisteredModule(name, &fdp, &winpath);
         if (fp != NULL) {
-            *path = PyUnicode_DecodeFSDefault(bbuf);
-            if (*path == NULL) {
-                fclose(fp);
-                return NULL;
-            }
             *p_fp = fp;
+            *path = winpath;
             return fdp;
         }
+        else if (PyErr_Occurred())
+            return NULL;
 #endif
         search_path = PySys_GetObject("path");
     }

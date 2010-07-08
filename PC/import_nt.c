@@ -17,9 +17,11 @@ extern const char *PyWin_DLLVersionString;
 
 FILE *PyWin_FindRegisteredModule(const char *moduleName,
                                  struct filedescr **ppFileDesc,
-                                 char *pathBuf,
-                                 Py_ssize_t pathLen)
+                                 PyObject **pathobj)
 {
+    /* FIXME: use wchar_t* type */
+    char pathBuf[MAXPATHLEN+1];
+    Py_ssize_t pathLen = sizeof(pathBuf);
     char *moduleKey;
     const char keyPrefix[] = "Software\\Python\\PythonCore\\";
     const char keySuffix[] = "\\Modules\\";
@@ -45,6 +47,9 @@ FILE *PyWin_FindRegisteredModule(const char *moduleName,
                      sizeof(keySuffix) +
                      strlen(moduleName) +
                      sizeof(debugString) - 1;
+
+    *pathobj = NULL;
+
     /* alloca == no free required, but memory only local to fn,
      * also no heap fragmentation!
      */
@@ -80,7 +85,14 @@ FILE *PyWin_FindRegisteredModule(const char *moduleName,
     if (fdp->suffix == NULL)
         return NULL;
     fp = fopen(pathBuf, fdp->mode);
-    if (fp != NULL)
+    if (fp == NULL)
+        return NULL;
+    *pathobj = PyUnicode_DecodeFSDefault(pathBuf);
+    if (*pathobj != NULL)
         *ppFileDesc = fdp;
+    else {
+        fclose(fp);
+        fp = NULL;
+    }
     return fp;
 }
