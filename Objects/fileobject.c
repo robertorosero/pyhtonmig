@@ -26,10 +26,10 @@ extern "C" {
 /* External C interface */
 
 PyObject *
-PyFile_FromFd(int fd, char *name, char *mode, int buffering, char *encoding,
-              char *errors, char *newline, int closefd)
+_PyFile_FromFdUnicode(int fd, PyObject *name, char *mode, int buffering,
+                      char *encoding, char *errors, char *newline, int closefd)
 {
-    PyObject *io, *stream, *nameobj = NULL;
+    PyObject *io, *stream;
 
     io = PyImport_ImportModule("io");
     if (io == NULL)
@@ -41,16 +41,28 @@ PyFile_FromFd(int fd, char *name, char *mode, int buffering, char *encoding,
     if (stream == NULL)
         return NULL;
     if (name != NULL) {
+        if (PyObject_SetAttrString(stream, "name", name) < 0)
+            PyErr_Clear();
+    }
+    return stream;
+}
+
+
+PyObject *
+PyFile_FromFd(int fd, char *name, char *mode, int buffering, char *encoding,
+              char *errors, char *newline, int closefd)
+{
+    PyObject *nameobj, *file;
+    if (name != NULL) {
         nameobj = PyUnicode_DecodeFSDefault(name);
         if (nameobj == NULL)
             PyErr_Clear();
-        else {
-            if (PyObject_SetAttrString(stream, "name", nameobj) < 0)
-                PyErr_Clear();
-            Py_DECREF(nameobj);
-        }
-    }
-    return stream;
+    } else
+        nameobj = NULL;
+    file = _PyFile_FromFdUnicode(fd, nameobj, mode, buffering,
+                                 encoding, errors, newline, closefd);
+    Py_XDECREF(nameobj);
+    return file;
 }
 
 PyObject *

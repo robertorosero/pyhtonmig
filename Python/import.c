@@ -3121,6 +3121,9 @@ call_find_module(char *name, PyObject *path)
     fdp = find_module(NULL, name, path, pathname, MAXPATHLEN+1, &fp, NULL);
     if (fdp == NULL)
         return NULL;
+    pathobj = PyUnicode_DecodeFSDefault(pathname);
+    if (pathobj == NULL)
+        return NULL;
     if (fp != NULL) {
         fd = fileno(fp);
         if (fd != -1)
@@ -3139,8 +3142,8 @@ call_find_module(char *name, PyObject *path)
             encoding = (found_encoding != NULL) ? found_encoding :
                    (char*)PyUnicode_GetDefaultEncoding();
         }
-        fob = PyFile_FromFd(fd, pathname, fdp->mode, -1,
-                            (char*)encoding, NULL, NULL, 1);
+        fob = _PyFile_FromFdUnicode(fd, pathobj, fdp->mode, -1,
+                                    encoding, NULL, NULL, 1);
         if (fob == NULL) {
             close(fd);
             PyMem_FREE(found_encoding);
@@ -3151,9 +3154,9 @@ call_find_module(char *name, PyObject *path)
         fob = Py_None;
         Py_INCREF(fob);
     }
-    pathobj = PyUnicode_DecodeFSDefault(pathname);
     ret = Py_BuildValue("NN(ssi)",
-                  fob, pathobj, fdp->suffix, fdp->mode, fdp->type);
+                        fob, pathobj,
+                        fdp->suffix, fdp->mode, fdp->type);
     PyMem_FREE(found_encoding);
 
     return ret;
