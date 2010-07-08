@@ -139,58 +139,58 @@ static wchar_t *lib_python = L"lib/python" VERSION;
 static int
 _wstat(const wchar_t* path, struct stat *buf)
 {
-    char fname[PATH_MAX];
-    size_t res = wcstombs(fname, path, sizeof(fname));
-    if (res == (size_t)-1) {
-        errno = EINVAL;
+    int ret;
+    char *fname;
+    fname = _Py_wchar2char(path);
+    if (fname == NULL)
         return -1;
-    }
-    return stat(fname, buf);
+    ret = stat(fname, buf);
+    PyMem_Free(fname);
+    return ret;
 }
 #endif
 
-#ifndef MS_WINDOWS
 static wchar_t*
-_wgetcwd(wchar_t *buf, size_t size)
+_Py_wgetcwd(wchar_t *buf, size_t size)
 {
+#ifdef MS_WINDOWS
+    wchar_t buffer[MAXPATHLEN + 1];
+    wchar_t *ret, *result;
+    size_t len;
+    ret = _wgetcwd(buffer, MAXPATHLEN);
+    if (ret == NULL)
+        return NULL;
+    len = wcslen(buffer);
+    result = PyMem_Malloc(len + 1);
+    if (result == NULL)
+        return NULL;
+    wcscpy(result, buffer);
+    return result;
+#else
     char fname[PATH_MAX];
     if (getcwd(fname, PATH_MAX) == NULL)
         return NULL;
-    if (mbstowcs(buf, fname, size) >= size) {
-        errno = ERANGE;
-        return NULL;
-    }
-    return buf;
-}
+    return _Py_char2wchar(fname);
 #endif
+}
 
 #ifdef HAVE_READLINK
-int
-_Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t bufsiz)
+wchar_t*
+_Py_wreadlink(const wchar_t *path)
 {
     char cbuf[PATH_MAX];
     char cpath[PATH_MAX];
     int res;
     size_t r1 = wcstombs(cpath, path, PATH_MAX);
-    if (r1 == (size_t)-1 || r1 >= PATH_MAX) {
-        errno = EINVAL;
-        return -1;
-    }
+    if (r1 == (size_t)-1 || r1 >= PATH_MAX)
+        return NULL;
     res = (int)readlink(cpath, cbuf, PATH_MAX);
     if (res == -1)
-        return -1;
-    if (res == PATH_MAX) {
-        errno = EINVAL;
-        return -1;
-    }
+        return NULL;
+    if (res == PATH_MAX)
+        return NULL;
     cbuf[res] = '\0'; /* buf will be null terminated */
-    r1 = mbstowcs(buf, cbuf, bufsiz);
-    if (r1 == -1) {
-        errno = EINVAL;
-        return -1;
-    }
-    return (int)r1;
-
+    return _Py_char2wchar(cbuf);
 }
 #endif
 
@@ -295,11 +295,19 @@ copy_absolute(wchar_t *path, wchar_t *p)
     if (p[0] == SEP)
         wcscpy(path, p);
     else {
-        _wgetcwd(path, MAXPATHLEN);
+        wchar_t *cwd;
+        cwd = _Py_wgetcwd(path, MAXPATHLEN);
+        if (cwd == NULL)
+            return /* FIXME: return an error */; 
+        if (wcslen(cwd) >= MAXPATHLEN)
+            return /* FIXME: return an error */; 
+        wcscpy(path, cwd);
+        PyMem_Free(cwd);
         if (p[0] == '.' && p[1] == SEP)
             p += 2;
         joinpath(path, p);
     }
+    return /* FIXME: return ok */;
 }
 
 /* absolutize() requires that path be allocated at least MAXPATHLEN+1 bytes. */
@@ -563,19 +571,20 @@ calculate_path(void)
 
 #if HAVE_READLINK
     {
-        wchar_t tmpbuffer[MAXPATHLEN+1];
-        int linklen = _Py_wreadlink(progpath, tmpbuffer, MAXPATHLEN);
-        while (linklen != -1) {
-            if (tmpbuffer[0] == SEP)
-                /* tmpbuffer should never be longer than MAXPATHLEN,
+        wchar_t *link;
+        link = _Py_wreadlink(progpath);
+        while (link != NULL) {
+            if (link[0] == SEP)
+                /* link should never be longer than MAXPATHLEN,
                    but extra check does not hurt */
-                wcsncpy(argv0_path, tmpbuffer, MAXPATHLEN);
+                wcsncpy(argv0_path, link, MAXPATHLEN);
             else {
                 /* Interpret relative to progpath */
                 reduce(argv0_path);
-                joinpath(argv0_path, tmpbuffer);
+                joinpath(argv0_path, link);
             }
-            linklen = _Py_wreadlink(argv0_path, tmpbuffer, MAXPATHLEN);
+            PyMem_Free(link);
+            link = _Py_wreadlink(argv0_path);
         }
     }
 #endif /* HAVE_READLINK */
