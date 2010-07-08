@@ -1658,7 +1658,7 @@ find_module(const char *fullname, const char *name, PyObject *search_path,
     size_t saved_namelen;
 #endif
     PyObject *unicode;
-    PyObject *unicode_without_suffix;
+    PyObject *unicode_without_suffix = NULL;
 
     *path = NULL;
     if (p_loader != NULL)
