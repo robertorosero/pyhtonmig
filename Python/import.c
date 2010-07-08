@@ -1626,7 +1626,7 @@ extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
                                         char *, Py_ssize_t);
 #endif
 
-static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
+static int case_ok(PyObject *, Py_ssize_t, Py_ssize_t, char *);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 
 static struct filedescr *
@@ -1828,7 +1828,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
             return NULL;
         if (stat_unicode(unicode, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
-            case_ok(buf, len, namelen, name)) { /* case matches */
+            case_ok(unicode, 0, namelen, name)) { /* case matches */
             if (find_init_module(unicode)) { /* and has __init__.py */
                 *path = unicode;
                 return &fd_package;
@@ -1889,7 +1889,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
                 filemode = "r" PY_STDIOTEXTMODE;
             fp = fopen_unicode(unicode, filemode);
             if (fp != NULL) {
-                if (case_ok(buf, len, namelen, name)) {
+                if (case_ok(unicode, strlen(fdp->suffix), namelen, name)) {
                     Py_DECREF(unicode);
                     break;
                 } else {                   /* continue search */
@@ -1996,8 +1996,12 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 #endif
 
 static int
-case_ok(char *buf, Py_ssize_t len, Py_ssize_t namelen, char *name)
+case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, char *name)
 {
+    /* FIXME: don't use _PyUnicode_AsString */
+    char *buf = _PyUnicode_AsString(bufobj);
+    Py_ssize_t len = strlen(buf) - lendelta;
+
 /* Pick a platform-specific implementation; the sequence of #if's here should
  * match the sequence just above.
  */
@@ -2133,14 +2137,11 @@ find_init_module(PyObject *bufobj)
 {
     struct stat statbuf;
     PyObject *unicode;
-    char *_buf;
 
     unicode = PyUnicode_FromFormat("%U%c__init__.py", bufobj, SEP);
     if (stat_unicode(unicode, &statbuf) == 0) {
-        /* FIXME: don't use _PyUnicode_AsString */
-        _buf = _PyUnicode_AsString(unicode);
-        if (case_ok(_buf,
-                    strlen(_buf) - 3,   /* length without .py suffix */
+        if (case_ok(unicode,
+                    3,   /* ignore ".py" suffix */
                     8, "__init__")) {
             Py_DECREF(unicode);
             return 1;
@@ -2150,10 +2151,8 @@ find_init_module(PyObject *bufobj)
 
     unicode = PyUnicode_FromFormat("%U%c__init__.py%c", bufobj, SEP, Py_OptimizeFlag ? "o" : "c");
     if (stat_unicode(unicode, &statbuf) == 0) {
-        /* FIXME: don't use _PyUnicode_AsString */
-        _buf = _PyUnicode_AsString(unicode);
-        if (case_ok(_buf,
-                    strlen(_buf) - 3,   /* length without .pyc/.pyo suffix */
+        if (case_ok(unicode,
+                    4,   /* ignore ".pyc" / ".pyo" suffix */
                     8, "__init__")) {
             Py_DECREF(unicode);
             return 1;
