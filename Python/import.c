@@ -1710,6 +1710,10 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
     }
 
     if (search_path == NULL) {
+#ifdef MS_COREDLL
+        /* FIXME: use buf buffer */
+        char bbuf[MAXPATHLEN+1];
+#endif
         if (is_builtin(name)) {
             *path = PyUnicode_DecodeFSDefault(name);
             if (*path == NULL)
@@ -1717,9 +1721,9 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
             return &fd_builtin;
         }
 #ifdef MS_COREDLL
-        fp = PyWin_FindRegisteredModule(name, &fdp, buf, buflen);
+        fp = PyWin_FindRegisteredModule(name, &fdp, bbuf, sizeof(bbuf));
         if (fp != NULL) {
-            *path = PyUnicode_DecodeFSDefault(buf);
+            *path = PyUnicode_DecodeFSDefault(bbuf);
             if (*path == NULL) {
                 fclose(fp);
                 return NULL;
