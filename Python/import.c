@@ -1995,9 +1995,12 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 static int
 case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, char *name)
 {
+#if defined(MS_WINDOWS) || defined(DJGPP) || (defined(__MACH__) && defined(__APPLE__) \
+    || defined(__CYGWIN__)) && defined(HAVE_DIRENT_H) || defined(PYOS_OS2)
     /* FIXME: don't use _PyUnicode_AsString */
     char *buf = _PyUnicode_AsString(bufobj);
     Py_ssize_t len = strlen(buf) - lendelta;
+#endif
 
 /* Pick a platform-specific implementation; the sequence of #if's here should
  * match the sequence just above.
