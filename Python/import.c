@@ -140,7 +140,7 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 static FILE* fopen_unicode(PyObject *unicode, const char *mode);
 #ifdef HAVE_STAT
 static int stat_unicode(PyObject *unicode, struct stat *statbuf);
-static int find_init_module(char *);
+static int find_init_module(PyObject *);
 #endif
 
 
@@ -1829,7 +1829,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
         if (stat_unicode(unicode, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(buf, len, namelen, name)) { /* case matches */
-            if (find_init_module(buf)) { /* and has __init__.py */
+            if (find_init_module(unicode)) { /* and has __init__.py */
                 *path = unicode;
                 return &fd_package;
             }
@@ -2129,54 +2129,37 @@ stat_unicode(PyObject *unicode, struct stat *statbuf)
 
 /* Helper to look for __init__.py or __init__.py[co] in potential package */
 static int
-find_init_module(char *buf)
+find_init_module(PyObject *bufobj)
 {
-    const size_t save_len = strlen(buf);
-    size_t i = save_len;
-    char *pname;  /* pointer to start of __init__ */
     struct stat statbuf;
     PyObject *unicode;
+    char *_buf;
 
-/*      For calling case_ok(buf, len, namelen, name):
- *      /a/b/c/d/e/f/g/h/i/j/k/some_long_module_name.py\0
- *      ^                      ^                   ^    ^
- *      |--------------------- buf ---------------------|
- *      |------------------- len ------------------|
- *                             |------ name -------|
- *                             |----- namelen -----|
- */
-    if (save_len + 13 >= MAXPATHLEN)
-        return 0;
-    buf[i++] = SEP;
-    pname = buf + i;
-    strcpy(pname, "__init__.py");
-    unicode = PyUnicode_DecodeFSDefault(buf);
+    unicode = PyUnicode_FromFormat("%U%c__init__.py", bufobj, SEP);
     if (stat_unicode(unicode, &statbuf) == 0) {
-        if (case_ok(buf,
-                    save_len + 9,               /* len("/__init__") */
-                8,                              /* len("__init__") */
-                pname)) {
-            buf[save_len] = '\0';
+        /* FIXME: don't use _PyUnicode_AsString */
+        _buf = _PyUnicode_AsString(unicode);
+        if (case_ok(_buf,
+                    strlen(_buf) - 3,   /* length without .py suffix */
+                    8, "__init__")) {
             Py_DECREF(unicode);
             return 1;
         }
     }
     Py_DECREF(unicode);
-    i += strlen(pname);
-    strcpy(buf+i, Py_OptimizeFlag ? "o" : "c");
-    unicode = PyUnicode_DecodeFSDefault(buf);
+
+    unicode = PyUnicode_FromFormat("%U%c__init__.py%c", bufobj, SEP, Py_OptimizeFlag ? "o" : "c");
     if (stat_unicode(unicode, &statbuf) == 0) {
-        if (case_ok(buf,
-                    save_len + 9,               /* len("/__init__") */
-                8,                              /* len("__init__") */
-                pname)) {
-            buf[save_len] = '\0';
+        /* FIXME: don't use _PyUnicode_AsString */
+        _buf = _PyUnicode_AsString(unicode);
+        if (case_ok(_buf,
+                    strlen(_buf) - 3,   /* length without .pyc/.pyo suffix */
+                    8, "__init__")) {
             Py_DECREF(unicode);
             return 1;
         }
     }
     Py_DECREF(unicode);
-    buf[save_len] = '\0';
     return 0;
 }
 
