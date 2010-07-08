@@ -2089,14 +2089,21 @@ find_init_module(char *buf)
 static int init_builtin(char *); /* Forward */
 
 static PyObject*
-load_builtin(char *name, char *pathname, int type)
+load_builtin(char *name, PyObject *pathobj, int type)
 {
     int err;
     PyObject *m;
     PyObject *modules;
+    char *pathname;
 
-    if (pathname != NULL && pathname[0] != '\0')
-        name = pathname;
+    if (pathobj != NULL) {
+        /* FIXME: don't use _PyUnicode_AsString */
+        pathname = _PyUnicode_AsString(pathobj);
+        if (pathname == NULL)
+            return NULL;
+        if (pathname[0] != '\0')
+            name = pathname;
+    }
     if (type == C_BUILTIN)
         err = init_builtin(name);
     else
@@ -2173,7 +2180,7 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 
     case C_BUILTIN:
     case PY_FROZEN:
-        m = load_builtin(name, pathname, type);
+        m = load_builtin(name, pathobj, type);
         break;
 
     case IMP_HOOK: {
