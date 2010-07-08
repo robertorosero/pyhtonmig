@@ -2094,7 +2094,7 @@ load_builtin(char *name, char *pathname, int type)
     int err;
     PyObject *m;
     PyObject *modules;
-    
+
     if (pathname != NULL && pathname[0] != '\0')
         name = pathname;
     if (type == C_BUILTIN)
@@ -2133,6 +2133,7 @@ static PyObject *
 load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 {
     PyObject *m;
+    PyObject *pathobj;
 
     /* First check that there's an open file (if we need one)  */
     switch (type) {
@@ -2146,45 +2147,29 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         }
     }
 
+    pathobj = PyUnicode_DecodeFSDefault(pathname);
+    if (pathobj == NULL)
+        return NULL;
+
     switch (type) {
 
-    case PY_SOURCE: {
-        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
-        if (pathobj == NULL)
-            return NULL;
+    case PY_SOURCE:
         m = load_source_module(name, pathobj, fp);
-        Py_DECREF(pathobj);
         break;
-    }
 
-    case PY_COMPILED: {
-        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
-        if (pathobj == NULL)
-            return NULL;
+    case PY_COMPILED:
         m = load_compiled_module(name, pathobj, fp);
-        Py_DECREF(pathobj);
         break;
-    }
 
 #ifdef HAVE_DYNAMIC_LOADING
-    case C_EXTENSION: {
-        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
-        if (pathobj == NULL)
-            return NULL;
+    case C_EXTENSION:
         m = _PyImport_LoadDynamicModule(name, pathobj, fp);
-        Py_DECREF(pathobj);
         break;
-    }
 #endif
 
-    case PKG_DIRECTORY: {
-        PyObject *pathobj = PyUnicode_DecodeFSDefault(pathname);
-        if (pathobj == NULL)
-            return NULL;
+    case PKG_DIRECTORY:
         m = load_package(name, pathobj);
-        Py_DECREF(pathobj);
         break;
-    }
 
     case C_BUILTIN:
     case PY_FROZEN:
@@ -2195,6 +2180,7 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         if (loader == NULL) {
             PyErr_SetString(PyExc_ImportError,
                             "import hook without loader");
+            Py_DECREF(pathobj);
             return NULL;
         }
         m = PyObject_CallMethod(loader, "load_module", "s", name);
@@ -2208,6 +2194,7 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         m = NULL;
 
     }
+    Py_DECREF(pathobj);
 
     return m;
 }
