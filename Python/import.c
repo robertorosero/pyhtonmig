@@ -1417,7 +1417,7 @@ get_sourcefile(PyObject *fileobj)
 }
 
 /* Forward */
-static PyObject *load_module(char *, FILE *, char *, int, PyObject *);
+static PyObject *load_module(char *, FILE *, PyObject *, int, PyObject *);
 static struct filedescr *find_module(char *, char *, PyObject *,
                                      char *, size_t, FILE **, PyObject **);
 static struct _frozen * find_frozen(char *);
@@ -1436,6 +1436,7 @@ load_package(char *name, PyObject *pathobj)
     FILE *fp = NULL;
     struct filedescr *fdp;
     char *pathname;
+    PyObject *bufobj;
 
     /* FIXME: don't use _PyUnicode_AsString */
     pathname = _PyUnicode_AsString(pathobj);
@@ -1469,7 +1470,11 @@ load_package(char *name, PyObject *pathobj)
             m = NULL;
         goto cleanup;
     }
-    m = load_module(name, fp, buf, fdp->type, NULL);
+    bufobj = PyUnicode_DecodeFSDefault(buf);
+    if (bufobj != NULL)
+        m = load_module(name, fp, bufobj, fdp->type, NULL);
+    else
+        m = NULL;
     if (fp != NULL)
         fclose(fp);
     goto cleanup;
@@ -2137,10 +2142,9 @@ load_builtin(char *name, PyObject *pathobj, int type)
    its module object WITH INCREMENTED REFERENCE COUNT */
 
 static PyObject *
-load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
+load_module(char *name, FILE *fp, PyObject *pathobj, int type, PyObject *loader)
 {
     PyObject *m;
-    PyObject *pathobj;
 
     /* First check that there's an open file (if we need one)  */
     switch (type) {
@@ -2153,10 +2157,6 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
             return NULL;
         }
     }
-
-    pathobj = PyUnicode_DecodeFSDefault(pathname);
-    if (pathobj == NULL)
-        return NULL;
 
     switch (type) {
 
@@ -2201,7 +2201,6 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
         m = NULL;
 
     }
-    Py_DECREF(pathobj);
 
     return m;
 }
@@ -2929,6 +2928,7 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
 {
     PyObject *modules = PyImport_GetModuleDict();
     PyObject *m = NULL;
+    PyObject *pathobj;
 
     /* Require:
        if mod == None: subname == fullname
@@ -2966,7 +2966,11 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
             Py_INCREF(Py_None);
             return Py_None;
         }
-        m = load_module(fullname, fp, buf, fdp->type, loader);
+        pathobj = PyUnicode_DecodeFSDefault(buf);
+        if (pathobj != NULL)
+            m = load_module(fullname, fp, pathobj, fdp->type, loader);
+        else
+            m = NULL;
         Py_XDECREF(loader);
         if (fp)
             fclose(fp);
@@ -2994,6 +2998,7 @@ PyImport_ReloadModule(PyObject *m)
     char buf[MAXPATHLEN+1];
     struct filedescr *fdp;
     FILE *fp = NULL;
+    PyObject *pathobj;
     PyObject *newm;
 
     if (modules_reloading == NULL) {
@@ -3061,7 +3066,11 @@ PyImport_ReloadModule(PyObject *m)
         return NULL;
     }
 
-    newm = load_module(name, fp, buf, fdp->type, loader);
+    pathobj = PyUnicode_DecodeFSDefault(buf);
+    if (pathobj != NULL)
+        newm = load_module(name, fp, pathobj, fdp->type, loader);
+    else
+        newm = NULL;
     Py_XDECREF(loader);
 
     if (fp)
@@ -3472,16 +3481,16 @@ imp_load_module(PyObject *self, PyObject *args)
 {
     char *name;
     PyObject *fob;
-    char *pathname;
+    PyObject *pathname;
     PyObject * ret;
     char *suffix; /* Unused */
     char *mode;
     int type;
     FILE *fp;
 
-    if (!PyArg_ParseTuple(args, "sOes(ssi):load_module",
+    if (!PyArg_ParseTuple(args, "sOU(ssi):load_module",
                           &name, &fob,
-                          Py_FileSystemDefaultEncoding, &pathname,
+                          &pathname,
                           &suffix, &mode, &type))
         return NULL;
     if (*mode) {
@@ -3492,7 +3501,6 @@ imp_load_module(PyObject *self, PyObject *args)
         if (!(*mode == 'r' || *mode == 'U') || strchr(mode, '+')) {
             PyErr_Format(PyExc_ValueError,
                          "invalid file open mode %.200s", mode);
-            PyMem_Free(pathname);
             return NULL;
         }
     }
@@ -3500,13 +3508,10 @@ imp_load_module(PyObject *self, PyObject *args)
         fp = NULL;
     else {
         fp = get_file(NULL, fob, mode);
-        if (fp == NULL) {
-            PyMem_Free(pathname);
+        if (fp == NULL)
             return NULL;
-        }
     }
     ret = load_module(name, fp, pathname, type, NULL);
-    PyMem_Free(pathname);
     if (fp)
         fclose(fp);
     return ret;
