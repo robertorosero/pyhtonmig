@@ -1632,6 +1632,7 @@ extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
 
 static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
 static int find_init_module(char *); /* Forward */
+static int stat_unicode(PyObject *unicode, struct stat *statbuf);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 
 static struct filedescr *
@@ -1831,7 +1832,7 @@ _find_module(char *fullname, char *subname, PyObject *search_path,
         unicode = PyUnicode_DecodeFSDefault(buf);
         if (unicode == NULL)
             return NULL;
-        if (stat(buf, &statbuf) == 0 &&         /* it exists */
+        if (stat_unicode(unicode, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(buf, len, namelen, name)) { /* case matches */
             if (find_init_module(buf)) { /* and has __init__.py */
@@ -2109,6 +2110,15 @@ case_ok(char *buf, Py_ssize_t len, Py_ssize_t namelen, char *name)
 
 
 #ifdef HAVE_STAT
+static int
+stat_unicode(PyObject *unicode, struct stat *statbuf)
+{
+    char *pathstr = _PyUnicode_AsString(unicode);
+    if (pathstr == NULL)
+        return 1;
+    return stat(pathstr, statbuf);
+}
+
 /* Helper to look for __init__.py or __init__.py[co] in potential package */
 static int
 find_init_module(char *buf)
@@ -3774,19 +3784,16 @@ typedef struct {
 static int
 NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
 {
-    char *path;
-    Py_ssize_t pathlen;
+    PyObject *pathobj;
 
     if (!_PyArg_NoKeywords("NullImporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "es:NullImporter",
-                          Py_FileSystemDefaultEncoding, &path))
+    if (!PyArg_ParseTuple(args, "U:NullImporter",
+                          &pathobj))
         return -1;
 
-    pathlen = strlen(path);
-    if (pathlen == 0) {
-        PyMem_Free(path);
+    if (PyUnicode_GET_SIZE(pathobj) == 0) {
         PyErr_SetString(PyExc_ImportError, "empty pathname");
         return -1;
     } else {
@@ -3794,8 +3801,7 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         struct stat statbuf;
         int rv;
 
-        rv = stat(path, &statbuf);
-        PyMem_Free(path);
+        rv = stat_unicode(pathobj, &statbuf);
         if (rv == 0) {
             /* it exists */
             if (S_ISDIR(statbuf.st_mode)) {
@@ -3807,12 +3813,14 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         }
 #else /* MS_WINDOWS */
         DWORD rv;
+        char *path;
+        /* FIXME: use PyUnicode_AsWideChar() and GetFileAttributesW() */
+        path = _PyUnicode_AsString(pathobj);
         /* see issue1293 and issue3677:
          * stat() on Windows doesn't recognise paths like
          * "e:\\shared\\" and "\\\\whiterab-c2znlh\\shared" as dirs.
          */
         rv = GetFileAttributesA(path);
-        PyMem_Free(path);
         if (rv != INVALID_FILE_ATTRIBUTES) {
             /* it exists */
             if (rv & FILE_ATTRIBUTE_DIRECTORY) {
