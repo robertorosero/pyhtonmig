@@ -661,10 +661,8 @@ _PyImport_FindExtensionUnicode(char *name, PyObject *filename)
         return NULL;
     }
     if (Py_VerboseFlag)
-        PySys_WriteStderr("import %s # previously loaded (%s)\n",
-                          name,
-                          /* FIXME: don't use _PyUnicode_AsString */
-                          _PyUnicode_AsString(filename));
+        PySys_FormatStderr("import %s # previously loaded (%U)\n",
+                           name, filename);
     return mod;
 }
 
@@ -1131,8 +1129,8 @@ load_compiled_module(char *name, PyObject *cpathobj, FILE *fp)
     if (co == NULL)
         return NULL;
     if (Py_VerboseFlag)
-        PySys_WriteStderr("import %s # precompiled from %s\n",
-            name, cpathname);
+        PySys_FormatStderr("import %s # precompiled from %U\n",
+                           name, cpathobj);
     m = PyImport_ExecCodeModuleWithUnicodePathnames(
         name, (PyObject *)co, cpathobj, cpathobj);
     Py_DECREF(co);
@@ -1320,7 +1318,6 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
 {
     struct stat st;
     FILE *fpc;
-    char buf[MAXPATHLEN+1];
     char *pathname;
     char *cpathname;
     PyObject *cpathobj;
@@ -1375,8 +1372,8 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
             return NULL;
         }
         if (Py_VerboseFlag)
-            PySys_WriteStderr("import %s # precompiled from %s\n",
-                name, cpathname);
+            PySys_FormatStderr("import %s # precompiled from %U\n",
+                               name, cpathobj);
         m = PyImport_ExecCodeModuleWithUnicodePathnames(
             name, (PyObject *)co, cpathobj, cpathobj);
     }
@@ -1387,8 +1384,7 @@ load_source_module(char *name, PyObject *pathobj, FILE *fp)
             return NULL;
         }
         if (Py_VerboseFlag)
-            PySys_WriteStderr("import %s # from %s\n",
-                name, pathname);
+            PySys_FormatStderr("import %s # from %U\n", name, pathobj);
         if (cpathname) {
             PyObject *ro = PySys_GetObject("dont_write_bytecode");
             if (ro == NULL || !PyObject_IsTrue(ro))
@@ -1490,8 +1486,7 @@ load_package(char *name, PyObject *pathobj)
     if (m == NULL)
         return NULL;
     if (Py_VerboseFlag)
-        PySys_WriteStderr("import %s # directory %s\n",
-            name, pathname);
+        PySys_FormatStderr("import %s # directory %U\n", name, pathobj);
     d = PyModule_GetDict(m);
     file = get_sourcefile(pathobj);
     if (file == NULL)
