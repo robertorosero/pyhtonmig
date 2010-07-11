@@ -179,12 +179,13 @@ wchar_t*
 _Py_wreadlink(const wchar_t *path)
 {
     char cbuf[PATH_MAX];
-    char cpath[PATH_MAX];
+    char *cpath;
     int res;
-    size_t r1 = wcstombs(cpath, path, PATH_MAX);
-    if (r1 == (size_t)-1 || r1 >= PATH_MAX)
+    cpath = _Py_wchar2char(path);
+    if (cpath == NULL)
         return NULL;
     res = (int)readlink(cpath, cbuf, PATH_MAX);
+    PyMem_Free(cpath);
     if (res == -1)
         return NULL;
     if (res == PATH_MAX)
@@ -298,9 +299,9 @@ copy_absolute(wchar_t *path, wchar_t *p)
         wchar_t *cwd;
         cwd = _Py_wgetcwd(path, MAXPATHLEN);
         if (cwd == NULL)
-            return /* FIXME: return an error */; 
+            return /* FIXME: return an error */;
         if (wcslen(cwd) >= MAXPATHLEN)
-            return /* FIXME: return an error */; 
+            return /* FIXME: return an error */;
         wcscpy(path, cwd);
         PyMem_Free(cwd);
         if (p[0] == '.' && p[1] == SEP)
