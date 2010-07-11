@@ -2116,8 +2116,11 @@ fopen_unicode(PyObject *unicode, const char *mode)
 {
     FILE *f;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
-    if (bytes == NULL)
+    if (bytes == NULL) {
+        /* FIXME: don't clear error? */
+        PyErr_Clear();
         return NULL;
+    }
     f = fopen(PyBytes_AS_STRING(bytes), mode);
     Py_DECREF(bytes);
     return f;
@@ -2130,8 +2133,11 @@ stat_unicode(PyObject *unicode, struct stat *statbuf)
 {
     int ret;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
-    if (bytes == NULL)
+    if (bytes == NULL) {
+        /* FIXME: don't clear error? */
+        PyErr_Clear();
         return -1;
+    }
     ret = stat(PyBytes_AS_STRING(bytes), statbuf);
     Py_DECREF(bytes);
     return ret;
