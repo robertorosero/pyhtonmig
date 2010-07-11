@@ -5,6 +5,8 @@
 #define NAME_CHARS \
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
+PyObject *_Py_code_object_list = NULL;
+
 /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
 
 static int
@@ -41,6 +43,14 @@ intern_strings(PyObject *tuple)
     }
 }
 
+
+void _PyCode_ClearList(void)
+{
+    if (_Py_code_object_list == NULL)
+        return;
+    Py_DECREF(_Py_code_object_list);
+    _Py_code_object_list = NULL;
+}
 
 PyCodeObject *
 PyCode_New(int argcount, int kwonlyargcount,
@@ -109,6 +119,13 @@ PyCode_New(int argcount, int kwonlyargcount,
         co->co_lnotab = lnotab;
         co->co_zombieframe = NULL;
         co->co_weakreflist = NULL;
+
+        if (_Py_code_object_list != NULL) {
+            if (PyList_Append(_Py_code_object_list, (PyObject*)co)) {
+                Py_DECREF(co);
+                return NULL;
+            }
+        }
     }
     return co;
 }

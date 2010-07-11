@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+extern PyObject *_Py_code_object_list;
+
 #ifdef Py_REF_DEBUG
 Py_ssize_t _Py_RefTotal;
 
@@ -1596,6 +1598,10 @@ _Py_ReadyTypes(void)
         Py_FatalError("Can't initialize StdPrinter");
 
     if (PyType_Ready(&PyCode_Type) < 0)
+        Py_FatalError("Can't initialize code type");
+
+    _Py_code_object_list = PyList_New(0);
+    if (_Py_code_object_list == NULL)
         Py_FatalError("Can't initialize code type");
 
     if (PyType_Ready(&PyFrame_Type) < 0)

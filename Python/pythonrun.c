@@ -55,6 +55,8 @@ extern wchar_t *Py_GetPath(void);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
 
+extern PyObject *_Py_code_object_list; /* From codeobject.c */
+
 /* Forward */
 static void initmain(void);
 static void initfsencoding(void);
@@ -74,6 +76,7 @@ extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
 extern int _PyLong_Init(void);
 extern void PyLong_Fini(void);
+extern void _PyCode_ClearList(void);
 
 #ifdef WITH_THREAD
 extern void _PyGILState_Init(PyInterpreterState *, PyThreadState *);
@@ -697,28 +700,27 @@ initmain(void)
 }
 
 static PyObject*
-reencode_filename(PyObject *module, PyObject *file, const char *new_encoding)
+reencode_filename(PyObject *file, const char *new_encoding,
+                  const char *errors)
 {
     PyObject *file_bytes = NULL;
     PyObject *new_file = NULL;
 
-    file_bytes = PyUnicode_AsEncodedString(
-            file,
-            Py_FileSystemDefaultEncoding,
-            "surrogateescape");
+    file_bytes = PyUnicode_EncodeFSDefault(file);
     if (file_bytes == NULL)
         return NULL;
     new_file = PyUnicode_Decode(
-            PyBytes_AsString(file_bytes),
-            PyBytes_GET_SIZE(file_bytes),
-            new_encoding,
-            "surrogateescape");
+        PyBytes_AsString(file_bytes),
+        PyBytes_GET_SIZE(file_bytes),
+        new_encoding,
+        "surrogateescape");
     Py_DECREF(file_bytes);
     return new_file;
 }
 
 static int
-reencode_module_path(PyObject *module, PyObject *path, const char *new_encoding)
+reencode_module_path(PyObject *module, PyObject *path,
+                     const char *new_encoding, const char *errors)
 {
     PyObject *filename;
     PyObject *new_filename;
@@ -730,7 +732,7 @@ reencode_module_path(PyObject *module, PyObject *path, const char *new_encoding)
         if (filename == NULL)
             return 1;
 
-        new_filename = reencode_filename(module, filename, new_encoding);
+        new_filename = reencode_filename(filename, new_encoding, errors);
         if (new_filename == NULL)
             return 1;
         if (PyList_SetItem(path, i, new_filename))
@@ -750,14 +752,23 @@ reencode_modules_path(const char *new_encoding)
     PyObject *module_dict = NULL;
     PyObject *file;
     PyObject *path;
+    Py_ssize_t i, len;
     int ret = 1;
+    char *errors;
+    PyObject *new_file;
+    PyCodeObject *co;
 
     /* FIXME: Re-encode PySys_GetObject("path_importer_cache") keys? */
-    /* FIXME: Re-encode co_filename of all code objects! */
 
-    if (strcmp(new_encoding, PyUnicode_GetDefaultEncoding()) == 0)
+    /* PyUnicode_DecodeFSDefault and PyUnicode_EncodeFSDefault use utf-8
+     * if Py_FileSystemDefaultEncoding is not set */
+    if (strcmp(new_encoding, "utf-8") == 0)
         return 0;
 
+    if (strcmp(new_encoding, "mbcs") != 0)
+        errors = "surrogateescape";
+    else
+        errors = NULL;
 
     values = PyObject_CallMethod(modules, "values", "");
     if (values == NULL)
@@ -771,7 +782,7 @@ reencode_modules_path(const char *new_encoding)
     for (module = PyIter_Next(iter); module != NULL; module = PyIter_Next(iter)) {
         file = PyModule_GetFilenameObject(module);
         if (file != NULL) {
-            PyObject *new_file = reencode_filename(module, file, new_encoding);
+            new_file = reencode_filename(file, new_encoding, errors);
             if (new_file == NULL)
                 goto error;
             if (PyObject_SetAttrString(module, "__file__", new_file)) {
@@ -788,7 +799,7 @@ reencode_modules_path(const char *new_encoding)
             goto error;
         path = PyDict_GetItemString(module_dict, "__path__");
         if (path != NULL) {
-            if (reencode_module_path(module, path, new_encoding))
+            if (reencode_module_path(module, path, new_encoding, errors))
                 goto error;
         } else {
             PyErr_Clear();
@@ -796,6 +807,18 @@ reencode_modules_path(const char *new_encoding)
 
         Py_CLEAR(module);
     }
+
+    len = Py_SIZE(_Py_code_object_list);
+    for (i=0; i < len; i++) {
+        co = (PyCodeObject *)PyList_GET_ITEM(_Py_code_object_list, i);
+
+        new_file = reencode_filename(co->co_filename, new_encoding, errors);
+        if (new_file == NULL)
+            return 1;
+        Py_DECREF(co->co_filename);
+        co->co_filename = new_file;
+    }
+    _PyCode_ClearList();
 
     ret = 0;
     goto finally;
@@ -829,6 +852,7 @@ initfsencoding(void)
 
             Py_FileSystemDefaultEncoding = codeset;
             Py_HasFileSystemDefaultEncoding = 0;
+            _PyCode_ClearList();
             return;
         }
 
@@ -840,6 +864,8 @@ initfsencoding(void)
         Py_HasFileSystemDefaultEncoding = 1;
     }
 #endif
+
+    _PyCode_ClearList();
 
     /* the encoding is mbcs, utf-8 or ascii */
     codec = _PyCodec_Lookup(Py_FileSystemDefaultEncoding);
