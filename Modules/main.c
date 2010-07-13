@@ -254,6 +254,31 @@ static int RunMainFromImporter(wchar_t *filename)
     }
 }
 
+static int 
+run_command(wchar_t *command, PyCompilerFlags *cf)
+{
+    int sts;
+    char *commandStr;
+    PyObject *commandObj = NULL;
+    PyObject *command_bytes = NULL;
+
+    commandObj = PyUnicode_FromWideChar(command, -1);
+    if (commandObj == NULL)
+        goto error;
+    command_bytes = PyUnicode_EncodeFSDefault(commandObj);
+    Py_DECREF(commandObj);
+    if (command_bytes == NULL)
+        goto error;
+    commandStr = PyBytes_AsString(command_bytes);
+    sts = PyRun_SimpleStringFlags(commandStr, cf) != 0;
+    Py_XDECREF(command_bytes);
+    return sts;
+
+error:
+    PyErr_Print();
+    return 1;
+}
+
 
 /* Main program */
 
@@ -565,22 +590,8 @@ Py_Main(int argc, wchar_t **argv)
     }
 
     if (command) {
-        char *commandStr;
-        PyObject *commandObj = PyUnicode_FromWideChar(
-            command, wcslen(command));
+        sts = run_command(command, &cf);
         free(command);
-        if (commandObj != NULL)
-            commandStr = _PyUnicode_AsString(commandObj);
-        else
-            commandStr = NULL;
-        if (commandStr != NULL) {
-            sts = PyRun_SimpleStringFlags(commandStr, &cf) != 0;
-            Py_DECREF(commandObj);
-        }
-        else {
-            PyErr_Print();
-            sts = 1;
-        }
     } else if (module) {
         sts = RunModule(module, 1);
     }
@@ -639,12 +650,15 @@ Py_Main(int argc, wchar_t **argv)
 
         if (sts==-1) {
             PyObject *filenameObj = NULL;
+            PyObject *filename_bytes = NULL;
             char *p_cfilename = "<stdin>";
             if (filename) {
                 filenameObj = PyUnicode_FromWideChar(
                     filename, wcslen(filename));
-                if (filenameObj != NULL)
-                    p_cfilename = _PyUnicode_AsString(filenameObj);
+                if (filenameObj != NULL) {
+                    filename_bytes = PyUnicode_EncodeFSDefault(filenameObj);
+                    p_cfilename = PyBytes_AsString(filename_bytes);
+                }
                 else
                     p_cfilename = "<decoding error>";
             }
@@ -658,6 +672,7 @@ Py_Main(int argc, wchar_t **argv)
                     p_cfilename,
                     filename != NULL, &cf) != 0;
             }
+            Py_XDECREF(filename_bytes);
             Py_XDECREF(filenameObj);
         }
 
