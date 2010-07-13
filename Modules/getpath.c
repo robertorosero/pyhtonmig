@@ -447,8 +447,7 @@ calculate_path(void)
     wchar_t rtpypath[MAXPATHLEN+1];
     wchar_t *home = Py_GetPythonHome();
     char *_path = getenv("PATH");
-    wchar_t wpath[MAXPATHLEN+1];
-    wchar_t *path = NULL;
+    wchar_t *path = NULL, *free_path = NULL;
     wchar_t *prog = Py_GetProgramName();
     wchar_t argv0_path[MAXPATHLEN+1];
     wchar_t zip_path[MAXPATHLEN+1];
@@ -470,13 +469,8 @@ calculate_path(void)
 #endif
 
     if (_path) {
-        /* FIXME: use _Py_char2wchar() */
-        size_t r = mbstowcs(wpath, _path, MAXPATHLEN+1);
-        path = wpath;
-        if (r == (size_t)-1 || r > MAXPATHLEN) {
-                /* Could not convert PATH, or it's too long. */
-                path = NULL;
-        }
+        path = _Py_char2wchar(_path);
+        free_path = path;
     }
 
     /* If there is no slash in the argv0 path, then we have to
@@ -537,6 +531,8 @@ calculate_path(void)
         absolutize(progpath);
     wcsncpy(argv0_path, progpath, MAXPATHLEN);
     argv0_path[MAXPATHLEN] = '\0';
+    if (free_path != NULL)
+        PyMem_Free(free_path);
 
 #ifdef WITH_NEXT_FRAMEWORK
     /* On Mac OS X we have a special case if we're running from a framework.
