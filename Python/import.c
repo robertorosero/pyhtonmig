@@ -1938,18 +1938,18 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
     return fd->type == PY_SOURCE || fd->type == PY_COMPILED;
 }
 
-/* case_ok(char* buf, Py_ssize_t len, Py_ssize_t namelen, char* name)
+/* case_ok(PyObject* fullpath, Py_ssize_t lendelta, Py_ssize_t namelen, const char* name)
  * The arguments here are tricky, best shown by example:
  *    /a/b/c/d/e/f/g/h/i/j/k/some_long_module_name.py\0
  *    ^                      ^                   ^    ^
- *    |--------------------- buf ---------------------|
+ *    |--------------------- fullpath ----------------|
  *    |------------------- len ------------------|
  *                           |------ name -------|
  *                           |----- namelen -----|
- * buf is the full path, but len only counts up to (& exclusive of) the
+ * fullpath is the full path, but len only counts up to (& exclusive of) the
  * extension.  name is the module name, also exclusive of extension.
  *
- * We've already done a successful stat() or fopen() on buf, so know that
+ * We've already done a successful stat() or fopen() on fullpath, so know that
  * there's some match, possibly case-insensitive.
  *
  * case_ok() is to return 1 if there's a case-sensitive match for
@@ -1983,7 +1983,7 @@ PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
 #endif
 
 static int
-case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *name)
+case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *name)
 {
 /* Pick a platform-specific implementation; the sequence of #if's here should
  * match the sequence just above.
@@ -1991,7 +1991,7 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 
 /* MS_WINDOWS */
 #if defined(MS_WINDOWS)
-    char *buf;
+    char *fullpath;
     WIN32_FIND_DATA data;
     HANDLE h;
 
@@ -1999,13 +1999,13 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
         return 1;
 
     /* FIXME: use PyUnicode_AsWideChar() and FindFirstFileW() */
-    buf = _PyUnicode_AsString(bufobj);
+    fullpath = _PyUnicode_AsString(fullpath_obj);
 
-    h = FindFirstFile(buf, &data);
+    h = FindFirstFile(fullpath, &data);
     if (h == INVALID_HANDLE_VALUE) {
         PyErr_Format(PyExc_NameError,
           "Can't find file for module %.100s\n(filename %U)",
-          name, bufobj);
+          name, fullpath_obj);
         return 0;
     }
     FindClose(h);
@@ -2013,28 +2013,31 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
 
 /* DJGPP */
 #elif defined(DJGPP)
-    char *buf;
     struct ffblk ffblk;
     int done;
+    PyObject *fullpath_bytes;
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    buf = _PyUnicode_AsString(bufobj);
+    fullpath_bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (fullpath_bytes == NULL)
+        return 0;
 
-    done = findfirst(buf, &ffblk, FA_ARCH|FA_RDONLY|FA_HIDDEN|FA_DIREC);
+    done = findfirst(PyBytes_AS_STRING(fullpath_bytes), 
+                     &ffblk, FA_ARCH|FA_RDONLY|FA_HIDDEN|FA_DIREC);
+    Py_DECREF(fullpath_bytes);
     if (done) {
         PyErr_Format(PyExc_NameError,
           "Can't find file for module %.100s\n(filename %U)",
-          name, bufobj);
+          name, fullpath_obj);
         return 0;
     }
     return strncmp(ffblk.ff_name, name, namelen) == 0;
 
 /* new-fangled macintosh (macosx) or Cygwin */
 #elif (defined(__MACH__) && defined(__APPLE__) || defined(__CYGWIN__)) && defined(HAVE_DIRENT_H)
-    char *buf;
+    char *fullpath;
     Py_ssize_t len;
     DIR *dirp;
     struct dirent *dp;
@@ -2044,9 +2047,11 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    buf = _PyUnicode_AsString(bufobj);
-    len = strlen(buf) - lendelta;
+    fullpath_bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (fullpath_bytes == NULL)
+        return 0;
+    fullpath = PyBytes_AS_STRING(fullpath_bytes);
+    len = PyBytes_GET_SIZE(fullpath_bytes) - lendelta;
     dirlen = len - namelen - 1; /* don't want trailing SEP */
 
     /* Copy the dir component into dirname; substitute "." if empty */
@@ -2056,13 +2061,13 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
     }
     else {
         assert(dirlen <= MAXPATHLEN);
-        memcpy(dirname, buf, dirlen);
+        memcpy(dirname, fullpath, dirlen);
         dirname[dirlen] = '\0';
     }
     /* Open the directory and search the entries for an exact match. */
     dirp = opendir(dirname);
     if (dirp) {
-        char *nameWithExt = buf + len - namelen;
+        char *nameWithExt = fullpath + len - namelen;
         while ((dp = readdir(dirp)) != NULL) {
             const int thislen =
 #ifdef _DIRENT_HAVE_D_NAMELEN
@@ -2073,16 +2078,17 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
             if (thislen >= namelen &&
                 strcmp(dp->d_name, nameWithExt) == 0) {
                 (void)closedir(dirp);
+                Py_DECREF(fullpath_bytes);
                 return 1; /* Found */
             }
         }
         (void)closedir(dirp);
     }
+    Py_DECREF(fullpath_bytes);
     return 0 ; /* Not found */
 
 /* OS/2 */
 #elif defined(PYOS_OS2)
-    char *buf;
     HDIR hdir = 1;
     ULONG srchcnt = 1;
     FILEFINDBUF3 ffbuf;
@@ -2091,15 +2097,17 @@ case_ok(PyObject *bufobj, Py_ssize_t lendelta, Py_ssize_t namelen, const char *n
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
-    /* FIXME: use PyUnicode_EncodeFSDefault() */
-    buf = _PyUnicode_AsString(bufobj);
+    fullpath_bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (fullpath_bytes == NULL)
+        return 0;
 
-    rc = DosFindFirst(buf,
+    rc = DosFindFirst(PyBytes_AS_STRING(fullpath_bytes),
                       &hdir,
                       FILE_READONLY | FILE_HIDDEN | FILE_SYSTEM | FILE_DIRECTORY,
                       &ffbuf, sizeof(ffbuf),
                       &srchcnt,
                       FIL_STANDARD);
+    Py_DECREF(fullpath_bytes);
     if (rc != NO_ERROR)
         return 0;
     return strncmp(ffbuf.achName, name, namelen) == 0;
