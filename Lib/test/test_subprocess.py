@@ -698,7 +698,7 @@ class POSIXProcessTestCase(BaseTestCase):
         # args is a string
         fd, fname = mkstemp()
         # reopen in text mode
-        with open(fd, "w") as fobj:
+        with open(fd, "w", errors="surrogateescape") as fobj:
             fobj.write("#!/bin/sh\n")
             fobj.write("exec '%s' -c 'import sys; sys.exit(47)'\n" %
                        sys.executable)
@@ -741,7 +741,7 @@ class POSIXProcessTestCase(BaseTestCase):
         # call() function with string argument on UNIX
         fd, fname = mkstemp()
         # reopen in text mode
-        with open(fd, "w") as fobj:
+        with open(fd, "w", errors="surrogateescape") as fobj:
             fobj.write("#!/bin/sh\n")
             fobj.write("exec '%s' -c 'import sys; sys.exit(47)'\n" %
                        sys.executable)
@@ -834,14 +834,14 @@ class POSIXProcessTestCase(BaseTestCase):
             stdout = stdout.rstrip(b'\n\r')
             self.assertEquals(stdout.decode('ascii'), repr(value))
 
+    def test_absolute_bytes_program(self):
+        exitcode = subprocess.call([os.fsencode(sys.executable), "-c", "pass"])
+        self.assertEquals(exitcode, 0)
+
+    @unittest.skipIf(sysconfig.is_python_build(), "need an installed Python")
     def test_bytes_program(self):
-        abs_program = os.fsencode(sys.executable)
         path, program = os.path.split(sys.executable)
         program = os.fsencode(program)
-
-        # absolute bytes path
-        exitcode = subprocess.call([abs_program, "-c", "pass"])
-        self.assertEquals(exitcode, 0)
 
         # bytes program, unicode PATH
         env = os.environ.copy()
