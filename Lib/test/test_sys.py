@@ -510,8 +510,9 @@ class SysModuleTest(unittest.TestCase):
         p = subprocess.Popen([sys.executable, "-c", code], stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         self.assertEqual(p.returncode, 1)
-        self.assert_(b"UnicodeEncodeError:" in stderr,
-            "%r not in %s" % (b"UniodeEncodeError:", ascii(stderr)))
+        pattern = b"SyntaxError: (unicode error) 'utf8' codec can't decode byte 0xff"
+        self.assert_(pattern in stderr,
+                     "%r not in %s" % (pattern, ascii(stderr)))
 
     def test_sys_flags(self):
         self.assertTrue(sys.flags)
