@@ -597,6 +597,10 @@ class OpenerDirectorTests(unittest.TestCase):
 
 
 def sanepathname2url(path):
+    try:
+        path.encode("utf8")
+    except UnicodeEncodeError:
+        raise unittest.SkipTest("path is not encodable to utf8")
     urlpath = urllib.request.pathname2url(path)
     if os.name == "nt" and urlpath.startswith("///"):
         urlpath = urlpath[2:]
@@ -1150,6 +1154,7 @@ class HandlerTests(unittest.TestCase):
         r = opener.open(request_url)
         self.assertEqual(len(http_handler.requests), 1)
         self.assertFalse(http_handler.requests[0].has_header(auth_header))
+
 
 class MiscTests(unittest.TestCase):
 
