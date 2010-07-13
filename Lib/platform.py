@@ -946,7 +946,7 @@ def _syscmd_uname(option,default=''):
     else:
         return output
 
-def _syscmd_file(target,default=''):
+def _syscmd_file(target, default=b''):
 
     """ Interface to the system's file command.
 
@@ -956,20 +956,22 @@ def _syscmd_file(target,default=''):
         case the command should fail.
 
     """
+    import subprocess
     if sys.platform in ('dos','win32','win16','os2'):
         # XXX Others too ?
         return default
-    target = _follow_symlinks(target).replace('"', '\\"')
-    try:
-        f = os.popen('file "%s" 2> %s' % (target, DEV_NULL))
-    except (AttributeError,os.error):
+    target = _follow_symlinks(target)
+    proc = subprocess.Popen(
+        ('file', target),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    if proc.returncode:
         return default
-    output = f.read().strip()
-    rc = f.close()
-    if not output or rc:
-        return default
-    else:
-        return output
+    output = stdout.strip()
+    if not output:
+        output = default
+    return output
 
 ### Information about the used architecture
 
@@ -981,9 +983,9 @@ _default_architecture = {
     'dos': ('','MSDOS'),
 }
 
-_architecture_split = re.compile(r'[\s,]').split
+_architecture_split = re.compile(br'[\s,]').split
 
-def architecture(executable=sys.executable,bits='',linkage=''):
+def architecture(executable=sys.executable,bits='', linkage=''):
 
     """ Queries the given executable (defaults to the Python interpreter
         binary) for various architecture information.
@@ -1017,9 +1019,9 @@ def architecture(executable=sys.executable,bits='',linkage=''):
 
     # Get data from the 'file' system command
     if executable:
-        output = _syscmd_file(executable, '')
+        output = _syscmd_file(executable, b'')
     else:
-        output = ''
+        output = b''
 
     if not output and \
        executable == sys.executable:
@@ -1036,31 +1038,31 @@ def architecture(executable=sys.executable,bits='',linkage=''):
     # Split the output into a list of strings omitting the filename
     fileout = _architecture_split(output)[1:]
 
-    if 'executable' not in fileout:
+    if b'executable' not in fileout:
         # Format not supported
         return bits,linkage
 
     # Bits
-    if '32-bit' in fileout:
+    if b'32-bit' in fileout:
         bits = '32bit'
-    elif 'N32' in fileout:
+    elif b'N32' in fileout:
         # On Irix only
         bits = 'n32bit'
-    elif '64-bit' in fileout:
+    elif b'64-bit' in fileout:
         bits = '64bit'
 
     # Linkage
-    if 'ELF' in fileout:
+    if b'ELF' in fileout:
         linkage = 'ELF'
-    elif 'PE' in fileout:
+    elif b'PE' in fileout:
         # E.g. Windows uses this format
-        if 'Windows' in fileout:
+        if b'Windows' in fileout:
             linkage = 'WindowsPE'
         else:
             linkage = 'PE'
-    elif 'COFF' in fileout:
+    elif b'COFF' in fileout:
         linkage = 'COFF'
-    elif 'MS-DOS' in fileout:
+    elif b'MS-DOS' in fileout:
         linkage = 'MSDOS'
     else:
         # XXX the A.OUT format also falls under this class...
