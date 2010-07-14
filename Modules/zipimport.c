@@ -48,7 +48,7 @@ extern FILE* _Py_fopen(PyObject *unicode, const char *mode);
 static PyObject *read_directory(char *archive);
 static PyObject *get_data(PyObject *archive, PyObject *toc_entry);
 static PyObject *get_module_code(ZipImporter *self, char *fullname,
-                                 int *p_ispackage, char **p_modpath);
+                                 int *p_ispackage, PyObject **p_modpath);
 
 
 #define ZipImporter_Check(op) PyObject_TypeCheck(op, &ZipImporter_Type)
@@ -301,7 +301,8 @@ zipimporter_load_module(PyObject *obj, PyObject *args)
 {
     ZipImporter *self = (ZipImporter *)obj;
     PyObject *code, *mod, *dict;
-    char *fullname, *modpath;
+    char *fullname;
+    PyObject *modpath;
     int ispackage;
 
     if (!PyArg_ParseTuple(args, "s:zipimporter.load_module",
@@ -331,8 +332,8 @@ zipimporter_load_module(PyObject *obj, PyObject *args)
         int err;
 
         fullpath = PyUnicode_FromFormat("%U%c%U%s",
-                                self->archive, SEP,
-                                self->prefix, subname);
+                                        self->archive, SEP,
+                                        self->prefix, subname);
         if (fullpath == NULL)
             goto error;
 
@@ -345,11 +346,11 @@ zipimporter_load_module(PyObject *obj, PyObject *args)
         if (err != 0)
             goto error;
     }
-    mod = PyImport_ExecCodeModuleEx(fullname, code, modpath);
+    mod = PyImport_ExecCodeModuleWithUnicodePathnames(fullname, code, modpath, NULL);
     Py_DECREF(code);
     if (Py_VerboseFlag)
-        PySys_WriteStderr("import %s # loaded from Zip %s\n",
-                          fullname, modpath);
+        PySys_FormatStderr("import %s # loaded from Zip %U\n",
+                           fullname, modpath);
     return mod;
 error:
     Py_DECREF(code);
@@ -363,21 +364,23 @@ zipimporter_get_filename(PyObject *obj, PyObject *args)
 {
     ZipImporter *self = (ZipImporter *)obj;
     PyObject *code;
-    char *fullname, *modpath;
+    char *fullname;
+    PyObject *modpath;
     int ispackage;
 
     if (!PyArg_ParseTuple(args, "s:zipimporter.get_filename",
                          &fullname))
-    return NULL;
+        return NULL;
 
     /* Deciding the filename requires working out where the code
        would come from if the module was actually loaded */
     code = get_module_code(self, fullname, &ispackage, &modpath);
     if (code == NULL)
-    return NULL;
+        return NULL;
     Py_DECREF(code); /* Only need the path info */
 
-    return PyUnicode_FromString(modpath);
+    Py_INCREF(modpath);
+    return modpath;
 }
 
 /* Return a bool signifying whether the module is a package or not. */
@@ -1108,7 +1111,7 @@ get_code_from_data(ZipImporter *self, int ispackage, int isbytecode,
    'fullname'. */
 static PyObject *
 get_module_code(ZipImporter *self, char *fullname,
-                int *p_ispackage, char **p_modpath)
+                int *p_ispackage, PyObject **p_modpath)
 {
     PyObject *toc_entry;
     char *subname, path[MAXPATHLEN + 1];
@@ -1149,8 +1152,7 @@ get_module_code(ZipImporter *self, char *fullname,
                 continue;
             }
             if (code != NULL && p_modpath != NULL)
-                *p_modpath = _PyUnicode_AsString(
-                    PyTuple_GetItem(toc_entry, 0));
+                *p_modpath = PyTuple_GetItem(toc_entry, 0);
             return code;
         }
     }
