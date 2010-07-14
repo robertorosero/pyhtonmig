@@ -64,11 +64,14 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
     PyObject *pathbytes;
     char *path, *p, *prefix, buf[MAXPATHLEN+2];
     size_t len;
+    PyObject *files;
+    PyObject *pathobj;
 
     if (!_PyArg_NoKeywords("zipimporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "O&:zipimporter", PyUnicode_FSConverter, &pathbytes))
+    if (!PyArg_ParseTuple(args, "O&:zipimporter",
+                          PyUnicode_FSConverter, &pathbytes))
         return -1;
 
     len = PyBytes_GET_SIZE(pathbytes);
@@ -117,30 +120,37 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         *p = '\0';
         prefix = p;
     }
-    if (path != NULL) {
-        PyObject *files;
-        files = PyDict_GetItemString(zip_directory_cache, path);
-        if (files == NULL) {
-            PyObject *bufobj;
-            bufobj = PyUnicode_DecodeFSDefault(buf);
-            if (bufobj == NULL)
-                return -1;
-            files = read_directory(bufobj);
-            Py_DECREF(bufobj);
-            if (files == NULL)
-                return -1;
-            if (PyDict_SetItemString(zip_directory_cache, path,
-                                     files) != 0)
-                return -1;
-        }
-        else
-            Py_INCREF(files);
-        self->files = files;
-    }
-    else {
+    if (path == NULL)
         PyErr_SetString(ZipImportError, "not a Zip file");
         return -1;
     }
+
+    pathobj = PyUnicode_DecodeFSDefault(path);
+    if (pathobj == NULL)
+        return -1;
+    files = PyDict_GetItem(zip_directory_cache, pathobj);
+    if (files == NULL) {
+        PyObject *bufobj;
+        bufobj = PyUnicode_DecodeFSDefault(buf);
+        if (bufobj == NULL) {
+            Py_DECREF(pathobj);
+            return -1;
+        }
+        files = read_directory(bufobj);
+        Py_DECREF(bufobj);
+        if (files == NULL) {
+            Py_DECREF(pathobj);
+            return -1;
+        }
+        if (PyDict_SetItem(zip_directory_cache, pathobj, files) != 0) {
+            Py_DECREF(pathobj);
+            return -1;
+        }
+    }
+    else
+        Py_INCREF(files);
+    Py_DECREF(pathobj);
+    self->files = files;
 
     if (prefix == NULL)
         prefix = "";
