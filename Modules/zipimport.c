@@ -45,7 +45,7 @@ static PyObject *zip_directory_cache = NULL;
 
 /* forward decls */
 extern FILE* _Py_fopen(PyObject *unicode, const char *mode);
-static PyObject *read_directory(char *archive);
+static PyObject *read_directory(PyObject *archive);
 static PyObject *get_data(PyObject *archive, PyObject *toc_entry);
 static PyObject *get_module_code(ZipImporter *self, char *fullname,
                                  int *p_ispackage, PyObject **p_modpath);
@@ -121,7 +121,12 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         PyObject *files;
         files = PyDict_GetItemString(zip_directory_cache, path);
         if (files == NULL) {
-            files = read_directory(buf);
+            PyObject *bufobj;
+            bufobj = PyUnicode_DecodeFSDefault(buf);
+            if (bufobj == NULL)
+                return -1;
+            files = read_directory(bufobj);
+            Py_DECREF(bufobj);
             if (files == NULL)
                 return -1;
             if (PyDict_SetItemString(zip_directory_cache, path,
@@ -679,8 +684,9 @@ get_long(unsigned char *buf) {
    data_size and file_offset are 0.
 */
 static PyObject *
-read_directory(char *archive)
+read_directory(PyObject *archive_obj)
 {
+    /* FIXME: work on Py_UNICODE* instead of char* */
     PyObject *files = NULL;
     FILE *fp;
     long compress, crc, data_size, file_size, file_offset, date, time;
@@ -691,18 +697,25 @@ read_directory(char *archive)
     char name[MAXPATHLEN + 5];
     char *p, endof_central_dir[22];
     long arc_offset; /* offset from beginning of file to start of zip-archive */
+    PyObject *archive_bytes;
 
-    if (strlen(archive) > MAXPATHLEN) {
+    archive_bytes = PyUnicode_EncodeFSDefault(archive_obj);
+    if (archive_bytes == NULL)
+        return NULL;
+
+    if (PyBytes_GET_SIZE(archive_bytes) > MAXPATHLEN) {
         PyErr_SetString(PyExc_OverflowError,
                         "Zip path name is too long");
+        Py_DECREF(archive_bytes);
         return NULL;
     }
-    strcpy(path, archive);
+    strcpy(path, PyBytes_AsString(archive_bytes));
+    Py_DECREF(archive_bytes);
 
-    fp = fopen(archive, "rb");
+    fp = _Py_fopen(archive_obj, "rb");
     if (fp == NULL) {
         PyErr_Format(ZipImportError, "can't open Zip file: "
-                     "'%.200s'", archive);
+                     "'%.200U'", archive_obj);
         return NULL;
     }
     fseek(fp, -22, SEEK_END);
@@ -710,14 +723,14 @@ read_directory(char *archive)
     if (fread(endof_central_dir, 1, 22, fp) != 22) {
         fclose(fp);
         PyErr_Format(ZipImportError, "can't read Zip file: "
-                     "'%.200s'", archive);
+                     "'%.200U'", archive_obj);
         return NULL;
     }
     if (get_long((unsigned char *)endof_central_dir) != 0x06054B50) {
         /* Bad: End of Central Dir signature */
         fclose(fp);
         PyErr_Format(ZipImportError, "not a Zip file: "
-                     "'%.200s'", archive);
+                     "'%.200U'", archive_obj);
         return NULL;
     }
 
@@ -783,8 +796,8 @@ read_directory(char *archive)
     }
     fclose(fp);
     if (Py_VerboseFlag)
-        PySys_WriteStderr("# zipimport: found %ld names in %s\n",
-            count, archive);
+        PySys_FormatStderr("# zipimport: found %ld names in %U\n",
+            count, archive_obj);
     return files;
 error:
     fclose(fp);
