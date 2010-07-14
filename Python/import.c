@@ -137,9 +137,9 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 };
 
 /* Forward */
-static FILE* fopen_unicode(PyObject *unicode, const char *mode);
+FILE* _Py_fopen(PyObject *unicode, const char *mode);
 #ifdef HAVE_STAT
-static int stat_unicode(PyObject *unicode, struct stat *statbuf);
+int _Py_stat(PyObject *unicode, struct stat *statbuf);
 static int find_init_module(PyObject *);
 #endif
 
@@ -1084,7 +1084,7 @@ check_compiled_module(PyObject *pathobj, time_t mtime, PyObject *cpathobj)
     long magic;
     long pyc_mtime;
 
-    fp = fopen_unicode(cpathobj, "rb");
+    fp = _Py_fopen(cpathobj, "rb");
     if (fp == NULL)
         return NULL;
     magic = PyMarshal_ReadLongFromFile(fp);
@@ -1471,7 +1471,7 @@ get_sourcefile(PyObject *fileobj)
             return NULL;
     }
 
-    if (stat_unicode(pyobj, &statbuf) == 0 &&
+    if (_Py_stat(pyobj, &statbuf) == 0 &&
         S_ISREG(statbuf.st_mode)) {
         return pyobj;
     }
@@ -1828,7 +1828,7 @@ find_module(const char *fullname, const char *name, PyObject *search_path,
         /* Check for package import (buf holds a directory name,
            and there's an __init__ module in that directory */
 #ifdef HAVE_STAT
-        if (stat_unicode(unicode, &statbuf) == 0 &&         /* it exists */
+        if (_Py_stat(unicode, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(unicode, 0, namelen, name)) { /* case matches */
             if (find_init_module(unicode)) { /* and has __init__.py */
@@ -1894,7 +1894,7 @@ find_module(const char *fullname, const char *name, PyObject *search_path,
             filemode = fdp->mode;
             if (filemode[0] == 'U')
                 filemode = "r" PY_STDIOTEXTMODE;
-            fp = fopen_unicode(unicode, filemode);
+            fp = _Py_fopen(unicode, filemode);
             if (fp != NULL) {
                 if (case_ok(unicode, strlen(fdp->suffix), namelen, name)) {
                     break;
@@ -2024,7 +2024,7 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
     if (fullpath_bytes == NULL)
         return 0;
 
-    done = findfirst(PyBytes_AS_STRING(fullpath_bytes), 
+    done = findfirst(PyBytes_AS_STRING(fullpath_bytes),
                      &ffblk, FA_ARCH|FA_RDONLY|FA_HIDDEN|FA_DIREC);
     Py_DECREF(fullpath_bytes);
     if (done) {
@@ -2119,9 +2119,10 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
 #endif
 }
 
-static FILE*
-fopen_unicode(PyObject *unicode, const char *mode)
+FILE*
+_Py_fopen(PyObject *unicode, const char *mode)
 {
+    /* FIXME: use _wfopen() on Windows */
     FILE *f;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
     if (bytes == NULL) {
@@ -2136,8 +2137,8 @@ fopen_unicode(PyObject *unicode, const char *mode)
 
 
 #ifdef HAVE_STAT
-static int
-stat_unicode(PyObject *unicode, struct stat *statbuf)
+int
+_Py_stat(PyObject *unicode, struct stat *statbuf)
 {
     int ret;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
@@ -2159,7 +2160,7 @@ find_init_module(PyObject *bufobj)
     PyObject *unicode;
 
     unicode = PyUnicode_FromFormat("%U%c__init__.py", bufobj, SEP);
-    if (stat_unicode(unicode, &statbuf) == 0) {
+    if (_Py_stat(unicode, &statbuf) == 0) {
         if (case_ok(unicode,
                     3,   /* ignore ".py" suffix */
                     8, "__init__")) {
@@ -2170,7 +2171,7 @@ find_init_module(PyObject *bufobj)
     Py_DECREF(unicode);
 
     unicode = PyUnicode_FromFormat("%U%c__init__.py%c", bufobj, SEP, Py_OptimizeFlag ? "o" : "c");
-    if (stat_unicode(unicode, &statbuf) == 0) {
+    if (_Py_stat(unicode, &statbuf) == 0) {
         if (case_ok(unicode,
                     4,   /* ignore ".pyc" / ".pyo" suffix */
                     8, "__init__")) {
@@ -3467,7 +3468,7 @@ get_file(PyObject *pathobj, PyObject *fob, char *mode)
     if (mode[0] == 'U')
         mode = "r" PY_STDIOTEXTMODE;
     if (fob == NULL) {
-        fp = fopen_unicode(pathobj, mode);
+        fp = _Py_fopen(pathobj, mode);
     }
     else {
         int fd = PyObject_AsFileDescriptor(fob);
@@ -3815,7 +3816,7 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         struct stat statbuf;
         int rv;
 
-        rv = stat_unicode(pathobj, &statbuf);
+        rv = _Py_stat(pathobj, &statbuf);
         if (rv == 0) {
             /* it exists */
             if (S_ISDIR(statbuf.st_mode)) {

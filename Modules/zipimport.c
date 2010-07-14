@@ -44,8 +44,9 @@ static PyObject *ZipImportError;
 static PyObject *zip_directory_cache = NULL;
 
 /* forward decls */
+extern FILE* _Py_fopen(PyObject *unicode, const char *mode);
 static PyObject *read_directory(char *archive);
-static PyObject *get_data(char *archive, PyObject *toc_entry);
+static PyObject *get_data(PyObject *archive, PyObject *toc_entry);
 static PyObject *get_module_code(ZipImporter *self, char *fullname,
                                  int *p_ispackage, char **p_modpath);
 
@@ -441,7 +442,7 @@ zipimporter_get_data(PyObject *obj, PyObject *args)
         PyErr_SetFromErrnoWithFilename(PyExc_IOError, path);
         return NULL;
     }
-    return get_data(archive_str, toc_entry);
+    return get_data(self->archive, toc_entry);
 }
 
 static PyObject *
@@ -491,7 +492,7 @@ zipimporter_get_source(PyObject *obj, PyObject *args)
 
     toc_entry = PyDict_GetItemString(self->files, path);
     if (toc_entry != NULL) {
-        PyObject *bytes = get_data(_PyUnicode_AsString(self->archive), toc_entry);
+        PyObject *bytes = get_data(self->archive, toc_entry);
         PyObject *res = PyUnicode_FromString(PyBytes_AsString(bytes));
         Py_XDECREF(bytes);
         return res;
@@ -825,7 +826,7 @@ get_decompress_func(void)
 /* Given a path to a Zip file and a toc_entry, return the (uncompressed)
    data as a new reference. */
 static PyObject *
-get_data(char *archive, PyObject *toc_entry)
+get_data(PyObject *archive, PyObject *toc_entry)
 {
     PyObject *raw_data, *data = NULL, *decompress;
     char *buf;
@@ -843,10 +844,10 @@ get_data(char *archive, PyObject *toc_entry)
         return NULL;
     }
 
-    fp = fopen(archive, "rb");
+    fp = _Py_fopen(archive, "rb");
     if (!fp) {
         PyErr_Format(PyExc_IOError,
-           "zipimport: can not open file %s", archive);
+           "zipimport: can not open file %U", archive);
         return NULL;
     }
 
@@ -856,7 +857,7 @@ get_data(char *archive, PyObject *toc_entry)
     if (l != 0x04034B50) {
         /* Bad: Local File Header */
         PyErr_Format(ZipImportError,
-                     "bad local file header in %s",
+                     "bad local file header in %U",
                      archive);
         fclose(fp);
         return NULL;
@@ -1086,12 +1087,8 @@ get_code_from_data(ZipImporter *self, int ispackage, int isbytecode,
 {
     PyObject *data, *code;
     char *modpath;
-    char *archive = _PyUnicode_AsString(self->archive);
 
-    if (archive == NULL)
-        return NULL;
-
-    data = get_data(archive, toc_entry);
+    data = get_data(self->archive, toc_entry);
     if (data == NULL)
         return NULL;
 
