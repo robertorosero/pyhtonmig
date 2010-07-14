@@ -70,8 +70,7 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
     if (!_PyArg_NoKeywords("zipimporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "O&:zipimporter",
-                          PyUnicode_FSConverter, &pathbytes))
+    if (!PyArg_ParseTuple(args, "O&:zipimporter", PyUnicode_FSConverter, &pathbytes))
         return -1;
 
     len = PyBytes_GET_SIZE(pathbytes);
@@ -120,7 +119,7 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         *p = '\0';
         prefix = p;
     }
-    if (path == NULL)
+    if (path == NULL) {
         PyErr_SetString(ZipImportError, "not a Zip file");
         return -1;
     }
@@ -142,7 +141,8 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
             Py_DECREF(pathobj);
             return -1;
         }
-        if (PyDict_SetItem(zip_directory_cache, pathobj, files) != 0) {
+        if (PyDict_SetItem(zip_directory_cache, pathobj,
+                                 files) != 0) {
             Py_DECREF(pathobj);
             return -1;
         }
@@ -164,11 +164,11 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         }
     }
 
-    self->archive = PyUnicode_FromString(buf);
+    self->archive = PyUnicode_DecodeFSDefault(buf);
     if (self->archive == NULL)
         return -1;
 
-    self->prefix = PyUnicode_FromString(prefix);
+    self->prefix = PyUnicode_DecodeFSDefault(prefix);
     if (self->prefix == NULL)
         return -1;
 
@@ -197,19 +197,12 @@ zipimporter_dealloc(ZipImporter *self)
 static PyObject *
 zipimporter_repr(ZipImporter *self)
 {
-    char *archive = "???";
-    char *prefix = "";
-
-    if (self->archive != NULL && PyUnicode_Check(self->archive))
-        archive = _PyUnicode_AsString(self->archive);
-    if (self->prefix != NULL && PyUnicode_Check(self->prefix))
-        prefix = _PyUnicode_AsString(self->prefix);
-    if (prefix != NULL && *prefix)
-        return PyUnicode_FromFormat("<zipimporter object \"%.300s%c%.150s\">",
-                                    archive, SEP, prefix);
+    if (PyUnicode_GET_SIZE(self->prefix) != 0)
+        return PyUnicode_FromFormat("<zipimporter object \"%.300U%c%.150U\">",
+                                    self->archive, SEP, self->prefix);
     else
-        return PyUnicode_FromFormat("<zipimporter object \"%.300s\">",
-                                    archive);
+        return PyUnicode_FromFormat("<zipimporter object \"%.300U\">",
+                                    self->archive);
 }
 
 /* return fullname.split(".")[-1] */
