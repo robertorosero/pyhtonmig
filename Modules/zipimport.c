@@ -418,20 +418,26 @@ static PyObject *
 zipimporter_get_data(PyObject *obj, PyObject *args)
 {
     ZipImporter *self = (ZipImporter *)obj;
-    char *path;
+    PyObject *pathbytes;
+    /* FIXME: use Py_UNICODE* instead of char* */
+    const char *path;
 #ifdef ALTSEP
     char *p, buf[MAXPATHLEN + 1];
 #endif
     PyObject *toc_entry;
     Py_ssize_t len;
+    PyObject *archive_bytes;
     char *archive_str;
 
-    if (!PyArg_ParseTuple(args, "s:zipimporter.get_data", &path))
+    if (!PyArg_ParseTuple(args, "O&:zipimporter.get_data",
+                          PyUnicode_FSConverter, &pathbytes))
         return NULL;
 
+    path = PyBytes_AsString(pathbytes);
 #ifdef ALTSEP
     if (strlen(path) >= MAXPATHLEN) {
         PyErr_SetString(ZipImportError, "path too long");
+        Py_DECREF(pathbytes);
         return NULL;
     }
     strcpy(buf, path);
@@ -441,18 +447,23 @@ zipimporter_get_data(PyObject *obj, PyObject *args)
     }
     path = buf;
 #endif
-    archive_str = _PyUnicode_AsStringAndSize(self->archive, &len);
+    archive_bytes = PyUnicode_EncodeFSDefault(self->archive);
+    archive_str = PyBytes_AS_STRING(archive_bytes);
+    len = PyBytes_GET_SIZE(archive_bytes);
     if ((size_t)len < strlen(path) &&
         strncmp(path, archive_str, len) == 0 &&
         path[len] == SEP) {
         path = path + len + 1;
     }
+    Py_DECREF(archive_bytes);
 
     toc_entry = PyDict_GetItemString(self->files, path);
     if (toc_entry == NULL) {
         PyErr_SetFromErrnoWithFilename(PyExc_IOError, path);
+        Py_DECREF(pathbytes);
         return NULL;
     }
+    Py_DECREF(pathbytes);
     return get_data(self->archive, toc_entry);
 }
 
@@ -703,6 +714,7 @@ read_directory(PyObject *archive_obj)
     char *p, endof_central_dir[22];
     long arc_offset; /* offset from beginning of file to start of zip-archive */
     PyObject *archive_bytes;
+    PyObject *pathobj;
 
     archive_bytes = PyUnicode_EncodeFSDefault(archive_obj);
     if (archive_bytes == NULL)
@@ -789,7 +801,10 @@ read_directory(PyObject *archive_obj)
 
         strncpy(path + length + 1, name, MAXPATHLEN - length - 1);
 
-        t = Py_BuildValue("siiiiiii", path, compress, data_size,
+        pathobj = PyUnicode_DecodeFSDefault(path);
+        if (pathobj == NULL)
+            goto error;
+        t = Py_BuildValue("Niiiiiii", pathobj, compress, data_size,
                           file_size, file_offset, time, date, crc);
         if (t == NULL)
             goto error;
@@ -855,15 +870,17 @@ get_data(PyObject *archive, PyObject *toc_entry)
     int err;
     Py_ssize_t bytes_read = 0;
     long l;
-    char *datapath;
+    PyObject *datapath;
     long compress, data_size, file_size, file_offset, bytes_size;
     long time, date, crc;
 
-    if (!PyArg_ParseTuple(toc_entry, "slllllll", &datapath, &compress,
+    if (!PyArg_ParseTuple(toc_entry, "O&lllllll",
+                          PyUnicode_FSConverter, &datapath, &compress,
                           &data_size, &file_size, &file_offset, &time,
                           &date, &crc)) {
         return NULL;
     }
+    Py_DECREF(datapath);
 
     fp = _Py_fopen(archive, "rb");
     if (!fp) {
