@@ -2,7 +2,7 @@
 
 
 /*
-   __version__ 73626.
+   __version__ 82163.
 
    This module must be committed separately after each AST grammar change;
    The __version__ number is set to the revision number of the commit
@@ -537,8 +537,9 @@ static int add_attributes(PyTypeObject* type, char**attrs, int num_fields)
 {
     int i, result;
     PyObject *s, *l = PyTuple_New(num_fields);
-    if (!l) return 0;
-    for(i = 0; i < num_fields; i++) {
+    if (!l)
+        return 0;
+    for (i = 0; i < num_fields; i++) {
         s = PyUnicode_FromString(attrs[i]);
         if (!s) {
             Py_DECREF(l);
@@ -6773,7 +6774,7 @@ PyInit__ast(void)
             NULL;
         if (PyModule_AddIntConstant(m, "PyCF_ONLY_AST", PyCF_ONLY_AST) < 0)
                 return NULL;
-        if (PyModule_AddStringConstant(m, "__version__", "73626") < 0)
+        if (PyModule_AddStringConstant(m, "__version__", "82163") < 0)
                 return NULL;
         if (PyDict_SetItemString(d, "mod", (PyObject*)mod_type) < 0) return
             NULL;

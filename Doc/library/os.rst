@@ -723,7 +723,7 @@ as internal buffering of data.
 
       This function is intended for low-level I/O.  For normal usage, use the
       built-in function :func:`open`, which returns a "file object" with
-      :meth:`~file.read` and :meth:`~file.wprite` methods (and many more).  To
+      :meth:`~file.read` and :meth:`~file.write` methods (and many more).  To
       wrap a file descriptor in a "file object", use :func:`fdopen`.
 
 
@@ -1064,8 +1064,10 @@ Files and Directories
 .. function:: lstat(path)
 
    Like :func:`stat`, but do not follow symbolic links.  This is an alias for
-   :func:`stat` on platforms that do not support symbolic links, such as
-   Windows.
+   :func:`stat` on platforms that do not support symbolic links.
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: mkfifo(path[, mode])
@@ -1115,7 +1117,8 @@ Files and Directories
 
    Create a directory named *path* with numeric mode *mode*. The default *mode*
    is ``0o777`` (octal).  On some systems, *mode* is ignored.  Where it is used,
-   the current umask value is first masked out.
+   the current umask value is first masked out.  If the directory already
+   exists, :exc:`OSError` is raised.
 
    It is also possible to create temporary directories; see the
    :mod:`tempfile` module's :func:`tempfile.mkdtemp` function.
@@ -1180,7 +1183,10 @@ Files and Directories
    and the call may raise an UnicodeDecodeError. If the *path* is a bytes
    object, the result will be a bytes object.
 
-   Availability: Unix.
+   Availability: Unix, Windows
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: remove(path)
@@ -1342,7 +1348,27 @@ Files and Directories
 
    Create a symbolic link pointing to *source* named *link_name*.
 
-   Availability: Unix.
+   On Windows, symlink version takes an additional, optional parameter,
+   *target_is_directory*, which defaults to False.
+
+   symlink(source, link_name, target_is_directory=False)
+
+   On Windows, a symlink represents a file or a directory, and does not
+   morph to the target dynamically.  For this reason, when creating a
+   symlink on Windows, if the target is not already present, the symlink
+   will default to being a file symlink.  If *target_is_directory* is set to
+   True, the symlink will be created as a directory symlink.  This
+   parameter is ignored if the target exists (and the symlink is created
+   with the same type as the target).
+
+   Symbolic link support was introduced in Windows 6.0 (Vista). *symlink*
+   will raise a NotImplementedError on Windows versions earlier than 6.0. The
+   SeCreateSymbolicLinkPrivilege is required in order to create symlinks.
+
+   Availability:  Unix, Windows
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: unlink(path)

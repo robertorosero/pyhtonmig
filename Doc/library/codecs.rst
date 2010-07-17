@@ -953,6 +953,8 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | cp857           | 857, IBM857                    | Turkish                        |
 +-----------------+--------------------------------+--------------------------------+
+| cp858           | 858, IBM858                    | Western Europe                 |
++-----------------+--------------------------------+--------------------------------+
 | cp860           | 860, IBM860                    | Portuguese                     |
 +-----------------+--------------------------------+--------------------------------+
 | cp861           | 861, CP-IS, IBM861             | Icelandic                      |
@@ -1221,6 +1223,23 @@ functions can be used directly if desired.
 .. function:: ToUnicode(label)
 
    Convert a label to Unicode, as specified in :rfc:`3490`.
+
+
+:mod:`encodings.mbcs` --- Windows ANSI codepage
+-----------------------------------------------
+
+.. module:: encodings.mbcs
+   :synopsis: Windows ANSI codepage
+
+Encode operand according to the ANSI codepage (CP_ACP). This codec only
+supports ``'strict'`` and ``'replace'`` error handlers to encode, and
+``'strict'`` and ``'ignore'`` error handlers to decode.
+
+Availability: Windows only.
+
+.. versionchanged:: 3.2
+   Before 3.2, the *errors* argument was ignored; ``'replace'`` was always used
+   to encode, and ``'ignore'`` to decode.
 
 
 :mod:`encodings.utf_8_sig` --- UTF-8 codec with BOM signature

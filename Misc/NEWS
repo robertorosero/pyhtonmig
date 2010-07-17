@@ -12,6 +12,45 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #7616: Fix copying of overlapping memoryview slices with the Intel
+  compiler.
+
+- Issue #8413: structsequence now subclasses tuple.
+
+- Issue #8271: during the decoding of an invalid UTF-8 byte sequence, only the
+  start byte and the continuation byte(s) are now considered invalid, instead
+  of the number of bytes specified by the start byte.
+  E.g.: '\xf1\x80AB'.decode('utf-8', 'replace') now returns u'\ufffdAB' and
+  replaces with U+FFFD only the start byte ('\xf1') and the continuation byte
+  ('\x80') even if '\xf1' is the start byte of a 4-bytes sequence.
+  Previous versions returned a single u'\ufffd'.
+
+- Issue #9011: A negated imaginary literal (e.g., "-7j") now has real
+  part -0.0 rather than 0.0.  So "-7j" is now exactly equivalent to
+  "-(7j)".
+
+- Be more specific in error messages about positional arguments.
+
+- Issue #8949: "z" format of PyArg_Parse*() functions doesn't accept bytes
+  objects, as described in the documentation.
+
+- Issue #6543: Write the traceback in the terminal encoding instead of utf-8.
+  Fix the encoding of the modules filename. Patch written by Amaury Forgeot
+  d'Arc.
+
+- Issue #9011: Remove buggy and unnecessary (in 3.x) ST->AST
+  compilation code dealing with unary minus applied to a constant.
+  The removed code was mutating the ST, causing a second compilation
+  to fail.
+
+- Issue #850997: mbcs encoding (Windows only) handles errors argument: strict
+  mode raises unicode errors. The encoder only supports "strict" and "replace"
+  error handlers, the decoder only supports "strict" and "ignore" error
+  handlers. Patch written by Mark Hammond.
+
+- Issue #8850: Remove "w" and "w#" formats from PyArg_Parse*() functions, use
+  "w*" format instead. Add tests for "w*" format.
+
 - Issue #8592: PyArg_Parse*() functions raise a TypeError for "y", "u" and "Z"
   formats if the string contains a null byte/character. Write unit tests for
   string formats.
@@ -22,6 +61,8 @@ Core and Builtins
 
 - Issue #8969: On Windows, use mbcs codec in strict mode to encode and decode
   filenames and enable os.fsencode().
+
+- Issue #9058: Remove assertions about INT_MAX in UnicodeDecodeError.
 
 - Issue #8941: decoding big endian UTF-32 data in UCS-2 builds could crash
   the interpreter with characters outside the Basic Multilingual Plane
@@ -431,6 +472,84 @@ C-API
 
 Library
 -------
+
+- Issue #1555570: email no longer inserts extra blank lines when a \r\n
+  combo crosses an 8192 byte boundary.
+
+- Issue #9243: Fix sndhdr module and add unit tests, contributed by James Lee.
+
+- ``ast.literal_eval()`` now allows byte literals.
+
+- Issue #9137: Fix issue in MutableMapping.update, which incorrectly
+  treated keyword arguments called 'self' or 'other' specially.
+
+- ``ast.literal_eval()`` now allows set literals.
+
+- Issue #9164: Ensure that sysconfig handles duplicate -arch flags in CFLAGS.
+
+- Issue #7646: The fnmatch pattern cache no longer grows without bound.
+
+- Issue #9136: Fix 'dictionary changed size during iteration'
+  RuntimeError produced when profiling the decimal module.  This was
+  due to a dangerous iteration over 'locals()' in Context.__init__.
+
+- Fix extreme speed issue in Decimal.pow when the base is an exact
+  power of 10 and the exponent is tiny (for example,
+  Decimal(10) ** Decimal('1e-999999999')).
+
+- Issue #9186: Fix math.log1p(-1.0) to raise ValueError, not OverflowError.
+
+- Issue #9130: Fix validation of relative imports in parser module.
+
+- Issue #9128: Fix validation of class decorators in parser module.
+
+- Issue #9094: python -m pickletools will now disassemble pickle files
+  listed in the command line arguments.  See output of python -m
+  pickletools -h for more details.
+
+- Issue #5468: urlencode to handle bytes type and other encodings in its query
+  parameter. Patch by Dan Mahn.
+
+- Issue #7673: Fix security vulnerability (CVE-2010-2089) in the audioop
+  module, ensure that the input string length is a multiple of the frame size
+
+- Issue #6507: Accept source strings in dis.dis(). Original patch by
+  Daniel Urban.
+
+- Issue #7829: Clearly document that the dis module is exposing an
+  implementation detail that is not stable between Python VMs or releases.
+
+- Issue #6589: cleanup asyncore.socket_map in case smtpd.SMTPServer constructor
+  raises an exception.
+
+- Issue #9110: Addition of ContextDecorator to contextlib, for creating APIs
+  that act as both context managers and decorators. contextmanager changes
+  to use ContextDecorator.
+
+- Implement importlib.abc.SourceLoader and deprecate PyLoader and PyPycLoader
+  for removal in Python 3.4.
+
+- Issue #9064: pdb's "up" and "down" commands now accept an optional argument.
+
+- Issue #9018: os.path.normcase() now raises a TypeError if the argument is
+  not ``str`` or ``bytes``.
+
+- Issue #9075: In the ssl module, remove the setting of a ``debug`` flag
+  on an OpenSSL structure.
+
+- Issue #8682: The ssl module now temporary increments the reference count of
+  a socket object got through ``PyWeakref_GetObject``, so as to avoid possible
+  deallocation while the object is still being used.
+
+- Issue #1368368: FancyURLOpener class changed to throw an Exception on wrong
+  password instead of presenting an interactive prompt. Older behavior can be
+  obtained by passing retry=True to http_error_xxx methods of FancyURLOpener.
+
+- Issue #8720: fix regression caused by fix for #4050 by making getsourcefile
+  smart enough to find source files in the linecache.
+
+- Issue #5610: feedparser no longer eats extra characters at the end of
+  a body part if the body part ends with a \r\n.
 
 - Issue #8986: math.erfc was incorrectly raising OverflowError for
   values between -27.3 and -30.0 on some platforms.
@@ -1306,6 +1425,41 @@ Library
 Extension Modules
 -----------------
 
+- Issue #9165: Add new functions math.isfinite and cmath.isfinite, to
+  accompany existing isinf and isnan functions.
+
+- Issue #1578269: Implement os.symlink for Windows 6.0+. Patch by
+  Jason R. Coombs
+
+- In struct.pack, correctly propogate exceptions from computing the truth of an
+  object in the '?' format.
+
+- Issue #9000: datetime.timezone objects now have eval-friendly repr.
+
+- In the math module, correctly lookup __trunc__, __ceil__, and __floor__ as
+  special methods.
+
+- Issue #9005: Prevent utctimetuple() from producing year 0 or year
+  10,000.  Prior to this change, timezone adjustment in utctimetuple()
+  could produce tm_year value of 0 or 10,000.  Now an OverflowError is
+  raised in these edge cases.
+
+- Issue #6641: The ``datetime.strptime`` method now supports the
+  ``%z`` directive.  When the ``%z`` directive is present in the
+  format string, an aware ``datetime`` object is returned with
+  ``tzinfo`` bound to a ``datetime.timezone`` instance constructed
+  from the parsed offset.  If both ``%z`` and ``%Z`` are present, the
+  data in ``%Z`` field is used for timezone name, but ``%Z`` data
+  without ``%z`` is discarded.
+
+- Issue #5094: The ``datetime`` module now has a simple concrete class
+  implementing ``datetime.tzinfo`` interface.  Instances of the new
+  class, ``datetime.timezone``, return fixed name and UTC offset from
+  their ``tzname(dt)`` and ``utcoffset(dt)`` methods.  The ``dst(dt)``
+  method always returns ``None``.  A class attribute, ``utc`` contains
+  an instance representing the UTC timezone.  Original patch by Rafe
+  Kaplan.
+
 - Issue #8973: Add __all__ to struct module; this ensures that
   help(struct) includes documentation for the struct.Struct class.
 
@@ -1395,6 +1549,14 @@ Extension Modules
 
 Build
 -----
+
+- Issue #9189: Make a user-specified CFLAGS, CPPFLAGS, or LDFLAGS
+  setting override the configure and makefile defaults, without
+  deleting options the user didn't intend to override.  Developers
+  should no longer need to specify OPT or EXTRA_CFLAGS, although those
+  variables are still present for backward-compatibility.
+
+- Issue #8854: Fix finding Visual Studio 2008 on Windows x64.
 
 - Issue #1759169, #8864: Drop _XOPEN_SOURCE on Solaris, define it for
   multiprocessing only.
@@ -1490,6 +1652,11 @@ Documentation
 
 Tests
 -----
+
+- Issue #9251: test_threaded_import didn't fail when run through regrtest
+  if the import lock was disabled.
+
+- Issue #8605: Skip test_gdb if Python is compiled with optimizations.
 
 - Issue #7449: Skip test_socketserver if threading support is disabled
 
@@ -1619,7 +1786,7 @@ Tests
 Tools/Demos
 -----------
 
-- Issue #5464: Implement plural forms in msgfmt.py.
+- Issue #5464, #8974: Implement plural forms in msgfmt.py.
 
 - iobench (a file I/O benchmark) and ccbench (a concurrency benchmark) were
   added to the `Tools/` directory.  They were previously living in the
@@ -2014,6 +2181,8 @@ Installation
 
 Library
 -------
+
+- Issue #8203: Fix IDLE Credits dialog: view_file() uses its encoding argument.
 
 - Issue #5311: bdist_msi can now build packages that do not depend on a
   specific Python version.

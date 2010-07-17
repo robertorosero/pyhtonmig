@@ -2454,6 +2454,39 @@ Do you like this message?
 -Me
 """)
 
+    def test_pushCR_LF(self):
+        '''FeedParser BufferedSubFile.push() assumed it received complete
+           line endings.  A CR ending one push() followed by a LF starting
+           the next push() added an empty line.
+        '''
+        imt = [
+            ("a\r \n",  2),
+            ("b",       0),
+            ("c\n",     1),
+            ("",        0),
+            ("d\r\n",   1),
+            ("e\r",     0),
+            ("\nf",     1),
+            ("\r\n",    1),
+          ]
+        from email.feedparser import BufferedSubFile, NeedMoreData
+        bsf = BufferedSubFile()
+        om = []
+        nt = 0
+        for il, n in imt:
+            bsf.push(il)
+            nt += n
+            n1 = 0
+            while True:
+                ol = bsf.readline()
+                if ol == NeedMoreData:
+                    break
+                om.append(ol)
+                n1 += 1
+            self.assertTrue(n == n1)
+        self.assertTrue(len(om) == nt)
+        self.assertTrue(''.join([il for il, n in imt]) == ''.join(om))
+
 
 
 class TestParsers(TestEmailBase):
@@ -2588,6 +2621,24 @@ Here's the message body
         eq(headers, ['A', 'B', 'CC'])
         eq(msg.get_payload(), 'body')
 
+    def test_CRLFLF_at_end_of_part(self):
+        # issue 5610: feedparser should not eat two chars from body part ending
+        # with "\r\n\n".
+        m = (
+            "From: foo@bar.com\n"
+            "To: baz\n"
+            "Mime-Version: 1.0\n"
+            "Content-Type: multipart/mixed; boundary=BOUNDARY\n"
+            "\n"
+            "--BOUNDARY\n"
+            "Content-Type: text/plain\n"
+            "\n"
+            "body ending with CRLF newline\r\n"
+            "\n"
+            "--BOUNDARY--\n"
+          )
+        msg = email.message_from_string(m)
+        self.assertTrue(msg.get_payload(0).get_payload().endswith('\r\n'))
 
 
 class TestBase64(unittest.TestCase):

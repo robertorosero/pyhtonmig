@@ -15,10 +15,13 @@ from datetime import MINYEAR, MAXYEAR
 from datetime import timedelta
 from datetime import tzinfo
 from datetime import time
+from datetime import timezone
 from datetime import date, datetime
+import time as _time
 
-pickle_choices = [(pickle, pickle, proto) for proto in range(3)]
-assert len(pickle_choices) == 3
+pickle_choices = [(pickle, pickle, proto)
+                  for proto in range(pickle.HIGHEST_PROTOCOL + 1)]
+assert len(pickle_choices) == pickle.HIGHEST_PROTOCOL + 1
 
 # An arbitrary collection of objects of non-datetime types, for testing
 # mixed-type comparisons.
@@ -49,6 +52,7 @@ class TestModule(unittest.TestCase):
 # tzinfo tests
 
 class FixedOffset(tzinfo):
+
     def __init__(self, offset, name, dstoffset=42):
         if isinstance(offset, int):
             offset = timedelta(minutes=offset)
@@ -67,6 +71,7 @@ class FixedOffset(tzinfo):
         return self.__dstoffset
 
 class PicklableFixedOffset(FixedOffset):
+
     def __init__(self, offset=None, name=None, dstoffset=None):
         FixedOffset.__init__(self, offset, name, dstoffset)
 
@@ -118,18 +123,126 @@ class TestTZInfo(unittest.TestCase):
     def test_pickling_subclass(self):
         # Make sure we can pickle/unpickle an instance of a subclass.
         offset = timedelta(minutes=-300)
-        orig = PicklableFixedOffset(offset, 'cookie')
-        self.assertIsInstance(orig, tzinfo)
-        self.assertTrue(type(orig) is PicklableFixedOffset)
-        self.assertEqual(orig.utcoffset(None), offset)
-        self.assertEqual(orig.tzname(None), 'cookie')
-        for pickler, unpickler, proto in pickle_choices:
-            green = pickler.dumps(orig, proto)
-            derived = unpickler.loads(green)
-            self.assertIsInstance(derived, tzinfo)
-            self.assertTrue(type(derived) is PicklableFixedOffset)
-            self.assertEqual(derived.utcoffset(None), offset)
-            self.assertEqual(derived.tzname(None), 'cookie')
+        for otype, args in [
+            (PicklableFixedOffset, (offset, 'cookie')),
+            (timezone, (offset,)),
+            (timezone, (offset, "EST"))]:
+            orig = otype(*args)
+            oname = orig.tzname(None)
+            self.assertIsInstance(orig, tzinfo)
+            self.assertIs(type(orig), otype)
+            self.assertEqual(orig.utcoffset(None), offset)
+            self.assertEqual(orig.tzname(None), oname)
+            for pickler, unpickler, proto in pickle_choices:
+                green = pickler.dumps(orig, proto)
+                derived = unpickler.loads(green)
+                self.assertIsInstance(derived, tzinfo)
+                self.assertIs(type(derived), otype)
+                self.assertEqual(derived.utcoffset(None), offset)
+                self.assertEqual(derived.tzname(None), oname)
+
+class TestTimeZone(unittest.TestCase):
+
+    def setUp(self):
+        self.ACDT = timezone(timedelta(hours=9.5), 'ACDT')
+        self.EST = timezone(-timedelta(hours=5), 'EST')
+        self.DT = datetime(2010, 1, 1)
+
+    def test_str(self):
+        for tz in [self.ACDT, self.EST, timezone.utc,
+                   timezone.min, timezone.max]:
+            self.assertEqual(str(tz), tz.tzname(None))
+
+    def test_repr(self):
+        import datetime
+        for tz in [self.ACDT, self.EST, timezone.utc,
+                   timezone.min, timezone.max]:
+            # test round-trip
+            tzrep = repr(tz)
+            self.assertEqual(tz, eval(tzrep))
+
+
+    def test_class_members(self):
+        limit = timedelta(hours=23, minutes=59)
+        self.assertEqual(timezone.utc.utcoffset(None), ZERO)
+        self.assertEqual(timezone.min.utcoffset(None), -limit)
+        self.assertEqual(timezone.max.utcoffset(None), limit)
+
+
+    def test_constructor(self):
+        self.assertEqual(timezone.utc, timezone(timedelta(0)))
+        # invalid offsets
+        for invalid in [timedelta(microseconds=1), timedelta(1, 1),
+                        timedelta(seconds=1), timedelta(1), -timedelta(1)]:
+            self.assertRaises(ValueError, timezone, invalid)
+            self.assertRaises(ValueError, timezone, -invalid)
+
+        with self.assertRaises(TypeError): timezone(None)
+        with self.assertRaises(TypeError): timezone(42)
+        with self.assertRaises(TypeError): timezone(ZERO, None)
+        with self.assertRaises(TypeError): timezone(ZERO, 42)
+        with self.assertRaises(TypeError): timezone(ZERO, 'ABC', 'extra')
+
+    def test_inheritance(self):
+        self.assertIsInstance(timezone.utc, tzinfo)
+        self.assertIsInstance(self.EST, tzinfo)
+
+    def test_utcoffset(self):
+        dummy = self.DT
+        for h in [0, 1.5, 12]:
+            offset = h * HOUR
+            self.assertEqual(offset, timezone(offset).utcoffset(dummy))
+            self.assertEqual(-offset, timezone(-offset).utcoffset(dummy))
+
+        with self.assertRaises(TypeError): self.EST.utcoffset('')
+        with self.assertRaises(TypeError): self.EST.utcoffset(5)
+
+
+    def test_dst(self):
+        self.assertEqual(None, timezone.utc.dst(self.DT))
+
+        with self.assertRaises(TypeError): self.EST.dst('')
+        with self.assertRaises(TypeError): self.EST.dst(5)
+
+    def test_tzname(self):
+        self.assertEqual('UTC+00:00', timezone(ZERO).tzname(None))
+        self.assertEqual('UTC-05:00', timezone(-5 * HOUR).tzname(None))
+        self.assertEqual('UTC+09:30', timezone(9.5 * HOUR).tzname(None))
+        self.assertEqual('UTC-00:01', timezone(timedelta(minutes=-1)).tzname(None))
+        self.assertEqual('XYZ', timezone(-5 * HOUR, 'XYZ').tzname(None))
+
+        with self.assertRaises(TypeError): self.EST.tzname('')
+        with self.assertRaises(TypeError): self.EST.tzname(5)
+
+    def test_fromutc(self):
+        with self.assertRaises(ValueError):
+            timezone.utc.fromutc(self.DT)
+        with self.assertRaises(TypeError):
+            timezone.utc.fromutc('not datetime')
+        for tz in [self.EST, self.ACDT, Eastern]:
+            utctime = self.DT.replace(tzinfo=tz)
+            local = tz.fromutc(utctime)
+            self.assertEqual(local - utctime, tz.utcoffset(local))
+            self.assertEqual(local,
+                             self.DT.replace(tzinfo=timezone.utc))
+
+    def test_comparison(self):
+        self.assertNotEqual(timezone(ZERO), timezone(HOUR))
+        self.assertEqual(timezone(HOUR), timezone(HOUR))
+        self.assertEqual(timezone(-5 * HOUR), timezone(-5 * HOUR, 'EST'))
+        with self.assertRaises(TypeError): timezone(ZERO) < timezone(ZERO)
+        self.assertIn(timezone(ZERO), {timezone(ZERO)})
+
+    def test_aware_datetime(self):
+        # test that timezone instances can be used by datetime
+        t = datetime(1, 1, 1)
+        for tz in [timezone.min, timezone.max, timezone.utc]:
+            self.assertEqual(tz.tzname(t),
+                             t.replace(tzinfo=tz).tzname())
+            self.assertEqual(tz.utcoffset(t),
+                             t.replace(tzinfo=tz).utcoffset())
+            self.assertEqual(tz.dst(t),
+                             t.replace(tzinfo=tz).dst())
 
 #############################################################################
 # Base clase for testing a particular aspect of timedelta, time, date and
@@ -206,6 +319,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         c = td(0, 0, 1000) # One millisecond
         eq(a+b+c, td(7, 60, 1000))
         eq(a-b, td(6, 24*3600 - 60))
+        eq(b.__rsub__(a), td(6, 24*3600 - 60))
         eq(-a, td(-7))
         eq(+a, td(7))
         eq(-b, td(-1, 24*3600 - 60))
@@ -283,6 +397,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         self.assertRaises(ZeroDivisionError, lambda: a // zero)
         self.assertRaises(ZeroDivisionError, lambda: a / zero)
         self.assertRaises(ZeroDivisionError, lambda: a / 0.0)
+        self.assertRaises(TypeError, lambda: a / '')
 
     @requires_IEEE_754
     def test_disallowed_special(self):
@@ -408,10 +523,20 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
                    microseconds=999999)),
            "999999999 days, 23:59:59.999999")
 
+    def test_repr(self):
+        name = 'datetime.' + self.theclass.__name__
+        self.assertEqual(repr(self.theclass(1)),
+                         "%s(1)" % name)
+        self.assertEqual(repr(self.theclass(10, 2)),
+                         "%s(10, 2)" % name)
+        self.assertEqual(repr(self.theclass(-10, 2, 400000)),
+                         "%s(-10, 2, 400000)" % name)
+
     def test_roundtrip(self):
         for td in (timedelta(days=999999999, hours=23, minutes=59,
                              seconds=59, microseconds=999999),
                    timedelta(days=-999999999),
+                   timedelta(days=-999999999, seconds=1),
                    timedelta(days=1, seconds=2, microseconds=3)):
 
             # Verify td -> string -> td identity.
@@ -765,6 +890,7 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
     def test_computations(self):
         a = self.theclass(2002, 1, 31)
         b = self.theclass(1956, 1, 31)
+        c = self.theclass(2001,2,1)
 
         diff = a-b
         self.assertEqual(diff.days, 46*365 + len(range(1956, 2002, 4)))
@@ -790,6 +916,7 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
         self.assertEqual(a - (a + day), -day)
         self.assertEqual(a - (a - week), week)
         self.assertEqual(a - (a - day), day)
+        self.assertEqual(c - (c - day), day)
 
         # Add/sub ints or floats should be illegal
         for i in 1, 1.0:
@@ -1005,8 +1132,13 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
             self.assertEqual(b.__format__(fmt), 'B')
 
     def test_resolution_info(self):
-        self.assertIsInstance(self.theclass.min, self.theclass)
-        self.assertIsInstance(self.theclass.max, self.theclass)
+        # XXX: Should min and max respect subclassing?
+        if issubclass(self.theclass, datetime):
+            expected_class = datetime
+        else:
+            expected_class = date
+        self.assertIsInstance(self.theclass.min, expected_class)
+        self.assertIsInstance(self.theclass.max, expected_class)
         self.assertIsInstance(self.theclass.resolution, timedelta)
         self.assertTrue(self.theclass.max > self.theclass.min)
 
@@ -1226,6 +1358,10 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
         for month_byte in b'9', b'\0', b'\r', b'\xff':
             self.assertRaises(TypeError, self.theclass,
                                          base[:2] + month_byte + base[3:])
+        # Good bytes, but bad tzinfo:
+        self.assertRaises(TypeError, self.theclass,
+                          bytes([1] * len(base)), 'EST')
+
         for ord_byte in range(1, 13):
             # This shouldn't blow up because of the month byte alone.  If
             # the implementation changes to do more-careful checking, it may
@@ -1587,8 +1723,8 @@ class TestDateTime(TestDate):
     def test_microsecond_rounding(self):
         # Test whether fromtimestamp "rounds up" floats that are less
         # than one microsecond smaller than an integer.
-        self.assertEquals(self.theclass.fromtimestamp(0.9999999),
-                          self.theclass.fromtimestamp(1))
+        self.assertEqual(self.theclass.fromtimestamp(0.9999999),
+                         self.theclass.fromtimestamp(1))
 
     def test_insane_fromtimestamp(self):
         # It's possible that some platform maps time_t to double,
@@ -1616,7 +1752,7 @@ class TestDateTime(TestDate):
     @unittest.skipIf(sys.platform == "win32", "Windows doesn't accept negative timestamps")
     def test_negative_float_utcfromtimestamp(self):
         d = self.theclass.utcfromtimestamp(-1.05)
-        self.assertEquals(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
+        self.assertEqual(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
 
     def test_utcnow(self):
         import time
@@ -1637,10 +1773,42 @@ class TestDateTime(TestDate):
 
         string = '2004-12-01 13:02:47.197'
         format = '%Y-%m-%d %H:%M:%S.%f'
-        result, frac = _strptime._strptime(string, format)
-        expected = self.theclass(*(result[0:6]+(frac,)))
+        expected = _strptime._strptime_datetime(self.theclass, string, format)
         got = self.theclass.strptime(string, format)
         self.assertEqual(expected, got)
+        self.assertIs(type(expected), self.theclass)
+        self.assertIs(type(got), self.theclass)
+
+        strptime = self.theclass.strptime
+        self.assertEqual(strptime("+0002", "%z").utcoffset(), 2 * MINUTE)
+        self.assertEqual(strptime("-0002", "%z").utcoffset(), -2 * MINUTE)
+        # Only local timezone and UTC are supported
+        for tzseconds, tzname in ((0, 'UTC'), (0, 'GMT'),
+                                 (-_time.timezone, _time.tzname[0])):
+            if tzseconds < 0:
+                sign = '-'
+                seconds = -tzseconds
+            else:
+                sign ='+'
+                seconds = tzseconds
+            hours, minutes = divmod(seconds//60, 60)
+            dtstr = "{}{:02d}{:02d} {}".format(sign, hours, minutes, tzname)
+            dt = strptime(dtstr, "%z %Z")
+            self.assertEqual(dt.utcoffset(), timedelta(seconds=tzseconds))
+            self.assertEqual(dt.tzname(), tzname)
+        # Can produce inconsistent datetime
+        dtstr, fmt = "+1234 UTC", "%z %Z"
+        dt = strptime(dtstr, fmt)
+        self.assertEqual(dt.utcoffset(), 12 * HOUR + 34 * MINUTE)
+        self.assertEqual(dt.tzname(), 'UTC')
+        # yet will roundtrip
+        self.assertEqual(dt.strftime(fmt), dtstr)
+
+        # Produce naive datetime if no %z is provided
+        self.assertEqual(strptime("UTC", "%Z").tzinfo, None)
+
+        with self.assertRaises(ValueError): strptime("-2400", "%z")
+        with self.assertRaises(ValueError): strptime("-000", "%z")
 
     def test_more_timetuple(self):
         # This tests fields beyond those tested by the TestDate.test_timetuple.
@@ -1695,6 +1863,8 @@ class TestDateTime(TestDate):
         self.assertRaises(TypeError, combine, t, d) # args reversed
         self.assertRaises(TypeError, combine, d, t, 1) # too many args
         self.assertRaises(TypeError, combine, "date", "time") # wrong types
+        self.assertRaises(TypeError, combine, d, "time") # wrong type
+        self.assertRaises(TypeError, combine, "date", t) # wrong type
 
     def test_replace(self):
         cls = self.theclass
@@ -1737,6 +1907,8 @@ class TestDateTime(TestDate):
             def dst(self, dt): return timedelta(0)
         bog = Bogus()
         self.assertRaises(ValueError, dt.astimezone, bog)   # naive
+        self.assertRaises(ValueError,
+                          dt.replace(tzinfo=bog).astimezone, f)
 
         class AlsoBogus(tzinfo):
             def utcoffset(self, dt): return timedelta(0)
@@ -1770,6 +1942,12 @@ class TestDateTime(TestDate):
         self.assertEqual(dt1.toordinal(), dt2.toordinal())
         self.assertEqual(dt2.newmeth(-7), dt1.year + dt1.month +
                                           dt1.second - 7)
+
+class TestSubclassDateTime(TestDateTime):
+    theclass = SubclassDatetime
+    # Override tests not designed for subclass
+    def test_roundtrip(self):
+        pass
 
 class SubclassTime(time):
     sub_var = 1
@@ -2707,6 +2885,11 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
         maxdiff = max - min
         self.assertEqual(maxdiff, self.theclass.max - self.theclass.min +
                                   timedelta(minutes=2*1439))
+        # Different tzinfo, but the same offset
+        tza = timezone(HOUR, 'A')
+        tzb = timezone(HOUR, 'B')
+        delta = min.replace(tzinfo=tza) - max.replace(tzinfo=tzb)
+        self.assertEqual(delta, self.theclass.min - self.theclass.max)
 
     def test_tzinfo_now(self):
         meth = self.theclass.now
@@ -2729,20 +2912,21 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
         # We don't know which time zone we're in, and don't have a tzinfo
         # class to represent it, so seeing whether a tz argument actually
         # does a conversion is tricky.
-        weirdtz = FixedOffset(timedelta(hours=15, minutes=58), "weirdtz", 0)
         utc = FixedOffset(0, "utc", 0)
-        for dummy in range(3):
-            now = datetime.now(weirdtz)
-            self.assertTrue(now.tzinfo is weirdtz)
-            utcnow = datetime.utcnow().replace(tzinfo=utc)
-            now2 = utcnow.astimezone(weirdtz)
-            if abs(now - now2) < timedelta(seconds=30):
-                break
-            # Else the code is broken, or more than 30 seconds passed between
-            # calls; assuming the latter, just try again.
-        else:
-            # Three strikes and we're out.
-            self.fail("utcnow(), now(tz), or astimezone() may be broken")
+        for weirdtz in [FixedOffset(timedelta(hours=15, minutes=58), "weirdtz", 0),
+                        timezone(timedelta(hours=15, minutes=58), "weirdtz"),]:
+            for dummy in range(3):
+                now = datetime.now(weirdtz)
+                self.assertTrue(now.tzinfo is weirdtz)
+                utcnow = datetime.utcnow().replace(tzinfo=utc)
+                now2 = utcnow.astimezone(weirdtz)
+                if abs(now - now2) < timedelta(seconds=30):
+                    break
+                # Else the code is broken, or more than 30 seconds passed between
+                # calls; assuming the latter, just try again.
+            else:
+                # Three strikes and we're out.
+                self.fail("utcnow(), now(tz), or astimezone() may be broken")
 
     def test_tzinfo_fromtimestamp(self):
         import time
@@ -2839,7 +3023,7 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
 
     def test_utctimetuple(self):
         class DST(tzinfo):
-            def __init__(self, dstvalue):
+            def __init__(self, dstvalue=0):
                 if isinstance(dstvalue, int):
                     dstvalue = timedelta(minutes=dstvalue)
                 self.dstvalue = dstvalue
@@ -2858,8 +3042,6 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
             def utcoffset(self, dt):
                 return self.uofs
 
-        # Ensure tm_isdst is 0 regardless of what dst() says:  DST is never
-        # in effect for a UTC time.
         for dstvalue in -33, 33, 0, None:
             d = cls(1, 2, 3, 10, 20, 30, 40, tzinfo=UOFS(-53, dstvalue))
             t = d.utctimetuple()
@@ -2872,34 +3054,52 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
             self.assertEqual(d.weekday(), t.tm_wday)
             self.assertEqual(d.toordinal() - date(1, 1, 1).toordinal() + 1,
                              t.tm_yday)
+            # Ensure tm_isdst is 0 regardless of what dst() says: DST
+            # is never in effect for a UTC time.
             self.assertEqual(0, t.tm_isdst)
 
-        # At the edges, UTC adjustment can normalize into years out-of-range
-        # for a datetime object.  Ensure that a correct timetuple is
-        # created anyway.
+        # For naive datetime, utctimetuple == timetuple except for isdst
+        d = cls(1, 2, 3, 10, 20, 30, 40)
+        t = d.utctimetuple()
+        self.assertEqual(t[:-1], d.timetuple()[:-1])
+        self.assertEqual(0, t.tm_isdst)
+        # Same if utcoffset is None
+        class NOFS(DST):
+            def utcoffset(self, dt):
+                return None
+        d = cls(1, 2, 3, 10, 20, 30, 40, tzinfo=NOFS())
+        t = d.utctimetuple()
+        self.assertEqual(t[:-1], d.timetuple()[:-1])
+        self.assertEqual(0, t.tm_isdst)
+        # Check that bad tzinfo is detected
+        class BOFS(DST):
+            def utcoffset(self, dt):
+                return "EST"
+        d = cls(1, 2, 3, 10, 20, 30, 40, tzinfo=BOFS())
+        self.assertRaises(TypeError, d.utctimetuple)
+
+        # Check that utctimetuple() is the same as
+        # astimezone(utc).timetuple()
+        d = cls(2010, 11, 13, 14, 15, 16, 171819)
+        for tz in [timezone.min, timezone.utc, timezone.max]:
+            dtz = d.replace(tzinfo=tz)
+            self.assertEqual(dtz.utctimetuple()[:-1],
+                             dtz.astimezone(timezone.utc).timetuple()[:-1])
+        # At the edges, UTC adjustment can produce years out-of-range
+        # for a datetime object.  Ensure that an OverflowError is
+        # raised.
         tiny = cls(MINYEAR, 1, 1, 0, 0, 37, tzinfo=UOFS(1439))
         # That goes back 1 minute less than a full day.
-        t = tiny.utctimetuple()
-        self.assertEqual(t.tm_year, MINYEAR-1)
-        self.assertEqual(t.tm_mon, 12)
-        self.assertEqual(t.tm_mday, 31)
-        self.assertEqual(t.tm_hour, 0)
-        self.assertEqual(t.tm_min, 1)
-        self.assertEqual(t.tm_sec, 37)
-        self.assertEqual(t.tm_yday, 366)    # "year 0" is a leap year
-        self.assertEqual(t.tm_isdst, 0)
+        self.assertRaises(OverflowError, tiny.utctimetuple)
 
         huge = cls(MAXYEAR, 12, 31, 23, 59, 37, 999999, tzinfo=UOFS(-1439))
         # That goes forward 1 minute less than a full day.
-        t = huge.utctimetuple()
-        self.assertEqual(t.tm_year, MAXYEAR+1)
-        self.assertEqual(t.tm_mon, 1)
-        self.assertEqual(t.tm_mday, 1)
-        self.assertEqual(t.tm_hour, 23)
-        self.assertEqual(t.tm_min, 58)
-        self.assertEqual(t.tm_sec, 37)
-        self.assertEqual(t.tm_yday, 1)
-        self.assertEqual(t.tm_isdst, 0)
+        self.assertRaises(OverflowError, huge.utctimetuple)
+        # More overflow cases
+        tiny = cls.min.replace(tzinfo=timezone(MINUTE))
+        self.assertRaises(OverflowError, tiny.utctimetuple)
+        huge = cls.max.replace(tzinfo=timezone(-MINUTE))
+        self.assertRaises(OverflowError, huge.utctimetuple)
 
     def test_tzinfo_isoformat(self):
         zero = FixedOffset(0, "+00:00")
@@ -3101,6 +3301,7 @@ def first_sunday_on_or_after(dt):
     return dt
 
 ZERO = timedelta(0)
+MINUTE = timedelta(minutes=1)
 HOUR = timedelta(hours=1)
 DAY = timedelta(days=1)
 # In the US, DST starts at 2am (standard time) on the first Sunday in April.
@@ -3343,6 +3544,19 @@ class TestTimezoneConversions(unittest.TestCase):
         class notok(ok):
             def dst(self, dt): return None
         self.assertRaises(ValueError, now.astimezone, notok())
+
+        # Sometimes blow up. In the following, tzinfo.dst()
+        # implementation may return None or not None depending on
+        # whether DST is assumed to be in effect.  In this situation,
+        # a ValueError should be raised by astimezone().
+        class tricky_notok(ok):
+            def dst(self, dt):
+                if dt.year == 2000:
+                    return None
+                else:
+                    return 10*HOUR
+        dt = self.theclass(2001, 1, 1).replace(tzinfo=utc_real)
+        self.assertRaises(ValueError, dt.astimezone, tricky_notok())
 
     def test_fromutc(self):
         self.assertRaises(TypeError, Eastern.fromutc)   # not enough args

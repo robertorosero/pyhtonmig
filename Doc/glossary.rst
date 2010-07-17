@@ -57,11 +57,17 @@ Glossary
 
    bytecode
       Python source code is compiled into bytecode, the internal representation
-      of a Python program in the interpreter.  The bytecode is also cached in
-      ``.pyc`` and ``.pyo`` files so that executing the same file is faster the
-      second time (recompilation from source to bytecode can be avoided).  This
-      "intermediate language" is said to run on a :term:`virtual machine`
-      that executes the machine code corresponding to each bytecode.
+      of a Python program in the CPython interpreter.  The bytecode is also
+      cached in ``.pyc`` and ``.pyo`` files so that executing the same file is
+      faster the second time (recompilation from source to bytecode can be
+      avoided).  This "intermediate language" is said to run on a
+      :term:`virtual machine` that executes the machine code corresponding to
+      each bytecode. Do note that bytecodes are not expected to work between
+      different Python virtual machines, nor to be stable between Python
+      releases.
+
+      A list of bytecode instructions can be found in the documentation for
+      :ref:`the dis module <bytecodes>`.
 
    class
       A template for creating user-defined objects. Class definitions
@@ -148,15 +154,15 @@ Glossary
       object.
 
    duck-typing
-      A pythonic programming style which determines an object's type by inspection
-      of its method or attribute signature rather than by explicit relationship
-      to some type object ("If it looks like a duck and quacks like a duck, it
+      A programming style which does not look at an object's type to determine
+      if it has the right interface; instead, the method or attribute is simply
+      called or used ("If it looks like a duck and quacks like a duck, it
       must be a duck.")  By emphasizing interfaces rather than specific types,
       well-designed code improves its flexibility by allowing polymorphic
       substitution.  Duck-typing avoids tests using :func:`type` or
-      :func:`isinstance`. (Note, however, that duck-typing can be complemented
-      with abstract base classes.) Instead, it typically employs :func:`hasattr`
-      tests or :term:`EAFP` programming.
+      :func:`isinstance`.  (Note, however, that duck-typing can be complemented
+      with :term:`abstract base class`\ es.)  Instead, it typically employs
+      :func:`hasattr` tests or :term:`EAFP` programming.
 
    EAFP
       Easier to ask for forgiveness than permission.  This common Python coding
@@ -424,10 +430,11 @@ Glossary
    nested scope
       The ability to refer to a variable in an enclosing definition.  For
       instance, a function defined inside another function can refer to
-      variables in the outer function.  Note that nested scopes work only for
-      reference and not for assignment which will always write to the innermost
-      scope.  In contrast, local variables both read and write in the innermost
-      scope.  Likewise, global variables read and write to the global namespace.
+      variables in the outer function.  Note that nested scopes by default work
+      only for reference and not for assignment.  Local variables both read and
+      write in the innermost scope.  Likewise, global variables read and write
+      to the global namespace.  The :keyword:`nonlocal` allows writing to outer
+      scopes.
 
    new-style class
       Old name for the flavor of classes now used for all class objects.  In

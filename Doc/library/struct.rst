@@ -20,9 +20,9 @@ structs and the intended conversion to/from Python values.
    order to maintain proper alignment for the C types involved; similarly,
    alignment is taken into account when unpacking.  This behavior is chosen so
    that the bytes of a packed struct correspond exactly to the layout in memory
-   of the corresponding C struct.  To omit pad bytes, use `standard` size and
-   alignment instead of `native` size and alignment: see :ref:`struct-alignment`
-   for details.
+   of the corresponding C struct.  To handle platform-independent data formats
+   or omit implicit pad bytes, use `standard` size and alignment instead of
+   `native` size and alignment: see :ref:`struct-alignment` for details.
 
 Functions and Exceptions
 ------------------------
@@ -95,19 +95,19 @@ Alternatively, the first character of the format string can be used to indicate
 the byte order, size and alignment of the packed data, according to the
 following table:
 
-+-----------+------------------------+--------------------+
-| Character | Byte order             | Size and alignment |
-+===========+========================+====================+
-| ``@``     | native                 | native             |
-+-----------+------------------------+--------------------+
-| ``=``     | native                 | standard           |
-+-----------+------------------------+--------------------+
-| ``<``     | little-endian          | standard           |
-+-----------+------------------------+--------------------+
-| ``>``     | big-endian             | standard           |
-+-----------+------------------------+--------------------+
-| ``!``     | network (= big-endian) | standard           |
-+-----------+------------------------+--------------------+
++-----------+------------------------+----------+-----------+
+| Character | Byte order             | Size     | Alignment |
++===========+========================+==========+===========+
+| ``@``     | native                 | native   | native    |
++-----------+------------------------+----------+-----------+
+| ``=``     | native                 | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``<``     | little-endian          | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``>``     | big-endian             | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``!``     | network (= big-endian) | standard | none      |
++-----------+------------------------+----------+-----------+
 
 If the first character is not one of these, ``'@'`` is assumed.
 
@@ -120,11 +120,8 @@ endianness of your system.
 Native size and alignment are determined using the C compiler's
 ``sizeof`` expression.  This is always combined with native byte order.
 
-Standard size and alignment are as follows: no alignment is required for any
-type (so you have to use pad bytes); :ctype:`short` is 2 bytes; :ctype:`int` and
-:ctype:`long` are 4 bytes; :ctype:`long long` (:ctype:`__int64` on Windows) is 8
-bytes; :ctype:`float` and :ctype:`double` are 32-bit and 64-bit IEEE floating
-point numbers, respectively. :ctype:`_Bool` is 1 byte.
+Standard size depends only on the format character;  see the table in
+the :ref:`format-characters` section.
 
 Note the difference between ``'@'`` and ``'='``: both use native byte order, but
 the size and alignment of the latter is standardized.
@@ -134,12 +131,6 @@ whether network byte order is big-endian or little-endian.
 
 There is no way to indicate non-native byte order (force byte-swapping); use the
 appropriate choice of ``'<'`` or ``'>'``.
-
-The ``'P'`` format character is only available for the native byte ordering
-(selected as the default or with the ``'@'`` byte order character). The byte
-order character ``'='`` chooses to use little- or big-endian ordering based on
-the host system. The struct module does not interpret this as native ordering,
-so the ``'P'`` format is not available.
 
 Notes:
 
@@ -160,7 +151,11 @@ Format Characters
 ^^^^^^^^^^^^^^^^^
 
 Format characters have the following meaning; the conversion between C and
-Python values should be obvious given their types:
+Python values should be obvious given their types.  The 'Standard size' column
+refers to the size of the packed value in bytes when using standard size; that
+is, when the format string starts with one of ``'<'``, ``'>'``, ``'!'`` or
+``'='``.  When using native size, the size of the packed value is
+platform-dependent.
 
 +--------+-------------------------+--------------------+----------------+------------+
 | Format | C Type                  | Python type        | Standard size  | Notes      |
@@ -192,15 +187,15 @@ Python values should be obvious given their types:
 | ``Q``  | :ctype:`unsigned long   | integer            | 8              | \(3), \(4) |
 |        | long`                   |                    |                |            |
 +--------+-------------------------+--------------------+----------------+------------+
-| ``f``  | :ctype:`float`          | float              | 4              |            |
+| ``f``  | :ctype:`float`          | float              | 4              | \(5)       |
 +--------+-------------------------+--------------------+----------------+------------+
-| ``d``  | :ctype:`double`         | float              | 8              |            |
+| ``d``  | :ctype:`double`         | float              | 8              | \(5)       |
 +--------+-------------------------+--------------------+----------------+------------+
 | ``s``  | :ctype:`char[]`         | bytes              |                | \(1)       |
 +--------+-------------------------+--------------------+----------------+------------+
 | ``p``  | :ctype:`char[]`         | bytes              |                | \(1)       |
 +--------+-------------------------+--------------------+----------------+------------+
-| ``P``  | :ctype:`void \*`        | integer            |                |            |
+| ``P``  | :ctype:`void \*`        | integer            |                | \(6)       |
 +--------+-------------------------+--------------------+----------------+------------+
 
 Notes:
@@ -228,6 +223,18 @@ Notes:
    .. versionchanged:: 3.2
       Use of the :meth:`__index__` method for non-integers is new in 3.2.
 
+(5)
+   For the ``'f'`` and ``'d'`` conversion codes, the packed representation uses
+   the IEEE 754 binary32 (for ``'f'``) or binary64 (for ``'d'``) format,
+   regardless of the floating-point format used by the platform.
+
+(6)
+   The ``'P'`` format character is only available for the native byte ordering
+   (selected as the default or with the ``'@'`` byte order character). The byte
+   order character ``'='`` chooses to use little- or big-endian ordering based
+   on the host system. The struct module does not interpret this as native
+   ordering, so the ``'P'`` format is not available.
+
 
 A format character may be preceded by an integral repeat count.  For example,
 the format string ``'4h'`` means exactly the same as ``'hhhh'``.
@@ -252,18 +259,16 @@ then :exc:`struct.error` is raised.
    In 3.0, some of the integer formats wrapped out-of-range values and
    raised :exc:`DeprecationWarning` instead of :exc:`struct.error`.
 
-
 The ``'p'`` format character encodes a "Pascal string", meaning a short
-variable-length string stored in a fixed number of bytes. The count is the total
-number of bytes stored.  The first byte stored is the length of the string, or
-255, whichever is smaller.  The bytes of the string follow.  If the string
-passed in to :func:`pack` is too long (longer than the count minus 1), only the
-leading count-1 bytes of the string are stored.  If the string is shorter than
-count-1, it is padded with null bytes so that exactly count bytes in all are
-used.  Note that for :func:`unpack`, the ``'p'`` format character consumes count
-bytes, but that the string returned can never contain more than 255 bytes.
-
-
+variable-length string stored in a *fixed number of bytes*, given by the count.
+The first byte stored is the length of the string, or 255, whichever is
+smaller.  The bytes of the string follow.  If the string passed in to
+:func:`pack` is too long (longer than the count minus 1), only the leading
+``count-1`` bytes of the string are stored.  If the string is shorter than
+``count-1``, it is padded with null bytes so that exactly count bytes in all
+are used.  Note that for :func:`unpack`, the ``'p'`` format character consumes
+``count`` bytes, but that the string returned can never contain more than 255
+bytes.
 
 For the ``'?'`` format character, the return value is either :const:`True` or
 :const:`False`. When packing, the truth value of the argument object is used.

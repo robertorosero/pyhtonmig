@@ -50,7 +50,7 @@ def literal_eval(node_or_string):
     if isinstance(node_or_string, Expression):
         node_or_string = node_or_string.body
     def _convert(node):
-        if isinstance(node, Str):
+        if isinstance(node, (Str, Bytes)):
             return node.s
         elif isinstance(node, Num):
             return node.n
@@ -58,6 +58,8 @@ def literal_eval(node_or_string):
             return tuple(map(_convert, node.elts))
         elif isinstance(node, List):
             return list(map(_convert, node.elts))
+        elif isinstance(node, Set):
+            return set(map(_convert, node.elts))
         elif isinstance(node, Dict):
             return dict((_convert(k), _convert(v)) for k, v
                         in zip(node.keys, node.values))

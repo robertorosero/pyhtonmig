@@ -149,6 +149,13 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
     def test_class_defs(self):
         self.check_suite("class foo():pass")
         self.check_suite("class foo(object):pass")
+        self.check_suite("@class_decorator\n"
+                         "class foo():pass")
+        self.check_suite("@class_decorator(arg)\n"
+                         "class foo():pass")
+        self.check_suite("@decorator1\n"
+                         "@decorator2\n"
+                         "class foo():pass")
 
     def test_import_from_statement(self):
         self.check_suite("from sys.path import *")
@@ -181,6 +188,18 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_suite("import sys, math")
         self.check_suite("import sys as system, math")
         self.check_suite("import sys, math as my_math")
+
+    def test_relative_imports(self):
+        self.check_suite("from . import name")
+        self.check_suite("from .. import name")
+        # check all the way up to '....', since '...' is tokenized
+        # differently from '.' (it's an ellipsis token).
+        self.check_suite("from ... import name")
+        self.check_suite("from .... import name")
+        self.check_suite("from .pkg import name")
+        self.check_suite("from ..pkg import name")
+        self.check_suite("from ...pkg import name")
+        self.check_suite("from ....pkg import name")
 
     def test_pep263(self):
         self.check_suite("# -*- coding: iso-8859-1 -*-\n"
@@ -457,6 +476,20 @@ class IllegalSyntaxTestCase(unittest.TestCase):
                 (0, ''))
         self.check_bad_tree(tree, "malformed global ast")
 
+    def test_missing_import_source(self):
+        # from import fred
+        tree = \
+            (257,
+             (268,
+              (269,
+               (270,
+                (282,
+                 (284, (1, 'from'), (1, 'import'),
+                  (287, (285, (1, 'fred')))))),
+               (4, ''))),
+             (4, ''), (0, ''))
+        self.check_bad_tree(tree, "from import fred")
+
 
 class CompileTestCase(unittest.TestCase):
 
@@ -484,8 +517,18 @@ class CompileTestCase(unittest.TestCase):
         st = parser.suite('a = "\\u1"')
         self.assertRaises(SyntaxError, parser.compilest, st)
 
+    def test_issue_9011(self):
+        # Issue 9011: compilation of an unary minus expression changed
+        # the meaning of the ST, so that a second compilation produced
+        # incorrect results.
+        st = parser.expr('-3')
+        code1 = parser.compilest(st)
+        self.assertEqual(eval(code1), -3)
+        code2 = parser.compilest(st)
+        self.assertEqual(eval(code2), -3)
+
 class ParserStackLimitTestCase(unittest.TestCase):
-    """try to push the parser to/over it's limits.
+    """try to push the parser to/over its limits.
     see http://bugs.python.org/issue1881 for a discussion
     """
     def _nested_expression(self, level):

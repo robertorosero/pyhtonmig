@@ -34,7 +34,9 @@ class FinderTests(abc.FinderTests):
     """
 
     def import_(self, root, module):
-        finder = _bootstrap._PyPycFileFinder(root)
+        finder = _bootstrap._FileFinder(root,
+                                        _bootstrap._SourceFinderDetails(),
+                                        _bootstrap._SourcelessFinderDetails())
         return finder.find_module(module)
 
     def run_test(self, test, create=None, *, compile_=None, unlink=None):
@@ -113,10 +115,9 @@ class FinderTests(abc.FinderTests):
 
     # [package over modules]
     def test_package_over_module(self):
-        # XXX This is not a blackbox test!
         name = '_temp'
         loader = self.run_test(name, {'{0}.__init__'.format(name), name})
-        self.assertTrue('__init__' in loader._base_path)
+        self.assertTrue('__init__' in loader.get_filename(name))
 
 
     def test_failure(self):
@@ -130,6 +131,17 @@ class FinderTests(abc.FinderTests):
             warnings.simplefilter("error", ImportWarning)
             with self.assertRaises(ImportWarning):
                 self.run_test('pkg', {'pkg.__init__'}, unlink={'pkg.__init__'})
+
+    def test_empty_string_for_dir(self):
+        # The empty string from sys.path means to search in the cwd.
+        finder = _bootstrap._FileFinder('', _bootstrap._SourceFinderDetails())
+        with open('mod.py', 'w') as file:
+            file.write("# test file for importlib")
+        try:
+            loader = finder.find_module('mod')
+            self.assertTrue(hasattr(loader, 'load_module'))
+        finally:
+            os.unlink('mod.py')
 
 
 def test_main():

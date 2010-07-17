@@ -146,8 +146,8 @@ commands.
 Creating dumb built distributions
 =================================
 
-**\*\*** Need to document absolute vs. prefix-relative packages here, but first
-I have to implement it! **\*\***
+.. XXX Need to document absolute vs. prefix-relative packages here, but first
+       I have to implement it!
 
 
 .. _creating-rpms:
@@ -322,7 +322,7 @@ the :option:`--no-target-compile` and/or the :option:`--no-target-optimize`
 option.
 
 By default the installer will display the cool "Python Powered" logo when it is
-run, but you can also supply your own 152x161 bitmap which must be a Windows
+run, but you can also supply your own 152x261 bitmap which must be a Windows
 :file:`.bmp` file with the :option:`--bitmap` option.
 
 The installer will also display a large title on the desktop background window
@@ -375,7 +375,7 @@ check or modify your existing install.)
 The Postinstallation script
 ---------------------------
 
-Starting with Python 2.3, a postinstallation script can be specified which the
+Starting with Python 2.3, a postinstallation script can be specified with the
 :option:`--install-script` option.  The basename of the script must be
 specified, and the script filename must also be listed in the scripts argument
 to the setup function.

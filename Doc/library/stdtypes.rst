@@ -452,7 +452,7 @@ Additional Methods on Integer Types
     Equivalent to::
 
         def bit_length(self):
-            s = bin(x)          # binary representation:  bin(-37) --> '-0b100101'
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
             s = s.lstrip('-0b') # remove leading zeros and minus sign
             return len(s)       # len('100101') --> 6
 
@@ -966,7 +966,8 @@ functions based on regular expressions.
 
 .. method:: str.capitalize()
 
-   Return a copy of the string with only its first character capitalized.
+   Return a copy of the string with its first character capitalized and the
+   rest lowercased.
 
 
 .. method:: str.center(width[, fillchar])
@@ -1328,6 +1329,10 @@ functions based on regular expressions.
 
    You can use :meth:`str.maketrans` to create a translation map from
    character-to-character mappings in different formats.
+
+   You can use the :func:`~string.maketrans` helper function in the :mod:`string`
+   module to create a translation table. For string objects, set the *table*
+   argument to ``None`` for translations that only delete characters:
 
    .. note::
 
@@ -2259,10 +2264,19 @@ is generally interpreted as simple bytes.
    buffer protocol.  Builtin objects that support the buffer protocol include
    :class:`bytes` and :class:`bytearray`.
 
-   ``len(view)`` returns the total number of bytes in the memoryview, *view*.
+   A :class:`memoryview` has the notion of an *element*, which is the
+   atomic memory unit handled by the originating object *obj*.  For many
+   simple types such as :class:`bytes` and :class:`bytearray`, an element
+   is a single byte, but other types such as :class:`array.array` may have
+   bigger elements.
+
+   ``len(view)`` returns the total number of elements in the memoryview,
+   *view*.  The :class:`~memoryview.itemsize` attribute will give you the
+   number of bytes in a single element.
 
    A :class:`memoryview` supports slicing to expose its data.  Taking a single
-   index will return a single byte.  Full slicing will result in a subview::
+   index will return a single element as a :class:`bytes` object.  Full
+   slicing will result in a subview::
 
       >>> v = memoryview(b'abcefg')
       >>> v[1]
@@ -2273,11 +2287,8 @@ is generally interpreted as simple bytes.
       <memory at 0x77ab28>
       >>> bytes(v[1:4])
       b'bce'
-      >>> v[3:-1]
-      <memory at 0x744f18>
-      >>> bytes(v[4:-1])
 
-   If the object the memory view is over supports changing its data, the
+   If the object the memoryview is over supports changing its data, the
    memoryview supports slice assignment::
 
       >>> data = bytearray(b'abcefg')
@@ -2295,14 +2306,20 @@ is generally interpreted as simple bytes.
       File "<stdin>", line 1, in <module>
       ValueError: cannot modify size of memoryview object
 
-   Notice how the size of the memoryview object can not be changed.
-
+   Notice how the size of the memoryview object cannot be changed.
 
    :class:`memoryview` has two methods:
 
    .. method:: tobytes()
 
-      Return the data in the buffer as a bytestring.
+      Return the data in the buffer as a bytestring.  This is equivalent to
+      calling the :class:`bytes` constructor on the memoryview. ::
+
+         >>> m = memoryview(b"abc")
+         >>> m.tobytes()
+         b'abc'
+         >>> bytes(m)
+         b'abc'
 
    .. method:: tolist()
 
@@ -2320,7 +2337,15 @@ is generally interpreted as simple bytes.
 
    .. attribute:: itemsize
 
-      The size in bytes of each element of the memoryview.
+      The size in bytes of each element of the memoryview::
+
+         >>> m = memoryview(array.array('H', [1,2,3]))
+         >>> m.itemsize
+         2
+         >>> m[0]
+         b'\x01\x00'
+         >>> len(m[0]) == m.itemsize
+         True
 
    .. attribute:: shape
 

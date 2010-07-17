@@ -69,6 +69,7 @@ extern double copysign(double, double);
 
 static const double pi = 3.141592653589793238462643383279502884197;
 static const double sqrtpi = 1.772453850905516027298167483341145182798;
+static const double logpi = 1.144729885849400174143427351353058711647;
 
 static double
 sinpi(double x)
@@ -356,20 +357,15 @@ m_lgamma(double x)
     if (absx < 1e-20)
         return -log(absx);
 
-    /* Lanczos' formula */
-    if (x > 0.0) {
-        /* we could save a fraction of a ulp in accuracy by having a
-           second set of numerator coefficients for lanczos_sum that
-           absorbed the exp(-lanczos_g) term, and throwing out the
-           lanczos_g subtraction below; it's probably not worth it. */
-        r = log(lanczos_sum(x)) - lanczos_g +
-            (x-0.5)*(log(x+lanczos_g-0.5)-1);
-    }
-    else {
-        r = log(pi) - log(fabs(sinpi(absx))) - log(absx) -
-            (log(lanczos_sum(absx)) - lanczos_g +
-             (absx-0.5)*(log(absx+lanczos_g-0.5)-1));
-    }
+    /* Lanczos' formula.  We could save a fraction of a ulp in accuracy by
+       having a second set of numerator coefficients for lanczos_sum that
+       absorbed the exp(-lanczos_g) term, and throwing out the lanczos_g
+       subtraction below; it's probably not worth it. */
+    r = log(lanczos_sum(absx)) - lanczos_g;
+    r += (absx - 0.5) * (log(absx + lanczos_g - 0.5) - 1);
+    if (x < 0.0)
+        /* Use reflection formula to get value for negative x. */
+        r = logpi - log(fabs(sinpi(absx))) - log(absx) - r;
     if (Py_IS_INFINITY(r))
         errno = ERANGE;
     return r;
@@ -841,19 +837,17 @@ FUNC1(atanh, m_atanh, 0,
 
 static PyObject * math_ceil(PyObject *self, PyObject *number) {
     static PyObject *ceil_str = NULL;
-    PyObject *method;
+    PyObject *method, *result;
 
-    if (ceil_str == NULL) {
-        ceil_str = PyUnicode_InternFromString("__ceil__");
-        if (ceil_str == NULL)
+    method = _PyObject_LookupSpecial(number, "__ceil__", &ceil_str);
+    if (method == NULL) {
+        if (PyErr_Occurred())
             return NULL;
-    }
-
-    method = _PyType_Lookup(Py_TYPE(number), ceil_str);
-    if (method == NULL)
         return math_1_to_int(number, ceil, 0);
-    else
-        return PyObject_CallFunction(method, "O", number);
+    }
+    result = PyObject_CallFunctionObjArgs(method, NULL);
+    Py_DECREF(method);
+    return result;
 }
 
 PyDoc_STRVAR(math_ceil_doc,
@@ -881,19 +875,17 @@ FUNC1(fabs, fabs, 0,
 
 static PyObject * math_floor(PyObject *self, PyObject *number) {
     static PyObject *floor_str = NULL;
-    PyObject *method;
+    PyObject *method, *result;
 
-    if (floor_str == NULL) {
-        floor_str = PyUnicode_InternFromString("__floor__");
-        if (floor_str == NULL)
+    method = _PyObject_LookupSpecial(number, "__floor__", &floor_str);
+    if (method == NULL) {
+        if (PyErr_Occurred())
             return NULL;
-    }
-
-    method = _PyType_Lookup(Py_TYPE(number), floor_str);
-    if (method == NULL)
         return math_1_to_int(number, floor, 0);
-    else
-        return PyObject_CallFunction(method, "O", number);
+    }
+    result = PyObject_CallFunctionObjArgs(method, NULL);
+    Py_DECREF(method);
+    return result;
 }
 
 PyDoc_STRVAR(math_floor_doc,
@@ -904,7 +896,7 @@ FUNC1A(gamma, m_tgamma,
       "gamma(x)\n\nGamma function at x.")
 FUNC1A(lgamma, m_lgamma,
       "lgamma(x)\n\nNatural logarithm of absolute value of Gamma function at x.")
-FUNC1(log1p, m_log1p, 1,
+FUNC1(log1p, m_log1p, 0,
       "log1p(x)\n\nReturn the natural logarithm of 1+x (base e).\n"
       "The result is computed in a way which is accurate for x near zero.")
 FUNC1(sin, sin, 0,
@@ -989,17 +981,17 @@ _fsum_realloc(double **p_ptr, Py_ssize_t  n,
    def msum(iterable):
        partials = []  # sorted, non-overlapping partial sums
        for x in iterable:
-       i = 0
-       for y in partials:
-           if abs(x) < abs(y):
-           x, y = y, x
-           hi = x + y
-           lo = y - (hi - x)
-           if lo:
-           partials[i] = lo
-           i += 1
-           x = hi
-       partials[i:] = [x]
+           i = 0
+           for y in partials:
+               if abs(x) < abs(y):
+                   x, y = y, x
+               hi = x + y
+               lo = y - (hi - x)
+               if lo:
+                   partials[i] = lo
+                   i += 1
+               x = hi
+           partials[i:] = [x]
        return sum_exact(partials)
 
    Rounded x+y stored in hi with the roundoff stored in lo.  Together hi+lo
@@ -1178,7 +1170,7 @@ count_set_bits(unsigned long n)
  * http://www.luschny.de/math/factorial/binarysplitfact.html
  *
  * Faster algorithms exist, but they're more complicated and depend on
- * a fast prime factoriazation algorithm.
+ * a fast prime factorization algorithm.
  *
  * Notes on the algorithm
  * ----------------------
@@ -1420,27 +1412,24 @@ static PyObject *
 math_trunc(PyObject *self, PyObject *number)
 {
     static PyObject *trunc_str = NULL;
-    PyObject *trunc;
+    PyObject *trunc, *result;
 
     if (Py_TYPE(number)->tp_dict == NULL) {
         if (PyType_Ready(Py_TYPE(number)) < 0)
             return NULL;
     }
 
-    if (trunc_str == NULL) {
-        trunc_str = PyUnicode_InternFromString("__trunc__");
-        if (trunc_str == NULL)
-            return NULL;
-    }
-
-    trunc = _PyType_Lookup(Py_TYPE(number), trunc_str);
+    trunc = _PyObject_LookupSpecial(number, "__trunc__", &trunc_str);
     if (trunc == NULL) {
-        PyErr_Format(PyExc_TypeError,
-                     "type %.100s doesn't define __trunc__ method",
-                     Py_TYPE(number)->tp_name);
+        if (!PyErr_Occurred())
+            PyErr_Format(PyExc_TypeError,
+                         "type %.100s doesn't define __trunc__ method",
+                         Py_TYPE(number)->tp_name);
         return NULL;
     }
-    return PyObject_CallFunctionObjArgs(trunc, number, NULL);
+    result = PyObject_CallFunctionObjArgs(trunc, NULL);
+    Py_DECREF(trunc);
+    return result;
 }
 
 PyDoc_STRVAR(math_trunc_doc,
@@ -1829,6 +1818,19 @@ PyDoc_STRVAR(math_radians_doc,
 Convert angle x from degrees to radians.");
 
 static PyObject *
+math_isfinite(PyObject *self, PyObject *arg)
+{
+    double x = PyFloat_AsDouble(arg);
+    if (x == -1.0 && PyErr_Occurred())
+        return NULL;
+    return PyBool_FromLong((long)Py_IS_FINITE(x));
+}
+
+PyDoc_STRVAR(math_isfinite_doc,
+"isfinite(x) -> bool\n\n\
+Return True if x is neither an infinity nor a NaN, and False otherwise.");
+
+static PyObject *
 math_isnan(PyObject *self, PyObject *arg)
 {
     double x = PyFloat_AsDouble(arg);
@@ -1839,7 +1841,7 @@ math_isnan(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_isnan_doc,
 "isnan(x) -> bool\n\n\
-Check if float x is not a number (NaN).");
+Return True if x is a NaN (not a number), and False otherwise.");
 
 static PyObject *
 math_isinf(PyObject *self, PyObject *arg)
@@ -1852,7 +1854,7 @@ math_isinf(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_isinf_doc,
 "isinf(x) -> bool\n\n\
-Check if float x is infinite (positive or negative).");
+Return True if x is a positive or negative infinity, and False otherwise.");
 
 static PyMethodDef math_methods[] = {
     {"acos",            math_acos,      METH_O,         math_acos_doc},
@@ -1879,6 +1881,7 @@ static PyMethodDef math_methods[] = {
     {"fsum",            math_fsum,      METH_O,         math_fsum_doc},
     {"gamma",           math_gamma,     METH_O,         math_gamma_doc},
     {"hypot",           math_hypot,     METH_VARARGS,   math_hypot_doc},
+    {"isfinite",        math_isfinite,  METH_O,         math_isfinite_doc},
     {"isinf",           math_isinf,     METH_O,         math_isinf_doc},
     {"isnan",           math_isnan,     METH_O,         math_isnan_doc},
     {"ldexp",           math_ldexp,     METH_VARARGS,   math_ldexp_doc},

@@ -47,8 +47,8 @@ class StructTest(unittest.TestCase):
 
         self.assertRaises(struct.error, struct.pack, 'iii', 3)
         self.assertRaises(struct.error, struct.pack, 'i', 3, 3, 3)
-        self.assertRaises(struct.error, struct.pack, 'i', 'foo')
-        self.assertRaises(struct.error, struct.pack, 'P', 'foo')
+        self.assertRaises((TypeError, struct.error), struct.pack, 'i', 'foo')
+        self.assertRaises((TypeError, struct.error), struct.pack, 'P', 'foo')
         self.assertRaises(struct.error, struct.unpack, 'd', b'flap')
         s = struct.pack('ii', 1, 2)
         self.assertRaises(struct.error, struct.unpack, 'iii', s)
@@ -234,7 +234,8 @@ class StructTest(unittest.TestCase):
                                                                  b'\x01' + got)
                 else:
                     # x is out of range -- verify pack realizes that.
-                    self.assertRaises(struct.error, pack, format, x)
+                    self.assertRaises((OverflowError, ValueError, struct.error),
+                                      pack, format, x)
 
             def run(self):
                 from random import randrange
@@ -438,12 +439,15 @@ class StructTest(unittest.TestCase):
 
         # Go beyond boundaries.
         small_buf = array.array('b', b' '*10)
-        self.assertRaises(struct.error, s.pack_into, small_buf, 0, test_string)
-        self.assertRaises(struct.error, s.pack_into, small_buf, 2, test_string)
+        self.assertRaises((ValueError, struct.error), s.pack_into, small_buf, 0,
+                          test_string)
+        self.assertRaises((ValueError, struct.error), s.pack_into, small_buf, 2,
+                          test_string)
 
         # Test bogus offset (issue 3694)
         sb = small_buf
-        self.assertRaises(TypeError, struct.pack_into, b'', sb, None)
+        self.assertRaises((TypeError, struct.error), struct.pack_into, b'', sb,
+                          None)
 
     def test_pack_into_fn(self):
         test_string = b'Reykjavik rocks, eow!'
@@ -463,8 +467,10 @@ class StructTest(unittest.TestCase):
 
         # Go beyond boundaries.
         small_buf = array.array('b', b' '*10)
-        self.assertRaises(struct.error, pack_into, small_buf, 0, test_string)
-        self.assertRaises(struct.error, pack_into, small_buf, 2, test_string)
+        self.assertRaises((ValueError, struct.error), pack_into, small_buf, 0,
+                          test_string)
+        self.assertRaises((ValueError, struct.error), pack_into, small_buf, 2,
+                          test_string)
 
     def test_unpack_with_buffer(self):
         # SF bug 1563759: struct.unpack doens't support buffer protocol objects
@@ -475,6 +481,9 @@ class StructTest(unittest.TestCase):
             self.assertEqual(value, 0x12345678)
 
     def test_bool(self):
+        class ExplodingBool(object):
+            def __bool__(self):
+                raise IOError
         for prefix in tuple("<>!=")+('',):
             false = (), [], [], '', 0
             true = [1], 'test', 5, -1, 0xffffffff+1, 0xffffffff/2
@@ -503,8 +512,16 @@ class StructTest(unittest.TestCase):
                 self.assertFalse(prefix, msg='encoded bool is not one byte: %r'
                                              %packed)
 
-            for c in [b'\x01', b'\x7f', b'\xff', b'\x0f', b'\xf0']:
-                self.assertTrue(struct.unpack('>?', c)[0])
+            try:
+                struct.pack(prefix + '?', ExplodingBool())
+            except IOError:
+                pass
+            else:
+                self.fail("Expected IOError: struct.pack(%r, "
+                          "ExplodingBool())" % (prefix + '?'))
+
+        for c in [b'\x01', b'\x7f', b'\xff', b'\x0f', b'\xf0']:
+            self.assertTrue(struct.unpack('>?', c)[0])
 
     def test_count_overflow(self):
         hugecount = '{}b'.format(sys.maxsize+1)

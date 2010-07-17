@@ -1188,7 +1188,8 @@ class FileHandler(BaseHandler):
     # Use local file or FTP depending on form of URL
     def file_open(self, req):
         url = req.selector
-        if url[:2] == '//' and url[2:3] != '/':
+        if url[:2] == '//' and url[2:3] != '/' and (req.host and
+                req.host != 'localhost'):
             req.type = 'ftp'
             return self.parent.open(req)
         else:
@@ -1866,7 +1867,8 @@ class FancyURLopener(URLopener):
         else:
             return self.http_error_default(url, fp, errcode, errmsg, headers)
 
-    def http_error_401(self, url, fp, errcode, errmsg, headers, data=None):
+    def http_error_401(self, url, fp, errcode, errmsg, headers, data=None,
+            retry=False):
         """Error 401 -- authentication required.
         This function supports Basic authentication only."""
         if not 'www-authenticate' in headers:
@@ -1882,13 +1884,17 @@ class FancyURLopener(URLopener):
         if scheme.lower() != 'basic':
             URLopener.http_error_default(self, url, fp,
                                          errcode, errmsg, headers)
+        if not retry:
+            URLopener.http_error_default(self, url, fp, errcode, errmsg,
+                    headers)
         name = 'retry_' + self.type + '_basic_auth'
         if data is None:
             return getattr(self,name)(url, realm)
         else:
             return getattr(self,name)(url, realm, data)
 
-    def http_error_407(self, url, fp, errcode, errmsg, headers, data=None):
+    def http_error_407(self, url, fp, errcode, errmsg, headers, data=None,
+            retry=False):
         """Error 407 -- proxy authentication required.
         This function supports Basic authentication only."""
         if not 'proxy-authenticate' in headers:
@@ -1904,6 +1910,9 @@ class FancyURLopener(URLopener):
         if scheme.lower() != 'basic':
             URLopener.http_error_default(self, url, fp,
                                          errcode, errmsg, headers)
+        if not retry:
+            URLopener.http_error_default(self, url, fp, errcode, errmsg,
+                    headers)
         name = 'retry_proxy_' + self.type + '_basic_auth'
         if data is None:
             return getattr(self,name)(url, realm)
@@ -2196,8 +2205,13 @@ if sys.platform == 'darwin':
                         continue
 
                 base = ip2num(m.group(1))
-                mask = int(m.group(2)[1:])
-                mask = 32 - mask
+                mask = m.group(2)
+                if mask is None:
+                    mask = 8 * (m.group(1).count('.') + 1)
+
+                else:
+                    mask = int(mask[1:])
+                    mask = 32 - mask
 
                 if (hostIP >> mask) == (base >> mask):
                     return True
@@ -2265,6 +2279,7 @@ elif os.name == 'nt':
                         proxies['http'] = proxyServer
                     else:
                         proxies['http'] = 'http://%s' % proxyServer
+                        proxies['https'] = 'https://%s' % proxyServer
                         proxies['ftp'] = 'ftp://%s' % proxyServer
             internetSettings.Close()
         except (WindowsError, ValueError, TypeError):

@@ -123,8 +123,8 @@ _PYTHON_BUILD = is_python_build()
 
 if _PYTHON_BUILD:
     for scheme in ('posix_prefix', 'posix_home'):
-        _INSTALL_SCHEMES[scheme]['include'] = '{projectbase}/Include'
-        _INSTALL_SCHEMES[scheme]['platinclude'] = '{srcdir}'
+        _INSTALL_SCHEMES[scheme]['include'] = '{srcdir}/Include'
+        _INSTALL_SCHEMES[scheme]['platinclude'] = '{projectbase}/.'
 
 def _subst_vars(s, local_vars):
     try:
@@ -258,6 +258,13 @@ def _parse_makefile(filename, vars=None):
             else:
                 # bogus variable reference; just drop it since we can't deal
                 variables.remove(name)
+
+    # Add in CFLAGS, LDFLAGS, and CPPFLAGS, which are named with a
+    # prefix in the Makefile.
+    for var in ('CFLAGS', 'LDFLAGS', 'CPPFLAGS'):
+        makefile_value = done.get('PY_' + var)
+        if makefile_value is not None:
+            done[var] = makefile_value
 
     # save the results in the global dictionary
     vars.update(done)
@@ -432,6 +439,8 @@ def get_config_vars(*args):
 
         if 'srcdir' not in _CONFIG_VARS:
             _CONFIG_VARS['srcdir'] = _PROJECT_BASE
+        else:
+            _CONFIG_VARS['srcdir'] = realpath(_CONFIG_VARS['srcdir'])
 
 
         # Convert srcdir into an absolute path if it appears necessary.
@@ -651,8 +660,7 @@ def get_platform():
                 cflags = get_config_vars().get('CFLAGS')
 
                 archs = re.findall('-arch\s+(\S+)', cflags)
-                archs.sort()
-                archs = tuple(archs)
+                archs = tuple(sorted(set(archs)))
 
                 if len(archs) == 1:
                     machine = archs[0]
