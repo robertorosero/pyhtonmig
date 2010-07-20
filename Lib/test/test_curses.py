@@ -218,7 +218,7 @@ def module_funcs(stdscr):
         (availmask, oldmask) = curses.mousemask(curses.BUTTON1_PRESSED)
         # availmask indicates that mouse stuff not available.
         if availmask != 0:
-            curses.mouseinterval(10)
+            curses.mouseinterval(10000)
             # just verify these don't cause errors
             m = curses.getmouse()
             curses.ungetmouse(*m)
