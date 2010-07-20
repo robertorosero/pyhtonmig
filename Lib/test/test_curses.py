@@ -16,14 +16,13 @@ import sys, tempfile, os
 # option.  If not available, nothing after this line will be executed.
 
 import unittest
-from test.support import requires, import_module, verbose
+from test.support import requires, import_module
 requires('curses')
 
 # If either of these don't exist, skip the tests.
 curses = import_module('curses')
 curses.panel = import_module('curses.panel')
 
-HAVE_ISSUE_8433 = False
 
 # XXX: if newterm was supported we could use it instead of initscr and not exit
 term = os.environ.get('TERM')
@@ -216,17 +215,13 @@ def module_funcs(stdscr):
         curses.has_key(13)
 
     if hasattr(curses, 'getmouse'):
-        global HAVE_ISSUE_8433
         (availmask, oldmask) = curses.mousemask(curses.BUTTON1_PRESSED)
         # availmask indicates that mouse stuff not available.
         if availmask != 0:
             curses.mouseinterval(10)
             # just verify these don't cause errors
-            try:
-                m = curses.getmouse()
-                curses.ungetmouse(*m)
-            except curses.error:
-                HAVE_ISSUE_8433 = True
+            m = curses.getmouse()
+            curses.ungetmouse(*m)
 
     if hasattr(curses, 'is_term_resized'):
         curses.is_term_resized(*stdscr.getmaxyx())
@@ -292,8 +287,6 @@ def test_main():
     finally:
         curses.endwin()
     unit_tests()
-    if HAVE_ISSUE_8433:
-        raise unittest.SkipTest("test getmouse() skipped: see issue 8433")
 
 if __name__ == '__main__':
     curses.wrapper(main)
