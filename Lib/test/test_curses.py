@@ -279,8 +279,6 @@ def main(stdscr):
         test_issue6243(stdscr)
     finally:
         curses.resetty()
-        if HAVE_ISSUE_8433:
-            raise unittest.SkipTest("test getmouse() skipped: see issue 8433")
 
 def test_main():
     if not sys.stdout.isatty():
@@ -294,6 +292,8 @@ def test_main():
     finally:
         curses.endwin()
     unit_tests()
+    if HAVE_ISSUE_8433:
+        raise unittest.SkipTest("test getmouse() skipped: see issue 8433")
 
 if __name__ == '__main__':
     curses.wrapper(main)
