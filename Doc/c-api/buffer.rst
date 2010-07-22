@@ -249,10 +249,10 @@ Buffer related functions
       +------------------------------+---------------------------------------------------+
 
 
-.. cfunction:: void PyBuffer_Release(PyObject *obj, Py_buffer *view)
+.. cfunction:: void PyBuffer_Release(Py_buffer *view)
 
-   Release the buffer *view* over *obj*.  This should be called when the buffer
-   is no longer being used as it may free memory from it.
+   Release the buffer *view*.  This should be called when the buffer is no
+   longer being used as it may free memory from it.
 
 
 .. cfunction:: Py_ssize_t PyBuffer_SizeFromFormat(const char *)
@@ -289,7 +289,7 @@ Buffer related functions
    given shape with the given number of bytes per element.
 
 
-.. cfunction:: int PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len, int readonly, int infoflags)
+.. cfunction:: int PyBuffer_FillInfo(Py_buffer *view, PyObject *obj, void *buf, Py_ssize_t len, int readonly, int infoflags)
 
    Fill in a buffer-info structure, *view*, correctly for an exporter that can
    only share a contiguous chunk of memory of "unsigned bytes" of the given

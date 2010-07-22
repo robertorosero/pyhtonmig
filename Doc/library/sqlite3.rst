@@ -90,7 +90,7 @@ This example uses the iterator form::
 
 .. seealso::
 
-   http://www.pysqlite.org
+   http://code.google.com/p/pysqlite/
       The pysqlite web page -- sqlite3 is developed externally under the name
       "pysqlite".
 
@@ -136,7 +136,7 @@ Module functions and constants
    first blank for the column name: the column name would simply be "x".
 
 
-.. function:: connect(database[, timeout, isolation_level, detect_types, factory])
+.. function:: connect(database[, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements])
 
    Opens a connection to the SQLite database file *database*. You can use
    ``":memory:"`` to open a database connection to a database that resides in RAM
@@ -187,7 +187,7 @@ Module functions and constants
    Registers a callable to convert the custom Python type *type* into one of
    SQLite's supported types. The callable *callable* accepts as single parameter
    the Python value, and must return a value of the following types: int,
-   float, str, bytes (UTF-8 encoded) or buffer.
+   float, str or bytes.
 
 
 .. function:: complete_statement(sql)
@@ -227,6 +227,13 @@ Connection Objects
    one of "DEFERRED", "IMMEDIATE" or "EXCLUSIVE". See section
    :ref:`sqlite3-controlling-transactions` for a more detailed explanation.
 
+.. attribute:: Connection.in_transaction
+
+   .. versionadded:: 3.2
+
+   :const:`True` if a transaction is active (there are uncommitted changes),
+   :const:`False` otherwise.  Read-only attribute.
+
 
 .. method:: Connection.cursor([cursorClass])
 
@@ -256,22 +263,23 @@ Connection Objects
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`execute` method with
-   the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`execute<Cursor.execute>` method with the parameters given.
 
 
 .. method:: Connection.executemany(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executemany` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executemany<Cursor.executemany>` method with the parameters given.
 
 
 .. method:: Connection.executescript(sql_script)
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executescript` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executescript<Cursor.executescript>` method with the parameters
+   given.
 
 
 .. method:: Connection.create_function(name, num_params, func)
@@ -282,7 +290,7 @@ Connection Objects
    as the SQL function.
 
    The function can return any of the types supported by SQLite: bytes, str, int,
-   float, buffer and None.
+   float and None.
 
    Example:
 
@@ -298,7 +306,7 @@ Connection Objects
    final result of the aggregate.
 
    The ``finalize`` method can return any of the types supported by SQLite:
-   bytes, str, int, float, buffer and None.
+   bytes, str, int, float and None.
 
    Example:
 
@@ -363,6 +371,25 @@ Connection Objects
    If you want to clear any previously installed progress handler, call the
    method with :const:`None` for *handler*.
 
+
+.. method:: Connection.enable_load_extension(enabled)
+
+   .. versionadded:: 3.2
+
+   This routine allows/disallows the SQLite engine to load SQLite extensions
+   from shared libraries.  SQLite extensions can define new functions,
+   aggregates or whole new virtual table implementations. One well-known
+   extension is the fulltext-search extension distributed with SQLite.
+
+   .. literalinclude:: ../includes/sqlite3/load_extension.py
+
+.. method:: Connection.load_extension(path)
+
+   .. versionadded:: 3.2
+
+   This routine loads a SQLite extension from a shared library. You have to
+   enable extension loading with ``enable_load_extension`` before you can use
+   this routine.
 
 .. attribute:: Connection.row_factory
 
@@ -433,7 +460,7 @@ Connection Objects
 Cursor Objects
 --------------
 
-.. class:: Cursor
+A :class:`Cursor` instance has the following attributes and methods:
 
    A SQLite database cursor has the following attributes and methods:
 
@@ -633,11 +660,9 @@ The following Python types can thus be sent to SQLite without any problem:
 +-------------------------------+-------------+
 | :class:`float`                | ``REAL``    |
 +-------------------------------+-------------+
-| :class:`bytes` (UTF8-encoded) | ``TEXT``    |
-+-------------------------------+-------------+
 | :class:`str`                  | ``TEXT``    |
 +-------------------------------+-------------+
-| :class:`buffer`               | ``BLOB``    |
+| :class:`bytes`                | ``BLOB``    |
 +-------------------------------+-------------+
 
 
@@ -654,7 +679,7 @@ This is how SQLite types are converted to Python types by default:
 +-------------+---------------------------------------------+
 | ``TEXT``    | depends on text_factory, str by default     |
 +-------------+---------------------------------------------+
-| ``BLOB``    | buffer                                      |
+| ``BLOB``    | :class:`bytes`                              |
 +-------------+---------------------------------------------+
 
 The type system of the :mod:`sqlite3` module is extensible in two ways: you can
@@ -669,7 +694,7 @@ Using adapters to store additional Python types in SQLite databases
 As described before, SQLite supports only a limited set of types natively. To
 use other Python types with SQLite, you must **adapt** them to one of the
 sqlite3 module's supported types for SQLite: one of NoneType, int, float,
-str, bytes, buffer.
+str, bytes.
 
 The :mod:`sqlite3` module uses Python object adaptation, as described in
 :pep:`246` for this.  The protocol to use is :class:`PrepareProtocol`.
@@ -788,7 +813,8 @@ So if you are within a transaction and issue a command like ``CREATE TABLE
 before executing that command. There are two reasons for doing that. The first
 is that some of these commands don't work within transactions. The other reason
 is that sqlite3 needs to keep track of the transaction state (if a transaction
-is active or not).
+is active or not).  The current transaction state is exposed through the
+:attr:`Connection.in_transaction` attribute of the connection object.
 
 You can control which kind of ``BEGIN`` statements sqlite3 implicitly executes
 (or none at all) via the *isolation_level* parameter to the :func:`connect`

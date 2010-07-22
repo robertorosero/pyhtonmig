@@ -37,6 +37,7 @@ import os
 import time
 import marshal
 import re
+from functools import cmp_to_key
 
 __all__ = ["Stats"]
 
@@ -226,7 +227,7 @@ class Stats:
             stats_list.append((cc, nc, tt, ct) + func +
                               (func_std_string(func), func))
 
-        stats_list.sort(key=CmpToKey(TupleComp(sort_tuple).compare))
+        stats_list.sort(key=cmp_to_key(TupleComp(sort_tuple).compare))
 
         self.fcn_list = fcn_list = []
         for tuple in stats_list:
@@ -458,15 +459,6 @@ class TupleComp:
                 return direction
         return 0
 
-def CmpToKey(mycmp):
-    'Convert a cmp= function into a key= function'
-    class K(object):
-        def __init__(self, obj):
-            self.obj = obj
-        def __lt__(self, other):
-            return mycmp(self.obj, other.obj) == -1
-    return K
-
 
 #**************************************************************************
 # func_name is a triple (file:string, line:int, name:string)
@@ -636,7 +628,7 @@ if __name__ == '__main__':
 
         def do_sort(self, line):
             abbrevs = self.stats.get_sort_arg_defs()
-            if line and not filter(lambda x,a=abbrevs: x not in a,line.split()):
+            if line and all((x in abbrevs) for x in line.split()):
                 self.stats.sort_stats(*line.split())
             else:
                 print("Valid sort keys (unique prefixes are accepted):", file=self.stream)

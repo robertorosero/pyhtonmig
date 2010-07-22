@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #-------------------------------------------------------------------
 # tarfile.py
 #-------------------------------------------------------------------
@@ -50,17 +50,19 @@ import struct
 import copy
 import re
 
-if sys.platform == 'mac':
-    # This module needs work for MacOS9, especially in the area of pathname
-    # handling. In many places it is assumed a simple substitution of / by the
-    # local os.path.sep is good enough to convert pathnames, but this does not
-    # work with the mac rooted:path:name versus :nonrooted:path:name syntax
-    raise ImportError("tarfile does not work for platform==mac")
-
 try:
     import grp, pwd
 except ImportError:
     grp = pwd = None
+
+# os.symlink on Windows prior to 6.0 raises NotImplementedError
+symlink_exception = (AttributeError, NotImplementedError)
+try:
+    # WindowsError (1314) will be raised if the caller does not hold the
+    # SeCreateSymbolicLinkPrivilege privilege
+    symlink_exception += (WindowsError,)
+except NameError:
+    pass
 
 # from tarfile import *
 __all__ = ["TarFile", "TarInfo", "is_tarfile", "TarError"]
@@ -125,6 +127,9 @@ GNU_TYPES = (GNUTYPE_LONGNAME, GNUTYPE_LONGLINK,
 PAX_FIELDS = ("path", "linkpath", "size", "mtime",
               "uid", "gid", "uname", "gname")
 
+# Fields from a pax header that are affected by hdrcharset.
+PAX_NAME_FIELDS = {"path", "linkpath", "uname", "gname"}
+
 # Fields in a pax header that are numbers, all other fields
 # are treated as strings.
 PAX_NUMBER_FIELDS = {
@@ -163,9 +168,10 @@ TOEXEC  = 0o001           # execute/search by other
 #---------------------------------------------------------
 # initialization
 #---------------------------------------------------------
-ENCODING = sys.getfilesystemencoding()
-if ENCODING is None:
-    ENCODING = "ascii"
+if os.name in ("nt", "ce"):
+    ENCODING = "utf-8"
+else:
+    ENCODING = sys.getfilesystemencoding()
 
 #---------------------------------------------------------
 # Some useful functions
@@ -359,7 +365,7 @@ class _LowLevelFile:
         }[mode]
         if hasattr(os, "O_BINARY"):
             mode |= os.O_BINARY
-        self.fd = os.open(name, mode)
+        self.fd = os.open(name, mode, 0o666)
 
     def close(self):
         os.close(self.fd)
@@ -410,7 +416,7 @@ class _Stream:
             except ImportError:
                 raise CompressionError("zlib module is not available")
             self.zlib = zlib
-            self.crc = zlib.crc32("")
+            self.crc = zlib.crc32(b"")
             if mode == "r":
                 self._init_read_gz()
             else:
@@ -985,7 +991,7 @@ class TarInfo(object):
 
         return info
 
-    def tobuf(self, format=DEFAULT_FORMAT, encoding=ENCODING, errors="strict"):
+    def tobuf(self, format=DEFAULT_FORMAT, encoding=ENCODING, errors="surrogateescape"):
         """Return a tar header as a string of 512 byte blocks.
         """
         info = self.get_info()
@@ -995,7 +1001,7 @@ class TarInfo(object):
         elif format == GNU_FORMAT:
             return self.create_gnu_header(info, encoding, errors)
         elif format == PAX_FORMAT:
-            return self.create_pax_header(info)
+            return self.create_pax_header(info, encoding)
         else:
             raise ValueError("invalid format")
 
@@ -1026,7 +1032,7 @@ class TarInfo(object):
 
         return buf + self._create_header(info, GNU_FORMAT, encoding, errors)
 
-    def create_pax_header(self, info):
+    def create_pax_header(self, info, encoding):
         """Return the object as a ustar header block. If it cannot be
            represented this way, prepend a pax extended header sequence
            with supplement information.
@@ -1069,7 +1075,7 @@ class TarInfo(object):
 
         # Create a pax extended header if necessary.
         if pax_headers:
-            buf = self._create_pax_generic_header(pax_headers, XHDTYPE)
+            buf = self._create_pax_generic_header(pax_headers, XHDTYPE, encoding)
         else:
             buf = b""
 
@@ -1079,7 +1085,7 @@ class TarInfo(object):
     def create_pax_global_header(cls, pax_headers):
         """Return the object as a pax global header block sequence.
         """
-        return cls._create_pax_generic_header(pax_headers, XGLTYPE)
+        return cls._create_pax_generic_header(pax_headers, XGLTYPE, "utf8")
 
     def _posix_split_name(self, name):
         """Split a name longer than 100 chars into a prefix
@@ -1152,15 +1158,35 @@ class TarInfo(object):
                 cls._create_payload(name)
 
     @classmethod
-    def _create_pax_generic_header(cls, pax_headers, type):
-        """Return a POSIX.1-2001 extended or global header sequence
+    def _create_pax_generic_header(cls, pax_headers, type, encoding):
+        """Return a POSIX.1-2008 extended or global header sequence
            that contains a list of keyword, value pairs. The values
            must be strings.
         """
+        # Check if one of the fields contains surrogate characters and thereby
+        # forces hdrcharset=BINARY, see _proc_pax() for more information.
+        binary = False
+        for keyword, value in pax_headers.items():
+            try:
+                value.encode("utf8", "strict")
+            except UnicodeEncodeError:
+                binary = True
+                break
+
         records = b""
+        if binary:
+            # Put the hdrcharset field at the beginning of the header.
+            records += b"21 hdrcharset=BINARY\n"
+
         for keyword, value in pax_headers.items():
             keyword = keyword.encode("utf8")
-            value = value.encode("utf8")
+            if binary:
+                # Try to restore the original byte representation of `value'.
+                # Needless to say, that the encoding must match the string.
+                value = value.encode(encoding, "surrogateescape")
+            else:
+                value = value.encode("utf8")
+
             l = len(keyword) + len(value) + 3   # ' ' + '=' + '\n'
             n = p = 0
             while True:
@@ -1361,7 +1387,7 @@ class TarInfo(object):
 
     def _proc_pax(self, tarfile):
         """Process an extended or global header as described in
-           POSIX.1-2001.
+           POSIX.1-2008.
         """
         # Read the header information.
         buf = tarfile.fileobj.read(self._block(self.size))
@@ -1373,6 +1399,24 @@ class TarInfo(object):
             pax_headers = tarfile.pax_headers
         else:
             pax_headers = tarfile.pax_headers.copy()
+
+        # Check if the pax header contains a hdrcharset field. This tells us
+        # the encoding of the path, linkpath, uname and gname fields. Normally,
+        # these fields are UTF-8 encoded but since POSIX.1-2008 tar
+        # implementations are allowed to store them as raw binary strings if
+        # the translation to UTF-8 fails.
+        match = re.search(br"\d+ hdrcharset=([^\n]+)\n", buf)
+        if match is not None:
+            pax_headers["hdrcharset"] = match.group(1).decode("utf8")
+
+        # For the time being, we don't care about anything other than "BINARY".
+        # The only other value that is currently allowed by the standard is
+        # "ISO-IR 10646 2000 UTF-8" in other words UTF-8.
+        hdrcharset = pax_headers.get("hdrcharset")
+        if hdrcharset == "BINARY":
+            encoding = tarfile.encoding
+        else:
+            encoding = "utf8"
 
         # Parse pax header information. A record looks like that:
         # "%d %s=%s\n" % (length, keyword, value). length is the size
@@ -1389,8 +1433,21 @@ class TarInfo(object):
             length = int(length)
             value = buf[match.end(2) + 1:match.start(1) + length - 1]
 
-            keyword = keyword.decode("utf8")
-            value = value.decode("utf8")
+            # Normally, we could just use "utf8" as the encoding and "strict"
+            # as the error handler, but we better not take the risk. For
+            # example, GNU tar <= 1.23 is known to store filenames it cannot
+            # translate to UTF-8 as raw strings (unfortunately without a
+            # hdrcharset=BINARY header).
+            # We first try the strict standard encoding, and if that fails we
+            # fall back on the user's encoding and error handler.
+            keyword = self._decode_pax_field(keyword, "utf8", "utf8",
+                    tarfile.errors)
+            if keyword in PAX_NAME_FIELDS:
+                value = self._decode_pax_field(value, encoding, tarfile.encoding,
+                        tarfile.errors)
+            else:
+                value = self._decode_pax_field(value, "utf8", "utf8",
+                        tarfile.errors)
 
             pax_headers[keyword] = value
             pos += length
@@ -1438,6 +1495,14 @@ class TarInfo(object):
 
         self.pax_headers = pax_headers.copy()
 
+    def _decode_pax_field(self, value, encoding, fallback_encoding, fallback_errors):
+        """Decode a single field from a pax record.
+        """
+        try:
+            return value.decode(encoding, "strict")
+        except UnicodeDecodeError:
+            return value.decode(fallback_encoding, fallback_errors)
+
     def _block(self, count):
         """Round up a byte count by BLOCKSIZE and return it,
            e.g. _block(834) => 1024.
@@ -1481,7 +1546,7 @@ class TarFile(object):
     ignore_zeros = False        # If true, skips empty or invalid blocks and
                                 # continues processing.
 
-    errorlevel = 0              # If 0, fatal errors only appear in debug
+    errorlevel = 1              # If 0, fatal errors only appear in debug
                                 # messages (if debug >= 0). If > 0, errors
                                 # are passed to the caller as exceptions.
 
@@ -1497,7 +1562,7 @@ class TarFile(object):
 
     def __init__(self, name=None, mode="r", fileobj=None, format=None,
             tarinfo=None, dereference=None, ignore_zeros=None, encoding=None,
-            errors=None, pax_headers=None, debug=None, errorlevel=None):
+            errors="surrogateescape", pax_headers=None, debug=None, errorlevel=None):
         """Open an (uncompressed) tar archive `name'. `mode' is either 'r' to
            read from an existing archive, 'a' to append data to an existing
            file or 'w' to create a new file overwriting an existing one. `mode'
@@ -1538,13 +1603,7 @@ class TarFile(object):
             self.ignore_zeros = ignore_zeros
         if encoding is not None:
             self.encoding = encoding
-
-        if errors is not None:
-            self.errors = errors
-        elif mode == "r":
-            self.errors = "replace"
-        else:
-            self.errors = "strict"
+        self.errors = errors
 
         if pax_headers is not None and self.format == PAX_FORMAT:
             self.pax_headers = pax_headers
@@ -1871,7 +1930,7 @@ class TarFile(object):
         tarinfo.mode = stmd
         tarinfo.uid = statres.st_uid
         tarinfo.gid = statres.st_gid
-        if stat.S_ISREG(stmd):
+        if type == REGTYPE:
             tarinfo.size = statres.st_size
         else:
             tarinfo.size = 0
@@ -2114,8 +2173,7 @@ class TarFile(object):
                 raise StreamError("cannot extract (sym)link as file object")
             else:
                 # A (sym)link's file object is its target's file object.
-                return self.extractfile(self._getmember(tarinfo.linkname,
-                                                        tarinfo))
+                return self.extractfile(self._find_link_target(tarinfo))
         else:
             # If there's no data associated with the member (directory, chrdev,
             # blkdev, etc.), return None instead of a file object.
@@ -2225,26 +2283,27 @@ class TarFile(object):
           instead of a link.
         """
         try:
+            # For systems that support symbolic and hard links.
             if tarinfo.issym():
                 os.symlink(tarinfo.linkname, targetpath)
             else:
                 # See extract().
-                os.link(tarinfo._link_target, targetpath)
-        except AttributeError:
+                if os.path.exists(tarinfo._link_target):
+                    os.link(tarinfo._link_target, targetpath)
+                else:
+                    self._extract_mem
+        except symlink_exception:
             if tarinfo.issym():
-                linkpath = os.path.dirname(tarinfo.name) + "/" + \
-                                        tarinfo.linkname
+                linkpath = os.path.join(os.path.dirname(tarinfo.name),
+                                        tarinfo.linkname)
             else:
                 linkpath = tarinfo.linkname
-
+        else:
             try:
-                self._extract_member(self.getmember(linkpath), targetpath)
-            except (EnvironmentError, KeyError) as e:
-                linkpath = linkpath.replace("/", os.sep)
-                try:
-                    shutil.copy2(linkpath, targetpath)
-                except EnvironmentError as e:
-                    raise IOError("link could not be created")
+                self._extract_member(self._find_link_target(tarinfo),
+                                     targetpath)
+            except KeyError:
+                raise ExtractError("unable to resolve link inside archive")
 
     def chown(self, tarinfo, targetpath):
         """Set owner of targetpath according to tarinfo.
@@ -2343,21 +2402,28 @@ class TarFile(object):
     #--------------------------------------------------------------------------
     # Little helper methods:
 
-    def _getmember(self, name, tarinfo=None):
+    def _getmember(self, name, tarinfo=None, normalize=False):
         """Find an archive member by name from bottom to top.
            If tarinfo is given, it is used as the starting point.
         """
         # Ensure that all members have been loaded.
         members = self.getmembers()
 
-        if tarinfo is None:
-            end = len(members)
-        else:
-            end = members.index(tarinfo)
+        # Limit the member search list up to tarinfo.
+        if tarinfo is not None:
+            members = members[:members.index(tarinfo)]
 
-        for i in range(end - 1, -1, -1):
-            if name == members[i].name:
-                return members[i]
+        if normalize:
+            name = os.path.normpath(name)
+
+        for member in reversed(members):
+            if normalize:
+                member_name = os.path.normpath(member.name)
+            else:
+                member_name = member.name
+
+            if name == member_name:
+                return member
 
     def _load(self):
         """Read through the entire archive file and look for readable
@@ -2378,6 +2444,25 @@ class TarFile(object):
         if mode is not None and self.mode not in mode:
             raise IOError("bad operation for mode %r" % self.mode)
 
+    def _find_link_target(self, tarinfo):
+        """Find the target member of a symlink or hardlink member in the
+           archive.
+        """
+        if tarinfo.issym():
+            # Always search the entire archive.
+            linkname = os.path.dirname(tarinfo.name) + "/" + tarinfo.linkname
+            limit = None
+        else:
+            # Search the archive before the link, because a hard link is
+            # just a reference to an already archived file.
+            linkname = tarinfo.linkname
+            limit = tarinfo
+
+        member = self._getmember(linkname, tarinfo=limit, normalize=True)
+        if member is None:
+            raise KeyError("linkname %r not found" % linkname)
+        return member
+
     def __iter__(self):
         """Provide an iterator object.
         """
@@ -2391,6 +2476,20 @@ class TarFile(object):
         """
         if level <= self.debug:
             print(msg, file=sys.stderr)
+
+    def __enter__(self):
+        self._check()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if type is None:
+            self.close()
+        else:
+            # An exception occurred. We must not call close() because
+            # it would try to write end-of-archive blocks and padding.
+            if not self._extfileobj:
+                self.fileobj.close()
+            self.closed = True
 # class TarFile
 
 class TarIter:

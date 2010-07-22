@@ -66,13 +66,11 @@ class CommonTest(seq_tests.CommonTest):
         d.append(d)
         d.append(400)
         try:
-            fo = open(support.TESTFN, "w")
-            fo.write(str(d))
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), repr(d))
+            with open(support.TESTFN, "w") as fo:
+                fo.write(str(d))
+            with open(support.TESTFN, "r") as fo:
+                self.assertEqual(fo.read(), repr(d))
         finally:
-            fo.close()
             os.remove(support.TESTFN)
 
     def test_set_subscript(self):
@@ -540,6 +538,9 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test(range(10))
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
+        # test issue7788
+        a = self.type2test(range(10))
+        del a[9::1<<333]
 
     def test_constructor_exception_handling(self):
         # Bug #1242657

@@ -11,6 +11,9 @@ import os
 import sys
 import encodings
 import subprocess
+import sysconfig
+from copy import copy
+
 # Need to make sure to not import 'site' if someone specified ``-S`` at the
 # command-line.  Detect this by just making sure 'site' has not been imported
 # already.
@@ -38,6 +41,7 @@ class HelperFunctionsTests(unittest.TestCase):
         self.old_base = site.USER_BASE
         self.old_site = site.USER_SITE
         self.old_prefixes = site.PREFIXES
+        self.old_vars = copy(sysconfig._CONFIG_VARS)
 
     def tearDown(self):
         """Restore sys.path"""
@@ -45,6 +49,7 @@ class HelperFunctionsTests(unittest.TestCase):
         site.USER_BASE = self.old_base
         site.USER_SITE = self.old_site
         site.PREFIXES = self.old_prefixes
+        sysconfig._CONFIG_VARS = self.old_vars
 
     def test_makepath(self):
         # Test makepath() have an absolute path for its first return value
@@ -63,14 +68,14 @@ class HelperFunctionsTests(unittest.TestCase):
         dir_set = site._init_pathinfo()
         for entry in [site.makepath(path)[1] for path in sys.path
                         if path and os.path.isdir(path)]:
-            self.assertTrue(entry in dir_set,
-                            "%s from sys.path not found in set returned "
-                            "by _init_pathinfo(): %s" % (entry, dir_set))
+            self.assertIn(entry, dir_set,
+                          "%s from sys.path not found in set returned "
+                          "by _init_pathinfo(): %s" % (entry, dir_set))
 
     def pth_file_tests(self, pth_file):
         """Contain common code for testing results of reading a .pth file"""
-        self.assertTrue(pth_file.imported in sys.modules,
-                "%s not in sys.modules" % pth_file.imported)
+        self.assertIn(pth_file.imported, sys.modules,
+                      "%s not in sys.modules" % pth_file.imported)
         self.assertIn(site.makepath(pth_file.good_dir_path)[0], sys.path)
         self.assertFalse(os.path.exists(pth_file.bad_dir_path))
 
@@ -137,6 +142,9 @@ class HelperFunctionsTests(unittest.TestCase):
 
         # let's set PYTHONUSERBASE and see if it uses it
         site.USER_BASE = None
+        import sysconfig
+        sysconfig._CONFIG_VARS = None
+
         with EnvironmentVarGuard() as environ:
             environ['PYTHONUSERBASE'] = 'xoxo'
             self.assertTrue(site.getuserbase().startswith('xoxo'),
@@ -173,7 +181,8 @@ class HelperFunctionsTests(unittest.TestCase):
             self.assertEquals(dirs[1], wanted)
 
         # let's try the specific Apple location
-        if sys.platform == "darwin":
+        if (sys.platform == "darwin" and
+            sysconfig.get_config_var("PYTHONFRAMEWORK")):
             site.PREFIXES = ['Python.framework']
             dirs = site.getsitepackages()
             self.assertEqual(len(dirs), 4)
@@ -250,19 +259,43 @@ class ImportSideEffectTests(unittest.TestCase):
         """Restore sys.path"""
         sys.path[:] = self.sys_path
 
-    def test_abs__file__(self):
-        # Make sure all imported modules have their __file__ attribute
-        # as an absolute path.
-        # Handled by abs__file__()
-        site.abs__file__()
-        for module in (sys, os, builtins):
-            try:
-                self.assertTrue(os.path.isabs(module.__file__), repr(module))
-            except AttributeError:
-                continue
-        # We could try everything in sys.modules; however, when regrtest.py
-        # runs something like test_frozen before test_site, then we will
-        # be testing things loaded *after* test_site did path normalization
+    def test_abs_paths(self):
+        # Make sure all imported modules have their __file__ and __cached__
+        # attributes as absolute paths.  Arranging to put the Lib directory on
+        # PYTHONPATH would cause the os module to have a relative path for
+        # __file__ if abs_paths() does not get run.  sys and builtins (the
+        # only other modules imported before site.py runs) do not have
+        # __file__ or __cached__ because they are built-in.
+        parent = os.path.relpath(os.path.dirname(os.__file__))
+        env = os.environ.copy()
+        env['PYTHONPATH'] = parent
+        code = ('import os, sys',
+            # use ASCII to avoid locale issues with non-ASCII directories
+            'os_file = os.__file__.encode("ascii", "backslashreplace")',
+            r'sys.stdout.buffer.write(os_file + b"\n")',
+            'os_cached = os.__cached__.encode("ascii", "backslashreplace")',
+            r'sys.stdout.buffer.write(os_cached + b"\n")')
+        command = '\n'.join(code)
+        # First, prove that with -S (no 'import site'), the paths are
+        # relative.
+        proc = subprocess.Popen([sys.executable, '-S', '-c', command],
+                                env=env,
+                                stdout=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+
+        self.assertEqual(proc.returncode, 0)
+        os__file__, os__cached__ = stdout.splitlines()[:2]
+        self.assertFalse(os.path.isabs(os__file__))
+        self.assertFalse(os.path.isabs(os__cached__))
+        # Now, with 'import site', it works.
+        proc = subprocess.Popen([sys.executable, '-c', command],
+                                env=env,
+                                stdout=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertEqual(proc.returncode, 0)
+        os__file__, os__cached__ = stdout.splitlines()[:2]
+        self.assertTrue(os.path.isabs(os__file__))
+        self.assertTrue(os.path.isabs(os__cached__))
 
     def test_no_duplicate_paths(self):
         # No duplicate paths should exist in sys.path
@@ -270,7 +303,7 @@ class ImportSideEffectTests(unittest.TestCase):
         site.removeduppaths()
         seen_paths = set()
         for path in sys.path:
-            self.assertTrue(path not in seen_paths)
+            self.assertNotIn(path, seen_paths)
             seen_paths.add(path)
 
     def test_add_build_dir(self):

@@ -1,10 +1,11 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """Test script for the gzip module.
 """
 
 import unittest
 from test import support
 import os
+import io
 import struct
 gzip = support.import_module('gzip')
 
@@ -80,6 +81,16 @@ class TestGzip(unittest.TestCase):
         zgfile.close()
         self.assertEquals(contents, b'a'*201)
 
+    def test_buffered_reader(self):
+        # Issue #7471: a GzipFile can be wrapped in a BufferedReader for
+        # performance.
+        self.test_write()
+
+        f = gzip.GzipFile(self.filename, 'rb')
+        with io.BufferedReader(f) as r:
+            lines = [line for line in r]
+
+        self.assertEqual(lines, 50 * data1.splitlines(True))
 
     def test_readline(self):
         self.test_write()
@@ -241,6 +252,18 @@ class TestGzip(unittest.TestCase):
             pass
         else:
             self.fail("1/0 didn't raise an exception")
+
+    def test_zero_padded_file(self):
+        with gzip.GzipFile(self.filename, "wb") as f:
+            f.write(data1 * 50)
+
+        # Pad the file with zeroes
+        with open(self.filename, "ab") as f:
+            f.write(b"\x00" * 50)
+
+        with gzip.GzipFile(self.filename, "rb") as f:
+            d = f.read()
+            self.assertEqual(d, data1 * 50, "Incorrect data in file")
 
 def test_main(verbose=None):
     support.run_unittest(TestGzip)

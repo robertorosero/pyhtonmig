@@ -5,7 +5,6 @@ from io import BytesIO
 import sys
 import unittest
 
-import pyexpat
 from xml.parsers import expat
 
 from test.support import sortdict, run_unittest
@@ -185,7 +184,7 @@ class NamespaceSeparatorTest(unittest.TestCase):
             self.fail()
         except TypeError as e:
             self.assertEquals(str(e),
-                'ParserCreate() argument 2 must be string or None, not int')
+                'ParserCreate() argument 2 must be str or None, not int')
 
         try:
             expat.ParserCreate(namespace_separator='too long')
@@ -518,7 +517,7 @@ class MalformedInputText(unittest.TestCase):
             parser.Parse(xml, True)
             self.fail()
         except expat.ExpatError as e:
-            self.assertEquals(str(e), 'no element found: line 2, column 1')
+            self.assertEquals(str(e), 'unclosed token: line 2, column 0')
 
     def test2(self):
         xml = "<?xml version\xc2\x85='1.0'?>\r\n"

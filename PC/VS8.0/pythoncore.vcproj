@@ -707,6 +707,10 @@
 				>
 			</File>			
 			<File
+				RelativePath="..\..\Include\dynamic_annotations.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Include\enumobject.h"
 				>
 			</File>
@@ -752,10 +756,6 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\import.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\Include\intobject.h"
 				>
 			</File>
 			<File
@@ -1040,6 +1040,14 @@
 			</File>
 			<File
 				RelativePath="..\..\Modules\_lsprof.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Modules\_math.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Modules\_math.h"
 				>
 			</File>
 			<File
@@ -1483,6 +1491,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Objects\stringlib\split.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Objects\structseq.c"
 				>
 			</File>
@@ -1640,6 +1652,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Python\compile.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Python\dynamic_annotations.c"
 				>
 			</File>
 			<File

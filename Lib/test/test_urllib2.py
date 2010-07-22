@@ -21,14 +21,12 @@ class TrivialTests(unittest.TestCase):
 
         # XXX Name hacking to get this to work on Windows.
         fname = os.path.abspath(urllib.request.__file__).replace('\\', '/')
-        if fname[1:2] == ":":
-            fname = fname[2:]
-        # And more hacking to get it to work on MacOS. This assumes
-        # urllib.pathname2url works, unfortunately...
-        if os.name == 'mac':
-            fname = '/' + fname.replace(':', '/')
 
-        file_url = "file://%s" % fname
+        if os.name == 'nt':
+            file_url = "file:///%s" % fname
+        else:
+            file_url = "file://%s" % fname
+
         f = urllib.request.urlopen(file_url)
 
         buf = f.read()
@@ -259,6 +257,62 @@ class FakeMethod:
     def __call__(self, *args):
         return self.handle(self.meth_name, self.action, *args)
 
+class MockHTTPResponse(io.IOBase):
+    def __init__(self, fp, msg, status, reason):
+        self.fp = fp
+        self.msg = msg
+        self.status = status
+        self.reason = reason
+        self.code = 200
+
+    def read(self):
+        return ''
+
+    def info(self):
+        return {}
+
+    def geturl(self):
+        return self.url
+
+
+class MockHTTPClass:
+    def __init__(self):
+        self.level = 0
+        self.req_headers = []
+        self.data = None
+        self.raise_on_endheaders = False
+        self._tunnel_headers = {}
+
+    def __call__(self, host, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+        self.host = host
+        self.timeout = timeout
+        return self
+
+    def set_debuglevel(self, level):
+        self.level = level
+
+    def set_tunnel(self, host, port=None, headers=None):
+        self._tunnel_host = host
+        self._tunnel_port = port
+        if headers:
+            self._tunnel_headers = headers
+        else:
+            self._tunnel_headers.clear()
+
+    def request(self, method, url, body=None, headers=None):
+        self.method = method
+        self.selector = url
+        if headers is not None:
+            self.req_headers += headers.items()
+        self.req_headers.sort()
+        if body:
+            self.data = body
+        if self.raise_on_endheaders:
+            import socket
+            raise socket.error()
+    def getresponse(self):
+        return MockHTTPResponse(MockFile(), {}, 200, "OK")
+
 class MockHandler:
     # useful for testing handler machinery
     # see add_ordered_mock_handlers() docstring
@@ -365,6 +419,17 @@ class MockHTTPHandler(urllib.request.BaseHandler):
             self.req = req
             msg = email.message_from_string("\r\n\r\n")
             return MockResponse(200, "OK", msg, "", req.get_full_url())
+
+class MockHTTPSHandler(urllib.request.AbstractHTTPHandler):
+    # Useful for testing the Proxy-Authorization request by verifying the
+    # properties of httpcon
+
+    def __init__(self):
+        urllib.request.AbstractHTTPHandler.__init__(self)
+        self.httpconn = MockHTTPClass()
+
+    def https_open(self, req):
+        return self.do_open(self.httpconn, req)
 
 class MockPasswordManager:
     def add_password(self, realm, uri, user, password):
@@ -519,12 +584,12 @@ class OpenerDirectorTests(unittest.TestCase):
                 # *_request
                 self.assertEqual((handler, name), calls[i])
                 self.assertEqual(len(args), 1)
-                self.assertTrue(isinstance(args[0], Request))
+                self.assertIsInstance(args[0], Request)
             else:
                 # *_response
                 self.assertEqual((handler, name), calls[i])
                 self.assertEqual(len(args), 2)
-                self.assertTrue(isinstance(args[0], Request))
+                self.assertIsInstance(args[0], Request)
                 # response from opener.open is None, because there's no
                 # handler that defines http_open to handle it
                 self.assertTrue(args[1] is None or
@@ -619,7 +684,7 @@ class HandlerTests(unittest.TestCase):
                 try:
                     data = r.read()
                     headers = r.info()
-                    newurl = r.geturl()
+                    respurl = r.geturl()
                 finally:
                     r.close()
                 stats = os.stat(TESTFN)
@@ -630,6 +695,7 @@ class HandlerTests(unittest.TestCase):
             self.assertEqual(headers["Content-type"], "text/plain")
             self.assertEqual(headers["Content-length"], "13")
             self.assertEqual(headers["Last-modified"], modified)
+            self.assertEqual(respurl, url)
 
         for url in [
             "file://localhost:80%s" % urlpath,
@@ -665,6 +731,8 @@ class HandlerTests(unittest.TestCase):
             ("file://ftp.example.com///foo.txt", False),
 # XXXX bug: fails with OSError, should be URLError
             ("file://ftp.example.com/foo.txt", False),
+            ("file://somehost//foo/something.txt", True),
+            ("file://localhost//foo/something.txt", False),
             ]:
             req = Request(url)
             try:
@@ -675,45 +743,9 @@ class HandlerTests(unittest.TestCase):
             else:
                 self.assertTrue(o.req is req)
                 self.assertEqual(req.type, "ftp")
+            self.assertEqual(req.type is "ftp", ftp)
 
     def test_http(self):
-        class MockHTTPResponse(io.IOBase):
-            def __init__(self, fp, msg, status, reason):
-                self.fp = fp
-                self.msg = msg
-                self.status = status
-                self.reason = reason
-                self.code = 200
-            def read(self):
-                return ''
-            def info(self):
-                return {}
-            def geturl(self):
-                return self.url
-        class MockHTTPClass:
-            def __init__(self):
-                self.level = 0
-                self.req_headers = []
-                self.data = None
-                self.raise_on_endheaders = False
-            def __call__(self, host, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
-                self.host = host
-                self.timeout = timeout
-                return self
-            def set_debuglevel(self, level):
-                self.level = level
-            def request(self, method, url, body=None, headers={}):
-                self.method = method
-                self.selector = url
-                self.req_headers += headers.items()
-                self.req_headers.sort()
-                if body:
-                    self.data = body
-                if self.raise_on_endheaders:
-                    import socket
-                    raise socket.error()
-            def getresponse(self):
-                return MockHTTPResponse(MockFile(), {}, 200, "OK")
 
         h = urllib.request.AbstractHTTPHandler()
         o = h.parent = MockOpener()
@@ -754,8 +786,8 @@ class HandlerTests(unittest.TestCase):
             r = MockResponse(200, "OK", {}, "")
             newreq = h.do_request_(req)
             if data is None:  # GET
-                self.assertTrue("Content-length" not in req.unredirected_hdrs)
-                self.assertTrue("Content-type" not in req.unredirected_hdrs)
+                self.assertNotIn("Content-length", req.unredirected_hdrs)
+                self.assertNotIn("Content-type", req.unredirected_hdrs)
             else:  # POST
                 self.assertEqual(req.unredirected_hdrs["Content-length"], "0")
                 self.assertEqual(req.unredirected_hdrs["Content-type"],
@@ -874,13 +906,13 @@ class HandlerTests(unittest.TestCase):
                 # now it's a GET, there should not be headers regarding content
                 # (possibly dragged from before being a POST)
                 headers = [x.lower() for x in o.req.headers]
-                self.assertTrue("content-length" not in headers)
-                self.assertTrue("content-type" not in headers)
+                self.assertNotIn("content-length", headers)
+                self.assertNotIn("content-type", headers)
 
                 self.assertEqual(o.req.headers["Nonsense"],
                                  "viking=withhold")
-                self.assertTrue("Spam" not in o.req.headers)
-                self.assertTrue("Spam" not in o.req.unredirected_hdrs)
+                self.assertNotIn("Spam", o.req.headers)
+                self.assertNotIn("Spam", o.req.unredirected_hdrs)
 
         # loop detection
         req = Request(from_url)
@@ -979,6 +1011,28 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual([(handlers[0], "https_open")],
                          [tup[0:2] for tup in o.calls])
 
+    def test_proxy_https_proxy_authorization(self):
+        o = OpenerDirector()
+        ph = urllib.request.ProxyHandler(dict(https='proxy.example.com:3128'))
+        o.add_handler(ph)
+        https_handler = MockHTTPSHandler()
+        o.add_handler(https_handler)
+        req = Request("https://www.example.com/")
+        req.add_header("Proxy-Authorization","FooBar")
+        req.add_header("User-Agent","Grail")
+        self.assertEqual(req.get_host(), "www.example.com")
+        self.assertIsNone(req._tunnel_host)
+        r = o.open(req)
+        # Verify Proxy-Authorization gets tunneled to request.
+        # httpsconn req_headers do not have the Proxy-Authorization header but
+        # the req will have.
+        self.assertNotIn(("Proxy-Authorization","FooBar"),
+                         https_handler.httpconn.req_headers)
+        self.assertIn(("User-Agent","Grail"),
+                      https_handler.httpconn.req_headers)
+        self.assertIsNotNone(req._tunnel_host)
+        self.assertEqual(req.get_host(), "proxy.example.com:3128")
+        self.assertEqual(req.get_header("Proxy-authorization"),"FooBar")
 
     def test_basic_auth(self, quote_char='"'):
         opener = OpenerDirector()
@@ -1090,7 +1144,8 @@ class HandlerTests(unittest.TestCase):
             base64.encodebytes(userpass).strip().decode())
         self.assertEqual(http_handler.requests[1].get_header(auth_header),
                          auth_hdr_value)
-
+        self.assertEqual(http_handler.requests[1].unredirected_hdrs[auth_header],
+                         auth_hdr_value)
         # if the password manager can't find a password, the handler won't
         # handle the HTTP auth error
         password_manager.user = password_manager.password = None
@@ -1098,7 +1153,6 @@ class HandlerTests(unittest.TestCase):
         r = opener.open(request_url)
         self.assertEqual(len(http_handler.requests), 1)
         self.assertFalse(http_handler.requests[0].has_header(auth_header))
-
 
 class MiscTests(unittest.TestCase):
 

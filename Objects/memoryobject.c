@@ -76,6 +76,7 @@ PyObject *
 PyMemoryView_FromObject(PyObject *base)
 {
     PyMemoryViewObject *mview;
+    Py_buffer view;
 
     if (!PyObject_CheckBuffer(base)) {
         PyErr_SetString(PyExc_TypeError,
@@ -84,20 +85,17 @@ PyMemoryView_FromObject(PyObject *base)
         return NULL;
     }
 
-    mview = (PyMemoryViewObject *)
-        PyObject_GC_New(PyMemoryViewObject, &PyMemoryView_Type);
-    if (mview == NULL)
+    if (PyObject_GetBuffer(base, &view, PyBUF_FULL_RO) < 0)
         return NULL;
 
-    mview->base = NULL;
-    if (PyObject_GetBuffer(base, &(mview->view), PyBUF_FULL_RO) < 0) {
-        Py_DECREF(mview);
+    mview = (PyMemoryViewObject *)PyMemoryView_FromBuffer(&view);
+    if (mview == NULL) {
+        PyBuffer_Release(&view);
         return NULL;
     }
 
     mview->base = base;
     Py_INCREF(base);
-    _PyObject_GC_TRACK(mview);
     return (PyObject *)mview;
 }
 
@@ -626,7 +624,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
 static int
 memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
 {
-    Py_ssize_t start, len, bytelen, i;
+    Py_ssize_t start, len, bytelen;
     Py_buffer srcview;
     Py_buffer *view = &(self->view);
     char *srcbuf, *destbuf;
@@ -696,16 +694,8 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     if (destbuf + bytelen < srcbuf || srcbuf + bytelen < destbuf)
         /* No overlapping */
         memcpy(destbuf, srcbuf, bytelen);
-    else if (destbuf < srcbuf) {
-        /* Copy in ascending order */
-        for (i = 0; i < bytelen; i++)
-            destbuf[i] = srcbuf[i];
-    }
-    else {
-        /* Copy in descencing order */
-        for (i = bytelen - 1; i >= 0; i--)
-            destbuf[i] = srcbuf[i];
-    }
+    else
+        memmove(destbuf, srcbuf, bytelen);
 
     PyBuffer_Release(&srcview);
     return 0;

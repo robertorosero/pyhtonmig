@@ -3,9 +3,6 @@ import os
 import tempfile
 import shutil
 from io import StringIO
-import warnings
-from test.support import check_warnings
-from test.support import captured_stdout
 
 from distutils.core import Extension, Distribution
 from distutils.command.build_ext import build_ext
@@ -332,6 +329,7 @@ class BuildExtTestCase(TempdirManager,
         self.assertEquals(so_dir, other_tmp_dir)
 
         cmd.inplace = 0
+        cmd.compiler = None
         cmd.run()
         so_file = cmd.get_outputs()[0]
         self.assertTrue(os.path.exists(so_file))
@@ -399,26 +397,6 @@ class BuildExtTestCase(TempdirManager,
         path = cmd.get_ext_fullpath('twisted.runner.portmap')
         wanted = os.path.join(curdir, 'twisted', 'runner', 'portmap' + ext)
         self.assertEquals(wanted, path)
-
-    def test_compiler_deprecation_warning(self):
-        dist = Distribution()
-        cmd = build_ext(dist)
-
-        class MyCompiler(object):
-            def do_something(self):
-                pass
-
-        with check_warnings() as w:
-            warnings.simplefilter("always")
-            cmd.compiler = MyCompiler()
-            self.assertEquals(len(w.warnings), 1)
-            cmd.compile = 'unix'
-            self.assertEquals(len(w.warnings), 1)
-            cmd.compiler = MyCompiler()
-            cmd.compiler.do_something()
-            # two more warnings genereated by the get
-            # and the set
-            self.assertEquals(len(w.warnings), 3)
 
 def test_suite():
     src = _get_source_filename()

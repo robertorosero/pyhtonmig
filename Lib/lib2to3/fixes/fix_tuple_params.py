@@ -81,7 +81,7 @@ class FixTupleParams(fixer_base.BaseFix):
                     handle_tuple(arg, add_prefix=(i > 0))
 
         if not new_lines:
-            return node
+            return
 
         # This isn't strictly necessary, but it plays nicely with other fixers.
         # TODO(cwinter) get rid of this when children becomes a smart list
@@ -154,7 +154,7 @@ def map_to_index(param_list, prefix=[], d=None):
     if d is None:
         d = {}
     for i, obj in enumerate(param_list):
-        trailer = [Subscript(Number(i))]
+        trailer = [Subscript(Number(str(i)))]
         if isinstance(obj, list):
             map_to_index(obj, trailer, d=d)
         else:

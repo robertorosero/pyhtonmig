@@ -115,11 +115,32 @@ Importing Modules
    such modules have no way to know that the module object is an unknown (and
    probably damaged with respect to the module author's intents) state.
 
+   The module's :attr:`__file__` attribute will be set to the code object's
+   :cmember:`co_filename`.
+
    This function will reload the module if it was already imported.  See
    :cfunc:`PyImport_ReloadModule` for the intended way to reload a module.
 
    If *name* points to a dotted name of the form ``package.module``, any package
    structures not already created will still not be created.
+
+   See also :func:`PyImport_ExecCodeModuleEx` and
+   :func:`PyImport_ExecCodeModuleWithPathnames`.
+
+
+.. cfunction:: PyObject* PyImport_ExecCodeModuleEx(char *name, PyObject *co, char *pathname)
+
+   Like :cfunc:`PyImport_ExecCodeModule`, but the :attr:`__file__` attribute of
+   the module object is set to *pathname* if it is non-``NULL``.
+
+   See also :func:`PyImport_ExecCodeModuleWithPathnames`.
+
+
+.. cfunction:: PyObject* PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname, char *cpathname)
+
+   Like :cfunc:`PyImport_ExecCodeModuleEx`, but the :attr:`__cached__`
+   attribute of the module object is set to *cpathname* if it is
+   non-``NULL``.  Of the three functions, this is the preferred one to use.
 
 
 .. cfunction:: long PyImport_GetMagicNumber()
@@ -128,6 +149,11 @@ Importing Modules
    :file:`.pyo` files).  The magic number should be present in the first four bytes
    of the bytecode file, in little-endian byte order.
 
+
+.. cfunction:: const char * PyImport_GetMagicTag()
+
+   Return the magic tag string for :pep:`3147` format Python bytecode file
+   names.
 
 .. cfunction:: PyObject* PyImport_GetModuleDict()
 

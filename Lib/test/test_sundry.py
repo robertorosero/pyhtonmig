@@ -3,12 +3,10 @@
 from test import support
 import sys
 import unittest
-import warnings
 
 class TestUntestedModules(unittest.TestCase):
     def test_at_least_import_untested_modules(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with support.check_warnings(quiet=True):
             import bdb
             import cgitb
             import code
@@ -62,7 +60,6 @@ class TestUntestedModules(unittest.TestCase):
             import rlcompleter
             import sched
             import sndhdr
-            import sunau
             import symbol
             import tabnanny
             import timeit

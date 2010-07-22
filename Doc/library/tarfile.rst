@@ -185,8 +185,8 @@ The following variables are available on module level:
 
 .. data:: ENCODING
 
-   The default character encoding i.e. the value from either
-   :func:`sys.getfilesystemencoding` or :func:`sys.getdefaultencoding`.
+   The default character encoding: ``'utf-8'`` on Windows,
+   :func:`sys.getfilesystemencoding` otherwise.
 
 
 .. seealso::
@@ -209,8 +209,16 @@ a header block followed by data blocks. It is possible to store a file in a tar
 archive several times. Each archive member is represented by a :class:`TarInfo`
 object, see :ref:`tarinfo-objects` for details.
 
+A :class:`TarFile` object can be used as a context manager in a :keyword:`with`
+statement. It will automatically be closed when the block is completed. Please
+note that in the event of an exception an archive opened for writing will not
+be finalized; only the internally used file object will be closed. See the
+:ref:`tar-examples` section for a use case.
 
-.. class:: TarFile(name=None, mode='r', fileobj=None, format=DEFAULT_FORMAT, tarinfo=TarInfo, dereference=False, ignore_zeros=False, encoding=ENCODING, errors=None, pax_headers=None, debug=0, errorlevel=0)
+.. versionadded:: 3.2
+   Added support for the context manager protocol.
+
+.. class:: TarFile(name=None, mode='r', fileobj=None, format=DEFAULT_FORMAT, tarinfo=TarInfo, dereference=False, ignore_zeros=False, encoding=ENCODING, errors='surrogateescape', pax_headers=None, debug=0, errorlevel=0)
 
    All following arguments are optional and can be accessed as instance attributes
    as well.
@@ -258,6 +266,9 @@ object, see :ref:`tarinfo-objects` for details.
    used for reading or writing the archive and how conversion errors are going
    to be handled. The default settings will work for most users.
    See section :ref:`tar-unicode` for in-depth information.
+
+   .. versionchanged:: 3.2
+      Use ``'surrogateescape'`` as the default for the *errors* argument.
 
    The *pax_headers* argument is an optional dictionary of strings which
    will be added as a pax global header if *format* is :const:`PAX_FORMAT`.
@@ -441,10 +452,13 @@ It does *not* contain the file's data itself.
    a :class:`TarInfo` object.
 
 
-.. method:: TarInfo.tobuf(format=DEFAULT_FORMAT, encoding=ENCODING, errors='strict')
+.. method:: TarInfo.tobuf(format=DEFAULT_FORMAT, encoding=ENCODING, errors='surrogateescape')
 
    Create a string buffer from a :class:`TarInfo` object. For information on the
    arguments see the constructor of the :class:`TarFile` class.
+
+   .. versionchanged:: 3.2
+      Use ``'surrogateescape'`` as the default for the *errors* argument.
 
 
 A ``TarInfo`` object has the following public data attributes:
@@ -593,6 +607,13 @@ How to create an uncompressed tar archive from a list of filenames::
        tar.add(name)
    tar.close()
 
+The same example using the :keyword:`with` statement::
+
+    import tarfile
+    with tarfile.open("sample.tar", "w") as tar:
+        for name in ["foo", "bar", "quux"]:
+            tar.add(name)
+
 How to read a gzip compressed tar archive and display some member information::
 
    import tarfile
@@ -686,11 +707,12 @@ metadata must be either decoded or encoded. If *encoding* is not set
 appropriately, this conversion may fail.
 
 The *errors* argument defines how characters are treated that cannot be
-converted. Possible values are listed in section :ref:`codec-base-classes`. In
-read mode the default scheme is ``'replace'``. This avoids unexpected
-:exc:`UnicodeError` exceptions and guarantees that an archive can always be
-read. In write mode the default value for *errors* is ``'strict'``.  This
-ensures that name information is not altered unnoticed.
+converted. Possible values are listed in section :ref:`codec-base-classes`.
+The default scheme is ``'surrogateescape'`` which Python also uses for its
+file system calls, see :ref:`os-filenames`.
 
-In case of writing :const:`PAX_FORMAT` archives, *encoding* is ignored because
-non-ASCII metadata is stored using *UTF-8*.
+In case of :const:`PAX_FORMAT` archives, *encoding* is generally not needed
+because all the metadata is stored using *UTF-8*. *encoding* is only used in
+the rare cases when binary pax headers are decoded or when strings with
+surrogate characters are stored.
+

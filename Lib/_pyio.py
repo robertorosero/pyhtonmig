@@ -13,8 +13,7 @@ except ImportError:
     from _dummy_thread import allocate_lock as Lock
 
 import io
-from io import __all__
-from io import SEEK_SET, SEEK_CUR, SEEK_END
+from io import (__all__, SEEK_SET, SEEK_CUR, SEEK_END)
 
 # open() uses st_blksize whenever we can
 DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes
@@ -35,7 +34,7 @@ class BlockingIOError(IOError):
         self.characters_written = characters_written
 
 
-def open(file: (str, bytes), mode: str = "r", buffering: int = None,
+def open(file: (str, bytes), mode: str = "r", buffering: int = -1,
          encoding: str = None, errors: str = None,
          newline: str = None, closefd: bool = True) -> "IOBase":
 
@@ -82,10 +81,20 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
     returned as strings, the bytes having been first decoded using a
     platform-dependent encoding or using the specified encoding if given.
 
-    buffering is an optional integer used to set the buffering policy. By
-    default full buffering is on. Pass 0 to switch buffering off (only
-    allowed in binary mode), 1 to set line buffering, and an integer > 1
-    for full buffering.
+    buffering is an optional integer used to set the buffering policy.
+    Pass 0 to switch buffering off (only allowed in binary mode), 1 to select
+    line buffering (only usable in text mode), and an integer > 1 to indicate
+    the size of a fixed-size chunk buffer.  When no buffering argument is
+    given, the default buffering policy works as follows:
+
+    * Binary files are buffered in fixed-size chunks; the size of the buffer
+      is chosen using a heuristic trying to determine the underlying device's
+      "block size" and falling back on `io.DEFAULT_BUFFER_SIZE`.
+      On many systems, the buffer will typically be 4096 or 8192 bytes long.
+
+    * "Interactive" text files (files for which isatty() returns True)
+      use line buffering.  Other text files use the policy described above
+      for binary files.
 
     encoding is the name of the encoding used to decode or encode the
     file. This should only be used in text mode. The default encoding is
@@ -140,7 +149,7 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
         raise TypeError("invalid file: %r" % file)
     if not isinstance(mode, str):
         raise TypeError("invalid mode: %r" % mode)
-    if buffering is not None and not isinstance(buffering, int):
+    if not isinstance(buffering, int):
         raise TypeError("invalid buffering: %r" % buffering)
     if encoding is not None and not isinstance(encoding, str):
         raise TypeError("invalid encoding: %r" % encoding)
@@ -177,8 +186,6 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
                  (appending and "a" or "") +
                  (updating and "+" or ""),
                  closefd)
-    if buffering is None:
-        buffering = -1
     line_buffering = False
     if buffering == 1 or buffering < 0 and raw.isatty():
         buffering = -1
@@ -218,7 +225,7 @@ class DocDescriptor:
     """
     def __get__(self, obj, typ):
         return (
-            "open(file, mode='r', buffering=None, encoding=None, "
+            "open(file, mode='r', buffering=-1, encoding=None, "
                  "errors=None, newline=None, closefd=True)\n\n" +
             open.__doc__)
 
@@ -315,6 +322,7 @@ class IOBase(metaclass=abc.ABCMeta):
 
         This is not implemented for read-only and non-blocking streams.
         """
+        self._checkClosed()
         # XXX Should this return the number of bytes written???
 
     __closed = False
@@ -325,10 +333,7 @@ class IOBase(metaclass=abc.ABCMeta):
         This method has no effect if the file is already closed.
         """
         if not self.__closed:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+            self.flush()
             self.__closed = True
 
     def __del__(self) -> None:
@@ -695,14 +700,13 @@ class _BufferedIOMixin(BufferedIOBase):
     ### Flush and close ###
 
     def flush(self):
+        if self.closed:
+            raise ValueError("flush of closed file")
         self.raw.flush()
 
     def close(self):
-        if not self.closed and self.raw is not None:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+        if self.raw is not None and not self.closed:
+            self.flush()
             self.raw.close()
 
     def detach(self):
@@ -818,7 +822,7 @@ class BytesIO(BufferedIOBase):
         if self.closed:
             raise ValueError("seek on closed file")
         try:
-            pos = pos.__index__()
+            pos.__index__
         except AttributeError as err:
             raise TypeError("an integer is required") from err
         if whence == 0:
@@ -843,10 +847,15 @@ class BytesIO(BufferedIOBase):
             raise ValueError("truncate on closed file")
         if pos is None:
             pos = self._pos
-        elif pos < 0:
-            raise ValueError("negative truncate position %r" % (pos,))
+        else:
+            try:
+                pos.__index__
+            except AttributeError as err:
+                raise TypeError("an integer is required") from err
+            if pos < 0:
+                raise ValueError("negative truncate position %r" % (pos,))
         del self._buffer[pos:]
-        return self.seek(pos)
+        return pos
 
     def readable(self):
         return True
@@ -1205,8 +1214,7 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         if pos is None:
             pos = self.tell()
         # Use seek to flush the read buffer.
-        self.seek(pos)
-        return BufferedWriter.truncate(self)
+        return BufferedWriter.truncate(self, pos)
 
     def read(self, n=None):
         if n is None:
@@ -1510,11 +1518,8 @@ class TextIOWrapper(TextIOBase):
         self._telling = self._seekable
 
     def close(self):
-        if self.buffer is not None:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+        if self.buffer is not None and not self.closed:
+            self.flush()
             self.buffer.close()
 
     @property
@@ -1707,8 +1712,7 @@ class TextIOWrapper(TextIOBase):
         self.flush()
         if pos is None:
             pos = self.tell()
-        self.seek(pos)
-        return self.buffer.truncate()
+        return self.buffer.truncate(pos)
 
     def detach(self):
         if self.buffer is None:
@@ -1795,6 +1799,10 @@ class TextIOWrapper(TextIOBase):
         if n is None:
             n = -1
         decoder = self._decoder or self._get_decoder()
+        try:
+            n.__index__
+        except AttributeError as err:
+            raise TypeError("an integer is required") from err
         if n < 0:
             # Read everything.
             result = (self._get_decoded_chars() +

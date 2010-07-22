@@ -146,15 +146,11 @@ Assignment of an object to a single target is recursively defined as follows.
   * Otherwise: the name is bound to the object in the global namespace or the
     outer namespace determined by :keyword:`nonlocal`, respectively.
 
+  .. index:: single: destructor
+
   The name is rebound if it was already bound.  This may cause the reference
   count for the object previously bound to the name to reach zero, causing the
   object to be deallocated and its destructor (if it has one) to be called.
-
-  .. index:: single: destructor
-
-  The name is rebound if it was already bound.  This may cause the reference count
-  for the object previously bound to the name to reach zero, causing the object to
-  be deallocated and its destructor (if it has one) to be called.
 
 * If the target is a target list enclosed in parentheses or in square brackets:
   The object must be an iterable with the same number of items as there are
@@ -953,7 +949,7 @@ definition, function definition, or :keyword:`import` statement.
 **Programmer's note:** the :keyword:`global` is a directive to the parser.  It
 applies only to code parsed at the same time as the :keyword:`global` statement.
 In particular, a :keyword:`global` statement contained in a string or code
-object supplied to the builtin :func:`exec` function does not affect the code
+object supplied to the built-in :func:`exec` function does not affect the code
 block *containing* the function call, and code contained in such a string is
 unaffected by :keyword:`global` statements in the code containing the function
 call.  The same applies to the :func:`eval` and :func:`compile` functions.

@@ -8,7 +8,6 @@ from test import support
 
 import io
 import _pyio as pyio
-import sys
 import pickle
 
 class MemorySeekTestMixin:
@@ -73,7 +72,7 @@ class MemoryTestMixin:
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(t("h")), 1)
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 12)
+        self.assertEqual(f.tell(), 1)
 
     def test_write(self):
         buf = self.buftype("hello world\n")
@@ -121,7 +120,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf[:6])
         self.assertEqual(memio.truncate(4), 4)
         self.assertEqual(memio.getvalue(), buf[:4])
-        self.assertEqual(memio.tell(), 4)
+        self.assertEqual(memio.tell(), 6)
+        memio.seek(0, 2)
         memio.write(buf)
         self.assertEqual(memio.getvalue(), buf[:4] + buf)
         pos = memio.tell()
@@ -469,25 +469,6 @@ class PyBytesIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
 
 class TextIOTestMixin:
 
-    def test_relative_seek(self):
-        memio = self.ioclass()
-
-        self.assertRaises(IOError, memio.seek, -1, 1)
-        self.assertRaises(IOError, memio.seek, 3, 1)
-        self.assertRaises(IOError, memio.seek, -3, 1)
-        self.assertRaises(IOError, memio.seek, -1, 2)
-        self.assertRaises(IOError, memio.seek, 1, 1)
-        self.assertRaises(IOError, memio.seek, 1, 2)
-
-    def test_textio_properties(self):
-        memio = self.ioclass()
-
-        # These are just dummy values but we nevertheless check them for fear
-        # of unexpected breakage.
-        self.assertTrue(memio.encoding is None)
-        self.assertEqual(memio.errors, "strict")
-        self.assertEqual(memio.line_buffering, False)
-
     def test_newlines_property(self):
         memio = self.ioclass(newline=None)
         # The C StringIO decodes newlines in write() calls, but the Python
@@ -623,7 +604,7 @@ class CBytesIOTest(PyBytesIOTest):
         state = memio.__getstate__()
         self.assertEqual(len(state), 3)
         bytearray(state[0]) # Check if state[0] supports the buffer interface.
-        self.assert_(isinstance(state[1], int))
+        self.assertIsInstance(state[1], int)
         self.assert_(isinstance(state[2], dict) or state[2] is None)
         memio.close()
         self.assertRaises(ValueError, memio.__getstate__)
@@ -667,9 +648,9 @@ class CStringIOTest(PyStringIOTest):
         memio = self.ioclass()
         state = memio.__getstate__()
         self.assertEqual(len(state), 4)
-        self.assert_(isinstance(state[0], str))
-        self.assert_(isinstance(state[1], str))
-        self.assert_(isinstance(state[2], int))
+        self.assertIsInstance(state[0], str)
+        self.assertIsInstance(state[1], str)
+        self.assertIsInstance(state[2], int)
         self.assert_(isinstance(state[3], dict) or state[3] is None)
         memio.close()
         self.assertRaises(ValueError, memio.__getstate__)

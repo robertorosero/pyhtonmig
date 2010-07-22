@@ -61,15 +61,15 @@ object and then calling its :meth:`~Process.start` method.  :class:`Process`
 follows the API of :class:`threading.Thread`.  A trivial example of a
 multiprocess program is ::
 
-    from multiprocessing import Process
+   from multiprocessing import Process
 
    def f(name):
        print('hello', name)
 
-    if __name__ == '__main__':
-        p = Process(target=f, args=('bob',))
-        p.start()
-        p.join()
+   if __name__ == '__main__':
+       p = Process(target=f, args=('bob',))
+       p.start()
+       p.join()
 
 To show the individual process IDs involved, here is an expanded example::
 
@@ -686,7 +686,7 @@ Miscellaneous
 
 .. function:: set_executable()
 
-   Sets the path of the python interpreter to use when starting a child process.
+   Sets the path of the Python interpreter to use when starting a child process.
    (By default :data:`sys.executable` is used).  Embedders will probably need to
    do some thing like ::
 
@@ -837,7 +837,7 @@ object -- see :ref:`multiprocessing-managers`.
 
    A bounded semaphore object: a clone of :class:`threading.BoundedSemaphore`.
 
-   (On Mac OS X this is indistinguishable from :class:`Semaphore` because
+   (On Mac OS X, this is indistinguishable from :class:`Semaphore` because
    ``sem_getvalue()`` is not implemented on that platform).
 
 .. class:: Condition([lock])
@@ -879,9 +879,8 @@ object -- see :ref:`multiprocessing-managers`.
    specifies a timeout in seconds.  If *block* is ``False`` then *timeout* is
    ignored.
 
-.. note::
-   On OS/X ``sem_timedwait`` is unsupported, so timeout arguments for the
-   aforementioned :meth:`acquire` methods will be ignored on OS/X.
+   On Mac OS X, ``sem_timedwait`` is unsupported, so calling ``acquire()`` with
+   a timeout will emulate that function's behavior using a sleeping loop.
 
 .. note::
 
@@ -1131,7 +1130,7 @@ their parent process exits.  The manager classes are defined in the
 
    Create a BaseManager object.
 
-   Once created one should call :meth:`start` or :meth:`serve_forever` to ensure
+   Once created one should call :meth:`start` or ``get_server().serve_forever()`` to ensure
    that the manager object refers to a started manager process.
 
    *address* is the address on which the manager process listens for new
@@ -1146,10 +1145,6 @@ their parent process exits.  The manager classes are defined in the
 
       Start a subprocess to start the manager.  If *initializer* is not ``None``
       then the subprocess will call ``initializer(*initargs)`` when it starts.
-
-   .. method:: serve_forever()
-
-      Run the server in the current process.
 
    .. method:: get_server()
 
@@ -1535,7 +1530,7 @@ Process Pools
 One can create a pool of processes which will carry out tasks submitted to it
 with the :class:`Pool` class.
 
-.. class:: multiprocessing.Pool([processes[, initializer[, initargs]]])
+.. class:: multiprocessing.Pool([processes[, initializer[, initargs[, maxtasksperchild]]]])
 
    A process pool object which controls a pool of worker processes to which jobs
    can be submitted.  It supports asynchronous results with timeouts and
@@ -1545,6 +1540,21 @@ with the :class:`Pool` class.
    ``None`` then the number returned by :func:`cpu_count` is used.  If
    *initializer* is not ``None`` then each worker process will call
    ``initializer(*initargs)`` when it starts.
+
+   *maxtasksperchild* is the number of tasks a worker process can complete
+   before it will exit and be replaced with a fresh worker process, to enable
+   unused resources to be freed. The default *maxtasksperchild* is None, which
+   means worker processes will live as long as the pool.
+
+   .. note::
+
+        Worker processes within a :class:`Pool` typically live for the complete
+        duration of the Pool's work queue. A frequent pattern found in other
+        systems (such as Apache, mod_wsgi, etc) to free resources held by
+        workers is to allow a worker within a pool to complete only a set
+        amount of work before being exiting, being cleaned up and a new
+        process spawned to replace the old one. The *maxtasksperchild*
+        argument to the :class:`Pool` exposes this ability to the end user.
 
    .. method:: apply(func[, args[, kwds]])
 
@@ -2218,8 +2228,8 @@ collect the results:
 
 
 An example of how a pool of worker processes can each run a
-:class:`SimpleHTTPServer.HttpServer` instance while sharing a single listening
-socket.
+:class:`~http.server.SimpleHTTPRequestHandler` instance while sharing a single
+listening socket.
 
 .. literalinclude:: ../includes/mp_webserver.py
 

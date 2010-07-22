@@ -38,9 +38,18 @@ HKEYS = (winreg.HKEY_USERS,
          winreg.HKEY_LOCAL_MACHINE,
          winreg.HKEY_CLASSES_ROOT)
 
-VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
-WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
-NET_BASE = r"Software\Microsoft\.NETFramework"
+NATIVE_WIN64 = (sys.platform == 'win32' and sys.maxsize > 2**32)
+if NATIVE_WIN64:
+    # Visual C++ is a 32-bit application, so we need to look in
+    # the corresponding registry branch, if we're running a
+    # 64-bit Python on Win64
+    VS_BASE = r"Software\Wow6432Node\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Wow6432Node\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Wow6432Node\Microsoft\.NETFramework"
+else:
+    VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Microsoft\.NETFramework"
 
 # A map keyed by get_platform() return values to values accepted by
 # 'vcvarsall.bat'.  Note a cross-compile may combine these (eg, 'x86_amd64' is
@@ -646,28 +655,8 @@ class MSVCCompiler(CCompiler) :
                 mfid = 1
             else:
                 mfid = 2
-                try:
-                    # Remove references to the Visual C runtime, so they will
-                    # fall through to the Visual C dependency of Python.exe.
-                    # This way, when installed for a restricted user (e.g.
-                    # runtimes are not in WinSxS folder, but in Python's own
-                    # folder), the runtimes do not need to be in every folder
-                    # with .pyd's.
-                    manifest_f = open(temp_manifest, "rb")
-                    manifest_buf = manifest_f.read()
-                    manifest_f.close()
-                    pattern = re.compile(
-                        r"""<assemblyIdentity.*?name=("|')Microsoft\."""\
-                        r"""VC\d{2}\.CRT("|').*?(/>|</assemblyIdentity>)""",
-                        re.DOTALL)
-                    manifest_buf = re.sub(pattern, "", manifest_buf)
-                    pattern = "<dependentAssembly>\s*</dependentAssembly>"
-                    manifest_buf = re.sub(pattern, "", manifest_buf)
-                    manifest_f = open(temp_manifest, "wb")
-                    manifest_f.write(manifest_buf)
-                    manifest_f.close()
-                except IOError:
-                    pass
+                # Remove references to the Visual C runtime
+                self._remove_visual_c_ref(temp_manifest)
             out_arg = '-outputresource:%s;%s' % (output_filename, mfid)
             try:
                 self.spawn(['mt.exe', '-nologo', '-manifest',
@@ -677,6 +666,33 @@ class MSVCCompiler(CCompiler) :
         else:
             log.debug("skipping %s (up-to-date)", output_filename)
 
+    def _remove_visual_c_ref(self, manifest_file):
+        try:
+            # Remove references to the Visual C runtime, so they will
+            # fall through to the Visual C dependency of Python.exe.
+            # This way, when installed for a restricted user (e.g.
+            # runtimes are not in WinSxS folder, but in Python's own
+            # folder), the runtimes do not need to be in every folder
+            # with .pyd's.
+            manifest_f = open(manifest_file)
+            try:
+                manifest_buf = manifest_f.read()
+            finally:
+                manifest_f.close()
+            pattern = re.compile(
+                r"""<assemblyIdentity.*?name=("|')Microsoft\."""\
+                r"""VC\d{2}\.CRT("|').*?(/>|</assemblyIdentity>)""",
+                re.DOTALL)
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            pattern = "<dependentAssembly>\s*</dependentAssembly>"
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            manifest_f = open(manifest_file, 'w')
+            try:
+                manifest_f.write(manifest_buf)
+            finally:
+                manifest_f.close()
+        except IOError:
+            pass
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in

@@ -4,7 +4,7 @@ Test script for doctest.
 
 from test import support
 import doctest
-import warnings
+
 
 # NOTE: There are some additional tests relating to interaction with
 #       zipimport in the test_zipimport_support test module.
@@ -863,6 +863,77 @@ detail:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> doctest.DocTestRunner(verbose=False).run(test)
     TestResults(failed=0, attempted=1)
+
+IGNORE_EXCEPTION_DETAIL also ignores difference in exception formatting
+between Python versions. For example, in Python 2.x, the module path of
+the exception is not in the output, but this will fail under Python 3:
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> from http.client import HTTPException
+    ...     >>> raise HTTPException('message')
+    ...     Traceback (most recent call last):
+    ...     HTTPException: message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner(verbose=False).run(test)
+    ... # doctest: +ELLIPSIS
+    **********************************************************************
+    File ..., line 4, in f
+    Failed example:
+        raise HTTPException('message')
+    Expected:
+        Traceback (most recent call last):
+        HTTPException: message
+    Got:
+        Traceback (most recent call last):
+        ...
+        http.client.HTTPException: message
+    TestResults(failed=1, attempted=2)
+
+But in Python 3 the module path is included, and therefore a test must look
+like the following test to succeed in Python 3. But that test will fail under
+Python 2.
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> from http.client import HTTPException
+    ...     >>> raise HTTPException('message')
+    ...     Traceback (most recent call last):
+    ...     http.client.HTTPException: message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner(verbose=False).run(test)
+    TestResults(failed=0, attempted=2)
+
+However, with IGNORE_EXCEPTION_DETAIL, the module name of the exception
+(or its unexpected absence) will be ignored:
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> from http.client import HTTPException
+    ...     >>> raise HTTPException('message') #doctest: +IGNORE_EXCEPTION_DETAIL
+    ...     Traceback (most recent call last):
+    ...     HTTPException: message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner(verbose=False).run(test)
+    TestResults(failed=0, attempted=2)
+
+The module path will be completely ignored, so two different module paths will
+still pass if IGNORE_EXCEPTION_DETAIL is given. This is intentional, so it can
+be used when exceptions have changed module.
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> from http.client import HTTPException
+    ...     >>> raise HTTPException('message') #doctest: +IGNORE_EXCEPTION_DETAIL
+    ...     Traceback (most recent call last):
+    ...     foo.bar.HTTPException: message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner(verbose=False).run(test)
+    TestResults(failed=0, attempted=2)
 
 But IGNORE_EXCEPTION_DETAIL does not allow a mismatch in the exception type:
 
@@ -2149,6 +2220,13 @@ doctest examples in a given file.  In its simple invokation, it is
 called with the name of a file, which is taken to be relative to the
 calling module.  The return value is (#failures, #tests).
 
+We don't want `-v` in sys.argv for these tests.
+
+    >>> save_argv = sys.argv
+    >>> if '-v' in sys.argv:
+    ...     sys.argv = [arg for arg in save_argv if arg != '-v']
+
+
     >>> doctest.testfile('test_doctest.txt') # doctest: +ELLIPSIS
     **********************************************************************
     File "...", line 6, in test_doctest.txt
@@ -2288,6 +2366,28 @@ using the optional keyword argument `encoding`:
     >>> doctest.testfile('test_doctest4.txt', encoding='utf-8')
     TestResults(failed=0, attempted=2)
     >>> doctest.master = None  # Reset master.
+
+Test the verbose output:
+
+    >>> doctest.testfile('test_doctest4.txt', encoding='utf-8', verbose=True)
+    Trying:
+        'föö'
+    Expecting:
+        'f\xf6\xf6'
+    ok
+    Trying:
+        'bąr'
+    Expecting:
+        'b\u0105r'
+    ok
+    1 items passed all tests:
+       2 tests in test_doctest4.txt
+    2 tests in 1 items.
+    2 passed and 0 failed.
+    Test passed.
+    TestResults(failed=0, attempted=2)
+    >>> doctest.master = None  # Reset master.
+    >>> sys.argv = save_argv
 """
 
 def test_testmod(): r"""
@@ -2297,7 +2397,7 @@ fail with a UnicodeDecodeError because doctest tried to read the "source" lines
 out of the binary module.
 
     >>> import unicodedata
-    >>> doctest.testmod(unicodedata)
+    >>> doctest.testmod(unicodedata, verbose=False)
     TestResults(failed=0, attempted=0)
 """
 
@@ -2312,8 +2412,10 @@ def test_main():
     from test import test_doctest
     support.run_doctest(test_doctest, verbosity=True)
 
-import trace, sys, re, io
+import sys, re, io
+
 def test_coverage(coverdir):
+    trace = support.import_module('trace')
     tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,],
                          trace=0, count=1)
     tracer.run('test_main()')

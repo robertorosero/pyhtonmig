@@ -376,8 +376,9 @@ class Mapping(Sized, Iterable, Container):
         return ValuesView(self)
 
     def __eq__(self, other):
-        return isinstance(other, Mapping) and \
-               dict(self.items()) == dict(other.items())
+        if not isinstance(other, Mapping):
+            return NotImplemented
+        return dict(self.items()) == dict(other.items())
 
     def __ne__(self, other):
         return not (self == other)
@@ -479,7 +480,15 @@ class MutableMapping(Mapping):
         except KeyError:
             pass
 
-    def update(self, other=(), **kwds):
+    def update(*args, **kwds):
+        if len(args) > 2:
+            raise TypeError("update() takes at most 2 positional "
+                            "arguments ({} given)".format(len(args)))
+        elif not args:
+            raise TypeError("update() takes at least 1 argument (0 given)")
+        self = args[0]
+        other = args[1] if len(args) >= 2 else ()
+
         if isinstance(other, Mapping):
             for key in other:
                 self[key] = other[key]

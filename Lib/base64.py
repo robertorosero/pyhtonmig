@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 """RFC 3548: Base16, Base32, Base64 Data Encodings"""
 
@@ -383,9 +383,9 @@ def main():
         if o == '-u': func = decode
         if o == '-t': test(); return
     if args and args[0] != '-':
-        func(open(args[0], 'rb'), sys.stdout)
+        func(open(args[0], 'rb'), sys.stdout.buffer)
     else:
-        func(sys.stdin, sys.stdout)
+        func(sys.stdin.buffer, sys.stdout.buffer)
 
 
 def test():

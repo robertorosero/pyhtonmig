@@ -7,6 +7,9 @@ Extending/Embedding FAQ
 .. highlight:: c
 
 
+.. XXX need review for Python 3.
+
+
 Can I create my own functions in C?
 -----------------------------------
 
@@ -25,6 +28,8 @@ Yes, using the C compatibility features found in C++.  Place ``extern "C" {
 function that is going to be called by the Python interpreter.  Global or static
 C++ objects with constructors are probably not a good idea.
 
+
+.. _c-wrapper-software:
 
 Writing C is hard; are there any alternatives?
 ----------------------------------------------
@@ -51,7 +56,7 @@ with a tool such as `SWIG <http://www.swig.org>`_.  `SIP
 <http://www.riverbankcomputing.co.uk/software/sip/>`__, `CXX
 <http://cxx.sourceforge.net/>`_ `Boost
 <http://www.boost.org/libs/python/doc/index.html>`_, or `Weave
-<http://www.scipy.org/site_content/weave>`_ are also alternatives for wrapping
+<http://www.scipy.org/Weave>`_ are also alternatives for wrapping
 C++ libraries.
 
 
@@ -159,8 +164,8 @@ Sample code and use for catching stdout:
    ...
    >>> import sys
    >>> sys.stdout = StdoutCatcher()
-   >>> print 'foo'
-   >>> print 'hello world!'
+   >>> print('foo')
+   >>> print('hello world!')
    >>> sys.stderr.write(sys.stdout.data)
    foo
    hello world!
@@ -197,11 +202,7 @@ begin by reading :ref:`the "Extending and Embedding" document
 whole lot of difference between C and C++ -- so the strategy of building a new
 Python type around a C structure (pointer) type will also work for C++ objects.
 
-For C++ libraries, you can look at `SIP
-<http://www.riverbankcomputing.co.uk/sip/>`_, `CXX
-<http://cxx.sourceforge.net/>`_, `Boost
-<http://www.boost.org/libs/python/doc/index.html>`_, `Weave
-<http://www.scipy.org/site_content/weave>`_ or `SWIG <http://www.swig.org>`_
+For C++ libraries, see :ref:`c-wrapper-software`.
 
 
 I added a module using the Setup file and the make fails; why?
@@ -432,14 +433,14 @@ How do I find undefined g++ symbols __builtin_new or __pure_virtual?
 --------------------------------------------------------------------
 
 To dynamically load g++ extension modules, you must recompile Python, relink it
-using g++ (change LINKCC in the python Modules Makefile), and link your
+using g++ (change LINKCC in the Python Modules Makefile), and link your
 extension module using g++ (e.g., ``g++ -shared -o mymodule.so mymodule.o``).
 
 
 Can I create an object class with some methods implemented in C and others in Python (e.g. through inheritance)?
 ----------------------------------------------------------------------------------------------------------------
 
-In Python 2.2, you can inherit from builtin classes such as :class:`int`,
+In Python 2.2, you can inherit from built-in classes such as :class:`int`,
 :class:`list`, :class:`dict`, etc.
 
 The Boost Python Library (BPL, http://www.boost.org/libs/python/doc/index.html)
@@ -470,12 +471,9 @@ checking the value of sys.maxunicode:
 
    >>> import sys
    >>> if sys.maxunicode > 65535:
-   ...     print 'UCS4 build'
+   ...     print('UCS4 build')
    ... else:
-   ...     print 'UCS2 build'
+   ...     print('UCS2 build')
 
 The only way to solve this problem is to use extension modules compiled with a
 Python binary built using the same size for Unicode characters.
-
-
-

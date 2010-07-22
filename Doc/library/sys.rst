@@ -127,13 +127,12 @@ always available.
 
    .. index:: object: traceback
 
-   If no exception is being handled anywhere on the stack, a tuple containing three
-   ``None`` values is returned.  Otherwise, the values returned are ``(type, value,
-   traceback)``.  Their meaning is: *type* gets the exception type of the exception
-   being handled (a class object); *value* gets the exception parameter (its
-   :dfn:`associated value` or the second argument to :keyword:`raise`, which is
-   always a class instance if the exception type is a class object); *traceback*
-   gets a traceback object (see the Reference Manual) which encapsulates the call
+   If no exception is being handled anywhere on the stack, a tuple containing
+   three ``None`` values is returned.  Otherwise, the values returned are
+   ``(type, value, traceback)``.  Their meaning is: *type* gets the type of the
+   exception being handled (a subclass of :exc:`BaseException`); *value* gets
+   the exception instance (an instance of the exception type); *traceback* gets
+   a traceback object (see the Reference Manual) which encapsulates the call
    stack at the point where the exception originally occurred.
 
    .. warning::
@@ -199,11 +198,7 @@ always available.
    +==============================+==========================================+
    | :const:`debug`               | -d                                       |
    +------------------------------+------------------------------------------+
-   | :const:`py3k_warning`        | -3                                       |
-   +------------------------------+------------------------------------------+
    | :const:`division_warning`    | -Q                                       |
-   +------------------------------+------------------------------------------+
-   | :const:`division_new`        | -Qnew                                    |
    +------------------------------+------------------------------------------+
    | :const:`inspect`             | -i                                       |
    +------------------------------+------------------------------------------+
@@ -213,57 +208,80 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`dont_write_bytecode` | -B                                       |
    +------------------------------+------------------------------------------+
+   | :const:`no_user_site`        | -s                                       |
+   +------------------------------+------------------------------------------+
    | :const:`no_site`             | -S                                       |
    +------------------------------+------------------------------------------+
    | :const:`ignore_environment`  | -E                                       |
    +------------------------------+------------------------------------------+
    | :const:`verbose`             | -v                                       |
    +------------------------------+------------------------------------------+
-   | :const:`unicode`             | -U                                       |
+   | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
 
 
 .. data:: float_info
 
    A structseq holding information about the float type. It contains low level
-   information about the precision and internal representation. Please study
-   your system's :file:`float.h` for more information.
+   information about the precision and internal representation.  The values
+   correspond to the various floating-point constants defined in the standard
+   header file :file:`float.h` for the 'C' programming language; see section
+   5.2.4.2.2 of the 1999 ISO/IEC C standard [C99]_, 'Characteristics of
+   floating types', for details.
 
-   +---------------------+--------------------------------------------------+
-   | attribute           |  explanation                                     |
-   +=====================+==================================================+
-   | :const:`epsilon`    | Difference between 1 and the next representable  |
-   |                     | floating point number                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`dig`        | digits (see :file:`float.h`)                     |
-   +---------------------+--------------------------------------------------+
-   | :const:`mant_dig`   | mantissa digits (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
-   | :const:`max`        | maximum representable finite float               |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_exp`    | maximum int e such that radix**(e-1) is in the   |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_10_exp` | maximum int e such that 10**e is in the          |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`min`        | Minimum positive normalizer float                |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_exp`    | minimum int e such that radix**(e-1) is a        |
-   |                     | normalized float                                 |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_10_exp` | minimum int e such that 10**e is a normalized    |
-   |                     | float                                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`radix`      | radix of exponent                                |
-   +---------------------+--------------------------------------------------+
-   | :const:`rounds`     | addition rounds (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
+   +---------------------+----------------+--------------------------------------------------+
+   | attribute           | float.h macro  | explanation                                      |
+   +=====================+================+==================================================+
+   | :const:`epsilon`    | DBL_EPSILON    | difference between 1 and the least value greater |
+   |                     |                | than 1 that is representable as a float          |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`dig`        | DBL_DIG        | maximum number of decimal digits that can be     |
+   |                     |                | faithfully represented in a float;  see below    |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`mant_dig`   | DBL_MANT_DIG   | float precision: the number of base-``radix``    |
+   |                     |                | digits in the significand of a float             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max`        | DBL_MAX        | maximum representable finite float               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_exp`    | DBL_MAX_EXP    | maximum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a representable finite float                     |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_10_exp` | DBL_MAX_10_EXP | maximum integer e such that ``10**e`` is in the  |
+   |                     |                | range of representable finite floats             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min`        | DBL_MIN        | minimum positive normalized float                |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_exp`    | DBL_MIN_EXP    | minimum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a normalized float                               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_10_exp` | DBL_MIN_10_EXP | minimum integer e such that ``10**e`` is a       |
+   |                     |                | normalized float                                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`radix`      | FLT_RADIX      | radix of exponent representation                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`rounds`     | FLT_ROUNDS     | constant representing rounding mode              |
+   |                     |                | used for arithmetic operations                   |
+   +---------------------+----------------+--------------------------------------------------+
 
-   .. note::
+   The attribute :attr:`sys.float_info.dig` needs further explanation.  If
+   ``s`` is any string representing a decimal number with at most
+   :attr:`sys.float_info.dig` significant digits, then converting ``s`` to a
+   float and back again will recover a string representing the same decimal
+   value::
 
-      The information in the table is simplified.
+      >>> import sys
+      >>> sys.float_info.dig
+      15
+      >>> s = '3.14159265358979'    # decimal string with 15 significant digits
+      >>> format(float(s), '.15g')  # convert to float and back -> same value
+      '3.14159265358979'
 
+   But for strings with more than :attr:`sys.float_info.dig` significant digits,
+   this isn't always true::
+
+      >>> s = '9876543211234567'    # 16 significant digits is too many!
+      >>> format(float(s), '.16g')  # conversion changes value
+      '9876543211234568'
 
 .. data:: float_repr_style
 
@@ -301,21 +319,25 @@ always available.
 
 .. function:: getfilesystemencoding()
 
-   Return the name of the encoding used to convert Unicode filenames into system
-   file names, or ``None`` if the system default encoding is used. The result value
-   depends on the operating system:
+   Return the name of the encoding used to convert Unicode filenames into
+   system file names. The result value depends on the operating system:
 
-   * On Windows 9x, the encoding is "mbcs".
-
-   * On Mac OS X, the encoding is "utf-8".
+   * On Mac OS X, the encoding is ``'utf-8'``.
 
    * On Unix, the encoding is the user's preference according to the result of
-     nl_langinfo(CODESET), or :const:`None` if the ``nl_langinfo(CODESET)`` failed.
+     nl_langinfo(CODESET), or ``'utf-8'`` if ``nl_langinfo(CODESET)`` failed.
 
    * On Windows NT+, file names are Unicode natively, so no conversion is
-     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as this is
-     the encoding that applications should use when they explicitly want to convert
-     Unicode strings to byte strings that are equivalent when used as file names.
+     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as
+     this is the encoding that applications should use when they explicitly
+     want to convert Unicode strings to byte strings that are equivalent when
+     used as file names.
+
+   * On Windows 9x, the encoding is ``'mbcs'``.
+
+   .. versionchanged:: 3.2
+      On Unix, use ``'utf-8'`` instead of ``None`` if ``nl_langinfo(CODESET)``
+      failed. :func:`getfilesystemencoding` result cannot be ``None``.
 
 
 .. function:: getrefcount(object)
@@ -341,7 +363,7 @@ always available.
    specific.
 
    If given, *default* will be returned if the object does not provide means to
-   retrieve the size.  Otherwise a `TypeError` will be raised.
+   retrieve the size.  Otherwise a :exc:`TypeError` will be raised.
 
    :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
    additional garbage collector overhead if the object is managed by the garbage
@@ -396,9 +418,15 @@ always available.
 
 .. function:: getwindowsversion()
 
-   Return a tuple containing five components, describing the Windows version
-   currently running.  The elements are *major*, *minor*, *build*, *platform*, and
-   *text*.  *text* contains a string while all other values are integers.
+   Return a named tuple describing the Windows version
+   currently running.  The named elements are *major*, *minor*,
+   *build*, *platform*, *service_pack*, *service_pack_minor*,
+   *service_pack_major*, *suite_mask*, and *product_type*.
+   *service_pack* contains a string while all other values are
+   integers. The components can also be accessed by name, so
+   ``sys.getwindowsversion()[0]`` is equivalent to
+   ``sys.getwindowsversion().major``. For compatibility with prior
+   versions, only the first 5 elements are retrievable by indexing.
 
    *platform* may be one of the following values:
 
@@ -414,10 +442,53 @@ always available.
    | :const:`3 (VER_PLATFORM_WIN32_CE)`      | Windows CE              |
    +-----------------------------------------+-------------------------+
 
-   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the Microsoft
-   documentation for more information about these fields.
+   *product_type* may be one of the following values:
+
+   +---------------------------------------+---------------------------------+
+   | Constant                              | Meaning                         |
+   +=======================================+=================================+
+   | :const:`1 (VER_NT_WORKSTATION)`       | The system is a workstation.    |
+   +---------------------------------------+---------------------------------+
+   | :const:`2 (VER_NT_DOMAIN_CONTROLLER)` | The system is a domain          |
+   |                                       | controller.                     |
+   +---------------------------------------+---------------------------------+
+   | :const:`3 (VER_NT_SERVER)`            | The system is a server, but not |
+   |                                       | a domain controller.            |
+   +---------------------------------------+---------------------------------+
+
+
+   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the
+   Microsoft documentation on :cfunc:`OSVERSIONINFOEX` for more information
+   about these fields.
 
    Availability: Windows.
+
+   .. versionchanged:: 3.2
+      Changed to a named tuple and added *service_pack_minor*,
+      *service_pack_major*, *suite_mask*, and *product_type*.
+
+
+.. data:: hash_info
+
+   A structseq giving parameters of the numeric hash implementation.  For
+   more details about hashing of numeric types, see :ref:`numeric-hash`.
+
+   +---------------------+--------------------------------------------------+
+   | attribute           | explanation                                      |
+   +=====================+==================================================+
+   | :const:`width`      | width in bits used for hash values               |
+   +---------------------+--------------------------------------------------+
+   | :const:`modulus`    | prime modulus P used for numeric hash scheme     |
+   +---------------------+--------------------------------------------------+
+   | :const:`inf`        | hash value returned for a positive infinity      |
+   +---------------------+--------------------------------------------------+
+   | :const:`nan`        | hash value returned for a nan                    |
+   +---------------------+--------------------------------------------------+
+   | :const:`imag`       | multiplier used for the imaginary part of a      |
+   |                     | complex number                                   |
+   +---------------------+--------------------------------------------------+
+
+   .. versionadded:: 3.2
 
 
 .. data:: hexversion
@@ -485,9 +556,7 @@ always available.
    more information.)
 
    The meaning of the variables is the same as that of the return values from
-   :func:`exc_info` above.  (Since there is only one interactive thread,
-   thread-safety is not a concern for these variables, unlike for ``exc_type``
-   etc.)
+   :func:`exc_info` above.
 
 
 .. data:: maxsize
@@ -796,6 +865,10 @@ always available.
    available only if Python was compiled with :option:`--with-tsc`. To understand
    the output of this dump, read :file:`Python/ceval.c` in the Python sources.
 
+   .. impl-detail::
+      This function is intimately bound to CPython implementation details and
+      thus not likely to be implemented elsewhere.
+
 
 .. data:: stdin
           stdout
@@ -905,3 +978,8 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
+
+.. rubric:: Citations
+
+.. [C99] ISO/IEC 9899:1999.  "Programming languages -- C."  A public draft of this standard is available at http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf .
+

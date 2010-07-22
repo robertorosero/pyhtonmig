@@ -120,6 +120,20 @@ class FTP:
             if user:
                 self.login(user, passwd, acct)
 
+    def __enter__(self):
+        return self
+
+    # Context management protocol: try to quit() if active
+    def __exit__(self, *args):
+        if self.sock is not None:
+            try:
+                self.quit()
+            except (socket.error, EOFError):
+                pass
+            finally:
+                if self.sock is not None:
+                    self.close()
+
     def connect(self, host='', port=0, timeout=-999):
         '''Connect to host.  Arguments are:
          - host: hostname to connect to (string, default previous host)
@@ -237,7 +251,7 @@ class FTP:
         if self.debugging > 1: print('*put urgent*', self.sanitize(line))
         self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
-        if resp[:3] not in ('426', '226'):
+        if resp[:3] not in ('426', '225', '226'):
             raise error_proto(resp)
 
     def sendcmd(self, cmd):
@@ -297,6 +311,8 @@ class FTP:
             resp = self.sendport(host, port)
         else:
             resp = self.sendeprt(host, port)
+        if self.timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+            sock.settimeout(self.timeout)
         return sock
 
     def makepasv(self):
@@ -349,6 +365,8 @@ class FTP:
             if resp[0] != '1':
                 raise error_reply(resp)
             conn, sockaddr = sock.accept()
+            if self.timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                conn.settimeout(self.timeout)
         if resp[:3] == '150':
             # this is conditional in case we received a 125
             size = parse150(resp)
@@ -620,9 +638,17 @@ else:
         ssl_version = ssl.PROTOCOL_TLSv1
 
         def __init__(self, host='', user='', passwd='', acct='', keyfile=None,
-                     certfile=None, timeout=_GLOBAL_DEFAULT_TIMEOUT):
+                     certfile=None, context=None,
+                     timeout=_GLOBAL_DEFAULT_TIMEOUT):
+            if context is not None and keyfile is not None:
+                raise ValueError("context and keyfile arguments are mutually "
+                                 "exclusive")
+            if context is not None and certfile is not None:
+                raise ValueError("context and certfile arguments are mutually "
+                                 "exclusive")
             self.keyfile = keyfile
             self.certfile = certfile
+            self.context = context
             self._prot_p = False
             FTP.__init__(self, host, user, passwd, acct, timeout)
 
@@ -639,8 +665,12 @@ else:
                 resp = self.voidcmd('AUTH TLS')
             else:
                 resp = self.voidcmd('AUTH SSL')
-            self.sock = ssl.wrap_socket(self.sock, self.keyfile, self.certfile,
-                                        ssl_version=self.ssl_version)
+            if self.context is not None:
+                self.sock = self.context.wrap_socket(self.sock)
+            else:
+                self.sock = ssl.wrap_socket(self.sock, self.keyfile,
+                                            self.certfile,
+                                            ssl_version=self.ssl_version)
             self.file = self.sock.makefile(mode='r', encoding=self.encoding)
             return resp
 
@@ -671,8 +701,11 @@ else:
         def ntransfercmd(self, cmd, rest=None):
             conn, size = FTP.ntransfercmd(self, cmd, rest)
             if self._prot_p:
-                conn = ssl.wrap_socket(conn, self.keyfile, self.certfile,
-                                       ssl_version=self.ssl_version)
+                if self.context is not None:
+                    conn = self.context.wrap_socket(conn)
+                else:
+                    conn = ssl.wrap_socket(conn, self.keyfile, self.certfile,
+                                           ssl_version=self.ssl_version)
             return conn, size
 
         def retrbinary(self, cmd, callback, blocksize=8192, rest=None):

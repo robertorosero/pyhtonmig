@@ -36,8 +36,8 @@ words::
 number.  In polar coordinates, a complex number *z* is defined by the
 modulus *r* and the phase angle *phi*. The modulus *r* is the distance
 from *z* to the origin, while the phase *phi* is the counterclockwise
-angle from the positive x-axis to the line segment that joins the
-origin to *z*.
+angle, measured in radians, from the positive x-axis to the line
+segment that joins the origin to *z*.
 
 The following functions can be used to convert from the native
 rectangular coordinates to polar coordinates and back.
@@ -187,15 +187,24 @@ Hyperbolic functions
 Classification functions
 ------------------------
 
+.. function:: isfinite(x)
+
+   Return ``True`` if both the real and imaginary parts of *x* are finite, and
+   ``False`` otherwise.
+
+   .. versionadded:: 3.2
+
+
 .. function:: isinf(x)
 
-   Return *True* if the real or the imaginary part of x is positive
-   or negative infinity.
+   Return ``True`` if either the real or the imaginary part of *x* is an
+   infinity, and ``False`` otherwise.
 
 
 .. function:: isnan(x)
 
-   Return *True* if the real or imaginary part of x is not a number (NaN).
+   Return ``True`` if either the real or the imaginary part of *x* is a NaN,
+   and ``False`` otherwise.
 
 
 Constants

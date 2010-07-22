@@ -214,7 +214,7 @@ in various ways.  There is a separate error indicator for each thread.
    .. note::
 
       The `"%lld"` and `"%llu"` format specifiers are only available
-      when `HAVE_LONG_LONG` is defined.
+      when :const:`HAVE_LONG_LONG` is defined.
 
    .. versionchanged:: 3.2
       Support for `"%lld"` and `"%llu"` added.
@@ -404,6 +404,15 @@ in various ways.  There is a separate error indicator for each thread.
    argument can be used to specify a dictionary of class variables and methods.
 
 
+.. cfunction:: PyObject* PyErr_NewExceptionWithDoc(char *name, char *doc, PyObject *base, PyObject *dict)
+
+   Same as :cfunc:`PyErr_NewException`, except that the new exception class can
+   easily be given a docstring: If *doc* is non-*NULL*, it will be used as the
+   docstring for the exception class.
+
+   .. versionadded:: 3.2
+
+
 .. cfunction:: void PyErr_WriteUnraisable(PyObject *obj)
 
    This utility function prints a warning message to ``sys.stderr`` when an
@@ -460,6 +469,36 @@ Exception Objects
    Set the cause associated with the exception to *ctx*.  Use *NULL* to clear
    it.  There is no type check to make sure that *ctx* is an exception instance.
    This steals a reference to *ctx*.
+
+
+Recursion Control
+=================
+
+These two functions provide a way to perform safe recursive calls at the C
+level, both in the core and in extension modules.  They are needed if the
+recursive code does not necessarily invoke Python code (which tracks its
+recursion depth automatically).
+
+.. cfunction:: int Py_EnterRecursiveCall(char *where)
+
+   Marks a point where a recursive C-level call is about to be performed.
+
+   If :const:`USE_STACKCHECK` is defined, this function checks if the the OS
+   stack overflowed using :cfunc:`PyOS_CheckStack`.  In this is the case, it
+   sets a :exc:`MemoryError` and returns a nonzero value.
+
+   The function then checks if the recursion limit is reached.  If this is the
+   case, a :exc:`RuntimeError` is set and a nonzero value is returned.
+   Otherwise, zero is returned.
+
+   *where* should be a string such as ``" in instance check"`` to be
+   concatenated to the :exc:`RuntimeError` message caused by the recursion depth
+   limit.
+
+.. cfunction:: void Py_LeaveRecursiveCall()
+
+   Ends a :cfunc:`Py_EnterRecursiveCall`.  Must be called once for each
+   *successful* invocation of :cfunc:`Py_EnterRecursiveCall`.
 
 
 .. _standardexceptions:

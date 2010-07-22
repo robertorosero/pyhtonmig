@@ -13,8 +13,6 @@ import shutil
 import unittest
 import warnings
 
-warnings.filterwarnings('ignore', '.* potential security risk .*',
-                        RuntimeWarning)
 
 class PosixTester(unittest.TestCase):
 
@@ -22,9 +20,14 @@ class PosixTester(unittest.TestCase):
         # create empty file
         fp = open(support.TESTFN, 'w+')
         fp.close()
+        self._warnings_manager = support.check_warnings()
+        self._warnings_manager.__enter__()
+        warnings.filterwarnings('ignore', '.* potential security risk .*',
+                                RuntimeWarning)
 
     def tearDown(self):
         support.unlink(support.TESTFN)
+        self._warnings_manager.__exit__(None, None, None)
 
     def testNoArgFunctions(self):
         # test posix functions which take no arguments and have
@@ -132,7 +135,7 @@ class PosixTester(unittest.TestCase):
             fp = open(support.TESTFN)
             try:
                 fd = posix.dup(fp.fileno())
-                self.assertTrue(isinstance(fd, int))
+                self.assertIsInstance(fd, int)
                 os.close(fd)
             finally:
                 fp.close()
@@ -195,32 +198,54 @@ class PosixTester(unittest.TestCase):
         if hasattr(posix, 'stat'):
             self.assertTrue(posix.stat(support.TESTFN))
 
-    if hasattr(posix, 'chown'):
-        def test_chown(self):
-            # raise an OSError if the file does not exist
-            os.unlink(support.TESTFN)
-            self.assertRaises(OSError, posix.chown, support.TESTFN, -1, -1)
+    def _test_all_chown_common(self, chown_func, first_param):
+        """Common code for chown, fchown and lchown tests."""
+        if os.getuid() == 0:
+            try:
+                # Many linux distros have a nfsnobody user as MAX_UID-2
+                # that makes a good test case for signedness issues.
+                #   http://bugs.python.org/issue1747858
+                # This part of the test only runs when run as root.
+                # Only scary people run their tests as root.
+                ent = pwd.getpwnam('nfsnobody')
+                chown_func(first_param, ent.pw_uid, ent.pw_gid)
+            except KeyError:
+                pass
+        else:
+            # non-root cannot chown to root, raises OSError
+            self.assertRaises(OSError, chown_func,
+                              first_param, 0, 0)
+        # test a successful chown call
+        chown_func(first_param, os.getuid(), os.getgid())
 
-            # re-create the file
-            open(support.TESTFN, 'w').close()
-            if os.getuid() == 0:
-                try:
-                    # Many linux distros have a nfsnobody user as MAX_UID-2
-                    # that makes a good test case for signedness issues.
-                    #   http://bugs.python.org/issue1747858
-                    # This part of the test only runs when run as root.
-                    # Only scary people run their tests as root.
-                    ent = pwd.getpwnam('nfsnobody')
-                    posix.chown(support.TESTFN, ent.pw_uid, ent.pw_gid)
-                except KeyError:
-                    pass
-            else:
-                # non-root cannot chown to root, raises OSError
-                self.assertRaises(OSError, posix.chown,
-                                  support.TESTFN, 0, 0)
+    @unittest.skipUnless(hasattr(posix, 'chown'), "test needs os.chown()")
+    def test_chown(self):
+        # raise an OSError if the file does not exist
+        os.unlink(support.TESTFN)
+        self.assertRaises(OSError, posix.chown, support.TESTFN, -1, -1)
 
-            # test a successful chown call
-            posix.chown(support.TESTFN, os.getuid(), os.getgid())
+        # re-create the file
+        open(support.TESTFN, 'w').close()
+        self._test_all_chown_common(posix.chown, support.TESTFN)
+
+    @unittest.skipUnless(hasattr(posix, 'fchown'), "test needs os.fchown()")
+    def test_fchown(self):
+        os.unlink(support.TESTFN)
+
+        # re-create the file
+        test_file = open(support.TESTFN, 'w')
+        try:
+            fd = test_file.fileno()
+            self._test_all_chown_common(posix.fchown, fd)
+        finally:
+            test_file.close()
+
+    @unittest.skipUnless(hasattr(posix, 'lchown'), "test needs os.lchown()")
+    def test_lchown(self):
+        os.unlink(support.TESTFN)
+        # create a symlink
+        os.symlink('/tmp/dummy-symlink-target', support.TESTFN)
+        self._test_all_chown_common(posix.lchown, support.TESTFN)
 
     def test_chdir(self):
         if hasattr(posix, 'chdir'):
@@ -229,7 +254,7 @@ class PosixTester(unittest.TestCase):
 
     def test_lsdir(self):
         if hasattr(posix, 'lsdir'):
-            self.assertTrue(support.TESTFN in posix.lsdir(os.curdir))
+            self.assertIn(support.TESTFN, posix.lsdir(os.curdir))
 
     def test_access(self):
         if hasattr(posix, 'access'):
@@ -238,7 +263,7 @@ class PosixTester(unittest.TestCase):
     def test_umask(self):
         if hasattr(posix, 'umask'):
             old_mask = posix.umask(0)
-            self.assertTrue(isinstance(old_mask, int))
+            self.assertIsInstance(old_mask, int)
             posix.umask(old_mask)
 
     def test_strerror(self):
@@ -274,9 +299,13 @@ class PosixTester(unittest.TestCase):
                 posix.lchflags(support.TESTFN, st.st_flags)
 
     def test_environ(self):
+        if os.name == "nt":
+            item_type = str
+        else:
+            item_type = bytes
         for k, v in posix.environ.items():
-            self.assertEqual(type(k), str)
-            self.assertEqual(type(v), str)
+            self.assertEqual(type(k), item_type)
+            self.assertEqual(type(v), item_type)
 
     def test_getcwd_long_pathnames(self):
         if hasattr(posix, 'getcwd'):

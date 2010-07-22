@@ -1,16 +1,12 @@
 # Python test set -- built-in functions
 
 import platform
-import test.support, unittest
-from test.support import fcmp, TESTFN, unlink,  run_unittest, \
-                              run_with_locale
+import unittest
+from test.support import fcmp, TESTFN, unlink,  run_unittest, check_warnings
 from operator import neg
 
-import sys, warnings, random, collections, io, fractions
-warnings.filterwarnings("ignore", "hex../oct.. of negative int",
-                        FutureWarning, __name__)
-warnings.filterwarnings("ignore", "integer argument expected",
-                        DeprecationWarning, "unittest")
+import sys, warnings, random, collections, io
+
 import builtins
 
 class Squares:
@@ -128,6 +124,16 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(abs(-3.14), 3.14)
         # str
         self.assertRaises(TypeError, abs, 'a')
+        # bool
+        self.assertEqual(abs(True), 1)
+        self.assertEqual(abs(False), 0)
+        # other
+        self.assertRaises(TypeError, abs)
+        self.assertRaises(TypeError, abs, None)
+        class AbsClass(object):
+            def __abs__(self):
+                return -5
+        self.assertEqual(abs(AbsClass()), -5)
 
     def test_all(self):
         self.assertEqual(all([2, 4, 6]), True)
@@ -248,11 +254,11 @@ class BuiltinTest(unittest.TestCase):
 
         # dir() - local scope
         local_var = 1
-        self.assertTrue('local_var' in dir())
+        self.assertIn('local_var', dir())
 
         # dir(module)
         import sys
-        self.assertTrue('exit' in dir(sys))
+        self.assertIn('exit', dir(sys))
 
         # dir(module_with_invalid__dict__)
         import types
@@ -262,8 +268,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, dir, f)
 
         # dir(type)
-        self.assertTrue("strip" in dir(str))
-        self.assertTrue("__mro__" not in dir(str))
+        self.assertIn("strip", dir(str))
+        self.assertNotIn("__mro__", dir(str))
 
         # dir(obj)
         class Foo(object):
@@ -272,13 +278,13 @@ class BuiltinTest(unittest.TestCase):
                 self.y = 8
                 self.z = 9
         f = Foo()
-        self.assertTrue("y" in dir(f))
+        self.assertIn("y", dir(f))
 
         # dir(obj_no__dict__)
         class Foo(object):
             __slots__ = []
         f = Foo()
-        self.assertTrue("__repr__" in dir(f))
+        self.assertIn("__repr__", dir(f))
 
         # dir(obj_no__class__with__dict__)
         # (an ugly trick to cause getattr(f, "__class__") to fail)
@@ -287,8 +293,8 @@ class BuiltinTest(unittest.TestCase):
             def __init__(self):
                 self.bar = "wow"
         f = Foo()
-        self.assertTrue("__repr__" not in dir(f))
-        self.assertTrue("bar" in dir(f))
+        self.assertNotIn("__repr__", dir(f))
+        self.assertIn("bar", dir(f))
 
         # dir(obj_using __dir__)
         class Foo(object):
@@ -427,9 +433,10 @@ class BuiltinTest(unittest.TestCase):
         g = {}
         l = {}
 
-        import warnings
-        warnings.filterwarnings("ignore", "global statement", module="<string>")
-        exec('global a; a = 1; b = 2', g, l)
+        with check_warnings():
+            warnings.filterwarnings("ignore", "global statement",
+                    module="<string>")
+            exec('global a; a = 1; b = 2', g, l)
         if '__builtins__' in g:
             del g['__builtins__']
         if '__builtins__' in l:
@@ -479,6 +486,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, getattr, sys, 1, "foo")
         self.assertRaises(TypeError, getattr)
         self.assertRaises(AttributeError, getattr, sys, chr(sys.maxunicode))
+        # unicode surrogates are not encodable to the default encoding (utf8)
+        self.assertRaises(AttributeError, getattr, 1, "\uDAD1\uD51E")
 
     def test_hasattr(self):
         import sys
@@ -601,6 +610,8 @@ class BuiltinTest(unittest.TestCase):
             def __len__(self):
                 return sys.maxsize + 1
         self.assertRaises(OverflowError, len, HugeLen())
+        class NoLenMethod(object): pass
+        self.assertRaises(TypeError, len, NoLenMethod())
 
     def test_map(self):
         self.assertEqual(
@@ -914,18 +925,18 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(list(range(a+4, a, -2)), [a+4, a+2])
 
         seq = list(range(a, b, c))
-        self.assertTrue(a in seq)
-        self.assertTrue(b not in seq)
+        self.assertIn(a, seq)
+        self.assertNotIn(b, seq)
         self.assertEqual(len(seq), 2)
 
         seq = list(range(b, a, -c))
-        self.assertTrue(b in seq)
-        self.assertTrue(a not in seq)
+        self.assertIn(b, seq)
+        self.assertNotIn(a, seq)
         self.assertEqual(len(seq), 2)
 
         seq = list(range(-a, -b, -c))
-        self.assertTrue(-a in seq)
-        self.assertTrue(-b not in seq)
+        self.assertIn(-a, seq)
+        self.assertNotIn(-b, seq)
         self.assertEqual(len(seq), 2)
 
         self.assertRaises(TypeError, range)
@@ -943,8 +954,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(RuntimeError, range, a, a + 1, badzero(1))
         """
 
-        # Reject floats when it would require PyLongs to represent.
-        # (smaller floats still accepted, but deprecated)
+        # Reject floats.
+        self.assertRaises(TypeError, range, 1., 1., 1.)
         self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
 
         self.assertRaises(TypeError, range, 0, "spam")
@@ -954,6 +965,46 @@ class BuiltinTest(unittest.TestCase):
         #NEAL self.assertRaises(OverflowError, range, 0, 2*sys.maxsize)
 
         self.assertRaises(OverflowError, len, range(0, sys.maxsize**10))
+
+        bignum = 2*sys.maxsize
+        smallnum = 42
+
+        # User-defined class with an __index__ method
+        class I:
+            def __init__(self, n):
+                self.n = int(n)
+            def __index__(self):
+                return self.n
+        self.assertEqual(list(range(I(bignum), I(bignum + 1))), [bignum])
+        self.assertEqual(list(range(I(smallnum), I(smallnum + 1))), [smallnum])
+
+        # User-defined class with a failing __index__ method
+        class IX:
+            def __index__(self):
+                raise RuntimeError
+        self.assertRaises(RuntimeError, range, IX())
+
+        # User-defined class with an invalid __index__ method
+        class IN:
+            def __index__(self):
+                return "not a number"
+
+        self.assertRaises(TypeError, range, IN())
+        # Exercise various combinations of bad arguments, to check
+        # refcounting logic
+        self.assertRaises(TypeError, range, 0.0)
+
+        self.assertRaises(TypeError, range, 0, 0.0)
+        self.assertRaises(TypeError, range, 0.0, 0)
+        self.assertRaises(TypeError, range, 0.0, 0.0)
+
+        self.assertRaises(TypeError, range, 0, 0, 1.0)
+        self.assertRaises(TypeError, range, 0, 0.0, 1)
+        self.assertRaises(TypeError, range, 0, 0.0, 1.0)
+        self.assertRaises(TypeError, range, 0.0, 0, 1)
+        self.assertRaises(TypeError, range, 0.0, 0, 1.0)
+        self.assertRaises(TypeError, range, 0.0, 0.0, 1)
+        self.assertRaises(TypeError, range, 0.0, 0.0, 1.0)
 
     def test_input(self):
         self.write_testfile()
@@ -1148,6 +1199,11 @@ class BuiltinTest(unittest.TestCase):
         b = 2
         return vars()
 
+    class C_get_vars(object):
+        def getDict(self):
+            return {'a':2}
+        __dict__ = property(fget=getDict)
+
     def test_vars(self):
         self.assertEqual(set(vars()), set(dir()))
         import sys
@@ -1156,6 +1212,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(self.get_vars_f2(), {'a': 1, 'b': 2})
         self.assertRaises(TypeError, vars, 42, 42)
         self.assertRaises(TypeError, vars, 42)
+        self.assertEqual(vars(self.C_get_vars()), {'a':2})
 
     def test_zip(self):
         a = (1, 2, 3)

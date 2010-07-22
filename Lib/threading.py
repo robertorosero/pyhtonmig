@@ -31,6 +31,7 @@ try:
     _CRLock = _thread.RLock
 except AttributeError:
     _CRLock = None
+TIMEOUT_MAX = _thread.TIMEOUT_MAX
 del _thread
 
 
@@ -107,14 +108,14 @@ class _RLock(_Verbose):
         return "<%s owner=%r count=%d>" % (
                 self.__class__.__name__, owner, self._count)
 
-    def acquire(self, blocking=True):
+    def acquire(self, blocking=True, timeout=-1):
         me = _get_ident()
         if self._owner == me:
             self._count = self._count + 1
             if __debug__:
                 self._note("%s.acquire(%s): recursive success", self, blocking)
             return 1
-        rc = self._block.acquire(blocking)
+        rc = self._block.acquire(blocking, timeout)
         if rc:
             self._owner = me
             self._count = 1
@@ -234,22 +235,10 @@ class _Condition(_Verbose):
                 if __debug__:
                     self._note("%s.wait(): got it", self)
             else:
-                # Balancing act:  We can't afford a pure busy loop, so we
-                # have to sleep; but if we sleep the whole timeout time,
-                # we'll be unresponsive.  The scheme here sleeps very
-                # little at first, longer as time goes on, but never longer
-                # than 20 times per second (or the timeout time remaining).
-                endtime = _time() + timeout
-                delay = 0.0005 # 500 us -> initial delay of 1 ms
-                while True:
-                    gotit = waiter.acquire(0)
-                    if gotit:
-                        break
-                    remaining = endtime - _time()
-                    if remaining <= 0:
-                        break
-                    delay = min(delay * 2, remaining, .05)
-                    _sleep(delay)
+                if timeout > 0:
+                    gotit = waiter.acquire(True, timeout)
+                else:
+                    gotit = waiter.acquire(False)
                 if not gotit:
                     if __debug__:
                         self._note("%s.wait(%s): timed out", self, timeout)
@@ -301,8 +290,11 @@ class _Semaphore(_Verbose):
         self._cond = Condition(Lock())
         self._value = value
 
-    def acquire(self, blocking=True):
+    def acquire(self, blocking=True, timeout=None):
+        if not blocking and timeout is not None:
+            raise ValueError("can't specify timeout for non-blocking acquire")
         rc = False
+        endtime = None
         self._cond.acquire()
         while self._value == 0:
             if not blocking:
@@ -310,7 +302,14 @@ class _Semaphore(_Verbose):
             if __debug__:
                 self._note("%s.acquire(%s): blocked waiting, value=%s",
                            self, blocking, self._value)
-            self._cond.wait()
+            if timeout is not None:
+                if endtime is None:
+                    endtime = _time() + timeout
+                else:
+                    timeout = endtime - _time()
+                    if timeout <= 0:
+                        break
+            self._cond.wait(timeout)
         else:
             self._value = self._value - 1
             if __debug__:
@@ -460,12 +459,17 @@ class Thread(_Verbose):
             raise RuntimeError("thread.__init__() not called")
 
         if self._started.is_set():
-            raise RuntimeError("thread already started")
+            raise RuntimeError("threads can only be started once")
         if __debug__:
             self._note("%s.start(): starting thread", self)
         with _active_limbo_lock:
             _limbo[self] = self
-        _start_new_thread(self._bootstrap, ())
+        try:
+            _start_new_thread(self._bootstrap, ())
+        except Exception:
+            with _active_limbo_lock:
+                del _limbo[self]
+            raise
         self._started.wait()
 
     def run(self):

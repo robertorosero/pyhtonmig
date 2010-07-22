@@ -8,9 +8,7 @@ from array import array
 from weakref import proxy
 from functools import wraps
 
-from test.support import (TESTFN, findfile, check_warnings, run_unittest,
-                          make_bad_fd)
-from collections import UserList
+from test.support import TESTFN, check_warnings, run_unittest, make_bad_fd
 
 from _io import FileIO as _FileIO
 
@@ -68,6 +66,18 @@ class AutoFileTests(unittest.TestCase):
         self.f = _FileIO(TESTFN, 'r')
         n = self.f.readinto(a)
         self.assertEquals(array('b', [1, 2]), a[:n])
+
+    def test_none_args(self):
+        self.f.write(b"hi\nbye\nabc")
+        self.f.close()
+        self.f = _FileIO(TESTFN, 'r')
+        self.assertEqual(self.f.read(None), b"hi\nbye\nabc")
+        self.f.seek(0)
+        self.assertEqual(self.f.readline(None), b"hi\n")
+        self.assertEqual(self.f.readlines(None), [b"bye\n", b"abc"])
+
+    def test_reject(self):
+        self.assertRaises(TypeError, self.f.write, "Hello!")
 
     def testRepr(self):
         self.assertEquals(repr(self.f), "<_io.FileIO name=%r mode=%r>"
@@ -159,7 +169,7 @@ class AutoFileTests(unittest.TestCase):
 
     @ClosedFDRaises
     def testErrnoOnClosedWrite(self, f):
-        f.write('a')
+        f.write(b'a')
 
     @ClosedFDRaises
     def testErrnoOnClosedSeek(self, f):
@@ -308,13 +318,24 @@ class OtherFileTests(unittest.TestCase):
         except ValueError as msg:
             if msg.args[0] != 0:
                 s = str(msg)
-                if s.find(TESTFN) != -1 or s.find(bad_mode) == -1:
+                if TESTFN in s or bad_mode not in s:
                     self.fail("bad error message for invalid mode: %s" % s)
             # if msg.args[0] == 0, we're probably on Windows where there may be
             # no obvious way to discover why open() failed.
         else:
             f.close()
             self.fail("no error for invalid mode: %s" % bad_mode)
+
+    def testTruncate(self):
+        f = _FileIO(TESTFN, 'w')
+        f.write(bytes(bytearray(range(10))))
+        self.assertEqual(f.tell(), 10)
+        f.truncate(5)
+        self.assertEqual(f.tell(), 10)
+        self.assertEqual(f.seek(0, os.SEEK_END), 5)
+        f.truncate(15)
+        self.assertEqual(f.tell(), 5)
+        self.assertEqual(f.seek(0, os.SEEK_END), 15)
 
     def testTruncateOnWindows(self):
         def bug801631():
@@ -367,7 +388,7 @@ class OtherFileTests(unittest.TestCase):
         self.assertRaises(TypeError, _FileIO, "1", 0, 0)
 
     def testWarnings(self):
-        with check_warnings() as w:
+        with check_warnings(quiet=True) as w:
             self.assertEqual(w.warnings, [])
             self.assertRaises(TypeError, _FileIO, [])
             self.assertEqual(w.warnings, [])

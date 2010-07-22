@@ -72,7 +72,7 @@ three`` at the command line::
 
 The :mod:`getopt` module processes *sys.argv* using the conventions of the Unix
 :func:`getopt` function.  More powerful and flexible command line processing is
-provided by the :mod:`optparse` module.
+provided by the :mod:`argparse` module.
 
 
 .. _tut-stderr:
@@ -152,6 +152,7 @@ from urls and :mod:`smtplib` for sending mail::
 
    >>> from urllib.request import urlopen
    >>> for line in urlopen('http://tycho.usno.navy.mil/cgi-bin/timer.pl'):
+   ...     line = line.decode('utf-8')  # Decoding the binary data to text.
    ...     if 'EST' in line or 'EDT' in line:  # look for Eastern Time
    ...         print(line)
 
@@ -308,7 +309,7 @@ sophisticated and robust capabilities of its larger packages. For example:
 * The :mod:`xml.dom` and :mod:`xml.sax` packages provide robust support for
   parsing this popular data interchange format. Likewise, the :mod:`csv` module
   supports direct reads and writes in a common database format. Together, these
-  modules and packages greatly simplify data interchange between python
+  modules and packages greatly simplify data interchange between Python
   applications and other tools.
 
 * Internationalization is supported by a number of modules including

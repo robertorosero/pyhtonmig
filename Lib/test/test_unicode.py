@@ -31,18 +31,11 @@ def search_function(encoding):
         return None
 codecs.register(search_function)
 
-class UnicodeTest(
-    string_tests.CommonTest,
-    string_tests.MixinStrUnicodeUserStringTest,
-    string_tests.MixinStrUnicodeTest,
-    ):
+class UnicodeTest(string_tests.CommonTest,
+        string_tests.MixinStrUnicodeUserStringTest,
+        string_tests.MixinStrUnicodeTest):
+
     type2test = str
-
-    def setUp(self):
-        self.warning_filters = warnings.filters[:]
-
-    def tearDown(self):
-        warnings.filters = self.warning_filters
 
     def checkequalnofix(self, result, object, methodname, *args):
         method = getattr(object, methodname)
@@ -283,11 +276,12 @@ class UnicodeTest(
         self.assertRaises(TypeError, 'replace'.replace, "r", 42)
 
     def test_bytes_comparison(self):
-        warnings.simplefilter('ignore', BytesWarning)
-        self.assertEqual('abc' == b'abc', False)
-        self.assertEqual('abc' != b'abc', True)
-        self.assertEqual('abc' == bytearray(b'abc'), False)
-        self.assertEqual('abc' != bytearray(b'abc'), True)
+        with support.check_warnings():
+            warnings.simplefilter('ignore', BytesWarning)
+            self.assertEqual('abc' == b'abc', False)
+            self.assertEqual('abc' != b'abc', True)
+            self.assertEqual('abc' == bytearray(b'abc'), False)
+            self.assertEqual('abc' != bytearray(b'abc'), True)
 
     def test_comparison(self):
         # Comparisons:
@@ -436,32 +430,32 @@ class UnicodeTest(
 
     def test_contains(self):
         # Testing Unicode contains method
-        self.assertTrue('a' in 'abdb')
-        self.assertTrue('a' in 'bdab')
-        self.assertTrue('a' in 'bdaba')
-        self.assertTrue('a' in 'bdba')
-        self.assertTrue('a' not in 'bdb')
-        self.assertTrue('a' in 'bdba')
-        self.assertTrue('a' in ('a',1,None))
-        self.assertTrue('a' in (1,None,'a'))
-        self.assertTrue('a' in ('a',1,None))
-        self.assertTrue('a' in (1,None,'a'))
-        self.assertTrue('a' not in ('x',1,'y'))
-        self.assertTrue('a' not in ('x',1,None))
-        self.assertTrue('abcd' not in 'abcxxxx')
-        self.assertTrue('ab' in 'abcd')
-        self.assertTrue('ab' in 'abc')
-        self.assertTrue('ab' in (1,None,'ab'))
-        self.assertTrue('' in 'abc')
-        self.assertTrue('' in '')
-        self.assertTrue('' in 'abc')
-        self.assertTrue('\0' not in 'abc')
-        self.assertTrue('\0' in '\0abc')
-        self.assertTrue('\0' in 'abc\0')
-        self.assertTrue('a' in '\0abc')
-        self.assertTrue('asdf' in 'asdf')
-        self.assertTrue('asdf' not in 'asd')
-        self.assertTrue('asdf' not in '')
+        self.assertIn('a', 'abdb')
+        self.assertIn('a', 'bdab')
+        self.assertIn('a', 'bdaba')
+        self.assertIn('a', 'bdba')
+        self.assertNotIn('a', 'bdb')
+        self.assertIn('a', 'bdba')
+        self.assertIn('a', ('a',1,None))
+        self.assertIn('a', (1,None,'a'))
+        self.assertIn('a', ('a',1,None))
+        self.assertIn('a', (1,None,'a'))
+        self.assertNotIn('a', ('x',1,'y'))
+        self.assertNotIn('a', ('x',1,None))
+        self.assertNotIn('abcd', 'abcxxxx')
+        self.assertIn('ab', 'abcd')
+        self.assertIn('ab', 'abc')
+        self.assertIn('ab', (1,None,'ab'))
+        self.assertIn('', 'abc')
+        self.assertIn('', '')
+        self.assertIn('', 'abc')
+        self.assertNotIn('\0', 'abc')
+        self.assertIn('\0', '\0abc')
+        self.assertIn('\0', 'abc\0')
+        self.assertIn('a', '\0abc')
+        self.assertIn('asdf', 'asdf')
+        self.assertNotIn('asdf', 'asd')
+        self.assertNotIn('asdf', '')
 
         self.assertRaises(TypeError, "abc".__contains__)
 
@@ -687,6 +681,9 @@ class UnicodeTest(
         self.assertRaises(IndexError, "{:}".format)
         self.assertRaises(IndexError, "{:s}".format)
         self.assertRaises(IndexError, "{}".format)
+        big = "23098475029384702983476098230754973209482573"
+        self.assertRaises(ValueError, ("{" + big + "}").format)
+        self.assertRaises(ValueError, ("{[" + big + "]}").format, [0])
 
         # issue 6089
         self.assertRaises(ValueError, "{0[0]x}".format, [None])
@@ -760,6 +757,7 @@ class UnicodeTest(
         self.assertRaises(OverflowError, "%c".__mod__, (0x110000,))
         self.assertEqual('%c' % '\U00021483', '\U00021483')
         self.assertRaises(TypeError, "%c".__mod__, "aa")
+        self.assertRaises(ValueError, "%.1\u1032f".__mod__, (1.0/3))
 
         # formatting jobs delegated from the string implementation:
         self.assertEqual('...%(foo)s...' % {'foo':"abc"}, '...abc...')
@@ -945,6 +943,159 @@ class UnicodeTest(
         # * strict decoding testing for all of the
         #   UTF8_ERROR cases in PyUnicode_DecodeUTF8
 
+    def test_utf8_decode_valid_sequences(self):
+        sequences = [
+            # single byte
+            (b'\x00', '\x00'), (b'a', 'a'), (b'\x7f', '\x7f'),
+            # 2 bytes
+            (b'\xc2\x80', '\x80'), (b'\xdf\xbf', '\u07ff'),
+            # 3 bytes
+            (b'\xe0\xa0\x80', '\u0800'), (b'\xed\x9f\xbf', '\ud7ff'),
+            (b'\xee\x80\x80', '\uE000'), (b'\xef\xbf\xbf', '\uffff'),
+            # 4 bytes
+            (b'\xF0\x90\x80\x80', '\U00010000'),
+            (b'\xf4\x8f\xbf\xbf', '\U0010FFFF')
+        ]
+        for seq, res in sequences:
+            self.assertEqual(seq.decode('utf-8'), res)
+
+
+    def test_utf8_decode_invalid_sequences(self):
+        # continuation bytes in a sequence of 2, 3, or 4 bytes
+        continuation_bytes = [bytes([x]) for x in range(0x80, 0xC0)]
+        # start bytes of a 2-byte sequence equivalent to codepoints < 0x7F
+        invalid_2B_seq_start_bytes = [bytes([x]) for x in range(0xC0, 0xC2)]
+        # start bytes of a 4-byte sequence equivalent to codepoints > 0x10FFFF
+        invalid_4B_seq_start_bytes = [bytes([x]) for x in range(0xF5, 0xF8)]
+        invalid_start_bytes = (
+            continuation_bytes + invalid_2B_seq_start_bytes +
+            invalid_4B_seq_start_bytes + [bytes([x]) for x in range(0xF7, 0x100)]
+        )
+
+        for byte in invalid_start_bytes:
+            self.assertRaises(UnicodeDecodeError, byte.decode, 'utf-8')
+
+        for sb in invalid_2B_seq_start_bytes:
+            for cb in continuation_bytes:
+                self.assertRaises(UnicodeDecodeError, (sb+cb).decode, 'utf-8')
+
+        for sb in invalid_4B_seq_start_bytes:
+            for cb1 in continuation_bytes[:3]:
+                for cb3 in continuation_bytes[:3]:
+                    self.assertRaises(UnicodeDecodeError,
+                                      (sb+cb1+b'\x80'+cb3).decode, 'utf-8')
+
+        for cb in [bytes([x]) for x in range(0x80, 0xA0)]:
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xE0'+cb+b'\x80').decode, 'utf-8')
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xE0'+cb+b'\xBF').decode, 'utf-8')
+        # surrogates
+        for cb in [bytes([x]) for x in range(0xA0, 0xC0)]:
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xED'+cb+b'\x80').decode, 'utf-8')
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xED'+cb+b'\xBF').decode, 'utf-8')
+        for cb in [bytes([x]) for x in range(0x80, 0x90)]:
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xF0'+cb+b'\x80\x80').decode, 'utf-8')
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xF0'+cb+b'\xBF\xBF').decode, 'utf-8')
+        for cb in [bytes([x]) for x in range(0x90, 0xC0)]:
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xF4'+cb+b'\x80\x80').decode, 'utf-8')
+            self.assertRaises(UnicodeDecodeError,
+                              (b'\xF4'+cb+b'\xBF\xBF').decode, 'utf-8')
+
+    def test_issue8271(self):
+        # Issue #8271: during the decoding of an invalid UTF-8 byte sequence,
+        # only the start byte and the continuation byte(s) are now considered
+        # invalid, instead of the number of bytes specified by the start byte.
+        # See http://www.unicode.org/versions/Unicode5.2.0/ch03.pdf (page 95,
+        # table 3-8, Row 2) for more information about the algorithm used.
+        FFFD = '\ufffd'
+        sequences = [
+            # invalid start bytes
+            (b'\x80', FFFD), # continuation byte
+            (b'\x80\x80', FFFD*2), # 2 continuation bytes
+            (b'\xc0', FFFD),
+            (b'\xc0\xc0', FFFD*2),
+            (b'\xc1', FFFD),
+            (b'\xc1\xc0', FFFD*2),
+            (b'\xc0\xc1', FFFD*2),
+            # with start byte of a 2-byte sequence
+            (b'\xc2', FFFD), # only the start byte
+            (b'\xc2\xc2', FFFD*2), # 2 start bytes
+            (b'\xc2\xc2\xc2', FFFD*3), # 2 start bytes
+            (b'\xc2\x41', FFFD+'A'), # invalid continuation byte
+            # with start byte of a 3-byte sequence
+            (b'\xe1', FFFD), # only the start byte
+            (b'\xe1\xe1', FFFD*2), # 2 start bytes
+            (b'\xe1\xe1\xe1', FFFD*3), # 3 start bytes
+            (b'\xe1\xe1\xe1\xe1', FFFD*4), # 4 start bytes
+            (b'\xe1\x80', FFFD), # only 1 continuation byte
+            (b'\xe1\x41', FFFD+'A'), # invalid continuation byte
+            (b'\xe1\x41\x80', FFFD+'A'+FFFD), # invalid cb followed by valid cb
+            (b'\xe1\x41\x41', FFFD+'AA'), # 2 invalid continuation bytes
+            (b'\xe1\x80\x41', FFFD+'A'), # only 1 valid continuation byte
+            (b'\xe1\x80\xe1\x41', FFFD*2+'A'), # 1 valid and the other invalid
+            (b'\xe1\x41\xe1\x80', FFFD+'A'+FFFD), # 1 invalid and the other valid
+            # with start byte of a 4-byte sequence
+            (b'\xf1', FFFD), # only the start byte
+            (b'\xf1\xf1', FFFD*2), # 2 start bytes
+            (b'\xf1\xf1\xf1', FFFD*3), # 3 start bytes
+            (b'\xf1\xf1\xf1\xf1', FFFD*4), # 4 start bytes
+            (b'\xf1\xf1\xf1\xf1\xf1', FFFD*5), # 5 start bytes
+            (b'\xf1\x80', FFFD), # only 1 continuation bytes
+            (b'\xf1\x80\x80', FFFD), # only 2 continuation bytes
+            (b'\xf1\x80\x41', FFFD+'A'), # 1 valid cb and 1 invalid
+            (b'\xf1\x80\x41\x41', FFFD+'AA'), # 1 valid cb and 1 invalid
+            (b'\xf1\x80\x80\x41', FFFD+'A'), # 2 valid cb and 1 invalid
+            (b'\xf1\x41\x80', FFFD+'A'+FFFD), # 1 invalid cv and 1 valid
+            (b'\xf1\x41\x80\x80', FFFD+'A'+FFFD*2), # 1 invalid cb and 2 invalid
+            (b'\xf1\x41\x80\x41', FFFD+'A'+FFFD+'A'), # 2 invalid cb and 1 invalid
+            (b'\xf1\x41\x41\x80', FFFD+'AA'+FFFD), # 1 valid cb and 1 invalid
+            (b'\xf1\x41\xf1\x80', FFFD+'A'+FFFD),
+            (b'\xf1\x41\x80\xf1', FFFD+'A'+FFFD*2),
+            (b'\xf1\xf1\x80\x41', FFFD*2+'A'),
+            (b'\xf1\x41\xf1\xf1', FFFD+'A'+FFFD*2),
+            # with invalid start byte of a 4-byte sequence (rfc2279)
+            (b'\xf5', FFFD), # only the start byte
+            (b'\xf5\xf5', FFFD*2), # 2 start bytes
+            (b'\xf5\x80', FFFD*2), # only 1 continuation byte
+            (b'\xf5\x80\x80', FFFD*3), # only 2 continuation byte
+            (b'\xf5\x80\x80\x80', FFFD*4), # 3 continuation bytes
+            (b'\xf5\x80\x41', FFFD*2+'A'), #  1 valid cb and 1 invalid
+            (b'\xf5\x80\x41\xf5', FFFD*2+'A'+FFFD),
+            (b'\xf5\x41\x80\x80\x41', FFFD+'A'+FFFD*2+'A'),
+            # with invalid start byte of a 5-byte sequence (rfc2279)
+            (b'\xf8', FFFD), # only the start byte
+            (b'\xf8\xf8', FFFD*2), # 2 start bytes
+            (b'\xf8\x80', FFFD*2), # only one continuation byte
+            (b'\xf8\x80\x41', FFFD*2 + 'A'), # 1 valid cb and 1 invalid
+            (b'\xf8\x80\x80\x80\x80', FFFD*5), # invalid 5 bytes seq with 5 bytes
+            # with invalid start byte of a 6-byte sequence (rfc2279)
+            (b'\xfc', FFFD), # only the start byte
+            (b'\xfc\xfc', FFFD*2), # 2 start bytes
+            (b'\xfc\x80\x80', FFFD*3), # only 2 continuation bytes
+            (b'\xfc\x80\x80\x80\x80\x80', FFFD*6), # 6 continuation bytes
+            # invalid start byte
+            (b'\xfe', FFFD),
+            (b'\xfe\x80\x80', FFFD*3),
+            # other sequences
+            (b'\xf1\x80\x41\x42\x43', '\ufffd\x41\x42\x43'),
+            (b'\xf1\x80\xff\x42\x43', '\ufffd\ufffd\x42\x43'),
+            (b'\xf1\x80\xc2\x81\x43', '\ufffd\x81\x43'),
+            (b'\x61\xF1\x80\x80\xE1\x80\xC2\x62\x80\x63\x80\xBF\x64',
+             '\x61\uFFFD\uFFFD\uFFFD\x62\uFFFD\x63\uFFFD\uFFFD\x64'),
+        ]
+        for n, (seq, res) in enumerate(sequences):
+            self.assertRaises(UnicodeDecodeError, seq.decode, 'utf-8', 'strict')
+            self.assertEqual(seq.decode('utf-8', 'replace'), res)
+            self.assertEqual((seq+b'b').decode('utf-8', 'replace'), res+'b')
+            self.assertEqual(seq.decode('utf-8', 'ignore'),
+                             res.replace('\uFFFD', ''))
+
     def test_codecs_idna(self):
         # Test whether trailing dot is preserved
         self.assertEqual("www.python.org.".encode("idna"), b"www.python.org.")
@@ -1042,8 +1193,8 @@ class UnicodeTest(
         s = bytes(range(128))
         for encoding in (
             'cp037', 'cp1026',
-            'cp437', 'cp500', 'cp737', 'cp775', 'cp850',
-            'cp852', 'cp855', 'cp860', 'cp861', 'cp862',
+            'cp437', 'cp500', 'cp720', 'cp737', 'cp775', 'cp850',
+            'cp852', 'cp855', 'cp858', 'cp860', 'cp861', 'cp862',
             'cp863', 'cp865', 'cp866',
             'iso8859_10', 'iso8859_13', 'iso8859_14', 'iso8859_15',
             'iso8859_2', 'iso8859_3', 'iso8859_4', 'iso8859_5', 'iso8859_6',
@@ -1070,8 +1221,8 @@ class UnicodeTest(
         s = bytes(range(128, 256))
         for encoding in (
             'cp037', 'cp1026',
-            'cp437', 'cp500', 'cp737', 'cp775', 'cp850',
-            'cp852', 'cp855', 'cp860', 'cp861', 'cp862',
+            'cp437', 'cp500', 'cp720', 'cp737', 'cp775', 'cp850',
+            'cp852', 'cp855', 'cp858', 'cp860', 'cp861', 'cp862',
             'cp863', 'cp865', 'cp866',
             'iso8859_10', 'iso8859_13', 'iso8859_14', 'iso8859_15',
             'iso8859_2', 'iso8859_4', 'iso8859_5',
@@ -1226,6 +1377,14 @@ class UnicodeTest(
         alloc = lambda: "a" * (sys.maxsize // charwidth * 2)
         self.assertRaises(MemoryError, alloc)
         self.assertRaises(MemoryError, alloc)
+
+    def test_format_subclass(self):
+        class S(str):
+            def __str__(self):
+                return '__str__ overridden'
+        s = S('xxx')
+        self.assertEquals("%s" % s, '__str__ overridden')
+        self.assertEquals("{}".format(s), '__str__ overridden')
 
 
 def test_main():

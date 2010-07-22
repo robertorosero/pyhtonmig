@@ -208,7 +208,7 @@ next line is a logical continuation of the line::
 
    print(hello)
 
-Note that newlines still need to be embedded in the string using ``\n``; the
+Note that newlines still need to be embedded in the string using ``\n`` -- the
 newline following the trailing backslash is discarded.  This example would print
 the following:
 
@@ -481,6 +481,12 @@ concatenated and so on::
    ['spam', 'eggs', 'bacon', 4]
    >>> 3*a[:3] + ['Boo!']
    ['spam', 'eggs', 100, 'spam', 'eggs', 100, 'spam', 'eggs', 100, 'Boo!']
+
+All slice operations return a new list containing the requested elements.  This
+means that the following slice returns a shallow copy of the list *a*::
+
+   >>> a[:]
+   ['spam', 'eggs', 100, 1234]
 
 Unlike strings, which are *immutable*, it is possible to change individual
 elements of a list::

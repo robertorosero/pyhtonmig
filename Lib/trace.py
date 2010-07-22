@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # portions copyright 2001, Autonomous Zones Industries, Inc., all rights...
 # err...  reserved and offered to the public under the terms of the
@@ -117,7 +117,7 @@ class Ignore:
         self._mods = modules or []
         self._dirs = dirs or []
 
-        self._dirs = map(os.path.normpath, self._dirs)
+        self._dirs = list(map(os.path.normpath, self._dirs))
         self._ignore = { '<string>': 1 }
 
     def names(self, filename, modulename):
@@ -257,7 +257,8 @@ class CoverageResults:
         if self.calledfuncs:
             print()
             print("functions called:")
-            for filename, modulename, funcname in sorted(calls.keys()):
+            calls = self.calledfuncs.keys()
+            for filename, modulename, funcname in sorted(calls):
                 print(("filename: %s, modulename: %s, funcname: %s"
                        % (filename, modulename, funcname)))
 
@@ -796,12 +797,9 @@ def main(argv=None):
                   ignoredirs=ignore_dirs, infile=counts_file,
                   outfile=counts_file, timing=timing)
         try:
-            fp = open(progname)
-            try:
-                script = fp.read()
-            finally:
-                fp.close()
-            t.run('exec(%r)' % (script,))
+            with open(progname) as fp:
+                code = compile(fp.read(), progname, 'exec')
+            t.run(code)
         except IOError as err:
             _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))
         except SystemExit:

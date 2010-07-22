@@ -5,7 +5,7 @@
 
     Sphinx extension with Python doc-specific markup.
 
-    :copyright: 2008, 2009 by Georg Brandl.
+    :copyright: 2008, 2009, 2010 by Georg Brandl.
     :license: Python license.
 """
 
@@ -78,7 +78,7 @@ pydoc_topic_labels = [
     'assert', 'assignment', 'atom-identifiers', 'atom-literals',
     'attribute-access', 'attribute-references', 'augassign', 'binary',
     'bitwise', 'bltin-code-objects', 'bltin-ellipsis-object',
-    'bltin-file-objects', 'bltin-null-object', 'bltin-type-objects', 'booleans',
+    'bltin-null-object', 'bltin-type-objects', 'booleans',
     'break', 'callable-types', 'calls', 'class', 'comparisons', 'compound',
     'context-managers', 'continue', 'conversions', 'customization', 'debugger',
     'del', 'dict', 'dynamic-features', 'else', 'exceptions', 'execmodel',
@@ -149,7 +149,7 @@ import suspicious
 import re
 from sphinx import addnodes
 
-opcode_sig_re = re.compile(r'(\w+(?:\+\d)?)\s*\((.*)\)')
+opcode_sig_re = re.compile(r'(\w+(?:\+\d)?)(?:\s*\((.*)\))?')
 
 def parse_opcode_signature(env, sig, signode):
     """Transform an opcode signature into RST nodes."""
@@ -158,10 +158,33 @@ def parse_opcode_signature(env, sig, signode):
         raise ValueError
     opname, arglist = m.groups()
     signode += addnodes.desc_name(opname, opname)
-    paramlist = addnodes.desc_parameterlist()
-    signode += paramlist
-    paramlist += addnodes.desc_parameter(arglist, arglist)
+    if arglist is not None:
+        paramlist = addnodes.desc_parameterlist()
+        signode += paramlist
+        paramlist += addnodes.desc_parameter(arglist, arglist)
     return opname.strip()
+
+
+pdbcmd_sig_re = re.compile(r'([a-z()!]+)\s*(.*)')
+
+# later...
+#pdbargs_tokens_re = re.compile(r'''[a-zA-Z]+  |  # identifiers
+#                                   [.,:]+     |  # punctuation
+#                                   [\[\]()]   |  # parens
+#                                   \s+           # whitespace
+#                                   ''', re.X)
+
+def parse_pdb_command(env, sig, signode):
+    """Transform a pdb command signature into RST nodes."""
+    m = pdbcmd_sig_re.match(sig)
+    if m is None:
+        raise ValueError
+    name, args = m.groups()
+    fullname = name.replace('(', '').replace(')', '')
+    signode += addnodes.desc_name(name, name)
+    if args:
+        signode += addnodes.desc_addname(' '+args, ' '+args)
+    return fullname
 
 
 def setup(app):
@@ -171,4 +194,6 @@ def setup(app):
     app.add_builder(suspicious.CheckSuspiciousMarkupBuilder)
     app.add_description_unit('opcode', 'opcode', '%s (opcode)',
                              parse_opcode_signature)
+    app.add_description_unit('pdbcommand', 'pdbcmd', '%s (pdb command)',
+                             parse_pdb_command)
     app.add_description_unit('2to3fixer', '2to3fixer', '%s (2to3 fixer)')

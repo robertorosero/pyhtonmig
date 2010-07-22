@@ -28,7 +28,7 @@ Using the subprocess Module
 This module defines one class called :class:`Popen`:
 
 
-.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=False, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0)
+.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=False, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0, restore_signals=True, start_new_session=False)
 
    Arguments are:
 
@@ -41,14 +41,40 @@ This module defines one class called :class:`Popen`:
    name for the executing program in utilities such as :program:`ps`.
 
    On Unix, with *shell=False* (default): In this case, the Popen class uses
-   :meth:`os.execvp` to execute the child program. *args* should normally be a
-   sequence.  A string will be treated as a sequence with the string as the only
-   item (the program to execute).
+   :meth:`os.execvp` like behavior to execute the child program.
+   *args* should normally be a
+   sequence.  If a string is specified for *args*, it will be used as the name
+   or path of the program to execute; this will only work if the program is
+   being given no arguments.
 
-   On Unix, with *shell=True*: If args is a string, it specifies the command string
-   to execute through the shell.  If *args* is a sequence, the first item specifies
-   the command string, and any additional items will be treated as additional shell
-   arguments.
+   .. note::
+
+      :meth:`shlex.split` can be useful when determining the correct
+      tokenization for *args*, especially in complex cases::
+
+         >>> import shlex, subprocess
+         >>> command_line = input()
+         /bin/vikings -input eggs.txt -output "spam spam.txt" -cmd "echo '$MONEY'"
+         >>> args = shlex.split(command_line)
+         >>> print(args)
+         ['/bin/vikings', '-input', 'eggs.txt', '-output', 'spam spam.txt', '-cmd', "echo '$MONEY'"]
+         >>> p = subprocess.Popen(args) # Success!
+
+      Note in particular that options (such as *-input*) and arguments (such
+      as *eggs.txt*) that are separated by whitespace in the shell go in separate
+      list elements, while arguments that need quoting or backslash escaping when
+      used in the shell (such as filenames containing spaces or the *echo* command
+      shown above) are single list elements.
+
+   On Unix, with *shell=True*: If args is a string, it specifies the command
+   string to execute through the shell.  This means that the string must be
+   formatted exactly as it would be when typed at the shell prompt.  This
+   includes, for example, quoting or backslash escaping filenames with spaces in
+   them.  If *args* is a sequence, the first item specifies the command string, and
+   any additional items will be treated as additional arguments to the shell
+   itself.  That is to say, *Popen* does the equivalent of::
+
+      Popen(['/bin/sh', '-c', args[0], args[1], ...])
 
    On Windows: the :class:`Popen` class uses CreateProcess() to execute the child
    program, which operates on strings.  If *args* is a sequence, it will be
@@ -62,6 +88,12 @@ This module defines one class called :class:`Popen`:
    buffered, any other positive value means use a buffer of (approximately) that
    size.  A negative *bufsize* means to use the system default, which usually means
    fully buffered.  The default value for *bufsize* is :const:`0` (unbuffered).
+
+   .. note::
+
+      If you experience performance issues, it is recommended that you try to
+      enable buffering by setting *bufsize* to either -1 or a large enough
+      positive value (such as 4096).
 
    The *executable* argument specifies the program to execute. It is very seldom
    needed: Usually, the program to execute is defined by the *args* argument. If
@@ -83,7 +115,23 @@ This module defines one class called :class:`Popen`:
    applications should be captured into the same file handle as for stdout.
 
    If *preexec_fn* is set to a callable object, this object will be called in the
-   child process just before the child is executed. (Unix only)
+   child process just before the child is executed.
+   (Unix only)
+
+   .. warning::
+
+      The *preexec_fn* parameter is not safe to use in the presence of threads
+      in your application.  The child process could deadlock before exec is
+      called.
+      If you must use it, keep it trivial!  Minimize the number of libraries
+      you call into.
+
+   .. note::
+
+      If you need to modify the environment for the child use the *env*
+      parameter rather than doing it in a *preexec_fn*.
+      The *start_new_session* parameter can take the place of a previously
+      common use of *preexec_fn* to call os.setsid() in the child.
 
    If *close_fds* is true, all file descriptors except :const:`0`, :const:`1` and
    :const:`2` will be closed before the child process is executed. (Unix only).
@@ -99,16 +147,29 @@ This module defines one class called :class:`Popen`:
    searching the executable, so you can't specify the program's path relative to
    *cwd*.
 
+   If *restore_signals* is True (the default) all signals that Python has set to
+   SIG_IGN are restored to SIG_DFL in the child process before the exec.
+   Currently this includes the SIGPIPE, SIGXFZ and SIGXFSZ signals.
+   (Unix only)
+
+   .. versionchanged:: 3.2
+      *restore_signals* was added.
+
+   If *start_new_session* is True the setsid() system call will be made in the
+   child process prior to the execution of the subprocess.  (Unix only)
+
+   .. versionchanged:: 3.2
+      *start_new_session* was added.
+
    If *env* is not ``None``, it must be a mapping that defines the environment
-   variables for the new process; these are used instead of inheriting the current
-   process' environment, which is the default behavior.
+   variables for the new process; these are used instead of the default
+   behavior of inheriting the current process' environment.
 
    .. note::
 
-      If specified, *env* must provide any variables required
-      for the program to execute.  On Windows, in order to run a
-      `side-by-side assembly`_ the specified *env* **must** include a valid
-      :envvar:`SystemRoot`.
+      If specified, *env* must provide any variables required for the program to
+      execute.  On Windows, in order to run a `side-by-side assembly`_ the
+      specified *env* **must** include a valid :envvar:`SystemRoot`.
 
    .. _side-by-side assembly: http://en.wikipedia.org/wiki/Side-by-Side_Assembly
 
@@ -155,9 +216,9 @@ This module also defines four shortcut functions:
    Run command with arguments.  Wait for command to complete, then return the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      retcode = call(["ls", "-l"])
+      >>> retcode = subprocess.call(["ls", "-l"])
 
    .. warning::
 
@@ -174,9 +235,10 @@ This module also defines four shortcut functions:
    :exc:`CalledProcessError` object will have the return code in the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      check_call(["ls", "-l"])
+      >>> subprocess.check_call(["ls", "-l"])
+      0
 
    .. warning::
 
@@ -195,15 +257,15 @@ This module also defines four shortcut functions:
    The arguments are the same as for the :class:`Popen` constructor.  Example::
 
       >>> subprocess.check_output(["ls", "-l", "/dev/null"])
-      'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
+      b'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
 
    The stdout argument is not allowed as it is used internally.
    To capture standard error in the result, use ``stderr=subprocess.STDOUT``::
 
       >>> subprocess.check_output(
-              ["/bin/sh", "-c", "ls non_existent_file ; exit 0"],
-              stderr=subprocess.STDOUT)
-      'ls: non_existent_file: No such file or directory\n'
+      ...     ["/bin/sh", "-c", "ls non_existent_file; exit 0"],
+      ...     stderr=subprocess.STDOUT)
+      b'ls: non_existent_file: No such file or directory\n'
 
    .. versionadded:: 3.1
 
@@ -217,7 +279,6 @@ This module also defines four shortcut functions:
    stripped from the output.  The exit status for the command can be interpreted
    according to the rules for the C function :cfunc:`wait`.  Example::
 
-      >>> import subprocess
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
       >>> subprocess.getstatusoutput('cat /bin/junk')
@@ -234,7 +295,6 @@ This module also defines four shortcut functions:
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
    value is a string containing the command's output.  Example::
 
-      >>> import subprocess
       >>> subprocess.getoutput('ls /bin/ls')
       '/bin/ls'
 
@@ -319,8 +379,9 @@ Instances of the :class:`Popen` class have the following methods:
 
    .. note::
 
-      On Windows only SIGTERM is supported so far. It's an alias for
-      :meth:`terminate`.
+      On Windows, SIGTERM is an alias for :meth:`terminate`. CTRL_C_EVENT and
+      CTRL_BREAK_EVENT can be sent to processes started with a `creationflags`
+      parameter which includes `CREATE_NEW_PROCESS_GROUP`.
 
 
 .. method:: Popen.terminate()
@@ -368,6 +429,9 @@ The following attributes are also available:
 .. attribute:: Popen.pid
 
    The process ID of the child process.
+
+   Note that if you set the *shell* argument to ``True``, this is the process ID
+   of the spawned shell.
 
 
 .. attribute:: Popen.returncode
@@ -511,7 +575,7 @@ Return code handling translates as follows::
    pipe = os.popen(cmd, 'w')
    ...
    rc = pipe.close()
-   if  rc != None and rc % 256:
+   if rc is not None and rc >> 8:
        print("There were some errors")
    ==>
    process = Popen(cmd, 'w', stdin=PIPE)

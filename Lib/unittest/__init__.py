@@ -27,7 +27,7 @@ Further information is available in the bundled documentation, and from
   http://docs.python.org/library/unittest.html
 
 Copyright (c) 1999-2003 Steve Purcell
-Copyright (c) 2003-2009 Python Software Foundation
+Copyright (c) 2003-2010 Python Software Foundation
 This module is free software, and you may redistribute it and/or modify
 it under the same terms as Python itself, so long as this copyright message
 and disclaimer are retained in their original form.
@@ -47,17 +47,23 @@ SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 __all__ = ['TestResult', 'TestCase', 'TestSuite',
            'TextTestRunner', 'TestLoader', 'FunctionTestCase', 'main',
            'defaultTestLoader', 'SkipTest', 'skip', 'skipIf', 'skipUnless',
-           'expectedFailure']
+           'expectedFailure', 'TextTestResult', 'installHandler',
+           'registerResult', 'removeResult', 'removeHandler']
 
 # Expose obsolete functions for backwards compatibility
 __all__.extend(['getTestCaseNames', 'makeSuite', 'findTestCases'])
 
+__unittest = True
 
 from .result import TestResult
 from .case import (TestCase, FunctionTestCase, SkipTest, skip, skipIf,
                    skipUnless, expectedFailure)
-from .suite import TestSuite
+from .suite import BaseTestSuite, TestSuite
 from .loader import (TestLoader, defaultTestLoader, makeSuite, getTestCaseNames,
                      findTestCases)
 from .main import TestProgram, main
-from .runner import TextTestRunner
+from .runner import TextTestRunner, TextTestResult
+from .signals import installHandler, registerResult, removeResult, removeHandler
+
+# deprecated
+_TextTestResult = TextTestResult

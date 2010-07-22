@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
 from test import support
@@ -6,9 +6,11 @@ from test.test_urllib2 import sanepathname2url
 
 import os
 import socket
-import sys
 import urllib.error
 import urllib.request
+import sys
+
+TIMEOUT = 60  # seconds
 
 
 def _retry_thrice(func, exc, *args, **kwargs):
@@ -75,8 +77,6 @@ class AuthTests(unittest.TestCase):
 class CloseSocketTest(unittest.TestCase):
 
     def test_close(self):
-        import socket, http.client, gc
-
         # calling .close() on urllib2's response objects should close the
         # underlying socket
 
@@ -150,7 +150,6 @@ class OtherNetworkTests(unittest.TestCase):
 ##             self._test_urls(urls, self._extra_handlers()+[bauth, dauth])
 
     def _test_urls(self, urls, handlers, retry=True):
-        import socket
         import time
         import logging
         debug = logging.getLogger("test_urllib2").debug
@@ -166,20 +165,29 @@ class OtherNetworkTests(unittest.TestCase):
                 req = expected_err = None
             debug(url)
             try:
-                f = urlopen(url, req)
+                f = urlopen(url, req, TIMEOUT)
             except EnvironmentError as err:
                 debug(err)
                 if expected_err:
                     msg = ("Didn't get expected error(s) %s for %s %s, got %s: %s" %
                            (expected_err, url, req, type(err), err))
-                    self.assertTrue(isinstance(err, expected_err), msg)
+                    self.assertIsInstance(err, expected_err, msg)
+            except urllib.error.URLError as err:
+                if isinstance(err[0], socket.timeout):
+                    print("<timeout: %s>" % url, file=sys.stderr)
+                    continue
+                else:
+                    raise
             else:
-                with support.time_out, \
-                     support.socket_peer_reset, \
-                     support.ioerror_peer_reset:
-                    buf = f.read()
+                try:
+                    with support.time_out, \
+                         support.socket_peer_reset, \
+                         support.ioerror_peer_reset:
+                        buf = f.read()
+                        debug("read %d bytes" % len(buf))
+                except socket.timeout:
+                    print("<timeout: %s>" % url, file=sys.stderr)
                 f.close()
-                debug("read %d bytes" % len(buf))
             debug("******** next url coming up...")
             time.sleep(0.1)
 
@@ -221,7 +229,7 @@ class TimeoutTest(unittest.TestCase):
         u = _urlopen_with_retry("http://www.python.org", timeout=120)
         self.assertEqual(u.fp.raw._sock.gettimeout(), 120)
 
-    FTP_HOST = "ftp://ftp.mirror.nl/pub/mirror/gnu/"
+    FTP_HOST = "ftp://ftp.mirror.nl/pub/gnu/"
 
     def test_ftp_basic(self):
         self.assertTrue(socket.getdefaulttimeout() is None)

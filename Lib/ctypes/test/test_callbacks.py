@@ -118,6 +118,22 @@ class Callbacks(unittest.TestCase):
         prototype = self.functype.__func__(object)
         self.assertRaises(TypeError, prototype, lambda: None)
 
+    def test_issue_7959(self):
+        proto = self.functype.__func__(None)
+
+        class X(object):
+            def func(self): pass
+            def __init__(self):
+                self.v = proto(self.func)
+
+        import gc
+        for i in range(32):
+            X()
+        gc.collect()
+        live = [x for x in gc.get_objects()
+                if isinstance(x, X)]
+        self.assertEqual(len(live), 0)
+
 try:
     WINFUNCTYPE
 except NameError:
@@ -149,6 +165,41 @@ class SampleCallbacksTestCase(unittest.TestCase):
         diff = abs(result - 1./3.)
 
         self.assertTrue(diff < 0.01, "%s not less than 0.01" % diff)
+
+    def test_issue_8959_a(self):
+        from ctypes.util import find_library
+        libc_path = find_library("c")
+        if not libc_path:
+            return # cannot test
+        libc = CDLL(libc_path)
+
+        @CFUNCTYPE(c_int, POINTER(c_int), POINTER(c_int))
+        def cmp_func(a, b):
+            return a[0] - b[0]
+
+        array = (c_int * 5)(5, 1, 99, 7, 33)
+
+        libc.qsort(array, len(array), sizeof(c_int), cmp_func)
+        self.assertEqual(array[:], [1, 5, 7, 33, 99])
+
+    try:
+        WINFUNCTYPE
+    except NameError:
+        pass
+    else:
+        def test_issue_8959_b(self):
+            from ctypes.wintypes import BOOL, HWND, LPARAM
+            global windowCount
+            windowCount = 0
+
+            @WINFUNCTYPE(BOOL, HWND, LPARAM)
+            def EnumWindowsCallbackFunc(hwnd, lParam):
+                global windowCount
+                windowCount += 1
+                return True #Allow windows to keep enumerating
+
+            windll.user32.EnumWindows(EnumWindowsCallbackFunc, 0)
+            self.assertFalse(windowCount == 0)
 
 ################################################################
 

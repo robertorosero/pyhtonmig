@@ -914,6 +914,11 @@ the left or right by the number of bits given by the second argument.
 A right shift by *n* bits is defined as division by ``pow(2,n)``.  A left shift
 by *n* bits is defined as multiplication with ``pow(2,n)``.
 
+.. note::
+
+   In the current implementation, the right-hand operand is required
+   to be at most :attr:`sys.maxsize`.  If the right-hand operand is larger than
+   :attr:`sys.maxsize` an :exc:`OverflowError` exception is raised.
 
 .. _bitwise:
 
@@ -1026,9 +1031,9 @@ Comparison of objects of the same type depends on the type:
   ``x <= y``.  If the corresponding element does not exist, the shorter
   sequence is ordered first (for example, ``[1,2] < [1,2,3]``).
 
-* Mappings (dictionaries) compare equal if and only if their sorted ``(key,
-  value)`` lists compare equal. [#]_ Outcomes other than equality are resolved
-  consistently, but are not otherwise defined. [#]_
+* Mappings (dictionaries) compare equal if and only if they have the same
+  ``(key, value)`` pairs. Order comparisons ``('<', '<=', '>=', '>')``
+  raise :exc:`TypeError`.
 
 * Sets and frozensets define comparison operators to mean subset and superset
   tests.  Those relations do not define total orderings (the two sets ``{1,2}``
@@ -1061,7 +1066,7 @@ in s`` returns the negation of ``x in s``.  All built-in sequences and set types
 support this as well as dictionary, for which :keyword:`in` tests whether a the
 dictionary has a given key. For container types such as list, tuple, set,
 frozenset, dict, or collections.deque, the expression ``x in y`` is equivalent
-to ``any(x is e or x == e for val e in y)``.
+to ``any(x is e or x == e for e in y)``.
 
 For the string and bytes types, ``x in y`` is true if and only if *x* is a
 substring of *y*.  An equivalent test is ``y.find(x) != -1``.  Empty strings are
@@ -1113,12 +1118,7 @@ Boolean operations
    pair: Conditional; expression
    pair: Boolean; operation
 
-Boolean operations have the lowest priority of all Python operations:
-
 .. productionlist::
-   expression: `conditional_expression` | `lambda_form`
-   expression_nocond: `or_test` | `lambda_form_nocond`
-   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
    or_test: `and_test` | `or_test` "or" `and_test`
    and_test: `not_test` | `and_test` "and" `not_test`
    not_test: `comparison` | "not" `not_test`
@@ -1134,10 +1134,6 @@ truth value by providing a :meth:`__bool__` method.
 
 The operator :keyword:`not` yields ``True`` if its argument is false, ``False``
 otherwise.
-
-The expression ``x if C else y`` first evaluates *C* (*not* *x*); if *C* is
-true, *x* is evaluated and its value is returned; otherwise, *y* is evaluated
-and its value is returned.
 
 .. index:: operator: and
 
@@ -1156,6 +1152,28 @@ replaced by a default value if it is empty, the expression ``s or 'foo'`` yields
 the desired value.  Because :keyword:`not` has to invent a value anyway, it does
 not bother to return a value of the same type as its argument, so e.g., ``not
 'foo'`` yields ``False``, not ``''``.)
+
+
+Conditional Expressions
+=======================
+
+.. index::
+   pair: conditional; expression
+   pair: ternary; operator
+
+.. productionlist::
+   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
+   expression: `conditional_expression` | `lambda_form`
+   expression_nocond: `or_test` | `lambda_form_nocond`
+
+Conditional expressions (sometimes called a "ternary operator") have the lowest
+priority of all Python operations.
+
+The expression ``x if C else y`` first evaluates the condition, *C* (*not* *x*);
+if *C* is true, *x* is evaluated and its value is returned; otherwise, *y* is
+evaluated and its value is returned.
+
+See :pep:`308` for more details about conditional expressions.
 
 
 .. _lambdas:
@@ -1252,6 +1270,8 @@ groups from right to left).
 +===============================================+=====================================+
 | :keyword:`lambda`                             | Lambda expression                   |
 +-----------------------------------------------+-------------------------------------+
+| :keyword:`if` -- :keyword:`else`              | Conditional expression              |
++-----------------------------------------------+-------------------------------------+
 | :keyword:`or`                                 | Boolean OR                          |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`and`                                | Boolean AND                         |
@@ -1309,15 +1329,6 @@ groups from right to left).
    same unicode character (LATIN CAPITAL LETTER C WITH CEDILLA).  To compare
    strings in a human recognizable way, compare using
    :func:`unicodedata.normalize`.
-
-.. [#] The implementation computes this efficiently, without constructing lists
-   or sorting.
-
-.. [#] Earlier versions of Python used lexicographic comparison of the sorted (key,
-   value) lists, but this was very expensive for the common case of comparing
-   for equality.  An even earlier version of Python compared dictionaries by
-   identity only, but this caused surprises because people expected to be able
-   to test a dictionary for emptiness by comparing it to ``{}``.
 
 .. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
    descriptors, you may notice seemingly unusual behaviour in certain uses of

@@ -22,6 +22,7 @@ Initialization, Finalization, and Threads
       module: sys
       triple: module; search; path
       single: PySys_SetArgv()
+      single: PySys_SetArgvEx()
       single: Py_Finalize()
 
    Initialize the Python interpreter.  In an application embedding  Python, this
@@ -31,7 +32,7 @@ Initialization, Finalization, and Threads
    the table of loaded modules (``sys.modules``), and creates the fundamental
    modules :mod:`builtins`, :mod:`__main__` and :mod:`sys`.  It also initializes
    the module search path (``sys.path``). It does not set ``sys.argv``; use
-   :cfunc:`PySys_SetArgv` for that.  This is a no-op when called for a second time
+   :cfunc:`PySys_SetArgvEx` for that.  This is a no-op when called for a second time
    (without calling :cfunc:`Py_Finalize` first).  There is no return value; it is a
    fatal error if the initialization fails.
 
@@ -256,14 +257,15 @@ Initialization, Finalization, and Threads
       triple: module; search; path
       single: path (in module sys)
 
-   Return the default module search path; this is computed from the  program name
-   (set by :cfunc:`Py_SetProgramName` above) and some environment variables.  The
-   returned string consists of a series of directory names separated by a platform
-   dependent delimiter character.  The delimiter character is ``':'`` on Unix and
-   Mac OS X, ``';'`` on Windows.  The returned string points into static storage;
-   the caller should not modify its value.  The value is available to Python code
-   as the list ``sys.path``, which may be modified to change the future search path
-   for loaded modules.
+   Return the default module search path; this is computed from the program name
+   (set by :cfunc:`Py_SetProgramName` above) and some environment variables.
+   The returned string consists of a series of directory names separated by a
+   platform dependent delimiter character.  The delimiter character is ``':'``
+   on Unix and Mac OS X, ``';'`` on Windows.  The returned string points into
+   static storage; the caller should not modify its value.  The list
+   :data:`sys.path` is initialized with this value on interpreter startup; it
+   can be (and usually is) modified later to change the search path for loading
+   modules.
 
    .. XXX should give the exact rules
 
@@ -281,13 +283,6 @@ Initialization, Finalization, and Threads
    the first three characters are the major and minor version separated by a
    period.  The returned string points into static storage; the caller should not
    modify its value.  The value is available to Python code as :data:`sys.version`.
-
-
-.. cfunction:: const char* Py_GetBuildNumber()
-
-   Return a string representing the Subversion revision that this Python executable
-   was built from.  This number is a string because it may contain a trailing 'M'
-   if Python was built from a mixed revision source tree.
 
 
 .. cfunction:: const char* Py_GetPlatform()
@@ -343,7 +338,7 @@ Initialization, Finalization, and Threads
    ``sys.version``.
 
 
-.. cfunction:: void PySys_SetArgv(int argc, wchar_t **argv)
+.. cfunction:: void PySys_SetArgvEx(int argc, wchar_t **argv, int updatepath)
 
    .. index::
       single: main()
@@ -358,12 +353,39 @@ Initialization, Finalization, and Threads
    string.  If this function fails to initialize :data:`sys.argv`, a fatal
    condition is signalled using :cfunc:`Py_FatalError`.
 
-   This function also prepends the executed script's path to :data:`sys.path`.
-   If no script is executed (in the case of calling ``python -c`` or just the
-   interactive interpreter), the empty string is used instead.
+   If *updatepath* is zero, this is all the function does.  If *updatepath*
+   is non-zero, the function also modifies :data:`sys.path` according to the
+   following algorithm:
+
+   - If the name of an existing script is passed in ``argv[0]``, the absolute
+     path of the directory where the script is located is prepended to
+     :data:`sys.path`.
+   - Otherwise (that is, if *argc* is 0 or ``argv[0]`` doesn't point
+     to an existing file name), an empty string is prepended to
+     :data:`sys.path`, which is the same as prepending the current working
+     directory (``"."``).
+
+   .. note::
+      It is recommended that applications embedding the Python interpreter
+      for purposes other than executing a single script pass 0 as *updatepath*,
+      and update :data:`sys.path` themselves if desired.
+      See `CVE-2008-5983 <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2008-5983>`_.
+
+      On versions before 3.1.3, you can achieve the same effect by manually
+      popping the first :data:`sys.path` element after having called
+      :cfunc:`PySys_SetArgv`, for example using::
+
+         PyRun_SimpleString("import sys; sys.path.pop(0)\n");
+
+   .. versionadded:: 3.1.3
 
    .. XXX impl. doesn't seem consistent in allowing 0/NULL for the params;
       check w/ Guido.
+
+
+.. cfunction:: void PySys_SetArgv(int argc, wchar_t **argv)
+
+   This function works like :cfunc:`PySys_SetArgvEx` with *updatepath* set to 1.
 
 
 .. cfunction:: void Py_SetPythonHome(wchar_t *home)
@@ -815,7 +837,7 @@ pointer and a void argument.
 .. index:: single: setcheckinterval() (in module sys)
 
 Every check interval, when the global interpreter lock is released and
-reacquired, python will also call any such provided functions.  This can be used
+reacquired, Python will also call any such provided functions.  This can be used
 for example by asynchronous IO handlers.  The notification can be scheduled from
 a worker thread and the actual call than made at the earliest convenience by the
 main thread where it has possession of the global interpreter lock and can
@@ -833,7 +855,7 @@ perform any Python API calls.
    exception.  The notification function won't be interrupted to perform another
    asynchronous notification recursively, but it can still be interrupted to
    switch threads if the global interpreter lock is released, for example, if it
-   calls back into python code.
+   calls back into Python code.
 
    This function returns 0 on success in which case the notification has been
    scheduled.  Otherwise, for example if the notification buffer is full, it

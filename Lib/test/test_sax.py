@@ -15,7 +15,9 @@ from xml.sax.xmlreader import InputSource, AttributesImpl, AttributesNSImpl
 from io import StringIO
 from test.support import findfile, run_unittest
 import unittest
-import os
+
+TEST_XMLFILE = findfile("test.xml", subdir="xmltestdata")
+TEST_XMLFILE_OUT = findfile("test.xml.out", subdir="xmltestdata")
 
 ns_uri = "http://www.python.org/xml-ns/saxtest/"
 
@@ -30,7 +32,7 @@ class XmlTestBase(unittest.TestCase):
         self.assertEquals(attrs.getNames(), [])
         self.assertEquals(attrs.getQNames(), [])
         self.assertEquals(len(attrs), 0)
-        self.assertFalse("attr" in attrs)
+        self.assertNotIn("attr", attrs)
         self.assertEquals(list(attrs.keys()), [])
         self.assertEquals(attrs.get("attrs"), None)
         self.assertEquals(attrs.get("attrs", 25), 25)
@@ -47,7 +49,7 @@ class XmlTestBase(unittest.TestCase):
         self.assertEquals(attrs.getNames(), [])
         self.assertEquals(attrs.getQNames(), [])
         self.assertEquals(len(attrs), 0)
-        self.assertFalse((ns_uri, "attr") in attrs)
+        self.assertNotIn((ns_uri, "attr"), attrs)
         self.assertEquals(list(attrs.keys()), [])
         self.assertEquals(attrs.get((ns_uri, "attr")), None)
         self.assertEquals(attrs.get((ns_uri, "attr"), 25), 25)
@@ -59,7 +61,7 @@ class XmlTestBase(unittest.TestCase):
         self.assertEquals(attrs.getNames(), ["attr"])
         self.assertEquals(attrs.getQNames(), ["attr"])
         self.assertEquals(len(attrs), 1)
-        self.assertTrue("attr" in attrs)
+        self.assertIn("attr", attrs)
         self.assertEquals(list(attrs.keys()), ["attr"])
         self.assertEquals(attrs.get("attr"), "val")
         self.assertEquals(attrs.get("attr", 25), "val")
@@ -311,7 +313,7 @@ class XMLFilterBaseTest(unittest.TestCase):
 #
 # ===========================================================================
 
-xml_test_out = open(findfile("test.xml.out")).read()
+xml_test_out = open(TEST_XMLFILE_OUT).read()
 
 class ExpatReaderTest(XmlTestBase):
 
@@ -323,7 +325,7 @@ class ExpatReaderTest(XmlTestBase):
         xmlgen = XMLGenerator(result)
 
         parser.setContentHandler(xmlgen)
-        parser.parse(open(findfile("test.xml")))
+        parser.parse(open(TEST_XMLFILE))
 
         self.assertEquals(result.getvalue(), xml_test_out)
 
@@ -436,7 +438,7 @@ class ExpatReaderTest(XmlTestBase):
         self.assertTrue((attrs.getQNames() == [] or
                          attrs.getQNames() == ["ns:attr"]))
         self.assertEquals(len(attrs), 1)
-        self.assertTrue((ns_uri, "attr") in attrs)
+        self.assertIn((ns_uri, "attr"), attrs)
         self.assertEquals(attrs.get((ns_uri, "attr")), "val")
         self.assertEquals(attrs.get((ns_uri, "attr"), 25), "val")
         self.assertEquals(list(attrs.items()), [((ns_uri, "attr"), "val")])
@@ -452,7 +454,7 @@ class ExpatReaderTest(XmlTestBase):
         xmlgen = XMLGenerator(result)
 
         parser.setContentHandler(xmlgen)
-        parser.parse(findfile("test.xml"))
+        parser.parse(TEST_XMLFILE)
 
         self.assertEquals(result.getvalue(), xml_test_out)
 
@@ -462,7 +464,7 @@ class ExpatReaderTest(XmlTestBase):
         xmlgen = XMLGenerator(result)
 
         parser.setContentHandler(xmlgen)
-        parser.parse(InputSource(findfile("test.xml")))
+        parser.parse(InputSource(TEST_XMLFILE))
 
         self.assertEquals(result.getvalue(), xml_test_out)
 
@@ -473,7 +475,7 @@ class ExpatReaderTest(XmlTestBase):
 
         parser.setContentHandler(xmlgen)
         inpsrc = InputSource()
-        inpsrc.setByteStream(open(findfile("test.xml")))
+        inpsrc.setByteStream(open(TEST_XMLFILE))
         parser.parse(inpsrc)
 
         self.assertEquals(result.getvalue(), xml_test_out)
@@ -534,9 +536,9 @@ class ExpatReaderTest(XmlTestBase):
         xmlgen = XMLGenerator(result)
         parser = create_parser()
         parser.setContentHandler(xmlgen)
-        parser.parse(findfile("test.xml"))
+        parser.parse(TEST_XMLFILE)
 
-        self.assertEquals(parser.getSystemId(), findfile("test.xml"))
+        self.assertEquals(parser.getSystemId(), TEST_XMLFILE)
         self.assertEquals(parser.getPublicId(), None)
 
 
@@ -626,7 +628,7 @@ class XmlReaderTest(XmlTestBase):
         self.assertEquals(attrs.getNames(), [(ns_uri, "attr")])
         self.assertEquals(attrs.getQNames(), ["ns:attr"])
         self.assertEquals(len(attrs), 1)
-        self.assertTrue((ns_uri, "attr") in attrs)
+        self.assertIn((ns_uri, "attr"), attrs)
         self.assertEquals(list(attrs.keys()), [(ns_uri, "attr")])
         self.assertEquals(attrs.get((ns_uri, "attr")), "val")
         self.assertEquals(attrs.get((ns_uri, "attr"), 25), "val")

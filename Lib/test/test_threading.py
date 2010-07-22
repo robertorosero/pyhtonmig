@@ -5,8 +5,8 @@ from test.support import verbose
 import random
 import re
 import sys
-import threading
-import _thread
+_thread = test.support.import_module('_thread')
+threading = test.support.import_module('threading')
 import time
 import unittest
 import weakref
@@ -153,9 +153,8 @@ class ThreadTests(BaseTestCase):
         tid = _thread.start_new_thread(f, (mutex,))
         # Wait for the thread to finish.
         mutex.acquire()
-        self.assertTrue(tid in threading._active)
-        self.assertTrue(isinstance(threading._active[tid],
-                                threading._DummyThread))
+        self.assertIn(tid, threading._active)
+        self.assertIsInstance(threading._active[tid], threading._DummyThread)
         del threading._active[tid]
 
     # PyThreadState_SetAsyncExc() is a CPython-only gimmick, not (currently)
@@ -247,6 +246,21 @@ class ThreadTests(BaseTestCase):
         if t.finished:
             t.join()
         # else the thread is still running, and we have no way to kill it
+
+    def test_limbo_cleanup(self):
+        # Issue 7481: Failure to start thread should cleanup the limbo map.
+        def fail_new_thread(*args):
+            raise threading.ThreadError()
+        _start_new_thread = threading._start_new_thread
+        threading._start_new_thread = fail_new_thread
+        try:
+            t = threading.Thread(target=lambda: None)
+            self.assertRaises(threading.ThreadError, t.start)
+            self.assertFalse(
+                t in threading._limbo,
+                "Failed to cleanup _limbo map on failure of Thread.start().")
+        finally:
+            threading._start_new_thread = _start_new_thread
 
     def test_finalize_runnning_thread(self):
         # Issue 1402: the PyGILState_Ensure / _Release functions may be called
@@ -350,7 +364,7 @@ class ThreadTests(BaseTestCase):
                 t.start()
                 t.join()
                 l = enum()
-                self.assertFalse(t in l,
+                self.assertNotIn(t, l,
                     "#1703448 triggered after %d trials: %s" % (i, l))
         finally:
             sys.setswitchinterval(old_interval)

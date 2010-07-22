@@ -1,8 +1,25 @@
 """Test result object"""
 
+import os
+import io
+import sys
 import traceback
 
 from . import util
+from functools import wraps
+
+__unittest = True
+
+def failfast(method):
+    @wraps(method)
+    def inner(self, *args, **kw):
+        if getattr(self, 'failfast', False):
+            self.stop()
+        return method(self, *args, **kw)
+    return inner
+
+STDOUT_LINE = '\nStdout:\n%s'
+STDERR_LINE = '\nStderr:\n%s'
 
 
 class TestResult(object):
@@ -16,7 +33,10 @@ class TestResult(object):
     contain tuples of (testcase, exceptioninfo), where exceptioninfo is the
     formatted traceback of the error that occurred.
     """
-    def __init__(self):
+    _previousTestClass = None
+    _moduleSetUpFailed = False
+    def __init__(self, stream=None, descriptions=None, verbosity=None):
+        self.failfast = False
         self.failures = []
         self.errors = []
         self.testsRun = 0
@@ -24,10 +44,26 @@ class TestResult(object):
         self.expectedFailures = []
         self.unexpectedSuccesses = []
         self.shouldStop = False
+        self.buffer = False
+        self._stdout_buffer = None
+        self._stderr_buffer = None
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        self._mirrorOutput = False
+
+    def printErrors(self):
+        "Called by TestRunner after test run"
 
     def startTest(self, test):
         "Called when the given test is about to be run"
-        self.testsRun = self.testsRun + 1
+        self.testsRun += 1
+        self._mirrorOutput = False
+        if self.buffer:
+            if self._stderr_buffer is None:
+                self._stderr_buffer = io.StringIO()
+                self._stdout_buffer = io.StringIO()
+            sys.stdout = self._stdout_buffer
+            sys.stderr = self._stderr_buffer
 
     def startTestRun(self):
         """Called once before any tests are executed.
@@ -36,8 +72,27 @@ class TestResult(object):
         """
 
     def stopTest(self, test):
-        "Called when the given test has been run"
-        pass
+        """Called when the given test has been run"""
+        if self.buffer:
+            if self._mirrorOutput:
+                output = sys.stdout.getvalue()
+                error = sys.stderr.getvalue()
+                if output:
+                    if not output.endswith('\n'):
+                        output += '\n'
+                    self._original_stdout.write(STDOUT_LINE % output)
+                if error:
+                    if not error.endswith('\n'):
+                        error += '\n'
+                    self._original_stderr.write(STDERR_LINE % error)
+
+            sys.stdout = self._original_stdout
+            sys.stderr = self._original_stderr
+            self._stdout_buffer.seek(0)
+            self._stdout_buffer.truncate()
+            self._stderr_buffer.seek(0)
+            self._stderr_buffer.truncate()
+        self._mirrorOutput = False
 
     def stopTestRun(self):
         """Called once after all tests are executed.
@@ -45,16 +100,20 @@ class TestResult(object):
         See stopTest for a method called after each test.
         """
 
+    @failfast
     def addError(self, test, err):
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info().
         """
         self.errors.append((test, self._exc_info_to_string(err, test)))
+        self._mirrorOutput = True
 
+    @failfast
     def addFailure(self, test, err):
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info()."""
         self.failures.append((test, self._exc_info_to_string(err, test)))
+        self._mirrorOutput = True
 
     def addSuccess(self, test):
         "Called when a test has completed successfully"
@@ -69,6 +128,7 @@ class TestResult(object):
         self.expectedFailures.append(
             (test, self._exc_info_to_string(err, test)))
 
+    @failfast
     def addUnexpectedSuccess(self, test):
         """Called when a test was expected to fail, but succeed."""
         self.unexpectedSuccesses.append(test)
@@ -87,18 +147,30 @@ class TestResult(object):
         # Skip test runner traceback levels
         while tb and self._is_relevant_tb_level(tb):
             tb = tb.tb_next
+
         if exctype is test.failureException:
             # Skip assert*() traceback levels
             length = self._count_relevant_tb_levels(tb)
-            return ''.join(traceback.format_exception(exctype, value, tb, length))
-        return ''.join(traceback.format_exception(exctype, value, tb))
+            msgLines = traceback.format_exception(exctype, value, tb, length)
+        else:
+            msgLines = traceback.format_exception(exctype, value, tb)
+
+        if self.buffer:
+            output = sys.stdout.getvalue()
+            error = sys.stderr.getvalue()
+            if output:
+                if not output.endswith('\n'):
+                    output += '\n'
+                msgLines.append(STDOUT_LINE % output)
+            if error:
+                if not error.endswith('\n'):
+                    error += '\n'
+                msgLines.append(STDERR_LINE % error)
+        return ''.join(msgLines)
+
 
     def _is_relevant_tb_level(self, tb):
-        globs = tb.tb_frame.f_globals
-        is_relevant =  '__name__' in globs and \
-            globs["__name__"].startswith("unittest")
-        del globs
-        return is_relevant
+        return '__unittest' in tb.tb_frame.f_globals
 
     def _count_relevant_tb_levels(self, tb):
         length = 0
@@ -108,6 +180,6 @@ class TestResult(object):
         return length
 
     def __repr__(self):
-        return "<%s run=%i errors=%i failures=%i>" % \
+        return ("<%s run=%i errors=%i failures=%i>" %
                (util.strclass(self.__class__), self.testsRun, len(self.errors),
-                len(self.failures))
+                len(self.failures)))

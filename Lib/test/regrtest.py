@@ -1,12 +1,23 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-"""Regression test.
+"""
+Usage:
 
-This will find all modules whose name is "test_*" in the test
-directory, and run them.  Various command line options provide
-additional facilities.
+python -m test.regrtest [options] [test_name1 [test_name2 ...]]
+python path/to/Lib/test/regrtest.py [options] [test_name1 [test_name2 ...]]
 
-Command line options:
+
+If no arguments or options are provided, finds all files matching
+the pattern "test_*" in the Lib/test subdirectory and runs
+them in alphabetical order (but see -M and -u, below, for exceptions).
+
+For more rigorous testing, it is useful to use the following
+command line:
+
+python -E -tt -Wd -3 -m test.regrtest [options] [test_name1 ...]
+
+
+Options:
 
 -h/--help       -- print this text and exit
 
@@ -16,15 +27,15 @@ Verbosity
 -w/--verbose2   -- re-run failed tests in verbose mode
 -W/--verbose3   -- re-run failed tests in verbose mode immediately
 -d/--debug      -- print traceback for failed tests
--q/--quiet      -- don't print anything except if a test fails
+-q/--quiet      -- no output unless one or more tests fail
 -S/--slow       -- print the slowest 10 tests
 
 Selecting tests
 
--r/--random     -- randomize test execution order
+-r/--random     -- randomize test execution order (see below)
 -f/--fromfile   -- read names of tests to run from a file (see below)
 -x/--exclude    -- arguments are tests to *exclude*
--s/--single     -- run only a single test (see below)
+-s/--single     -- single step through a set of tests (see below)
 -u/--use RES1,RES2,...
                 -- specify which special resource intensive tests to run
 -M/--memlimit LIMIT
@@ -38,36 +49,32 @@ Special runs
                 -- search for reference leaks (needs debug build, v. slow)
 -j/--multiprocess PROCESSES
                 -- run PROCESSES processes at once
--T/--coverage   -- turn on code coverage using the trace module
+-T/--coverage   -- turn on code coverage tracing using the trace module
 -D/--coverdir DIRECTORY
                 -- Directory where coverage files are put
 -N/--nocoverdir -- Put coverage files alongside modules
 -t/--threshold THRESHOLD
                 -- call gc.set_threshold(THRESHOLD)
 -n/--nowindows  -- suppress error message boxes on Windows
--F/--forever    -- run the selected tests in a loop, until an error happens
+-F/--forever    -- run the specified tests in a loop, until an error happens
 
-If non-option arguments are present, they are names for tests to run,
-unless -x is given, in which case they are names for tests not to run.
-If no test names are given, all tests are run.
+
+Additional Option Details:
 
 -r randomizes test execution order. You can use --randseed=int to provide a
 int seed value for the randomizer; this is useful for reproducing troublesome
 test orders.
 
--T turns on code coverage tracing with the trace module.
-
--D specifies the directory where coverage files are put.
-
--N Put coverage files alongside modules.
-
--s means to run only a single test and exit.  This is useful when
-doing memory analysis on the Python interpreter (which tend to consume
-too many resources to run the full regression test non-stop).  The
-file /tmp/pynexttest is read to find the next test to run.  If this
-file is missing, the first test_*.py file in testdir or on the command
-line is used.  (actually tempfile.gettempdir() is used instead of
-/tmp).
+-s On the first invocation of regrtest using -s, the first test file found
+or the first test file given on the command line is run, and the name of
+the next test is recorded in a file named pynexttest.  If run from the
+Python build directory, pynexttest is located in the 'build' subdirectory,
+otherwise it is located in tempfile.gettempdir().  On subsequent runs,
+the test in pynexttest is run, and the next test is written to pynexttest.
+When the last test has been run, pynexttest is deleted.  In this way it
+is possible to single step through the test files.  This is useful when
+doing memory analysis on the Python interpreter, which process tends to
+consume too many resources to run the full regression test non-stop.
 
 -S is used to continue running tests after an aborted run.  It will
 maintain the order a standard run (ie, this assumes -r is not used).
@@ -121,8 +128,6 @@ resources to test.  Currently only the following are defined:
     curses -    Tests that use curses and will modify the terminal's
                 state and output modes.
 
-    lib2to3 -   Run the tests for 2to3 (They take a while.)
-
     largefile - It is okay to run some test that may create huge
                 files.  These tests can take a long time and may
                 consume >2GB of disk space temporarily.
@@ -147,8 +152,8 @@ example, to run all the tests except for the gui tests, give the
 option '-uall,-gui'.
 """
 
+import builtins
 import getopt
-import itertools
 import json
 import os
 import random
@@ -160,16 +165,27 @@ import traceback
 import warnings
 import unittest
 from inspect import isabstract
+import tempfile
+import platform
+import sysconfig
 
-# I see no other way to suppress these warnings;
-# putting them in test_grammar.py has no effect:
-warnings.filterwarnings("ignore", "hex/oct constants", FutureWarning,
-                        ".*test.test_grammar$")
-if sys.maxsize > 0x7fffffff:
-    # Also suppress them in <string>, because for 64-bit platforms,
-    # that's where test_grammar.py hides them.
-    warnings.filterwarnings("ignore", "hex/oct constants", FutureWarning,
-                            "<string>")
+
+# Some times __path__ and __file__ are not absolute (e.g. while running from
+# Lib/) and, if we change the CWD to run the tests in a temporary dir, some
+# imports might fail.  This affects only the modules imported before os.chdir().
+# These modules are searched first in sys.path[0] (so '' -- the CWD) and if
+# they are found in the CWD their __file__ and __path__ will be relative (this
+# happens before the chdir).  All the modules imported after the chdir, are
+# not found in the CWD, and since the other paths in sys.path[1:] are absolute
+# (site.py absolutize them), the __file__ and __path__ will be absolute too.
+# Therefore it is necessary to absolutize manually the __file__ and __path__ of
+# the packages to prevent later imports to fail when the CWD is different.
+for module in sys.modules.values():
+    if hasattr(module, '__path__'):
+        module.__path__ = [os.path.abspath(path) for path in module.__path__]
+    if hasattr(module, '__file__'):
+        module.__file__ = os.path.abspath(module.__file__)
+
 
 # Ignore ImportWarnings that only occur in the source tree,
 # (because of modules with the same name as source-directories in Modules/)
@@ -242,6 +258,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     directly to set the values that would normally be set by flags
     on the command line.
     """
+
+    replace_stdout()
 
     support.record_original_stdout(sys.stdout)
     try:
@@ -377,15 +395,19 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if single and fromfile:
         usage("-s and -f don't go together!")
     if use_mp and trace:
-        usage(2, "-T and -j don't go together!")
+        usage("-T and -j don't go together!")
     if use_mp and findleaks:
-        usage(2, "-l and -j don't go together!")
+        usage("-l and -j don't go together!")
+    if use_mp and max(sys.flags):
+        # TODO: inherit the environment and the flags
+        print("Warning: flags and environment variables are ignored with -j option")
 
     good = []
     bad = []
     skipped = []
     resource_denieds = []
     environment_changed = []
+    interrupted = False
 
     if findleaks:
         try:
@@ -401,8 +423,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             found_garbage = []
 
     if single:
-        from tempfile import gettempdir
-        filename = os.path.join(gettempdir(), 'pynexttest')
+        filename = 'pynexttest'
         try:
             fp = open(filename, 'r')
             next_test = fp.read().strip()
@@ -413,7 +434,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 
     if fromfile:
         tests = []
-        fp = open(fromfile)
+        fp = open(os.path.join(support.SAVEDCWD, fromfile))
         for line in fp:
             guts = line.split() # assuming no test has whitespace in its name
             if guts and not guts[0].startswith('#'):
@@ -421,10 +442,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         fp.close()
 
     # Strip .py extensions.
-    if args:
-        args = list(map(removepy, args))
-    if tests:
-        tests = list(map(removepy, tests))
+    removepy(args)
+    removepy(tests)
 
     stdtests = STDTESTS[:]
     nottests = NOTTESTS.copy()
@@ -434,9 +453,22 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                 stdtests.remove(arg)
             nottests.add(arg)
         args = []
-    tests = tests or args or findtests(testdir, stdtests, nottests)
+
+    # For a partial run, we do not need to clutter the output.
+    if verbose or not (quiet or tests or args):
+        # Print basic platform information
+        print("==", platform.python_implementation(), *sys.version.split())
+        print("==  ", platform.platform(aliased=True))
+        print("==  ", os.getcwd())
+
+    alltests = findtests(testdir, stdtests, nottests)
+    selected = tests or args or alltests
     if single:
-        tests = tests[:1]
+        selected = selected[:1]
+        try:
+            next_single_test = alltests[alltests.index(selected[0])+1]
+        except IndexError:
+            next_single_test = None
     # Remove all the tests that precede start if it's set.
     if start:
         try:
@@ -446,7 +478,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if randomize:
         random.seed(random_seed)
         print("Using random seed", random_seed)
-        random.shuffle(tests)
+        random.shuffle(selected)
     if trace:
         import trace, tempfile
         tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,
@@ -475,7 +507,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             resource_denieds.append(test)
 
     if forever:
-        def test_forever(tests=list(tests)):
+        def test_forever(tests=list(selected)):
             while True:
                 for test in tests:
                     yield test
@@ -483,15 +515,17 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         return
         tests = test_forever()
     else:
-        tests = iter(tests)
+        tests = iter(selected)
 
     if use_mp:
-        from threading import Thread
-        from queue import Queue, Empty
-        from subprocess import Popen, PIPE, STDOUT
-        from collections import deque
+        try:
+            from threading import Thread
+        except ImportError:
+            print("Multiprocess option requires thread support")
+            sys.exit(2)
+        from queue import Queue
+        from subprocess import Popen, PIPE
         debug_output_pat = re.compile(r"\[\d+ refs\]$")
-        pending = deque()
         output = Queue()
         def tests_and_args():
             for test in tests:
@@ -550,6 +584,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     raise KeyboardInterrupt   # What else?
                 accumulate_result(test, result)
         except KeyboardInterrupt:
+            interrupted = True
             pending.close()
         for worker in workers:
             worker.join()
@@ -572,8 +607,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         print("Re-running test {} in verbose mode".format(test))
                         runtest(test, True, quiet, testdir, huntrleaks, debug)
                 except KeyboardInterrupt:
-                    # print a newline separate from the ^C
-                    print()
+                    interrupted = True
                     break
                 except:
                     raise
@@ -591,14 +625,15 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                 if module not in save_modules and module.startswith("test."):
                     support.unload(module)
 
-    # The lists won't be sorted if running with -r
-    good.sort()
-    bad.sort()
-    skipped.sort()
-    environment_changed.sort()
-
+    if interrupted:
+        # print a newline after ^C
+        print()
+        print("Test suite interrupted by signal SIGINT.")
+        omitted = set(selected) - set(good) - set(bad) - set(skipped)
+        print(count(len(omitted), "test"), "omitted:")
+        printlist(omitted)
     if good and not quiet:
-        if not bad and not skipped and len(good) > 1:
+        if not bad and not skipped and not interrupted and len(good) > 1:
             print("All", end=' ')
         print(count(len(good), "test"), "OK.")
     if print_slow:
@@ -650,16 +685,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                 raise
 
     if single:
-        alltests = findtests(testdir, stdtests, nottests)
-        for i in range(len(alltests)):
-            if tests[0] == alltests[i]:
-                if i == len(alltests) - 1:
-                    os.unlink(filename)
-                else:
-                    fp = open(filename, 'w')
-                    fp.write(alltests[i+1] + '\n')
-                    fp.close()
-                break
+        if next_single_test:
+            with open(filename, 'w') as fp:
+                fp.write(next_single_test + '\n')
         else:
             os.unlink(filename)
 
@@ -670,7 +698,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if runleaks:
         os.system("leaks %d" % os.getpid())
 
-    sys.exit(len(bad) > 0)
+    sys.exit(len(bad) > 0 or interrupted)
 
 
 STDTESTS = [
@@ -692,16 +720,26 @@ NOTTESTS = {
 
 def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
     """Return a list of all applicable test modules."""
-    if not testdir: testdir = findtestdir()
+    testdir = findtestdir(testdir)
     names = os.listdir(testdir)
     tests = []
+    others = set(stdtests) | nottests
     for name in names:
-        if name[:5] == "test_" and name[-3:] == ".py":
-            modname = name[:-3]
-            if modname not in stdtests and modname not in nottests:
-                tests.append(modname)
-    tests.sort()
-    return stdtests + tests
+        modname, ext = os.path.splitext(name)
+        if modname[:5] == "test_" and ext == ".py" and modname not in others:
+            tests.append(modname)
+    return stdtests + sorted(tests)
+
+def replace_stdout():
+    """Set stdout encoder error handler to backslashreplace (as stderr error
+    handler) to avoid UnicodeEncodeError when printing a traceback"""
+    if os.name == "nt":
+        # Replace sys.stdout breaks the stdout newlines on Windows: issue #8533
+        return
+    stdout = sys.stdout
+    sys.stdout = open(stdout.fileno(), 'w',
+        encoding=stdout.encoding,
+        errors="backslashreplace")
 
 def runtest(test, verbose, quiet,
             testdir=None, huntrleaks=False, debug=False, use_resources=None):
@@ -773,7 +811,8 @@ class saved_test_environment:
     # the corresponding method names.
 
     resources = ('sys.argv', 'cwd', 'sys.stdin', 'sys.stdout', 'sys.stderr',
-                 'os.environ', 'sys.path')
+                 'os.environ', 'sys.path', 'sys.path_hooks', '__import__',
+                 'warnings.filters')
 
     def get_sys_argv(self):
         return id(sys.argv), sys.argv, sys.argv[:]
@@ -814,6 +853,23 @@ class saved_test_environment:
         sys.path = saved_path[1]
         sys.path[:] = saved_path[2]
 
+    def get_sys_path_hooks(self):
+        return id(sys.path_hooks), sys.path_hooks, sys.path_hooks[:]
+    def restore_sys_path_hooks(self, saved_hooks):
+        sys.path_hooks = saved_hooks[1]
+        sys.path_hooks[:] = saved_hooks[2]
+
+    def get___import__(self):
+        return builtins.__import__
+    def restore___import__(self, import_):
+        builtins.__import__ = import_
+
+    def get_warnings_filters(self):
+        return id(warnings.filters), warnings.filters, warnings.filters[:]
+    def restore_warnings_filters(self, saved_filters):
+        warnings.filters = saved_filters[1]
+        warnings.filters[:] = saved_filters[2]
+
     def resource_info(self):
         for name in self.resources:
             method_suffix = name.replace('.', '_')
@@ -848,8 +904,11 @@ class saved_test_environment:
 def runtest_inner(test, verbose, quiet,
                   testdir=None, huntrleaks=False, debug=False):
     support.unload(test)
-    if not testdir:
-        testdir = findtestdir()
+    testdir = findtestdir(testdir)
+    if verbose:
+        capture_stdout = None
+    else:
+        capture_stdout = io.StringIO()
 
     test_time = 0.0
     refleak = False  # True if the test leaked references.
@@ -980,19 +1039,21 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
 
     deltas = []
     nwarmup, ntracked, fname = huntrleaks
+    fname = os.path.join(support.SAVEDCWD, fname)
     repcount = nwarmup + ntracked
     print("beginning", repcount, "repetitions", file=sys.stderr)
     print(("1234567890"*(repcount//10 + 1))[:repcount], file=sys.stderr)
     sys.stderr.flush()
     dash_R_cleanup(fs, ps, pic, zdc, abcs)
     for i in range(repcount):
-        rc = sys.gettotalrefcount()
+        rc_before = sys.gettotalrefcount()
         run_the_test()
         sys.stderr.write('.')
         sys.stderr.flush()
         dash_R_cleanup(fs, ps, pic, zdc, abcs)
+        rc_after = sys.gettotalrefcount()
         if i >= nwarmup:
-            deltas.append(sys.gettotalrefcount() - rc - 2)
+            deltas.append(rc_after - rc_before)
     print(file=sys.stderr)
     if any(deltas):
         msg = '%s leaked %s references, sum=%s' % (test, deltas, sum(deltas))
@@ -1069,18 +1130,16 @@ def warm_char_cache():
     for i in range(256):
         s[i:i+1]
 
-def findtestdir():
-    if __name__ == '__main__':
-        file = sys.argv[0]
-    else:
-        file = __file__
-    testdir = os.path.dirname(file) or os.curdir
-    return testdir
+def findtestdir(path=None):
+    return path or os.path.dirname(__file__) or os.curdir
 
-def removepy(name):
-    if name.endswith(".py"):
-        name = name[:-3]
-    return name
+def removepy(names):
+    if not names:
+        return
+    for idx, name in enumerate(names):
+        basename, ext = os.path.splitext(name)
+        if ext == '.py':
+            names[idx] = basename
 
 def count(n, word):
     if n == 1:
@@ -1098,7 +1157,8 @@ def printlist(x, width=70, indent=4):
 
     from textwrap import fill
     blanks = ' ' * indent
-    print(fill(' '.join(map(str, x)), width,
+    # Print the sorted list: 'x' may be a '--random' list or a set()
+    print(fill(' '.join(str(elt) for elt in sorted(x)), width,
                initial_indent=blanks, subsequent_indent=blanks))
 
 # Map sys.platform to a string containing the basenames of tests
@@ -1151,34 +1211,6 @@ _expectations = {
         test_largefile
         test_kqueue
         test_ossaudiodev
-        """,
-   'mac':
-        """
-        test_atexit
-        test_bz2
-        test_crypt
-        test_curses
-        test_dbm
-        test_fcntl
-        test_fork1
-        test_epoll
-        test_grp
-        test_ioctl
-        test_largefile
-        test_locale
-        test_kqueue
-        test_mmap
-        test_openpty
-        test_ossaudiodev
-        test_poll
-        test_popen
-        test_posix
-        test_pty
-        test_pwd
-        test_resource
-        test_signal
-        test_sundry
-        test_tarfile
         """,
     'unixware7':
         """
@@ -1414,16 +1446,29 @@ class _ExpectedSkips:
         return self.expected
 
 if __name__ == '__main__':
-    # Remove regrtest.py's own directory from the module search path.  This
-    # prevents relative imports from working, and relative imports will screw
-    # up the testing framework.  E.g. if both test.support and
-    # support are imported, they will not contain the same globals, and
-    # much of the testing framework relies on the globals in the
-    # test.support module.
-    mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
-    i = len(sys.path)
-    while i >= 0:
-        i -= 1
-        if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
-            del sys.path[i]
-    main()
+    # Simplification for findtestdir().
+    assert __file__ == os.path.abspath(sys.argv[0])
+
+    # When tests are run from the Python build directory, it is best practice
+    # to keep the test files in a subfolder.  It eases the cleanup of leftover
+    # files using command "make distclean".
+    if sysconfig.is_python_build():
+        parent_dir = os.path.join(sysconfig.get_config_var('srcdir'), 'build')
+        if not os.path.exists(parent_dir):
+            os.mkdir(parent_dir)
+    else:
+        parent_dir = os.path.abspath(tempfile.gettempdir())
+
+    # Define a writable temp dir that will be used as cwd while running
+    # the tests. The name of the dir includes the pid to allow parallel
+    # testing (see the -j option).
+    TESTCWD = 'test_python_{}'.format(os.getpid())
+
+    TESTCWD = os.path.join(parent_dir, TESTCWD)
+
+    # Run the tests in a context manager that temporary changes the CWD to a
+    # temporary and writable directory. If it's not possible to create or
+    # change the CWD, the original CWD will be used. The original CWD is
+    # available from support.SAVEDCWD.
+    with support.temp_cwd(TESTCWD, quiet=True):
+        main()

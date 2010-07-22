@@ -23,7 +23,8 @@ inet_aton() -- convert IP addr string (123.45.67.89) to 32-bit packed format
 inet_ntoa() -- convert 32-bit packed format IP to string (123.45.67.89)
 socket.getdefaulttimeout() -- get the default timeout value
 socket.setdefaulttimeout() -- set the default timeout value
-create_connection() -- connects to an address, with an optional timeout
+create_connection() -- connects to an address, with an optional timeout and
+                       optional source address.
 
  [*] not available on all platforms!
 
@@ -48,9 +49,11 @@ from _socket import *
 import os, sys, io
 
 try:
-    from errno import EBADF
+    import errno
 except ImportError:
-    EBADF = 9
+    errno = None
+EBADF = getattr(errno, 'EBADF', 9)
+EINTR = getattr(errno, 'EINTR', 4)
 
 __all__ = ["getfqdn", "create_connection"]
 __all__.extend(os._get_exports_list(_socket))
@@ -211,7 +214,13 @@ class SocketIO(io.RawIOBase):
     def readinto(self, b):
         self._checkClosed()
         self._checkReadable()
-        return self._sock.recv_into(b)
+        while True:
+            try:
+                return self._sock.recv_into(b)
+            except error as e:
+                if e.args[0] == EINTR:
+                    continue
+                raise
 
     def write(self, b):
         self._checkClosed()
@@ -243,10 +252,6 @@ class SocketIO(io.RawIOBase):
         self._sock._decref_socketios()
         self._sock = None
 
-    def __del__(self):
-        if not self.closed:
-            self._sock._decref_socketios()
-
 
 def getfqdn(name=''):
     """Get fully qualified domain name from name.
@@ -276,7 +281,8 @@ def getfqdn(name=''):
 
 _GLOBAL_DEFAULT_TIMEOUT = object()
 
-def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT):
+def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                      source_address=None):
     """Connect to *address* and return the socket object.
 
     Convenience function.  Connect to *address* (a 2-tuple ``(host,
@@ -284,7 +290,9 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT):
     *timeout* parameter will set the timeout on the socket instance
     before attempting to connect.  If no *timeout* is supplied, the
     global default timeout setting returned by :func:`getdefaulttimeout`
-    is used.
+    is used.  If *source_address* is set it must be a tuple of (host, port)
+    for the socket to bind as a source address before making the connection.
+    An host of '' or port 0 tells the OS to use the default.
     """
 
     msg = "getaddrinfo returns an empty list"
@@ -296,6 +304,8 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT):
             sock = socket(af, socktype, proto)
             if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
                 sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
             sock.connect(sa)
             return sock
 

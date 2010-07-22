@@ -66,6 +66,9 @@ Some smaller changes made to the core Python language are:
 New, Improved, and Deprecated Modules
 =====================================
 
+* The :class:`ftplib.FTP` class now supports the context manager protocol
+  (Contributed by Tarek Ziadé and Giampaolo Rodolà; :issue:`4972`.)
+
 * The previously deprecated :func:`string.maketrans` function has been
   removed in favor of the static methods, :meth:`bytes.maketrans` and
   :meth:`bytearray.maketrans`.  This change solves the confusion around which
@@ -85,6 +88,30 @@ New, Improved, and Deprecated Modules
   (Contributed by Georg Brandl and Mattias Brändström;
   `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
 
+* The :func:`shutil.copytree` function has two new options:
+
+  * *ignore_dangling_symlinks*: when ``symlinks=False`` (meaning that the
+    function copies the file pointed to by the symlink, not the symlink
+    itself) this option will silence the error thrown if the file doesn't
+    exist.
+
+  * *copy_function*: a callable that will be used to copy files.
+    :func:`shutil.copy2` is used by default.
+
+  (Contributed by Tarek Ziade.)
+
+* The *sqlite3* module has some new features:
+
+  * XXX *enable_load_extension*
+
+  * XXX *load_extension*
+
+  * New :class:`~sqlite3.Connection` attribute
+    :attr:`~sqlite3.Connection.in_transaction` is :const:`True` when there
+    are uncommitted changes, and :const:`False` otherwise.  (Contributed
+    by R. David Murray and Shashwat Anand, :issue:`8845`.)
+
+
 Multi-threading
 ===============
 
@@ -103,13 +130,18 @@ Multi-threading
   (however, "priority requests" as exposed in this message have not been
   kept for inclusion).
 
-  (Contributed by Antoine Pitrou)
+  (Contributed by Antoine Pitrou.)
 
 * Recursive locks (created with the :func:`threading.RLock` API) now benefit
   from a C implementation which makes them as fast as regular locks, and
   between 10x and 15x faster than their previous pure Python implementation.
 
   (Contributed by Antoine Pitrou; :issue:`3001`.)
+
+* Regular and recursive locks now accept an optional *timeout* argument
+  to their ``acquire`` method. (Contributed by Antoine Pitrou; :issue:`7316`)
+  Similarly, :meth:`threading.Semaphore.acquire` also gains a *timeout*
+  argument. (Contributed by Torsten Landschoff; :issue:`850728`.)
 
 
 Optimizations
@@ -139,4 +171,10 @@ Porting to Python 3.2
 This section lists previously described changes and other bugfixes
 that may require changes to your code:
 
-* Stub
+* bytearray objects cannot be used anymore as filenames: convert them to bytes
+
+* PyArg_Parse*() functions:
+
+  * "t#" format has been removed: use "s#" or "s*" instead
+  * "w" and "w#" formats has been removed: use "w*" instead
+

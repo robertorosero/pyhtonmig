@@ -905,8 +905,11 @@ textiowrapper_init(textio *self, PyObject *args, PyObject *kwds)
                 Py_CLEAR(self->encoding);
         }
     }
-    if (self->encoding != NULL)
+    if (self->encoding != NULL) {
         encoding = _PyUnicode_AsString(self->encoding);
+        if (encoding == NULL)
+            goto error;
+    }
     else if (encoding != NULL) {
         self->encoding = PyUnicode_FromString(encoding);
         if (self->encoding == NULL)
@@ -935,6 +938,8 @@ textiowrapper_init(textio *self, PyObject *args, PyObject *kwds)
     self->writetranslate = (newline == NULL || newline[0] != '\0');
     if (!self->readuniversal && self->readnl) {
         self->writenl = _PyUnicode_AsString(self->readnl);
+        if (self->writenl == NULL)
+            goto error;
         if (!strcmp(self->writenl, "\n"))
             self->writenl = NULL;
     }
@@ -1479,7 +1484,7 @@ textiowrapper_read(textio *self, PyObject *args)
 
     CHECK_INITIALIZED(self);
 
-    if (!PyArg_ParseTuple(args, "|n:read", &n))
+    if (!PyArg_ParseTuple(args, "|O&:read", &_PyIO_ConvertSsize_t, &n))
         return NULL;
 
     CHECK_CLOSED(self);
@@ -2318,15 +2323,7 @@ textiowrapper_truncate(textio *self, PyObject *args)
         return NULL;
     Py_DECREF(res);
 
-    if (pos != Py_None) {
-        res = PyObject_CallMethodObjArgs((PyObject *) self,
-                                          _PyIO_str_seek, pos, NULL);
-        if (res == NULL)
-            return NULL;
-        Py_DECREF(res);
-    }
-
-    return PyObject_CallMethodObjArgs(self->buffer, _PyIO_str_truncate, NULL);
+    return PyObject_CallMethodObjArgs(self->buffer, _PyIO_str_truncate, pos, NULL);
 }
 
 static PyObject *
@@ -2406,16 +2403,30 @@ static PyObject *
 textiowrapper_close(textio *self, PyObject *args)
 {
     PyObject *res;
+    int r;
     CHECK_INITIALIZED(self);
-    res = PyObject_CallMethod((PyObject *)self, "flush", NULL);
-    if (res == NULL) {
-        /* If flush() fails, just give up */
-        PyErr_Clear();
-    }
-    else
-        Py_DECREF(res);
 
-    return PyObject_CallMethod(self->buffer, "close", NULL);
+    res = textiowrapper_closed_get(self, NULL);
+    if (res == NULL)
+        return NULL;
+    r = PyObject_IsTrue(res);
+    Py_DECREF(res);
+    if (r < 0)
+        return NULL;
+
+    if (r > 0) {
+        Py_RETURN_NONE; /* stream already closed */
+    }
+    else {
+        res = PyObject_CallMethod((PyObject *)self, "flush", NULL);
+        if (res == NULL) {
+            return NULL;
+        }
+        else
+            Py_DECREF(res);
+
+        return PyObject_CallMethod(self->buffer, "close", NULL);
+    }
 }
 
 static PyObject *

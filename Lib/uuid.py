@@ -13,7 +13,7 @@ Typical usage:
     >>> import uuid
 
     # make a UUID based on the host ID and current time
-    >>> uuid.uuid1()
+    >>> uuid.uuid1()    # doctest: +SKIP
     UUID('a8098c1a-f86e-11da-bd1a-00112444be1e')
 
     # make a UUID using an MD5 hash of a namespace UUID and a name
@@ -21,7 +21,7 @@ Typical usage:
     UUID('6fa459ea-ee8a-3ca4-894e-db77e160355e')
 
     # make a random UUID
-    >>> uuid.uuid4()
+    >>> uuid.uuid4()    # doctest: +SKIP
     UUID('16fd2706-8baf-433b-82eb-8c7fada847da')
 
     # make a UUID using a SHA-1 hash of a namespace UUID and a name
@@ -237,7 +237,7 @@ class UUID(object):
         bytes = bytearray()
         for shift in range(0, 128, 8):
             bytes.insert(0, (self.int >> shift) & 0xff)
-        return bytes
+        return bytes_(bytes)
 
     @property
     def bytes_le(self):
@@ -426,6 +426,19 @@ try:
             _uuid_generate_random = lib.uuid_generate_random
         if hasattr(lib, 'uuid_generate_time'):
             _uuid_generate_time = lib.uuid_generate_time
+
+    # The uuid_generate_* functions are broken on MacOS X 10.5, as noted
+    # in issue #8621 the function generates the same sequence of values
+    # in the parent process and all children created using fork (unless
+    # those children use exec as well).
+    #
+    # Assume that the uuid_generate functions are broken from 10.5 onward,
+    # the test can be adjusted when a later version is fixed.
+    import sys
+    if sys.platform == 'darwin':
+        import os
+        if int(os.uname()[2].split('.')[0]) >= 9:
+            _uuid_generate_random = _uuid_generate_time = None
 
     # On Windows prior to 2000, UuidCreate gives a UUID containing the
     # hardware address.  On Windows 2000 and later, UuidCreate makes a

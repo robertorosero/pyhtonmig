@@ -440,11 +440,7 @@ buffered_close(buffered *self, PyObject *args)
     res = PyObject_CallMethodObjArgs((PyObject *)self, _PyIO_str_flush, NULL);
     ENTER_BUFFERED(self)
     if (res == NULL) {
-        /* If flush() fails, just give up */
-        if (PyErr_ExceptionMatches(PyExc_IOError))
-            PyErr_Clear();
-        else
-            goto end;
+        goto end;
     }
     Py_XDECREF(res);
 
@@ -720,7 +716,7 @@ buffered_read(buffered *self, PyObject *args)
     PyObject *res;
 
     CHECK_INITIALIZED(self)
-    if (!PyArg_ParseTuple(args, "|n:read", &n)) {
+    if (!PyArg_ParseTuple(args, "|O&:read", &_PyIO_ConvertSsize_t, &n)) {
         return NULL;
     }
     if (n < -1) {
@@ -953,10 +949,8 @@ buffered_readline(buffered *self, PyObject *args)
     Py_ssize_t limit = -1;
 
     CHECK_INITIALIZED(self)
-
-    if (!PyArg_ParseTuple(args, "|n:readline", &limit)) {
+    if (!PyArg_ParseTuple(args, "|O&:readline", &_PyIO_ConvertSsize_t, &limit))
         return NULL;
-    }
     return _buffered_readline(self, limit);
 }
 

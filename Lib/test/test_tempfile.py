@@ -3,15 +3,11 @@ import tempfile
 import os
 import sys
 import re
-import errno
 import warnings
 
 import unittest
 from test import support
 
-warnings.filterwarnings("ignore",
-                        category=RuntimeWarning,
-                        message="mktemp", module=__name__)
 
 if hasattr(os, 'stat'):
     import stat
@@ -24,9 +20,7 @@ has_spawnl = hasattr(os, 'spawnl')
 
 # TEST_FILES may need to be tweaked for systems depending on the maximum
 # number of files that can be opened at one time (see ulimit -n)
-if sys.platform == 'mac':
-    TEST_FILES = 32
-elif sys.platform in ('openbsd3', 'openbsd4'):
+if sys.platform in ('openbsd3', 'openbsd4'):
     TEST_FILES = 48
 else:
     TEST_FILES = 100
@@ -39,6 +33,16 @@ else:
 class TC(unittest.TestCase):
 
     str_check = re.compile(r"[a-zA-Z0-9_-]{6}$")
+
+    def setUp(self):
+        self._warnings_manager = support.check_warnings()
+        self._warnings_manager.__enter__()
+        warnings.filterwarnings("ignore", category=RuntimeWarning,
+                                message="mktemp", module=__name__)
+
+    def tearDown(self):
+        self._warnings_manager.__exit__(None, None, None)
+
 
     def failOnException(self, what, ei=None):
         if ei is None:
@@ -99,6 +103,7 @@ class test__RandomNameSequence(TC):
 
     def setUp(self):
         self.r = tempfile._RandomNameSequence()
+        super().setUp()
 
     def test_get_six_char_str(self):
         # _RandomNameSequence returns a six-character string
@@ -113,7 +118,7 @@ class test__RandomNameSequence(TC):
         for i in range(TEST_FILES):
             s = next(r)
             self.nameCheck(s, '', '', '')
-            self.assertFalse(s in dict)
+            self.assertNotIn(s, dict)
             dict[s] = 1
 
     def supports_iter(self):
@@ -127,7 +132,7 @@ class test__RandomNameSequence(TC):
                 if i == 20:
                     break
         except:
-            failOnException("iteration")
+            self.failOnException("iteration")
 
 test_classes.append(test__RandomNameSequence)
 
@@ -142,8 +147,7 @@ class test__candidate_tempdir_list(TC):
 
         self.assertFalse(len(cand) == 0)
         for c in cand:
-            self.assertTrue(isinstance(c, str),
-                         "%s is not a string" % c)
+            self.assertIsInstance(c, str)
 
     def test_wanted_dirs(self):
         # _candidate_tempdir_list contains the expected directories
@@ -160,14 +164,14 @@ class test__candidate_tempdir_list(TC):
             for envname in 'TMPDIR', 'TEMP', 'TMP':
                 dirname = os.getenv(envname)
                 if not dirname: raise ValueError
-                self.assertTrue(dirname in cand)
+                self.assertIn(dirname, cand)
 
             try:
                 dirname = os.getcwd()
             except (AttributeError, os.error):
                 dirname = os.curdir
 
-            self.assertTrue(dirname in cand)
+            self.assertIn(dirname, cand)
 
             # Not practical to try to verify the presence of OS-specific
             # paths in this list.
@@ -184,7 +188,7 @@ class test__get_candidate_names(TC):
     def test_retval(self):
         # _get_candidate_names returns a _RandomNameSequence object
         obj = tempfile._get_candidate_names()
-        self.assertTrue(isinstance(obj, tempfile._RandomNameSequence))
+        self.assertIsInstance(obj, tempfile._RandomNameSequence)
 
     def test_same_thing(self):
         # _get_candidate_names always returns the same object
@@ -259,7 +263,7 @@ class test__mkstemp_inner(TC):
         file = self.do_create()
         mode = stat.S_IMODE(os.stat(file.name).st_mode)
         expected = 0o600
-        if sys.platform in ('win32', 'os2emx', 'mac'):
+        if sys.platform in ('win32', 'os2emx'):
             # There's no distinction among 'user', 'group' and 'world';
             # replicate the 'user' bits.
             user = expected >> 6
@@ -326,7 +330,7 @@ class test_gettempprefix(TC):
         # gettempprefix returns a nonempty prefix string
         p = tempfile.gettempprefix()
 
-        self.assertTrue(isinstance(p, str))
+        self.assertIsInstance(p, str)
         self.assertTrue(len(p) > 0)
 
     def test_usable_template(self):
@@ -482,7 +486,7 @@ class test_mkdtemp(TC):
             mode = stat.S_IMODE(os.stat(dir).st_mode)
             mode &= 0o777 # Mask off sticky bits inherited from /tmp
             expected = 0o700
-            if sys.platform in ('win32', 'os2emx', 'mac'):
+            if sys.platform in ('win32', 'os2emx'):
                 # There's no distinction among 'user', 'group' and 'world';
                 # replicate the 'user' bits.
                 user = expected >> 6
@@ -501,11 +505,13 @@ class test_mktemp(TC):
     # We must also suppress the RuntimeWarning it generates.
     def setUp(self):
         self.dir = tempfile.mkdtemp()
+        super().setUp()
 
     def tearDown(self):
         if self.dir:
             os.rmdir(self.dir)
             self.dir = None
+        super().tearDown()
 
     class mktemped:
         _unlink = os.unlink

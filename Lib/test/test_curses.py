@@ -23,6 +23,7 @@ requires('curses')
 curses = import_module('curses')
 curses.panel = import_module('curses.panel')
 
+
 # XXX: if newterm was supported we could use it instead of initscr and not exit
 term = os.environ.get('TERM')
 if not term or term == 'unknown':

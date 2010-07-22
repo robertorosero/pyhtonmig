@@ -17,7 +17,7 @@ Here are some of the useful functions provided by this module:
     getmodule() - determine the module that an object came from
     getclasstree() - arrange classes so as to represent their hierarchy
 
-    getargspec(), getargvalues() - get info about function arguments
+    getargspec(), getargvalues(), getcallargs() - get info about function arguments
     getfullargspec() - same, with support for Python-3000 features
     formatargspec(), formatargvalues() - format an argument spec
     getouterframes(), getinnerframes() - get info about frames
@@ -33,6 +33,7 @@ __date__ = '1 Jan 2001'
 import sys
 import os
 import types
+import itertools
 import string
 import re
 import dis
@@ -53,6 +54,7 @@ def ismodule(object):
     """Return true if the object is a module.
 
     Module objects provide these attributes:
+        __cached__      pathname to byte compiled file
         __doc__         documentation string
         __file__        filename (missing for built-in modules)"""
     return isinstance(object, types.ModuleType)
@@ -435,7 +437,9 @@ def getmodulename(path):
     if info: return info[0]
 
 def getsourcefile(object):
-    """Return the Python source file an object was defined in, if it exists."""
+    """Return the filename that can be used to locate an object's source.
+    Return None if no way can be identified to get the source.
+    """
     filename = getfile(object)
     if filename[-4:].lower() in ('.pyc', '.pyo'):
         filename = filename[:-4] + '.py'
@@ -447,6 +451,9 @@ def getsourcefile(object):
         return filename
     # only return a non-existent filename if the module has a PEP 302 loader
     if hasattr(getmodule(object, filename), '__loader__'):
+        return filename
+    # or it is in the linecache
+    if filename in linecache.cache:
         return filename
 
 def getabsfile(object, _filename=None):
@@ -925,6 +932,71 @@ def formatargvalues(args, varargs, varkw, locals,
     if varkw:
         specs.append(formatvarkw(varkw) + formatvalue(locals[varkw]))
     return '(' + ', '.join(specs) + ')'
+
+def getcallargs(func, *positional, **named):
+    """Get the mapping of arguments to values.
+
+    A dict is returned, with keys the function argument names (including the
+    names of the * and ** arguments, if any), and values the respective bound
+    values from 'positional' and 'named'."""
+    spec = getfullargspec(func)
+    args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, ann = spec
+    f_name = func.__name__
+    arg2value = {}
+
+    if ismethod(func) and func.__self__ is not None:
+        # implicit 'self' (or 'cls' for classmethods) argument
+        positional = (func.__self__,) + positional
+    num_pos = len(positional)
+    num_total = num_pos + len(named)
+    num_args = len(args)
+    num_defaults = len(defaults) if defaults else 0
+    for arg, value in zip(args, positional):
+        arg2value[arg] = value
+    if varargs:
+        if num_pos > num_args:
+            arg2value[varargs] = positional[-(num_pos-num_args):]
+        else:
+            arg2value[varargs] = ()
+    elif 0 < num_args < num_pos:
+        raise TypeError('%s() takes %s %d positional %s (%d given)' % (
+            f_name, 'at most' if defaults else 'exactly', num_args,
+            'arguments' if num_args > 1 else 'argument', num_total))
+    elif num_args == 0 and num_total:
+        raise TypeError('%s() takes no arguments (%d given)' %
+                        (f_name, num_total))
+
+    for arg in itertools.chain(args, kwonlyargs):
+        if arg in named:
+            if arg in arg2value:
+                raise TypeError("%s() got multiple values for keyword "
+                                "argument '%s'" % (f_name, arg))
+            else:
+                arg2value[arg] = named.pop(arg)
+    for kwonlyarg in kwonlyargs:
+        if kwonlyarg not in arg2value:
+            try:
+                arg2value[kwonlyarg] = kwonlydefaults[kwonlyarg]
+            except KeyError:
+                raise TypeError("%s() needs keyword-only argument %s" %
+                                (f_name, kwonlyarg))
+    if defaults:    # fill in any missing values with the defaults
+        for arg, value in zip(args[-num_defaults:], defaults):
+            if arg not in arg2value:
+                arg2value[arg] = value
+    if varkw:
+        arg2value[varkw] = named
+    elif named:
+        unexpected = next(iter(named))
+        raise TypeError("%s() got an unexpected keyword argument '%s'" %
+                        (f_name, unexpected))
+    unassigned = num_args - len([arg for arg in args if arg in arg2value])
+    if unassigned:
+        num_required = num_args - num_defaults
+        raise TypeError('%s() takes %s %d %s (%d given)' % (
+            f_name, 'at least' if defaults else 'exactly', num_required,
+            'arguments' if num_required > 1 else 'argument', num_total))
+    return arg2value
 
 # -------------------------------------------------- stack frame extraction
 

@@ -7,8 +7,6 @@ extensions ASAP)."""
 __revision__ = "$Id$"
 
 import sys, os, re
-from warnings import warn
-
 from distutils.core import Command
 from distutils.errors import *
 from distutils.sysconfig import customize_compiler, get_python_version
@@ -113,39 +111,6 @@ class build_ext(Command):
         ('help-compiler', None,
          "list available compilers", show_compilers),
         ]
-
-    # making 'compiler' a property to deprecate
-    # its usage as something else than a compiler type
-    # e.g. like a compiler instance
-    def __init__(self, dist):
-        self._compiler = None
-        Command.__init__(self, dist)
-
-    def __setattr__(self, name, value):
-        # need this to make sure setattr() (used in distutils)
-        # doesn't kill our property
-        if name == 'compiler':
-            self._set_compiler(value)
-        else:
-            self.__dict__[name] = value
-
-    def _set_compiler(self, compiler):
-        if not isinstance(compiler, str) and compiler is not None:
-            # we don't want to allow that anymore in the future
-            warn("'compiler' specifies the compiler type in build_ext. "
-                 "If you want to get the compiler object itself, "
-                 "use 'compiler_obj'", DeprecationWarning)
-        self._compiler = compiler
-
-    def _get_compiler(self):
-        if not isinstance(self._compiler, str) and self._compiler is not None:
-            # we don't want to allow that anymore in the future
-            warn("'compiler' specifies the compiler type in build_ext. "
-                 "If you want to get the compiler object itself, "
-                 "use 'compiler_obj'", DeprecationWarning)
-        return self._compiler
-
-    compiler = property(_get_compiler, _set_compiler)
 
     def initialize_options(self):
         self.extensions = None
@@ -262,9 +227,9 @@ class build_ext(Command):
         if os.name == 'os2':
             self.library_dirs.append(os.path.join(sys.exec_prefix, 'Config'))
 
-        # for extensions under Cygwin Python's library directory must be
+        # for extensions under Cygwin and AtheOS Python's library directory must be
         # appended to library_dirs
-        if sys.platform[:6] == 'cygwin':
+        if sys.platform[:6] == 'cygwin' or sys.platform[:6] == 'atheos':
             if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
                 # building third party extensions
                 self.library_dirs.append(os.path.join(sys.prefix, "lib",
@@ -345,50 +310,38 @@ class build_ext(Command):
 
         # Setup the CCompiler object that we'll use to do all the
         # compiling and linking
-
-        # used to prevent the usage of an existing compiler for the
-        # compiler option when calling new_compiler()
-        # this will be removed in 3.3 and 2.8
-        if not isinstance(self._compiler, str):
-            self._compiler = None
-
-        self.compiler_obj = new_compiler(compiler=self._compiler,
-                                         verbose=self.verbose,
-                                         dry_run=self.dry_run,
-                                         force=self.force)
-
-        # used to keep the compiler object reachable with
-        # "self.compiler". this will be removed in 3.3 and 2.8
-        self._compiler = self.compiler_obj
-
-        customize_compiler(self.compiler_obj)
+        self.compiler = new_compiler(compiler=self.compiler,
+                                     verbose=self.verbose,
+                                     dry_run=self.dry_run,
+                                     force=self.force)
+        customize_compiler(self.compiler)
         # If we are cross-compiling, init the compiler now (if we are not
         # cross-compiling, init would not hurt, but people may rely on
         # late initialization of compiler even if they shouldn't...)
         if os.name == 'nt' and self.plat_name != get_platform():
-            self.compiler_obj.initialize(self.plat_name)
+            self.compiler.initialize(self.plat_name)
 
         # And make sure that any compile/link-related options (which might
         # come from the command-line or from the setup script) are set in
         # that CCompiler object -- that way, they automatically apply to
         # all compiling and linking done here.
         if self.include_dirs is not None:
-            self.compiler_obj.set_include_dirs(self.include_dirs)
+            self.compiler.set_include_dirs(self.include_dirs)
         if self.define is not None:
             # 'define' option is a list of (name,value) tuples
             for (name, value) in self.define:
-                self.compiler_obj.define_macro(name, value)
+                self.compiler.define_macro(name, value)
         if self.undef is not None:
             for macro in self.undef:
-                self.compiler_obj.undefine_macro(macro)
+                self.compiler.undefine_macro(macro)
         if self.libraries is not None:
-            self.compiler_obj.set_libraries(self.libraries)
+            self.compiler.set_libraries(self.libraries)
         if self.library_dirs is not None:
-            self.compiler_obj.set_library_dirs(self.library_dirs)
+            self.compiler.set_library_dirs(self.library_dirs)
         if self.rpath is not None:
-            self.compiler_obj.set_runtime_library_dirs(self.rpath)
+            self.compiler.set_runtime_library_dirs(self.rpath)
         if self.link_objects is not None:
-            self.compiler_obj.set_link_objects(self.link_objects)
+            self.compiler.set_link_objects(self.link_objects)
 
         # Now actually compile and link everything.
         self.build_extensions()
@@ -549,13 +502,13 @@ class build_ext(Command):
         for undef in ext.undef_macros:
             macros.append((undef,))
 
-        objects = self.compiler_obj.compile(sources,
-                                            output_dir=self.build_temp,
-                                            macros=macros,
-                                            include_dirs=ext.include_dirs,
-                                            debug=self.debug,
-                                            extra_postargs=extra_args,
-                                            depends=ext.depends)
+        objects = self.compiler.compile(sources,
+                                         output_dir=self.build_temp,
+                                         macros=macros,
+                                         include_dirs=ext.include_dirs,
+                                         debug=self.debug,
+                                         extra_postargs=extra_args,
+                                         depends=ext.depends)
 
         # XXX -- this is a Vile HACK!
         #
@@ -576,9 +529,9 @@ class build_ext(Command):
         extra_args = ext.extra_link_args or []
 
         # Detect target language, if not provided
-        language = ext.language or self.compiler_obj.detect_language(sources)
+        language = ext.language or self.compiler.detect_language(sources)
 
-        self.compiler_obj.link_shared_object(
+        self.compiler.link_shared_object(
             objects, ext_path,
             libraries=self.get_libraries(ext),
             library_dirs=ext.library_dirs,
@@ -745,7 +698,7 @@ class build_ext(Command):
         # Append '_d' to the python import library on debug builds.
         if sys.platform == "win32":
             from distutils.msvccompiler import MSVCCompiler
-            if not isinstance(self.compiler_obj, MSVCCompiler):
+            if not isinstance(self.compiler, MSVCCompiler):
                 template = "python%d%d"
                 if self.debug:
                     template = template + '_d'
@@ -776,6 +729,22 @@ class build_ext(Command):
             # don't extend ext.libraries, it may be shared with other
             # extensions, it is a reference to the original list
             return ext.libraries + [pythonlib]
+        elif sys.platform[:6] == "atheos":
+            from distutils import sysconfig
+
+            template = "python%d.%d"
+            pythonlib = (template %
+                   (sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff))
+            # Get SHLIBS from Makefile
+            extra = []
+            for lib in sysconfig.get_config_var('SHLIBS').split():
+                if lib.startswith('-l'):
+                    extra.append(lib[2:])
+                else:
+                    extra.append(lib)
+            # don't extend ext.libraries, it may be shared with other
+            # extensions, it is a reference to the original list
+            return ext.libraries + [pythonlib, "m"] + extra
         elif sys.platform == 'darwin':
             # Don't use the default code below
             return ext.libraries

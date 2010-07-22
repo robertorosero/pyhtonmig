@@ -49,6 +49,8 @@
 
 #include "pyport.h"
 
+#include "pyatomic.h"
+
 /* Debug-mode build with pymalloc implies PYMALLOC_DEBUG.
  *  PYMALLOC_DEBUG is in error if pymalloc is not in use.
  */
@@ -120,16 +122,20 @@
 #include "pystrcmp.h"
 #include "dtoa.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /* _Py_Mangle is defined in compile.c */
 PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 
-/* Convert a possibly signed character to a nonnegative int */
-/* XXX This assumes characters are 8 bits wide */
-#ifdef __CHAR_UNSIGNED__
-#define Py_CHARMASK(c)		(c)
-#else
-#define Py_CHARMASK(c)		((unsigned char)((c) & 0xff))
+/* _Py_char2wchar lives in main.c */
+PyAPI_FUNC(wchar_t *) _Py_char2wchar(char *);
+#ifdef __cplusplus
+}
 #endif
+
+/* Argument must be a char or an int in [-128, 127] or [0, 255]. */
+#define Py_CHARMASK(c)		((unsigned char)((c) & 0xff))
 
 #include "pyfpe.h"
 

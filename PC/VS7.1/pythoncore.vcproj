@@ -409,6 +409,9 @@
 			RelativePath="..\..\Modules\_lsprof.c">
 		</File>
 		<File
+			RelativePath="..\..\Modules\_math.c">
+		</File>
+		<File
 			RelativePath="..\..\Modules\_pickle.c">
 		</File>
 		<File
@@ -503,6 +506,9 @@
 		</File>
 		<File
 			RelativePath="..\..\PC\config.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\dynamic_annotations.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\datetimemodule.c">

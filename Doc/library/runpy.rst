@@ -18,7 +18,7 @@ The :mod:`runpy` module provides two functions:
 
    Execute the code of the specified module and return the resulting module
    globals dictionary. The module's code is first located using the standard
-   import mechanism (refer to PEP 302 for details) and then executed in a
+   import mechanism (refer to :pep:`302` for details) and then executed in a
    fresh module namespace.
 
    If the supplied module name refers to a package rather than a normal
@@ -32,7 +32,8 @@ The :mod:`runpy` module provides two functions:
    below are defined in the supplied dictionary, those definitions are
    overridden by :func:`run_module`.
 
-   The special global variables ``__name__``, ``__file__``, ``__loader__``
+   The special global variables ``__name__``, ``__file__``, ``__cached__``,
+   ``__loader__``
    and ``__package__`` are set in the globals dictionary before the module
    code is executed (Note that this is a minimal set of variables - other
    variables may be set implicitly as an interpreter implementation detail).
@@ -43,9 +44,11 @@ The :mod:`runpy` module provides two functions:
 
    ``__file__`` is set to the name provided by the module loader. If the
    loader does not make filename information available, this variable is set
-   to `:const:`None`.
+   to :const:`None`.
 
-   ``__loader__`` is set to the PEP 302 module loader used to retrieve the
+    ``__cached__`` will be set to ``None``.
+
+   ``__loader__`` is set to the :pep:`302` module loader used to retrieve the
    code for the module (This loader may be a wrapper around the standard
    import mechanism).
 
@@ -103,7 +106,7 @@ The :mod:`runpy` module provides two functions:
    loader does not make filename information available, this variable is set
    to :const:`None`. For a simple script, this will be set to ``file_path``.
 
-   ``__loader__`` is set to the PEP 302 module loader used to retrieve the
+   ``__loader__`` is set to the :pep:`302` module loader used to retrieve the
    code for the module (This loader may be a wrapper around the standard
    import mechanism). For a simple script, this will be set to :const:`None`.
 

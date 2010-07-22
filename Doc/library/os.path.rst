@@ -201,6 +201,7 @@ applications should use string objects to access all files.
    Normalize the case of a pathname.  On Unix and Mac OS X, this returns the
    path unchanged; on case-insensitive filesystems, it converts the path to
    lowercase.  On Windows, it also converts forward slashes to backward slashes.
+   Raise a TypeError if the type of *path* is not ``str`` or ``bytes``.
 
 
 .. function:: normpath(path)
@@ -223,19 +224,31 @@ applications should use string objects to access all files.
    Return a relative filepath to *path* either from the current directory or from
    an optional *start* point.
 
-   *start* defaults to :attr:`os.curdir`. Availability:  Windows, Unix.
+   *start* defaults to :attr:`os.curdir`.
+
+   Availability:  Windows, Unix.
 
 
 .. function:: samefile(path1, path2)
 
-   Return ``True`` if both pathname arguments refer to the same file or directory
-   (as indicated by device number and i-node number). Raise an exception if a
-   :func:`os.stat` call on either pathname fails. Availability: Unix.
+   Return ``True`` if both pathname arguments refer to the same file or directory.
+   On Unix, this is determined by the device number and i-node number and raises an
+   exception if a :func:`os.stat` call on either pathname fails.
+
+   On Windows, two files are the same if they resolve to the same final path
+   name using the Windows API call GetFinalPathNameByHandle. This function
+   raises an exception if handles cannot be obtained to either file.
+
+   Availability: Windows, Unix.
+
+   .. versionchanged:: 3.2
+      Added Windows support.
 
 
 .. function:: sameopenfile(fp1, fp2)
 
    Return ``True`` if the file descriptors *fp1* and *fp2* refer to the same file.
+
    Availability: Unix.
 
 
@@ -244,7 +257,9 @@ applications should use string objects to access all files.
    Return ``True`` if the stat tuples *stat1* and *stat2* refer to the same file.
    These structures may have been returned by :func:`fstat`, :func:`lstat`, or
    :func:`stat`.  This function implements the underlying comparison used by
-   :func:`samefile` and :func:`sameopenfile`. Availability: Unix.
+   :func:`samefile` and :func:`sameopenfile`.
+
+   Availability: Unix.
 
 
 .. function:: split(path)
@@ -293,7 +308,9 @@ applications should use string objects to access all files.
    Split the pathname *path* into a pair ``(unc, rest)`` so that *unc* is the UNC
    mount point (such as ``r'\\host\mount'``), if present, and *rest* the rest of
    the path (such as  ``r'\path\file.ext'``).  For paths containing drive letters,
-   *unc* will always be the empty string. Availability:  Windows.
+   *unc* will always be the empty string.
+
+   Availability:  Windows.
 
 
 .. data:: supports_unicode_filenames

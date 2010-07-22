@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """Test the arraymodule.
    Roger E. Masse
 """
@@ -201,10 +201,10 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example)
         self.assertRaises(TypeError, a.buffer_info, 42)
         bi = a.buffer_info()
-        self.assertTrue(isinstance(bi, tuple))
+        self.assertIsInstance(bi, tuple)
         self.assertEqual(len(bi), 2)
-        self.assertTrue(isinstance(bi[0], int))
-        self.assertTrue(isinstance(bi[1], int))
+        self.assertIsInstance(bi[0], int)
+        self.assertIsInstance(bi[1], int)
         self.assertEqual(bi[1], len(a))
 
     def test_byteswap(self):
@@ -324,6 +324,17 @@ class BaseTest(unittest.TestCase):
         finally:
             if not f.closed:
                 f.close()
+            support.unlink(support.TESTFN)
+
+    def test_fromfile_ioerror(self):
+        # Issue #5395: Check if fromfile raises a proper IOError
+        # instead of EOFError.
+        a = array.array(self.typecode)
+        f = open(support.TESTFN, 'wb')
+        try:
+            self.assertRaises(IOError, a.fromfile, f, len(self.example))
+        finally:
+            f.close()
             support.unlink(support.TESTFN)
 
     def test_filewrite(self):
@@ -1011,6 +1022,9 @@ class NumberTest(BaseTest):
         a = array.array(self.typecode, range(10))
         del a[::1000]
         self.assertEqual(a, array.array(self.typecode, [1,2,3,4,5,6,7,8,9]))
+        # test issue7788
+        a = array.array(self.typecode, range(10))
+        del a[9::1<<333]
 
     def test_assignment(self):
         a = array.array(self.typecode, range(10))

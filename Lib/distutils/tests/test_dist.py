@@ -9,7 +9,6 @@ import textwrap
 
 from distutils.dist import Distribution, fix_help_options
 from distutils.cmd import Command
-import distutils.dist
 
 from test.support import TESTFN, captured_stdout
 from distutils.tests import support
@@ -38,8 +37,7 @@ class TestDistribution(Distribution):
         return self._config_files
 
 
-class DistributionTestCase(support.TempdirManager,
-                           support.LoggingSilencer,
+class DistributionTestCase(support.LoggingSilencer,
                            support.EnvironGuard,
                            unittest.TestCase):
 
@@ -59,27 +57,6 @@ class DistributionTestCase(support.TempdirManager,
         d.parse_config_files()
         d.parse_command_line()
         return d
-
-    def test_debug_mode(self):
-        with open(TESTFN, "w") as f:
-            f.write("[global]")
-            f.write("command_packages = foo.bar, splat")
-
-        files = [TESTFN]
-        sys.argv.append("build")
-
-        with captured_stdout() as stdout:
-            self.create_distribution(files)
-        stdout.seek(0)
-        self.assertEquals(stdout.read(), '')
-        distutils.dist.DEBUG = True
-        try:
-            with captured_stdout() as stdout:
-                self.create_distribution(files)
-            stdout.seek(0)
-            self.assertEquals(stdout.read(), '')
-        finally:
-            distutils.dist.DEBUG = False
 
     def test_command_packages_unspecified(self):
         sys.argv.append("build")
@@ -181,35 +158,6 @@ class DistributionTestCase(support.TempdirManager,
         args = ('ok',)
         kwargs = {'level': 'ok2'}
         self.assertRaises(ValueError, dist.announce, args, kwargs)
-
-    def test_find_config_files_disable(self):
-        # Ticket #1180: Allow user to disable their home config file.
-        temp_home = self.mkdtemp()
-        if os.name == 'posix':
-            user_filename = os.path.join(temp_home, ".pydistutils.cfg")
-        else:
-            user_filename = os.path.join(temp_home, "pydistutils.cfg")
-
-        with open(user_filename, 'w') as f:
-            f.write('[distutils]\n')
-
-        def _expander(path):
-            return temp_home
-
-        old_expander = os.path.expanduser
-        os.path.expanduser = _expander
-        try:
-            d = distutils.dist.Distribution()
-            all_files = d.find_config_files()
-
-            d = distutils.dist.Distribution(attrs={'script_args':
-                                            ['--no-user-cfg']})
-            files = d.find_config_files()
-        finally:
-            os.path.expanduser = old_expander
-
-        # make sure --no-user-cfg disables the user cfg file
-        self.assertEquals(len(all_files)-1, len(files))
 
 class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
                        unittest.TestCase):
@@ -364,7 +312,7 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
                  "version": "1.0",
                  "long_description": long_desc}
 
-        dist = distutils.dist.Distribution(attrs)
+        dist = Distribution(attrs)
         meta = self.format_metadata(dist)
         meta = meta.replace('\n' + 8 * ' ', '\n')
         self.assertTrue(long_desc in meta)

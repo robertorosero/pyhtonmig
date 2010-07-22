@@ -26,7 +26,7 @@ following URL schemes: ``file``, ``ftp``, ``gopher``, ``hdl``, ``http``,
 
 The :mod:`urllib.parse` module defines the following functions:
 
-.. function:: urlparse(urlstring, default_scheme='', allow_fragments=True)
+.. function:: urlparse(urlstring, scheme='', allow_fragments=True)
 
    Parse a URL into six components, returning a 6-tuple.  This corresponds to the
    general structure of a URL: ``scheme://netloc/path;parameters?query#fragment``.
@@ -48,7 +48,7 @@ The :mod:`urllib.parse` module defines the following functions:
       >>> o.geturl()
       'http://www.cwi.nl:80/%7Eguido/Python.html'
 
-   If the *default_scheme* argument is specified, it gives the default addressing
+   If the *scheme* argument is specified, it gives the default addressing
    scheme, to be used only if the URL does not specify one.  The default value for
    this argument is the empty string.
 
@@ -87,6 +87,9 @@ The :mod:`urllib.parse` module defines the following functions:
 
    See section :ref:`urlparse-result-object` for more information on the result
    object.
+
+   .. versionchanged:: 3.2
+      Added IPv6 URL parsing capabilities.
 
 
 .. function:: parse_qs(qs, keep_blank_values=False, strict_parsing=False)
@@ -139,7 +142,7 @@ The :mod:`urllib.parse` module defines the following functions:
    states that these are equivalent).
 
 
-.. function:: urlsplit(urlstring, default_scheme='', allow_fragments=True)
+.. function:: urlsplit(urlstring, scheme='', allow_fragments=True)
 
    This is similar to :func:`urlparse`, but does not split the params from the URL.
    This should generally be used instead of :func:`urlparse` if the more recent URL
@@ -307,36 +310,56 @@ The :mod:`urllib.parse` module defines the following functions:
    ``b'a&\xef'``.
 
 
-.. function:: urlencode(query, doseq=False)
+.. function:: urlencode(query, doseq=False, safe='', encoding=None, errors=None)
 
-   Convert a mapping object or a sequence of two-element tuples  to a "url-encoded"
-   string, suitable to pass to :func:`urlopen` above as the optional *data*
-   argument.  This is useful to pass a dictionary of form fields to a ``POST``
-   request.  The resulting string is a series of ``key=value`` pairs separated by
-   ``'&'`` characters, where both *key* and *value* are quoted using
-   :func:`quote_plus` above.  If the optional parameter *doseq* is present and
-   evaluates to true, individual ``key=value`` pairs are generated for each element
-   of the sequence. When a sequence of two-element tuples is used as the *query*
-   argument, the first element of each tuple is a key and the second is a value.
-   The order of parameters in the encoded string will match the order of parameter
-   tuples in the sequence. This module provides the functions
-   :func:`parse_qs` and :func:`parse_qsl` which are used to parse query strings
-   into Python data structures.
+   Convert a mapping object or a sequence of two-element tuples, which may
+   either be a :class:`str` or a :class:`bytes`,  to a "url-encoded" string,
+   suitable to pass to :func:`urlopen` above as the optional *data* argument.
+   This is useful to pass a dictionary of form fields to a ``POST`` request.
+   The resulting string is a series of ``key=value`` pairs separated by ``'&'``
+   characters, where both *key* and *value* are quoted using :func:`quote_plus`
+   above. When a sequence of two-element tuples is used as the *query*
+   argument, the first element of each tuple is a key and the second is a
+   value. The value element in itself can be a sequence and in that case, if
+   the optional parameter *doseq* is evaluates to *True*, individual
+   ``key=value`` pairs separated by ``'&'`` are generated for each element of
+   the value sequence for the key.  The order of parameters in the encoded
+   string will match the order of parameter tuples in the sequence. This module
+   provides the functions :func:`parse_qs` and :func:`parse_qsl` which are used
+   to parse query strings into Python data structures.
+
+   When *query* parameter is a :class:`str`, the *safe*, *encoding* and *error*
+   parameters are sent the :func:`quote_plus` for encoding.
+
+   .. versionchanged:: 3.2
+      query paramater supports bytes and string.
 
 
 .. seealso::
 
-   :rfc:`1738` - Uniform Resource Locators (URL)
-      This specifies the formal syntax and semantics of absolute URLs.
+   :rfc:`3986` - Uniform Resource Identifiers
+      This is the current standard (STD66). Any changes to urlparse module
+      should conform to this. Certain deviations could be observed, which are
+      mostly due backward compatiblity purposes and for certain de-facto
+      parsing requirements as commonly observed in major browsers.
+
+   :rfc:`2732` - Format for Literal IPv6 Addresses in URL's.
+      This specifies the parsing requirements of IPv6 URLs.
+
+   :rfc:`2396` - Uniform Resource Identifiers (URI): Generic Syntax
+      Document describing the generic syntactic requirements for both Uniform Resource
+      Names (URNs) and Uniform Resource Locators (URLs).
+
+   :rfc:`2368` - The mailto URL scheme.
+      Parsing requirements for mailto url schemes.
 
    :rfc:`1808` - Relative Uniform Resource Locators
       This Request For Comments includes the rules for joining an absolute and a
       relative URL, including a fair number of "Abnormal Examples" which govern the
       treatment of border cases.
 
-   :rfc:`2396` - Uniform Resource Identifiers (URI): Generic Syntax
-      Document describing the generic syntactic requirements for both Uniform Resource
-      Names (URNs) and Uniform Resource Locators (URLs).
+   :rfc:`1738` - Uniform Resource Locators (URL)
+      This specifies the formal syntax and semantics of absolute URLs.
 
 
 .. _urlparse-result-object:

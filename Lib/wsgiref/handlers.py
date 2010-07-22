@@ -20,7 +20,6 @@ def format_date_time(timestamp):
     )
 
 
-
 class BaseHandler:
     """Manage the invocation of a WSGI application"""
 
@@ -45,7 +44,7 @@ class BaseHandler:
 
     # Error handling (also per-subclass or per-instance)
     traceback_limit = None  # Print entire traceback to self.get_stderr()
-    error_status = "500 Dude, this is whack!"
+    error_status = "500 Internal Server Error"
     error_headers = [('Content-Type','text/plain')]
     error_body = "A server error occurred.  Please contact the administrator."
 
@@ -54,13 +53,6 @@ class BaseHandler:
     headers_sent = False
     headers = None
     bytes_sent = 0
-
-
-
-
-
-
-
 
     def run(self, application):
         """Invoke the application"""
@@ -351,15 +343,6 @@ class BaseHandler:
         raise NotImplementedError
 
 
-
-
-
-
-
-
-
-
-
 class SimpleHandler(BaseHandler):
     """Handler that's just initialized with streams, environment, etc.
 
@@ -430,23 +413,6 @@ class BaseCGIHandler(SimpleHandler):
     origin_server = False
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class CGIHandler(BaseCGIHandler):
 
     """CGI-based invocation via sys.stdin/stdout/stderr and os.environ
@@ -465,26 +431,13 @@ class CGIHandler(BaseCGIHandler):
     """
 
     wsgi_run_once = True
+    # Do not allow os.environ to leak between requests in Google App Engine
+    # and other multi-run CGI use cases.  This is not easily testable.
+    # See http://bugs.python.org/issue7250
+    os_environ = {}
 
     def __init__(self):
         BaseCGIHandler.__init__(
             self, sys.stdin, sys.stdout, sys.stderr, dict(os.environ.items()),
             multithread=False, multiprocess=True
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#

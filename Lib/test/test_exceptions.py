@@ -6,7 +6,8 @@ import unittest
 import pickle
 import weakref
 
-from test.support import TESTFN, unlink, run_unittest, captured_output
+from test.support import (TESTFN, unlink, run_unittest, captured_output,
+                          gc_collect, cpython_only)
 
 # XXX This is not really enough, each *operation* should be tested!
 
@@ -136,6 +137,7 @@ class ExceptionTests(unittest.TestCase):
         ckmsg(s, "'continue' not properly in loop")
         ckmsg("continue\n", "'continue' not properly in loop")
 
+    @cpython_only
     def testSettingException(self):
         # test that setting an exception at the C level works even if the
         # exception object can't be constructed.
@@ -319,25 +321,25 @@ class ExceptionTests(unittest.TestCase):
             tb = sys.exc_info()[2]
 
         e = BaseException().with_traceback(tb)
-        self.assertTrue(isinstance(e, BaseException))
+        self.assertIsInstance(e, BaseException)
         self.assertEqual(e.__traceback__, tb)
 
         e = IndexError(5).with_traceback(tb)
-        self.assertTrue(isinstance(e, IndexError))
+        self.assertIsInstance(e, IndexError)
         self.assertEqual(e.__traceback__, tb)
 
         class MyException(Exception):
             pass
 
         e = MyException().with_traceback(tb)
-        self.assertTrue(isinstance(e, MyException))
+        self.assertIsInstance(e, MyException)
         self.assertEqual(e.__traceback__, tb)
 
     def testInvalidTraceback(self):
         try:
             Exception().__traceback__ = 5
         except TypeError as e:
-            self.assertTrue("__traceback__ must be a traceback" in str(e))
+            self.assertIn("__traceback__ must be a traceback", str(e))
         else:
             self.fail("No exception raised")
 
@@ -399,13 +401,11 @@ class ExceptionTests(unittest.TestCase):
                 return -1
         self.assertRaises(RuntimeError, g)
 
-    def testUnicodeStrUsage(self):
-        # Make sure both instances and classes have a str and unicode
-        # representation.
-        self.assertTrue(str(Exception))
+    def test_str(self):
+        # Make sure both instances and classes have a str representation.
         self.assertTrue(str(Exception))
         self.assertTrue(str(Exception('a')))
-        self.assertTrue(str(Exception('a')))
+        self.assertTrue(str(Exception('a', 'b')))
 
     def testExceptionCleanupNames(self):
         # Make sure the local variable bound to the exception instance by
@@ -415,7 +415,7 @@ class ExceptionTests(unittest.TestCase):
         except Exception as e:
             self.assertTrue(e)
             del e
-        self.assertFalse('e' in locals())
+        self.assertNotIn('e', locals())
 
     def testExceptionCleanupState(self):
         # Make sure exception state is cleaned up as soon as the except
@@ -556,6 +556,20 @@ class ExceptionTests(unittest.TestCase):
             del g
             self.assertEquals(sys.exc_info()[0], TypeError)
 
+    def test_generator_finalizing_and_exc_info(self):
+        # See #7173
+        def simple_gen():
+            yield 1
+        def run_gen():
+            gen = simple_gen()
+            try:
+                raise RuntimeError
+            except RuntimeError:
+                return next(gen)
+        run_gen()
+        gc_collect()
+        self.assertEqual(sys.exc_info(), (None, None, None))
+
     def test_3114(self):
         # Bug #3114: in its destructor, MyObject retrieves a pointer to
         # obsolete and/or deallocated objects.
@@ -570,6 +584,42 @@ class ExceptionTests(unittest.TestCase):
             pass
         self.assertEquals(e, (None, None, None))
 
+    def testUnicodeChangeAttributes(self):
+        # See issue 7309. This was a crasher.
+
+        u = UnicodeEncodeError('baz', 'xxxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "'baz' codec can't encode characters in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "'baz' codec can't encode character '\\x78' in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "'baz' codec can't encode characters in position 1-4: 965230951443685724997")
+        u.encoding = 4000
+        self.assertEqual(str(u), "'4000' codec can't encode characters in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "'4000' codec can't encode characters in position 1000-4: 965230951443685724997")
+
+        u = UnicodeDecodeError('baz', b'xxxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "'baz' codec can't decode bytes in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "'baz' codec can't decode byte 0x78 in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "'baz' codec can't decode bytes in position 1-4: 965230951443685724997")
+        u.encoding = 4000
+        self.assertEqual(str(u), "'4000' codec can't decode bytes in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "'4000' codec can't decode bytes in position 1000-4: 965230951443685724997")
+
+        u = UnicodeTranslateError('xxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "can't translate characters in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "can't translate character '\\x78' in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "can't translate characters in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "can't translate characters in position 1000-4: 965230951443685724997")
 
     def test_badisinstance(self):
         # Bug #2542: if issubclass(e, MyException) raises an exception,
@@ -599,7 +649,7 @@ class ExceptionTests(unittest.TestCase):
                 return sys.exc_info()
         e, v, tb = g()
         self.assertTrue(isinstance(v, RuntimeError), type(v))
-        self.assertTrue("maximum recursion depth exceeded" in str(v), str(v))
+        self.assertIn("maximum recursion depth exceeded", str(v))
 
 
     def test_MemoryError(self):
@@ -619,6 +669,47 @@ class ExceptionTests(unittest.TestCase):
         tb1 = raiseMemError()
         tb2 = raiseMemError()
         self.assertEqual(tb1, tb2)
+
+    @cpython_only
+    def test_exception_with_doc(self):
+        import _testcapi
+        doc2 = "This is a test docstring."
+        doc4 = "This is another test docstring."
+
+        self.assertRaises(SystemError, _testcapi.make_exception_with_doc,
+                          "error1")
+
+        # test basic usage of PyErr_NewException
+        error1 = _testcapi.make_exception_with_doc("_testcapi.error1")
+        self.assertIs(type(error1), type)
+        self.assertTrue(issubclass(error1, Exception))
+        self.assertIsNone(error1.__doc__)
+
+        # test with given docstring
+        error2 = _testcapi.make_exception_with_doc("_testcapi.error2", doc2)
+        self.assertEqual(error2.__doc__, doc2)
+
+        # test with explicit base (without docstring)
+        error3 = _testcapi.make_exception_with_doc("_testcapi.error3",
+                                                   base=error2)
+        self.assertTrue(issubclass(error3, error2))
+
+        # test with explicit base tuple
+        class C(object):
+            pass
+        error4 = _testcapi.make_exception_with_doc("_testcapi.error4", doc4,
+                                                   (error3, C))
+        self.assertTrue(issubclass(error4, error3))
+        self.assertTrue(issubclass(error4, C))
+        self.assertEqual(error4.__doc__, doc4)
+
+        # test with explicit dictionary
+        error5 = _testcapi.make_exception_with_doc("_testcapi.error5", "",
+                                                   error4, {'a': 1})
+        self.assertTrue(issubclass(error5, error4))
+        self.assertEqual(error5.a, 1)
+        self.assertEqual(error5.__doc__, "")
+
 
 def test_main():
     run_unittest(ExceptionTests)

@@ -102,25 +102,32 @@ ZipFile Objects
    Open a ZIP file, where *file* can be either a path to a file (a string) or a
    file-like object.  The *mode* parameter should be ``'r'`` to read an existing
    file, ``'w'`` to truncate and write a new file, or ``'a'`` to append to an
-   existing file.  If *mode* is ``'a'`` and *file* refers to an existing ZIP file,
-   then additional files are added to it.  If *file* does not refer to a ZIP file,
-   then a new ZIP archive is appended to the file.  This is meant for adding a ZIP
-   archive to another file, such as :file:`python.exe`.  Using ::
+   existing file.  If *mode* is ``'a'`` and *file* refers to an existing ZIP
+   file, then additional files are added to it.  If *file* does not refer to a
+   ZIP file, then a new ZIP archive is appended to the file.  This is meant for
+   adding a ZIP archive to another file (such as :file:`python.exe`).  If
+   *mode* is ``a`` and the file does not exist at all, it is created.
+   *compression* is the ZIP compression method to use when writing the archive,
+   and should be :const:`ZIP_STORED` or :const:`ZIP_DEFLATED`; unrecognized
+   values will cause :exc:`RuntimeError` to be raised.  If :const:`ZIP_DEFLATED`
+   is specified but the :mod:`zlib` module is not available, :exc:`RuntimeError`
+   is also raised. The default is :const:`ZIP_STORED`.  If *allowZip64* is
+   ``True`` zipfile will create ZIP files that use the ZIP64 extensions when
+   the zipfile is larger than 2 GB. If it is  false (the default) :mod:`zipfile`
+   will raise an exception when the ZIP file would require ZIP64 extensions.
+   ZIP64 extensions are disabled by default because the default :program:`zip`
+   and :program:`unzip` commands on Unix (the InfoZIP utilities) don't support
+   these extensions.
 
-      cat myzip.zip >> python.exe
+   ZipFile is also a context manager and therefore supports the
+   :keyword:`with` statement.  In the example, *myzip* is closed after the
+   :keyword:`with` statement's suite is finished---even if an exception occurs::
 
-   also works, and at least :program:`WinZip` can read such files. If *mode* is
-   ``a`` and the file does not exist at all, it is created. *compression* is the
-   ZIP compression method to use when writing the archive, and should be
-   :const:`ZIP_STORED` or :const:`ZIP_DEFLATED`; unrecognized values will cause
-   :exc:`RuntimeError` to be raised.  If :const:`ZIP_DEFLATED` is specified but the
-   :mod:`zlib` module is not available, :exc:`RuntimeError` is also raised.  The
-   default is :const:`ZIP_STORED`.  If *allowZip64* is ``True`` zipfile will create
-   ZIP files that use the ZIP64 extensions when the zipfile is larger than 2 GB. If
-   it is  false (the default) :mod:`zipfile` will raise an exception when the ZIP
-   file would require ZIP64 extensions. ZIP64 extensions are disabled by default
-   because the default :program:`zip` and :program:`unzip` commands on Unix (the
-   InfoZIP utilities) don't support these extensions.
+      with ZipFile('spam.zip', 'w') as myzip:
+          myzip.write('eggs.txt')
+
+   .. versionadded:: 3.2
+      Added the ability to use :class:`ZipFile` as a context manager.
 
 
 .. method:: ZipFile.close()
@@ -161,7 +168,7 @@ ZipFile Objects
 
       The file-like object is read-only and provides the following methods:
       :meth:`read`, :meth:`readline`, :meth:`readlines`, :meth:`__iter__`,
-      :meth:`next`.
+      :meth:`__next__`.
 
    .. note::
 
@@ -260,7 +267,7 @@ ZipFile Objects
       byte, the name of the file in the archive will be truncated at the null byte.
 
 
-.. method:: ZipFile.writestr(zinfo_or_arcname, bytes)
+.. method:: ZipFile.writestr(zinfo_or_arcname, bytes[, compress_type])
 
    Write the string *bytes* to the archive; *zinfo_or_arcname* is either the file
    name it will be given in the archive, or a :class:`ZipInfo` instance.  If it's
@@ -270,12 +277,19 @@ ZipFile Objects
    created with mode ``'r'``  will raise a :exc:`RuntimeError`.  Calling
    :meth:`writestr` on a closed ZipFile will raise a :exc:`RuntimeError`.
 
+   If given, *compress_type* overrides the value given for the *compression*
+   parameter to the constructor for the new entry, or in the *zinfo_or_arcname*
+   (if that is a :class:`ZipInfo` instance).
+
    .. note::
 
       When passing a :class:`ZipInfo` instance as the *zinfo_or_acrname* parameter,
       the compression method used will be that specified in the *compress_type*
       member of the given :class:`ZipInfo` instance.  By default, the
       :class:`ZipInfo` constructor sets this member to :const:`ZIP_STORED`.
+
+   .. versionchanged:: 3.2
+      The *compression_type* argument.
 
 The following data attributes are also available:
 

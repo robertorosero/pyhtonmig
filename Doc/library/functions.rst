@@ -142,9 +142,9 @@ are always available.  They are listed here in alphabetical order.
 .. function:: compile(source, filename, mode, flags=0, dont_inherit=False)
 
    Compile the *source* into a code or AST object.  Code objects can be executed
-   by an :keyword:`exec` statement or evaluated by a call to :func:`eval`.
-   *source* can either be a string or an AST object.  Refer to the :mod:`ast`
-   module documentation for information on how to work with AST objects.
+   by :func:`exec` or :func:`eval`.  *source* can either be a string or an AST
+   object.  Refer to the :mod:`ast` module documentation for information on how
+   to work with AST objects.
 
    The *filename* argument should give the file from which the code was read;
    pass some recognizable value if it wasn't read from a file (``'<string>'`` is
@@ -328,12 +328,15 @@ are always available.  They are listed here in alphabetical order.
    This function can also be used to execute arbitrary code objects (such as
    those created by :func:`compile`).  In this case pass a code object instead
    of a string.  If the code object has been compiled with ``'exec'`` as the
-   *kind* argument, :func:`eval`\'s return value will be ``None``.
+   *mode* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :func:`exec`
    function.  The :func:`globals` and :func:`locals` functions
    returns the current global and local dictionary, respectively, which may be
    useful to pass around for use by :func:`eval` or :func:`exec`.
+
+   See :func:`ast.literal_eval` for a function that can safely evaluate strings
+   with expressions containing only literals.
 
 
 .. function:: exec(object[, globals[, locals]])
@@ -676,7 +679,7 @@ are always available.  They are listed here in alphabetical order.
    :meth:`__index__` method that returns an integer.
 
 
-.. function:: open(file, mode='r', buffering=None, encoding=None, errors=None, newline=None, closefd=True)
+.. function:: open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True)
 
    Open *file* and return a corresponding stream.  If the file cannot be opened,
    an :exc:`IOError` is raised.
@@ -973,7 +976,7 @@ are always available.  They are listed here in alphabetical order.
 .. function:: set([iterable])
    :noindex:
 
-   Return a new set, optionally with elements are taken from *iterable*.
+   Return a new set, optionally with elements taken from *iterable*.
    The set type is described in :ref:`types-set`.
 
 
@@ -1008,14 +1011,17 @@ are always available.  They are listed here in alphabetical order.
    Has two optional arguments which must be specified as keyword arguments.
 
    *key* specifies a function of one argument that is used to extract a comparison
-   key from each list element: ``key=str.lower``.  The default value is ``None``.
+   key from each list element: ``key=str.lower``.  The default value is ``None``
+   (compare the elements directly).
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
 
-   To convert an old-style *cmp* function to a *key* function, see the
-   `CmpToKey recipe in the ASPN cookbook
-   <http://code.activestate.com/recipes/576653/>`_\.
+   Use :func:`functools.cmp_to_key` to convert an
+   old-style *cmp* function to a *key* function.
+
+   For sorting examples and a brief sorting tutorial, see `Sorting HowTo
+   <http://wiki.python.org/moin/HowTo/Sorting/>`_\.
 
 .. function:: staticmethod(function)
 
@@ -1224,7 +1230,7 @@ are always available.  They are listed here in alphabetical order.
       True
 
 
-.. function:: __import__(name, globals={}, locals={}, fromlist=[], level=-1)
+.. function:: __import__(name, globals={}, locals={}, fromlist=[], level=0)
 
    .. index::
       statement: import

@@ -18,9 +18,8 @@ The primary entry point is a :term:`generator`:
 
    The :func:`tokenize` generator requires one argument, *readline*, which
    must be a callable object which provides the same interface as the
-   :meth:`readline` method of built-in file objects (see section
-   :ref:`bltin-file-objects`).  Each call to the function should return one
-   line of input as bytes.
+   :meth:`io.IOBase.readline` method of file objects.  Each call to the
+   function should return one line of input as bytes.
 
    The generator produces 5-tuples with these members: the token type; the
    token string; a 2-tuple ``(srow, scol)`` of ints specifying the row and
@@ -94,15 +93,29 @@ function it uses to do this is available:
     (as a string) and a list of any lines (not decoded from bytes) it has read
     in.
 
-    It detects the encoding from the presence of a utf-8 bom or an encoding
-    cookie as specified in pep-0263. If both a bom and a cookie are present,
-    but disagree, a SyntaxError will be raised.
+    It detects the encoding from the presence of a UTF-8 BOM or an encoding
+    cookie as specified in :pep:`263`. If both a BOM and a cookie are present,
+    but disagree, a SyntaxError will be raised. Note that if the BOM is found,
+    ``'utf-8-sig'`` will be returned as an encoding.
 
-    If no encoding is specified, then the default of 'utf-8' will be returned.
+    If no encoding is specified, then the default of ``'utf-8'`` will be
+    returned.
+
+    :func:`detect_encoding` is useful for robustly reading Python source files.
+    A common pattern for this follows::
+
+        def read_python_source(file_name):
+            with open(file_name, "rb") as fp:
+                encoding = tokenize.detect_encoding(fp.readline)[0]
+            with open(file_name, "r", encoding=encoding) as fp:
+                return fp.read()
 
 
 Example of a script re-writer that transforms float literals into Decimal
 objects::
+
+    from tokenize import tokenize, untokenize, NUMBER, STRING, NAME, OP
+    from io import BytesIO
 
     def decistmt(s):
         """Substitute Decimals for floats in a string of statements.

@@ -12,6 +12,11 @@ from pickle import dumps, loads
 F = fractions.Fraction
 gcd = fractions.gcd
 
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
+
 class DummyFloat(object):
     """Dummy float class for testing comparisons with Fractions"""
 
@@ -130,13 +135,33 @@ class FractionTest(unittest.TestCase):
 
         self.assertRaisesMessage(ZeroDivisionError, "Fraction(12, 0)",
                                  F, 12, 0)
-        self.assertRaises(TypeError, F, 1.5)
         self.assertRaises(TypeError, F, 1.5 + 3j)
 
         self.assertRaises(TypeError, F, "3/2", 3)
         self.assertRaises(TypeError, F, 3, 0j)
         self.assertRaises(TypeError, F, 3, 1j)
 
+    @requires_IEEE_754
+    def testInitFromFloat(self):
+        self.assertEquals((5, 2), _components(F(2.5)))
+        self.assertEquals((0, 1), _components(F(-0.0)))
+        self.assertEquals((3602879701896397, 36028797018963968),
+                          _components(F(0.1)))
+        self.assertRaises(TypeError, F, float('nan'))
+        self.assertRaises(TypeError, F, float('inf'))
+        self.assertRaises(TypeError, F, float('-inf'))
+
+    def testInitFromDecimal(self):
+        self.assertEquals((11, 10),
+                          _components(F(Decimal('1.1'))))
+        self.assertEquals((7, 200),
+                          _components(F(Decimal('3.5e-2'))))
+        self.assertEquals((0, 1),
+                          _components(F(Decimal('.000e20'))))
+        self.assertRaises(TypeError, F, Decimal('nan'))
+        self.assertRaises(TypeError, F, Decimal('snan'))
+        self.assertRaises(TypeError, F, Decimal('inf'))
+        self.assertRaises(TypeError, F, Decimal('-inf'))
 
     def testFromString(self):
         self.assertEquals((5, 1), _components(F("5")))
@@ -370,12 +395,11 @@ class FractionTest(unittest.TestCase):
         self.assertTypedEquals(1.0 + 0j, (1.0 + 0j) ** F(1, 10))
 
     def testMixingWithDecimal(self):
-        # Decimal refuses mixed comparisons.
+        # Decimal refuses mixed arithmetic (but not mixed comparisons)
         self.assertRaisesMessage(
             TypeError,
             "unsupported operand type(s) for +: 'Fraction' and 'Decimal'",
             operator.add, F(3,11), Decimal('3.1415926'))
-        self.assertNotEquals(F(5, 2), Decimal('2.5'))
 
     def testComparisons(self):
         self.assertTrue(F(1, 2) < F(2, 3))
@@ -479,8 +503,21 @@ class FractionTest(unittest.TestCase):
 
     def testBigComplexComparisons(self):
         self.assertFalse(F(10**23) == complex(10**23))
-        self.assertTrue(F(10**23) > complex(10**23))
-        self.assertFalse(F(10**23) <= complex(10**23))
+        self.assertRaises(TypeError, operator.gt, F(10**23), complex(10**23))
+        self.assertRaises(TypeError, operator.le, F(10**23), complex(10**23))
+
+        x = F(3, 8)
+        z = complex(0.375, 0.0)
+        w = complex(0.375, 0.2)
+        self.assertTrue(x == z)
+        self.assertFalse(x != z)
+        self.assertFalse(x == w)
+        self.assertTrue(x != w)
+        for op in operator.lt, operator.le, operator.gt, operator.ge:
+            self.assertRaises(TypeError, op, x, z)
+            self.assertRaises(TypeError, op, z, x)
+            self.assertRaises(TypeError, op, x, w)
+            self.assertRaises(TypeError, op, w, x)
 
     def testMixedEqual(self):
         self.assertTrue(0.5 == F(1, 2))

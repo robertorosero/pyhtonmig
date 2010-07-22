@@ -74,15 +74,19 @@ def makepath(*paths):
     return dir, os.path.normcase(dir)
 
 
-def abs__file__():
-    """Set all module' __file__ attribute to an absolute path"""
+def abs_paths():
+    """Set all module __file__ and __cached__ attributes to an absolute path"""
     for m in set(sys.modules.values()):
         if hasattr(m, '__loader__'):
             continue   # don't mess with a PEP 302-supplied __file__
         try:
             m.__file__ = os.path.abspath(m.__file__)
         except AttributeError:
-            continue
+            pass
+        try:
+            m.__cached__ = os.path.abspath(m.__cached__)
+        except AttributeError:
+            pass
 
 
 def removeduppaths():
@@ -108,11 +112,11 @@ def removeduppaths():
 def addbuilddir():
     """Append ./build/lib.<platform> in case we're running in the build dir
     (especially for Guido :-)"""
-    from distutils.util import get_platform
+    from sysconfig import get_platform
     s = "build/lib.%s-%.3s" % (get_platform(), sys.version)
     if hasattr(sys, 'gettotalrefcount'):
         s += '-pydebug'
-    s = os.path.join(os.path.dirname(sys.path[-1]), s)
+    s = os.path.join(os.path.dirname(sys.path.pop()), s)
     sys.path.append(s)
 
 
@@ -218,19 +222,8 @@ def getuserbase():
     global USER_BASE
     if USER_BASE is not None:
         return USER_BASE
-
-    env_base = os.environ.get("PYTHONUSERBASE", None)
-
-    def joinuser(*args):
-        return os.path.expanduser(os.path.join(*args))
-
-    # what about 'os2emx', 'riscos' ?
-    if os.name == "nt":
-        base = os.environ.get("APPDATA") or "~"
-        USER_BASE = env_base if env_base else joinuser(base, "Python")
-    else:
-        USER_BASE = env_base if env_base else joinuser("~", ".local")
-
+    from sysconfig import get_config_var
+    USER_BASE = get_config_var('userbase')
     return USER_BASE
 
 def getusersitepackages():
@@ -245,13 +238,16 @@ def getusersitepackages():
     if USER_SITE is not None:
         return USER_SITE
 
-    if os.name == "nt":
-        USER_SITE = os.path.join(user_base, "Python" + sys.version[0] +
-                                 sys.version[2], "site-packages")
-    else:
-        USER_SITE = os.path.join(user_base, "lib", "python" + sys.version[:3],
-                                 "site-packages")
+    from sysconfig import get_path
+    import os
 
+    if sys.platform == 'darwin':
+        from sysconfig import get_config_var
+        if get_config_var('PYTHONFRAMEWORK'):
+            USER_SITE = get_path('purelib', 'osx_framework_user')
+            return USER_SITE
+
+    USER_SITE = get_path('purelib', '%s_user' % os.name)
     return USER_SITE
 
 def addusersitepackages(known_paths):
@@ -277,12 +273,12 @@ def getsitepackages():
     environment, and will return a list of full paths.
     """
     sitepackages = []
-    seen = []
+    seen = set()
 
     for prefix in PREFIXES:
         if not prefix or prefix in seen:
             continue
-        seen.append(prefix)
+        seen.add(prefix)
 
         if sys.platform in ('os2emx', 'riscos'):
             sitepackages.append(os.path.join(prefix, "Lib", "site-packages"))
@@ -297,13 +293,11 @@ def getsitepackages():
         if sys.platform == "darwin":
             # for framework builds *only* we add the standard Apple
             # locations.
-            if 'Python.framework' in prefix:
+            from sysconfig import get_config_var
+            framework = get_config_var("PYTHONFRAMEWORK")
+            if framework and "/%s.framework/"%(framework,) in prefix:
                 sitepackages.append(
-                    os.path.expanduser(
-                        os.path.join("~", "Library", "Python",
-                                     sys.version[:3], "site-packages")))
-                sitepackages.append(
-                        os.path.join("/Library", "Python",
+                        os.path.join("/Library", framework,
                             sys.version[:3], "site-packages"))
     return sitepackages
 
@@ -333,8 +327,10 @@ def setBEGINLIBPATH():
 
 
 def setquit():
-    """Define new built-ins 'quit' and 'exit'.
-    These are simply strings that display a hint on how to exit.
+    """Define new builtins 'quit' and 'exit'.
+
+    These are objects which make the interpreter exit when called.
+    The repr of each object contains a hint at how it works.
 
     """
     if os.sep == ':':
@@ -446,7 +442,7 @@ def setcopyright():
 
 
 class _Helper(object):
-    """Define the built-in 'help'.
+    """Define the builtin 'help'.
     This is a wrapper around pydoc.help (with a twist).
 
     """
@@ -504,11 +500,12 @@ def execsitecustomize():
         pass
     except Exception as err:
         if os.environ.get("PYTHONVERBOSE"):
-            raise
-        sys.stderr.write(
-            "Error in sitecustomize; set PYTHONVERBOSE for traceback:\n"
-            "%s: %s\n" %
-            (err.__class__.__name__, err))
+            sys.excepthook(*sys.exc_info())
+        else:
+            sys.stderr.write(
+                "Error in sitecustomize; set PYTHONVERBOSE for traceback:\n"
+                "%s: %s\n" %
+                (err.__class__.__name__, err))
 
 
 def execusercustomize():
@@ -517,12 +514,20 @@ def execusercustomize():
         import usercustomize
     except ImportError:
         pass
+    except Exception as err:
+        if os.environ.get("PYTHONVERBOSE"):
+            sys.excepthook(*sys.exc_info())
+        else:
+            sys.stderr.write(
+                "Error in usercustomize; set PYTHONVERBOSE for traceback:\n"
+                "%s: %s\n" %
+                (err.__class__.__name__, err))
 
 
 def main():
     global ENABLE_USER_SITE
 
-    abs__file__()
+    abs_paths()
     known_paths = removeduppaths()
     if (os.name == "posix" and sys.path and
         os.path.basename(sys.path[-1]) == "Modules"):

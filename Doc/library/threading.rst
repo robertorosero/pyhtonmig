@@ -155,6 +155,17 @@ This module defines the following functions and objects:
    Availability: Windows, systems with POSIX threads.
 
 
+This module also defines the following constant:
+
+.. data:: TIMEOUT_MAX
+
+   The maximum value allowed for the *timeout* parameter of blocking functions
+   (:meth:`Lock.acquire`, :meth:`RLock.acquire`, :meth:`Condition.wait`, etc.).
+   Specifiying a timeout greater than this value will raise an
+   :exc:`OverflowError`.
+
+   .. versionadded:: 3.2
+
 Detailed interfaces for the objects are documented below.
 
 The design of this module is loosely based on Java's threading model. However,
@@ -349,7 +360,7 @@ and may vary across implementations.
 All methods are executed atomically.
 
 
-.. method:: Lock.acquire(blocking=True)
+.. method:: Lock.acquire(blocking=True, timeout=-1)
 
    Acquire a lock, blocking or non-blocking.
 
@@ -363,6 +374,17 @@ All methods are executed atomically.
    without an argument would block, return false immediately; otherwise, do the
    same thing as when called without arguments, and return true.
 
+   When invoked with the floating-point *timeout* argument set to a positive
+   value, block for at most the number of seconds specified by *timeout*
+   and as long as the lock cannot be acquired.  A negative *timeout* argument
+   specifies an unbounded wait.  It is forbidden to specify a *timeout*
+   when *blocking* is false.
+
+   The return value is ``True`` if the lock is acquired successfully,
+   ``False`` if not (for example if the *timeout* expired).
+
+   .. versionchanged:: 3.2
+      The *timeout* parameter is new.
 
 .. method:: Lock.release()
 
@@ -396,7 +418,7 @@ pair) resets the lock to unlocked and allows another thread blocked in
 :meth:`acquire` to proceed.
 
 
-.. method:: RLock.acquire(blocking=True)
+.. method:: RLock.acquire(blocking=True, timeout=-1)
 
    Acquire a lock, blocking or non-blocking.
 
@@ -414,6 +436,14 @@ pair) resets the lock to unlocked and allows another thread blocked in
    When invoked with the *blocking* argument set to false, do not block.  If a call
    without an argument would block, return false immediately; otherwise, do the
    same thing as when called without arguments, and return true.
+
+   When invoked with the floating-point *timeout* argument set to a positive
+   value, block for at most the number of seconds specified by *timeout*
+   and as long as the lock cannot be acquired.  Return true if the lock has
+   been acquired, false if the timeout has elapsed.
+
+   .. versionchanged:: 3.2
+      The *timeout* parameter is new.
 
 
 .. method:: RLock.release()
@@ -572,7 +602,7 @@ waiting until some other thread calls :meth:`release`.
    defaults to ``1``. If the *value* given is less than 0, :exc:`ValueError` is
    raised.
 
-   .. method:: acquire(blocking=True)
+   .. method:: acquire(blocking=True, timeout=None)
 
       Acquire a semaphore.
 
@@ -583,14 +613,18 @@ waiting until some other thread calls :meth:`release`.
       interlocking so that if multiple :meth:`acquire` calls are blocked,
       :meth:`release` will wake exactly one of them up.  The implementation may
       pick one at random, so the order in which blocked threads are awakened
-      should not be relied on.  There is no return value in this case.
-
-      When invoked with *blocking* set to true, do the same thing as when called
-      without arguments, and return true.
+      should not be relied on.  Returns true (or blocks indefinitely).
 
       When invoked with *blocking* set to false, do not block.  If a call
-      without an argument would block, return false immediately; otherwise, do
-      the same thing as when called without arguments, and return true.
+      without an argument would block, return false immediately; otherwise,
+      do the same thing as when called without arguments, and return true.
+
+      When invoked with a *timeout* other than None, it will block for at
+      most *timeout* seconds.  If acquire does not complete successfully in
+      that interval, return false.  Return true otherwise.
+
+      .. versionchanged:: 3.2
+         The *timeout* parameter is new.
 
    .. method:: release()
 

@@ -519,12 +519,12 @@ class BaseStrTest:
         edge = _('-') * (size // 2)
         s = _('').join([edge, SUBSTR, edge])
         del edge
-        self.assertTrue(SUBSTR in s)
-        self.assertFalse(SUBSTR * 2 in s)
-        self.assertTrue(_('-') in s)
-        self.assertFalse(_('a') in s)
+        self.assertIn(SUBSTR, s)
+        self.assertNotIn(SUBSTR * 2, s)
+        self.assertIn(_('-'), s)
+        self.assertNotIn(_('a'), s)
         s += _('a')
-        self.assertTrue(_('a') in s)
+        self.assertIn(_('a'), s)
 
     @bigmemtest(minsize=_2G + 10, memuse=2)
     def test_compare(self, size):
@@ -618,7 +618,7 @@ class StrTest(unittest.TestCase, BaseStrTest):
     @precisionbigmemtest(size=_4G // 5, memuse=character_size * (6 + 1))
     def test_unicode_repr_overflow(self, size):
         try:
-            s = "\uAAAA"*size
+            s = "\uDCBA"*size
             r = repr(s)
         except MemoryError:
             pass # acceptable on 32-bit
@@ -679,22 +679,24 @@ class StrTest(unittest.TestCase, BaseStrTest):
 
     @bigmemtest(minsize=2**32 / 5, memuse=character_size * 7)
     def test_unicode_repr(self, size):
-        s = "\uAAAA" * size
+        # Use an assigned, but not printable code point.
+        # It is in the range of the low surrogates \uDC00-\uDFFF.
+        s = "\uDCBA" * size
         for f in (repr, ascii):
             r = f(s)
             self.assertTrue(len(r) > size)
-            self.assertTrue(r.endswith(r"\uaaaa'"), r[-10:])
+            self.assertTrue(r.endswith(r"\udcba'"), r[-10:])
             del r
 
     # The character takes 4 bytes even in UCS-2 builds because it will
     # be decomposed into surrogates.
     @bigmemtest(minsize=2**32 / 5, memuse=4 + character_size * 9)
     def test_unicode_repr_wide(self, size):
-        s = "\U0001AAAA" * size
+        s = "\U0001DCBA" * size
         for f in (repr, ascii):
             r = f(s)
             self.assertTrue(len(r) > size)
-            self.assertTrue(r.endswith(r"\U0001aaaa'"), r[-12:])
+            self.assertTrue(r.endswith(r"\U0001dcba'"), r[-12:])
             del r
 
 
@@ -768,9 +770,9 @@ class TupleTest(unittest.TestCase):
     def test_contains(self, size):
         t = (1, 2, 3, 4, 5) * size
         self.assertEquals(len(t), size * 5)
-        self.assertTrue(5 in t)
-        self.assertFalse((1, 2, 3, 4, 5) in t)
-        self.assertFalse(0 in t)
+        self.assertIn(5, t)
+        self.assertNotIn((1, 2, 3, 4, 5), t)
+        self.assertNotIn(0, t)
 
     @bigmemtest(minsize=_2G + 10, memuse=8)
     def test_hash(self, size):
@@ -917,9 +919,9 @@ class ListTest(unittest.TestCase):
     def test_contains(self, size):
         l = [1, 2, 3, 4, 5] * size
         self.assertEquals(len(l), size * 5)
-        self.assertTrue(5 in l)
-        self.assertFalse([1, 2, 3, 4, 5] in l)
-        self.assertFalse(0 in l)
+        self.assertIn(5, l)
+        self.assertNotIn([1, 2, 3, 4, 5], l)
+        self.assertNotIn(0, l)
 
     @bigmemtest(minsize=_2G + 10, memuse=8)
     def test_hash(self, size):

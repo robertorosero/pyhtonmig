@@ -580,7 +580,7 @@ Private Variables
 =================
 
 "Private" instance variables that cannot be accessed except from inside an
-object, don't exist in Python.  However, there is a convention that is followed
+object don't exist in Python.  However, there is a convention that is followed
 by most Python code: a name prefixed with an underscore (e.g. ``_spam``) should
 be treated as a non-public part of the API (whether it is a function, a method
 or a data member).  It should be considered an implementation detail and subject
@@ -599,12 +599,12 @@ Note that the mangling rules are designed mostly to avoid accidents; it still is
 possible to access or modify a variable that is considered private.  This can
 even be useful in special circumstances, such as in the debugger.
 
-Notice that code passed to ``exec()``, ``eval()`` or ``execfile()`` does not
-consider the classname of the invoking  class to be the current class; this is
-similar to the effect of the  ``global`` statement, the effect of which is
-likewise restricted to  code that is byte-compiled together.  The same
-restriction applies to ``getattr()``, ``setattr()`` and ``delattr()``, as well
-as when referencing ``__dict__`` directly.
+Notice that code passed to ``exec()`` or ``eval()`` does not consider the
+classname of the invoking class to be the current class; this is similar to the
+effect of the ``global`` statement, the effect of which is likewise restricted
+to code that is byte-compiled together.  The same restriction applies to
+``getattr()``, ``setattr()`` and ``delattr()``, as well as when referencing
+``__dict__`` directly.
 
 
 .. _tut-odds:
@@ -717,7 +717,7 @@ object that defines the method :meth:`__next__` which accesses elements in the
 container one at a time.  When there are no more elements, :meth:`__next__`
 raises a :exc:`StopIteration` exception which tells the :keyword:`for` loop to
 terminate.  You can call the :meth:`__next__` method using the :func:`next`
-builtin; this example shows how it all works::
+built-in function; this example shows how it all works::
 
    >>> s = 'abc'
    >>> it = iter(s)
@@ -737,7 +737,7 @@ builtin; this example shows how it all works::
    StopIteration
 
 Having seen the mechanics behind the iterator protocol, it is easy to add
-iterator behavior to your classes.  Define a :meth:`__iter__` method which
+iterator behavior to your classes.  Define an :meth:`__iter__` method which
 returns an object with a :meth:`__next__` method.  If the class defines
 :meth:`__next__`, then :meth:`__iter__` can just return ``self``::
 
@@ -754,7 +754,10 @@ returns an object with a :meth:`__next__` method.  If the class defines
            self.index = self.index - 1
            return self.data[self.index]
 
-   >>> for char in Reverse('spam'):
+   >>> rev = Reverse('spam')
+   >>> iter(rev)
+   <__main__.Reverse object at 0x00A1DB50>
+   >>> for char in rev:
    ...     print(char)
    ...
    m

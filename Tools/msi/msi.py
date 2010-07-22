@@ -7,6 +7,7 @@ import uisample
 from win32com.client import constants
 from distutils.spawn import find_executable
 from uuids import product_codes
+import tempfile
 
 # Settings can be overridden in config.py below
 # 0 for official python.org releases
@@ -28,6 +29,8 @@ have_tcl = True
 PCBUILD="PCbuild"
 # msvcrt version
 MSVCR = "90"
+# Name of certificate in default store to sign MSI with
+certname = None
 
 try:
     from config import *
@@ -113,6 +116,7 @@ pythondll_uuid = {
     "27":"{4fe21c76-1760-437b-a2f2-99909130a175}",
     "30":"{6953bc3b-6768-4291-8410-7914ce6e2ca8}",
     "31":"{4afcba0b-13e4-47c3-bebe-477428b46913}",
+    "32":"{3ff95315-1096-4d31-bd86-601d5438ad5e}",
     } [major+minor]
 
 # Compute the name that Sphinx gives to the docfile
@@ -219,7 +223,8 @@ def build_database():
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
+    msiname = "python-%s%s.msi" % (full_current_version, msilib.arch_ext)
+    db = msilib.init_database(msiname,
                   schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
@@ -242,7 +247,7 @@ def build_database():
                               ("ProductLine", "Python%s%s" % (major, minor)),
                              ])
     db.Commit()
-    return db
+    return db, msiname
 
 def remove_old_versions(db):
     "Fill the upgrade table."
@@ -403,7 +408,7 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py2_ "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x "bad_coding|badsyntax|site-packages|py2_|lib2to3\\tests" "[TARGETDIR]Lib"'
     lib2to3args = r'-c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
@@ -1006,8 +1011,6 @@ def add_files(db):
             lib.add_file("audiotest.au")
             lib.add_file("cfgparser.1")
             lib.add_file("sgml_input.html")
-            lib.add_file("test.xml")
-            lib.add_file("test.xml.out")
             lib.add_file("testtar.tar")
             lib.add_file("test_difflib_expect.html")
             lib.add_file("check_soundcard.vbs")
@@ -1019,6 +1022,9 @@ def add_files(db):
             lib.add_file("zipdir.zip")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
+        if dir=='xmltestdata':
+            lib.glob("*.xml")
+            lib.add_file("test.xml.out")
         if dir=='output':
             lib.glob("test_*")
         if dir=='idlelib':
@@ -1293,7 +1299,7 @@ def add_registry(db):
               ])
     db.Commit()
 
-db = build_database()
+db,msiname = build_database()
 try:
     add_features(db)
     add_ui(db)
@@ -1303,3 +1309,75 @@ try:
     db.Commit()
 finally:
     del db
+
+# Merge CRT into MSI file. This requires the database to be closed.
+mod_dir = os.path.join(os.environ["ProgramFiles"], "Common Files", "Merge Modules")
+if msilib.Win64:
+    modules = ["Microsoft_VC90_CRT_x86_x64.msm", "policy_9_0_Microsoft_VC90_CRT_x86_x64.msm"]
+else:
+    modules = ["Microsoft_VC90_CRT_x86.msm","policy_9_0_Microsoft_VC90_CRT_x86.msm"]
+
+for i, n in enumerate(modules):
+    modules[i] = os.path.join(mod_dir, n)
+
+def merge(msi, feature, rootdir, modules):
+    cab_and_filecount = []
+    # Step 1: Merge databases, extract cabfiles
+    m = msilib.MakeMerge2()
+    m.OpenLog("merge.log")
+    m.OpenDatabase(msi)
+    for module in modules:
+        print module
+        m.OpenModule(module,0)
+        m.Merge(feature, rootdir)
+        print "Errors:"
+        for e in m.Errors:
+            print e.Type, e.ModuleTable, e.DatabaseTable
+            print "   Modkeys:",
+            for s in e.ModuleKeys: print s,
+            print
+            print "   DBKeys:",
+            for s in e.DatabaseKeys: print s,
+            print
+        cabname = tempfile.mktemp(suffix=".cab")
+        m.ExtractCAB(cabname)
+        cab_and_filecount.append((cabname, len(m.ModuleFiles)))
+        m.CloseModule()
+    m.CloseDatabase(True)
+    m.CloseLog()
+
+    # Step 2: Add CAB files
+    i = msilib.MakeInstaller()
+    db = i.OpenDatabase(msi, constants.msiOpenDatabaseModeTransact)
+
+    v = db.OpenView("SELECT LastSequence FROM Media")
+    v.Execute(None)
+    maxmedia = -1
+    while 1:
+        r = v.Fetch()
+        if not r: break
+        seq = r.IntegerData(1)
+        if seq > maxmedia:
+            maxmedia = seq
+    print "Start of Media", maxmedia
+
+    for cabname, count in cab_and_filecount:
+        stream = "merged%d" % maxmedia
+        msilib.add_data(db, "Media",
+                [(maxmedia+1, maxmedia+count, None, "#"+stream, None, None)])
+        msilib.add_stream(db, stream,  cabname)
+        os.unlink(cabname)
+        maxmedia += count
+    # The merge module sets ALLUSERS to 1 in the property table.
+    # This is undesired; delete that
+    v = db.OpenView("DELETE FROM Property WHERE Property='ALLUSERS'")
+    v.Execute(None)
+    v.Close()
+    db.Commit()
+
+merge(msiname, "SharedCRT", "TARGETDIR", modules)
+
+# certname (from config.py) should be (a substring of)
+# the certificate subject, e.g. "Python Software Foundation"
+if certname:
+    os.system('signtool sign /n "%s" /t http://timestamp.verisign.com/scripts/timestamp.dll %s' % (certname, msiname))

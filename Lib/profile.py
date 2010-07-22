@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 #
 # Class for profiling python code. rev 1.0  6/2/94
 #
@@ -92,11 +92,6 @@ def runctx(statement, globals, locals, filename=None):
     else:
         return prof.print_stats()
 
-if os.name == "mac":
-    import MacOS
-    def _get_time_mac(timer=MacOS.GetTicks):
-        return timer() / 60.0
-
 if hasattr(os, "times"):
     def _get_time_times(timer=os.times):
         t = timer()
@@ -173,10 +168,6 @@ class Profile:
                 self.timer = resgetrusage
                 self.dispatcher = self.trace_dispatch
                 self.get_time = _get_time_resource
-            elif os.name == 'mac':
-                self.timer = MacOS.GetTicks
-                self.dispatcher = self.trace_dispatch_mac
-                self.get_time = _get_time_mac
             elif hasattr(time, 'clock'):
                 self.timer = self.get_time = time.clock
                 self.dispatcher = self.trace_dispatch_i
@@ -602,11 +593,8 @@ def main():
     if (len(args) > 0):
         sys.argv[:] = args
         sys.path.insert(0, os.path.dirname(sys.argv[0]))
-        fp = open(sys.argv[0])
-        try:
+        with open(sys.argv[0], 'rb') as fp:
             script = fp.read()
-        finally:
-            fp.close()
         run('exec(%r)' % script, options.outfile, options.sort)
     else:
         parser.print_usage()

@@ -41,6 +41,11 @@ stream for text.
 Argument names are not part of the specification, and only the arguments of
 :func:`.open` are intended to be used as keyword arguments.
 
+.. seealso::
+   :mod:`sys`
+       contains the standard IO streams: :data:`sys.stdin`, :data:`sys.stdout`,
+       and :data:`sys.stderr`.
+
 
 Module Interface
 ----------------
@@ -51,13 +56,13 @@ Module Interface
    classes.  :func:`.open` uses the file's blksize (as obtained by
    :func:`os.stat`) if possible.
 
-.. function:: open(file, mode='r', buffering=None, encoding=None, errors=None, newline=None, closefd=True)
+.. function:: open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True)
 
    Open *file* and return a corresponding stream.  If the file cannot be opened,
    an :exc:`IOError` is raised.
 
-   *file* is either a string or bytes object giving the name (and the path if
-   the file isn't in the current working directory) of the file to be opened or
+   *file* is either a string or bytes object giving the pathname (absolute or
+   relative to the current working directory) of the file to be opened or
    an integer file descriptor of the file to be wrapped.  (If a file descriptor
    is given, it is closed when the returned I/O object is closed, unless
    *closefd* is set to ``False``.)
@@ -96,10 +101,20 @@ Module Interface
    strings, the bytes having been first decoded using a platform-dependent
    encoding or using the specified *encoding* if given.
 
-   *buffering* is an optional integer used to set the buffering policy.  By
-   default full buffering is on.  Pass 0 to switch buffering off (only allowed
-   in binary mode), 1 to set line buffering, and an integer > 1 to indicate the
-   size of the buffer.
+   *buffering* is an optional integer used to set the buffering policy.
+   Pass 0 to switch buffering off (only allowed in binary mode), 1 to select
+   line buffering (only usable in text mode), and an integer > 1 to indicate
+   the size of a fixed-size chunk buffer.  When no *buffering* argument is
+   given, the default buffering policy works as follows:
+
+   * Binary files are buffered in fixed-size chunks; the size of the buffer
+     is chosen using a heuristic trying to determine the underlying device's
+     "block size" and falling back on :attr:`DEFAULT_BUFFER_SIZE`.
+     On many systems, the buffer will typically be 4096 or 8192 bytes long.
+
+   * "Interactive" text files (files for which :meth:`isatty` returns True)
+     use line buffering.  Other text files use the policy described above
+     for binary files.
 
    *encoding* is the name of the encoding used to decode or encode the file.
    This should only be used in text mode.  The default encoding is platform
@@ -225,8 +240,10 @@ I/O Base Classes
 
       Flush and close this stream. This method has no effect if the file is
       already closed. Once the file is closed, any operation on the file
-      (e.g. reading or writing) will raise an :exc:`IOError`. The internal
-      file descriptor isn't closed if *closefd* was False.
+      (e.g. reading or writing) will raise a :exc:`ValueError`.
+
+      As a convenience, it is allowed to call this method more than once;
+      only the first call, however, will have an effect.
 
    .. attribute:: closed
 
@@ -297,8 +314,12 @@ I/O Base Classes
 
    .. method:: truncate(size=None)
 
-      Truncate the file to at most *size* bytes.  *size* defaults to the current
-      file position, as returned by :meth:`tell`.
+      Resize the stream to the given *size* in bytes (or the current position
+      if *size* is not specified).  The current stream position isn't changed.
+      This resizing can extend or reduce the current file size.  In case of
+      extension, the contents of the new file area depend on the platform
+      (on most systems, additional bytes are zero-filled, on Windows they're
+      undetermined).  The new file size is returned.
 
    .. method:: writable()
 
@@ -506,11 +527,6 @@ In many situations, buffered I/O streams will provide higher performance
    .. method:: read1()
 
       In :class:`BytesIO`, this is the same as :meth:`read`.
-
-   .. method:: truncate([size])
-
-      Truncate the buffer to at most *size* bytes.  *size* defaults to the
-      current stream position, as returned by :meth:`tell`.
 
 
 .. class:: BufferedReader(raw, buffer_size=DEFAULT_BUFFER_SIZE)

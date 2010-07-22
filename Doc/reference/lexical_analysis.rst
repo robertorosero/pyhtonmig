@@ -407,7 +407,7 @@ String literals are described by the following lexical definitions:
 
 .. productionlist::
    bytesliteral: `bytesprefix`(`shortbytes` | `longbytes`)
-   bytesprefix: "b" | "B"
+   bytesprefix: "b" | "B" | "br" | "Br" | "bR" | "BR"
    shortbytes: "'" `shortbytesitem`* "'" | '"' `shortbytesitem`* '"'
    longbytes: "'''" `longbytesitem`* "'''" | '"""' `longbytesitem`* '"""'
    shortbytesitem: `shortbyteschar` | `bytesescapeseq`
@@ -431,15 +431,15 @@ of three single or double quotes (these are generally referred to as
 characters that otherwise have a special meaning, such as newline, backslash
 itself, or the quote character.
 
-String literals may optionally be prefixed with a letter ``'r'`` or ``'R'``;
-such strings are called :dfn:`raw strings` and treat backslashes as literal
-characters.  As a result, ``'\U'`` and ``'\u'`` escapes in raw strings are not
-treated specially.
-
 Bytes literals are always prefixed with ``'b'`` or ``'B'``; they produce an
 instance of the :class:`bytes` type instead of the :class:`str` type.  They
 may only contain ASCII characters; bytes with a numeric value of 128 or greater
 must be expressed with escapes.
+
+Both string and bytes literals may optionally be prefixed with a letter ``'r'``
+or ``'R'``; such strings are called :dfn:`raw strings` and treat backslashes as
+literal characters.  As a result, in string literals, ``'\U'`` and ``'\u'``
+escapes in raw strings are not treated specially.
 
 In triple-quoted strings, unescaped newlines and quotes are allowed (and are
 retained), except that three unescaped quotes in a row terminate the string.  (A
@@ -503,7 +503,7 @@ Notes:
    As in Standard C, up to three octal digits are accepted.
 
 (2)
-   Unlike in Standard C, at most two hex digits are accepted.
+   Unlike in Standard C, exactly two hex digits are required.
 
 (3)
    In a bytes literal, hexadecimal and octal escapes denote the byte with the
@@ -512,13 +512,13 @@ Notes:
 
 (4)
    Individual code units which form parts of a surrogate pair can be encoded using
-   this escape sequence. Unlike in Standard C, exactly two hex digits are required.
+   this escape sequence.  Exactly four hex digits are required.
 
 (5)
    Any Unicode character can be encoded this way, but characters outside the Basic
    Multilingual Plane (BMP) will be encoded using a surrogate pair if Python is
-   compiled to use 16-bit code units (the default).  Individual code units which
-   form parts of a surrogate pair can be encoded using this escape sequence.
+   compiled to use 16-bit code units (the default).  Exactly eight hex digits
+   are required.
 
 
 .. index:: unrecognized escape sequence
@@ -545,9 +545,9 @@ characters as part of the string, *not* as a line continuation.
 String literal concatenation
 ----------------------------
 
-Multiple adjacent string literals (delimited by whitespace), possibly using
-different quoting conventions, are allowed, and their meaning is the same as
-their concatenation.  Thus, ``"hello" 'world'`` is equivalent to
+Multiple adjacent string or bytes literals (delimited by whitespace), possibly
+using different quoting conventions, are allowed, and their meaning is the same
+as their concatenation.  Thus, ``"hello" 'world'`` is equivalent to
 ``"helloworld"``.  This feature can be used to reduce the number of backslashes
 needed, to split long strings conveniently across long lines, or even to add
 comments to parts of strings, for example::
@@ -700,4 +700,4 @@ tokens or are otherwise significant to the lexical analyzer::
 The following printing ASCII characters are not used in Python.  Their
 occurrence outside string literals and comments is an unconditional error::
 
-   $       ?
+   $       ?       `

@@ -1,5 +1,8 @@
 .. highlightlang:: none
 
+.. ATTENTION: You probably should update Misc/python.man, too, if you modify
+.. this file.
+
 .. _using-on-general:
 
 Command line and environment
@@ -21,7 +24,7 @@ Command line
 
 When invoking Python, you may specify any of these options::
 
-    python [-bdEiOsStuUvxX?] [-c command | -m module-name | script | - ] [args]
+    python [-bBdEhiOsSuvVWx?] [-c command | -m module-name | script | - ] [args]
 
 The most common use case is, of course, a simple invocation of a script::
 
@@ -58,7 +61,7 @@ source.
 
 .. cmdoption:: -c <command>
 
-   Execute the Python code in *command*.  *command* can be one ore more
+   Execute the Python code in *command*.  *command* can be one or more
    statements separated by newlines, with significant leading whitespace as in
    normal module code.
 
@@ -232,18 +235,12 @@ Miscellaneous options
 
 .. cmdoption:: -u
 
-   Force stdin, stdout and stderr to be totally unbuffered.  On systems where it
-   matters, also put stdin, stdout and stderr in binary mode.
-
-   Note that there is internal buffering in :meth:`file.readlines` and
-   :ref:`bltin-file-objects` (``for line in sys.stdin``) which is not influenced
-   by this option.  To work around this, you will want to use
-   :meth:`file.readline` inside a ``while 1:`` loop.
+   Force the binary layer of the stdin, stdout and stderr streams (which is
+   available as their ``buffer`` attribute) to be unbuffered.  The text I/O
+   layer will still be line-buffered.
 
    See also :envvar:`PYTHONUNBUFFERED`.
 
-
-.. XXX should the -U option be documented?
 
 .. cmdoption:: -v
 
@@ -300,7 +297,7 @@ Miscellaneous options
    the remaining fields.  Empty fields match all values; trailing empty fields
    may be omitted.  The *message* field matches the start of the warning message
    printed; this match is case-insensitive.  The *category* field matches the
-   warning category.  This must be a class name; the match test whether the
+   warning category.  This must be a class name; the match tests whether the
    actual warning category of the message is a subclass of the specified warning
    category.  The full class name must be given.  The *module* field matches the
    (fully-qualified) module name; this match is case-sensitive.  The *line*
@@ -312,6 +309,8 @@ Miscellaneous options
 
       :pep:`230` -- Warning framework
 
+      :envvar:`PYTHONWARNINGS`
+
 
 .. cmdoption:: -x
 
@@ -319,6 +318,20 @@ Miscellaneous options
    ``#!cmd``.  This is intended for a DOS specific hack only.
 
    .. note:: The line numbers in error messages will be off by one.
+
+Options you shouldn't use
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. cmdoption:: -J
+
+   Reserved for use by Jython_.
+
+.. _Jython: http://jython.org
+
+.. cmdoption:: -X
+
+    Reserved for alternative implementations of Python to use for their own
+    purposes.
 
 .. _using-on-envvars:
 
@@ -460,6 +473,12 @@ These environment variables influence Python's behavior.
    If this environment variable is set, ``sys.argv[0]`` will be set to its
    value instead of the value got through the C runtime.  Only works on
    Mac OS X.
+
+.. envvar:: PYTHONWARNINGS
+
+   This is equivalent to the :option:`-W` option. If set to a comma
+   separated string, it is equivalent to specifying :option:`-W` multiple
+   times.
 
 
 Debug-mode variables

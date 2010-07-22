@@ -21,11 +21,11 @@ errors = 'surrogatepass'
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
-    expectedchecksum = '0b915116051f3ed029a98542c2b7df63c9646272'
+    expectedchecksum = '4504dffd035baea02c5b9de82bebc3d65e0e0baf'
 
     def test_method_checksum(self):
         h = hashlib.sha1()
-        for i in range(65536):
+        for i in range(0x10000):
             char = chr(i)
             data = [
                 # Predicates (single char)
@@ -80,7 +80,7 @@ class UnicodeDatabaseTest(unittest.TestCase):
 class UnicodeFunctionsTest(UnicodeDatabaseTest):
 
     # update this, if the database changes
-    expectedchecksum = 'd4169ccff998ebbd1ec007a0b3fbd66e5ccf0229'
+    expectedchecksum = '6ccf1b1a36460d2694f9b0b0f0324942fe70ede6'
 
     def test_function_checksum(self):
         data = []
@@ -187,6 +187,11 @@ class UnicodeFunctionsTest(UnicodeDatabaseTest):
         # The rest can be found in test_normalization.py
         # which requires an external file.
 
+    def test_pr29(self):
+        # http://www.unicode.org/review/pr-29.html
+        for text in ("\u0b47\u0300\u0b3e", "\u1100\u0300\u1161"):
+            self.assertEqual(self.db.normalize('NFC', text), text)
+
     def test_east_asian_width(self):
         eaw = self.db.east_asian_width
         self.assertRaises(TypeError, eaw, b'a')
@@ -220,7 +225,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertEqual(popen.returncode, 1)
         error = "SyntaxError: (unicode error) \\N escapes not supported " \
             "(can't load unicodedata module)"
-        self.assertTrue(error in popen.stderr.read().decode("ascii"))
+        self.assertIn(error, popen.stderr.read().decode("ascii"))
 
     def test_decimal_numeric_consistent(self):
         # Test that decimal and numeric are consistent,
@@ -278,6 +283,17 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertEqual("\u01c4".title(), "\u01c5")
         self.assertEqual("\u01c5".title(), "\u01c5")
         self.assertEqual("\u01c6".title(), "\u01c5")
+
+    def test_linebreak_7643(self):
+        for i in range(0x10000):
+            lines = (chr(i) + 'A').splitlines()
+            if i in (0x0a, 0x0b, 0x0c, 0x0d, 0x85,
+                     0x1c, 0x1d, 0x1e, 0x2028, 0x2029):
+                self.assertEqual(len(lines), 2,
+                                 r"\u%.4x should be a linebreak" % i)
+            else:
+                self.assertEqual(len(lines), 1,
+                                 r"\u%.4x should not be a linebreak" % i)
 
 def test_main():
     test.support.run_unittest(

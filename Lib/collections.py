@@ -233,6 +233,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
         __slots__ = () \n
         _fields = %(field_names)r \n
         def __new__(_cls, %(argtxt)s):
+            'Create new instance of %(typename)s(%(argtxt)s)'
             return _tuple.__new__(_cls, (%(argtxt)s)) \n
         @classmethod
         def _make(cls, iterable, new=tuple.__new__, len=len):
@@ -242,6 +243,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
                 raise TypeError('Expected %(numfields)d arguments, got %%d' %% len(result))
             return result \n
         def __repr__(self):
+            'Return a nicely formatted representation string'
             return '%(typename)s(%(reprtxt)s)' %% self \n
         def _asdict(self):
             'Return a new OrderedDict which maps field names to their values'
@@ -253,9 +255,10 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
                 raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
             return result \n
         def __getnewargs__(self):
+            'Return self as a plain tuple.  Used by copy and pickle.'
             return tuple(self) \n\n''' % locals()
     for i, name in enumerate(field_names):
-        template += '        %s = _property(_itemgetter(%d))\n' % (name, i)
+        template += "        %s = _property(_itemgetter(%d), doc='Alias for field number %d')\n" % (name, i, i)
     if verbose:
         print(template)
 
@@ -432,6 +435,33 @@ class Counter(dict):
                     self[elem] = 1 + self_get(elem, 0)
         if kwds:
             self.update(kwds)
+
+    def subtract(self, iterable=None, **kwds):
+        '''Like dict.update() but subtracts counts instead of replacing them.
+        Counts can be reduced below zero.  Both the inputs and outputs are
+        allowed to contain zero and negative counts.
+
+        Source can be an iterable, a dictionary, or another Counter instance.
+
+        >>> c = Counter('which')
+        >>> c.subtract('witch')             # subtract elements from another iterable
+        >>> c.subtract(Counter('watch'))    # subtract elements from another counter
+        >>> c['h']                          # 2 in which, minus 1 in witch, minus 1 in watch
+        0
+        >>> c['w']                          # 1 in which, minus 1 in witch, minus 1 in watch
+        -1
+
+        '''
+        if iterable is not None:
+            self_get = self.get
+            if isinstance(iterable, Mapping):
+                for elem, count in iterable.items():
+                    self[elem] = self_get(elem, 0) - count
+            else:
+                for elem in iterable:
+                    self[elem] = self_get(elem, 0) - 1
+        if kwds:
+            self.subtract(kwds)
 
     def copy(self):
         'Like dict.copy() but returns a Counter instance instead of a dict.'
@@ -767,6 +797,8 @@ class UserString(Sequence):
             new = new.data
         return self.__class__(self.data.replace(old, new, maxsplit))
     def rfind(self, sub, start=0, end=_sys.maxsize):
+        if isinstance(sub, UserString):
+            sub = sub.data
         return self.data.rfind(sub, start, end)
     def rindex(self, sub, start=0, end=_sys.maxsize):
         return self.data.rindex(sub, start, end)

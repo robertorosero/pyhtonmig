@@ -191,7 +191,7 @@ For example::
    .. versionadded:: 3.1
 
 
-   Counter objects support two methods beyond those available for all
+   Counter objects support three methods beyond those available for all
    dictionaries:
 
    .. method:: elements()
@@ -213,6 +213,19 @@ For example::
 
             >>> Counter('abracadabra').most_common(3)
             [('a', 5), ('r', 2), ('b', 2)]
+
+   .. method:: subtract([iterable-or-mapping])
+
+      Elements are subtracted from an *iterable* or from another *mapping*
+      (or counter).  Like :meth:`dict.update` but subtracts counts instead
+      of replacing them.  Both inputs and outputs may be zero or negative.
+
+            >>> c = Counter(a=4, b=2, c=0, d=-2)
+            >>> d = Counter(a=1, b=2, c=3, d=4)
+            >>> c.subtract(d)
+            Counter({'a': 3, 'b': 0, 'c': -3, 'd': -6})
+
+      .. versionadded:: 3.2
 
    The usual dictionary methods are available for :class:`Counter` objects
    except for two which work differently for counters.
@@ -257,6 +270,33 @@ counts, but the output will exclude results with counts of zero or less.
     Counter({'a': 1, 'b': 1})
     >>> c | d                       # union:  max(c[x], d[x])
     Counter({'a': 3, 'b': 2})
+
+.. note::
+
+   Counters were primarily designed to work with positive integers to represent
+   running counts; however, care was taken to not unnecessarily preclude use
+   cases needing other types or negative values.  To help with those use cases,
+   this section documents the minimum range and type restrictions.
+
+   * The :class:`Counter` class itself is a dictionary subclass with no
+     restrictions on its keys and values.  The values are intended to be numbers
+     representing counts, but you *could* store anything in the value field.
+
+   * The :meth:`most_common` method requires only that the values be orderable.
+
+   * For in-place operations such as ``c[key] += 1``, the value type need only
+     support addition and subtraction.  So fractions, floats, and decimals would
+     work and negative values are supported.  The same is also true for
+     :meth:`update` and :meth:`subtract` which allow negative and zero values
+     for both inputs and outputs.
+
+   * The multiset methods are designed only for use cases with positive values.
+     The inputs may be negative or zero, but only outputs with positive values
+     are created.  There are no type restrictions, but the value type needs to
+     support support addition, subtraction, and comparison.
+
+   * The :meth:`elements` method requires integer counts.  It ignores zero and
+     negative counts.
 
 .. seealso::
 
@@ -327,6 +367,12 @@ counts, but the output will exclude results with counts of zero or less.
       Remove all elements from the deque leaving it with length 0.
 
 
+   .. method:: count(x)
+
+      Count the number of deque elements equal to *x*.
+
+      .. versionadded:: 3.2
+
    .. method:: extend(iterable)
 
       Extend the right side of the deque by appending elements from the iterable
@@ -357,6 +403,11 @@ counts, but the output will exclude results with counts of zero or less.
       Removed the first occurrence of *value*.  If not found, raises a
       :exc:`ValueError`.
 
+   .. method:: reverse()
+
+      Reverse the elements of the deque in-place and then return ``None``.
+
+      .. versionadded:: 3.2
 
    .. method:: rotate(n)
 
@@ -464,7 +515,7 @@ added elements by appending to the right and popping to the left::
             yield s / n
 
 The :meth:`rotate` method provides a way to implement :class:`deque` slicing and
-deletion.  For example, a pure python implementation of ``del d[n]`` relies on
+deletion.  For example, a pure Python implementation of ``del d[n]`` relies on
 the :meth:`rotate` method to position elements to be popped::
 
    def delete_nth(d, n):
@@ -500,7 +551,7 @@ stack manipulations such as ``dup``, ``drop``, ``swap``, ``over``, ``pick``,
    :class:`defaultdict` objects support the following method in addition to the
    standard :class:`dict` operations:
 
-   .. method:: defaultdict.__missing__(key)
+   .. method:: __missing__(key)
 
       If the :attr:`default_factory` attribute is ``None``, this raises a
       :exc:`KeyError` exception with the *key* as argument.
@@ -520,7 +571,7 @@ stack manipulations such as ``dup``, ``drop``, ``swap``, ``over``, ``pick``,
    :class:`defaultdict` objects support the following instance variable:
 
 
-   .. attribute:: defaultdict.default_factory
+   .. attribute:: default_factory
 
       This attribute is used by the :meth:`__missing__` method; it is
       initialized from the first argument to the constructor, if present, or to
@@ -648,6 +699,7 @@ Example:
            _fields = ('x', 'y')
    <BLANKLINE>
            def __new__(_cls, x, y):
+               'Create a new instance of Point(x, y)'
                return _tuple.__new__(_cls, (x, y))
    <BLANKLINE>
            @classmethod
@@ -659,6 +711,7 @@ Example:
                return result
    <BLANKLINE>
            def __repr__(self):
+               'Return a nicely formatted representation string'
                return 'Point(x=%r, y=%r)' % self
    <BLANKLINE>
            def _asdict(self):
@@ -673,10 +726,11 @@ Example:
                return result
    <BLANKLINE>
            def __getnewargs__(self):
+               'Return self as a plain tuple.   Used by copy and pickle.'
                return tuple(self)
    <BLANKLINE>
-           x = _property(_itemgetter(0))
-           y = _property(_itemgetter(1))
+           x = _property(_itemgetter(0), doc='Alias for field number 0')
+           y = _property(_itemgetter(1), doc='Alias for field number 1')
 
    >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
    >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
@@ -709,7 +763,7 @@ In addition to the methods inherited from tuples, named tuples support
 three additional methods and one attribute.  To prevent conflicts with
 field names, the method and attribute names start with an underscore.
 
-.. method:: somenamedtuple._make(iterable)
+.. classmethod:: somenamedtuple._make(iterable)
 
    Class method that makes a new instance from an existing sequence or iterable.
 
@@ -789,7 +843,7 @@ a fixed-width print format:
     Point: x= 3.000  y= 4.000  hypot= 5.000
     Point: x=14.000  y= 0.714  hypot=14.018
 
-The subclass shown above sets ``__slots__`` to an empty tuple.  This keeps
+The subclass shown above sets ``__slots__`` to an empty tuple.  This helps
 keep memory requirements low by preventing the creation of instance dictionaries.
 
 
@@ -837,11 +891,11 @@ the items are returned in the order their keys were first added.
 
    .. versionadded:: 3.1
 
-.. method:: OrderedDict.popitem(last=True)
+   .. method:: popitem(last=True)
 
-   The :meth:`popitem` method for ordered dictionaries returns and removes
-   a (key, value) pair.  The pairs are returned in LIFO order if *last* is
-   true or FIFO order if false.
+      The :meth:`popitem` method for ordered dictionaries returns and removes a
+      (key, value) pair.  The pairs are returned in LIFO order if *last* is true
+      or FIFO order if false.
 
 In addition to the usual mapping methods, ordered dictionaries also support
 reverse iteration using :func:`reversed`.
@@ -902,12 +956,13 @@ attribute.
    initialized with its contents; note that a reference to *initialdata* will not
    be kept, allowing it be used for other purposes.
 
-In addition to supporting the methods and operations of mappings,
-:class:`UserDict` instances provide the following attribute:
+   In addition to supporting the methods and operations of mappings,
+   :class:`UserDict` instances provide the following attribute:
 
-.. attribute:: UserDict.data
+   .. attribute:: data
 
-   A real dictionary used to store the contents of the :class:`UserDict` class.
+      A real dictionary used to store the contents of the :class:`UserDict`
+      class.
 
 
 
@@ -931,13 +986,13 @@ to work with because the underlying list is accessible as an attribute.
    defaulting to the empty list ``[]``.  *list* can be any iterable, for
    example a real Python list or a :class:`UserList` object.
 
-In addition to supporting the methods and operations of mutable sequences,
-:class:`UserList` instances provide the following attribute:
+   In addition to supporting the methods and operations of mutable sequences,
+   :class:`UserList` instances provide the following attribute:
 
-.. attribute:: UserList.data
+   .. attribute:: data
 
-   A real :class:`list` object used to store the contents of the
-   :class:`UserList` class.
+      A real :class:`list` object used to store the contents of the
+      :class:`UserList` class.
 
 **Subclassing requirements:** Subclasses of :class:`UserList` are expect to
 offer a constructor which can be called with either no arguments or one

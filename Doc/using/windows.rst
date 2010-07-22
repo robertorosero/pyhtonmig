@@ -69,7 +69,7 @@ key features:
 
 `Enthought Python Distribution <http://www.enthought.com/products/epd.php>`_
     Popular modules (such as PyWin32) with their respective documentation, tool
-    suite for building extensible python applications
+    suite for building extensible Python applications
 
 Notice that these packages are likely to install *older* versions of Python.
 
@@ -166,12 +166,13 @@ separated by semicolons, though, to distinguish them from drive identifiers
 
 .. ``
 
-Modifying the module search path can also be done through the Windows registry:
-Edit
-:file:`HKEY_LOCAL_MACHINE\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath\\`,
-as described above for the environment variable :envvar:`%PYTHONPATH%`.  A
-convenient registry editor is :program:`regedit` (start it by typing "regedit"
-into :menuselection:`Start --> Run`).
+Modifying the module search path can also be done through the Windows registry
+under the key :file:`HKLM\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath`.
+Subkeys which have semicolon-delimited path strings as their default value will
+cause each path to be searched.  Multiple subkeys can be created and are
+appended to the path in alphabetical order.  A convenient registry editor is
+:program:`regedit` (start it by typing "regedit" into :menuselection:`Start -->
+Run`).
 
 
 Executing scripts

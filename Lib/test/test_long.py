@@ -4,6 +4,7 @@ import sys
 
 import random
 import math
+import array
 
 # Used for lazy formatting of failure messages
 class Frm(object):
@@ -13,6 +14,11 @@ class Frm(object):
 
     def __str__(self):
         return self.format % self.args
+
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
 
 # SHIFT should match the value in longintrepr.h for best testing.
 SHIFT = sys.int_info.bits_per_digit
@@ -34,6 +40,43 @@ for i in range(2*SHIFT):
 del p2
 # add complements & negations
 special += [~x for x in special] + [-x for x in special]
+
+DBL_MAX = sys.float_info.max
+DBL_MAX_EXP = sys.float_info.max_exp
+DBL_MIN_EXP = sys.float_info.min_exp
+DBL_MANT_DIG = sys.float_info.mant_dig
+DBL_MIN_OVERFLOW = 2**DBL_MAX_EXP - 2**(DBL_MAX_EXP - DBL_MANT_DIG - 1)
+
+# pure Python version of correctly-rounded true division
+def truediv(a, b):
+    """Correctly-rounded true division for integers."""
+    negative = a^b < 0
+    a, b = abs(a), abs(b)
+
+    # exceptions:  division by zero, overflow
+    if not b:
+        raise ZeroDivisionError("division by zero")
+    if a >= DBL_MIN_OVERFLOW * b:
+        raise OverflowError("int/int too large to represent as a float")
+
+   # find integer d satisfying 2**(d - 1) <= a/b < 2**d
+    d = a.bit_length() - b.bit_length()
+    if d >= 0 and a >= 2**d * b or d < 0 and a * 2**-d >= b:
+        d += 1
+
+    # compute 2**-exp * a / b for suitable exp
+    exp = max(d, DBL_MIN_EXP) - DBL_MANT_DIG
+    a, b = a << max(-exp, 0), b << max(exp, 0)
+    q, r = divmod(a, b)
+
+    # round-half-to-even: fractional part is r/b, which is > 0.5 iff
+    # 2*r > b, and == 0.5 iff 2*r == b.
+    if 2*r > b or 2*r == b and q % 2 == 1:
+        q += 1
+
+    result = math.ldexp(q, exp)
+    return -result if negative else result
+
 
 class LongTest(unittest.TestCase):
 
@@ -287,6 +330,31 @@ class LongTest(unittest.TestCase):
         # ... but it's just a normal digit if base >= 22
         self.assertEqual(int('1L', 22), 43)
 
+        # tests with base 0
+        self.assertEqual(int('000', 0), 0)
+        self.assertEqual(int('0o123', 0), 83)
+        self.assertEqual(int('0x123', 0), 291)
+        self.assertEqual(int('0b100', 0), 4)
+        self.assertEqual(int(' 0O123   ', 0), 83)
+        self.assertEqual(int(' 0X123  ', 0), 291)
+        self.assertEqual(int(' 0B100 ', 0), 4)
+        self.assertEqual(int('0', 0), 0)
+        self.assertEqual(int('+0', 0), 0)
+        self.assertEqual(int('-0', 0), 0)
+        self.assertEqual(int('00', 0), 0)
+        self.assertRaises(ValueError, int, '08', 0)
+        self.assertRaises(ValueError, int, '-012395', 0)
+
+        # invalid bases
+        invalid_bases = [-909,
+                          2**31-1, 2**31, -2**31, -2**31-1,
+                          2**63-1, 2**63, -2**63, -2**63-1,
+                          2**100, -2**100,
+                          ]
+        for base in invalid_bases:
+            self.assertRaises(ValueError, int, '42', base)
+
+
     def test_conversion(self):
 
         class JustLong:
@@ -306,10 +374,6 @@ class LongTest(unittest.TestCase):
     @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
                          "test requires IEEE 754 doubles")
     def test_float_conversion(self):
-        import sys
-        DBL_MAX = sys.float_info.max
-        DBL_MAX_EXP = sys.float_info.max_exp
-        DBL_MANT_DIG = sys.float_info.mant_dig
 
         exact_values = [0, 1, 2,
                          2**53-3,
@@ -363,8 +427,6 @@ class LongTest(unittest.TestCase):
             self.assertEqual(int(float(x)), y)
 
     def test_float_overflow(self):
-        import math
-
         for x in -2.0, -1.0, 0.0, 1.0, 2.0:
             self.assertEqual(float(int(x)), x)
 
@@ -396,8 +458,6 @@ class LongTest(unittest.TestCase):
             "float(shuge) should not equal int(shuge)")
 
     def test_logs(self):
-        import math
-
         LOG10E = math.log10(math.e)
 
         for exp in list(range(10)) + [100, 1000, 10000]:
@@ -417,7 +477,6 @@ class LongTest(unittest.TestCase):
 
     def test_mixed_compares(self):
         eq = self.assertEqual
-        import math
 
         # We're mostly concerned with that mixing floats and longs does the
         # right stuff, even when longs are too large to fit in a float.
@@ -463,7 +522,7 @@ class LongTest(unittest.TestCase):
                     self.d = d
                     assert float(n) / float(d) == value
                 else:
-                    raise TypeError("can't deal with %r" % val)
+                    raise TypeError("can't deal with %r" % value)
 
             def _cmp__(self, other):
                 if not isinstance(other, Rat):
@@ -614,6 +673,127 @@ class LongTest(unittest.TestCase):
         for zero in ["huge / 0", "mhuge / 0"]:
             self.assertRaises(ZeroDivisionError, eval, zero, namespace)
 
+    def check_truediv(self, a, b, skip_small=True):
+        """Verify that the result of a/b is correctly rounded, by
+        comparing it with a pure Python implementation of correctly
+        rounded division.  b should be nonzero."""
+
+        # skip check for small a and b: in this case, the current
+        # implementation converts the arguments to float directly and
+        # then applies a float division.  This can give doubly-rounded
+        # results on x87-using machines (particularly 32-bit Linux).
+        if skip_small and max(abs(a), abs(b)) < 2**DBL_MANT_DIG:
+            return
+
+        try:
+            # use repr so that we can distinguish between -0.0 and 0.0
+            expected = repr(truediv(a, b))
+        except OverflowError:
+            expected = 'overflow'
+        except ZeroDivisionError:
+            expected = 'zerodivision'
+
+        try:
+            got = repr(a / b)
+        except OverflowError:
+            got = 'overflow'
+        except ZeroDivisionError:
+            got = 'zerodivision'
+
+        self.assertEqual(expected, got, "Incorrectly rounded division {}/{}: "
+                         "expected {}, got {}".format(a, b, expected, got))
+
+    @requires_IEEE_754
+    def test_correctly_rounded_true_division(self):
+        # more stringent tests than those above, checking that the
+        # result of true division of ints is always correctly rounded.
+        # This test should probably be considered CPython-specific.
+
+        # Exercise all the code paths not involving Gb-sized ints.
+        # ... divisions involving zero
+        self.check_truediv(123, 0)
+        self.check_truediv(-456, 0)
+        self.check_truediv(0, 3)
+        self.check_truediv(0, -3)
+        self.check_truediv(0, 0)
+        # ... overflow or underflow by large margin
+        self.check_truediv(671 * 12345 * 2**DBL_MAX_EXP, 12345)
+        self.check_truediv(12345, 345678 * 2**(DBL_MANT_DIG - DBL_MIN_EXP))
+        # ... a much larger or smaller than b
+        self.check_truediv(12345*2**100, 98765)
+        self.check_truediv(12345*2**30, 98765*7**81)
+        # ... a / b near a boundary: one of 1, 2**DBL_MANT_DIG, 2**DBL_MIN_EXP,
+        #                 2**DBL_MAX_EXP, 2**(DBL_MIN_EXP-DBL_MANT_DIG)
+        bases = (0, DBL_MANT_DIG, DBL_MIN_EXP,
+                 DBL_MAX_EXP, DBL_MIN_EXP - DBL_MANT_DIG)
+        for base in bases:
+            for exp in range(base - 15, base + 15):
+                self.check_truediv(75312*2**max(exp, 0), 69187*2**max(-exp, 0))
+                self.check_truediv(69187*2**max(exp, 0), 75312*2**max(-exp, 0))
+
+        # overflow corner case
+        for m in [1, 2, 7, 17, 12345, 7**100,
+                  -1, -2, -5, -23, -67891, -41**50]:
+            for n in range(-10, 10):
+                self.check_truediv(m*DBL_MIN_OVERFLOW + n, m)
+                self.check_truediv(m*DBL_MIN_OVERFLOW + n, -m)
+
+        # check detection of inexactness in shifting stage
+        for n in range(250):
+            # (2**DBL_MANT_DIG+1)/(2**DBL_MANT_DIG) lies halfway
+            # between two representable floats, and would usually be
+            # rounded down under round-half-to-even.  The tiniest of
+            # additions to the numerator should cause it to be rounded
+            # up instead.
+            self.check_truediv((2**DBL_MANT_DIG + 1)*12345*2**200 + 2**n,
+                           2**DBL_MANT_DIG*12345)
+
+        # 1/2731 is one of the smallest division cases that's subject
+        # to double rounding on IEEE 754 machines working internally with
+        # 64-bit precision.  On such machines, the next check would fail,
+        # were it not explicitly skipped in check_truediv.
+        self.check_truediv(1, 2731)
+
+        # a particularly bad case for the old algorithm:  gives an
+        # error of close to 3.5 ulps.
+        self.check_truediv(295147931372582273023, 295147932265116303360)
+        for i in range(1000):
+            self.check_truediv(10**(i+1), 10**i)
+            self.check_truediv(10**i, 10**(i+1))
+
+        # test round-half-to-even behaviour, normal result
+        for m in [1, 2, 4, 7, 8, 16, 17, 32, 12345, 7**100,
+                  -1, -2, -5, -23, -67891, -41**50]:
+            for n in range(-10, 10):
+                self.check_truediv(2**DBL_MANT_DIG*m + n, m)
+
+        # test round-half-to-even, subnormal result
+        for n in range(-20, 20):
+            self.check_truediv(n, 2**1076)
+
+        # largeish random divisions: a/b where |a| <= |b| <=
+        # 2*|a|; |ans| is between 0.5 and 1.0, so error should
+        # always be bounded by 2**-54 with equality possible only
+        # if the least significant bit of q=ans*2**53 is zero.
+        for M in [10**10, 10**100, 10**1000]:
+            for i in range(1000):
+                a = random.randrange(1, M)
+                b = random.randrange(a, 2*a+1)
+                self.check_truediv(a, b)
+                self.check_truediv(-a, b)
+                self.check_truediv(a, -b)
+                self.check_truediv(-a, -b)
+
+        # and some (genuinely) random tests
+        for _ in range(10000):
+            a_bits = random.randrange(1000)
+            b_bits = random.randrange(1, 1000)
+            x = random.randrange(2**a_bits)
+            y = random.randrange(1, 2**b_bits)
+            self.check_truediv(x, y)
+            self.check_truediv(x, -y)
+            self.check_truediv(-x, y)
+            self.check_truediv(-x, -y)
 
     def test_small_ints(self):
         for i in range(-5, 257):
@@ -741,6 +921,237 @@ class LongTest(unittest.TestCase):
         for e in bad_exponents:
             self.assertRaises(TypeError, round, 3, e)
 
+    def test_to_bytes(self):
+        def check(tests, byteorder, signed=False):
+            for test, expected in tests.items():
+                try:
+                    self.assertEqual(
+                        test.to_bytes(len(expected), byteorder, signed=signed),
+                        expected)
+                except Exception as err:
+                    raise AssertionError(
+                        "failed to convert {0} with byteorder={1} and signed={2}"
+                        .format(test, byteorder, signed)) from err
+
+        # Convert integers to signed big-endian byte arrays.
+        tests1 = {
+            0: b'\x00',
+            1: b'\x01',
+            -1: b'\xff',
+            -127: b'\x81',
+            -128: b'\x80',
+            -129: b'\xff\x7f',
+            127: b'\x7f',
+            129: b'\x00\x81',
+            -255: b'\xff\x01',
+            -256: b'\xff\x00',
+            255: b'\x00\xff',
+            256: b'\x01\x00',
+            32767: b'\x7f\xff',
+            -32768: b'\xff\x80\x00',
+            65535: b'\x00\xff\xff',
+            -65536: b'\xff\x00\x00',
+            -8388608: b'\x80\x00\x00'
+        }
+        check(tests1, 'big', signed=True)
+
+        # Convert integers to signed little-endian byte arrays.
+        tests2 = {
+            0: b'\x00',
+            1: b'\x01',
+            -1: b'\xff',
+            -127: b'\x81',
+            -128: b'\x80',
+            -129: b'\x7f\xff',
+            127: b'\x7f',
+            129: b'\x81\x00',
+            -255: b'\x01\xff',
+            -256: b'\x00\xff',
+            255: b'\xff\x00',
+            256: b'\x00\x01',
+            32767: b'\xff\x7f',
+            -32768: b'\x00\x80',
+            65535: b'\xff\xff\x00',
+            -65536: b'\x00\x00\xff',
+            -8388608: b'\x00\x00\x80'
+        }
+        check(tests2, 'little', signed=True)
+
+        # Convert integers to unsigned big-endian byte arrays.
+        tests3 = {
+            0: b'\x00',
+            1: b'\x01',
+            127: b'\x7f',
+            128: b'\x80',
+            255: b'\xff',
+            256: b'\x01\x00',
+            32767: b'\x7f\xff',
+            32768: b'\x80\x00',
+            65535: b'\xff\xff',
+            65536: b'\x01\x00\x00'
+        }
+        check(tests3, 'big', signed=False)
+
+        # Convert integers to unsigned little-endian byte arrays.
+        tests4 = {
+            0: b'\x00',
+            1: b'\x01',
+            127: b'\x7f',
+            128: b'\x80',
+            255: b'\xff',
+            256: b'\x00\x01',
+            32767: b'\xff\x7f',
+            32768: b'\x00\x80',
+            65535: b'\xff\xff',
+            65536: b'\x00\x00\x01'
+        }
+        check(tests4, 'little', signed=False)
+
+        self.assertRaises(OverflowError, (256).to_bytes, 1, 'big', signed=False)
+        self.assertRaises(OverflowError, (256).to_bytes, 1, 'big', signed=True)
+        self.assertRaises(OverflowError, (256).to_bytes, 1, 'little', signed=False)
+        self.assertRaises(OverflowError, (256).to_bytes, 1, 'little', signed=True)
+        self.assertRaises(OverflowError, (-1).to_bytes, 2, 'big', signed=False),
+        self.assertRaises(OverflowError, (-1).to_bytes, 2, 'little', signed=False)
+        self.assertEqual((0).to_bytes(0, 'big'), b'')
+        self.assertEqual((1).to_bytes(5, 'big'), b'\x00\x00\x00\x00\x01')
+        self.assertEqual((0).to_bytes(5, 'big'), b'\x00\x00\x00\x00\x00')
+        self.assertEqual((-1).to_bytes(5, 'big', signed=True),
+                         b'\xff\xff\xff\xff\xff')
+        self.assertRaises(OverflowError, (1).to_bytes, 0, 'big')
+
+    def test_from_bytes(self):
+        def check(tests, byteorder, signed=False):
+            for test, expected in tests.items():
+                try:
+                    self.assertEqual(
+                        int.from_bytes(test, byteorder, signed=signed),
+                        expected)
+                except Exception as err:
+                    raise AssertionError(
+                        "failed to convert {0} with byteorder={1!r} and signed={2}"
+                        .format(test, byteorder, signed)) from err
+
+        # Convert signed big-endian byte arrays to integers.
+        tests1 = {
+            b'': 0,
+            b'\x00': 0,
+            b'\x00\x00': 0,
+            b'\x01': 1,
+            b'\x00\x01': 1,
+            b'\xff': -1,
+            b'\xff\xff': -1,
+            b'\x81': -127,
+            b'\x80': -128,
+            b'\xff\x7f': -129,
+            b'\x7f': 127,
+            b'\x00\x81': 129,
+            b'\xff\x01': -255,
+            b'\xff\x00': -256,
+            b'\x00\xff': 255,
+            b'\x01\x00': 256,
+            b'\x7f\xff': 32767,
+            b'\x80\x00': -32768,
+            b'\x00\xff\xff': 65535,
+            b'\xff\x00\x00': -65536,
+            b'\x80\x00\x00': -8388608
+        }
+        check(tests1, 'big', signed=True)
+
+        # Convert signed little-endian byte arrays to integers.
+        tests2 = {
+            b'': 0,
+            b'\x00': 0,
+            b'\x00\x00': 0,
+            b'\x01': 1,
+            b'\x00\x01': 256,
+            b'\xff': -1,
+            b'\xff\xff': -1,
+            b'\x81': -127,
+            b'\x80': -128,
+            b'\x7f\xff': -129,
+            b'\x7f': 127,
+            b'\x81\x00': 129,
+            b'\x01\xff': -255,
+            b'\x00\xff': -256,
+            b'\xff\x00': 255,
+            b'\x00\x01': 256,
+            b'\xff\x7f': 32767,
+            b'\x00\x80': -32768,
+            b'\xff\xff\x00': 65535,
+            b'\x00\x00\xff': -65536,
+            b'\x00\x00\x80': -8388608
+        }
+        check(tests2, 'little', signed=True)
+
+        # Convert unsigned big-endian byte arrays to integers.
+        tests3 = {
+            b'': 0,
+            b'\x00': 0,
+            b'\x01': 1,
+            b'\x7f': 127,
+            b'\x80': 128,
+            b'\xff': 255,
+            b'\x01\x00': 256,
+            b'\x7f\xff': 32767,
+            b'\x80\x00': 32768,
+            b'\xff\xff': 65535,
+            b'\x01\x00\x00': 65536,
+        }
+        check(tests3, 'big', signed=False)
+
+        # Convert integers to unsigned little-endian byte arrays.
+        tests4 = {
+            b'': 0,
+            b'\x00': 0,
+            b'\x01': 1,
+            b'\x7f': 127,
+            b'\x80': 128,
+            b'\xff': 255,
+            b'\x00\x01': 256,
+            b'\xff\x7f': 32767,
+            b'\x00\x80': 32768,
+            b'\xff\xff': 65535,
+            b'\x00\x00\x01': 65536,
+        }
+        check(tests4, 'little', signed=False)
+
+        class myint(int):
+            pass
+
+        self.assertTrue(type(myint.from_bytes(b'\x00', 'big')) is myint)
+        self.assertEqual(myint.from_bytes(b'\x01', 'big'), 1)
+        self.assertTrue(
+            type(myint.from_bytes(b'\x00', 'big', signed=False)) is myint)
+        self.assertEqual(myint.from_bytes(b'\x01', 'big', signed=False), 1)
+        self.assertTrue(type(myint.from_bytes(b'\x00', 'little')) is myint)
+        self.assertEqual(myint.from_bytes(b'\x01', 'little'), 1)
+        self.assertTrue(type(myint.from_bytes(
+            b'\x00', 'little', signed=False)) is myint)
+        self.assertEqual(myint.from_bytes(b'\x01', 'little', signed=False), 1)
+        self.assertEqual(
+            int.from_bytes([255, 0, 0], 'big', signed=True), -65536)
+        self.assertEqual(
+            int.from_bytes((255, 0, 0), 'big', signed=True), -65536)
+        self.assertEqual(int.from_bytes(
+            bytearray(b'\xff\x00\x00'), 'big', signed=True), -65536)
+        self.assertEqual(int.from_bytes(
+            bytearray(b'\xff\x00\x00'), 'big', signed=True), -65536)
+        self.assertEqual(int.from_bytes(
+            array.array('B', b'\xff\x00\x00'), 'big', signed=True), -65536)
+        self.assertEqual(int.from_bytes(
+            memoryview(b'\xff\x00\x00'), 'big', signed=True), -65536)
+        self.assertRaises(ValueError, int.from_bytes, [256], 'big')
+        self.assertRaises(ValueError, int.from_bytes, [0], 'big\x00')
+        self.assertRaises(ValueError, int.from_bytes, [0], 'little\x00')
+        self.assertRaises(TypeError, int.from_bytes, "", 'big')
+        self.assertRaises(TypeError, int.from_bytes, "\x00", 'big')
+        self.assertRaises(TypeError, int.from_bytes, 0, 'big')
+        self.assertRaises(TypeError, int.from_bytes, 0, 'big', True)
+        self.assertRaises(TypeError, myint.from_bytes, "", 'big')
+        self.assertRaises(TypeError, myint.from_bytes, "\x00", 'big')
+        self.assertRaises(TypeError, myint.from_bytes, 0, 'big')
+        self.assertRaises(TypeError, int.from_bytes, 0, 'big', True)
 
 
 def test_main():

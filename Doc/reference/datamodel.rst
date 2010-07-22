@@ -767,10 +767,10 @@ Class instances
    Special attributes: :attr:`__dict__` is the attribute dictionary;
    :attr:`__class__` is the instance's class.
 
-Files
+I/O objects (also known as file objects)
    .. index::
-      object: file
       builtin: open
+      module: io
       single: popen() (in module os)
       single: makefile() (socket method)
       single: sys.stdin
@@ -781,14 +781,17 @@ Files
       single: stdout (in module sys)
       single: stderr (in module sys)
 
-   A file object represents an open file.  File objects are created by the
-   :func:`open` built-in function, and also by :func:`os.popen`,
-   :func:`os.fdopen`, and the :meth:`makefile` method of socket objects (and
-   perhaps by other functions or methods provided by extension modules).  The
-   objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are initialized to
-   file objects corresponding to the interpreter's standard input, output and
-   error streams.  See :ref:`bltin-file-objects` for complete documentation of
-   file objects.
+   A file object represents an open file.  Various shortcuts are available
+   to create file objects: the :func:`open` built-in function, and also
+   :func:`os.popen`, :func:`os.fdopen`, and the :meth:`makefile` method
+   of socket objects (and perhaps by other functions or methods provided
+   by extension modules).
+
+   The objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are
+   initialized to file objects corresponding to the interpreter's standard
+   input, output and error streams; they are all open in text mode and
+   therefore follow the interface defined by the :class:`io.TextIOBase`
+   abstract class.
 
 Internal types
    .. index::
@@ -1206,8 +1209,7 @@ Basic customization
    Arguments to rich comparison methods are never coerced.
 
    To automatically generate ordering operations from a single root operation,
-   see the `Total Ordering recipe in the ASPN cookbook
-   <http://code.activestate.com/recipes/576529/>`_\.
+   see :func:`functools.total_ordering`.
 
 .. method:: object.__hash__(self)
 
@@ -1410,11 +1412,17 @@ Super Binding
    ``A.__dict__['m'].__get__(obj, A)``.
 
 For instance bindings, the precedence of descriptor invocation depends on the
-which descriptor methods are defined.  Normally, data descriptors define both
-:meth:`__get__` and :meth:`__set__`, while non-data descriptors have just the
-:meth:`__get__` method.  Data descriptors always override a redefinition in an
+which descriptor methods are defined.  A descriptor can define any combination
+of :meth:`__get__`, :meth:`__set__` and :meth:`__delete__`.  If it does not
+define :meth:`__get__`, then accessing the attribute will return the descriptor
+object itself unless there is a value in the object's instance dictionary.  If
+the descriptor defines :meth:`__set__` and/or :meth:`__delete__`, it is a data
+descriptor; if it defines neither, it is a non-data descriptor.  Normally, data
+descriptors define both :meth:`__get__` and :meth:`__set__`, while non-data
+descriptors have just the :meth:`__get__` method.  Data descriptors with
+:meth:`__set__` and :meth:`__get__` defined always override a redefinition in an
 instance dictionary.  In contrast, non-data descriptors can be overridden by
-instances. [#]_
+instances.
 
 Python methods (including :func:`staticmethod` and :func:`classmethod`) are
 implemented as non-data descriptors.  Accordingly, instances can redefine and
@@ -1577,6 +1585,46 @@ Once those definitions are executed, the ordered dictionary is fully populated
 and the metaclass's :meth:`__new__` method gets invoked.  That method builds
 the new type and it saves the ordered dictionary keys in an attribute
 called *members*.
+
+
+Customizing instance and subclass checks
+----------------------------------------
+
+The following methods are used to override the default behavior of the
+:func:`isinstance` and :func:`issubclass` built-in functions.
+
+In particular, the metaclass :class:`abc.ABCMeta` implements these methods in
+order to allow the addition of Abstract Base Classes (ABCs) as "virtual base
+classes" to any class or type (including built-in types), including other
+ABCs.
+
+.. method:: class.__instancecheck__(self, instance)
+
+   Return true if *instance* should be considered a (direct or indirect)
+   instance of *class*. If defined, called to implement ``isinstance(instance,
+   class)``.
+
+
+.. method:: class.__subclasscheck__(self, subclass)
+
+   Return true if *subclass* should be considered a (direct or indirect)
+   subclass of *class*.  If defined, called to implement ``issubclass(subclass,
+   class)``.
+
+
+Note that these methods are looked up on the type (metaclass) of a class.  They
+cannot be defined as class methods in the actual class.  This is consistent with
+the lookup of special methods that are called on instances, only in this
+case the instance is itself a class.
+
+.. seealso::
+
+   :pep:`3119` - Introducing Abstract Base Classes
+      Includes the specification for customizing :func:`isinstance` and
+      :func:`issubclass` behavior through :meth:`__instancecheck__` and
+      :meth:`__subclasscheck__`, with motivation for this functionality in the
+      context of adding Abstract Base Classes (see the :mod:`abc` module) to the
+      language.
 
 
 .. _callable-types:
@@ -2002,13 +2050,6 @@ object itself in order to be consistently invoked by the interpreter).
 .. [#] It *is* possible in some cases to change an object's type, under certain
    controlled conditions. It generally isn't a good idea though, since it can
    lead to some very strange behaviour if it is handled incorrectly.
-
-.. [#] A descriptor can define any combination of :meth:`__get__`,
-   :meth:`__set__` and :meth:`__delete__`.  If it does not define :meth:`__get__`,
-   then accessing the attribute even on an instance will return the descriptor
-   object itself.  If the descriptor defines :meth:`__set__` and/or
-   :meth:`__delete__`, it is a data descriptor; if it defines neither, it is a
-   non-data descriptor.
 
 .. [#] For operands of the same type, it is assumed that if the non-reflected method
    (such as :meth:`__add__`) fails the operation is not supported, which is why the

@@ -12,7 +12,7 @@ interpreter.
 
 .. index:: pair: built-in; types
 
-The principal built-in types are numerics, sequences, mappings, files, classes,
+The principal built-in types are numerics, sequences, mappings, classes,
 instances and exceptions.
 
 Some operations are supported by several object types; in particular,
@@ -165,11 +165,12 @@ This table summarizes the comparison operations:
    pair: objects; comparing
 
 Objects of different types, except different numeric types, never compare equal.
-Furthermore, some types (for example, file objects) support only a degenerate
+Furthermore, some types (for example, function objects) support only a degenerate
 notion of comparison where any two objects of that type are unequal.  The ``<``,
 ``<=``, ``>`` and ``>=`` operators will raise a :exc:`TypeError` exception when
-any operand is a complex number, the objects are of different types that cannot
-be compared, or other cases where there is no defined ordering.
+comparing a complex number with another built-in numeric type, when the objects
+are of different types that cannot be compared, or in other cases where there is
+no defined ordering.
 
 .. index::
    single: __eq__() (instance method)
@@ -451,11 +452,74 @@ Additional Methods on Integer Types
     Equivalent to::
 
         def bit_length(self):
-            s = bin(x)          # binary representation:  bin(-37) --> '-0b100101'
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
             s = s.lstrip('-0b') # remove leading zeros and minus sign
             return len(s)       # len('100101') --> 6
 
     .. versionadded:: 3.1
+
+    .. method:: int.to_bytes(length, byteorder, \*, signed=False)
+
+    Return an array of bytes representing an integer.
+
+        >>> (1024).to_bytes(2, byteorder='big')
+        b'\x04\x00'
+        >>> (1024).to_bytes(10, byteorder='big')
+        b'\x00\x00\x00\x00\x00\x00\x00\x00\x04\x00'
+        >>> (-1024).to_bytes(10, byteorder='big', signed=True)
+        b'\xff\xff\xff\xff\xff\xff\xff\xff\xfc\x00'
+        >>> x = 1000
+        >>> x.to_bytes((x.bit_length() // 8) + 1, byteorder='little')
+        b'\xe8\x03'
+
+    The integer is represented using *length* bytes.  An :exc:`OverflowError`
+    is raised if the integer is not representable with the given number of
+    bytes.
+
+    The *byteorder* argument determines the byte order used to represent the
+    integer.  If *byteorder* is ``"big"``, the most significant byte is at the
+    beginning of the byte array.  If *byteorder* is ``"little"``, the most
+    significant byte is at the end of the byte array.  To request the native
+    byte order of the host system, use :data:`sys.byteorder` as the byte order
+    value.
+
+    The *signed* argument determines whether two's complement is used to
+    represent the integer.  If *signed* is ``False`` and a negative integer is
+    given, an :exc:`OverflowError` is raised. The default value for *signed*
+    is ``False``.
+
+    .. versionadded:: 3.2
+
+    .. classmethod:: int.from_bytes(bytes, byteorder, \*, signed=False)
+
+    Return the integer represented by the given array of bytes.
+
+        >>> int.from_bytes(b'\x00\x10', byteorder='big')
+        16
+        >>> int.from_bytes(b'\x00\x10', byteorder='little')
+        4096
+        >>> int.from_bytes(b'\xfc\x00', byteorder='big', signed=True)
+        -1024
+        >>> int.from_bytes(b'\xfc\x00', byteorder='big', signed=False)
+        64512
+        >>> int.from_bytes([255, 0, 0], byteorder='big')
+        16711680
+
+    The argument *bytes* must either support the buffer protocol or be an
+    iterable producing bytes. :class:`bytes` and :class:`bytearray` are
+    examples of built-in objects that support the buffer protocol.
+
+    The *byteorder* argument determines the byte order used to represent the
+    integer.  If *byteorder* is ``"big"``, the most significant byte is at the
+    beginning of the byte array.  If *byteorder* is ``"little"``, the most
+    significant byte is at the end of the byte array.  To request the native
+    byte order of the host system, use :data:`sys.byteorder` as the byte order
+    value.
+
+    The *signed* argument indicates whether two's complement is used to
+    represent the integer.
+
+    .. versionadded:: 3.2
 
 
 Additional Methods on Float
@@ -530,6 +594,109 @@ hexadecimal string representing the same number::
    >>> float.hex(3740.0)
    '0x1.d380000000000p+11'
 
+
+.. _numeric-hash:
+
+Hashing of numeric types
+------------------------
+
+For numbers ``x`` and ``y``, possibly of different types, it's a requirement
+that ``hash(x) == hash(y)`` whenever ``x == y`` (see the :meth:`__hash__`
+method documentation for more details).  For ease of implementation and
+efficiency across a variety of numeric types (including :class:`int`,
+:class:`float`, :class:`decimal.Decimal` and :class:`fractions.Fraction`)
+Python's hash for numeric types is based on a single mathematical function
+that's defined for any rational number, and hence applies to all instances of
+:class:`int` and :class:`fraction.Fraction`, and all finite instances of
+:class:`float` and :class:`decimal.Decimal`.  Essentially, this function is
+given by reduction modulo ``P`` for a fixed prime ``P``.  The value of ``P`` is
+made available to Python as the :attr:`modulus` attribute of
+:data:`sys.hash_info`.
+
+.. impl-detail::
+
+   Currently, the prime used is ``P = 2**31 - 1`` on machines with 32-bit C
+   longs and ``P = 2**61 - 1`` on machines with 64-bit C longs.
+
+Here are the rules in detail:
+
+ - If ``x = m / n`` is a nonnegative rational number and ``n`` is not divisible
+   by ``P``, define ``hash(x)`` as ``m * invmod(n, P) % P``, where ``invmod(n,
+   P)`` gives the inverse of ``n`` modulo ``P``.
+
+ - If ``x = m / n`` is a nonnegative rational number and ``n`` is
+   divisible by ``P`` (but ``m`` is not) then ``n`` has no inverse
+   modulo ``P`` and the rule above doesn't apply; in this case define
+   ``hash(x)`` to be the constant value ``sys.hash_info.inf``.
+
+ - If ``x = m / n`` is a negative rational number define ``hash(x)``
+   as ``-hash(-x)``.  If the resulting hash is ``-1``, replace it with
+   ``-2``.
+
+ - The particular values ``sys.hash_info.inf``, ``-sys.hash_info.inf``
+   and ``sys.hash_info.nan`` are used as hash values for positive
+   infinity, negative infinity, or nans (respectively).  (All hashable
+   nans have the same hash value.)
+
+ - For a :class:`complex` number ``z``, the hash values of the real
+   and imaginary parts are combined by computing ``hash(z.real) +
+   sys.hash_info.imag * hash(z.imag)``, reduced modulo
+   ``2**sys.hash_info.width`` so that it lies in
+   ``range(-2**(sys.hash_info.width - 1), 2**(sys.hash_info.width -
+   1))``.  Again, if the result is ``-1``, it's replaced with ``-2``.
+
+
+To clarify the above rules, here's some example Python code,
+equivalent to the builtin hash, for computing the hash of a rational
+number, :class:`float`, or :class:`complex`::
+
+
+   import sys, math
+
+   def hash_fraction(m, n):
+       """Compute the hash of a rational number m / n.
+
+       Assumes m and n are integers, with n positive.
+       Equivalent to hash(fractions.Fraction(m, n)).
+
+       """
+       P = sys.hash_info.modulus
+       # Remove common factors of P.  (Unnecessary if m and n already coprime.)
+       while m % P == n % P == 0:
+           m, n = m // P, n // P
+
+       if n % P == 0:
+           hash_ = sys.hash_info.inf
+       else:
+           # Fermat's Little Theorem: pow(n, P-1, P) is 1, so
+           # pow(n, P-2, P) gives the inverse of n modulo P.
+           hash_ = (abs(m) % P) * pow(n, P - 2, P) % P
+       if m < 0:
+           hash_ = -hash_
+       if hash_ == -1:
+           hash_ = -2
+       return hash_
+
+   def hash_float(x):
+       """Compute the hash of a float x."""
+
+       if math.isnan(x):
+           return sys.hash_info.nan
+       elif math.isinf(x):
+           return sys.hash_info.inf if x > 0 else -sys.hash_info.inf
+       else:
+           return hash_fraction(*x.as_integer_ratio())
+
+   def hash_complex(z):
+       """Compute the hash of a complex number z."""
+
+       hash_ = hash_float(z.real) + sys.hash_info.imag * hash_float(z.imag)
+       # do a signed reduction modulo 2**sys.hash_info.width
+       M = 2**(sys.hash_info.width - 1)
+       hash_ = (hash_ & (M - 1)) - (hash & M)
+       if hash_ == -1:
+           hash_ == -2
+       return hash_
 
 .. _typeiter:
 
@@ -650,7 +817,7 @@ string syntax: ``b'xyzzy'``.  To construct byte arrays, use the
    Also, while in previous Python versions, byte strings and Unicode strings
    could be exchanged for each other rather freely (barring encoding issues),
    strings and bytes are now completely separate concepts.  There's no implicit
-   en-/decoding if you pass and object of the wrong type.  A string always
+   en-/decoding if you pass an object of the wrong type.  A string always
    compares unequal to a bytes or bytearray object.
 
 Lists are constructed with square brackets, separating items with commas: ``[a,
@@ -799,7 +966,8 @@ functions based on regular expressions.
 
 .. method:: str.capitalize()
 
-   Return a copy of the string with only its first character capitalized.
+   Return a copy of the string with its first character capitalized and the
+   rest lowercased.
 
 
 .. method:: str.center(width[, fillchar])
@@ -848,20 +1016,20 @@ functions based on regular expressions.
 
 .. method:: str.find(sub[, start[, end]])
 
-   Return the lowest index in the string where substring *sub* is found, such that
-   *sub* is contained in the range [*start*, *end*].  Optional arguments *start*
-   and *end* are interpreted as in slice notation.  Return ``-1`` if *sub* is not
-   found.
+   Return the lowest index in the string where substring *sub* is found, such
+   that *sub* is contained in the slice ``s[start:end]``.  Optional arguments
+   *start* and *end* are interpreted as in slice notation.  Return ``-1`` if
+   *sub* is not found.
 
 
 .. method:: str.format(*args, **kwargs)
 
-   Perform a string formatting operation.  The *format_string* argument can
-   contain literal text or replacement fields delimited by braces ``{}``.  Each
-   replacement field contains either the numeric index of a positional argument,
-   or the name of a keyword argument.  Returns a copy of *format_string* where
-   each replacement field is replaced with the string value of the corresponding
-   argument.
+   Perform a string formatting operation.  The string on which this method is
+   called can contain literal text or replacement fields delimited by braces
+   ``{}``.  Each replacement field contains either the numeric index of a
+   positional argument, or the name of a keyword argument.  Returns a copy of
+   the string where each replacement field is replaced with the string value of
+   the corresponding argument.
 
       >>> "The sum of 1 + 2 is {0}".format(1+2)
       'The sum of 1 + 2 is 3'
@@ -1018,9 +1186,9 @@ functions based on regular expressions.
 
 .. method:: str.rfind(sub[, start[, end]])
 
-   Return the highest index in the string where substring *sub* is found, such that
-   *sub* is contained within s[start,end].  Optional arguments *start* and *end*
-   are interpreted as in slice notation.  Return ``-1`` on failure.
+   Return the highest index in the string where substring *sub* is found, such
+   that *sub* is contained within ``s[start:end]``.  Optional arguments *start*
+   and *end* are interpreted as in slice notation.  Return ``-1`` on failure.
 
 
 .. method:: str.rindex(sub[, start[, end]])
@@ -1161,6 +1329,10 @@ functions based on regular expressions.
 
    You can use :meth:`str.maketrans` to create a translation map from
    character-to-character mappings in different formats.
+
+   You can use the :func:`~string.maketrans` helper function in the :mod:`string`
+   module to create a translation table. For string objects, set the *table*
+   argument to ``None`` for translations that only delete characters:
 
    .. note::
 
@@ -1311,10 +1483,10 @@ The conversion types are:
 | ``'c'``    | Single character (accepts integer or single         |       |
 |            | character string).                                  |       |
 +------------+-----------------------------------------------------+-------+
-| ``'r'``    | String (converts any python object using            | \(5)  |
+| ``'r'``    | String (converts any Python object using            | \(5)  |
 |            | :func:`repr`).                                      |       |
 +------------+-----------------------------------------------------+-------+
-| ``'s'``    | String (converts any python object using            |       |
+| ``'s'``    | String (converts any Python object using            |       |
 |            | :func:`str`).                                       |       |
 +------------+-----------------------------------------------------+-------+
 | ``'%'``    | No argument is converted, results in a ``'%'``      |       |
@@ -1503,6 +1675,9 @@ Notes:
 
    *key* specifies a function of one argument that is used to extract a comparison
    key from each list element: ``key=str.lower``.  The default value is ``None``.
+   Use :func:`functools.cmp_to_key` to convert an
+   old-style *cmp* function to a *key* function.
+
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
@@ -1639,6 +1814,10 @@ and cannot be used as either a dictionary key or as an element of another set.
 The :class:`frozenset` type is immutable and :term:`hashable` --- its contents cannot be
 altered after it is created; it can therefore be used as a dictionary key or as
 an element of another set.
+
+Non-empty sets (not frozensets) can be created by placing a comma-separated list
+of elements within braces, for example: ``{'jack', 'sjoerd'}``, in addition to the
+:class:`set` constructor.
 
 The constructors for both classes work the same:
 
@@ -1907,7 +2086,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
    .. describe:: iter(d)
 
       Return an iterator over the keys of the dictionary.  This is a shortcut
-      for :meth:`iterkeys`.
+      for ``iter(d.keys())``.
 
    .. method:: clear()
 
@@ -2070,291 +2249,14 @@ An example of dictionary view usage::
    {'bacon'}
 
 
-.. _bltin-file-objects:
-
-File Objects
-============
-
-.. index::
-   object: file
-   builtin: file
-   module: os
-   module: socket
-
-.. XXX this is quite out of date, must be updated with "io" module
-
-File objects are implemented using C's ``stdio`` package and can be
-created with the built-in :func:`open` function.  File
-objects are also returned by some other built-in functions and methods,
-such as :func:`os.popen` and :func:`os.fdopen` and the :meth:`makefile`
-method of socket objects. Temporary files can be created using the
-:mod:`tempfile` module, and high-level file operations such as copying,
-moving, and deleting files and directories can be achieved with the
-:mod:`shutil` module.
-
-When a file operation fails for an I/O-related reason, the exception
-:exc:`IOError` is raised.  This includes situations where the operation is not
-defined for some reason, like :meth:`seek` on a tty device or writing a file
-opened for reading.
-
-Files have the following methods:
-
-
-.. method:: file.close()
-
-   Close the file.  A closed file cannot be read or written any more. Any operation
-   which requires that the file be open will raise a :exc:`ValueError` after the
-   file has been closed.  Calling :meth:`close` more than once is allowed.
-
-   You can avoid having to call this method explicitly if you use
-   the :keyword:`with` statement.  For example, the following code will
-   automatically close *f* when the :keyword:`with` block is exited::
-
-      from __future__ import with_statement # This isn't required in Python 2.6
-
-      with open("hello.txt") as f:
-          for line in f:
-              print(line)
-
-   In older versions of Python, you would have needed to do this to get the same
-   effect::
-
-      f = open("hello.txt")
-      try:
-          for line in f:
-              print(line)
-      finally:
-          f.close()
-
-   .. note::
-
-      Not all "file-like" types in Python support use as a context manager for the
-      :keyword:`with` statement.  If your code is intended to work with any file-like
-      object, you can use the function :func:`contextlib.closing` instead of using
-      the object directly.
-
-
-.. method:: file.flush()
-
-   Flush the internal buffer, like ``stdio``'s :cfunc:`fflush`.  This may be a
-   no-op on some file-like objects.
-
-   .. note::
-
-      :meth:`flush` does not necessarily write the file's data to disk.  Use
-      :meth:`flush` followed by :func:`os.fsync` to ensure this behavior.
-
-
-.. method:: file.fileno()
-
-   .. index::
-      pair: file; descriptor
-      module: fcntl
-
-   Return the integer "file descriptor" that is used by the underlying
-   implementation to request I/O operations from the operating system.  This can be
-   useful for other, lower level interfaces that use file descriptors, such as the
-   :mod:`fcntl` module or :func:`os.read` and friends.
-
-   .. note::
-
-      File-like objects which do not have a real file descriptor should *not* provide
-      this method!
-
-
-.. method:: file.isatty()
-
-   Return ``True`` if the file is connected to a tty(-like) device, else ``False``.
-
-   .. note::
-
-      If a file-like object is not associated with a real file, this method should
-      *not* be implemented.
-
-
-.. method:: file.__next__()
-
-   A file object is its own iterator, for example ``iter(f)`` returns *f* (unless
-   *f* is closed).  When a file is used as an iterator, typically in a
-   :keyword:`for` loop (for example, ``for line in f: print(line)``), the
-   :meth:`__next__` method is called repeatedly.  This method returns the next
-   input line, or raises :exc:`StopIteration` when EOF is hit when the file is open
-   for reading (behavior is undefined when the file is open for writing).  In order
-   to make a :keyword:`for` loop the most efficient way of looping over the lines
-   of a file (a very common operation), the :meth:`__next__` method uses a hidden
-   read-ahead buffer.  As a consequence of using a read-ahead buffer, combining
-   :meth:`__next__` with other file methods (like :meth:`readline`) does not work
-   right.  However, using :meth:`seek` to reposition the file to an absolute
-   position will flush the read-ahead buffer.
-
-
-.. method:: file.read([size])
-
-   Read at most *size* bytes from the file (less if the read hits EOF before
-   obtaining *size* bytes).  If the *size* argument is negative or omitted, read
-   all data until EOF is reached.  The bytes are returned as a string object.  An
-   empty string is returned when EOF is encountered immediately.  (For certain
-   files, like ttys, it makes sense to continue reading after an EOF is hit.)  Note
-   that this method may call the underlying C function :cfunc:`fread` more than
-   once in an effort to acquire as close to *size* bytes as possible. Also note
-   that when in non-blocking mode, less data than was requested may be
-   returned, even if no *size* parameter was given.
-
-
-.. method:: file.readline([size])
-
-   Read one entire line from the file.  A trailing newline character is kept in the
-   string (but may be absent when a file ends with an incomplete line). [#]_  If
-   the *size* argument is present and non-negative, it is a maximum byte count
-   (including the trailing newline) and an incomplete line may be returned. An
-   empty string is returned *only* when EOF is encountered immediately.
-
-   .. note::
-
-      Unlike ``stdio``'s :cfunc:`fgets`, the returned string contains null characters
-      (``'\0'``) if they occurred in the input.
-
-
-.. method:: file.readlines([sizehint])
-
-   Read until EOF using :meth:`readline` and return a list containing the lines
-   thus read.  If the optional *sizehint* argument is present, instead of
-   reading up to EOF, whole lines totalling approximately *sizehint* bytes
-   (possibly after rounding up to an internal buffer size) are read.  Objects
-   implementing a file-like interface may choose to ignore *sizehint* if it
-   cannot be implemented, or cannot be implemented efficiently.
-
-
-.. method:: file.seek(offset[, whence])
-
-   Set the file's current position, like ``stdio``'s :cfunc:`fseek`. The *whence*
-   argument is optional and defaults to  ``os.SEEK_SET`` or ``0`` (absolute file
-   positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
-   current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
-   end).  There is no return value.
-
-   For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
-   ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
-
-   Note that if the file is opened for appending
-   (mode ``'a'`` or ``'a+'``), any :meth:`seek` operations will be undone at the
-   next write.  If the file is only opened for writing in append mode (mode
-   ``'a'``), this method is essentially a no-op, but it remains useful for files
-   opened in append mode with reading enabled (mode ``'a+'``).  If the file is
-   opened in text mode (without ``'b'``), only offsets returned by :meth:`tell` are
-   legal.  Use of other offsets causes undefined behavior.
-
-   Note that not all file objects are seekable.
-
-
-.. method:: file.tell()
-
-   Return the file's current position, like ``stdio``'s :cfunc:`ftell`.
-
-   .. note::
-
-      On Windows, :meth:`tell` can return illegal values (after an :cfunc:`fgets`)
-      when reading files with Unix-style line-endings. Use binary mode (``'rb'``) to
-      circumvent this problem.
-
-
-.. method:: file.truncate([size])
-
-   Truncate the file's size.  If the optional *size* argument is present, the file
-   is truncated to (at most) that size.  The size defaults to the current position.
-   The current file position is not changed.  Note that if a specified size exceeds
-   the file's current size, the result is platform-dependent:  possibilities
-   include that the file may remain unchanged, increase to the specified size as if
-   zero-filled, or increase to the specified size with undefined new content.
-   Availability:  Windows, many Unix variants.
-
-
-.. method:: file.write(str)
-
-   Write a string to the file.  Due to buffering, the string may not actually
-   show up in the file until the :meth:`flush` or :meth:`close` method is
-   called.
-
-   The meaning of the return value is not defined for every file-like object.
-   Some (mostly low-level) file-like objects may return the number of bytes
-   actually written, others return ``None``.
-
-
-.. method:: file.writelines(sequence)
-
-   Write a sequence of strings to the file.  The sequence can be any iterable
-   object producing strings, typically a list of strings. There is no return value.
-   (The name is intended to match :meth:`readlines`; :meth:`writelines` does not
-   add line separators.)
-
-Files support the iterator protocol.  Each iteration returns the same result as
-``file.readline()``, and iteration ends when the :meth:`readline` method returns
-an empty string.
-
-File objects also offer a number of other interesting attributes. These are not
-required for file-like objects, but should be implemented if they make sense for
-the particular object.
-
-
-.. attribute:: file.closed
-
-   bool indicating the current state of the file object.  This is a read-only
-   attribute; the :meth:`close` method changes the value. It may not be available
-   on all file-like objects.
-
-
-.. XXX does this still apply?
-.. attribute:: file.encoding
-
-   The encoding that this file uses. When strings are written to a file,
-   they will be converted to byte strings using this encoding. In addition, when
-   the file is connected to a terminal, the attribute gives the encoding that the
-   terminal is likely to use (that  information might be incorrect if the user has
-   misconfigured the  terminal). The attribute is read-only and may not be present
-   on all file-like objects. It may also be ``None``, in which case the file uses
-   the system default encoding for converting strings.
-
-
-.. attribute:: file.errors
-
-   The Unicode error handler used along with the encoding.
-
-
-.. attribute:: file.mode
-
-   The I/O mode for the file.  If the file was created using the :func:`open`
-   built-in function, this will be the value of the *mode* parameter.  This is a
-   read-only attribute and may not be present on all file-like objects.
-
-
-.. attribute:: file.name
-
-   If the file object was created using :func:`open`, the name of the file.
-   Otherwise, some string that indicates the source of the file object, of the
-   form ``<...>``.  This is a read-only attribute and may not be present on all
-   file-like objects.
-
-
-.. attribute:: file.newlines
-
-   If Python was built with the :option:`--with-universal-newlines` option to
-   :program:`configure` (the default) this read-only attribute exists, and for
-   files opened in universal newline read mode it keeps track of the types of
-   newlines encountered while reading the file. The values it can take are
-   ``'\r'``, ``'\n'``, ``'\r\n'``, ``None`` (unknown, no newlines read yet) or a
-   tuple containing all the newline types seen, to indicate that multiple newline
-   conventions were encountered. For files not opened in universal newline read
-   mode the value of this attribute will be ``None``.
-
-
 .. _typememoryview:
 
-memoryview Types
-================
+memoryview type
+===============
 
-:class:`memoryview`\s allow Python code to access the internal data of an object
-that supports the buffer protocol without copying.  Memory can be interpreted as
-simple bytes or complex data structures.
+:class:`memoryview` objects allow Python code to access the internal data
+of an object that supports the buffer protocol without copying.  Memory
+is generally interpreted as simple bytes.
 
 .. class:: memoryview(obj)
 
@@ -2362,10 +2264,19 @@ simple bytes or complex data structures.
    buffer protocol.  Builtin objects that support the buffer protocol include
    :class:`bytes` and :class:`bytearray`.
 
-   ``len(view)`` returns the total number of bytes in the memoryview, *view*.
+   A :class:`memoryview` has the notion of an *element*, which is the
+   atomic memory unit handled by the originating object *obj*.  For many
+   simple types such as :class:`bytes` and :class:`bytearray`, an element
+   is a single byte, but other types such as :class:`array.array` may have
+   bigger elements.
+
+   ``len(view)`` returns the total number of elements in the memoryview,
+   *view*.  The :class:`~memoryview.itemsize` attribute will give you the
+   number of bytes in a single element.
 
    A :class:`memoryview` supports slicing to expose its data.  Taking a single
-   index will return a single byte.  Full slicing will result in a subview::
+   index will return a single element as a :class:`bytes` object.  Full
+   slicing will result in a subview::
 
       >>> v = memoryview(b'abcefg')
       >>> v[1]
@@ -2376,11 +2287,8 @@ simple bytes or complex data structures.
       <memory at 0x77ab28>
       >>> bytes(v[1:4])
       b'bce'
-      >>> v[3:-1]
-      <memory at 0x744f18>
-      >>> bytes(v[4:-1])
 
-   If the object the memory view is over supports changing its data, the
+   If the object the memoryview is over supports changing its data, the
    memoryview supports slice assignment::
 
       >>> data = bytearray(b'abcefg')
@@ -2398,14 +2306,20 @@ simple bytes or complex data structures.
       File "<stdin>", line 1, in <module>
       ValueError: cannot modify size of memoryview object
 
-   Notice how the size of the memoryview object can not be changed.
-
+   Notice how the size of the memoryview object cannot be changed.
 
    :class:`memoryview` has two methods:
 
    .. method:: tobytes()
 
-      Return the data in the buffer as a bytestring.
+      Return the data in the buffer as a bytestring.  This is equivalent to
+      calling the :class:`bytes` constructor on the memoryview. ::
+
+         >>> m = memoryview(b"abc")
+         >>> m.tobytes()
+         b'abc'
+         >>> bytes(m)
+         b'abc'
 
    .. method:: tolist()
 
@@ -2423,7 +2337,15 @@ simple bytes or complex data structures.
 
    .. attribute:: itemsize
 
-      The size in bytes of each element of the memoryview.
+      The size in bytes of each element of the memoryview::
+
+         >>> m = memoryview(array.array('H', [1,2,3]))
+         >>> m.itemsize
+         2
+         >>> m[0]
+         b'\x01\x00'
+         >>> len(m[0]) == m.itemsize
+         True
 
    .. attribute:: shape
 
@@ -2735,8 +2657,7 @@ types, where they are relevant.  Some of these are not reported by the
 
 .. attribute:: class.__bases__
 
-   The tuple of base classes of a class object.  If there are no base classes, this
-   will be an empty tuple.
+   The tuple of base classes of a class object.
 
 
 .. attribute:: class.__name__
@@ -2781,9 +2702,3 @@ The following attributes are only supported by :term:`new-style class`\ es.
 
 .. [#] To format only a tuple you should therefore provide a singleton tuple whose only
    element is the tuple to be formatted.
-
-.. [#] The advantage of leaving the newline on is that returning an empty string is
-   then an unambiguous EOF indication.  It is also possible (in cases where it
-   might matter, for example, if you want to make an exact copy of a file while
-   scanning its lines) to tell whether the last line of a file ended in a newline
-   or not (yes this happens!).

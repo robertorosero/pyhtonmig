@@ -511,7 +511,7 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
         rval = scanstring_unicode(pystr, end, strict, &next_end);
     }
     else {
-        PyErr_Format(PyExc_TypeError, 
+        PyErr_Format(PyExc_TypeError,
                      "first argument must be a string or bytes, not %.80s",
                      Py_TYPE(pystr)->tp_name);
         return NULL;
@@ -1123,14 +1123,27 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", NULL};
 
     PyEncoderObject *s;
-    PyObject *allow_nan;
+    PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOO:make_encoder", kwlist,
-        &s->markers, &s->defaultfn, &s->encoder, &s->indent, &s->key_separator, &s->item_separator, &s->sort_keys, &s->skipkeys, &allow_nan))
+        &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
+        &sort_keys, &skipkeys, &allow_nan))
         return -1;
+
+    s->markers = markers;
+    s->defaultfn = defaultfn;
+    s->encoder = encoder;
+    s->indent = indent;
+    s->key_separator = key_separator;
+    s->item_separator = item_separator;
+    s->sort_keys = sort_keys;
+    s->skipkeys = skipkeys;
+    s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
+    s->allow_nan = PyObject_IsTrue(allow_nan);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -1140,8 +1153,6 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->item_separator);
     Py_INCREF(s->sort_keys);
     Py_INCREF(s->skipkeys);
-    s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
-    s->allow_nan = PyObject_IsTrue(allow_nan);
     return 0;
 }
 
@@ -1383,7 +1394,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 
     if (PyObject_IsTrue(s->sort_keys)) {
         if (code == NULL) {
-            code = Py_CompileString("sorted(d.items(), key=lambda kv: kv[0])", 
+            code = Py_CompileString("sorted(d.items(), key=lambda kv: kv[0])",
                                     "_json.c", Py_eval_input);
             if (code == NULL)
                 goto bail;
@@ -1398,14 +1409,14 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         items = PyEval_EvalCode((PyCodeObject *)code, PyEval_GetGlobals(), mapping);
         Py_DECREF(mapping);
-	} else {
+        } else {
         items = PyMapping_Items(dct);
-	}
-	if (items == NULL)
+        }
+        if (items == NULL)
         goto bail;
     it = PyObject_GetIter(items);
-	Py_DECREF(items);
-	if (it == NULL)
+        Py_DECREF(items);
+        if (it == NULL)
         goto bail;
     skipkeys = PyObject_IsTrue(s->skipkeys);
     idx = 0;
@@ -1426,8 +1437,8 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
         else if (key == Py_True || key == Py_False || key == Py_None) {
-			/* This must come before the PyLong_Check because 
-			   True and False are also 1 and 0.*/
+                        /* This must come before the PyLong_Check because
+                           True and False are also 1 and 0.*/
             kstr = _encoded_const(key);
             if (kstr == NULL)
                 goto bail;
@@ -1443,7 +1454,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         else {
             /* TODO: include repr of key */
-            PyErr_SetString(PyExc_ValueError, "keys must be a string");
+            PyErr_SetString(PyExc_TypeError, "keys must be a string");
             goto bail;
         }
 
@@ -1693,15 +1704,15 @@ PyDoc_STRVAR(module_doc,
 "json speedups\n");
 
 static struct PyModuleDef jsonmodule = {
-	PyModuleDef_HEAD_INIT,
-	"_json",
-	module_doc,
-	-1,
-	speedups_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "_json",
+        module_doc,
+        -1,
+        speedups_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
 PyObject*

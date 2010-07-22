@@ -55,7 +55,7 @@ REMOTE_SYSTEM="neal@dinsdale.python.org"
 REMOTE_DIR="/data/ftp.python.org/pub/docs.python.org/dev/py3k"
 RESULT_FILE="$DIR/build/index.html"
 INSTALL_DIR="/tmp/python-test-3.2/local"
-RSYNC_OPTS="-aC -e ssh"
+RSYNC_OPTS="-C -e ssh -rlogD"
 
 # Always run the installed version of Python.
 PYTHON=$INSTALL_DIR/bin/python
@@ -136,7 +136,7 @@ mail_on_failure() {
 
 ## setup
 cd $DIR
-make clobber /dev/null 2>&1
+make clobber > /dev/null 2>&1
 cp -p Modules/Setup.dist Modules/Setup
 # But maybe there was no Makefile - we are only building docs. Clear build:
 rm -rf build/
@@ -214,7 +214,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             ## make and run basic tests
             F=make-test.out
             start=`current_time`
-            $PYTHON $REGRTEST_ARGS -u urlfetch >& build/$F
+            $PYTHON $REGRTEST_ARGS -W -u urlfetch >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing basics ($NUM_FAILURES failures)" "$F" $start
@@ -222,7 +222,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
 
             F=make-test-opt.out
             start=`current_time`
-            $PYTHON -O $REGRTEST_ARGS -u urlfetch >& build/$F
+            $PYTHON -O $REGRTEST_ARGS -W -u urlfetch >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing opt ($NUM_FAILURES failures)" "$F" $start
@@ -245,7 +245,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             start=`current_time`
             ## skip curses when running from cron since there's no terminal
             ## skip sound since it's not setup on the PSF box (/dev/dsp)
-            $PYTHON $REGRTEST_ARGS -uall -x test_curses test_linuxaudiodev test_ossaudiodev $_ALWAYS_SKIP >& build/$F
+            $PYTHON $REGRTEST_ARGS -W -uall -x test_curses test_linuxaudiodev test_ossaudiodev &_ALWAYS_SKIP >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing all except curses and sound ($NUM_FAILURES failures)" "$F" $start
@@ -259,25 +259,9 @@ fi
 cd $DIR/Doc
 F="make-doc.out"
 start=`current_time`
-# XXX(nnorwitz): For now, keep the code that checks for a conflicted file until
-# after the first release of 2.6a1 or 3.0a1.  At that point, it will be clear
-# if there will be a similar problem with the new doc system.
-
-# Doc/commontex/boilerplate.tex is expected to always have an outstanding
-# modification for the date.  When a release is cut, a conflict occurs.
-# This allows us to detect this problem and not try to build the docs
-# which will definitely fail with a conflict. 
-#CONFLICTED_FILE=commontex/boilerplate.tex
-#conflict_count=`grep -c "<<<" $CONFLICTED_FILE`
-conflict_count=0
-if [ $conflict_count != 0 ]; then
-    echo "Conflict detected in $CONFLICTED_FILE.  Doc build skipped." > ../build/$F
-    err=1
-else
-    make clean > ../build/$F 2>&1
-    make checkout update html >> ../build/$F 2>&1
-    err=$?
-fi
+make clean > ../build/$F 2>&1
+make checkout html >> ../build/$F 2>&1
+err=$?
 update_status "Making doc" "$F" $start
 if [ $err != 0 ]; then
     NUM_FAILURES=1
@@ -289,8 +273,9 @@ echo "</body>" >> $RESULT_FILE
 echo "</html>" >> $RESULT_FILE
 
 ## copy results
-chgrp -R webmaster build/html
-chmod -R g+w build/html
-rsync $RSYNC_OPTS build/html/* $REMOTE_SYSTEM:$REMOTE_DIR
-cd ../build
-rsync $RSYNC_OPTS index.html *.out $REMOTE_SYSTEM:$REMOTE_DIR/results/
+## (not used anymore, the daily build is now done directly on the server)
+#chgrp -R webmaster build/html
+#chmod -R g+w build/html
+#rsync $RSYNC_OPTS build/html/* $REMOTE_SYSTEM:$REMOTE_DIR
+#cd ../build
+#rsync $RSYNC_OPTS index.html *.out $REMOTE_SYSTEM:$REMOTE_DIR/results/

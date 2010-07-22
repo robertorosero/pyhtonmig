@@ -4,6 +4,8 @@ import unittest
 import collections
 import weakref
 import operator
+import contextlib
+import copy
 
 from test import support
 
@@ -167,8 +169,7 @@ class ReferencesTestCase(TestBase):
         p[:] = [2, 3]
         self.assertEqual(len(L), 2)
         self.assertEqual(len(p), 2)
-        self.assertTrue(3 in p,
-                        "proxy didn't support __contains__() properly")
+        self.assertIn(3, p, "proxy didn't support __contains__() properly")
         p[1] = 5
         self.assertEqual(L[1], 5)
         self.assertEqual(p[1], 5)
@@ -191,7 +192,7 @@ class ReferencesTestCase(TestBase):
             def __bytes__(self):
                 return b"bytes"
         instance = C()
-        self.assertTrue("__bytes__" in dir(weakref.proxy(instance)))
+        self.assertIn("__bytes__", dir(weakref.proxy(instance)))
         self.assertEqual(bytes(weakref.proxy(instance)), b"bytes")
 
     def test_proxy_index(self):
@@ -679,6 +680,18 @@ class ReferencesTestCase(TestBase):
         # No exception should be raised here
         gc.collect()
 
+    def test_classes(self):
+        # Check that classes are weakrefable.
+        class A(object):
+            pass
+        l = []
+        weakref.ref(int)
+        a = weakref.ref(A, l.append)
+        A = None
+        gc.collect()
+        self.assertEqual(a(), None)
+        self.assertEqual(l, [a])
+
 
 class SubclassableWeakrefTestCase(TestBase):
 
@@ -713,8 +726,8 @@ class SubclassableWeakrefTestCase(TestBase):
         refs = weakref.getweakrefs(o)
         self.assertEqual(len(refs), 3)
         self.assertTrue(r2 is refs[0])
-        self.assertTrue(r1 in refs[1:])
-        self.assertTrue(r3 in refs[1:])
+        self.assertIn(r1, refs[1:])
+        self.assertIn(r3, refs[1:])
 
     def test_subclass_refs_dont_conflate_callbacks(self):
         class MyRef(weakref.ref):
@@ -724,8 +737,8 @@ class SubclassableWeakrefTestCase(TestBase):
         r2 = MyRef(o, str)
         self.assertTrue(r1 is not r2)
         refs = weakref.getweakrefs(o)
-        self.assertTrue(r1 in refs)
-        self.assertTrue(r2 in refs)
+        self.assertIn(r1, refs)
+        self.assertIn(r2, refs)
 
     def test_subclass_refs_with_slots(self):
         class MyRef(weakref.ref):
@@ -788,6 +801,10 @@ class Object:
         self.arg = arg
     def __repr__(self):
         return "<Object %r>" % self.arg
+    def __eq__(self, other):
+        if isinstance(other, Object):
+            return self.arg == other.arg
+        return NotImplemented
     def __lt__(self, other):
         if isinstance(other, Object):
             return self.arg < other.arg
@@ -854,8 +871,8 @@ class MappingTestCase(TestBase):
                      "deleting the keys did not clear the dictionary")
         o = Object(42)
         dict[o] = "What is the meaning of the universe?"
-        self.assertTrue(o in dict)
-        self.assertTrue(34 not in dict)
+        self.assertIn(o, dict)
+        self.assertNotIn(34, dict)
 
     def test_weak_keyed_iters(self):
         dict, objects = self.make_weak_keyed_dict()
@@ -867,8 +884,8 @@ class MappingTestCase(TestBase):
         objects2 = list(objects)
         for wr in refs:
             ob = wr()
-            self.assertTrue(ob in dict)
-            self.assertTrue(ob in dict)
+            self.assertIn(ob, dict)
+            self.assertIn(ob, dict)
             self.assertEqual(ob.arg, dict[ob])
             objects2.remove(ob)
         self.assertEqual(len(objects2), 0)
@@ -878,8 +895,8 @@ class MappingTestCase(TestBase):
         self.assertEqual(len(list(dict.keyrefs())), len(objects))
         for wr in dict.keyrefs():
             ob = wr()
-            self.assertTrue(ob in dict)
-            self.assertTrue(ob in dict)
+            self.assertIn(ob, dict)
+            self.assertIn(ob, dict)
             self.assertEqual(ob.arg, dict[ob])
             objects2.remove(ob)
         self.assertEqual(len(objects2), 0)
@@ -934,6 +951,87 @@ class MappingTestCase(TestBase):
             values.remove(v)
         self.assertFalse(values,
                      "itervalues() did not touch all values")
+
+    def check_weak_destroy_while_iterating(self, dict, objects, iter_name):
+        n = len(dict)
+        it = iter(getattr(dict, iter_name)())
+        next(it)             # Trigger internal iteration
+        # Destroy an object
+        del objects[-1]
+        gc.collect()    # just in case
+        # We have removed either the first consumed object, or another one
+        self.assertIn(len(list(it)), [len(objects), len(objects) - 1])
+        del it
+        # The removal has been committed
+        self.assertEqual(len(dict), n - 1)
+
+    def check_weak_destroy_and_mutate_while_iterating(self, dict, testcontext):
+        # Check that we can explicitly mutate the weak dict without
+        # interfering with delayed removal.
+        # `testcontext` should create an iterator, destroy one of the
+        # weakref'ed objects and then return a new key/value pair corresponding
+        # to the destroyed object.
+        with testcontext() as (k, v):
+            self.assertNotIn(k, dict)
+        with testcontext() as (k, v):
+            self.assertRaises(KeyError, dict.__delitem__, k)
+        self.assertNotIn(k, dict)
+        with testcontext() as (k, v):
+            self.assertRaises(KeyError, dict.pop, k)
+        self.assertNotIn(k, dict)
+        with testcontext() as (k, v):
+            dict[k] = v
+        self.assertEqual(dict[k], v)
+        ddict = copy.copy(dict)
+        with testcontext() as (k, v):
+            dict.update(ddict)
+        self.assertEqual(dict, ddict)
+        with testcontext() as (k, v):
+            dict.clear()
+        self.assertEqual(len(dict), 0)
+
+    def test_weak_keys_destroy_while_iterating(self):
+        # Issue #7105: iterators shouldn't crash when a key is implicitly removed
+        dict, objects = self.make_weak_keyed_dict()
+        self.check_weak_destroy_while_iterating(dict, objects, 'keys')
+        self.check_weak_destroy_while_iterating(dict, objects, 'items')
+        self.check_weak_destroy_while_iterating(dict, objects, 'values')
+        self.check_weak_destroy_while_iterating(dict, objects, 'keyrefs')
+        dict, objects = self.make_weak_keyed_dict()
+        @contextlib.contextmanager
+        def testcontext():
+            try:
+                it = iter(dict.items())
+                next(it)
+                # Schedule a key/value for removal and recreate it
+                v = objects.pop().arg
+                gc.collect()      # just in case
+                yield Object(v), v
+            finally:
+                it = None           # should commit all removals
+        self.check_weak_destroy_and_mutate_while_iterating(dict, testcontext)
+
+    def test_weak_values_destroy_while_iterating(self):
+        # Issue #7105: iterators shouldn't crash when a key is implicitly removed
+        dict, objects = self.make_weak_valued_dict()
+        self.check_weak_destroy_while_iterating(dict, objects, 'keys')
+        self.check_weak_destroy_while_iterating(dict, objects, 'items')
+        self.check_weak_destroy_while_iterating(dict, objects, 'values')
+        self.check_weak_destroy_while_iterating(dict, objects, 'itervaluerefs')
+        self.check_weak_destroy_while_iterating(dict, objects, 'valuerefs')
+        dict, objects = self.make_weak_valued_dict()
+        @contextlib.contextmanager
+        def testcontext():
+            try:
+                it = iter(dict.items())
+                next(it)
+                # Schedule a key/value for removal and recreate it
+                k = objects.pop().arg
+                gc.collect()      # just in case
+                yield k, Object(k)
+            finally:
+                it = None           # should commit all removals
+        self.check_weak_destroy_and_mutate_while_iterating(dict, testcontext)
 
     def test_make_weak_keyed_dict_from_dict(self):
         o = Object(3)
@@ -1004,13 +1102,13 @@ class MappingTestCase(TestBase):
         weakdict = klass()
         o = weakdict.setdefault(key, value1)
         self.assertTrue(o is value1)
-        self.assertTrue(key in weakdict)
+        self.assertIn(key, weakdict)
         self.assertTrue(weakdict.get(key) is value1)
         self.assertTrue(weakdict[key] is value1)
 
         o = weakdict.setdefault(key, value2)
         self.assertTrue(o is value1)
-        self.assertTrue(key in weakdict)
+        self.assertIn(key, weakdict)
         self.assertTrue(weakdict.get(key) is value1)
         self.assertTrue(weakdict[key] is value1)
 
@@ -1031,14 +1129,12 @@ class MappingTestCase(TestBase):
         weakdict.update(dict)
         self.assertEqual(len(weakdict), len(dict))
         for k in weakdict.keys():
-            self.assertTrue(k in dict,
-                         "mysterious new key appeared in weak dict")
+            self.assertIn(k, dict, "mysterious new key appeared in weak dict")
             v = dict.get(k)
             self.assertTrue(v is weakdict[k])
             self.assertTrue(v is weakdict.get(k))
         for k in dict.keys():
-            self.assertTrue(k in weakdict,
-                         "original key disappeared in weak dict")
+            self.assertIn(k, weakdict, "original key disappeared in weak dict")
             v = dict[k]
             self.assertTrue(v is weakdict[k])
             self.assertTrue(v is weakdict.get(k))

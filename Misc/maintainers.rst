@@ -1,21 +1,19 @@
 Maintainers Index
 =================
 
-This document cross references Python Modules (first table) and platforms
-(second table) with the Tracker user names of people who are experts
-and/or resources for that module or platform.  This list is intended
-to be used by issue submitters, issue triage people, and other issue
-participants to find people to add to the nosy list or to contact
-directly by email for help and decisions on feature requests and bug
-fixes.  People on this list may be asked to render final judgement on a
-feature or bug.  If no active maintainer is listed for a given module,
-then questionable changes should go to python-dev, while any other issues
-can and should be decided by any committer.
+This document has tables that list Python Modules, Tools, Platforms and
+Interest Areas and names for each item that indicate a maintainer or an
+expert in the field.  This list is intended to be used by issue submitters,
+issue triage people, and other issue participants to find people to add to
+the nosy list or to contact directly by email for help and decisions on
+feature requests and bug fixes.  People on this list may be asked to render
+final judgement on a feature or bug.  If no active maintainer is listed for
+a given module, then questionable changes should go to python-dev, while
+any other issues can and should be decided by any committer.
 
-The last part of this document is a third table, listing broader topic
-areas in which various people have expertise.  These people can also
-be contacted for help, opinions, and decisions when issues involve
-their areas.
+The Platform and Interest Area tables list broader fields in which various
+people have expertise.  These people can also be contacted for help,
+opinions, and decisions when issues involve their areas.
 
 If a listed maintainer does not respond to requests for comment for an
 extended period (three weeks or more), they should be marked as inactive
@@ -47,10 +45,11 @@ _dummy_thread       brett.cannon
 _thread
 abc
 aifc                r.david.murray
+argparse            bethard
 array
 ast
-asynchat            josiahcarlson
-asyncore            josiahcarlson
+asynchat            josiahcarlson, giampaolo.rodola
+asyncore            josiahcarlson, giampaolo.rodola
 atexit
 audioop
 base64
@@ -81,7 +80,7 @@ crypt
 csv
 ctypes              theller
 curses              andrew.kuchling
-datetime
+datetime            alexander.belopolsky
 dbm
 decimal             facundobatista, rhettinger, mark.dickinson
 difflib             tim_one
@@ -89,8 +88,8 @@ dis
 distutils           tarek
 doctest             tim_one (inactive)
 dummy_threading     brett.cannon
-email               barry
-encodings           lemburg, loewis
+email               barry, r.david.murray
+encodings           lemburg
 errno
 exceptions
 fcntl
@@ -99,13 +98,13 @@ fileinput
 fnmatch
 formatter
 fpectl
-fractions           mark.dickinson rhettinger
-ftplib
+fractions           mark.dickinson, rhettinger
+ftplib              giampaolo.rodola
 functools
 gc                  pitrou
 getopt
 getpass
-gettext             loewis
+gettext
 glob
 grp
 gzip
@@ -114,7 +113,7 @@ heapq               rhettinger
 hmac
 html
 http
-idlelib             kurt.kaiser
+idlelib             kbk
 imaplib
 imghdr
 imp
@@ -126,17 +125,17 @@ json                bob.ippolito (inactive)
 keyword
 lib2to3             benjamin.peterson
 linecache
-locale              loewis, lemburg
+locale              lemburg
 logging             vsajip
 macpath
 mailbox             andrew.kuchling
 mailcap
 marshal
-math                mark.dickinson rhettinger
+math                mark.dickinson, rhettinger
 mimetypes
 mmap
 modulefinder        theller, jvr
-msilib              loewis
+msilib
 msvcrt
 multiprocessing     jnoller
 netrc
@@ -145,7 +144,7 @@ nntplib
 numbers
 operator
 optparse            aronacher
-os                  loewis
+os
 ossaudiodev
 parser
 pdb
@@ -178,7 +177,7 @@ sched
 select
 shelve
 shlex
-shutil
+shutil              tarek
 signal
 site
 smtpd
@@ -188,7 +187,7 @@ socket
 socketserver
 spwd
 sqlite3             ghaering
-ssl                 janssen
+ssl                 janssen, pitrou, giampaolo.rodola
 stat
 string
 stringprep
@@ -198,7 +197,8 @@ sunau
 symbol
 symtable            benjamin.peterson
 sys
-syslog
+sysconfig           tarek
+syslog              jafo
 tabnanny            tim_one
 tarfile             lars.gustaebel
 telnetlib
@@ -207,17 +207,17 @@ termios
 test
 textwrap
 threading
-time                brett.cannon
+time                alexander.belopolsky
 timeit
 tkinter             gpolo
 token               georg.brandl
 tokenize
-trace
+trace               alexander.belopolsky
 traceback           georg.brandl
 tty
 turtle              gregorlingl
 types
-unicodedata         loewis, lemburg, ezio.melotti
+unicodedata         lemburg, ezio.melotti
 unittest            michael.foord
 urllib              orsenthil
 uu
@@ -226,13 +226,13 @@ warnings            brett.cannon
 wave
 weakref             fdrake
 webbrowser          georg.brandl
-winreg
+winreg              brian.curtin
 winsound            effbot (inactive)
 wsgiref             pje
 xdrlib
-xml                 loewis
+xml
 xml.etree           effbot (inactive)
-xmlrpc              loewis
+xmlrpc
 zipfile
 zipimport
 zlib
@@ -251,12 +251,13 @@ Platform            Maintainers
 AIX
 Cygwin              jlt63
 FreeBSD
+HP-UX
 Linux
 Mac                 ronaldoussoren
 NetBSD1
 OS2/EMX             aimacintyre
 Solaris
-HP-UX
+Windows
 ==================  ===========
 
 
@@ -276,20 +277,19 @@ GUI
 i18n                lemburg
 import machinery    brett.cannon, ncoghlan
 io                  pitrou, benjamin.peterson
-locale              lemburg, loewis
+locale              lemburg
 mathematics         mark.dickinson, eric.smith, lemburg
 memory management   tim_one, lemburg
-networking
+networking          giampaolo.rodola
 packaging           tarek, lemburg
 py3 transition      benjamin.peterson
-release management  tarek, lemburg, benjamin.peterson, barry, loewis,
+release management  tarek, lemburg, benjamin.peterson, barry,
                     gvanrossum, anthonybaxter
 str.format          eric.smith
 time and dates      lemburg
-testing             michael.foord, pitrou
+testing             michael.foord, pitrou, giampaolo.rodola
 threads
 tracker
-unicode             lemburg
+unicode             lemburg, ezio.melotti, haypo
 version control
-windows
 ==================  ===========

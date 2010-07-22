@@ -4,16 +4,16 @@ Implements the Distutils 'build_py' command."""
 
 __revision__ = "$Id$"
 
-import os
+import sys, os
 import sys
 from glob import glob
 
 from distutils.core import Command
-from distutils.errors import DistutilsOptionError, DistutilsFileError
+from distutils.errors import *
 from distutils.util import convert_path, Mixin2to3
 from distutils import log
 
-class build_py(Command):
+class build_py (Command):
 
     description = "\"build\" pure Python modules (copy to build directory)"
 

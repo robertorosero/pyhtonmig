@@ -67,6 +67,7 @@ def _run_code(code, run_globals, init_globals=None,
         run_globals.update(init_globals)
     run_globals.update(__name__ = mod_name,
                        __file__ = mod_fname,
+                       __cached__ = None,
                        __loader__ = mod_loader,
                        __package__ = pkg_name)
     exec(code, run_globals)
@@ -125,11 +126,12 @@ def _run_module_as_main(mod_name, alter_argv=True):
 
        Note that the executed module will have full access to the
        __main__ namespace. If this is not desirable, the run_module()
-       function sbould be used to run the module code in a fresh namespace.
+       function should be used to run the module code in a fresh namespace.
 
        At the very least, these variables in __main__ will be overwritten:
            __name__
            __file__
+           __cached__
            __loader__
            __package__
     """

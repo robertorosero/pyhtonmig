@@ -77,7 +77,7 @@ It defines the following functions:
    * ``'xmlcharrefreplace'``: replace with the appropriate XML character
      reference (for encoding only)
    * ``'backslashreplace'``: replace with backslashed escape sequences (for
-     encoding only
+     encoding only)
    * ``'surrogateescape'``: replace with surrogate U+DCxx, see :pep:`383`
 
    as well as any other error handling name defined via :func:`register_error`.
@@ -953,6 +953,8 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | cp857           | 857, IBM857                    | Turkish                        |
 +-----------------+--------------------------------+--------------------------------+
+| cp858           | 858, IBM858                    | Western Europe                 |
++-----------------+--------------------------------+--------------------------------+
 | cp860           | 860, IBM860                    | Portuguese                     |
 +-----------------+--------------------------------+--------------------------------+
 | cp861           | 861, CP-IS, IBM861             | Icelandic                      |
@@ -1065,11 +1067,13 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_10      | iso-8859-10, latin6, L6        | Nordic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_13      | iso-8859-13                    | Baltic languages               |
+| iso8859_13      | iso-8859-13, latin7, L7        | Baltic languages               |
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_14      | iso-8859-14, latin8, L8        | Celtic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_15      | iso-8859-15                    | Western Europe                 |
+| iso8859_15      | iso-8859-15, latin9, L9        | Western Europe                 |
++-----------------+--------------------------------+--------------------------------+
+| iso8859_16      | iso-8859-16, latin10, L10      | South-Eastern Europe           |
 +-----------------+--------------------------------+--------------------------------+
 | johab           | cp1361, ms1361                 | Korean                         |
 +-----------------+--------------------------------+--------------------------------+
@@ -1219,6 +1223,23 @@ functions can be used directly if desired.
 .. function:: ToUnicode(label)
 
    Convert a label to Unicode, as specified in :rfc:`3490`.
+
+
+:mod:`encodings.mbcs` --- Windows ANSI codepage
+-----------------------------------------------
+
+.. module:: encodings.mbcs
+   :synopsis: Windows ANSI codepage
+
+Encode operand according to the ANSI codepage (CP_ACP). This codec only
+supports ``'strict'`` and ``'replace'`` error handlers to encode, and
+``'strict'`` and ``'ignore'`` error handlers to decode.
+
+Availability: Windows only.
+
+.. versionchanged:: 3.2
+   Before 3.2, the *errors* argument was ignored; ``'replace'`` was always used
+   to encode, and ``'ignore'`` to decode.
 
 
 :mod:`encodings.utf_8_sig` --- UTF-8 codec with BOM signature

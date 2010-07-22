@@ -23,7 +23,7 @@ HTTPS protocols.  It is normally not used directly --- the module
 The module provides the following classes:
 
 
-.. class:: HTTPConnection(host, port=None, strict=None[, timeout])
+.. class:: HTTPConnection(host, port=None, strict=None[, timeout[, source_address]])
 
    An :class:`HTTPConnection` instance represents one transaction with an HTTP
    server.  It should be instantiated passing it a host and optional port
@@ -35,6 +35,8 @@ The module provides the following classes:
    status line.  If the optional *timeout* parameter is given, blocking
    operations (like connection attempts) will timeout after that many seconds
    (if it is not given, the global default timeout setting is used).
+   The optional *source_address* parameter may be a typle of a (host, port)
+   to use as the source address the HTTP connection is made from.
 
    For example, the following calls all create instances that connect to the server
    at the same host and port::
@@ -44,8 +46,11 @@ The module provides the following classes:
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80)
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80, timeout=10)
 
+   .. versionchanged:: 3.2
+      *source_address* was added.
 
-.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout])
+
+.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout[, source_address]])
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
    secure servers.  Default port is ``443``. *key_file* is the name of a PEM
@@ -55,6 +60,9 @@ The module provides the following classes:
    .. note::
 
       This does not do any certificate verification.
+
+   .. versionchanged:: 3.2
+      *source_address* was added.
 
 
 .. class:: HTTPResponse(sock, debuglevel=0, strict=0, method=None, url=None)
@@ -386,10 +394,13 @@ HTTPConnection Objects
 
    .. versionadded:: 3.1
 
-.. method:: HTTPConnection.set_tunnel(host, port=None)
+.. method:: HTTPConnection.set_tunnel(host, port=None, headers=None)
 
    Set the host and the port for HTTP Connect Tunnelling. Normally used when it
    is required to a HTTPS Connection through a proxy server.
+
+   The headers argument should be a mapping of extra HTTP headers to to sent
+   with the CONNECT request.
 
    .. versionadded:: 3.2
 
@@ -487,7 +498,7 @@ statement.
 
 .. attribute:: HTTPResponse.debuglevel
 
-   A debugging hook.  If `debuglevel` is greater than zero, messages
+   A debugging hook.  If :attr:`debuglevel` is greater than zero, messages
    will be printed to stdout as the response is read and parsed.
 
 
@@ -509,6 +520,21 @@ Here is an example session that uses the ``GET`` method::
    404 Not Found
    >>> data2 = r2.read()
    >>> conn.close()
+
+Here is an example session that uses the ``HEAD`` method.  Note that the
+``HEAD`` method never returns any data. ::
+
+   >>> import http.client
+   >>> conn = http.client.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print(res.status, res.reason)
+   200 OK
+   >>> data = res.read()
+   >>> print(len(data))
+   0
+   >>> data == b''
+   True
 
 Here is an example session that shows how to ``POST`` requests::
 

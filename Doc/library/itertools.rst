@@ -22,7 +22,7 @@ algebra" making it possible to construct specialized tools succinctly and
 efficiently in pure Python.
 
 For instance, SML provides a tabulation tool: ``tabulate(f)`` which produces a
-sequence ``f(0), f(1), ...``.  But, this effect can be achieved in Python
+sequence ``f(0), f(1), ...``.  The same effect can be achieved in Python
 by combining :func:`map` and :func:`count` to form ``map(f, count())``.
 
 These tools and their built-in counterparts also work well with the high-speed
@@ -455,7 +455,7 @@ loops that truncate the stream.
        def product(*args, repeat=1):
            # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
            # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
-           pools = map(tuple, args) * repeat
+           pools = [tuple(pool) for pool in args] * repeat
            result = [[]]
            for pool in pools:
                result = [x+[y] for x in result for y in pool]
@@ -580,16 +580,19 @@ which incur interpreter overhead.
        "Return first n items of the iterable as a list"
        return list(islice(iterable, n))
 
-   def enumerate(iterable, start=0):
-       return zip(count(start), iterable)
-
    def tabulate(function, start=0):
        "Return function(0), function(1), ..."
        return map(function, count(start))
 
    def consume(iterator, n):
        "Advance the iterator n-steps ahead. If n is none, consume entirely."
-       collections.deque(islice(iterator, n), maxlen=0)
+       # Use functions that consume iterators at C speed.
+       if n is None:
+           # feed the entire iterator into a zero-length deque
+           collections.deque(iterator, maxlen=0)
+       else:
+           # advance to the emtpy slice starting at position n
+           next(islice(iterator, n, n), None)
 
    def nth(iterable, n, default=None):
        "Returns the nth item or a default value"
@@ -608,13 +611,14 @@ which incur interpreter overhead.
 
    def ncycles(iterable, n):
        "Returns the sequence elements n times"
-       return chain.from_iterable(repeat(iterable, n))
+       return chain.from_iterable(repeat(tuple(iterable), n))
 
    def dotproduct(vec1, vec2):
        return sum(map(operator.mul, vec1, vec2))
 
    def flatten(listOfLists):
-       return list(chain.from_iterable(listOfLists))
+       "Flatten one level of nesting"
+       return chain.from_iterable(listOfLists)
 
    def repeatfunc(func, times=None, *args):
        """Repeat calls to func with specified arguments.
@@ -661,10 +665,9 @@ which incur interpreter overhead.
        seen = set()
        seen_add = seen.add
        if key is None:
-           for element in iterable:
-               if element not in seen:
-                   seen_add(element)
-                   yield element
+           for element in filterfalse(seen.__contains__, iterable):
+               seen_add(element)
+               yield element
        else:
            for element in iterable:
                k = key(element)
@@ -677,3 +680,58 @@ which incur interpreter overhead.
        # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
        # unique_justseen('ABBCcAD', str.lower) --> A B C A D
        return map(next, map(itemgetter(1), groupby(iterable, key)))
+
+   def iter_except(func, exception, first=None):
+       """ Call a function repeatedly until an exception is raised.
+
+       Converts a call-until-exception interface to an iterator interface.
+       Like __builtin__.iter(func, sentinel) but uses an exception instead
+       of a sentinel to end the loop.
+
+       Examples:
+           iter_except(functools.partial(heappop, h), IndexError)   # priority queue iterator
+           iter_except(d.popitem, KeyError)                         # non-blocking dict iterator
+           iter_except(d.popleft, IndexError)                       # non-blocking deque iterator
+           iter_except(q.get_nowait, Queue.Empty)                   # loop over a producer Queue
+           iter_except(s.pop, KeyError)                             # non-blocking set iterator
+
+       """
+       try:
+           if first is not None:
+               yield first()            # For database APIs needing an initial cast to db.first()
+           while 1:
+               yield func()
+       except exception:
+           pass
+
+   def random_product(*args, repeat=1):
+       "Random selection from itertools.product(*args, **kwds)"
+       pools = [tuple(pool) for pool in args] * repeat
+       return tuple(random.choice(pool) for pool in pools)
+
+   def random_permutation(iterable, r=None):
+       "Random selection from itertools.permutations(iterable, r)"
+       pool = tuple(iterable)
+       r = len(pool) if r is None else r
+       return tuple(random.sample(pool, r))
+
+   def random_combination(iterable, r):
+       "Random selection from itertools.combinations(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.sample(range(n), r))
+       return tuple(pool[i] for i in indices)
+
+   def random_combination_with_replacement(iterable, r):
+       "Random selection from itertools.combinations_with_replacement(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.randrange(n) for i in range(r))
+       return tuple(pool[i] for i in indices)
+
+Note, many of the above recipes can be optimized by replacing global lookups
+with local variables defined as default values.  For example, the
+*dotproduct* recipe can be written as::
+
+   def dotproduct(vec1, vec2, sum=sum, map=map, mul=operator.mul):
+       return sum(map(mul, vec1, vec2))

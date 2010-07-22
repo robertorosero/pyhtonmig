@@ -1,7 +1,7 @@
 import ntpath
 import os
-from test.support import verbose, TestFailed
-import test.support as support
+from test.support import TestFailed
+from test import support, test_genericpath
 import unittest
 
 
@@ -235,8 +235,13 @@ class TestNtpath(unittest.TestCase):
         tester('ntpath.relpath("/a/b", "/a/b")', '.')
 
 
+class NtCommonTest(test_genericpath.CommonTest):
+    pathmodule = ntpath
+    attributes = ['relpath', 'splitunc']
+
+
 def test_main():
-    support.run_unittest(TestNtpath)
+    support.run_unittest(TestNtpath, NtCommonTest)
 
 
 if __name__ == "__main__":

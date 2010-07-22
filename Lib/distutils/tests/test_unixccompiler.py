@@ -82,6 +82,18 @@ class UnixCCompilerTestCase(unittest.TestCase):
         sysconfig.get_config_var = gcv
         self.assertEqual(self.cc.rpath_foo(), '-Wl,-R/foo')
 
+        # GCC GNULD with fully qualified configuration prefix
+        # see #7617
+        sys.platform = 'bar'
+        def gcv(v):
+            if v == 'CC':
+                return 'x86_64-pc-linux-gnu-gcc-4.4.2'
+            elif v == 'GNULD':
+                return 'yes'
+        sysconfig.get_config_var = gcv
+        self.assertEqual(self.cc.rpath_foo(), '-Wl,--enable-new-dtags,-R/foo')
+
+
         # non-GCC GNULD
         sys.platform = 'bar'
         def gcv(v):
@@ -101,14 +113,6 @@ class UnixCCompilerTestCase(unittest.TestCase):
                 return 'no'
         sysconfig.get_config_var = gcv
         self.assertEqual(self.cc.rpath_foo(), '-R/foo')
-
-        # AIX C/C++ linker
-        sys.platform = 'aix'
-        def gcv(v):
-            return 'xxx'
-        sysconfig.get_config_var = gcv
-        self.assertEqual(self.cc.rpath_foo(), '-blibpath:/foo')
-
 
 def test_suite():
     return unittest.makeSuite(UnixCCompilerTestCase)
