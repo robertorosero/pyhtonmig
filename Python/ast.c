@@ -103,6 +103,7 @@ ast_error_finish(const char *filename)
 {
     PyObject *type, *value, *tback, *errstr, *loc, *tmp;
     long lineno;
+    PyObject *filename_obj;
 
     assert(PyErr_Occurred());
     if (!PyErr_ExceptionMatches(PyExc_SyntaxError))
@@ -125,8 +126,19 @@ ast_error_finish(const char *filename)
         Py_INCREF(Py_None);
         loc = Py_None;
     }
-    tmp = Py_BuildValue("(zlOO)", filename, lineno, Py_None, loc);
-    Py_DECREF(loc);
+    if (filename != NULL) {
+        filename_obj = PyUnicode_DecodeFSDefault(filename);
+        if (filename_obj == NULL) {
+            Py_DECREF(loc);
+            Py_DECREF(errstr);
+            return;
+        }
+    }
+    else {
+        Py_INCREF(Py_None);
+        filename_obj = Py_None;
+    }
+    tmp = Py_BuildValue("(NlON)", filename_obj, lineno, Py_None, loc);
     if (!tmp) {
         Py_DECREF(errstr);
         return;
