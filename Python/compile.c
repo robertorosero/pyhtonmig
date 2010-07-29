@@ -3363,13 +3363,23 @@ compiler_error(struct compiler *c, const char *errstr)
 {
     PyObject *loc;
     PyObject *u = NULL, *v = NULL;
+    PyObject *filename;
 
     loc = PyErr_ProgramText(c->c_filename, c->u->u_lineno);
     if (!loc) {
         Py_INCREF(Py_None);
         loc = Py_None;
     }
-    u = Py_BuildValue("(ziOO)", c->c_filename, c->u->u_lineno,
+    if (c->c_filename != NULL) {
+        filename = PyUnicode_DecodeFSDefault(c->c_filename);
+        if (filename == NULL)
+            goto exit;
+    }
+    else {
+        Py_INCREF(Py_None);
+        filename = Py_None;
+    }
+    u = Py_BuildValue("(NiOO)", filename, c->u->u_lineno,
                       Py_None, loc);
     if (!u)
         goto exit;
