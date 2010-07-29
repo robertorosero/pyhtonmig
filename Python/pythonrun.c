@@ -2088,6 +2088,8 @@ err_input(perrdetail *err)
     PyObject *v, *w, *errtype, *errtext;
     PyObject *msg_obj = NULL;
     char *msg = NULL;
+    PyObject *filename;
+
     errtype = PyExc_SyntaxError;
     switch (err->error) {
     case E_ERROR:
@@ -2171,8 +2173,17 @@ err_input(perrdetail *err)
         errtext = PyUnicode_DecodeUTF8(err->text, strlen(err->text),
                                        "replace");
     }
-    v = Py_BuildValue("(ziiN)", err->filename,
-                      err->lineno, err->offset, errtext);
+    if (err->filename != NULL)
+        filename = PyUnicode_DecodeFSDefault(err->filename);
+    else {
+        Py_INCREF(Py_None);
+        filename = Py_None;
+    }
+    if (filename != NULL)
+        v = Py_BuildValue("(NiiN)", filename,
+                          err->lineno, err->offset, errtext);
+    else
+        v = NULL;
     if (v != NULL) {
         if (msg_obj)
             w = Py_BuildValue("(OO)", msg_obj, v);
