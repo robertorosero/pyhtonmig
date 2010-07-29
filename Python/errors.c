@@ -803,7 +803,7 @@ PyErr_SyntaxLocation(const char *filename, int lineno)
         Py_DECREF(tmp);
     }
     if (filename != NULL) {
-        tmp = PyUnicode_FromString(filename);
+        tmp = PyUnicode_DecodeFSDefault(filename);
         if (tmp == NULL)
             PyErr_Clear();
         else {
