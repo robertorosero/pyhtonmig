@@ -47,8 +47,8 @@ class StructTest(unittest.TestCase):
 
         self.assertRaises(struct.error, struct.pack, 'iii', 3)
         self.assertRaises(struct.error, struct.pack, 'i', 3, 3, 3)
-        self.assertRaises(struct.error, struct.pack, 'i', 'foo')
-        self.assertRaises(struct.error, struct.pack, 'P', 'foo')
+        self.assertRaises((TypeError, struct.error), struct.pack, 'i', 'foo')
+        self.assertRaises((TypeError, struct.error), struct.pack, 'P', 'foo')
         self.assertRaises(struct.error, struct.unpack, 'd', b'flap')
         s = struct.pack('ii', 1, 2)
         self.assertRaises(struct.error, struct.unpack, 'iii', s)
@@ -213,6 +213,7 @@ class StructTest(unittest.TestCase):
                     expected = '%x' % expected
                     if len(expected) & 1:
                         expected = "0" + expected
+                    expected = expected.encode('ascii')
                     expected = unhexlify(expected)
                     expected = (b"\x00" * (self.bytesize - len(expected)) +
                                 expected)
@@ -234,7 +235,8 @@ class StructTest(unittest.TestCase):
                                                                  b'\x01' + got)
                 else:
                     # x is out of range -- verify pack realizes that.
-                    self.assertRaises(struct.error, pack, format, x)
+                    self.assertRaises((OverflowError, ValueError, struct.error),
+                                      pack, format, x)
 
             def run(self):
                 from random import randrange
@@ -445,7 +447,8 @@ class StructTest(unittest.TestCase):
 
         # Test bogus offset (issue 3694)
         sb = small_buf
-        self.assertRaises(TypeError, struct.pack_into, b'', sb, None)
+        self.assertRaises((TypeError, struct.error), struct.pack_into, b'', sb,
+                          None)
 
     def test_pack_into_fn(self):
         test_string = b'Reykjavik rocks, eow!'
@@ -510,8 +513,13 @@ class StructTest(unittest.TestCase):
                 self.assertFalse(prefix, msg='encoded bool is not one byte: %r'
                                              %packed)
 
-            self.assertRaises(IOError, struct.pack, prefix + '?',
-                              ExplodingBool())
+            try:
+                struct.pack(prefix + '?', ExplodingBool())
+            except IOError:
+                pass
+            else:
+                self.fail("Expected IOError: struct.pack(%r, "
+                          "ExplodingBool())" % (prefix + '?'))
 
         for c in [b'\x01', b'\x7f', b'\xff', b'\x0f', b'\xf0']:
             self.assertTrue(struct.unpack('>?', c)[0])

@@ -423,7 +423,9 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         """Check that the repr() of os.environ looks like environ({...})."""
         env = os.environ
         self.assertTrue(isinstance(env.data, dict))
-        self.assertEqual(repr(env), 'environ({!r})'.format(env.data))
+        self.assertEqual(repr(env), 'environ({{{}}})'.format(', '.join(
+            '{!r}: {!r}'.format(key, value)
+            for key, value in env.items())))
 
     def test_get_exec_path(self):
         defpath_list = os.defpath.split(os.pathsep)
@@ -1034,7 +1036,8 @@ class Win32KillTests(unittest.TestCase):
 
 
 def skipUnlessWindows6(test):
-    if hasattr(sys, 'getwindowsversion') and sys.getwindowsversion().major >= 6:
+    if (hasattr(sys, 'getwindowsversion')
+        and sys.getwindowsversion().major >= 6):
         return test
     return unittest.skip("Requires Windows Vista or later")(test)
 

@@ -1117,7 +1117,8 @@ check_GetFinalPathNameByHandle()
                                                 "GetFinalPathNameByHandleA");
         *(FARPROC*)&Py_GetFinalPathNameByHandleW = GetProcAddress(hKernel32,
                                                 "GetFinalPathNameByHandleW");
-        has_GetFinalPathNameByHandle = Py_GetFinalPathNameByHandleA && Py_GetFinalPathNameByHandleW;
+        has_GetFinalPathNameByHandle = Py_GetFinalPathNameByHandleA &&
+                                       Py_GetFinalPathNameByHandleW;
     }
     return has_GetFinalPathNameByHandle;
 }
@@ -1310,9 +1311,12 @@ win32_fstat(int file_number, struct win32_stat *result)
     /* similar to stat() */
     result->st_mode = attributes_to_mode(info.dwFileAttributes);
     result->st_size = (((__int64)info.nFileSizeHigh)<<32) + info.nFileSizeLow;
-    FILE_TIME_to_time_t_nsec(&info.ftCreationTime, &result->st_ctime, &result->st_ctime_nsec);
-    FILE_TIME_to_time_t_nsec(&info.ftLastWriteTime, &result->st_mtime, &result->st_mtime_nsec);
-    FILE_TIME_to_time_t_nsec(&info.ftLastAccessTime, &result->st_atime, &result->st_atime_nsec);
+    FILE_TIME_to_time_t_nsec(&info.ftCreationTime, &result->st_ctime,
+                             &result->st_ctime_nsec);
+    FILE_TIME_to_time_t_nsec(&info.ftLastWriteTime, &result->st_mtime,
+                             &result->st_mtime_nsec);
+    FILE_TIME_to_time_t_nsec(&info.ftLastAccessTime, &result->st_atime,
+                             &result->st_atime_nsec);
     /* specific to fstat() */
     result->st_nlink = info.nNumberOfLinks;
     result->st_ino = (((__int64)info.nFileIndexHigh)<<32) + info.nFileIndexLow;
@@ -2287,10 +2291,10 @@ posix_link(PyObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(posix_listdir__doc__,
-"listdir(path) -> list_of_strings\n\n\
+"listdir([path]) -> list_of_strings\n\n\
 Return a list containing the names of the entries in the directory.\n\
 \n\
-    path: path of directory to list\n\
+    path: path of directory to list (default: '.')\n\
 \n\
 The list is in arbitrary order.  It does not include the special\n\
 entries '.' and '..' even if they are present in the directory.");
@@ -2311,18 +2315,25 @@ posix_listdir(PyObject *self, PyObject *args)
     char *bufptr = namebuf;
     Py_ssize_t len = sizeof(namebuf)-5; /* only claim to have space for MAX_PATH */
 
-    PyObject *po;
-    if (PyArg_ParseTuple(args, "U:listdir", &po)) {
+    PyObject *po = NULL;
+    if (PyArg_ParseTuple(args, "|U:listdir", &po)) {
         WIN32_FIND_DATAW wFileData;
-        Py_UNICODE *wnamebuf;
+        Py_UNICODE *wnamebuf, *po_wchars;
+        
+        if (po == NULL) { // Default arg: "."
+            po_wchars = L".";
+            len = 1;
+        } else {
+            po_wchars = PyUnicode_AS_UNICODE(po);
+            len = PyUnicode_GET_SIZE(po);
+        }
         /* Overallocate for \\*.*\0 */
-        len = PyUnicode_GET_SIZE(po);
         wnamebuf = malloc((len + 5) * sizeof(wchar_t));
         if (!wnamebuf) {
             PyErr_NoMemory();
             return NULL;
         }
-        wcscpy(wnamebuf, PyUnicode_AS_UNICODE(po));
+        wcscpy(wnamebuf, po_wchars);
         if (len > 0) {
             Py_UNICODE wch = wnamebuf[len-1];
             if (wch != L'/' && wch != L'\\' && wch != L':')
@@ -2544,12 +2555,17 @@ posix_listdir(PyObject *self, PyObject *args)
     int arg_is_unicode = 1;
 
     errno = 0;
-    if (!PyArg_ParseTuple(args, "U:listdir", &v)) {
+    /* v is never read, so it does not need to be initialized yet. */
+    if (!PyArg_ParseTuple(args, "|U:listdir", &v)) {
         arg_is_unicode = 0;
         PyErr_Clear();
     }
-    if (!PyArg_ParseTuple(args, "O&:listdir", PyUnicode_FSConverter, &oname))
+    oname = NULL;
+    if (!PyArg_ParseTuple(args, "|O&:listdir", PyUnicode_FSConverter, &oname))
         return NULL;
+    if (oname == NULL) { // Default arg: "."
+      oname = PyBytes_FromString(".");
+    }
     name = PyBytes_AsString(oname);
     if ((dirp = opendir(name)) == NULL) {
         return posix_error_with_allocated_filename(oname);
@@ -2691,7 +2707,8 @@ posix__getfinalpathname(PyObject *self, PyObject *args)
     
     if(hFile == INVALID_HANDLE_VALUE) {
         return win32_error_unicode("GetFinalPathNamyByHandle", path);
-        return PyErr_Format(PyExc_RuntimeError, "Could not get a handle to file.");
+        return PyErr_Format(PyExc_RuntimeError,
+                            "Could not get a handle to file.");
     }
 
     /* We have a good handle to the target, use it to determine the
@@ -3005,7 +3022,8 @@ static PyObject *
 posix_unlink(PyObject *self, PyObject *args)
 {
 #ifdef MS_WINDOWS
-    return win32_1str(args, "remove", "y:remove", DeleteFileA, "U:remove", Py_DeleteFileW);
+    return win32_1str(args, "remove", "y:remove", DeleteFileA,
+                      "U:remove", Py_DeleteFileW);
 #else
     return posix_1str(args, "O&:remove", unlink);
 #endif
@@ -4148,17 +4166,49 @@ posix_getgroups(PyObject *self, PyObject *noargs)
 #define MAX_GROUPS 64
 #endif
     gid_t grouplist[MAX_GROUPS];
+
+    /* On MacOSX getgroups(2) can return more than MAX_GROUPS results 
+     * This is a helper variable to store the intermediate result when
+     * that happens.
+     *
+     * To keep the code readable the OSX behaviour is unconditional,
+     * according to the POSIX spec this should be safe on all unix-y
+     * systems.
+     */
+    gid_t* alt_grouplist = grouplist;
     int n;
 
     n = getgroups(MAX_GROUPS, grouplist);
-    if (n < 0)
-        posix_error();
-    else {
-        result = PyList_New(n);
-        if (result != NULL) {
+    if (n < 0) {
+        if (errno == EINVAL) {
+            n = getgroups(0, NULL);
+            if (n == -1) {
+                return posix_error();
+            }
+            if (n == 0) {
+                /* Avoid malloc(0) */
+                alt_grouplist = grouplist;
+            } else {
+                alt_grouplist = PyMem_Malloc(n * sizeof(gid_t));
+                if (alt_grouplist == NULL) {
+                    errno = EINVAL;
+                    return posix_error();
+                }
+                n = getgroups(n, alt_grouplist);
+                if (n == -1) {
+                    PyMem_Free(alt_grouplist);
+                    return posix_error();
+                }
+            }
+        } else {
+            return posix_error();
+        }
+    }
+    result = PyList_New(n);
+    if (result != NULL) {
         int i;
         for (i = 0; i < n; ++i) {
-            PyObject *o = PyLong_FromLong((long)grouplist[i]);
+            PyObject *o = PyLong_FromLong((long)alt_grouplist[i]);
             if (o == NULL) {
             Py_DECREF(result);
             result = NULL;
@@ -4166,7 +4216,10 @@ posix_getgroups(PyObject *self, PyObject *noargs)
             }
             PyList_SET_ITEM(result, i, o);
         }
-        }
+    }
+
+    if (alt_grouplist != grouplist) {
+        PyMem_Free(alt_grouplist);
     }
 
     return result;
@@ -4959,7 +5012,8 @@ typedef struct _REPARSE_DATA_BUFFER {
     };
 } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
 
-#define REPARSE_DATA_BUFFER_HEADER_SIZE  FIELD_OFFSET(REPARSE_DATA_BUFFER, GenericReparseBuffer)
+#define REPARSE_DATA_BUFFER_HEADER_SIZE  FIELD_OFFSET(REPARSE_DATA_BUFFER,\
+                                                      GenericReparseBuffer)
 
 #define MAXIMUM_REPARSE_DATA_BUFFER_SIZE  ( 16 * 1024 )
 
@@ -5023,8 +5077,11 @@ win_readlink(PyObject *self, PyObject *args)
                 "not a symbolic link");
         return NULL;
     }
-    print_name = rdb->SymbolicLinkReparseBuffer.PathBuffer + rdb->SymbolicLinkReparseBuffer.PrintNameOffset;
-    result = PyUnicode_FromWideChar(print_name, rdb->SymbolicLinkReparseBuffer.PrintNameLength/2);
+    print_name = rdb->SymbolicLinkReparseBuffer.PathBuffer +
+                 rdb->SymbolicLinkReparseBuffer.PrintNameOffset;
+
+    result = PyUnicode_FromWideChar(print_name,
+                    rdb->SymbolicLinkReparseBuffer.PrintNameLength/2);
     return result;
 }
 
@@ -5043,7 +5100,8 @@ check_CreateSymbolicLinkW()
     if (has_CreateSymbolicLinkW)
         return has_CreateSymbolicLinkW;
     hKernel32 = GetModuleHandle("KERNEL32");
-    *(FARPROC*)&Py_CreateSymbolicLinkW = GetProcAddress(hKernel32, "CreateSymbolicLinkW");
+    *(FARPROC*)&Py_CreateSymbolicLinkW = GetProcAddress(hKernel32,
+                                                        "CreateSymbolicLinkW");
     if (Py_CreateSymbolicLinkW)
         has_CreateSymbolicLinkW = 1;
     return has_CreateSymbolicLinkW;
@@ -7586,7 +7644,8 @@ static PyMethodDef posix_methods[] = {
     {"symlink",         posix_symlink, METH_VARARGS, posix_symlink__doc__},
 #endif /* HAVE_SYMLINK */
 #if !defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
-    {"symlink", (PyCFunction)win_symlink, METH_VARARGS | METH_KEYWORDS, win_symlink__doc__},
+    {"symlink", (PyCFunction)win_symlink, METH_VARARGS | METH_KEYWORDS,
+                win_symlink__doc__},
 #endif /* !defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
 #ifdef HAVE_SYSTEM
     {"system",          posix_system, METH_VARARGS, posix_system__doc__},

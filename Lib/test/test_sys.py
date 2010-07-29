@@ -86,7 +86,6 @@ class SysModuleTest(unittest.TestCase):
     # Python/pythonrun.c::PyErr_PrintEx() is tricky.
 
     def test_exit(self):
-        import subprocess
 
         self.assertRaises(TypeError, sys.exit, 42, 42)
 
@@ -179,8 +178,8 @@ class SysModuleTest(unittest.TestCase):
         # can't check more than the type, as the user might have changed it
         self.assertIsInstance(sys.getdefaultencoding(), str)
 
-    # testing sys.settrace() is done in test_trace.py
-    # testing sys.setprofile() is done in test_profile.py
+    # testing sys.settrace() is done in test_sys_settrace.py
+    # testing sys.setprofile() is done in test_sys_setprofile.py
 
     def test_setcheckinterval(self):
         with warnings.catch_warnings():
@@ -530,7 +529,6 @@ class SysModuleTest(unittest.TestCase):
         sys._clear_type_cache()
 
     def test_ioencoding(self):
-        import subprocess
         env = dict(os.environ)
 
         # Test character: cent sign, encoded as 0x4A (ASCII J) in CP424,
@@ -552,7 +550,7 @@ class SysModuleTest(unittest.TestCase):
         # Issue #7774: Ensure that sys.executable is an empty string if argv[0]
         # has been set to an non existent program name and Python is unable to
         # retrieve the real program name
-        import subprocess
+
         # For a normal installation, it should work without 'cwd'
         # argument. For test runs in the build directory, see #7774.
         python_dir = os.path.dirname(os.path.realpath(sys.executable))

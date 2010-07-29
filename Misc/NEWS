@@ -12,6 +12,11 @@ What's New in Python 3.2 Alpha 1?
 Core and Builtins
 -----------------
 
+- Issue #8991: convertbuffer() rejects discontigious buffers.
+
+- Issue #7616: Fix copying of overlapping memoryview slices with the Intel
+  compiler.
+
 - Issue #8413: structsequence now subclasses tuple.
 
 - Issue #8271: during the decoding of an invalid UTF-8 byte sequence, only the
@@ -469,6 +474,87 @@ C-API
 
 Library
 -------
+
+- Issue #4108: In urllib.robotparser, if there are multiple 'User-agent: *'
+  entries, consider the first one.
+
+- Issue #6630: Allow customizing regex flags when subclassing the
+  string.Template class.
+
+- Issue #9411: Allow specifying an encoding for config files in the
+  configparser module.
+
+- Issue #1682942: Improvements to configparser: support alternate
+  delimiters, alternate comment prefixes and empty lines in values.
+
+- Issue #9354: Provide getsockopt() in asyncore's file_wrapper.
+
+- Issue #8966: ctypes: Remove implicit bytes-unicode conversion.
+
+- Issue #9378: python -m pickle <pickle file> will now load and
+  display the first object in the pickle file.
+
+- Issue #4770: Restrict binascii module to accept only bytes (as specified).
+  And fix the email package to encode to ASCII instead of
+  ``raw-unicode-escape`` before ASCII-to-binary decoding.
+
+- Issue #9384: python -m tkinter will now display a simple demo applet.
+
+- The default size of the re module's compiled regular expression cache has
+  been increased from 100 to 500 and the cache replacement policy has changed
+  from simply clearing the entire cache on overflow to randomly forgetting 20%
+  of the existing cached compiled regular expressions.  This is a performance
+  win for applications that use a lot of regular expressions and limits the
+  impact of the performance hit anytime the cache is exceeded.
+
+- Issue #7113: Speed up loading in configparser. Patch by Łukasz Langa.
+
+- Issue #9032: XML-RPC client retries the request on EPIPE error. The EPIPE
+  error occurs when the server closes the socket and the client sends a big
+  XML-RPC request.
+
+- Issue #4629: getopt raises an error if an argument ends with = whereas getopt
+  doesn't except a value (eg. --help= is rejected if getopt uses ['help='] long
+  options).
+
+- Issue #7989: Added pure python implementation of the `datetime`
+  module.  The C module is renamed to `_datetime` and if available,
+  overrides all classes defined in datetime with fast C impementation.
+  Python implementation is based on the original python prototype for
+  the datetime module by Tim Peters with minor modifications by the
+  PyPy project.  The test suite now tests `datetime` module with and
+  without `_datetime` acceleration using the same test cases.
+
+- Issue #7895: platform.mac_ver() no longer crashes after calling os.fork()
+
+- Issue #9323: Fixed a bug in trace.py that resulted in loosing the
+  name of the script being traced.  Patch by Eli Bendersky.
+
+- Issue #9282: Fixed --listfuncs option of trace.py.  Thanks Eli
+  Bendersky for the patch.
+
+- Issue #3704: http.cookiejar was not properly handling URLs with a / in the
+  parameters.
+
+- Issue #9268: ``pickletools.dis()`` now has an optional *annotate*
+  argument which controls printing of opcode descriptions in ``dis()``
+  output.
+
+- Issue #1555570: email no longer inserts extra blank lines when a \r\n
+  combo crosses an 8192 byte boundary.
+
+- Issue #9243: Fix sndhdr module and add unit tests, contributed by James Lee.
+
+- ``ast.literal_eval()`` now allows byte literals.
+
+- Issue #9137: Fix issue in MutableMapping.update, which incorrectly
+  treated keyword arguments called 'self' or 'other' specially.
+
+- ``ast.literal_eval()`` now allows set literals.
+
+- Issue #9164: Ensure that sysconfig handles duplicate -arch flags in CFLAGS.
+
+- Issue #7646: The fnmatch pattern cache no longer grows without bound.
 
 - Issue #9136: Fix 'dictionary changed size during iteration'
   RuntimeError produced when profiling the decimal module.  This was
@@ -1406,6 +1492,28 @@ Library
 Extension Modules
 -----------------
 
+- Issue #9422: Fix memory leak when re-initializing a struct.Struct object.
+
+- Issue #7900: The getgroups(2) system call on MacOSX behaves rather oddly
+  compared to other unix systems. In particular, os.getgroups() does
+  not reflect any changes made using os.setgroups() but basicly always
+  returns the same information as the id command.
+
+  os.getgroups() can now return more than 16 groups on MacOSX.
+
+- Issue #6095: Make directory argument to os.listdir optional.
+
+- Issue #9277: Fix bug in struct.pack for bools in standard mode
+  (e.g., struct.pack('>?')):  if conversion to bool raised an exception
+  then that exception wasn't properly propagated on machines where
+  char is unsigned.
+
+- Issue #5180: Fixed a bug that prevented loading 2.x pickles in 3.x
+  python when they contain instances of old-style classes.
+
+- Issue #9165: Add new functions math.isfinite and cmath.isfinite, to
+  accompany existing isinf and isnan functions.
+
 - Issue #1578269: Implement os.symlink for Windows 6.0+. Patch by
   Jason R. Coombs
 
@@ -1528,6 +1636,14 @@ Extension Modules
 Build
 -----
 
+- Issue #9280: Make sharedinstall depend on sharedmods.
+
+- Issue #9189: Make a user-specified CFLAGS, CPPFLAGS, or LDFLAGS
+  setting override the configure and makefile defaults, without
+  deleting options the user didn't intend to override.  Developers
+  should no longer need to specify OPT or EXTRA_CFLAGS, although those
+  variables are still present for backward-compatibility.
+
 - Issue #8854: Fix finding Visual Studio 2008 on Windows x64.
 
 - Issue #1759169, #8864: Drop _XOPEN_SOURCE on Solaris, define it for
@@ -1604,6 +1720,9 @@ Build
 Documentation
 ------------
 
+- Issue 9255: Document that the 'test' package is meant for internal Python use
+  only.
+
 - A small wsgi server was added as Tools/scripts/serve.py, and is used to
   implement a local documentation server via 'make serve' in the doc directory.
 
@@ -1624,6 +1743,9 @@ Documentation
 
 Tests
 -----
+
+- Issue #9251: test_threaded_import didn't fail when run through regrtest
+  if the import lock was disabled.
 
 - Issue #8605: Skip test_gdb if Python is compiled with optimizations.
 
@@ -1755,7 +1877,7 @@ Tests
 Tools/Demos
 -----------
 
-- Issue #5464: Implement plural forms in msgfmt.py.
+- Issue #5464, #8974: Implement plural forms in msgfmt.py.
 
 - iobench (a file I/O benchmark) and ccbench (a concurrency benchmark) were
   added to the `Tools/` directory.  They were previously living in the

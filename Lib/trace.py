@@ -257,7 +257,8 @@ class CoverageResults:
         if self.calledfuncs:
             print()
             print("functions called:")
-            for filename, modulename, funcname in sorted(calls.keys()):
+            calls = self.calledfuncs.keys()
+            for filename, modulename, funcname in sorted(calls):
                 print(("filename: %s, modulename: %s, funcname: %s"
                        % (filename, modulename, funcname)))
 
@@ -796,12 +797,9 @@ def main(argv=None):
                   ignoredirs=ignore_dirs, infile=counts_file,
                   outfile=counts_file, timing=timing)
         try:
-            fp = open(progname)
-            try:
-                script = fp.read()
-            finally:
-                fp.close()
-            t.run('exec(%r)' % (script,))
+            with open(progname) as fp:
+                code = compile(fp.read(), progname, 'exec')
+            t.run(code)
         except IOError as err:
             _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))
         except SystemExit:

@@ -15,8 +15,8 @@ class PlatformTest(unittest.TestCase):
         # On Windows, the EXE needs to know where pythonXY.dll is at so we have
         # to add the directory to the path.
         if sys.platform == "win32":
-            os.environ["Path"] = "{};{}".format(os.path.dirname(sys.executable),
-                                                os.environ["Path"])
+            os.environ["Path"] = "{};{}".format(
+                os.path.dirname(sys.executable), os.environ["Path"])
 
         def get(python):
             cmd = [python, '-c',
@@ -193,6 +193,25 @@ class PlatformTest(unittest.TestCase):
                 self.assertEquals(res[2], 'i386')
             else:
                 self.assertEquals(res[2], 'PowerPC')
+
+
+    @unittest.skipUnless(sys.platform == 'darwin', "OSX only test")
+    def test_mac_ver_with_fork(self):
+        # Issue7895: platform.mac_ver() crashes when using fork without exec
+        #
+        # This test checks that the fix for that issue works.
+        #
+        pid = os.fork()
+        if pid == 0:
+            # child
+            info = platform.mac_ver()
+            os._exit(0)
+
+        else:
+            # parent
+            cpid, sts = os.waitpid(pid, 0)
+            self.assertEquals(cpid, pid)
+            self.assertEquals(sts, 0)
 
     def test_dist(self):
         res = platform.dist()

@@ -559,6 +559,21 @@ class _SuppressCoreFiles(object):
         except (ImportError, ValueError, resource.error):
             pass
 
+        if sys.platform == 'darwin':
+            # Check if the 'Crash Reporter' on OSX was configured
+            # in 'Developer' mode and warn that it will get triggered
+            # when it is.
+            #
+            # This assumes that this context manager is used in tests
+            # that might trigger the next manager.
+            value = subprocess.Popen(['/usr/bin/defaults', 'read',
+                    'com.apple.CrashReporter', 'DialogType'],
+                    stdout=subprocess.PIPE).communicate()[0]
+            if value.strip() == b'developer':
+                print("this tests triggers the Crash Reporter, "
+                      "that is intentional", end='')
+                sys.stdout.flush()
+
     def __exit__(self, *args):
         """Return core file behavior to default."""
         if self.old_limit is None:
@@ -749,6 +764,25 @@ class POSIXProcessTestCase(BaseTestCase):
         rc = subprocess.call(fname)
         os.remove(fname)
         self.assertEqual(rc, 47)
+
+    def test_specific_shell(self):
+        # Issue #9265: Incorrect name passed as arg[0].
+        shells = []
+        for prefix in ['/bin', '/usr/bin/', '/usr/local/bin']:
+            for name in ['bash', 'ksh']:
+                sh = os.path.join(prefix, name)
+                if os.path.isfile(sh):
+                    shells.append(sh)
+        if not shells: # Will probably work for any shell but csh.
+            self.skipTest("bash or ksh required for this test")
+        sh = '/bin/sh'
+        if os.path.isfile(sh) and not os.path.islink(sh):
+            # Test will fail if /bin/sh is a symlink to csh.
+            shells.append(sh)
+        for sh in shells:
+            p = subprocess.Popen("echo $0", executable=sh, shell=True,
+                                 stdout=subprocess.PIPE)
+            self.assertEqual(p.stdout.read().strip(), bytes(sh, 'ascii'))
 
     def _kill_process(self, method, *args):
         # Do not inherit file handles from the parent.

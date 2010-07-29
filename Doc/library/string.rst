@@ -7,13 +7,13 @@
 
 .. index:: module: re
 
-The :mod:`string` module contains a number of useful constants and classes, as
-well as some deprecated legacy functions that are also available as methods on
-strings. In addition, Python's built-in string classes support the sequence type
-methods described in the :ref:`typesseq` section, and also the string-specific
-methods described in the :ref:`string-methods` section. To output formatted
-strings, see the :ref:`string-formatting` section. Also, see the :mod:`re`
-module for string functions based on regular expressions.
+The :mod:`string` module contains a number of useful constants and classes
+for string formatting.  In addition, Python's built-in string classes
+support the sequence type methods described in the :ref:`typesseq`
+section, and also the string-specific methods described in the
+:ref:`string-methods` section.  To output formatted strings, see the
+:ref:`string-formatting` section.  Also, see the :mod:`re` module for
+string functions based on regular expressions.
 
 
 String constants
@@ -709,6 +709,14 @@ to parse template strings.  To do this, you can override these class attributes:
   non-braced placeholders (the braces will be added automatically as
   appropriate).  The default value is the regular expression
   ``[_a-z][_a-z0-9]*``.
+
+* *flags* -- The regular expression flags that will be applied when compiling
+  the regular expression used for recognizing substitutions.  The default value
+  is ``re.IGNORECASE``.  Note that ``re.VERBOSE`` will always be added to the
+  flags, so custom *idpattern*\ s must follow conventions for verbose regular
+  expressions.
+
+  .. versionadded:: 3.2
 
 Alternatively, you can provide the entire regular expression pattern by
 overriding the class attribute *pattern*.  If you do this, the value must be a

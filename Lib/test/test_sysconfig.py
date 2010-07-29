@@ -244,8 +244,8 @@ class TestSysConfig(unittest.TestCase):
         # On Windows, the EXE needs to know where pythonXY.dll is at so we have
         # to add the directory to the path.
         if sys.platform == "win32":
-            os.environ["Path"] = "{};{}".format(os.path.dirname(sys.executable),
-                                                os.environ["Path"])
+            os.environ["Path"] = "{};{}".format(
+                os.path.dirname(sys.executable), os.environ["Path"])
 
         # Issue 7880
         def get(python):
@@ -276,6 +276,13 @@ class TestSysConfig(unittest.TestCase):
         with captured_stdout() as output:
             _main()
         self.assertTrue(len(output.getvalue().split('\n')) > 0)
+
+    @unittest.skipIf(sys.platform == "win32", "Does not apply to Windows")
+    def test_ldshared_value(self):
+        ldflags = sysconfig.get_config_var('LDFLAGS')
+        ldshared = sysconfig.get_config_var('LDSHARED')
+
+        self.assertIn(ldflags, ldshared)
 
 
 def test_main():

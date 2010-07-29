@@ -222,7 +222,7 @@ class PyBuildExt(build_ext):
         if compiler is not None:
             (ccshared,cflags) = sysconfig.get_config_vars('CCSHARED','CFLAGS')
             args['compiler_so'] = compiler + ' ' + ccshared + ' ' + cflags
-        self.compiler_obj.set_executables(**args)
+        self.compiler.set_executables(**args)
 
         build_ext.build_extensions(self)
 
@@ -343,8 +343,8 @@ class PyBuildExt(build_ext):
 
     def detect_modules(self):
         # Ensure that /usr/local is always used
-        add_dir_to_list(self.compiler_obj.library_dirs, '/usr/local/lib')
-        add_dir_to_list(self.compiler_obj.include_dirs, '/usr/local/include')
+        add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
+        add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
 
         # Add paths specified in the environment variables LDFLAGS and
         # CPPFLAGS for header and library files.
@@ -353,9 +353,9 @@ class PyBuildExt(build_ext):
         # the environment variable is not set even though the value were passed
         # into configure and stored in the Makefile (issue found on OS X 10.3).
         for env_var, arg_name, dir_list in (
-                ('LDFLAGS', '-R', self.compiler_obj.runtime_library_dirs),
-                ('LDFLAGS', '-L', self.compiler_obj.library_dirs),
-                ('CPPFLAGS', '-I', self.compiler_obj.include_dirs)):
+                ('LDFLAGS', '-R', self.compiler.runtime_library_dirs),
+                ('LDFLAGS', '-L', self.compiler.library_dirs),
+                ('CPPFLAGS', '-I', self.compiler.include_dirs)):
             env_val = sysconfig.get_config_var(env_var)
             if env_val:
                 # To prevent optparse from raising an exception about any
@@ -381,19 +381,19 @@ class PyBuildExt(build_ext):
                         add_dir_to_list(dir_list, directory)
 
         if os.path.normpath(sys.prefix) != '/usr':
-            add_dir_to_list(self.compiler_obj.library_dirs,
+            add_dir_to_list(self.compiler.library_dirs,
                             sysconfig.get_config_var("LIBDIR"))
-            add_dir_to_list(self.compiler_obj.include_dirs,
+            add_dir_to_list(self.compiler.include_dirs,
                             sysconfig.get_config_var("INCLUDEDIR"))
 
         # lib_dirs and inc_dirs are used to search for files;
         # if a file is found in one of those directories, it can
         # be assumed that no additional -I,-L directives are needed.
-        lib_dirs = self.compiler_obj.library_dirs + [
+        lib_dirs = self.compiler.library_dirs + [
             '/lib64', '/usr/lib64',
             '/lib', '/usr/lib',
             ]
-        inc_dirs = self.compiler_obj.include_dirs + ['/usr/include']
+        inc_dirs = self.compiler.include_dirs + ['/usr/include']
         exts = []
         missing = []
 
@@ -452,7 +452,7 @@ class PyBuildExt(build_ext):
         # time operations and variables
         exts.append( Extension('time', ['timemodule.c', '_time.c'],
                                libraries=math_libs) )
-        exts.append( Extension('datetime', ['datetimemodule.c', '_time.c'],
+        exts.append( Extension('_datetime', ['_datetimemodule.c', '_time.c'],
                                libraries=math_libs) )
         # fast iterator tools implemented in C
         exts.append( Extension("itertools", ["itertoolsmodule.c"]) )
@@ -525,7 +525,7 @@ class PyBuildExt(build_ext):
         exts.append( Extension('audioop', ['audioop.c']) )
 
         # readline
-        do_readline = self.compiler_obj.find_library_file(lib_dirs, 'readline')
+        do_readline = self.compiler.find_library_file(lib_dirs, 'readline')
         readline_termcap_library = ""
         curses_library = ""
         # Determine if readline is already linked against curses or tinfo.
@@ -534,28 +534,29 @@ class PyBuildExt(build_ext):
             tmpfile = os.path.join(self.build_temp, 'readline_termcap_lib')
             if not os.path.exists(self.build_temp):
                 os.makedirs(self.build_temp)
-            os.system("ldd %s > %s" % (do_readline, tmpfile))
-            fp = open(tmpfile)
-            for ln in fp:
-                if 'curses' in ln:
-                    readline_termcap_library = re.sub(
-                        r'.*lib(n?cursesw?)\.so.*', r'\1', ln
-                    ).rstrip()
-                    break
-                if 'tinfo' in ln: # termcap interface split out from ncurses
-                    readline_termcap_library = 'tinfo'
-                    break
-            fp.close()
+            ret = os.system("ldd %s > %s" % (do_readline, tmpfile))
+            if ret >> 8 == 0:
+                fp = open(tmpfile)
+                for ln in fp:
+                    if 'curses' in ln:
+                        readline_termcap_library = re.sub(
+                            r'.*lib(n?cursesw?)\.so.*', r'\1', ln
+                        ).rstrip()
+                        break
+                    if 'tinfo' in ln: # termcap interface split out from ncurses
+                        readline_termcap_library = 'tinfo'
+                        break
+                fp.close()
             os.unlink(tmpfile)
         # Issue 7384: If readline is already linked against curses,
         # use the same library for the readline and curses modules.
         if 'curses' in readline_termcap_library:
             curses_library = readline_termcap_library
-        elif self.compiler_obj.find_library_file(lib_dirs, 'ncursesw'):
+        elif self.compiler.find_library_file(lib_dirs, 'ncursesw'):
             curses_library = 'ncursesw'
-        elif self.compiler_obj.find_library_file(lib_dirs, 'ncurses'):
+        elif self.compiler.find_library_file(lib_dirs, 'ncurses'):
             curses_library = 'ncurses'
-        elif self.compiler_obj.find_library_file(lib_dirs, 'curses'):
+        elif self.compiler.find_library_file(lib_dirs, 'curses'):
             curses_library = 'curses'
 
         if platform == 'darwin':
@@ -585,7 +586,7 @@ class PyBuildExt(build_ext):
                 pass # Issue 7384: Already linked against curses or tinfo.
             elif curses_library:
                 readline_libs.append(curses_library)
-            elif self.compiler_obj.find_library_file(lib_dirs +
+            elif self.compiler.find_library_file(lib_dirs +
                                                      ['/usr/lib/termcap'],
                                                      'termcap'):
                 readline_libs.append('termcap')
@@ -598,7 +599,7 @@ class PyBuildExt(build_ext):
 
         # crypt module.
 
-        if self.compiler_obj.find_library_file(lib_dirs, 'crypt'):
+        if self.compiler.find_library_file(lib_dirs, 'crypt'):
             libs = ['crypt']
         else:
             libs = []
@@ -626,7 +627,7 @@ class PyBuildExt(build_ext):
                                ['/usr/kerberos/include'])
             if krb5_h:
                 ssl_incs += krb5_h
-        ssl_libs = find_library_file(self.compiler_obj, 'ssl',lib_dirs,
+        ssl_libs = find_library_file(self.compiler, 'ssl',lib_dirs,
                                      ['/usr/local/ssl/lib',
                                       '/usr/contrib/ssl/lib/'
                                      ] )
@@ -951,7 +952,7 @@ class PyBuildExt(build_ext):
                 os.path.join(sqlite_incdir, '..', '..', 'lib64'),
                 os.path.join(sqlite_incdir, '..', '..', 'lib'),
             ]
-            sqlite_libfile = self.compiler_obj.find_library_file(
+            sqlite_libfile = self.compiler.find_library_file(
                                 sqlite_dirs_to_check + lib_dirs, 'sqlite3')
             if sqlite_libfile:
                 sqlite_libdir = [os.path.abspath(os.path.dirname(sqlite_libfile))]
@@ -1013,7 +1014,7 @@ class PyBuildExt(build_ext):
                 if cand == "ndbm":
                     if find_file("ndbm.h", inc_dirs, []) is not None:
                         # Some systems have -lndbm, others don't
-                        if self.compiler_obj.find_library_file(lib_dirs,
+                        if self.compiler.find_library_file(lib_dirs,
                                                                'ndbm'):
                             ndbm_libs = ['ndbm']
                         else:
@@ -1027,9 +1028,9 @@ class PyBuildExt(build_ext):
                         break
 
                 elif cand == "gdbm":
-                    if self.compiler_obj.find_library_file(lib_dirs, 'gdbm'):
+                    if self.compiler.find_library_file(lib_dirs, 'gdbm'):
                         gdbm_libs = ['gdbm']
-                        if self.compiler_obj.find_library_file(lib_dirs,
+                        if self.compiler.find_library_file(lib_dirs,
                                                                'gdbm_compat'):
                             gdbm_libs.append('gdbm_compat')
                         if find_file("gdbm/ndbm.h", inc_dirs, []) is not None:
@@ -1070,7 +1071,7 @@ class PyBuildExt(build_ext):
 
         # Anthony Baxter's gdbm module.  GNU dbm(3) will require -lgdbm:
         if ('gdbm' in dbm_order and
-            self.compiler_obj.find_library_file(lib_dirs, 'gdbm')):
+            self.compiler.find_library_file(lib_dirs, 'gdbm')):
             exts.append( Extension('_gdbm', ['_gdbmmodule.c'],
                                    libraries = ['gdbm'] ) )
         else:
@@ -1086,7 +1087,7 @@ class PyBuildExt(build_ext):
             # Sun yellow pages. Some systems have the functions in libc.
             if (platform not in ['cygwin', 'qnx6'] and
                 find_file('rpcsvc/yp_prot.h', inc_dirs, []) is not None):
-                if (self.compiler_obj.find_library_file(lib_dirs, 'nsl')):
+                if (self.compiler.find_library_file(lib_dirs, 'nsl')):
                     libs = ['nsl']
                 else:
                     libs = []
@@ -1111,9 +1112,9 @@ class PyBuildExt(build_ext):
         elif curses_library == 'curses' and platform != 'darwin':
                 # OSX has an old Berkeley curses, not good enough for
                 # the _curses module.
-            if (self.compiler_obj.find_library_file(lib_dirs, 'terminfo')):
+            if (self.compiler.find_library_file(lib_dirs, 'terminfo')):
                 curses_libs = ['curses', 'terminfo']
-            elif (self.compiler_obj.find_library_file(lib_dirs, 'termcap')):
+            elif (self.compiler.find_library_file(lib_dirs, 'termcap')):
                 curses_libs = ['curses', 'termcap']
             else:
                 curses_libs = ['curses']
@@ -1125,7 +1126,7 @@ class PyBuildExt(build_ext):
 
         # If the curses module is enabled, check for the panel module
         if (module_enabled(exts, '_curses') and
-            self.compiler_obj.find_library_file(lib_dirs, panel_library)):
+            self.compiler.find_library_file(lib_dirs, panel_library)):
             exts.append( Extension('_curses_panel', ['_curses_panel.c'],
                                    libraries = [panel_library] + curses_libs) )
         else:
@@ -1158,7 +1159,7 @@ class PyBuildExt(build_ext):
                     version = line.split()[2]
                     break
             if version >= version_req:
-                if (self.compiler_obj.find_library_file(lib_dirs, 'z')):
+                if (self.compiler.find_library_file(lib_dirs, 'z')):
                     if sys.platform == "darwin":
                         zlib_extra_link_args = ('-Wl,-search_paths_first',)
                     else:
@@ -1190,7 +1191,7 @@ class PyBuildExt(build_ext):
                                extra_link_args = extra_link_args) )
 
         # Gustavo Niemeyer's bz2 module.
-        if (self.compiler_obj.find_library_file(lib_dirs, 'bz2')):
+        if (self.compiler.find_library_file(lib_dirs, 'bz2')):
             if sys.platform == "darwin":
                 bz2_extra_link_args = ('-Wl,-search_paths_first',)
             else:
@@ -1451,9 +1452,9 @@ class PyBuildExt(build_ext):
         tcllib = tklib = tcl_includes = tk_includes = None
         for version in ['8.6', '86', '8.5', '85', '8.4', '84', '8.3', '83',
                         '8.2', '82', '8.1', '81', '8.0', '80']:
-            tklib = self.compiler_obj.find_library_file(lib_dirs,
+            tklib = self.compiler.find_library_file(lib_dirs,
                                                         'tk' + version)
-            tcllib = self.compiler_obj.find_library_file(lib_dirs,
+            tcllib = self.compiler.find_library_file(lib_dirs,
                                                          'tcl' + version)
             if tklib and tcllib:
                 # Exit the loop when we've found the Tcl/Tk libraries
@@ -1512,11 +1513,11 @@ class PyBuildExt(build_ext):
                 return
 
         # Check for BLT extension
-        if self.compiler_obj.find_library_file(lib_dirs + added_lib_dirs,
+        if self.compiler.find_library_file(lib_dirs + added_lib_dirs,
                                                'BLT8.0'):
             defs.append( ('WITH_BLT', 1) )
             libs.append('BLT8.0')
-        elif self.compiler_obj.find_library_file(lib_dirs + added_lib_dirs,
+        elif self.compiler.find_library_file(lib_dirs + added_lib_dirs,
                                                 'BLT'):
             defs.append( ('WITH_BLT', 1) )
             libs.append('BLT')
@@ -1571,7 +1572,7 @@ class PyBuildExt(build_ext):
                              ]]
 
         # Add .S (preprocessed assembly) to C compiler source extensions.
-        self.compiler_obj.src_extensions.append('.S')
+        self.compiler.src_extensions.append('.S')
 
         include_dirs = [os.path.join(ffi_srcdir, 'include'),
                         os.path.join(ffi_srcdir, 'powerpc')]
@@ -1616,7 +1617,7 @@ class PyBuildExt(build_ext):
                 exec(f.read(), globals(), fficonfig)
 
             # Add .S (preprocessed assembly) to C compiler source extensions.
-            self.compiler_obj.src_extensions.append('.S')
+            self.compiler.src_extensions.append('.S')
 
             include_dirs = [os.path.join(ffi_builddir, 'include'),
                             ffi_builddir,
@@ -1698,7 +1699,7 @@ class PyBuildExt(build_ext):
         ffi_lib = None
         if ffi_inc is not None:
             for lib_name in ('ffi_convenience', 'ffi_pic', 'ffi'):
-                if (self.compiler_obj.find_library_file(lib_dirs, lib_name)):
+                if (self.compiler.find_library_file(lib_dirs, lib_name)):
                     ffi_lib = lib_name
                     break
 

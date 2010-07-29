@@ -43,6 +43,7 @@ The module also extends gdb with some python-specific commands.
 from __future__ import with_statement
 import gdb
 import locale
+import sys
 
 # Look up the gdb.Type for some standard types:
 _type_char_ptr = gdb.lookup_type('char').pointer() # char*
@@ -55,7 +56,6 @@ SIZEOF_VOID_P = _type_void_ptr.sizeof
 
 Py_TPFLAGS_HEAPTYPE = (1L << 9)
 
-Py_TPFLAGS_INT_SUBCLASS      = (1L << 23)
 Py_TPFLAGS_LONG_SUBCLASS     = (1L << 24)
 Py_TPFLAGS_LIST_SUBCLASS     = (1L << 25)
 Py_TPFLAGS_TUPLE_SUBCLASS    = (1L << 26)
@@ -312,8 +312,6 @@ class PyObjectPtr(object):
         if tp_flags & Py_TPFLAGS_HEAPTYPE:
             return HeapTypeObjectPtr
 
-        if tp_flags & Py_TPFLAGS_INT_SUBCLASS:
-            return PyIntObjectPtr
         if tp_flags & Py_TPFLAGS_LONG_SUBCLASS:
             return PyLongObjectPtr
         if tp_flags & Py_TPFLAGS_LIST_SUBCLASS:
