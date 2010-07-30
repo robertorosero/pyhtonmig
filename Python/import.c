@@ -1912,6 +1912,7 @@ find_module(const char *fullname, const char *name, PyObject *search_path,
             unicode_without_suffix = saved_unicode;
             namelen = saved_namelen;
 #endif
+            Py_CLEAR(unicode);
         }
         Py_CLEAR(unicode_without_suffix);
 #if defined(PYOS_OS2)
@@ -1919,7 +1920,6 @@ find_module(const char *fullname, const char *name, PyObject *search_path,
 #endif
         if (fp != NULL)
             break;
-        Py_DECREF(unicode);
     }
     Py_XDECREF(unicode_without_suffix);
     if (fp == NULL) {
