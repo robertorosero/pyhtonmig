@@ -3830,7 +3830,8 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         DWORD rv;
         wchar_t path[MAXPATHLEN+1];
         Py_ssize_t len;
-        len = PyUnicode_AsWideChar(pathobj, path, sizeof(path));
+        len = PyUnicode_AsWideChar((PyUnicodeObject*)pathobj,
+                                   path, sizeof(path));
         if (len == -1)
             return -1;
         /* see issue1293 and issue3677:
