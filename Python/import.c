@@ -139,7 +139,7 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 /* Forward */
 FILE* _Py_fopen(PyObject *unicode, const char *mode);
 #ifdef HAVE_STAT
-int _Py_stat(PyObject *unicode, struct stat *statbuf);
+static int _Py_stat(PyObject *unicode, struct stat *statbuf);
 static int find_init_module(PyObject *);
 #endif
 
@@ -2161,7 +2161,7 @@ _Py_fopen(PyObject *unicode, const char *mode)
 
 
 #ifdef HAVE_STAT
-int
+static int
 _Py_stat(PyObject *unicode, struct stat *statbuf)
 {
 #ifdef MS_WINDOWS

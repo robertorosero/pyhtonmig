@@ -44,7 +44,6 @@ static PyObject *ZipImportError;
 static PyObject *zip_directory_cache = NULL;
 
 /* forward decls */
-extern FILE* _Py_fopen(PyObject *unicode, const char *mode);
 static PyObject *read_directory(PyObject *archive);
 static PyObject *get_data(PyObject *archive, PyObject *toc_entry);
 static PyObject *get_module_code(ZipImporter *self, char *fullname,
