@@ -3828,14 +3828,16 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         }
 #else /* MS_WINDOWS */
         DWORD rv;
-        char *path;
-        /* FIXME: use PyUnicode_AsWideChar() and GetFileAttributesW() */
-        path = _PyUnicode_AsString(pathobj);
+        wchar_t path[MAXPATHLEN+1];
+        Py_ssize_t len;
+        len = PyUnicode_AsWideChar(pathobj, path, sizeof(path));
+        if (len == -1)
+            return -1;
         /* see issue1293 and issue3677:
          * stat() on Windows doesn't recognise paths like
          * "e:\\shared\\" and "\\\\whiterab-c2znlh\\shared" as dirs.
          */
-        rv = GetFileAttributesA(path);
+        rv = GetFileAttributesW(path);
         if (rv != INVALID_FILE_ATTRIBUTES) {
             /* it exists */
             if (rv & FILE_ATTRIBUTE_DIRECTORY) {
