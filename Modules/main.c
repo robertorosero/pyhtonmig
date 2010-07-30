@@ -271,7 +271,7 @@ run_command(wchar_t *command, PyCompilerFlags *cf)
         goto error;
     commandStr = PyBytes_AsString(command_bytes);
     sts = PyRun_SimpleStringFlags(commandStr, cf) != 0;
-    Py_XDECREF(command_bytes);
+    Py_DECREF(command_bytes);
     return sts;
 
 error:
