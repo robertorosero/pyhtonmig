@@ -128,7 +128,7 @@ extern "C" {
 /* _Py_Mangle is defined in compile.c */
 PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 
-/* _Py_char2wchar and _Py_wchar2char lives in main.c */
+/* _Py_char2wchar and _Py_wchar2char live in main.c */
 PyAPI_FUNC(wchar_t *) _Py_char2wchar(char *);
 PyAPI_FUNC(char*) _Py_wchar2char(const wchar_t *text);
 
