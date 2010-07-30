@@ -744,7 +744,7 @@ _Py_wchar2char(const wchar_t *text)
     bytes = result;
     for (i=0; i < len; i++) {
         c = text[i];
-        if (c >= 0xd800 && c <= 0xdfff) {
+        if (c >= 0xdc00 && c <= 0xdcff) {
             /* Surrogate character */
             *bytes++ = c - 0xdc00;
             size--;
