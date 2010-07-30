@@ -1060,7 +1060,7 @@ make_source_pathname(PyObject *pathobj)
     pathname = strdup(PyBytes_AsString(pathbytes));
     Py_DECREF(pathbytes);
     if (pathname == NULL)
-        return NULL;
+        return PyErr_NoMemory();
 
     cpathname = _make_source_pathname(pathname, buf);
     free(pathname);
