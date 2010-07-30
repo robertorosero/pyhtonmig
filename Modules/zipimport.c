@@ -514,10 +514,11 @@ zipimporter_get_source(PyObject *obj, PyObject *args)
 
     toc_entry = PyDict_GetItemString(self->files, path);
     if (toc_entry != NULL) {
+        PyObject *res;
         PyObject *bytes = get_data(self->archive, toc_entry);
         if (bytes == NULL)
             return NULL;
-        PyObject *res = PyUnicode_DecodeFSDefault(PyBytes_AsString(bytes));
+        res = PyUnicode_DecodeFSDefault(PyBytes_AsString(bytes));
         Py_XDECREF(bytes);
         return res;
     }
