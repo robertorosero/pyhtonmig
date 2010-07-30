@@ -854,7 +854,7 @@ class POSIXProcessTestCase(BaseTestCase):
                 [sys.executable, "-c", script],
                 env=env)
             stdout = stdout.rstrip(b'\n\r')
-            self.assertEquals(stdout.decode('ascii'), repr(value))
+            self.assertEqual(stdout.decode('ascii'), repr(value))
 
             # test bytes
             key = key.encode("ascii", "surrogateescape")
@@ -866,28 +866,28 @@ class POSIXProcessTestCase(BaseTestCase):
                 [sys.executable, "-c", script],
                 env=env)
             stdout = stdout.rstrip(b'\n\r')
-            self.assertEquals(stdout.decode('ascii'), repr(value))
+            self.assertEqual(stdout.decode('ascii'), repr(value))
 
-    def test_absolute_bytes_program(self):
-        exitcode = subprocess.call([os.fsencode(sys.executable), "-c", "pass"])
-        self.assertEquals(exitcode, 0)
-
-    @unittest.skipIf(sysconfig.is_python_build(), "need an installed Python")
     def test_bytes_program(self):
+        abs_program = os.fsencode(sys.executable)
         path, program = os.path.split(sys.executable)
         program = os.fsencode(program)
+
+        # absolute bytes path
+        exitcode = subprocess.call([abs_program, "-c", "pass"])
+        self.assertEqual(exitcode, 0)
 
         # bytes program, unicode PATH
         env = os.environ.copy()
         env["PATH"] = path
         exitcode = subprocess.call([program, "-c", "pass"], env=env)
-        self.assertEquals(exitcode, 0)
+        self.assertEqual(exitcode, 0)
 
         # bytes program, bytes PATH
         envb = os.environb.copy()
         envb[b"PATH"] = os.fsencode(path)
         exitcode = subprocess.call([program, "-c", "pass"], env=envb)
-        self.assertEquals(exitcode, 0)
+        self.assertEqual(exitcode, 0)
 
 
 @unittest.skipUnless(mswindows, "Windows specific tests")
