@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-extern PyObject *_Py_code_object_list;
-
 #ifdef Py_REF_DEBUG
 Py_ssize_t _Py_RefTotal;
 

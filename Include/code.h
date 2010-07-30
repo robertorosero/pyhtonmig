@@ -72,7 +72,7 @@ PyAPI_DATA(PyTypeObject) PyCode_Type;
 PyAPI_FUNC(PyCodeObject *) PyCode_New(
 	int, int, int, int, int, PyObject *, PyObject *,
 	PyObject *, PyObject *, PyObject *, PyObject *,
-	PyObject *, PyObject *, int, PyObject *); 
+	PyObject *, PyObject *, int, PyObject *);
         /* same as struct above */
 
 /* Creates a new empty code object with the specified source location. */
@@ -98,6 +98,8 @@ PyAPI_FUNC(int) _PyCode_CheckLineNumber(PyCodeObject* co,
 
 PyAPI_FUNC(PyObject*) PyCode_Optimize(PyObject *code, PyObject* consts,
                                       PyObject *names, PyObject *lineno_obj);
+
+extern PyObject *_Py_code_object_list;
 
 #ifdef __cplusplus
 }
