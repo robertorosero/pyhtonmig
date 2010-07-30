@@ -1173,8 +1173,10 @@ parse_source_module(PyObject *pathobj, FILE *fp)
         return NULL;
 
     pathbytes = PyUnicode_EncodeFSDefault(pathobj);
-    if (pathbytes == NULL)
+    if (pathbytes == NULL) {
+        PyArena_Free(arena);
         return NULL;
+    }
     pathname = PyBytes_AS_STRING(pathbytes);
 
     flags.cf_flags = 0;
