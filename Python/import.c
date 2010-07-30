@@ -2130,7 +2130,22 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
 FILE*
 _Py_fopen(PyObject *unicode, const char *mode)
 {
-    /* FIXME: use _wfopen() on Windows */
+#ifdef MS_WINDOWS
+    wchar_t path[MAXPATHLEN+1];
+    wchar_t wmode[10];
+    Py_ssize_t len;
+    int usize;
+
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, sizeof(path));
+    if (len == -1)
+        return NULL;
+
+    usize = MultiByteToWideChar(CP_ACP, 0, mode, -1, wmode, sizeof(wmode));
+    if (usize == 0)
+        return NULL;
+
+    return _wfopen(path, wmode);
+#else
     FILE *f;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
     if (bytes == NULL) {
@@ -2141,6 +2156,7 @@ _Py_fopen(PyObject *unicode, const char *mode)
     f = fopen(PyBytes_AS_STRING(bytes), mode);
     Py_DECREF(bytes);
     return f;
+#endif
 }
 
 
@@ -2148,6 +2164,22 @@ _Py_fopen(PyObject *unicode, const char *mode)
 int
 _Py_stat(PyObject *unicode, struct stat *statbuf)
 {
+#ifdef MS_WINDOWS
+    wchar_t path[MAXPATHLEN+1];
+    Py_ssize_t len;
+    int err;
+    struct _stat wstatbuf;
+
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, sizeof(path));
+    if (len == -1)
+        return -1;
+    err = _wstat(path, &wstatbuf);
+    if (!err) {
+        /* FIXME: copy more attributes? */
+        statbuf->st_mode = wstatbuf.st_mode;
+    }
+    return err;
+#else
     int ret;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
     if (bytes == NULL) {
@@ -2158,6 +2190,7 @@ _Py_stat(PyObject *unicode, struct stat *statbuf)
     ret = stat(PyBytes_AS_STRING(bytes), statbuf);
     Py_DECREF(bytes);
     return ret;
+#endif
 }
 
 /* Helper to look for __init__.py or __init__.py[co] in potential package */
