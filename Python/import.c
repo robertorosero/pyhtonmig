@@ -723,7 +723,7 @@ remove_module(const char *name)
                       "sys.modules failed");
 }
 
-static PyObject * get_sourcefile(PyObject *file);
+static PyObject *get_sourcefile(PyObject *file);
 static PyObject *make_source_pathname(PyObject *pathname);
 static PyObject *make_compiled_pathname(PyObject *pathname, int debug);
 
