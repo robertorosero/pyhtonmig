@@ -5,6 +5,9 @@
 #define NAME_CHARS \
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
+/* List of all code objects used to reencode code filenames at startup when the
+ * file system encoding is changed. After startup, the list is no more used (it
+ * is set to NULL). */
 PyObject *_Py_code_object_list = NULL;
 
 /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
@@ -46,10 +49,7 @@ intern_strings(PyObject *tuple)
 
 void _PyCode_ClearList(void)
 {
-    if (_Py_code_object_list == NULL)
-        return;
-    Py_DECREF(_Py_code_object_list);
-    _Py_code_object_list = NULL;
+    Py_CLEAR(_Py_code_object_list);
 }
 
 PyCodeObject *
