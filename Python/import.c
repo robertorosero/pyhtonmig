@@ -1452,10 +1452,10 @@ get_sourcefile(PyObject *fileobj)
     file = PyUnicode_AS_UNICODE(fileobj);
 
     /* match '*.py?' */
-    if (4 <= len
-        && file[len-3] == '.'
-        && (file[len-2] == 'p' || file[len-2] == 'P')
-        && (file[len-1] == 'y' || file[len-1] == 'Y')) {
+    if (5 <= len
+        && file[len-4] == '.'
+        && (file[len-3] == 'p' || file[len-3] == 'P')
+        && (file[len-2] == 'y' || file[len-2] == 'Y')) {
         Py_INCREF(fileobj);
         return fileobj;
     }
