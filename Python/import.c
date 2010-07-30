@@ -1991,17 +1991,20 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
 
 /* MS_WINDOWS */
 #if defined(MS_WINDOWS)
-    char *fullpath;
-    WIN32_FIND_DATA data;
+    wchar_t buffer[MAXPATHLEN+1];
+    Py_ssize_t len;
+    DWORD usize;
+    WIN32_FIND_DATAW data;
     HANDLE h;
 
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
-    /* FIXME: use PyUnicode_AsWideChar() and FindFirstFileW() */
-    fullpath = _PyUnicode_AsString(fullpath_obj);
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)fullpath_obj, buffer, sizeof(buffer));
+    if (len == -1)
+        return 0;
 
-    h = FindFirstFile(fullpath, &data);
+    h = FindFirstFileW(buffer, &data);
     if (h == INVALID_HANDLE_VALUE) {
         PyErr_Format(PyExc_NameError,
           "Can't find file for module %.100s\n(filename %U)",
@@ -2009,7 +2012,12 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
         return 0;
     }
     FindClose(h);
-    return strncmp(data.cFileName, name, namelen) == 0;
+
+    /* FIXME: use maybe a dynamic buffer? (namelen) */
+    usize = MultiByteToWideChar(CP_ACP, 0, name, namelen, buffer, sizeof(buffer));
+    if (usize == 0)
+        return 0;
+    return wcsncmp(data.cFileName, buffer, namelen) == 0;
 
 /* DJGPP */
 #elif defined(DJGPP)
