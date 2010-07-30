@@ -254,7 +254,7 @@ static int RunMainFromImporter(wchar_t *filename)
     }
 }
 
-static int 
+static int
 run_command(wchar_t *command, PyCompilerFlags *cf)
 {
     int sts;
@@ -749,7 +749,8 @@ _Py_wchar2char(const wchar_t *text)
             *bytes++ = c - 0xdc00;
             size--;
             continue;
-        } else {
+        }
+        else {
             wchar_t buf[2];
             buf[0] = c;
             buf[1] = 0;

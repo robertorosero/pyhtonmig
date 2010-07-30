@@ -57,7 +57,8 @@ PyFile_FromFd(int fd, char *name, char *mode, int buffering, char *encoding,
         nameobj = PyUnicode_DecodeFSDefault(name);
         if (nameobj == NULL)
             PyErr_Clear();
-    } else
+    }
+    else
         nameobj = NULL;
     file = _PyFile_FromFdUnicode(fd, nameobj, mode, buffering,
                                  encoding, errors, newline, closefd);

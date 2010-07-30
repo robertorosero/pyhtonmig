@@ -474,7 +474,8 @@ fp_setreadl(struct tok_state *tok, const char* enc)
         stream = PyObject_CallMethod(io, "open", "Osis",
                                      filename, "r", -1, enc);
         Py_DECREF(filename);
-    } else
+    }
+    else
         stream = PyObject_CallMethod(io, "open", "isisOOO",
                         fileno(tok->fp), "r", -1, enc, Py_None, Py_None, Py_False);
     if (stream == NULL)
