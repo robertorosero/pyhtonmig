@@ -24,7 +24,7 @@ SIMPLE_XMLFILE = findfile("simple.xml", subdir="xmltestdata")
 try:
     SIMPLE_XMLFILE.encode("utf8")
 except UnicodeEncodeError:
-    # ignore all tests if the current working directory is undecodable
+    # ignore all tests if the current working directory is unencodable
     raise unittest.SkipTest("filename is not encodable to utf8")
 SIMPLE_NS_XMLFILE = findfile("simple-ns.xml", subdir="xmltestdata")
 
