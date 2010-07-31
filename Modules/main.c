@@ -265,7 +265,7 @@ run_command(wchar_t *command, PyCompilerFlags *cf)
     commandObj = PyUnicode_FromWideChar(command, -1);
     if (commandObj == NULL)
         goto error;
-    command_bytes = PyUnicode_EncodeFSDefault(commandObj);
+    command_bytes = PyUnicode_AsUTF8String(commandObj);
     Py_DECREF(commandObj);
     if (command_bytes == NULL)
         goto error;
