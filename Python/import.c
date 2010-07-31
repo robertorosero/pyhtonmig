@@ -2002,7 +2002,8 @@ case_ok(PyObject *fullpath_obj, Py_ssize_t lendelta, Py_ssize_t namelen, const c
     if (Py_GETENV("PYTHONCASEOK") != NULL)
         return 1;
 
-    len = PyUnicode_AsWideChar((PyUnicodeObject*)fullpath_obj, buffer, sizeof(buffer));
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)fullpath_obj, buffer,
+                               sizeof(buffer) / sizeof(buffer[0]));
     if (len == -1)
         return 0;
 
@@ -2138,7 +2139,8 @@ _Py_fopen(PyObject *unicode, const char *mode)
     Py_ssize_t len;
     int usize;
 
-    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, sizeof(path));
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path,
+                               sizeof(path) / sizeof(path[0]));
     if (len == -1)
         return NULL;
 
@@ -2172,7 +2174,8 @@ _Py_stat(PyObject *unicode, struct stat *statbuf)
     int err;
     struct _stat wstatbuf;
 
-    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, sizeof(path));
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path,
+                               sizeof(path) / sizeof(path[0]));
     if (len == -1)
         return -1;
     err = _wstat(path, &wstatbuf);
@@ -3874,7 +3877,7 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         wchar_t path[MAXPATHLEN+1];
         Py_ssize_t len;
         len = PyUnicode_AsWideChar((PyUnicodeObject*)pathobj,
-                                   path, sizeof(path));
+                                   path, sizeof(path) / sizeof(path[0]));
         if (len == -1)
             return -1;
         /* see issue1293 and issue3677:
