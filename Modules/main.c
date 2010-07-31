@@ -279,6 +279,38 @@ error:
     return 1;
 }
 
+static int
+run_file(FILE *fp, const wchar_t *filename, PyCompilerFlags *p_cf)
+{
+    PyObject *filenameObj, *filename_bytes = NULL;
+    char *filename_str = "<stdin>";
+    int sts;
+
+    /* call pending calls like signal handlers (SIGINT) */
+    if (Py_MakePendingCalls() == -1) {
+        PyErr_Print();
+        return 1;
+    }
+
+    if (filename) {
+        filenameObj = PyUnicode_FromWideChar(filename, wcslen(filename));
+        if (filenameObj != NULL) {
+            filename_bytes = PyUnicode_EncodeFSDefault(filenameObj);
+            Py_DECREF(filenameObj);
+        }
+        if (filename_bytes != NULL)
+            filename_str = PyBytes_AsString(filename_bytes);
+        else {
+            PyErr_Clear();
+            filename_str = "<decoding error>";
+        }
+    } else
+        filename_str = "<stdin>";
+
+    sts = PyRun_AnyFileExFlags(fp, filename_str, filename != NULL, p_cf) != 0;
+    Py_XDECREF(filename_bytes);
+    return sts;
+}
 
 /* Main program */
 
@@ -648,34 +680,8 @@ Py_Main(int argc, wchar_t **argv)
             }
         }
 
-        if (sts==-1) {
-            PyObject *filenameObj = NULL;
-            PyObject *filename_bytes = NULL;
-            char *p_cfilename = "<stdin>";
-            if (filename) {
-                filenameObj = PyUnicode_FromWideChar(
-                    filename, wcslen(filename));
-                if (filenameObj != NULL) {
-                    filename_bytes = PyUnicode_EncodeFSDefault(filenameObj);
-                    p_cfilename = PyBytes_AsString(filename_bytes);
-                }
-                else
-                    p_cfilename = "<decoding error>";
-            }
-            /* call pending calls like signal handlers (SIGINT) */
-            if (Py_MakePendingCalls() == -1) {
-                PyErr_Print();
-                sts = 1;
-            } else {
-                sts = PyRun_AnyFileExFlags(
-                    fp,
-                    p_cfilename,
-                    filename != NULL, &cf) != 0;
-            }
-            Py_XDECREF(filename_bytes);
-            Py_XDECREF(filenameObj);
-        }
-
+        if (sts==-1)
+            sts = run_file(fp, filename, &cf);
     }
 
     /* Check this environment variable at the end, to give programs the
