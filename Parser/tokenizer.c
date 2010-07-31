@@ -471,9 +471,8 @@ fp_setreadl(struct tok_state *tok, const char* enc)
         PyObject *filename = PyUnicode_DecodeFSDefault(tok->filename);
         if (filename == NULL)
             goto cleanup;
-        stream = PyObject_CallMethod(io, "open", "Osis",
+        stream = PyObject_CallMethod(io, "open", "Nsis",
                                      filename, "r", -1, enc);
-        Py_DECREF(filename);
     }
     else
         stream = PyObject_CallMethod(io, "open", "isisOOO",
