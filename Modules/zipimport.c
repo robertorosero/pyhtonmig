@@ -60,34 +60,35 @@ static PyObject *get_module_code(ZipImporter *self, char *fullname,
 static int
 zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 {
-    PyObject *pathbytes;
+    PyObject *path_unicode;
     /* FIXME: work on unicode strings, not byte strings */
-    char *path, *p, *prefix, buf[MAXPATHLEN+2];
-    size_t len;
+    Py_UNICODE *path, *p, *prefix, buf[MAXPATHLEN+2];
+    Py_ssize_t len;
     PyObject *files;
-    PyObject *pathobj;
+    PyObject *pathobj, *prefixobj;
 
     if (!_PyArg_NoKeywords("zipimporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "O&:zipimporter", PyUnicode_FSConverter, &pathbytes))
+    if (!PyArg_ParseTuple(args, "O&:zipimporter",
+        PyUnicode_FSDecoder, &path_unicode))
         return -1;
 
-    len = PyBytes_GET_SIZE(pathbytes);
+    len = PyUnicode_GET_SIZE(path_unicode);
     if (len == 0) {
         PyErr_SetString(ZipImportError, "archive path is empty");
-        Py_DECREF(pathbytes);
+        Py_DECREF(path_unicode);
         return -1;
     }
-    path = PyBytes_AsString(pathbytes);
     if (len >= MAXPATHLEN) {
         PyErr_SetString(ZipImportError,
                         "archive path too long");
-        Py_DECREF(pathbytes);
+        Py_DECREF(path_unicode);
         return -1;
     }
-    strcpy(buf, path);
-    Py_DECREF(pathbytes);
+    path = PyUnicode_AS_UNICODE(path_unicode);
+    Py_UNICODE_strcpy(buf, path);
+    Py_DECREF(path_unicode);
 
 #ifdef ALTSEP
     for (p = buf; *p; p++) {
@@ -102,7 +103,11 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         struct stat statbuf;
         int rv;
 
-        rv = stat(buf, &statbuf);
+        pathobj = PyUnicode_FromUnicode(buf, Py_UNICODE_strlen(buf));
+        if (pathobj == NULL)
+            return -1;
+        rv = _Py_stat(pathobj, &statbuf);
+        Py_DECREF(pathobj);
         if (rv == 0) {
             /* it exists */
             if (S_ISREG(statbuf.st_mode))
@@ -111,7 +116,7 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
             break;
         }
         /* back up one path element */
-        p = strrchr(buf, SEP);
+        p = Py_UNICODE_strrchr(buf, SEP);
         if (prefix != NULL)
             *prefix = SEP;
         if (p == NULL)
@@ -124,19 +129,12 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    pathobj = PyUnicode_DecodeFSDefault(path);
+    pathobj = PyUnicode_FromUnicode(path, Py_UNICODE_strlen(path));
     if (pathobj == NULL)
         return -1;
     files = PyDict_GetItem(zip_directory_cache, pathobj);
     if (files == NULL) {
-        PyObject *bufobj;
-        bufobj = PyUnicode_DecodeFSDefault(buf);
-        if (bufobj == NULL) {
-            Py_DECREF(pathobj);
-            return -1;
-        }
-        files = read_directory(bufobj);
-        Py_DECREF(bufobj);
+        files = read_directory(pathobj);
         if (files == NULL) {
             Py_DECREF(pathobj);
             return -1;
@@ -149,26 +147,23 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
     }
     else
         Py_INCREF(files);
-    Py_DECREF(pathobj);
     self->files = files;
 
+    self->archive = pathobj;
+
     if (prefix == NULL)
-        prefix = "";
+        self->prefix = PyUnicode_FromString("");
     else {
         prefix++;
-        len = strlen(prefix);
+        len = Py_UNICODE_strlen(prefix);
         if (prefix[len-1] != SEP) {
             /* add trailing SEP */
             prefix[len] = SEP;
             prefix[len + 1] = '\0';
+            len++;
         }
+        self->prefix = PyUnicode_FromUnicode(prefix, len);
     }
-
-    self->archive = PyUnicode_DecodeFSDefault(buf);
-    if (self->archive == NULL)
-        return -1;
-
-    self->prefix = PyUnicode_DecodeFSDefault(prefix);
     if (self->prefix == NULL)
         return -1;
 
