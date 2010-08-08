@@ -1630,6 +1630,10 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strchr(
     const Py_UNICODE *s, Py_UNICODE c
     );
 
+PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
+    const Py_UNICODE *s, Py_UNICODE c
+    );
+
 #ifdef __cplusplus
 }
 #endif
