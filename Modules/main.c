@@ -733,41 +733,71 @@ Py_GetArgcArgv(int *argc, wchar_t ***argv)
     *argv = orig_argv;
 }
 
+/**
+ * Encode a buffer of wide characters to the locale encoding with the
+ * surrogateescape error handler (characters in range U+DC00..U+DCFF are
+ * converted to bytes 0x00..0xff).
+ *
+ * Return a pointer to a newly allocated byte strings (use PyMem_Free() to free
+ * the memory), or NULL on error (conversion error or memory error).
+ */
 char*
 _Py_wchar2char(const wchar_t *text)
 {
-    char *result, *bytes;
-    size_t i, len, converted, size;
+    const size_t len = wcslen(text);
+    char *result = NULL, *bytes = NULL;
+    size_t i, size, converted;
     wchar_t c;
+    wchar_t buf[2];
 
-    len = wcslen(text);
-    /* FIXME: use better heuristic for the buffer size */
-    size = len * 10 + 1; /* +1 for the nul byte at the end */
-    result = PyMem_Malloc(size);
-    if (result == NULL)
-        return NULL;
-
-    bytes = result;
-    for (i=0; i < len; i++) {
-        c = text[i];
-        if (c >= 0xdc00 && c <= 0xdcff) {
-            /* Surrogate character */
-            *bytes++ = c - 0xdc00;
-            size--;
-            continue;
-        }
-        else {
-            wchar_t buf[2];
-            buf[0] = c;
-            buf[1] = 0;
-            converted = wcstombs(bytes, buf, size);
-            if (converted == (size_t)-1 || converted == 0) {
-                PyMem_Free(result);
-                return NULL;
+    /* The function works in two steps:
+     *  1. compute the length of the output buffer in bytes (size)
+     *  2. write the output bytes */
+    size = 0; 
+    buf[1] = 0;
+    while (1)
+    {
+        for (i=0; i < len; i++) {
+            c = text[i];
+            if (c >= 0xdc00 && c <= 0xdcff) {
+                /* Surrogate character */
+                if (bytes != NULL) {
+                    *bytes++ = c - 0xdc00;
+                    size--;
+                }
+                else
+                    size++;
+                continue;
             }
-            bytes += converted;
-            size -= converted;
+            else {
+                buf[0] = c;
+                if (bytes != NULL)
+                    converted = wcstombs(bytes, buf, size);
+                else
+                    converted = wcstombs(NULL, buf, 0);
+                if (converted == (size_t)-1 || converted == 0) {
+                    if (result != NULL)
+                        PyMem_Free(result);
+                    return NULL;
+                }
+                if (bytes != NULL) {
+                    bytes += converted;
+                    size -= converted;
+                }
+                else
+                    size += converted;
+            }
         }
+        if (result != NULL) {
+            *bytes = 0;
+            break;
+        }
+
+        size += 1; /* nul byte at the end */
+        result = PyMem_Malloc(size);
+        if (result == NULL)
+            return NULL;
+        bytes = result;
     }
     return result;
 }
