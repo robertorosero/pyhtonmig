@@ -387,6 +387,18 @@ used, passsing :func:`PyUnicode_FSConverter` as the conversion function:
 
    .. versionadded:: 3.1
 
+To decode file names during argument parsing, the ``"O&"`` converter should be
+used, passsing :func:`PyUnicode_FSDecoder` as the conversion function:
+
+.. cfunction:: int PyUnicode_FSDecoder(PyObject* obj, void* result)
+
+   Convert *obj* into *result*, using :cdata:`Py_FileSystemDefaultEncoding`,
+   and the ``"surrogateescape"`` error handler. *result* must be a
+   ``PyObject*``, return a :func:`str` object which must be released if it
+   is no longer used.
+
+   .. versionadded:: 3.2
+
 .. cfunction:: PyObject* PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
 
    Decode a null-terminated string using :cdata:`Py_FileSystemDefaultEncoding`
