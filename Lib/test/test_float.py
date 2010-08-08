@@ -394,9 +394,11 @@ class RoundingModeTestCase(unittest.TestCase):
         # to set and get rounding mode
         modes = "tonearest", "upward", "downward", "towardzero"
         for mode in modes:
+            oldmode = float.__getround__()
             float.__setround__(mode)
             self.assertEqual(float.__getround__(), mode)
-
+            float.__setround__(oldmode)
+            self.assertEqual(float.__getround__(), oldmode)
 
 @requires_setformat
 class FormatFunctionsTestCase(unittest.TestCase):
