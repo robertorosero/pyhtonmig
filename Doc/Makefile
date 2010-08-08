@@ -40,7 +40,7 @@ help:
 checkout:
 	@if [ ! -d tools/sphinx ]; then \
 	  echo "Checking out Sphinx..."; \
-	  svn checkout $(SVNROOT)/external/Sphinx-0.6.5/sphinx tools/sphinx; \
+	  svn checkout $(SVNROOT)/external/Sphinx-1.0.1/sphinx tools/sphinx; \
 	fi
 	@if [ ! -d tools/docutils ]; then \
 	  echo "Checking out Docutils..."; \
@@ -120,7 +120,7 @@ clean:
 	-rm -rf tools/docutils
 
 dist:
-	-rm -rf dist
+	rm -rf dist
 	mkdir -p dist
 
 	# archive the HTML
@@ -142,15 +142,17 @@ dist:
 	rm dist/python-$(DISTVERSION)-docs-text.tar
 
 	# archive the A4 latex
-	-rm -r build/latex
+	rm -rf build/latex
 	make latex PAPER=a4
+	-sed -i 's/makeindex/makeindex -q/' build/latex/Makefile
 	(cd build/latex; make clean && make all-pdf && make FMT=pdf zip bz2)
 	cp build/latex/docs-pdf.zip dist/python-$(DISTVERSION)-docs-pdf-a4.zip
 	cp build/latex/docs-pdf.tar.bz2 dist/python-$(DISTVERSION)-docs-pdf-a4.tar.bz2
 
 	# archive the letter latex
-	rm -r build/latex
+	rm -rf build/latex
 	make latex PAPER=letter
+	-sed -i 's/makeindex/makeindex -q/' build/latex/Makefile
 	(cd build/latex; make clean && make all-pdf && make FMT=pdf zip bz2)
 	cp build/latex/docs-pdf.zip dist/python-$(DISTVERSION)-docs-pdf-letter.zip
 	cp build/latex/docs-pdf.tar.bz2 dist/python-$(DISTVERSION)-docs-pdf-letter.tar.bz2

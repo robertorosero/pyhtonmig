@@ -66,18 +66,46 @@ Some smaller changes made to the core Python language are:
 New, Improved, and Deprecated Modules
 =====================================
 
-* The :class:`ftplib.FTP` class now supports the context manager protocol
-  (Contributed by Tarek Ziadé and Giampaolo Rodolà; :issue:`4972`.)
+* The functools module now includes two new decorators for caching function
+  calls, :func:`functools.lru_cache` and :func:`functools.lfu_cache`. These can
+  save repeated queries to an external resource whenever the results are
+  expected to be the same.
 
-* The previously deprecated :func:`string.maketrans` function has been
-  removed in favor of the static methods, :meth:`bytes.maketrans` and
-  :meth:`bytearray.maketrans`.  This change solves the confusion around which
-  types were supported by the :mod:`string` module. Now, :class:`str`,
-  :class:`bytes`, and :class:`bytearray` each have their own **maketrans** and
-  **translate** methods with intermediate translation tables of the
-  appropriate type.
+  For example, adding a caching decorator to a database query function can save
+  database accesses for popular searches::
 
-  (Contributed by Georg Brandl; :issue:`5675`.)
+      @functools.lfu_cache(maxsize=50)
+      def get_phone_number(name):
+          c = conn.cursor()
+          c.execute('SELECT phonenumber FROM phonelist WHERE name=?', (name,))
+          return c.fetchone()[0]
+
+  The caches support two strategies for limiting their size to *maxsize*. The
+  LFU (least-frequently-used) cache works bests when popular queries remain the
+  same over time.  In contrast, the LRU (least-recently-used) cache works best
+  query popularity changes over time (for example, the most popular news
+  articles change each day as newer articles are added).
+
+  The two caching decorators can be composed (nested) to handle hybrid cases.
+  For example, music searches can reflect both long-term patterns (popular
+  classics) and short-term trends (new releases)::
+
+        @functools.lfu_cache(maxsize=500)
+        @functools.lru_cache(maxsize=100)
+        def find_lyrics(song):
+            query = 'http://www.example.com/songlist/%s' % urllib.quote(song)
+            page = urllib.urlopen(query).read()
+            return parse_lyrics(page)
+
+  To help with choosing an effective cache size, the wrapped function
+  is instrumented with two attributes *hits* and *misses*::
+
+        >>> for song in user_requests:
+        ...     find_lyrics(song)
+        >>> print(find_lyrics.hits, find_lyrics.misses)
+        4805 980
+
+  (Contributed by Raymond Hettinger)
 
 * The previously deprecated :func:`contextlib.nested` function has been
   removed in favor of a plain :keyword:`with` statement which can
@@ -88,17 +116,20 @@ New, Improved, and Deprecated Modules
   (Contributed by Georg Brandl and Mattias Brändström;
   `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
 
+* The :class:`ftplib.FTP` class now supports the context manager protocol
+  (Contributed by Tarek Ziadé and Giampaolo Rodolà; :issue:`4972`.)
+
 * The :func:`shutil.copytree` function has two new options:
 
   * *ignore_dangling_symlinks*: when ``symlinks=False`` (meaning that the
     function copies the file pointed to by the symlink, not the symlink
-    itself) this option will silence the error thrown if the file doesn't
+    itself) this option will silence the error raised if the file doesn't
     exist.
 
   * *copy_function*: a callable that will be used to copy files.
     :func:`shutil.copy2` is used by default.
 
-  (Contributed by Tarek Ziade.)
+  (Contributed by Tarek Ziadé.)
 
 * The *sqlite3* module has some new features:
 
@@ -110,6 +141,47 @@ New, Improved, and Deprecated Modules
     :attr:`~sqlite3.Connection.in_transaction` is :const:`True` when there
     are uncommitted changes, and :const:`False` otherwise.  (Contributed
     by R. David Murray and Shashwat Anand, :issue:`8845`.)
+
+* The :mod:`ssl` module has a new class, :class:`~ssl.SSLContext` which
+  serves as a container for various persistent SSL data, such as protocol
+  settings, certificates, private keys, and various other options.
+  The :meth:`~ssl.SSLContext.wrap_socket` method allows to create an
+  SSL socket from such an SSL context.
+  (Added by Antoine Pitrou; :issue:`8550`.)
+
+  The :func:`ssl.wrap_socket` constructor function now takes a
+  *ciphers* argument that's a string listing the encryption algorithms
+  to be allowed; the format of the string is described
+  `in the OpenSSL documentation
+  <http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT>`__.
+  (Added by Antoine Pitrou; :issue:`8322`.)
+
+  Various options have been added to the :mod:`ssl` module, such as
+  :data:`~ssl.OP_NO_SSLv2` which allows to force disabling of the insecure
+  and obsolete SSLv2 protocol.
+  (Added by Antoine Pitrou; :issue:`4870`.)
+
+  Another change makes the extension load all of OpenSSL's ciphers and
+  digest algorithms so that they're all available.  Some SSL
+  certificates couldn't be verified, reporting an "unknown algorithm"
+  error.  (Reported by Beda Kosata, and fixed by Antoine Pitrou;
+  :issue:`8484`.)
+
+  The version of OpenSSL being used is now available as the module
+  attributes :data:`ssl.OPENSSL_VERSION` (a string),
+  :data:`ssl.OPENSSL_VERSION_INFO` (a 5-tuple), and
+  :data:`ssl.OPENSSL_VERSION_NUMBER` (an integer).  (Added by Antoine
+  Pitrou; :issue:`8321`.)
+
+* The previously deprecated :func:`string.maketrans` function has been
+  removed in favor of the static methods, :meth:`bytes.maketrans` and
+  :meth:`bytearray.maketrans`.  This change solves the confusion around which
+  types were supported by the :mod:`string` module. Now, :class:`str`,
+  :class:`bytes`, and :class:`bytearray` each have their own **maketrans** and
+  **translate** methods with intermediate translation tables of the
+  appropriate type.
+
+  (Contributed by Georg Brandl; :issue:`5675`.)
 
 
 Multi-threading

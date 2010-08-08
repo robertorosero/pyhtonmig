@@ -10,20 +10,26 @@ class PlatformTest(unittest.TestCase):
     def test_architecture(self):
         res = platform.architecture()
 
-    if hasattr(os, "symlink"):
-        def test_architecture_via_symlink(self): # issue3762
-            def get(python):
-                cmd = [python, '-c',
-                    'import platform; print(platform.architecture())']
-                p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-                return p.communicate()
-            real = os.path.realpath(sys.executable)
-            link = os.path.abspath(support.TESTFN)
-            os.symlink(real, link)
-            try:
-                self.assertEqual(get(real), get(link))
-            finally:
-                os.remove(link)
+    @support.skip_unless_symlink
+    def test_architecture_via_symlink(self): # issue3762
+        # On Windows, the EXE needs to know where pythonXY.dll is at so we have
+        # to add the directory to the path.
+        if sys.platform == "win32":
+            os.environ["Path"] = "{};{}".format(
+                os.path.dirname(sys.executable), os.environ["Path"])
+
+        def get(python):
+            cmd = [python, '-c',
+                'import platform; print(platform.architecture())']
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            return p.communicate()
+        real = os.path.realpath(sys.executable)
+        link = os.path.abspath(support.TESTFN)
+        os.symlink(real, link)
+        try:
+            self.assertEqual(get(real), get(link))
+        finally:
+            os.remove(link)
 
     def test_platform(self):
         for aliased in (False, True):
@@ -187,6 +193,25 @@ class PlatformTest(unittest.TestCase):
                 self.assertEquals(res[2], 'i386')
             else:
                 self.assertEquals(res[2], 'PowerPC')
+
+
+    @unittest.skipUnless(sys.platform == 'darwin', "OSX only test")
+    def test_mac_ver_with_fork(self):
+        # Issue7895: platform.mac_ver() crashes when using fork without exec
+        #
+        # This test checks that the fix for that issue works.
+        #
+        pid = os.fork()
+        if pid == 0:
+            # child
+            info = platform.mac_ver()
+            os._exit(0)
+
+        else:
+            # parent
+            cpid, sts = os.waitpid(pid, 0)
+            self.assertEquals(cpid, pid)
+            self.assertEquals(sts, 0)
 
     def test_dist(self):
         res = platform.dist()

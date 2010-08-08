@@ -53,7 +53,7 @@ class BaseTestCase(unittest.TestCase):
         # In a debug build, stuff like "[6580 refs]" is printed to stderr at
         # shutdown time.  That frustrates tests trying to check stderr produced
         # from a spawned Python process.
-        actual = re.sub("\[\d+ refs\]\r?\n?$", "", stderr.decode()).encode()
+        actual = support.strip_python_stderr(stderr)
         self.assertEqual(actual, expected, msg)
 
 
@@ -544,6 +544,26 @@ class ProcessTestCase(BaseTestCase):
         output = subprocess.check_output([sys.executable, '-c', code])
         self.assert_(output.startswith(b'Hello World!'), ascii(output))
 
+    def test_handles_closed_on_exception(self):
+        # If CreateProcess exits with an error, ensure the
+        # duplicate output handles are released
+        ifhandle, ifname = mkstemp()
+        ofhandle, ofname = mkstemp()
+        efhandle, efname = mkstemp()
+        try:
+            subprocess.Popen (["*"], stdin=ifhandle, stdout=ofhandle,
+              stderr=efhandle)
+        except OSError:
+            os.close(ifhandle)
+            os.remove(ifname)
+            os.close(ofhandle)
+            os.remove(ofname)
+            os.close(efhandle)
+            os.remove(efname)
+        self.assertFalse(os.path.exists(ifname))
+        self.assertFalse(os.path.exists(ofname))
+        self.assertFalse(os.path.exists(efname))
+
 
 # context manager
 class _SuppressCoreFiles(object):
@@ -558,6 +578,21 @@ class _SuppressCoreFiles(object):
             resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         except (ImportError, ValueError, resource.error):
             pass
+
+        if sys.platform == 'darwin':
+            # Check if the 'Crash Reporter' on OSX was configured
+            # in 'Developer' mode and warn that it will get triggered
+            # when it is.
+            #
+            # This assumes that this context manager is used in tests
+            # that might trigger the next manager.
+            value = subprocess.Popen(['/usr/bin/defaults', 'read',
+                    'com.apple.CrashReporter', 'DialogType'],
+                    stdout=subprocess.PIPE).communicate()[0]
+            if value.strip() == b'developer':
+                print("this tests triggers the Crash Reporter, "
+                      "that is intentional", end='')
+                sys.stdout.flush()
 
     def __exit__(self, *args):
         """Return core file behavior to default."""
@@ -749,6 +784,25 @@ class POSIXProcessTestCase(BaseTestCase):
         rc = subprocess.call(fname)
         os.remove(fname)
         self.assertEqual(rc, 47)
+
+    def test_specific_shell(self):
+        # Issue #9265: Incorrect name passed as arg[0].
+        shells = []
+        for prefix in ['/bin', '/usr/bin/', '/usr/local/bin']:
+            for name in ['bash', 'ksh']:
+                sh = os.path.join(prefix, name)
+                if os.path.isfile(sh):
+                    shells.append(sh)
+        if not shells: # Will probably work for any shell but csh.
+            self.skipTest("bash or ksh required for this test")
+        sh = '/bin/sh'
+        if os.path.isfile(sh) and not os.path.islink(sh):
+            # Test will fail if /bin/sh is a symlink to csh.
+            shells.append(sh)
+        for sh in shells:
+            p = subprocess.Popen("echo $0", executable=sh, shell=True,
+                                 stdout=subprocess.PIPE)
+            self.assertEqual(p.stdout.read().strip(), bytes(sh, 'ascii'))
 
     def _kill_process(self, method, *args):
         # Do not inherit file handles from the parent.

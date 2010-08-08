@@ -65,7 +65,7 @@ Let's begin with some definitions.
 A *namespace* is a mapping from names to objects.  Most namespaces are currently
 implemented as Python dictionaries, but that's normally not noticeable in any
 way (except for performance), and it may change in the future.  Examples of
-namespaces are: the set of built-in names (functions such as :func:`abs`, and
+namespaces are: the set of built-in names (containing functions such as :func:`abs`, and
 built-in exception names); the global names in a module; and the local names in
 a function invocation.  In a sense the set of attributes of an object also form
 a namespace.  The important thing to know about namespaces is that there is
@@ -599,12 +599,12 @@ Note that the mangling rules are designed mostly to avoid accidents; it still is
 possible to access or modify a variable that is considered private.  This can
 even be useful in special circumstances, such as in the debugger.
 
-Notice that code passed to ``exec()``, ``eval()`` or ``execfile()`` does not
-consider the classname of the invoking  class to be the current class; this is
-similar to the effect of the  ``global`` statement, the effect of which is
-likewise restricted to  code that is byte-compiled together.  The same
-restriction applies to ``getattr()``, ``setattr()`` and ``delattr()``, as well
-as when referencing ``__dict__`` directly.
+Notice that code passed to ``exec()`` or ``eval()`` does not consider the
+classname of the invoking class to be the current class; this is similar to the
+effect of the ``global`` statement, the effect of which is likewise restricted
+to code that is byte-compiled together.  The same restriction applies to
+``getattr()``, ``setattr()`` and ``delattr()``, as well as when referencing
+``__dict__`` directly.
 
 
 .. _tut-odds:
@@ -737,7 +737,7 @@ built-in function; this example shows how it all works::
    StopIteration
 
 Having seen the mechanics behind the iterator protocol, it is easy to add
-iterator behavior to your classes.  Define a :meth:`__iter__` method which
+iterator behavior to your classes.  Define an :meth:`__iter__` method which
 returns an object with a :meth:`__next__` method.  If the class defines
 :meth:`__next__`, then :meth:`__iter__` can just return ``self``::
 
@@ -754,7 +754,10 @@ returns an object with a :meth:`__next__` method.  If the class defines
            self.index = self.index - 1
            return self.data[self.index]
 
-   >>> for char in Reverse('spam'):
+   >>> rev = Reverse('spam')
+   >>> iter(rev)
+   <__main__.Reverse object at 0x00A1DB50>
+   >>> for char in rev:
    ...     print(char)
    ...
    m

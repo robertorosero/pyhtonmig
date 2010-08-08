@@ -218,6 +218,16 @@ class TestNamedTuple(unittest.TestCase):
         # test __getnewargs__
         self.assertEqual(t.__getnewargs__(), values)
 
+    def test_repr(self):
+        with support.captured_stdout() as template:
+            A = namedtuple('A', 'x', verbose=True)
+        self.assertEqual(repr(A(1)), 'A(x=1)')
+        # repr should show the name of the subclass
+        class B(A):
+            pass
+        self.assertEqual(repr(B(1)), 'B(x=1)')
+
+
 class ABCTestCase(unittest.TestCase):
 
     def validate_abstract_methods(self, abc, *names):
@@ -757,6 +767,19 @@ class TestOrderedDict(unittest.TestCase):
         od = OrderedDict()
         od.update([('a', 1), ('b', 2), ('c', 9), ('d', 4)], c=3, e=5)
         self.assertEqual(list(od.items()), pairs)                                   # mixed input
+
+        # Issue 9137: Named argument called 'other' or 'self'
+        # shouldn't be treated specially.
+        od = OrderedDict()
+        od.update(self=23)
+        self.assertEqual(list(od.items()), [('self', 23)])
+        od = OrderedDict()
+        od.update(other={})
+        self.assertEqual(list(od.items()), [('other', {})])
+        od = OrderedDict()
+        od.update(red=5, blue=6, other=7, self=8)
+        self.assertEqual(sorted(list(od.items())),
+                         [('blue', 6), ('other', 7), ('red', 5), ('self', 8)])
 
         # Make sure that direct calls to update do not clear previous contents
         # add that updates items are not moved to the end

@@ -390,7 +390,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             sys.exit(0)
         else:
             print(("No handler for option {}.  Please report this as a bug "
-                  "at http://bugs.python.org.").format(o), file=sys.stderr)
+                   "at http://bugs.python.org.").format(o), file=sys.stderr)
             sys.exit(1)
     if single and fromfile:
         usage("-s and -f don't go together!")
@@ -514,8 +514,12 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     if bad:
                         return
         tests = test_forever()
+        test_count = ''
+        test_count_width = 3
     else:
         tests = iter(selected)
+        test_count = '/{}'.format(len(selected))
+        test_count_width = len(test_count) - 1
 
     if use_mp:
         try:
@@ -559,8 +563,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         output.put((None, None, None, None))
                         return
                     result = json.loads(result)
-                    if not quiet:
-                        stdout = test+'\n'+stdout
                     output.put((test, stdout.rstrip(), stderr.rstrip(), result))
             except BaseException:
                 output.put((None, None, None, None))
@@ -569,12 +571,16 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         for worker in workers:
             worker.start()
         finished = 0
+        test_index = 1
         try:
             while finished < use_mp:
                 test, stdout, stderr, result = output.get()
                 if test is None:
                     finished += 1
                     continue
+                if not quiet:
+                    print("[{1:{0}}{2}] {3}".format(
+                        test_count_width, test_index, test_count, test))
                 if stdout:
                     print(stdout)
                 if stderr:
@@ -583,15 +589,17 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     assert result[1] == 'KeyboardInterrupt'
                     raise KeyboardInterrupt   # What else?
                 accumulate_result(test, result)
+                test_index += 1
         except KeyboardInterrupt:
             interrupted = True
             pending.close()
         for worker in workers:
             worker.join()
     else:
-        for test in tests:
+        for test_index, test in enumerate(tests, 1):
             if not quiet:
-                print(test)
+                print("[{1:{0}}{2}] {3}".format(
+                    test_count_width, test_index, test_count, test))
                 sys.stdout.flush()
             if trace:
                 # If we're tracing code coverage, then we don't exit with status

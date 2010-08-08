@@ -446,7 +446,9 @@ class _Environ(MutableMapping):
         return len(self.data)
 
     def __repr__(self):
-        return 'environ({!r})'.format(self.data)
+        return 'environ({{{}}})'.format(', '.join(
+            ('{!r}: {!r}'.format(self.decodekey(key), self.decodevalue(value))
+            for key, value in self.data.items())))
 
     def copy(self):
         return dict(self)
@@ -531,7 +533,8 @@ if supports_bytes_environ:
         The optional second argument can specify an alternate default.
         key, default and the result are bytes."""
         return environb.get(key, default)
-    __all__.append("getenvb")
+
+    __all__.extend(("environb", "getenvb"))
 
 def fsencode(value):
     """Encode value for use in the file system, environment variables

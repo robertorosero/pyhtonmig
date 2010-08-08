@@ -63,6 +63,7 @@ Reimer Behrends
 Ben Bell
 Thomas Bellman
 Alexander Belopolsky
+Eli Bendersky
 Andrew Bennetts
 Andy Bensky
 Michel Van den Bergh
@@ -97,6 +98,7 @@ Monty Brandenberg
 Georg Brandl
 Christopher Brannon
 Terrence Brannon
+Brian Brazil
 Dave Brennan
 Tom Bridgman
 Richard Brodie
@@ -128,6 +130,7 @@ Charles Cazabon
 Per Cederqvist
 Octavian Cerna
 Pascal Chambon
+John Chandler
 Hye-Shik Chang
 Jeffrey Chang
 Mitch Chapman
@@ -145,11 +148,13 @@ Tom Christiansen
 Vadim Chugunov
 David Cinege
 Mike Clarkson
+Andrew Clegg
 Brad Clements
 Steve Clift
 Nick Coghlan
 Josh Cogliati
 Dave Cole
+Terrence Cole
 Benjamin Collar
 Jeffery Collins
 Robert Collins
@@ -158,6 +163,7 @@ Geremy Condra
 Juan José Conti
 Matt Conway
 David M. Cooke
+Jason R. Coombs
 Greg Copeland
 Aldo Cortesi
 David Costanzo
@@ -175,6 +181,7 @@ Drew Csillag
 Joaquin Cuenca Abela
 John Cugini
 Tom Culliton
+Antonio Cuni
 Brian Curtin
 Lisandro Dalcin
 Andrew Dalke
@@ -191,6 +198,7 @@ Erik Demaine
 Roger Dev
 Raghuram Devarakonda
 Caleb Deveraux
+Catherine Devlin
 Toby Dickenson
 Mark Dickinson
 Jack Diederich
@@ -443,6 +451,7 @@ Andrew Kuchling
 Vladimir Kushnir
 Cameron Laird
 Torsten Landschoff
+Łukasz Langa
 Tino Lange
 Andrew Langmead
 Detlef Lannert
@@ -452,6 +461,7 @@ Ben Laurie
 Simon Law
 Chris Lawrence
 Brian Leair
+James Lee
 John J. Lee
 Inyeol Lee
 Thomas Lee
@@ -472,6 +482,7 @@ Robert van Liere
 Ross Light
 Shawn Ligocki
 Martin Ligr
+Grant Limberg
 Christopher Lindblad
 Bjorn Lindqvist
 Per Lindqvist
@@ -581,6 +592,7 @@ Grant Olson
 Piet van Oostrum
 Jason Orendorff
 Douglas Orr
+Michele Orrù
 Denis S. Otkidach
 Michael Otteneder
 R. M. Oudkerk
@@ -792,6 +804,7 @@ John Tromp
 Jason Trowbridge
 Anthony Tuininga
 Stephen Turner
+Theodore Turocy
 Bill Tutt
 Doobee R. Tzeck
 Eren Türkay
@@ -843,6 +856,7 @@ Felix Wiemann
 Gerry Wiener
 Frank Wierzbicki
 Bryce "Zooko" Wilcox-O'Hearn
+Jason Williams
 John Williams
 Sue Williams
 Gerald S. Williams
@@ -883,3 +897,4 @@ Siebren van der Zee
 Uwe Zessin
 Tarek Ziadé
 Peter Åstrand
+Alexander Shigin

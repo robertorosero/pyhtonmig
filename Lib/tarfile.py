@@ -55,6 +55,15 @@ try:
 except ImportError:
     grp = pwd = None
 
+# os.symlink on Windows prior to 6.0 raises NotImplementedError
+symlink_exception = (AttributeError, NotImplementedError)
+try:
+    # WindowsError (1314) will be raised if the caller does not hold the
+    # SeCreateSymbolicLinkPrivilege privilege
+    symlink_exception += (WindowsError,)
+except NameError:
+    pass
+
 # from tarfile import *
 __all__ = ["TarFile", "TarInfo", "is_tarfile", "TarError"]
 
@@ -2273,7 +2282,7 @@ class TarFile(object):
           (platform limitation), we try to make a copy of the referenced file
           instead of a link.
         """
-        if hasattr(os, "symlink") and hasattr(os, "link"):
+        try:
             # For systems that support symbolic and hard links.
             if tarinfo.issym():
                 os.symlink(tarinfo.linkname, targetpath)
@@ -2282,10 +2291,17 @@ class TarFile(object):
                 if os.path.exists(tarinfo._link_target):
                     os.link(tarinfo._link_target, targetpath)
                 else:
-                    self._extract_member(self._find_link_target(tarinfo), targetpath)
+                    self._extract_mem
+        except symlink_exception:
+            if tarinfo.issym():
+                linkpath = os.path.join(os.path.dirname(tarinfo.name),
+                                        tarinfo.linkname)
+            else:
+                linkpath = tarinfo.linkname
         else:
             try:
-                self._extract_member(self._find_link_target(tarinfo), targetpath)
+                self._extract_member(self._find_link_target(tarinfo),
+                                     targetpath)
             except KeyError:
                 raise ExtractError("unable to resolve link inside archive")
 

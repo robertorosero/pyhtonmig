@@ -995,7 +995,7 @@ directories.
    errors are ignored (apart from being reported to ``sys.stdout`` if *verbose* is
    true).
 
-**\*\*** Some of this could be replaced with the shutil module? **\*\***
+.. XXX Some of this could be replaced with the shutil module?
 
 
 :mod:`distutils.file_util` --- Single file operations
@@ -1311,9 +1311,7 @@ provides the following additional features:
   the "negative alias" of :option:`--verbose`, then :option:`--quiet` on the
   command line sets *verbose* to false.
 
-**\*\*** Should be replaced with :mod:`optik` (which is also now known as
-:mod:`optparse` in Python 2.3 and later). **\*\***
-
+.. XXX Should be replaced with optparse
 
 .. function:: fancy_getopt(options, negative_opt, object, args)
 
@@ -1941,6 +1939,19 @@ This module supplies the abstract base class :class:`Command`.
 
 The ``register`` command registers the package with the Python Package  Index.
 This is described in more detail in :pep:`301`.
+
+.. % todo
+
+:mod:`distutils.command.check` --- Check the meta-data of a package
+===================================================================
+
+.. module:: distutils.command.check
+   :synopsis: Check the metadata of a package
+
+
+The ``check`` command performs some tests on the meta-data of a package.
+For example, it verifies that all required meta-data are provided as
+the arguments passed to the :func:`setup` function.
 
 .. % todo
 

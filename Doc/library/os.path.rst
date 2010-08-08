@@ -207,7 +207,9 @@ applications should use string objects to access all files.
 .. function:: normpath(path)
 
    Normalize a pathname.  This collapses redundant separators and up-level
-   references so that ``A//B``, ``A/./B`` and ``A/foo/../B`` all become ``A/B``.
+   references so that ``A//B``, ``A/B/``, ``A/./B`` and ``A/foo/../B`` all become
+   ``A/B``.
+
    It does not normalize the case (use :func:`normcase` for that).  On Windows, it
    converts forward slashes to backward slashes. It should be understood that this
    may change the meaning of the path if it contains symbolic links!
@@ -231,11 +233,18 @@ applications should use string objects to access all files.
 
 .. function:: samefile(path1, path2)
 
-   Return ``True`` if both pathname arguments refer to the same file or directory
-   (as indicated by device number and i-node number). Raise an exception if a
-   :func:`os.stat` call on either pathname fails.
+   Return ``True`` if both pathname arguments refer to the same file or directory.
+   On Unix, this is determined by the device number and i-node number and raises an
+   exception if a :func:`os.stat` call on either pathname fails.
 
-   Availability: Unix.
+   On Windows, two files are the same if they resolve to the same final path
+   name using the Windows API call GetFinalPathNameByHandle. This function
+   raises an exception if handles cannot be obtained to either file.
+
+   Availability: Windows, Unix.
+
+   .. versionchanged:: 3.2
+      Added Windows support.
 
 
 .. function:: sameopenfile(fp1, fp2)

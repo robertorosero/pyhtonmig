@@ -69,6 +69,7 @@ extern double copysign(double, double);
 
 static const double pi = 3.141592653589793238462643383279502884197;
 static const double sqrtpi = 1.772453850905516027298167483341145182798;
+static const double logpi = 1.144729885849400174143427351353058711647;
 
 static double
 sinpi(double x)
@@ -356,20 +357,15 @@ m_lgamma(double x)
     if (absx < 1e-20)
         return -log(absx);
 
-    /* Lanczos' formula */
-    if (x > 0.0) {
-        /* we could save a fraction of a ulp in accuracy by having a
-           second set of numerator coefficients for lanczos_sum that
-           absorbed the exp(-lanczos_g) term, and throwing out the
-           lanczos_g subtraction below; it's probably not worth it. */
-        r = log(lanczos_sum(x)) - lanczos_g +
-            (x-0.5)*(log(x+lanczos_g-0.5)-1);
-    }
-    else {
-        r = log(pi) - log(fabs(sinpi(absx))) - log(absx) -
-            (log(lanczos_sum(absx)) - lanczos_g +
-             (absx-0.5)*(log(absx+lanczos_g-0.5)-1));
-    }
+    /* Lanczos' formula.  We could save a fraction of a ulp in accuracy by
+       having a second set of numerator coefficients for lanczos_sum that
+       absorbed the exp(-lanczos_g) term, and throwing out the lanczos_g
+       subtraction below; it's probably not worth it. */
+    r = log(lanczos_sum(absx)) - lanczos_g;
+    r += (absx - 0.5) * (log(absx + lanczos_g - 0.5) - 1);
+    if (x < 0.0)
+        /* Use reflection formula to get value for negative x. */
+        r = logpi - log(fabs(sinpi(absx))) - log(absx) - r;
     if (Py_IS_INFINITY(r))
         errno = ERANGE;
     return r;
@@ -900,7 +896,7 @@ FUNC1A(gamma, m_tgamma,
       "gamma(x)\n\nGamma function at x.")
 FUNC1A(lgamma, m_lgamma,
       "lgamma(x)\n\nNatural logarithm of absolute value of Gamma function at x.")
-FUNC1(log1p, m_log1p, 1,
+FUNC1(log1p, m_log1p, 0,
       "log1p(x)\n\nReturn the natural logarithm of 1+x (base e).\n"
       "The result is computed in a way which is accurate for x near zero.")
 FUNC1(sin, sin, 0,
@@ -1174,7 +1170,7 @@ count_set_bits(unsigned long n)
  * http://www.luschny.de/math/factorial/binarysplitfact.html
  *
  * Faster algorithms exist, but they're more complicated and depend on
- * a fast prime factoriazation algorithm.
+ * a fast prime factorization algorithm.
  *
  * Notes on the algorithm
  * ----------------------
@@ -1822,6 +1818,19 @@ PyDoc_STRVAR(math_radians_doc,
 Convert angle x from degrees to radians.");
 
 static PyObject *
+math_isfinite(PyObject *self, PyObject *arg)
+{
+    double x = PyFloat_AsDouble(arg);
+    if (x == -1.0 && PyErr_Occurred())
+        return NULL;
+    return PyBool_FromLong((long)Py_IS_FINITE(x));
+}
+
+PyDoc_STRVAR(math_isfinite_doc,
+"isfinite(x) -> bool\n\n\
+Return True if x is neither an infinity nor a NaN, and False otherwise.");
+
+static PyObject *
 math_isnan(PyObject *self, PyObject *arg)
 {
     double x = PyFloat_AsDouble(arg);
@@ -1832,7 +1841,7 @@ math_isnan(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_isnan_doc,
 "isnan(x) -> bool\n\n\
-Check if float x is not a number (NaN).");
+Return True if x is a NaN (not a number), and False otherwise.");
 
 static PyObject *
 math_isinf(PyObject *self, PyObject *arg)
@@ -1845,7 +1854,7 @@ math_isinf(PyObject *self, PyObject *arg)
 
 PyDoc_STRVAR(math_isinf_doc,
 "isinf(x) -> bool\n\n\
-Check if float x is infinite (positive or negative).");
+Return True if x is a positive or negative infinity, and False otherwise.");
 
 static PyMethodDef math_methods[] = {
     {"acos",            math_acos,      METH_O,         math_acos_doc},
@@ -1872,6 +1881,7 @@ static PyMethodDef math_methods[] = {
     {"fsum",            math_fsum,      METH_O,         math_fsum_doc},
     {"gamma",           math_gamma,     METH_O,         math_gamma_doc},
     {"hypot",           math_hypot,     METH_VARARGS,   math_hypot_doc},
+    {"isfinite",        math_isfinite,  METH_O,         math_isfinite_doc},
     {"isinf",           math_isinf,     METH_O,         math_isinf_doc},
     {"isnan",           math_isnan,     METH_O,         math_isnan_doc},
     {"ldexp",           math_ldexp,     METH_VARARGS,   math_ldexp_doc},

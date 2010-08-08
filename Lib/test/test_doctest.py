@@ -980,6 +980,35 @@ unexpected exception:
         ZeroDivisionError: integer division or modulo by zero
     TestResults(failed=1, attempted=1)
 """
+    def displayhook(): r"""
+Test that changing sys.displayhook doesn't matter for doctest.
+
+    >>> import sys
+    >>> orig_displayhook = sys.displayhook
+    >>> def my_displayhook(x):
+    ...     print('hi!')
+    >>> sys.displayhook = my_displayhook
+    >>> def f():
+    ...     '''
+    ...     >>> 3
+    ...     3
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> r = doctest.DocTestRunner(verbose=False).run(test)
+    >>> post_displayhook = sys.displayhook
+
+    We need to restore sys.displayhook now, so that we'll be able to test
+    results.
+
+    >>> sys.displayhook = orig_displayhook
+
+    Ok, now we can check that everything is ok.
+
+    >>> r
+    TestResults(failed=0, attempted=1)
+    >>> post_displayhook is my_displayhook
+    True
+"""
     def optionflags(): r"""
 Tests of `DocTestRunner`'s option flag handling.
 
@@ -1869,7 +1898,7 @@ def test_pdb_set_trace_nested():
     > <doctest foo[1]>(1)<module>()
     -> calls_set_trace()
     (Pdb) print(foo)
-    *** NameError: NameError("name 'foo' is not defined",)
+    *** NameError: name 'foo' is not defined
     (Pdb) continue
     TestResults(failed=0, attempted=2)
 """

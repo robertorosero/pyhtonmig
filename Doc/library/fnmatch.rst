@@ -70,6 +70,8 @@ patterns.
 
    Return the shell-style *pattern* converted to a regular expression.
 
+   Be aware there is no way to quote meta-characters.
+
    Example:
 
       >>> import fnmatch, re
@@ -80,6 +82,13 @@ patterns.
       >>> reobj = re.compile(regex)
       >>> reobj.match('foobar.txt')
       <_sre.SRE_Match object at 0x...>
+
+
+.. function:: purge()
+
+   Clear the internal pattern cache.
+
+   .. versionadded:: 3.2
 
 
 .. seealso::

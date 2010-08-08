@@ -484,7 +484,7 @@ bail:
 }
 
 PyDoc_STRVAR(pydoc_scanstring,
-    "scanstring(basestring, end, strict=True) -> (bytes, end)\n"
+    "scanstring(string, end, strict=True) -> (string, end)\n"
     "\n"
     "Scan the string s for a JSON string. End is the index of the\n"
     "character in s after the quote that started the JSON string.\n"
@@ -512,7 +512,7 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     }
     else {
         PyErr_Format(PyExc_TypeError,
-                     "first argument must be a string or bytes, not %.80s",
+                     "first argument must be a string, not %.80s",
                      Py_TYPE(pystr)->tp_name);
         return NULL;
     }
@@ -520,7 +520,7 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
 }
 
 PyDoc_STRVAR(pydoc_encode_basestring_ascii,
-    "encode_basestring_ascii(basestring) -> bytes\n"
+    "encode_basestring_ascii(string) -> string\n"
     "\n"
     "Return an ASCII-only JSON representation of a Python string"
 );
@@ -1454,7 +1454,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         else {
             /* TODO: include repr of key */
-            PyErr_SetString(PyExc_ValueError, "keys must be a string");
+            PyErr_SetString(PyExc_TypeError, "keys must be a string");
             goto bail;
         }
 

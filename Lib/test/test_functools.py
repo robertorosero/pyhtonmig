@@ -4,6 +4,7 @@ import unittest
 from test import support
 from weakref import proxy
 import pickle
+from random import choice
 
 @staticmethod
 def PythonPartial(func, *args, **keywords):
@@ -181,11 +182,11 @@ class TestUpdateWrapper(unittest.TestCase):
                 self.assertTrue(wrapped_attr[key] is wrapper_attr[key])
 
     def _default_update(self):
-        def f():
+        def f(a:'This is a new annotation'):
             """This is a test"""
             pass
         f.attr = 'This is also a test'
-        def wrapper():
+        def wrapper(b:'This is the prior annotation'):
             pass
         functools.update_wrapper(wrapper, f)
         return wrapper, f
@@ -195,6 +196,8 @@ class TestUpdateWrapper(unittest.TestCase):
         self.check_wrapper(wrapper, f)
         self.assertEqual(wrapper.__name__, 'f')
         self.assertEqual(wrapper.attr, 'This is also a test')
+        self.assertEqual(wrapper.__annotations__['a'], 'This is a new annotation')
+        self.assertNotIn('b', wrapper.__annotations__)
 
     @unittest.skipIf(sys.flags.optimize >= 2,
                      "Docstrings are omitted with -O2 and above")
@@ -213,6 +216,7 @@ class TestUpdateWrapper(unittest.TestCase):
         self.check_wrapper(wrapper, f, (), ())
         self.assertEqual(wrapper.__name__, 'wrapper')
         self.assertEqual(wrapper.__doc__, None)
+        self.assertEqual(wrapper.__annotations__, {})
         self.assertFalse(hasattr(wrapper, 'attr'))
 
     def test_selective_update(self):
@@ -239,6 +243,7 @@ class TestUpdateWrapper(unittest.TestCase):
         functools.update_wrapper(wrapper, max)
         self.assertEqual(wrapper.__name__, 'max')
         self.assertTrue(wrapper.__doc__.startswith('max('))
+        self.assertEqual(wrapper.__annotations__, {})
 
 class TestWraps(TestUpdateWrapper):
 
@@ -454,6 +459,50 @@ class TestTotalOrdering(unittest.TestCase):
             class A:
                 pass
 
+class TestLRU(unittest.TestCase):
+
+    def test_lru(self):
+        def orig(x, y):
+            return 3*x+y
+        f = functools.lru_cache(maxsize=20)(orig)
+
+        domain = range(5)
+        for i in range(1000):
+            x, y = choice(domain), choice(domain)
+            actual = f(x, y)
+            expected = orig(x, y)
+            self.assertEquals(actual, expected)
+        self.assert_(f.hits > f.misses)
+        self.assertEquals(f.hits + f.misses, 1000)
+
+        f.clear()   # test clearing
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 0)
+        f(x, y)
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 1)
+
+    def test_lfu(self):
+        def orig(x, y):
+            return 3*x+y
+        f = functools.lfu_cache(maxsize=20)(orig)
+
+        domain = range(5)
+        for i in range(1000):
+            x, y = choice(domain), choice(domain)
+            actual = f(x, y)
+            expected = orig(x, y)
+            self.assertEquals(actual, expected)
+        self.assert_(f.hits > f.misses)
+        self.assertEquals(f.hits + f.misses, 1000)
+
+        f.clear()   # test clearing
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 0)
+        f(x, y)
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 1)
+
 def test_main(verbose=None):
     test_classes = (
         TestPartial,
@@ -461,7 +510,8 @@ def test_main(verbose=None):
         TestPythonPartial,
         TestUpdateWrapper,
         TestWraps,
-        TestReduce
+        TestReduce,
+        TestLRU,
     )
     support.run_unittest(*test_classes)
 

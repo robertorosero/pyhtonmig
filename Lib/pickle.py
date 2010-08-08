@@ -1034,19 +1034,15 @@ class _Unpickler:
     def _instantiate(self, klass, k):
         args = tuple(self.stack[k+1:])
         del self.stack[k:]
-        instantiated = False
-        if (not args and
-                isinstance(klass, type) and
-                not hasattr(klass, "__getinitargs__")):
-            value = _EmptyClass()
-            value.__class__ = klass
-            instantiated = True
-        if not instantiated:
+        if (args or not isinstance(klass, type) or
+            hasattr(klass, "__getinitargs__")):
             try:
                 value = klass(*args)
             except TypeError as err:
                 raise TypeError("in constructor for %s: %s" %
                                 (klass.__name__, str(err)), sys.exc_info()[2])
+        else:
+            value = klass.__new__(klass)
         self.append(value)
 
     def load_inst(self):
@@ -1239,14 +1235,7 @@ class _Unpickler:
         raise _Stop(value)
     dispatch[STOP[0]] = load_stop
 
-# Helper class for load_inst/load_obj
-
-class _EmptyClass:
-    pass
-
-# Encode/decode longs in linear time.
-
-import binascii as _binascii
+# Encode/decode longs.
 
 def encode_long(x):
     r"""Encode a long to a two's complement little-endian binary string.
@@ -1333,4 +1322,26 @@ def _test():
     return doctest.testmod()
 
 if __name__ == "__main__":
-    _test()
+    import sys, argparse
+    parser = argparse.ArgumentParser(
+        description='display contents of the pickle files')
+    parser.add_argument(
+        'pickle_file', type=argparse.FileType('br'),
+        nargs='*', help='the pickle file')
+    parser.add_argument(
+        '-t', '--test', action='store_true',
+        help='run self-test suite')
+    parser.add_argument(
+        '-v', action='store_true',
+        help='run verbosely; only affects self-test run')
+    args = parser.parse_args()
+    if args.test:
+        _test()
+    else:
+        if not args.pickle_file:
+            parser.print_help()
+        else:
+            import pprint
+            for f in args.pickle_file:
+                obj = load(f)
+                pprint.pprint(obj)

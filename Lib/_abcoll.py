@@ -18,11 +18,6 @@ __all__ = ["Hashable", "Iterable", "Iterator",
            "MappingView", "KeysView", "ItemsView", "ValuesView",
            "Sequence", "MutableSequence",
            "ByteString",
-           "bytearray_iterator", "bytes_iterator", "dict_itemiterator",
-           "dict_items", "dict_keyiterator", "dict_keys", "dict_proxy",
-           "dict_valueiterator", "dict_values", "list_iterator",
-           "list_reverseiterator", "range_iterator", "set_iterator",
-           "str_iterator", "tuple_iterator", "zip_iterator",
            ]
 
 
@@ -480,7 +475,15 @@ class MutableMapping(Mapping):
         except KeyError:
             pass
 
-    def update(self, other=(), **kwds):
+    def update(*args, **kwds):
+        if len(args) > 2:
+            raise TypeError("update() takes at most 2 positional "
+                            "arguments ({} given)".format(len(args)))
+        elif not args:
+            raise TypeError("update() takes at least 1 argument (0 given)")
+        self = args[0]
+        other = args[1] if len(args) >= 2 else ()
+
         if isinstance(other, Mapping):
             for key in other:
                 self[key] = other[key]

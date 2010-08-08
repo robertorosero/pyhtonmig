@@ -37,7 +37,61 @@ The :mod:`functools` module defines the following functions:
 
    .. versionadded:: 3.2
 
-.. function:: total_ordering(cls)
+.. decorator:: lfu_cache(maxsize)
+
+   Decorator to wrap a function with a memoizing callable that saves up to the
+   *maxsize* most frequent calls.  It can save time when an expensive or I/O
+   bound function is periodically called with the same arguments.
+
+   The *maxsize* parameter defaults to 100.  Since a dictionary is used to cache
+   results, the positional and keyword arguments to the function must be
+   hashable.
+
+   The wrapped function is instrumented with two attributes, :attr:`hits`
+   and :attr:`misses` which count the number of successful or unsuccessful
+   cache lookups.  These statistics are helpful for tuning the *maxsize*
+   parameter and for measuring the cache's effectiveness.
+
+   The wrapped function also has a :attr:`clear` attribute which can be
+   called (with no arguments) to clear the cache.
+
+   A `LFU (least frequently used) cache
+   <http://en.wikipedia.org/wiki/Cache_algorithms#Least-Frequently_Used>`_
+   is indicated when the pattern of calls does not change over time, when
+   more the most common calls already seen are the best predictors of the
+   most common upcoming calls (for example, a phonelist of popular
+   help-lines may have access patterns that persist over time).
+
+   .. versionadded:: 3.2
+
+.. decorator:: lru_cache(maxsize)
+
+   Decorator to wrap a function with a memoizing callable that saves up to the
+   *maxsize* most recent calls.  It can save time when an expensive or I/O bound
+   function is periodically called with the same arguments.
+
+   The *maxsize* parameter defaults to 100.  Since a dictionary is used to cache
+   results, the positional and keyword arguments to the function must be
+   hashable.
+
+   The wrapped function is instrumented with two attributes, :attr:`hits`
+   and :attr:`misses` which count the number of successful or unsuccessful
+   cache lookups.  These statistics are helpful for tuning the *maxsize*
+   parameter and for measuring the cache's effectiveness.
+
+   The wrapped function also has a :attr:`clear` attribute which can be
+   called (with no arguments) to clear the cache.
+
+   A `LRU (least recently used) cache
+   <http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used>`_
+   is indicated when the pattern of calls changes over time, such as
+   when more recent calls are the best predictors of upcoming calls
+   (for example, the most popular articles on a news server tend to
+   change every day).
+
+   .. versionadded:: 3.2
+
+.. decorator:: total_ordering
 
    Given a class defining one or more rich comparison ordering methods, this
    class decorator supplies the rest.  This simplifies the effort involved
@@ -111,9 +165,9 @@ The :mod:`functools` module defines the following functions:
    attributes of the wrapper function are updated with the corresponding attributes
    from the original function. The default values for these arguments are the
    module level constants *WRAPPER_ASSIGNMENTS* (which assigns to the wrapper
-   function's *__name__*, *__module__* and *__doc__*, the documentation string) and
-   *WRAPPER_UPDATES* (which updates the wrapper function's *__dict__*, i.e. the
-   instance dictionary).
+   function's *__name__*, *__module__*, *__annotations__* and *__doc__*, the
+   documentation string) and *WRAPPER_UPDATES* (which updates the wrapper
+   function's *__dict__*, i.e. the instance dictionary).
 
    The main intended use for this function is in :term:`decorator` functions which
    wrap the decorated function and return the wrapper. If the wrapper function is
@@ -122,7 +176,7 @@ The :mod:`functools` module defines the following functions:
    than helpful.
 
 
-.. function:: wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)
+.. decorator:: wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)
 
    This is a convenience function for invoking ``partial(update_wrapper,
    wrapped=wrapped, assigned=assigned, updated=updated)`` as a function decorator

@@ -192,11 +192,13 @@ def fullmodname(path):
         base = path[len(longest) + 1:]
     else:
         base = path
+    # the drive letter is never part of the module name
+    drive, base = os.path.splitdrive(base)
     base = base.replace(os.sep, ".")
     if os.altsep:
         base = base.replace(os.altsep, ".")
     filename, ext = os.path.splitext(base)
-    return filename
+    return filename.lstrip(".")
 
 class CoverageResults:
     def __init__(self, counts=None, calledfuncs=None, infile=None,
@@ -257,7 +259,8 @@ class CoverageResults:
         if self.calledfuncs:
             print()
             print("functions called:")
-            for filename, modulename, funcname in sorted(calls.keys()):
+            calls = self.calledfuncs.keys()
+            for filename, modulename, funcname in sorted(calls):
                 print(("filename: %s, modulename: %s, funcname: %s"
                        % (filename, modulename, funcname)))
 
@@ -490,8 +493,8 @@ class Trace:
         import __main__
         dict = __main__.__dict__
         if not self.donothing:
-            sys.settrace(self.globaltrace)
             threading.settrace(self.globaltrace)
+            sys.settrace(self.globaltrace)
         try:
             exec(cmd, dict, dict)
         finally:
@@ -503,8 +506,8 @@ class Trace:
         if globals is None: globals = {}
         if locals is None: locals = {}
         if not self.donothing:
-            sys.settrace(self.globaltrace)
             threading.settrace(self.globaltrace)
+            sys.settrace(self.globaltrace)
         try:
             exec(cmd, globals, locals)
         finally:
@@ -623,7 +626,7 @@ class Trace:
                 print('%.2f' % (time.time() - self.start_time), end=' ')
             bname = os.path.basename(filename)
             print("%s(%d): %s" % (bname, lineno,
-                                  linecache.getline(filename, lineno)), end=' ')
+                                  linecache.getline(filename, lineno)), end='')
         return self.localtrace
 
     def localtrace_trace(self, frame, why, arg):
@@ -636,7 +639,7 @@ class Trace:
                 print('%.2f' % (time.time() - self.start_time), end=' ')
             bname = os.path.basename(filename)
             print("%s(%d): %s" % (bname, lineno,
-                                  linecache.getline(filename, lineno)), end=' ')
+                                  linecache.getline(filename, lineno)), end='')
         return self.localtrace
 
     def localtrace_count(self, frame, why, arg):
@@ -796,12 +799,16 @@ def main(argv=None):
                   ignoredirs=ignore_dirs, infile=counts_file,
                   outfile=counts_file, timing=timing)
         try:
-            fp = open(progname)
-            try:
-                script = fp.read()
-            finally:
-                fp.close()
-            t.run('exec(%r)' % (script,))
+            with open(progname) as fp:
+                code = compile(fp.read(), progname, 'exec')
+            # try to emulate __main__ namespace as much as possible
+            globs = {
+                '__file__': progname,
+                '__name__': '__main__',
+                '__package__': None,
+                '__cached__': None,
+            }
+            t.runctx(code, globs, globs)
         except IOError as err:
             _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))
         except SystemExit:

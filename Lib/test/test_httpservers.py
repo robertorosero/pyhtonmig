@@ -299,7 +299,7 @@ class CGIHTTPServerTestCase(BaseTestCase):
 
         # The shebang line should be pure ASCII: use symlink if possible.
         # See issue #7668.
-        if hasattr(os, 'symlink'):
+        if support.can_symlink():
             self.pythonexe = os.path.join(self.parent_dir, 'python')
             os.symlink(sys.executable, self.pythonexe)
         else:
@@ -401,13 +401,41 @@ class CGIHTTPServerTestCase(BaseTestCase):
              (res.read(), res.getheader('Content-type'), res.status))
 
 
+class SocketlessRequestHandler(SimpleHTTPRequestHandler):
+    def __init__(self):
+        pass
+
+class SimpleHTTPRequestHandlerTestCase(unittest.TestCase):
+    """ Test url parsing """
+    def setUp(self):
+        self.translated = os.getcwd()
+        self.translated = os.path.join(self.translated, 'filename')
+        self.handler = SocketlessRequestHandler()
+
+    def test_query_arguments(self):
+        path = self.handler.translate_path('/filename')
+        self.assertEqual(path, self.translated)
+        path = self.handler.translate_path('/filename?foo=bar')
+        self.assertEqual(path, self.translated)
+        path = self.handler.translate_path('/filename?a=b&spam=eggs#zot')
+        self.assertEqual(path, self.translated)
+
+    def test_start_with_double_slash(self):
+        path = self.handler.translate_path('//filename')
+        self.assertEqual(path, self.translated)
+        path = self.handler.translate_path('//filename?foo=bar')
+        self.assertEqual(path, self.translated)
+
+
 def test_main(verbose=None):
+    cwd = os.getcwd()
     try:
-        cwd = os.getcwd()
-        support.run_unittest(BaseHTTPServerTestCase,
-                             SimpleHTTPServerTestCase,
-                             CGIHTTPServerTestCase
-                             )
+        support.run_unittest(
+            BaseHTTPServerTestCase,
+            SimpleHTTPServerTestCase,
+            CGIHTTPServerTestCase,
+            SimpleHTTPRequestHandlerTestCase,
+        )
     finally:
         os.chdir(cwd)
 

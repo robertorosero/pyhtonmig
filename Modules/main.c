@@ -253,6 +253,62 @@ static int RunMainFromImporter(wchar_t *filename)
     }
 }
 
+static int
+run_command(wchar_t *command, PyCompilerFlags *cf)
+{
+    PyObject *unicode, *bytes;
+    int ret;
+
+    unicode = PyUnicode_FromWideChar(command, -1);
+    if (unicode == NULL)
+        goto error;
+    bytes = PyUnicode_AsUTF8String(unicode);
+    Py_DECREF(unicode);
+    if (bytes == NULL)
+        goto error;
+    ret = PyRun_SimpleStringFlags(PyBytes_AsString(bytes), cf);
+    Py_DECREF(bytes);
+    return ret != 0;
+
+error:
+    PyErr_Print();
+    return 1;
+}
+
+static int
+run_file(FILE *fp, const wchar_t *filename, PyCompilerFlags *p_cf)
+{
+    PyObject *unicode, *bytes = NULL;
+    char *filename_str;
+    int run;
+
+    /* call pending calls like signal handlers (SIGINT) */
+    if (Py_MakePendingCalls() == -1) {
+        PyErr_Print();
+        return 1;
+    }
+
+    if (filename) {
+        unicode = PyUnicode_FromWideChar(filename, wcslen(filename));
+        if (unicode != NULL) {
+            bytes = PyUnicode_AsUTF8String(unicode);
+            Py_DECREF(unicode);
+        }
+        if (bytes != NULL)
+            filename_str = PyBytes_AsString(bytes);
+        else {
+            PyErr_Clear();
+            filename_str = "<decoding error>";
+        }
+    }
+    else
+        filename_str = "<stdin>";
+
+    run = PyRun_AnyFileExFlags(fp, filename_str, filename != NULL, p_cf);
+    Py_XDECREF(bytes);
+    return run != 0;
+}
+
 
 /* Main program */
 
@@ -564,22 +620,8 @@ Py_Main(int argc, wchar_t **argv)
     }
 
     if (command) {
-        char *commandStr;
-        PyObject *commandObj = PyUnicode_FromWideChar(
-            command, wcslen(command));
+        sts = run_command(command, &cf);
         free(command);
-        if (commandObj != NULL)
-            commandStr = _PyUnicode_AsString(commandObj);
-        else
-            commandStr = NULL;
-        if (commandStr != NULL) {
-            sts = PyRun_SimpleStringFlags(commandStr, &cf) != 0;
-            Py_DECREF(commandObj);
-        }
-        else {
-            PyErr_Print();
-            sts = 1;
-        }
     } else if (module) {
         sts = RunModule(module, 1);
     }
@@ -636,30 +678,8 @@ Py_Main(int argc, wchar_t **argv)
             }
         }
 
-        if (sts==-1) {
-            PyObject *filenameObj = NULL;
-            char *p_cfilename = "<stdin>";
-            if (filename) {
-                filenameObj = PyUnicode_FromWideChar(
-                    filename, wcslen(filename));
-                if (filenameObj != NULL)
-                    p_cfilename = _PyUnicode_AsString(filenameObj);
-                else
-                    p_cfilename = "<decoding error>";
-            }
-            /* call pending calls like signal handlers (SIGINT) */
-            if (Py_MakePendingCalls() == -1) {
-                PyErr_Print();
-                sts = 1;
-            } else {
-                sts = PyRun_AnyFileExFlags(
-                    fp,
-                    p_cfilename,
-                    filename != NULL, &cf) != 0;
-            }
-            Py_XDECREF(filenameObj);
-        }
-
+        if (sts == -1)
+            sts = run_file(fp, filename, &cf);
     }
 
     /* Check this environment variable at the end, to give programs the

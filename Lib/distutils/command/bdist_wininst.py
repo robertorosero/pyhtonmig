@@ -5,16 +5,13 @@ exe-program."""
 
 __revision__ = "$Id$"
 
-import sys
-import os
-
-from sysconfig import get_python_version
-
+import sys, os
 from distutils.core import Command
-from distutils.dir_util import remove_tree
-from distutils.errors import DistutilsOptionError, DistutilsPlatformError
-from distutils import log
 from distutils.util import get_platform
+from distutils.dir_util import create_tree, remove_tree
+from distutils.errors import *
+from distutils.sysconfig import get_python_version
+from distutils import log
 
 class bdist_wininst(Command):
 
@@ -92,7 +89,7 @@ class bdist_wininst(Command):
             short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
                 raise DistutilsOptionError(
-                      "target version can only be %s, or the '--skip_build'" \
+                      "target version can only be %s, or the '--skip-build'" \
                       " option must be specified" % (short_version,))
             self.target_version = short_version
 

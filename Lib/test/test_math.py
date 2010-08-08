@@ -647,15 +647,7 @@ class MathTests(unittest.TestCase):
 
     def testLog1p(self):
         self.assertRaises(TypeError, math.log1p)
-        self.ftest('log1p(1/e -1)', math.log1p(1/math.e-1), -1)
-        self.ftest('log1p(0)', math.log1p(0), 0)
-        self.ftest('log1p(e-1)', math.log1p(math.e-1), 1)
-        self.ftest('log1p(1)', math.log1p(1), math.log(2))
-        self.assertEquals(math.log1p(INF), INF)
-        self.assertRaises(ValueError, math.log1p, NINF)
-        self.assertTrue(math.isnan(math.log1p(NAN)))
         n= 2**90
-        self.assertAlmostEquals(math.log1p(n), 62.383246250395075)
         self.assertAlmostEquals(math.log1p(n), math.log1p(float(n)))
 
     def testLog10(self):
@@ -922,6 +914,15 @@ class MathTests(unittest.TestCase):
         self.assertRaises(TypeError, math.trunc)
         self.assertRaises(TypeError, math.trunc, 1, 2)
         self.assertRaises(TypeError, math.trunc, TestNoTrunc())
+
+    def testIsfinite(self):
+        self.assertTrue(math.isfinite(0.0))
+        self.assertTrue(math.isfinite(-0.0))
+        self.assertTrue(math.isfinite(1.0))
+        self.assertTrue(math.isfinite(-1.0))
+        self.assertFalse(math.isfinite(float("nan")))
+        self.assertFalse(math.isfinite(float("inf")))
+        self.assertFalse(math.isfinite(float("-inf")))
 
     def testIsnan(self):
         self.assertTrue(math.isnan(float("nan")))

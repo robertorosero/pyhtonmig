@@ -42,7 +42,7 @@ Module              Maintainers
 __future__
 __main__            gvanrossum
 _dummy_thread       brett.cannon
-_thread
+_thread             pitrou
 abc
 aifc                r.david.murray
 argparse            bethard
@@ -89,7 +89,7 @@ distutils           tarek
 doctest             tim_one (inactive)
 dummy_threading     brett.cannon
 email               barry, r.david.murray
-encodings           lemburg, loewis
+encodings           lemburg
 errno
 exceptions
 fcntl
@@ -104,7 +104,7 @@ functools
 gc                  pitrou
 getopt
 getpass
-gettext             loewis
+gettext
 glob
 grp
 gzip
@@ -125,7 +125,7 @@ json                bob.ippolito (inactive)
 keyword
 lib2to3             benjamin.peterson
 linecache
-locale              loewis, lemburg
+locale              lemburg
 logging             vsajip
 macpath
 mailbox             andrew.kuchling
@@ -135,7 +135,7 @@ math                mark.dickinson, rhettinger
 mimetypes
 mmap
 modulefinder        theller, jvr
-msilib              loewis
+msilib
 msvcrt
 multiprocessing     jnoller
 netrc
@@ -144,10 +144,10 @@ nntplib
 numbers
 operator
 optparse            aronacher
-os                  loewis
+os
 ossaudiodev
 parser
-pdb
+pdb                 georg.brandl
 pickle              alexandre.vassalotti, pitrou
 pickletools         alexandre.vassalotti
 pipes
@@ -206,33 +206,40 @@ tempfile
 termios
 test
 textwrap
-threading
+threading           pitrou
 time                alexander.belopolsky
 timeit
 tkinter             gpolo
 token               georg.brandl
 tokenize
-trace
+trace               alexander.belopolsky
 traceback           georg.brandl
 tty
 turtle              gregorlingl
 types
-unicodedata         loewis, lemburg, ezio.melotti
+unicodedata         lemburg, ezio.melotti
 unittest            michael.foord
 urllib              orsenthil
 uu
 uuid
 warnings            brett.cannon
 wave
-weakref             fdrake
+weakref             fdrake, pitrou
 webbrowser          georg.brandl
-winreg
+winreg              brian.curtin
 winsound            effbot (inactive)
 wsgiref             pje
 xdrlib
-xml                 loewis
+xml.dom
+xml.dom.minidom
+xml.dom.pulldom
 xml.etree           effbot (inactive)
-xmlrpc              loewis
+xml.parsers.expat
+xml.sax
+xml.sax.handler
+xml.sax.saxutils
+xml.sax.xmlreader
+xmlrpc
 zipfile
 zipimport
 zlib
@@ -277,13 +284,13 @@ GUI
 i18n                lemburg
 import machinery    brett.cannon, ncoghlan
 io                  pitrou, benjamin.peterson
-locale              lemburg, loewis
+locale              lemburg
 mathematics         mark.dickinson, eric.smith, lemburg
 memory management   tim_one, lemburg
 networking          giampaolo.rodola
 packaging           tarek, lemburg
 py3 transition      benjamin.peterson
-release management  tarek, lemburg, benjamin.peterson, barry, loewis,
+release management  tarek, lemburg, benjamin.peterson, barry,
                     gvanrossum, anthonybaxter
 str.format          eric.smith
 time and dates      lemburg

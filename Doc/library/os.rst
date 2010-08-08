@@ -723,7 +723,7 @@ as internal buffering of data.
 
       This function is intended for low-level I/O.  For normal usage, use the
       built-in function :func:`open`, which returns a "file object" with
-      :meth:`~file.read` and :meth:`~file.wprite` methods (and many more).  To
+      :meth:`~file.read` and :meth:`~file.write` methods (and many more).  To
       wrap a file descriptor in a "file object", use :func:`fdopen`.
 
 
@@ -1049,10 +1049,10 @@ Files and Directories
    Availability: Unix.
 
 
-.. function:: listdir(path)
+.. function:: listdir(path='.')
 
    Return a list containing the names of the entries in the directory given by
-   *path*.  The list is in arbitrary order.  It does not include the special
+   *path* (default: ``'.'``).  The list is in arbitrary order.  It does not include the special
    entries ``'.'`` and ``'..'`` even if they are present in the directory.
 
    This function can be called with a bytes or string argument, and returns
@@ -1060,12 +1060,16 @@ Files and Directories
 
    Availability: Unix, Windows.
 
+   .. versionchanged:: 3.2
+      The *path* parameter became optional.
 
 .. function:: lstat(path)
 
    Like :func:`stat`, but do not follow symbolic links.  This is an alias for
-   :func:`stat` on platforms that do not support symbolic links, such as
-   Windows.
+   :func:`stat` on platforms that do not support symbolic links.
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: mkfifo(path[, mode])
@@ -1181,7 +1185,10 @@ Files and Directories
    and the call may raise an UnicodeDecodeError. If the *path* is a bytes
    object, the result will be a bytes object.
 
-   Availability: Unix.
+   Availability: Unix, Windows
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: remove(path)
@@ -1343,7 +1350,27 @@ Files and Directories
 
    Create a symbolic link pointing to *source* named *link_name*.
 
-   Availability: Unix.
+   On Windows, symlink version takes an additional, optional parameter,
+   *target_is_directory*, which defaults to False.
+
+   symlink(source, link_name, target_is_directory=False)
+
+   On Windows, a symlink represents a file or a directory, and does not
+   morph to the target dynamically.  For this reason, when creating a
+   symlink on Windows, if the target is not already present, the symlink
+   will default to being a file symlink.  If *target_is_directory* is set to
+   True, the symlink will be created as a directory symlink.  This
+   parameter is ignored if the target exists (and the symlink is created
+   with the same type as the target).
+
+   Symbolic link support was introduced in Windows 6.0 (Vista). *symlink*
+   will raise a NotImplementedError on Windows versions earlier than 6.0. The
+   SeCreateSymbolicLinkPrivilege is required in order to create symlinks.
+
+   Availability:  Unix, Windows
+
+   .. versionchanged:: 3.2
+      Added support for Windows 6.0 (Vista) symbolic links.
 
 
 .. function:: unlink(path)
@@ -1896,8 +1923,9 @@ written in Python, such as a mail server's external command delivery program.
 
    The :mod:`subprocess` module provides more powerful facilities for spawning new
    processes and retrieving their results; using that module is preferable to using
-   this function.  Use the :mod:`subprocess` module.  Check especially the
-   :ref:`subprocess-replacements` section.
+   this function.  See the
+   :ref:`subprocess-replacements` section in the :mod:`subprocess` documentation
+   for some helpful recipes.
 
    Availability: Unix, Windows.
 

@@ -173,7 +173,7 @@ def _getuserbase():
     if sys.platform == "darwin":
         framework = get_config_var("PYTHONFRAMEWORK")
         if framework:
-            return joinuser("~", "Library", framework, "%d.%d"%(
+            return env_base if env_base else joinuser("~", "Library", framework, "%d.%d"%(
                 sys.version_info[:2]))
 
     return env_base if env_base else joinuser("~", ".local")
@@ -225,6 +225,12 @@ def _parse_makefile(filename, vars=None):
     # do variable interpolation here
     variables = list(notdone.keys())
 
+    # Variables with a 'PY_' prefix in the makefile. These need to
+    # be made available without that prefix through sysconfig.
+    # Special care is needed to ensure that variable expansion works, even
+    # if the expansion uses the name without a prefix.
+    renamed_variables = ('CFLAGS', 'LDFLAGS', 'CPPFLAGS')
+
     while len(variables) > 0:
         for name in tuple(variables):
             value = notdone[name]
@@ -240,8 +246,20 @@ def _parse_makefile(filename, vars=None):
                 elif n in os.environ:
                     # do it like make: fall back to environment
                     item = os.environ[n]
+
+                elif n in renamed_variables:
+                    if name.startswith('PY_') and name[3:] in renamed_variables:
+                        item = ""
+
+                    elif 'PY_' + n in notdone:
+                        found = False
+
+                    else:
+                        item = str(done['PY_' + n])
+
                 else:
                     done[n] = item = ""
+
                 if found:
                     after = value[m.end():]
                     value = value[:m.start()] + item + after
@@ -255,6 +273,15 @@ def _parse_makefile(filename, vars=None):
                         else:
                             done[name] = value
                         variables.remove(name)
+
+                        if name.startswith('PY_') \
+                                and name[3:] in renamed_variables:
+
+                            name = name[3:]
+                            if name not in done:
+                                done[name] = value
+
+
             else:
                 # bogus variable reference; just drop it since we can't deal
                 variables.remove(name)
@@ -653,8 +680,7 @@ def get_platform():
                 cflags = get_config_vars().get('CFLAGS')
 
                 archs = re.findall('-arch\s+(\S+)', cflags)
-                archs.sort()
-                archs = tuple(archs)
+                archs = tuple(sorted(set(archs)))
 
                 if len(archs) == 1:
                     machine = archs[0]

@@ -1,7 +1,7 @@
 # Very rudimentary test of threading module
 
 import test.support
-from test.support import verbose
+from test.support import verbose, strip_python_stderr
 import random
 import re
 import sys
@@ -97,7 +97,8 @@ class ThreadTests(BaseTestCase):
             self.assertTrue(not t.is_alive())
             self.assertNotEqual(t.ident, 0)
             self.assertFalse(t.ident is None)
-            self.assertTrue(re.match('<TestThread\(.*, \w+ -?\d+\)>', repr(t)))
+            self.assertTrue(re.match('<TestThread\(.*, stopped -?\d+\)>',
+                                     repr(t)))
         if verbose:
             print('all tasks done')
         self.assertEqual(numrunning.get(), 0)
@@ -349,7 +350,7 @@ class ThreadTests(BaseTestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(stdout.strip(),
             b"Woke up, sleep function is: <built-in function sleep>")
-        stderr = re.sub(br"^\[\d+ refs\]", b"", stderr, re.MULTILINE).strip()
+        stderr = strip_python_stderr(stderr)
         self.assertEqual(stderr, b"")
 
     def test_enumerate_after_join(self):
@@ -412,6 +413,12 @@ class ThreadTests(BaseTestCase):
         e = threading.Event()
         e.isSet()
         threading.activeCount()
+
+    def test_repr_daemon(self):
+        t = threading.Thread()
+        self.assertFalse('daemon' in repr(t))
+        t.daemon = True
+        self.assertTrue('daemon' in repr(t))
 
 
 class ThreadJoinOnShutdown(BaseTestCase):

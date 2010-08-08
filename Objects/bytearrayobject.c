@@ -33,6 +33,7 @@ _getbytevalue(PyObject* arg, int *value)
         PyObject *index = PyNumber_Index(arg);
         if (index == NULL) {
             PyErr_Format(PyExc_TypeError, "an integer is required");
+            *value = -1;
             return 0;
         }
         face_value = PyLong_AsLong(index);
@@ -42,6 +43,7 @@ _getbytevalue(PyObject* arg, int *value)
     if (face_value < 0 || face_value >= 256) {
         /* this includes the OverflowError in case the long is too large */
         PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
+        *value = -1;
         return 0;
     }
 
@@ -647,6 +649,11 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
 
             if (!_canresize(self))
                 return -1;
+
+            if (slicelen == 0)
+                /* Nothing to do here. */
+                return 0;
+
             if (step < 0) {
                 stop = start + 1;
                 start = stop + step * (slicelen - 1) - 1;
@@ -663,7 +670,7 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
                         self->ob_bytes + cur + 1, lim);
             }
             /* Move the tail of the bytes, in one chunk */
-            cur = start + slicelen*step;
+            cur = start + (size_t)slicelen*step;
             if (cur < (size_t)PyByteArray_GET_SIZE(self)) {
                 memmove(self->ob_bytes + cur - slicelen,
                         self->ob_bytes + cur,
@@ -677,7 +684,8 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
         }
         else {
             /* Assign slice */
-            Py_ssize_t cur, i;
+            Py_ssize_t i;
+            size_t cur;
 
             if (needed != slicelen) {
                 PyErr_Format(PyExc_ValueError,
