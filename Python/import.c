@@ -139,7 +139,7 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 /* Forward */
 FILE* _Py_fopen(PyObject *unicode, const char *mode);
 #ifdef HAVE_STAT
-static int _Py_stat(PyObject *unicode, struct stat *statbuf);
+int _Py_stat(PyObject *unicode, struct stat *statbuf);
 static int find_init_module(PyObject *);
 #endif
 
@@ -2165,7 +2165,7 @@ _Py_fopen(PyObject *unicode, const char *mode)
 
 
 #ifdef HAVE_STAT
-static int
+int
 _Py_stat(PyObject *unicode, struct stat *statbuf)
 {
 #ifdef MS_WINDOWS
@@ -3869,8 +3869,7 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         /* it exists */
         if (S_ISDIR(statbuf.st_mode)) {
             /* it's a directory */
-            PyErr_SetString(PyExc_ImportError,
-                            "existing directory");
+            PyErr_SetString(PyExc_ImportError, "existing directory");
             return -1;
         }
     }
@@ -3905,8 +3904,7 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
         /* it exists */
         if (rv & FILE_ATTRIBUTE_DIRECTORY) {
             /* it's a directory */
-            PyErr_SetString(PyExc_ImportError,
-                            "existing directory");
+            PyErr_SetString(PyExc_ImportError, "existing directory");
             return -1;
         }
     }

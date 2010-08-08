@@ -132,8 +132,11 @@ PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 PyAPI_FUNC(wchar_t *) _Py_char2wchar(char *);
 PyAPI_FUNC(char*) _Py_wchar2char(const wchar_t *text);
 
-/* _Py_fopen lives in import.c */
+/* _Py_stat and _Py_fopen live in import.c */
 PyAPI_FUNC(FILE*) _Py_fopen(PyObject *unicode, const char *mode);
+#ifdef HAVE_STAT
+int _Py_stat(PyObject *unicode, struct stat *statbuf);
+#endif
 
 #ifdef __cplusplus
 }
