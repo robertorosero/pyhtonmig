@@ -389,16 +389,19 @@ class GeneralFloatCases(unittest.TestCase):
 
 @requires_setround
 class RoundingModeTestCase(unittest.TestCase):
+    def setUp(self):
+        self.save_mode = float.__getround__()
+
+    def tearDown(self):
+        float.__setround__(self.save_mode)
+
     def test_roundtrip(self):
         # just check that we can use __setround__ and __getround__
         # to set and get rounding mode
         modes = "tonearest", "upward", "downward", "towardzero"
         for mode in modes:
-            oldmode = float.__getround__()
             float.__setround__(mode)
             self.assertEqual(float.__getround__(), mode)
-            float.__setround__(oldmode)
-            self.assertEqual(float.__getround__(), oldmode)
 
 @requires_setformat
 class FormatFunctionsTestCase(unittest.TestCase):
