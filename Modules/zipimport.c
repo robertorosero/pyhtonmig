@@ -61,6 +61,7 @@ static int
 zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 {
     PyObject *pathbytes;
+    /* FIXME: work on unicode strings, not byte strings */
     char *path, *p, *prefix, buf[MAXPATHLEN+2];
     size_t len;
     PyObject *files;
