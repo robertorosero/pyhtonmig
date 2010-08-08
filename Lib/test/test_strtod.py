@@ -82,7 +82,7 @@ def strtod(s, mant_dig=53, min_exp = -1021, max_exp = 1024):
         hexdigs,
         e + 4*hexdigs)
 
-TEST_SIZE = 1000
+TEST_SIZE = 10
 
 class StrtodTests(unittest.TestCase):
     def check_strtod(self, s):
@@ -457,14 +457,42 @@ class StrtodTests(unittest.TestCase):
             '168444365510704342711559699508093042880177904174497792.001',
             # 1 - 2**-54, +-tiny
             '999999999999999944488848768742172978818416595458984375e-54',
-            '9999999999999999444888487687421729788184165954589843749999999e-54',
-            '9999999999999999444888487687421729788184165954589843750000001e-54',
+            '999999999999999944488848768742172978818416595458984' #...
+            '3749999999e-54',
+            '999999999999999944488848768742172978818416595458984' #...
+            '3750000001e-54',
+            # Values near underflow-to-zero boundary; these ended up
+            # as 0.0 instead of -0.0 (or vice versa) with some
+            # nonstandard rounding modes.
+            '-20727364621e-334',
+            '247032822920623272088284396434110686182529901307162' #...
+            '38221279284125033775362990e-400',
             ]
         for s in test_strings:
             self.check_strtod(s)
 
+
+def test_with_rounding_mode(mode):
+    class StrtodTestsWithRounding(StrtodTests):
+        def setUp(self):
+            StrtodTests.setUp(self)
+            self.old_mode = float.__getround__()
+            float.__setround__(mode)
+
+        def tearDown(self):
+            float.__setround__(self.old_mode)
+            StrtodTests.tearDown(self)
+
+    StrtodTestsWithRounding.__name__ = "StrtodTestsWith{}Rounding".format(
+        mode.capitalize())
+    return StrtodTestsWithRounding
+
 def test_main():
-    test.support.run_unittest(StrtodTests)
+    test_classes = [StrtodTests]
+    if hasattr(float, '__setround__'):
+        for mode in "upward", "downward", "towardzero", "tonearest":
+            test_classes.append(test_with_rounding_mode(mode))
+        test.support.run_unittest(*test_classes)
 
 if __name__ == "__main__":
     test_main()

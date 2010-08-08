@@ -185,20 +185,23 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 extern "C" {
 #endif
 
-typedef union { double d; ULong L[2]; } U;
+typedef union { ULong L[2]; double d; } U;
 
 #ifdef IEEE_8087
 #define word0(x) (x)->L[1]
 #define word1(x) (x)->L[0]
+#define Uint(hi, lo) {{lo, hi}}
 #else
 #define word0(x) (x)->L[0]
 #define word1(x) (x)->L[1]
+#define Uint(hi, lo) {{hi, lo}}
 #endif
 #define dval(x) (x)->d
 
-#ifndef STRTOD_DIGLIM
-#define STRTOD_DIGLIM 40
-#endif
+/* STRTOD_DIGLIM = 17 + 8.  17 is the number of decimal digits required to
+   distinguish doubles; the extra 8 digits ensure that truncation to
+   STRTOD_DIGLIM digits induces an error of at most 1e-8 ulps. */
+#define STRTOD_DIGLIM 25
 
 /* maximum permitted exponent value for strtod; exponents larger than
    MAX_ABS_EXP in absolute value get truncated to +-MAX_ABS_EXP.  MAX_ABS_EXP
@@ -253,6 +256,13 @@ typedef union { double d; ULong L[2]; } U;
 #define Tiny1 1
 #define Quick_max 14
 #define Int_max 14
+
+/* Some double constants, defined via the union U to avoid the chicken-and-egg
+   problem of relying on the compiler to do correctly-rounded string->double
+   conversions. */
+static U Dbl_min = Uint((Bias + Emin)*Exp_msk1, 0); /* 2.0 ** Emin */
+static U Exp4P = Uint((Bias + 2*P)*Exp_msk1, 0);    /* 2.0**(2*P) */
+static U Inf = Uint(Exp_mask, 0);
 
 #ifndef Flt_Rounds
 #ifdef FLT_ROUNDS
@@ -970,21 +980,6 @@ diff(Bigint *a, Bigint *b)
     return c;
 }
 
-/* Given a positive normal double x, return the difference between x and the
-   next double up.  Doesn't give correct results for subnormals. */
-
-static double
-ulp(U *x)
-{
-    Long L;
-    U u;
-
-    L = (word0(x) & Exp_mask) - (P-1)*Exp_msk1;
-    word0(&u) = L;
-    word1(&u) = 0;
-    return dval(&u);
-}
-
 /* Convert a Bigint a to a double giving the value a / 2**(32 * a->wds).
    Error < 0.75 ulps.  This function is currently used only by ratio. */
 
@@ -1155,14 +1150,8 @@ tens[] = {
     1e20, 1e21, 1e22
 };
 
-static const double
-bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
-static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
-                                   9007199254740992.*9007199254740992.e-256
-                                   /* = 2^106 * 1e-256 */
-};
-/* The factor of 2^53 in tinytens[4] helps us avoid setting the underflow */
-/* flag unnecessarily.  It leads to a song and dance at the end of strtod. */
+static const double bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
+static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128, 1e-256 };
 #define Scale_Bit 0x10
 #define n_bigtens 5
 
@@ -1279,27 +1268,144 @@ quorem(Bigint *b, Bigint *S)
     return q;
 }
 
-/* sulp(x) is a version of ulp(x) that takes bc.scale into account.
-
-   Assuming that x is finite and nonnegative (positive zero is fine
-   here) and x / 2^bc.scale is exactly representable as a double,
-   sulp(x) is equivalent to 2^bc.scale * ulp(x / 2^bc.scale). */
+/* Round a finite double x to the nearest integer (in double format), rounding
+ * ties away from zero.  This function is unaffected by FPU rounding mode. */
 
 static double
-sulp(U *x, BCinfo *bc)
+rnd(double x)
 {
     U u;
+    int exp;
+    dval(&u) = x;
 
-    if (bc->scale && 2*P + 1 > (int)((word0(x) & Exp_mask) >> Exp_shift)) {
-        /* rv/2^bc->scale is subnormal */
-        word0(&u) = (P+2)*Exp_msk1;
+    /* Extract unbiased exponent. */
+    exp = (int)((word0(&u) & Exp_mask) >> Exp_shift) - Bias;
+    if (exp < 0) {
+        /* Absolute value of x is at most 1.0; result is +-0.0 if exp < -1,
+           and +-1.0 if exp == -1. */
+        word0(&u) &= Sign_bit;
+        if (exp == -1)
+            word0(&u) |= Exp_1;
         word1(&u) = 0;
-        return u.d;
     }
-    else {
-        assert(word0(x) || word1(x)); /* x != 0.0 */
-        return ulp(x);
+    else if (exp <= P - 34) {
+        /* Absolute value of x is in [1.0, 2**(P-33)).  The bit with value 0.5
+           is bit (P - 34 - exp) in the upper word. */
+        ULong mask = 1UL << ((P - 34) - exp);
+        /* Zero out all bits with value < 0.5. */
+        word1(&u) = 0;
+        word0(&u) &= -mask;
+        /* If bit with value 0.5 is set, round up. */
+        if (word0(&u) & mask)
+            word0(&u) += mask;
     }
+    else if (exp <= P - 2) {
+        /* Absolute value of x is in [2**(P-33), 2**(P-1)).  The bit with
+           value 0.5 is bit (P - 2 - exp) in the lower word. */
+        ULong mask = 1UL << ((P - 2) - exp);
+        word1(&u) &= -mask;
+        if (word1(&u) & mask) {
+            word1(&u) += mask;
+            if (word1(&u) < mask)
+                /* word1 addition overflowed; add carry into word0. */
+                ++word0(&u);
+        }
+    }
+    /* If exp >= P-1 then abs(x) >= 2**(P-1) and x is already
+       an integer, so there's nothing to do. */
+    return dval(&u);
+}
+
+/* In strtod, the current estimate is stored in a pair (x, scale) consisting
+   of a double x and an int scale, representing the value x / 2**scale.
+
+   For a finite double x, sulp(x) returns 1 ulp(x), taking scale into account.
+   That is, sulp(x, scale) / 2**scale == ulp(x / 2**scale), where ulp(x) is the
+   difference between abs(x) and the next largest double.
+
+   Logic in the strtod function ensures that the pair (x, scale) always
+   satisfies the following two conditions:
+
+   (0) x / 2**scale is an integral multiple of 2**(Emin - P + 1).  In other
+       words, if x / 2**scale is at most DBL_MAX then it's exactly
+       representable as a double.
+
+   (1) Either x / 2**(P-1) >= 2**Emin, or scale >= P - 1.
+
+   It follows from these conditions that on input, x is necessarily either
+   normal or zero, and that sulp(x, scale) is always positive and normal.
+   Moreover, if x is zero then scale >= P - 1.
+
+*/
+
+static double
+sulp(U *x, int scale)
+{
+    U u;
+    int e;
+
+    /* Method: if 2**k <= abs(x / 2**scale) < 2**(k+1) then
+
+         ulp(x / 2**scale) == max(2**Etiny, 2**k / 2**(P - 1)).
+
+       We compute
+
+          e = max(scale + 1, k + Bias + scale)
+
+       Here k + Bias + scale corresponds exactly to the value given by the
+       exponent bits of x.  From the conditions above, e > P - 1.  Setting u =
+       2**(e - Bias - P + 1) gives
+
+          u / 2**scale == 2**(e - Bias - P + 1 - scale)
+                       == 2**max(2 - P - Bias, k - P + 1)
+                       == max(2**Etiny, 2**k / 2**(P - 1)).
+                       == ulp(x / 2**scale).
+
+       The code below also works, unaltered, with x == +-0.0,
+       returning u such that u / 2**scale == 2**Etiny.
+    */
+
+    e = (int)((word0(x) & Exp_mask) >> Exp_shift);
+    if (e < scale + 1)
+        e = scale + 1;
+
+    assert(e > P - 1);
+    word0(&u) = (ULong)(e - P + 1) << Exp_shift;
+    word1(&u) = 0;
+    return dval(&u);
+}
+
+/* Given a scaled double (as used in _Py_dg_strtod), find the next largest
+   boundary, using the same scale.  If we're already on a boundary, return the
+   next one up.
+
+   A *boundary* is either 0.0, or a power of 2 that's at least 2**(Emin + 1);
+   2**Emin is not considered a boundary, because the spacing of consecutive
+   floats does not change at 2**Emin. */
+
+double next_boundary(U *x, int scale) {
+    U u;
+    int e;
+
+    e = (int)((word0(x) & Exp_mask) >> Exp_shift);
+
+    if (e < scale + 1)
+        e = scale + 1;
+    word0(&u) = (ULong)(e + 1) << Exp_shift;
+    word1(&u) = 0;
+    return dval(&u);
+}
+
+double last_boundary(U *x, int scale) {
+    U u;
+    int e;
+
+    e = (int)((word0(x) & Exp_mask) >> Exp_shift);
+    if (e <= scale + 1)
+        e = 0;
+    word0(&u) = (ULong)e << Exp_shift;
+    word1(&u) = 0;
+    return dval(&u);
 }
 
 /* parse_numeric_string: Parse and validate a finite numeric string.
@@ -1655,553 +1761,332 @@ bigcomp(U *rv, const char *s0, BCinfo *bc)
     Bfree(b);
     Bfree(d);
     if (dd > 0 || (dd == 0 && odd))
-        dval(rv) += sulp(rv, bc);
+        dval(rv) += sulp(rv, bc->scale);
     return 0;
+}
+
+/* Get current FPU rounding mode; same values as for FLT_ROUNDS
+        -1 for indeterminate
+         0 for rounding towards zero
+         1 for rounding towards nearest (with halves rounded towards even)
+         2 for rounding upward (towards positive infinity)
+         3 for rounding downward (towards negative infinity)
+*/
+
+static int
+get_rounding_mode(void)
+{
+    /* this may not work on all systems;  we should try a configure-time
+       test. */
+    return FLT_ROUNDS;
 }
 
 double
 _Py_dg_strtod(const char *s00, char **se)
 {
-    int bb2, bb5, bbe, bd2, bd5, bs2, dsign, e, e1, error, i, j, k, odd, sign;
-    Py_ssize_t nd, nd0, pos;
+    int bbe, dsign, e, e1, e2, e5, error, i, k, scale, sign;
+    Py_ssize_t nd, nd0;
     char *s0;
-    double aadj, aadj1;
-    U aadj2, adj, rv, rv0;
-    ULong y, z;
-    Long L;
+    double aadj, aadj_int, scalefac, ulp;
+    U rv;
+    Bigint *bb, *bd, *bs, *delta;
     BCinfo bc;
-    Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
-
-    dval(&rv) = 0.;
 
     error = parse_numeric_string(s00, se, &s0, &nd, &nd0, &e, &sign);
     if (error)
         goto parse_error;
 
     /* If all digits were zero, exit with return value +-0.0. */
-    if (!nd)
+    if (!nd) {
+        dval(&rv) = 0.0;
         goto ret;
+    }
 
-    /* Overflow and underflow. */
+    /* Catch cases of obvious overflow and underflow. */
     if (e > Big_10_exp)
         goto ovfl;
     else if (e <= Tiny_10_exp)
         goto undfl;
 
-    /* Initial approximation based on first DBL_DIG+1 digits of the input. */
-    k = nd < DBL_DIG + 1 ? nd : DBL_DIG + 1;
-    for (pos = 0; pos < k; pos++)
-        dval(&rv) = 10.0 * dval(&rv) + (s0[pos < nd0 ? pos : pos + 1] - '0');
+    /* Compute an initial approximation of the form rv * 10 ** e1, where rv is
+     * the integer obtained from the first (up to) DBL_DIG digits of the
+     * input. */
+    k = nd <= DBL_DIG ? nd : DBL_DIG;
+    dval(&rv) = 0.0;
+    for (i = 0; i < k; i++)
+        dval(&rv) = 10.0 * dval(&rv) + (s0[i < nd0 ? i : i + 1] - '0');
     e1 = e - k;
 
-   /* If there are at most Dbl_dig significant digits in the input, then rv
-       is exact and there's a chance to compute the exact result with a single
-       floating-point multiplication or division. */
-    if (nd <= DBL_DIG) {
-        if (!e1)
-            goto ret;
-        if (e1 > 0) {
-            if (e1 <= Ten_pmax) {
-                dval(&rv) *= tens[e1];
+    /* If the input has at most DBL_DIG significant digits (that is, nd <=
+     * DBL_DIG), then the represented value is exactly +/- rv * 10 ** e1.  In
+     * this case, if e1 is small enough *and* the FPU rounding mode matches the
+     * one we want, then we can compute a correctly rounded result with a
+     * single floating-point multiplication or division. */
+    if (get_rounding_mode() == 1) {
+        if (nd <= DBL_DIG) {
+            if (e1 >= 0) {
+                if (e1 <= Ten_pmax) {
+                    dval(&rv) *= tens[e1];
+                    goto ret;
+                }
+                i = DBL_DIG - nd;
+                if (e1 - i <= Ten_pmax) {
+                    dval(&rv) *= tens[i];
+                    dval(&rv) *= tens[e1 - i];
+                    goto ret;
+                }
+            }
+            else if (-e1 <= Ten_pmax) {
+                dval(&rv) /= tens[-e1];
                 goto ret;
             }
-            i = DBL_DIG - nd;
-            if (e1 - i <= Ten_pmax) {
-                /* A fancier test would sometimes let us do
-                 * this for larger i values.
-                 */
-                dval(&rv) *= tens[i];
-                dval(&rv) *= tens[e1 - i];
-                goto ret;
-            }
-        }
-        else if (-e1 <= Ten_pmax) {
-            dval(&rv) /= tens[-e1];
-            goto ret;
         }
     }
 
-    bc.scale = 0;
+    /* The fast path above wasn't applicable, so at this point we have to do
+     * things the hard way.  Here's an outline of the strategy.
+     *
+     *    (1) Compute a double approximation 'rv' to the true value of the
+     *    input.  There are various sources of error in this approximation:
+     *    it's based on the first (at most) DBL_DIG significant digits of the
+     *    input, as computed above, so there's a truncation error involved; the
+     *    floating-point arithmetic used to compute the approximation will also
+     *    contribute error.  1000 ulps is a safe upper bound for the magnitude
+     *    of the error, though it will be much smaller in most cases.
+     *
+     *    (2) Use Bigint arithmetic to compute an approximation 'aadj' to ulps
+     *    difference between rv and the true value.  Again there are sources of
+     *    error here: instead of computing with the true value, we compute with
+     *    a value truncated to at most STRTOD_DIGLIM digits; this introduces an
+     *    absolute error of at most 1e-8 to aadj.  Rounding error may
+     *    contribute a further absolute error of 1e-10.
+     *
+     *    (3) Adjust rv based on the ulps difference computed above.  In most
+     *    cases, the result will be unambiguous and we can return after this
+     *    step.  But:
+     *
+     *    (4) If the ulps difference value computed in (2) indicates that the
+     *    true value lies very nearly halfway between two representable
+     *    doubles, then because of the uncertainty in aadj itself we need to
+     *    more work.  In this case the decision is passed off to the 'bigcomp'
+     *    function, which does a comparison with the original (not truncated)
+     *    input value in order to figure out which way to round.
+     *
+     * If the value represented by the input is close to the limits of the
+     * range of the double type (i.e., either very large or very small), then
+     * it's convenient to using a scaling factor 'scalefac == 2**scale' to
+     * ensure that rv is normal and not too close to the overflow boundary;
+     * thus our approximation will actually be rv / 2**scale (or rv / scalefac)
+     * rather than rv itself.
+     */
 
-    /* Get starting approximation = rv * 10**e1 */
-
+    /* Get starting approximation, rv * 10**e1.  For small inputs, rv is
+     * scaled by a factor of 2**(2*P); that is, we compute the value rv *
+     * 10**e1 * 2**(2*P).  For large inputs, we scale in the opposite
+     * direction, computing rv * 10**e1 / 2**(2*P). */
+    scale = 0;
+    scalefac = 1.0;
     if (e1 > 0) {
-        if ((i = e1 & 15))
-            dval(&rv) *= tens[i];
-        if (e1 &= ~15) {
-            if (e1 > DBL_MAX_10_EXP)
-                goto ovfl;
-            e1 >>= 4;
-            for(j = 0; e1 > 1; j++, e1 >>= 1)
-                if (e1 & 1)
-                    dval(&rv) *= bigtens[j];
-            /* The last multiplication could overflow. */
-            word0(&rv) -= P*Exp_msk1;
-            dval(&rv) *= bigtens[j];
-            if ((z = word0(&rv) & Exp_mask)
-                > Exp_msk1*(DBL_MAX_EXP+Bias-P))
-                goto ovfl;
-            if (z > Exp_msk1*(DBL_MAX_EXP+Bias-1-P)) {
-                /* set to largest number */
-                /* (Can't trust DBL_MAX) */
-                word0(&rv) = Big0;
-                word1(&rv) = Big1;
-            }
-            else
-                word0(&rv) += P*Exp_msk1;
+        dval(&rv) *= tens[e1 & 15];
+        e1 >>= 4;
+        if (e1 & Scale_Bit) {
+            scale = -2*P;
+            scalefac = 1.0 / dval(&Exp4P);
+            dval(&rv) *= scalefac;
         }
+        for(i = 0; e1 > 0; i++, e1 >>= 1)
+            if (e1 & 1)
+                dval(&rv) *= bigtens[i];
     }
     else if (e1 < 0) {
-        /* The input decimal value lies in [10**e1, 10**(e1+16)).
-
-           If e1 <= -512, underflow immediately.
-           If e1 <= -256, set bc.scale to 2*P.
-
-           So for input value < 1e-256, bc.scale is always set;
-           for input value >= 1e-240, bc.scale is never set.
-           For input values in [1e-256, 1e-240), bc.scale may or may
-           not be set. */
-
         e1 = -e1;
-        if ((i = e1 & 15))
-            dval(&rv) /= tens[i];
-        if (e1 >>= 4) {
-            if (e1 >= 1 << n_bigtens)
-                goto undfl;
-            if (e1 & Scale_Bit)
-                bc.scale = 2*P;
-            for(j = 0; e1 > 0; j++, e1 >>= 1)
-                if (e1 & 1)
-                    dval(&rv) *= tinytens[j];
-            if (bc.scale && (j = 2*P + 1 - ((word0(&rv) & Exp_mask)
-                                            >> Exp_shift)) > 0) {
-                /* scaled rv is denormal; clear j low bits */
-                if (j >= 32) {
-                    word1(&rv) = 0;
-                    if (j >= 53)
-                        word0(&rv) = (P+2)*Exp_msk1;
-                    else
-                        word0(&rv) &= 0xffffffff << (j-32);
-                }
-                else
-                    word1(&rv) &= 0xffffffff << j;
-            }
-            if (!dval(&rv))
-                goto undfl;
+        dval(&rv) /= tens[e1 & 15];
+        e1 >>= 4;
+        if (e1 & Scale_Bit) {
+            scale = 2*P;
+            scalefac = dval(&Exp4P);
+            dval(&rv) *= scalefac;
         }
+        for(i = 0; e1 > 0; i++, e1 >>= 1)
+            if (e1 & 1)
+                dval(&rv) *= tinytens[i];
     }
 
-    /* Now the hard part -- adjusting rv to the correct value.*/
+    /* Some inequalities:
 
-    /* Put digits into bd: true value = bd * 10^e */
+          -324 < e <= 309  (so 10**-324 <= dv < 10**309).
+          1 <= k <= DBL_DIG (= 15).
+          e = e1 + k (using the value of e1 before entering the above loops)
+          scale > 0 iff e1 <= -256, and scale < 0 iff e1 >= 256
 
-    bc.e0 = e;
-    bc.nd = nd;
-    bc.nd0 = nd0;       /* Only needed if nd > STRTOD_DIGLIM, but done here */
-                        /* to silence an erroneous warning about bc.nd0 */
-                        /* possibly not being initialized. */
-    if (nd > STRTOD_DIGLIM) {
-        /* ASSERT(STRTOD_DIGLIM >= 18); 18 == one more than the */
-        /* minimum number of decimal digits to distinguish double values */
-        /* in IEEE arithmetic. */
+       From these we deduce:
 
-        /* Truncate input to 18 significant digits, then discard any trailing
-           zeros on the result. */
-        nd = 18;
-        while (nd > 0 && s0[nd - 1  < nd0 ? nd - 1 : nd] == '0')
-            nd--;
-    }
-    bd0 = s2b(s0, nd0, nd);
-    if (bd0 == NULL)
-        goto failed_malloc;
+          If scale > 0  then 1e-324 <= dv < 1e-241.
+          If scale == 0 then 1e-255 <= dv < 1e+270.
+          If scale < 0  then 1e+256 <= dv < 1e+309.
 
-    /* Notation for the comments below.  Write:
-
-         - dv for the absolute value of the number represented by the original
-           decimal input string.
-
-         - if we've truncated dv, write tdv for the truncated value.
-           Otherwise, set tdv == dv.
-
-         - srv for the quantity rv/2^bc.scale; so srv is the current binary
-           approximation to tdv (and dv).  It should be exactly representable
-           in an IEEE 754 double.
     */
 
-    for(;;) {
-
-        /* This is the main correction loop for _Py_dg_strtod.
-
-           We've got a decimal value tdv, and a floating-point approximation
-           srv=rv/2^bc.scale to tdv.  The aim is to determine whether srv is
-           close enough (i.e., within 0.5 ulps) to tdv, and to compute a new
-           approximation if not.
-
-           To determine whether srv is close enough to tdv, compute integers
-           bd, bb and bs proportional to tdv, srv and 0.5 ulp(srv)
-           respectively, and then use integer arithmetic to determine whether
-           |tdv - srv| is less than, equal to, or greater than 0.5 ulp(srv).
-        */
-
-        bd = Balloc(bd0->k);
-        if (bd == NULL) {
-            Bfree(bd0);
-            goto failed_malloc;
-        }
-        Bcopy(bd, bd0);
-        bb = sd2b(&rv, bc.scale, &bbe);   /* srv = bb * 2^bbe */
-        if (bb == NULL) {
-            Bfree(bd);
-            Bfree(bd0);
-            goto failed_malloc;
-        }
-        /* Record whether lsb of bb is odd, in case we need this
-           for the round-to-even step later. */
-        odd = bb->x[0] & 1;
-
-        /* tdv = bd * 10**e;  srv = bb * 2**bbe */
-        bs = i2b(1);
-        if (bs == NULL) {
-            Bfree(bb);
-            Bfree(bd);
-            Bfree(bd0);
-            goto failed_malloc;
-        }
-
-        if (e >= nd) {
-            bb2 = bb5 = 0;
-            bd2 = bd5 = e - nd;
-        }
-        else {
-            bb2 = bb5 = nd - e;
-            bd2 = bd5 = 0;
-        }
-        if (bbe >= 0)
-            bb2 += bbe;
-        else
-            bd2 -= bbe;
-        bs2 = bb2;
-        bb2++;
-        bd2++;
-
-        /* At this stage bd5 - bb5 == e == bd2 - bb2 + bbe, bb2 - bs2 == 1,
-           and bs == 1, so:
-
-              tdv == bd * 10**e = bd * 2**(bbe - bb2 + bd2) * 5**(bd5 - bb5)
-              srv == bb * 2**bbe = bb * 2**(bbe - bb2 + bb2)
-              0.5 ulp(srv) == 2**(bbe-1) = bs * 2**(bbe - bb2 + bs2)
-
-           It follows that:
-
-              M * tdv = bd * 2**bd2 * 5**bd5
-              M * srv = bb * 2**bb2 * 5**bb5
-              M * 0.5 ulp(srv) = bs * 2**bs2 * 5**bb5
-
-           for some constant M.  (Actually, M == 2**(bb2 - bbe) * 5**bb5, but
-           this fact is not needed below.)
-        */
-
-        /* Remove factor of 2**i, where i = min(bb2, bd2, bs2). */
-        i = bb2 < bd2 ? bb2 : bd2;
-        if (i > bs2)
-            i = bs2;
-        if (i > 0) {
-            bb2 -= i;
-            bd2 -= i;
-            bs2 -= i;
-        }
-
-        /* Scale bb, bd, bs by the appropriate powers of 2 and 5. */
-        if (bb5 > 0) {
-            bs = pow5mult(bs, bb5);
-            if (bs == NULL) {
-                Bfree(bb);
-                Bfree(bd);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-            bb1 = mult(bs, bb);
-            Bfree(bb);
-            bb = bb1;
-            if (bb == NULL) {
-                Bfree(bs);
-                Bfree(bd);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-        }
-        if (bb2 > 0) {
-            bb = lshift(bb, bb2);
-            if (bb == NULL) {
-                Bfree(bs);
-                Bfree(bd);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-        }
-        if (bd5 > 0) {
-            bd = pow5mult(bd, bd5);
-            if (bd == NULL) {
-                Bfree(bb);
-                Bfree(bs);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-        }
-        if (bd2 > 0) {
-            bd = lshift(bd, bd2);
-            if (bd == NULL) {
-                Bfree(bb);
-                Bfree(bs);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-        }
-        if (bs2 > 0) {
-            bs = lshift(bs, bs2);
-            if (bs == NULL) {
-                Bfree(bb);
-                Bfree(bd);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-        }
-
-        /* Now bd, bb and bs are scaled versions of tdv, srv and 0.5 ulp(srv),
-           respectively.  Compute the difference |tdv - srv|, and compare
-           with 0.5 ulp(srv). */
-
-        delta = diff(bb, bd);
-        if (delta == NULL) {
-            Bfree(bb);
-            Bfree(bs);
-            Bfree(bd);
-            Bfree(bd0);
-            goto failed_malloc;
-        }
-        dsign = delta->sign;
-        delta->sign = 0;
-        i = cmp(delta, bs);
-        if (bc.nd > nd && i <= 0) {
-            if (dsign)
-                break;  /* Must use bigcomp(). */
-
-            /* Here rv overestimates the truncated decimal value by at most
-               0.5 ulp(rv).  Hence rv either overestimates the true decimal
-               value by <= 0.5 ulp(rv), or underestimates it by some small
-               amount (< 0.1 ulp(rv)); either way, rv is within 0.5 ulps of
-               the true decimal value, so it's possible to exit.
-
-               Exception: if scaled rv is a normal exact power of 2, but not
-               DBL_MIN, then rv - 0.5 ulp(rv) takes us all the way down to the
-               next double, so the correctly rounded result is either rv - 0.5
-               ulp(rv) or rv; in this case, use bigcomp to distinguish. */
-
-            if (!word1(&rv) && !(word0(&rv) & Bndry_mask)) {
-                /* rv can't be 0, since it's an overestimate for some
-                   nonzero value.  So rv is a normal power of 2. */
-                j = (int)(word0(&rv) & Exp_mask) >> Exp_shift;
-                /* rv / 2^bc.scale = 2^(j - 1023 - bc.scale); use bigcomp if
-                   rv / 2^bc.scale >= 2^-1021. */
-                if (j - bc.scale >= 2) {
-                    dval(&rv) -= 0.5 * sulp(&rv, &bc);
-                    break; /* Use bigcomp. */
-                }
-            }
-
-            {
-                bc.nd = nd;
-                i = -1; /* Discarded digits make delta smaller. */
-            }
-        }
-
-        if (i < 0) {
-            /* Error is less than half an ulp -- check for
-             * special case of mantissa a power of two.
-             */
-            if (dsign || word1(&rv) || word0(&rv) & Bndry_mask
-                || (word0(&rv) & Exp_mask) <= (2*P+1)*Exp_msk1
-                ) {
-                break;
-            }
-            if (!delta->x[0] && delta->wds <= 1) {
-                /* exact result */
-                break;
-            }
-            delta = lshift(delta,Log2P);
-            if (delta == NULL) {
-                Bfree(bb);
-                Bfree(bs);
-                Bfree(bd);
-                Bfree(bd0);
-                goto failed_malloc;
-            }
-            if (cmp(delta, bs) > 0)
-                goto drop_down;
-            break;
-        }
-        if (i == 0) {
-            /* exactly half-way between */
-            if (dsign) {
-                if ((word0(&rv) & Bndry_mask1) == Bndry_mask1
-                    &&  word1(&rv) == (
-                        (bc.scale &&
-                         (y = word0(&rv) & Exp_mask) <= 2*P*Exp_msk1) ?
-                        (0xffffffff & (0xffffffff << (2*P+1-(y>>Exp_shift)))) :
-                        0xffffffff)) {
-                    /*boundary case -- increment exponent*/
-                    word0(&rv) = (word0(&rv) & Exp_mask)
-                        + Exp_msk1
-                        ;
-                    word1(&rv) = 0;
-                    dsign = 0;
-                    break;
-                }
-            }
-            else if (!(word0(&rv) & Bndry_mask) && !word1(&rv)) {
-              drop_down:
-                /* boundary case -- decrement exponent */
-                if (bc.scale) {
-                    L = word0(&rv) & Exp_mask;
-                    if (L <= (2*P+1)*Exp_msk1) {
-                        if (L > (P+2)*Exp_msk1)
-                            /* round even ==> */
-                            /* accept rv */
-                            break;
-                        /* rv = smallest denormal */
-                        if (bc.nd > nd)
-                            break;
-                        goto undfl;
-                    }
-                }
-                L = (word0(&rv) & Exp_mask) - Exp_msk1;
-                word0(&rv) = L | Bndry_mask1;
-                word1(&rv) = 0xffffffff;
-                break;
-            }
-            if (!odd)
-                break;
-            if (dsign)
-                dval(&rv) += sulp(&rv, &bc);
-            else {
-                dval(&rv) -= sulp(&rv, &bc);
-                if (!dval(&rv)) {
-                    if (bc.nd >nd)
-                        break;
-                    goto undfl;
-                }
-            }
-            dsign = 1 - dsign;
-            break;
-        }
-        if ((aadj = ratio(delta, bs)) <= 2.) {
-            if (dsign)
-                aadj = aadj1 = 1.;
-            else if (word1(&rv) || word0(&rv) & Bndry_mask) {
-                if (word1(&rv) == Tiny1 && !word0(&rv)) {
-                    if (bc.nd >nd)
-                        break;
-                    goto undfl;
-                }
-                aadj = 1.;
-                aadj1 = -1.;
-            }
-            else {
-                /* special case -- power of FLT_RADIX to be */
-                /* rounded down... */
-
-                if (aadj < 2./FLT_RADIX)
-                    aadj = 1./FLT_RADIX;
-                else
-                    aadj *= 0.5;
-                aadj1 = -aadj;
-            }
-        }
-        else {
-            aadj *= 0.5;
-            aadj1 = dsign ? aadj : -aadj;
-            if (Flt_Rounds == 0)
-                aadj1 += 0.5;
-        }
-        y = word0(&rv) & Exp_mask;
-
-        /* Check for overflow */
-
-        if (y == Exp_msk1*(DBL_MAX_EXP+Bias-1)) {
-            dval(&rv0) = dval(&rv);
-            word0(&rv) -= P*Exp_msk1;
-            adj.d = aadj1 * ulp(&rv);
-            dval(&rv) += adj.d;
-            if ((word0(&rv) & Exp_mask) >=
-                Exp_msk1*(DBL_MAX_EXP+Bias-P)) {
-                if (word0(&rv0) == Big0 && word1(&rv0) == Big1) {
-                    Bfree(bb);
-                    Bfree(bd);
-                    Bfree(bs);
-                    Bfree(bd0);
-                    Bfree(delta);
-                    goto ovfl;
-                }
-                word0(&rv) = Big0;
-                word1(&rv) = Big1;
-                goto cont;
-            }
-            else
-                word0(&rv) += P*Exp_msk1;
-        }
-        else {
-            if (bc.scale && y <= 2*P*Exp_msk1) {
-                if (aadj <= 0x7fffffff) {
-                    if ((z = (ULong)aadj) <= 0)
-                        z = 1;
-                    aadj = z;
-                    aadj1 = dsign ? aadj : -aadj;
-                }
-                dval(&aadj2) = aadj1;
-                word0(&aadj2) += (2*P+1)*Exp_msk1 - y;
-                aadj1 = dval(&aadj2);
-            }
-            adj.d = aadj1 * ulp(&rv);
-            dval(&rv) += adj.d;
-        }
-        z = word0(&rv) & Exp_mask;
-        if (bc.nd == nd) {
-            if (!bc.scale)
-                if (y == z) {
-                    /* Can we stop now? */
-                    L = (Long)aadj;
-                    aadj -= L;
-                    /* The tolerances below are conservative. */
-                    if (dsign || word1(&rv) || word0(&rv) & Bndry_mask) {
-                        if (aadj < .4999999 || aadj > .5000001)
-                            break;
-                    }
-                    else if (aadj < .4999999/FLT_RADIX)
-                        break;
-                }
-        }
-      cont:
-        Bfree(bb);
-        Bfree(bd);
-        Bfree(bs);
-        Bfree(delta);
+    /* Ensure that rv / 2**scale is exactly representable.  This is an issue
+     * only if scale > 0 and rv / 2**scale is subnormal: rv itself will be
+     * normal in this case, so will have a full 53-bit significand, but rv /
+     * 2**scale won't have that many bits available.
+     *
+     * Evil trickery ahead: We want to round rv to an exact multiple of
+     * 2**scale * DBL_MIN * 2**(1 - P).  Rather than doing this by hand, we
+     * persuade the FPU to do the rounding for us: assuming that rv < 2**scale
+     * DBL_MIN, we add 2**scale * DBL_MIN to rv.  The result is in the binade
+     * [2**scale * DBL_MIN, 2 * 2**scale * DBL_MIN], and the representable
+     * floating-point numbers in this binade are exactly the multiples of
+     * 2**scale * DBL_MIN * 2**(1 - P), hence the result of the addition is the
+     * exact sum rounded to the nearest multiple of 2**scale * DBL_MIN *
+     * 2**(1-P).  Subtracting 2**scale * DBL_MIN again gives the rounded rv
+     * value.
+     *
+     * Note that at this point rv is still just an approximation, so we don't
+     * care about discrepancies due to rounding mode.
+     */
+    if (scale > 0 && dval(&rv) < dval(&Dbl_min) * scalefac) {
+        dval(&rv) += dval(&Dbl_min) * scalefac;
+        dval(&rv) -= dval(&Dbl_min) * scalefac;
     }
-    Bfree(bb);
-    Bfree(bd);
-    Bfree(bs);
-    Bfree(bd0);
+
+    /* We now have our starting approximation rv / 2**scale.  Note that it's
+     * not possible for rv to be *strictly* negative at this point, though it
+     * might be -0.0; this is dealt with towards the end of the function.
+     */
+    assert(dval(&rv) >= 0.0);
+
+    /* Step (2): Compute 'aadj', an (approximation to) ulps difference between
+     * the true value (after truncation to STRTOD_DIGLIM significant digits)
+     * and the current approximation rv / 2**scale.
+     *
+     * From this point onwards, all floating-point operations on rv that are
+     * performed have an exactly representable result.  This ensures that the
+     * FPU rounding mode can't affect the result.
+     */
+
+    /* Notation used in the comments: 'srv' is rv / 2**scale; 'tdv' is the
+       value represented by the input (after truncation); 'ulp' is ulp(srv).
+       We're aiming to compute (srv - tdv) / ulp.  We do this by using integer
+       arithmetic to compute (M*srv - M*tdv) / (M*ulp) for a suitable scale
+       factor M for which M*srv, M*tdv and M*ulp are all integral. */
+
+    k = nd < STRTOD_DIGLIM ? nd : STRTOD_DIGLIM;
+    bd = s2b(s0, nd0, k);          /* tdv == bd * 10**(e - k). */
+    bb = sd2b(&rv, scale, &bbe);   /* srv == bb * 2**bbe. */
+    bs = i2b(1);                   /* ulp == 2**bbe. */
+    if (bd == NULL || bb == NULL || bs == NULL)
+        goto failed_malloc;
+
+    /* srv, tdv and ulp are proportional to bb, bd * 2**(e-k-bbe)*5**(e-k) and
+       bs, respectively.  Scale bb, bd, bs by the appropriate powers of 5... */
+    e5 = e - k;
+    if (e5 > 0)
+        bd = pow5mult(bd, e5);
+    else if (e5 < 0) {
+        bb = pow5mult(bb, -e5);
+        bs = pow5mult(bs, -e5);
+    }
+    if (bd == NULL || bb == NULL || bs == NULL)
+        goto failed_malloc;
+
+    /* ... and powers of 2. */
+    e2 = e - k - bbe;
+    if (e2 > 0)
+        bd = lshift(bd, e2);
+    else if (e2 < 0) {
+        bb = lshift(bb, -e2);
+        bs = lshift(bs, -e2);
+    }
+    if (bd == NULL || bb == NULL || bs == NULL)
+        goto failed_malloc;
+
+    /* Now srv, tdv and ulp are proportional to bb, bd, and bs, respectively.
+     * Compute the quotient aadj = (srv - tdv) / ulp = (bb - bd) / bs, as a
+     * double. */
+    delta = diff(bb, bd);
+    dsign = delta->sign;
+    if (delta == NULL)
+        goto failed_malloc;
+    aadj = ratio(delta, bs);
     Bfree(delta);
-    if (bc.nd > nd) {
+    if (dsign)
+        aadj = -aadj;
+    Bfree(bd);
+    Bfree(bb);
+    Bfree(bs);
+
+    /* Step (3): Adjust rv using the computed value of aadj.  In most cases the
+       correct result is unambiguous; in hard cases we move on to step (4). */
+
+    ulp = sulp(&rv, scale);
+    /* Invariant: here and after the adjustment, srv ~= tdv + ulp * aadj. */
+    if (aadj <= 0.0) {
+        /* next = ulps from next boundary up to rv (will be negative) */
+        double next = (dval(&rv) - next_boundary(&rv, scale))/ulp;
+        if (aadj <= next) {
+            /* Adjustment takes us past a power of 2 boundary, going up. */
+            aadj *= 0.5;
+            next *= 0.5;
+            ulp *= 2.0;
+            /* Round to integer if next is even, else to half-odd-integer. */
+            aadj_int = next + rnd(aadj - next);
+        }
+        else {
+            /* Usual case. */
+            aadj_int = rnd(aadj);
+        }
+    }
+    else {
+        double last = (dval(&rv) - last_boundary(&rv, scale))/ulp;
+        if (aadj > last && last_boundary(&rv, scale) != 0.0) {
+            /* Adjustment takes us past a power of 2 boundary, going down. */
+            aadj *= 2.0;
+            ulp *= 0.5;
+        }
+        aadj_int = rnd(aadj);
+    }
+
+    /* Adjust, and compute residual error. */
+    dval(&rv) -= aadj_int * ulp;
+    aadj -= aadj_int;
+
+    /* If we're in a near halfway case, use bigcomp to figure out
+       the correctly-rounded value */
+    assert(aadj > -0.5000001 && aadj < 0.5000001);
+    if (aadj < -0.4999999 || aadj > 0.4999999) {
+        /* input to bigcomp should be the lower of the two possible results */
+        if (aadj > 0.0) {
+            dval(&rv) -= ulp;
+            /* aadj += 1.0; */  /* Necessary only to maintain invariant; not
+                                 * used beyond this point. */
+        }
+        bc.nd0 = nd0;
+        bc.nd = nd;
+        bc.e0 = e;
+        bc.scale = scale;
         error = bigcomp(&rv, s0, &bc);
         if (error)
             goto failed_malloc;
     }
 
-    if (bc.scale) {
-        word0(&rv0) = Exp_1 - 2*P*Exp_msk1;
-        word1(&rv0) = 0;
-        dval(&rv) *= dval(&rv0);
-    }
+    /* Under some rounding modes (particularly FE_DOWNWARD), it's possible for
+     * dval(&rv) to be -0.0 at this point; we want to get rid of the negative
+     * sign. */
+    if (word0(&rv) & Sign_bit)
+        word0(&rv) &= ~Sign_bit;
+
+    /* Do underflow and overflow checks, and undo the effects of scaling (if
+     * applicable). */
+    if (word0(&rv) == 0 && word1(&rv) == 0)
+        goto undfl;
+    if ((int)((word0(&rv) & Exp_mask) >> Exp_shift) - scale > Emax + Bias)
+        goto ovfl;
+
+    /* Undo the effects of the scaling, if applicable. */
+    if (scale)
+        dval(&rv) /= scalefac;
 
   ret:
     return sign ? -dval(&rv) : dval(&rv);
@@ -2210,6 +2095,9 @@ _Py_dg_strtod(const char *s00, char **se)
     return 0.0;
 
   failed_malloc:
+    if (bd != NULL) Bfree(bd);
+    if (bb != NULL) Bfree(bb);
+    if (bs != NULL) Bfree(bs);
     errno = ENOMEM;
     return -1.0;
 
@@ -2218,9 +2106,7 @@ _Py_dg_strtod(const char *s00, char **se)
 
   ovfl:
     errno = ERANGE;
-    /* Can't trust HUGE_VAL */
-    word0(&rv) = Exp_mask;
-    word1(&rv) = 0;
+    dval(&rv) = dval(&Inf);
     return sign ? -dval(&rv) : dval(&rv);
 
 }
