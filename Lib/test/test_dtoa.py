@@ -6,6 +6,10 @@ import decimal
 import test.support
 import sys
 
+if getattr(sys, 'float_repr_style', '') != 'short':
+    raise unittest.SkipTest('correctly-rounded string->float conversions '
+                            'not available on this system')
+
 def bitfield(n, a, b):
     """Extract bits a through b - 1 (inclusive) of an integer n."""
     return (n >> a) & ((1 << b - a) - 1)
