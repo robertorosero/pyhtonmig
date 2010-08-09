@@ -1,3 +1,4 @@
+this will not compile
 /* Minimal main program -- everything is loaded from the library */
 
 #include "Python.h"
