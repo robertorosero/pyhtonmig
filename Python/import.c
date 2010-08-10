@@ -137,12 +137,25 @@ static const struct filedescr _PyImport_StandardFiletab[] = {
 };
 
 /* Forward */
-FILE* _Py_fopen(PyObject *unicode, const char *mode);
 #ifdef HAVE_STAT
-int _Py_stat(PyObject *unicode, struct stat *statbuf);
 static int find_init_module(PyObject *);
 #endif
 
+static PyObject *load_module(char *, FILE *, PyObject *, int, PyObject *);
+static struct filedescr *find_module(const char *, const char *, PyObject *,
+                                     PyObject **, FILE **, PyObject **);
+static struct _frozen * find_frozen(const char *);
+
+static int init_builtin(char *);
+
+static PyObject *get_parent(PyObject *globals, char *buf,
+                            Py_ssize_t *p_buflen, int level);
+static PyObject *load_next(PyObject *mod, PyObject *altmod,
+                           char **p_name, char *buf, Py_ssize_t *p_buflen);
+static int mark_miss(char *name);
+static int ensure_fromlist(PyObject *mod, PyObject *fromlist,
+                           char *buf, Py_ssize_t buflen, int recursive);
+static PyObject * import_submodule(PyObject *mod, char *name, char *fullname);
 
 /* Initialize things */
 
@@ -1484,12 +1497,6 @@ get_sourcefile(PyObject *fileobj)
     }
 }
 
-/* Forward */
-static PyObject *load_module(char *, FILE *, PyObject *, int, PyObject *);
-static struct filedescr *find_module(const char *, const char *, PyObject *,
-                                     PyObject **, FILE **, PyObject **);
-static struct _frozen * find_frozen(const char *);
-
 /* Load a package and return its module object WITH INCREMENTED
    REFERENCE COUNT */
 
@@ -2235,8 +2242,6 @@ find_init_module(PyObject *bufobj)
 #endif /* HAVE_STAT */
 
 
-static int init_builtin(char *); /* Forward */
-
 static PyObject*
 load_builtin(char *name, PyObject *pathobj, int type)
 {
@@ -2607,16 +2612,6 @@ PyImport_ImportModuleNoBlock(const char *name)
     return PyImport_ImportModule(name);
 #endif
 }
-
-/* Forward declarations for helper routines */
-static PyObject *get_parent(PyObject *globals, char *buf,
-                            Py_ssize_t *p_buflen, int level);
-static PyObject *load_next(PyObject *mod, PyObject *altmod,
-                           char **p_name, char *buf, Py_ssize_t *p_buflen);
-static int mark_miss(char *name);
-static int ensure_fromlist(PyObject *mod, PyObject *fromlist,
-                           char *buf, Py_ssize_t buflen, int recursive);
-static PyObject * import_submodule(PyObject *mod, char *name, char *fullname);
 
 /* The Magnum Opus of dotted-name import :-) */
 
