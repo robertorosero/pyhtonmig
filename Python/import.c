@@ -2163,8 +2163,12 @@ _Py_fopen(PyObject *unicode, const char *mode)
 #endif
 }
 
-
 #ifdef HAVE_STAT
+
+/* Call _wstat() on Windows, or stat() otherwise. Only fill st_mode
+   attribute on Windows. Clear unicode error on path encoding failure.
+   Return 0 on success, -1 on error. */
+
 int
 _Py_stat(PyObject *unicode, struct stat *statbuf)
 {
@@ -2176,19 +2180,18 @@ _Py_stat(PyObject *unicode, struct stat *statbuf)
 
     len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path,
                                sizeof(path) / sizeof(path[0]));
-    if (len == -1)
+    if (len == -1) {
+        PyErr_Clear();
         return -1;
-    err = _wstat(path, &wstatbuf);
-    if (!err) {
-        /* FIXME: copy more attributes? */
-        statbuf->st_mode = wstatbuf.st_mode;
     }
+    err = _wstat(path, &wstatbuf);
+    if (!err)
+        statbuf->st_mode = wstatbuf.st_mode;
     return err;
 #else
     int ret;
     PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
     if (bytes == NULL) {
-        /* FIXME: don't clear error? */
         PyErr_Clear();
         return -1;
     }
