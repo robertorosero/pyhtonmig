@@ -61,6 +61,10 @@ whose size is determined when the object is allocated.
 #define Py_REF_DEBUG
 #endif
 
+#if defined(Py_LIMITED_API) && defined(Py_REF_DEBUG)
+#error Py_LIMITED_API is incompatible with Py_DEBUG, Py_TRACE_REFS, and Py_REF_DEBUG
+#endif
+
 #ifdef Py_TRACE_REFS
 /* Define pointers to support a doubly-linked list of all live heap objects. */
 #define _PyObject_HEAD_EXTRA            \
@@ -269,7 +273,13 @@ typedef struct {
 
 typedef void (*freefunc)(void *);
 typedef void (*destructor)(PyObject *);
+#ifndef Py_LIMITED_API
+/* We can't provide a full compile-time check that limited-API
+   users won't implement tp_print. However, not defining printfunc
+   and making tp_print of a different function pointer type
+   should at least cause a warning in most cases. */
 typedef int (*printfunc)(PyObject *, FILE *, int);
+#endif
 typedef PyObject *(*getattrfunc)(PyObject *, char *);
 typedef PyObject *(*getattrofunc)(PyObject *, PyObject *);
 typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
@@ -285,6 +295,9 @@ typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*newfunc)(struct _typeobject *, PyObject *, PyObject *);
 typedef PyObject *(*allocfunc)(struct _typeobject *, Py_ssize_t);
 
+#ifdef Py_LIMITED_API
+typedef struct _typeobject PyTypeObject; /* opaque */
+#else
 typedef struct _typeobject {
     PyObject_VAR_HEAD
     const char *tp_name; /* For printing, in format "<module>.<name>" */
@@ -372,6 +385,23 @@ typedef struct _typeobject {
     struct _typeobject *tp_next;
 #endif
 } PyTypeObject;
+#endif
+
+typedef struct{
+    int slot;    /* slot id, see below */
+    void *pfunc; /* function pointer */
+} PyType_Slot;
+
+typedef struct{
+    const char* name;
+    const char* doc;
+    int basicsize;
+    int itemsize;
+    int flags;
+    PyType_Slot *slots; /* terminated by slot==0. */
+} PyType_Spec;
+
+PyObject* PyType_FromSpec(PyType_Spec*);
 
 
 /* The *real* layout of a type object when allocated on the heap */
@@ -419,7 +449,9 @@ PyAPI_FUNC(unsigned int) PyType_ClearCache(void);
 PyAPI_FUNC(void) PyType_Modified(PyTypeObject *);
 
 /* Generic operations on objects */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) PyObject_Print(PyObject *, FILE *, int);
+#endif
 PyAPI_FUNC(void) _Py_BreakPoint(void);
 PyAPI_FUNC(void) _PyObject_Dump(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_Repr(PyObject *);

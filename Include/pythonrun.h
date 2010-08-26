@@ -33,25 +33,32 @@ PyAPI_FUNC(int) Py_IsInitialized(void);
 PyAPI_FUNC(PyThreadState *) Py_NewInterpreter(void);
 PyAPI_FUNC(void) Py_EndInterpreter(PyThreadState *);
 
+PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) PyRun_AnyFileFlags(FILE *, const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_AnyFileExFlags(FILE *, const char *, int, PyCompilerFlags *);
-PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_SimpleFileExFlags(FILE *, const char *, int, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_InteractiveOneFlags(FILE *, const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_InteractiveLoopFlags(FILE *, const char *, PyCompilerFlags *);
+#endif
 
 PyAPI_FUNC(struct _mod *) PyParser_ASTFromString(const char *, const char *,
                                                  int, PyCompilerFlags *flags,
                                                  PyArena *);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(struct _mod *) PyParser_ASTFromFile(FILE *, const char *,
                                                const char*, int,
                                                char *, char *,
                                                PyCompilerFlags *, int *,
                                                PyArena *);
+#endif
+
+#ifndef PyParser_SimpleParseString
 #define PyParser_SimpleParseString(S, B) \
     PyParser_SimpleParseStringFlags(S, B, 0)
 #define PyParser_SimpleParseFile(FP, S, B) \
     PyParser_SimpleParseFileFlags(FP, S, B, 0)
+#endif
 PyAPI_FUNC(struct _node *) PyParser_SimpleParseStringFlags(const char *, int,
                                                           int);
 PyAPI_FUNC(struct _node *) PyParser_SimpleParseFileFlags(FILE *, const char *,
@@ -60,9 +67,11 @@ PyAPI_FUNC(struct _node *) PyParser_SimpleParseFileFlags(FILE *, const char *,
 PyAPI_FUNC(PyObject *) PyRun_StringFlags(const char *, int, PyObject *,
                                          PyObject *, PyCompilerFlags *);
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyRun_FileExFlags(FILE *, const char *, int,
                                          PyObject *, PyObject *, int,
                                          PyCompilerFlags *);
+#endif
 
 #define Py_CompileString(str, p, s) Py_CompileStringFlags(str, p, s, NULL)
 PyAPI_FUNC(PyObject *) Py_CompileStringFlags(const char *, const char *, int,
@@ -84,11 +93,14 @@ PyAPI_FUNC(void) Py_Exit(int);
 /* Restore signals that the interpreter has called SIG_IGN on to SIG_DFL. */
 PyAPI_FUNC(void) _Py_RestoreSignals(void);
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) Py_FdIsInteractive(FILE *, const char *);
+#endif
 
 /* Bootstrap */
 PyAPI_FUNC(int) Py_Main(int argc, wchar_t **argv);
 
+#ifndef Py_LIMITED_API
 /* Use macros for a bunch of old variants */
 #define PyRun_String(str, s, g, l) PyRun_StringFlags(str, s, g, l, NULL)
 #define PyRun_AnyFile(fp, name) PyRun_AnyFileExFlags(fp, name, 0, NULL)
@@ -107,6 +119,7 @@ PyAPI_FUNC(int) Py_Main(int argc, wchar_t **argv);
     PyRun_FileExFlags(fp, p, s, g, l, c, NULL)
 #define PyRun_FileFlags(fp, p, s, g, l, flags) \
     PyRun_FileExFlags(fp, p, s, g, l, 0, flags)
+#endif
 
 /* In getpath.c */
 PyAPI_FUNC(wchar_t *) Py_GetProgramFullPath(void);
@@ -150,7 +163,9 @@ PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
 
 /* Stuff with no proper home (yet) */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);
+#endif
 PyAPI_DATA(int) (*PyOS_InputHook)(void);
 PyAPI_DATA(char) *(*PyOS_ReadlineFunctionPointer)(FILE *, FILE *, char *);
 PyAPI_DATA(PyThreadState*) _PyOS_ReadlineTState;

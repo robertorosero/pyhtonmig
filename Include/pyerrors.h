@@ -65,6 +65,7 @@ PyAPI_FUNC(PyObject *) PyErr_Occurred(void);
 PyAPI_FUNC(void) PyErr_Clear(void);
 PyAPI_FUNC(void) PyErr_Fetch(PyObject **, PyObject **, PyObject **);
 PyAPI_FUNC(void) PyErr_Restore(PyObject *, PyObject *, PyObject *);
+PyAPI_FUNC(void) Py_FatalError(const char *message);
 
 #ifdef Py_DEBUG
 #define _PyErr_OCCURRED() PyErr_Occurred()

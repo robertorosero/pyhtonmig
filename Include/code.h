@@ -1,5 +1,6 @@
 /* Definitions for bytecode */
 
+#ifndef Py_LIMITED_API
 #ifndef Py_CODE_H
 #define Py_CODE_H
 #ifdef __cplusplus
@@ -103,3 +104,4 @@ PyAPI_FUNC(PyObject*) PyCode_Optimize(PyObject *code, PyObject* consts,
 }
 #endif
 #endif /* !Py_CODE_H */
+#endif /* Py_LIMITED_API */
