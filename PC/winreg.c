@@ -765,8 +765,9 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
             else {
                 if (!PyUnicode_Check(value))
                     return FALSE;
-
-                *retDataSize = 2 + PyUnicode_GET_DATA_SIZE(value);
+                *retDataSize = Py_SAFE_DOWNCAST(
+                                   2 + PyUnicode_GET_DATA_SIZE(value),
+                                   size_t, DWORD);
             }
             *retDataBuf = (BYTE *)PyMem_NEW(DWORD, *retDataSize);
             if (*retDataBuf==NULL){
@@ -798,7 +799,8 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
                     t = PyList_GET_ITEM(value, j);
                     if (!PyUnicode_Check(t))
                         return FALSE;
-                    size += 2 + PyUnicode_GET_DATA_SIZE(t);
+                    size += Py_SAFE_DOWNCAST(2 + PyUnicode_GET_DATA_SIZE(t),
+                                             size_t, DWORD);
                 }
 
                 *retDataSize = size + 2;
@@ -848,7 +850,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
                     PyErr_NoMemory();
                     return FALSE;
                 }
-                *retDataSize = view.len;
+                *retDataSize = Py_SAFE_DOWNCAST(view.len, Py_ssize_t, DWORD);
                 memcpy(*retDataBuf, view.buf, view.len);
                 PyBuffer_Release(&view);
             }
@@ -1129,7 +1131,7 @@ PyEnumValue(PyObject *self, PyObject *args)
     int index;
     long rc;
     wchar_t *retValueBuf;
-    wchar_t *tmpBuf;
+    BYTE *tmpBuf;
     BYTE *retDataBuf;
     DWORD retValueSize, bufValueSize;
     DWORD retDataSize, bufDataSize;
@@ -1177,7 +1179,7 @@ PyEnumValue(PyObject *self, PyObject *args)
             break;
 
         bufDataSize *= 2;
-        tmpBuf = (wchar_t *)PyMem_Realloc(retDataBuf, bufDataSize);
+        tmpBuf = (BYTE *)PyMem_Realloc(retDataBuf, bufDataSize);
         if (tmpBuf == NULL) {
             PyErr_NoMemory();
             retVal = NULL;

@@ -305,10 +305,10 @@ APIs:
    |                   |                     | *NULL*).                       |
    +-------------------+---------------------+--------------------------------+
    | :attr:`%S`        | PyObject\*          | The result of calling          |
-   |                   |                     | :func:`PyObject_Str`.          |
+   |                   |                     | :cfunc:`PyObject_Str`.         |
    +-------------------+---------------------+--------------------------------+
    | :attr:`%R`        | PyObject\*          | The result of calling          |
-   |                   |                     | :func:`PyObject_Repr`.         |
+   |                   |                     | :cfunc:`PyObject_Repr`.        |
    +-------------------+---------------------+--------------------------------+
 
    An unrecognized format character causes all the rest of the format string to be
@@ -320,13 +320,12 @@ APIs:
       when :const:`HAVE_LONG_LONG` is defined.
 
    .. versionchanged:: 3.2
-      Support for `"%lld"` and `"%llu"` added.
-
+      Support for ``"%lld"`` and ``"%llu"`` added.
 
 
 .. cfunction:: PyObject* PyUnicode_FromFormatV(const char *format, va_list vargs)
 
-   Identical to :func:`PyUnicode_FromFormat` except that it takes exactly two
+   Identical to :cfunc:`PyUnicode_FromFormat` except that it takes exactly two
    arguments.
 
 
@@ -376,16 +375,30 @@ To encode and decode file names and other environment strings,
 :cdata:`Py_FileSystemEncoding` should be used as the encoding, and
 ``"surrogateescape"`` should be used as the error handler (:pep:`383`). To
 encode file names during argument parsing, the ``"O&"`` converter should be
-used, passsing :func:PyUnicode_FSConverter as the conversion function:
+used, passsing :cfunc:`PyUnicode_FSConverter` as the conversion function:
 
 .. cfunction:: int PyUnicode_FSConverter(PyObject* obj, void* result)
 
-   Convert *obj* into *result*, using :cdata:`Py_FileSystemDefaultEncoding`,
-   and the ``"surrogateescape"`` error handler. *result* must be a
-   ``PyObject*``, return a :func:`bytes` object which must be released if it
-   is no longer used.
+   ParseTuple converter: encode :class:`str` objects to :class:`bytes` using
+   :cfunc:`PyUnicode_EncodeFSDefault`; :class:`bytes` objects are output as-is.
+   *result* must be a :ctype:`PyBytesObject*` which must be released when it is
+   no longer used.
 
    .. versionadded:: 3.1
+
+
+To decode file names during argument parsing, the ``"O&"`` converter should be
+used, passsing :cfunc:`PyUnicode_FSDecoder` as the conversion function:
+
+.. cfunction:: int PyUnicode_FSDecoder(PyObject* obj, void* result)
+
+   ParseTuple converter: decode :class:`bytes` objects to :class:`str` using
+   :cfunc:`PyUnicode_DecodeFSDefaultAndSize`; :class:`str` objects are output
+   as-is. *result* must be a :ctype:`PyUnicodeObject*` which must be released
+   when it is no longer used.
+
+   .. versionadded:: 3.2
+
 
 .. cfunction:: PyObject* PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
 
@@ -394,7 +407,7 @@ used, passsing :func:PyUnicode_FSConverter as the conversion function:
 
    If :cdata:`Py_FileSystemDefaultEncoding` is not set, fall back to UTF-8.
 
-   Use :func:`PyUnicode_DecodeFSDefaultAndSize` if you know the string length.
+   Use :cfunc:`PyUnicode_DecodeFSDefaultAndSize` if you know the string length.
 
 
 .. cfunction:: PyObject* PyUnicode_DecodeFSDefault(const char *s)
@@ -668,6 +681,38 @@ These are the UTF-16 codec APIs:
    Return a Python byte string using the UTF-16 encoding in native byte
    order. The string always starts with a BOM mark.  Error handling is "strict".
    Return *NULL* if an exception was raised by the codec.
+
+
+UTF-7 Codecs
+""""""""""""
+
+These are the UTF-7 codec APIs:
+
+
+.. cfunction:: PyObject* PyUnicode_DecodeUTF7(const char *s, Py_ssize_t size, const char *errors)
+
+   Create a Unicode object by decoding *size* bytes of the UTF-7 encoded string
+   *s*.  Return *NULL* if an exception was raised by the codec.
+
+
+.. cfunction:: PyObject* PyUnicode_DecodeUTF7Stateful(const char *s, Py_ssize_t size, const char *errors, Py_ssize_t *consumed)
+
+   If *consumed* is *NULL*, behave like :cfunc:`PyUnicode_DecodeUTF7`.  If
+   *consumed* is not *NULL*, trailing incomplete UTF-7 base-64 sections will not
+   be treated as an error.  Those bytes will not be decoded and the number of
+   bytes that have been decoded will be stored in *consumed*.
+
+
+.. cfunction:: PyObject* PyUnicode_EncodeUTF7(const Py_UNICODE *s, Py_ssize_t size, int base64SetO, int base64WhiteSpace, const char *errors)
+
+   Encode the :ctype:`Py_UNICODE` buffer of the given size using UTF-7 and
+   return a Python bytes object.  Return *NULL* if an exception was raised by
+   the codec.
+
+   If *base64SetO* is nonzero, "Set O" (punctuation that has no otherwise
+   special meaning) will be encoded in base-64.  If *base64WhiteSpace* is
+   nonzero, whitespace will be encoded in base-64.  Both are set to zero for the
+   Python "utf-7" codec.
 
 
 Unicode-Escape Codecs

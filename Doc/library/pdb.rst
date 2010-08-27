@@ -44,10 +44,14 @@ example::
    python3 -m pdb myscript.py
 
 When invoked as a script, pdb will automatically enter post-mortem debugging if
-the program being debugged exits abnormally. After post-mortem debugging (or
-after normal exit of the program), pdb will restart the program. Automatic
+the program being debugged exits abnormally.  After post-mortem debugging (or
+after normal exit of the program), pdb will restart the program.  Automatic
 restarting preserves pdb's state (such as breakpoints) and in most cases is more
 useful than quitting the debugger upon program's exit.
+
+.. versionadded:: 3.2
+   :file:`pdb.py` now accepts a ``-c`` option that executes commands as if given
+   in a :file:`.pdbrc` file, see :ref:`debugger-commands`.
 
 The typical usage to break into the debugger from a running program is to
 insert ::
@@ -81,21 +85,21 @@ slightly different way:
 
 .. function:: run(statement, globals=None, locals=None)
 
-   Execute the *statement* (given as a string) under debugger control.  The
-   debugger prompt appears before any code is executed; you can set breakpoints
-   and type :pdbcmd:`continue`, or you can step through the statement using
-   :pdbcmd:`step` or :pdbcmd:`next` (all these commands are explained below).
-   The optional *globals* and *locals* arguments specify the environment in
-   which the code is executed; by default the dictionary of the module
-   :mod:`__main__` is used.  (See the explanation of the built-in :func:`exec`
-   or :func:`eval` functions.)
+   Execute the *statement* (given as a string or a code object) under debugger
+   control.  The debugger prompt appears before any code is executed; you can
+   set breakpoints and type :pdbcmd:`continue`, or you can step through the
+   statement using :pdbcmd:`step` or :pdbcmd:`next` (all these commands are
+   explained below).  The optional *globals* and *locals* arguments specify the
+   environment in which the code is executed; by default the dictionary of the
+   module :mod:`__main__` is used.  (See the explanation of the built-in
+   :func:`exec` or :func:`eval` functions.)
 
 
 .. function:: runeval(expression, globals=None, locals=None)
 
-   Evaluate the *expression* (given as a string) under debugger control.  When
-   :func:`runeval` returns, it returns the value of the expression.  Otherwise
-   this function is similar to :func:`run`.
+   Evaluate the *expression* (given as a string or a code object) under debugger
+   control.  When :func:`runeval` returns, it returns the value of the
+   expression.  Otherwise this function is similar to :func:`run`.
 
 
 .. function:: runcall(function, *args, **kwds)
@@ -201,6 +205,11 @@ directory, it is read in and executed as if it had been typed at the debugger
 prompt.  This is particularly useful for aliases.  If both files exist, the one
 in the home directory is read first and aliases defined there can be overridden
 by the local file.
+
+.. versionchanged:: 3.2
+   :file:`.pdbrc` can now contain commands that continue debugging, such as
+   :pdbcmd:`continue` or :pdbcmd:`next`.  Previously, these commands had no
+   effect.
 
 
 .. pdbcommand:: h(elp) [command]
@@ -321,10 +330,17 @@ by the local file.
    executes called functions at (nearly) full speed, only stopping at the next
    line in the current function.)
 
-.. pdbcommand:: unt(il)
+.. pdbcommand:: unt(il) [lineno]
 
-   Continue execution until the line with the line number greater than the
-   current one is reached or when returning from current frame.
+   Without argument, continue execution until the line with a number greater
+   than the current one is reached.
+
+   With a line number, continue execution until a line with a number greater or
+   equal to that is reached.  In both cases, also stop when the current frame
+   returns.
+
+   .. versionchanged:: 3.2
+      Allow giving an explicit line number.
 
 .. pdbcommand:: r(eturn)
 
@@ -347,9 +363,25 @@ by the local file.
 .. pdbcommand:: l(ist) [first[, last]]
 
    List source code for the current file.  Without arguments, list 11 lines
-   around the current line or continue the previous listing.  With one argument,
+   around the current line or continue the previous listing.  With ``.`` as
+   argument, list 11 lines around the current line.  With one argument,
    list 11 lines around at that line.  With two arguments, list the given range;
    if the second argument is less than the first, it is interpreted as a count.
+
+   The current line in the current frame is indicated by ``->``.  If an
+   exception is being debugged, the line where the exception was originally
+   raised or propagated is indicated by ``>>``, if it differs from the current
+   line.
+
+   .. versionadded:: 3.2
+      The ``>>`` marker.
+
+.. pdbcommand:: ll | longlist
+
+   List all source code for the current function or frame.  Interesting lines
+   are marked as for :pdbcmd:`list`.
+
+   .. versionadded:: 3.2
 
 .. pdbcommand:: a(rgs)
 
@@ -367,6 +399,12 @@ by the local file.
 .. pdbcommand:: whatis expression
 
    Print the type of the *expression*.
+
+.. pdbcommand:: source expression
+
+   Try to get source code for the given object and display it.
+
+   .. versionadded:: 3.2
 
 .. _debugger-aliases:
 
@@ -387,9 +425,9 @@ by the local file.
    As an example, here are two useful aliases (especially when placed in the
    :file:`.pdbrc` file)::
 
-      #Print instance variables (usage "pi classInst")
+      # Print instance variables (usage "pi classInst")
       alias pi for k in %1.__dict__.keys(): print("%1.",k,"=",%1.__dict__[k])
-      #Print instance variables in self
+      # Print instance variables in self
       alias ps pi self
 
 .. pdbcommand:: unalias name

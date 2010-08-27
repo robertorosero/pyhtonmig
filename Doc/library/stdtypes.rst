@@ -217,14 +217,15 @@ Numeric Types --- :class:`int`, :class:`float`, :class:`complex`
 There are three distinct numeric types: :dfn:`integers`, :dfn:`floating
 point numbers`, and :dfn:`complex numbers`.  In addition, Booleans are a
 subtype of integers.  Integers have unlimited precision.  Floating point
-numbers are implemented using :ctype:`double` in C---all bets on their
-precision are off unless you happen to know the machine you are working
-with. Complex numbers have a real and imaginary part, which are each
-implemented using :ctype:`double` in C.  To extract these parts from a
-complex number *z*, use ``z.real`` and ``z.imag``. (The standard library
-includes additional numeric types, :mod:`fractions` that hold rationals,
-and :mod:`decimal` that hold floating-point numbers with user-definable
-precision.)
+numbers are usually implemented using :ctype:`double` in C; information
+about the precision and internal representation of floating point
+numbers for the machine on which your program is running is available
+in :data:`sys.float_info`.  Complex numbers have a real and imaginary
+part, which are each a floating point number.  To extract these parts
+from a complex number *z*, use ``z.real`` and ``z.imag``. (The standard
+library includes additional numeric types, :mod:`fractions` that hold
+rationals, and :mod:`decimal` that hold floating-point numbers with
+user-definable precision.)
 
 .. index::
    pair: numeric; literals
@@ -458,7 +459,7 @@ Additional Methods on Integer Types
 
     .. versionadded:: 3.1
 
-    .. method:: int.to_bytes(length, byteorder, \*, signed=False)
+.. method:: int.to_bytes(length, byteorder, \*, signed=False)
 
     Return an array of bytes representing an integer.
 
@@ -490,7 +491,7 @@ Additional Methods on Integer Types
 
     .. versionadded:: 3.2
 
-    .. classmethod:: int.from_bytes(bytes, byteorder, \*, signed=False)
+.. classmethod:: int.from_bytes(bytes, byteorder, \*, signed=False)
 
     Return the integer represented by the given array of bytes.
 
@@ -995,7 +996,8 @@ functions based on regular expressions.
    list of possible encodings, see section :ref:`standard-encodings`.
 
    .. versionchanged:: 3.1
-      Added support for keyword arguments added.
+      Support for keyword arguments added.
+
 
 .. method:: str.endswith(suffix[, start[, end]])
 
@@ -1329,10 +1331,6 @@ functions based on regular expressions.
 
    You can use :meth:`str.maketrans` to create a translation map from
    character-to-character mappings in different formats.
-
-   You can use the :func:`~string.maketrans` helper function in the :mod:`string`
-   module to create a translation table. For string objects, set the *table*
-   argument to ``None`` for translations that only delete characters:
 
    .. note::
 
@@ -2141,8 +2139,8 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
    .. method:: update([other])
 
-     Update the dictionary with the key/value pairs from *other*, overwriting
-     existing keys.  Return ``None``.
+      Update the dictionary with the key/value pairs from *other*, overwriting
+      existing keys.  Return ``None``.
 
       :meth:`update` accepts either another dictionary object or an iterable of
       key/value pairs (as a tuple or other iterable of length two).  If keyword

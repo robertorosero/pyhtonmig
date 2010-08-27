@@ -16,8 +16,21 @@ import array
 from weakref import proxy
 import signal
 
+def try_address(host, port=0, family=socket.AF_INET):
+    """Try to bind a socket on the given host:port and return True
+    if that has been possible."""
+    try:
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        sock.bind((host, port))
+    except (socket.error, socket.gaierror):
+        return False
+    else:
+        sock.close()
+        return True
+
 HOST = support.HOST
 MSG = b'Michael Gilfix was here\n'
+SUPPORTS_IPV6 = socket.has_ipv6 and try_address('::1', family=socket.AF_INET6)
 
 try:
     import _thread as thread
@@ -564,6 +577,78 @@ class GeneralModuleTests(unittest.TestCase):
         self.assertRaises(ValueError, s.ioctl, -1, None)
         s.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 100, 100))
 
+    def testGetaddrinfo(self):
+        try:
+            socket.getaddrinfo('localhost', 80)
+        except socket.gaierror as err:
+            if err.errno == socket.EAI_SERVICE:
+                # see http://bugs.python.org/issue1282647
+                self.skipTest("buggy libc version")
+            raise
+        # len of every sequence is supposed to be == 5
+        for info in socket.getaddrinfo(HOST, None):
+            self.assertEqual(len(info), 5)
+        # host can be a domain name, a string representation of an
+        # IPv4/v6 address or None
+        socket.getaddrinfo('localhost', 80)
+        socket.getaddrinfo('127.0.0.1', 80)
+        socket.getaddrinfo(None, 80)
+        if SUPPORTS_IPV6:
+            socket.getaddrinfo('::1', 80)
+        # port can be a string service name such as "http", a numeric
+        # port number or None
+        socket.getaddrinfo(HOST, "http")
+        socket.getaddrinfo(HOST, 80)
+        socket.getaddrinfo(HOST, None)
+        # test family and socktype filters
+        infos = socket.getaddrinfo(HOST, None, socket.AF_INET)
+        for family, _, _, _, _ in infos:
+            self.assertEqual(family, socket.AF_INET)
+        infos = socket.getaddrinfo(HOST, None, 0, socket.SOCK_STREAM)
+        for _, socktype, _, _, _ in infos:
+            self.assertEqual(socktype, socket.SOCK_STREAM)
+        # test proto and flags arguments
+        socket.getaddrinfo(HOST, None, 0, 0, socket.SOL_TCP)
+        socket.getaddrinfo(HOST, None, 0, 0, 0, socket.AI_PASSIVE)
+        # a server willing to support both IPv4 and IPv6 will
+        # usually do this
+        socket.getaddrinfo(None, 0, socket.AF_UNSPEC, socket.SOCK_STREAM, 0,
+                           socket.AI_PASSIVE)
+        # test keyword arguments
+        a = socket.getaddrinfo(HOST, None)
+        b = socket.getaddrinfo(host=HOST, port=None)
+        self.assertEqual(a, b)
+        a = socket.getaddrinfo(HOST, None, socket.AF_INET)
+        b = socket.getaddrinfo(HOST, None, family=socket.AF_INET)
+        self.assertEqual(a, b)
+        a = socket.getaddrinfo(HOST, None, 0, socket.SOCK_STREAM)
+        b = socket.getaddrinfo(HOST, None, type=socket.SOCK_STREAM)
+        self.assertEqual(a, b)
+        a = socket.getaddrinfo(HOST, None, 0, 0, socket.SOL_TCP)
+        b = socket.getaddrinfo(HOST, None, proto=socket.SOL_TCP)
+        self.assertEqual(a, b)
+        a = socket.getaddrinfo(HOST, None, 0, 0, 0, socket.AI_PASSIVE)
+        b = socket.getaddrinfo(HOST, None, flags=socket.AI_PASSIVE)
+        self.assertEqual(a, b)
+        a = socket.getaddrinfo(None, 0, socket.AF_UNSPEC, socket.SOCK_STREAM, 0,
+                               socket.AI_PASSIVE)
+        b = socket.getaddrinfo(host=None, port=0, family=socket.AF_UNSPEC,
+                               type=socket.SOCK_STREAM, proto=0,
+                               flags=socket.AI_PASSIVE)
+        self.assertEqual(a, b)
+
+    def test_getnameinfo(self):
+        # only IP addresses are allowed
+        self.assertRaises(socket.error, socket.getnameinfo, ('mail.python.org',0), 0)
+
+    def test_idna(self):
+        # these should all be successful
+        socket.gethostbyname('испытание.python.org')
+        socket.gethostbyname_ex('испытание.python.org')
+        socket.getaddrinfo('испытание.python.org',0,socket.AF_UNSPEC,socket.SOCK_STREAM)
+        # this may not work if the forward lookup choses the IPv6 address, as that doesn't
+        # have a reverse entry yet
+        # socket.gethostbyaddr('испытание.python.org')
 
 @unittest.skipUnless(thread, 'Threading required for this test.')
 class BasicTCPTest(SocketConnectedTest):
@@ -654,6 +739,23 @@ class BasicTCPTest(SocketConnectedTest):
     def _testShutdown(self):
         self.serv_conn.send(MSG)
         self.serv_conn.shutdown(2)
+
+    def testDetach(self):
+        # Testing detach()
+        fileno = self.cli_conn.fileno()
+        f = self.cli_conn.detach()
+        self.assertEqual(f, fileno)
+        # cli_conn cannot be used anymore...
+        self.assertRaises(socket.error, self.cli_conn.recv, 1024)
+        self.cli_conn.close()
+        # ...but we can create another socket using the (still open)
+        # file descriptor
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, fileno=f)
+        msg = sock.recv(1024)
+        self.assertEqual(msg, MSG)
+
+    def _testDetach(self):
+        self.serv_conn.send(MSG)
 
 @unittest.skipUnless(thread, 'Threading required for this test.')
 class BasicUDPTest(ThreadedUDPSocketTest):

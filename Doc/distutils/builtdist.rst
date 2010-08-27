@@ -141,13 +141,13 @@ The following sections give details on the individual :command:`bdist_\*`
 commands.
 
 
-.. _creating-dumb:
+.. .. _creating-dumb:
 
-Creating dumb built distributions
-=================================
+.. Creating dumb built distributions
+.. =================================
 
 .. XXX Need to document absolute vs. prefix-relative packages here, but first
-       I have to implement it!
+   I have to implement it!
 
 
 .. _creating-rpms:
@@ -176,7 +176,7 @@ easily specify multiple formats in one run.  If you need to do both, you can
 explicitly specify multiple :command:`bdist_\*` commands and their options::
 
    python setup.py bdist_rpm --packager="John Doe <jdoe@example.org>" \
-                   bdist_wininst --target_version="2.0"
+                   bdist_wininst --target-version="2.0"
 
 Creating RPM packages is driven by a :file:`.spec` file, much as using the
 Distutils is driven by the setup script.  To make your life easier, the
@@ -241,8 +241,7 @@ tedious and error-prone, so it's usually best to put them in the setup
 configuration file, :file:`setup.cfg`\ ---see section :ref:`setup-config`.  If
 you distribute or package many Python module distributions, you might want to
 put options that apply to all of them in your personal Distutils configuration
-file (:file:`~/.pydistutils.cfg`).  If you want to temporarily disable
-this file, you can pass the --no-user-cfg option to setup.py.
+file (:file:`~/.pydistutils.cfg`).
 
 There are three steps to building a binary RPM package, all of which are
 handled automatically by the Distutils:

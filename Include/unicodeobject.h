@@ -200,6 +200,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_FromUnicode PyUnicodeUCS2_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS2_FromWideChar
 # define PyUnicode_FSConverter PyUnicodeUCS2_FSConverter
+# define PyUnicode_FSDecoder PyUnicodeUCS2_FSDecoder
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS2_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS2_GetMax
 # define PyUnicode_GetSize PyUnicodeUCS2_GetSize
@@ -220,24 +221,6 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS2_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS2_Fini
 # define _PyUnicode_Init _PyUnicodeUCS2_Init
-# define _PyUnicode_IsAlpha _PyUnicodeUCS2_IsAlpha
-# define _PyUnicode_IsDecimalDigit _PyUnicodeUCS2_IsDecimalDigit
-# define _PyUnicode_IsDigit _PyUnicodeUCS2_IsDigit
-# define _PyUnicode_IsLinebreak _PyUnicodeUCS2_IsLinebreak
-# define _PyUnicode_IsLowercase _PyUnicodeUCS2_IsLowercase
-# define _PyUnicode_IsNumeric _PyUnicodeUCS2_IsNumeric
-# define _PyUnicode_IsPrintable _PyUnicodeUCS2_IsPrintable
-# define _PyUnicode_IsTitlecase _PyUnicodeUCS2_IsTitlecase
-# define _PyUnicode_IsXidStart _PyUnicodeUCS2_IsXidStart
-# define _PyUnicode_IsXidContinue _PyUnicodeUCS2_IsXidContinue
-# define _PyUnicode_IsUppercase _PyUnicodeUCS2_IsUppercase
-# define _PyUnicode_IsWhitespace _PyUnicodeUCS2_IsWhitespace
-# define _PyUnicode_ToDecimalDigit _PyUnicodeUCS2_ToDecimalDigit
-# define _PyUnicode_ToDigit _PyUnicodeUCS2_ToDigit
-# define _PyUnicode_ToLowercase _PyUnicodeUCS2_ToLowercase
-# define _PyUnicode_ToNumeric _PyUnicodeUCS2_ToNumeric
-# define _PyUnicode_ToTitlecase _PyUnicodeUCS2_ToTitlecase
-# define _PyUnicode_ToUppercase _PyUnicodeUCS2_ToUppercase
 
 #else
 
@@ -300,6 +283,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_FromUnicode PyUnicodeUCS4_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS4_FromWideChar
 # define PyUnicode_FSConverter PyUnicodeUCS4_FSConverter
+# define PyUnicode_FSDecoder PyUnicodeUCS4_FSDecoder
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS4_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS4_GetMax
 # define PyUnicode_GetSize PyUnicodeUCS4_GetSize
@@ -320,24 +304,6 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS4_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS4_Fini
 # define _PyUnicode_Init _PyUnicodeUCS4_Init
-# define _PyUnicode_IsAlpha _PyUnicodeUCS4_IsAlpha
-# define _PyUnicode_IsDecimalDigit _PyUnicodeUCS4_IsDecimalDigit
-# define _PyUnicode_IsDigit _PyUnicodeUCS4_IsDigit
-# define _PyUnicode_IsLinebreak _PyUnicodeUCS4_IsLinebreak
-# define _PyUnicode_IsLowercase _PyUnicodeUCS4_IsLowercase
-# define _PyUnicode_IsNumeric _PyUnicodeUCS4_IsNumeric
-# define _PyUnicode_IsPrintable _PyUnicodeUCS4_IsPrintable
-# define _PyUnicode_IsTitlecase _PyUnicodeUCS4_IsTitlecase
-# define _PyUnicode_IsXidStart _PyUnicodeUCS4_IsXidStart
-# define _PyUnicode_IsXidContinue _PyUnicodeUCS4_IsXidContinue
-# define _PyUnicode_IsUppercase _PyUnicodeUCS4_IsUppercase
-# define _PyUnicode_IsWhitespace _PyUnicodeUCS4_IsWhitespace
-# define _PyUnicode_ToDecimalDigit _PyUnicodeUCS4_ToDecimalDigit
-# define _PyUnicode_ToDigit _PyUnicodeUCS4_ToDigit
-# define _PyUnicode_ToLowercase _PyUnicodeUCS4_ToLowercase
-# define _PyUnicode_ToNumeric _PyUnicodeUCS4_ToNumeric
-# define _PyUnicode_ToTitlecase _PyUnicodeUCS4_ToTitlecase
-# define _PyUnicode_ToUppercase _PyUnicodeUCS4_ToUppercase
 
 
 #endif
@@ -349,7 +315,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
    configure Python using --with-wctype-functions.  This reduces the
    interpreter's code size. */
 
-#if defined(HAVE_USABLE_WCHAR_T) && defined(WANT_WCTYPE_FUNCTIONS)
+#if defined(Py_UNICODE_WIDE) && defined(HAVE_USABLE_WCHAR_T) && defined(WANT_WCTYPE_FUNCTIONS)
 
 #include <wctype.h>
 
@@ -1239,11 +1205,15 @@ PyAPI_FUNC(int) PyUnicode_EncodeDecimal(
 
 /* --- File system encoding ---------------------------------------------- */
 
-/* ParseTuple converter which converts a Unicode object into the file
-   system encoding as a bytes object, using the "surrogateescape" error
-   handler; bytes objects are output as-is. */
+/* ParseTuple converter: encode str objects to bytes using
+   PyUnicode_EncodeFSDefault(); bytes objects are output as-is. */
 
 PyAPI_FUNC(int) PyUnicode_FSConverter(PyObject*, void*);
+
+/* ParseTuple converter: decode bytes objects to unicode using
+   PyUnicode_DecodeFSDefaultAndSize(); str objects are output as-is. */
+
+PyAPI_FUNC(int) PyUnicode_FSDecoder(PyObject*, void*);
 
 /* Decode a null-terminated string using Py_FileSystemDefaultEncoding
    and the "surrogateescape" error handler.
@@ -1536,90 +1506,109 @@ PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
 */
 
 PyAPI_FUNC(int) _PyUnicode_IsLowercase(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsUppercase(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsTitlecase(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsXidStart(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsXidContinue(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsWhitespace(
-    const Py_UNICODE ch         /* Unicode character */
+    const Py_UCS4 ch         /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsLinebreak(
-    const Py_UNICODE ch         /* Unicode character */
+    const Py_UCS4 ch         /* Unicode character */
     );
 
-PyAPI_FUNC(Py_UNICODE) _PyUnicode_ToLowercase(
-    Py_UNICODE ch       /* Unicode character */
+PyAPI_FUNC(Py_UCS4) _PyUnicode_ToLowercase(
+    Py_UCS4 ch       /* Unicode character */
     );
 
-PyAPI_FUNC(Py_UNICODE) _PyUnicode_ToUppercase(
-    Py_UNICODE ch       /* Unicode character */
+PyAPI_FUNC(Py_UCS4) _PyUnicode_ToUppercase(
+    Py_UCS4 ch       /* Unicode character */
     );
 
-PyAPI_FUNC(Py_UNICODE) _PyUnicode_ToTitlecase(
-    Py_UNICODE ch       /* Unicode character */
+PyAPI_FUNC(Py_UCS4) _PyUnicode_ToTitlecase(
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_ToDecimalDigit(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_ToDigit(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(double) _PyUnicode_ToNumeric(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsDecimalDigit(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsDigit(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsNumeric(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsPrintable(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
 PyAPI_FUNC(int) _PyUnicode_IsAlpha(
-    Py_UNICODE ch       /* Unicode character */
+    Py_UCS4 ch       /* Unicode character */
     );
 
-PyAPI_FUNC(size_t) Py_UNICODE_strlen(const Py_UNICODE *u);
+PyAPI_FUNC(size_t) Py_UNICODE_strlen(
+    const Py_UNICODE *u
+    );
 
 PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strcpy(
-    Py_UNICODE *s1, const Py_UNICODE *s2);
+    Py_UNICODE *s1,
+    const Py_UNICODE *s2);
 
 PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strncpy(
-    Py_UNICODE *s1, const Py_UNICODE *s2, size_t n);
+    Py_UNICODE *s1,
+    const Py_UNICODE *s2,
+    size_t n);
 
 PyAPI_FUNC(int) Py_UNICODE_strcmp(
-    const Py_UNICODE *s1, const Py_UNICODE *s2);
+    const Py_UNICODE *s1,
+    const Py_UNICODE *s2
+    );
+
+PyAPI_FUNC(int) Py_UNICODE_strncmp(
+    const Py_UNICODE *s1,
+    const Py_UNICODE *s2,
+    size_t n
+    );
 
 PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strchr(
-    const Py_UNICODE *s, Py_UNICODE c
+    const Py_UNICODE *s,
+    Py_UNICODE c
+    );
+
+PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
+    const Py_UNICODE *s,
+    Py_UNICODE c
     );
 
 #ifdef __cplusplus

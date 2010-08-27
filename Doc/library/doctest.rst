@@ -574,8 +574,8 @@ doctest decides whether actual output matches an example's expected output:
    changed in Python 2.4 to say "does not" instead of "doesn't".
 
    .. versionchanged:: 3.2
-      :const:`IGNORE_EXCEPTION_DETAIL` now also ignores any information
-      relating to the module containing the exception under test
+      :const:`IGNORE_EXCEPTION_DETAIL` now also ignores any information relating
+      to the module containing the exception under test.
 
 
 .. data:: SKIP
@@ -1673,7 +1673,7 @@ There are two exceptions that may be raised by :class:`DebugRunner` instances:
 
 .. exception:: DocTestFailure(test, example, got)
 
-   An exception thrown by :class:`DocTestRunner` to signal that a doctest example's
+   An exception raised by :class:`DocTestRunner` to signal that a doctest example's
    actual output did not match its expected output. The constructor arguments are
    used to initialize the member variables of the same names.
 
@@ -1697,9 +1697,9 @@ There are two exceptions that may be raised by :class:`DebugRunner` instances:
 
 .. exception:: UnexpectedException(test, example, exc_info)
 
-   An exception thrown by :class:`DocTestRunner` to signal that a doctest example
-   raised an unexpected exception.  The constructor arguments are used to
-   initialize the member variables of the same names.
+   An exception raised by :class:`DocTestRunner` to signal that a doctest
+   example raised an unexpected exception.  The constructor arguments are used
+   to initialize the member variables of the same names.
 
 :exc:`UnexpectedException` defines the following member variables:
 

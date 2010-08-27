@@ -4,6 +4,7 @@ import unittest
 from test import support
 from weakref import proxy
 import pickle
+from random import choice
 
 @staticmethod
 def PythonPartial(func, *args, **keywords):
@@ -181,11 +182,11 @@ class TestUpdateWrapper(unittest.TestCase):
                 self.assertTrue(wrapped_attr[key] is wrapper_attr[key])
 
     def _default_update(self):
-        def f():
+        def f(a:'This is a new annotation'):
             """This is a test"""
             pass
         f.attr = 'This is also a test'
-        def wrapper():
+        def wrapper(b:'This is the prior annotation'):
             pass
         functools.update_wrapper(wrapper, f)
         return wrapper, f
@@ -193,8 +194,11 @@ class TestUpdateWrapper(unittest.TestCase):
     def test_default_update(self):
         wrapper, f = self._default_update()
         self.check_wrapper(wrapper, f)
+        self.assertIs(wrapper.__wrapped__, f)
         self.assertEqual(wrapper.__name__, 'f')
         self.assertEqual(wrapper.attr, 'This is also a test')
+        self.assertEqual(wrapper.__annotations__['a'], 'This is a new annotation')
+        self.assertNotIn('b', wrapper.__annotations__)
 
     @unittest.skipIf(sys.flags.optimize >= 2,
                      "Docstrings are omitted with -O2 and above")
@@ -213,6 +217,7 @@ class TestUpdateWrapper(unittest.TestCase):
         self.check_wrapper(wrapper, f, (), ())
         self.assertEqual(wrapper.__name__, 'wrapper')
         self.assertEqual(wrapper.__doc__, None)
+        self.assertEqual(wrapper.__annotations__, {})
         self.assertFalse(hasattr(wrapper, 'attr'))
 
     def test_selective_update(self):
@@ -232,6 +237,28 @@ class TestUpdateWrapper(unittest.TestCase):
         self.assertEqual(wrapper.attr, 'This is a different test')
         self.assertEqual(wrapper.dict_attr, f.dict_attr)
 
+    def test_missing_attributes(self):
+        def f():
+            pass
+        def wrapper():
+            pass
+        wrapper.dict_attr = {}
+        assign = ('attr',)
+        update = ('dict_attr',)
+        # Missing attributes on wrapped object are ignored
+        functools.update_wrapper(wrapper, f, assign, update)
+        self.assertNotIn('attr', wrapper.__dict__)
+        self.assertEqual(wrapper.dict_attr, {})
+        # Wrapper must have expected attributes for updating
+        del wrapper.dict_attr
+        with self.assertRaises(AttributeError):
+            functools.update_wrapper(wrapper, f, assign, update)
+        wrapper.dict_attr = 1
+        with self.assertRaises(AttributeError):
+            functools.update_wrapper(wrapper, f, assign, update)
+
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
     def test_builtin_update(self):
         # Test for bug #1576241
         def wrapper():
@@ -239,6 +266,7 @@ class TestUpdateWrapper(unittest.TestCase):
         functools.update_wrapper(wrapper, max)
         self.assertEqual(wrapper.__name__, 'max')
         self.assertTrue(wrapper.__doc__.startswith('max('))
+        self.assertEqual(wrapper.__annotations__, {})
 
 class TestWraps(TestUpdateWrapper):
 
@@ -316,10 +344,11 @@ class TestReduce(unittest.TestCase):
                     self.sofar.append(n*n)
                     n += 1
                 return self.sofar[i]
-
-        self.assertEqual(self.func(lambda x, y: x+y, ['a', 'b', 'c'], ''), 'abc')
+        def add(x, y):
+            return x + y
+        self.assertEqual(self.func(add, ['a', 'b', 'c'], ''), 'abc')
         self.assertEqual(
-            self.func(lambda x, y: x+y, [['a', 'c'], [], ['d', 'w']], []),
+            self.func(add, [['a', 'c'], [], ['d', 'w']], []),
             ['a','c','d','w']
         )
         self.assertEqual(self.func(lambda x, y: x*y, range(2,8), 1), 5040)
@@ -327,15 +356,27 @@ class TestReduce(unittest.TestCase):
             self.func(lambda x, y: x*y, range(2,21), 1),
             2432902008176640000
         )
-        self.assertEqual(self.func(lambda x, y: x+y, Squares(10)), 285)
-        self.assertEqual(self.func(lambda x, y: x+y, Squares(10), 0), 285)
-        self.assertEqual(self.func(lambda x, y: x+y, Squares(0), 0), 0)
+        self.assertEqual(self.func(add, Squares(10)), 285)
+        self.assertEqual(self.func(add, Squares(10), 0), 285)
+        self.assertEqual(self.func(add, Squares(0), 0), 0)
         self.assertRaises(TypeError, self.func)
         self.assertRaises(TypeError, self.func, 42, 42)
         self.assertRaises(TypeError, self.func, 42, 42, 42)
         self.assertEqual(self.func(42, "1"), "1") # func is never called with one item
         self.assertEqual(self.func(42, "", "1"), "1") # func is never called with one item
         self.assertRaises(TypeError, self.func, 42, (42, 42))
+        self.assertRaises(TypeError, self.func, add, []) # arg 2 must not be empty sequence with no initial value
+        self.assertRaises(TypeError, self.func, add, "")
+        self.assertRaises(TypeError, self.func, add, ())
+        self.assertRaises(TypeError, self.func, add, object())
+
+        class TestFailingIter:
+            def __iter__(self):
+                raise RuntimeError
+        self.assertRaises(RuntimeError, self.func, add, TestFailingIter())
+
+        self.assertEqual(self.func(add, [], None), None)
+        self.assertEqual(self.func(add, [], 42), 42)
 
         class BadSeq:
             def __getitem__(self, index):
@@ -440,7 +481,7 @@ class TestTotalOrdering(unittest.TestCase):
         # new methods should not overwrite existing
         @functools.total_ordering
         class A(int):
-            raise Exception()
+            pass
         self.assert_(A(1) < A(2))
         self.assert_(A(2) > A(1))
         self.assert_(A(1) <= A(2))
@@ -454,14 +495,79 @@ class TestTotalOrdering(unittest.TestCase):
             class A:
                 pass
 
+class TestLRU(unittest.TestCase):
+
+    def test_lru(self):
+        def orig(x, y):
+            return 3*x+y
+        f = functools.lru_cache(maxsize=20)(orig)
+
+        domain = range(5)
+        for i in range(1000):
+            x, y = choice(domain), choice(domain)
+            actual = f(x, y)
+            expected = orig(x, y)
+            self.assertEquals(actual, expected)
+        self.assert_(f.hits > f.misses)
+        self.assertEquals(f.hits + f.misses, 1000)
+
+        f.clear()   # test clearing
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 0)
+        f(x, y)
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 1)
+
+        # Test bypassing the cache
+        self.assertIs(f.__wrapped__, orig)
+        f.__wrapped__(x, y)
+        self.assertEqual(f.hits, 0)
+        self.assertEqual(f.misses, 1)
+
+        # test size zero (which means "never-cache")
+        @functools.lru_cache(0)
+        def f():
+            nonlocal f_cnt
+            f_cnt += 1
+            return 20
+        f_cnt = 0
+        for i in range(5):
+            self.assertEqual(f(), 20)
+        self.assertEqual(f_cnt, 5)
+
+        # test size one
+        @functools.lru_cache(1)
+        def f():
+            nonlocal f_cnt
+            f_cnt += 1
+            return 20
+        f_cnt = 0
+        for i in range(5):
+            self.assertEqual(f(), 20)
+        self.assertEqual(f_cnt, 1)
+
+        # test size two
+        @functools.lru_cache(2)
+        def f(x):
+            nonlocal f_cnt
+            f_cnt += 1
+            return x*10
+        f_cnt = 0
+        for x in 7, 9, 7, 9, 7, 9, 8, 8, 8, 9, 9, 9, 8, 8, 8, 7:
+            #    *  *              *                          *
+            self.assertEqual(f(x), x*10)
+        self.assertEqual(f_cnt, 4)
+
 def test_main(verbose=None):
     test_classes = (
         TestPartial,
         TestPartialSubclass,
         TestPythonPartial,
         TestUpdateWrapper,
+        TestTotalOrdering,
         TestWraps,
-        TestReduce
+        TestReduce,
+        TestLRU,
     )
     support.run_unittest(*test_classes)
 

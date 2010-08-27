@@ -99,7 +99,7 @@ from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
     urlparse, urlsplit, urljoin, unwrap, quote, unquote,
     splittype, splithost, splitport, splituser, splitpasswd,
-    splitattr, splitquery, splitvalue, to_bytes, urlunparse)
+    splitattr, splitquery, splitvalue, splittag, to_bytes, urlunparse)
 from urllib.response import addinfourl, addclosehook
 
 # check for SSL
@@ -163,6 +163,7 @@ class Request:
                  origin_req_host=None, unverifiable=False):
         # unwrap('<URL:type://host/path>') --> 'type://host/path'
         self.full_url = unwrap(url)
+        self.full_url, fragment = splittag(self.full_url)
         self.data = data
         self.headers = {}
         self._tunnel_host = None
@@ -777,6 +778,9 @@ class AbstractBasicAuthHandler:
         self.add_password = self.passwd.add_password
         self.retried = 0
 
+    def reset_retry_count(self):
+        self.retried = 0
+
     def http_error_auth_reqed(self, authreq, host, req, headers):
         # host may be an authority (without userinfo) or a URL with an
         # authority
@@ -795,7 +799,10 @@ class AbstractBasicAuthHandler:
             if mo:
                 scheme, quote, realm = mo.groups()
                 if scheme.lower() == 'basic':
-                    return self.retry_http_basic_auth(host, req, realm)
+                    response = self.retry_http_basic_auth(host, req, realm)
+                    if response and response.code != 401:
+                        self.retried = 0
+                    return response
 
     def retry_http_basic_auth(self, host, req, realm):
         user, pw = self.passwd.find_user_password(realm, host)
@@ -816,8 +823,10 @@ class HTTPBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
 
     def http_error_401(self, req, fp, code, msg, headers):
         url = req.full_url
-        return self.http_error_auth_reqed('www-authenticate',
+        response = self.http_error_auth_reqed('www-authenticate',
                                           url, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
@@ -830,8 +839,10 @@ class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
         # should not, RFC 3986 s. 3.2.1) support requests for URLs containing
         # userinfo.
         authority = req.host
-        return self.http_error_auth_reqed('proxy-authenticate',
+        response = self.http_error_auth_reqed('proxy-authenticate',
                                           authority, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 def randombytes(n):
@@ -1591,13 +1602,13 @@ class URLopener:
 
         if proxy_passwd:
             import base64
-            proxy_auth = base64.b64encode(proxy_passwd).strip()
+            proxy_auth = base64.b64encode(proxy_passwd.encode()).decode('ascii')
         else:
             proxy_auth = None
 
         if user_passwd:
             import base64
-            auth = base64.b64encode(user_passwd).strip()
+            auth = base64.b64encode(user_passwd.encode()).decode('ascii')
         else:
             auth = None
         http_conn = connection_factory(host)

@@ -377,54 +377,78 @@ else:
 TESTFN = "{}_{}_tmp".format(TESTFN, os.getpid())
 
 
-# Assuming sys.getfilesystemencoding()!=sys.getdefaultencoding()
-# TESTFN_UNICODE is a filename that can be encoded using the
-# file system encoding, but *not* with the default (ascii) encoding
-TESTFN_UNICODE = TESTFN + "-\xe0\xf2"
+# TESTFN_UNICODE is a non-ascii filename
+TESTFN_UNICODE = TESTFN + "-\xe0\xf2\u0258\u0141\u011f"
+if sys.platform == 'darwin':
+    # In Mac OS X's VFS API file names are, by definition, canonically
+    # decomposed Unicode, encoded using UTF-8. See QA1173:
+    # http://developer.apple.com/mac/library/qa/qa2001/qa1173.html
+    import unicodedata
+    TESTFN_UNICODE = unicodedata.normalize('NFD', TESTFN_UNICODE)
 TESTFN_ENCODING = sys.getfilesystemencoding()
-# TESTFN_UNICODE_UNENCODEABLE is a filename that should *not* be
-# able to be encoded by *either* the default or filesystem encoding.
-# This test really only makes sense on Windows NT platforms
-# which have special Unicode support in posixmodule.
-if (not hasattr(sys, "getwindowsversion") or
-        sys.getwindowsversion()[3] < 2): #  0=win32s or 1=9x/ME
-    TESTFN_UNICODE_UNENCODEABLE = None
-else:
-    # Japanese characters (I think - from bug 846133)
-    TESTFN_UNICODE_UNENCODEABLE = TESTFN + "-\u5171\u6709\u3055\u308c\u308b"
+
+# TESTFN_UNENCODABLE is a filename (str type) that should *not* be able to be
+# encoded by the filesystem encoding (in strict mode). It can be None if we
+# cannot generate such filename.
+TESTFN_UNENCODABLE = None
+if os.name in ('nt', 'ce'):
+    # skip win32s (0) or Windows 9x/ME (1)
+    if sys.getwindowsversion().platform >= 2:
+        # Japanese characters (I think - from bug 846133)
+        TESTFN_UNENCODABLE = TESTFN + "-\u5171\u6709\u3055\u308c\u308b"
+        try:
+            TESTFN_UNENCODABLE.encode(TESTFN_ENCODING)
+        except UnicodeEncodeError:
+            pass
+        else:
+            print('WARNING: The filename %r CAN be encoded by the filesystem encoding (%s). '
+                  'Unicode filename tests may not be effective'
+                  % (TESTFN_UNENCODABLE, TESTFN_ENCODING))
+            TESTFN_UNENCODABLE = None
+# Mac OS X denies unencodable filenames (invalid utf-8)
+elif sys.platform != 'darwin':
     try:
-        # XXX - Note - should be using TESTFN_ENCODING here - but for
-        # Windows, "mbcs" currently always operates as if in
-        # errors=ignore' mode - hence we get '?' characters rather than
-        # the exception.  'Latin1' operates as we expect - ie, fails.
-        # See [ 850997 ] mbcs encoding ignores errors
-        TESTFN_UNICODE_UNENCODEABLE.encode("Latin1")
-    except UnicodeEncodeError:
-        pass
+        # ascii and utf-8 cannot encode the byte 0xff
+        b'\xff'.decode(TESTFN_ENCODING)
+    except UnicodeDecodeError:
+        # 0xff will be encoded using the surrogate character u+DCFF
+        TESTFN_UNENCODABLE = TESTFN \
+            + b'-\xff'.decode(TESTFN_ENCODING, 'surrogateescape')
     else:
-        print('WARNING: The filename %r CAN be encoded by the filesystem.  '
-              'Unicode filename tests may not be effective'
-              % TESTFN_UNICODE_UNENCODEABLE)
+        # File system encoding (eg. ISO-8859-* encodings) can encode
+        # the byte 0xff. Skip some unicode filename tests.
+        pass
 
 # Save the initial cwd
 SAVEDCWD = os.getcwd()
 
 @contextlib.contextmanager
-def temp_cwd(name='tempcwd', quiet=False):
+def temp_cwd(name='tempcwd', quiet=False, path=None):
     """
-    Context manager that creates a temporary directory and set it as CWD.
+    Context manager that temporarily changes the CWD.
 
-    The new CWD is created in the current directory and it's named *name*.
-    If *quiet* is False (default) and it's not possible to create or change
-    the CWD, an error is raised.  If it's True, only a warning is raised
-    and the original CWD is used.
+    An existing path may be provided as *path*, in which case this
+    function makes no changes to the file system.
+
+    Otherwise, the new CWD is created in the current directory and it's
+    named *name*. If *quiet* is False (default) and it's not possible to
+    create or change the CWD, an error is raised.  If it's True, only a
+    warning is raised and the original CWD is used.
     """
     saved_dir = os.getcwd()
     is_temporary = False
+    if path is None:
+        path = name
+        try:
+            os.mkdir(name)
+            is_temporary = True
+        except OSError:
+            if not quiet:
+                raise
+            warnings.warn('tests may fail, unable to create temp CWD ' + name,
+                          RuntimeWarning, stacklevel=3)
     try:
-        os.mkdir(name)
-        os.chdir(name)
-        is_temporary = True
+        os.chdir(path)
     except OSError:
         if not quiet:
             raise
@@ -1243,3 +1267,21 @@ def swap_item(obj, item, new_val):
             yield
         finally:
             del obj[item]
+
+def strip_python_stderr(stderr):
+    """Strip the stderr of a Python process from potential debug output
+    emitted by the interpreter.
+
+    This will typically be run on the result of the communicate() method
+    of a subprocess.Popen object.
+    """
+    stderr = re.sub(br"\[\d+ refs\]\r?\n?$", b"", stderr).strip()
+    return stderr
+
+def workaroundIssue8611():
+    try:
+        sys.executable.encode('ascii')
+    except UnicodeEncodeError:
+        raise unittest.SkipTest(
+            "Issue #8611: Python doesn't support ascii locale encoding "
+            "with an non-ascii path")

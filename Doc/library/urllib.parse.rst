@@ -48,6 +48,23 @@ The :mod:`urllib.parse` module defines the following functions:
       >>> o.geturl()
       'http://www.cwi.nl:80/%7Eguido/Python.html'
 
+   If the scheme value is not specified, urlparse expects the netloc value to
+   start with '//', following the syntax specifications from :rfc:`1808`.
+   Otherwise, it is not possible to distinguish between netloc and path
+   components, and would the indistinguishable component would be classified
+   as the path as in a relative URL.
+
+       >>> from urlparse import urlparse
+       >>> urlparse('//www.cwi.nl:80/%7Eguido/Python.html')
+       ParseResult(scheme='', netloc='www.cwi.nl:80', path='/%7Eguido/Python.html',
+                  params='', query='', fragment='')
+       >>> urlparse('www.cwi.nl:80/%7Eguido/Python.html')
+       ParseResult(scheme='', netloc='', path='www.cwi.nl:80/%7Eguido/Python.html',
+                  params='', query='', fragment='')
+       >>> urlparse('help/Python.html')
+       ParseResult(scheme='', netloc='', path='help/Python.html', params='',
+                  query='', fragment='')
+
    If the *scheme* argument is specified, it gives the default addressing
    scheme, to be used only if the URL does not specify one.  The default value for
    this argument is the empty string.
@@ -100,7 +117,7 @@ The :mod:`urllib.parse` module defines the following functions:
    values are lists of values for each name.
 
    The optional argument *keep_blank_values* is a flag indicating whether blank
-   values in URL encoded queries should be treated as blank strings.   A true value
+   values in percent-encoded queries should be treated as blank strings. A true value
    indicates that blanks should be retained as  blank strings.  The default false
    value indicates that blank values are to be ignored and treated as if they were
    not included.
@@ -120,7 +137,7 @@ The :mod:`urllib.parse` module defines the following functions:
    name, value pairs.
 
    The optional argument *keep_blank_values* is a flag indicating whether blank
-   values in URL encoded queries should be treated as blank strings.   A true value
+   values in percent-encoded queries should be treated as blank strings. A true value
    indicates that blanks should be retained as  blank strings.  The default false
    value indicates that blank values are to be ignored and treated as if they were
    not included.
@@ -313,7 +330,7 @@ The :mod:`urllib.parse` module defines the following functions:
 .. function:: urlencode(query, doseq=False, safe='', encoding=None, errors=None)
 
    Convert a mapping object or a sequence of two-element tuples, which may
-   either be a :class:`str` or a :class:`bytes`,  to a "url-encoded" string,
+   either be a :class:`str` or a :class:`bytes`,  to a "percent-encoded" string,
    suitable to pass to :func:`urlopen` above as the optional *data* argument.
    This is useful to pass a dictionary of form fields to a ``POST`` request.
    The resulting string is a series of ``key=value`` pairs separated by ``'&'``
@@ -332,7 +349,7 @@ The :mod:`urllib.parse` module defines the following functions:
    parameters are sent the :func:`quote_plus` for encoding.
 
    .. versionchanged:: 3.2
-      query paramater supports bytes and string.
+      Query parameter supports bytes and string objects.
 
 
 .. seealso::

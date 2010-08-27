@@ -95,8 +95,9 @@ source.
       file is not available.
 
    If this option is given, the first element of :data:`sys.argv` will be the
-   full path to the module file. As with the :option:`-c` option, the current
-   directory will be added to the start of :data:`sys.path`.
+   full path to the module file (while the module file is being located, the
+   first element will be set to ``"-m"``). As with the :option:`-c` option,
+   the current directory will be added to the start of :data:`sys.path`.
 
    Many standard library modules contain code that is invoked on their execution
    as a script.  An example is the :mod:`timeit` module::
@@ -113,6 +114,7 @@ source.
 
    .. versionchanged:: 3.1
       Supply the package name to run a ``__main__`` submodule.
+
 
 .. describe:: -
 
@@ -440,11 +442,24 @@ These environment variables influence Python's behavior.
    import of source modules.
 
 
+.. envvar:: PYTHONFSENCODING
+
+   If this is set before running the interpreter, it overrides the encoding used
+   for the filesystem encoding (see :func:`sys.getfilesystemencoding`).
+
+   This variable is not available (ignored) on Windows and Mac OS X: the
+   filesystem encoding is pinned to ``'mbcs'`` on Windows and ``'utf-8'`` on
+   Mac OS X.
+
+   .. versionadded:: 3.2
+
+
 .. envvar:: PYTHONIOENCODING
 
-   Overrides the encoding used for stdin/stdout/stderr, in the syntax
-   ``encodingname:errorhandler``.  The ``:errorhandler`` part is optional and
-   has the same meaning as in :func:`str.encode`.
+   If this is set before running the interpreter, it overrides the encoding used
+   for stdin/stdout/stderr, in the syntax ``encodingname:errorhandler``. The
+   ``:errorhandler`` part is optional and has the same meaning as in
+   :func:`str.encode`.
 
    For stderr, the ``:errorhandler`` part is ignored; the handler will always be
    ``'backslashreplace'``.

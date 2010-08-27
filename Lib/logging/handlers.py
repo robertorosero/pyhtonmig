@@ -103,8 +103,13 @@ class RotatingFileHandler(BaseRotatingHandler):
 
         If maxBytes is zero, rollover never occurs.
         """
+        # If rotation/rollover is wanted, it doesn't make sense to use another
+        # mode. If for example 'w' were specified, then if there were multiple
+        # runs of the calling application, the logs from previous runs would be
+        # lost if the 'w' is respected, because the log file would be truncated
+        # on each run.
         if maxBytes > 0:
-            mode = 'a' # doesn't make sense otherwise!
+            mode = 'a'
         BaseRotatingHandler.__init__(self, filename, mode, encoding, delay)
         self.maxBytes = maxBytes
         self.backupCount = backupCount
@@ -732,12 +737,6 @@ class SysLogHandler(logging.Handler):
             self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.socket.connect(address)
 
-    # curious: when talking to the unix-domain '/dev/log' socket, a
-    #   zero-terminator seems to be required.  this string is placed
-    #   into a class variable so that it can be overridden if
-    #   necessary.
-    log_format_string = '<%d>%s\000'
-
     def encodePriority(self, facility, priority):
         """
         Encode the facility and priority. You can pass in strings or
@@ -776,19 +775,19 @@ class SysLogHandler(logging.Handler):
         The record is formatted, and then sent to the syslog server. If
         exception information is present, it is NOT sent to the server.
         """
-        msg = self.format(record)
+        msg = self.format(record) + '\000'
         """
         We need to convert record level to lowercase, maybe this will
         change in the future.
         """
-        msg = self.log_format_string % (
-            self.encodePriority(self.facility,
-                                self.mapPriority(record.levelname)),
-                                msg)
+        prio = '<%d>' % self.encodePriority(self.facility,
+                                            self.mapPriority(record.levelname))
+        prio = prio.encode('utf-8')
         #Message is a string. Convert to bytes as required by RFC 5424
         msg = msg.encode('utf-8')
         if codecs:
             msg = codecs.BOM_UTF8 + msg
+        msg = prio + msg
         try:
             if self.unixsocket:
                 try:
@@ -1012,7 +1011,7 @@ class HTTPHandler(logging.Handler):
         """
         Emit a record.
 
-        Send the record to the Web server as an URL-encoded dictionary
+        Send the record to the Web server as a percent-encoded dictionary
         """
         try:
             import http.client, urllib.parse

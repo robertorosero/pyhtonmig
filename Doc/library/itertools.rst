@@ -99,7 +99,7 @@ loops that truncate the stream.
                   yield element
 
 
-.. function:: itertools.chain.from_iterable(iterable)
+.. classmethod:: chain.from_iterable(iterable)
 
    Alternate constructor for :func:`chain`.  Gets chained inputs from a
    single iterable argument that is evaluated lazily.  Equivalent to::
@@ -207,6 +207,7 @@ loops that truncate the stream.
 
    .. versionadded:: 3.1
 
+
 .. function:: compress(data, selectors)
 
    Make an iterator that filters elements from *data* returning only those that
@@ -240,7 +241,7 @@ loops that truncate the stream.
    for i in count())``.
 
    .. versionchanged:: 3.1
-      added *step* argument and allowed non-integer arguments.
+      Added *step* argument and allowed non-integer arguments.
 
 .. function:: cycle(iterable)
 
@@ -652,6 +653,12 @@ which incur interpreter overhead.
            except StopIteration:
                pending -= 1
                nexts = cycle(islice(nexts, pending))
+
+   def partition(pred, iterable):
+       'Use a predicate to partition entries into false entries and true entries'
+       # partition(is_odd, range(10)) --> 0 2 4 6 8   and  1 3 5 7 9
+       t1, t2 = tee(iterable)
+       return filterfalse(pred, t1), filter(pred, t2)
 
    def powerset(iterable):
        "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"

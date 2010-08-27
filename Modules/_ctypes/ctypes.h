@@ -1,3 +1,7 @@
+#if defined (__SVR4) && defined (__sun)
+#   include <alloca.h>
+#endif
+
 #ifndef MS_WIN32
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -54,7 +58,8 @@ struct tagCDataObject {
 
 typedef struct {
     PyObject_VAR_HEAD
-    ffi_closure *pcl; /* the C callable */
+    ffi_closure *pcl_write; /* the C callable, writeable */
+    void *pcl_exec;         /* the C callable, executable */
     ffi_cif cif;
     int flags;
     PyObject *converters;

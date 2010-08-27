@@ -26,7 +26,8 @@ The :mod:`urllib.request` module defines the following functions:
    *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
    :func:`urllib.parse.urlencode` function takes a mapping or sequence
-   of 2-tuples and returns a string in this format.
+   of 2-tuples and returns a string in this format. urllib.request module uses
+   HTTP/1.1 and includes `Connection:close` header in its HTTP requests.
 
    The optional *timeout* parameter specifies a timeout in seconds for
    blocking operations like the connection attempt (if not specified,
@@ -140,7 +141,7 @@ The :mod:`urllib.request` module defines the following functions:
 
 .. function:: url2pathname(path)
 
-   Convert the path component *path* from an encoded URL to the local syntax for a
+   Convert the path component *path* from a percent-encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
 
@@ -638,7 +639,8 @@ sorting the handler instances.
    :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
-   :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
+   :class:`OpenerDirector` instance's :meth:`~OpenerDirector.open` and
+   :meth:`~OpenerDirector.error` methods.
 
 #. Every handler with a method named like :meth:`protocol_response` has that
    method called to post-process the response.

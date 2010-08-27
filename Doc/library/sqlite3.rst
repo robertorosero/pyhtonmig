@@ -229,18 +229,16 @@ Connection Objects
 
 .. attribute:: Connection.in_transaction
 
-   .. versionadded:: 3.2
-
    :const:`True` if a transaction is active (there are uncommitted changes),
    :const:`False` otherwise.  Read-only attribute.
 
+   .. versionadded:: 3.2
 
 .. method:: Connection.cursor([cursorClass])
 
    The cursor method accepts a single optional parameter *cursorClass*. If
    supplied, this must be a custom cursor class that extends
    :class:`sqlite3.Cursor`.
-
 
 .. method:: Connection.commit()
 
@@ -374,22 +372,22 @@ Connection Objects
 
 .. method:: Connection.enable_load_extension(enabled)
 
-   .. versionadded:: 3.2
-
    This routine allows/disallows the SQLite engine to load SQLite extensions
    from shared libraries.  SQLite extensions can define new functions,
    aggregates or whole new virtual table implementations. One well-known
    extension is the fulltext-search extension distributed with SQLite.
 
+   .. versionadded:: 3.2
+
    .. literalinclude:: ../includes/sqlite3/load_extension.py
 
 .. method:: Connection.load_extension(path)
 
-   .. versionadded:: 3.2
-
    This routine loads a SQLite extension from a shared library. You have to
    enable extension loading with ``enable_load_extension`` before you can use
    this routine.
+
+   .. versionadded:: 3.2
 
 .. attribute:: Connection.row_factory
 
@@ -867,3 +865,18 @@ exception, the transaction is rolled back; otherwise, the transaction is
 committed:
 
 .. literalinclude:: ../includes/sqlite3/ctx_manager.py
+
+
+Common issues
+-------------
+
+Multithreading
+^^^^^^^^^^^^^^
+
+Older SQLite versions had issues with sharing connections between threads.
+That's why the Python module disallows sharing connections and cursors between
+threads. If you still try to do so, you will get an exception at runtime.
+
+The only exception is calling the :meth:`~Connection.interrupt` method, which
+only makes sense to call from a different thread.
+

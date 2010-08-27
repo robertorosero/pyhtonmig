@@ -519,11 +519,6 @@ class UnicodeTest(string_tests.CommonTest,
                     return 'G(' + self.x + ')'
                 return object.__format__(self, format_spec)
 
-        # class that returns a bad type from __format__
-        class H:
-            def __format__(self, format_spec):
-                return 1.0
-
         class I(datetime.date):
             def __format__(self, format_spec):
                 return self.strftime(format_spec)
@@ -1357,6 +1352,10 @@ class UnicodeTest(string_tests.CommonTest,
 
         self.assertEqual(repr(s1()), '\\n')
         self.assertEqual(repr(s2()), '\\n')
+
+    def test_printable_repr(self):
+        self.assertEqual(repr('\U00010000'), "'%c'" % (0x10000,)) # printable
+        self.assertEqual(repr('\U00011000'), "'\\U00011000'")     # nonprintable
 
     def test_expandtabs_overflows_gracefully(self):
         # This test only affects 32-bit platforms because expandtabs can only take

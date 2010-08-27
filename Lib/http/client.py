@@ -602,7 +602,11 @@ class HTTPResponse(io.RawIOBase):
     def getheader(self, name, default=None):
         if self.headers is None:
             raise ResponseNotReady()
-        return ', '.join(self.headers.get_all(name, default))
+        headers = self.headers.get_all(name) or default
+        if isinstance(headers, str) or not hasattr(headers, '__iter__'):
+            return headers
+        else:
+            return ', '.join(headers)
 
     def getheaders(self):
         """Return list of (header, value) tuples."""
@@ -734,11 +738,6 @@ class HTTPConnection:
             else:
                 raise NotConnected()
 
-        # send the data to the server. if we get a broken pipe, then close
-        # the socket. we want to reconnect when somebody tries to send again.
-        #
-        # NOTE: we DO propagate the error, though, because we cannot simply
-        #       ignore the error... the caller will know if they can retry.
         if self.debuglevel > 0:
             print("send:", repr(str))
         blocksize = 8192

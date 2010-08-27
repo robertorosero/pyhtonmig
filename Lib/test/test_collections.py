@@ -13,7 +13,7 @@ import sys
 from collections import Hashable, Iterable, Iterator
 from collections import Sized, Container, Callable
 from collections import Set, MutableSet
-from collections import Mapping, MutableMapping
+from collections import Mapping, MutableMapping, KeysView, ItemsView, UserDict
 from collections import Sequence, MutableSequence
 from collections import ByteString
 
@@ -217,6 +217,16 @@ class TestNamedTuple(unittest.TestCase):
         self.assertEqual(T._fields, tuple(words))
         # test __getnewargs__
         self.assertEqual(t.__getnewargs__(), values)
+
+    def test_repr(self):
+        with support.captured_stdout() as template:
+            A = namedtuple('A', 'x', verbose=True)
+        self.assertEqual(repr(A(1)), 'A(x=1)')
+        # repr should show the name of the subclass
+        class B(A):
+            pass
+        self.assertEqual(repr(B(1)), 'B(x=1)')
+
 
 class ABCTestCase(unittest.TestCase):
 
@@ -516,6 +526,21 @@ class TestCollectionABCs(ABCTestCase):
         s = MySet([5,43,2,1])
         self.assertEqual(s.pop(), 1)
 
+    def test_issue8750(self):
+        empty = WithSet()
+        full = WithSet(range(10))
+        s = WithSet(full)
+        s -= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s ^= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s &= s
+        self.assertEqual(s, full)
+        s |= s
+        self.assertEqual(s, full)
+
     def test_Mapping(self):
         for sample in [dict]:
             self.assertIsInstance(sample(), Mapping)
@@ -537,6 +562,31 @@ class TestCollectionABCs(ABCTestCase):
             self.assertTrue(issubclass(sample, MutableMapping))
         self.validate_abstract_methods(MutableMapping, '__contains__', '__iter__', '__len__',
             '__getitem__', '__setitem__', '__delitem__')
+
+    def test_MutableMapping_subclass(self):
+        # Test issue 9214
+        mymap = UserDict()
+        mymap['red'] = 5
+        self.assertIsInstance(mymap.keys(), Set)
+        self.assertIsInstance(mymap.keys(), KeysView)
+        self.assertIsInstance(mymap.items(), Set)
+        self.assertIsInstance(mymap.items(), ItemsView)
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.keys() | {'orange'}
+        self.assertIsInstance(z, set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), ['orange', 'red'])
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.items() | {('orange', 3)}
+        self.assertIsInstance(z, set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), [('orange', 3), ('red', 5)])
 
     def test_Sequence(self):
         for sample in [tuple, list, bytes, str]:

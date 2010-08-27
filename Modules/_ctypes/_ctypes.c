@@ -132,8 +132,6 @@ static PyTypeObject Simple_Type;
 /* a callable object used for unpickling */
 static PyObject *_unpickle;
 
-char *_ctypes_conversion_encoding = NULL;
-char *_ctypes_conversion_errors = NULL;
 
 
 /****************************************************************/
@@ -1090,13 +1088,7 @@ CharArray_set_value(CDataObject *self, PyObject *value)
         return -1;
     }
 
-    if (PyUnicode_Check(value)) {
-        value = PyUnicode_AsEncodedString(value,
-                                          _ctypes_conversion_encoding,
-                                          _ctypes_conversion_errors);
-        if (!value)
-            return -1;
-    } else if (!PyBytes_Check(value)) {
+    if (!PyBytes_Check(value)) {
         PyErr_Format(PyExc_TypeError,
                      "str/bytes expected instead of %s instance",
                      Py_TYPE(value)->tp_name);
@@ -1150,13 +1142,7 @@ WCharArray_set_value(CDataObject *self, PyObject *value)
                         "can't delete attribute");
         return -1;
     }
-    if (PyBytes_Check(value)) {
-        value = PyUnicode_FromEncodedObject(value,
-                                            _ctypes_conversion_encoding,
-                                            _ctypes_conversion_errors);
-        if (!value)
-            return -1;
-    } else if (!PyUnicode_Check(value)) {
+    if (!PyUnicode_Check(value)) {
         PyErr_Format(PyExc_TypeError,
                         "unicode string expected instead of %s instance",
                         Py_TYPE(value)->tp_name);
@@ -1510,7 +1496,7 @@ c_char_p_from_param(PyObject *type, PyObject *value)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    if (PyBytes_Check(value) || PyUnicode_Check(value)) {
+    if (PyBytes_Check(value)) {
         PyCArgObject *parg;
         struct fielddesc *fd = _ctypes_get_fielddesc("z");
 
@@ -3367,7 +3353,7 @@ PyCFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->callable = callable;
 
     self->thunk = thunk;
-    *(void **)self->b_ptr = (void *)thunk->pcl;
+    *(void **)self->b_ptr = (void *)thunk->pcl_exec;
 
     Py_INCREF((PyObject *)thunk); /* for KeepRef */
     if (-1 == KeepRef((CDataObject *)self, 0, (PyObject *)thunk)) {
@@ -5326,36 +5312,42 @@ PyInit__ctypes(void)
     Struct_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&Struct_Type) < 0)
         return NULL;
+    Py_INCREF(&Struct_Type);
     PyModule_AddObject(m, "Structure", (PyObject *)&Struct_Type);
 
     Py_TYPE(&Union_Type) = &UnionType_Type;
     Union_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&Union_Type) < 0)
         return NULL;
+    Py_INCREF(&Union_Type);
     PyModule_AddObject(m, "Union", (PyObject *)&Union_Type);
 
     Py_TYPE(&PyCPointer_Type) = &PyCPointerType_Type;
     PyCPointer_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&PyCPointer_Type) < 0)
         return NULL;
+    Py_INCREF(&PyCPointer_Type);
     PyModule_AddObject(m, "_Pointer", (PyObject *)&PyCPointer_Type);
 
     Py_TYPE(&PyCArray_Type) = &PyCArrayType_Type;
     PyCArray_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&PyCArray_Type) < 0)
         return NULL;
+    Py_INCREF(&PyCArray_Type);
     PyModule_AddObject(m, "Array", (PyObject *)&PyCArray_Type);
 
     Py_TYPE(&Simple_Type) = &PyCSimpleType_Type;
     Simple_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&Simple_Type) < 0)
         return NULL;
+    Py_INCREF(&Simple_Type);
     PyModule_AddObject(m, "_SimpleCData", (PyObject *)&Simple_Type);
 
     Py_TYPE(&PyCFuncPtr_Type) = &PyCFuncPtrType_Type;
     PyCFuncPtr_Type.tp_base = &PyCData_Type;
     if (PyType_Ready(&PyCFuncPtr_Type) < 0)
         return NULL;
+    Py_INCREF(&PyCFuncPtr_Type);
     PyModule_AddObject(m, "CFuncPtr", (PyObject *)&PyCFuncPtr_Type);
 
     /*************************************************

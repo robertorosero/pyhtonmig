@@ -1,11 +1,11 @@
 import builtins
-import errno
 import imp
+from importlib.test.import_ import test_relative_imports
+from importlib.test.import_ import util as importlib_util
 import marshal
 import os
 import py_compile
 import random
-import shutil
 import stat
 import sys
 import unittest
@@ -23,11 +23,7 @@ def remove_files(name):
               name + ".pyw",
               name + "$py.class"):
         unlink(f)
-    try:
-        shutil.rmtree('__pycache__')
-    except OSError as error:
-        if error.errno != errno.ENOENT:
-            raise
+    rmtree('__pycache__')
 
 
 class ImportTests(unittest.TestCase):
@@ -203,13 +199,6 @@ class ImportTests(unittest.TestCase):
         import test.support as y
         self.assertTrue(y is test.support, y.__name__)
 
-    def test_import_initless_directory_warning(self):
-        with warnings.catch_warnings():
-            # Just a random non-package directory we always expect to be
-            # somewhere in sys.path...
-            warnings.simplefilter('error', ImportWarning)
-            self.assertRaises(ImportWarning, __import__, "site-packages")
-
     def test_failing_reload(self):
         # A failing reload should leave the module object in sys.modules.
         source = TESTFN + os.extsep + "py"
@@ -289,6 +278,11 @@ class ImportTests(unittest.TestCase):
 
     def test_import_by_filename(self):
         path = os.path.abspath(TESTFN)
+        encoding = sys.getfilesystemencoding()
+        try:
+            path.encode(encoding)
+        except UnicodeEncodeError:
+            self.skipTest('path is not encodable to {}'.format(encoding))
         with self.assertRaises(ImportError) as c:
             __import__(path)
         self.assertEqual("Import by filename is not supported.",
@@ -330,8 +324,7 @@ func_filename = func.__code__.co_filename
             unload(self.module_name)
         unlink(self.file_name)
         unlink(self.compiled_name)
-        if os.path.exists(self.dir_name):
-            shutil.rmtree(self.dir_name)
+        rmtree(self.dir_name)
 
     def import_module(self):
         ns = globals()
@@ -398,7 +391,7 @@ class PathsTests(unittest.TestCase):
         self.syspath = sys.path[:]
 
     def tearDown(self):
-        shutil.rmtree(self.path)
+        rmtree(self.path)
         sys.path[:] = self.syspath
 
     # Regression test for http://bugs.python.org/issue1293.
@@ -471,16 +464,14 @@ class RelativeImportTests(unittest.TestCase):
         self.assertRaises(ValueError, check_relative)
 
     def test_absolute_import_without_future(self):
-        # If absolute import syntax is used, then do not try to perform
-        # a relative import in the face of failure.
+        # If explicit relative import syntax is used, then do not try
+        # to perform an absolute import in the face of failure.
         # Issue #7902.
-        try:
+        with self.assertRaises(ImportError):
             from .os import sep
-        except ImportError:
-            pass
-        else:
             self.fail("explicit relative import triggered an "
-                      "implicit relative import")
+                      "implicit absolute import")
+
 
 class OverridingImportBuiltinTests(unittest.TestCase):
     def test_override_builtin(self):
@@ -589,7 +580,7 @@ class PycacheTests(unittest.TestCase):
     def test_package___cached__(self):
         # Like test___cached__ but for packages.
         def cleanup():
-            shutil.rmtree('pep3147')
+            rmtree('pep3147')
         os.mkdir('pep3147')
         self.addCleanup(cleanup)
         # Touch the __init__.py
@@ -611,7 +602,7 @@ class PycacheTests(unittest.TestCase):
         # Like test___cached__ but ensuring __cached__ when imported from a
         # PEP 3147 pyc file.
         def cleanup():
-            shutil.rmtree('pep3147')
+            rmtree('pep3147')
         os.mkdir('pep3147')
         self.addCleanup(cleanup)
         unload('pep3147.foo')
@@ -633,10 +624,21 @@ class PycacheTests(unittest.TestCase):
                          os.path.join(os.curdir, foo_pyc))
 
 
+class RelativeImportFromImportlibTests(test_relative_imports.RelativeImports):
+
+    def setUp(self):
+        self._importlib_util_flag = importlib_util.using___import__
+        importlib_util.using___import__ = True
+
+    def tearDown(self):
+        importlib_util.using___import__ = self._importlib_util_flag
+
+
 def test_main(verbose=None):
     run_unittest(ImportTests, PycacheTests,
                  PycRewritingTests, PathsTests, RelativeImportTests,
-                 OverridingImportBuiltinTests)
+                 OverridingImportBuiltinTests,
+                 RelativeImportFromImportlibTests)
 
 
 if __name__ == '__main__':

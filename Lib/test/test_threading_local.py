@@ -1,9 +1,14 @@
 import unittest
 from doctest import DocTestSuite
 from test import support
-threading = support.import_module('threading')
 import weakref
 import gc
+
+# Modules under test
+_thread = support.import_module('_thread')
+threading = support.import_module('threading')
+import _threading_local
+
 
 class Weak(object):
     pass
@@ -13,7 +18,8 @@ def target(local, weaklist):
     local.weak = weak
     weaklist.append(weakref.ref(weak))
 
-class ThreadingLocalTest(unittest.TestCase):
+
+class BaseLocalTest:
 
     def test_local_refs(self):
         self._local_refs(20)
@@ -21,7 +27,7 @@ class ThreadingLocalTest(unittest.TestCase):
         self._local_refs(100)
 
     def _local_refs(self, n):
-        local = threading.local()
+        local = self._local()
         weaklist = []
         for i in range(n):
             t = threading.Thread(target=target, args=(local, weaklist))
@@ -32,9 +38,9 @@ class ThreadingLocalTest(unittest.TestCase):
         gc.collect()
         self.assertEqual(len(weaklist), n)
 
-        # XXX threading.local keeps the local of the last stopped thread alive.
+        # XXX _threading_local keeps the local of the last stopped thread alive.
         deadlist = [weak for weak in weaklist if weak() is None]
-        self.assertEqual(len(deadlist), n-1)
+        self.assertIn(len(deadlist), (n-1, n))
 
         # Assignment to the same thread local frees it sometimes (!)
         local.someothervar = None
@@ -48,7 +54,7 @@ class ThreadingLocalTest(unittest.TestCase):
         # is created but not correctly set on the object.
         # The first member set may be bogus.
         import time
-        class Local(threading.local):
+        class Local(self._local):
             def __init__(self):
                 time.sleep(0.01)
         local = Local()
@@ -69,7 +75,7 @@ class ThreadingLocalTest(unittest.TestCase):
 
     def test_derived_cycle_dealloc(self):
         # http://bugs.python.org/issue6990
-        class Local(threading.local):
+        class Local(self._local):
             pass
         locals = None
         passed = False
@@ -108,39 +114,51 @@ class ThreadingLocalTest(unittest.TestCase):
 
     def test_arguments(self):
         # Issue 1522237
-        from _thread import _local as local
-        from _threading_local import local as py_local
+        class MyLocal(self._local):
+            def __init__(self, *args, **kwargs):
+                pass
 
-        for cls in (local, py_local):
-            class MyLocal(cls):
-                def __init__(self, *args, **kwargs):
-                    pass
+        MyLocal(a=1)
+        MyLocal(1)
+        self.assertRaises(TypeError, self._local, a=1)
+        self.assertRaises(TypeError, self._local, 1)
 
-            MyLocal(a=1)
-            MyLocal(1)
-            self.assertRaises(TypeError, cls, a=1)
-            self.assertRaises(TypeError, cls, 1)
+
+class ThreadLocalTest(unittest.TestCase, BaseLocalTest):
+    _local = _thread._local
+
+    # Fails for the pure Python implementation
+    def test_cycle_collection(self):
+        class X:
+            pass
+
+        x = X()
+        x.local = self._local()
+        x.local.x = x
+        wr = weakref.ref(x)
+        del x
+        gc.collect()
+        self.assertIs(wr(), None)
+
+
+class PyThreadingLocalTest(unittest.TestCase, BaseLocalTest):
+    _local = _threading_local.local
 
 
 def test_main():
     suite = unittest.TestSuite()
     suite.addTest(DocTestSuite('_threading_local'))
-    suite.addTest(unittest.makeSuite(ThreadingLocalTest))
+    suite.addTest(unittest.makeSuite(ThreadLocalTest))
+    suite.addTest(unittest.makeSuite(PyThreadingLocalTest))
 
-    try:
-        from thread import _local
-    except ImportError:
-        pass
-    else:
-        import _threading_local
-        local_orig = _threading_local.local
-        def setUp(test):
-            _threading_local.local = _local
-        def tearDown(test):
-            _threading_local.local = local_orig
-        suite.addTest(DocTestSuite('_threading_local',
-                                   setUp=setUp, tearDown=tearDown)
-                      )
+    local_orig = _threading_local.local
+    def setUp(test):
+        _threading_local.local = _thread._local
+    def tearDown(test):
+        _threading_local.local = local_orig
+    suite.addTest(DocTestSuite('_threading_local',
+                               setUp=setUp, tearDown=tearDown)
+                  )
 
     support.run_unittest(suite)
 

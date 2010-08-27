@@ -874,6 +874,7 @@ def run_re_tests():
                 if result is None:
                     print('=== Fails on unicode-sensitive match', t)
 
+
 def test_main():
     run_unittest(ReTests)
     run_re_tests()

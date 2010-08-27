@@ -76,7 +76,9 @@ The variables defined in the :mod:`signal` module are:
 
 .. data:: CTRL_C_EVENT
 
-   The signal corresponding to the CTRL+C keystroke event.
+   The signal corresponding to the CTRL+C keystroke event. This signal can
+   only be used with :func:`os.kill`.
+
    Availability: Windows.
 
    .. versionadded:: 3.2
@@ -84,7 +86,9 @@ The variables defined in the :mod:`signal` module are:
 
 .. data:: CTRL_BREAK_EVENT
 
-   The signal corresponding to the CTRL+BREAK keystroke event.
+   The signal corresponding to the CTRL+BREAK keystroke event. This signal can
+   only be used with :func:`os.kill`.
+
    Availability: Windows.
 
    .. versionadded:: 3.2
@@ -225,6 +229,10 @@ The :mod:`signal` module defines the following functions:
    stack frame (``None`` or a frame object; for a description of frame objects,
    see the :ref:`description in the type hierarchy <frame-objects>` or see the
    attribute descriptions in the :mod:`inspect` module).
+
+   On Windows, :func:`signal` can only be called with :const:`SIGABRT`,
+   :const:`SIGFPE`, :const:`SIGILL`, :const:`SIGINT`, :const:`SIGSEGV`, or
+   :const:`SIGTERM`. A :exc:`ValueError` will be raised in any other case.
 
 
 .. _signal-example:

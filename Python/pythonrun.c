@@ -134,18 +134,13 @@ add_flag(int flag, const char *envs)
     return flag;
 }
 
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
 static char*
-get_codeset(void)
+get_codec_name(const char *encoding)
 {
-    char* codeset, *name_str;
+    char *name_utf8, *name_str;
     PyObject *codec, *name = NULL;
 
-    codeset = nl_langinfo(CODESET);
-    if (!codeset || codeset[0] == '\0')
-        return NULL;
-
-    codec = _PyCodec_Lookup(codeset);
+    codec = _PyCodec_Lookup(encoding);
     if (!codec)
         goto error;
 
@@ -154,17 +149,33 @@ get_codeset(void)
     if (!name)
         goto error;
 
-    name_str = _PyUnicode_AsString(name);
+    name_utf8 = _PyUnicode_AsString(name);
     if (name == NULL)
         goto error;
-    codeset = strdup(name_str);
+    name_str = strdup(name_utf8);
     Py_DECREF(name);
-    return codeset;
+    if (name_str == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    return name_str;
 
 error:
     Py_XDECREF(codec);
     Py_XDECREF(name);
     return NULL;
+}
+
+#if defined(HAVE_LANGINFO_H) && defined(CODESET)
+static char*
+get_codeset(void)
+{
+    char* codeset = nl_langinfo(CODESET);
+    if (!codeset || codeset[0] == '\0') {
+        PyErr_SetString(PyExc_ValueError, "CODESET is not set or empty");
+        return NULL;
+    }
+    return get_codec_name(codeset);
 }
 #endif
 
@@ -205,6 +216,11 @@ Py_InitializeEx(int install_sigs)
     if (tstate == NULL)
         Py_FatalError("Py_Initialize: can't make first thread");
     (void) PyThreadState_Swap(tstate);
+
+    /* auto-thread-state API, if available */
+#ifdef WITH_THREAD
+    _PyGILState_Init(interp, tstate);
+#endif /* WITH_THREAD */
 
     _Py_ReadyTypes();
 
@@ -268,6 +284,8 @@ Py_InitializeEx(int install_sigs)
     /* Initialize _warnings. */
     _PyWarnings_Init();
 
+    _PyTime_Init();
+
     initfsencoding();
 
     if (install_sigs)
@@ -285,11 +303,6 @@ Py_InitializeEx(int install_sigs)
     if (initstdio() < 0)
         Py_FatalError(
             "Py_Initialize: can't initialize sys standard streams");
-
-    /* auto-thread-state API, if available */
-#ifdef WITH_THREAD
-    _PyGILState_Init(interp, tstate);
-#endif /* WITH_THREAD */
 
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
@@ -318,7 +331,7 @@ flush_std_files(void)
     if (fout != NULL && fout != Py_None) {
         tmp = PyObject_CallMethod(fout, "flush", "");
         if (tmp == NULL)
-            PyErr_Clear();
+            PyErr_WriteUnraisable(fout);
         else
             Py_DECREF(tmp);
     }
@@ -402,6 +415,9 @@ Py_Finalize(void)
     while (PyGC_Collect() > 0)
         /* nothing */;
 #endif
+    /* We run this while most interpreter state is still alive, so that
+       debug information can be printed out */
+    _PyGC_Fini();
 
     /* Destroy all modules */
     PyImport_Cleanup();
@@ -701,25 +717,35 @@ initfsencoding(void)
 {
     PyObject *codec;
 #if defined(HAVE_LANGINFO_H) && defined(CODESET)
-    char *codeset;
+    char *codeset = NULL;
 
     if (Py_FileSystemDefaultEncoding == NULL) {
-        /* On Unix, set the file system encoding according to the
-           user's preference, if the CODESET names a well-known
-           Python codec, and Py_FileSystemDefaultEncoding isn't
-           initialized by other means. Also set the encoding of
-           stdin and stdout if these are terminals.  */
-        codeset = get_codeset();
+        const char *env_encoding = Py_GETENV("PYTHONFSENCODING");
+        if (env_encoding != NULL) {
+            codeset = get_codec_name(env_encoding);
+            if (!codeset) {
+                fprintf(stderr, "PYTHONFSENCODING is not a valid encoding:\n");
+                PyErr_Print();
+            }
+        }
+        if (!codeset) {
+            /* On Unix, set the file system encoding according to the
+               user's preference, if the CODESET names a well-known
+               Python codec, and Py_FileSystemDefaultEncoding isn't
+               initialized by other means. Also set the encoding of
+               stdin and stdout if these are terminals.  */
+            codeset = get_codeset();
+        }
         if (codeset != NULL) {
             Py_FileSystemDefaultEncoding = codeset;
             Py_HasFileSystemDefaultEncoding = 0;
             return;
+        } else {
+            fprintf(stderr, "Unable to get the locale encoding:\n");
+            PyErr_Print();
         }
 
-        PyErr_Clear();
-        fprintf(stderr,
-                "Unable to get the locale encoding: "
-                "fallback to utf-8\n");
+        fprintf(stderr, "Unable to get the filesystem encoding: fallback to utf-8\n");
         Py_FileSystemDefaultEncoding = "utf-8";
         Py_HasFileSystemDefaultEncoding = 1;
     }

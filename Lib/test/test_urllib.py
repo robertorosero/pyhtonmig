@@ -102,7 +102,7 @@ class urlopen_FileTests(unittest.TestCase):
         self.assertEqual(self.returned_obj.geturl(), self.pathname)
 
     def test_getcode(self):
-        self.assertEqual(self.returned_obj.getcode(), None)
+        self.assertIsNone(self.returned_obj.getcode())
 
     def test_iter(self):
         # Test iterator
@@ -131,7 +131,7 @@ class ProxyTests(unittest.TestCase):
         self.env.set('NO_PROXY', 'localhost')
         proxies = urllib.request.getproxies_environment()
         # getproxies_environment use lowered case truncated (no '_proxy') keys
-        self.assertEquals('localhost', proxies['no'])
+        self.assertEqual('localhost', proxies['no'])
 
 
 class urlopen_HttpTests(unittest.TestCase):
@@ -190,6 +190,17 @@ Content-Type: text/html; charset=iso-8859-1
         finally:
             self.unfakehttp()
 
+    def test_userpass_inurl(self):
+        self.fakehttp(b"Hello!")
+        try:
+            fp = urlopen("http://user:pass@python.org/")
+            self.assertEqual(fp.readline(), b"Hello!")
+            self.assertEqual(fp.readline(), b"")
+            self.assertEqual(fp.geturl(), 'http://user:pass@python.org/')
+            self.assertEqual(fp.getcode(), 200)
+        finally:
+            self.unfakehttp()
+
 class urlretrieve_FileTests(unittest.TestCase):
     """Test urllib.urlretrieve() on local files"""
 
@@ -221,8 +232,12 @@ class urlretrieve_FileTests(unittest.TestCase):
             except: pass
 
     def constructLocalFileUrl(self, filePath):
-        return "file://%s" % urllib.request.pathname2url(
-            os.path.abspath(filePath))
+        filePath = os.path.abspath(filePath)
+        try:
+            filePath.encode("utf8")
+        except UnicodeEncodeError:
+            raise unittest.SkipTest("filePath is not encodable to utf8")
+        return "file://%s" % urllib.request.pathname2url(filePath)
 
     def createNewTempFile(self, data=b""):
         """Creates a new temporary file containing the specified data,
@@ -527,6 +542,7 @@ class QuotingTests(unittest.TestCase):
         self.assertEqual(expect, result,
                          "using quote_plus(): %r != %r" % (expect, result))
 
+
 class UnquotingTests(unittest.TestCase):
     """Tests for unquote() and unquote_plus()
 
@@ -554,7 +570,10 @@ class UnquotingTests(unittest.TestCase):
         self.assertEqual(result.count('%'), 1,
                          "using unquote(): not all characters escaped: "
                          "%s" % result)
-        self.assertRaises(TypeError, urllib.parse.unquote, None)
+        self.assertRaises((TypeError, AttributeError), urllib.parse.unquote, None)
+        self.assertRaises((TypeError, AttributeError), urllib.parse.unquote, ())
+        with support.check_warnings(('', BytesWarning), quiet=True):
+            self.assertRaises((TypeError, AttributeError), urllib.parse.unquote, b'')
 
     def test_unquoting_badpercent(self):
         # Test unquoting on bad percent-escapes
@@ -589,8 +608,8 @@ class UnquotingTests(unittest.TestCase):
         result = urllib.parse.unquote_to_bytes(given)
         self.assertEqual(expect, result, "using unquote_to_bytes(): %r != %r"
                          % (expect, result))
-
-        self.assertRaises(TypeError, urllib.parse.unquote_to_bytes, None)
+        self.assertRaises((TypeError, AttributeError), urllib.parse.unquote_to_bytes, None)
+        self.assertRaises((TypeError, AttributeError), urllib.parse.unquote_to_bytes, ())
 
     def test_unquoting_mixed_case(self):
         # Test unquoting on mixed-case hex digits in the percent-escapes

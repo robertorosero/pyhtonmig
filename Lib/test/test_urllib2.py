@@ -41,7 +41,7 @@ class TrivialTests(unittest.TestCase):
             ('a="b\\"c", d="e\\,f", g="h\\\\i"',
              ['a="b"c"', 'd="e,f"', 'g="h\\i"'])]
         for string, list in tests:
-            self.assertEquals(urllib.request.parse_http_list(string), list)
+            self.assertEqual(urllib.request.parse_http_list(string), list)
 
 
 def test_request_headers_dict():
@@ -597,6 +597,10 @@ class OpenerDirectorTests(unittest.TestCase):
 
 
 def sanepathname2url(path):
+    try:
+        path.encode("utf8")
+    except UnicodeEncodeError:
+        raise unittest.SkipTest("path is not encodable to utf8")
     urlpath = urllib.request.pathname2url(path)
     if os.name == "nt" and urlpath.startswith("///"):
         urlpath = urlpath[2:]
@@ -739,9 +743,9 @@ class HandlerTests(unittest.TestCase):
                 h.file_open(req)
             # XXXX remove OSError when bug fixed
             except (urllib.error.URLError, OSError):
-                self.assertTrue(not ftp)
+                self.assertFalse(ftp)
             else:
-                self.assertTrue(o.req is req)
+                self.assertIs(o.req, req)
                 self.assertEqual(req.type, "ftp")
             self.assertEqual(req.type is "ftp", ftp)
 
@@ -844,19 +848,19 @@ class HandlerTests(unittest.TestCase):
         # all 2xx are passed through
         r = MockResponse(200, "OK", {}, "", url)
         newr = h.http_response(req, r)
-        self.assertTrue(r is newr)
-        self.assertTrue(not hasattr(o, "proto"))  # o.error not called
+        self.assertIs(r, newr)
+        self.assertFalse(hasattr(o, "proto"))  # o.error not called
         r = MockResponse(202, "Accepted", {}, "", url)
         newr = h.http_response(req, r)
-        self.assertTrue(r is newr)
-        self.assertTrue(not hasattr(o, "proto"))  # o.error not called
+        self.assertIs(r, newr)
+        self.assertFalse(hasattr(o, "proto"))  # o.error not called
         r = MockResponse(206, "Partial content", {}, "", url)
         newr = h.http_response(req, r)
-        self.assertTrue(r is newr)
-        self.assertTrue(not hasattr(o, "proto"))  # o.error not called
+        self.assertIs(r, newr)
+        self.assertFalse(hasattr(o, "proto"))  # o.error not called
         # anything else calls o.error (and MockOpener returns None, here)
         r = MockResponse(502, "Bad gateway", {}, "", url)
-        self.assertTrue(h.http_response(req, r) is None)
+        self.assertIsNone(h.http_response(req, r))
         self.assertEqual(o.proto, "http")  # o.error called
         self.assertEqual(o.args, (req, r, 502, "Bad gateway", {}))
 
@@ -868,12 +872,14 @@ class HandlerTests(unittest.TestCase):
         req = Request("http://example.com/")
         r = MockResponse(200, "OK", {}, "")
         newreq = h.http_request(req)
-        self.assertTrue(cj.ach_req is req is newreq)
-        self.assertEquals(req.get_origin_req_host(), "example.com")
-        self.assertTrue(not req.is_unverifiable())
+        self.assertIs(cj.ach_req, req)
+        self.assertIs(cj.ach_req, newreq)
+        self.assertEqual(req.get_origin_req_host(), "example.com")
+        self.assertFalse(req.is_unverifiable())
         newr = h.http_response(req, r)
-        self.assertTrue(cj.ec_req is req)
-        self.assertTrue(cj.ec_r is r is newr)
+        self.assertIs(cj.ec_req, req)
+        self.assertIs(cj.ec_r, r)
+        self.assertIs(r, newr)
 
     def test_redirect(self):
         from_url = "http://example.com/a.html"
@@ -901,7 +907,7 @@ class HandlerTests(unittest.TestCase):
                 try:
                     self.assertEqual(o.req.get_method(), "GET")
                 except AttributeError:
-                    self.assertTrue(not o.req.has_data())
+                    self.assertFalse(o.req.has_data())
 
                 # now it's a GET, there should not be headers regarding content
                 # (possibly dragged from before being a POST)
@@ -960,7 +966,7 @@ class HandlerTests(unittest.TestCase):
         cp = urllib.request.HTTPCookieProcessor(cj)
         o = build_test_opener(hh, hdeh, hrh, cp)
         o.open("http://www.example.com/")
-        self.assertTrue(not hh.req.has_header("Cookie"))
+        self.assertFalse(hh.req.has_header("Cookie"))
 
     def test_proxy(self):
         o = OpenerDirector()
@@ -1194,11 +1200,8 @@ class MiscTests(unittest.TestCase):
         self.opener_has_handler(o, MyOtherHTTPHandler)
 
     def opener_has_handler(self, opener, handler_class):
-        for h in opener.handlers:
-            if h.__class__ == handler_class:
-                break
-        else:
-            self.assertTrue(False)
+        self.assertTrue(any(h.__class__ == handler_class
+                            for h in opener.handlers))
 
 class RequestTests(unittest.TestCase):
 
@@ -1213,7 +1216,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual("GET", self.get.get_method())
 
     def test_add_data(self):
-        self.assertTrue(not self.get.has_data())
+        self.assertFalse(self.get.has_data())
         self.assertEqual("GET", self.get.get_method())
         self.get.add_data("spam")
         self.assertTrue(self.get.has_data())
@@ -1239,11 +1242,21 @@ class RequestTests(unittest.TestCase):
         self.assertEqual("www.python.org", req.get_host())
 
     def test_proxy(self):
-        self.assertTrue(not self.get.has_proxy())
+        self.assertFalse(self.get.has_proxy())
         self.get.set_proxy("www.perl.org", "http")
         self.assertTrue(self.get.has_proxy())
         self.assertEqual("www.python.org", self.get.get_origin_req_host())
         self.assertEqual("www.perl.org", self.get.get_host())
+
+    def test_wrapped_url(self):
+        req = Request("<URL:http://www.python.org>")
+        self.assertEqual("www.python.org", req.get_host())
+
+    def test_urlwith_fragment(self):
+        req = Request("http://www.python.org/?qs=query#fragment=true")
+        self.assertEqual("/?qs=query", req.get_selector())
+        req = Request("http://www.python.org/#fun=true")
+        self.assertEqual("/", req.get_selector())
 
 
 def test_main(verbose=None):

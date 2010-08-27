@@ -394,6 +394,7 @@ HTTPConnection Objects
 
    .. versionadded:: 3.1
 
+
 .. method:: HTTPConnection.set_tunnel(host, port=None, headers=None)
 
    Set the host and the port for HTTP Connect Tunnelling. Normally used when it
@@ -403,6 +404,7 @@ HTTPConnection Objects
    with the CONNECT request.
 
    .. versionadded:: 3.2
+
 
 .. method:: HTTPConnection.connect()
 
@@ -465,8 +467,10 @@ statement.
 
 .. method:: HTTPResponse.getheader(name, default=None)
 
-   Get the contents of the header *name*, or *default* if there is no matching
-   header.
+   Return the value of the header *name*, or *default* if there is no header
+   matching *name*.  If there is more than one  header with the name *name*,
+   return all of the values joined by ', '.  If 'default' is any iterable other
+   than a single string, its elements are similarly returned joined by commas.
 
 
 .. method:: HTTPResponse.getheaders()

@@ -71,6 +71,12 @@ def _get_colon(path):
     else:
         return ':'
 
+def _get_special(path):
+    if isinstance(path, bytes):
+        return (b'\\\\.\\', b'\\\\?\\')
+    else:
+        return ('\\\\.\\', '\\\\?\\')
+
 # Normalize the case of a pathname and map slashes to backslashes.
 # Other normalizations (such as optimizing '../' away) are not done
 # (this is done by normpath).
@@ -275,7 +281,7 @@ def split(p):
     # set i to index beyond p's last slash
     i = len(p)
     while i and p[i-1] not in seps:
-        i = i - 1
+        i -= 1
     head, tail = p[:i], p[i:]  # now tail has no slashes
     # remove trailing slashes from head, unless it's all slashes
     head2 = head
@@ -366,7 +372,7 @@ def expanduser(path):
         return path
     i, n = 1, len(path)
     while i < n and path[i] not in _get_bothseps(path):
-        i = i + 1
+        i += 1
 
     if 'HOME' in os.environ:
         userhome = os.environ['HOME']
@@ -435,21 +441,21 @@ def expandvars(path):
             pathlen = len(path)
             try:
                 index = path.index(c)
-                res = res + c + path[:index + 1]
+                res += c + path[:index + 1]
             except ValueError:
-                res = res + path
+                res += path
                 index = pathlen - 1
         elif c == percent:  # variable or '%'
             if path[index + 1:index + 2] == percent:
-                res = res + c
-                index = index + 1
+                res += c
+                index += 1
             else:
                 path = path[index+1:]
                 pathlen = len(path)
                 try:
                     index = path.index(percent)
                 except ValueError:
-                    res = res + percent + path
+                    res += percent + path
                     index = pathlen - 1
                 else:
                     var = path[:index]
@@ -461,11 +467,11 @@ def expandvars(path):
                         value = '%' + var + '%'
                     if isinstance(path, bytes):
                         value = value.encode('ascii')
-                    res = res + value
+                    res += value
         elif c == dollar:  # variable or '$$'
             if path[index + 1:index + 2] == dollar:
-                res = res + c
-                index = index + 1
+                res += c
+                index += 1
             elif path[index + 1:index + 2] == brace:
                 path = path[index+2:]
                 pathlen = len(path)
@@ -483,23 +489,23 @@ def expandvars(path):
                         value = '${' + var + '}'
                     if isinstance(path, bytes):
                         value = value.encode('ascii')
-                    res = res + value
+                    res += value
                 except ValueError:
                     if isinstance(path, bytes):
-                        res = res + b'${' + path
+                        res += b'${' + path
                     else:
-                        res = res + '${' + path
+                        res += '${' + path
                     index = pathlen - 1
             else:
                 var = ''
-                index = index + 1
+                index += 1
                 c = path[index:index + 1]
                 while c and c in varchars:
                     if isinstance(path, bytes):
-                        var = var + c.decode('ascii')
+                        var += c.decode('ascii')
                     else:
-                        var = var + c
-                    index = index + 1
+                        var += c
+                    index += 1
                     c = path[index:index + 1]
                 if var in os.environ:
                     value = os.environ[var]
@@ -507,12 +513,12 @@ def expandvars(path):
                     value = '$' + var
                 if isinstance(path, bytes):
                     value = value.encode('ascii')
-                res = res + value
+                res += value
                 if c:
-                    index = index - 1
+                    index -= 1
         else:
-            res = res + c
-        index = index + 1
+            res += c
+        index += 1
     return res
 
 
@@ -524,12 +530,19 @@ def normpath(path):
     """Normalize path, eliminating double slashes, etc."""
     sep = _get_sep(path)
     dotdot = _get_dot(path) * 2
+    special_prefixes = _get_special(path)
+    if path.startswith(special_prefixes):
+        # in the case of paths with these prefixes:
+        # \\.\ -> device names
+        # \\?\ -> literal paths
+        # do not do any normalization, but return the path unchanged
+        return path
     path = path.replace(_get_altsep(path), sep)
     prefix, path = splitdrive(path)
 
     # collapse initial backslashes
     if path.startswith(sep):
-        prefix = prefix + sep
+        prefix += sep
         path = path.lstrip(sep)
 
     comps = path.split(sep)

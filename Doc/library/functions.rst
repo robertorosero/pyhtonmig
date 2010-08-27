@@ -181,7 +181,6 @@ are always available.  They are listed here in alphabetical order.
       character.  This is to facilitate detection of incomplete and complete
       statements in the :mod:`code` module.
 
-
    .. versionchanged:: 3.2
       Allowed use of Windows and Mac newlines.  Also input in ``'exec'`` mode
       does not have to end in a newline anymore.
@@ -464,10 +463,10 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: hasattr(object, name)
 
-   The arguments are an object and a string.  The result is ``True`` if the string
-   is the name of one of the object's attributes, ``False`` if not. (This is
-   implemented by calling ``getattr(object, name)`` and seeing whether it raises an
-   exception or not.)
+   The arguments are an object and a string.  The result is ``True`` if the
+   string is the name of one of the object's attributes, ``False`` if not. (This
+   is implemented by calling ``getattr(object, name)`` and seeing whether it
+   raises an :exc:`AttributeError` or not.)
 
 
 .. function:: hash(object)
@@ -847,7 +846,7 @@ are always available.  They are listed here in alphabetical order.
 
    *fget* is a function for getting an attribute value, likewise *fset* is a
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
-   use is to define a managed attribute x::
+   use is to define a managed attribute ``x``::
 
       class C(object):
           def __init__(self):
@@ -860,6 +859,9 @@ are always available.  They are listed here in alphabetical order.
           def delx(self):
               del self._x
           x = property(getx, setx, delx, "I'm the 'x' property.")
+
+   If then *c* is an instance of *C*, ``c.x`` will invoke the getter,
+   ``c.x = value`` will invoke the setter and ``del c.x`` the deleter.
 
    If given, *doc* will be the docstring of the property attribute. Otherwise, the
    property will copy *fget*'s docstring (if it exists).  This makes it possible to
@@ -936,8 +938,8 @@ are always available.  They are listed here in alphabetical order.
       []
 
    .. versionchanged:: 3.2
-      Testing integers for membership takes constant time instead of
-      iterating through all items.
+      Testing integers for membership takes constant time instead of iterating
+      through all items.
 
 
 .. function:: repr(object)
@@ -972,6 +974,13 @@ are always available.  They are listed here in alphabetical order.
    The return value is an integer if called with one argument, otherwise of the
    same type as *x*.
 
+   .. note::
+
+      The behavior of :func:`round` for floats can be surprising: for example,
+      ``round(2.675, 2)`` gives ``2.67`` instead of the expected ``2.68``.
+      This is not a bug: it's a result of the fact that most decimal fractions
+      can't be represented exactly as a float.  See :ref:`tut-fp-issues` for
+      more information.
 
 .. function:: set([iterable])
    :noindex:
@@ -1017,8 +1026,8 @@ are always available.  They are listed here in alphabetical order.
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
 
-   Use :func:`functools.cmp_to_key` to convert an
-   old-style *cmp* function to a *key* function.
+   Use :func:`functools.cmp_to_key` to convert an old-style *cmp* function to a
+   *key* function.
 
    For sorting examples and a brief sorting tutorial, see `Sorting HowTo
    <http://wiki.python.org/moin/HowTo/Sorting/>`_\.

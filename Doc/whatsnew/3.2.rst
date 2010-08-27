@@ -66,8 +66,114 @@ Some smaller changes made to the core Python language are:
 New, Improved, and Deprecated Modules
 =====================================
 
+* The :mod:`functools` module now includes a new decorator for caching
+  function calls. :func:`functools.lru_cache` can save repeated queries to an
+  external resource whenever the results are expected to be the same.
+
+  For example, adding a caching decorator to a database query function can save
+  database accesses for popular searches::
+
+      @functools.lru_cache(maxsize=300)
+      def get_phone_number(name):
+          c = conn.cursor()
+          c.execute('SELECT phonenumber FROM phonelist WHERE name=?', (name,))
+          return c.fetchone()[0]
+
+  To help with choosing an effective cache size, the wrapped function is
+  instrumented with two attributes *hits* and *misses*::
+
+        >>> for name in user_requests:
+        ...     get_phone_number(name)
+        >>> print(get_phone_number.hits, get_phone_number.misses)
+        4805 980
+
+  If the phonelist table gets updated, the outdated contents of the cache can be
+  cleared with::
+
+        >>> get_phone_number.clear()
+
+  (Contributed by Raymond Hettinger)
+
+* The previously deprecated :func:`contextlib.nested` function has been
+  removed in favor of a plain :keyword:`with` statement which can
+  accept multiple context managers.  The latter technique is faster
+  (because it is built-in), and it does a better job finalizing multiple
+  context managers when one of them raises an exception.
+
+  (Contributed by Georg Brandl and Mattias Brändström;
+  `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
+
 * The :class:`ftplib.FTP` class now supports the context manager protocol
   (Contributed by Tarek Ziadé and Giampaolo Rodolà; :issue:`4972`.)
+
+* A warning message will now get printed at interpreter shutdown if
+  the :data:`gc.garbage` list isn't empty.  This is meant to make the
+  programmer aware that his code contains object finalization issues.
+  (Added by Antoine Pitrou; :issue:`477863`.)
+
+* The :mod:`os` module now has the :const:`ST_RDONLY` and :const:`ST_NOSUID`
+  constants, for use with the :func:`~os.statvfs` function.
+  (Patch by Adam Jackson; :issue:`7647`.)
+
+* The :func:`shutil.copytree` function has two new options:
+
+  * *ignore_dangling_symlinks*: when ``symlinks=False`` (meaning that the
+    function copies the file pointed to by the symlink, not the symlink
+    itself) this option will silence the error raised if the file doesn't
+    exist.
+
+  * *copy_function*: a callable that will be used to copy files.
+    :func:`shutil.copy2` is used by default.
+
+  (Contributed by Tarek Ziadé.)
+
+* Socket objects now have a :meth:`~socket.socket.detach()` method which
+  puts the socket into closed state without actually closing the underlying
+  file descriptor.  The latter can then be reused for other purposes.
+
+  (Added by Antoine Pitrou; :issue:`8524`.)
+
+* The :mod:`sqlite3` module has some new features:
+
+  * XXX *enable_load_extension*
+
+  * XXX *load_extension*
+
+  * New :class:`~sqlite3.Connection` attribute
+    :attr:`~sqlite3.Connection.in_transaction` is :const:`True` when there
+    are uncommitted changes, and :const:`False` otherwise.  (Contributed
+    by R. David Murray and Shashwat Anand, :issue:`8845`.)
+
+* The :mod:`ssl` module has a new class, :class:`~ssl.SSLContext` which
+  serves as a container for various persistent SSL data, such as protocol
+  settings, certificates, private keys, and various other options.
+  The :meth:`~ssl.SSLContext.wrap_socket` method allows to create an
+  SSL socket from such an SSL context.
+  (Added by Antoine Pitrou; :issue:`8550`.)
+
+  The :func:`ssl.wrap_socket` constructor function now takes a
+  *ciphers* argument that's a string listing the encryption algorithms
+  to be allowed; the format of the string is described
+  `in the OpenSSL documentation
+  <http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT>`__.
+  (Added by Antoine Pitrou; :issue:`8322`.)
+
+  Various options have been added to the :mod:`ssl` module, such as
+  :data:`~ssl.OP_NO_SSLv2` which allows to force disabling of the insecure
+  and obsolete SSLv2 protocol.
+  (Added by Antoine Pitrou; :issue:`4870`.)
+
+  Another change makes the extension load all of OpenSSL's ciphers and
+  digest algorithms so that they're all available.  Some SSL
+  certificates couldn't be verified, reporting an "unknown algorithm"
+  error.  (Reported by Beda Kosata, and fixed by Antoine Pitrou;
+  :issue:`8484`.)
+
+  The version of OpenSSL being used is now available as the module
+  attributes :data:`ssl.OPENSSL_VERSION` (a string),
+  :data:`ssl.OPENSSL_VERSION_INFO` (a 5-tuple), and
+  :data:`ssl.OPENSSL_VERSION_NUMBER` (an integer).  (Added by Antoine
+  Pitrou; :issue:`8321`.)
 
 * The previously deprecated :func:`string.maketrans` function has been
   removed in favor of the static methods, :meth:`bytes.maketrans` and
@@ -79,38 +185,17 @@ New, Improved, and Deprecated Modules
 
   (Contributed by Georg Brandl; :issue:`5675`.)
 
-* The previously deprecated :func:`contextlib.nested` function has been
-  removed in favor of a plain :keyword:`with` statement which can
-  accept multiple context managers.  The latter technique is faster
-  (because it is built-in), and it does a better job finalizing multiple
-  context managers when one of them raises an exception.
+* Parameters passed to :func:`socket.getaddrinfo()` function can now be
+  specified as single keyword arguments.
 
-  (Contributed by Georg Brandl and Mattias Brändström;
-  `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
+  (Contributed by Giampaolo Rodolà; :issue:`8866`.)
 
-* The :func:`shutil.copytree` function has two new options:
+* :class:`~poplib.POP3_SSL` class now accepts a *context* parameter, which is a
+  :class:`ssl.SSLContext` object allowing bundling SSL configuration options,
+  certificates and private keys into a single (potentially long-lived)
+  structure.
 
-  * *ignore_dangling_symlinks*: when ``symlinks=False`` (meaning that the
-    function copies the file pointed to by the symlink, not the symlink
-    itself) this option will silence the error thrown if the file doesn't
-    exist.
-
-  * *copy_function*: a callable that will be used to copy files.
-    :func:`shutil.copy2` is used by default.
-
-  (Contributed by Tarek Ziade.)
-
-* The *sqlite3* module has some new features:
-
-  * XXX *enable_load_extension*
-
-  * XXX *load_extension*
-
-  * New :class:`~sqlite3.Connection` attribute
-    :attr:`~sqlite3.Connection.in_transaction` is :const:`True` when there
-    are uncommitted changes, and :const:`False` otherwise.  (Contributed
-    by R. David Murray and Shashwat Anand, :issue:`8845`.)
-
+  (Contributed by Giampaolo Rodolà; :issue:`8807`.)
 
 Multi-threading
 ===============
@@ -150,6 +235,20 @@ Optimizations
 Major performance enhancements have been added:
 
 * Stub
+
+
+Filenames and unicode
+=====================
+
+The filesystem encoding can be specified by setting the
+:envvar:`PYTHONFSENCODING` environment variable before running the interpreter.
+The value is an encoding name, e.g. ``iso-8859-1``. This variable is not
+available (ignored) on Windows and Mac OS X: the filesystem encoding is pinned
+to ``'mbcs'`` on Windows and ``'utf-8'`` on Mac OS X.
+
+The :mod:`os` module has two new functions: :func:`os.fsencode` and
+:func:`os.fsdecode`.
+
 
 IDLE
 ====

@@ -40,6 +40,18 @@ if sys.platform != 'darwin':
                                 #  NFKC('\u2001') == NFKC('\u2003')
 ])
 
+
+# Is it Unicode-friendly?
+if not os.path.supports_unicode_filenames:
+    fsencoding = sys.getfilesystemencoding()
+    try:
+        for name in filenames:
+            name.encode(fsencoding)
+    except UnicodeEncodeError:
+        raise unittest.SkipTest("only NT+ and systems with "
+                                "Unicode-friendly filesystem encoding")
+
+
 # Destroy directory dirname and all files under it, to one level.
 def deltree(dirname):
     # Don't hide legitimate errors:  if one of these suckers exists, it's
@@ -63,14 +75,8 @@ class UnicodeFileTests(unittest.TestCase):
         files = set()
         for name in self.files:
             name = os.path.join(support.TESTFN, self.norm(name))
-            try:
-                f = open(name, 'wb')
-            except UnicodeEncodeError:
-                if not os.path.supports_unicode_filenames:
-                    self.skipTest("only NT+ and systems with Unicode-friendly"
-                                  "filesystem encoding")
-            f.write((name+'\n').encode("utf-8"))
-            f.close()
+            with open(name, 'wb') as f:
+                f.write((name+'\n').encode("utf-8"))
             os.stat(name)
             files.add(name)
         self.files = files
@@ -126,7 +132,10 @@ class UnicodeFileTests(unittest.TestCase):
         for name in others:
             if sys.platform == 'darwin' and normalize('NFD', name) in files:
                 # Mac OS X decomposes Unicode names.  See comment above.
-                os.stat(name)
+                try:
+                    os.stat(name)
+                except OSError as err:
+                    raise AssertionError("File %a doesn't exist" % name)
                 continue
             self._apply_failure(open, name, IOError)
             self._apply_failure(os.stat, name, OSError)

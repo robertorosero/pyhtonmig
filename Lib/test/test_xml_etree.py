@@ -13,6 +13,7 @@
 
 import sys
 import cgi
+import unittest
 
 from test import support
 from test.support import findfile
@@ -20,6 +21,10 @@ from test.support import findfile
 from xml.etree import ElementTree as ET
 
 SIMPLE_XMLFILE = findfile("simple.xml", subdir="xmltestdata")
+try:
+    SIMPLE_XMLFILE.encode("utf8")
+except UnicodeEncodeError:
+    raise unittest.SkipTest("filename is not encodable to utf8")
 SIMPLE_NS_XMLFILE = findfile("simple-ns.xml", subdir="xmltestdata")
 
 SAMPLE_XML = """\
@@ -66,14 +71,14 @@ def check_method(method):
     if not hasattr(method, '__call__'):
         print(method, "not callable")
 
-def serialize(elem, to_string=True, **options):
+def serialize(elem, to_string=True, encoding='unicode', **options):
     import io
-    if options.get("encoding"):
+    if encoding != 'unicode':
         file = io.BytesIO()
     else:
         file = io.StringIO()
     tree = ET.ElementTree(elem)
-    tree.write(file, **options)
+    tree.write(file, encoding=encoding, **options)
     if to_string:
         return file.getvalue()
     else:
@@ -532,7 +537,7 @@ def attrib():
     >>> elem.set('testa', 'testval')
     >>> elem.set('testb', 'test2')
     >>> ET.tostring(elem)
-    '<test testa="testval" testb="test2">aa</test>'
+    b'<test testa="testval" testb="test2">aa</test>'
     >>> sorted(elem.keys())
     ['testa', 'testb']
     >>> sorted(elem.items())
@@ -542,7 +547,7 @@ def attrib():
     >>> elem.attrib['testb'] = 'test1'
     >>> elem.attrib['testc'] = 'test2'
     >>> ET.tostring(elem)
-    '<test testa="testval" testb="test1" testc="test2">aa</test>'
+    b'<test testa="testval" testb="test1" testc="test2">aa</test>'
     """
 
 def makeelement():
@@ -582,7 +587,7 @@ def parsefile():
 
     >>> tree = ET.parse(SIMPLE_XMLFILE)
     >>> normalize_crlf(tree)
-    >>> tree.write(sys.stdout)
+    >>> tree.write(sys.stdout, encoding='unicode')
     <root>
        <element key="value">text</element>
        <element>text</element>tail
@@ -590,7 +595,7 @@ def parsefile():
     </root>
     >>> tree = ET.parse(SIMPLE_NS_XMLFILE)
     >>> normalize_crlf(tree)
-    >>> tree.write(sys.stdout)
+    >>> tree.write(sys.stdout, encoding='unicode')
     <ns0:root xmlns:ns0="namespace">
        <ns0:element key="value">text</ns0:element>
        <ns0:element>text</ns0:element>tail
@@ -631,17 +636,17 @@ def parsefile():
 def parseliteral():
     """
     >>> element = ET.XML("<html><body>text</body></html>")
-    >>> ET.ElementTree(element).write(sys.stdout)
+    >>> ET.ElementTree(element).write(sys.stdout, encoding='unicode')
     <html><body>text</body></html>
     >>> element = ET.fromstring("<html><body>text</body></html>")
-    >>> ET.ElementTree(element).write(sys.stdout)
+    >>> ET.ElementTree(element).write(sys.stdout, encoding='unicode')
     <html><body>text</body></html>
     >>> sequence = ["<html><body>", "text</bo", "dy></html>"]
     >>> element = ET.fromstringlist(sequence)
-    >>> print(ET.tostring(element))
-    <html><body>text</body></html>
-    >>> print("".join(ET.tostringlist(element)))
-    <html><body>text</body></html>
+    >>> ET.tostring(element)
+    b'<html><body>text</body></html>'
+    >>> b"".join(ET.tostringlist(element))
+    b'<html><body>text</body></html>'
     >>> ET.tostring(element, "ascii")
     b"<?xml version='1.0' encoding='ascii'?>\\n<html><body>text</body></html>"
     >>> _, ids = ET.XMLID("<html><body>text</body></html>")
@@ -870,10 +875,10 @@ def writestring():
     """
     >>> elem = ET.XML("<html><body>text</body></html>")
     >>> ET.tostring(elem)
-    '<html><body>text</body></html>'
+    b'<html><body>text</body></html>'
     >>> elem = ET.fromstring("<html><body>text</body></html>")
     >>> ET.tostring(elem)
-    '<html><body>text</body></html>'
+    b'<html><body>text</body></html>'
     """
 
 def check_encoding(encoding):
@@ -1228,14 +1233,14 @@ def processinginstruction():
     Test ProcessingInstruction directly
 
     >>> ET.tostring(ET.ProcessingInstruction('test', 'instruction'))
-    '<?test instruction?>'
+    b'<?test instruction?>'
     >>> ET.tostring(ET.PI('test', 'instruction'))
-    '<?test instruction?>'
+    b'<?test instruction?>'
 
     Issue #2746
 
     >>> ET.tostring(ET.PI('test', '<testing&>'))
-    '<?test <testing&>?>'
+    b'<?test <testing&>?>'
     >>> ET.tostring(ET.PI('test', '<testing&>\xe3'), 'latin1')
     b"<?xml version='1.0' encoding='latin1'?>\\n<?test <testing&>\\xe3?>"
     """
@@ -1271,6 +1276,14 @@ XINCLUDE["C2.xml"] = """\
 """
 
 XINCLUDE["count.txt"] = "324387"
+
+XINCLUDE["C2b.xml"] = """\
+<?xml version='1.0'?>
+<document xmlns:xi="http://www.w3.org/2001/XInclude">
+  <p>This document has been <em>accessed</em>
+  <xi:include href="count.txt" parse="text"/> times.</p>
+</document>
+"""
 
 XINCLUDE["C3.xml"] = """\
 <?xml version='1.0'?>
@@ -1344,6 +1357,16 @@ def xinclude():
     >>> print(serialize(document)) # C2
     <document>
       <p>This document has been accessed
+      324387 times.</p>
+    </document>
+
+    Textual inclusion after sibling element (based on modified XInclude C.2)
+
+    >>> document = xinclude_loader("C2b.xml")
+    >>> ElementInclude.include(document, xinclude_loader)
+    >>> print(serialize(document)) # C2b
+    <document>
+      <p>This document has been <em>accessed</em>
       324387 times.</p>
     </document>
 
@@ -1638,11 +1661,11 @@ def bug_200708_newline():
 
     >>> e = ET.Element('SomeTag', text="def _f():\n  return 3\n")
     >>> ET.tostring(e)
-    '<SomeTag text="def _f():&#10;  return 3&#10;" />'
+    b'<SomeTag text="def _f():&#10;  return 3&#10;" />'
     >>> ET.XML(ET.tostring(e)).get("text")
     'def _f():\n  return 3\n'
     >>> ET.tostring(ET.XML(ET.tostring(e)))
-    '<SomeTag text="def _f():&#10;  return 3&#10;" />'
+    b'<SomeTag text="def _f():&#10;  return 3&#10;" />'
 
     """
 
@@ -1693,15 +1716,15 @@ def bug_200709_register_namespace():
     """
 
     >>> ET.tostring(ET.Element("{http://namespace.invalid/does/not/exist/}title"))
-    '<ns0:title xmlns:ns0="http://namespace.invalid/does/not/exist/" />'
+    b'<ns0:title xmlns:ns0="http://namespace.invalid/does/not/exist/" />'
     >>> ET.register_namespace("foo", "http://namespace.invalid/does/not/exist/")
     >>> ET.tostring(ET.Element("{http://namespace.invalid/does/not/exist/}title"))
-    '<foo:title xmlns:foo="http://namespace.invalid/does/not/exist/" />'
+    b'<foo:title xmlns:foo="http://namespace.invalid/does/not/exist/" />'
 
     And the Dublin Core namespace is in the default list:
 
     >>> ET.tostring(ET.Element("{http://purl.org/dc/elements/1.1/}title"))
-    '<dc:title xmlns:dc="http://purl.org/dc/elements/1.1/" />'
+    b'<dc:title xmlns:dc="http://purl.org/dc/elements/1.1/" />'
 
     """
 
@@ -1787,7 +1810,7 @@ def check_issue3151():
     '{${stuff}}localname'
     >>> t = ET.ElementTree(e)
     >>> ET.tostring(e)
-    '<ns0:localname xmlns:ns0="${stuff}" />'
+    b'<ns0:localname xmlns:ns0="${stuff}" />'
 
     """
 

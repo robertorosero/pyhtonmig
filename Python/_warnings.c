@@ -498,23 +498,21 @@ setup_context(Py_ssize_t stack_level, PyObject **filename, int *lineno,
     *filename = PyDict_GetItemString(globals, "__file__");
     if (*filename != NULL) {
         Py_ssize_t len = PyUnicode_GetSize(*filename);
-        const char *file_str = _PyUnicode_AsString(*filename);
-            if (file_str == NULL || (len < 0 && PyErr_Occurred()))
-            goto handle_error;
+        Py_UNICODE *unicode = PyUnicode_AS_UNICODE(*filename);
 
         /* if filename.lower().endswith((".pyc", ".pyo")): */
         if (len >= 4 &&
-            file_str[len-4] == '.' &&
-            tolower(file_str[len-3]) == 'p' &&
-            tolower(file_str[len-2]) == 'y' &&
-            (tolower(file_str[len-1]) == 'c' ||
-                tolower(file_str[len-1]) == 'o'))
+            unicode[len-4] == '.' &&
+            Py_UNICODE_TOLOWER(unicode[len-3]) == 'p' &&
+            Py_UNICODE_TOLOWER(unicode[len-2]) == 'y' &&
+            (Py_UNICODE_TOLOWER(unicode[len-1]) == 'c' ||
+                Py_UNICODE_TOLOWER(unicode[len-1]) == 'o'))
         {
-            *filename = PyUnicode_FromStringAndSize(file_str, len-1);
-                if (*filename == NULL)
-                        goto handle_error;
-            }
-            else
+            *filename = PyUnicode_FromUnicode(unicode, len-1);
+            if (*filename == NULL)
+                goto handle_error;
+        }
+        else
             Py_INCREF(*filename);
     }
     else {
@@ -712,24 +710,58 @@ warnings_warn_explicit(PyObject *self, PyObject *args, PyObject *kwds)
 
 
 /* Function to issue a warning message; may raise an exception. */
-int
-PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+
+static int
+warn_unicode(PyObject *category, PyObject *message,
+             Py_ssize_t stack_level)
 {
     PyObject *res;
-    PyObject *message = PyUnicode_FromString(text);
-    if (message == NULL)
-        return -1;
 
     if (category == NULL)
         category = PyExc_RuntimeWarning;
 
     res = do_warn(message, category, stack_level);
-    Py_DECREF(message);
     if (res == NULL)
         return -1;
     Py_DECREF(res);
 
     return 0;
+}
+
+int
+PyErr_WarnFormat(PyObject *category, Py_ssize_t stack_level,
+                 const char *format, ...)
+{
+    int ret;
+    PyObject *message;
+    va_list vargs;
+
+#ifdef HAVE_STDARG_PROTOTYPES
+    va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
+    message = PyUnicode_FromFormatV(format, vargs);
+    if (message != NULL) {
+        ret = warn_unicode(category, message, stack_level);
+        Py_DECREF(message);
+    }
+    else
+        ret = -1;
+    va_end(vargs);
+    return ret;
+}
+
+int
+PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+{
+    int ret;
+    PyObject *message = PyUnicode_FromString(text);
+    if (message == NULL)
+        return -1;
+    ret = warn_unicode(category, message, stack_level);
+    Py_DECREF(message);
+    return ret;
 }
 
 /* PyErr_Warn is only for backwards compatability and will be removed.

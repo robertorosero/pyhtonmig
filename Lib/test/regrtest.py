@@ -187,14 +187,6 @@ for module in sys.modules.values():
         module.__file__ = os.path.abspath(module.__file__)
 
 
-# Ignore ImportWarnings that only occur in the source tree,
-# (because of modules with the same name as source-directories in Modules/)
-for mod in ("ctypes", "gzip", "zipfile", "tarfile", "encodings.zlib_codec",
-            "test.test_zipimport", "test.test_zlib", "test.test_zipfile",
-            "test.test_codecs", "test.string_tests"):
-    warnings.filterwarnings(module=".*%s$" % (mod,),
-                            action="ignore", category=ImportWarning)
-
 # MacOSX (a.k.a. Darwin) has a default stack size that is too small
 # for deeply recursive regular expressions.  We see this as crashes in
 # the Python test suite when running test_re.py and test_sre.py.  The
@@ -224,6 +216,7 @@ from test import support
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
                   'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
 
+TEMPDIR = os.path.abspath(tempfile.gettempdir())
 
 def usage(msg):
     print(msg, file=sys.stderr)
@@ -390,7 +383,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             sys.exit(0)
         else:
             print(("No handler for option {}.  Please report this as a bug "
-                  "at http://bugs.python.org.").format(o), file=sys.stderr)
+                   "at http://bugs.python.org.").format(o), file=sys.stderr)
             sys.exit(1)
     if single and fromfile:
         usage("-s and -f don't go together!")
@@ -423,7 +416,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             found_garbage = []
 
     if single:
-        filename = 'pynexttest'
+        filename = os.path.join(TEMPDIR, 'pynexttest')
         try:
             fp = open(filename, 'r')
             next_test = fp.read().strip()
@@ -455,10 +448,11 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         args = []
 
     # For a partial run, we do not need to clutter the output.
-    if verbose or not (quiet or tests or args):
+    if verbose or not (quiet or single or tests or args):
         # Print basic platform information
         print("==", platform.python_implementation(), *sys.version.split())
-        print("==  ", platform.platform(aliased=True))
+        print("==  ", platform.platform(aliased=True),
+                      "%s-endian" % sys.byteorder)
         print("==  ", os.getcwd())
 
     alltests = findtests(testdir, stdtests, nottests)
@@ -514,8 +508,12 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     if bad:
                         return
         tests = test_forever()
+        test_count = ''
+        test_count_width = 3
     else:
         tests = iter(selected)
+        test_count = '/{}'.format(len(selected))
+        test_count_width = len(test_count) - 1
 
     if use_mp:
         try:
@@ -549,7 +547,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     popen = Popen([sys.executable, '-E', '-m', 'test.regrtest',
                                    '--slaveargs', json.dumps(args_tuple)],
                                    stdout=PIPE, stderr=PIPE,
-                                   universal_newlines=True, close_fds=True)
+                                   universal_newlines=True,
+                                   close_fds=(os.name != 'nt'))
                     stdout, stderr = popen.communicate()
                     # Strip last refcount output line if it exists, since it
                     # comes from the shutdown of the interpreter in the subcommand.
@@ -559,8 +558,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         output.put((None, None, None, None))
                         return
                     result = json.loads(result)
-                    if not quiet:
-                        stdout = test+'\n'+stdout
                     output.put((test, stdout.rstrip(), stderr.rstrip(), result))
             except BaseException:
                 output.put((None, None, None, None))
@@ -569,12 +566,16 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         for worker in workers:
             worker.start()
         finished = 0
+        test_index = 1
         try:
             while finished < use_mp:
                 test, stdout, stderr, result = output.get()
                 if test is None:
                     finished += 1
                     continue
+                if not quiet:
+                    print("[{1:{0}}{2}] {3}".format(
+                        test_count_width, test_index, test_count, test))
                 if stdout:
                     print(stdout)
                 if stderr:
@@ -583,15 +584,17 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                     assert result[1] == 'KeyboardInterrupt'
                     raise KeyboardInterrupt   # What else?
                 accumulate_result(test, result)
+                test_index += 1
         except KeyboardInterrupt:
             interrupted = True
             pending.close()
         for worker in workers:
             worker.join()
     else:
-        for test in tests:
+        for test_index, test in enumerate(tests, 1):
             if not quiet:
-                print(test)
+                print("[{1:{0}}{2}] {3}".format(
+                    test_count_width, test_index, test_count, test))
                 sys.stdout.flush()
             if trace:
                 # If we're tracing code coverage, then we don't exit with status
@@ -812,7 +815,7 @@ class saved_test_environment:
 
     resources = ('sys.argv', 'cwd', 'sys.stdin', 'sys.stdout', 'sys.stderr',
                  'os.environ', 'sys.path', 'sys.path_hooks', '__import__',
-                 'warnings.filters')
+                 'warnings.filters', 'asyncore.socket_map')
 
     def get_sys_argv(self):
         return id(sys.argv), sys.argv, sys.argv[:]
@@ -869,6 +872,15 @@ class saved_test_environment:
     def restore_warnings_filters(self, saved_filters):
         warnings.filters = saved_filters[1]
         warnings.filters[:] = saved_filters[2]
+
+    def get_asyncore_socket_map(self):
+        asyncore = sys.modules.get('asyncore')
+        return asyncore and asyncore.socket_map or {}
+    def restore_asyncore_socket_map(self, saved_map):
+        asyncore = sys.modules.get('asyncore')
+        if asyncore is not None:
+            asyncore.socket_map.clear()
+            asyncore.socket_map.update(saved_map)
 
     def resource_info(self):
         for name in self.resources:
@@ -1453,18 +1465,17 @@ if __name__ == '__main__':
     # to keep the test files in a subfolder.  It eases the cleanup of leftover
     # files using command "make distclean".
     if sysconfig.is_python_build():
-        parent_dir = os.path.join(sysconfig.get_config_var('srcdir'), 'build')
-        if not os.path.exists(parent_dir):
-            os.mkdir(parent_dir)
-    else:
-        parent_dir = os.path.abspath(tempfile.gettempdir())
+        TEMPDIR = os.path.join(sysconfig.get_config_var('srcdir'), 'build')
+        TEMPDIR = os.path.abspath(TEMPDIR)
+        if not os.path.exists(TEMPDIR):
+            os.mkdir(TEMPDIR)
 
     # Define a writable temp dir that will be used as cwd while running
     # the tests. The name of the dir includes the pid to allow parallel
     # testing (see the -j option).
     TESTCWD = 'test_python_{}'.format(os.getpid())
 
-    TESTCWD = os.path.join(parent_dir, TESTCWD)
+    TESTCWD = os.path.join(TEMPDIR, TESTCWD)
 
     # Run the tests in a context manager that temporary changes the CWD to a
     # temporary and writable directory. If it's not possible to create or

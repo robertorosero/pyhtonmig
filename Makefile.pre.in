@@ -314,6 +314,7 @@ PYTHON_OBJS=	\
 		Python/pymath.o \
 		Python/pystate.o \
 		Python/pythonrun.o \
+		Python/pytime.o \
 		Python/structmember.o \
 		Python/symtable.o \
 		Python/sysmodule.o \
@@ -417,9 +418,7 @@ coverage:
 
 # Build the interpreter
 $(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY)
-		$(LINKCC) $(PY_LDFLAGS) $(LINKFORSHARED) -o $@ \
-			Modules/python.o \
-			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
+	$(LINKCC) $(PY_LDFLAGS) $(LINKFORSHARED) -o $@ Modules/python.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
 
 platform: $(BUILDPYTHON)
 	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from sysconfig import get_platform ; print(get_platform()+"-"+sys.version[0:3])' >platform
@@ -562,9 +561,12 @@ Modules/python.o: $(srcdir)/Modules/python.c
 
 $(IO_OBJS): $(IO_H)
 
-$(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+# Use a stamp file to prevent make -j invoking pgen twice
+$(GRAMMAR_H) $(GRAMMAR_C): Parser/pgen.stamp
+Parser/pgen.stamp: $(PGEN) $(GRAMMAR_INPUT)
 		-@$(INSTALL) -d Include
 		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+		-touch Parser/pgen.stamp
 
 $(PGEN):	$(PGENOBJS)
 		$(CC) $(OPT) $(PY_LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
@@ -701,6 +703,7 @@ PYTHON_HEADERS= \
 		Include/pystrtod.h \
 		Include/pythonrun.h \
 		Include/pythread.h \
+		Include/pytime.h \
 		Include/rangeobject.h \
 		Include/setobject.h \
 		Include/sliceobject.h \
@@ -900,7 +903,7 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Lib/*.py $(srcdir)/Lib/*.doc $(srcdir)/Lib/*.egg-info ; \
+	@for i in $(srcdir)/Lib/*.py $(srcdir)/Lib/*.egg-info ; \
 	do \
 		if test -x $$i; then \
 			$(INSTALL_SCRIPT) $$i $(DESTDIR)$(LIBDEST); \
@@ -1188,8 +1191,9 @@ docclean:
 	-rm -rf Doc/tools/sphinx Doc/tools/pygments Doc/tools/docutils
 
 clean: pycremoval
-	find . -name '*.o' -exec rm -f {} ';'
+	find . -name '*.[oa]' -exec rm -f {} ';'
 	find . -name '*.s[ol]' -exec rm -f {} ';'
+	find . -name '*.so.[0-9]*.[0-9]*' -exec rm -f {} ';'
 	find build -name 'fficonfig.h' -exec rm -f {} ';' || true
 	find build -name 'fficonfig.py' -exec rm -f {} ';' || true
 	-rm -f Lib/lib2to3/*Grammar*.pickle
@@ -1199,7 +1203,7 @@ profile-removal:
 
 clobber: clean profile-removal
 	-rm -f $(BUILDPYTHON) $(PGEN) $(LIBRARY) $(LDLIBRARY) $(DLLLIBRARY) \
-		tags TAGS \
+		tags TAGS Parser/pgen.stamp \
 		config.cache config.log pyconfig.h Modules/config.c
 	-rm -rf build platform
 	-rm -rf $(PYTHONFRAMEWORKDIR)
@@ -1208,11 +1212,14 @@ clobber: clean profile-removal
 # remove all generated files, even Makefile[.pre]
 # Keep configure and Python-ast.[ch], it's possible they can't be generated
 distclean: clobber
-	-rm -f Lib/test/data/*
+	for file in Lib/test/data/* ; do \
+	    if test "$$file" != "Lib/test/data/README"; then rm "$$file"; fi; \
+	done
 	-rm -f core Makefile Makefile.pre config.status \
 		Modules/Setup Modules/Setup.local Modules/Setup.config \
 		Misc/python.pc
 	-rm -f python*-gdb.py
+	-rm -f pybuilddir.txt
 	find $(srcdir) '(' -name '*.fdc' -o -name '*~' \
 			   -o -name '[@,#]*' -o -name '*.old' \
 			   -o -name '*.orig' -o -name '*.rej' \
@@ -1231,7 +1238,7 @@ funny:
 		-o -type d \
 		-o -name '*.[chs]' \
 		-o -name '*.py' \
-		-o -name '*.doc' \
+		-o -name '*.pyw' \
 		-o -name '*.dat' \
 		-o -name '*.el' \
 		-o -name '*.fd' \
@@ -1243,20 +1250,18 @@ funny:
 		-o -name '*.xpm' \
 		-o -name '*.uue' \
 		-o -name '*.decTest' \
-		-o -name '*,[vpt]' \
+		-o -name '*.tmCommand' \
+		-o -name '*.tmSnippet' \
 		-o -name 'Setup' \
 		-o -name 'Setup.*' \
 		-o -name regen \
 		-o -name README \
+		-o -name NEWS \
+		-o -name HISTORY \
 		-o -name Makefile \
 		-o -name ChangeLog \
-		-o -name Repository \
-		-o -name Root \
-		-o -name Entries \
-		-o -name Tag \
-		-o -name tags \
-		-o -name TAGS \
-		-o -name .cvsignore \
+		-o -name .hgignore \
+		-o -name .bzrignore \
 		-o -name MANIFEST \
 		-o -print
 

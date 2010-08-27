@@ -5,7 +5,7 @@
 # Based on prior profile module by Sjoerd Mullender...
 #   which was hacked somewhat by: Guido van Rossum
 #
-# see profile.doc and profile.py for more info.
+# see profile.py for more info.
 
 # Copyright 1994, by InfoSeek Corporation, all rights reserved.
 # Written by James Roskind
@@ -66,7 +66,7 @@ class Stats:
     minor key of 'the name of the function'.  Look at the two tables in
     sort_stats() and get_sort_arg_defs(self) for more examples.
 
-    All methods return self,  so you can string together commands like:
+    All methods return self, so you can string together commands like:
         Stats('foo', 'goo').strip_dirs().sort_stats('calls').\
                             print_stats(5).print_callers(5)
     """
@@ -138,7 +138,7 @@ class Stats:
         if not arg_list: return self
         if len(arg_list) > 1: self.add(*arg_list[1:])
         other = arg_list[0]
-        if type(self) != type(other) or self.__class__ != other.__class__:
+        if type(self) != type(other):
             other = Stats(other)
         self.files += other.files
         self.total_calls += other.total_calls
@@ -206,12 +206,12 @@ class Stats:
         if not field:
             self.fcn_list = 0
             return self
-        if len(field) == 1 and type(field[0]) == type(1):
+        if len(field) == 1 and isinstance(field[0], int):
             # Be compatible with old profiler
             field = [ {-1: "stdname",
-                      0:"calls",
-                      1:"time",
-                      2: "cumulative" }  [ field[0] ] ]
+                       0:  "calls",
+                       1:  "time",
+                       2:  "cumulative"}[field[0]] ]
 
         sort_arg_defs = self.get_sort_arg_defs()
         sort_tuple = ()
@@ -288,48 +288,53 @@ class Stats:
 
     def eval_print_amount(self, sel, list, msg):
         new_list = list
-        if type(sel) == type(""):
+        if isinstance(sel, str):
+            try:
+                rex = re.compile(sel)
+            except re.error:
+                msg += "   <Invalid regular expression %r>\n" % sel
+                return new_list, msg
             new_list = []
             for func in list:
-                if re.search(sel, func_std_string(func)):
+                if rex.search(func_std_string(func)):
                     new_list.append(func)
         else:
             count = len(list)
-            if type(sel) == type(1.0) and 0.0 <= sel < 1.0:
+            if isinstance(sel, float) and 0.0 <= sel < 1.0:
                 count = int(count * sel + .5)
                 new_list = list[:count]
-            elif type(sel) == type(1) and 0 <= sel < count:
+            elif isinstance(sel, int) and 0 <= sel < count:
                 count = sel
                 new_list = list[:count]
         if len(list) != len(new_list):
-            msg = msg + "   List reduced from %r to %r due to restriction <%r>\n" % (
-                         len(list), len(new_list), sel)
+            msg += "   List reduced from %r to %r due to restriction <%r>\n" % (
+                len(list), len(new_list), sel)
 
         return new_list, msg
 
     def get_print_list(self, sel_list):
         width = self.max_name_len
         if self.fcn_list:
-            list = self.fcn_list[:]
+            stat_list = self.fcn_list[:]
             msg = "   Ordered by: " + self.sort_type + '\n'
         else:
-            list = self.stats.keys()
+            stat_list = list(self.stats.keys())
             msg = "   Random listing order was used\n"
 
         for selection in sel_list:
-            list, msg = self.eval_print_amount(selection, list, msg)
+            stat_list, msg = self.eval_print_amount(selection, stat_list, msg)
 
-        count = len(list)
+        count = len(stat_list)
 
-        if not list:
-            return 0, list
+        if not stat_list:
+            return 0, stat_list
         print(msg, file=self.stream)
         if count < len(self.stats):
             width = 0
-            for func in list:
+            for func in stat_list:
                 if  len(func_std_string(func)) > width:
                     width = len(func_std_string(func))
-        return width+2, list
+        return width+2, stat_list
 
     def print_stats(self, *amount):
         for filename in self.files:
@@ -501,8 +506,13 @@ def add_callers(target, source):
         new_callers[func] = caller
     for func, caller in source.items():
         if func in new_callers:
-            new_callers[func] = tuple([i[0] + i[1] for i in
-                                       zip(caller, new_callers[func])])
+            if isinstance(caller, tuple):
+                # format used by cProfile
+                new_callers[func] = tuple([i[0] + i[1] for i in
+                                           zip(caller, new_callers[func])])
+            else:
+                # format used by profile
+                new_callers[func] += caller
         else:
             new_callers[func] = caller
     return new_callers
@@ -536,12 +546,10 @@ if __name__ == '__main__':
         def __init__(self, profile=None):
             cmd.Cmd.__init__(self)
             self.prompt = "% "
+            self.stats = None
+            self.stream = sys.stdout
             if profile is not None:
-                self.stats = Stats(profile)
-                self.stream = self.stats.stream
-            else:
-                self.stats = None
-                self.stream = sys.stdout
+                self.do_read(profile)
 
         def generic(self, fn, line):
             args = line.split()
@@ -576,7 +584,10 @@ if __name__ == '__main__':
             print("  that match it are printed.", file=self.stream)
 
         def do_add(self, line):
-            self.stats.add(line)
+            if self.stats:
+                self.stats.add(line)
+            else:
+                print("No statistics object is loaded.", file=self.stream)
             return 0
         def help_add(self):
             print("Add profile info from given file to current statistics object.", file=self.stream)
@@ -611,22 +622,33 @@ if __name__ == '__main__':
                 except IOError as err:
                     print(err.args[1], file=self.stream)
                     return
+                except Exception as err:
+                    print(err.__class__.__name__ + ':', err, file=self.stream)
+                    return
                 self.prompt = line + "% "
             elif len(self.prompt) > 2:
-                line = self.prompt[-2:]
+                line = self.prompt[:-2]
+                self.do_read(line)
             else:
                 print("No statistics object is current -- cannot reload.", file=self.stream)
             return 0
         def help_read(self):
             print("Read in profile data from a specified file.", file=self.stream)
+            print("Without argument, reload the current file.", file=self.stream)
 
         def do_reverse(self, line):
-            self.stats.reverse_order()
+            if self.stats:
+                self.stats.reverse_order()
+            else:
+                print("No statistics object is loaded.", file=self.stream)
             return 0
         def help_reverse(self):
             print("Reverse the sort order of the profiling report.", file=self.stream)
 
         def do_sort(self, line):
+            if not self.stats:
+                print("No statistics object is loaded.", file=self.stream)
+                return
             abbrevs = self.stats.get_sort_arg_defs()
             if line and all((x in abbrevs) for x in line.split()):
                 self.stats.sort_stats(*line.split())
@@ -648,10 +670,15 @@ if __name__ == '__main__':
             self.generic_help()
 
         def do_strip(self, line):
-            self.stats.strip_dirs()
-            return 0
+            if self.stats:
+                self.stats.strip_dirs()
+            else:
+                print("No statistics object is loaded.", file=self.stream)
         def help_strip(self):
             print("Strip leading path information from filenames in the report.", file=self.stream)
+
+        def help_help(self):
+            print("Show help for a given command.", file=self.stream)
 
         def postcmd(self, stop, line):
             if stop:

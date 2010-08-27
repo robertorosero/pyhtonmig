@@ -164,7 +164,7 @@ class SampleCallbacksTestCase(unittest.TestCase):
         result = integrate(0.0, 1.0, CALLBACK(func), 10)
         diff = abs(result - 1./3.)
 
-        self.assertTrue(diff < 0.01, "%s not less than 0.01" % diff)
+        self.assertLess(diff, 0.01, "%s not less than 0.01" % diff)
 
     def test_issue_8959_a(self):
         from ctypes.util import find_library
@@ -199,7 +199,6 @@ class SampleCallbacksTestCase(unittest.TestCase):
                 return True #Allow windows to keep enumerating
 
             windll.user32.EnumWindows(EnumWindowsCallbackFunc, 0)
-            self.assertFalse(windowCount == 0)
 
 ################################################################
 

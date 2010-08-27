@@ -879,6 +879,10 @@
 				>
 			</File>
 			<File
+                                RelativePath="..\..\Include\pytime.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Include\pymem.h"
 				>
 			</File>
@@ -940,6 +944,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\sysmodule.h"
+				>
+			</File>
+			<File
+                                RelativePath="..\..\Include\_time.h"
 				>
 			</File>
 			<File
@@ -1091,7 +1099,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\datetimemodule.c"
+				RelativePath="..\..\Modules\_datetimemodule.c"
 				>
 			</File>
 			<File
@@ -1164,6 +1172,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Modules\_threadmodule.c"
+				>
+			</File>
+			<File
+                                RelativePath="..\..\Modules\_time.c"
 				>
 			</File>
 			<File
@@ -1756,6 +1768,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Python\pymath.c"
+				>
+			</File>
+			<File
+                                RelativePath="..\..\Python\pytime.c"
 				>
 			</File>
 			<File

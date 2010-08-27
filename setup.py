@@ -22,6 +22,10 @@ COMPILED_WITH_PYDEBUG = hasattr(sys, 'gettotalrefcount')
 # This global variable is used to hold the list of modules to be disabled.
 disabled_module_list = []
 
+# File which contains the directory for shared mods (for sys.path fixup
+# when running from the build dir, see Modules/getpath.c)
+_BUILDDIR_COOKIE = "pybuilddir.txt"
+
 def add_dir_to_list(dirlist, dir):
     """Add the directory 'dir' to the list 'dirlist' (at the front) if
     1) 'dir' is not already in 'dirlist'
@@ -223,6 +227,16 @@ class PyBuildExt(build_ext):
             (ccshared,cflags) = sysconfig.get_config_vars('CCSHARED','CFLAGS')
             args['compiler_so'] = compiler + ' ' + ccshared + ' ' + cflags
         self.compiler.set_executables(**args)
+
+        # Not only do we write the builddir cookie, but we manually install
+        # the shared modules directory if it isn't already in sys.path.
+        # Otherwise trying to import the extensions after building them
+        # will fail.
+        with open(_BUILDDIR_COOKIE, "wb") as f:
+            f.write(self.build_lib.encode('utf-8', 'surrogateescape'))
+        abs_build_lib = os.path.join(os.getcwd(), self.build_lib)
+        if abs_build_lib not in sys.path:
+            sys.path.append(abs_build_lib)
 
         build_ext.build_extensions(self)
 
@@ -452,20 +466,14 @@ class PyBuildExt(build_ext):
         # time operations and variables
         exts.append( Extension('time', ['timemodule.c', '_time.c'],
                                libraries=math_libs) )
-        exts.append( Extension('datetime', ['datetimemodule.c', '_time.c'],
+        exts.append( Extension('_datetime', ['_datetimemodule.c', '_time.c'],
                                libraries=math_libs) )
-        # fast iterator tools implemented in C
-        exts.append( Extension("itertools", ["itertoolsmodule.c"]) )
         # random number generator implemented in C
         exts.append( Extension("_random", ["_randommodule.c"]) )
-        # high-performance collections
-        exts.append( Extension("_collections", ["_collectionsmodule.c"]) )
         # bisect
         exts.append( Extension("_bisect", ["_bisectmodule.c"]) )
         # heapq
         exts.append( Extension("_heapq", ["_heapqmodule.c"]) )
-        # operator.add() and similar goodies
-        exts.append( Extension('operator', ['operator.c']) )
         # C-optimized pickle replacement
         exts.append( Extension("_pickle", ["_pickle.c"]) )
         # atexit
@@ -1639,8 +1647,7 @@ class PyBuildExt(build_ext):
                    '_ctypes/callbacks.c',
                    '_ctypes/callproc.c',
                    '_ctypes/stgdict.c',
-                   '_ctypes/cfield.c',
-                   '_ctypes/malloc_closure.c']
+                   '_ctypes/cfield.c']
         depends = ['_ctypes/ctypes.h']
 
         if sys.platform == 'darwin':

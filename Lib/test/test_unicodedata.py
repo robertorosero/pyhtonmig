@@ -80,8 +80,7 @@ class UnicodeDatabaseTest(unittest.TestCase):
 class UnicodeFunctionsTest(UnicodeDatabaseTest):
 
     # update this, if the database changes
-    expectedchecksum = '6ccf1b1a36460d2694f9b0b0f0324942fe70ede6'
-
+    expectedchecksum = 'e89a6380093a00a7685ac7b92e7367d737fcb79b'
     def test_function_checksum(self):
         data = []
         h = hashlib.sha1()
@@ -90,9 +89,9 @@ class UnicodeFunctionsTest(UnicodeDatabaseTest):
             char = chr(i)
             data = [
                 # Properties
-                str(self.db.digit(char, -1)),
-                str(self.db.numeric(char, -1)),
-                str(self.db.decimal(char, -1)),
+                format(self.db.digit(char, -1), '.12g'),
+                format(self.db.numeric(char, -1), '.12g'),
+                format(self.db.decimal(char, -1), '.12g'),
                 self.db.category(char),
                 self.db.bidirectional(char),
                 self.db.decomposition(char),
@@ -294,6 +293,14 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
             else:
                 self.assertEqual(len(lines), 1,
                                  r"\u%.4x should not be a linebreak" % i)
+
+    def test_UCS4(self):
+        # unicodedata should work with code points outside the BMP
+        # even on a narrow Unicode build
+        self.assertEqual(self.db.category("\U0001012A"), "No")
+        self.assertEqual(self.db.numeric("\U0001012A"), 9000)
+        self.assertEqual(self.db.decimal("\U0001D7FD"), 7)
+        self.assertEqual(self.db.digit("\U0001D7FD"), 7)
 
 def test_main():
     test.support.run_unittest(

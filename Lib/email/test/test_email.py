@@ -1649,6 +1649,15 @@ Re: =?mac-iceland?q?r=8Aksm=9Arg=8Cs?= baz foo bar =?mac-iceland?q?r=8Aksm?=
                               (b'rg', None), (b'\xe5', 'iso-8859-1'),
                               (b'sbord', None)])
 
+    def test_rfc2047_B_bad_padding(self):
+        s = '=?iso-8859-1?B?%s?='
+        data = [                                # only test complete bytes
+            ('dm==', b'v'), ('dm=', b'v'), ('dm', b'v'),
+            ('dmk=', b'vi'), ('dmk', b'vi')
+          ]
+        for q, a in data:
+            dh = decode_header(s % q)
+            self.assertEqual(dh, [(a, 'iso-8859-1')])
 
 
 # Test the MIMEMessage class
@@ -2224,6 +2233,19 @@ class TestMiscellaneous(TestEmailBase):
         t = int(time.mktime(timetup[:9]))
         eq(time.localtime(t)[:6], timetup[:6])
         eq(int(time.strftime('%Y', timetup[:9])), 2003)
+
+    def test_parsedate_y2k(self):
+        """Test for parsing a date with a two-digit year.
+
+        Parsing a date with a two-digit year should return the correct
+        four-digit year. RFC822 allows two-digit years, but RFC2822 (which
+        obsoletes RFC822) requires four-digit years.
+
+        """
+        self.assertEqual(utils.parsedate_tz('25 Feb 03 13:47:26 -0800'),
+                         utils.parsedate_tz('25 Feb 2003 13:47:26 -0800'))
+        self.assertEqual(utils.parsedate_tz('25 Feb 71 13:47:26 -0800'),
+                         utils.parsedate_tz('25 Feb 1971 13:47:26 -0800'))
 
     def test_parseaddr_empty(self):
         self.assertEqual(utils.parseaddr('<>'), ('', ''))
@@ -3176,7 +3198,7 @@ A very long line that must get split to something other than at the
 
     def test_broken_base64_header(self):
         raises = self.assertRaises
-        s = 'Subject: =?EUC-KR?B?CSixpLDtKSC/7Liuvsax4iC6uLmwMcijIKHaILzSwd/H0SC8+LCjwLsgv7W/+Mj3IQ?='
+        s = 'Subject: =?EUC-KR?B?CSixpLDtKSC/7Liuvsax4iC6uLmwMcijIKHaILzSwd/H0SC8+LCjwLsgv7W/+Mj3I ?='
         raises(errors.HeaderParseError, decode_header, s)
 
 

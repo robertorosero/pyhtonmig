@@ -318,6 +318,8 @@ class _OutputRedirectingPdb(pdb.Pdb):
         self.__out = out
         self.__debugger_used = False
         pdb.Pdb.__init__(self, stdout=out)
+        # still use input() to get user input
+        self.use_rawinput = 1
 
     def set_trace(self, frame=None):
         self.__debugger_used = True
@@ -1379,12 +1381,17 @@ class DocTestRunner:
         self.save_linecache_getlines = linecache.getlines
         linecache.getlines = self.__patched_linecache_getlines
 
+        # Make sure sys.displayhook just prints the value to stdout
+        save_displayhook = sys.displayhook
+        sys.displayhook = sys.__displayhook__
+
         try:
             return self.__run(test, compileflags, out)
         finally:
             sys.stdout = save_stdout
             pdb.set_trace = save_set_trace
             linecache.getlines = self.save_linecache_getlines
+            sys.displayhook = save_displayhook
             if clear_globs:
                 test.globs.clear()
                 import builtins
@@ -1779,7 +1786,7 @@ def testmod(m=None, name=None, globs=None, verbose=None,
 
     Return (#failures, #tests).
 
-    See doctest.__doc__ for an overview.
+    See help(doctest) for an overview.
 
     Optional keyword arg "name" gives the name of the module; by default
     use m.__name__.

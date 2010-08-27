@@ -423,7 +423,9 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         """Check that the repr() of os.environ looks like environ({...})."""
         env = os.environ
         self.assertTrue(isinstance(env.data, dict))
-        self.assertEqual(repr(env), 'environ({!r})'.format(env.data))
+        self.assertEqual(repr(env), 'environ({{{}}})'.format(', '.join(
+            '{!r}: {!r}'.format(key, value)
+            for key, value in env.items())))
 
     def test_get_exec_path(self):
         defpath_list = os.defpath.split(os.pathsep)
@@ -448,8 +450,12 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
 
         if os.supports_bytes_environ:
             # env cannot contain 'PATH' and b'PATH' keys
-            self.assertRaises(ValueError,
-                os.get_exec_path, {'PATH': '1', b'PATH': b'2'})
+            try:
+                mixed_env = {'PATH': '1', b'PATH': b'2'}
+            except BytesWarning:
+                pass
+            else:
+                self.assertRaises(ValueError, os.get_exec_path, mixed_env)
 
             # bytes key and/or value
             self.assertSequenceEqual(os.get_exec_path({b'PATH': b'abc'}),
@@ -721,7 +727,10 @@ class ExecTests(unittest.TestCase):
         # os.get_exec_path() reads the 'PATH' variable
         with _execvpe_mockup() as calls:
             env_path = env.copy()
-            env_path['PATH'] = program_path
+            if test_type is bytes:
+                env_path[b'PATH'] = program_path
+            else:
+                env_path['PATH'] = program_path
             self.assertRaises(OSError,
                 os._execvpe, program, arguments, env=env_path)
             self.assertEqual(len(calls), 1)
@@ -893,29 +902,47 @@ if sys.platform != 'win32':
                         sys.executable, '-c',
                         'import os,sys;os.setregid(-1,-1);sys.exit(0)'])
 
-    @unittest.skipIf(sys.platform == 'darwin', "tests don't apply to OS X")
     class Pep383Tests(unittest.TestCase):
-        filenames = [b'foo\xf6bar', 'foo\xf6bar'.encode("utf-8")]
-
         def setUp(self):
-            self.fsencoding = sys.getfilesystemencoding()
-            sys.setfilesystemencoding("utf-8")
-            self.dir = support.TESTFN
-            self.bdir = self.dir.encode("utf-8", "surrogateescape")
+            if support.TESTFN_UNENCODABLE:
+                self.dir = support.TESTFN_UNENCODABLE
+            else:
+                self.dir = support.TESTFN
+            self.bdir = os.fsencode(self.dir)
+
+            bytesfn = []
+            def add_filename(fn):
+                try:
+                    fn = os.fsencode(fn)
+                except UnicodeEncodeError:
+                    return
+                bytesfn.append(fn)
+            add_filename(support.TESTFN_UNICODE)
+            if support.TESTFN_UNENCODABLE:
+                add_filename(support.TESTFN_UNENCODABLE)
+            if not bytesfn:
+                self.skipTest("couldn't create any non-ascii filename")
+
+            self.unicodefn = set()
             os.mkdir(self.dir)
-            self.unicodefn = []
-            for fn in self.filenames:
-                f = open(os.path.join(self.bdir, fn), "w")
-                f.close()
-                self.unicodefn.append(fn.decode("utf-8", "surrogateescape"))
+            try:
+                for fn in bytesfn:
+                    f = open(os.path.join(self.bdir, fn), "w")
+                    f.close()
+                    fn = os.fsdecode(fn)
+                    if fn in self.unicodefn:
+                        raise ValueError("duplicate filename")
+                    self.unicodefn.add(fn)
+            except:
+                shutil.rmtree(self.dir)
+                raise
 
         def tearDown(self):
             shutil.rmtree(self.dir)
-            sys.setfilesystemencoding(self.fsencoding)
 
         def test_listdir(self):
-            expected = set(self.unicodefn)
-            found = set(os.listdir(support.TESTFN))
+            expected = self.unicodefn
+            found = set(os.listdir(self.dir))
             self.assertEquals(found, expected)
 
         def test_open(self):
@@ -1111,12 +1138,49 @@ class Win32SymlinkTests(unittest.TestCase):
         self.assertNotEqual(os.lstat(link), os.stat(link))
 
 
-class MiscTests(unittest.TestCase):
+class FSEncodingTests(unittest.TestCase):
+    def test_nop(self):
+        self.assertEquals(os.fsencode(b'abc\xff'), b'abc\xff')
+        self.assertEquals(os.fsdecode('abc\u0141'), 'abc\u0141')
 
-    @unittest.skipIf(os.name == "nt", "POSIX specific test")
-    def test_fsencode(self):
-        self.assertEquals(os.fsencode(b'ab\xff'), b'ab\xff')
-        self.assertEquals(os.fsencode('ab\uDCFF'), b'ab\xff')
+    def test_identity(self):
+        # assert fsdecode(fsencode(x)) == x
+        for fn in ('unicode\u0141', 'latin\xe9', 'ascii'):
+            try:
+                bytesfn = os.fsencode(fn)
+            except UnicodeEncodeError:
+                continue
+            self.assertEquals(os.fsdecode(bytesfn), fn)
+
+    def get_output(self, fs_encoding, func):
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONFSENCODING'] = fs_encoding
+        code = 'import os; print(%s, end="")' % func
+        process = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdout=subprocess.PIPE, env=env)
+        stdout, stderr = process.communicate()
+        self.assertEqual(process.returncode, 0)
+        return stdout.decode('utf-8')
+
+    @unittest.skipIf(sys.platform in ('win32', 'darwin'),
+                     'PYTHONFSENCODING is ignored on Windows and Mac OS X')
+    def test_encodings(self):
+        def check(encoding, bytesfn, unicodefn):
+            encoded = self.get_output(encoding, 'repr(os.fsencode(%a))' % unicodefn)
+            self.assertEqual(encoded, repr(bytesfn))
+
+            decoded = self.get_output(encoding, 'repr(os.fsdecode(%a))' % bytesfn)
+            self.assertEqual(decoded, repr(unicodefn))
+
+        check('utf-8', b'\xc3\xa9\x80', '\xe9\udc80')
+
+        # Raise SkipTest() if sys.executable is not encodable to ascii
+        support.workaroundIssue8611()
+
+        check('ascii', b'abc\xff', 'abc\udcff')
+        check('iso-8859-15', b'\xef\xa4', '\xef\u20ac')
 
 
 def test_main():
@@ -1135,7 +1199,7 @@ def test_main():
         Pep383Tests,
         Win32KillTests,
         Win32SymlinkTests,
-        MiscTests,
+        FSEncodingTests,
     )
 
 if __name__ == "__main__":

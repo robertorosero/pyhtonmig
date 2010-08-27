@@ -205,6 +205,31 @@ bad = ['/folder1/anotherfile.html']
 RobotTest(13, doc, good, bad, agent="googlebot")
 
 
+# 14. For issue #6325 (query string support)
+doc = """
+User-agent: *
+Disallow: /some/path?name=value
+"""
+
+good = ['/some/path']
+bad = ['/some/path?name=value']
+
+RobotTest(14, doc, good, bad)
+
+# 15. For issue #4108 (obey first * entry)
+doc = """
+User-agent: *
+Disallow: /some/path
+
+User-agent: *
+Disallow: /another/path
+"""
+
+good = ['/another/path']
+bad = ['/some/path']
+
+RobotTest(15, doc, good, bad)
+
 
 class NetworkTestCase(unittest.TestCase):
 

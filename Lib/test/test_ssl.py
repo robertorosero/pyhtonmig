@@ -15,6 +15,8 @@ import urllib.parse, urllib.request
 import traceback
 import asyncore
 import weakref
+import platform
+import functools
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
@@ -63,6 +65,20 @@ def can_clear_options():
 def no_sslv2_implies_sslv3_hello():
     # 0.9.7h or higher
     return ssl.OPENSSL_VERSION_INFO >= (0, 9, 7, 8, 15)
+
+
+# Issue #9415: Ubuntu hijacks their OpenSSL and forcefully disables SSLv2
+def skip_if_broken_ubuntu_ssl(func):
+    @functools.wraps(func)
+    def f(*args, **kwargs):
+        try:
+            ssl.SSLContext(ssl.PROTOCOL_SSLv2)
+        except ssl.SSLError:
+            if (ssl.OPENSSL_VERSION_INFO == (0, 9, 8, 15, 15) and
+                platform.linux_distribution() == ('debian', 'squeeze/sid', '')):
+                raise unittest.SkipTest("Patched Ubuntu OpenSSL breaks behaviour")
+        return func(*args, **kwargs)
+    return f
 
 
 class BasicSocketTests(unittest.TestCase):
@@ -137,22 +153,6 @@ class BasicSocketTests(unittest.TestCase):
         self.assertTrue(s.startswith("OpenSSL {:d}.{:d}.{:d}".format(major, minor, fix)),
                         (s, t))
 
-    def test_ciphers(self):
-        if not support.is_resource_enabled('network'):
-            return
-        remote = ("svn.python.org", 443)
-        s = ssl.wrap_socket(socket.socket(socket.AF_INET),
-                            cert_reqs=ssl.CERT_NONE, ciphers="ALL")
-        s.connect(remote)
-        s = ssl.wrap_socket(socket.socket(socket.AF_INET),
-                            cert_reqs=ssl.CERT_NONE, ciphers="DEFAULT")
-        s.connect(remote)
-        # Error checking can happen at instantiation or when connecting
-        with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
-            s = ssl.wrap_socket(socket.socket(socket.AF_INET),
-                                cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
-            s.connect(remote)
-
     @support.cpython_only
     def test_refcycle(self):
         # Issue #7943: an SSL object doesn't create reference cycles with
@@ -175,6 +175,7 @@ class BasicSocketTests(unittest.TestCase):
 
 class ContextTests(unittest.TestCase):
 
+    @skip_if_broken_ubuntu_ssl
     def test_constructor(self):
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv2)
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
@@ -184,6 +185,7 @@ class ContextTests(unittest.TestCase):
         self.assertRaises(ValueError, ssl.SSLContext, -1)
         self.assertRaises(ValueError, ssl.SSLContext, 42)
 
+    @skip_if_broken_ubuntu_ssl
     def test_protocol(self):
         for proto in PROTOCOLS:
             ctx = ssl.SSLContext(proto)
@@ -196,6 +198,7 @@ class ContextTests(unittest.TestCase):
         with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
             ctx.set_ciphers("^$:,;?*'dorothyx")
 
+    @skip_if_broken_ubuntu_ssl
     def test_options(self):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         # OP_ALL is the default value
@@ -276,6 +279,12 @@ class ContextTests(unittest.TestCase):
 
 
 class NetworkedTests(unittest.TestCase):
+    def setUp(self):
+        self.old_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(30)
+
+    def tearDown(self):
+        socket.setdefaulttimeout(self.old_timeout)
 
     def test_connect(self):
         s = ssl.wrap_socket(socket.socket(socket.AF_INET),
@@ -404,8 +413,6 @@ class NetworkedTests(unittest.TestCase):
         if not pem:
             self.fail("No server certificate on svn.python.org:443!")
 
-        return
-
         try:
             pem = ssl.get_server_certificate(("svn.python.org", 443), ca_certs=CERTFILE)
         except ssl.SSLError as x:
@@ -420,6 +427,20 @@ class NetworkedTests(unittest.TestCase):
             self.fail("No server certificate on svn.python.org:443!")
         if support.verbose:
             sys.stdout.write("\nVerified certificate for svn.python.org:443 is\n%s\n" % pem)
+
+    def test_ciphers(self):
+        remote = ("svn.python.org", 443)
+        s = ssl.wrap_socket(socket.socket(socket.AF_INET),
+                            cert_reqs=ssl.CERT_NONE, ciphers="ALL")
+        s.connect(remote)
+        s = ssl.wrap_socket(socket.socket(socket.AF_INET),
+                            cert_reqs=ssl.CERT_NONE, ciphers="DEFAULT")
+        s.connect(remote)
+        # Error checking can happen at instantiation or when connecting
+        with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
+            s = ssl.wrap_socket(socket.socket(socket.AF_INET),
+                                cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
+            s.connect(remote)
 
     def test_algorithms(self):
         # Issue #8484: all algorithms should be available when verifying a
@@ -937,6 +958,7 @@ else:
 
     class ThreadedTests(unittest.TestCase):
 
+        @skip_if_broken_ubuntu_ssl
         def test_echo(self):
             """Basic test of an SSL client connecting to a server"""
             if support.verbose:
@@ -1039,6 +1061,7 @@ else:
             finally:
                 t.join()
 
+        @skip_if_broken_ubuntu_ssl
         def test_protocol_sslv2(self):
             """Connecting to an SSLv2 server with various client options"""
             if support.verbose:
@@ -1059,6 +1082,7 @@ else:
             try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv23, True,
                                client_options=ssl.OP_NO_TLSv1)
 
+        @skip_if_broken_ubuntu_ssl
         def test_protocol_sslv23(self):
             """Connecting to an SSLv23 server with various client options"""
             if support.verbose:
@@ -1093,6 +1117,7 @@ else:
                                server_options=ssl.OP_NO_TLSv1)
 
 
+        @skip_if_broken_ubuntu_ssl
         def test_protocol_sslv3(self):
             """Connecting to an SSLv3 server with various client options"""
             if support.verbose:
@@ -1108,6 +1133,7 @@ else:
                 try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv23, True,
                                    client_options=ssl.OP_NO_SSLv2)
 
+        @skip_if_broken_ubuntu_ssl
         def test_protocol_tlsv1(self):
             """Connecting to a TLSv1 server with various client options"""
             if support.verbose:
@@ -1253,9 +1279,17 @@ else:
                 if support.verbose:
                     sys.stdout.write(" client:  closing connection.\n")
                 s.close()
+                if support.verbose:
+                    sys.stdout.write(" client:  connection closed.\n")
             finally:
+                if support.verbose:
+                    sys.stdout.write(" cleanup: stopping server.\n")
                 server.stop()
+                if support.verbose:
+                    sys.stdout.write(" cleanup: joining server thread.\n")
                 server.join()
+                if support.verbose:
+                    sys.stdout.write(" cleanup: successfully joined.\n")
 
         def test_recv_send(self):
             """Test recv(), send() and friends."""
@@ -1423,6 +1457,23 @@ else:
 def test_main(verbose=False):
     if skip_expected:
         raise unittest.SkipTest("No SSL support")
+
+    if support.verbose:
+        plats = {
+            'Linux': platform.linux_distribution,
+            'Mac': platform.mac_ver,
+            'Windows': platform.win32_ver,
+        }
+        for name, func in plats.items():
+            plat = func()
+            if plat and plat[0]:
+                plat = '%s %r' % (name, plat)
+                break
+        else:
+            plat = repr(platform.platform())
+        print("test_ssl: testing with %r %r" %
+            (ssl.OPENSSL_VERSION, ssl.OPENSSL_VERSION_INFO))
+        print("          under %s" % plat)
 
     for filename in [
         CERTFILE, SVN_PYTHON_ORG_ROOT_CERT, BYTES_CERTFILE,

@@ -1790,22 +1790,6 @@ find_module(char *fullname, char *subname, PyObject *path, char *buf,
     return fdp;
 }
 
-/* Helpers for main.c
- *  Find the source file corresponding to a named module
- */
-struct filedescr *
-_PyImport_FindModule(const char *name, PyObject *path, char *buf,
-            size_t buflen, FILE **p_fp, PyObject **p_loader)
-{
-    return find_module((char *) name, (char *) name, path,
-                       buf, buflen, p_fp, p_loader);
-}
-
-PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr * fd)
-{
-    return fd->type == PY_SOURCE || fd->type == PY_COMPILED;
-}
-
 /* case_ok(char* buf, Py_ssize_t len, Py_ssize_t namelen, char* name)
  * The arguments here are tricky, best shown by example:
  *    /a/b/c/d/e/f/g/h/i/j/k/some_long_module_name.py\0
@@ -1960,8 +1944,75 @@ case_ok(char *buf, Py_ssize_t len, Py_ssize_t namelen, char *name)
 #endif
 }
 
+/* Call _wfopen() on Windows, or fopen() otherwise. Return the new file
+   object on success, or NULL if the file cannot be open or (if
+   PyErr_Occurred()) on unicode error */
+
+FILE*
+_Py_fopen(PyObject *unicode, const char *mode)
+{
+#ifdef MS_WINDOWS
+    wchar_t path[MAXPATHLEN+1];
+    wchar_t wmode[10];
+    Py_ssize_t len;
+    int usize;
+
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, MAXPATHLEN);
+    if (len == -1)
+        return NULL;
+    path[len] = L'\0';
+
+    usize = MultiByteToWideChar(CP_ACP, 0, mode, -1, wmode, sizeof(wmode));
+    if (usize == 0)
+        return NULL;
+
+    return _wfopen(path, wmode);
+#else
+    FILE *f;
+    PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (bytes == NULL)
+        return NULL;
+    f = fopen(PyBytes_AS_STRING(bytes), mode);
+    Py_DECREF(bytes);
+    return f;
+#endif
+}
 
 #ifdef HAVE_STAT
+
+/* Call _wstat() on Windows, or stat() otherwise. Only fill st_mode
+   attribute on Windows. Return 0 on success, -1 on stat error or (if
+   PyErr_Occurred()) unicode error. */
+
+int
+_Py_stat(PyObject *unicode, struct stat *statbuf)
+{
+#ifdef MS_WINDOWS
+    wchar_t path[MAXPATHLEN+1];
+    Py_ssize_t len;
+    int err;
+    struct _stat wstatbuf;
+
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, path, MAXPATHLEN);
+    if (len == -1)
+        return -1;
+    path[len] = L'\0';
+
+    err = _wstat(path, &wstatbuf);
+    if (!err)
+        statbuf->st_mode = wstatbuf.st_mode;
+    return err;
+#else
+    int ret;
+    PyObject *bytes = PyUnicode_EncodeFSDefault(unicode);
+    if (bytes == NULL)
+        return -1;
+    ret = stat(PyBytes_AS_STRING(bytes), statbuf);
+    Py_DECREF(bytes);
+    return ret;
+#endif
+}
+
 /* Helper to look for __init__.py or __init__.py[co] in potential package */
 static int
 find_init_module(char *buf)
@@ -2013,15 +2064,52 @@ find_init_module(char *buf)
 
 static int init_builtin(char *); /* Forward */
 
+static PyObject*
+load_builtin(char *name, char *pathname, int type)
+{
+    PyObject *m, *modules;
+    int err;
+
+    if (pathname != NULL && pathname[0] != '\0')
+        name = pathname;
+
+    if (type == C_BUILTIN)
+        err = init_builtin(name);
+    else
+        err = PyImport_ImportFrozenModule(name);
+    if (err < 0)
+        return NULL;
+    if (err == 0) {
+        PyErr_Format(PyExc_ImportError,
+                "Purported %s module %.200s not found",
+                type == C_BUILTIN ?
+                "builtin" : "frozen",
+                name);
+        return NULL;
+    }
+
+    modules = PyImport_GetModuleDict();
+    m = PyDict_GetItemString(modules, name);
+    if (m == NULL) {
+        PyErr_Format(
+                PyExc_ImportError,
+                "%s module %.200s not properly initialized",
+                type == C_BUILTIN ?
+                "builtin" : "frozen",
+                name);
+        return NULL;
+    }
+    Py_INCREF(m);
+    return m;
+}
+
 /* Load an external module using the default search path and return
    its module object WITH INCREMENTED REFERENCE COUNT */
 
 static PyObject *
 load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 {
-    PyObject *modules;
     PyObject *m;
-    int err;
 
     /* First check that there's an open file (if we need one)  */
     switch (type) {
@@ -2057,34 +2145,7 @@ load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 
     case C_BUILTIN:
     case PY_FROZEN:
-        if (pathname != NULL && pathname[0] != '\0')
-            name = pathname;
-        if (type == C_BUILTIN)
-            err = init_builtin(name);
-        else
-            err = PyImport_ImportFrozenModule(name);
-        if (err < 0)
-            return NULL;
-        if (err == 0) {
-            PyErr_Format(PyExc_ImportError,
-                         "Purported %s module %.200s not found",
-                         type == C_BUILTIN ?
-                                    "builtin" : "frozen",
-                         name);
-            return NULL;
-        }
-        modules = PyImport_GetModuleDict();
-        m = PyDict_GetItemString(modules, name);
-        if (m == NULL) {
-            PyErr_Format(
-                PyExc_ImportError,
-                "%s module %.200s not properly initialized",
-                type == C_BUILTIN ?
-                    "builtin" : "frozen",
-                name);
-            return NULL;
-        }
-        Py_INCREF(m);
+        m = load_builtin(name, pathname, type);
         break;
 
     case IMP_HOOK: {
@@ -3613,56 +3674,70 @@ typedef struct {
 static int
 NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
 {
-    char *path;
-    Py_ssize_t pathlen;
+#ifndef MS_WINDOWS
+    PyObject *path;
+    struct stat statbuf;
+    int rv;
 
     if (!_PyArg_NoKeywords("NullImporter()", kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "es:NullImporter",
-                          Py_FileSystemDefaultEncoding, &path))
+    if (!PyArg_ParseTuple(args, "O&:NullImporter",
+                          PyUnicode_FSConverter, &path))
         return -1;
 
-    pathlen = strlen(path);
-    if (pathlen == 0) {
-        PyMem_Free(path);
+    if (PyBytes_GET_SIZE(path) == 0) {
+        Py_DECREF(path);
         PyErr_SetString(PyExc_ImportError, "empty pathname");
         return -1;
-    } else {
-#ifndef MS_WINDOWS
-        struct stat statbuf;
-        int rv;
-
-        rv = stat(path, &statbuf);
-        PyMem_Free(path);
-        if (rv == 0) {
-            /* it exists */
-            if (S_ISDIR(statbuf.st_mode)) {
-                /* it's a directory */
-                PyErr_SetString(PyExc_ImportError,
-                                "existing directory");
-                return -1;
-            }
-        }
-#else /* MS_WINDOWS */
-        DWORD rv;
-        /* see issue1293 and issue3677:
-         * stat() on Windows doesn't recognise paths like
-         * "e:\\shared\\" and "\\\\whiterab-c2znlh\\shared" as dirs.
-         */
-        rv = GetFileAttributesA(path);
-        PyMem_Free(path);
-        if (rv != INVALID_FILE_ATTRIBUTES) {
-            /* it exists */
-            if (rv & FILE_ATTRIBUTE_DIRECTORY) {
-                /* it's a directory */
-                PyErr_SetString(PyExc_ImportError,
-                                "existing directory");
-                return -1;
-            }
-        }
-#endif
     }
+
+    rv = stat(PyBytes_AS_STRING(path), &statbuf);
+    Py_DECREF(path);
+    if (rv == 0) {
+        /* it exists */
+        if (S_ISDIR(statbuf.st_mode)) {
+            /* it's a directory */
+            PyErr_SetString(PyExc_ImportError, "existing directory");
+            return -1;
+        }
+    }
+#else /* MS_WINDOWS */
+    PyObject *pathobj;
+    DWORD rv;
+    wchar_t path[MAXPATHLEN+1];
+    Py_ssize_t len;
+
+    if (!_PyArg_NoKeywords("NullImporter()", kwds))
+        return -1;
+
+    if (!PyArg_ParseTuple(args, "U:NullImporter",
+                          &pathobj))
+        return -1;
+
+    if (PyUnicode_GET_SIZE(pathobj) == 0) {
+        PyErr_SetString(PyExc_ImportError, "empty pathname");
+        return -1;
+    }
+
+    len = PyUnicode_AsWideChar((PyUnicodeObject*)pathobj,
+                               path, sizeof(path) / sizeof(path[0]));
+    if (len == -1)
+        return -1;
+    /* see issue1293 and issue3677:
+     * stat() on Windows doesn't recognise paths like
+     * "e:\\shared\\" and "\\\\whiterab-c2znlh\\shared" as dirs.
+     */
+    rv = GetFileAttributesW(path);
+    if (rv != INVALID_FILE_ATTRIBUTES) {
+        /* it exists */
+        if (rv & FILE_ATTRIBUTE_DIRECTORY) {
+            /* it's a directory */
+            PyErr_SetString(PyExc_ImportError, "existing directory");
+            return -1;
+        }
+    }
+#endif
     return 0;
 }
 

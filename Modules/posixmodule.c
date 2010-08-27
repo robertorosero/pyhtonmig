@@ -262,6 +262,15 @@ extern int lstat(const char *, struct stat *);
 #ifdef HAVE_PROCESS_H
 #include <process.h>
 #endif
+#ifndef VOLUME_NAME_DOS
+#define VOLUME_NAME_DOS 0x0
+#endif
+#ifndef VOLUME_NAME_NT
+#define VOLUME_NAME_NT  0x2
+#endif
+#ifndef IO_REPARSE_TAG_SYMLINK
+#define IO_REPARSE_TAG_SYMLINK (0xA000000CL)
+#endif
 #include "osdefs.h"
 #include <malloc.h>
 #include <windows.h>
@@ -376,7 +385,7 @@ _PyVerify_fd(int fd)
     const int i1 = fd >> IOINFO_L2E;
     const int i2 = fd & ((1 << IOINFO_L2E) - 1);
 
-    static int sizeof_ioinfo = 0;
+    static size_t sizeof_ioinfo = 0;
 
     /* Determine the actual size of the ioinfo structure,
      * as used by the CRT loaded in memory
@@ -1220,7 +1229,7 @@ win32_stat_w(const wchar_t* path, struct win32_stat *result)
         /* FILE_FLAG_BACKUP_SEMANTICS is required to open a directory */
         FILE_ATTRIBUTE_NORMAL|FILE_FLAG_BACKUP_SEMANTICS,
         NULL);
-    
+
     if(hFile == INVALID_HANDLE_VALUE) {
         /* Either the target doesn't exist, or we don't have access to
            get a handle to it. If the former, we need to return an error.
@@ -1840,7 +1849,7 @@ posix_ttyname(PyObject *self, PyObject *args)
 #endif
     if (ret == NULL)
         return posix_error();
-    return PyUnicode_FromString(ret);
+    return PyUnicode_DecodeFSDefault(ret);
 }
 #endif
 
@@ -1862,7 +1871,7 @@ posix_ctermid(PyObject *self, PyObject *noargs)
 #endif
     if (ret == NULL)
         return posix_error();
-    return PyUnicode_FromString(buffer);
+    return PyUnicode_DecodeFSDefault(buffer);
 }
 #endif
 
@@ -2291,10 +2300,10 @@ posix_link(PyObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(posix_listdir__doc__,
-"listdir(path) -> list_of_strings\n\n\
+"listdir([path]) -> list_of_strings\n\n\
 Return a list containing the names of the entries in the directory.\n\
 \n\
-    path: path of directory to list\n\
+    path: path of directory to list (default: '.')\n\
 \n\
 The list is in arbitrary order.  It does not include the special\n\
 entries '.' and '..' even if they are present in the directory.");
@@ -2315,18 +2324,25 @@ posix_listdir(PyObject *self, PyObject *args)
     char *bufptr = namebuf;
     Py_ssize_t len = sizeof(namebuf)-5; /* only claim to have space for MAX_PATH */
 
-    PyObject *po;
-    if (PyArg_ParseTuple(args, "U:listdir", &po)) {
+    PyObject *po = NULL;
+    if (PyArg_ParseTuple(args, "|U:listdir", &po)) {
         WIN32_FIND_DATAW wFileData;
-        Py_UNICODE *wnamebuf;
+        Py_UNICODE *wnamebuf, *po_wchars;
+        
+        if (po == NULL) { // Default arg: "."
+            po_wchars = L".";
+            len = 1;
+        } else {
+            po_wchars = PyUnicode_AS_UNICODE(po);
+            len = PyUnicode_GET_SIZE(po);
+        }
         /* Overallocate for \\*.*\0 */
-        len = PyUnicode_GET_SIZE(po);
         wnamebuf = malloc((len + 5) * sizeof(wchar_t));
         if (!wnamebuf) {
             PyErr_NoMemory();
             return NULL;
         }
-        wcscpy(wnamebuf, PyUnicode_AS_UNICODE(po));
+        wcscpy(wnamebuf, po_wchars);
         if (len > 0) {
             Py_UNICODE wch = wnamebuf[len-1];
             if (wch != L'/' && wch != L'\\' && wch != L':')
@@ -2337,7 +2353,9 @@ posix_listdir(PyObject *self, PyObject *args)
             free(wnamebuf);
             return NULL;
         }
+        Py_BEGIN_ALLOW_THREADS
         hFindFile = FindFirstFileW(wnamebuf, &wFileData);
+        Py_END_ALLOW_THREADS
         if (hFindFile == INVALID_HANDLE_VALUE) {
             int error = GetLastError();
             if (error == ERROR_FILE_NOT_FOUND) {
@@ -2414,7 +2432,9 @@ posix_listdir(PyObject *self, PyObject *args)
     if ((d = PyList_New(0)) == NULL)
         return NULL;
 
+    Py_BEGIN_ALLOW_THREADS
     hFindFile = FindFirstFile(namebuf, &FileData);
+    Py_END_ALLOW_THREADS
     if (hFindFile == INVALID_HANDLE_VALUE) {
         int error = GetLastError();
         if (error == ERROR_FILE_NOT_FOUND)
@@ -2548,12 +2568,17 @@ posix_listdir(PyObject *self, PyObject *args)
     int arg_is_unicode = 1;
 
     errno = 0;
-    if (!PyArg_ParseTuple(args, "U:listdir", &v)) {
+    /* v is never read, so it does not need to be initialized yet. */
+    if (!PyArg_ParseTuple(args, "|U:listdir", &v)) {
         arg_is_unicode = 0;
         PyErr_Clear();
     }
-    if (!PyArg_ParseTuple(args, "O&:listdir", PyUnicode_FSConverter, &oname))
+    oname = NULL;
+    if (!PyArg_ParseTuple(args, "|O&:listdir", PyUnicode_FSConverter, &oname))
         return NULL;
+    if (oname == NULL) { // Default arg: "."
+      oname = PyBytes_FromString(".");
+    }
     name = PyBytes_AsString(oname);
     if ((dirp = opendir(name)) == NULL) {
         return posix_error_with_allocated_filename(oname);
@@ -3630,8 +3655,8 @@ posix_spawnve(PyObject *self, PyObject *args)
     char **argvlist;
     char **envlist;
     PyObject *res = NULL;
-    int mode, envc;
-    Py_ssize_t argc, i;
+    int mode;
+    Py_ssize_t argc, i, envc;
     Py_intptr_t spawnval;
     PyObject *(*getitem)(PyObject *, Py_ssize_t);
     Py_ssize_t lastarg = 0;
@@ -3816,7 +3841,8 @@ posix_spawnvpe(PyObject *self, PyObject *args)
     char **argvlist;
     char **envlist;
     PyObject *res=NULL;
-    int mode, i, argc, envc;
+    int mode;
+    Py_ssize_t argc, i, envc;
     Py_intptr_t spawnval;
     PyObject *(*getitem)(PyObject *, Py_ssize_t);
     int lastarg = 0;
@@ -4154,17 +4180,49 @@ posix_getgroups(PyObject *self, PyObject *noargs)
 #define MAX_GROUPS 64
 #endif
     gid_t grouplist[MAX_GROUPS];
+
+    /* On MacOSX getgroups(2) can return more than MAX_GROUPS results 
+     * This is a helper variable to store the intermediate result when
+     * that happens.
+     *
+     * To keep the code readable the OSX behaviour is unconditional,
+     * according to the POSIX spec this should be safe on all unix-y
+     * systems.
+     */
+    gid_t* alt_grouplist = grouplist;
     int n;
 
     n = getgroups(MAX_GROUPS, grouplist);
-    if (n < 0)
-        posix_error();
-    else {
-        result = PyList_New(n);
-        if (result != NULL) {
+    if (n < 0) {
+        if (errno == EINVAL) {
+            n = getgroups(0, NULL);
+            if (n == -1) {
+                return posix_error();
+            }
+            if (n == 0) {
+                /* Avoid malloc(0) */
+                alt_grouplist = grouplist;
+            } else {
+                alt_grouplist = PyMem_Malloc(n * sizeof(gid_t));
+                if (alt_grouplist == NULL) {
+                    errno = EINVAL;
+                    return posix_error();
+                }
+                n = getgroups(n, alt_grouplist);
+                if (n == -1) {
+                    PyMem_Free(alt_grouplist);
+                    return posix_error();
+                }
+            }
+        } else {
+            return posix_error();
+        }
+    }
+    result = PyList_New(n);
+    if (result != NULL) {
         int i;
         for (i = 0; i < n; ++i) {
-            PyObject *o = PyLong_FromLong((long)grouplist[i]);
+            PyObject *o = PyLong_FromLong((long)alt_grouplist[i]);
             if (o == NULL) {
             Py_DECREF(result);
             result = NULL;
@@ -4172,7 +4230,10 @@ posix_getgroups(PyObject *self, PyObject *noargs)
             }
             PyList_SET_ITEM(result, i, o);
         }
-        }
+    }
+
+    if (alt_grouplist != grouplist) {
+        PyMem_Free(alt_grouplist);
     }
 
     return result;
@@ -4189,13 +4250,19 @@ group id.");
 static PyObject *
 posix_initgroups(PyObject *self, PyObject *args)
 {
+    PyObject *oname;
     char *username;
+    int res;
     long gid;
 
-    if (!PyArg_ParseTuple(args, "sl:initgroups", &username, &gid))
+    if (!PyArg_ParseTuple(args, "O&l:initgroups",
+                          PyUnicode_FSConverter, &oname, &gid))
         return NULL;
+    username = PyBytes_AS_STRING(oname);
 
-    if (initgroups(username, (gid_t) gid) == -1)
+    res = initgroups(username, (gid_t) gid);
+    Py_DECREF(oname);
+    if (res == -1)
         return PyErr_SetFromErrno(PyExc_OSError);
 
     Py_INCREF(Py_None);
@@ -4288,13 +4355,12 @@ posix_getlogin(PyObject *self, PyObject *noargs)
     name = getlogin();
     if (name == NULL) {
         if (errno)
-        posix_error();
+            posix_error();
         else
-        PyErr_SetString(PyExc_OSError,
-                        "unable to determine login name");
+            PyErr_SetString(PyExc_OSError, "unable to determine login name");
     }
     else
-        result = PyUnicode_FromString(name);
+        result = PyUnicode_DecodeFSDefault(name);
     errno = old_errno;
 
     return result;
@@ -5642,14 +5708,18 @@ Create a FIFO (a POSIX named pipe).");
 static PyObject *
 posix_mkfifo(PyObject *self, PyObject *args)
 {
+    PyObject *opath;
     char *filename;
     int mode = 0666;
     int res;
-    if (!PyArg_ParseTuple(args, "s|i:mkfifo", &filename, &mode))
+    if (!PyArg_ParseTuple(args, "O&|i:mkfifo", PyUnicode_FSConverter, &opath,
+                          &mode))
         return NULL;
+    filename = PyBytes_AS_STRING(opath);
     Py_BEGIN_ALLOW_THREADS
     res = mkfifo(filename, mode);
     Py_END_ALLOW_THREADS
+    Py_DECREF(opath);
     if (res < 0)
         return posix_error();
     Py_INCREF(Py_None);
@@ -5672,15 +5742,19 @@ os.makedev()), otherwise it is ignored.");
 static PyObject *
 posix_mknod(PyObject *self, PyObject *args)
 {
+    PyObject *opath;
     char *filename;
     int mode = 0600;
     int device = 0;
     int res;
-    if (!PyArg_ParseTuple(args, "s|ii:mknod", &filename, &mode, &device))
+    if (!PyArg_ParseTuple(args, "O&|ii:mknod", PyUnicode_FSConverter, &opath,
+                          &mode, &device))
         return NULL;
+    filename = PyBytes_AS_STRING(opath);
     Py_BEGIN_ALLOW_THREADS
     res = mknod(filename, mode, device);
     Py_END_ALLOW_THREADS
+    Py_DECREF(opath);
     if (res < 0)
         return posix_error();
     Py_INCREF(Py_None);
@@ -7587,11 +7661,11 @@ static PyMethodDef posix_methods[] = {
     {"readlink",        posix_readlink, METH_VARARGS, posix_readlink__doc__},
 #endif /* HAVE_READLINK */
 #if !defined(HAVE_READLINK) && defined(MS_WINDOWS)
-    {"readlink",	win_readlink, METH_VARARGS, win_readlink__doc__},
+    {"readlink",        win_readlink, METH_VARARGS, win_readlink__doc__},
 #endif /* !defined(HAVE_READLINK) && defined(MS_WINDOWS) */
-    {"rename",	posix_rename, METH_VARARGS, posix_rename__doc__},
-    {"rmdir",	posix_rmdir, METH_VARARGS, posix_rmdir__doc__},
-    {"stat",	posix_stat, METH_VARARGS, posix_stat__doc__},
+    {"rename",          posix_rename, METH_VARARGS, posix_rename__doc__},
+    {"rmdir",           posix_rmdir, METH_VARARGS, posix_rmdir__doc__},
+    {"stat",            posix_stat, METH_VARARGS, posix_stat__doc__},
     {"stat_float_times", stat_float_times, METH_VARARGS, stat_float_times__doc__},
 #ifdef HAVE_SYMLINK
     {"symlink",         posix_symlink, METH_VARARGS, posix_symlink__doc__},
@@ -8094,6 +8168,14 @@ all_ins(PyObject *d)
 #ifdef EX_NOTFOUND
     if (ins(d, "EX_NOTFOUND", (long)EX_NOTFOUND)) return -1;
 #endif /* EX_NOTFOUND */
+
+	/* statvfs */
+#ifdef ST_RDONLY
+	if (ins(d, "ST_RDONLY", (long)ST_RDONLY)) return -1;
+#endif /* ST_RDONLY */
+#ifdef ST_NOSUID
+	if (ins(d, "ST_NOSUID", (long)ST_NOSUID)) return -1;
+#endif /* ST_NOSUID */
 
 #ifdef HAVE_SPAWNV
 #if defined(PYOS_OS2) && defined(PYCC_GCC)

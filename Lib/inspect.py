@@ -36,15 +36,25 @@ import types
 import itertools
 import string
 import re
-import dis
 import imp
 import tokenize
 import linecache
 from operator import attrgetter
 from collections import namedtuple
-# These constants are from Include/code.h.
-CO_OPTIMIZED, CO_NEWLOCALS, CO_VARARGS, CO_VARKEYWORDS = 0x1, 0x2, 0x4, 0x8
-CO_NESTED, CO_GENERATOR, CO_NOFREE = 0x10, 0x20, 0x40
+
+# Create constants for the compiler flags in Include/code.h
+# We try to get them from dis to avoid duplication, but fall
+# back to hardcording so the dependency is optional
+try:
+    from dis import COMPILER_FLAG_NAMES as _flag_names
+except ImportError:
+    CO_OPTIMIZED, CO_NEWLOCALS = 0x1, 0x2
+    CO_VARARGS, CO_VARKEYWORDS = 0x4, 0x8
+    CO_NESTED, CO_GENERATOR, CO_NOFREE = 0x10, 0x20, 0x40
+else:
+    mod_dict = globals()
+    for k, v in _flag_names.items():
+        mod_dict["CO_" + v] = k
 
 # See Include/object.h
 TPFLAGS_IS_ABSTRACT = 1 << 20
@@ -159,7 +169,7 @@ def isgeneratorfunction(object):
 
     Generator function objects provides same attributes as functions.
 
-    See isfunction.__doc__ for attributes listing."""
+    See help(isfunction) for attributes listing."""
     return bool((isfunction(object) or ismethod(object)) and
                 object.__code__.co_flags & CO_GENERATOR)
 
@@ -1062,10 +1072,9 @@ def getinnerframes(tb, context=1):
         tb = tb.tb_next
     return framelist
 
-if hasattr(sys, '_getframe'):
-    currentframe = sys._getframe
-else:
-    currentframe = lambda _=None: None
+def currentframe():
+    """Return the frame of the caller or None if this is not possible."""
+    return sys._getframe(1) if hasattr(sys, "_getframe") else None
 
 def stack(context=1):
     """Return a list of records for the stack above the caller's frame."""

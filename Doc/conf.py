@@ -66,6 +66,9 @@ highlight_language = 'python3'
 # Options for HTML output
 # -----------------------
 
+html_theme = 'default'
+html_theme_options = {'collapsiblesidebar': True}
+
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
 html_last_updated_fmt = '%b %d, %Y'
@@ -152,7 +155,7 @@ latex_preamble = r'''
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
 
 # Get LaTeX to handle Unicode correctly
-latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}'}
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}', 'utf8extra': ''}
 
 # Options for the coverage checker
 # --------------------------------

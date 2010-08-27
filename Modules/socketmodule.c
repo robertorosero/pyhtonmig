@@ -678,9 +678,11 @@ internal_select(PySocketSockObject *s, int writing)
 
         /* See if the socket is ready */
         if (writing)
-            n = select(s->sock_fd+1, NULL, &fds, NULL, &tv);
+            n = select(Py_SAFE_DOWNCAST(s->sock_fd+1, SOCKET_T, int),
+                       NULL, &fds, NULL, &tv);
         else
-            n = select(s->sock_fd+1, &fds, NULL, NULL, &tv);
+            n = select(Py_SAFE_DOWNCAST(s->sock_fd+1, SOCKET_T, int),
+                       &fds, NULL, NULL, &tv);
     }
 #endif
 
@@ -937,7 +939,7 @@ makebdaddr(bdaddr_t *bdaddr)
 
 /*ARGSUSED*/
 static PyObject *
-makesockaddr(int sockfd, struct sockaddr *addr, int addrlen, int proto)
+makesockaddr(SOCKET_T sockfd, struct sockaddr *addr, size_t addrlen, int proto)
 {
     if (addrlen == 0) {
         /* No address -- may be recvfrom() from known socket */
@@ -1869,6 +1871,21 @@ PyDoc_STRVAR(close_doc,
 \n\
 Close the socket.  It cannot be used after this call.");
 
+static PyObject *
+sock_detach(PySocketSockObject *s)
+{
+    SOCKET_T fd = s->sock_fd;
+    s->sock_fd = -1;
+    return PyLong_FromSocket_t(fd);
+}
+
+PyDoc_STRVAR(detach_doc,
+"detach()\n\
+\n\
+Close the socket object without closing the underlying file descriptor.\
+The object cannot be used after this call, but the file descriptor\
+can be reused for other purposes.  The file descriptor is returned.");
+
 static int
 internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen,
                  int *timeoutp)
@@ -1893,7 +1910,8 @@ internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen,
             FD_SET(s->sock_fd, &fds);
             FD_ZERO(&fds_exc);
             FD_SET(s->sock_fd, &fds_exc);
-            res = select(s->sock_fd+1, NULL, &fds, &fds_exc, &tv);
+            res = select(Py_SAFE_DOWNCAST(s->sock_fd+1, SOCKET_T, int),
+                         NULL, &fds, &fds_exc, &tv);
             if (res == 0) {
                 res = WSAEWOULDBLOCK;
                 timeout = 1;
@@ -2136,10 +2154,10 @@ will allow before refusing new connections.");
  * also possible that we return a number of bytes smaller than the request
  * bytes.
  */
-static ssize_t
-sock_recv_guts(PySocketSockObject *s, char* cbuf, int len, int flags)
+static Py_ssize_t
+sock_recv_guts(PySocketSockObject *s, char* cbuf, Py_ssize_t len, int flags)
 {
-    ssize_t outlen = -1;
+    Py_ssize_t outlen = -1;
     int timeout;
 #ifdef __VMS
     int remaining;
@@ -2221,11 +2239,11 @@ sock_recv_guts(PySocketSockObject *s, char* cbuf, int len, int flags)
 static PyObject *
 sock_recv(PySocketSockObject *s, PyObject *args)
 {
-    int recvlen, flags = 0;
-    ssize_t outlen;
+    Py_ssize_t recvlen, outlen;
+    int flags = 0;
     PyObject *buf;
 
-    if (!PyArg_ParseTuple(args, "i|i:recv", &recvlen, &flags))
+    if (!PyArg_ParseTuple(args, "n|i:recv", &recvlen, &flags))
         return NULL;
 
     if (recvlen < 0) {
@@ -2272,14 +2290,13 @@ sock_recv_into(PySocketSockObject *s, PyObject *args, PyObject *kwds)
 {
     static char *kwlist[] = {"buffer", "nbytes", "flags", 0};
 
-    int recvlen = 0, flags = 0;
-    ssize_t readlen;
+    int flags = 0;
     Py_buffer pbuf;
     char *buf;
-    int buflen;
+    Py_ssize_t buflen, readlen, recvlen = 0;
 
     /* Get the buffer's memory */
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "w*|ii:recv_into", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "w*|ni:recv_into", kwlist,
                                      &pbuf, &recvlen, &flags))
         return NULL;
     buf = pbuf.buf;
@@ -2339,13 +2356,13 @@ See recv() for documentation about the flags.");
  * 'addr' is a return value for the address object.  Note that you must decref
  * it yourself.
  */
-static ssize_t
-sock_recvfrom_guts(PySocketSockObject *s, char* cbuf, int len, int flags,
+static Py_ssize_t
+sock_recvfrom_guts(PySocketSockObject *s, char* cbuf, Py_ssize_t len, int flags,
                    PyObject** addr)
 {
     sock_addr_t addrbuf;
     int timeout;
-    ssize_t n = -1;
+    Py_ssize_t n = -1;
     socklen_t addrlen;
 
     *addr = NULL;
@@ -2401,10 +2418,10 @@ sock_recvfrom(PySocketSockObject *s, PyObject *args)
     PyObject *buf = NULL;
     PyObject *addr = NULL;
     PyObject *ret = NULL;
-    int recvlen, flags = 0;
-    ssize_t outlen;
+    int flags = 0;
+    Py_ssize_t recvlen, outlen;
 
-    if (!PyArg_ParseTuple(args, "i|i:recvfrom", &recvlen, &flags))
+    if (!PyArg_ParseTuple(args, "n|i:recvfrom", &recvlen, &flags))
         return NULL;
 
     if (recvlen < 0) {
@@ -2452,15 +2469,14 @@ sock_recvfrom_into(PySocketSockObject *s, PyObject *args, PyObject* kwds)
 {
     static char *kwlist[] = {"buffer", "nbytes", "flags", 0};
 
-    int recvlen = 0, flags = 0;
-    ssize_t readlen;
+    int flags = 0;
     Py_buffer pbuf;
     char *buf;
-    int buflen;
+    Py_ssize_t readlen, buflen, recvlen = 0;
 
     PyObject *addr = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "w*|ii:recvfrom_into",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "w*|ni:recvfrom_into",
                                      kwlist, &pbuf,
                                      &recvlen, &flags))
         return NULL;
@@ -2490,7 +2506,7 @@ sock_recvfrom_into(PySocketSockObject *s, PyObject *args, PyObject* kwds)
     PyBuffer_Release(&pbuf);
     /* Return the number of bytes read and the address.  Note that we do
        not do anything special here in the case that readlen < recvlen. */
-    return Py_BuildValue("lN", readlen, addr);
+    return Py_BuildValue("nN", readlen, addr);
 }
 
 PyDoc_STRVAR(recvfrom_into_doc,
@@ -2505,7 +2521,8 @@ static PyObject *
 sock_send(PySocketSockObject *s, PyObject *args)
 {
     char *buf;
-    int len, n = -1, flags = 0, timeout;
+    Py_ssize_t len, n = -1;
+    int flags = 0, timeout;
     Py_buffer pbuf;
 
     if (!PyArg_ParseTuple(args, "y*|i:send", &pbuf, &flags))
@@ -2536,7 +2553,7 @@ sock_send(PySocketSockObject *s, PyObject *args)
     }
     if (n < 0)
         return s->errorhandler();
-    return PyLong_FromLong((long)n);
+    return PyLong_FromSsize_t(n);
 }
 
 PyDoc_STRVAR(send_doc,
@@ -2553,7 +2570,8 @@ static PyObject *
 sock_sendall(PySocketSockObject *s, PyObject *args)
 {
     char *buf;
-    int len, n = -1, flags = 0, timeout;
+    Py_ssize_t len, n = -1;
+    int flags = 0, timeout;
     Py_buffer pbuf;
 
     if (!PyArg_ParseTuple(args, "y*|i:sendall", &pbuf, &flags))
@@ -2663,7 +2681,7 @@ sock_sendto(PySocketSockObject *s, PyObject *args)
     }
     if (n < 0)
         return s->errorhandler();
-    return PyLong_FromLong((long)n);
+    return PyLong_FromSsize_t(n);
 }
 
 PyDoc_STRVAR(sendto_doc,
@@ -2757,6 +2775,8 @@ static PyMethodDef sock_methods[] = {
                       connect_doc},
     {"connect_ex",        (PyCFunction)sock_connect_ex, METH_O,
                       connect_ex_doc},
+    {"detach",            (PyCFunction)sock_detach, METH_NOARGS,
+                      detach_doc},
     {"fileno",            (PyCFunction)sock_fileno, METH_NOARGS,
                       fileno_doc},
 #ifdef HAVE_GETPEERNAME
@@ -2980,12 +3000,16 @@ socket_gethostbyname(PyObject *self, PyObject *args)
 {
     char *name;
     sock_addr_t addrbuf;
+    PyObject *ret = NULL;
 
-    if (!PyArg_ParseTuple(args, "s:gethostbyname", &name))
+    if (!PyArg_ParseTuple(args, "et:gethostbyname", "idna", &name))
         return NULL;
     if (setipaddr(name, SAS2SA(&addrbuf),  sizeof(addrbuf), AF_INET) < 0)
-        return NULL;
-    return makeipaddr(SAS2SA(&addrbuf), sizeof(struct sockaddr_in));
+        goto finally;
+    ret = makeipaddr(SAS2SA(&addrbuf), sizeof(struct sockaddr_in));
+finally:
+    PyMem_Free(name);
+    return ret;
 }
 
 PyDoc_STRVAR(gethostbyname_doc,
@@ -3136,7 +3160,7 @@ socket_gethostbyname_ex(PyObject *self, PyObject *args)
     struct sockaddr_in addr;
 #endif
     struct sockaddr *sa;
-    PyObject *ret;
+    PyObject *ret = NULL;
 #ifdef HAVE_GETHOSTBYNAME_R
     struct hostent hp_allocated;
 #ifdef HAVE_GETHOSTBYNAME_R_3_ARG
@@ -3151,10 +3175,10 @@ socket_gethostbyname_ex(PyObject *self, PyObject *args)
 #endif
 #endif /* HAVE_GETHOSTBYNAME_R */
 
-    if (!PyArg_ParseTuple(args, "s:gethostbyname_ex", &name))
+    if (!PyArg_ParseTuple(args, "et:gethostbyname_ex", "idna", &name))
         return NULL;
     if (setipaddr(name, (struct sockaddr *)&addr, sizeof(addr), AF_INET) < 0)
-        return NULL;
+        goto finally;
     Py_BEGIN_ALLOW_THREADS
 #ifdef HAVE_GETHOSTBYNAME_R
 #if   defined(HAVE_GETHOSTBYNAME_R_6_ARG)
@@ -3184,6 +3208,8 @@ socket_gethostbyname_ex(PyObject *self, PyObject *args)
 #ifdef USE_GETHOSTBYNAME_LOCK
     PyThread_release_lock(netdb_lock);
 #endif
+finally:
+    PyMem_Free(name);
     return ret;
 }
 
@@ -3208,7 +3234,7 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
     struct sockaddr *sa = (struct sockaddr *)&addr;
     char *ip_num;
     struct hostent *h;
-    PyObject *ret;
+    PyObject *ret = NULL;
 #ifdef HAVE_GETHOSTBYNAME_R
     struct hostent hp_allocated;
 #ifdef HAVE_GETHOSTBYNAME_R_3_ARG
@@ -3230,11 +3256,11 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
     int al;
     int af;
 
-    if (!PyArg_ParseTuple(args, "s:gethostbyaddr", &ip_num))
+    if (!PyArg_ParseTuple(args, "et:gethostbyaddr", "idna", &ip_num))
         return NULL;
     af = AF_UNSPEC;
     if (setipaddr(ip_num, sa, sizeof(addr), af) < 0)
-        return NULL;
+        goto finally;
     af = sa->sa_family;
     ap = NULL;
     al = 0;
@@ -3251,7 +3277,7 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
 #endif
     default:
         PyErr_SetString(socket_error, "unsupported address family");
-        return NULL;
+        goto finally;
     }
     Py_BEGIN_ALLOW_THREADS
 #ifdef HAVE_GETHOSTBYNAME_R
@@ -3278,6 +3304,8 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
 #ifdef USE_GETHOSTBYNAME_LOCK
     PyThread_release_lock(netdb_lock);
 #endif
+finally:
+    PyMem_Free(ip_num);
     return ret;
 }
 
@@ -3805,8 +3833,10 @@ socket_inet_ntop(PyObject *self, PyObject *args)
 
 /*ARGSUSED*/
 static PyObject *
-socket_getaddrinfo(PyObject *self, PyObject *args)
+socket_getaddrinfo(PyObject *self, PyObject *args, PyObject* kwargs)
 {
+    static char* kwnames[] = {"host", "port", "family", "type", "proto", 
+                              "flags", 0};
     struct addrinfo hints, *res;
     struct addrinfo *res0 = NULL;
     PyObject *hobj = NULL;
@@ -3820,8 +3850,8 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 
     family = socktype = protocol = flags = 0;
     family = AF_UNSPEC;
-    if (!PyArg_ParseTuple(args, "OO|iiii:getaddrinfo",
-                          &hobj, &pobj, &family, &socktype,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|iiii:getaddrinfo", 
+                          kwnames, &hobj, &pobj, &family, &socktype,
                           &protocol, &flags)) {
         return NULL;
     }
@@ -3939,6 +3969,7 @@ socket_getnameinfo(PyObject *self, PyObject *args)
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;     /* make numeric port happy */
+    hints.ai_flags = AI_NUMERICHOST;    /* don't do any name resolution */
     Py_BEGIN_ALLOW_THREADS
     ACQUIRE_GETADDRINFO_LOCK
     error = getaddrinfo(hostp, pbuf, &hints, &res);
@@ -3974,7 +4005,7 @@ socket_getnameinfo(PyObject *self, PyObject *args)
         }
 #endif
     }
-    error = getnameinfo(res->ai_addr, res->ai_addrlen,
+    error = getnameinfo(res->ai_addr, (socklen_t) res->ai_addrlen,
                     hbuf, sizeof(hbuf), pbuf, sizeof(pbuf), flags);
     if (error) {
         set_gaierror(error);
@@ -4088,8 +4119,8 @@ static PyMethodDef socket_methods[] = {
     {"inet_ntop",               socket_inet_ntop,
      METH_VARARGS, inet_ntop_doc},
 #endif
-    {"getaddrinfo",             socket_getaddrinfo,
-     METH_VARARGS, getaddrinfo_doc},
+    {"getaddrinfo",             (PyCFunction)socket_getaddrinfo,
+     METH_VARARGS | METH_KEYWORDS, getaddrinfo_doc},
     {"getnameinfo",             socket_getnameinfo,
      METH_VARARGS, getnameinfo_doc},
     {"getdefaulttimeout",       (PyCFunction)socket_getdefaulttimeout,

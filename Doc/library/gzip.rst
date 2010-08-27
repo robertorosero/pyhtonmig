@@ -82,6 +82,21 @@ The module defines the following items:
    The *filename* argument is required; *mode* defaults to ``'rb'`` and
    *compresslevel* defaults to ``9``.
 
+.. function:: compress(data, compresslevel=9)
+
+   Compress the *data*, returning a :class:`bytes` object containing
+   the compressed data.  *compresslevel* has the same meaning as in
+   the :class:`GzipFile` constructor above.
+
+   .. versionadded:: 3.2
+
+.. function:: decompress(data)
+
+   Decompress the *data*, returning a :class:`bytes` object containing the
+   uncompressed data.
+
+   .. versionadded:: 3.2
+
 
 .. _gzip-usage-examples:
 
@@ -91,27 +106,28 @@ Examples of usage
 Example of how to read a compressed file::
 
    import gzip
-   f = gzip.open('/home/joe/file.txt.gz', 'rb')
-   file_content = f.read()
-   f.close()
+   with gzip.open('/home/joe/file.txt.gz', 'rb') as f:
+       file_content = f.read()
 
 Example of how to create a compressed GZIP file::
 
    import gzip
-   content = "Lots of content here"
-   f = gzip.open('/home/joe/file.txt.gz', 'wb')
-   f.write(content)
-   f.close()
+   content = b"Lots of content here"
+   with gzip.open('/home/joe/file.txt.gz', 'wb') as f:
+       f.write(content)
 
 Example of how to GZIP compress an existing file::
 
    import gzip
-   f_in = open('/home/joe/file.txt', 'rb')
-   f_out = gzip.open('/home/joe/file.txt.gz', 'wb')
-   f_out.writelines(f_in)
-   f_out.close()
-   f_in.close()
+   with open('/home/joe/file.txt', 'rb') as f_in:
+       with gzip.open('/home/joe/file.txt.gz', 'wb') as f_out:
+           f_out.writelines(f_in)
 
+Example of how to GZIP compress a binary string::
+
+   import gzip
+   s_in = b"Lots of content here"
+   s_out = gzip.compress(s_in)
 
 .. seealso::
 

@@ -6,10 +6,12 @@ from test import support
 posix = support.import_module('posix')
 
 import errno
+import sys
 import time
 import os
 import pwd
 import shutil
+import stat
 import unittest
 import warnings
 
@@ -198,6 +200,28 @@ class PosixTester(unittest.TestCase):
         if hasattr(posix, 'stat'):
             self.assertTrue(posix.stat(support.TESTFN))
 
+    @unittest.skipUnless(hasattr(posix, 'mkfifo'), "don't have mkfifo()")
+    def test_mkfifo(self):
+        support.unlink(support.TESTFN)
+        posix.mkfifo(support.TESTFN, stat.S_IRUSR | stat.S_IWUSR)
+        self.assertTrue(stat.S_ISFIFO(posix.stat(support.TESTFN).st_mode))
+
+    @unittest.skipUnless(hasattr(posix, 'mknod') and hasattr(stat, 'S_IFIFO'),
+                         "don't have mknod()/S_IFIFO")
+    def test_mknod(self):
+        # Test using mknod() to create a FIFO (the only use specified
+        # by POSIX).
+        support.unlink(support.TESTFN)
+        mode = stat.S_IFIFO | stat.S_IRUSR | stat.S_IWUSR
+        try:
+            posix.mknod(support.TESTFN, mode, 0)
+        except OSError as e:
+            # Some old systems don't allow unprivileged users to use
+            # mknod(), or only support creating device nodes.
+            self.assertIn(e.errno, (errno.EPERM, errno.EINVAL))
+        else:
+            self.assertTrue(stat.S_ISFIFO(posix.stat(support.TESTFN).st_mode))
+
     def _test_all_chown_common(self, chown_func, first_param):
         """Common code for chown, fchown and lchown tests."""
         if os.getuid() == 0:
@@ -252,9 +276,14 @@ class PosixTester(unittest.TestCase):
             posix.chdir(os.curdir)
             self.assertRaises(OSError, posix.chdir, support.TESTFN)
 
-    def test_lsdir(self):
-        if hasattr(posix, 'lsdir'):
-            self.assertIn(support.TESTFN, posix.lsdir(os.curdir))
+    def test_listdir(self):
+        if hasattr(posix, 'listdir'):
+            self.assertTrue(support.TESTFN in posix.listdir(os.curdir))
+
+    def test_listdir_default(self):
+        # When listdir is called without argument, it's the same as listdir(os.curdir)
+        if hasattr(posix, 'listdir'):
+            self.assertTrue(support.TESTFN in posix.listdir())
 
     def test_access(self):
         if hasattr(posix, 'access'):
@@ -344,9 +373,63 @@ class PosixTester(unittest.TestCase):
                 os.chdir(curdir)
                 support.rmtree(base_path)
 
+    def test_getgroups(self):
+        with os.popen('id -G') as idg:
+            groups = idg.read().strip()
+
+        if not groups:
+            raise unittest.SkipTest("need working 'id -G'")
+
+        # 'id -G' and 'os.getgroups()' should return the same
+        # groups, ignoring order and duplicates.
+        self.assertEqual(
+                set([int(x) for x in groups.split()]),
+                set(posix.getgroups()))
+
+class PosixGroupsTester(unittest.TestCase):
+
+    def setUp(self):
+        if posix.getuid() != 0:
+            raise unittest.SkipTest("not enough privileges")
+        if not hasattr(posix, 'getgroups'):
+            raise unittest.SkipTest("need posix.getgroups")
+        if sys.platform == 'darwin':
+            raise unittest.SkipTest("getgroups(2) is broken on OSX")
+        self.saved_groups = posix.getgroups()
+
+    def tearDown(self):
+        if hasattr(posix, 'setgroups'):
+            posix.setgroups(self.saved_groups)
+        elif hasattr(posix, 'initgroups'):
+            name = pwd.getpwuid(posix.getuid()).pw_name
+            posix.initgroups(name, self.saved_groups[0])
+
+    @unittest.skipUnless(hasattr(posix, 'initgroups'),
+                         "test needs posix.initgroups()")
+    def test_initgroups(self):
+        # find missing group
+
+        groups = sorted(self.saved_groups)
+        for g1,g2 in zip(groups[:-1], groups[1:]):
+            g = g1 + 1
+            if g < g2:
+                break
+        else:
+            g = g2 + 1
+        name = pwd.getpwuid(posix.getuid()).pw_name
+        posix.initgroups(name, g)
+        self.assertIn(g, posix.getgroups())
+
+    @unittest.skipUnless(hasattr(posix, 'setgroups'),
+                         "test needs posix.setgroups()")
+    def test_setgroups(self):
+        for groups in [[0], range(16)]:
+            posix.setgroups(groups)
+            self.assertListEqual(groups, posix.getgroups())
+
 
 def test_main():
-    support.run_unittest(PosixTester)
+    support.run_unittest(PosixTester, PosixGroupsTester)
 
 if __name__ == '__main__':
     test_main()

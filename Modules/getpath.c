@@ -48,7 +48,7 @@
  * argv0_path.  For prefix, the landmark's path is derived from the VPATH
  * preprocessor variable (taking into account that its value is almost, but
  * not quite, what we need).  For exec_prefix, the landmark is
- * Modules/Setup.  If the landmark is found, we're done.
+ * pybuilddir.txt.  If the landmark is found, we're done.
  *
  * For the remaining steps, the prefix landmark will always be
  * lib/python$VERSION/os.py and the exec_prefix will always be
@@ -89,6 +89,8 @@
  * directory).  This seems to make more sense given that currently the only
  * known use of sys.prefix and sys.exec_prefix is for the ILU installation
  * process to find the installed Python tree.
+ *
+ * NOTE: Windows MSVC builds use PC/getpathp.c instead!
  */
 
 #ifdef __cplusplus
@@ -134,18 +136,24 @@ static wchar_t *lib_python = L"lib/python" VERSION;
 /* In principle, this should use HAVE__WSTAT, and _wstat
    should be detected by autoconf. However, no current
    POSIX system provides that function, so testing for
-   it is pointless. */
+   it is pointless.
+   Not sure whether the MS_WINDOWS guards are necessary:
+   perhaps for cygwin/mingw builds?
+*/
 #ifndef MS_WINDOWS
 static int
 _wstat(const wchar_t* path, struct stat *buf)
 {
-    char fname[PATH_MAX];
-    size_t res = wcstombs(fname, path, sizeof(fname));
-    if (res == (size_t)-1) {
+    int err;
+    char *fname;
+    fname = _Py_wchar2char(path);
+    if (fname == NULL) {
         errno = EINVAL;
         return -1;
     }
-    return stat(fname, buf);
+    err = stat(fname, buf);
+    PyMem_Free(fname);
+    return err;
 }
 #endif
 
@@ -394,12 +402,36 @@ search_for_exec_prefix(wchar_t *argv0_path, wchar_t *home)
         return 1;
     }
 
-    /* Check to see if argv[0] is in the build directory */
+    /* Check to see if argv[0] is in the build directory. "pybuilddir.txt"
+       is written by setup.py and contains the relative path to the location
+       of shared library modules. */
     wcscpy(exec_prefix, argv0_path);
-    joinpath(exec_prefix, L"Modules/Setup");
+    joinpath(exec_prefix, L"pybuilddir.txt");
     if (isfile(exec_prefix)) {
-        reduce(exec_prefix);
-        return -1;
+        FILE *f = _Py_wfopen(exec_prefix, L"rb");
+        if (f == NULL)
+            errno = 0;
+        else {
+            char buf[MAXPATHLEN+1];
+            PyObject *decoded;
+            wchar_t rel_builddir_path[MAXPATHLEN+1];
+            size_t n;
+            n = fread(buf, 1, MAXPATHLEN, f);
+            buf[n] = '\0';
+            fclose(f);
+            decoded = PyUnicode_DecodeUTF8(buf, n, "surrogateescape");
+            if (decoded != NULL) {
+                n = PyUnicode_AsWideChar((PyUnicodeObject*)decoded,
+                                         rel_builddir_path, MAXPATHLEN);
+                Py_DECREF(decoded);
+                if (n >= 0) {
+                    rel_builddir_path[n] = L'\0';
+                    wcscpy(exec_prefix, argv0_path);
+                    joinpath(exec_prefix, rel_builddir_path);
+                    return -1;
+                }
+            }
+        }
     }
 
     /* Search from argv0_path, until root is found */
@@ -461,21 +493,21 @@ calculate_path(void)
 #endif
 
     if (_path) {
-            size_t r = mbstowcs(wpath, _path, MAXPATHLEN+1);
-            path = wpath;
-            if (r == (size_t)-1 || r > MAXPATHLEN) {
-                    /* Could not convert PATH, or it's too long. */
-                    path = NULL;
-            }
+        size_t r = mbstowcs(wpath, _path, MAXPATHLEN+1);
+        path = wpath;
+        if (r == (size_t)-1 || r > MAXPATHLEN) {
+            /* Could not convert PATH, or it's too long. */
+            path = NULL;
+        }
     }
 
-        /* If there is no slash in the argv0 path, then we have to
-         * assume python is on the user's $PATH, since there's no
-         * other way to find a directory to start the search from.  If
-         * $PATH isn't exported, you lose.
-         */
-        if (wcschr(prog, SEP))
-                wcsncpy(progpath, prog, MAXPATHLEN);
+    /* If there is no slash in the argv0 path, then we have to
+     * assume python is on the user's $PATH, since there's no
+     * other way to find a directory to start the search from.  If
+     * $PATH isn't exported, you lose.
+     */
+    if (wcschr(prog, SEP))
+        wcsncpy(progpath, prog, MAXPATHLEN);
 #ifdef __APPLE__
      /* On Mac OS X, if a script uses an interpreter of the form
       * "#!/opt/python2.3/bin/python", the kernel only passes "python"
@@ -487,52 +519,52 @@ calculate_path(void)
       * will fail if a relative path was used. but in that case,
       * absolutize() should help us out below
       */
-        else if(0 == _NSGetExecutablePath(execpath, &nsexeclength) && execpath[0] == SEP) {
-                size_t r = mbstowcs(progpath, execpath, MAXPATHLEN+1);
-                if (r == (size_t)-1 || r > MAXPATHLEN) {
-                        /* Could not convert execpath, or it's too long. */
-                        progpath[0] = '\0';
-                }
+    else if(0 == _NSGetExecutablePath(execpath, &nsexeclength) && execpath[0] == SEP) {
+        size_t r = mbstowcs(progpath, execpath, MAXPATHLEN+1);
+        if (r == (size_t)-1 || r > MAXPATHLEN) {
+            /* Could not convert execpath, or it's too long. */
+            progpath[0] = '\0';
         }
+    }
 #endif /* __APPLE__ */
-        else if (path) {
-                while (1) {
-                        wchar_t *delim = wcschr(path, DELIM);
+    else if (path) {
+        while (1) {
+            wchar_t *delim = wcschr(path, DELIM);
 
-                        if (delim) {
-                                size_t len = delim - path;
-                                if (len > MAXPATHLEN)
-                                        len = MAXPATHLEN;
-                                wcsncpy(progpath, path, len);
-                                *(progpath + len) = '\0';
-                        }
-                        else
-                                wcsncpy(progpath, path, MAXPATHLEN);
+            if (delim) {
+                size_t len = delim - path;
+                if (len > MAXPATHLEN)
+                    len = MAXPATHLEN;
+                wcsncpy(progpath, path, len);
+                *(progpath + len) = '\0';
+            }
+            else
+                wcsncpy(progpath, path, MAXPATHLEN);
 
-                        joinpath(progpath, prog);
-                        if (isxfile(progpath))
-                                break;
+            joinpath(progpath, prog);
+            if (isxfile(progpath))
+                break;
 
-                        if (!delim) {
-                                progpath[0] = L'\0';
-                                break;
-                        }
-                        path = delim + 1;
-                }
+            if (!delim) {
+                progpath[0] = L'\0';
+                break;
+            }
+            path = delim + 1;
         }
-        else
-                progpath[0] = '\0';
-        if (progpath[0] != SEP && progpath[0] != '\0')
-                absolutize(progpath);
-        wcsncpy(argv0_path, progpath, MAXPATHLEN);
-        argv0_path[MAXPATHLEN] = '\0';
+    }
+    else
+        progpath[0] = '\0';
+    if (progpath[0] != SEP && progpath[0] != '\0')
+        absolutize(progpath);
+    wcsncpy(argv0_path, progpath, MAXPATHLEN);
+    argv0_path[MAXPATHLEN] = '\0';
 
 #ifdef WITH_NEXT_FRAMEWORK
-        /* On Mac OS X we have a special case if we're running from a framework.
-        ** This is because the python home should be set relative to the library,
-        ** which is in the framework, not relative to the executable, which may
-        ** be outside of the framework. Except when we're in the build directory...
-        */
+    /* On Mac OS X we have a special case if we're running from a framework.
+    ** This is because the python home should be set relative to the library,
+    ** which is in the framework, not relative to the executable, which may
+    ** be outside of the framework. Except when we're in the build directory...
+    */
     pythonModule = NSModuleForSymbol(NSLookupAndBindSymbol("_Py_Initialize"));
     /* Use dylib functions to find out where the framework was loaded from */
     buf = (wchar_t *)NSLibraryNameForModule(pythonModule);
@@ -550,13 +582,13 @@ calculate_path(void)
         joinpath(argv0_path, lib_python);
         joinpath(argv0_path, LANDMARK);
         if (!ismodule(argv0_path)) {
-                /* We are in the build directory so use the name of the
-                   executable - we know that the absolute path is passed */
-                wcsncpy(argv0_path, prog, MAXPATHLEN);
+            /* We are in the build directory so use the name of the
+               executable - we know that the absolute path is passed */
+            wcsncpy(argv0_path, progpath, MAXPATHLEN);
         }
         else {
-                /* Use the location of the library as the progpath */
-                wcsncpy(argv0_path, buf, MAXPATHLEN);
+            /* Use the location of the library as the progpath */
+            wcsncpy(argv0_path, buf, MAXPATHLEN);
         }
     }
 #endif
