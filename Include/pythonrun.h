@@ -40,12 +40,10 @@ PyAPI_FUNC(int) PyRun_AnyFileExFlags(FILE *, const char *, int, PyCompilerFlags 
 PyAPI_FUNC(int) PyRun_SimpleFileExFlags(FILE *, const char *, int, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_InteractiveOneFlags(FILE *, const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_InteractiveLoopFlags(FILE *, const char *, PyCompilerFlags *);
-#endif
 
 PyAPI_FUNC(struct _mod *) PyParser_ASTFromString(const char *, const char *,
                                                  int, PyCompilerFlags *flags,
                                                  PyArena *);
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(struct _mod *) PyParser_ASTFromFile(FILE *, const char *,
                                                const char*, int,
                                                char *, char *,

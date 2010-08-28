@@ -403,7 +403,7 @@ typedef struct{
 
 PyObject* PyType_FromSpec(PyType_Spec*);
 
-
+#ifndef Py_LIMITED_API
 /* The *real* layout of a type object when allocated on the heap */
 typedef struct _heaptypeobject {
     /* Note: there's a dependency on the order of these members
@@ -424,7 +424,7 @@ typedef struct _heaptypeobject {
 /* access macro to the members which are floating "behind" the object */
 #define PyHeapType_GET_MEMBERS(etype) \
     ((PyMemberDef *)(((char *)etype) + Py_TYPE(etype)->tp_basicsize))
-
+#endif
 
 /* Generic type check */
 PyAPI_FUNC(int) PyType_IsSubtype(PyTypeObject *, PyTypeObject *);
@@ -674,9 +674,13 @@ PyAPI_FUNC(void) _Py_AddToAllObjects(PyObject *, int force);
 
 #define _Py_ForgetReference(op) _Py_INC_TPFREES(op)
 
+#ifdef Py_LIMITED_API
+PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
+#else
 #define _Py_Dealloc(op) (                               \
     _Py_INC_TPFREES(op) _Py_COUNT_ALLOCS_COMMA          \
     (*Py_TYPE(op)->tp_dealloc)((PyObject *)(op)))
+#endif
 #endif /* !Py_TRACE_REFS */
 
 #define Py_INCREF(op) (                         \
