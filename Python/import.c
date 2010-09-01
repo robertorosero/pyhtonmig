@@ -853,10 +853,29 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
 /* Like strrchr(string, '/') but searches for the rightmost of either SEP
    or ALTSEP, if the latter is defined.
 */
+
+/* FIXME: Remove this function and rename rightmost_sep_unicode() */
 static char *
 rightmost_sep(char *s)
 {
     char *found, c;
+    for (found = NULL; (c = *s); s++) {
+        if (c == SEP
+#ifdef ALTSEP
+            || c == ALTSEP
+#endif
+            )
+        {
+            found = s;
+        }
+    }
+    return found;
+}
+
+static Py_UNICODE *
+rightmost_sep_unicode(Py_UNICODE *s)
+{
+    Py_UNICODE *found, c;
     for (found = NULL; (c = *s); s++) {
         if (c == SEP
 #ifdef ALTSEP
@@ -1010,77 +1029,73 @@ make_compiled_pathname(PyObject *pathobj, int debug)
    3147 style, NULL is returned.  buf must be at least as big as pathname;
    the resulting path will always be shorter. */
 
-/* FIXME: use Py_UNICODE* instead of char* */
-static char *
-_make_source_pathname(char *pathname, char *buf)
+static PyObject*
+make_source_pathname(PyObject *pathobj)
 {
+    Py_UNICODE buf[MAXPATHLEN + 1];
+    PyObject *cpathname;
+    Py_UNICODE *pathname;
     /* __pycache__/foo.<tag>.pyc -> foo.py */
-    size_t i, j;
-    char *left, *right, *dot0, *dot1, sep;
+    Py_UNICODE *left, *right, *dot0, *dot1, sep;
+    PyObject *cachedir = NULL;
+    Py_ssize_t len;
+
+    pathname = Py_UNICODE_strdup(pathobj);
+    if (pathname == NULL)
+        return PyErr_NoMemory();
+    cachedir = PyUnicode_FromString(CACHEDIR);
 
     /* Look back two slashes from the end.  In between these two slashes
        must be the string __pycache__ or this is not a PEP 3147 style
        path.  It's possible for there to be only one slash.
     */
-    if ((right = rightmost_sep(pathname)) == NULL)
-        return NULL;
+    if ((right = rightmost_sep_unicode(pathname)) == NULL)
+        goto error;
     sep = *right;
     *right = '\0';
-    left = rightmost_sep(pathname);
+    left = rightmost_sep_unicode(pathname);
     *right = sep;
     if (left == NULL)
         left = pathname;
     else
         left++;
-    if (right-left != strlen(CACHEDIR) ||
-        strncmp(left, CACHEDIR, right-left) != 0)
-        return NULL;
+    if (right-left != PyUnicode_GET_SIZE(cachedir) ||
+        Py_UNICODE_strncmp(left, PyUnicode_AS_UNICODE(cachedir), right-left) != 0)
+        goto error;
 
     /* Now verify that the path component to the right of the last slash
        has two dots in it.
     */
-    if ((dot0 = strchr(right + 1, '.')) == NULL)
-        return NULL;
-    if ((dot1 = strchr(dot0 + 1, '.')) == NULL)
-        return NULL;
+    if ((dot0 = Py_UNICODE_strchr(right + 1, '.')) == NULL)
+        goto error;
+    if ((dot1 = Py_UNICODE_strchr(dot0 + 1, '.')) == NULL)
+        goto error;
     /* Too many dots? */
-    if (strchr(dot1 + 1, '.') != NULL)
-        return NULL;
+    if (Py_UNICODE_strchr(dot1 + 1, '.') != NULL)
+        goto error;
 
     /* This is a PEP 3147 path.  Start by copying everything from the
        start of pathname up to and including the leftmost slash.  Then
        copy the file's basename, removing the magic tag and adding a .py
        suffix.
     */
-    strncpy(buf, pathname, (i=left-pathname));
-    strncpy(buf+i, right+1, (j=dot0-right));
-    strcpy(buf+i+j, "py");
-    return buf;
-}
+    len = left-pathname;
+    Py_UNICODE_strncpy(buf, pathname, len);
+    Py_UNICODE_strncpy(buf+len, right+1, dot0-right);
+    len += dot0 - right;
+    buf[len++] = 'p';
+    buf[len++] = 'y';
+    buf[len] = '\0';
 
-static PyObject*
-make_source_pathname(PyObject *pathobj)
-{
-    /* FIXME: use Py_UNICODE* instead of char* */
-    char buf[MAXPATHLEN + 1];
-    PyObject *pathbytes;
-    char *pathname, *cpathname;
+    cpathname = PyUnicode_FromUnicode(buf, len);
+    goto finally;
 
-    pathbytes = PyUnicode_EncodeFSDefault(pathobj);
-    if (pathbytes == NULL)
-        return NULL;
-
-    pathname = strdup(PyBytes_AsString(pathbytes));
-    Py_DECREF(pathbytes);
-    if (pathname == NULL)
-        return PyErr_NoMemory();
-
-    cpathname = _make_source_pathname(pathname, buf);
-    free(pathname);
-    if (cpathname != NULL)
-        return PyUnicode_DecodeFSDefault(cpathname);
-    else
-        return NULL;
+error:
+    cpathname = NULL;
+finally:
+    PyMem_Free(pathname);
+    Py_XDECREF(cachedir);
+    return cpathname;
 }
 
 /* Given a pathname for a Python source file, its time of last
