@@ -2771,8 +2771,6 @@ posix_mkdir(PyObject *self, PyObject *args)
         return NULL;
     path = PyBytes_AsString(opath);
     Py_BEGIN_ALLOW_THREADS
-    /* PyUnicode_AS_UNICODE OK without thread lock as
-       it is a simple dereference. */
     res = CreateDirectoryA(path, NULL);
     Py_END_ALLOW_THREADS
     if (!res) {
