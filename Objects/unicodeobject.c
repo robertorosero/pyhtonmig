@@ -9980,6 +9980,13 @@ Py_UNICODE_strncpy(Py_UNICODE *s1, const Py_UNICODE *s2, size_t n)
     return s1;
 }
 
+Py_UNICODE*
+Py_UNICODE_strcat(Py_UNICODE *s1, const Py_UNICODE *s2)
+{
+    s1 += Py_UNICODE_strlen(s1);
+    return Py_UNICODE_strcpy(s1, s2);
+}
+
 int
 Py_UNICODE_strcmp(const Py_UNICODE *s1, const Py_UNICODE *s2)
 {
