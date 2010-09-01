@@ -10018,6 +10018,22 @@ Py_UNICODE_strrchr(const Py_UNICODE *s, Py_UNICODE c)
     return NULL;
 }
 
+Py_UNICODE* 
+Py_UNICODE_strdup(PyObject *object)
+{
+    PyUnicodeObject *unicode = (PyUnicodeObject *)object;
+    Py_UNICODE *copy;
+    Py_ssize_t size;
+    size = PyUnicode_GET_SIZE(unicode) + 1; /* copy the nul character */
+    size *= sizeof(Py_UNICODE);
+    copy = PyMem_Malloc(size);
+    if (copy == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    memcpy(copy, PyUnicode_AS_UNICODE(unicode), size);
+    return copy;
+}
 
 #ifdef __cplusplus
 }

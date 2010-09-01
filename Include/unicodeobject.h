@@ -1634,6 +1634,14 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
     const Py_UNICODE *s, Py_UNICODE c
     );
 
+/* Create a copy of a unicode string ending with a nul character.
+   Return NULL on memory error, otherwise return a new allocated buffer: 
+   use PyMem_Free() to free the buffer. */
+
+PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strdup(
+    PyObject *unicode 
+    );
+
 #ifdef __cplusplus
 }
 #endif
