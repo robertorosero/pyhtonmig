@@ -854,7 +854,7 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
    or ALTSEP, if the latter is defined.
 */
 
-/* FIXME: Remove this function and rename rightmost_sep_unicode() */
+#ifndef MS_WINDOWS
 static char *
 rightmost_sep(char *s)
 {
@@ -871,6 +871,7 @@ rightmost_sep(char *s)
     }
     return found;
 }
+#endif
 
 static Py_UNICODE *
 rightmost_sep_unicode(Py_UNICODE *s)
@@ -1241,6 +1242,23 @@ parse_source_module(PyObject *pathobj, FILE *fp)
 
 /* Helper to open a bytecode file for writing in exclusive mode */
 
+#ifdef MS_WINDOWS   /* since Windows uses different permissions  */
+static FILE *
+open_exclusive(Py_UNICODE *filename, mode_t mode)
+{
+    int fd;
+    (void)DeleteFileW(filename);
+
+    /* hFile = CreateFileW(filename,
+        FILE_WRITE_ATTRIBUTES, 0,
+        NULL, OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS, NULL); */
+    fd = open(@@@ filename @@@, O_EXCL|O_CREAT|O_WRONLY|O_TRUNC|O_BINARY, mode);
+    if (fd < 0)
+        return NULL;
+    return fdopen(fd, "wb");
+}
+#else
 static FILE *
 open_exclusive(char *filename, mode_t mode)
 {
@@ -1271,6 +1289,7 @@ open_exclusive(char *filename, mode_t mode)
     return fopen(filename, "wb");
 #endif
 }
+#endif
 
 
 /* Write a compiled module to a file, placing the time of last
@@ -1283,50 +1302,66 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
                       struct stat *srcstat)
 {
     FILE *fp;
-    char *dirpath;
     time_t mtime = srcstat->st_mtime;
 #ifdef MS_WINDOWS   /* since Windows uses different permissions  */
     mode_t mode = srcstat->st_mode & ~S_IEXEC;
     mode_t dirmode = srcstat->st_mode | S_IEXEC; /* XXX Is this correct
                                                     for Windows?
                                                     2010-04-07 BAW */
+    Py_UNICODE saved;
+    Py_UNICODE *dirpath;
+    Py_UNICODE *cpathname;
+    int res;
 #else
     mode_t mode = srcstat->st_mode & ~S_IXUSR & ~S_IXGRP & ~S_IXOTH;
     mode_t dirmode = (srcstat->st_mode |
                       S_IXUSR | S_IXGRP | S_IXOTH |
                       S_IWUSR | S_IWGRP | S_IWOTH);
-#endif
-    int saved;
-    PyObject *cpathbytes;
+    char saved;
+    char *dirpath;
     char *cpathname;
+    PyObject *cpathbytes;
+#endif
+    int err;
 
+#ifdef MS_WINDOWS
+    cpathname = PyUnicode_AS_UNICODE(cpathobj);
+    dirpath = rightmost_sep_unicode(cpathname);
+#else
     cpathbytes = PyUnicode_EncodeFSDefault(cpathobj);
     if (cpathbytes == NULL) {
         PyErr_Clear();
         return;
     }
     cpathname = PyBytes_AS_STRING(cpathbytes);
+    dirpath = rightmost_sep(cpathname);
+#endif
 
     /* Ensure that the __pycache__ directory exists. */
-    dirpath = rightmost_sep(cpathname);
     if (dirpath == NULL) {
         if (Py_VerboseFlag)
             PySys_FormatStderr(
                 "# no %U path found %U\n",
                 CACHEDIR, cpathobj);
-        Py_DECREF(cpathbytes);
-        return;
+        goto finally;
     }
     saved = *dirpath;
     *dirpath = '\0';
-    /* XXX call os.mkdir() or maybe CreateDirectoryA() on Windows? */
-    if (mkdir(cpathname, dirmode) < 0 && errno != EEXIST) {
+#ifdef MS_WINDOWS
+    res = CreateDirectoryW(cpathname, NULL); /* FIXME: use dirmode? */
+    err = !res;
+#else
+    if (mkdir(cpathname, dirmode) < 0)
+        err = (errno != EEXIST);
+    else
+        err = 0;
+#endif
+    if (err) {
         *dirpath = saved;
         if (Py_VerboseFlag)
             PySys_FormatStderr(
                 "# cannot create cache directory %U\n", cpathobj);
-        Py_DECREF(cpathbytes);
-        return;
+        goto finally;
     }
     *dirpath = saved;
 
@@ -1335,8 +1370,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
         if (Py_VerboseFlag)
             PySys_FormatStderr(
                 "# can't create %U\n", cpathobj);
-        Py_DECREF(cpathbytes);
-        return;
+        goto finally;
     }
     PyMarshal_WriteLongToFile(pyc_magic, fp, Py_MARSHAL_VERSION);
     /* First write a 0 for mtime */
@@ -1347,9 +1381,12 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
             PySys_FormatStderr("# can't write %U\n", cpathobj);
         /* Don't keep partial file */
         fclose(fp);
+#ifdef MS_WINDOWS
+        (void)DeleteFileW(cpathname);
+#else
         (void) unlink(cpathname);
-        Py_DECREF(cpathbytes);
-        return;
+#endif
+        goto finally;
     }
     /* Now write the true mtime */
     fseek(fp, 4L, 0);
@@ -1359,7 +1396,11 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     fclose(fp);
     if (Py_VerboseFlag)
         PySys_FormatStderr("# wrote %U\n", cpathobj);
+
+finally:
+#ifndef MS_WINDOWS
     Py_DECREF(cpathbytes);
+#endif
 }
 
 static void
