@@ -585,7 +585,7 @@ PyImport_GetMagicTag(void)
 */
 
 int
-_PyImport_FixupExtensionUnicode(PyObject *mod, char *name, PyObject *filename)
+_PyImport_FixupExtension(PyObject *mod, char *name, PyObject *filename)
 {
     PyObject *modules, *dict;
     struct PyModuleDef *def;
@@ -625,32 +625,30 @@ _PyImport_FixupExtensionUnicode(PyObject *mod, char *name, PyObject *filename)
         if (def->m_base.m_copy == NULL)
             return -1;
     }
-    PyDict_SetItem(extensions, filename, (PyObject*)def);
+    if (filename != NULL)
+        PyDict_SetItem(extensions, filename, (PyObject*)def);
+    else
+        PyDict_SetItemString(extensions, name, (PyObject*)def);
     return 0;
 }
 
 int
-_PyImport_FixupExtension(PyObject *mod, char *name, char *filename)
+_PyImport_FixupBuiltinExtension(PyObject *mod, char *name)
 {
-    PyObject *fileobj;
-    int result;
-    fileobj = PyUnicode_FromString(filename);
-    if (fileobj == NULL)
-        return -1;
-    result = _PyImport_FixupExtensionUnicode(mod, name, fileobj);
-    Py_DECREF(fileobj);
-    return result;
+    return _PyImport_FixupExtension(mod, name, NULL);
 }
 
-
 PyObject *
-_PyImport_FindExtensionUnicode(char *name, PyObject *filename)
+_PyImport_FindExtension(char *name, PyObject *filename)
 {
     PyObject *mod, *mdict;
     PyModuleDef* def;
     if (extensions == NULL)
         return NULL;
-    def = (PyModuleDef*)PyDict_GetItem(extensions, filename);
+    if (filename != NULL)
+        def = (PyModuleDef*)PyDict_GetItem(extensions, filename);
+    else
+        def = (PyModuleDef*)PyDict_GetItemString(extensions, name);
     if (def == NULL)
         return NULL;
     if (def->m_size == -1) {
@@ -680,22 +678,21 @@ _PyImport_FindExtensionUnicode(char *name, PyObject *filename)
         Py_DECREF(mod);
         return NULL;
     }
-    if (Py_VerboseFlag)
-        PySys_FormatStderr("import %s # previously loaded (%U)\n",
-                           name, filename);
+    if (Py_VerboseFlag) {
+        if (filename != NULL)
+            PySys_FormatStderr("import %s # previously loaded (%U)\n",
+                               name, filename);
+        else
+            PySys_FormatStderr("import %s\n", name);
+    }
     return mod;
 }
 
 PyObject *
-_PyImport_FindExtension(char *name, char *filename)
+_PyImport_FindBuiltinExtension(char *name)
 {
-    PyObject *fileobj, *mod;
-    fileobj = PyUnicode_DecodeFSDefault(filename);
-    mod = _PyImport_FindExtensionUnicode(name, fileobj);
-    Py_DECREF(fileobj);
-    return mod;
+    return _PyImport_FindExtension(name, NULL);
 }
-
 
 /* Get the module object corresponding to a module name.
    First check the modules dictionary if there's one there,
@@ -2446,7 +2443,7 @@ init_builtin(char *name)
     PyObject *path;
 
     path = PyUnicode_FromString(name);
-    if (_PyImport_FindExtensionUnicode(name, path) != NULL) {
+    if (_PyImport_FindExtension(name, path) != NULL) {
         Py_DECREF(path);
         return 1;
     }
@@ -2468,7 +2465,7 @@ init_builtin(char *name)
                 Py_DECREF(path);
                 return -1;
             }
-            if (_PyImport_FixupExtensionUnicode(mod, name, path) < 0) {
+            if (_PyImport_FixupExtension(mod, name, path) < 0) {
                 Py_DECREF(path);
                 return -1;
             }

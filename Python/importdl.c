@@ -28,7 +28,7 @@ _PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
     PyObject* (*p)(void);
     struct PyModuleDef *def;
 
-    if ((m = _PyImport_FindExtensionUnicode(name, path)) != NULL) {
+    if ((m = _PyImport_FindExtension(name, path)) != NULL) {
         Py_INCREF(m);
         return m;
     }
@@ -83,7 +83,7 @@ _PyImport_LoadDynamicModule(char *name, PyObject *path, FILE *fp)
         Py_DECREF(path);
     }
 
-    if (_PyImport_FixupExtensionUnicode(m, name, path) < 0)
+    if (_PyImport_FixupExtension(m, name, path) < 0)
         return NULL;
     if (Py_VerboseFlag)
         PySys_FormatStderr(
