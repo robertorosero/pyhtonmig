@@ -1629,6 +1629,12 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strncpy(
 PyAPI_FUNC(int) Py_UNICODE_strcmp(
     const Py_UNICODE *s1, const Py_UNICODE *s2);
 
+PyAPI_FUNC(int) Py_UNICODE_strncmp(
+    const Py_UNICODE *s1,
+    const Py_UNICODE *s2,
+    size_t n
+    );
+
 PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strchr(
     const Py_UNICODE *s, Py_UNICODE c
     );
