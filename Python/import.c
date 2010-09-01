@@ -895,15 +895,42 @@ rightmost_sep_unicode(Py_UNICODE *s)
    for the compiled file, or NULL if there's no space in the buffer.
    Doesn't set an exception. */
 
-/* FIXME: use Py_UNICODE*, not char* */
-static char *
-_make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
+static PyObject*
+make_compiled_pathname(PyObject *pathobj, int debug)
 {
     /* foo.py -> __pycache__/foo.<tag>.pyc */
-    size_t len = strlen(pathname);
     size_t i, save;
-    char *pos;
+    Py_UNICODE *pos;
     int sep = SEP;
+    Py_UNICODE buf[MAXPATHLEN+1];
+    size_t buflen = sizeof(buf);
+    PyObject *cpathname;
+    Py_UNICODE *pathname;
+    PyObject *cachedir = NULL;
+    PyObject *pyc_tag_unicode = NULL;
+    PyObject *suffix = NULL;
+    Py_ssize_t len;
+
+    pathname = Py_UNICODE_strdup(pathobj);
+    if (pathname == NULL)
+        return NULL;
+    cachedir = PyUnicode_FromString(CACHEDIR);
+    if (cachedir == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+    pyc_tag_unicode = PyUnicode_FromString(pyc_tag);
+    if (pyc_tag_unicode == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+    suffix = PyUnicode_FromString(debug ? ".pyc" : ".pyo");
+    if (suffix == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+
+    len = PyUnicode_GET_SIZE(pathobj);
 
     /* Sanity check that the buffer has roughly enough space to hold what
        will eventually be the full path to the compiled file.  The 5 extra
@@ -914,35 +941,35 @@ _make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
        sanity check before writing the extension to ensure we do not
        overflow the buffer.
     */
-    if (len + strlen(CACHEDIR) + strlen(pyc_tag) + 5 > buflen)
-        return NULL;
+    if (len + PyUnicode_GET_SIZE(cachedir) + PyUnicode_GET_SIZE(pyc_tag_unicode) + 5 > buflen)
+        goto error;
 
     /* Find the last path separator and copy everything from the start of
        the source string up to and including the separator.
     */
-    if ((pos = rightmost_sep(pathname)) == NULL) {
+    if ((pos = rightmost_sep_unicode(pathname)) == NULL) {
         i = 0;
     }
     else {
         sep = *pos;
         i = pos - pathname + 1;
-        strncpy(buf, pathname, i);
+        Py_UNICODE_strncpy(buf, pathname, i);
     }
 
     save = i;
     buf[i++] = '\0';
     /* Add __pycache__/ */
-    strcat(buf, CACHEDIR);
-    i += strlen(CACHEDIR) - 1;
+    Py_UNICODE_strcat(buf, PyUnicode_AS_UNICODE(cachedir));
+    i += PyUnicode_GET_SIZE(cachedir) - 1;
     buf[i++] = sep;
     buf[i++] = '\0';
     /* Add the base filename, but remove the .py or .pyw extension, since
        the tag name must go before the extension.
     */
-    strcat(buf, pathname + save);
-    if ((pos = strrchr(buf, '.')) != NULL)
+    Py_UNICODE_strcat(buf, pathname + save);
+    if ((pos = Py_UNICODE_strrchr(buf, '.')) != NULL)
         *++pos = '\0';
-    strcat(buf, pyc_tag);
+    Py_UNICODE_strcat(buf, PyUnicode_AS_UNICODE(pyc_tag_unicode));
     /* The length test above assumes that we're only adding one character
        to the end of what would normally be the extension.  What if there
        is no extension, or the string ends in '.' or '.p', and otherwise
@@ -992,34 +1019,22 @@ _make_compiled_pathname(char *pathname, char *buf, size_t buflen, int debug)
 #if 0
     printf("strlen(buf): %d; buflen: %d\n", (int)strlen(buf), (int)buflen);
 #endif
-    if (strlen(buf) + 5 > buflen)
-        return NULL;
-    strcat(buf, debug ? ".pyc" : ".pyo");
-    assert(strlen(buf) < buflen);
-    return buf;
-}
+    if (Py_UNICODE_strlen(buf) + 5 > buflen)
+        goto error;
+    Py_UNICODE_strcat(buf, PyUnicode_AS_UNICODE(suffix));
+    len = Py_UNICODE_strlen(buf);
+    assert(len < buflen);
+    cpathname = PyUnicode_FromUnicode(buf, len);
+    goto finally;
 
-static PyObject*
-make_compiled_pathname(PyObject *pathobj, int debug)
-{
-    /* FIXME: use Py_UNICODE* instead of char* */
-    char buf[MAXPATHLEN+1];
-    PyObject *pathbytes;
-    char *pathname, *cpathname;
-
-    pathbytes = PyUnicode_EncodeFSDefault(pathobj);
-    if (pathbytes == NULL)
-        return NULL;
-
-    pathname = strdup(PyBytes_AsString(pathbytes));
-    Py_DECREF(pathbytes);
-
-    cpathname = _make_compiled_pathname(pathname, buf, sizeof(buf), debug);
-    free(pathname);
-    if (cpathname != NULL)
-        return PyUnicode_DecodeFSDefault(cpathname);
-    else
-        return NULL;
+error:
+    cpathname = NULL;
+finally:
+    PyMem_Free(pathname);
+    Py_XDECREF(cachedir);
+    Py_XDECREF(pyc_tag_unicode);
+    Py_XDECREF(suffix);
+    return cpathname;
 }
 
 
@@ -1044,6 +1059,10 @@ make_source_pathname(PyObject *pathobj)
     if (pathname == NULL)
         return PyErr_NoMemory();
     cachedir = PyUnicode_FromString(CACHEDIR);
+    if (cachedir == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
 
     /* Look back two slashes from the end.  In between these two slashes
        must be the string __pycache__ or this is not a PEP 3147 style
