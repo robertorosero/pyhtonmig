@@ -1311,9 +1311,9 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     dirpath = rightmost_sep(cpathname);
     if (dirpath == NULL) {
         if (Py_VerboseFlag)
-            PySys_WriteStderr(
-                "# no %s path found %s\n",
-                CACHEDIR, cpathname);
+            PySys_FormatStderr(
+                "# no %U path found %U\n",
+                CACHEDIR, cpathobj);
         Py_DECREF(cpathbytes);
         return;
     }
@@ -1323,8 +1323,8 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     if (mkdir(cpathname, dirmode) < 0 && errno != EEXIST) {
         *dirpath = saved;
         if (Py_VerboseFlag)
-            PySys_WriteStderr(
-                "# cannot create cache dir %s\n", cpathname);
+            PySys_FormatStderr(
+                "# cannot create cache directory %U\n", cpathobj);
         Py_DECREF(cpathbytes);
         return;
     }
@@ -1333,8 +1333,8 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     fp = open_exclusive(cpathname, mode);
     if (fp == NULL) {
         if (Py_VerboseFlag)
-            PySys_WriteStderr(
-                "# can't create %s\n", cpathname);
+            PySys_FormatStderr(
+                "# can't create %U\n", cpathobj);
         Py_DECREF(cpathbytes);
         return;
     }
@@ -1344,7 +1344,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     PyMarshal_WriteObjectToFile((PyObject *)co, fp, Py_MARSHAL_VERSION);
     if (fflush(fp) != 0 || ferror(fp)) {
         if (Py_VerboseFlag)
-            PySys_WriteStderr("# can't write %s\n", cpathname);
+            PySys_FormatStderr("# can't write %U\n", cpathobj);
         /* Don't keep partial file */
         fclose(fp);
         (void) unlink(cpathname);
@@ -1358,7 +1358,7 @@ write_compiled_module(PyCodeObject *co, PyObject *cpathobj,
     fflush(fp);
     fclose(fp);
     if (Py_VerboseFlag)
-        PySys_WriteStderr("# wrote %s\n", cpathname);
+        PySys_FormatStderr("# wrote %U\n", cpathobj);
     Py_DECREF(cpathbytes);
 }
 
