@@ -2,6 +2,9 @@ import sys
 import unittest
 import Tkinter
 import ttk
+import threading
+import thread
+import time
 from test.test_support import requires, run_unittest
 
 import support
@@ -17,7 +20,7 @@ class LabeledScaleTest(unittest.TestCase):
         support.root_withdraw()
 
 
-    def test_widget_destroy(self):
+    def _test_widget_destroy(self):
         # automatically created variable
         x = ttk.LabeledScale()
         var = x._variable._name
@@ -48,7 +51,7 @@ class LabeledScaleTest(unittest.TestCase):
             self.assertFalse(sys.last_type == Tkinter.TclError)
 
 
-    def test_initialization(self):
+    def _test_initialization(self):
         # master passing
         x = ttk.LabeledScale()
         self.assertEqual(x.master, Tkinter._default_root)
@@ -104,6 +107,13 @@ class LabeledScaleTest(unittest.TestCase):
 
 
     def test_horizontal_range(self):
+        def func():
+            time.sleep(60 * 5) # XXX: adjust here
+            thread.interrupt_main()
+
+        t = threading.Thread(target=func)
+        t.start()
+
         lscale = ttk.LabeledScale(from_=0, to=10)
         lscale.pack()
         lscale.wait_visibility()
@@ -132,8 +142,9 @@ class LabeledScaleTest(unittest.TestCase):
 
         lscale.destroy()
 
+        t.join()
 
-    def test_variable_change(self):
+    def _test_variable_change(self):
         x = ttk.LabeledScale()
         x.pack()
         x.wait_visibility()
@@ -160,7 +171,7 @@ class LabeledScaleTest(unittest.TestCase):
         x.destroy()
 
 
-    def test_resize(self):
+    def _test_resize(self):
         x = ttk.LabeledScale()
         x.pack(expand=True, fill='both')
         x.wait_visibility()
@@ -268,7 +279,8 @@ class OptionMenuTest(unittest.TestCase):
         optmenu.destroy()
 
 
-tests_gui = (LabeledScaleTest, OptionMenuTest)
+#tests_gui = (LabeledScaleTest, OptionMenuTest)
+tests_gui = (LabeledScaleTest,)
 
 if __name__ == "__main__":
     run_unittest(*tests_gui)
