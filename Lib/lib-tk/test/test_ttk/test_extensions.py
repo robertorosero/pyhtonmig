@@ -2,6 +2,7 @@ import sys
 import unittest
 import Tkinter
 import ttk
+import collections
 import threading
 import thread
 import time
@@ -10,6 +11,10 @@ from test.test_support import requires, run_unittest
 import support
 
 requires('gui')
+
+CODES_SIZE = 100
+WAIT = 10 * 60 # XXX: adjust here
+
 
 class LabeledScaleTest(unittest.TestCase):
 
@@ -107,13 +112,6 @@ class LabeledScaleTest(unittest.TestCase):
 
 
     def test_horizontal_range(self):
-        def func():
-            time.sleep(60 * 5) # XXX: adjust here
-            thread.interrupt_main()
-
-        t = threading.Thread(target=func)
-        t.start()
-
         lscale = ttk.LabeledScale(from_=0, to=10)
         lscale.pack()
         lscale.wait_visibility()
@@ -142,7 +140,6 @@ class LabeledScaleTest(unittest.TestCase):
 
         lscale.destroy()
 
-        t.join()
 
     def _test_variable_change(self):
         x = ttk.LabeledScale()
@@ -283,4 +280,21 @@ class OptionMenuTest(unittest.TestCase):
 tests_gui = (LabeledScaleTest,)
 
 if __name__ == "__main__":
-    run_unittest(*tests_gui)
+    codes = collections.deque([None] * CODES_SIZE)
+    def tracefunc(frame, event, arg):
+        codes.append(frame.f_code)
+        codes.popleft()
+    sys.settrace(tracefunc) # only main thread now
+
+    def threadfunc():
+        time.sleep(WAIT)
+        for code in codes:
+            if code is None:
+                continue
+            print(code)
+    t = threading.Thread(target=threadfunc)
+    t.start()
+    try:
+        run_unittest(*tests_gui)
+    finally:
+        t.join()
