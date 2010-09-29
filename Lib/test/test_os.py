@@ -13,6 +13,7 @@ import time
 import shutil
 from test import support
 import contextlib
+from win_console_handler import create_mmap
 
 # Detect whether we're on a Linux system that uses the (now outdated
 # and unmaintained) linuxthreads threading library.  There's an issue
@@ -1029,13 +1030,16 @@ class Win32KillTests(unittest.TestCase):
         self._kill(100)
 
     def _kill_with_event(self, event, name):
+        m = create_mmap()
+        m[0] = 0
         # Run a script which has console control handling enabled.
         proc = subprocess.Popen([sys.executable,
                    os.path.join(os.path.dirname(__file__),
                                 "win_console_handler.py")],
                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         # Let the interpreter startup before we send signals. See #3137.
-        time.sleep(0.5)
+        while m[0] == 0:
+            time.sleep(0.5)
         os.kill(proc.pid, event)
         # proc.send_signal(event) could also be done here.
         # Allow time for the signal to be passed and the process to exit.
