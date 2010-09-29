@@ -19,7 +19,7 @@ if __name__ == "__main__":
     import ctypes
 
     # Function prototype for the handler function. Returns BOOL, takes a DWORD.
-    HandlerRoutine = wintypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+    HandlerRoutine = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
 
     def _ctrl_handler(sig):
         """Handle a sig event and return 0 to terminate the process"""
