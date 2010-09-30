@@ -13,7 +13,7 @@ import support
 requires('gui')
 
 CODES_SIZE = 100
-WAIT = 1 * 60 # XXX: adjust here
+trace_enabled = False
 
 def debug(s):
     print >>sys.stdout, s
@@ -115,10 +115,14 @@ class LabeledScaleTest(unittest.TestCase):
 
 
     def test_horizontal_range(self):
+        global trace_enabled
+
         lscale = ttk.LabeledScale(from_=0, to=10)
         lscale.pack()
         debug("===> enter lscale.wait_visibility....")
+        trace_enabled = True
         lscale.wait_visibility()
+        trace_enabled = False
         debug("===> leave lscale.wait_visibility....")
         lscale.update()
 
@@ -285,31 +289,9 @@ class OptionMenuTest(unittest.TestCase):
 tests_gui = (LabeledScaleTest,)
 
 if __name__ == "__main__":
-    codes = collections.deque([None] * CODES_SIZE)
-    code_count = 0
     def tracefunc(frame, event, arg):
-        global code_count
-        code_count += 1
-        codes.append(frame.f_code)
-        codes.popleft()
+        if trace_enabled:
+            debug(frame.f_code)
     sys.settrace(tracefunc) # only main thread now
 
-    def threadfunc():
-        while 1:
-            old_code_count = code_count
-            debug("----> thread sleeping now...")
-            time.sleep(WAIT)
-            debug("----> thread awakened ....")
-            if old_code_count == code_count:
-                break
-        debug("===================")
-        for code in codes:
-            if code is None:
-                continue
-            debug(code)
-    t = threading.Thread(target=threadfunc)
-    t.start()
-    try:
-        run_unittest(*tests_gui)
-    finally:
-        t.join()
+    run_unittest(*tests_gui)
