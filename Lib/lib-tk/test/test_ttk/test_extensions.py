@@ -13,7 +13,7 @@ import support
 requires('gui')
 
 CODES_SIZE = 100
-WAIT = 10 * 60 # XXX: adjust here
+WAIT = 1 * 60 # XXX: adjust here
 
 
 class LabeledScaleTest(unittest.TestCase):
@@ -114,8 +114,12 @@ class LabeledScaleTest(unittest.TestCase):
     def test_horizontal_range(self):
         lscale = ttk.LabeledScale(from_=0, to=10)
         lscale.pack()
+        print("===> enter lscale.wait_visibility....")
         lscale.wait_visibility()
+        print("===> leave lscale.wait_visibility....")
         lscale.update()
+
+        time.sleep(2 * 60)
 
         linfo_1 = lscale.label.place_info()
         prev_xcoord = lscale.scale.coords()[0]
@@ -281,13 +285,23 @@ tests_gui = (LabeledScaleTest,)
 
 if __name__ == "__main__":
     codes = collections.deque([None] * CODES_SIZE)
+    code_count = 0
     def tracefunc(frame, event, arg):
+        global code_count
+        code_count += 1
         codes.append(frame.f_code)
         codes.popleft()
     sys.settrace(tracefunc) # only main thread now
 
     def threadfunc():
-        time.sleep(WAIT)
+        while 1:
+            old_code_count = code_count
+            print("----> thread sleeping now...")
+            time.sleep(WAIT)
+            print("----> thread awakened ....")
+            if old_code_count == code_count:
+                break
+        print("===================")
         for code in codes:
             if code is None:
                 continue
