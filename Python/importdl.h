@@ -17,7 +17,8 @@ enum filetype {
     C_BUILTIN,
     PY_FROZEN,
     PY_CODERESOURCE, /* Mac only */
-    IMP_HOOK
+    IMP_HOOK,
+    NAMESPACE_PACKAGE
 };
 
 struct filedescr {
