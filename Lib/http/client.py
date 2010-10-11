@@ -1082,8 +1082,12 @@ else:
                 self._tunnel()
 
             self.sock = self._context.wrap_socket(sock)
-            if self._check_hostname:
-                ssl.match_hostname(self.sock.getpeercert(), self.host)
+            try:
+                if self._check_hostname:
+                    ssl.match_hostname(self.sock.getpeercert(), self.host)
+            except Exception:
+                self.sock.shutdown(socket.SHUT_RDWR)
+                raise
 
     __all__.append("HTTPSConnection")
 

@@ -21,7 +21,6 @@ class HTTPSServer(_HTTPServer):
         _HTTPServer.__init__(self, server_address, handler_class)
         # we assume the certfile contains both private key and certificate
         self.certfile = certfile
-        self.allow_reuse_address = True
 
     def __str__(self):
         return ('<%s %s:%s>' %
@@ -43,6 +42,8 @@ class RootedHTTPRequestHandler(SimpleHTTPRequestHandler):
 
     server_version = "TestHTTPS/1.0"
     root = here
+    # Avoid hanging when a request gets interrupted by the client
+    timeout = 5
 
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
