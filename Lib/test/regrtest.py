@@ -247,7 +247,9 @@ if sys.platform == "win32":
     # XXX: is this right place to do this?
     if not window_station_has_display_surfaces():
         print("Window Station has no display surfaces, so remove gui from RESOURCE_NAMES")
-        RESOURCE_NAMES.remove("gui")
+        tmp = list(RESOURCE_NAMES)
+        tmp.remove("gui")
+        RESOURCE_NAMES = tuple(tmp)
 
 TEMPDIR = os.path.abspath(tempfile.gettempdir())
 
