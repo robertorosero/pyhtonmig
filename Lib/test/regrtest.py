@@ -216,6 +216,39 @@ from test import support
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
                   'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
 
+if sys.platform == "win32":
+    import ctypes
+    import ctypes.wintypes
+
+    UOI_FLAGS = 1
+    WSF_VISIBLE = 0x0001
+
+    class USEROBJECTFLAGS(ctypes.Structure):
+        _fields_ = [("fInherit", ctypes.wintypes.BOOL),
+                    ("fReserved", ctypes.wintypes.BOOL),
+                    ("dwFlags", ctypes.wintypes.DWORD)]
+
+    def window_station_has_display_surfaces():
+        dll = ctypes.windll.user32
+        h = dll.GetProcessWindowStation()
+        if not h:
+            raise ctypes.WinError()
+        uof = USEROBJECTFLAGS()
+        needed = ctypes.wintypes.DWORD()
+        res = dll.GetUserObjectInformationW(h,
+            UOI_FLAGS,
+            ctypes.byref(uof),
+            ctypes.sizeof(uof),
+            ctypes.byref(needed))
+        if not res:
+            raise ctypes.WinError()
+        return bool(uof.dwFlags & WSF_VISIBLE)
+
+    # XXX: is this right place to do this?
+    if not window_station_has_display_surfaces():
+        print("Window Station has no display surfaces, so remove gui from RESOURCE_NAMES")
+        RESOURCE_NAMES.remove("gui")
+
 TEMPDIR = os.path.abspath(tempfile.gettempdir())
 
 def usage(msg):
