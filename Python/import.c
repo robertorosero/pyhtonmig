@@ -1356,10 +1356,10 @@ get_sourcefile(char *file)
 
 /* Forward */
 static PyObject *load_module(char *, FILE *, char *, int, PyObject *, 
-			     PyObject*, PyObject *);
+                             PyObject*, PyObject *);
 static struct filedescr *find_module(char *, char *, PyObject *, PyObject*,
                                      char *, size_t, FILE **, PyObject **,
-				     PyObject **);
+                                     PyObject **);
 static struct _frozen * find_frozen(char *);
 
 /* Load a package and return its module object WITH INCREMENTED
@@ -1420,7 +1420,7 @@ load_package(char *name, char *pathname)
 
 static PyObject*
 load_namespace_package(char *name, char *pathname, 
-		       PyObject* parent_path, PyObject *pth_list)
+                       PyObject* parent_path, PyObject *pth_list)
 {
     PyObject *m, *d, *file, *path, *sublist = NULL;
     Py_ssize_t i, len;
@@ -1440,57 +1440,57 @@ load_namespace_package(char *name, char *pathname,
     /* Compute path from pth_list */
     file = get_sourcefile(pathname);
     if (!file)
-	return NULL;
+        return NULL;
     path = Py_BuildValue("[O]", file);
     Py_CLEAR(file);
     if (path == NULL)
-	return NULL;
+        return NULL;
     len = PyList_Size(pth_list);
     for (i = 0; i < len; i++) {
-	PyObject *item = PyList_GetItem(pth_list, i); /* borrowed */
-	PyObject *extend_res;
-	if (item == 0)
-	    goto error;
-	if (!PyUnicode_Check(item)) {
-	    PyErr_SetString(PyExc_TypeError, "path item is not str");
-	    goto error;
-	}
-	sublist = PyUnicode_Splitlines(item, 0);
-	if (!sublist)
-	    goto error;
-	/* if sublist starts with *, add to path, unless it's already there */
-	if (PyList_Size(sublist) > 0) {
-	    PyObject *first = PyList_GetItem(sublist, 0); /* borrowed */
-	    Py_UNICODE *s_first = PyUnicode_AS_UNICODE(first);
-	    if (s_first[0] == (int)'*' && s_first[1] == 0) {
-		if (!starred) {
-		    if (PyList_Insert(path, 0, first) < 0)
-			goto error;
-		    starred = 1;
-		}
-		if (PySequence_DelItem(sublist, 0) < 0)
-		    goto error;
-	    }
-	}
-	extend_res = _PyList_Extend((PyListObject*)path, sublist);
-	if (extend_res == NULL)
-	    goto error;
-	Py_DECREF(extend_res); /* should be None */
-	Py_CLEAR(sublist);
+        PyObject *item = PyList_GetItem(pth_list, i); /* borrowed */
+        PyObject *extend_res;
+        if (item == 0)
+            goto error;
+        if (!PyUnicode_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "path item is not str");
+            goto error;
+        }
+        sublist = PyUnicode_Splitlines(item, 0);
+        if (!sublist)
+            goto error;
+        /* if sublist starts with *, add to path, unless it's already there */
+        if (PyList_Size(sublist) > 0) {
+            PyObject *first = PyList_GetItem(sublist, 0); /* borrowed */
+            Py_UNICODE *s_first = PyUnicode_AS_UNICODE(first);
+            if (s_first[0] == (int)'*' && s_first[1] == 0) {
+                if (!starred) {
+                    if (PyList_Insert(path, 0, first) < 0)
+                        goto error;
+                    starred = 1;
+                }
+                if (PySequence_DelItem(sublist, 0) < 0)
+                    goto error;
+            }
+        }
+        extend_res = _PyList_Extend((PyListObject*)path, sublist);
+        if (extend_res == NULL)
+            goto error;
+        Py_DECREF(extend_res); /* should be None */
+        Py_CLEAR(sublist);
     }
     if (PyDict_SetItemString(d, "__path__", path) < 0)
-	goto error;
+        goto error;
 
     /* find __init__.py, if any */
     buf[0] = '\0';
     fdp = find_module(name, "__init__", path, parent_path, buf, sizeof(buf), &fp, NULL, NULL);
     if (fdp == NULL) {
-	if (PyErr_ExceptionMatches(PyExc_ImportError)) {
-	    PyErr_Clear();
-	    Py_INCREF(m);
-	    goto cleanup;
-	}
-	goto error;
+        if (PyErr_ExceptionMatches(PyExc_ImportError)) {
+            PyErr_Clear();
+            Py_INCREF(m);
+            goto cleanup;
+        }
+        goto error;
     }
     m = load_module(name, fp, buf, fdp->type, NULL, NULL, NULL);
     /* XXX success/fail change to cleanup, adjust INCREF(m) */
@@ -1619,8 +1619,8 @@ static struct filedescr namespacepkgdescr = {"", "", NAMESPACE_PACKAGE};
 
 static struct filedescr *
 find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
-	    char *buf, size_t buflen, FILE **p_fp, PyObject **p_loader,
-	    PyObject **p_pth_list)
+            char *buf, size_t buflen, FILE **p_fp, PyObject **p_loader,
+            PyObject **p_pth_list)
 {
     Py_ssize_t i, npath, nppath = 0;
     size_t len, namelen, pkgnamelen = 0;
@@ -1666,7 +1666,7 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
         npath = PyList_Size(meta_path);
         for (i = 0; i < npath; i++) {
             PyObject *loader;
-	    PyObject *pth_list;
+            PyObject *pth_list;
             PyObject *hook = PyList_GetItem(meta_path, i);
             loader = PyObject_CallMethod(hook, "find_module",
                                          "sO", fullname,
@@ -1676,39 +1676,39 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
                 Py_DECREF(meta_path);
                 return NULL;  /* true error */
             }
-	    /* PEP 382: find .pth files */
+            /* PEP 382: find .pth files */
             pth_list = PyObject_CallMethod(hook, "find_path",
-					   "sO", fullname,
-					   path != NULL ?
-					   path : Py_None);
-	    if (pth_list == NULL) {
-		if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-		    /* Finder does not support PEP 382 */
-		    PyErr_Clear();
-		}
-		else { 
-		    Py_XDECREF(loader);
-		    Py_DECREF(meta_path);
-		    return NULL; /* true error */
-		}
-	    }
-	    if (pth_list == Py_None)
-		    /* Nothing found. */
-		    Py_CLEAR(pth_list);
+                                           "sO", fullname,
+                                           path != NULL ?
+                                           path : Py_None);
+            if (pth_list == NULL) {
+                if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+                    /* Finder does not support PEP 382 */
+                    PyErr_Clear();
+                }
+                else { 
+                    Py_XDECREF(loader);
+                    Py_DECREF(meta_path);
+                    return NULL; /* true error */
+                }
+            }
+            if (pth_list == Py_None)
+                    /* Nothing found. */
+                    Py_CLEAR(pth_list);
             if (loader != Py_None) {
                 /* a loader was found */
                 *p_loader = loader;
-		*p_pth_list = pth_list;
+                *p_pth_list = pth_list;
                 Py_DECREF(meta_path);
                 return &importhookdescr;
             }
             Py_DECREF(loader);
-	    if (pth_list) {
-		/* .pth files found, create namespace package */
-		*p_pth_list = pth_list;
-		Py_DECREF(meta_path);
-		return &namespacepkgdescr;
-	    }
+            if (pth_list) {
+                /* .pth files found, create namespace package */
+                *p_pth_list = pth_list;
+                Py_DECREF(meta_path);
+                return &namespacepkgdescr;
+            }
         }
         Py_DECREF(meta_path);
     }
@@ -1758,62 +1758,62 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
     namelen = strlen(name);
     curpath = path; /* may change to ppath below */
     if (!toplevel && npath > 1) {
-	/* Check whether path[0] == '*' */
-	PyObject *first = PyList_GetItem(path, 0);
-	if (!first)
-	    return NULL;
-	if (PyUnicode_Check(first)) {
-	    Py_UNICODE *ufirst = PyUnicode_AsUnicode(first);
-	    starred = ufirst[0] == (Py_UNICODE)'*' && ufirst[1] == 0;
-	}
-	else if (PyBytes_Check(first)) {
-	    char* cfirst = PyBytes_AsString(first);
-	    starred = cfirst[0] == (int)'*' && cfirst[1] == 0;
-	}
-	if (starred) {
-	    if (ppath == NULL)
-		ppath = PySys_GetObject("path");
-	    nppath = PyList_Size(ppath);
-	    npath += nppath;
-	    curpath = ppath;
-	    pkgname = strrchr(fullname, '.');
-	    if (pkgname && strcmp(pkgname+1, subname) == 0) {
-		/* last part of fullname is typically subname,
-		   except when __init__ is loaded. */
-		char *pkgname2 = pkgname-1;
-		/* move backwards up to another dot, or the start of fullname */
-		while(pkgname2 > fullname && pkgname2[-1] != '.')
-		    pkgname2--;
-		pkgnamelen = pkgname-pkgname2;
-		pkgname = pkgname2;
-	    }
-	    else {
-		pkgname = pkgname ? pkgname+1 : fullname;
-		pkgnamelen = strlen(pkgname);
-	    }
-	    pkgnamelen++; /* accounting for / */
-	}   
+        /* Check whether path[0] == '*' */
+        PyObject *first = PyList_GetItem(path, 0);
+        if (!first)
+            return NULL;
+        if (PyUnicode_Check(first)) {
+            Py_UNICODE *ufirst = PyUnicode_AsUnicode(first);
+            starred = ufirst[0] == (Py_UNICODE)'*' && ufirst[1] == 0;
+        }
+        else if (PyBytes_Check(first)) {
+            char* cfirst = PyBytes_AsString(first);
+            starred = cfirst[0] == (int)'*' && cfirst[1] == 0;
+        }
+        if (starred) {
+            if (ppath == NULL)
+                ppath = PySys_GetObject("path");
+            nppath = PyList_Size(ppath);
+            npath += nppath;
+            curpath = ppath;
+            pkgname = strrchr(fullname, '.');
+            if (pkgname && strcmp(pkgname+1, subname) == 0) {
+                /* last part of fullname is typically subname,
+                   except when __init__ is loaded. */
+                char *pkgname2 = pkgname-1;
+                /* move backwards up to another dot, or the start of fullname */
+                while(pkgname2 > fullname && pkgname2[-1] != '.')
+                    pkgname2--;
+                pkgnamelen = pkgname-pkgname2;
+                pkgname = pkgname2;
+            }
+            else {
+                pkgname = pkgname ? pkgname+1 : fullname;
+                pkgnamelen = strlen(pkgname);
+            }
+            pkgnamelen++; /* accounting for / */
+        }   
     }
     for (i = 0; i < npath; i++) {
         PyObject *v;
         PyObject *origv;
         const char *base;
         Py_ssize_t size;
-	if (starred && i == nppath) {
-	    /* exhausted ppath, go to path, skipping star */
-	    curpath = path;
-	    npath -= nppath;
-	    i = 1;
-	    pkgname = NULL;
-	    pkgnamelen = 0;
-	    if (i == npath)
-		/* path has only * on it */
-		break;
-	}
-	v = PyList_GetItem(curpath, i);
+        if (starred && i == nppath) {
+            /* exhausted ppath, go to path, skipping star */
+            curpath = path;
+            npath -= nppath;
+            i = 1;
+            pkgname = NULL;
+            pkgnamelen = 0;
+            if (i == npath)
+                /* path has only * on it */
+                break;
+        }
+        v = PyList_GetItem(curpath, i);
         if (!v)
             return NULL;
-	origv = v;
+        origv = v;
         if (PyUnicode_Check(v)) {
             v = PyUnicode_EncodeFSDefault(v);
             if (v == NULL)
@@ -1855,33 +1855,33 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
                                              "s", fullname);
                 if (loader == NULL)
                     return NULL;  /* error */
-		pth_list = PyObject_CallMethod(importer, "find_path",
-					       "s", fullname);
-		if (pth_list == NULL) {
-		    if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
-			/* Finder does not support PEP 382 */
-			PyErr_Clear();
-		    }
-		    else { 
-			Py_XDECREF(loader);
-			return NULL; /* error */
-		    }
-		}
-		if (pth_list == Py_None)
-		    /* Nothing found. */
-		    Py_CLEAR(pth_list);
+                pth_list = PyObject_CallMethod(importer, "find_path",
+                                               "s", fullname);
+                if (pth_list == NULL) {
+                    if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+                        /* Finder does not support PEP 382 */
+                        PyErr_Clear();
+                    }
+                    else { 
+                        Py_XDECREF(loader);
+                        return NULL; /* error */
+                    }
+                }
+                if (pth_list == Py_None)
+                    /* Nothing found. */
+                    Py_CLEAR(pth_list);
                 if (loader != Py_None) {
                     /* a loader was found */
                     *p_loader = loader;
-		    *p_pth_list = pth_list;
+                    *p_pth_list = pth_list;
                     return &importhookdescr;
                 }
                 Py_DECREF(loader);
-		if (pth_list) {
-		    /* Namespace package */
-		    *p_pth_list = pth_list;
-		    return &namespacepkgdescr;
-		}
+                if (pth_list) {
+                    /* Namespace package */
+                    *p_pth_list = pth_list;
+                    return &namespacepkgdescr;
+                }
                 continue;
             }
         }
@@ -1893,11 +1893,11 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
 #endif
             )
             buf[len++] = SEP;
-	if (pkgname) {
-	    strncpy(buf+len, pkgname, pkgnamelen);
-	    len += pkgnamelen; /* len now includes the / already */
-	    buf[len-1] = SEP;
-	}
+        if (pkgname) {
+            strncpy(buf+len, pkgname, pkgnamelen);
+            len += pkgnamelen; /* len now includes the / already */
+            buf[len-1] = SEP;
+        }
         strcpy(buf+len, name);
         len += namelen;
 
@@ -1907,12 +1907,12 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
         if (stat(buf, &statbuf) == 0 &&         /* it exists */
             S_ISDIR(statbuf.st_mode) &&         /* it's a directory */
             case_ok(buf, len, namelen, name)) { /* case matches */
-	    int status;
-	    if ((status = find_pth_files(buf, buflen, p_pth_list)) != 0) {/* and has pth files */
-		if (status == -1)
-		    return NULL;
-		return &namespacepkgdescr;
-	    }
+            int status;
+            if ((status = find_pth_files(buf, buflen, p_pth_list)) != 0) {/* and has pth files */
+                if (status == -1)
+                    return NULL;
+                return &namespacepkgdescr;
+            }
             else if (find_init_module(buf)) { /* and has __init__.py */
                 return &fd_package;
             }
@@ -2273,7 +2273,7 @@ find_init_module(char *buf)
 
 static int
 add_pth_contents(PyObject *list, char* buf, int dirlen, 
-		 int buflen, struct dirent* entry)
+                 int buflen, struct dirent* entry)
 {
     struct stat st;
     FILE *f = NULL;
@@ -2281,9 +2281,9 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
     PyObject *string = NULL;
 
     if (dirlen + entry->d_namlen + 2 > buflen) {
-	/* The buffer should have received the maximum path length. */
-	PyErr_SetString(PyExc_RuntimeError, "filename buffer too small for pth file");
-	return 0;
+        /* The buffer should have received the maximum path length. */
+        PyErr_SetString(PyExc_RuntimeError, "filename buffer too small for pth file");
+        return 0;
     }
     /* XXX this really ought to use the io module, but might not because of
        cyclic reliance on import in the io module. Perhaps switching to importlib
@@ -2291,43 +2291,43 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
     buf[dirlen] = SEP;
     strcpy(buf+dirlen+1, entry->d_name);
     if (stat(buf, &st) < 0) {
-	PyErr_SetFromErrno(PyExc_IOError);
-	goto fail;
+        PyErr_SetFromErrno(PyExc_IOError);
+        goto fail;
     }
     data = malloc(st.st_size);
     if (!data) {
-	PyErr_NoMemory();
-	goto fail;
-    }	
+        PyErr_NoMemory();
+        goto fail;
+    }        
     f = fopen(buf, "rb");
     if (!f) {
-	PyErr_SetFromErrno(PyExc_IOError);
-	goto fail;
+        PyErr_SetFromErrno(PyExc_IOError);
+        goto fail;
     }
     if (fread(data, 1, st.st_size, f) != st.st_size) {
-	/* This really shouldn't happen with all the checking above. */
-	PyErr_SetString(PyExc_IOError, ".pth read failed");
-	goto fail;
+        /* This really shouldn't happen with all the checking above. */
+        PyErr_SetString(PyExc_IOError, ".pth read failed");
+        goto fail;
     }
     fclose(f);
     f=NULL;
     /* list.append(data) */
     string = PyUnicode_DecodeFSDefault(data);
     if (!string)
-	goto fail;
+        goto fail;
     free(data);
     data = NULL;
     if (PyList_Append(list, string) == -1)
-	goto fail;
+        goto fail;
     Py_CLEAR(string);
     buf[dirlen] = 0;
     /* success */
     return 1;
   fail:
     if (f)
-	fclose(f);
+        fclose(f);
     if (data)
-	free(data);
+        free(data);
     Py_XDECREF(string);
     buf[dirlen] = 0;
     return 0;
@@ -2345,24 +2345,24 @@ find_pth_files(char *buf, int buflen, PyObject **p_result)
     *p_result = NULL;
     DIR *dirp = opendir(buf);
     while(1) {
-	struct dirent *entry = readdir(dirp);
-	if (entry == NULL)
-	    break;
-	/* .endswith(".pth") */
-	if (entry->d_namlen > 4 && strcmp(entry->d_name+entry->d_namlen-4, ".pth") == 0) {
-	    if (result == NULL) {
-		result = PyList_New(0);
-		if (!result)
-		    return -1;
-	    }
-	    if (!add_pth_contents(result, buf, dirlen, buflen, entry)) {
-		Py_DECREF(result);
-		return -1;
-	    }
-	}
+        struct dirent *entry = readdir(dirp);
+        if (entry == NULL)
+            break;
+        /* .endswith(".pth") */
+        if (entry->d_namlen > 4 && strcmp(entry->d_name+entry->d_namlen-4, ".pth") == 0) {
+            if (result == NULL) {
+                result = PyList_New(0);
+                if (!result)
+                    return -1;
+            }
+            if (!add_pth_contents(result, buf, dirlen, buflen, entry)) {
+                Py_DECREF(result);
+                return -1;
+            }
+        }
     }
     if (result == NULL)
-	return 0;
+        return 0;
     *p_result = result;
     return 1;
 }
@@ -2416,7 +2416,7 @@ load_builtin(char *name, char *pathname, int type)
 
 static PyObject *
 load_module(char *name, FILE *fp, char *pathname, int type, 
-	    PyObject *loader, PyObject *parent_path, PyObject *pth_list)
+            PyObject *loader, PyObject *parent_path, PyObject *pth_list)
 {
     PyObject *m;
 
@@ -2463,17 +2463,17 @@ load_module(char *name, FILE *fp, char *pathname, int type,
                             "import hook without loader");
             return NULL;
         }
-	if (pth_list)
-	    m = PyObject_CallMethod(loader, "load_module_with_path",
-				    "sO", name, pth_list);
-	else
-	    m = PyObject_CallMethod(loader, "load_module", "s", name);
+        if (pth_list)
+            m = PyObject_CallMethod(loader, "load_module_with_path",
+                                    "sO", name, pth_list);
+        else
+            m = PyObject_CallMethod(loader, "load_module", "s", name);
         break;
     }
 
     case NAMESPACE_PACKAGE: {
-	m = load_namespace_package(name, pathname, parent_path, pth_list);
-	break;
+        m = load_namespace_package(name, pathname, parent_path, pth_list);
+        break;
     }
 
     default:
@@ -3229,8 +3229,8 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
         fdp = find_module(fullname, subname, path, NULL, buf, MAXPATHLEN+1,
                           &fp, &loader, &pth_list);
         if (fdp == NULL) {
-	    Py_XDECREF(loader);
-	    Py_XDECREF(path);
+            Py_XDECREF(loader);
+            Py_XDECREF(path);
             if (!PyErr_ExceptionMatches(PyExc_ImportError))
                 return NULL;
             PyErr_Clear();
@@ -3325,11 +3325,11 @@ PyImport_ReloadModule(PyObject *m)
     }
     buf[0] = '\0';
     fdp = find_module(name, subname, path, NULL,
-		      buf, MAXPATHLEN+1, &fp, &loader, &pth_list);
+                      buf, MAXPATHLEN+1, &fp, &loader, &pth_list);
 
     if (fdp == NULL) {
         Py_XDECREF(loader);
-	Py_XDECREF(path);
+        Py_XDECREF(path);
         imp_modules_reloading_clear();
         return NULL;
     }
