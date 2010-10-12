@@ -22,6 +22,10 @@
 extern "C" {
 #endif
 
+#ifdef HAVE_DIRENT_H
+#include <dirent.h>
+#endif
+
 #ifdef MS_WINDOWS
 /* for stat.st_mode */
 typedef unsigned short mode_t;
@@ -2271,16 +2275,17 @@ find_init_module(char *buf)
     return 0;
 }
 
+#ifdef HAVE_DIRENT_H
 static int
 add_pth_contents(PyObject *list, char* buf, int dirlen, 
-                 int buflen, struct dirent* entry)
+                 int buflen, struct dirent* entry, size_t namlen)
 {
     struct stat st;
     FILE *f = NULL;
     char *data = NULL;
     PyObject *string = NULL;
 
-    if (dirlen + entry->d_namlen + 2 > buflen) {
+    if (dirlen + namlen + 2 > buflen) {
         /* The buffer should have received the maximum path length. */
         PyErr_SetString(PyExc_RuntimeError, "filename buffer too small for pth file");
         return 0;
@@ -2332,11 +2337,13 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
     buf[dirlen] = 0;
     return 0;
 }
+#endif
 
 /* -1: error, 0: nothing found, 1: pth_list */
 static int
 find_pth_files(char *buf, int buflen, PyObject **p_result)
 {
+#ifdef HAVE_DIRENT_H
     PyObject *result  = NULL;
     /* XXX windows */
     /* XXX begin/end allow threads */
@@ -2346,16 +2353,18 @@ find_pth_files(char *buf, int buflen, PyObject **p_result)
     DIR *dirp = opendir(buf);
     while(1) {
         struct dirent *entry = readdir(dirp);
+        size_t namlen;
         if (entry == NULL)
             break;
+        namlen = strlen(entry->d_name);
         /* .endswith(".pth") */
-        if (entry->d_namlen > 4 && strcmp(entry->d_name+entry->d_namlen-4, ".pth") == 0) {
+        if (namlen > 4 && strcmp(entry->d_name+namlen-4, ".pth") == 0) {
             if (result == NULL) {
                 result = PyList_New(0);
                 if (!result)
                     return -1;
             }
-            if (!add_pth_contents(result, buf, dirlen, buflen, entry)) {
+            if (!add_pth_contents(result, buf, dirlen, buflen, entry, namlen)) {
                 Py_DECREF(result);
                 return -1;
             }
@@ -2365,6 +2374,9 @@ find_pth_files(char *buf, int buflen, PyObject **p_result)
         return 0;
     *p_result = result;
     return 1;
+#else
+#error Dont know how to read directories on this system
+#endif
 }
 
 #endif /* HAVE_STAT */
