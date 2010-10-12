@@ -1318,6 +1318,21 @@ load_source_module(char *name, char *pathname, FILE *fp)
     return m;
 }
 
+/* Check wether s=='*' or s==b'*' */
+static int
+is_star(PyObject *s)
+{
+    if (PyUnicode_Check(s)) {
+        Py_UNICODE *u = PyUnicode_AsUnicode(s);
+        return u[0] == (Py_UNICODE)'*' && u[1] == 0;
+    }
+    else if (PyBytes_Check(s)) {
+        char* c = PyBytes_AsString(s);
+        return c[0] == (int)'*' && c[1] == 0;
+    }
+    return 0;
+}
+
 /* Get source file -> unicode or None
  * Returns the path to the py file if available, else the given path
  */
@@ -1359,12 +1374,14 @@ get_sourcefile(char *file)
 }
 
 /* Forward */
-static PyObject *load_module(char *, FILE *, char *, int, PyObject *, 
+static PyObject *load_module(char *, FILE *, char *, int,
                              PyObject*, PyObject *);
-static struct filedescr *find_module(char *, char *, PyObject *, PyObject*,
+static struct filedescr *find_module(char *, char *, PyObject *,
                                      char *, size_t, FILE **, PyObject **,
                                      PyObject **);
 static struct _frozen * find_frozen(char *);
+static int find_pth_files(char *buf, int buflen, PyObject **p_result);
+static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
 
 /* Load a package and return its module object WITH INCREMENTED
    REFERENCE COUNT */
@@ -1399,7 +1416,7 @@ load_package(char *name, char *pathname)
     if (err != 0)
         goto error;
     buf[0] = '\0';
-    fdp = find_module(name, "__init__", path, NULL, buf, sizeof(buf), &fp, NULL, NULL);
+    fdp = find_module(name, "__init__", path, buf, sizeof(buf), &fp, NULL, NULL);
     if (fdp == NULL) {
         if (PyErr_ExceptionMatches(PyExc_ImportError)) {
             PyErr_Clear();
@@ -1409,7 +1426,7 @@ load_package(char *name, char *pathname)
             m = NULL;
         goto cleanup;
     }
-    m = load_module(name, fp, buf, fdp->type, NULL, NULL, NULL);
+    m = load_module(name, fp, buf, fdp->type, NULL, NULL);
     if (fp != NULL)
         fclose(fp);
     goto cleanup;
@@ -1422,12 +1439,200 @@ load_package(char *name, char *pathname)
     return m;
 }
 
+/* Add all pathes in pth_list to path; set starred if the resulting
+   path is a wildcard path. */
+static int
+merge_pth_list(PyObject* path, PyObject* pth_list, int* starred)
+{
+    PyObject *sublist = NULL;
+    Py_ssize_t i, len, sublen, subi;
+    len = PyList_Size(pth_list);
+    for (i = 0; i < len; i++) {
+        PyObject *item = PyList_GetItem(pth_list, i); /* borrowed */
+        if (item == 0)
+            goto error;
+        if (!PyUnicode_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "path item is not str");
+            goto error;
+        }
+        sublist = PyUnicode_Splitlines(item, 0);
+        if (!sublist)
+            goto error;
+        sublen = PyList_Size(sublist);
+        /* Add all items to the path */
+        for (subi = 0; subi < sublen; subi++) {
+            PyObject *item = PyList_GetItem(sublist, subi);
+            Py_UNICODE *uitem = PyUnicode_AsUnicode(item);
+            if (uitem[0] == 0)
+                continue; /* skip empty lines */
+            if (uitem[0] == (Py_UNICODE)'#')
+                continue; /* skip comment lines */
+            if (is_star(item)) {
+                if (*starred)
+                    continue;
+                /* Insert in the front */
+                if (PyList_Insert(path, 0, item) < 0)
+                    goto error;
+                *starred = 1;
+                continue;
+            }
+            if (PyList_Append(path, item) == -1)
+                goto error;
+        }
+        Py_CLEAR(sublist);
+    }
+    return 1;
+  error:
+    Py_XDECREF(sublist);
+    return 0;
+}
+
+/* Expand wildcard path to search parent path */
+static int
+expand_wildcard_path(char *name, PyObject *path, int* starred,
+                     char* buf, int buflen)
+{
+    PyObject *ppath = NULL, *newdir = NULL, *newpath = NULL;
+    char *parentname = NULL;
+    char *modulename;
+    char *lastdot;
+    size_t namelen;
+    Py_ssize_t i, len;
+    PyObject *pth_files;
+    struct stat st;
+    int status;
+
+    parentname = strdup(name);
+    if (!parentname)
+        goto error;
+    lastdot = strrchr(parentname, '.');
+    if (lastdot) {
+        PyObject *modules; /* borrowed */
+        PyObject *module;
+        *lastdot = '\0';
+        modulename = lastdot+1;
+        modules = PyImport_GetModuleDict();
+        module = PyDict_GetItemString(modules, parentname);
+        if (!module)
+            goto error;
+        ppath = PyObject_GetAttrString(module, "__path__");
+        Py_DECREF(module);
+    }
+    else {
+        modulename = name;
+        ppath = PySys_GetObject("path");
+        if (ppath)
+            Py_INCREF(ppath);
+    }
+    if (!ppath || !PyList_Check(ppath)) {
+        PyErr_SetString(PyExc_ImportError, "parent path not found");
+        goto error;
+    }
+    namelen = strlen(modulename);
+
+    /* Iterate over parent path, looking for further pth files */
+    len = PyList_GET_SIZE(ppath);
+    for (i = 0; i < len; i++) {
+        PyObject *v = PyList_GetItem(ppath, i);
+        char *base;
+        Py_ssize_t size;
+        if (i == 0 && is_star(v))
+            /* wildcard in parent, skip */
+            continue;
+        if (PyUnicode_Check(v)) {
+            v = PyUnicode_EncodeFSDefault(v);
+            if (v == NULL)
+                goto error;
+        }
+        else if (!PyBytes_Check(v))
+            continue;
+        else
+            Py_INCREF(v);
+        /* XXX for path hooks, use find_path */
+        base = PyBytes_AS_STRING(v);
+        size = PyBytes_GET_SIZE(v);
+        if (size + namelen + 1 > MAXPATHLEN) {
+            /* XXX no error here? */
+            Py_DECREF(v);
+            continue;
+        }
+        if (size) {
+            strcpy(buf, base);
+            buf[size++] = SEP;
+            strcpy(buf+size, modulename);
+            size += namelen;
+        }
+        else {
+            strcpy(buf, modulename);
+            size = namelen;
+        }
+        Py_DECREF(v);
+        if (stat(buf, &st) == -1)
+            continue;
+        if (!S_ISDIR(st.st_mode))
+            continue;
+        if (!case_ok(buf, size, namelen, name))
+            continue;
+        newdir = PyUnicode_DecodeFSDefault(buf);
+        if (!newdir)
+            goto error;
+        /* Check whether this is already in the path */
+        status = PySequence_Contains(path, newdir);
+        if (status == -1)
+            goto error;
+        if (status == 1) {
+            Py_CLEAR(newdir);
+            continue;
+        }
+
+        /* Check for .pth and __init__.py */        
+        status = find_pth_files(buf, MAXPATHLEN, &pth_files);
+        if (status == -1)
+            goto error;
+        if (status == 0) {
+            /* No pth files found, check for __init__, 
+               by trying to find it on a single-item path. */
+            struct filedescr *fdp;
+            FILE *fp;
+            newpath = Py_BuildValue("[O]", newdir);
+            fdp = find_module(name, "__init__", newpath, buf, buflen, &fp, NULL, NULL);
+            Py_CLEAR(newpath);
+            if (fdp == NULL) {
+                if (!PyErr_ExceptionMatches(PyExc_ImportError))
+                    goto error;
+                PyErr_Clear();
+                continue;
+            }
+            /* __init__ exists; it may not get imported since it may not
+               be the first one on the path. */
+            fclose(fp);
+        }
+        /* Add directory itself to path */
+        if (PyList_Append(path, newdir) == -1)
+            goto error;
+        Py_CLEAR(newdir);
+        /* Also add contents of pth files, if any */
+        if (pth_files && !merge_pth_list(path, pth_files, starred))
+            goto error;
+        Py_CLEAR(pth_files);
+    }
+    free(parentname);
+    Py_DECREF(ppath);
+    return 1;
+  error:
+    free(parentname);
+    Py_XDECREF(ppath);
+    Py_XDECREF(pth_files);
+    Py_XDECREF(newdir);
+    return 0;
+}
+
+
 static PyObject*
 load_namespace_package(char *name, char *pathname, 
-                       PyObject* parent_path, PyObject *pth_list)
+                       PyObject *pth_list)
 {
-    PyObject *m, *d, *file, *path, *sublist = NULL;
-    Py_ssize_t i, len;
+    PyObject *m, *d, *file, *path;
     int starred = 0;
     char buf[MAXPATHLEN+1];
     FILE *fp = NULL;
@@ -1449,45 +1654,20 @@ load_namespace_package(char *name, char *pathname,
     Py_CLEAR(file);
     if (path == NULL)
         return NULL;
-    len = PyList_Size(pth_list);
-    for (i = 0; i < len; i++) {
-        PyObject *item = PyList_GetItem(pth_list, i); /* borrowed */
-        PyObject *extend_res;
-        if (item == 0)
+    if (!merge_pth_list(path, pth_list, &starred))
+        goto error;
+
+    if (starred) {
+        if (!expand_wildcard_path(name, path, &starred, buf, sizeof(buf)))
             goto error;
-        if (!PyUnicode_Check(item)) {
-            PyErr_SetString(PyExc_TypeError, "path item is not str");
-            goto error;
-        }
-        sublist = PyUnicode_Splitlines(item, 0);
-        if (!sublist)
-            goto error;
-        /* if sublist starts with *, add to path, unless it's already there */
-        if (PyList_Size(sublist) > 0) {
-            PyObject *first = PyList_GetItem(sublist, 0); /* borrowed */
-            Py_UNICODE *s_first = PyUnicode_AS_UNICODE(first);
-            if (s_first[0] == (int)'*' && s_first[1] == 0) {
-                if (!starred) {
-                    if (PyList_Insert(path, 0, first) < 0)
-                        goto error;
-                    starred = 1;
-                }
-                if (PySequence_DelItem(sublist, 0) < 0)
-                    goto error;
-            }
-        }
-        extend_res = _PyList_Extend((PyListObject*)path, sublist);
-        if (extend_res == NULL)
-            goto error;
-        Py_DECREF(extend_res); /* should be None */
-        Py_CLEAR(sublist);
     }
+
     if (PyDict_SetItemString(d, "__path__", path) < 0)
         goto error;
 
     /* find __init__.py, if any */
     buf[0] = '\0';
-    fdp = find_module(name, "__init__", path, parent_path, buf, sizeof(buf), &fp, NULL, NULL);
+    fdp = find_module(name, "__init__", path, buf, sizeof(buf), &fp, NULL, NULL);
     if (fdp == NULL) {
         if (PyErr_ExceptionMatches(PyExc_ImportError)) {
             PyErr_Clear();
@@ -1496,7 +1676,7 @@ load_namespace_package(char *name, char *pathname,
         }
         goto error;
     }
-    m = load_module(name, fp, buf, fdp->type, NULL, NULL, NULL);
+    m = load_module(name, fp, buf, fdp->type, NULL, NULL);
     /* XXX success/fail change to cleanup, adjust INCREF(m) */
     Py_INCREF(m);
     if (fp != NULL)
@@ -1506,7 +1686,6 @@ load_namespace_package(char *name, char *pathname,
     m = NULL;
   cleanup:
     Py_DECREF(path);
-    Py_XDECREF(sublist);
     return m;
 }
 
@@ -1615,26 +1794,22 @@ extern FILE *PyWin_FindRegisteredModule(const char *, struct filedescr **,
                                         char *, Py_ssize_t);
 #endif
 
-static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
 static int find_init_module(char *); /* Forward */
-static int find_pth_files(char *buf, int buflen, PyObject **p_result);
 static struct filedescr importhookdescr = {"", "", IMP_HOOK};
 static struct filedescr namespacepkgdescr = {"", "", NAMESPACE_PACKAGE};
 
 static struct filedescr *
-find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
+find_module(char *fullname, char *subname, PyObject *path,
             char *buf, size_t buflen, FILE **p_fp, PyObject **p_loader,
             PyObject **p_pth_list)
 {
-    Py_ssize_t i, npath, nppath = 0;
+    Py_ssize_t i, npath;
     size_t len, namelen, pkgnamelen = 0;
     struct filedescr *fdp = NULL;
     char *filemode;
     char *pkgname = NULL;
     FILE *fp = NULL;
-    PyObject *path_hooks, *path_importer_cache, *curpath;
-    int starred = 0;
-    int toplevel = path == NULL;
+    PyObject *path_hooks, *path_importer_cache;
     struct stat statbuf;
     static struct filedescr fd_frozen = {"", "", PY_FROZEN};
     static struct filedescr fd_builtin = {"", "", C_BUILTIN};
@@ -1760,61 +1935,12 @@ find_module(char *fullname, char *subname, PyObject *path, PyObject *ppath,
 
     npath = PyList_Size(path);
     namelen = strlen(name);
-    curpath = path; /* may change to ppath below */
-    if (!toplevel && npath > 1) {
-        /* Check whether path[0] == '*' */
-        PyObject *first = PyList_GetItem(path, 0);
-        if (!first)
-            return NULL;
-        if (PyUnicode_Check(first)) {
-            Py_UNICODE *ufirst = PyUnicode_AsUnicode(first);
-            starred = ufirst[0] == (Py_UNICODE)'*' && ufirst[1] == 0;
-        }
-        else if (PyBytes_Check(first)) {
-            char* cfirst = PyBytes_AsString(first);
-            starred = cfirst[0] == (int)'*' && cfirst[1] == 0;
-        }
-        if (starred) {
-            if (ppath == NULL)
-                ppath = PySys_GetObject("path");
-            nppath = PyList_Size(ppath);
-            npath += nppath;
-            curpath = ppath;
-            pkgname = strrchr(fullname, '.');
-            if (pkgname && strcmp(pkgname+1, subname) == 0) {
-                /* last part of fullname is typically subname,
-                   except when __init__ is loaded. */
-                char *pkgname2 = pkgname-1;
-                /* move backwards up to another dot, or the start of fullname */
-                while(pkgname2 > fullname && pkgname2[-1] != '.')
-                    pkgname2--;
-                pkgnamelen = pkgname-pkgname2;
-                pkgname = pkgname2;
-            }
-            else {
-                pkgname = pkgname ? pkgname+1 : fullname;
-                pkgnamelen = strlen(pkgname);
-            }
-            pkgnamelen++; /* accounting for / */
-        }   
-    }
     for (i = 0; i < npath; i++) {
         PyObject *v;
         PyObject *origv;
         const char *base;
         Py_ssize_t size;
-        if (starred && i == nppath) {
-            /* exhausted ppath, go to path, skipping star */
-            curpath = path;
-            npath -= nppath;
-            i = 1;
-            pkgname = NULL;
-            pkgnamelen = 0;
-            if (i == npath)
-                /* path has only * on it */
-                break;
-        }
-        v = PyList_GetItem(curpath, i);
+        v = PyList_GetItem(path, i);
         if (!v)
             return NULL;
         origv = v;
@@ -2299,7 +2425,7 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
         PyErr_SetFromErrno(PyExc_IOError);
         goto fail;
     }
-    data = malloc(st.st_size);
+    data = malloc(st.st_size + 1);
     if (!data) {
         PyErr_NoMemory();
         goto fail;
@@ -2316,6 +2442,7 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
     }
     fclose(f);
     f=NULL;
+    data[st.st_size] = '\0';
     /* list.append(data) */
     string = PyUnicode_DecodeFSDefault(data);
     if (!string)
@@ -2428,7 +2555,7 @@ load_builtin(char *name, char *pathname, int type)
 
 static PyObject *
 load_module(char *name, FILE *fp, char *pathname, int type, 
-            PyObject *loader, PyObject *parent_path, PyObject *pth_list)
+            PyObject *loader, PyObject *pth_list)
 {
     PyObject *m;
 
@@ -2484,7 +2611,7 @@ load_module(char *name, FILE *fp, char *pathname, int type,
     }
 
     case NAMESPACE_PACKAGE: {
-        m = load_namespace_package(name, pathname, parent_path, pth_list);
+        m = load_namespace_package(name, pathname, pth_list);
         break;
     }
 
@@ -3238,7 +3365,7 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
         }
 
         buf[0] = '\0';
-        fdp = find_module(fullname, subname, path, NULL, buf, MAXPATHLEN+1,
+        fdp = find_module(fullname, subname, path, buf, MAXPATHLEN+1,
                           &fp, &loader, &pth_list);
         if (fdp == NULL) {
             Py_XDECREF(loader);
@@ -3249,7 +3376,7 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
             Py_INCREF(Py_None);
             return Py_None;
         }
-        m = load_module(fullname, fp, buf, fdp->type, loader, path, pth_list);
+        m = load_module(fullname, fp, buf, fdp->type, loader, pth_list);
         Py_XDECREF(loader);
         Py_XDECREF(path);
         if (fp)
@@ -3336,7 +3463,7 @@ PyImport_ReloadModule(PyObject *m)
             PyErr_Clear();
     }
     buf[0] = '\0';
-    fdp = find_module(name, subname, path, NULL,
+    fdp = find_module(name, subname, path,
                       buf, MAXPATHLEN+1, &fp, &loader, &pth_list);
 
     if (fdp == NULL) {
@@ -3346,7 +3473,7 @@ PyImport_ReloadModule(PyObject *m)
         return NULL;
     }
 
-    newm = load_module(name, fp, buf, fdp->type, loader, path, pth_list);
+    newm = load_module(name, fp, buf, fdp->type, loader, pth_list);
     Py_XDECREF(loader);
     Py_XDECREF(path);
 
@@ -3523,7 +3650,7 @@ call_find_module(char *name, PyObject *path)
     pathname[0] = '\0';
     if (path == Py_None)
         path = NULL;
-    fdp = find_module(NULL, name, path, NULL, pathname, MAXPATHLEN+1, &fp, NULL, NULL);
+    fdp = find_module(NULL, name, path, pathname, MAXPATHLEN+1, &fp, NULL, NULL);
     if (fdp == NULL)
         return NULL;
     if (fp != NULL) {
@@ -3805,7 +3932,7 @@ imp_load_module(PyObject *self, PyObject *args)
             return NULL;
         }
     }
-    ret = load_module(name, fp, pathname, type, NULL, NULL, NULL);
+    ret = load_module(name, fp, pathname, type, NULL, NULL);
     PyMem_Free(pathname);
     if (fp)
         fclose(fp);
