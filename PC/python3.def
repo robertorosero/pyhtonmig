@@ -1,0 +1,3 @@
+LIBRARY	"python3"
+EXPORTS
+  PySequence_Check=python32.PySequence_Check
