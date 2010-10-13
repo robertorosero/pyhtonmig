@@ -1380,7 +1380,7 @@ static struct filedescr *find_module(char *, char *, PyObject *,
                                      char *, size_t, FILE **, PyObject **,
                                      PyObject **);
 static struct _frozen * find_frozen(char *);
-static int find_pth_files(char *buf, int buflen, PyObject **p_result);
+static int find_pth_files(char *buf, size_t buflen, PyObject **p_result);
 static int case_ok(char *, Py_ssize_t, Py_ssize_t, char *);
 
 /* Load a package and return its module object WITH INCREMENTED
@@ -2401,10 +2401,9 @@ find_init_module(char *buf)
     return 0;
 }
 
-#ifdef HAVE_DIRENT_H
 static int
-add_pth_contents(PyObject *list, char* buf, int dirlen, 
-                 int buflen, struct dirent* entry, size_t namlen)
+add_pth_contents(PyObject *list, char* buf, size_t dirlen, 
+                 size_t buflen, char* name, size_t namlen)
 {
     struct stat st;
     FILE *f = NULL;
@@ -2420,7 +2419,7 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
        cyclic reliance on import in the io module. Perhaps switching to importlib
        allows to drop this code. */
     buf[dirlen] = SEP;
-    strcpy(buf+dirlen+1, entry->d_name);
+    strcpy(buf+dirlen+1, name);
     if (stat(buf, &st) < 0) {
         PyErr_SetFromErrno(PyExc_IOError);
         goto fail;
@@ -2464,17 +2463,46 @@ add_pth_contents(PyObject *list, char* buf, int dirlen,
     buf[dirlen] = 0;
     return 0;
 }
-#endif
 
 /* -1: error, 0: nothing found, 1: pth_list */
 static int
-find_pth_files(char *buf, int buflen, PyObject **p_result)
+find_pth_files(char *buf, size_t buflen, PyObject **p_result)
 {
-#ifdef HAVE_DIRENT_H
-    PyObject *result  = NULL;
-    /* XXX windows */
+#if defined(MS_WINDOWS)
+    PyObject *result = *p_result = NULL;
+    size_t dirlen = strlen(buf);
+    WIN32_FIND_DATAA data;
+    HANDLE hFindFile;
+    
+    if (dirlen + 6 > buflen)
+        /* claim that nothing was found */
+        return 0;
+    strcpy(buf+dirlen, "\\*.pth");
+    hFindFile = FindFirstFileA(buf, &data);
+    buf[dirlen] = '\0';
+    if (hFindFile == INVALID_HANDLE_VALUE)
+        return 0;
+    result = PyList_New(0);
+    if (!result)
+        return -1;
+    while(1) {
+        if (!add_pth_contents(result, buf, dirlen, buflen,
+                              data.cFileName, strlen(data.cFileName))) {
+                Py_DECREF(result);
+                FindClose(hFindFile);
+                return -1;
+        }
+        if (!FindNextFile(hFindFile, &data)) {
+            break;
+        }
+    }
+    FindClose(hFindFile);
+    *p_result = result;
+    return 1;
+#elif defined(HAVE_DIRENT_H)
     /* XXX begin/end allow threads */
     /* XXX caseok */
+    PyObject *result  = NULL;
     int dirlen = strlen(buf);
     *p_result = NULL;
     DIR *dirp = opendir(buf);
@@ -2488,19 +2516,21 @@ find_pth_files(char *buf, int buflen, PyObject **p_result)
         if (namlen > 4 && strcmp(entry->d_name+namlen-4, ".pth") == 0) {
             if (result == NULL) {
                 result = PyList_New(0);
-                if (!result)
+                if (!result) {
+                    closedir(dirp);
                     return -1;
+                }
             }
-            if (!add_pth_contents(result, buf, dirlen, buflen, entry, namlen)) {
+            if (!add_pth_contents(result, buf, dirlen, buflen, entry->d_name, namlen)) {
                 Py_DECREF(result);
+                closedir(dirp);
                 return -1;
             }
         }
     }
-    if (result == NULL)
-        return 0;
     *p_result = result;
-    return 1;
+    closedir(dirp);
+    return result != NULL;
 #else
 #error Dont know how to read directories on this system
 #endif
