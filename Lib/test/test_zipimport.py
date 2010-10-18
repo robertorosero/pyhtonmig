@@ -100,6 +100,8 @@ class UncompressedZipImportTestCase(ImportHooksBaseTestCase):
                 self.assertEquals(file, os.path.join(TEMP_ZIP,
                                   *modules) + expected_ext)
         finally:
+            if sys.path[0] == TEMP_ZIP:
+                del sys.path[0]
             z.close()
             os.remove(TEMP_ZIP)
 
