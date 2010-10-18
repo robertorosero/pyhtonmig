@@ -2469,10 +2469,14 @@ static int
 find_pth_files(char *buf, size_t buflen, PyObject **p_result)
 {
 #if defined(MS_WINDOWS)
-    PyObject *result = *p_result = NULL;
+    PyObject *result = NULL;
     size_t dirlen = strlen(buf);
     WIN32_FIND_DATAA data;
     HANDLE hFindFile;
+
+    if (p_result != NULL) {
+        *p_result = NULL;
+    }
     
     if (dirlen + 6 > buflen)
         /* claim that nothing was found */
@@ -2497,16 +2501,15 @@ find_pth_files(char *buf, size_t buflen, PyObject **p_result)
         }
     }
     FindClose(hFindFile);
-    *p_result = result;
+    if (p_result != NULL) {
+        *p_result = result;
+    }
     return 1;
 #elif defined(HAVE_DIRENT_H)
     /* XXX begin/end allow threads */
     /* XXX caseok */
     PyObject *result  = NULL;
     int dirlen = strlen(buf);
-    if (p_result != NULL) {
-        *p_result = NULL;
-    }
     DIR *dirp = opendir(buf);
     while(1) {
         struct dirent *entry = readdir(dirp);
@@ -2530,7 +2533,7 @@ find_pth_files(char *buf, size_t buflen, PyObject **p_result)
             }
         }
     }
-    if (p_result != NULL ) {
+    if (p_result != NULL) {
         *p_result = result;
     }
     closedir(dirp);
