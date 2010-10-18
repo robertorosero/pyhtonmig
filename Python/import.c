@@ -2504,7 +2504,9 @@ find_pth_files(char *buf, size_t buflen, PyObject **p_result)
     /* XXX caseok */
     PyObject *result  = NULL;
     int dirlen = strlen(buf);
-    *p_result = NULL;
+    if (p_result != NULL) {
+        *p_result = NULL;
+    }
     DIR *dirp = opendir(buf);
     while(1) {
         struct dirent *entry = readdir(dirp);
@@ -2528,7 +2530,9 @@ find_pth_files(char *buf, size_t buflen, PyObject **p_result)
             }
         }
     }
-    *p_result = result;
+    if (p_result != NULL ) {
+        *p_result = result;
+    }
     closedir(dirp);
     return result != NULL;
 #else
