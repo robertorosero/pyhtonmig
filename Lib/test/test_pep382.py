@@ -64,7 +64,7 @@ class PthTestsBase(unittest.TestCase):
             self.assertTrue(pep382test.d2.imported)
             self.assertTrue(pep382test.d3.imported)
             self.assertTrue(pep382test.d4.imported)
-            self.assertEquals(pep382test.D3, "d3")
+            self.assertEqual(pep382test.D3, "d3")
             self.assertIn("/does/not/exist", pep382test.__path__)
             self.assertIn("/does/not/exist/either", pep382test.__path__)
 
@@ -97,7 +97,7 @@ class PthTestsBase(unittest.TestCase):
             else:
                 self.fail("Found d1 unexpectedly")
             self.assertTrue(pep382test.d3.imported)
-            self.assertEquals(pep382test.D3, "d3")
+            self.assertEqual(pep382test.D3, "d3")
 
 
 class PthFilesystemTests(PthTestsBase):
