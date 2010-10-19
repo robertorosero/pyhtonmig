@@ -1,4 +1,5 @@
 import unittest, sys, os
+import contextlib
 from test import support
 
 d1="d1"
@@ -7,26 +8,23 @@ d3="d3"
 d4="d4"
 test_namespace_prefix = 'pep382test'
 
-class restoring_sys_modules:
-    # in __exit__ removes any modules in sys.modules that start with module_prefix
-    def __init__(self, module_prefix):
-        self.module_prefix = module_prefix
+@contextlib.contextmanager
+def restoring_sys_modules(module_prefix):
+    # after running, removes any modules in sys.modules that start with module_prefix
 
-    def __enter__(self):
-        # just make sure no such modules are already present
-        for key in sys.modules:
-            if key.startswith(self.module_prefix):
-                assert False, '{} already in sys.modules'.format(key)
+    def matching_modules():
+        # return module names that match the prefix
+        return [key for key in sys.modules if key.startswith(module_prefix)]
 
-        return self
+    # just make sure no matching modules are already present
+    for key in matching_modules():
+        assert False, '{} already in sys.modules'.format(key)
 
-    def __exit__(self, *ignore_exc):
-        # delete all matching modules
+    yield
 
-        # convert sys.modules to a list because we're going to mutate it
-        for key in list(sys.modules):
-            if key.startswith(self.module_prefix):
-                del sys.modules[key]
+    # delete all matching modules
+    for key in matching_modules():
+        del sys.modules[key]
 
 
 class PthTestsBase(unittest.TestCase):
