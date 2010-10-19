@@ -67,8 +67,8 @@ class PthTestsBase(unittest.TestCase):
             self.assertTrue(pep382test.d3.imported)
             self.assertTrue(pep382test.d4.imported)
             self.assertEquals(pep382test.D3, "d3")
-            self.assertTrue("/does/not/exist" in pep382test.__path__)
-            self.assertTrue("/does/not/exist/either" in pep382test.__path__)
+            self.assertIn("/does/not/exist", pep382test.__path__)
+            self.assertIn("/does/not/exist/either", pep382test.__path__)
 
     def test_d4_d3_d2_d1(self):
         'All directories should show up in the __path__'
