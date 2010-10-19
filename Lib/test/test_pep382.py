@@ -1,11 +1,13 @@
 import unittest, sys, os
 import contextlib
+import zipfile
+
 from test import support
 
-d1="d1"
-d2="d2"
-d3="d3"
-d4="d4"
+d1 = "d1"
+d2 = "d2"
+d3 = "d3"
+d4 = "d4"
 test_namespace_prefix = 'pep382test'
 
 @contextlib.contextmanager
@@ -107,8 +109,63 @@ class PthFilesystemTests(PthTestsBase):
         base = os.path.dirname(__file__)
         return support.DirsOnSysPath(*[os.path.join(base, "pep382", dir) for dir in items])
 
+
+class ZipTester:
+    ignored_dirs = ['.svn']
+
+    created_zips = None
+
+    def create_zips(self, base=None):
+        self.created_zips = {}
+        if base is None:
+            base = os.path.join(os.path.dirname(__file__), 'pep382')
+        for test_dir in os.listdir(base):
+            if test_dir in self.ignored_dirs: continue
+            source_name = os.path.join(base, test_dir)
+            self.create(source_name)
+
+    def create(self, source):
+        """
+        Create a ziptest from a source directory.
+        """
+        filename = support.TESTFN + os.path.basename(source) + '.zip'
+        self.zip_dir(source, filename)
+        self.created_zips[os.path.basename(source)] = filename
+
+    def cleanup_zips(self):
+        # use in teardown
+        for file in self.created_zips.values():
+            os.unlink(file)
+
+    @staticmethod
+    def zip_dir(source_dir, archive_name, compression=zipfile.ZIP_DEFLATED):
+        """
+        Take a source directory and add all of its contents to a zip
+        archive called archive_name
+        """
+        assert os.path.isdir(source_dir)
+        with contextlib.closing(zipfile.ZipFile(archive_name, "w", compression)) as z:
+            for root, dirs, files in os.walk(source_dir):
+                if '.svn' in dirs: dirs.remove('.svn')
+                #NOTE: ignore empty directories
+                for fn in files:
+                    absfn = os.path.join(root, fn)
+                    zfn = os.path.relpath(absfn, source_dir)
+                    z.write(absfn, zfn)
+
+
+class PthZipFileTests(PthTestsBase, ZipTester):
+    """Test namespace packages that live solely in zip files."""
+
+    def add_to_syspath(self, *items):
+        self.create_zips()
+        self.addCleanup(self.cleanup_zips)
+        return support.DirsOnSysPath(*[self.created_zips[name]
+                                       for name in items])
+
+
 def test_main():
-    tests = [PthFilesystemTests]
+    tests = [PthFilesystemTests, PthZipFileTests]
     support.run_unittest(*tests)
 
 
