@@ -11,7 +11,23 @@ d4 = "d4"
 test_namespace_prefix = 'pep382test'
 
 @contextlib.contextmanager
-def restoring_sys_modules(module_prefix):
+def restore_sys_path_importer_cache():
+    """Context manager to reset sys.path_importer_cache after the test runs.
+       Based on test.support.DirsOnSysPath
+    """
+
+    original_value = sys.path_importer_cache.copy()
+    original_object = sys.path_importer_cache
+
+    yield
+
+    sys.path_importer_cache = original_object
+    sys.path_importer_cache.clear()
+    sys.path_importer_cache.update(original_value)
+
+
+@contextlib.contextmanager
+def restore_sys_modules(module_prefix):
     # after running, removes any modules in sys.modules that start with module_prefix
 
     def matching_modules():
@@ -53,7 +69,7 @@ class PthTestsBase(unittest.TestCase):
 
     def test_d1_d2_d3_d4(self):
         'All directories should show up in the __path__'
-        with self.add_to_syspath(d1, d2, d3, d4), restoring_sys_modules(test_namespace_prefix):
+        with self.add_to_syspath(d1, d2, d3, d4), restore_sys_modules(test_namespace_prefix), restore_sys_path_importer_cache():
             try:
                 import pep382test
                 import pep382test.d1
@@ -72,7 +88,7 @@ class PthTestsBase(unittest.TestCase):
 
     def test_d4_d3_d2_d1(self):
         'All directories should show up in the __path__'
-        with self.add_to_syspath(d4, d3, d2, d1), restoring_sys_modules(test_namespace_prefix):
+        with self.add_to_syspath(d4, d3, d2, d1), restore_sys_modules(test_namespace_prefix), restore_sys_path_importer_cache():
             try:
                 import pep382test.d1
                 import pep382test.d2
@@ -87,7 +103,7 @@ class PthTestsBase(unittest.TestCase):
 
     def test_d3_d4_d2_d1(self):
         'Only d3 should be imported, since there is no pth file'
-        with self.add_to_syspath(d3, d4, d2, d1), restoring_sys_modules(test_namespace_prefix):
+        with self.add_to_syspath(d3, d4, d2, d1), restore_sys_modules(test_namespace_prefix), restore_sys_path_importer_cache():
             try:
                 import pep382test.d3
             except ImportError as e:
