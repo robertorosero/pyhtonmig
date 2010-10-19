@@ -32,7 +32,7 @@ def restoring_sys_modules(module_prefix):
 class PthTestsBase(unittest.TestCase):
     """Try various combinations of __init__ and .pth files.
     At the end, remove everything from sys.path and sys.modules.
-    The namespace package package begin tested is always pep382test.
+    The namespace package begin tested is always pep382test.
     Directory structure:
     - d1: wildcard pth file, plus d1.py
     - d2: wildcard pth file,
