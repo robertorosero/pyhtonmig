@@ -111,7 +111,7 @@ class PthFilesystemTests(PthTestsBase):
 
 
 class ZipTester:
-    ignored_dirs = ['.svn']
+    ignored_dirs = ['.svn', '__pycache__']
 
     created_zips = None
 
@@ -137,8 +137,8 @@ class ZipTester:
         for file in self.created_zips.values():
             os.unlink(file)
 
-    @staticmethod
-    def zip_dir(source_dir, archive_name, compression=zipfile.ZIP_DEFLATED):
+    def zip_dir(self, source_dir, archive_name,
+                compression=zipfile.ZIP_DEFLATED):
         """
         Take a source directory and add all of its contents to a zip
         archive called archive_name
@@ -146,7 +146,9 @@ class ZipTester:
         assert os.path.isdir(source_dir)
         with contextlib.closing(zipfile.ZipFile(archive_name, "w", compression)) as z:
             for root, dirs, files in os.walk(source_dir):
-                if '.svn' in dirs: dirs.remove('.svn')
+                for ignored in self.ignored_dirs:
+                    if ignored in dirs:
+                        dirs.remove(ignored)
                 #NOTE: ignore empty directories
                 for fn in files:
                     absfn = os.path.join(root, fn)
