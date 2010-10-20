@@ -204,7 +204,7 @@ def run_pydoc(module_name, *args):
         env['PYTHONIOENCODING'] = 'utf-8'
         output = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env).communicate()[0]
         output = str(output, 'utf-8', 'surrogatepass')
-        return output.rstrip()
+        return output.strip()
     finally:
         reap_children()
 
