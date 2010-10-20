@@ -306,7 +306,8 @@ class PyDocDocTest(unittest.TestCase):
                 with open(sourcefn, 'w') as f:
                     f.write("import {}\n".format(importstring))
                 try:
-                    result = run_pydoc(modname).decode("ascii")
+                    result = run_pydoc(modname)
+                    result = result.decode("ascii", "surrogateescape")
                 finally:
                     forget(modname)
                 expected = badimport_pattern % (modname, expectedinmsg)
