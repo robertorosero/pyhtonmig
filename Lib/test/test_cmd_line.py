@@ -104,8 +104,7 @@ class CmdLineTest(unittest.TestCase):
             if test.support.verbose:
                 import locale
                 print('locale encoding = %s, filesystem encoding = %s'
-                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()),
-                      env=env)
+                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
             env = os.environ.copy()
             for key in ('LC_ALL', 'LC_CTYPE', 'LANG'):
                 try:
@@ -113,7 +112,7 @@ class CmdLineTest(unittest.TestCase):
                 except KeyError:
                     pass
             command = "assert(ord('\xe9') == 0xe9)"
-            assert_python_ok('-c', command)
+            assert_python_ok('-c', command, env=env)
 
     def test_unbuffered_output(self):
         # Test expected operation of the '-u' switch
