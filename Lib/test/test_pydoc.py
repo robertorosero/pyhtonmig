@@ -200,8 +200,11 @@ def run_pydoc(module_name, *args):
     """
     cmd = [sys.executable, pydoc.__file__, " ".join(args), module_name]
     try:
-        output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
-        return output.strip()
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        output = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env).communicate()[0]
+        output = str(output, 'utf-8', 'surrogatepass')
+        return output.rstrip()
     finally:
         reap_children()
 
@@ -271,7 +274,7 @@ class PyDocDocTest(unittest.TestCase):
 
     def test_not_here(self):
         missing_module = "test.i_am_not_here"
-        result = str(run_pydoc(missing_module), 'ascii')
+        result = run_pydoc(missing_module)
         expected = missing_pattern % missing_module
         self.assertEqual(expected, result,
             "documentation for missing module found")
@@ -307,7 +310,6 @@ class PyDocDocTest(unittest.TestCase):
                     f.write("import {}\n".format(importstring))
                 try:
                     result = run_pydoc(modname)
-                    result = result.decode("ascii", "surrogateescape")
                 finally:
                     forget(modname)
                 expected = badimport_pattern % (modname, expectedinmsg)
@@ -315,7 +317,7 @@ class PyDocDocTest(unittest.TestCase):
 
     def test_input_strip(self):
         missing_module = " test.i_am_not_here "
-        result = str(run_pydoc(missing_module), 'ascii')
+        result = run_pydoc(missing_module)
         expected = missing_pattern % missing_module.strip()
         self.assertEqual(expected, result)
 
