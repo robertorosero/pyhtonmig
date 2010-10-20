@@ -253,6 +253,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 
     replace_stdout()
 
+    tests = ['test_cmd_line']
+
     for key in ('LC_ALL', 'LC_CTYPE', 'LANG'):
         try:
             del os.environ[key]

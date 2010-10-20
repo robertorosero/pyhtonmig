@@ -34,8 +34,8 @@ def _assert_python(expected_success, *args, **kw):
 def assert_python_ok(*args, **kw):
     return _assert_python(True, *args, **kw)
 
-def assert_python_failure(*args):
-    return _assert_python(False, *args)
+def assert_python_failure(*args, **kw):
+    return _assert_python(False, *args, **kw)
 
 def spawn_python(*args):
     cmd_line = [sys.executable, '-E']

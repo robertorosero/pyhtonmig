@@ -99,15 +99,34 @@ class CmdLineTest(unittest.TestCase):
         # All good if execution is successful
         assert_python_ok('-c', 'pass')
 
+    def test_non_ascii(self):
         # Test handling of non-ascii data
-        if sys.getfilesystemencoding() != 'ascii':
-            if test.support.verbose:
-                import locale
-                print('locale encoding = %s, filesystem encoding = %s'
-                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
-            env = os.environ.copy()
-            command = "assert(ord('\xe9') == 0xe9)"
-            assert_python_ok('-c', command, env=env)
+        fs_encoding = sys.getfilesystemencoding()
+        non_ascii_char = "\xe9"
+        try:
+            non_ascii_char.encode(fs_encoding)
+        except UnicodeEncodeError:
+            self.skipTest(
+                r"%a is not encodable to the filesystem encoding (%s)"
+                % (non_ascii_char, fs_encoding))
+
+        if test.support.verbose:
+            import locale
+            print('locale encoding = %s, filesystem encoding = %s'
+                  % (locale.getpreferredencoding(), fs_encoding))
+        command = "assert('%s' == %a)" % (non_ascii_char, non_ascii_char)
+        assert_python_ok('-c', command)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'test specific to Mac OS X')
+    def test_osx_utf8_cmdline(self):
+        env = os.environ.copy()
+        # C locale gives ASCII locale encoding, but Python uses UTF-8
+        # to parse the command line arguments
+        env['LC_ALL'] = 'C'
+        non_ascii_char = "\xe9"
+        command = "assert('%s' == %a)" % (non_ascii_char, non_ascii_char)
+        command = command.encode('utf-8')
+        assert_python_ok('-c', command, env=env)
 
     def test_unbuffered_output(self):
         # Test expected operation of the '-u' switch
