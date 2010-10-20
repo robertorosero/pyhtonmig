@@ -15,11 +15,11 @@ from imp import source_from_cache
 from test.support import make_legacy_pyc
 
 # Executing the interpreter in a subprocess
-def _assert_python(expected_success, *args):
+def _assert_python(expected_success, *args, **kw):
     cmd_line = [sys.executable, '-E']
     cmd_line.extend(args)
     p = subprocess.Popen(cmd_line, stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kw)
     try:
         out, err = p.communicate()
     finally:
@@ -31,8 +31,8 @@ def _assert_python(expected_success, *args):
             "stderr follows:\n%s" % (rc, err.decode('ascii', 'ignore')))
     return rc, out, err
 
-def assert_python_ok(*args):
-    return _assert_python(True, *args)
+def assert_python_ok(*args, **kw):
+    return _assert_python(True, *args, **kw)
 
 def assert_python_failure(*args):
     return _assert_python(False, *args)

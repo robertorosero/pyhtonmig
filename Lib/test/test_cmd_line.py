@@ -103,8 +103,15 @@ class CmdLineTest(unittest.TestCase):
         if sys.getfilesystemencoding() != 'ascii':
             if test.support.verbose:
                 import locale
+                env = os.environ.copy()
+                for key in ('LC_ALL', 'LC_CTYPE', 'LANG'):
+                    try:
+                        del env[key]
+                    except KeyError:
+                        pass
                 print('locale encoding = %s, filesystem encoding = %s'
-                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
+                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()),
+                      env=env)
             command = "assert(ord('\xe9') == 0xe9)"
             assert_python_ok('-c', command)
 
