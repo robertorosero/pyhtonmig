@@ -2737,8 +2737,10 @@ _Py_DecodeUTF8_surrogateescape(const char *s, Py_ssize_t size)
     unicode = PyMem_Malloc((size + 1) * sizeof(wchar_t));
     if (!unicode)
         return NULL;
-    if (size == 0)
+    if (size == 0) {
+        *unicode = L'\0';
         return unicode;
+    }
 
     /* Unpack UTF-8 encoded data */
     p = unicode;
