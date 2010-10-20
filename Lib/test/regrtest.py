@@ -253,7 +253,11 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 
     replace_stdout()
 
-    tests = ['test_cmd_line', 'test_pydoc', 'test_sys', 'test_os']
+    for key in ('LC_ALL', 'LC_CTYPE', 'LANG'):
+        try:
+            del os.environ[key]
+        except KeyError:
+            pass
 
     support.record_original_stdout(sys.stdout)
     try:
