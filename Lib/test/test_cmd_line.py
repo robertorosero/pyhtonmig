@@ -107,10 +107,7 @@ class CmdLineTest(unittest.TestCase):
                       % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
             env = os.environ.copy()
             for key in ('LC_ALL', 'LC_CTYPE', 'LANG'):
-                try:
-                    del env[key]
-                except KeyError:
-                    pass
+                env[key] = 'C'
             command = "assert(ord('\xe9') == 0xe9)"
             assert_python_ok('-c', command, env=env)
 

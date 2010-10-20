@@ -253,6 +253,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 
     replace_stdout()
 
+    tests = ['test_cmd_line', 'test_pydoc', 'test_sys', 'test_os']
+
     support.record_original_stdout(sys.stdout)
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'hvqxsSrf:lu:t:TD:NLR:FwWM:nj:',
