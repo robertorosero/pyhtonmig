@@ -1081,7 +1081,7 @@ else:
                 self.sock = sock
                 self._tunnel()
 
-            self.sock = self._context.wrap_socket(sock)
+            self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
             try:
                 if self._check_hostname:
                     ssl.match_hostname(self.sock.getpeercert(), self.host)
