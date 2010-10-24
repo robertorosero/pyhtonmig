@@ -83,7 +83,9 @@ PyAPI_FUNC(PY_LONG_LONG) PyLong_AsLongLongAndOverflow(PyObject *, int *);
 #endif /* HAVE_LONG_LONG */
 
 PyAPI_FUNC(PyObject *) PyLong_FromString(char *, char **, int);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyLong_FromUnicode(Py_UNICODE*, Py_ssize_t, int);
+#endif
 
 /* _PyLong_Sign.  Return 0 if v is 0, -1 if v < 0, +1 if v > 0.
    v must not be NULL, and must be a normalized long.
@@ -156,9 +158,11 @@ PyAPI_FUNC(PyObject *) _PyLong_Format(PyObject *aa, int base);
 
 /* Format the object based on the format_spec, as defined in PEP 3101
    (Advanced String Formatting). */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyLong_FormatAdvanced(PyObject *obj,
 					      Py_UNICODE *format_spec,
 					      Py_ssize_t format_spec_len);
+#endif
 
 /* These aren't really part of the long object, but they're handy. The
    functions are in Python/mystrtoul.c.

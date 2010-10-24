@@ -1154,10 +1154,11 @@ PyUnicode_FromFormat(const char *format, ...)
     return ret;
 }
 
-Py_ssize_t PyUnicode_AsWideChar(PyUnicodeObject *unicode,
+Py_ssize_t PyUnicode_AsWideChar(PyObject *_unicode,
                                 wchar_t *w,
                                 Py_ssize_t size)
 {
+    PyUnicodeObject *unicode = (PyUnicodeObject*)_unicode;
     if (unicode == NULL) {
         PyErr_BadInternalCall();
         return -1;

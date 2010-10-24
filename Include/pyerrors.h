@@ -179,7 +179,7 @@ PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithFilenameObject(
     PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithFilename(
     PyObject *, const char *);
-#ifdef MS_WINDOWS
+#if defined(MS_WINDOWS) && !defined(Py_LIMITED_API)
 PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithUnicodeFilename(
     PyObject *, const Py_UNICODE *);
 #endif /* MS_WINDOWS */
@@ -191,15 +191,20 @@ PyAPI_FUNC(PyObject *) PyErr_SetFromWindowsErrWithFilenameObject(
     int, const char *);
 PyAPI_FUNC(PyObject *) PyErr_SetFromWindowsErrWithFilename(
     int, const char *);
+#ifndef Py_LIMITED_API
+/* XXX redeclare to use WSTRING */
 PyAPI_FUNC(PyObject *) PyErr_SetFromWindowsErrWithUnicodeFilename(
     int, const Py_UNICODE *);
+#endif
 PyAPI_FUNC(PyObject *) PyErr_SetFromWindowsErr(int);
 PyAPI_FUNC(PyObject *) PyErr_SetExcFromWindowsErrWithFilenameObject(
     PyObject *,int, PyObject *);
 PyAPI_FUNC(PyObject *) PyErr_SetExcFromWindowsErrWithFilename(
     PyObject *,int, const char *);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyErr_SetExcFromWindowsErrWithUnicodeFilename(
     PyObject *,int, const Py_UNICODE *);
+#endif
 PyAPI_FUNC(PyObject *) PyErr_SetExcFromWindowsErr(PyObject *, int);
 #endif /* MS_WINDOWS */
 
@@ -236,12 +241,16 @@ PyAPI_FUNC(PyObject *) PyUnicodeDecodeError_Create(
     const char *, const char *, Py_ssize_t, Py_ssize_t, Py_ssize_t, const char *);
 
 /* create a UnicodeEncodeError object */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyUnicodeEncodeError_Create(
     const char *, const Py_UNICODE *, Py_ssize_t, Py_ssize_t, Py_ssize_t, const char *);
+#endif
 
 /* create a UnicodeTranslateError object */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyUnicodeTranslateError_Create(
     const Py_UNICODE *, Py_ssize_t, Py_ssize_t, Py_ssize_t, const char *);
+#endif
 
 /* get the encoding attribute */
 PyAPI_FUNC(PyObject *) PyUnicodeEncodeError_GetEncoding(PyObject *);

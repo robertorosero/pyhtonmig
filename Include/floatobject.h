@@ -107,9 +107,11 @@ PyAPI_FUNC(int) PyFloat_ClearFreeList(void);
 
 /* Format the object based on the format_spec, as defined in PEP 3101
    (Advanced String Formatting). */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyFloat_FormatAdvanced(PyObject *obj,
 					       Py_UNICODE *format_spec,
 					       Py_ssize_t format_spec_len);
+#endif
 
 #ifdef __cplusplus
 }
