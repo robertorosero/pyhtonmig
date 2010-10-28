@@ -251,6 +251,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     on the command line.
     """
 
+    tests = ['test_os', 'test_sys', 'test_pep277', 'test_unicode', 'test_unicode_file', 'test_unicodedata']
+
     replace_stdout()
 
     support.record_original_stdout(sys.stdout)
