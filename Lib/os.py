@@ -552,7 +552,12 @@ def _fscodec():
         if isinstance(filename, bytes):
             return filename
         elif isinstance(filename, str):
-            return filename.encode(encoding, errors)
+            if sys.platform == 'darwin':
+                import unicodedata
+                filename = unicodedata.normalize('NFD', filename)
+                return filename.encode('utf-8', 'surrogateescape')
+            else:
+                return filename.encode(encoding, errors)
         else:
             raise TypeError("expect bytes or str, not %s" % type(filename).__name__)
 
@@ -565,7 +570,12 @@ def _fscodec():
         if isinstance(filename, str):
             return filename
         elif isinstance(filename, bytes):
-            return filename.decode(encoding, errors)
+            if sys.platform == 'darwin':
+                import unicodedata
+                filename = filename.decode('utf-8', 'surrogateescape')
+                return unicodedata.normalize('NFC', filename)
+            else:
+                return filename.decode(encoding, errors)
         else:
             raise TypeError("expect bytes or str, not %s" % type(filename).__name__)
 

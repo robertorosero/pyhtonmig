@@ -74,6 +74,10 @@ extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
 extern int _PyLong_Init(void);
 extern void PyLong_Fini(void);
+#ifdef __APPLE__
+extern int _PyUnicode_InitFSEncoding(void);
+#endif
+
 
 #ifdef WITH_THREAD
 extern void _PyGILState_Init(PyInterpreterState *, PyThreadState *);
@@ -751,6 +755,13 @@ initfsencoding(void)
     } else {
         Py_DECREF(codec);
     }
+
+#ifdef __APPLE__
+    if (_PyUnicode_InitFSEncoding()) {
+        PyErr_Warn(PyExc_RuntimeWarning,
+            "Unable to get normalize() function of the unicodedata module");
+    }
+#endif
 }
 
 /* Import the site module (not into __main__ though) */

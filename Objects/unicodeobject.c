@@ -184,6 +184,10 @@ static unsigned char ascii_linebreak[] = {
     0, 0, 0, 0, 0, 0, 0, 0
 };
 
+#if defined(__APPLE__)
+static PyObject *normalize_func = NULL;
+#endif
+
 
 Py_UNICODE
 PyUnicode_GetMax(void)
@@ -1584,6 +1588,22 @@ PyObject *PyUnicode_AsEncodedObject(PyObject *unicode,
     return NULL;
 }
 
+#ifdef __APPLE__
+int
+_PyUnicode_InitFSEncoding(void)
+{
+    PyObject *unicodedata;
+    unicodedata = PyImport_ImportModule("unicodedata");
+    if (unicodedata == NULL)
+        return -1;
+    normalize_func = PyObject_GetAttrString(unicodedata, "normalize");
+    Py_DECREF(unicodedata);
+    if (normalize_func == NULL)
+        return -1;
+    return 0;
+}
+#endif
+
 PyObject *
 PyUnicode_EncodeFSDefault(PyObject *unicode)
 {
@@ -1592,9 +1612,24 @@ PyUnicode_EncodeFSDefault(PyObject *unicode)
                                 PyUnicode_GET_SIZE(unicode),
                                 NULL);
 #elif defined(__APPLE__)
-    return PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
-                                PyUnicode_GET_SIZE(unicode),
-                                "surrogateescape");
+    PyObject *filename, *bytes;
+    int decref;
+    if (normalize_func) {
+        filename = PyObject_CallFunction(normalize_func, "sO", "NFD", unicode);
+        if (filename == NULL)
+            return NULL;
+        decref = 1;
+    }
+    else {
+        filename = unicode;
+        decref = 0;
+    }
+    bytes = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(filename),
+                                 PyUnicode_GET_SIZE(filename),
+                                 "surrogateescape");
+    if (decref)
+        Py_DECREF(filename);
+    return bytes;
 #else
     if (Py_FileSystemDefaultEncoding) {
         return PyUnicode_AsEncodedString(unicode,
@@ -1769,7 +1804,14 @@ PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
 #if defined(MS_WINDOWS) && defined(HAVE_USABLE_WCHAR_T)
     return PyUnicode_DecodeMBCS(s, size, NULL);
 #elif defined(__APPLE__)
-    return PyUnicode_DecodeUTF8(s, size, "surrogateescape");
+    PyObject *filename, *normalized;
+    filename = PyUnicode_DecodeUTF8(s, size, "surrogateescape");
+    if (normalize_func) {
+        normalized = PyObject_CallFunction(normalize_func, "sO", "NFC", filename);
+        Py_DECREF(filename);
+        filename = normalized;
+    }
+    return filename;
 #else
     /* During the early bootstrapping process, Py_FileSystemDefaultEncoding
        can be undefined. If it is case, decode using UTF-8. The following assumes
@@ -9958,6 +10000,10 @@ _PyUnicode_Fini(void)
         }
     }
     (void)PyUnicode_ClearFreeList();
+
+#if defined(__APPLE__)
+    Py_CLEAR(normalize_func);
+#endif
 }
 
 void

@@ -1172,6 +1172,11 @@ class FSEncodingTests(unittest.TestCase):
                 continue
             self.assertEquals(os.fsdecode(bytesfn), fn)
 
+    @unittest.skipUnless(sys.platform == 'darwin', 'test specific to Mac OS X')
+    def test_osx_normalize(self):
+        self.assertEquals(os.fsencode('\xe9'), b'e\xcc\x81')
+        self.assertEquals(os.fsdecode(b'e\xcc\x81'), '\xe9')
+
 
 class PidTests(unittest.TestCase):
     @unittest.skipUnless(hasattr(os, 'getppid'), "test needs os.getppid")
