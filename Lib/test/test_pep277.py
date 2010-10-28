@@ -95,8 +95,13 @@ class UnicodeFileTests(unittest.TestCase):
             fn(filename)
         exc_filename = c.exception.filename
         # the "filename" exception attribute may be encoded
+        if sys.platform == 'darwin':
+            # Python functions encode the filename to pass it to the libc, and
+            # then redecode it to create the exception. Encoding normalizes the
+            # filename to NFD, whereas decoding normalizes to NFC.
+            filename = normalize('NFC', filename)
         if isinstance(exc_filename, bytes):
-            filename = filename.encode(sys.getfilesystemencoding())
+            filename = os.fsencode(filename)
         if check_fn_in_exception:
             self.assertEqual(exc_filename, filename, "Function '%s(%a) failed "
                              "with bad filename in the exception: %a" %
