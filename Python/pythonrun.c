@@ -315,6 +315,14 @@ Py_InitializeEx(int install_sigs)
         Py_FatalError(
             "Py_Initialize: can't initialize sys standard streams");
 
+#ifdef __APPLE__
+    if (_PyUnicode_InitFSEncoding()) {
+        PyErr_Clear();
+        PyErr_Warn(PyExc_RuntimeWarning,
+            "Unable to get normalize() function of the unicodedata module");
+    }
+#endif
+
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
 }
@@ -755,13 +763,6 @@ initfsencoding(void)
     } else {
         Py_DECREF(codec);
     }
-
-#ifdef __APPLE__
-    if (_PyUnicode_InitFSEncoding()) {
-        PyErr_Warn(PyExc_RuntimeWarning,
-            "Unable to get normalize() function of the unicodedata module");
-    }
-#endif
 }
 
 /* Import the site module (not into __main__ though) */
