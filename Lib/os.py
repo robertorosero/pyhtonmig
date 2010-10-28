@@ -553,8 +553,12 @@ def _fscodec():
             return filename
         elif isinstance(filename, str):
             if sys.platform == 'darwin':
-                import unicodedata
-                filename = unicodedata.normalize('NFD', filename)
+                try:
+                    import unicodedata
+                except ImportError:
+                    pass
+                else:
+                    filename = unicodedata.normalize('NFD', filename)
                 return filename.encode('utf-8', 'surrogateescape')
             else:
                 return filename.encode(encoding, errors)
@@ -571,9 +575,13 @@ def _fscodec():
             return filename
         elif isinstance(filename, bytes):
             if sys.platform == 'darwin':
-                import unicodedata
                 filename = filename.decode('utf-8', 'surrogateescape')
-                return unicodedata.normalize('NFC', filename)
+                try:
+                    import unicodedata
+                except ImportError:
+                    return filename
+                else:
+                    return unicodedata.normalize('NFC', filename)
             else:
                 return filename.decode(encoding, errors)
         else:
