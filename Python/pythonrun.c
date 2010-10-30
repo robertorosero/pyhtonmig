@@ -1827,6 +1827,14 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
     return (PyObject *)co;
 }
 
+/* For use in Py_LIMITED_API */
+#undef Py_CompileString
+PyObject *
+PyCompileString(const char *str, const char *filename, int start)
+{
+    return Py_CompileStringFlags(str, filename, start, NULL);
+}
+
 struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {

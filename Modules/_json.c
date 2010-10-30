@@ -1407,7 +1407,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             Py_DECREF(mapping);
             goto bail;
         }
-        items = PyEval_EvalCode((PyCodeObject *)code, PyEval_GetGlobals(), mapping);
+        items = PyEval_EvalCode(code, PyEval_GetGlobals(), mapping);
         Py_DECREF(mapping);
         } else {
         items = PyMapping_Items(dct);

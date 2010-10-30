@@ -21,6 +21,7 @@ inserted in the tuple.  Similarly, PyTuple_GetItem does not increment the
 returned item's reference count.
 */
 
+#ifndef Py_LIMITED_API
 typedef struct {
     PyObject_VAR_HEAD
     PyObject *ob_item[1];
@@ -30,6 +31,7 @@ typedef struct {
      * the tuple is not yet visible outside the function that builds it.
      */
 } PyTupleObject;
+#endif
 
 PyAPI_DATA(PyTypeObject) PyTuple_Type;
 PyAPI_DATA(PyTypeObject) PyTupleIter_Type;
@@ -48,11 +50,13 @@ PyAPI_FUNC(PyObject *) PyTuple_Pack(Py_ssize_t, ...);
 PyAPI_FUNC(void) _PyTuple_MaybeUntrack(PyObject *);
 
 /* Macro, trading safety for speed */
+#ifndef Py_LIMITED_API
 #define PyTuple_GET_ITEM(op, i) (((PyTupleObject *)(op))->ob_item[i])
 #define PyTuple_GET_SIZE(op)    Py_SIZE(op)
 
 /* Macro, *only* to be used to fill in brand new tuples */
 #define PyTuple_SET_ITEM(op, i, v) (((PyTupleObject *)(op))->ob_item[i] = v)
+#endif
 
 PyAPI_FUNC(int) PyTuple_ClearFreeList(void);
 

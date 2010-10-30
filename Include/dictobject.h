@@ -45,6 +45,7 @@ meaning otherwise.
  * majority of dicts (consisting mostly of usually-small instance dicts and
  * usually-small dicts created to pass keyword arguments).
  */
+#ifndef Py_LIMITED_API
 #define PyDict_MINSIZE 8
 
 typedef struct {
@@ -87,6 +88,7 @@ struct _dictobject {
     PyDictEntry *(*ma_lookup)(PyDictObject *mp, PyObject *key, long hash);
     PyDictEntry ma_smalltable[PyDict_MINSIZE];
 };
+#endif /* Py_LIMITED_API */
 
 PyAPI_DATA(PyTypeObject) PyDict_Type;
 PyAPI_DATA(PyTypeObject) PyDictIterKey_Type;

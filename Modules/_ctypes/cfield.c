@@ -1289,7 +1289,7 @@ U_set(void *ptr, PyObject *value, Py_ssize_t length)
     } else if (size < length-1)
         /* copy terminating NUL character if there is space */
         size += 1;
-    PyUnicode_AsWideChar((PyUnicodeObject *)value, (wchar_t *)ptr, size);
+    PyUnicode_AsWideChar(value, (wchar_t *)ptr, size);
     return value;
 }
 
@@ -1449,7 +1449,7 @@ Z_set(void *ptr, PyObject *value, Py_ssize_t size)
             return NULL;
         }
         *(wchar_t **)ptr = (wchar_t *)buffer;
-        if (-1 == PyUnicode_AsWideChar((PyUnicodeObject *)value,
+        if (-1 == PyUnicode_AsWideChar(value,
                                        buffer, PyUnicode_GET_SIZE(value))) {
             Py_DECREF(value);
             Py_DECREF(keep);

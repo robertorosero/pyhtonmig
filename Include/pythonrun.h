@@ -16,9 +16,11 @@ extern "C" {
 #define PyCF_ONLY_AST 0x0400
 #define PyCF_IGNORE_COOKIE 0x0800
 
+#ifndef Py_LIMITED_API
 typedef struct {
     int cf_flags;  /* bitmask of CO_xxx flags relevant to future */
 } PyCompilerFlags;
+#endif
 
 PyAPI_FUNC(void) Py_SetProgramName(wchar_t *);
 PyAPI_FUNC(wchar_t *) Py_GetProgramName(void);
@@ -33,8 +35,8 @@ PyAPI_FUNC(int) Py_IsInitialized(void);
 PyAPI_FUNC(PyThreadState *) Py_NewInterpreter(void);
 PyAPI_FUNC(void) Py_EndInterpreter(PyThreadState *);
 
-PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
 #ifndef Py_LIMITED_API
+PyAPI_FUNC(int) PyRun_SimpleStringFlags(const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_AnyFileFlags(FILE *, const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_AnyFileExFlags(FILE *, const char *, int, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_SimpleFileExFlags(FILE *, const char *, int, PyCompilerFlags *);
@@ -62,18 +64,22 @@ PyAPI_FUNC(struct _node *) PyParser_SimpleParseStringFlags(const char *, int,
 PyAPI_FUNC(struct _node *) PyParser_SimpleParseFileFlags(FILE *, const char *,
                                                         int, int);
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyRun_StringFlags(const char *, int, PyObject *,
                                          PyObject *, PyCompilerFlags *);
 
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyRun_FileExFlags(FILE *, const char *, int,
                                          PyObject *, PyObject *, int,
                                          PyCompilerFlags *);
 #endif
 
+#ifdef Py_LIMITED_API
+PyAPI_FUNC(PyObject *) Py_CompileStringFlags(const char *, const char *, int);
+#else
 #define Py_CompileString(str, p, s) Py_CompileStringFlags(str, p, s, NULL)
 PyAPI_FUNC(PyObject *) Py_CompileStringFlags(const char *, const char *, int,
                                              PyCompilerFlags *);
+#endif
 PyAPI_FUNC(struct symtable *) Py_SymtableString(const char *, const char *, int);
 
 PyAPI_FUNC(void) PyErr_Print(void);

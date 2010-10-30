@@ -19,6 +19,7 @@ extern "C" {
  */
 
 /* Object layout */
+#ifndef Py_LIMITED_API
 typedef struct {
     PyObject_VAR_HEAD
     /* XXX(nnorwitz): should ob_exports be Py_ssize_t? */
@@ -26,6 +27,7 @@ typedef struct {
     Py_ssize_t ob_alloc; /* How many bytes allocated */
     char *ob_bytes;
 } PyByteArrayObject;
+#endif
 
 /* Type object */
 PyAPI_DATA(PyTypeObject) PyByteArray_Type;

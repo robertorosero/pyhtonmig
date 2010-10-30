@@ -20,8 +20,10 @@ PyAPI_FUNC(PyObject *) PyEval_CallMethod(PyObject *obj,
                                          const char *methodname,
                                          const char *format, ...);
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) PyEval_SetProfile(Py_tracefunc, PyObject *);
 PyAPI_FUNC(void) PyEval_SetTrace(Py_tracefunc, PyObject *);
+#endif
 
 struct _frame; /* Avoid including frameobject.h */
 
@@ -33,7 +35,9 @@ PyAPI_FUNC(struct _frame *) PyEval_GetFrame(void);
 /* Look at the current frame's (if any) code's co_flags, and turn on
    the corresponding compiler flags in cf->cf_flags.  Return 1 if any
    flag was set, else return 0. */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) PyEval_MergeCompilerFlags(PyCompilerFlags *cf);
+#endif
 
 PyAPI_FUNC(int) Py_AddPendingCall(int (*func)(void *), void *arg);
 PyAPI_FUNC(int) Py_MakePendingCalls(void);

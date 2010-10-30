@@ -97,6 +97,7 @@ Xxo_setattr(XxoObject *self, char *name, PyObject *v)
 static PyType_Slot Xxo_Type_slots[] = {
     {Py_tp_dealloc, Xxo_dealloc},
     {Py_tp_getattro, Xxo_getattro},
+    {Py_tp_setattr, Xxo_setattr},
     {Py_tp_methods, Xxo_methods},
     {0, 0},
 };

@@ -43,17 +43,20 @@ PyAPI_FUNC(void) _PyImport_ReInitLock(void);
 PyAPI_FUNC(PyObject *)_PyImport_FindExtension(char *, char *);
 PyAPI_FUNC(int)_PyImport_FixupExtension(PyObject*, char *, char *);
 
+#ifndef Py_LIMITED_API
 struct _inittab {
     char *name;
     PyObject* (*initfunc)(void);
 };
+PyAPI_DATA(struct _inittab *) PyImport_Inittab;
+PyAPI_FUNC(int) PyImport_ExtendInittab(struct _inittab *newtab);
+#endif
 
 PyAPI_DATA(PyTypeObject) PyNullImporter_Type;
-PyAPI_DATA(struct _inittab *) PyImport_Inittab;
 
 PyAPI_FUNC(int) PyImport_AppendInittab(const char *name, PyObject* (*initfunc)(void));
-PyAPI_FUNC(int) PyImport_ExtendInittab(struct _inittab *newtab);
 
+#ifndef Py_LIMITED_API
 struct _frozen {
     char *name;
     unsigned char *code;
@@ -64,6 +67,7 @@ struct _frozen {
    collection of frozen modules: */
 
 PyAPI_DATA(struct _frozen *) PyImport_FrozenModules;
+#endif
 
 #ifdef __cplusplus
 }

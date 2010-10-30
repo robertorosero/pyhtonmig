@@ -488,7 +488,7 @@ time_strftime(PyObject *self, PyObject *args)
         return NULL;
     /* This assumes that PyUnicode_AsWideChar doesn't do any UTF-16
        expansion. */
-    if (PyUnicode_AsWideChar((PyUnicodeObject*)format,
+    if (PyUnicode_AsWideChar(format,
                              (wchar_t*)PyBytes_AS_STRING(tmpfmt),
                              PyUnicode_GetSize(format)+1) == (size_t)-1)
         /* This shouldn't fail. */

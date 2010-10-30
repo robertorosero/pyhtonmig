@@ -680,7 +680,7 @@ static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa)
             PyMem_Free(pa->value.p);
             return -1;
         }
-        if (-1 == PyUnicode_AsWideChar((PyUnicodeObject *)obj,
+        if (-1 == PyUnicode_AsWideChar(obj,
                                        pa->value.p, PyUnicode_GET_SIZE(obj)))
             return -1;
         return 0;

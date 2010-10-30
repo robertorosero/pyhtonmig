@@ -201,6 +201,7 @@ typedef int (*objobjproc)(PyObject *, PyObject *);
 typedef int (*visitproc)(PyObject *, void *);
 typedef int (*traverseproc)(PyObject *, visitproc, void *);
 
+#ifndef Py_LIMITED_API
 typedef struct {
     /* Number implementations must check *both*
        arguments for proper type and implement the necessary conversions
@@ -270,6 +271,7 @@ typedef struct {
      getbufferproc bf_getbuffer;
      releasebufferproc bf_releasebuffer;
 } PyBufferProcs;
+#endif /* Py_LIMITED_API */
 
 typedef void (*freefunc)(void *);
 typedef void (*destructor)(PyObject *);

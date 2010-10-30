@@ -253,7 +253,7 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
         PyErr_NoMemory();
         goto done;
     }
-    if (PyUnicode_AsWideChar((PyUnicodeObject*)os1, ws1, len1) == -1)
+    if (PyUnicode_AsWideChar(os1, ws1, len1) == -1)
         goto done;
     ws1[len1 - 1] = 0;
     len2 = PyUnicode_GET_SIZE(os2) + 1;
@@ -262,7 +262,7 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
         PyErr_NoMemory();
         goto done;
     }
-    if (PyUnicode_AsWideChar((PyUnicodeObject*)os2, ws2, len2) == -1)
+    if (PyUnicode_AsWideChar(os2, ws2, len2) == -1)
         goto done;
     ws2[len2 - 1] = 0;
     /* Collate the strings. */

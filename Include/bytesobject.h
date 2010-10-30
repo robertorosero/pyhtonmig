@@ -27,6 +27,7 @@ functions should be applied to nil objects.
 /* Caching the hash (ob_shash) saves recalculation of a string's hash value.
    This significantly speeds up dict lookups. */
 
+#ifndef Py_LIMITED_API
 typedef struct {
     PyObject_VAR_HEAD
     long ob_shash;
@@ -38,6 +39,7 @@ typedef struct {
      *     ob_shash is the hash of the string or -1 if not computed yet.
      */
 } PyBytesObject;
+#endif
 
 PyAPI_DATA(PyTypeObject) PyBytes_Type;
 PyAPI_DATA(PyTypeObject) PyBytesIter_Type;
@@ -66,9 +68,11 @@ PyAPI_FUNC(PyObject *) PyBytes_DecodeEscape(const char *, Py_ssize_t,
 						   const char *);
 
 /* Macro, trading safety for speed */
+#ifndef Py_LIMITED_API
 #define PyBytes_AS_STRING(op) (assert(PyBytes_Check(op)), \
                                 (((PyBytesObject *)(op))->ob_sval))
 #define PyBytes_GET_SIZE(op)  (assert(PyBytes_Check(op)),Py_SIZE(op))
+#endif
 
 /* _PyBytes_Join(sep, x) is like sep.join(x).  sep must be PyBytesObject*,
    x must be an iterable object. */

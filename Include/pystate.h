@@ -13,6 +13,9 @@ extern "C" {
 struct _ts; /* Forward */
 struct _is; /* Forward */
 
+#ifdef Py_LIMITED_API
+typedef struct _is PyInterpreterState;
+#else
 typedef struct _is {
 
     struct _is *next;
@@ -37,12 +40,14 @@ typedef struct _is {
 #endif
 
 } PyInterpreterState;
+#endif
 
 
 /* State unique per thread */
 
 struct _frame; /* Avoid including frameobject.h */
 
+#ifndef Py_LIMITED_API
 /* Py_tracefunc return -1 when raising an exception, or 0 for success. */
 typedef int (*Py_tracefunc)(PyObject *, struct _frame *, int, PyObject *);
 
@@ -54,7 +59,11 @@ typedef int (*Py_tracefunc)(PyObject *, struct _frame *, int, PyObject *);
 #define PyTrace_C_CALL 4
 #define PyTrace_C_EXCEPTION 5
 #define PyTrace_C_RETURN 6
+#endif
 
+#ifdef Py_LIMITED_API
+typedef struct _ts PyThreadState;
+#else
 typedef struct _ts {
     /* See Python/ceval.c for comments explaining most fields */
 
@@ -106,6 +115,7 @@ typedef struct _ts {
     /* XXX signal handlers should also be here */
 
 } PyThreadState;
+#endif
 
 
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_New(void);
@@ -133,9 +143,11 @@ PyAPI_FUNC(int) PyThreadState_SetAsyncExc(long, PyObject *);
 
 /* Assuming the current thread holds the GIL, this is the
    PyThreadState for the current thread. */
+#ifndef Py_LIMITED_API
 PyAPI_DATA(_Py_atomic_address) _PyThreadState_Current;
+#endif
 
-#ifdef Py_DEBUG
+#if defined(Py_DEBUG) || defined(Py_LIMITED_API)
 #define PyThreadState_GET() PyThreadState_Get()
 #else
 #define PyThreadState_GET() \

@@ -2378,7 +2378,7 @@ list_subscript(PyListObject* self, PyObject* item)
         PyObject* it;
         PyObject **src, **dest;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self),
+        if (PySlice_GetIndicesEx(item, Py_SIZE(self),
                          &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -2427,7 +2427,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
     else if (PySlice_Check(item)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self),
+        if (PySlice_GetIndicesEx(item, Py_SIZE(self),
                          &start, &stop, &step, &slicelength) < 0) {
             return -1;
         }

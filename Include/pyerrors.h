@@ -6,6 +6,7 @@ extern "C" {
 
 /* Error objects */
 
+#ifndef Py_LIMITED_API
 /* PyException_HEAD defines the initial segment of every exception class. */
 #define PyException_HEAD PyObject_HEAD PyObject *dict;\
              PyObject *args; PyObject *traceback;\
@@ -55,6 +56,7 @@ typedef struct {
     PyObject *winerror;
 } PyWindowsErrorObject;
 #endif
+#endif
 
 /* Error handling definitions */
 
@@ -67,7 +69,7 @@ PyAPI_FUNC(void) PyErr_Fetch(PyObject **, PyObject **, PyObject **);
 PyAPI_FUNC(void) PyErr_Restore(PyObject *, PyObject *, PyObject *);
 PyAPI_FUNC(void) Py_FatalError(const char *message);
 
-#ifdef Py_DEBUG
+#if defined(Py_DEBUG) || defined(Py_LIMITED_API)
 #define _PyErr_OCCURRED() PyErr_Occurred()
 #else
 #define _PyErr_OCCURRED() (_PyThreadState_Current->curexc_type)
