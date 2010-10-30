@@ -45,9 +45,13 @@ PyAPI_FUNC(Py_ssize_t) PyTuple_Size(PyObject *);
 PyAPI_FUNC(PyObject *) PyTuple_GetItem(PyObject *, Py_ssize_t);
 PyAPI_FUNC(int) PyTuple_SetItem(PyObject *, Py_ssize_t, PyObject *);
 PyAPI_FUNC(PyObject *) PyTuple_GetSlice(PyObject *, Py_ssize_t, Py_ssize_t);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _PyTuple_Resize(PyObject **, Py_ssize_t);
+#endif
 PyAPI_FUNC(PyObject *) PyTuple_Pack(Py_ssize_t, ...);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _PyTuple_MaybeUntrack(PyObject *);
+#endif
 
 /* Macro, trading safety for speed */
 #ifndef Py_LIMITED_API

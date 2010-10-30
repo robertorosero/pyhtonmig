@@ -32,7 +32,9 @@ PyAPI_DATA(PyTypeObject) PyEllipsis_Type;
 
 PyAPI_FUNC(PyObject *) PySlice_New(PyObject* start, PyObject* stop,
                                   PyObject* step);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PySlice_FromIndices(Py_ssize_t start, Py_ssize_t stop);
+#endif
 PyAPI_FUNC(int) PySlice_GetIndices(PyObject *r, Py_ssize_t length,
                                   Py_ssize_t *start, Py_ssize_t *stop, Py_ssize_t *step);
 PyAPI_FUNC(int) PySlice_GetIndicesEx(PyObject *r, Py_ssize_t length,

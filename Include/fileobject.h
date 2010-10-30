@@ -23,12 +23,15 @@ PyAPI_FUNC(char *) Py_UniversalNewlineFgets(char *, int, FILE*, PyObject *);
 */
 PyAPI_DATA(const char *) Py_FileSystemDefaultEncoding;
 PyAPI_DATA(int) Py_HasFileSystemDefaultEncoding;
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _Py_SetFileSystemEncoding(PyObject *);
+#endif
 
 /* Internal API
 
    The std printer acts as a preliminary sys.stderr until the new io
    infrastructure is in place. */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) PyFile_NewStdPrinter(int);
 PyAPI_DATA(PyTypeObject) PyStdPrinter_Type;
 
@@ -42,6 +45,7 @@ int _PyVerify_fd(int fd);
 #else
 #define _PyVerify_fd(A) (1) /* dummy */
 #endif
+#endif /* Py_LIMITED_API */
 
 #ifdef __cplusplus
 }

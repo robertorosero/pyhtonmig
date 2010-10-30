@@ -94,8 +94,10 @@ typedef struct _addr_pair {
 /* Update *bounds to describe the first and one-past-the-last instructions in the
    same line as lasti.  Return the number of that line.
 */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _PyCode_CheckLineNumber(PyCodeObject* co,
                                         int lasti, PyAddrPair *bounds);
+#endif
 
 PyAPI_FUNC(PyObject*) PyCode_Optimize(PyObject *code, PyObject* consts,
                                       PyObject *names, PyObject *lineno_obj);

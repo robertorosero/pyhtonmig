@@ -579,7 +579,9 @@ PyAPI_FUNC(PyObject *) _PyUnicode_FormatAdvanced(PyObject *obj,
 PyAPI_FUNC(void) PyUnicode_InternInPlace(PyObject **);
 PyAPI_FUNC(void) PyUnicode_InternImmortal(PyObject **);
 PyAPI_FUNC(PyObject *) PyUnicode_InternFromString(const char *);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _Py_ReleaseInternedUnicodeStrings(void);
+#endif
 
 /* Use only if you know it's a string */
 #define PyUnicode_CHECK_INTERNED(op) (((PyUnicodeObject *)(op))->state)
@@ -675,9 +677,11 @@ PyAPI_FUNC(int) PyUnicode_ClearFreeList(void);
 
 */
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyUnicode_AsDefaultEncodedString(
     PyObject *unicode,
     const char *errors);
+#endif
 
 /* Returns a pointer to the default encoding (normally, UTF-8) of the
    Unicode object unicode and the size of the encoded representation
@@ -693,9 +697,11 @@ PyAPI_FUNC(PyObject *) _PyUnicode_AsDefaultEncodedString(
 
 */
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(char *) _PyUnicode_AsStringAndSize(
     PyObject *unicode,
     Py_ssize_t *size);
+#endif
 
 /* Returns a pointer to the default encoding (normally, UTf-8) of the
    Unicode object unicode.
@@ -711,7 +717,9 @@ PyAPI_FUNC(char *) _PyUnicode_AsStringAndSize(
 
 */
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(char *) _PyUnicode_AsString(PyObject *unicode);
+#endif
 
 /* Returns the currently active default encoding.
 
@@ -1059,11 +1067,13 @@ PyAPI_FUNC(PyObject*) PyUnicode_EncodeRawUnicodeEscape(
 
     Only for internal use in _codecsmodule.c */
 
+#ifndef Py_LIMITED_API
 PyObject *_PyUnicode_DecodeUnicodeInternal(
     const char *string,
     Py_ssize_t length,
     const char *errors
     );
+#endif
 
 /* --- Latin-1 Codecs -----------------------------------------------------
 
@@ -1544,6 +1554,7 @@ PyAPI_FUNC(Py_ssize_t) _PyUnicode_InsertThousandsGrouping(Py_UNICODE *buffer,
 
 /* Helper array used by Py_UNICODE_ISSPACE(). */
 
+#ifndef Py_LIMITED_API
 PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
 
 /* These should not be used directly. Use the Py_UNICODE_IS* and
@@ -1625,7 +1636,6 @@ PyAPI_FUNC(int) _PyUnicode_IsAlpha(
     Py_UCS4 ch       /* Unicode character */
     );
 
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(size_t) Py_UNICODE_strlen(
     const Py_UNICODE *u
     );
@@ -1659,7 +1669,7 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
     const Py_UNICODE *s,
     Py_UNICODE c
     );
-#endif
+#endif /* Py_LIMITED_API */
 
 #ifdef __cplusplus
 }

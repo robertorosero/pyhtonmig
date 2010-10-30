@@ -46,12 +46,14 @@ PyAPI_FUNC(char *) PyByteArray_AsString(PyObject *);
 PyAPI_FUNC(int) PyByteArray_Resize(PyObject *, Py_ssize_t);
 
 /* Macros, trading safety for speed */
+#ifndef Py_LIMITED_API
 #define PyByteArray_AS_STRING(self) \
     (assert(PyByteArray_Check(self)), \
      Py_SIZE(self) ? ((PyByteArrayObject *)(self))->ob_bytes : _PyByteArray_empty_string)
 #define PyByteArray_GET_SIZE(self)  (assert(PyByteArray_Check(self)),Py_SIZE(self))
 
 PyAPI_DATA(char) _PyByteArray_empty_string[];
+#endif
 
 #ifdef __cplusplus
 }

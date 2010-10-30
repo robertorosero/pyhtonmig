@@ -20,7 +20,9 @@ typedef struct _traceback {
 
 PyAPI_FUNC(int) PyTraceBack_Here(struct _frame *);
 PyAPI_FUNC(int) PyTraceBack_Print(PyObject *, PyObject *);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _Py_DisplaySourceLine(PyObject *, PyObject *, int, int);
+#endif
 
 /* Reveal traceback type so we can typecheck traceback objects */
 PyAPI_DATA(PyTypeObject) PyTraceBack_Type;

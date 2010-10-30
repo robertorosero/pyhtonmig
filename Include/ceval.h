@@ -170,8 +170,10 @@ PyAPI_FUNC(void) PyEval_AcquireThread(PyThreadState *tstate);
 PyAPI_FUNC(void) PyEval_ReleaseThread(PyThreadState *tstate);
 PyAPI_FUNC(void) PyEval_ReInitThreads(void);
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _PyEval_SetSwitchInterval(unsigned long microseconds);
 PyAPI_FUNC(unsigned long) _PyEval_GetSwitchInterval(void);
+#endif
 
 #define Py_BEGIN_ALLOW_THREADS { \
                         PyThreadState *_save; \
@@ -190,8 +192,10 @@ PyAPI_FUNC(unsigned long) _PyEval_GetSwitchInterval(void);
 
 #endif /* !WITH_THREAD */
 
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _PyEval_SliceIndex(PyObject *, Py_ssize_t *);
 PyAPI_FUNC(void) _PyEval_SignalAsyncExc(void);
+#endif
 
 
 #ifdef __cplusplus

@@ -51,6 +51,7 @@ PyAPI_FUNC(double) PyFloat_AsDouble(PyObject *);
 #define PyFloat_AS_DOUBLE(op) (((PyFloatObject *)(op))->ob_fval)
 #endif
 
+#ifndef Py_LIMITED_API
 /* _PyFloat_{Pack,Unpack}{4,8}
  *
  * The struct and pickle (at least) modules need an efficient platform-
@@ -111,11 +112,10 @@ PyAPI_FUNC(int) PyFloat_ClearFreeList(void);
 
 /* Format the object based on the format_spec, as defined in PEP 3101
    (Advanced String Formatting). */
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyFloat_FormatAdvanced(PyObject *obj,
 					       Py_UNICODE *format_spec,
 					       Py_ssize_t format_spec_len);
-#endif
+#endif /* Py_LIMITED_API */
 
 #ifdef __cplusplus
 }

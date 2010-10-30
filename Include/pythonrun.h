@@ -89,15 +89,17 @@ PyAPI_FUNC(void) PyErr_Display(PyObject *, PyObject *, PyObject *);
 /* Py_PyAtExit is for the atexit module, Py_AtExit is for low-level
  * exit functions.
  */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _Py_PyAtExit(void (*func)(void));
+#endif
 PyAPI_FUNC(int) Py_AtExit(void (*func)(void));
 
 PyAPI_FUNC(void) Py_Exit(int);
 
 /* Restore signals that the interpreter has called SIG_IGN on to SIG_DFL. */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _Py_RestoreSignals(void);
 
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) Py_FdIsInteractive(FILE *, const char *);
 #endif
 
@@ -137,11 +139,14 @@ PyAPI_FUNC(const char *) Py_GetPlatform(void);
 PyAPI_FUNC(const char *) Py_GetCopyright(void);
 PyAPI_FUNC(const char *) Py_GetCompiler(void);
 PyAPI_FUNC(const char *) Py_GetBuildInfo(void);
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(const char *) _Py_svnversion(void);
 PyAPI_FUNC(const char *) Py_SubversionRevision(void);
 PyAPI_FUNC(const char *) Py_SubversionShortBranch(void);
+#endif
 
 /* Internal -- various one-time initializations */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyBuiltin_Init(void);
 PyAPI_FUNC(PyObject *) _PySys_Init(void);
 PyAPI_FUNC(void) _PyImport_Init(void);
@@ -150,8 +155,10 @@ PyAPI_FUNC(void) _PyImportHooks_Init(void);
 PyAPI_FUNC(int) _PyFrame_Init(void);
 PyAPI_FUNC(void) _PyFloat_Init(void);
 PyAPI_FUNC(int) PyByteArray_Init(void);
+#endif
 
 /* Various internal finalizers */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(void) _PyExc_Fini(void);
 PyAPI_FUNC(void) _PyImport_Fini(void);
 PyAPI_FUNC(void) PyMethod_Fini(void);
@@ -166,6 +173,7 @@ PyAPI_FUNC(void) PyByteArray_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
 PyAPI_FUNC(void) _PyGC_Fini(void);
+#endif
 
 /* Stuff with no proper home (yet) */
 #ifndef Py_LIMITED_API
@@ -173,7 +181,9 @@ PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);
 #endif
 PyAPI_DATA(int) (*PyOS_InputHook)(void);
 PyAPI_DATA(char) *(*PyOS_ReadlineFunctionPointer)(FILE *, FILE *, char *);
+#ifndef Py_LIMITED_API
 PyAPI_DATA(PyThreadState*) _PyOS_ReadlineTState;
+#endif
 
 /* Stack size, in "pointers" (so we get extra safety margins
    on 64-bit platforms).  On a 32-bit platform, this translates

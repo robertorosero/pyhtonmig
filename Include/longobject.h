@@ -59,7 +59,9 @@ PyAPI_FUNC(PyObject *) PyLong_GetInfo(void);
 #endif /* SIZEOF_PID_T */
 
 /* Used by Python/mystrtoul.c. */
+#ifndef Py_LIMITED_API
 PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];
+#endif
 
 /* _PyLong_Frexp returns a double x and an exponent e such that the
    true value is approximately equal to x * 2**e.  e is >= 0.  x is
@@ -67,7 +69,9 @@ PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];
    zeroes); otherwise, 0.5 <= abs(x) < 1.0.  On overflow, which is
    possible if the number of bits doesn't fit into a Py_ssize_t, sets
    OverflowError and returns -1.0 for x, 0 for e. */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(double) _PyLong_Frexp(PyLongObject *a, Py_ssize_t *e);
+#endif
 
 PyAPI_FUNC(double) PyLong_AsDouble(PyObject *);
 PyAPI_FUNC(PyObject *) PyLong_FromVoidPtr(void *);
@@ -87,6 +91,7 @@ PyAPI_FUNC(PyObject *) PyLong_FromString(char *, char **, int);
 PyAPI_FUNC(PyObject *) PyLong_FromUnicode(Py_UNICODE*, Py_ssize_t, int);
 #endif
 
+#ifndef Py_LIMITED_API
 /* _PyLong_Sign.  Return 0 if v is 0, -1 if v < 0, +1 if v > 0.
    v must not be NULL, and must be a normalized long.
    There are no error cases.
@@ -158,11 +163,10 @@ PyAPI_FUNC(PyObject *) _PyLong_Format(PyObject *aa, int base);
 
 /* Format the object based on the format_spec, as defined in PEP 3101
    (Advanced String Formatting). */
-#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyLong_FormatAdvanced(PyObject *obj,
 					      Py_UNICODE *format_spec,
 					      Py_ssize_t format_spec_len);
-#endif
+#endif /* Py_LIMITED_API */
 
 /* These aren't really part of the long object, but they're handy. The
    functions are in Python/mystrtoul.c.

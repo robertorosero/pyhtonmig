@@ -202,19 +202,25 @@ PyAPI_FUNC(PyThreadState *) PyGILState_GetThisThreadState(void);
 /* The implementation of sys._current_frames()  Returns a dict mapping
    thread id to that thread's current frame.
 */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject *) _PyThread_CurrentFrames(void);
+#endif
 
 /* Routines for advanced debuggers, requested by David Beazley.
    Don't use unless you know what you are doing! */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_Head(void);
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_Next(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyInterpreterState_ThreadHead(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyThreadState_Next(PyThreadState *);
+#endif
 
 typedef struct _frame *(*PyThreadFrameGetter)(PyThreadState *self_);
 
 /* hook for PyEval_GetFrame(), requested for Psyco */
+#ifndef Py_LIMITED_API
 PyAPI_DATA(PyThreadFrameGetter) _PyThreadState_GetFrame;
+#endif
 
 #ifdef __cplusplus
 }
