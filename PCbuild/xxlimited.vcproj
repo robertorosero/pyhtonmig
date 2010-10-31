@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9,00"
-	Name="python3dll"
-	ProjectGUID="{885D4898-D08D-4091-9C40-C700CFE3FC5A}"
-	RootNamespace="python3dll"
+	Name="xxlimited"
+	ProjectGUID="{F749B822-B489-4CA5-A3AD-CE078F5F338A}"
+	RootNamespace="xxlimited"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="196613"
 	>
@@ -22,7 +22,8 @@
 		<Configuration
 			Name="Release|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\release.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops"
+			CharacterSet="0"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -42,14 +43,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PYTHON3DLL_EXPORTS"
-				RuntimeLibrary="2"
-				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				DebugInformationFormat="3"
+				PreprocessorDefinitions="NDEBUG;_WIN32;_WINDLL;Py_LIMITED_API;$(NOINHERIT)"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -62,15 +56,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="..\PC\python32.lib"
-				OutputFile="$(OutDir)\python3.dll"
-				LinkIncremental="1"
-				ModuleDefinitionFile="..\PC\python3.def"
-				GenerateDebugInformation="true"
-				SubSystem="2"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
-				TargetMachine="1"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -97,7 +85,9 @@
 		<Configuration
 			Name="Release|x64"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\x64.vsprops;.\release.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops;.\x64.vsprops"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -113,6 +103,7 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
+				TargetEnvironment="3"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
@@ -128,8 +119,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)\python3.dll"
-				ModuleDefinitionFile="..\PC\python3.def"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -156,7 +148,9 @@
 		<Configuration
 			Name="PGInstrument|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\release.vsprops;.\pginstrument.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops;.\pginstrument.vsprops"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -175,6 +169,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				PreprocessorDefinitions="Py_LIMITED_API"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -187,9 +182,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="python32.lib"
-				OutputFile="$(OutDir)\python3.dll"
-				ModuleDefinitionFile="..\PC\python3.def"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -216,7 +211,9 @@
 		<Configuration
 			Name="PGInstrument|x64"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\x64.vsprops;.\release.vsprops;.\pginstrument.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops;.\x64.vsprops;.\pginstrument.vsprops"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -232,6 +229,7 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
+				TargetEnvironment="3"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
@@ -247,8 +245,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)\python3.dll"
-				ModuleDefinitionFile="..\PC\python3.def"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
+				TargetMachine="17"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -275,7 +275,9 @@
 		<Configuration
 			Name="PGUpdate|Win32"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\release.vsprops;.\pgupdate.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops;.\pgupdate.vsprops"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -294,6 +296,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				PreprocessorDefinitions="Py_LIMITED_API"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -306,9 +309,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="python32.lib"
-				OutputFile="$(OutDir)\python3.dll"
-				ModuleDefinitionFile="..\PC\python3.def"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -335,7 +338,9 @@
 		<Configuration
 			Name="PGUpdate|x64"
 			ConfigurationType="2"
-			InheritedPropertySheets=".\pyproject.vsprops;.\x64.vsprops;.\release.vsprops;.\pgupdate.vsprops"
+			InheritedPropertySheets=".\pyd.vsprops;.\x64.vsprops;.\pgupdate.vsprops"
+			CharacterSet="0"
+			WholeProgramOptimization="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -351,6 +356,7 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
+				TargetEnvironment="3"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
@@ -366,8 +372,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)\python3.dll"
-				ModuleDefinitionFile="..\PC\python3.def"
+				AdditionalDependencies="wsock32.lib"
+				IgnoreDefaultLibraryNames="libc"
+				BaseAddress="0x1D110000"
+				TargetMachine="17"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -397,31 +405,9 @@
 	<Files>
 		<Filter
 			Name="Source Files"
-			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
-			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\PC\python3.def"
-				>
-			</File>
-			<File
-				RelativePath="..\PC\python3dll.c"
-				>
-			</File>
-		</Filter>
-		<Filter
-			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc;xsd"
-			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
-			>
-		</Filter>
-		<Filter
-			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
-			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
-			>
-			<File
-				RelativePath="..\PC\python_nt.rc"
+				RelativePath="..\Modules\xxlimited.c"
 				>
 			</File>
 		</Filter>
