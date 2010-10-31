@@ -229,7 +229,9 @@ PyAPI_FUNC(int) PyErr_CheckSignals(void);
 PyAPI_FUNC(void) PyErr_SetInterrupt(void);
 
 /* In signalmodule.c */
+#ifndef Py_LIMITED_API
 int PySignal_SetWakeupFd(int fd);
+#endif
 
 /* Support for adding program text to SyntaxErrors */
 PyAPI_FUNC(void) PyErr_SyntaxLocation(const char *, int);
