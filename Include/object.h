@@ -403,7 +403,7 @@ typedef struct{
     PyType_Slot *slots; /* terminated by slot==0. */
 } PyType_Spec;
 
-PyObject* PyType_FromSpec(PyType_Spec*);
+PyAPI_FUNC(PyObject*) PyType_FromSpec(PyType_Spec*);
 
 #ifndef Py_LIMITED_API
 /* The *real* layout of a type object when allocated on the heap */
