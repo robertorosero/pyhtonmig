@@ -22,7 +22,8 @@ no meaning otherwise.
 #define PySet_MINSIZE 8
 
 typedef struct {
-    long hash;      /* cached hash code for the entry key */
+    /* Cached hash code of the key. */
+    Py_hash_t hash;
     PyObject *key;
 } setentry;
 
@@ -49,10 +50,10 @@ struct _setobject {
      * saves repeated runtime null-tests.
      */
     setentry *table;
-    setentry *(*lookup)(PySetObject *so, PyObject *key, long hash);
+    setentry *(*lookup)(PySetObject *so, PyObject *key, Py_hash_t hash);
     setentry smalltable[PySet_MINSIZE];
 
-    long hash;                  /* only used by frozenset objects */
+    Py_hash_t hash;                  /* only used by frozenset objects */
     PyObject *weakreflist;      /* List of weak references */
 };
 
@@ -89,7 +90,7 @@ PyAPI_FUNC(int) PySet_Clear(PyObject *set);
 PyAPI_FUNC(int) PySet_Contains(PyObject *anyset, PyObject *key);
 PyAPI_FUNC(int) PySet_Discard(PyObject *set, PyObject *key);
 PyAPI_FUNC(int) PySet_Add(PyObject *set, PyObject *key);
-PyAPI_FUNC(int) _PySet_NextEntry(PyObject *set, Py_ssize_t *pos, PyObject **key, long *hash);
+PyAPI_FUNC(int) _PySet_NextEntry(PyObject *set, Py_ssize_t *pos, PyObject **key, Py_hash_t *hash);
 PyAPI_FUNC(PyObject *) PySet_Pop(PyObject *set);
 PyAPI_FUNC(int) _PySet_Update(PyObject *set, PyObject *iterable);
 

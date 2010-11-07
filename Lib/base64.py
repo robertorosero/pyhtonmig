@@ -241,7 +241,7 @@ def b32decode(s, casefold=False, map01=None):
         acc += _b32rev[c] << shift
         shift -= 5
         if shift < 0:
-            parts.append(binascii.unhexlify('%010x' % acc))
+            parts.append(binascii.unhexlify(bytes('%010x' % acc, "ascii")))
             acc = 0
             shift = 35
     # Process the last, partial quanta
@@ -383,7 +383,8 @@ def main():
         if o == '-u': func = decode
         if o == '-t': test(); return
     if args and args[0] != '-':
-        func(open(args[0], 'rb'), sys.stdout.buffer)
+        with open(args[0], 'rb') as f:
+            func(f, sys.stdout.buffer)
     else:
         func(sys.stdin.buffer, sys.stdout.buffer)
 

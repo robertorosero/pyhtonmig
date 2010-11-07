@@ -1934,16 +1934,16 @@ listsort(PyListObject *self, PyObject *args, PyObject *kwds)
         }
     }
 
-    /* Reverse sort stability achieved by initially reversing the list,
-    applying a stable forward sort, then reversing the final result. */
-    if (reverse && saved_ob_size > 1)
-        reverse_slice(saved_ob_item, saved_ob_item + saved_ob_size);
-
     merge_init(&ms);
 
     nremaining = saved_ob_size;
     if (nremaining < 2)
         goto succeed;
+
+    /* Reverse sort stability achieved by initially reversing the list,
+    applying a stable forward sort, then reversing the final result. */
+    if (reverse)
+        reverse_slice(saved_ob_item, saved_ob_item + saved_ob_size);
 
     /* March over the array once, left to right, finding natural runs,
      * and extending short natural runs to minrun elements.
@@ -2596,7 +2596,7 @@ PyTypeObject PyList_Type = {
     0,                                          /* tp_as_number */
     &list_as_sequence,                          /* tp_as_sequence */
     &list_as_mapping,                           /* tp_as_mapping */
-    (hashfunc)PyObject_HashNotImplemented,      /* tp_hash */
+    PyObject_HashNotImplemented,                /* tp_hash */
     0,                                          /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */

@@ -394,21 +394,15 @@ complex_repr(PyComplexObject *v)
     return complex_format(v, 0, 'r');
 }
 
-static PyObject *
-complex_str(PyComplexObject *v)
-{
-    return complex_format(v, PyFloat_STR_PRECISION, 'g');
-}
-
-static long
+static Py_hash_t
 complex_hash(PyComplexObject *v)
 {
-    unsigned long hashreal, hashimag, combined;
-    hashreal = (unsigned long)_Py_HashDouble(v->cval.real);
-    if (hashreal == (unsigned long)-1)
+    Py_uhash_t hashreal, hashimag, combined;
+    hashreal = (Py_uhash_t)_Py_HashDouble(v->cval.real);
+    if (hashreal == (Py_uhash_t)-1)
         return -1;
-    hashimag = (unsigned long)_Py_HashDouble(v->cval.imag);
-    if (hashimag == (unsigned long)-1)
+    hashimag = (Py_uhash_t)_Py_HashDouble(v->cval.imag);
+    if (hashimag == (Py_uhash_t)-1)
         return -1;
     /* Note:  if the imaginary part is 0, hashimag is 0 now,
      * so the following returns hashreal unchanged.  This is
@@ -417,9 +411,9 @@ complex_hash(PyComplexObject *v)
      * hash(x + 0*j) must equal hash(x).
      */
     combined = hashreal + _PyHASH_IMAG * hashimag;
-    if (combined == (unsigned long)-1)
-        combined = (unsigned long)-2;
-    return (long)combined;
+    if (combined == (Py_uhash_t)-1)
+        combined = (Py_uhash_t)-2;
+    return (Py_hash_t)combined;
 }
 
 /* This macro may return! */
@@ -1104,7 +1098,7 @@ PyTypeObject PyComplex_Type = {
     0,                                          /* tp_as_mapping */
     (hashfunc)complex_hash,                     /* tp_hash */
     0,                                          /* tp_call */
-    (reprfunc)complex_str,                      /* tp_str */
+    (reprfunc)complex_repr,                     /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */

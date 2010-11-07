@@ -265,6 +265,14 @@ Supported operations:
 | ``abs(t)``                     | equivalent to +\ *t* when ``t.days >= 0``, and|
 |                                | to -*t* when ``t.days < 0``. (2)              |
 +--------------------------------+-----------------------------------------------+
+| ``str(t)``                     | Returns a string in the form                  |
+|                                | ``[D day[s], ][H]H:MM:SS[.UUUUUU]``, where D  |
+|                                | is negative for negative ``t``. (5)           |
++--------------------------------+-----------------------------------------------+
+| ``repr(t)``                    | Returns a string in the form                  |
+|                                | ``datetime.timedelta(D[, S[, U]])``, where D  |
+|                                | is negative for negative ``t``. (5)           |
++--------------------------------+-----------------------------------------------+
 
 Notes:
 
@@ -280,16 +288,25 @@ Notes:
 (4)
    -*timedelta.max* is not representable as a :class:`timedelta` object.
 
+(5)
+  String representations of :class:`timedelta` objects are normalized
+  similarly to their internal representation.  This leads to somewhat
+  unusual results for negative timedeltas.  For example:
+
+  >>> timedelta(hours=-5)
+  datetime.timedelta(-1, 68400)
+  >>> print(_)
+  -1 day, 19:00:00
+
 In addition to the operations listed above :class:`timedelta` objects support
 certain additions and subtractions with :class:`date` and :class:`datetime`
 objects (see below).
 
-.. versionadded:: 3.2
-   Floor division and true division of a :class:`timedelta` object by
-   another :class:`timedelta` object are now supported, as are
-   remainder operations and the :func:`divmod` function.  True
-   division and multiplication of a :class:`timedelta` object by
-   a :class:`float` object are now supported.
+.. versionchanged:: 3.2
+   Floor division and true division of a :class:`timedelta` object by another
+   :class:`timedelta` object are now supported, as are remainder operations and
+   the :func:`divmod` function.  True division and multiplication of a
+   :class:`timedelta` object by a :class:`float` object are now supported.
 
 
 Comparisons of :class:`timedelta` objects are supported with the
@@ -379,7 +396,7 @@ Other constructors, all class methods:
 
    Return the local date corresponding to the POSIX timestamp, such as is returned
    by :func:`time.time`.  This may raise :exc:`ValueError`, if the timestamp is out
-   of the range of values supported by the platform C :cfunc:`localtime` function.
+   of the range of values supported by the platform C :c:func:`localtime` function.
    It's common for this to be restricted to years from 1970 through 2038.  Note
    that on non-POSIX systems that include leap seconds in their notion of a
    timestamp, leap seconds are ignored by :meth:`fromtimestamp`.
@@ -553,7 +570,7 @@ Instance methods:
    Return a string representing the date, for example ``date(2002, 12,
    4).ctime() == 'Wed Dec 4 00:00:00 2002'``. ``d.ctime()`` is equivalent to
    ``time.ctime(time.mktime(d.timetuple()))`` on platforms where the native C
-   :cfunc:`ctime` function (which :func:`time.ctime` invokes, but which
+   :c:func:`ctime` function (which :func:`time.ctime` invokes, but which
    :meth:`date.ctime` does not invoke) conforms to the C standard.
 
 
@@ -660,7 +677,7 @@ Other constructors, all class methods:
    or not specified, this is like :meth:`today`, but, if possible, supplies more
    precision than can be gotten from going through a :func:`time.time` timestamp
    (for example, this may be possible on platforms supplying the C
-   :cfunc:`gettimeofday` function).
+   :c:func:`gettimeofday` function).
 
    Else *tz* must be an instance of a class :class:`tzinfo` subclass, and the
    current date and time are converted to *tz*'s time zone.  In this case the
@@ -688,8 +705,8 @@ Other constructors, all class methods:
    ``tz.fromutc(datetime.utcfromtimestamp(timestamp).replace(tzinfo=tz))``.
 
    :meth:`fromtimestamp` may raise :exc:`ValueError`, if the timestamp is out of
-   the range of values supported by the platform C :cfunc:`localtime` or
-   :cfunc:`gmtime` functions.  It's common for this to be restricted to years in
+   the range of values supported by the platform C :c:func:`localtime` or
+   :c:func:`gmtime` functions.  It's common for this to be restricted to years in
    1970 through 2038. Note that on non-POSIX systems that include leap seconds in
    their notion of a timestamp, leap seconds are ignored by :meth:`fromtimestamp`,
    and then it's possible to have two timestamps differing by a second that yield
@@ -700,7 +717,7 @@ Other constructors, all class methods:
 
    Return the UTC :class:`datetime` corresponding to the POSIX timestamp, with
    :attr:`tzinfo` ``None``. This may raise :exc:`ValueError`, if the timestamp is
-   out of the range of values supported by the platform C :cfunc:`gmtime` function.
+   out of the range of values supported by the platform C :c:func:`gmtime` function.
    It's common for this to be restricted to years in 1970 through 2038. See also
    :meth:`fromtimestamp`.
 
@@ -962,7 +979,7 @@ Instance methods:
    d.toordinal() - date(d.year, 1, 1).toordinal() + 1`` is the day number within
    the current year starting with ``1`` for January 1st. The :attr:`tm_isdst` flag
    of the result is set according to the :meth:`dst` method: :attr:`tzinfo` is
-   ``None`` or :meth:`dst`` returns ``None``, :attr:`tm_isdst` is set to ``-1``;
+   ``None`` or :meth:`dst` returns ``None``, :attr:`tm_isdst` is set to ``-1``;
    else if :meth:`dst` returns a non-zero value, :attr:`tm_isdst` is set to ``1``;
    else :attr:`tm_isdst` is set to ``0``.
 
@@ -1039,7 +1056,7 @@ Instance methods:
    Return a string representing the date and time, for example ``datetime(2002, 12,
    4, 20, 30, 40).ctime() == 'Wed Dec  4 20:30:40 2002'``. ``d.ctime()`` is
    equivalent to ``time.ctime(time.mktime(d.timetuple()))`` on platforms where the
-   native C :cfunc:`ctime` function (which :func:`time.ctime` invokes, but which
+   native C :c:func:`ctime` function (which :func:`time.ctime` invokes, but which
    :meth:`datetime.ctime` does not invoke) conforms to the C standard.
 
 
@@ -1761,9 +1778,7 @@ Notes:
    For example, if :meth:`utcoffset` returns ``timedelta(hours=-3, minutes=-30)``,
    ``%z`` is replaced with the string ``'-0330'``.
 
-.. versionadded:: 3.2
-
-   When the ``%z`` directive is provided to the :meth:`strptime`
-   method, an aware :class:`datetime` object will be produced.  The
-   ``tzinfo`` of the result will be set to a :class:`timezone`
-   instance.
+.. versionchanged:: 3.2
+   When the ``%z`` directive is provided to the :meth:`strptime` method, an
+   aware :class:`datetime` object will be produced.  The ``tzinfo`` of the
+   result will be set to a :class:`timezone` instance.

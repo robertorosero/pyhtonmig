@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: latin-1 -*-
 """Generate Python documentation in HTML or text for interactive use.
 
 In the Python interpreter, do "from pydoc import help" to provide online
@@ -1695,9 +1694,12 @@ class Helper:
         'CONTEXTMANAGERS': ('context-managers', 'with'),
     }
 
-    def __init__(self, input, output):
-        self.input = input
-        self.output = output
+    def __init__(self, input=None, output=None):
+        self._input = input
+        self._output = output
+
+    input  = property(lambda self: self._input or sys.stdin)
+    output = property(lambda self: self._output or sys.stdout)
 
     def __repr__(self):
         if inspect.stack()[1][3] == '?':
@@ -1874,7 +1876,7 @@ Enter any module name to get more help.  Or, type "modules spam" to search
 for modules whose descriptions contain the word "spam".
 ''')
 
-help = Helper(sys.stdin, sys.stdout)
+help = Helper()
 
 class Scanner:
     """A generic tree iterator."""
@@ -2026,7 +2028,7 @@ pydoc</strong> by Ka-Ping Yee &lt;ping@lfw.org&gt;</font>'''
     class DocServer(http.server.HTTPServer):
         def __init__(self, port, callback):
             host = 'localhost'
-            self.address = ('', port)
+            self.address = (host, port)
             self.url = 'http://%s:%d/' % (host, port)
             self.callback = callback
             self.base.__init__(self, self.address, self.handler)

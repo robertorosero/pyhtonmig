@@ -6,6 +6,7 @@ import os
 import sys
 import getopt
 
+
 def main():
     tabsize = 8
     try:
@@ -23,11 +24,11 @@ def main():
     for filename in args:
         process(filename, tabsize)
 
-def process(filename, tabsize):
+
+def process(filename, tabsize, verbose=True):
     try:
-        f = open(filename)
-        text = f.read()
-        f.close()
+        with open(filename) as f:
+            text = f.read()
     except IOError as msg:
         print("%r: I/O error: %s" % (filename, msg))
         return
@@ -43,10 +44,11 @@ def process(filename, tabsize):
         os.rename(filename, backup)
     except os.error:
         pass
-    f = open(filename, "w")
-    f.write(newtext)
-    f.close()
-    print(filename)
+    with open(filename, "w") as f:
+        f.write(newtext)
+    if verbose:
+        print(filename)
+
 
 if __name__ == '__main__':
     main()

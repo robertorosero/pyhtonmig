@@ -3,6 +3,7 @@ import unittest
 
 from test import support
 import time
+import locale
 
 result_2004_text = """
                                   2004
@@ -250,6 +251,19 @@ class CalendarTestCase(unittest.TestCase):
             # verify it "acts like a sequence" in two forms of iteration
             self.assertEqual(value[::-1], list(reversed(value)))
 
+    def test_localecalendars(self):
+        # ensure that Locale{Text,HTML}Calendar resets the locale properly
+        # (it is still not thread-safe though)
+        old_october = calendar.TextCalendar().formatmonthname(2010, 10, 10)
+        try:
+            calendar.LocaleTextCalendar(locale='').formatmonthname(2010, 10, 10)
+        except locale.Error:
+            # cannot set the system default locale -- skip rest of test
+            return
+        calendar.LocaleHTMLCalendar(locale='').formatmonthname(2010, 10)
+        new_october = calendar.TextCalendar().formatmonthname(2010, 10, 10)
+        self.assertEquals(old_october, new_october)
+
 
 class MonthCalendarTestCase(unittest.TestCase):
     def setUp(self):
@@ -389,6 +403,34 @@ class TimegmTestCase(unittest.TestCase):
             tuple = time.gmtime(secs)
             self.assertEqual(secs, calendar.timegm(tuple))
 
+class MonthRangeTestCase(unittest.TestCase):
+    def test_january(self):
+        # Tests valid lower boundary case.
+        self.assertEqual(calendar.monthrange(2004,1), (3,31))
+
+    def test_february_leap(self):
+        # Tests February during leap year.
+        self.assertEqual(calendar.monthrange(2004,2), (6,29))
+
+    def test_february_nonleap(self):
+        # Tests February in non-leap year.
+        self.assertEqual(calendar.monthrange(2010,2), (0,28))
+
+    def test_december(self):
+        # Tests valid upper boundary case.
+        self.assertEqual(calendar.monthrange(2004,12), (2,31))
+
+    def test_zeroth_month(self):
+        # Tests low invalid boundary case.
+        with self.assertRaises(calendar.IllegalMonthError):
+            calendar.monthrange(2004, 0)
+
+    def test_thirteenth_month(self):
+        # Tests high invalid boundary case.
+        with self.assertRaises(calendar.IllegalMonthError):
+            calendar.monthrange(2004, 13)
+
+
 def test_main():
     support.run_unittest(
         OutputTestCase,
@@ -396,6 +438,7 @@ def test_main():
         MondayTestCase,
         SundayTestCase,
         TimegmTestCase,
+        MonthRangeTestCase,
     )
 
 

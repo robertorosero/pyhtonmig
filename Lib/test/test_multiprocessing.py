@@ -13,7 +13,6 @@ import os
 import gc
 import signal
 import array
-import copy
 import socket
 import random
 import logging
@@ -36,6 +35,12 @@ import multiprocessing.heap
 import multiprocessing.pool
 
 from multiprocessing import util
+
+try:
+    from multiprocessing.sharedctypes import Value, copy
+    HAS_SHAREDCTYPES = True
+except ImportError:
+    HAS_SHAREDCTYPES = False
 
 #
 #
@@ -71,7 +76,7 @@ WIN32 = (sys.platform == "win32")
 #
 
 try:
-    from ctypes import Structure, Value, copy, c_int, c_double
+    from ctypes import Structure, c_int, c_double
 except ImportError:
     Structure = object
     c_int = c_double = None
@@ -113,6 +118,13 @@ class BaseTestCase(object):
         else:
             return self.assertEqual(value, res)
 
+    # For the sanity of Windows users, rather than crashing or freezing in
+    # multiple ways.
+    def __reduce__(self, *args):
+        raise NotImplementedError("shouldn't try to pickle a test case")
+
+    __reduce_ex__ = __reduce__
+
 #
 # Return the value of a semaphore
 #
@@ -151,12 +163,13 @@ class _TestProcess(BaseTestCase):
         self.assertEqual(current.ident, os.getpid())
         self.assertEqual(current.exitcode, None)
 
-    def _test(self, q, *args, **kwds):
-        current = self.current_process()
+    @classmethod
+    def _test(cls, q, *args, **kwds):
+        current = cls.current_process()
         q.put(args)
         q.put(kwds)
         q.put(current.name)
-        if self.TYPE != 'threads':
+        if cls.TYPE != 'threads':
             q.put(bytes(current.authkey))
             q.put(current.pid)
 
@@ -199,7 +212,8 @@ class _TestProcess(BaseTestCase):
         self.assertEquals(p.is_alive(), False)
         self.assertNotIn(p, self.active_children())
 
-    def _test_terminate(self):
+    @classmethod
+    def _test_terminate(cls):
         time.sleep(1000)
 
     def test_terminate(self):
@@ -248,13 +262,14 @@ class _TestProcess(BaseTestCase):
         p.join()
         self.assertNotIn(p, self.active_children())
 
-    def _test_recursion(self, wconn, id):
+    @classmethod
+    def _test_recursion(cls, wconn, id):
         from multiprocessing import forking
         wconn.send(id)
         if len(id) < 2:
             for i in range(2):
-                p = self.Process(
-                    target=self._test_recursion, args=(wconn, id+[i])
+                p = cls.Process(
+                    target=cls._test_recursion, args=(wconn, id+[i])
                     )
                 p.start()
                 p.join()
@@ -337,7 +352,8 @@ def queue_full(q, maxsize):
 class _TestQueue(BaseTestCase):
 
 
-    def _test_put(self, queue, child_can_start, parent_can_continue):
+    @classmethod
+    def _test_put(cls, queue, child_can_start, parent_can_continue):
         child_can_start.wait()
         for i in range(6):
             queue.get()
@@ -401,7 +417,8 @@ class _TestQueue(BaseTestCase):
 
         proc.join()
 
-    def _test_get(self, queue, child_can_start, parent_can_continue):
+    @classmethod
+    def _test_get(cls, queue, child_can_start, parent_can_continue):
         child_can_start.wait()
         #queue.put(1)
         queue.put(2)
@@ -462,7 +479,8 @@ class _TestQueue(BaseTestCase):
 
         proc.join()
 
-    def _test_fork(self, queue):
+    @classmethod
+    def _test_fork(cls, queue):
         for i in range(10, 20):
             queue.put(i)
         # note that at this point the items may only be buffered, so the
@@ -510,7 +528,8 @@ class _TestQueue(BaseTestCase):
         q.get()
         self.assertEqual(q.qsize(), 0)
 
-    def _test_task_done(self, q):
+    @classmethod
+    def _test_task_done(cls, q):
         for obj in iter(q.get, None):
             time.sleep(DELTA)
             q.task_done()
@@ -622,7 +641,8 @@ class _TestSemaphore(BaseTestCase):
 
 class _TestCondition(BaseTestCase):
 
-    def f(self, cond, sleeping, woken, timeout=None):
+    @classmethod
+    def f(cls, cond, sleeping, woken, timeout=None):
         cond.acquire()
         sleeping.release()
         cond.wait(timeout)
@@ -748,13 +768,14 @@ class _TestCondition(BaseTestCase):
         cond.acquire()
         res = wait(TIMEOUT1)
         cond.release()
-        self.assertEqual(res, None)
+        self.assertEqual(res, False)
         self.assertTimingAlmostEqual(wait.elapsed, TIMEOUT1)
 
 
 class _TestEvent(BaseTestCase):
 
-    def _test_event(self, event):
+    @classmethod
+    def _test_event(cls, event):
         time.sleep(TIMEOUT2)
         event.set()
 
@@ -794,6 +815,8 @@ class _TestEvent(BaseTestCase):
 #
 #
 
+@unittest.skipUnless(HAS_SHAREDCTYPES,
+                     "requires multiprocessing.sharedctypes")
 class _TestValue(BaseTestCase):
 
     ALLOWED_TYPES = ('processes',)
@@ -805,12 +828,12 @@ class _TestValue(BaseTestCase):
         ('c', latin('x'), latin('y'))
         ]
 
-    def _test(self, values):
-        for sv, cv in zip(values, self.codes_values):
+    @classmethod
+    def _test(cls, values):
+        for sv, cv in zip(values, cls.codes_values):
             sv.value = cv[2]
 
 
-    @unittest.skipIf(c_int is None, "requires _ctypes")
     def test_value(self, raw=False):
         if raw:
             values = [self.RawValue(code, value)
@@ -829,11 +852,9 @@ class _TestValue(BaseTestCase):
         for sv, cv in zip(values, self.codes_values):
             self.assertEqual(sv.value, cv[2])
 
-    @unittest.skipIf(c_int is None, "requires _ctypes")
     def test_rawvalue(self):
         self.test_value(raw=True)
 
-    @unittest.skipIf(c_int is None, "requires _ctypes")
     def test_getobj_getlock(self):
         val1 = self.Value('i', 5)
         lock1 = val1.get_lock()
@@ -864,7 +885,8 @@ class _TestArray(BaseTestCase):
 
     ALLOWED_TYPES = ('processes',)
 
-    def f(self, seq):
+    @classmethod
+    def f(cls, seq):
         for i in range(1, len(seq)):
             seq[i] += seq[i-1]
 
@@ -1138,11 +1160,9 @@ def baz():
         yield i*i
 
 class IteratorProxy(BaseProxy):
-    _exposed_ = ('next', '__next__')
+    _exposed_ = ('__next__',)
     def __iter__(self):
         return self
-    def __next__(self):
-        return self._callmethod('next')
     def __next__(self):
         return self._callmethod('__next__')
 
@@ -1209,7 +1229,8 @@ class _TestRemoteManager(BaseTestCase):
 
     ALLOWED_TYPES = ('manager',)
 
-    def _putter(self, address, authkey):
+    @classmethod
+    def _putter(cls, address, authkey):
         manager = QueueManager2(
             address=address, authkey=authkey, serializer=SERIALIZER
             )
@@ -1247,7 +1268,8 @@ class _TestRemoteManager(BaseTestCase):
 
 class _TestManagerRestart(BaseTestCase):
 
-    def _putter(self, address, authkey):
+    @classmethod
+    def _putter(cls, address, authkey):
         manager = QueueManager(
             address=address, authkey=authkey, serializer=SERIALIZER)
         manager.connect()
@@ -1258,7 +1280,11 @@ class _TestManagerRestart(BaseTestCase):
         authkey = os.urandom(32)
         manager = QueueManager(
             address=('localhost', 0), authkey=authkey, serializer=SERIALIZER)
-        addr = manager.get_server().address
+        srvr = manager.get_server()
+        addr = srvr.address
+        # Close the connection.Listener socket which gets opened as a part
+        # of manager.get_server(). It's not needed for the test.
+        srvr.listener.close()
         manager.start()
 
         p = self.Process(target=self._putter, args=(manager.address, authkey))
@@ -1282,7 +1308,8 @@ class _TestConnection(BaseTestCase):
 
     ALLOWED_TYPES = ('processes', 'threads')
 
-    def _echo(self, conn):
+    @classmethod
+    def _echo(cls, conn):
         for msg in iter(conn.recv_bytes, SENTINEL):
             conn.send_bytes(msg)
         conn.close()
@@ -1431,8 +1458,9 @@ class _TestListenerClient(BaseTestCase):
 
     ALLOWED_TYPES = ('processes', 'threads')
 
-    def _test(self, address):
-        conn = self.connection.Client(address)
+    @classmethod
+    def _test(cls, address):
+        conn = cls.connection.Client(address)
         conn.send('hello')
         conn.close()
 
@@ -1587,11 +1615,14 @@ class _Foo(Structure):
         ('y', c_double)
         ]
 
+@unittest.skipUnless(HAS_SHAREDCTYPES,
+                     "requires multiprocessing.sharedctypes")
 class _TestSharedCTypes(BaseTestCase):
 
     ALLOWED_TYPES = ('processes',)
 
-    def _double(self, x, y, foo, arr, string):
+    @classmethod
+    def _double(cls, x, y, foo, arr, string):
         x.value *= 2
         y.value *= 2
         foo.x *= 2
@@ -1600,14 +1631,13 @@ class _TestSharedCTypes(BaseTestCase):
         for i in range(len(arr)):
             arr[i] *= 2
 
-    @unittest.skipIf(c_int is None, "requires _ctypes")
     def test_sharedctypes(self, lock=False):
         x = Value('i', 7, lock=lock)
         y = Value(c_double, 1.0/3.0, lock=lock)
         foo = Value(_Foo, 3, 2, lock=lock)
         arr = self.Array('d', list(range(10)), lock=lock)
         string = self.Array('c', 20, lock=lock)
-        string.value = 'hello'
+        string.value = latin('hello')
 
         p = self.Process(target=self._double, args=(x, y, foo, arr, string))
         p.start()
@@ -1624,7 +1654,6 @@ class _TestSharedCTypes(BaseTestCase):
     def test_synchronize(self):
         self.test_sharedctypes(lock=True)
 
-    @unittest.skipIf(c_int is None, "requires _ctypes")
     def test_copy(self):
         foo = _Foo(2, 5.0)
         bar = copy(foo)
@@ -1641,7 +1670,8 @@ class _TestFinalize(BaseTestCase):
 
     ALLOWED_TYPES = ('processes',)
 
-    def _test_finalize(self, conn):
+    @classmethod
+    def _test_finalize(cls, conn):
         class Foo(object):
             pass
 
@@ -1735,7 +1765,8 @@ class _TestLogging(BaseTestCase):
         logger.info('nor will this')
         logger.setLevel(LOG_LEVEL)
 
-    def _test_level(self, conn):
+    @classmethod
+    def _test_level(cls, conn):
         logger = multiprocessing.get_logger()
         conn.send(logger.getEffectiveLevel())
 

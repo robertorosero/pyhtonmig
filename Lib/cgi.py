@@ -31,13 +31,13 @@ __version__ = "2.6"
 # Imports
 # =======
 
-from operator import attrgetter
 from io import StringIO
 import sys
 import os
 import urllib.parse
 import email.parser
 from warnings import warn
+import html
 
 __all__ = ["MiniFieldStorage", "FieldStorage",
            "parse", "parse_qs", "parse_qsl", "parse_multipart",
@@ -114,7 +114,7 @@ def parse(fp=None, environ=os.environ, keep_blank_values=0, strict_parsing=0):
         environ         : environment dictionary; default: os.environ
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded forms should be treated as blank strings.
+            percent-encoded forms should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -394,7 +394,7 @@ class FieldStorage:
         environ         : environment dictionary; default: os.environ
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded forms should be treated as blank strings.
+            percent-encoded forms should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -800,8 +800,8 @@ def print_exception(type=None, value=None, tb=None, limit=None):
     list = traceback.format_tb(tb, limit) + \
            traceback.format_exception_only(type, value)
     print("<PRE>%s<B>%s</B></PRE>" % (
-        escape("".join(list[:-1])),
-        escape(list[-1]),
+        html.escape("".join(list[:-1])),
+        html.escape(list[-1]),
         ))
     del tb
 
@@ -812,7 +812,7 @@ def print_environ(environ=os.environ):
     print("<H3>Shell Environment:</H3>")
     print("<DL>")
     for key in keys:
-        print("<DT>", escape(key), "<DD>", escape(environ[key]))
+        print("<DT>", html.escape(key), "<DD>", html.escape(environ[key]))
     print("</DL>")
     print()
 
@@ -825,10 +825,10 @@ def print_form(form):
         print("<P>No form fields.")
     print("<DL>")
     for key in keys:
-        print("<DT>" + escape(key) + ":", end=' ')
+        print("<DT>" + html.escape(key) + ":", end=' ')
         value = form[key]
-        print("<i>" + escape(repr(type(value))) + "</i>")
-        print("<DD>" + escape(repr(value)))
+        print("<i>" + html.escape(repr(type(value))) + "</i>")
+        print("<DD>" + html.escape(repr(value)))
     print("</DL>")
     print()
 
@@ -839,9 +839,9 @@ def print_directory():
     try:
         pwd = os.getcwd()
     except os.error as msg:
-        print("os.error:", escape(str(msg)))
+        print("os.error:", html.escape(str(msg)))
     else:
-        print(escape(pwd))
+        print(html.escape(pwd))
     print()
 
 def print_arguments():
@@ -899,15 +899,16 @@ environment as well.  Here are some common variable names:
 # =========
 
 def escape(s, quote=None):
-    '''Replace special characters "&", "<" and ">" to HTML-safe sequences.
-    If the optional flag quote is true, the quotation mark character (")
-    is also translated.'''
+    """Deprecated API."""
+    warn("cgi.escape is deprecated, use html.escape instead",
+         PendingDeprecationWarning, stacklevel=2)
     s = s.replace("&", "&amp;") # Must be done first!
     s = s.replace("<", "&lt;")
     s = s.replace(">", "&gt;")
     if quote:
         s = s.replace('"', "&quot;")
     return s
+
 
 def valid_boundary(s, _vb_pattern="^[ -~]{0,200}[!-~]$"):
     import re

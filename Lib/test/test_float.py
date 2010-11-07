@@ -540,17 +540,18 @@ class FormatTestCase(unittest.TestCase):
 
     @requires_IEEE_754
     def test_format_testfile(self):
-        for line in open(format_testfile):
-            if line.startswith('--'):
-                continue
-            line = line.strip()
-            if not line:
-                continue
+        with open(format_testfile) as testfile:
+            for line in testfile:
+                if line.startswith('--'):
+                    continue
+                line = line.strip()
+                if not line:
+                    continue
 
-            lhs, rhs = map(str.strip, line.split('->'))
-            fmt, arg = lhs.split()
-            self.assertEqual(fmt % float(arg), rhs)
-            self.assertEqual(fmt % -float(arg), '-' + rhs)
+                lhs, rhs = map(str.strip, line.split('->'))
+                fmt, arg = lhs.split()
+                self.assertEqual(fmt % float(arg), rhs)
+                self.assertEqual(fmt % -float(arg), '-' + rhs)
 
     def test_issue5864(self):
         self.assertEquals(format(123.456, '.4'), '123.5')
@@ -617,7 +618,9 @@ class ReprTestCase(unittest.TestCase):
             negs = '-'+s
             self.assertEqual(s, repr(float(s)))
             self.assertEqual(negs, repr(float(negs)))
-
+            # Since Python 3.2, repr and str are identical
+            self.assertEqual(repr(float(s)), str(float(s)))
+            self.assertEqual(repr(float(negs)), str(float(negs)))
 
 @requires_IEEE_754
 class RoundTestCase(unittest.TestCase):

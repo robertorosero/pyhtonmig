@@ -4,7 +4,6 @@ import sys
 import os
 import tempfile
 import shutil
-
 from test.support import run_unittest
 
 from distutils.core import Distribution

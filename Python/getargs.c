@@ -105,15 +105,7 @@ PyArg_VaParse(PyObject *args, const char *format, va_list va)
 {
     va_list lva;
 
-#ifdef VA_LIST_IS_ARRAY
-    memcpy(lva, va, sizeof(va_list));
-#else
-#ifdef __va_copy
-    __va_copy(lva, va);
-#else
-    lva = va;
-#endif
-#endif
+        Py_VA_COPY(lva, va);
 
     return vgetargs1(args, format, &lva, 0);
 }
@@ -123,15 +115,7 @@ _PyArg_VaParse_SizeT(PyObject *args, char *format, va_list va)
 {
     va_list lva;
 
-#ifdef VA_LIST_IS_ARRAY
-    memcpy(lva, va, sizeof(va_list));
-#else
-#ifdef __va_copy
-    __va_copy(lva, va);
-#else
-    lva = va;
-#endif
-#endif
+        Py_VA_COPY(lva, va);
 
     return vgetargs1(args, format, &lva, FLAG_SIZE_T);
 }
@@ -1246,13 +1230,15 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
             PyErr_Clear();
             return converterr("read-write buffer", arg, msgbuf, bufsize);
         }
+        if (!PyBuffer_IsContiguous((Py_buffer*)p, 'C')) {
+            PyBuffer_Release((Py_buffer*)p);
+            return converterr("contiguous buffer", arg, msgbuf, bufsize);
+        }
         if (addcleanup(p, freelist, cleanup_buffer)) {
             return converterr(
                 "(cleanup problem)",
                 arg, msgbuf, bufsize);
         }
-        if (!PyBuffer_IsContiguous((Py_buffer*)p, 'C'))
-            return converterr("contiguous buffer", arg, msgbuf, bufsize);
         break;
     }
 
@@ -1274,39 +1260,24 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 
     *errmsg = NULL;
     *p = NULL;
-    if (pb == NULL ||
-        pb->bf_getbuffer == NULL ||
-        pb->bf_releasebuffer != NULL) {
-        *errmsg = "bytes or read-only buffer";
+    if (pb != NULL && pb->bf_releasebuffer != NULL) {
+        *errmsg = "read-only pinned buffer";
         return -1;
     }
 
-    if (PyObject_GetBuffer(arg, &view, PyBUF_SIMPLE) != 0) {
-        *errmsg = "bytes or single-segment read-only buffer";
+    if (getbuffer(arg, &view, errmsg) < 0)
         return -1;
-    }
     count = view.len;
     *p = view.buf;
     PyBuffer_Release(&view);
     return count;
 }
 
-/* XXX for 3.x, getbuffer and convertbuffer can probably
-   be merged again. */
 static int
 getbuffer(PyObject *arg, Py_buffer *view, char **errmsg)
 {
-    PyBufferProcs *pb = Py_TYPE(arg)->tp_as_buffer;
-    if (pb == NULL) {
+    if (PyObject_GetBuffer(arg, view, PyBUF_SIMPLE) != 0) {
         *errmsg = "bytes or buffer";
-        return -1;
-    }
-    if (pb->bf_getbuffer == NULL) {
-        *errmsg = "convertible to a buffer";
-        return -1;
-    }
-    if (PyObject_GetBuffer(arg, view, 0) < 0) {
-        *errmsg = "convertible to a buffer";
         return -1;
     }
     if (!PyBuffer_IsContiguous(view, 'C')) {
@@ -1389,15 +1360,7 @@ PyArg_VaParseTupleAndKeywords(PyObject *args,
         return 0;
     }
 
-#ifdef VA_LIST_IS_ARRAY
-    memcpy(lva, va, sizeof(va_list));
-#else
-#ifdef __va_copy
-    __va_copy(lva, va);
-#else
-    lva = va;
-#endif
-#endif
+        Py_VA_COPY(lva, va);
 
     retval = vgetargskeywords(args, keywords, format, kwlist, &lva, 0);
     return retval;
@@ -1421,15 +1384,7 @@ _PyArg_VaParseTupleAndKeywords_SizeT(PyObject *args,
         return 0;
     }
 
-#ifdef VA_LIST_IS_ARRAY
-    memcpy(lva, va, sizeof(va_list));
-#else
-#ifdef __va_copy
-    __va_copy(lva, va);
-#else
-    lva = va;
-#endif
-#endif
+        Py_VA_COPY(lva, va);
 
     retval = vgetargskeywords(args, keywords, format,
                               kwlist, &lva, FLAG_SIZE_T);

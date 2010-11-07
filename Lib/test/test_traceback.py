@@ -5,7 +5,7 @@ from io import StringIO
 import sys
 import unittest
 import re
-from test.support import run_unittest, is_jython, Error, captured_output
+from test.support import run_unittest, Error, captured_output
 from test.support import TESTFN, unlink
 
 import traceback
@@ -29,10 +29,6 @@ class SyntaxTracebackCases(unittest.TestCase):
     def syntax_error_with_caret_2(self):
         compile("1 +\n", "?", "exec")
 
-    def syntax_error_without_caret(self):
-        # XXX why doesn't compile raise the same traceback?
-        import test.badsyntax_nocaret
-
     def syntax_error_bad_indentation(self):
         compile("def spam():\n  print(1)\n print(2)", "?", "exec")
 
@@ -51,13 +47,10 @@ class SyntaxTracebackCases(unittest.TestCase):
         self.assertTrue(err[1].find("+") == err[2].find("^")) # in the right place
 
     def test_nocaret(self):
-        if is_jython:
-            # jython adds a caret in this case (why shouldn't it?)
-            return
-        err = self.get_exception_format(self.syntax_error_without_caret,
-                                        SyntaxError)
+        exc = SyntaxError("error", ("x.py", 23, None, "bad syntax"))
+        err = traceback.format_exception_only(SyntaxError, exc)
         self.assertEqual(len(err), 3)
-        self.assertTrue(err[1].strip() == "[x for x in x] = x")
+        self.assertEqual(err[1].strip(), "bad syntax")
 
     def test_bad_indentation(self):
         err = self.get_exception_format(self.syntax_error_bad_indentation,
@@ -296,6 +289,16 @@ class BaseExceptionReportingTests:
         self.assertIn('inner_raise() # Marker', blocks[2])
         self.check_zero_div(blocks[2])
 
+    def test_syntax_error_offset_at_eol(self):
+        # See #10186.
+        def e():
+            raise SyntaxError('', ('', 0, 5, 'hello'))
+        msg = self.get_report(e).splitlines()
+        self.assertEqual(msg[-2], "        ^")
+        def e():
+            exec("x = 5 | 4 |")
+        msg = self.get_report(e).splitlines()
+        self.assertEqual(msg[-2], '              ^')
 
 
 class PyExcReportingTests(BaseExceptionReportingTests, unittest.TestCase):

@@ -197,6 +197,7 @@ typedef struct {
     int detached;
     int readable;
     int writable;
+    int deallocating;
     
     /* True if this is a vanilla Buffered object (rather than a user derived
        class) *and* the raw stream is a vanilla FileIO object. */
@@ -342,6 +343,7 @@ typedef struct {
 static void
 buffered_dealloc(buffered *self)
 {
+    self->deallocating = 1;
     if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
         return;
     _PyObject_GC_UNTRACK(self);
@@ -380,6 +382,23 @@ buffered_clear(buffered *self)
     Py_CLEAR(self->raw);
     Py_CLEAR(self->dict);
     return 0;
+}
+
+/* Because this can call arbitrary code, it shouldn't be called when
+   the refcount is 0 (that is, not directly from tp_dealloc unless
+   the refcount has been temporarily re-incremented). */
+PyObject *
+buffered_dealloc_warn(buffered *self, PyObject *source)
+{
+    if (self->ok && self->raw) {
+        PyObject *r;
+        r = PyObject_CallMethod(self->raw, "_dealloc_warn", "O", source);
+        if (r)
+            Py_DECREF(r);
+        else
+            PyErr_Clear();
+    }
+    Py_RETURN_NONE;
 }
 
 /*
@@ -434,6 +453,14 @@ buffered_close(buffered *self, PyObject *args)
         res = Py_None;
         Py_INCREF(res);
         goto end;
+    }
+
+    if (self->deallocating) {
+        PyObject *r = buffered_dealloc_warn(self, (PyObject *) self);
+        if (r)
+            Py_DECREF(r);
+        else
+            PyErr_Clear();
     }
     /* flush() will most probably re-take the lock, so drop it first */
     LEAVE_BUFFERED(self)
@@ -522,6 +549,15 @@ buffered_isatty(buffered *self, PyObject *args)
     return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_isatty, NULL);
 }
 
+/* Serialization */
+
+static PyObject *
+buffered_getstate(buffered *self, PyObject *args)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "cannot serialize '%s' object", Py_TYPE(self)->tp_name);
+    return NULL;
+}
 
 /* Forward decls */
 static PyObject *
@@ -636,6 +672,8 @@ _buffered_init(buffered *self)
         return -1;
     }
 #ifdef WITH_THREAD
+    if (self->lock)
+        PyThread_free_lock(self->lock);
     self->lock = PyThread_allocate_lock();
     if (self->lock == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "can't allocate read lock");
@@ -1381,7 +1419,10 @@ _bufferedreader_read_generic(buffered *self, Py_ssize_t n)
     self->pos = 0;
     self->raw_pos = 0;
     self->read_end = 0;
-    while (self->read_end < self->buffer_size) {
+    /* NOTE: when the read is satisfied, we avoid issuing any additional
+       reads, which could block indefinitely (e.g. on a socket).
+       See issue #9550. */
+    while (remaining > 0 && self->read_end < self->buffer_size) {
         Py_ssize_t r = _bufferedreader_fill_buffer(self);
         if (r == -1)
             goto error;
@@ -1456,6 +1497,8 @@ static PyMethodDef bufferedreader_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"read", (PyCFunction)buffered_read, METH_VARARGS},
     {"peek", (PyCFunction)buffered_peek, METH_VARARGS},
@@ -1660,6 +1703,11 @@ _bufferedwriter_flush_unlocked(buffered *self, int restore_pos)
         self->write_pos += n;
         self->raw_pos = self->write_pos;
         written += Py_SAFE_DOWNCAST(n, Py_off_t, Py_ssize_t);
+        /* Partial writes can return successfully when interrupted by a
+           signal (see write(2)).  We must run signal handlers before
+           blocking another time, possibly indefinitely. */
+        if (PyErr_CheckSignals() < 0)
+            goto error;
     }
 
     if (restore_pos) {
@@ -1797,6 +1845,11 @@ bufferedwriter_write(buffered *self, PyObject *args)
         }
         written += n;
         remaining -= n;
+        /* Partial writes can return successfully when interrupted by a
+           signal (see write(2)).  We must run signal handlers before
+           blocking another time, possibly indefinitely. */
+        if (PyErr_CheckSignals() < 0)
+            goto error;
     }
     if (self->readable)
         _bufferedreader_reset_buf(self);
@@ -1828,6 +1881,8 @@ static PyMethodDef bufferedwriter_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"write", (PyCFunction)bufferedwriter_write, METH_VARARGS},
     {"truncate", (PyCFunction)buffered_truncate, METH_VARARGS},
@@ -2093,6 +2148,8 @@ static PyMethodDef bufferedrwpair_methods[] = {
     {"close", (PyCFunction)bufferedrwpair_close, METH_NOARGS},
     {"isatty", (PyCFunction)bufferedrwpair_isatty, METH_NOARGS},
 
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
+
     {NULL, NULL}
 };
 
@@ -2212,6 +2269,8 @@ static PyMethodDef bufferedrandom_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"flush", (PyCFunction)buffered_flush, METH_NOARGS},
 
@@ -2281,4 +2340,3 @@ PyTypeObject PyBufferedRandom_Type = {
     0,                          /* tp_alloc */
     PyType_GenericNew,          /* tp_new */
 };
-

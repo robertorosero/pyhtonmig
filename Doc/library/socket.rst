@@ -118,7 +118,7 @@ The module :mod:`socket` exports the following constants and functions:
 
    The accompanying value is a pair ``(h_errno, string)`` representing an error
    returned by a library call. *string* represents the description of *h_errno*, as
-   returned by the :cfunc:`hstrerror` C function.
+   returned by the :c:func:`hstrerror` C function.
 
 
 .. exception:: gaierror
@@ -126,7 +126,7 @@ The module :mod:`socket` exports the following constants and functions:
    This exception is raised for address-related errors, for :func:`getaddrinfo` and
    :func:`getnameinfo`. The accompanying value is a pair ``(error, string)``
    representing an error returned by a library call. *string* represents the
-   description of *error*, as returned by the :cfunc:`gai_strerror` C function. The
+   description of *error*, as returned by the :c:func:`gai_strerror` C function. The
    *error* value will match one of the :const:`EAI_\*` constants defined in this
    module.
 
@@ -157,6 +157,21 @@ The module :mod:`socket` exports the following constants and functions:
    :func:`socket`. (Only :const:`SOCK_STREAM` and :const:`SOCK_DGRAM` appear to be
    generally useful.)
 
+.. data:: SOCK_CLOEXEC
+          SOCK_NONBLOCK
+
+   These two constants, if defined, can be combined with the socket types and
+   allow you to set some flags atomically (thus avoiding possible race
+   conditions and the need for separate calls).
+
+   .. seealso::
+
+      `Secure File Descriptor Handling <http://udrepper.livejournal.com/20407.html>`_
+      for a more thorough explanation.
+
+   Availability: Linux >= 2.6.27.
+
+   .. versionadded:: 3.2
 
 .. data:: SO_*
           SOMAXCONN
@@ -213,8 +228,11 @@ The module :mod:`socket` exports the following constants and functions:
    .. versionchanged:: 3.2
       *source_address* was added.
 
+   .. versionchanged:: 3.2
+      support for the :keyword:`with` statement was added.
 
-.. function:: getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0)
+
+.. function:: getaddrinfo(host, port, family=0, type=0, proto=0, flags=0)
 
    Translate the *host*/*port* argument into a sequence of 5-tuples that contain
    all the necessary arguments for creating a socket connected to that service.
@@ -223,7 +241,7 @@ The module :mod:`socket` exports the following constants and functions:
    port number or ``None``.  By passing ``None`` as the value of *host*
    and *port*, you can pass ``NULL`` to the underlying C API.
 
-   The *family*, *socktype* and *proto* arguments can be optionally specified
+   The *family*, *type* and *proto* arguments can be optionally specified
    in order to narrow the list of addresses returned.  Passing zero as a
    value for each of these arguments selects the full range of results.
    The *flags* argument can be one or several of the ``AI_*`` constants,
@@ -233,9 +251,9 @@ The module :mod:`socket` exports the following constants and functions:
 
    The function returns a list of 5-tuples with the following structure:
 
-   ``(family, socktype, proto, canonname, sockaddr)``
+   ``(family, type, proto, canonname, sockaddr)``
 
-   In these tuples, *family*, *socktype*, *proto* are all integers and are
+   In these tuples, *family*, *type*, *proto* are all integers and are
    meant to be passed to the :func:`socket` function.  *canonname* will be
    a string representing the canonical name of the *host* if
    :const:`AI_CANONNAME` is part of the *flags* argument; else *canonname*
@@ -249,9 +267,12 @@ The module :mod:`socket` exports the following constants and functions:
    connection to ``www.python.org`` on port 80 (results may differ on your
    system if IPv6 isn't enabled)::
 
-      >>> socket.getaddrinfo("www.python.org", 80, 0, 0, socket.SOL_TCP)
+      >>> socket.getaddrinfo("www.python.org", 80, proto=socket.SOL_TCP)
       [(2, 1, 6, '', ('82.94.164.162', 80)),
        (10, 1, 6, '', ('2001:888:2000:d::a2', 80, 0, 0))]
+
+   .. versionchanged:: 3.2
+      parameters can now be passed as single keyword arguments.
 
 .. function:: getfqdn([name])
 
@@ -358,6 +379,10 @@ The module :mod:`socket` exports the following constants and functions:
    if defined on the platform; otherwise, the default is :const:`AF_INET`.
    Availability: Unix.
 
+   .. versionchanged:: 3.2
+      The returned socket objects now support the whole socket API, rather
+      than a subset.
+
 
 .. function:: fromfd(fd, family, type[, proto])
 
@@ -369,7 +394,6 @@ The module :mod:`socket` exports the following constants and functions:
    This function is rarely needed, but can be used to get or set socket options on
    a socket passed to a program as standard input or output (such as a server
    started by the Unix inet daemon).  The socket is assumed to be in blocking mode.
-   Availability: Unix.
 
 
 .. function:: ntohl(x)
@@ -405,7 +429,7 @@ The module :mod:`socket` exports the following constants and functions:
    Convert an IPv4 address from dotted-quad string format (for example,
    '123.45.67.89') to 32-bit packed binary format, as a bytes object four characters in
    length.  This is useful when conversing with a program that uses the standard C
-   library and needs objects of type :ctype:`struct in_addr`, which is the C type
+   library and needs objects of type :c:type:`struct in_addr`, which is the C type
    for the 32-bit packed binary this function returns.
 
    :func:`inet_aton` also accepts strings with less than three dots; see the
@@ -413,7 +437,7 @@ The module :mod:`socket` exports the following constants and functions:
 
    If the IPv4 address string passed to this function is invalid,
    :exc:`socket.error` will be raised. Note that exactly what is valid depends on
-   the underlying C implementation of :cfunc:`inet_aton`.
+   the underlying C implementation of :c:func:`inet_aton`.
 
    :func:`inet_aton` does not support IPv6, and :func:`inet_pton` should be used
    instead for IPv4/v6 dual stack support.
@@ -424,7 +448,7 @@ The module :mod:`socket` exports the following constants and functions:
    Convert a 32-bit packed IPv4 address (a bytes object four characters in
    length) to its standard dotted-quad string representation (for example,
    '123.45.67.89').  This is useful when conversing with a program that uses the
-   standard C library and needs objects of type :ctype:`struct in_addr`, which
+   standard C library and needs objects of type :c:type:`struct in_addr`, which
    is the C type for the 32-bit packed binary data this function takes as an
    argument.
 
@@ -438,14 +462,14 @@ The module :mod:`socket` exports the following constants and functions:
 
    Convert an IP address from its family-specific string format to a packed,
    binary format. :func:`inet_pton` is useful when a library or network protocol
-   calls for an object of type :ctype:`struct in_addr` (similar to
-   :func:`inet_aton`) or :ctype:`struct in6_addr`.
+   calls for an object of type :c:type:`struct in_addr` (similar to
+   :func:`inet_aton`) or :c:type:`struct in6_addr`.
 
    Supported values for *address_family* are currently :const:`AF_INET` and
    :const:`AF_INET6`. If the IP address string *ip_string* is invalid,
    :exc:`socket.error` will be raised. Note that exactly what is valid depends on
    both the value of *address_family* and the underlying implementation of
-   :cfunc:`inet_pton`.
+   :c:func:`inet_pton`.
 
    Availability: Unix (maybe not all platforms).
 
@@ -455,8 +479,8 @@ The module :mod:`socket` exports the following constants and functions:
    Convert a packed IP address (a bytes object of some number of characters) to its
    standard, family-specific string representation (for example, ``'7.10.0.5'`` or
    ``'5aef:2b::8'``). :func:`inet_ntop` is useful when a library or network protocol
-   returns an object of type :ctype:`struct in_addr` (similar to :func:`inet_ntoa`)
-   or :ctype:`struct in6_addr`.
+   returns an object of type :c:type:`struct in_addr` (similar to :func:`inet_ntoa`)
+   or :c:type:`struct in6_addr`.
 
    Supported values for *address_family* are currently :const:`AF_INET` and
    :const:`AF_INET6`. If the string *packed_ip* is not the correct length for the
@@ -531,11 +555,20 @@ correspond to Unix system calls applicable to sockets.
 .. method:: socket.connect_ex(address)
 
    Like ``connect(address)``, but return an error indicator instead of raising an
-   exception for errors returned by the C-level :cfunc:`connect` call (other
+   exception for errors returned by the C-level :c:func:`connect` call (other
    problems, such as "host not found," can still raise exceptions).  The error
    indicator is ``0`` if the operation succeeded, otherwise the value of the
-   :cdata:`errno` variable.  This is useful to support, for example, asynchronous
+   :c:data:`errno` variable.  This is useful to support, for example, asynchronous
    connects.
+
+
+.. method:: socket.detach()
+
+   Put the socket object into closed state without actually closing the
+   underlying file descriptor.  The file descriptor is returned, and can
+   be reused for other purposes.
+
+   .. versionadded:: 3.2
 
 
 .. method:: socket.fileno()
@@ -594,19 +627,18 @@ correspond to Unix system calls applicable to sockets.
    is system-dependent (usually 5).
 
 
-.. method:: socket.makefile(mode='r', buffering=None, *, encoding=None, newline=None)
+.. method:: socket.makefile(mode='r', buffering=None, *, encoding=None, errors=None, newline=None)
 
    .. index:: single: I/O control; buffering
 
-   Return a :dfn:`file object` associated with the socket.  The exact
+   Return a :term:`file object` associated with the socket.  The exact
    returned type depends on the arguments given to :meth:`makefile`.  These
    arguments are interpreted the same way as by the built-in :func:`open`
    function.
 
-   The returned file object references a :cfunc:`dup`\ ped version of the
-   socket file descriptor, so the file object and socket object may be
-   closed or garbage-collected independently.  The socket must be in
-   blocking mode (it can not have a timeout).
+   Closing the file object won't close the socket unless there are no
+   remaining references to the socket.  The socket must be in blocking mode
+   (it can not have a timeout).
 
 
 .. method:: socket.recv(bufsize[, flags])

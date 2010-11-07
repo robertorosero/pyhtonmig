@@ -1,23 +1,20 @@
 import sys
 import os
-import tempfile
 import shutil
 from io import StringIO
-import warnings
-from test.support import check_warnings
-from test.support import captured_stdout
 
-from distutils.core import Extension, Distribution
+from distutils.core import Distribution
 from distutils.command.build_ext import build_ext
-import sysconfig
+from distutils import sysconfig
 from distutils.tests.support import TempdirManager
 from distutils.tests.support import LoggingSilencer
 from distutils.extension import Extension
-from distutils.errors import (UnknownFileError, DistutilsSetupError,
-                              CompileError)
+from distutils.errors import (
+    CompileError, DistutilsSetupError, UnknownFileError)
 
 import unittest
 from test import support
+from test.support import run_unittest
 
 # http://bugs.python.org/issue4373
 # Don't load the xx module more than once.
@@ -25,23 +22,19 @@ ALREADY_TESTED = False
 
 def _get_source_filename():
     srcdir = sysconfig.get_config_var('srcdir')
-    if srcdir is None:
-        return os.path.join(sysconfig.project_base, 'Modules', 'xxmodule.c')
     return os.path.join(srcdir, 'Modules', 'xxmodule.c')
 
-_XX_MODULE_PATH = _get_source_filename()
-
-class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
-
+class BuildExtTestCase(TempdirManager,
+                       LoggingSilencer,
+                       unittest.TestCase):
     def setUp(self):
         # Create a simple test environment
         # Note that we're making changes to sys.path
         super(BuildExtTestCase, self).setUp()
         self.tmp_dir = self.mkdtemp()
-        if os.path.exists(_XX_MODULE_PATH):
-            self.sys_path = sys.path[:]
-            sys.path.append(self.tmp_dir)
-            shutil.copy(_XX_MODULE_PATH, self.tmp_dir)
+        self.sys_path = sys.path, sys.path[:]
+        sys.path.append(self.tmp_dir)
+        shutil.copy(_get_source_filename(), self.tmp_dir)
         if sys.version > "2.6":
             import site
             self.old_user_base = site.USER_BASE
@@ -49,19 +42,25 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
             from distutils.command import build_ext
             build_ext.USER_BASE = site.USER_BASE
 
-    def tearDown(self):
-        # Get everything back to normal
-        if os.path.exists(_XX_MODULE_PATH):
-            support.unload('xx')
-            sys.path[:] = self.sys_path
-            # XXX on Windows the test leaves a directory
-            # with xx module in TEMP
-        shutil.rmtree(self.tmp_dir, os.name == 'nt' or
-                                    sys.platform == 'cygwin')
-        super(BuildExtTestCase, self).tearDown()
+    def _fixup_command(self, cmd):
+        # When Python was build with --enable-shared, -L. is not good enough
+        # to find the libpython<blah>.so.  This is because regrtest runs it
+        # under a tempdir, not in the top level where the .so lives.  By the
+        # time we've gotten here, Python's already been chdir'd to the
+        # tempdir.
+        #
+        # To further add to the fun, we can't just add library_dirs to the
+        # Extension() instance because that doesn't get plumbed through to the
+        # final compiler command.
+        if (sysconfig.get_config_var('Py_ENABLE_SHARED') and
+            not sys.platform.startswith('win')):
+            runshared = sysconfig.get_config_var('RUNSHARED')
+            if runshared is None:
+                cmd.library_dirs = ['.']
+            else:
+                name, equals, value = runshared.partition('=')
+                cmd.library_dirs = value.split(os.pathsep)
 
-    @unittest.skipIf(not os.path.exists(_XX_MODULE_PATH),
-                     'xxmodule.c not found')
     def test_build_ext(self):
         global ALREADY_TESTED
         xx_c = os.path.join(self.tmp_dir, 'xxmodule.c')
@@ -69,6 +68,7 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         dist = Distribution({'name': 'xx', 'ext_modules': [xx_ext]})
         dist.package_dir = self.tmp_dir
         cmd = build_ext(dist)
+        self._fixup_command(cmd)
         if os.name == "nt":
             # On Windows, we must build a debug version iff running
             # a debug build of Python
@@ -104,23 +104,35 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         self.assertTrue(isinstance(xx.Null(), xx.Null))
         self.assertTrue(isinstance(xx.Str(), xx.Str))
 
+    def tearDown(self):
+        # Get everything back to normal
+        support.unload('xx')
+        sys.path = self.sys_path[0]
+        sys.path[:] = self.sys_path[1]
+        if sys.version > "2.6":
+            import site
+            site.USER_BASE = self.old_user_base
+            from distutils.command import build_ext
+            build_ext.USER_BASE = self.old_user_base
+        super(BuildExtTestCase, self).tearDown()
+
     def test_solaris_enable_shared(self):
         dist = Distribution({'name': 'xx'})
         cmd = build_ext(dist)
         old = sys.platform
 
         sys.platform = 'sunos' # fooling finalize_options
-        from sysconfig import _CONFIG_VARS
-        old_var = _CONFIG_VARS.get('Py_ENABLE_SHARED')
-        _CONFIG_VARS['Py_ENABLE_SHARED'] = 1
+        from distutils.sysconfig import  _config_vars
+        old_var = _config_vars.get('Py_ENABLE_SHARED')
+        _config_vars['Py_ENABLE_SHARED'] = 1
         try:
             cmd.ensure_finalized()
         finally:
             sys.platform = old
             if old_var is None:
-                del _CONFIG_VARS['Py_ENABLE_SHARED']
+                del _config_vars['Py_ENABLE_SHARED']
             else:
-                _CONFIG_VARS['Py_ENABLE_SHARED'] = old_var
+                _config_vars['Py_ENABLE_SHARED'] = old_var
 
         # make sure we get some library dirs under solaris
         self.assertTrue(len(cmd.library_dirs) > 0)
@@ -182,10 +194,11 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         cmd = build_ext(dist)
         cmd.finalize_options()
 
-        py_include = sysconfig.get_path('include')
+        from distutils import sysconfig
+        py_include = sysconfig.get_python_inc()
         self.assertTrue(py_include in cmd.include_dirs)
 
-        plat_py_include = sysconfig.get_path('platinclude')
+        plat_py_include = sysconfig.get_python_inc(plat_specific=1)
         self.assertTrue(plat_py_include in cmd.include_dirs)
 
         # make sure cmd.libraries is turned into a list
@@ -242,7 +255,8 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         cmd.finalize_options()
 
         #'extensions' option must be a list of Extension instances
-        self.assertRaises(DistutilsSetupError, cmd.check_extensions_list, 'foo')
+        self.assertRaises(DistutilsSetupError,
+                          cmd.check_extensions_list, 'foo')
 
         # each element of 'ext_modules' option must be an
         # Extension instance or 2-tuple
@@ -309,6 +323,7 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         dist = Distribution({'name': 'xx',
                              'ext_modules': [ext]})
         cmd = build_ext(dist)
+        self._fixup_command(cmd)
         cmd.ensure_finalized()
         self.assertEquals(len(cmd.get_outputs()), 1)
 
@@ -330,17 +345,17 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         finally:
             os.chdir(old_wd)
         self.assertTrue(os.path.exists(so_file))
-        self.assertEquals(os.path.splitext(so_file)[-1],
-                          sysconfig.get_config_var('SO'))
+        so_ext = sysconfig.get_config_var('SO')
+        self.assertTrue(so_file.endswith(so_ext))
         so_dir = os.path.dirname(so_file)
         self.assertEquals(so_dir, other_tmp_dir)
 
         cmd.inplace = 0
+        cmd.compiler = None
         cmd.run()
         so_file = cmd.get_outputs()[0]
         self.assertTrue(os.path.exists(so_file))
-        self.assertEquals(os.path.splitext(so_file)[-1],
-                          sysconfig.get_config_var('SO'))
+        self.assertTrue(so_file.endswith(so_ext))
         so_dir = os.path.dirname(so_file)
         self.assertEquals(so_dir, cmd.build_lib)
 
@@ -403,26 +418,6 @@ class BuildExtTestCase(TempdirManager, LoggingSilencer, unittest.TestCase):
         path = cmd.get_ext_fullpath('twisted.runner.portmap')
         wanted = os.path.join(curdir, 'twisted', 'runner', 'portmap' + ext)
         self.assertEquals(wanted, path)
-
-    def test_compiler_deprecation_warning(self):
-        dist = Distribution()
-        cmd = build_ext(dist)
-
-        class MyCompiler(object):
-            def do_something(self):
-                pass
-
-        with check_warnings() as w:
-            warnings.simplefilter("always")
-            cmd.compiler = MyCompiler()
-            self.assertEquals(len(w.warnings), 1)
-            cmd.compile = 'unix'
-            self.assertEquals(len(w.warnings), 1)
-            cmd.compiler = MyCompiler()
-            cmd.compiler.do_something()
-            # two more warnings genereated by the get
-            # and the set
-            self.assertEquals(len(w.warnings), 3)
 
 def test_suite():
     src = _get_source_filename()

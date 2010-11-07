@@ -5,7 +5,7 @@ import shutil
 import sys
 import unittest
 from test import support
-
+import importlib
 
 class LockTests(unittest.TestCase):
 
@@ -42,26 +42,40 @@ class LockTests(unittest.TestCase):
                             "RuntimeError")
 
 class ImportTests(unittest.TestCase):
+    def setUp(self):
+        mod = importlib.import_module('test.encoded_modules')
+        self.test_strings = mod.test_strings
+        self.test_path = mod.__path__
+
+    def test_import_encoded_module(self):
+        for modname, encoding, teststr in self.test_strings:
+            mod = importlib.import_module('test.encoded_modules.'
+                                          'module_' + modname)
+            self.assertEqual(teststr, mod.test)
 
     def test_find_module_encoding(self):
-        fd = imp.find_module("pydoc")[0]
-        self.assertEqual(fd.encoding, "iso-8859-1")
+        for mod, encoding, _ in self.test_strings:
+            with imp.find_module('module_' + mod, self.test_path)[0] as fd:
+                self.assertEqual(fd.encoding, encoding)
 
     def test_issue1267(self):
-        fp, filename, info  = imp.find_module("pydoc")
-        self.assertNotEqual(fp, None)
-        self.assertEqual(fp.encoding, "iso-8859-1")
-        self.assertEqual(fp.tell(), 0)
-        self.assertEqual(fp.readline(), '#!/usr/bin/env python3\n')
-        fp.close()
+        for mod, encoding, _ in self.test_strings:
+            fp, filename, info  = imp.find_module('module_' + mod,
+                                                  self.test_path)
+            with fp:
+                self.assertNotEqual(fp, None)
+                self.assertEqual(fp.encoding, encoding)
+                self.assertEqual(fp.tell(), 0)
+                self.assertEqual(fp.readline(), '# test %s encoding\n'
+                                 % encoding)
 
         fp, filename, info = imp.find_module("tokenize")
-        self.assertNotEqual(fp, None)
-        self.assertEqual(fp.encoding, "utf-8")
-        self.assertEqual(fp.tell(), 0)
-        self.assertEqual(fp.readline(),
-                         '"""Tokenization help for Python programs.\n')
-        fp.close()
+        with fp:
+            self.assertNotEqual(fp, None)
+            self.assertEqual(fp.encoding, "utf-8")
+            self.assertEqual(fp.tell(), 0)
+            self.assertEqual(fp.readline(),
+                             '"""Tokenization help for Python programs.\n')
 
     def test_issue3594(self):
         temp_mod_name = 'test_imp_helper'
@@ -87,7 +101,6 @@ class ImportTests(unittest.TestCase):
 
         # the return encoding could be uppercase or None
         fs_encoding = sys.getfilesystemencoding()
-        fs_encoding = fs_encoding.lower() if fs_encoding else 'ascii'
 
         # covers utf-8 and Windows ANSI code pages
         # one non-space symbol from every page
@@ -127,15 +140,15 @@ class ImportTests(unittest.TestCase):
             with open(temp_mod_name + '.py', 'w') as file:
                 file.write('a = 1\n')
             file, filename, info = imp.find_module(temp_mod_name)
-            self.assertIsNotNone(file)
-            self.assertTrue(filename[:-3].endswith(temp_mod_name))
-            self.assertEqual(info[0], '.py')
-            self.assertEqual(info[1], 'U')
-            self.assertEqual(info[2], imp.PY_SOURCE)
+            with file:
+                self.assertIsNotNone(file)
+                self.assertTrue(filename[:-3].endswith(temp_mod_name))
+                self.assertEqual(info[0], '.py')
+                self.assertEqual(info[1], 'U')
+                self.assertEqual(info[2], imp.PY_SOURCE)
 
-            mod = imp.load_module(temp_mod_name, file, filename, info)
-            self.assertEqual(mod.a, 1)
-            file.close()
+                mod = imp.load_module(temp_mod_name, file, filename, info)
+                self.assertEqual(mod.a, 1)
 
             mod = imp.load_source(temp_mod_name, temp_mod_name + '.py')
             self.assertEqual(mod.a, 1)
@@ -306,11 +319,24 @@ class PEP3147Tests(unittest.TestCase):
                          os.sep.join(('.', 'pep3147', '__init__.py')))
 
 
+class NullImporterTests(unittest.TestCase):
+    @unittest.skipIf(support.TESTFN_UNENCODABLE is None,
+                     "Need an undecodeable filename")
+    def test_unencodeable(self):
+        name = support.TESTFN_UNENCODABLE
+        os.mkdir(name)
+        try:
+            self.assertRaises(ImportError, imp.NullImporter, name)
+        finally:
+            os.rmdir(name)
+
+
 def test_main():
     tests = [
         ImportTests,
         PEP3147Tests,
         ReloadTests,
+        NullImporterTests,
         ]
     try:
         import _thread

@@ -38,13 +38,12 @@ PyAPI_FUNC(int) _PyImport_ReleaseLock(void);
 #define _PyImport_ReleaseLock() 1
 #endif
 
-PyAPI_FUNC(struct filedescr *) _PyImport_FindModule(
-	const char *, PyObject *, char *, size_t, FILE **, PyObject **);
-PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr *);
 PyAPI_FUNC(void) _PyImport_ReInitLock(void);
 
-PyAPI_FUNC(PyObject *)_PyImport_FindExtension(char *, char *);
-PyAPI_FUNC(int)_PyImport_FixupExtension(PyObject*, char *, char *);
+PyAPI_FUNC(PyObject *)_PyImport_FindBuiltin(char *);
+PyAPI_FUNC(PyObject *)_PyImport_FindExtensionUnicode(char *, PyObject *);
+PyAPI_FUNC(int)_PyImport_FixupBuiltin(PyObject*, char *);
+PyAPI_FUNC(int)_PyImport_FixupExtensionUnicode(PyObject*, char *, PyObject *);
 
 struct _inittab {
     char *name;

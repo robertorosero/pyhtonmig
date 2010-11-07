@@ -375,13 +375,13 @@ class ConditionTests(BaseTestCase):
         phase_num = 0
         def f():
             cond.acquire()
-            cond.wait()
+            result = cond.wait()
             cond.release()
-            results1.append(phase_num)
+            results1.append((result, phase_num))
             cond.acquire()
-            cond.wait()
+            result = cond.wait()
             cond.release()
-            results2.append(phase_num)
+            results2.append((result, phase_num))
         b = Bunch(f, N)
         b.wait_for_started()
         _wait()
@@ -394,7 +394,7 @@ class ConditionTests(BaseTestCase):
         cond.release()
         while len(results1) < 3:
             _wait()
-        self.assertEqual(results1, [1] * 3)
+        self.assertEqual(results1, [(True, 1)] * 3)
         self.assertEqual(results2, [])
         # Notify 5 threads: they might be in their first or second wait
         cond.acquire()
@@ -404,8 +404,8 @@ class ConditionTests(BaseTestCase):
         cond.release()
         while len(results1) + len(results2) < 8:
             _wait()
-        self.assertEqual(results1, [1] * 3 + [2] * 2)
-        self.assertEqual(results2, [2] * 3)
+        self.assertEqual(results1, [(True, 1)] * 3 + [(True, 2)] * 2)
+        self.assertEqual(results2, [(True, 2)] * 3)
         # Notify all threads: they are all in their second wait
         cond.acquire()
         cond.notify_all()
@@ -414,8 +414,8 @@ class ConditionTests(BaseTestCase):
         cond.release()
         while len(results2) < 5:
             _wait()
-        self.assertEqual(results1, [1] * 3 + [2] * 2)
-        self.assertEqual(results2, [2] * 3 + [3] * 2)
+        self.assertEqual(results1, [(True, 1)] * 3 + [(True,2)] * 2)
+        self.assertEqual(results2, [(True, 2)] * 3 + [(True, 3)] * 2)
         b.wait_for_finished()
 
     def test_notify(self):
@@ -431,14 +431,20 @@ class ConditionTests(BaseTestCase):
         def f():
             cond.acquire()
             t1 = time.time()
-            cond.wait(0.5)
+            result = cond.wait(0.5)
             t2 = time.time()
             cond.release()
-            results.append(t2 - t1)
+            results.append((t2 - t1, result))
         Bunch(f, N).wait_for_finished()
-        self.assertEqual(len(results), 5)
-        for dt in results:
+        self.assertEqual(len(results), N)
+        for dt, result in results:
             self.assertTimeout(dt, 0.5)
+            # Note that conceptually (that"s the condition variable protocol)
+            # a wait() may succeed even if no one notifies us and before any
+            # timeout occurs.  Spurious wakeups can occur.
+            # This makes it hard to verify the result value.
+            # In practice, this implementation has no spurious wakeups.
+            self.assertFalse(result)
 
 
 class BaseSemaphoreTests(BaseTestCase):
@@ -591,3 +597,196 @@ class BoundedSemaphoreTests(BaseSemaphoreTests):
         sem.acquire()
         sem.release()
         self.assertRaises(ValueError, sem.release)
+
+
+class BarrierTests(BaseTestCase):
+    """
+    Tests for Barrier objects.
+    """
+    N = 5
+    defaultTimeout = 0.5
+
+    def setUp(self):
+        self.barrier = self.barriertype(self.N, timeout=self.defaultTimeout)
+    def tearDown(self):
+        self.barrier.abort()
+
+    def run_threads(self, f):
+        b = Bunch(f, self.N-1)
+        f()
+        b.wait_for_finished()
+
+    def multipass(self, results, n):
+        m = self.barrier.parties
+        self.assertEqual(m, self.N)
+        for i in range(n):
+            results[0].append(True)
+            self.assertEqual(len(results[1]), i * m)
+            self.barrier.wait()
+            results[1].append(True)
+            self.assertEqual(len(results[0]), (i + 1) * m)
+            self.barrier.wait()
+        self.assertEqual(self.barrier.n_waiting, 0)
+        self.assertFalse(self.barrier.broken)
+
+    def test_barrier(self, passes=1):
+        """
+        Test that a barrier is passed in lockstep
+        """
+        results = [[],[]]
+        def f():
+            self.multipass(results, passes)
+        self.run_threads(f)
+
+    def test_barrier_10(self):
+        """
+        Test that a barrier works for 10 consecutive runs
+        """
+        return self.test_barrier(10)
+
+    def test_wait_return(self):
+        """
+        test the return value from barrier.wait
+        """
+        results = []
+        def f():
+            r = self.barrier.wait()
+            results.append(r)
+
+        self.run_threads(f)
+        self.assertEqual(sum(results), sum(range(self.N)))
+
+    def test_action(self):
+        """
+        Test the 'action' callback
+        """
+        results = []
+        def action():
+            results.append(True)
+        barrier = self.barriertype(self.N, action)
+        def f():
+            barrier.wait()
+            self.assertEqual(len(results), 1)
+
+        self.run_threads(f)
+
+    def test_abort(self):
+        """
+        Test that an abort will put the barrier in a broken state
+        """
+        results1 = []
+        results2 = []
+        def f():
+            try:
+                i = self.barrier.wait()
+                if i == self.N//2:
+                    raise RuntimeError
+                self.barrier.wait()
+                results1.append(True)
+            except threading.BrokenBarrierError:
+                results2.append(True)
+            except RuntimeError:
+                self.barrier.abort()
+                pass
+
+        self.run_threads(f)
+        self.assertEqual(len(results1), 0)
+        self.assertEqual(len(results2), self.N-1)
+        self.assertTrue(self.barrier.broken)
+
+    def test_reset(self):
+        """
+        Test that a 'reset' on a barrier frees the waiting threads
+        """
+        results1 = []
+        results2 = []
+        results3 = []
+        def f():
+            i = self.barrier.wait()
+            if i == self.N//2:
+                # Wait until the other threads are all in the barrier.
+                while self.barrier.n_waiting < self.N-1:
+                    time.sleep(0.001)
+                self.barrier.reset()
+            else:
+                try:
+                    self.barrier.wait()
+                    results1.append(True)
+                except threading.BrokenBarrierError:
+                    results2.append(True)
+            # Now, pass the barrier again
+            self.barrier.wait()
+            results3.append(True)
+
+        self.run_threads(f)
+        self.assertEqual(len(results1), 0)
+        self.assertEqual(len(results2), self.N-1)
+        self.assertEqual(len(results3), self.N)
+
+
+    def test_abort_and_reset(self):
+        """
+        Test that a barrier can be reset after being broken.
+        """
+        results1 = []
+        results2 = []
+        results3 = []
+        barrier2 = self.barriertype(self.N)
+        def f():
+            try:
+                i = self.barrier.wait()
+                if i == self.N//2:
+                    raise RuntimeError
+                self.barrier.wait()
+                results1.append(True)
+            except threading.BrokenBarrierError:
+                results2.append(True)
+            except RuntimeError:
+                self.barrier.abort()
+                pass
+            # Synchronize and reset the barrier.  Must synchronize first so
+            # that everyone has left it when we reset, and after so that no
+            # one enters it before the reset.
+            if barrier2.wait() == self.N//2:
+                self.barrier.reset()
+            barrier2.wait()
+            self.barrier.wait()
+            results3.append(True)
+
+        self.run_threads(f)
+        self.assertEqual(len(results1), 0)
+        self.assertEqual(len(results2), self.N-1)
+        self.assertEqual(len(results3), self.N)
+
+    def test_timeout(self):
+        """
+        Test wait(timeout)
+        """
+        def f():
+            i = self.barrier.wait()
+            if i == self.N // 2:
+                # One thread is late!
+                time.sleep(0.1)
+            # Default timeout is 0.1, so this is shorter.
+            self.assertRaises(threading.BrokenBarrierError,
+                              self.barrier.wait, 0.05)
+        self.run_threads(f)
+
+    def test_default_timeout(self):
+        """
+        Test the barrier's default timeout
+        """
+        #create a barrier with a low default timeout
+        barrier = self.barriertype(self.N, timeout=0.1)
+        def f():
+            i = barrier.wait()
+            if i == self.N // 2:
+                # One thread is later than the default timeout of 0.1s.
+                time.sleep(0.2)
+            self.assertRaises(threading.BrokenBarrierError, barrier.wait)
+        self.run_threads(f)
+
+    def test_single_thread(self):
+        b = self.barriertype(1)
+        b.wait()
+        b.wait()

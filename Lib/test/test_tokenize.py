@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 doctests = """
 Tests for the tokenize module.
 
@@ -516,13 +514,13 @@ Two string literals on the same line
     True
 
 Test roundtrip on random python modules.
-pass the '-ucompiler' option to process the full directory.
+pass the '-ucpu' option to process the full directory.
 
     >>> import random
     >>> tempdir = os.path.dirname(f) or os.curdir
     >>> testfiles = glob.glob(os.path.join(tempdir, "test*.py"))
 
-    >>> if not support.is_resource_enabled("compiler"):
+    >>> if not support.is_resource_enabled("cpu"):
     ...     testfiles = random.sample(testfiles, 10)
     ...
     >>> for testfile in testfiles:
@@ -533,6 +531,7 @@ pass the '-ucompiler' option to process the full directory.
     True
 
 Evil tabs
+
     >>> dump_tokens("def f():\\n\\tif x\\n        \\tpass")
     ENCODING   'utf-8'       (0, 0) (0, 0)
     NAME       'def'         (1, 0) (1, 3)
@@ -549,6 +548,18 @@ Evil tabs
     NAME       'pass'        (3, 9) (3, 13)
     DEDENT     ''            (4, 0) (4, 0)
     DEDENT     ''            (4, 0) (4, 0)
+
+Non-ascii identifiers
+
+    >>> dump_tokens("Örter = 'places'\\ngrün = 'green'")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'Örter'       (1, 0) (1, 5)
+    OP         '='           (1, 6) (1, 7)
+    STRING     "'places'"    (1, 8) (1, 16)
+    NEWLINE    '\\n'          (1, 16) (1, 17)
+    NAME       'grün'        (2, 0) (2, 4)
+    OP         '='           (2, 5) (2, 6)
+    STRING     "'green'"     (2, 7) (2, 14)
 """
 
 from test import support
@@ -579,8 +590,10 @@ def roundtrip(f):
     """
     if isinstance(f, str):
         f = BytesIO(f.encode('utf-8'))
-    token_list = list(tokenize(f.readline))
-    f.close()
+    try:
+        token_list = list(tokenize(f.readline))
+    finally:
+        f.close()
     tokens1 = [tok[:2] for tok in token_list]
     new_bytes = untokenize(tokens1)
     readline = (line for line in new_bytes.splitlines(1)).__next__
@@ -598,11 +611,11 @@ def decistmt(s):
 
     The format of the exponent is inherited from the platform C library.
     Known cases are "e-007" (Windows) and "e-07" (not Windows).  Since
-    we're only showing 12 digits, and the 13th isn't close to 5, the
+    we're only showing 11 digits, and the 12th isn't close to 5, the
     rest of the output should be platform-independent.
 
     >>> exec(s) #doctest: +ELLIPSIS
-    -3.21716034272e-0...7
+    -3.2171603427...e-0...7
 
     Output from calculations with Decimal should be identical across all
     platforms.

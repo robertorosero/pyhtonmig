@@ -55,7 +55,7 @@ PC/VC6/
     Visual C++ 6.0
 PC/VS7.1/
     Visual Studio 2003 (7.1)
-PCbuild8/
+PC/VS8.0/
     Visual Studio 2005 (8.0)
 
 
@@ -139,7 +139,7 @@ _ssl
 
     Get the source code through
 
-    svn export http://svn.python.org/projects/external/openssl-0.9.8l
+    svn export http://svn.python.org/projects/external/openssl-1.0.0a
 
     ** NOTE: if you use the Tools\buildbot\external(-amd64).bat approach for
     obtaining external sources then you don't need to manually get the source
@@ -152,9 +152,11 @@ _ssl
     You must install the NASM assembler from
         http://nasm.sf.net
     for x86 builds.  Put nasmw.exe anywhere in your PATH.
+    Note: recent releases of nasm only have nasm.exe. Just rename it to 
+    nasmw.exe.
 
     You can also install ActivePerl from
-        http://www.activestate.com/Products/ActivePerl/
+        http://www.activestate.com/activeperl/
     if you like to use the official sources instead of the files from 
     python's subversion repository. The svn version contains pre-build
     makefiles and assembly files.

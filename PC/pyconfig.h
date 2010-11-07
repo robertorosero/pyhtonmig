@@ -80,7 +80,7 @@ WIN32 is still required for the locale module.
 #define MS_WIN32 /* only support win32 and greater. */
 #define MS_WINDOWS
 #ifndef PYTHONPATH
-#	define PYTHONPATH L".\\DLLs;.\\lib;.\\lib\\plat-win"
+#	define PYTHONPATH L".\\DLLs;.\\lib"
 #endif
 #define NT_THREADS
 #define WITH_THREAD
@@ -720,6 +720,9 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 
 /* Define if the compiler provides a wchar.h header file. */
 #define HAVE_WCHAR_H 1
+
+/* The size of `wchar_t', as computed by sizeof. */
+#define SIZEOF_WCHAR_T 2
 
 /* Define if you have the dl library (-ldl).  */
 /* #undef HAVE_LIBDL */

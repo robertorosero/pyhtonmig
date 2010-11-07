@@ -33,6 +33,8 @@ This module defines the following functions and objects:
    variable allows one or more threads to wait until they are notified by another
    thread.
 
+   See :ref:`condition-objects`.
+
 
 .. function:: current_thread()
 
@@ -58,6 +60,8 @@ This module defines the following functions and objects:
    with the :meth:`clear` method.  The :meth:`wait` method blocks until the flag
    is true.
 
+   See :ref:`event-objects`.
+
 
 .. class:: local
 
@@ -80,6 +84,8 @@ This module defines the following functions and objects:
    acquired it, subsequent attempts to acquire it block, until it is released; any
    thread may release it.
 
+   See :ref:`lock-objects`.
+
 
 .. function:: RLock()
 
@@ -87,6 +93,8 @@ This module defines the following functions and objects:
    must be released by the thread that acquired it. Once a thread has acquired a
    reentrant lock, the same thread may acquire it again without blocking; the
    thread must release it once for each time it has acquired it.
+
+   See :ref:`rlock-objects`.
 
 
 .. function:: Semaphore(value=1)
@@ -97,6 +105,8 @@ This module defines the following functions and objects:
    :meth:`acquire` calls, plus an initial value. The :meth:`acquire` method blocks
    if necessary until it can return without making the counter negative.  If not
    given, *value* defaults to 1.
+
+   See :ref:`semaphore-objects`.
 
 
 .. function:: BoundedSemaphore(value=1)
@@ -109,14 +119,20 @@ This module defines the following functions and objects:
 
 
 .. class:: Thread
+   :noindex:
 
    A class that represents a thread of control.  This class can be safely
    subclassed in a limited fashion.
 
+   See :ref:`thread-objects`.
+
 
 .. class:: Timer
+   :noindex:
 
    A thread that executes a function after a specified interval has passed.
+
+   See :ref:`timer-objects`.
 
 
 .. function:: settrace(func)
@@ -161,10 +177,11 @@ This module also defines the following constant:
 
    The maximum value allowed for the *timeout* parameter of blocking functions
    (:meth:`Lock.acquire`, :meth:`RLock.acquire`, :meth:`Condition.wait`, etc.).
-   Specifiying a timeout greater than this value will raise an
+   Specifying a timeout greater than this value will raise an
    :exc:`OverflowError`.
 
    .. versionadded:: 3.2
+
 
 Detailed interfaces for the objects are documented below.
 
@@ -310,8 +327,8 @@ impossible to detect the termination of alien threads.
 
       Return whether the thread is alive.
 
-      Roughly, a thread is alive from the moment the :meth:`start` method
-      returns until its :meth:`run` method terminates. The module function
+      This method returns ``True`` just before the :meth:`run` method starts
+      until just after the :meth:`run` method terminates.  The module function
       :func:`.enumerate` returns a list of all alive threads.
 
    .. attribute:: daemon
@@ -385,6 +402,7 @@ All methods are executed atomically.
 
    .. versionchanged:: 3.2
       The *timeout* parameter is new.
+
 
 .. method:: Lock.release()
 
@@ -555,6 +573,12 @@ needs to wake up one consumer thread.
       even when it has been recursively acquired several times. Another internal
       interface is then used to restore the recursion level when the lock is
       reacquired.
+
+      The return value is ``True`` unless a given *timeout* expired, in which
+      case it is ``False``.
+
+      .. versionchanged:: 3.2
+         Previously, the method always returned ``None``.
 
    .. method:: notify()
 
@@ -744,6 +768,108 @@ For example::
       only work if the timer is still in its waiting stage.
 
 
+Barrier Objects
+---------------
+
+.. versionadded:: 3.2
+
+This class provides a simple synchronization primitive for use by a fixed number
+of threads that need to wait for each other.  Each of the threads tries to pass
+the barrier by calling the :meth:`wait` method and will block until all of the
+threads have made the call.  At this points, the threads are released
+simultanously.
+
+The barrier can be reused any number of times for the same number of threads.
+
+As an example, here is a simple way to synchronize a client and server thread::
+
+   b = Barrier(2, timeout=5)
+
+   def server():
+       start_server()
+       b.wait()
+       while True:
+           connection = accept_connection()
+           process_server_connection(connection)
+
+   def client():
+       b.wait()
+       while True:
+           connection = make_connection()
+           process_client_connection(connection)
+
+
+.. class:: Barrier(parties, action=None, timeout=None)
+
+   Create a barrier object for *parties* number of threads.  An *action*, when
+   provided, is a callable to be called by one of the threads when they are
+   released.  *timeout* is the default timeout value if none is specified for
+   the :meth:`wait` method.
+
+   .. method:: wait(timeout=None)
+
+      Pass the barrier.  When all the threads party to the barrier have called
+      this function, they are all released simultaneously.  If a *timeout* is
+      provided, is is used in preference to any that was supplied to the class
+      constructor.
+
+      The return value is an integer in the range 0 to *parties* -- 1, different
+      for each thrad.  This can be used to select a thread to do some special
+      housekeeping, e.g.::
+
+         i = barrier.wait()
+         if i == 0:
+             # Only one thread needs to print this
+             print("passed the barrier")
+
+      If an *action* was provided to the constructor, one of the threads will
+      have called it prior to being released.  Should this call raise an error,
+      the barrier is put into the broken state.
+
+      If the call times out, the barrier is put into the broken state.
+
+      This method may raise a :class:`BrokenBarrierError` exception if the
+      barrier is broken or reset while a thread is waiting.
+
+   .. method:: reset()
+
+      Return the barrier to the default, empty state.  Any threads waiting on it
+      will receive the :class:`BrokenBarrierError` exception.
+
+      Note that using this function may can require some external
+      synchronization if there are other threads whose state is unknown.  If a
+      barrier is broken it may be better to just leave it and create a new one.
+
+   .. method:: abort()
+
+      Put the barrier into a broken state.  This causes any active or future
+      calls to :meth:`wait` to fail with the :class:`BrokenBarrierError`.  Use
+      this for example if one of the needs to abort, to avoid deadlocking the
+      application.
+
+      It may be preferable to simply create the barrier with a sensible
+      *timeout* value to automatically guard against one of the threads going
+      awry.
+
+   .. attribute:: parties
+
+      The number of threads required to pass the barrier.
+
+   .. attribute:: n_waiting
+
+      The number of threads currently waiting in the barrier.
+
+   .. attribute:: broken
+
+      A boolean that is ``True`` if the barrier is in the broken state.
+
+
+.. exception:: BrokenBarrierError
+
+   This exception, a subclass of :exc:`RuntimeError`, is raised when the
+   :class:`Barrier` object is reset or broken.
+
+
 .. _with-locks:
 
 Using locks, conditions, and semaphores in the :keyword:`with` statement
@@ -771,9 +897,9 @@ Currently, :class:`Lock`, :class:`RLock`, :class:`Condition`,
 Importing in threaded code
 --------------------------
 
-While the import machinery is thread safe, there are two key
-restrictions on threaded imports due to inherent limitations in the way
-that thread safety is provided:
+While the import machinery is thread-safe, there are two key restrictions on
+threaded imports due to inherent limitations in the way that thread-safety is
+provided:
 
 * Firstly, other than in the main module, an import should not have the
   side effect of spawning a new thread and then waiting for that thread in

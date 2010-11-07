@@ -31,8 +31,8 @@ import sys
 import collections
 
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag",
-           "urlsplit", "urlunsplit", "parse_qs", "parse_qsl",
-           "quote", "quote_plus", "quote_from_bytes",
+           "urlsplit", "urlunsplit", "urlencode", "parse_qs",
+           "parse_qsl", "quote", "quote_plus", "quote_from_bytes",
            "unquote", "unquote_plus", "unquote_to_bytes"]
 
 # A classification of schemes ('' means apply by default)
@@ -192,11 +192,12 @@ def urlsplit(url, scheme='', allow_fragments=True):
             v = SplitResult(scheme, netloc, url, query, fragment)
             _parse_cache[key] = v
             return v
-        for c in url[:i]:
-            if c not in scheme_chars:
-                break
-        else:
-            scheme, url = url[:i].lower(), url[i+1:]
+        if url.endswith(':') or not url[i+1].isdigit():
+            for c in url[:i]:
+                if c not in scheme_chars:
+                    break
+            else:
+                scheme, url = url[:i].lower(), url[i+1:]
     if url[:2] == '//':
         netloc, url = _splitnetloc(url, 2)
         if (('[' in netloc and ']' not in netloc) or
@@ -314,6 +315,8 @@ def unquote_to_bytes(string):
     # Note: strings are encoded as UTF-8. This is only an issue if it contains
     # unescaped non-ASCII characters, which URIs should not.
     if not string:
+        # Is it a string-like object?
+        string.split
         return b''
     if isinstance(string, str):
         string = string.encode('utf-8')
@@ -338,7 +341,7 @@ def unquote(string, encoding='utf-8', errors='replace'):
 
     unquote('abc%20def') -> 'abc def'.
     """
-    if not string:
+    if string == '':
         return string
     res = string.split('%')
     if len(res) == 1:
@@ -377,10 +380,10 @@ def parse_qs(qs, keep_blank_values=False, strict_parsing=False):
 
         Arguments:
 
-        qs: URL-encoded query string to be parsed
+        qs: percent-encoded query string to be parsed
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded queries should be treated as blank strings.
+            percent-encoded queries should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -403,10 +406,10 @@ def parse_qsl(qs, keep_blank_values=False, strict_parsing=False):
 
     Arguments:
 
-    qs: URL-encoded query string to be parsed
+    qs: percent-encoded query string to be parsed
 
     keep_blank_values: flag indicating whether blank values in
-        URL encoded queries should be treated as blank strings.  A
+        percent-encoded queries should be treated as blank strings.  A
         true value indicates that blanks should be retained as blank
         strings.  The default false value indicates that blank values
         are to be ignored and treated as if they were  not included.

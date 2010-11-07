@@ -4,15 +4,24 @@
 # to allow utilities written in Python to be added
 # to the functools module.
 # Written by Nick Coghlan <ncoghlan at gmail.com>
-#   Copyright (C) 2006 Python Software Foundation.
+# and Raymond Hettinger <python at rcn.com>
+#   Copyright (C) 2006-2010 Python Software Foundation.
 # See C source code for _functools credits/copyright
 
+__all__ = ['update_wrapper', 'wraps', 'WRAPPER_ASSIGNMENTS', 'WRAPPER_UPDATES',
+           'total_ordering', 'cmp_to_key', 'lru_cache', 'reduce', 'partial']
+
 from _functools import partial, reduce
+from collections import OrderedDict
+try:
+    from _thread import allocate_lock as Lock
+except:
+    from _dummy_thread import allocate_lock as Lock
 
 # update_wrapper() and wraps() are tools to help write
 # wrapper functions that can handle naive introspection
 
-WRAPPER_ASSIGNMENTS = ('__module__', '__name__', '__doc__')
+WRAPPER_ASSIGNMENTS = ('__module__', '__name__', '__doc__', '__annotations__')
 WRAPPER_UPDATES = ('__dict__',)
 def update_wrapper(wrapper,
                    wrapped,
@@ -29,8 +38,14 @@ def update_wrapper(wrapper,
        are updated with the corresponding attribute from the wrapped
        function (defaults to functools.WRAPPER_UPDATES)
     """
+    wrapper.__wrapped__ = wrapped
     for attr in assigned:
-        setattr(wrapper, attr, getattr(wrapped, attr))
+        try:
+            value = getattr(wrapped, attr)
+        except AttributeError:
+            pass
+        else:
+            setattr(wrapper, attr, value)
     for attr in updated:
         getattr(wrapper, attr).update(getattr(wrapped, attr, {}))
     # Return the wrapper so this can be used as a decorator via partial()
@@ -66,7 +81,8 @@ def total_ordering(cls):
                    ('__gt__', lambda self, other: not other >= self),
                    ('__lt__', lambda self, other: not self >= other)]
     }
-    roots = set(dir(cls)) & set(convert)
+    # Find user-defined comparisons (not those inherited from object).
+    roots = [op for op in convert if getattr(cls, op, None) is not getattr(object, op, None)]
     if not roots:
         raise ValueError('must define at least one ordering operation: < > <= >=')
     root = max(roots)       # prefer __lt__ to __le__ to __gt__ to __ge__
@@ -97,3 +113,50 @@ def cmp_to_key(mycmp):
         def __hash__(self):
             raise TypeError('hash not implemented')
     return K
+
+def lru_cache(maxsize=100):
+    """Least-recently-used cache decorator.
+
+    Arguments to the cached function must be hashable.
+    Cache performance statistics stored in f.hits and f.misses.
+    Clear the cache using f.clear().
+    http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used
+
+    """
+    def decorating_function(user_function, tuple=tuple, sorted=sorted,
+                            len=len, KeyError=KeyError):
+        cache = OrderedDict()           # ordered least recent to most recent
+        cache_popitem = cache.popitem
+        cache_renew = cache.move_to_end
+        kwd_mark = object()             # separate positional and keyword args
+        lock = Lock()
+
+        @wraps(user_function)
+        def wrapper(*args, **kwds):
+            key = args
+            if kwds:
+                key += (kwd_mark,) + tuple(sorted(kwds.items()))
+            try:
+                with lock:
+                    result = cache[key]
+                    cache_renew(key)            # record recent use of this key
+                    wrapper.cache_hits += 1
+            except KeyError:
+                result = user_function(*args, **kwds)
+                with lock:
+                    cache[key] = result         # record recent use of this key
+                    wrapper.cache_misses += 1
+                    if len(cache) > maxsize:
+                        cache_popitem(0)        # purge least recently used cache entry
+            return result
+
+        def cache_clear():
+            """Clear the cache and cache statistics"""
+            with lock:
+                cache.clear()
+                wrapper.cache_hits = wrapper.cache_misses = 0
+
+        wrapper.cache_hits = wrapper.cache_misses = 0
+        wrapper.cache_clear = cache_clear
+        return wrapper
+    return decorating_function

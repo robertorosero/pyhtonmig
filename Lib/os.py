@@ -382,28 +382,37 @@ def get_exec_path(env=None):
     *env* must be an environment variable dict or None.  If *env* is None,
     os.environ will be used.
     """
+    # Use a local import instead of a global import to limit the number of
+    # modules loaded at startup: the os module is always loaded at startup by
+    # Python. It may also avoid a bootstrap issue.
+    import warnings
+
     if env is None:
         env = environ
 
-    try:
-        path_list = env.get('PATH')
-    except TypeError:
-        path_list = None
+    # {b'PATH': ...}.get('PATH') and {'PATH': ...}.get(b'PATH') emit a
+    # BytesWarning when using python -b or python -bb: ignore the warning
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", BytesWarning)
 
-    if supports_bytes_environ:
         try:
-            path_listb = env[b'PATH']
-        except (KeyError, TypeError):
-            pass
-        else:
-            if path_list is not None:
-                raise ValueError(
-                    "env cannot contain 'PATH' and b'PATH' keys")
-            path_list = path_listb
+            path_list = env.get('PATH')
+        except TypeError:
+            path_list = None
 
-        if path_list is not None and isinstance(path_list, bytes):
-            path_list = path_list.decode(sys.getfilesystemencoding(),
-                                         'surrogateescape')
+        if supports_bytes_environ:
+            try:
+                path_listb = env[b'PATH']
+            except (KeyError, TypeError):
+                pass
+            else:
+                if path_list is not None:
+                    raise ValueError(
+                        "env cannot contain 'PATH' and b'PATH' keys")
+                path_list = path_listb
+
+            if path_list is not None and isinstance(path_list, bytes):
+                path_list = fsdecode(path_list)
 
     if path_list is None:
         path_list = defpath
@@ -421,32 +430,34 @@ class _Environ(MutableMapping):
         self.decodevalue = decodevalue
         self.putenv = putenv
         self.unsetenv = unsetenv
-        self.data = data
+        self._data = data
 
     def __getitem__(self, key):
-        value = self.data[self.encodekey(key)]
+        value = self._data[self.encodekey(key)]
         return self.decodevalue(value)
 
     def __setitem__(self, key, value):
         key = self.encodekey(key)
         value = self.encodevalue(value)
         self.putenv(key, value)
-        self.data[key] = value
+        self._data[key] = value
 
     def __delitem__(self, key):
         key = self.encodekey(key)
         self.unsetenv(key)
-        del self.data[key]
+        del self._data[key]
 
     def __iter__(self):
-        for key in self.data:
+        for key in self._data:
             yield self.decodekey(key)
 
     def __len__(self):
-        return len(self.data)
+        return len(self._data)
 
     def __repr__(self):
-        return 'environ({!r})'.format(self.data)
+        return 'environ({{{}}})'.format(', '.join(
+            ('{!r}: {!r}'.format(self.decodekey(key), self.decodevalue(value))
+            for key, value in self._data.items())))
 
     def copy(self):
         return dict(self)
@@ -486,12 +497,13 @@ def _createenviron():
             data[encodekey(key)] = value
     else:
         # Where Env Var Names Can Be Mixed Case
+        encoding = sys.getfilesystemencoding()
         def encode(value):
             if not isinstance(value, str):
                 raise TypeError("str expected, not %s" % type(value).__name__)
-            return value.encode(sys.getfilesystemencoding(), 'surrogateescape')
+            return value.encode(encoding, 'surrogateescape')
         def decode(value):
-            return value.decode(sys.getfilesystemencoding(), 'surrogateescape')
+            return value.decode(encoding, 'surrogateescape')
         encodekey = encode
         data = environ
     return _Environ(data,
@@ -520,7 +532,7 @@ if supports_bytes_environ:
         return value
 
     # bytes environ
-    environb = _Environ(environ.data,
+    environb = _Environ(environ._data,
         _check_bytes, bytes,
         _check_bytes, bytes,
         _putenv, _unsetenv)
@@ -531,21 +543,46 @@ if supports_bytes_environ:
         The optional second argument can specify an alternate default.
         key, default and the result are bytes."""
         return environb.get(key, default)
-    __all__.append("getenvb")
 
-def fsencode(value):
-    """Encode value for use in the file system, environment variables
-    or the command line."""
-    if isinstance(value, bytes):
-        return value
-    elif isinstance(value, str):
-        encoding = sys.getfilesystemencoding()
-        if encoding == 'mbcs':
-            return value.encode(encoding)
-        else:
-            return value.encode(encoding, 'surrogateescape')
+    __all__.extend(("environb", "getenvb"))
+
+def _fscodec():
+    encoding = sys.getfilesystemencoding()
+    if encoding == 'mbcs':
+        errors = 'strict'
     else:
-        raise TypeError("expect bytes or str, not %s" % type(value).__name__)
+        errors = 'surrogateescape'
+
+    def fsencode(filename):
+        """
+        Encode filename to the filesystem encoding with 'surrogateescape' error
+        handler, return bytes unchanged. On Windows, use 'strict' error handler if
+        the file system encoding is 'mbcs' (which is the default encoding).
+        """
+        if isinstance(filename, bytes):
+            return filename
+        elif isinstance(filename, str):
+            return filename.encode(encoding, errors)
+        else:
+            raise TypeError("expect bytes or str, not %s" % type(filename).__name__)
+
+    def fsdecode(filename):
+        """
+        Decode filename from the filesystem encoding with 'surrogateescape' error
+        handler, return str unchanged. On Windows, use 'strict' error handler if
+        the file system encoding is 'mbcs' (which is the default encoding).
+        """
+        if isinstance(filename, str):
+            return filename
+        elif isinstance(filename, bytes):
+            return filename.decode(encoding, errors)
+        else:
+            raise TypeError("expect bytes or str, not %s" % type(filename).__name__)
+
+    return fsencode, fsdecode
+
+fsencode, fsdecode = _fscodec()
+del _fscodec
 
 def _exists(name):
     return name in globals()

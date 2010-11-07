@@ -13,6 +13,7 @@ import sys as _sys
 import heapq as _heapq
 from weakref import proxy as _proxy
 from itertools import repeat as _repeat, chain as _chain, starmap as _starmap
+from reprlib import recursive_repr as _recursive_repr
 
 ################################################################################
 ### OrderedDict
@@ -31,6 +32,7 @@ class OrderedDict(dict, MutableMapping):
     # The internal self.__map dictionary maps keys to links in a doubly linked list.
     # The circular doubly linked list starts and ends with a sentinel element.
     # The sentinel element never gets deleted (this simplifies the algorithm).
+    # The sentinel is stored in self.__hardroot with a weakref proxy in self.__root.
     # The prev/next links are weakref proxies (to prevent circular references).
     # Individual links are kept alive by the hard reference in self.__map.
     # Those hard references disappear when a key is deleted from an OrderedDict.
@@ -46,38 +48,36 @@ class OrderedDict(dict, MutableMapping):
         try:
             self.__root
         except AttributeError:
-            self.__root = root = _Link()    # sentinel node for the doubly linked list
+            self.__hardroot = _Link()
+            self.__root = root = _proxy(self.__hardroot)
             root.prev = root.next = root
             self.__map = {}
         self.update(*args, **kwds)
 
-    def clear(self):
-        'od.clear() -> None.  Remove all items from od.'
-        root = self.__root
-        root.prev = root.next = root
-        self.__map.clear()
-        dict.clear(self)
-
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value,
+                    dict_setitem=dict.__setitem__, proxy=_proxy, Link=_Link):
         'od.__setitem__(i, y) <==> od[i]=y'
         # Setting a new item creates a new link which goes at the end of the linked
         # list, and the inherited dictionary is updated with the new key/value pair.
         if key not in self:
-            self.__map[key] = link = _Link()
+            self.__map[key] = link = Link()
             root = self.__root
             last = root.prev
             link.prev, link.next, link.key = last, root, key
-            last.next = root.prev = _proxy(link)
-        dict.__setitem__(self, key, value)
+            last.next = link
+            root.prev = proxy(link)
+        dict_setitem(self, key, value)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key, dict_delitem=dict.__delitem__):
         'od.__delitem__(y) <==> del od[y]'
         # Deleting an existing item uses self.__map to find the link which is
         # then removed by updating the links in the predecessor and successor nodes.
-        dict.__delitem__(self, key)
+        dict_delitem(self, key)
         link = self.__map.pop(key)
-        link.prev.next = link.next
-        link.next.prev = link.prev
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
 
     def __iter__(self):
         'od.__iter__() <==> iter(od)'
@@ -97,23 +97,12 @@ class OrderedDict(dict, MutableMapping):
             yield curr.key
             curr = curr.prev
 
-    def __reduce__(self):
-        'Return state information for pickling'
-        items = [[k, self[k]] for k in self]
-        tmp = self.__map, self.__root
-        del self.__map, self.__root
-        inst_dict = vars(self).copy()
-        self.__map, self.__root = tmp
-        if inst_dict:
-            return (self.__class__, (items,), inst_dict)
-        return self.__class__, (items,)
-
-    setdefault = MutableMapping.setdefault
-    update = MutableMapping.update
-    pop = MutableMapping.pop
-    keys = MutableMapping.keys
-    values = MutableMapping.values
-    items = MutableMapping.items
+    def clear(self):
+        'od.clear() -> None.  Remove all items from od.'
+        root = self.__root
+        root.prev = root.next = root
+        self.__map.clear()
+        dict.clear(self)
 
     def popitem(self, last=True):
         '''od.popitem() -> (k, v), return and remove a (key, value) pair.
@@ -122,10 +111,75 @@ class OrderedDict(dict, MutableMapping):
         '''
         if not self:
             raise KeyError('dictionary is empty')
-        key = next(reversed(self) if last else iter(self))
-        value = self.pop(key)
+        root = self.__root
+        if last:
+            link = root.prev
+            link_prev = link.prev
+            link_prev.next = root
+            root.prev = link_prev
+        else:
+            link = root.next
+            link_next = link.next
+            root.next = link_next
+            link_next.prev = root
+        key = link.key
+        del self.__map[key]
+        value = dict.pop(self, key)
         return key, value
 
+    def move_to_end(self, key, last=True):
+        '''Move an existing element to the end (or beginning if last==False).
+
+        Raises KeyError if the element does not exist.
+        When last=True, acts like a fast version of self[key]=self.pop(key).
+
+        '''
+        link = self.__map[key]
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
+        root = self.__root
+        if last:
+            last = root.prev
+            link.prev = last
+            link.next = root
+            last.next = root.prev = link
+        else:
+            first = root.next
+            link.prev = root
+            link.next = first
+            root.next = first.prev = link
+
+    def __reduce__(self):
+        'Return state information for pickling'
+        items = [[k, self[k]] for k in self]
+        tmp = self.__map, self.__root, self.__hardroot
+        del self.__map, self.__root, self.__hardroot
+        inst_dict = vars(self).copy()
+        self.__map, self.__root, self.__hardroot = tmp
+        if inst_dict:
+            return (self.__class__, (items,), inst_dict)
+        return self.__class__, (items,)
+
+    def __sizeof__(self):
+        sizeof = _sys.getsizeof
+        n = len(self) + 1                       # number of links including root
+        size = sizeof(self.__dict__)            # instance dictionary
+        size += sizeof(self.__map) * 2          # internal dict and inherited dict
+        size += sizeof(self.__hardroot) * n     # link objects
+        size += sizeof(self.__root) * n         # proxy objects
+        return size
+
+    setdefault = MutableMapping.setdefault
+    update = MutableMapping.update
+    pop = MutableMapping.pop
+    keys = MutableMapping.keys
+    values = MutableMapping.values
+    items = MutableMapping.items
+    __ne__ = MutableMapping.__ne__
+
+    @_recursive_repr()
     def __repr__(self):
         'od.__repr__() <==> repr(od)'
         if not self:
@@ -156,14 +210,6 @@ class OrderedDict(dict, MutableMapping):
             return len(self)==len(other) and \
                    all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
-
-    def __ne__(self, other):
-        '''od.__ne__(y) <==> od!=y.  Comparison to another OD is order-sensitive
-        while comparison to a regular mapping is order-insensitive.
-
-        '''
-        return not self == other
-
 
 
 ################################################################################
@@ -244,7 +290,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
             return result \n
         def __repr__(self):
             'Return a nicely formatted representation string'
-            return '%(typename)s(%(reprtxt)s)' %% self \n
+            return self.__class__.__name__ + '(%(reprtxt)s)' %% self \n
         def _asdict(self):
             'Return a new OrderedDict which maps field names to their values'
             return OrderedDict(zip(self._fields, self)) \n
@@ -269,7 +315,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
     try:
         exec(template, namespace)
     except SyntaxError as e:
-        raise SyntaxError(e.msg + ':\n' + template) from e
+        raise SyntaxError(e.msg + ':\n\n' + template)
     result = namespace[typename]
 
     # For pickling to work, the __module__ variable needs to be set to the frame

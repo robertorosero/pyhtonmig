@@ -1,11 +1,11 @@
 import builtins
-import errno
 import imp
+from importlib.test.import_ import test_relative_imports
+from importlib.test.import_ import util as importlib_util
 import marshal
 import os
 import py_compile
 import random
-import shutil
 import stat
 import sys
 import unittest
@@ -23,11 +23,7 @@ def remove_files(name):
               name + ".pyw",
               name + "$py.class"):
         unlink(f)
-    try:
-        shutil.rmtree('__pycache__')
-    except OSError as error:
-        if error.errno != errno.ENOENT:
-            raise
+    rmtree('__pycache__')
 
 
 class ImportTests(unittest.TestCase):
@@ -40,12 +36,8 @@ class ImportTests(unittest.TestCase):
     def test_case_sensitivity(self):
         # Brief digression to test that import is case-sensitive:  if we got
         # this far, we know for sure that "random" exists.
-        try:
+        with self.assertRaises(ImportError):
             import RAnDoM
-        except ImportError:
-            pass
-        else:
-            self.fail("import of RAnDoM should have failed (case mismatch)")
 
     def test_double_const(self):
         # Another brief digression to test the accuracy of manifest float
@@ -106,7 +98,7 @@ class ImportTests(unittest.TestCase):
             sys.path.insert(0, os.curdir)
             try:
                 fname = TESTFN + os.extsep + "py"
-                f = open(fname, 'w').close()
+                open(fname, 'w').close()
                 os.chmod(fname, (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH |
                                  stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
                 __import__(TESTFN)
@@ -125,7 +117,6 @@ class ImportTests(unittest.TestCase):
 
     def test_imp_module(self):
         # Verify that the imp module can correctly load and find .py files
-        import imp, os
         # XXX (ncoghlan): It would be nice to use support.CleanImport
         # here, but that breaks because the os module registers some
         # handlers in copy_reg on import. Since CleanImport doesn't
@@ -137,6 +128,7 @@ class ImportTests(unittest.TestCase):
         orig_getenv = os.getenv
         with EnvironmentVarGuard():
             x = imp.find_module("os")
+            self.addCleanup(x[0].close)
             new_os = imp.load_module("os", *x)
             self.assertIs(os, new_os)
             self.assertIs(orig_path, new_os.path)
@@ -202,13 +194,6 @@ class ImportTests(unittest.TestCase):
         # import x.y.z as w binds z as w
         import test.support as y
         self.assertTrue(y is test.support, y.__name__)
-
-    def test_import_initless_directory_warning(self):
-        with warnings.catch_warnings():
-            # Just a random non-package directory we always expect to be
-            # somewhere in sys.path...
-            warnings.simplefilter('error', ImportWarning)
-            self.assertRaises(ImportWarning, __import__, "site-packages")
 
     def test_failing_reload(self):
         # A failing reload should leave the module object in sys.modules.
@@ -289,6 +274,11 @@ class ImportTests(unittest.TestCase):
 
     def test_import_by_filename(self):
         path = os.path.abspath(TESTFN)
+        encoding = sys.getfilesystemencoding()
+        try:
+            path.encode(encoding)
+        except UnicodeEncodeError:
+            self.skipTest('path is not encodable to {}'.format(encoding))
         with self.assertRaises(ImportError) as c:
             __import__(path)
         self.assertEqual("Import by filename is not supported.",
@@ -330,8 +320,7 @@ func_filename = func.__code__.co_filename
             unload(self.module_name)
         unlink(self.file_name)
         unlink(self.compiled_name)
-        if os.path.exists(self.dir_name):
-            shutil.rmtree(self.dir_name)
+        rmtree(self.dir_name)
 
     def import_module(self):
         ns = globals()
@@ -398,7 +387,7 @@ class PathsTests(unittest.TestCase):
         self.syspath = sys.path[:]
 
     def tearDown(self):
-        shutil.rmtree(self.path)
+        rmtree(self.path)
         sys.path[:] = self.syspath
 
     # Regression test for http://bugs.python.org/issue1293.
@@ -471,16 +460,14 @@ class RelativeImportTests(unittest.TestCase):
         self.assertRaises(ValueError, check_relative)
 
     def test_absolute_import_without_future(self):
-        # If absolute import syntax is used, then do not try to perform
-        # a relative import in the face of failure.
+        # If explicit relative import syntax is used, then do not try
+        # to perform an absolute import in the face of failure.
         # Issue #7902.
-        try:
+        with self.assertRaises(ImportError):
             from .os import sep
-        except ImportError:
-            pass
-        else:
             self.fail("explicit relative import triggered an "
-                      "implicit relative import")
+                      "implicit absolute import")
+
 
 class OverridingImportBuiltinTests(unittest.TestCase):
     def test_override_builtin(self):
@@ -529,7 +516,8 @@ class PycacheTests(unittest.TestCase):
         __import__(TESTFN)
         self.assertTrue(os.path.exists('__pycache__'))
         self.assertTrue(os.path.exists(os.path.join(
-            '__pycache__', '{}.{}.pyc'.format(TESTFN, self.tag))))
+            '__pycache__', '{}.{}.py{}'.format(
+            TESTFN, self.tag, __debug__ and 'c' or 'o'))))
 
     @unittest.skipUnless(os.name == 'posix',
                          "test meaningful only on posix systems")
@@ -589,7 +577,7 @@ class PycacheTests(unittest.TestCase):
     def test_package___cached__(self):
         # Like test___cached__ but for packages.
         def cleanup():
-            shutil.rmtree('pep3147')
+            rmtree('pep3147')
         os.mkdir('pep3147')
         self.addCleanup(cleanup)
         # Touch the __init__.py
@@ -611,7 +599,7 @@ class PycacheTests(unittest.TestCase):
         # Like test___cached__ but ensuring __cached__ when imported from a
         # PEP 3147 pyc file.
         def cleanup():
-            shutil.rmtree('pep3147')
+            rmtree('pep3147')
         os.mkdir('pep3147')
         self.addCleanup(cleanup)
         unload('pep3147.foo')
@@ -633,10 +621,21 @@ class PycacheTests(unittest.TestCase):
                          os.path.join(os.curdir, foo_pyc))
 
 
+class RelativeImportFromImportlibTests(test_relative_imports.RelativeImports):
+
+    def setUp(self):
+        self._importlib_util_flag = importlib_util.using___import__
+        importlib_util.using___import__ = True
+
+    def tearDown(self):
+        importlib_util.using___import__ = self._importlib_util_flag
+
+
 def test_main(verbose=None):
     run_unittest(ImportTests, PycacheTests,
                  PycRewritingTests, PathsTests, RelativeImportTests,
-                 OverridingImportBuiltinTests)
+                 OverridingImportBuiltinTests,
+                 RelativeImportFromImportlibTests)
 
 
 if __name__ == '__main__':

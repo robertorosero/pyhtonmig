@@ -68,8 +68,7 @@ The :mod:`runpy` module provides two functions:
 
 
    .. versionchanged:: 3.1
-         Added ability to execute packages by looking for a ``__main__``
-         submodule
+      Added ability to execute packages by looking for a ``__main__`` submodule.
 
 
 .. function:: run_path(file_path, init_globals=None, run_name=None)
@@ -121,7 +120,7 @@ The :mod:`runpy` module provides two functions:
 
    Note that, unlike :func:`run_module`, the alterations made to :mod:`sys`
    are not optional in this function as these adjustments are essential to
-   allowing the execution of sys.path entries. As the thread safety
+   allowing the execution of sys.path entries. As the thread-safety
    limitations still apply, use of this function in threaded code should be
    either serialised with the import lock or delegated to a separate process.
 

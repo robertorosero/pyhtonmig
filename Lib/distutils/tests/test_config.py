@@ -10,6 +10,7 @@ from distutils.log import set_threshold
 from distutils.log import WARN
 
 from distutils.tests import support
+from test.support import run_unittest
 
 PYPIRC = """\
 [distutils]
@@ -105,11 +106,15 @@ class PyPIRCCommandTestCase(support.TempdirManager,
         self.assertTrue(not os.path.exists(rc))
         cmd._store_pypirc('tarek', 'xxx')
         self.assertTrue(os.path.exists(rc))
-        content = open(rc).read()
-        self.assertEquals(content, WANTED)
+        f = open(rc)
+        try:
+            content = f.read()
+            self.assertEquals(content, WANTED)
+        finally:
+            f.close()
 
 def test_suite():
     return unittest.makeSuite(PyPIRCCommandTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

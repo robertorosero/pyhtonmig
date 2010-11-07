@@ -108,9 +108,9 @@ This module defines one class called :class:`Popen`:
    *stdin*, *stdout* and *stderr* specify the executed programs' standard input,
    standard output and standard error file handles, respectively.  Valid values
    are :data:`PIPE`, an existing file descriptor (a positive integer), an
-   existing file object, and ``None``.  :data:`PIPE` indicates that a new pipe
-   to the child should be created.  With ``None``, no redirection will occur;
-   the child's file handles will be inherited from the parent.  Additionally,
+   existing :term:`file object`, and ``None``.  :data:`PIPE` indicates that a
+   new pipe to the child should be created.  With ``None``, no redirection will
+   occur; the child's file handles will be inherited from the parent.  Additionally,
    *stderr* can be :data:`STDOUT`, which indicates that the stderr data from the
    applications should be captured into the same file handle as for stdout.
 
@@ -271,13 +271,14 @@ This module also defines four shortcut functions:
 
 
 .. function:: getstatusoutput(cmd)
+
    Return ``(status, output)`` of executing *cmd* in a shell.
 
    Execute the string *cmd* in a shell with :func:`os.popen` and return a 2-tuple
    ``(status, output)``.  *cmd* is actually run as ``{ cmd ; } 2>&1``, so that the
    returned output will contain output or error messages.  A trailing newline is
    stripped from the output.  The exit status for the command can be interpreted
-   according to the rules for the C function :cfunc:`wait`.  Example::
+   according to the rules for the C function :c:func:`wait`.  Example::
 
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
@@ -290,6 +291,7 @@ This module also defines four shortcut functions:
 
 
 .. function:: getoutput(cmd)
+
    Return output (stdout and stderr) of executing *cmd* in a shell.
 
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
@@ -307,7 +309,7 @@ Exceptions
 Exceptions raised in the child process, before the new program has started to
 execute, will be re-raised in the parent.  Additionally, the exception object
 will have one extra attribute called :attr:`child_traceback`, which is a string
-containing traceback information from the childs point of view.
+containing traceback information from the child's point of view.
 
 The most common exception raised is :exc:`OSError`.  This occurs, for example,
 when trying to execute a non-existent file.  Applications should prepare for
@@ -380,14 +382,14 @@ Instances of the :class:`Popen` class have the following methods:
    .. note::
 
       On Windows, SIGTERM is an alias for :meth:`terminate`. CTRL_C_EVENT and
-      CTRL_BREAK_EVENT can be sent to processes started with a `creationflags`
+      CTRL_BREAK_EVENT can be sent to processes started with a *creationflags*
       parameter which includes `CREATE_NEW_PROCESS_GROUP`.
 
 
 .. method:: Popen.terminate()
 
    Stop the child. On Posix OSs the method sends SIGTERM to the
-   child. On Windows the Win32 API function :cfunc:`TerminateProcess` is called
+   child. On Windows the Win32 API function :c:func:`TerminateProcess` is called
    to stop the child.
 
 
@@ -409,20 +411,20 @@ The following attributes are also available:
 
 .. attribute:: Popen.stdin
 
-   If the *stdin* argument was :data:`PIPE`, this attribute is a file object
-   that provides input to the child process.  Otherwise, it is ``None``.
+   If the *stdin* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides input to the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stdout
 
-   If the *stdout* argument was :data:`PIPE`, this attribute is a file object
-   that provides output from the child process.  Otherwise, it is ``None``.
+   If the *stdout* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides output from the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stderr
 
-   If the *stderr* argument was :data:`PIPE`, this attribute is a file object
-   that provides error output from the child process.  Otherwise, it is
+   If the *stderr* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides error output from the child process.  Otherwise, it is
    ``None``.
 
 

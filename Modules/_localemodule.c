@@ -242,29 +242,16 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
 {
     PyObject *os1, *os2, *result = NULL;
     wchar_t *ws1 = NULL, *ws2 = NULL;
-    Py_ssize_t len1, len2;
 
     if (!PyArg_ParseTuple(args, "UU:strcoll", &os1, &os2))
         return NULL;
     /* Convert the unicode strings to wchar[]. */
-    len1 = PyUnicode_GET_SIZE(os1) + 1;
-    ws1 = PyMem_MALLOC(len1 * sizeof(wchar_t));
-    if (!ws1) {
-        PyErr_NoMemory();
+    ws1 = PyUnicode_AsWideCharString(os1, NULL);
+    if (ws1 == NULL)
         goto done;
-    }
-    if (PyUnicode_AsWideChar((PyUnicodeObject*)os1, ws1, len1) == -1)
+    ws2 = PyUnicode_AsWideCharString(os2, NULL);
+    if (ws2 == NULL)
         goto done;
-    ws1[len1 - 1] = 0;
-    len2 = PyUnicode_GET_SIZE(os2) + 1;
-    ws2 = PyMem_MALLOC(len2 * sizeof(wchar_t));
-    if (!ws2) {
-        PyErr_NoMemory();
-        goto done;
-    }
-    if (PyUnicode_AsWideChar((PyUnicodeObject*)os2, ws2, len2) == -1)
-        goto done;
-    ws2[len2 - 1] = 0;
     /* Collate the strings. */
     result = PyLong_FromLong(wcscoll(ws1, ws2));
   done:
@@ -289,15 +276,15 @@ PyLocale_strxfrm(PyObject* self, PyObject* args)
     wchar_t *s, *buf = NULL;
     size_t n1, n2;
     PyObject *result = NULL;
-#ifndef HAVE_USABLE_WCHAR_T
+#if Py_UNICODE_SIZE != SIZEOF_WCHAR_T
     Py_ssize_t i;
 #endif
 
     if (!PyArg_ParseTuple(args, "u#:strxfrm", &s0, &n0))
         return NULL;
 
-#ifdef HAVE_USABLE_WCHAR_T
-    s = s0;
+#if Py_UNICODE_SIZE == SIZEOF_WCHAR_T
+    s = (wchar_t *) s0;
 #else
     s = PyMem_Malloc((n0+1)*sizeof(wchar_t));
     if (!s)
@@ -326,7 +313,7 @@ PyLocale_strxfrm(PyObject* self, PyObject* args)
     result = PyUnicode_FromWideChar(buf, n2);
  exit:
     if (buf) PyMem_Free(buf);
-#ifndef HAVE_USABLE_WCHAR_T
+#if Py_UNICODE_SIZE != SIZEOF_WCHAR_T
     PyMem_Free(s);
 #endif
     return result;

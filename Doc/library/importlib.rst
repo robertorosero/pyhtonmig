@@ -228,7 +228,7 @@ are also provided to help in implementing the core ABCs.
 
     * :meth:`ResourceLoader.get_data`
     * :meth:`ExecutionLoader.get_filename`
-          Implement to only return the path to the source file; sourceless
+          Should only return the path to the source file; sourceless
           loading is not supported.
 
     The abstract methods defined by this class are to add optional bytecode
@@ -286,7 +286,7 @@ are also provided to help in implementing the core ABCs.
     .. deprecated:: 3.2
         This class has been deprecated in favor of :class:`SourceLoader` and is
         slated for removal in Python 3.4. See below for how to create a
-        subclass that is compatbile with Python 3.1 onwards.
+        subclass that is compatible with Python 3.1 onwards.
 
     If compatibility with Python 3.1 is required, then use the following idiom
     to implement a subclass that will work with Python 3.1 onwards (make sure
@@ -469,7 +469,7 @@ find and load modules.
 This module contains the various objects that help in the construction of
 an :term:`importer`.
 
-.. function:: module_for_loader(method)
+.. decorator:: module_for_loader
 
     A :term:`decorator` for a :term:`loader` method,
     to handle selecting the proper
@@ -494,7 +494,7 @@ an :term:`importer`.
     Use of this decorator handles all the details of which module object a
     loader should initialize as specified by :pep:`302`.
 
-.. function:: set_loader(fxn)
+.. decorator:: set_loader
 
     A :term:`decorator` for a :term:`loader` method,
     to set the :attr:`__loader__`
@@ -502,7 +502,7 @@ an :term:`importer`.
     does nothing. It is assumed that the first positional argument to the
     wrapped method is what :attr:`__loader__` should be set to.
 
-.. function:: set_package(fxn)
+.. decorator:: set_package
 
     A :term:`decorator` for a :term:`loader` to set the :attr:`__package__`
     attribute on the module returned by the loader. If :attr:`__package__` is

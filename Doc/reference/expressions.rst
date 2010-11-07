@@ -344,7 +344,7 @@ All of this makes generator functions quite similar to coroutines; they yield
 multiple times, they have more than one entry point and their execution can be
 suspended.  The only difference is that a generator function cannot control
 where should the execution continue after it yields; the control is always
-transfered to the generator's caller.
+transferred to the generator's caller.
 
 The :keyword:`yield` statement is allowed in the :keyword:`try` clause of a
 :keyword:`try` ...  :keyword:`finally` construct.  If the generator is not
@@ -518,11 +518,18 @@ whose value is one of the keys of the mapping, and the subscription selects the
 value in the mapping that corresponds to that key.  (The expression list is a
 tuple except if it has exactly one item.)
 
-If the primary is a sequence, the expression (list) must evaluate to an integer.
-If this value is negative, the length of the sequence is added to it (so that,
-e.g., ``x[-1]`` selects the last item of ``x``.)  The resulting value must be a
-nonnegative integer less than the number of items in the sequence, and the
-subscription selects the item whose index is that value (counting from zero).
+If the primary is a sequence, the expression (list) must evaluate to an integer
+or a slice (as discussed in the following section).
+
+The formal syntax makes no special provision for negative indices in
+sequences; however, built-in sequences all provide a :meth:`__getitem__`
+method that interprets negative indices by adding the length of the sequence
+to the index (so that ``x[-1]`` selects the last item of ``x``).  The
+resulting value must be a nonnegative integer less than the number of items in
+the sequence, and the subscription selects the item whose index is that value
+(counting from zero). Since the support for negative indices and slicing
+occurs in the object's :meth:`__getitem__` method, subclasses overriding
+this method will need to explicitly add that support.
 
 .. index::
    single: character
@@ -644,7 +651,7 @@ the call.
    An implementation may provide built-in functions whose positional parameters
    do not have names, even if they are 'named' for the purpose of documentation,
    and which therefore cannot be supplied by keyword.  In CPython, this is the
-   case for functions implemented in C that use :cfunc:`PyArg_ParseTuple` to
+   case for functions implemented in C that use :c:func:`PyArg_ParseTuple` to
    parse their arguments.
 
 If there are more positional arguments than there are formal parameter slots, a
@@ -1056,7 +1063,7 @@ and therefore not exactly equal to ``Decimal('1.1')`` which is.  When
 cross-type comparison is not supported, the comparison method returns
 ``NotImplemented``.  This can create the illusion of non-transitivity between
 supported cross-type comparisons and unsupported comparisons.  For example,
-``Decimal(2) == 2`` and `2 == float(2)`` but ``Decimal(2) != float(2)``.
+``Decimal(2) == 2`` and ``2 == float(2)`` but ``Decimal(2) != float(2)``.
 
 .. _membership-test-details:
 
@@ -1293,6 +1300,7 @@ groups from right to left).
 | ``+``, ``-``                                  | Addition and subtraction            |
 +-----------------------------------------------+-------------------------------------+
 | ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
+|                                               | [#]_                                |
 +-----------------------------------------------+-------------------------------------+
 | ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
 +-----------------------------------------------+-------------------------------------+
@@ -1334,6 +1342,8 @@ groups from right to left).
    descriptors, you may notice seemingly unusual behaviour in certain uses of
    the :keyword:`is` operator, like those involving comparisons between instance
    methods, or constants.  Check their documentation for more info.
+
+.. [#] The ``%`` is also used for string formatting; the same precedence applies.
 
 .. [#] The power operator ``**`` binds less tightly than an arithmetic or
    bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

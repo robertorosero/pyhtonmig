@@ -50,9 +50,10 @@ The :mod:`bdb` module also defines two classes:
       Mark the breakpoint as disabled.
 
 
-   .. method:: bpprint(out=None)
+   .. method:: bpformat()
 
-      Print all the information about the breakpoint:
+      Return a string with all the information about the breakpoint, nicely
+      formatted:
 
       * The breakpoint number.
       * If it is temporary or not.
@@ -60,6 +61,13 @@ The :mod:`bdb` module also defines two classes:
       * The condition that causes a break.
       * If it must be ignored the next N times.
       * The breakpoint hit count.
+
+      .. versionadded:: 3.2
+
+   .. method:: bpprint(out=None)
+
+      Print the output of :meth:`bpformat` to the file *out*, or if it is
+      ``None``, to standard output.
 
 
 .. class:: Bdb(skip=None)
@@ -108,7 +116,7 @@ The :mod:`bdb` module also defines two classes:
       * ``"exception"``: An exception has occurred.
       * ``"c_call"``: A C function is about to be called.
       * ``"c_return"``: A C function has returned.
-      * ``"c_exception"``: A C function has thrown an exception.
+      * ``"c_exception"``: A C function has raised an exception.
 
       For the Python events, specialized functions (see below) are called.  For
       the C events, no action is taken.
@@ -266,6 +274,15 @@ The :mod:`bdb` module also defines two classes:
    .. method:: clear_all_breaks()
 
       Delete all existing breakpoints.
+
+   .. method:: get_bpbynumber(arg)
+
+      Return a breakpoint specified by the given number.  If *arg* is a string,
+      it will be converted to a number.  If *arg* is a non-numeric string, if
+      the given breakpoint never existed or has been deleted, a
+      :exc:`ValueError` is raised.
+
+      .. versionadded:: 3.2
 
    .. method:: get_break(filename, lineno)
 

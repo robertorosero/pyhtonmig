@@ -1,4 +1,4 @@
-# regression test for SAX 2.0            -*- coding: iso-8859-1 -*-
+# regression test for SAX 2.0
 # $Id$
 
 from xml.sax import make_parser, ContentHandler, \
@@ -11,6 +11,7 @@ except SAXReaderNotAvailable:
 from xml.sax.saxutils import XMLGenerator, escape, unescape, quoteattr, \
                              XMLFilterBase
 from xml.sax.expatreader import create_parser
+from xml.sax.handler import feature_namespaces
 from xml.sax.xmlreader import InputSource, AttributesImpl, AttributesNSImpl
 from io import StringIO
 from test.support import findfile, run_unittest
@@ -18,6 +19,11 @@ import unittest
 
 TEST_XMLFILE = findfile("test.xml", subdir="xmltestdata")
 TEST_XMLFILE_OUT = findfile("test.xml.out", subdir="xmltestdata")
+try:
+    TEST_XMLFILE.encode("utf8")
+    TEST_XMLFILE_OUT.encode("utf8")
+except UnicodeEncodeError:
+    raise unittest.SkipTest("filename is not encodable to utf8")
 
 ns_uri = "http://www.python.org/xml-ns/saxtest/"
 
@@ -108,7 +114,7 @@ class SaxutilsTest(unittest.TestCase):
                           "&lt;Donald Duck &amp; Co&gt;")
 
     def test_escape_extra(self):
-        self.assertEquals(escape("Hei på deg", {"å" : "&aring;"}),
+        self.assertEquals(escape("Hei pÃ¥ deg", {"Ã¥" : "&aring;"}),
                           "Hei p&aring; deg")
 
     # ===== unescape
@@ -120,7 +126,7 @@ class SaxutilsTest(unittest.TestCase):
                           "<Donald Duck & Co>")
 
     def test_unescape_extra(self):
-        self.assertEquals(unescape("Hei på deg", {"å" : "&aring;"}),
+        self.assertEquals(unescape("Hei pÃ¥ deg", {"Ã¥" : "&aring;"}),
                           "Hei p&aring; deg")
 
     def test_unescape_amp_extra(self):
@@ -165,9 +171,31 @@ class XmlgenTest(unittest.TestCase):
 
         self.assertEquals(result.getvalue(), start + "<doc></doc>")
 
+    def test_xmlgen_basic_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+        gen.startDocument()
+        gen.startElement("doc", {})
+        gen.endElement("doc")
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start + "<doc/>")
+
     def test_xmlgen_content(self):
         result = StringIO()
         gen = XMLGenerator(result)
+
+        gen.startDocument()
+        gen.startElement("doc", {})
+        gen.characters("huhei")
+        gen.endElement("doc")
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start + "<doc>huhei</doc>")
+
+    def test_xmlgen_content_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
 
         gen.startDocument()
         gen.startElement("doc", {})
@@ -234,6 +262,18 @@ class XmlgenTest(unittest.TestCase):
 
         self.assertEquals(result.getvalue(), start + "<doc> </doc>")
 
+    def test_xmlgen_ignorable_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+
+        gen.startDocument()
+        gen.startElement("doc", {})
+        gen.ignorableWhitespace(" ")
+        gen.endElement("doc")
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start + "<doc> </doc>")
+
     def test_xmlgen_ns(self):
         result = StringIO()
         gen = XMLGenerator(result)
@@ -252,6 +292,24 @@ class XmlgenTest(unittest.TestCase):
            ('<ns1:doc xmlns:ns1="%s"><udoc></udoc></ns1:doc>' %
                                          ns_uri))
 
+    def test_xmlgen_ns_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+
+        gen.startDocument()
+        gen.startPrefixMapping("ns1", ns_uri)
+        gen.startElementNS((ns_uri, "doc"), "ns1:doc", {})
+        # add an unqualified name
+        gen.startElementNS((None, "udoc"), None, {})
+        gen.endElementNS((None, "udoc"), None)
+        gen.endElementNS((ns_uri, "doc"), "ns1:doc")
+        gen.endPrefixMapping("ns1")
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start + \
+           ('<ns1:doc xmlns:ns1="%s"><udoc/></ns1:doc>' %
+                                         ns_uri))
+
     def test_1463026_1(self):
         result = StringIO()
         gen = XMLGenerator(result)
@@ -262,6 +320,17 @@ class XmlgenTest(unittest.TestCase):
         gen.endDocument()
 
         self.assertEquals(result.getvalue(), start+'<a b="c"></a>')
+
+    def test_1463026_1_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+
+        gen.startDocument()
+        gen.startElementNS((None, 'a'), 'a', {(None, 'b'):'c'})
+        gen.endElementNS((None, 'a'), 'a')
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start+'<a b="c"/>')
 
     def test_1463026_2(self):
         result = StringIO()
@@ -276,6 +345,19 @@ class XmlgenTest(unittest.TestCase):
 
         self.assertEquals(result.getvalue(), start+'<a xmlns="qux"></a>')
 
+    def test_1463026_2_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+
+        gen.startDocument()
+        gen.startPrefixMapping(None, 'qux')
+        gen.startElementNS(('qux', 'a'), 'a', {})
+        gen.endElementNS(('qux', 'a'), 'a')
+        gen.endPrefixMapping(None)
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(), start+'<a xmlns="qux"/>')
+
     def test_1463026_3(self):
         result = StringIO()
         gen = XMLGenerator(result)
@@ -289,6 +371,74 @@ class XmlgenTest(unittest.TestCase):
 
         self.assertEquals(result.getvalue(),
             start+'<my:a xmlns:my="qux" b="c"></my:a>')
+
+    def test_1463026_3_empty(self):
+        result = StringIO()
+        gen = XMLGenerator(result, short_empty_elements=True)
+
+        gen.startDocument()
+        gen.startPrefixMapping('my', 'qux')
+        gen.startElementNS(('qux', 'a'), 'a', {(None, 'b'):'c'})
+        gen.endElementNS(('qux', 'a'), 'a')
+        gen.endPrefixMapping('my')
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(),
+            start+'<my:a xmlns:my="qux" b="c"/>')
+
+    def test_5027_1(self):
+        # The xml prefix (as in xml:lang below) is reserved and bound by
+        # definition to http://www.w3.org/XML/1998/namespace.  XMLGenerator had
+        # a bug whereby a KeyError is thrown because this namespace is missing
+        # from a dictionary.
+        #
+        # This test demonstrates the bug by parsing a document.
+        test_xml = StringIO(
+            '<?xml version="1.0"?>'
+            '<a:g1 xmlns:a="http://example.com/ns">'
+             '<a:g2 xml:lang="en">Hello</a:g2>'
+            '</a:g1>')
+
+        parser = make_parser()
+        parser.setFeature(feature_namespaces, True)
+        result = StringIO()
+        gen = XMLGenerator(result)
+        parser.setContentHandler(gen)
+        parser.parse(test_xml)
+
+        self.assertEquals(result.getvalue(),
+                          start + (
+                          '<a:g1 xmlns:a="http://example.com/ns">'
+                           '<a:g2 xml:lang="en">Hello</a:g2>'
+                          '</a:g1>'))
+
+    def test_5027_2(self):
+        # The xml prefix (as in xml:lang below) is reserved and bound by
+        # definition to http://www.w3.org/XML/1998/namespace.  XMLGenerator had
+        # a bug whereby a KeyError is thrown because this namespace is missing
+        # from a dictionary.
+        #
+        # This test demonstrates the bug by direct manipulation of the
+        # XMLGenerator.
+        result = StringIO()
+        gen = XMLGenerator(result)
+
+        gen.startDocument()
+        gen.startPrefixMapping('a', 'http://example.com/ns')
+        gen.startElementNS(('http://example.com/ns', 'g1'), 'g1', {})
+        lang_attr = {('http://www.w3.org/XML/1998/namespace', 'lang'): 'en'}
+        gen.startElementNS(('http://example.com/ns', 'g2'), 'g2', lang_attr)
+        gen.characters('Hello')
+        gen.endElementNS(('http://example.com/ns', 'g2'), 'g2')
+        gen.endElementNS(('http://example.com/ns', 'g1'), 'g1')
+        gen.endPrefixMapping('a')
+        gen.endDocument()
+
+        self.assertEquals(result.getvalue(),
+                          start + (
+                          '<a:g1 xmlns:a="http://example.com/ns">'
+                           '<a:g2 xml:lang="en">Hello</a:g2>'
+                          '</a:g1>'))
 
 
 class XMLFilterBaseTest(unittest.TestCase):
@@ -313,7 +463,8 @@ class XMLFilterBaseTest(unittest.TestCase):
 #
 # ===========================================================================
 
-xml_test_out = open(TEST_XMLFILE_OUT).read()
+with open(TEST_XMLFILE_OUT) as f:
+    xml_test_out = f.read()
 
 class ExpatReaderTest(XmlTestBase):
 
@@ -325,7 +476,8 @@ class ExpatReaderTest(XmlTestBase):
         xmlgen = XMLGenerator(result)
 
         parser.setContentHandler(xmlgen)
-        parser.parse(open(TEST_XMLFILE))
+        with open(TEST_XMLFILE) as f:
+            parser.parse(f)
 
         self.assertEquals(result.getvalue(), xml_test_out)
 
@@ -475,8 +627,9 @@ class ExpatReaderTest(XmlTestBase):
 
         parser.setContentHandler(xmlgen)
         inpsrc = InputSource()
-        inpsrc.setByteStream(open(TEST_XMLFILE))
-        parser.parse(inpsrc)
+        with open(TEST_XMLFILE) as f:
+            inpsrc.setByteStream(f)
+            parser.parse(inpsrc)
 
         self.assertEquals(result.getvalue(), xml_test_out)
 

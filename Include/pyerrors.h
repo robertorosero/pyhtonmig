@@ -60,7 +60,10 @@ typedef struct {
 
 PyAPI_FUNC(void) PyErr_SetNone(PyObject *);
 PyAPI_FUNC(void) PyErr_SetObject(PyObject *, PyObject *);
-PyAPI_FUNC(void) PyErr_SetString(PyObject *, const char *);
+PyAPI_FUNC(void) PyErr_SetString(
+    PyObject *exception,
+    const char *string   /* decoded from utf-8 */
+    );
 PyAPI_FUNC(PyObject *) PyErr_Occurred(void);
 PyAPI_FUNC(void) PyErr_Clear(void);
 PyAPI_FUNC(void) PyErr_Fetch(PyObject **, PyObject **, PyObject **);
@@ -153,7 +156,6 @@ PyAPI_DATA(PyObject *) PyExc_VMSError;
 
 PyAPI_DATA(PyObject *) PyExc_BufferError;
 
-PyAPI_DATA(PyObject *) PyExc_MemoryErrorInst;
 PyAPI_DATA(PyObject *) PyExc_RecursionErrorInst;
 
 /* Predefined warning categories */
@@ -167,6 +169,7 @@ PyAPI_DATA(PyObject *) PyExc_FutureWarning;
 PyAPI_DATA(PyObject *) PyExc_ImportWarning;
 PyAPI_DATA(PyObject *) PyExc_UnicodeWarning;
 PyAPI_DATA(PyObject *) PyExc_BytesWarning;
+PyAPI_DATA(PyObject *) PyExc_ResourceWarning;
 
 
 /* Convenience functions */
@@ -177,13 +180,19 @@ PyAPI_FUNC(PyObject *) PyErr_SetFromErrno(PyObject *);
 PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithFilenameObject(
     PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithFilename(
-    PyObject *, const char *);
+    PyObject *exc,
+    const char *filename   /* decoded from the filesystem encoding */
+    );
 #ifdef MS_WINDOWS
 PyAPI_FUNC(PyObject *) PyErr_SetFromErrnoWithUnicodeFilename(
     PyObject *, const Py_UNICODE *);
 #endif /* MS_WINDOWS */
 
-PyAPI_FUNC(PyObject *) PyErr_Format(PyObject *, const char *, ...);
+PyAPI_FUNC(PyObject *) PyErr_Format(
+    PyObject *exception,
+    const char *format,   /* ASCII-encoded string  */
+    ...
+    );
 
 #ifdef MS_WINDOWS
 PyAPI_FUNC(PyObject *) PyErr_SetFromWindowsErrWithFilenameObject(
@@ -225,6 +234,7 @@ int PySignal_SetWakeupFd(int fd);
 
 /* Support for adding program text to SyntaxErrors */
 PyAPI_FUNC(void) PyErr_SyntaxLocation(const char *, int);
+PyAPI_FUNC(void) PyErr_SyntaxLocationEx(const char *, int, int);
 PyAPI_FUNC(PyObject *) PyErr_ProgramText(const char *, int);
 
 /* The following functions are used to create and modify unicode

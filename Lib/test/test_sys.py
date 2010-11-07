@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-1 -*-
 import unittest, test.support
 import sys, io, os
 import struct
@@ -6,6 +5,7 @@ import subprocess
 import textwrap
 import warnings
 import operator
+import codecs
 
 # count the number of test runs, used to create unique
 # strings to intern in test_intern()
@@ -86,7 +86,6 @@ class SysModuleTest(unittest.TestCase):
     # Python/pythonrun.c::PyErr_PrintEx() is tricky.
 
     def test_exit(self):
-        import subprocess
 
         self.assertRaises(TypeError, sys.exit, 42, 42)
 
@@ -179,8 +178,8 @@ class SysModuleTest(unittest.TestCase):
         # can't check more than the type, as the user might have changed it
         self.assertIsInstance(sys.getdefaultencoding(), str)
 
-    # testing sys.settrace() is done in test_trace.py
-    # testing sys.setprofile() is done in test_profile.py
+    # testing sys.settrace() is done in test_sys_settrace.py
+    # testing sys.setprofile() is done in test_sys_setprofile.py
 
     def test_setcheckinterval(self):
         with warnings.catch_warnings():
@@ -469,6 +468,8 @@ class SysModuleTest(unittest.TestCase):
         self.assertTrue(vi > (1,0,0))
         self.assertIsInstance(sys.float_repr_style, str)
         self.assertIn(sys.float_repr_style, ('short', 'legacy'))
+        if not sys.platform.startswith('win'):
+            self.assertIsInstance(sys.abiflags, str)
 
     def test_43581(self):
         # Can't use sys.stdout, as this is a StringIO object when
@@ -495,24 +496,6 @@ class SysModuleTest(unittest.TestCase):
 
         self.assertRaises(TypeError, sys.intern, S("abc"))
 
-    def test_main_invalid_unicode(self):
-        import locale
-        non_decodable = b"\xff"
-        encoding = locale.getpreferredencoding()
-        try:
-            non_decodable.decode(encoding)
-        except UnicodeDecodeError:
-            pass
-        else:
-            self.skipTest('%r is decodable with encoding %s'
-                % (non_decodable, encoding))
-        code = b'print("' + non_decodable + b'")'
-        p = subprocess.Popen([sys.executable, "-c", code], stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        self.assertEqual(p.returncode, 1)
-        self.assert_(b"UnicodeEncodeError:" in stderr,
-            "%r not in %s" % (b"UniodeEncodeError:", ascii(stderr)))
-
     def test_sys_flags(self):
         self.assertTrue(sys.flags)
         attrs = ("debug", "division_warning",
@@ -529,7 +512,6 @@ class SysModuleTest(unittest.TestCase):
         sys._clear_type_cache()
 
     def test_ioencoding(self):
-        import subprocess
         env = dict(os.environ)
 
         # Test character: cent sign, encoded as 0x4A (ASCII J) in CP424,
@@ -551,7 +533,7 @@ class SysModuleTest(unittest.TestCase):
         # Issue #7774: Ensure that sys.executable is an empty string if argv[0]
         # has been set to an non existent program name and Python is unable to
         # retrieve the real program name
-        import subprocess
+
         # For a normal installation, it should work without 'cwd'
         # argument. For test runs in the build directory, see #7774.
         python_dir = os.path.dirname(os.path.realpath(sys.executable))
@@ -563,6 +545,22 @@ class SysModuleTest(unittest.TestCase):
         executable = stdout.strip().decode("ASCII")
         p.wait()
         self.assertIn(executable, ["b''", repr(sys.executable.encode("ascii", "backslashreplace"))])
+
+    def check_fsencoding(self, fs_encoding, expected=None):
+        self.assertIsNotNone(fs_encoding)
+        codecs.lookup(fs_encoding)
+        if expected:
+            self.assertEqual(fs_encoding, expected)
+
+    def test_getfilesystemencoding(self):
+        fs_encoding = sys.getfilesystemencoding()
+        if sys.platform == 'darwin':
+            expected = 'utf-8'
+        elif sys.platform == 'win32':
+            expected = 'mbcs'
+        else:
+            expected = None
+        self.check_fsencoding(fs_encoding, expected)
 
 
 class SizeofTest(unittest.TestCase):
@@ -761,7 +759,7 @@ class SizeofTest(unittest.TestCase):
         check(int(PyLong_BASE**2-1), size(vh) + 2*self.longdigit)
         check(int(PyLong_BASE**2), size(vh) + 3*self.longdigit)
         # memory
-        check(memoryview(b''), size(h + 'P PP2P2i7P'))
+        check(memoryview(b''), size(h + 'PP2P2i7P'))
         # module
         check(unittest, size(h + '3P'))
         # None
@@ -829,7 +827,7 @@ class SizeofTest(unittest.TestCase):
         # we need to test for both sizes, because we don't know if the string
         # has been cached
         for s in samples:
-            basicsize =  size(h + 'PPliP') + usize * (len(s) + 1)
+            basicsize =  size(h + 'PPPiP') + usize * (len(s) + 1)
             check(s, basicsize)
         # weakref
         import weakref
@@ -863,46 +861,6 @@ class SizeofTest(unittest.TestCase):
         # sys.flags
         check(sys.flags, size(vh) + self.P * len(sys.flags))
 
-    def test_getfilesystemencoding(self):
-        import codecs
-
-        def check_fsencoding(fs_encoding):
-            self.assertIsNotNone(fs_encoding)
-            if sys.platform == 'darwin':
-                self.assertEqual(fs_encoding, 'utf-8')
-            codecs.lookup(fs_encoding)
-
-        fs_encoding = sys.getfilesystemencoding()
-        check_fsencoding(fs_encoding)
-
-        # Even in C locale
-        try:
-            sys.executable.encode('ascii')
-        except UnicodeEncodeError:
-            # Python doesn't start with ASCII locale if its path is not ASCII,
-            # see issue #8611
-            pass
-        else:
-            env = os.environ.copy()
-            env['LANG'] = 'C'
-            output = subprocess.check_output(
-                [sys.executable, "-c",
-                 "import sys; print(sys.getfilesystemencoding())"],
-                env=env)
-            fs_encoding = output.rstrip().decode('ascii')
-            check_fsencoding(fs_encoding)
-
-    def test_setfilesystemencoding(self):
-        old = sys.getfilesystemencoding()
-        try:
-            sys.setfilesystemencoding("iso-8859-1")
-            self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
-        finally:
-            sys.setfilesystemencoding(old)
-        try:
-            self.assertRaises(LookupError, sys.setfilesystemencoding, "xxx")
-        finally:
-            sys.setfilesystemencoding(old)
 
 def test_main():
     test.support.run_unittest(SysModuleTest, SizeofTest)

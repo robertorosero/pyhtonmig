@@ -138,6 +138,22 @@ typedef struct {
 /* ===================================================================== */
 /* Utility functions. */
 
+/* Refuse regular I/O if there's data in the iteration-buffer.
+ * Mixing them would cause data to arrive out of order, as the read*
+ * methods don't use the iteration buffer. */
+static int
+check_iterbuffered(BZ2FileObject *f)
+{
+    if (f->f_buf != NULL &&
+        (f->f_bufend - f->f_bufptr) > 0 &&
+        f->f_buf[0] != '\0') {
+        PyErr_SetString(PyExc_ValueError,
+            "Mixing iteration and read methods would lose data");
+        return -1;
+    }
+    return 0;
+}
+
 static int
 Util_CatchBZ2Error(int bzerror)
 {
@@ -427,6 +443,10 @@ BZ2File_read(BZ2FileObject *self, PyObject *args)
             goto cleanup;
     }
 
+    /* refuse to mix with f.next() */
+    if (check_iterbuffered(self))
+        goto cleanup;
+
     if (bytesrequested < 0)
         buffersize = Util_NewBufferSize((size_t)0);
     else
@@ -516,6 +536,10 @@ BZ2File_readline(BZ2FileObject *self, PyObject *args)
             goto cleanup;
     }
 
+    /* refuse to mix with f.next() */
+    if (check_iterbuffered(self))
+        goto cleanup;
+
     if (sizehint == 0)
         ret = PyBytes_FromStringAndSize("", 0);
     else
@@ -572,6 +596,10 @@ BZ2File_readlines(BZ2FileObject *self, PyObject *args)
                             "file is not ready for reading");
             goto cleanup;
     }
+
+    /* refuse to mix with f.next() */
+    if (check_iterbuffered(self))
+        goto cleanup;
 
     if ((list = PyList_New(0)) == NULL)
         goto cleanup;
@@ -2127,9 +2155,12 @@ PyInit_bz2(void)
 {
     PyObject *m;
 
-    Py_TYPE(&BZ2File_Type) = &PyType_Type;
-    Py_TYPE(&BZ2Comp_Type) = &PyType_Type;
-    Py_TYPE(&BZ2Decomp_Type) = &PyType_Type;
+    if (PyType_Ready(&BZ2File_Type) < 0)
+        return NULL;
+    if (PyType_Ready(&BZ2Comp_Type) < 0)
+        return NULL;
+    if (PyType_Ready(&BZ2Decomp_Type) < 0)
+        return NULL;
 
     m = PyModule_Create(&bz2module);
     if (m == NULL)

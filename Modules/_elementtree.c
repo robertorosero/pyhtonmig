@@ -2870,15 +2870,15 @@ static PyMethodDef _functions[] = {
 
 
 static struct PyModuleDef _elementtreemodule = {
-	PyModuleDef_HEAD_INIT,
-	"_elementtree",
-	NULL,
-	-1,
-	_functions,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "_elementtree",
+        NULL,
+        -1,
+        _functions,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
 PyMODINIT_FUNC
@@ -2890,12 +2890,12 @@ PyInit__elementtree(void)
 
     /* Initialize object types */
     if (PyType_Ready(&TreeBuilder_Type) < 0)
-	return NULL;
+        return NULL;
     if (PyType_Ready(&Element_Type) < 0)
-	return NULL;
+        return NULL;
 #if defined(USE_EXPAT)
     if (PyType_Ready(&XMLParser_Type) < 0)
-	return NULL;
+        return NULL;
 #endif
 
     m = PyModule_Create(&_elementtreemodule);
@@ -2905,8 +2905,8 @@ PyInit__elementtree(void)
     /* The code below requires that the module gets already added
        to sys.modules. */
     PyDict_SetItemString(PyImport_GetModuleDict(),
-			 _elementtreemodule.m_name,
-			 m);
+                         _elementtreemodule.m_name,
+                         m);
 
     /* python glue code */
 
@@ -2946,19 +2946,25 @@ PyInit__elementtree(void)
 
         "class ElementTree(ET.ElementTree):\n" /* public */
         "  def parse(self, source, parser=None):\n"
+        "    close_source = False\n"
         "    if not hasattr(source, 'read'):\n"
         "      source = open(source, 'rb')\n"
-        "    if parser is not None:\n"
-        "      while 1:\n"
-        "        data = source.read(65536)\n"
-        "        if not data:\n"
-        "          break\n"
-        "        parser.feed(data)\n"
-        "      self._root = parser.close()\n"
-        "    else:\n" 
-        "      parser = cElementTree.XMLParser()\n"
-        "      self._root = parser._parse(source)\n"
-        "    return self._root\n"
+        "      close_source = True\n"
+        "    try:\n"
+        "      if parser is not None:\n"
+        "        while 1:\n"
+        "          data = source.read(65536)\n"
+        "          if not data:\n"
+        "            break\n"
+        "          parser.feed(data)\n"
+        "        self._root = parser.close()\n"
+        "      else:\n" 
+        "        parser = cElementTree.XMLParser()\n"
+        "        self._root = parser._parse(source)\n"
+        "      return self._root\n"
+        "    finally:\n"
+        "      if close_source:\n"
+        "        source.close()\n"
         "cElementTree.ElementTree = ElementTree\n"
 
         "def iter(node, tag=None):\n" /* helper */
@@ -2988,8 +2994,10 @@ PyInit__elementtree(void)
         "class iterparse:\n"
         " root = None\n"
         " def __init__(self, file, events=None):\n"
+        "  self._close_file = False\n"
         "  if not hasattr(file, 'read'):\n"
         "    file = open(file, 'rb')\n"
+        "    self._close_file = True\n"
         "  self._file = file\n"
         "  self._events = []\n"
         "  self._index = 0\n"
@@ -3004,6 +3012,8 @@ PyInit__elementtree(void)
         "    except IndexError:\n"
         "      if self._parser is None:\n"
         "        self.root = self._root\n"
+        "        if self._close_file:\n"
+        "          self._file.close()\n"
         "        raise StopIteration\n"
         "      # load event buffer\n"
         "      del self._events[:]\n"

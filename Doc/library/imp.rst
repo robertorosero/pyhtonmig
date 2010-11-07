@@ -48,8 +48,8 @@ This module provides an interface to the mechanisms used to implement the
    If search is successful, the return value is a 3-element tuple ``(file,
    pathname, description)``:
 
-   *file* is an open file object positioned at the beginning, *pathname* is the
-   pathname of the file found, and *description* is a 3-element tuple as
+   *file* is an open :term:`file object` positioned at the beginning, *pathname*
+   is the pathname of the file found, and *description* is a 3-element tuple as
    contained in the list returned by :func:`get_suffixes` describing the kind of
    module found.
 
@@ -113,8 +113,7 @@ This module provides an interface to the mechanisms used to implement the
 .. function:: acquire_lock()
 
    Acquire the interpreter's import lock for the current thread.  This lock should
-   be used by import hooks to ensure thread-safety when importing modules. On
-   platforms without threads, this function does nothing.
+   be used by import hooks to ensure thread-safety when importing modules.
 
    Once a thread has acquired the import lock, the same thread may acquire it
    again without blocking; the thread must release it once for each time it has
@@ -191,19 +190,6 @@ This module provides an interface to the mechanisms used to implement the
    continue to use the old class definition.  The same is true for derived classes.
 
 
-.. function:: acquire_lock()
-
-   Acquires the interpreter's import lock for the current thread.  This lock should
-   be used by import hooks to ensure thread-safety when importing modules. On
-   platforms without threads, this function does nothing.
-
-
-.. function:: release_lock()
-
-   Release the interpreter's import lock. On platforms without threads, this
-   function does nothing.
-
-
 The following functions and data provide conveniences for handling :pep:`3147`
 byte-compiled file paths.
 
@@ -223,6 +209,7 @@ byte-compiled file paths.
 
    *path* need not exist.
 
+
 .. function:: source_from_cache(path)
 
    Given the *path* to a :pep:`3147` file name, return the associated source code
@@ -230,6 +217,7 @@ byte-compiled file paths.
    ``/foo/bar/__pycache__/baz.cpython-32.pyc`` the returned path would be
    ``/foo/bar/baz.py``.  *path* need not exist, however if it does not conform
    to :pep:`3147` format, a ``ValueError`` is raised.
+
 
 .. function:: get_tag()
 

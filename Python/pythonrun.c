@@ -134,18 +134,13 @@ add_flag(int flag, const char *envs)
     return flag;
 }
 
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
 static char*
-get_codeset(void)
+get_codec_name(const char *encoding)
 {
-    char* codeset, *name_str;
+    char *name_utf8, *name_str;
     PyObject *codec, *name = NULL;
 
-    codeset = nl_langinfo(CODESET);
-    if (!codeset || codeset[0] == '\0')
-        return NULL;
-
-    codec = _PyCodec_Lookup(codeset);
+    codec = _PyCodec_Lookup(encoding);
     if (!codec)
         goto error;
 
@@ -154,17 +149,33 @@ get_codeset(void)
     if (!name)
         goto error;
 
-    name_str = _PyUnicode_AsString(name);
+    name_utf8 = _PyUnicode_AsString(name);
     if (name == NULL)
         goto error;
-    codeset = strdup(name_str);
+    name_str = strdup(name_utf8);
     Py_DECREF(name);
-    return codeset;
+    if (name_str == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    return name_str;
 
 error:
     Py_XDECREF(codec);
     Py_XDECREF(name);
     return NULL;
+}
+
+#if defined(HAVE_LANGINFO_H) && defined(CODESET)
+static char*
+get_codeset(void)
+{
+    char* codeset = nl_langinfo(CODESET);
+    if (!codeset || codeset[0] == '\0') {
+        PyErr_SetString(PyExc_ValueError, "CODESET is not set or empty");
+        return NULL;
+    }
+    return get_codec_name(codeset);
 }
 #endif
 
@@ -206,6 +217,18 @@ Py_InitializeEx(int install_sigs)
         Py_FatalError("Py_Initialize: can't make first thread");
     (void) PyThreadState_Swap(tstate);
 
+#ifdef WITH_THREAD
+    /* We can't call _PyEval_FiniThreads() in Py_Finalize because
+       destroying the GIL might fail when it is being referenced from
+       another running thread (see issue #9901).
+       Instead we destroy the previously created GIL here, which ensures
+       that we can call Py_Initialize / Py_Finalize multiple times. */
+    _PyEval_FiniThreads();
+
+    /* Auto-thread-state API */
+    _PyGILState_Init(interp, tstate);
+#endif /* WITH_THREAD */
+
     _Py_ReadyTypes();
 
     if (!_PyFrame_Init())
@@ -232,7 +255,7 @@ Py_InitializeEx(int install_sigs)
     bimod = _PyBuiltin_Init();
     if (bimod == NULL)
         Py_FatalError("Py_Initialize: can't initialize builtins modules");
-    _PyImport_FixupExtension(bimod, "builtins", "builtins");
+    _PyImport_FixupBuiltin(bimod, "builtins");
     interp->builtins = PyModule_GetDict(bimod);
     if (interp->builtins == NULL)
         Py_FatalError("Py_Initialize: can't initialize builtins dict");
@@ -248,7 +271,7 @@ Py_InitializeEx(int install_sigs)
     if (interp->sysdict == NULL)
         Py_FatalError("Py_Initialize: can't initialize sys dict");
     Py_INCREF(interp->sysdict);
-    _PyImport_FixupExtension(sysmod, "sys", "sys");
+    _PyImport_FixupBuiltin(sysmod, "sys");
     PySys_SetPath(Py_GetPath());
     PyDict_SetItemString(interp->sysdict, "modules",
                          interp->modules);
@@ -260,6 +283,7 @@ Py_InitializeEx(int install_sigs)
         Py_FatalError("Py_Initialize: can't set preliminary stderr");
     PySys_SetObject("stderr", pstderr);
     PySys_SetObject("__stderr__", pstderr);
+    Py_DECREF(pstderr);
 
     _PyImport_Init();
 
@@ -267,6 +291,8 @@ Py_InitializeEx(int install_sigs)
 
     /* Initialize _warnings. */
     _PyWarnings_Init();
+
+    _PyTime_Init();
 
     initfsencoding();
 
@@ -285,11 +311,6 @@ Py_InitializeEx(int install_sigs)
     if (initstdio() < 0)
         Py_FatalError(
             "Py_Initialize: can't initialize sys standard streams");
-
-    /* auto-thread-state API, if available */
-#ifdef WITH_THREAD
-    _PyGILState_Init(interp, tstate);
-#endif /* WITH_THREAD */
 
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
@@ -318,7 +339,7 @@ flush_std_files(void)
     if (fout != NULL && fout != Py_None) {
         tmp = PyObject_CallMethod(fout, "flush", "");
         if (tmp == NULL)
-            PyErr_Clear();
+            PyErr_WriteUnraisable(fout);
         else
             Py_DECREF(tmp);
     }
@@ -402,6 +423,9 @@ Py_Finalize(void)
     while (PyGC_Collect() > 0)
         /* nothing */;
 #endif
+    /* We run this while most interpreter state is still alive, so that
+       debug information can be printed out */
+    _PyGC_Fini();
 
     /* Destroy all modules */
     PyImport_Cleanup();
@@ -554,7 +578,7 @@ Py_NewInterpreter(void)
     interp->modules = PyDict_New();
     interp->modules_reloading = PyDict_New();
 
-    bimod = _PyImport_FindExtension("builtins", "builtins");
+    bimod = _PyImport_FindBuiltin("builtins");
     if (bimod != NULL) {
         interp->builtins = PyModule_GetDict(bimod);
         if (interp->builtins == NULL)
@@ -565,7 +589,7 @@ Py_NewInterpreter(void)
     /* initialize builtin exceptions */
     _PyExc_Init();
 
-    sysmod = _PyImport_FindExtension("sys", "sys");
+    sysmod = _PyImport_FindBuiltin("sys");
     if (bimod != NULL && sysmod != NULL) {
         PyObject *pstderr;
         interp->sysdict = PyModule_GetDict(sysmod);
@@ -582,6 +606,7 @@ Py_NewInterpreter(void)
             Py_FatalError("Py_Initialize: can't set preliminary stderr");
         PySys_SetObject("stderr", pstderr);
         PySys_SetObject("__stderr__", pstderr);
+        Py_DECREF(pstderr);
 
         _PyImportHooks_Init();
         if (initstdio() < 0)
@@ -701,27 +726,20 @@ initfsencoding(void)
 {
     PyObject *codec;
 #if defined(HAVE_LANGINFO_H) && defined(CODESET)
-    char *codeset;
+    char *codeset = NULL;
 
     if (Py_FileSystemDefaultEncoding == NULL) {
         /* On Unix, set the file system encoding according to the
            user's preference, if the CODESET names a well-known
            Python codec, and Py_FileSystemDefaultEncoding isn't
-           initialized by other means. Also set the encoding of
-           stdin and stdout if these are terminals.  */
+           initialized by other means. */
         codeset = get_codeset();
-        if (codeset != NULL) {
-            Py_FileSystemDefaultEncoding = codeset;
-            Py_HasFileSystemDefaultEncoding = 0;
-            return;
-        }
+        if (codeset == NULL)
+            Py_FatalError("Py_Initialize: Unable to get the locale encoding");
 
-        PyErr_Clear();
-        fprintf(stderr,
-                "Unable to get the locale encoding: "
-                "fallback to utf-8\n");
-        Py_FileSystemDefaultEncoding = "utf-8";
-        Py_HasFileSystemDefaultEncoding = 1;
+        Py_FileSystemDefaultEncoding = codeset;
+        Py_HasFileSystemDefaultEncoding = 0;
+        return;
     }
 #endif
 
@@ -955,6 +973,7 @@ initstdio(void)
         if (encoding != NULL) {
             _PyCodec_Lookup(encoding);
         }
+        Py_DECREF(encoding_attr);
     }
     PyErr_Clear();  /* Not a fatal error if codec isn't available */
 
@@ -1190,7 +1209,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
     d = PyModule_GetDict(m);
     if (PyDict_GetItemString(d, "__file__") == NULL) {
         PyObject *f;
-        f = PyUnicode_FromString(filename);
+        f = PyUnicode_DecodeFSDefault(filename);
         if (f == NULL)
             return -1;
         if (PyDict_SetItemString(d, "__file__", f) < 0) {
@@ -1328,7 +1347,7 @@ print_error_text(PyObject *f, int offset, const char *text)
 {
     char *nl;
     if (offset >= 0) {
-        if (offset > 0 && offset == (int)strlen(text))
+        if (offset > 0 && offset == strlen(text) && text[offset - 1] == '\n')
             offset--;
         for (;;) {
             nl = strchr(text, '\n');
@@ -1349,11 +1368,8 @@ print_error_text(PyObject *f, int offset, const char *text)
     if (offset == -1)
         return;
     PyFile_WriteString("    ", f);
-    offset--;
-    while (offset > 0) {
+    while (--offset > 0)
         PyFile_WriteString(" ", f);
-        offset--;
-    }
     PyFile_WriteString("^\n", f);
 }
 
@@ -1945,7 +1961,9 @@ err_input(perrdetail *err)
 {
     PyObject *v, *w, *errtype, *errtext;
     PyObject *msg_obj = NULL;
+    PyObject *filename;
     char *msg = NULL;
+
     errtype = PyExc_SyntaxError;
     switch (err->error) {
     case E_ERROR:
@@ -2029,8 +2047,17 @@ err_input(perrdetail *err)
         errtext = PyUnicode_DecodeUTF8(err->text, strlen(err->text),
                                        "replace");
     }
-    v = Py_BuildValue("(ziiN)", err->filename,
-                      err->lineno, err->offset, errtext);
+    if (err->filename != NULL)
+        filename = PyUnicode_DecodeFSDefault(err->filename);
+    else {
+        Py_INCREF(Py_None);
+        filename = Py_None;
+    }
+    if (filename != NULL)
+        v = Py_BuildValue("(NiiN)", filename,
+                          err->lineno, err->offset, errtext);
+    else
+        v = NULL;
     if (v != NULL) {
         if (msg_obj)
             w = Py_BuildValue("(OO)", msg_obj, v);

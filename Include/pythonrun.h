@@ -113,6 +113,7 @@ PyAPI_FUNC(wchar_t *) Py_GetProgramFullPath(void);
 PyAPI_FUNC(wchar_t *) Py_GetPrefix(void);
 PyAPI_FUNC(wchar_t *) Py_GetExecPrefix(void);
 PyAPI_FUNC(wchar_t *) Py_GetPath(void);
+PyAPI_FUNC(void)      Py_SetPath(const wchar_t *);
 
 /* In their own files */
 PyAPI_FUNC(const char *) Py_GetVersion(void);
@@ -148,6 +149,7 @@ PyAPI_FUNC(void) PyBytes_Fini(void);
 PyAPI_FUNC(void) PyByteArray_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
+PyAPI_FUNC(void) _PyGC_Fini(void);
 
 /* Stuff with no proper home (yet) */
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);

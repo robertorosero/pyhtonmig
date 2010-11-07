@@ -31,10 +31,9 @@ the documents in the "See Also" section at the bottom.
 This module provides a class, :class:`ssl.SSLSocket`, which is derived from the
 :class:`socket.socket` type, and provides a socket-like wrapper that also
 encrypts and decrypts the data going over the socket with SSL.  It supports
-additional :meth:`read` and :meth:`write` methods, along with a method,
-:meth:`getpeercert`, to retrieve the certificate of the other side of the
-connection, and a method, :meth:`cipher`, to retrieve the cipher being used for
-the secure connection.
+additional methods such as :meth:`getpeercert`, which retrieves the
+certificate of the other side of the connection, and :meth:`cipher`,which
+retrieves the cipher being used for the secure connection.
 
 For more sophisticated applications, the :class:`ssl.SSLContext` class
 helps manage settings and certificates, which can then be inherited
@@ -46,11 +45,27 @@ Functions, Constants, and Exceptions
 
 .. exception:: SSLError
 
-   Raised to signal an error from the underlying SSL implementation.  This
-   signifies some problem in the higher-level encryption and authentication
-   layer that's superimposed on the underlying network connection.  This error
+   Raised to signal an error from the underlying SSL implementation
+   (currently provided by the OpenSSL library).  This signifies some
+   problem in the higher-level encryption and authentication layer that's
+   superimposed on the underlying network connection.  This error
    is a subtype of :exc:`socket.error`, which in turn is a subtype of
-   :exc:`IOError`.
+   :exc:`IOError`.  The error code and message of :exc:`SSLError` instances
+   are provided by the OpenSSL library.
+
+.. exception:: CertificateError
+
+   Raised to signal an error with a certificate (such as mismatching
+   hostname).  Certificate errors detected by OpenSSL, though, raise
+   an :exc:`SSLError`.
+
+
+Socket creation
+^^^^^^^^^^^^^^^
+
+The following function allows for standalone socket creation.  Starting from
+Python 3.2, it can be more flexible to use :meth:`SSLContext.wrap_socket`
+instead.
 
 .. function:: wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=CERT_NONE, ssl_version={see docs}, ca_certs=None, do_handshake_on_connect=True, suppress_ragged_eofs=True, ciphers=None)
 
@@ -131,13 +146,17 @@ Functions, Constants, and Exceptions
    blocking behavior of the socket I/O involved in the handshake.
 
    The parameter ``suppress_ragged_eofs`` specifies how the
-   :meth:`SSLSocket.read` method should signal unexpected EOF from the other end
+   :meth:`SSLSocket.recv` method should signal unexpected EOF from the other end
    of the connection.  If specified as :const:`True` (the default), it returns a
-   normal EOF in response to unexpected EOF errors raised from the underlying
-   socket; if :const:`False`, it will raise the exceptions back to the caller.
+   normal EOF (an empty bytes object) in response to unexpected EOF errors
+   raised from the underlying socket; if :const:`False`, it will raise the
+   exceptions back to the caller.
 
    .. versionchanged:: 3.2
       New optional argument *ciphers*.
+
+Random generation
+^^^^^^^^^^^^^^^^^
 
 .. function:: RAND_status()
 
@@ -164,6 +183,32 @@ Functions, Constants, and Exceptions
    string (so you can always use :const:`0.0`).  See :rfc:`1750` for more
    information on sources of entropy.
 
+Certificate handling
+^^^^^^^^^^^^^^^^^^^^
+
+.. function:: match_hostname(cert, hostname)
+
+   Verify that *cert* (in decoded format as returned by
+   :meth:`SSLSocket.getpeercert`) matches the given *hostname*.  The rules
+   applied are those for checking the identity of HTTPS servers as outlined
+   in :rfc:`2818`, except that IP addresses are not currently supported.
+   In addition to HTTPS, this function should be suitable for checking the
+   identity of servers in various SSL-based protocols such as FTPS, IMAPS,
+   POPS and others.
+
+   :exc:`CertificateError` is raised on failure. On success, the function
+   returns nothing::
+
+      >>> cert = {'subject': ((('commonName', 'example.com'),),)}
+      >>> ssl.match_hostname(cert, "example.com")
+      >>> ssl.match_hostname(cert, "example.org")
+      Traceback (most recent call last):
+        File "<stdin>", line 1, in <module>
+        File "/home/py3k/Lib/ssl.py", line 130, in match_hostname
+      ssl.CertificateError: hostname 'example.org' doesn't match 'example.com'
+
+   .. versionadded:: 3.2
+
 .. function:: cert_time_to_seconds(timestring)
 
    Returns a floating-point value containing a normal seconds-after-the-epoch
@@ -178,7 +223,6 @@ Functions, Constants, and Exceptions
      >>> import time
      >>> time.ctime(ssl.cert_time_to_seconds("May  9 00:00:00 2007 GMT"))
      'Wed May  9 00:00:00 2007'
-     >>>
 
 .. function:: get_server_certificate(addr, ssl_version=PROTOCOL_SSLv3, ca_certs=None)
 
@@ -200,6 +244,9 @@ Functions, Constants, and Exceptions
 
    Given a certificate as an ASCII PEM string, returns a DER-encoded sequence of
    bytes for that same certificate.
+
+Constants
+^^^^^^^^^
 
 .. data:: CERT_NONE
 
@@ -291,6 +338,15 @@ Functions, Constants, and Exceptions
 
    .. versionadded:: 3.2
 
+.. data:: HAS_SNI
+
+   Whether the OpenSSL library has built-in support for the *Server Name
+   Indication* extension to the SSLv3 and TLSv1 protocols (as defined in
+   :rfc:`4366`).  When true, you can use the *server_hostname* argument to
+   :meth:`SSLContext.wrap_socket`.
+
+   .. versionadded:: 3.2
+
 .. data:: OPENSSL_VERSION
 
    The version string of the OpenSSL library loaded by the interpreter::
@@ -325,18 +381,27 @@ Functions, Constants, and Exceptions
 SSL Sockets
 -----------
 
-.. method:: SSLSocket.read(nbytes=1024, buffer=None)
+SSL sockets provide the following methods of :ref:`socket-objects`:
 
-   Reads up to ``nbytes`` bytes from the SSL-encrypted channel and returns them.
-   If the ``buffer`` is specified, it will attempt to read into the buffer the
-   minimum of the size of the buffer and ``nbytes``, if that is specified.  If
-   no buffer is specified, an immutable buffer is allocated and returned with
-   the data read from the socket.
+- :meth:`~socket.socket.accept()`
+- :meth:`~socket.socket.bind()`
+- :meth:`~socket.socket.close()`
+- :meth:`~socket.socket.connect()`
+- :meth:`~socket.socket.detach()`
+- :meth:`~socket.socket.fileno()`
+- :meth:`~socket.socket.getpeername()`, :meth:`~socket.socket.getsockname()`
+- :meth:`~socket.socket.getsockopt()`, :meth:`~socket.socket.setsockopt()`
+- :meth:`~socket.socket.gettimeout()`, :meth:`~socket.socket.settimeout()`,
+  :meth:`~socket.socket.setblocking()`
+- :meth:`~socket.socket.listen()`
+- :meth:`~socket.socket.makefile()`
+- :meth:`~socket.socket.recv()`, :meth:`~socket.socket.recv_into()`
+  (but passing a non-zero ``flags`` argument is not allowed)
+- :meth:`~socket.socket.send()`, :meth:`~socket.socket.sendall()` (with
+  the same limitation)
+- :meth:`~socket.socket.shutdown()`
 
-.. method:: SSLSocket.write(data)
-
-   Writes the ``data`` to the other side of the connection, using the SSL
-   channel to encrypt.  Returns the number of bytes written.
+They also have the following additional methods and attributes:
 
 .. method:: SSLSocket.do_handshake()
 
@@ -425,13 +490,17 @@ SSL Contexts
 
 .. versionadded:: 3.2
 
+An SSL context holds various data longer-lived than single SSL connections,
+such as SSL configuration options, certificate(s) and private key(s).
+It also manages a cache of SSL sessions for server-side sockets, in order
+to speed up repeated connections from the same clients.
+
 .. class:: SSLContext(protocol)
 
-   An object holding various data longer-lived than single SSL connections,
-   such as SSL configuration options, certificate(s) and private key(s).
-   You must pass *protocol* which must be one of the ``PROTOCOL_*`` constants
-   defined in this module.  :data:`PROTOCOL_SSLv23` is recommended for
-   maximum interoperability.
+   Create a new SSL context.  You must pass *protocol* which must be one
+   of the ``PROTOCOL_*`` constants defined in this module.
+   :data:`PROTOCOL_SSLv23` is recommended for maximum interoperability.
+
 
 :class:`SSLContext` objects have the following methods and attributes:
 
@@ -478,13 +547,36 @@ SSL Contexts
       when connected, the :meth:`SSLSocket.cipher` method of SSL sockets will
       give the currently selected cipher.
 
-.. method:: SSLContext.wrap_socket(sock, server_side=False, do_handshake_on_connect=True, suppress_ragged_eofs=True)
+.. method:: SSLContext.wrap_socket(sock, server_side=False, \
+      do_handshake_on_connect=True, suppress_ragged_eofs=True, \
+      server_hostname=None)
 
    Wrap an existing Python socket *sock* and return an :class:`SSLSocket`
    object.  The SSL socket is tied to the context, its settings and
    certificates.  The parameters *server_side*, *do_handshake_on_connect*
    and *suppress_ragged_eofs* have the same meaning as in the top-level
    :func:`wrap_socket` function.
+
+   On client connections, the optional parameter *server_hostname* specifies
+   the hostname of the service which we are connecting to.  This allows a
+   single server to host multiple SSL-based services with distinct certificates,
+   quite similarly to HTTP virtual hosts.  Specifying *server_hostname*
+   will raise a :exc:`ValueError` if the OpenSSL library doesn't have support
+   for it (that is, if :data:`HAS_SNI` is :const:`False`).  Specifying
+   *server_hostname* will also raise a :exc:`ValueError` if *server_side*
+   is true.
+
+.. method:: SSLContext.session_stats()
+
+   Get statistics about the SSL sessions created or managed by this context.
+   A dictionary is returned which maps the names of each `piece of information
+   <http://www.openssl.org/docs/ssl/SSL_CTX_sess_number.html>`_ to their
+   numeric values.  For example, here is the total number of hits and misses
+   in the session cache since the context was created::
+
+      >>> stats = context.session_stats()
+      >>> stats['hits'], stats['misses']
+      (0, 0)
 
 .. attribute:: SSLContext.options
 
@@ -674,68 +766,51 @@ should use the following idiom::
 Client-side operation
 ^^^^^^^^^^^^^^^^^^^^^
 
-This example connects to an SSL server, prints the server's address and
-certificate, sends some bytes, and reads part of the response::
+This example connects to an SSL server and prints the server's certificate::
 
    import socket, ssl, pprint
 
    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
    # require a certificate from the server
    ssl_sock = ssl.wrap_socket(s,
                               ca_certs="/etc/ca_certs_file",
                               cert_reqs=ssl.CERT_REQUIRED)
-
    ssl_sock.connect(('www.verisign.com', 443))
 
-   print(repr(ssl_sock.getpeername()))
    pprint.pprint(ssl_sock.getpeercert())
-   print(pprint.pformat(ssl_sock.getpeercert()))
-
-   # Set a simple HTTP request -- use http.client in actual code.
-   ssl_sock.write(b"GET / HTTP/1.0\r\nHost: www.verisign.com\r\n\r\n")
-
-   # Read a chunk of data.  Will not necessarily
-   # read all the data returned by the server.
-   data = ssl_sock.read()
-
    # note that closing the SSLSocket will also close the underlying socket
    ssl_sock.close()
 
-As of September 6, 2007, the certificate printed by this program looked like
+As of October 6, 2010, the certificate printed by this program looks like
 this::
 
-      {'notAfter': 'May  8 23:59:59 2009 GMT',
-       'subject': ((('serialNumber', '2497886'),),
-                   (('1.3.6.1.4.1.311.60.2.1.3', 'US'),),
-                   (('1.3.6.1.4.1.311.60.2.1.2', 'Delaware'),),
-                   (('countryName', 'US'),),
-                   (('postalCode', '94043'),),
-                   (('stateOrProvinceName', 'California'),),
-                   (('localityName', 'Mountain View'),),
-                   (('streetAddress', '487 East Middlefield Road'),),
-                   (('organizationName', 'VeriSign, Inc.'),),
-                   (('organizationalUnitName',
-                     'Production Security Services'),),
-                   (('organizationalUnitName',
-                     'Terms of use at www.verisign.com/rpa (c)06'),),
-                   (('commonName', 'www.verisign.com'),))}
-
-which is a fairly poorly-formed ``subject`` field.
+   {'notAfter': 'May 25 23:59:59 2012 GMT',
+    'subject': ((('1.3.6.1.4.1.311.60.2.1.3', 'US'),),
+                (('1.3.6.1.4.1.311.60.2.1.2', 'Delaware'),),
+                (('businessCategory', 'V1.0, Clause 5.(b)'),),
+                (('serialNumber', '2497886'),),
+                (('countryName', 'US'),),
+                (('postalCode', '94043'),),
+                (('stateOrProvinceName', 'California'),),
+                (('localityName', 'Mountain View'),),
+                (('streetAddress', '487 East Middlefield Road'),),
+                (('organizationName', 'VeriSign, Inc.'),),
+                (('organizationalUnitName', ' Production Security Services'),),
+                (('commonName', 'www.verisign.com'),))}
 
 This other example first creates an SSL context, instructs it to verify
 certificates sent by peers, and feeds it a set of recognized certificate
 authorities (CA)::
 
    >>> context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-   >>> context.verify_mode = ssl.CERT_OPTIONAL
+   >>> context.verify_mode = ssl.CERT_REQUIRED
    >>> context.load_verify_locations("/etc/ssl/certs/ca-bundle.crt")
 
 (it is assumed your operating system places a bundle of all CA certificates
 in ``/etc/ssl/certs/ca-bundle.crt``; if not, you'll get an error and have
 to adjust the location)
 
-When you use the context to connect to a server, :const:`CERT_OPTIONAL`
+When you use the context to connect to a server, :const:`CERT_REQUIRED`
 validates the server certificate: it ensures that the server certificate
 was signed with one of the CA certificates, and checks the signature for
 correctness::
@@ -743,11 +818,15 @@ correctness::
    >>> conn = context.wrap_socket(socket.socket(socket.AF_INET))
    >>> conn.connect(("linuxfr.org", 443))
 
-You should then fetch the certificate and check its fields for conformity.
-Here, the ``commonName`` field in the ``subject`` matches the desired HTTPS
-host ``linuxfr.org``::
+You should then fetch the certificate and check its fields for conformity::
 
-   >>> pprint.pprint(conn.getpeercert())
+   >>> cert = conn.getpeercert()
+   >>> ssl.match_hostname(cert, "linuxfr.org")
+
+Visual inspection shows that the certificate does identify the desired service
+(that is, the HTTPS host ``linuxfr.org``)::
+
+   >>> pprint.pprint(cert)
    {'notAfter': 'Jun 26 21:41:46 2011 GMT',
     'subject': ((('commonName', 'linuxfr.org'),),),
     'subjectAltName': (('DNS', 'linuxfr.org'), ('othername', '<unsupported>'))}
@@ -755,9 +834,8 @@ host ``linuxfr.org``::
 Now that you are assured of its authenticity, you can proceed to talk with
 the server::
 
-   >>> conn.write(b"HEAD / HTTP/1.0\r\nHost: linuxfr.org\r\n\r\n")
-   38
-   >>> pprint.pprint(conn.read().split(b"\r\n"))
+   >>> conn.sendall(b"HEAD / HTTP/1.0\r\nHost: linuxfr.org\r\n\r\n")
+   >>> pprint.pprint(conn.recv(1024).split(b"\r\n"))
    [b'HTTP/1.1 302 Found',
     b'Date: Sun, 16 May 2010 13:43:28 GMT',
     b'Server: Apache/2.2',
@@ -767,7 +845,6 @@ the server::
     b'Content-Type: text/html; charset=iso-8859-1',
     b'',
     b'']
-
 
 See the discussion of :ref:`ssl-security` below.
 
@@ -806,14 +883,14 @@ Then you'll read data from the ``connstream`` and do something with it till you
 are finished with the client (or the client is finished with you)::
 
    def deal_with_client(connstream):
-      data = connstream.read()
+      data = connstream.recv(1024)
       # empty data means the client is finished with us
       while data:
          if not do_something(connstream, data):
             # we'll assume do_something returns False
             # when we're finished with client
             break
-         data = connstream.read()
+         data = connstream.recv(1024)
       # finished with client
 
 And go back to listening for new client connections (of course, a real server
@@ -834,12 +911,10 @@ peer, it can be insecure, especially in client mode where most of time you
 would like to ensure the authenticity of the server you're talking to.
 Therefore, when in client mode, it is highly recommended to use
 :const:`CERT_REQUIRED`.  However, it is in itself not sufficient; you also
-have to check that the server certificate (obtained with
-:meth:`SSLSocket.getpeercert`) matches the desired service.  The exact way
-of doing so depends on the higher-level protocol used; for example, with
-HTTPS, you'll check that the host name in the URL matches either the
-``commonName`` field in the ``subjectName``, or one of the ``DNS`` fields
-in the ``subjectAltName``.
+have to check that the server certificate, which can be obtained by calling
+:meth:`SSLSocket.getpeercert`, matches the desired service.  For many
+protocols and applications, the service can be identified by the hostname;
+in this case, the :func:`match_hostname` function can be used.
 
 In server mode, if you want to authenticate your clients using the SSL layer
 (rather than using a higher-level authentication mechanism), you'll also have
@@ -882,3 +957,6 @@ not SSLv2.
 
    `RFC 3280: Internet X.509 Public Key Infrastructure Certificate and CRL Profile <http://www.ietf.org/rfc/rfc3280>`_
        Housley et. al.
+
+   `RFC 4366: Transport Layer Security (TLS) Extensions <http://www.ietf.org/rfc/rfc4366>`_
+       Blake-Wilson et. al.

@@ -20,6 +20,9 @@ import re
 import subprocess
 import imp
 import time
+import sysconfig
+
+
 try:
     import _thread
 except ImportError:
@@ -35,7 +38,7 @@ __all__ = [
     "check_warnings", "CleanImport", "EnvironmentVarGuard",
     "TransientResource", "captured_output", "captured_stdout",
     "time_out", "socket_peer_reset", "ioerror_peer_reset",
-    "run_with_locale", 'temp_umask',
+    "run_with_locale", 'temp_umask', "transient_internet",
     "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
     "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
     "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
@@ -377,54 +380,79 @@ else:
 TESTFN = "{}_{}_tmp".format(TESTFN, os.getpid())
 
 
-# Assuming sys.getfilesystemencoding()!=sys.getdefaultencoding()
-# TESTFN_UNICODE is a filename that can be encoded using the
-# file system encoding, but *not* with the default (ascii) encoding
-TESTFN_UNICODE = TESTFN + "-\xe0\xf2"
+# TESTFN_UNICODE is a non-ascii filename
+TESTFN_UNICODE = TESTFN + "-\xe0\xf2\u0258\u0141\u011f"
+if sys.platform == 'darwin':
+    # In Mac OS X's VFS API file names are, by definition, canonically
+    # decomposed Unicode, encoded using UTF-8. See QA1173:
+    # http://developer.apple.com/mac/library/qa/qa2001/qa1173.html
+    import unicodedata
+    TESTFN_UNICODE = unicodedata.normalize('NFD', TESTFN_UNICODE)
 TESTFN_ENCODING = sys.getfilesystemencoding()
-# TESTFN_UNICODE_UNENCODEABLE is a filename that should *not* be
-# able to be encoded by *either* the default or filesystem encoding.
-# This test really only makes sense on Windows NT platforms
-# which have special Unicode support in posixmodule.
-if (not hasattr(sys, "getwindowsversion") or
-        sys.getwindowsversion()[3] < 2): #  0=win32s or 1=9x/ME
-    TESTFN_UNICODE_UNENCODEABLE = None
-else:
-    # Japanese characters (I think - from bug 846133)
-    TESTFN_UNICODE_UNENCODEABLE = TESTFN + "-\u5171\u6709\u3055\u308c\u308b"
+
+# TESTFN_UNENCODABLE is a filename (str type) that should *not* be able to be
+# encoded by the filesystem encoding (in strict mode). It can be None if we
+# cannot generate such filename.
+TESTFN_UNENCODABLE = None
+if os.name in ('nt', 'ce'):
+    # skip win32s (0) or Windows 9x/ME (1)
+    if sys.getwindowsversion().platform >= 2:
+        # Different kinds of characters from various languages to minimize the
+        # probability that the whole name is encodable to MBCS (issue #9819)
+        TESTFN_UNENCODABLE = TESTFN + "-\u5171\u0141\u2661\u0363\uDC80"
+        try:
+            TESTFN_UNENCODABLE.encode(TESTFN_ENCODING)
+        except UnicodeEncodeError:
+            pass
+        else:
+            print('WARNING: The filename %r CAN be encoded by the filesystem encoding (%s). '
+                  'Unicode filename tests may not be effective'
+                  % (TESTFN_UNENCODABLE, TESTFN_ENCODING))
+            TESTFN_UNENCODABLE = None
+# Mac OS X denies unencodable filenames (invalid utf-8)
+elif sys.platform != 'darwin':
     try:
-        # XXX - Note - should be using TESTFN_ENCODING here - but for
-        # Windows, "mbcs" currently always operates as if in
-        # errors=ignore' mode - hence we get '?' characters rather than
-        # the exception.  'Latin1' operates as we expect - ie, fails.
-        # See [ 850997 ] mbcs encoding ignores errors
-        TESTFN_UNICODE_UNENCODEABLE.encode("Latin1")
-    except UnicodeEncodeError:
-        pass
+        # ascii and utf-8 cannot encode the byte 0xff
+        b'\xff'.decode(TESTFN_ENCODING)
+    except UnicodeDecodeError:
+        # 0xff will be encoded using the surrogate character u+DCFF
+        TESTFN_UNENCODABLE = TESTFN \
+            + b'-\xff'.decode(TESTFN_ENCODING, 'surrogateescape')
     else:
-        print('WARNING: The filename %r CAN be encoded by the filesystem.  '
-              'Unicode filename tests may not be effective'
-              % TESTFN_UNICODE_UNENCODEABLE)
+        # File system encoding (eg. ISO-8859-* encodings) can encode
+        # the byte 0xff. Skip some unicode filename tests.
+        pass
 
 # Save the initial cwd
 SAVEDCWD = os.getcwd()
 
 @contextlib.contextmanager
-def temp_cwd(name='tempcwd', quiet=False):
+def temp_cwd(name='tempcwd', quiet=False, path=None):
     """
-    Context manager that creates a temporary directory and set it as CWD.
+    Context manager that temporarily changes the CWD.
 
-    The new CWD is created in the current directory and it's named *name*.
-    If *quiet* is False (default) and it's not possible to create or change
-    the CWD, an error is raised.  If it's True, only a warning is raised
-    and the original CWD is used.
+    An existing path may be provided as *path*, in which case this
+    function makes no changes to the file system.
+
+    Otherwise, the new CWD is created in the current directory and it's
+    named *name*. If *quiet* is False (default) and it's not possible to
+    create or change the CWD, an error is raised.  If it's True, only a
+    warning is raised and the original CWD is used.
     """
     saved_dir = os.getcwd()
     is_temporary = False
+    if path is None:
+        path = name
+        try:
+            os.mkdir(name)
+            is_temporary = True
+        except OSError:
+            if not quiet:
+                raise
+            warnings.warn('tests may fail, unable to create temp CWD ' + name,
+                          RuntimeWarning, stacklevel=3)
     try:
-        os.mkdir(name)
-        os.chdir(name)
-        is_temporary = True
+        os.chdir(path)
     except OSError:
         if not quiet:
             raise
@@ -571,22 +599,22 @@ def _filterwarnings(filters, quiet=False):
         sys.modules['warnings'].simplefilter("always")
         yield WarningsRecorder(w)
     # Filter the recorded warnings
-    reraise = [warning.message for warning in w]
+    reraise = list(w)
     missing = []
     for msg, cat in filters:
         seen = False
-        for exc in reraise[:]:
-            message = str(exc)
+        for w in reraise[:]:
+            warning = w.message
             # Filter out the matching messages
-            if (re.match(msg, message, re.I) and
-                issubclass(exc.__class__, cat)):
+            if (re.match(msg, str(warning), re.I) and
+                issubclass(warning.__class__, cat)):
                 seen = True
-                reraise.remove(exc)
+                reraise.remove(w)
         if not seen and not quiet:
             # This filter caught nothing
             missing.append((msg, cat.__name__))
     if reraise:
-        raise AssertionError("unhandled warning %r" % reraise[0])
+        raise AssertionError("unhandled warning %s" % reraise[0])
     if missing:
         raise AssertionError("filter (%r, %s) did not catch any warning" %
                              missing[0])
@@ -751,23 +779,72 @@ class TransientResource(object):
             else:
                 raise ResourceDenied("an optional resource is not available")
 
-
 # Context managers that raise ResourceDenied when various issues
 # with the Internet connection manifest themselves as exceptions.
+# XXX deprecate these and use transient_internet() instead
 time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
 socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
 ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
 
 
 @contextlib.contextmanager
-def transient_internet():
+def transient_internet(resource_name, *, timeout=30.0, errnos=()):
     """Return a context manager that raises ResourceDenied when various issues
     with the Internet connection manifest themselves as exceptions."""
-    time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
-    socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
-    ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
-    with time_out, socket_peer_reset, ioerror_peer_reset:
+    default_errnos = [
+        ('ECONNREFUSED', 111),
+        ('ECONNRESET', 104),
+        ('ENETUNREACH', 101),
+        ('ETIMEDOUT', 110),
+    ]
+    default_gai_errnos = [
+        ('EAI_NONAME', -2),
+        ('EAI_NODATA', -5),
+    ]
+
+    denied = ResourceDenied("Resource '%s' is not available" % resource_name)
+    captured_errnos = errnos
+    gai_errnos = []
+    if not captured_errnos:
+        captured_errnos = [getattr(errno, name, num)
+                           for (name, num) in default_errnos]
+        gai_errnos = [getattr(socket, name, num)
+                      for (name, num) in default_gai_errnos]
+
+    def filter_error(err):
+        n = getattr(err, 'errno', None)
+        if (isinstance(err, socket.timeout) or
+            (isinstance(err, socket.gaierror) and n in gai_errnos) or
+            n in captured_errnos):
+            if not verbose:
+                sys.stderr.write(denied.args[0] + "\n")
+            raise denied from err
+
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        if timeout is not None:
+            socket.setdefaulttimeout(timeout)
         yield
+    except IOError as err:
+        # urllib can wrap original socket errors multiple times (!), we must
+        # unwrap to get at the original error.
+        while True:
+            a = err.args
+            if len(a) >= 1 and isinstance(a[0], IOError):
+                err = a[0]
+            # The error can also be wrapped as args[1]:
+            #    except socket.error as msg:
+            #        raise IOError('socket error', msg).with_traceback(sys.exc_info()[2])
+            elif len(a) >= 2 and isinstance(a[1], IOError):
+                err = a[1]
+            else:
+                break
+        filter_error(err)
+        raise
+    # XXX should we catch generic exceptions and look for their
+    # __cause__ or __context__?
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 @contextlib.contextmanager
@@ -809,6 +886,16 @@ def gc_collect():
         time.sleep(0.1)
     gc.collect()
     gc.collect()
+
+
+def python_is_optimized():
+    """Find if Python was built with optimizations."""
+    cflags = sysconfig.get_config_var('PY_CFLAGS') or ''
+    final_opt = ""
+    for opt in cflags.split():
+        if opt.startswith('-O'):
+            final_opt = opt
+    return final_opt and final_opt != '-O0'
 
 
 #=======================================================================
@@ -972,7 +1059,7 @@ def _id(obj):
     return obj
 
 def requires_resource(resource):
-    if resource_is_enabled(resource):
+    if is_resource_enabled(resource):
         return _id
     else:
         return unittest.skip("resource {0!r} is not enabled".format(resource))
@@ -1243,3 +1330,32 @@ def swap_item(obj, item, new_val):
             yield
         finally:
             del obj[item]
+
+def strip_python_stderr(stderr):
+    """Strip the stderr of a Python process from potential debug output
+    emitted by the interpreter.
+
+    This will typically be run on the result of the communicate() method
+    of a subprocess.Popen object.
+    """
+    stderr = re.sub(br"\[\d+ refs\]\r?\n?$", b"", stderr).strip()
+    return stderr
+
+def args_from_interpreter_flags():
+    """Return a list of command-line arguments reproducing the current
+    settings in sys.flags."""
+    flag_opt_map = {
+        'bytes_warning': 'b',
+        'dont_write_bytecode': 'B',
+        'ignore_environment': 'E',
+        'no_user_site': 's',
+        'no_site': 'S',
+        'optimize': 'O',
+        'verbose': 'v',
+    }
+    args = []
+    for flag, opt in flag_opt_map.items():
+        v = getattr(sys.flags, flag)
+        if v > 0:
+            args.append('-' + opt * v)
+    return args

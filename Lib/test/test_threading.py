@@ -1,7 +1,7 @@
 # Very rudimentary test of threading module
 
 import test.support
-from test.support import verbose
+from test.support import verbose, strip_python_stderr
 import random
 import re
 import sys
@@ -97,7 +97,8 @@ class ThreadTests(BaseTestCase):
             self.assertTrue(not t.is_alive())
             self.assertNotEqual(t.ident, 0)
             self.assertFalse(t.ident is None)
-            self.assertTrue(re.match('<TestThread\(.*, \w+ -?\d+\)>', repr(t)))
+            self.assertTrue(re.match('<TestThread\(.*, stopped -?\d+\)>',
+                                     repr(t)))
         if verbose:
             print('all tasks done')
         self.assertEqual(numrunning.get(), 0)
@@ -303,7 +304,7 @@ class ThreadTests(BaseTestCase):
         # Issue1733757
         # Avoid a deadlock when sys.settrace steps into threading._shutdown
         import subprocess
-        rc = subprocess.call([sys.executable, "-c", """if 1:
+        p = subprocess.Popen([sys.executable, "-c", """if 1:
             import sys, threading
 
             # A deadlock-killer, to prevent the
@@ -323,9 +324,16 @@ class ThreadTests(BaseTestCase):
                 return func
 
             sys.settrace(func)
-            """])
+            """],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.stderr.close)
+        stdout, stderr = p.communicate()
+        rc = p.returncode
         self.assertFalse(rc == 2, "interpreted was blocked")
-        self.assertTrue(rc == 0, "Unexpected error")
+        self.assertTrue(rc == 0,
+                        "Unexpected error: " + ascii(stderr))
 
     def test_join_nondaemon_on_shutdown(self):
         # Issue 1722344
@@ -346,10 +354,12 @@ class ThreadTests(BaseTestCase):
             """],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.stderr.close)
         stdout, stderr = p.communicate()
         self.assertEqual(stdout.strip(),
             b"Woke up, sleep function is: <built-in function sleep>")
-        stderr = re.sub(br"^\[\d+ refs\]", b"", stderr, re.MULTILINE).strip()
+        stderr = strip_python_stderr(stderr)
         self.assertEqual(stderr, b"")
 
     def test_enumerate_after_join(self):
@@ -413,6 +423,12 @@ class ThreadTests(BaseTestCase):
         e.isSet()
         threading.activeCount()
 
+    def test_repr_daemon(self):
+        t = threading.Thread()
+        self.assertFalse('daemon' in repr(t))
+        t.daemon = True
+        self.assertTrue('daemon' in repr(t))
+
 
 class ThreadJoinOnShutdown(BaseTestCase):
 
@@ -433,6 +449,7 @@ class ThreadJoinOnShutdown(BaseTestCase):
         p = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE)
         rc = p.wait()
         data = p.stdout.read().decode().replace('\r', '')
+        p.stdout.close()
         self.assertEqual(data, "end of main\nend of thread\n")
         self.assertFalse(rc == 2, "interpreter was blocked")
         self.assertTrue(rc == 0, "Unexpected error")
@@ -473,7 +490,8 @@ class ThreadJoinOnShutdown(BaseTestCase):
 
         # Skip platforms with known problems forking from a worker thread.
         # See http://bugs.python.org/issue3863.
-        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'os2emx'):
+        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'netbsd5',
+                           'os2emx'):
             raise unittest.SkipTest('due to known OS bugs on ' + sys.platform)
         script = """if 1:
             main_thread = threading.current_thread()
@@ -542,6 +560,8 @@ class SemaphoreTests(lock_tests.SemaphoreTests):
 class BoundedSemaphoreTests(lock_tests.BoundedSemaphoreTests):
     semtype = staticmethod(threading.BoundedSemaphore)
 
+class BarrierTests(lock_tests.BarrierTests):
+    barriertype = staticmethod(threading.Barrier)
 
 def test_main():
     test.support.run_unittest(LockTests, PyRLockTests, CRLockTests, EventTests,
@@ -550,6 +570,7 @@ def test_main():
                               ThreadTests,
                               ThreadJoinOnShutdown,
                               ThreadingExceptionTests,
+                              BarrierTests
                               )
 
 if __name__ == "__main__":

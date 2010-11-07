@@ -15,12 +15,29 @@ from imp import source_from_cache
 from test.support import make_legacy_pyc
 
 # Executing the interpreter in a subprocess
-def python_exit_code(*args):
+def _assert_python(expected_success, *args):
     cmd_line = [sys.executable, '-E']
     cmd_line.extend(args)
-    with open(os.devnull, 'w') as devnull:
-        return subprocess.call(cmd_line, stdout=devnull,
-                                stderr=subprocess.STDOUT)
+    p = subprocess.Popen(cmd_line, stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        out, err = p.communicate()
+    finally:
+        subprocess._cleanup()
+        p.stdout.close()
+        p.stderr.close()
+    rc = p.returncode
+    if (rc and expected_success) or (not rc and not expected_success):
+        raise AssertionError(
+            "Process return code is %d, "
+            "stderr follows:\n%s" % (rc, err.decode('ascii', 'ignore')))
+    return rc, out, err
+
+def assert_python_ok(*args):
+    return _assert_python(True, *args)
+
+def assert_python_failure(*args):
+    return _assert_python(False, *args)
 
 def spawn_python(*args):
     cmd_line = [sys.executable, '-E']
@@ -37,14 +54,6 @@ def kill_python(p):
     p.wait()
     subprocess._cleanup()
     return data
-
-def run_python(*args):
-    if __debug__:
-        p = spawn_python(*args)
-    else:
-        p = spawn_python('-O', *args)
-    stdout_data = kill_python(p)
-    return p.wait(), stdout_data
 
 # Script creation utilities
 @contextlib.contextmanager
@@ -79,16 +88,16 @@ def make_zip_script(zip_dir, zip_basename, script_name, name_in_zip=None):
             name_in_zip = os.path.basename(script_name)
     zip_file.write(script_name, name_in_zip)
     zip_file.close()
-    #if test.test_support.verbose:
+    #if test.support.verbose:
     #    zip_file = zipfile.ZipFile(zip_name, 'r')
     #    print 'Contents of %r:' % zip_name
     #    zip_file.printdir()
     #    zip_file.close()
     return zip_name, os.path.join(zip_name, name_in_zip)
 
-def make_pkg(pkg_dir):
+def make_pkg(pkg_dir, init_source=''):
     os.mkdir(pkg_dir)
-    make_script(pkg_dir, '__init__', '')
+    make_script(pkg_dir, '__init__', init_source)
 
 def make_zip_pkg(zip_dir, zip_basename, pkg_name, script_basename,
                  source, depth=1, compiled=False):
@@ -114,7 +123,7 @@ def make_zip_pkg(zip_dir, zip_basename, pkg_name, script_basename,
     zip_file.close()
     for name in unlink:
         os.unlink(name)
-    #if test.test_support.verbose:
+    #if test.support.verbose:
     #    zip_file = zipfile.ZipFile(zip_name, 'r')
     #    print 'Contents of %r:' % zip_name
     #    zip_file.printdir()

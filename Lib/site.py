@@ -70,7 +70,11 @@ USER_BASE = None
 
 
 def makepath(*paths):
-    dir = os.path.abspath(os.path.join(*paths))
+    dir = os.path.join(*paths)
+    try:
+        dir = os.path.abspath(dir)
+    except OSError:
+        pass
     return dir, os.path.normcase(dir)
 
 
@@ -81,11 +85,11 @@ def abs_paths():
             continue   # don't mess with a PEP 302-supplied __file__
         try:
             m.__file__ = os.path.abspath(m.__file__)
-        except AttributeError:
+        except (AttributeError, OSError):
             pass
         try:
             m.__cached__ = os.path.abspath(m.__cached__)
-        except AttributeError:
+        except (AttributeError, OSError):
             pass
 
 
@@ -106,18 +110,6 @@ def removeduppaths():
             known_paths.add(dircase)
     sys.path[:] = L
     return known_paths
-
-# XXX This should not be part of site.py, since it is needed even when
-# using the -S option for Python.  See http://www.python.org/sf/586680
-def addbuilddir():
-    """Append ./build/lib.<platform> in case we're running in the build dir
-    (especially for Guido :-)"""
-    from sysconfig import get_platform
-    s = "build/lib.%s-%.3s" % (get_platform(), sys.version)
-    if hasattr(sys, 'gettotalrefcount'):
-        s += '-pydebug'
-    s = os.path.join(os.path.dirname(sys.path.pop()), s)
-    sys.path.append(s)
 
 
 def _init_pathinfo():
@@ -295,7 +287,7 @@ def getsitepackages():
             # locations.
             from sysconfig import get_config_var
             framework = get_config_var("PYTHONFRAMEWORK")
-            if framework and "/%s.framework/"%(framework,) in prefix:
+            if framework:
                 sitepackages.append(
                         os.path.join("/Library", framework,
                             sys.version[:3], "site-packages"))
@@ -472,25 +464,6 @@ def aliasmbcs():
                 encodings._cache[enc] = encodings._unknown
                 encodings.aliases.aliases[enc] = 'mbcs'
 
-def setencoding():
-    """Set the string encoding used by the Unicode implementation.  The
-    default is 'ascii', but if you're willing to experiment, you can
-    change this."""
-    encoding = "ascii" # Default value set by _PyUnicode_Init()
-    if 0:
-        # Enable to support locale aware default string encodings.
-        import locale
-        loc = locale.getdefaultlocale()
-        if loc[1]:
-            encoding = loc[1]
-    if 0:
-        # Enable to switch off string to Unicode coercion and implicit
-        # Unicode to string conversion.
-        encoding = "undefined"
-    if encoding != "ascii":
-        # On Non-Unicode builds this will raise an AttributeError...
-        sys.setdefaultencoding(encoding) # Needs Python Unicode build !
-
 
 def execsitecustomize():
     """Run custom site specific code, if available."""
@@ -529,9 +502,6 @@ def main():
 
     abs_paths()
     known_paths = removeduppaths()
-    if (os.name == "posix" and sys.path and
-        os.path.basename(sys.path[-1]) == "Modules"):
-        addbuilddir()
     if ENABLE_USER_SITE is None:
         ENABLE_USER_SITE = check_enableusersite()
     known_paths = addusersitepackages(known_paths)
@@ -542,15 +512,9 @@ def main():
     setcopyright()
     sethelper()
     aliasmbcs()
-    setencoding()
     execsitecustomize()
     if ENABLE_USER_SITE:
         execusercustomize()
-    # Remove sys.setdefaultencoding() so that users cannot change the
-    # encoding after initialization.  The test for presence is needed when
-    # this module is run as a script, because this code is executed twice.
-    if hasattr(sys, "setdefaultencoding"):
-        del sys.setdefaultencoding
 
 main()
 

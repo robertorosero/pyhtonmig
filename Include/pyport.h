@@ -130,12 +130,12 @@ Used in:  PY_LONG_LONG
    _PyHash_Double in Objects/object.c.  Numeric hashes are based on
    reduction modulo the prime 2**_PyHASH_BITS - 1. */
 
-#if SIZEOF_LONG >= 8
+#if SIZEOF_VOID_P >= 8
 #define _PyHASH_BITS 61
 #else
 #define _PyHASH_BITS 31
 #endif
-#define _PyHASH_MODULUS ((1UL << _PyHASH_BITS) - 1)
+#define _PyHASH_MODULUS (((size_t)1 << _PyHASH_BITS) - 1)
 #define _PyHASH_INF 314159
 #define _PyHASH_NAN 0
 #define _PyHASH_IMAG 1000003UL
@@ -176,6 +176,11 @@ typedef Py_intptr_t     Py_ssize_t;
 #else
 #   error "Python needs a typedef for Py_ssize_t in pyport.h."
 #endif
+
+/* Py_hash_t is the same size as a pointer. */
+typedef Py_ssize_t Py_hash_t;
+/* Py_uhash_t is the unsigned equivalent needed to calculate numeric hash. */
+typedef size_t Py_uhash_t;
 
 /* Largest possible value of size_t.
    SIZE_MAX is part of C99, so it might be defined on some
@@ -265,8 +270,6 @@ typedef Py_intptr_t     Py_ssize_t;
  * module; functions that are exported via method tables, callbacks, etc,
  * should keep using static.
  */
-
-#undef USE_INLINE /* XXX - set via configure? */
 
 #if defined(_MSC_VER)
 #if defined(PY_LOCAL_AGGRESSIVE)
@@ -697,23 +700,24 @@ extern pid_t forkpty(int *, char *, struct termios *, struct winsize *);
 #               ifdef Py_BUILD_CORE
 #                       define PyAPI_FUNC(RTYPE) __declspec(dllexport) RTYPE
 #                       define PyAPI_DATA(RTYPE) extern __declspec(dllexport) RTYPE
-            /* module init functions inside the core need no external linkage */
-            /* except for Cygwin to handle embedding */
+        /* module init functions inside the core need no external linkage */
+        /* except for Cygwin to handle embedding */
 #                       if defined(__CYGWIN__)
 #                               define PyMODINIT_FUNC __declspec(dllexport) PyObject*
 #                       else /* __CYGWIN__ */
 #                               define PyMODINIT_FUNC PyObject*
 #                       endif /* __CYGWIN__ */
 #               else /* Py_BUILD_CORE */
-            /* Building an extension module, or an embedded situation */
-            /* public Python functions and data are imported */
-            /* Under Cygwin, auto-import functions to prevent compilation */
-            /* failures similar to http://python.org/doc/FAQ.html#3.24 */
+        /* Building an extension module, or an embedded situation */
+        /* public Python functions and data are imported */
+        /* Under Cygwin, auto-import functions to prevent compilation */
+        /* failures similar to those described at the bottom of 4.1: */
+        /* http://docs.python.org/extending/windows.html#a-cookbook-approach */
 #                       if !defined(__CYGWIN__)
 #                               define PyAPI_FUNC(RTYPE) __declspec(dllimport) RTYPE
 #                       endif /* !__CYGWIN__ */
 #                       define PyAPI_DATA(RTYPE) extern __declspec(dllimport) RTYPE
-            /* module init functions outside the core must be exported */
+        /* module init functions outside the core must be exported */
 #                       if defined(__cplusplus)
 #                               define PyMODINIT_FUNC extern "C" __declspec(dllexport) PyObject*
 #                       else /* __cplusplus */
@@ -820,6 +824,16 @@ extern pid_t forkpty(int *, char *, struct termios *, struct winsize *);
 
 #ifndef Py_ULL
 #define Py_ULL(x) Py_LL(x##U)
+#endif
+
+#ifdef VA_LIST_IS_ARRAY
+#define Py_VA_COPY(x, y) Py_MEMCPY((x), (y), sizeof(va_list))
+#else
+#ifdef __va_copy
+#define Py_VA_COPY __va_copy
+#else
+#define Py_VA_COPY(x, y) (x) = (y)
+#endif
 #endif
 
 #endif /* Py_PYPORT_H */

@@ -3,9 +3,10 @@ import unittest
 import os
 import shutil
 
-from distutils.file_util import move_file, write_file, copy_file
+from distutils.file_util import move_file
 from distutils import log
 from distutils.tests import support
+from test.support import run_unittest
 
 class FileUtilTestCase(support.TempdirManager, unittest.TestCase):
 
@@ -31,8 +32,10 @@ class FileUtilTestCase(support.TempdirManager, unittest.TestCase):
 
     def test_move_file_verbosity(self):
         f = open(self.source, 'w')
-        f.write('some content')
-        f.close()
+        try:
+            f.write('some content')
+        finally:
+            f.close()
 
         move_file(self.source, self.target, verbose=0)
         wanted = []
@@ -55,24 +58,9 @@ class FileUtilTestCase(support.TempdirManager, unittest.TestCase):
         wanted = ['moving %s -> %s' % (self.source, self.target_dir)]
         self.assertEquals(self._logs, wanted)
 
-    def test_write_file(self):
-        lines = ['a', 'b', 'c']
-        dir = self.mkdtemp()
-        foo = os.path.join(dir, 'foo')
-        write_file(foo, lines)
-        content = [line.strip() for line in open(foo).readlines()]
-        self.assertEquals(content, lines)
-
-    def test_copy_file(self):
-        src_dir = self.mkdtemp()
-        foo = os.path.join(src_dir, 'foo')
-        write_file(foo, 'content')
-        dst_dir = self.mkdtemp()
-        copy_file(foo, dst_dir)
-        self.assertTrue(os.path.exists(os.path.join(dst_dir, 'foo')))
 
 def test_suite():
     return unittest.makeSuite(FileUtilTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

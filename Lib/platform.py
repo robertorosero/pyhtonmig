@@ -200,9 +200,8 @@ def _dist_try_harder(distname,version,id):
     """
     if os.path.exists('/var/adm/inst-log/info'):
         # SuSE Linux stores distribution information in that file
-        info = open('/var/adm/inst-log/info').readlines()
         distname = 'SuSE'
-        for line in info:
+        for line in open('/var/adm/inst-log/info'):
             tv = line.split()
             if len(tv) == 2:
                 tag,value = tv
@@ -217,8 +216,7 @@ def _dist_try_harder(distname,version,id):
 
     if os.path.exists('/etc/.installed'):
         # Caldera OpenLinux has some infos in that file (thanks to Colin Kong)
-        info = open('/etc/.installed').readlines()
-        for line in info:
+        for line in open('/etc/.installed'):
             pkg = line.split('-')
             if len(pkg) >= 2 and pkg[0] == 'OpenLinux':
                 # XXX does Caldera support non Intel platforms ? If yes,
@@ -327,9 +325,8 @@ def linux_distribution(distname='', version='', id='',
         return _dist_try_harder(distname,version,id)
 
     # Read the first line
-    f = open('/etc/'+file, 'r')
-    firstline = f.readline()
-    f.close()
+    with open('/etc/'+file, 'r') as f:
+        firstline = f.readline()
     _distname, _version, _id = _parse_release_file(firstline)
 
     if _distname and full_distribution_name:
@@ -724,27 +721,19 @@ def _bcd2str(bcd):
 
     return hex(bcd)[2:]
 
-def mac_ver(release='',versioninfo=('','',''),machine=''):
-
-    """ Get MacOS version information and return it as tuple (release,
-        versioninfo, machine) with versioninfo being a tuple (version,
-        dev_stage, non_release_version).
-
-        Entries which cannot be determined are set to the paramter values
-        which default to ''. All tuple entries are strings.
-
+def _mac_ver_gestalt():
+    """
         Thanks to Mark R. Levinson for mailing documentation links and
         code examples for this function. Documentation for the
         gestalt() API is available online at:
 
            http://www.rgaros.nl/gestalt/
-
     """
     # Check whether the version info module is available
     try:
         import _gestalt
     except ImportError:
-        return release,versioninfo,machine
+        return None
     # Get the infos
     sysv, sysa = _mac_ver_lookup(('sysv','sysa'))
     # Decode the infos
@@ -768,6 +757,53 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
         machine = {0x1: '68k',
                    0x2: 'PowerPC',
                    0xa: 'i386'}.get(sysa,'')
+
+    return release,versioninfo,machine
+
+def _mac_ver_xml():
+    fn = '/System/Library/CoreServices/SystemVersion.plist'
+    if not os.path.exists(fn):
+        return None
+
+    try:
+        import plistlib
+    except ImportError:
+        return None
+
+    pl = plistlib.readPlist(fn)
+    release = pl['ProductVersion']
+    versioninfo=('', '', '')
+    machine = os.uname()[4]
+    if machine in ('ppc', 'Power Macintosh'):
+        # for compatibility with the gestalt based code
+        machine = 'PowerPC'
+
+    return release,versioninfo,machine
+
+
+def mac_ver(release='',versioninfo=('','',''),machine=''):
+
+    """ Get MacOS version information and return it as tuple (release,
+        versioninfo, machine) with versioninfo being a tuple (version,
+        dev_stage, non_release_version).
+
+        Entries which cannot be determined are set to the paramter values
+        which default to ''. All tuple entries are strings.
+    """
+
+    # First try reading the information from an XML file which should
+    # always be present
+    info = _mac_ver_xml()
+    if info is not None:
+        return info
+
+    # If that doesn't work for some reason fall back to reading the
+    # information using gestalt calls.
+    info = _mac_ver_gestalt()
+    if info is not None:
+        return info
+
+    # If that also doesn't work return the default values
     return release,versioninfo,machine
 
 def _java_getprop(name,default):
@@ -951,9 +987,8 @@ def _syscmd_file(target,default=''):
     """ Interface to the system's file command.
 
         The function uses the -b option of the file command to have it
-        ommit the filename in its output and if possible the -L option
-        to have the command follow symlinks. It returns default in
-        case the command should fail.
+        omit the filename in its output. Follow the symlinks. It returns
+        default in case the command should fail.
 
     """
     if sys.platform in ('dos','win32','win16','os2'):
@@ -961,7 +996,7 @@ def _syscmd_file(target,default=''):
         return default
     target = _follow_symlinks(target).replace('"', '\\"')
     try:
-        f = os.popen('file "%s" 2> %s' % (target, DEV_NULL))
+        f = os.popen('file -b "%s" 2> %s' % (target, DEV_NULL))
     except (AttributeError,os.error):
         return default
     output = f.read().strip()
@@ -980,8 +1015,6 @@ _default_architecture = {
     'win16': ('','Windows'),
     'dos': ('','MSDOS'),
 }
-
-_architecture_split = re.compile(r'[\s,]').split
 
 def architecture(executable=sys.executable,bits='',linkage=''):
 
@@ -1017,11 +1050,11 @@ def architecture(executable=sys.executable,bits='',linkage=''):
 
     # Get data from the 'file' system command
     if executable:
-        output = _syscmd_file(executable, '')
+        fileout = _syscmd_file(executable, '')
     else:
-        output = ''
+        fileout = ''
 
-    if not output and \
+    if not fileout and \
        executable == sys.executable:
         # "file" command did not return anything; we'll try to provide
         # some sensible defaults then...
@@ -1032,9 +1065,6 @@ def architecture(executable=sys.executable,bits='',linkage=''):
             if l:
                 linkage = l
         return bits,linkage
-
-    # Split the output into a list of strings omitting the filename
-    fileout = _architecture_split(output)[1:]
 
     if 'executable' not in fileout:
         # Format not supported
@@ -1098,7 +1128,7 @@ def uname():
     except AttributeError:
         no_os_uname = 1
 
-    if no_os_uname or not filter(None, (system, node, release, version, machine)):
+    if no_os_uname or not list(filter(None, (system, node, release, version, machine))):
         # Hmm, no there is either no uname or uname has returned
         #'unknowns'... we'll have to poke around the system then.
         if no_os_uname:

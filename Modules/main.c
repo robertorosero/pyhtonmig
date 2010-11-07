@@ -47,7 +47,7 @@ static wchar_t **orig_argv;
 static int  orig_argc;
 
 /* command line options */
-#define BASE_OPTS L"bBc:dEhiJm:OsStuvVW:xX?"
+#define BASE_OPTS L"bBc:dEhiJm:OsStuvVW:xX:?"
 
 #define PROGRAM_OPTS BASE_OPTS
 
@@ -84,6 +84,7 @@ static char *usage_3 = "\
 -W arg : warning control; arg is action:message:category:module:lineno\n\
          also PYTHONWARNINGS=arg\n\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
+-X opt : set implementation-specific option\n\
 ";
 static char *usage_4 = "\
 file   : program read from script file\n\
@@ -94,34 +95,12 @@ PYTHONSTARTUP: file executed on interactive startup (no default)\n\
 PYTHONPATH   : '%c'-separated list of directories prefixed to the\n\
                default module search path.  The result is sys.path.\n\
 ";
-static char *usage_5 = "\
-PYTHONHOME   : alternate <prefix> directory (or <prefix>%c<exec_prefix>).\n\
-               The default module search path uses %s.\n\
-PYTHONCASEOK : ignore case in 'import' statements (Windows).\n\
-PYTHONIOENCODING: Encoding[:errors] used for stdin/stdout/stderr.\n\
-";
-
-#ifndef MS_WINDOWS
-static FILE*
-_wfopen(const wchar_t *path, const wchar_t *mode)
-{
-    char cpath[PATH_MAX];
-    char cmode[10];
-    size_t r;
-    r = wcstombs(cpath, path, PATH_MAX);
-    if (r == (size_t)-1 || r >= PATH_MAX) {
-        errno = EINVAL;
-        return NULL;
-    }
-    r = wcstombs(cmode, mode, 10);
-    if (r == (size_t)-1 || r >= 10) {
-        errno = EINVAL;
-        return NULL;
-    }
-    return fopen(cpath, cmode);
-}
-#endif
-
+static char *usage_5 =
+"PYTHONHOME   : alternate <prefix> directory (or <prefix>%c<exec_prefix>).\n"
+"               The default module search path uses %s.\n"
+"PYTHONCASEOK : ignore case in 'import' statements (Windows).\n"
+"PYTHONIOENCODING: Encoding[:errors] used for stdin/stdout/stderr.\n"
+;
 
 static int
 usage(int exitcode, wchar_t* program)
@@ -222,35 +201,102 @@ static int RunModule(wchar_t *modname, int set_argv0)
     return 0;
 }
 
-static int RunMainFromImporter(wchar_t *filename)
+static int
+RunMainFromImporter(wchar_t *filename)
 {
-    PyObject *argv0 = NULL, *importer = NULL;
+    PyObject *argv0 = NULL, *importer, *sys_path;
+    int sts;
 
-    if ((argv0 = PyUnicode_FromWideChar(filename,wcslen(filename))) &&
-        (importer = PyImport_GetImporter(argv0)) &&
-        (importer->ob_type != &PyNullImporter_Type))
-    {
-             /* argv0 is usable as an import source, so
-                    put it in sys.path[0] and import __main__ */
-        PyObject *sys_path = NULL;
-        if ((sys_path = PySys_GetObject("path")) &&
-            !PyList_SetItem(sys_path, 0, argv0))
-        {
-            Py_INCREF(argv0);
-            Py_DECREF(importer);
-            sys_path = NULL;
-            return RunModule(L"__main__", 0) != 0;
-        }
+    argv0 = PyUnicode_FromWideChar(filename, wcslen(filename));
+    if (argv0 == NULL)
+        goto error;
+
+    importer = PyImport_GetImporter(argv0);
+    if (importer == NULL)
+        goto error;
+
+    if (importer->ob_type == &PyNullImporter_Type) {
+        Py_DECREF(argv0);
+        Py_DECREF(importer);
+        return -1;
     }
+    Py_DECREF(importer);
+
+    /* argv0 is usable as an import source, so put it in sys.path[0]
+       and import __main__ */
+    sys_path = PySys_GetObject("path");
+    if (sys_path == NULL)
+        goto error;
+    if (PyList_SetItem(sys_path, 0, argv0)) {
+        argv0 = NULL;
+        goto error;
+    }
+    Py_INCREF(argv0);
+
+    sts = RunModule(L"__main__", 0);
+    return sts != 0;
+
+error:
     Py_XDECREF(argv0);
-    Py_XDECREF(importer);
-    if (PyErr_Occurred()) {
+    PyErr_Print();
+    return 1;
+}
+
+static int
+run_command(wchar_t *command, PyCompilerFlags *cf)
+{
+    PyObject *unicode, *bytes;
+    int ret;
+
+    unicode = PyUnicode_FromWideChar(command, -1);
+    if (unicode == NULL)
+        goto error;
+    bytes = PyUnicode_AsUTF8String(unicode);
+    Py_DECREF(unicode);
+    if (bytes == NULL)
+        goto error;
+    ret = PyRun_SimpleStringFlags(PyBytes_AsString(bytes), cf);
+    Py_DECREF(bytes);
+    return ret != 0;
+
+error:
+    PySys_WriteStderr("Unable to decode the command from the command line:\n");
+    PyErr_Print();
+    return 1;
+}
+
+static int
+run_file(FILE *fp, const wchar_t *filename, PyCompilerFlags *p_cf)
+{
+    PyObject *unicode, *bytes = NULL;
+    char *filename_str;
+    int run;
+
+    /* call pending calls like signal handlers (SIGINT) */
+    if (Py_MakePendingCalls() == -1) {
         PyErr_Print();
         return 1;
     }
-    else {
-        return -1;
+
+    if (filename) {
+        unicode = PyUnicode_FromWideChar(filename, wcslen(filename));
+        if (unicode != NULL) {
+            bytes = PyUnicode_EncodeFSDefault(unicode);
+            Py_DECREF(unicode);
+        }
+        if (bytes != NULL)
+            filename_str = PyBytes_AsString(bytes);
+        else {
+            PyErr_Clear();
+            filename_str = "<encoding error>";
+        }
     }
+    else
+        filename_str = "<stdin>";
+
+    run = PyRun_AnyFileExFlags(fp, filename_str, filename != NULL, p_cf);
+    Py_XDECREF(bytes);
+    return run != 0;
 }
 
 
@@ -362,8 +408,6 @@ Py_Main(int argc, wchar_t **argv)
             skipfirstline = 1;
             break;
 
-        /* case 'X': reserved for implementation-specific arguments */
-
         case 'h':
         case '?':
             help++;
@@ -375,6 +419,10 @@ Py_Main(int argc, wchar_t **argv)
 
         case 'W':
             PySys_AddWarnOption(_PyOS_optarg);
+            break;
+
+        case 'X':
+            PySys_AddXOption(_PyOS_optarg);
             break;
 
         /* This space reserved for other options */
@@ -425,7 +473,7 @@ Py_Main(int argc, wchar_t **argv)
 #else
     if ((p = Py_GETENV("PYTHONWARNINGS")) && *p != '\0') {
         char *buf, *oldloc;
-        PyObject *warning;
+        PyObject *unicode;
 
         /* settle for strtok here as there's no one standard
            C89 wcstok */
@@ -437,11 +485,22 @@ Py_Main(int argc, wchar_t **argv)
         oldloc = strdup(setlocale(LC_ALL, NULL));
         setlocale(LC_ALL, "");
         for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
-            warning = PyUnicode_DecodeFSDefault(p);
-            if (warning != NULL) {
-                PySys_AddWarnOptionUnicode(warning);
-                Py_DECREF(warning);
-            }
+#ifdef __APPLE__
+            /* Use utf-8 on Mac OS X */
+            unicode = PyUnicode_FromString(p);
+#else
+            wchar_t *wchar;
+            size_t len;
+            wchar = _Py_char2wchar(p, &len);
+            if (wchar == NULL)
+                continue;
+            unicode = PyUnicode_FromWideChar(wchar, len);
+            PyMem_Free(wchar);
+#endif
+            if (unicode == NULL)
+                continue;
+            PySys_AddWarnOptionUnicode(unicode);
+            Py_DECREF(unicode);
         }
         setlocale(LC_ALL, oldloc);
         free(oldloc);
@@ -545,10 +604,9 @@ Py_Main(int argc, wchar_t **argv)
     }
 
     if (module != NULL) {
-        /* Backup _PyOS_optind and force sys.argv[0] = '-c'
-           so that PySys_SetArgv correctly sets sys.path[0] to ''*/
+        /* Backup _PyOS_optind and force sys.argv[0] = '-m'*/
         _PyOS_optind--;
-        argv[_PyOS_optind] = L"-c";
+        argv[_PyOS_optind] = L"-m";
     }
 
     PySys_SetArgv(argc-_PyOS_optind, argv+_PyOS_optind);
@@ -564,22 +622,8 @@ Py_Main(int argc, wchar_t **argv)
     }
 
     if (command) {
-        char *commandStr;
-        PyObject *commandObj = PyUnicode_FromWideChar(
-            command, wcslen(command));
+        sts = run_command(command, &cf);
         free(command);
-        if (commandObj != NULL)
-            commandStr = _PyUnicode_AsString(commandObj);
-        else
-            commandStr = NULL;
-        if (commandStr != NULL) {
-            sts = PyRun_SimpleStringFlags(commandStr, &cf) != 0;
-            Py_DECREF(commandObj);
-        }
-        else {
-            PyErr_Print();
-            sts = 1;
-        }
     } else if (module) {
         sts = RunModule(module, 1);
     }
@@ -598,19 +642,19 @@ Py_Main(int argc, wchar_t **argv)
         }
 
         if (sts==-1 && filename!=NULL) {
-            if ((fp = _wfopen(filename, L"r")) == NULL) {
-                char cfilename[PATH_MAX];
-                size_t r = wcstombs(cfilename, filename, PATH_MAX);
-                if (r == PATH_MAX)
-                    /* cfilename is not null-terminated;
-                     * forcefully null-terminating it
-                     * might break the shift state */
-                    strcpy(cfilename, "<file name too long>");
-                if (r == ((size_t)-1))
-                    strcpy(cfilename, "<unprintable file name>");
+            fp = _Py_wfopen(filename, L"r");
+            if (fp == NULL) {
+                char *cfilename_buffer;
+                const char *cfilename;
+                cfilename_buffer = _Py_wchar2char(filename);
+                if (cfilename_buffer != NULL)
+                    cfilename = cfilename_buffer;
+                else
+                    cfilename = "<unprintable file name>";
                 fprintf(stderr, "%ls: can't open file '%s': [Errno %d] %s\n",
                     argv[0], cfilename, errno, strerror(errno));
-
+                if (cfilename_buffer)
+                    PyMem_Free(cfilename_buffer);
                 return 2;
             }
             else if (skipfirstline) {
@@ -636,30 +680,8 @@ Py_Main(int argc, wchar_t **argv)
             }
         }
 
-        if (sts==-1) {
-            PyObject *filenameObj = NULL;
-            char *p_cfilename = "<stdin>";
-            if (filename) {
-                filenameObj = PyUnicode_FromWideChar(
-                    filename, wcslen(filename));
-                if (filenameObj != NULL)
-                    p_cfilename = _PyUnicode_AsString(filenameObj);
-                else
-                    p_cfilename = "<decoding error>";
-            }
-            /* call pending calls like signal handlers (SIGINT) */
-            if (Py_MakePendingCalls() == -1) {
-                PyErr_Print();
-                sts = 1;
-            } else {
-                sts = PyRun_AnyFileExFlags(
-                    fp,
-                    p_cfilename,
-                    filename != NULL, &cf) != 0;
-            }
-            Py_XDECREF(filenameObj);
-        }
-
+        if (sts == -1)
+            sts = run_file(fp, filename, &cf);
     }
 
     /* Check this environment variable at the end, to give programs the
@@ -709,110 +731,6 @@ Py_GetArgcArgv(int *argc, wchar_t ***argv)
 {
     *argc = orig_argc;
     *argv = orig_argv;
-}
-
-
-wchar_t*
-_Py_char2wchar(char* arg)
-{
-    wchar_t *res;
-#ifdef HAVE_BROKEN_MBSTOWCS
-    /* Some platforms have a broken implementation of
-     * mbstowcs which does not count the characters that
-     * would result from conversion.  Use an upper bound.
-     */
-    size_t argsize = strlen(arg);
-#else
-    size_t argsize = mbstowcs(NULL, arg, 0);
-#endif
-    size_t count;
-    unsigned char *in;
-    wchar_t *out;
-#ifdef HAVE_MBRTOWC
-    mbstate_t mbs;
-#endif
-    if (argsize != (size_t)-1) {
-        res = (wchar_t *)PyMem_Malloc((argsize+1)*sizeof(wchar_t));
-        if (!res)
-            goto oom;
-        count = mbstowcs(res, arg, argsize+1);
-        if (count != (size_t)-1) {
-            wchar_t *tmp;
-            /* Only use the result if it contains no
-               surrogate characters. */
-            for (tmp = res; *tmp != 0 &&
-                         (*tmp < 0xd800 || *tmp > 0xdfff); tmp++)
-                ;
-            if (*tmp == 0)
-                return res;
-        }
-        PyMem_Free(res);
-    }
-    /* Conversion failed. Fall back to escaping with surrogateescape. */
-#ifdef HAVE_MBRTOWC
-    /* Try conversion with mbrtwoc (C99), and escape non-decodable bytes. */
-
-    /* Overallocate; as multi-byte characters are in the argument, the
-       actual output could use less memory. */
-    argsize = strlen(arg) + 1;
-    res = (wchar_t*)PyMem_Malloc(argsize*sizeof(wchar_t));
-    if (!res) goto oom;
-    in = (unsigned char*)arg;
-    out = res;
-    memset(&mbs, 0, sizeof mbs);
-    while (argsize) {
-        size_t converted = mbrtowc(out, (char*)in, argsize, &mbs);
-        if (converted == 0)
-            /* Reached end of string; null char stored. */
-            break;
-        if (converted == (size_t)-2) {
-            /* Incomplete character. This should never happen,
-               since we provide everything that we have -
-               unless there is a bug in the C library, or I
-               misunderstood how mbrtowc works. */
-            fprintf(stderr, "unexpected mbrtowc result -2\n");
-            return NULL;
-        }
-        if (converted == (size_t)-1) {
-            /* Conversion error. Escape as UTF-8b, and start over
-               in the initial shift state. */
-            *out++ = 0xdc00 + *in++;
-            argsize--;
-            memset(&mbs, 0, sizeof mbs);
-            continue;
-        }
-        if (*out >= 0xd800 && *out <= 0xdfff) {
-            /* Surrogate character.  Escape the original
-               byte sequence with surrogateescape. */
-            argsize -= converted;
-            while (converted--)
-                *out++ = 0xdc00 + *in++;
-            continue;
-        }
-        /* successfully converted some bytes */
-        in += converted;
-        argsize -= converted;
-        out++;
-    }
-#else
-    /* Cannot use C locale for escaping; manually escape as if charset
-       is ASCII (i.e. escape all bytes > 128. This will still roundtrip
-       correctly in the locale's charset, which must be an ASCII superset. */
-    res = PyMem_Malloc((strlen(arg)+1)*sizeof(wchar_t));
-    if (!res) goto oom;
-    in = (unsigned char*)arg;
-    out = res;
-    while(*in)
-        if(*in < 128)
-            *out++ = *in++;
-        else
-            *out++ = 0xdc00 + *in++;
-    *out = 0;
-#endif
-    return res;
-oom:
-    fprintf(stderr, "out of memory\n");
-    return NULL;
 }
 
 #ifdef __cplusplus

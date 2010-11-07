@@ -53,8 +53,10 @@ import time
 import warnings
 
 import os
-from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
+from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, EINVAL, \
      ENOTCONN, ESHUTDOWN, EINTR, EISCONN, EBADF, ECONNABORTED, errorcode
+
+_DISCONNECTED = frozenset((ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED))
 
 try:
     socket_map
@@ -337,8 +339,8 @@ class dispatcher:
     def connect(self, address):
         self.connected = False
         err = self.socket.connect_ex(address)
-        # XXX Should interpret Winsock return values
-        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK):
+        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
+        or err == EINVAL and os.name in ('nt', 'ce'):
             return
         if err in (0, EISCONN):
             self.addr = address
@@ -350,12 +352,15 @@ class dispatcher:
         # XXX can return either an address pair or None
         try:
             conn, addr = self.socket.accept()
-            return conn, addr
+        except TypeError:
+            return None
         except socket.error as why:
-            if why.args[0] == EWOULDBLOCK:
-                pass
+            if why.args[0] in (EWOULDBLOCK, ECONNABORTED):
+                return None
             else:
                 raise
+        else:
+            return conn, addr
 
     def send(self, data):
         try:
@@ -364,7 +369,7 @@ class dispatcher:
         except socket.error as why:
             if why.args[0] == EWOULDBLOCK:
                 return 0
-            elif why.args[0] in (ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED):
+            elif why.args[0] in _DISCONNECTED:
                 self.handle_close()
                 return 0
             else:
@@ -382,7 +387,7 @@ class dispatcher:
                 return data
         except socket.error as why:
             # winsock sometimes throws ENOTCONN
-            if why.args[0] in [ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED]:
+            if why.args[0] in _DISCONNECTED:
                 self.handle_close()
                 return b''
             else:
@@ -435,8 +440,11 @@ class dispatcher:
             self.handle_read()
 
     def handle_connect_event(self):
-        self.connected = True
+        err = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+        if err != 0:
+            raise socket.error(err, _strerror(err))
         self.handle_connect()
+        self.connected = True
 
     def handle_write_event(self):
         if self.accepting:
@@ -501,7 +509,13 @@ class dispatcher:
         self.log_info('unhandled connect event', 'warning')
 
     def handle_accept(self):
-        self.log_info('unhandled accept event', 'warning')
+        pair = self.accept()
+        if pair is not None:
+            self.handle_accepted(*pair)
+
+    def handle_accepted(self, sock, addr):
+        sock.close()
+        self.log_info('unhandled accepted event', 'warning')
 
     def handle_close(self):
         self.log_info('unhandled close event', 'warning')
@@ -606,6 +620,14 @@ if os.name == 'posix':
 
         def send(self, *args):
             return os.write(self.fd, *args)
+
+        def getsockopt(self, level, optname, buflen=None):
+            if (level == socket.SOL_SOCKET and
+                optname == socket.SO_ERROR and
+                not buflen):
+                return 0
+            raise NotImplementedError("Only asyncore specific behaviour "
+                                      "implemented.")
 
         read = recv
         write = send

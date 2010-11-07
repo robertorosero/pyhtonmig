@@ -5,9 +5,10 @@ import unittest
 
 from distutils.command.build_scripts import build_scripts
 from distutils.core import Distribution
-import sysconfig
+from distutils import sysconfig
 
 from distutils.tests import support
+from test.support import run_unittest
 
 
 class BuildScriptsTestCase(support.TempdirManager,
@@ -71,8 +72,10 @@ class BuildScriptsTestCase(support.TempdirManager,
 
     def write_script(self, dir, name, text):
         f = open(os.path.join(dir, name), "w")
-        f.write(text)
-        f.close()
+        try:
+            f.write(text)
+        finally:
+            f.close()
 
     def test_version_int(self):
         source = self.mkdtemp()
@@ -91,12 +94,12 @@ class BuildScriptsTestCase(support.TempdirManager,
         # --with-suffix=3`, python is compiled okay but the build scripts
         # failed when writing the name of the executable
         old = sysconfig.get_config_vars().get('VERSION')
-        sysconfig._CONFIG_VARS['VERSION'] = 4
+        sysconfig._config_vars['VERSION'] = 4
         try:
             cmd.run()
         finally:
             if old is not None:
-                sysconfig._CONFIG_VARS['VERSION'] = old
+                sysconfig._config_vars['VERSION'] = old
 
         built = os.listdir(target)
         for name in expected:
@@ -106,4 +109,4 @@ def test_suite():
     return unittest.makeSuite(BuildScriptsTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

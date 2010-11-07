@@ -17,8 +17,8 @@ HTTPS protocols.  It is normally not used directly --- the module
 
 .. note::
 
-   HTTPS support is only available if the :mod:`socket` module was compiled with
-   SSL support.
+   HTTPS support is only available if Python was compiled with SSL support
+   (through the :mod:`ssl` module).
 
 The module provides the following classes:
 
@@ -50,19 +50,35 @@ The module provides the following classes:
       *source_address* was added.
 
 
-.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout[, source_address]])
+.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout[, source_address]], *, context=None, check_hostname=None)
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
-   secure servers.  Default port is ``443``. *key_file* is the name of a PEM
-   formatted file that contains your private key. *cert_file* is a PEM formatted
-   certificate chain file.
+   secure servers.  Default port is ``443``.  If *context* is specified, it
+   must be a :class:`ssl.SSLContext` instance describing the various SSL
+   options.  If *context* is specified and has a :attr:`~ssl.SSLContext.verify_mode`
+   of either :data:`~ssl.CERT_OPTIONAL` or :data:`~ssl.CERT_REQUIRED`, then
+   by default *host* is matched against the host name(s) allowed by the
+   server's certificate.  If you want to change that behaviour, you can
+   explicitly set *check_hostname* to False.
 
-   .. note::
+   *key_file* and *cert_file* are deprecated, please use
+   :meth:`ssl.SSLContext.load_cert_chain` instead.
 
-      This does not do any certificate verification.
+   If you access arbitrary hosts on the Internet, it is recommended to
+   require certificate checking and feed the *context* with a set of
+   trusted CA certificates::
+
+      context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+      context.verify_mode = ssl.CERT_REQUIRED
+      context.load_verify_locations('/etc/pki/tls/certs/ca-bundle.crt')
+      h = client.HTTPSConnection('svn.python.org', 443, context=context)
 
    .. versionchanged:: 3.2
-      *source_address* was added.
+      *source_address*, *context* and *check_hostname* were added.
+
+   .. versionchanged:: 3.2
+      This class now supports HTTPS virtual hosts if possible (that is,
+      if :data:`ssl.HAS_SNI` is true).
 
 
 .. class:: HTTPResponse(sock, debuglevel=0, strict=0, method=None, url=None)
@@ -367,7 +383,7 @@ HTTPConnection Objects
    object.  The Content-Length header is set to the length of the
    string.
 
-   The *body* may also be an open file object, in which case the
+   The *body* may also be an open :term:`file object`, in which case the
    contents of the file is sent; this file object should support
    ``fileno()`` and ``read()`` methods. The header Content-Length is
    automatically set to the length of the file as reported by
@@ -394,6 +410,7 @@ HTTPConnection Objects
 
    .. versionadded:: 3.1
 
+
 .. method:: HTTPConnection.set_tunnel(host, port=None, headers=None)
 
    Set the host and the port for HTTP Connect Tunnelling. Normally used when it
@@ -403,6 +420,7 @@ HTTPConnection Objects
    with the CONNECT request.
 
    .. versionadded:: 3.2
+
 
 .. method:: HTTPConnection.connect()
 
@@ -465,14 +483,19 @@ statement.
 
 .. method:: HTTPResponse.getheader(name, default=None)
 
-   Get the contents of the header *name*, or *default* if there is no matching
-   header.
+   Return the value of the header *name*, or *default* if there is no header
+   matching *name*.  If there is more than one  header with the name *name*,
+   return all of the values joined by ', '.  If 'default' is any iterable other
+   than a single string, its elements are similarly returned joined by commas.
 
 
 .. method:: HTTPResponse.getheaders()
 
    Return a list of (header, value) tuples.
 
+.. method:: HTTPResponse.fileno()
+
+   Return the ``fileno`` of the underlying socket.
 
 .. attribute:: HTTPResponse.msg
 

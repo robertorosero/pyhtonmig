@@ -95,8 +95,9 @@ source.
       file is not available.
 
    If this option is given, the first element of :data:`sys.argv` will be the
-   full path to the module file. As with the :option:`-c` option, the current
-   directory will be added to the start of :data:`sys.path`.
+   full path to the module file (while the module file is being located, the
+   first element will be set to ``"-m"``). As with the :option:`-c` option,
+   the current directory will be added to the start of :data:`sys.path`.
 
    Many standard library modules contain code that is invoked on their execution
    as a script.  An example is the :mod:`timeit` module::
@@ -113,6 +114,7 @@ source.
 
    .. versionchanged:: 3.1
       Supply the package name to run a ``__main__`` submodule.
+
 
 .. describe:: -
 
@@ -319,6 +321,17 @@ Miscellaneous options
 
    .. note:: The line numbers in error messages will be off by one.
 
+
+.. cmdoption:: -X
+
+   Reserved for various implementation-specific options.  CPython currently
+   defines none of them, but allows to pass arbitrary values and retrieve
+   them through the :data:`sys._xoptions` dictionary.
+
+   .. versionchanged:: 3.2
+      It is now allowed to pass :option:`-X` with CPython.
+
+
 Options you shouldn't use
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -327,11 +340,6 @@ Options you shouldn't use
    Reserved for use by Jython_.
 
 .. _Jython: http://jython.org
-
-.. cmdoption:: -X
-
-    Reserved for alternative implementations of Python to use for their own
-    purposes.
 
 .. _using-on-envvars:
 
@@ -442,9 +450,10 @@ These environment variables influence Python's behavior.
 
 .. envvar:: PYTHONIOENCODING
 
-   Overrides the encoding used for stdin/stdout/stderr, in the syntax
-   ``encodingname:errorhandler``.  The ``:errorhandler`` part is optional and
-   has the same meaning as in :func:`str.encode`.
+   If this is set before running the interpreter, it overrides the encoding used
+   for stdin/stdout/stderr, in the syntax ``encodingname:errorhandler``. The
+   ``:errorhandler`` part is optional and has the same meaning as in
+   :func:`str.encode`.
 
    For stderr, the ``:errorhandler`` part is ignored; the handler will always be
    ``'backslashreplace'``.

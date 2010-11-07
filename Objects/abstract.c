@@ -413,7 +413,7 @@ PyBuffer_GetPointer(Py_buffer *view, Py_ssize_t *indices)
 
 
 void
-_add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
+_Py_add_one_to_index_F(int nd, Py_ssize_t *index, const Py_ssize_t *shape)
 {
     int k;
 
@@ -429,7 +429,7 @@ _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 }
 
 void
-_add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape)
+_Py_add_one_to_index_C(int nd, Py_ssize_t *index, const Py_ssize_t *shape)
 {
     int k;
 
@@ -453,7 +453,7 @@ int
 PyBuffer_ToContiguous(void *buf, Py_buffer *view, Py_ssize_t len, char fort)
 {
     int k;
-    void (*addone)(int, Py_ssize_t *, Py_ssize_t *);
+    void (*addone)(int, Py_ssize_t *, const Py_ssize_t *);
     Py_ssize_t *indices, elements;
     char *dest, *ptr;
 
@@ -480,10 +480,10 @@ PyBuffer_ToContiguous(void *buf, Py_buffer *view, Py_ssize_t len, char fort)
     }
 
     if (fort == 'F') {
-        addone = _add_one_to_index_F;
+        addone = _Py_add_one_to_index_F;
     }
     else {
-        addone = _add_one_to_index_C;
+        addone = _Py_add_one_to_index_C;
     }
     dest = buf;
     /* XXX : This is not going to be the fastest code in the world
@@ -504,7 +504,7 @@ int
 PyBuffer_FromContiguous(Py_buffer *view, void *buf, Py_ssize_t len, char fort)
 {
     int k;
-    void (*addone)(int, Py_ssize_t *, Py_ssize_t *);
+    void (*addone)(int, Py_ssize_t *, const Py_ssize_t *);
     Py_ssize_t *indices, elements;
     char *src, *ptr;
 
@@ -531,10 +531,10 @@ PyBuffer_FromContiguous(Py_buffer *view, void *buf, Py_ssize_t len, char fort)
     }
 
     if (fort == 'F') {
-        addone = _add_one_to_index_F;
+        addone = _Py_add_one_to_index_F;
     }
     else {
-        addone = _add_one_to_index_C;
+        addone = _Py_add_one_to_index_C;
     }
     src = buf;
     /* XXX : This is not going to be the fastest code in the world
@@ -611,7 +611,7 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
         elements *= view_src.shape[k];
     }
     while (elements--) {
-        _add_one_to_index_C(view_src.ndim, indices, view_src.shape);
+        _Py_add_one_to_index_C(view_src.ndim, indices, view_src.shape);
         dptr = PyBuffer_GetPointer(&view_dest, indices);
         sptr = PyBuffer_GetPointer(&view_src, indices);
         memcpy(dptr, sptr, view_src.itemsize);
@@ -1612,7 +1612,7 @@ PySequence_GetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
     if (!s) return null_error();
 
     mp = s->ob_type->tp_as_mapping;
-    if (mp->mp_subscript) {
+    if (mp && mp->mp_subscript) {
         PyObject *res;
         PyObject *slice = _PySlice_FromIndices(i1, i2);
         if (!slice)
@@ -1690,7 +1690,7 @@ PySequence_SetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2, PyObject *o)
     }
 
     mp = s->ob_type->tp_as_mapping;
-    if (mp->mp_ass_subscript) {
+    if (mp && mp->mp_ass_subscript) {
         int res;
         PyObject *slice = _PySlice_FromIndices(i1, i2);
         if (!slice)
@@ -1715,7 +1715,7 @@ PySequence_DelSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
     }
 
     mp = s->ob_type->tp_as_mapping;
-    if (mp->mp_ass_subscript) {
+    if (mp && mp->mp_ass_subscript) {
         int res;
         PyObject *slice = _PySlice_FromIndices(i1, i2);
         if (!slice)
@@ -2311,15 +2311,7 @@ objargs_mktuple(va_list va)
     va_list countva;
     PyObject *result, *tmp;
 
-#ifdef VA_LIST_IS_ARRAY
-    memcpy(countva, va, sizeof(va_list));
-#else
-#ifdef __va_copy
-    __va_copy(countva, va);
-#else
-    countva = va;
-#endif
-#endif
+        Py_VA_COPY(countva, va);
 
     while (((PyObject *)va_arg(countva, PyObject *)) != NULL)
         ++n;

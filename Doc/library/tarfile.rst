@@ -20,7 +20,8 @@ Some facts and figures:
 * read/write support for the POSIX.1-1988 (ustar) format.
 
 * read/write support for the GNU tar format including *longname* and *longlink*
-  extensions, read-only support for the *sparse* extension.
+  extensions, read-only support for all variants of the *sparse* extension
+  including restoration of sparse files.
 
 * read/write support for the POSIX.1-2001 (pax) format.
 
@@ -66,8 +67,8 @@ Some facts and figures:
    *mode* ``'r'`` to avoid this.  If a compression method is not supported,
    :exc:`CompressionError` is raised.
 
-   If *fileobj* is specified, it is used as an alternative to a file object opened
-   for *name*. It is supposed to be at position 0.
+   If *fileobj* is specified, it is used as an alternative to a :term:`file object`
+   opened in binary mode for *name*. It is supposed to be at position 0.
 
    For special purposes, there is a second format for *mode*:
    ``'filemode|[compression]'``.  :func:`tarfile.open` will return a :class:`TarFile`
@@ -75,7 +76,7 @@ Some facts and figures:
    be done on the file. If given, *fileobj* may be any object that has a
    :meth:`read` or :meth:`write` method (depending on the *mode*). *bufsize*
    specifies the blocksize and defaults to ``20 * 512`` bytes. Use this variant
-   in combination with e.g. ``sys.stdin``, a socket file object or a tape
+   in combination with e.g. ``sys.stdin``, a socket :term:`file object` or a tape
    device. However, such a :class:`TarFile` object is limited in that it does
    not allow to be accessed randomly, see :ref:`tar-examples`.  The currently
    possible modes:
@@ -335,12 +336,13 @@ be finalized; only the internally used file object will be closed. See the
       dots ``".."``.
 
 
-.. method:: TarFile.extract(member, path="")
+.. method:: TarFile.extract(member, path="", set_attrs=True)
 
    Extract a member from the archive to the current working directory, using its
    full name. Its file information is extracted as accurately as possible. *member*
    may be a filename or a :class:`TarInfo` object. You can specify a different
-   directory using *path*.
+   directory using *path*. File attributes (owner, mtime, mode) are set unless
+   *set_attrs* is False.
 
    .. note::
 
@@ -351,13 +353,15 @@ be finalized; only the internally used file object will be closed. See the
 
       See the warning for :meth:`extractall`.
 
+   .. versionchanged:: 3.2
+      Added the *set_attrs* parameter.
 
 .. method:: TarFile.extractfile(member)
 
    Extract a member from the archive as a file object. *member* may be a filename
-   or a :class:`TarInfo` object. If *member* is a regular file, a file-like object
-   is returned. If *member* is a link, a file-like object is constructed from the
-   link's target. If *member* is none of the above, :const:`None` is returned.
+   or a :class:`TarInfo` object. If *member* is a regular file, a :term:`file-like
+   object` is returned. If *member* is a link, a file-like object is constructed from
+   the link's target. If *member* is none of the above, :const:`None` is returned.
 
    .. note::
 
@@ -402,9 +406,9 @@ be finalized; only the internally used file object will be closed. See the
 
 .. method:: TarFile.gettarinfo(name=None, arcname=None, fileobj=None)
 
-   Create a :class:`TarInfo` object for either the file *name* or the file object
-   *fileobj* (using :func:`os.fstat` on its file descriptor).  You can modify some
-   of the :class:`TarInfo`'s attributes before you add it using :meth:`addfile`.
+   Create a :class:`TarInfo` object for either the file *name* or the :term:`file
+   object` *fileobj* (using :func:`os.fstat` on its file descriptor).  You can modify
+   some of the :class:`TarInfo`'s attributes before you add it using :meth:`addfile`.
    If given, *arcname* specifies an alternative name for the file in the archive.
 
 

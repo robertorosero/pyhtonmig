@@ -208,7 +208,7 @@ Old string formatting
 ---------------------
 
 The ``%`` operator can also be used for string formatting. It interprets the
-left argument much like a :cfunc:`sprintf`\ -style format string to be applied
+left argument much like a :c:func:`sprintf`\ -style format string to be applied
 to the right argument, and returns the string resulting from this formatting
 operation. For example::
 
@@ -232,8 +232,8 @@ Reading and Writing Files
    builtin: open
    object: file
 
-:func:`open` returns a file object, and is most commonly used with two
-arguments: ``open(filename, mode)``.
+:func:`open` returns a :term:`file object`, and is most commonly used with
+two arguments: ``open(filename, mode)``.
 
 ::
 

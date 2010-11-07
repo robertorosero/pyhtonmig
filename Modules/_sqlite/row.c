@@ -1,6 +1,6 @@
 /* row.c - an enhanced tuple for database rows
  *
- * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ * Copyright (C) 2005-2010 Gerhard HÃ¤ring <gh@ghaering.de>
  *
  * This file is part of pysqlite.
  *
@@ -166,7 +166,7 @@ static PyObject* pysqlite_iter(pysqlite_Row* self)
     return PyObject_GetIter(self->data);
 }
 
-static long pysqlite_row_hash(pysqlite_Row *self)
+static Py_hash_t pysqlite_row_hash(pysqlite_Row *self)
 {
     return PyObject_Hash(self->description) ^ PyObject_Hash(self->data);
 }

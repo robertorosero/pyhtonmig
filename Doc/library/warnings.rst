@@ -13,7 +13,7 @@ warrant raising an exception and terminating the program.  For example, one
 might want to issue a warning when a program uses an obsolete module.
 
 Python programmers issue warnings by calling the :func:`warn` function defined
-in this module.  (C programmers use :cfunc:`PyErr_WarnEx`; see
+in this module.  (C programmers use :c:func:`PyErr_WarnEx`; see
 :ref:`exceptionhandling` for details).
 
 Warning messages are normally written to ``sys.stderr``, but their disposition
@@ -82,6 +82,9 @@ following warnings category classes are currently defined:
 | :exc:`BytesWarning`              | Base category for warnings related to         |
 |                                  | :class:`bytes` and :class:`buffer`.           |
 +----------------------------------+-----------------------------------------------+
+| :exc:`ResourceWarning`           | Base category for warnings related to         |
+|                                  | resource usage.                               |
++----------------------------------+-----------------------------------------------+
 
 
 While these are technically built-in exceptions, they are documented here,
@@ -90,9 +93,6 @@ because conceptually they belong to the warnings mechanism.
 User code can define additional warning categories by subclassing one of the
 standard warning categories.  A warning category must always be a subclass of
 the :exc:`Warning` class.
-
-.. versionchanged:: 3.2
-   :exc:`DeprecationWarning` is ignored by default.
 
 
 .. _warning-filter:
@@ -152,6 +152,27 @@ interpreter command line.  The interpreter saves the arguments for all
 :option:`-W` options without interpretation in ``sys.warnoptions``; the
 :mod:`warnings` module parses these when it is first imported (invalid options
 are ignored, after printing a message to ``sys.stderr``).
+
+
+Default Warning Filters
+~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, Python installs several warning filters, which can be overridden by
+the command-line options passed to :option:`-W` and calls to
+:func:`filterwarnings`.
+
+* :exc:`DeprecationWarning` and :exc:`PendingDeprecationWarning`, and
+  :exc:`ImportWarning` are ignored.
+
+* :exc:`BytesWarning` is ignored unless the :option:`-b` option is given once or
+  twice; in this case this warning is either printed (``-b``) or turned into an
+  exception (``-bb``).
+
+* :exc:`ResourceWarning` is ignored unless Python was built in debug mode.
+
+.. versionchanged:: 3.2
+   :exc:`DeprecationWarning` is now ignored by default in addition to
+   :exc:`PendingDeprecationWarning`.
 
 
 .. _warning-suppress:

@@ -13,6 +13,8 @@ import time
 import shutil
 from test import support
 import contextlib
+import mmap
+import uuid
 
 # Detect whether we're on a Linux system that uses the (now outdated
 # and unmaintained) linuxthreads threading library.  There's an issue
@@ -219,12 +221,12 @@ class StatAttributeTests(unittest.TestCase):
         os.unlink(self.fname)
         os.rmdir(support.TESTFN)
 
-    def test_stat_attributes(self):
+    def check_stat_attributes(self, fname):
         if not hasattr(os, "stat"):
             return
 
         import stat
-        result = os.stat(self.fname)
+        result = os.stat(fname)
 
         # Make sure direct access works
         self.assertEquals(result[stat.ST_SIZE], 3)
@@ -281,6 +283,15 @@ class StatAttributeTests(unittest.TestCase):
         except TypeError:
             pass
 
+    def test_stat_attributes(self):
+        self.check_stat_attributes(self.fname)
+
+    def test_stat_attributes_bytes(self):
+        try:
+            fname = self.fname.encode(sys.getfilesystemencoding())
+        except UnicodeEncodeError:
+            self.skipTest("cannot encode %a for the filesystem" % self.fname)
+        self.check_stat_attributes(fname)
 
     def test_statvfs_attributes(self):
         if not hasattr(os, "statvfs"):
@@ -395,17 +406,19 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         os.environ.clear()
         if os.path.exists("/bin/sh"):
             os.environ.update(HELLO="World")
-            value = os.popen("/bin/sh -c 'echo $HELLO'").read().strip()
-            self.assertEquals(value, "World")
+            with os.popen("/bin/sh -c 'echo $HELLO'") as popen:
+                value = popen.read().strip()
+                self.assertEquals(value, "World")
 
     def test_os_popen_iter(self):
         if os.path.exists("/bin/sh"):
-            popen = os.popen("/bin/sh -c 'echo \"line1\nline2\nline3\"'")
-            it = iter(popen)
-            self.assertEquals(next(it), "line1\n")
-            self.assertEquals(next(it), "line2\n")
-            self.assertEquals(next(it), "line3\n")
-            self.assertRaises(StopIteration, next, it)
+            with os.popen(
+                "/bin/sh -c 'echo \"line1\nline2\nline3\"'") as popen:
+                it = iter(popen)
+                self.assertEquals(next(it), "line1\n")
+                self.assertEquals(next(it), "line2\n")
+                self.assertEquals(next(it), "line3\n")
+                self.assertRaises(StopIteration, next, it)
 
     # Verify environ keys and values from the OS are of the
     # correct str type.
@@ -422,8 +435,9 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
     def test___repr__(self):
         """Check that the repr() of os.environ looks like environ({...})."""
         env = os.environ
-        self.assertTrue(isinstance(env.data, dict))
-        self.assertEqual(repr(env), 'environ({!r})'.format(env.data))
+        self.assertEqual(repr(env), 'environ({{{}}})'.format(', '.join(
+            '{!r}: {!r}'.format(key, value)
+            for key, value in env.items())))
 
     def test_get_exec_path(self):
         defpath_list = os.defpath.split(os.pathsep)
@@ -448,8 +462,15 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
 
         if os.supports_bytes_environ:
             # env cannot contain 'PATH' and b'PATH' keys
-            self.assertRaises(ValueError,
-                os.get_exec_path, {'PATH': '1', b'PATH': b'2'})
+            try:
+                # ignore BytesWarning warning
+                with warnings.catch_warnings(record=True):
+                    mixed_env = {'PATH': '1', b'PATH': b'2'}
+            except BytesWarning:
+                # mixed_env cannot be created with python -bb
+                pass
+            else:
+                self.assertRaises(ValueError, os.get_exec_path, mixed_env)
 
             # bytes key and/or value
             self.assertSequenceEqual(os.get_exec_path({b'PATH': b'abc'}),
@@ -721,7 +742,10 @@ class ExecTests(unittest.TestCase):
         # os.get_exec_path() reads the 'PATH' variable
         with _execvpe_mockup() as calls:
             env_path = env.copy()
-            env_path['PATH'] = program_path
+            if test_type is bytes:
+                env_path[b'PATH'] = program_path
+            else:
+                env_path['PATH'] = program_path
             self.assertRaises(OSError,
                 os._execvpe, program, arguments, env=env_path)
             self.assertEqual(len(calls), 1)
@@ -893,29 +917,47 @@ if sys.platform != 'win32':
                         sys.executable, '-c',
                         'import os,sys;os.setregid(-1,-1);sys.exit(0)'])
 
-    @unittest.skipIf(sys.platform == 'darwin', "tests don't apply to OS X")
     class Pep383Tests(unittest.TestCase):
-        filenames = [b'foo\xf6bar', 'foo\xf6bar'.encode("utf-8")]
-
         def setUp(self):
-            self.fsencoding = sys.getfilesystemencoding()
-            sys.setfilesystemencoding("utf-8")
-            self.dir = support.TESTFN
-            self.bdir = self.dir.encode("utf-8", "surrogateescape")
+            if support.TESTFN_UNENCODABLE:
+                self.dir = support.TESTFN_UNENCODABLE
+            else:
+                self.dir = support.TESTFN
+            self.bdir = os.fsencode(self.dir)
+
+            bytesfn = []
+            def add_filename(fn):
+                try:
+                    fn = os.fsencode(fn)
+                except UnicodeEncodeError:
+                    return
+                bytesfn.append(fn)
+            add_filename(support.TESTFN_UNICODE)
+            if support.TESTFN_UNENCODABLE:
+                add_filename(support.TESTFN_UNENCODABLE)
+            if not bytesfn:
+                self.skipTest("couldn't create any non-ascii filename")
+
+            self.unicodefn = set()
             os.mkdir(self.dir)
-            self.unicodefn = []
-            for fn in self.filenames:
-                f = open(os.path.join(self.bdir, fn), "w")
-                f.close()
-                self.unicodefn.append(fn.decode("utf-8", "surrogateescape"))
+            try:
+                for fn in bytesfn:
+                    f = open(os.path.join(self.bdir, fn), "w")
+                    f.close()
+                    fn = os.fsdecode(fn)
+                    if fn in self.unicodefn:
+                        raise ValueError("duplicate filename")
+                    self.unicodefn.add(fn)
+            except:
+                shutil.rmtree(self.dir)
+                raise
 
         def tearDown(self):
             shutil.rmtree(self.dir)
-            sys.setfilesystemencoding(self.fsencoding)
 
         def test_listdir(self):
-            expected = set(self.unicodefn)
-            found = set(os.listdir(support.TESTFN))
+            expected = self.unicodefn
+            found = set(os.listdir(self.dir))
             self.assertEquals(found, expected)
 
         def test_open(self):
@@ -964,6 +1006,9 @@ class Win32KillTests(unittest.TestCase):
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 stdin=subprocess.PIPE)
+        self.addCleanup(proc.stdout.close)
+        self.addCleanup(proc.stderr.close)
+        self.addCleanup(proc.stdin.close)
 
         count, max = 0, 100
         while count < max and proc.poll() is None:
@@ -994,13 +1039,23 @@ class Win32KillTests(unittest.TestCase):
         self._kill(100)
 
     def _kill_with_event(self, event, name):
+        tagname = "test_os_%s" % uuid.uuid1()
+        m = mmap.mmap(-1, 1, tagname)
+        m[0] = 0
         # Run a script which has console control handling enabled.
         proc = subprocess.Popen([sys.executable,
                    os.path.join(os.path.dirname(__file__),
-                                "win_console_handler.py")],
+                                "win_console_handler.py"), tagname],
                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         # Let the interpreter startup before we send signals. See #3137.
-        time.sleep(0.5)
+        count, max = 0, 20
+        while count < max and proc.poll() is None:
+            if m[0] == 1:
+                break
+            time.sleep(0.5)
+            count += 1
+        else:
+            self.fail("Subprocess didn't finish initialization")
         os.kill(proc.pid, event)
         # proc.send_signal(event) could also be done here.
         # Allow time for the signal to be passed and the process to exit.
@@ -1111,12 +1166,40 @@ class Win32SymlinkTests(unittest.TestCase):
         self.assertNotEqual(os.lstat(link), os.stat(link))
 
 
-class MiscTests(unittest.TestCase):
+class FSEncodingTests(unittest.TestCase):
+    def test_nop(self):
+        self.assertEquals(os.fsencode(b'abc\xff'), b'abc\xff')
+        self.assertEquals(os.fsdecode('abc\u0141'), 'abc\u0141')
 
-    @unittest.skipIf(os.name == "nt", "POSIX specific test")
-    def test_fsencode(self):
-        self.assertEquals(os.fsencode(b'ab\xff'), b'ab\xff')
-        self.assertEquals(os.fsencode('ab\uDCFF'), b'ab\xff')
+    def test_identity(self):
+        # assert fsdecode(fsencode(x)) == x
+        for fn in ('unicode\u0141', 'latin\xe9', 'ascii'):
+            try:
+                bytesfn = os.fsencode(fn)
+            except UnicodeEncodeError:
+                continue
+            self.assertEquals(os.fsdecode(bytesfn), fn)
+
+
+class PidTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, 'getppid'), "test needs os.getppid")
+    def test_getppid(self):
+        p = subprocess.Popen([sys.executable, '-c',
+                              'import os; print(os.getppid())'],
+                             stdout=subprocess.PIPE)
+        stdout, _ = p.communicate()
+        # We are the parent of our subprocess
+        self.assertEqual(int(stdout), os.getpid())
+
+
+# The introduction of this TestCase caused at least two different errors on
+# *nix buildbots. Temporarily skip this to let the buildbots move along.
+@unittest.skip("Skip due to platform/environment differences on *NIX buildbots")
+@unittest.skipUnless(hasattr(os, 'getlogin'), "test needs os.getlogin")
+class LoginTests(unittest.TestCase):
+    def test_getlogin(self):
+        user_name = os.getlogin()
+        self.assertNotEqual(len(user_name), 0)
 
 
 def test_main():
@@ -1135,7 +1218,9 @@ def test_main():
         Pep383Tests,
         Win32KillTests,
         Win32SymlinkTests,
-        MiscTests,
+        FSEncodingTests,
+        PidTests,
+        LoginTests,
     )
 
 if __name__ == "__main__":

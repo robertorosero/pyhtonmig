@@ -99,7 +99,7 @@ from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
     urlparse, urlsplit, urljoin, unwrap, quote, unquote,
     splittype, splithost, splitport, splituser, splitpasswd,
-    splitattr, splitquery, splitvalue, to_bytes, urlunparse)
+    splitattr, splitquery, splitvalue, splittag, to_bytes, urlunparse)
 from urllib.response import addinfourl, addclosehook
 
 # check for SSL
@@ -114,11 +114,27 @@ else:
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+            *, cafile=None, capath=None):
     global _opener
-    if _opener is None:
-        _opener = build_opener()
-    return _opener.open(url, data, timeout)
+    if cafile or capath:
+        if not _have_ssl:
+            raise ValueError('SSL support not available')
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.options |= ssl.OP_NO_SSLv2
+        if cafile or capath:
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile, capath)
+            check_hostname = True
+        else:
+            check_hostname = False
+        https_handler = HTTPSHandler(context=context, check_hostname=check_hostname)
+        opener = build_opener(https_handler)
+    elif _opener is None:
+        _opener = opener = build_opener()
+    else:
+        opener = _opener
+    return opener.open(url, data, timeout)
 
 def install_opener(opener):
     global _opener
@@ -163,6 +179,7 @@ class Request:
                  origin_req_host=None, unverifiable=False):
         # unwrap('<URL:type://host/path>') --> 'type://host/path'
         self.full_url = unwrap(url)
+        self.full_url, fragment = splittag(self.full_url)
         self.data = data
         self.headers = {}
         self._tunnel_host = None
@@ -777,6 +794,9 @@ class AbstractBasicAuthHandler:
         self.add_password = self.passwd.add_password
         self.retried = 0
 
+    def reset_retry_count(self):
+        self.retried = 0
+
     def http_error_auth_reqed(self, authreq, host, req, headers):
         # host may be an authority (without userinfo) or a URL with an
         # authority
@@ -795,7 +815,10 @@ class AbstractBasicAuthHandler:
             if mo:
                 scheme, quote, realm = mo.groups()
                 if scheme.lower() == 'basic':
-                    return self.retry_http_basic_auth(host, req, realm)
+                    response = self.retry_http_basic_auth(host, req, realm)
+                    if response and response.code != 401:
+                        self.retried = 0
+                    return response
 
     def retry_http_basic_auth(self, host, req, realm):
         user, pw = self.passwd.find_user_password(realm, host)
@@ -816,8 +839,10 @@ class HTTPBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
 
     def http_error_401(self, req, fp, code, msg, headers):
         url = req.full_url
-        return self.http_error_auth_reqed('www-authenticate',
+        response = self.http_error_auth_reqed('www-authenticate',
                                           url, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
@@ -830,8 +855,10 @@ class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
         # should not, RFC 3986 s. 3.2.1) support requests for URLs containing
         # userinfo.
         authority = req.host
-        return self.http_error_auth_reqed('proxy-authenticate',
+        response = self.http_error_auth_reqed('proxy-authenticate',
                                           authority, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 def randombytes(n):
@@ -1042,7 +1069,7 @@ class AbstractHTTPHandler(BaseHandler):
 
         return request
 
-    def do_open(self, http_class, req):
+    def do_open(self, http_class, req, **http_conn_args):
         """Return an HTTPResponse object for the request, using http_class.
 
         http_class must implement the HTTPConnection API from http.client.
@@ -1051,9 +1078,12 @@ class AbstractHTTPHandler(BaseHandler):
         if not host:
             raise URLError('no host given')
 
-        h = http_class(host, timeout=req.timeout) # will parse host:port
-        headers = dict(req.headers)
-        headers.update(req.unredirected_hdrs)
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+
+        headers = dict(req.unredirected_hdrs)
+        headers.update(dict((k, v) for k, v in req.headers.items()
+                            if k not in headers))
 
         # TODO(jhylton): Should this be redesigned to handle
         # persistent connections?
@@ -1101,10 +1131,18 @@ class HTTPHandler(AbstractHTTPHandler):
     http_request = AbstractHTTPHandler.do_request_
 
 if hasattr(http.client, 'HTTPSConnection'):
+    import ssl
+
     class HTTPSHandler(AbstractHTTPHandler):
 
+        def __init__(self, debuglevel=0, context=None, check_hostname=None):
+            AbstractHTTPHandler.__init__(self, debuglevel)
+            self._context = context
+            self._check_hostname = check_hostname
+
         def https_open(self, req):
-            return self.do_open(http.client.HTTPSConnection, req)
+            return self.do_open(http.client.HTTPSConnection, req,
+                context=self._context, check_hostname=self._check_hostname)
 
         https_request = AbstractHTTPHandler.do_request_
 
@@ -1190,8 +1228,8 @@ class FileHandler(BaseHandler):
         url = req.selector
         if url[:2] == '//' and url[2:3] != '/' and (req.host and
                 req.host != 'localhost'):
-            req.type = 'ftp'
-            return self.parent.open(req)
+            if not req.host is self.get_names():
+                raise URLError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(req)
 
@@ -1591,13 +1629,13 @@ class URLopener:
 
         if proxy_passwd:
             import base64
-            proxy_auth = base64.b64encode(proxy_passwd).strip()
+            proxy_auth = base64.b64encode(proxy_passwd.encode()).decode('ascii')
         else:
             proxy_auth = None
 
         if user_passwd:
             import base64
-            auth = base64.b64encode(user_passwd).strip()
+            auth = base64.b64encode(user_passwd.encode()).decode('ascii')
         else:
             auth = None
         http_conn = connection_factory(host)
@@ -1674,7 +1712,7 @@ class URLopener:
         if not isinstance(url, str):
             raise URLError('file error', 'proxy support for file protocol currently not implemented')
         if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
-            return self.open_ftp(url)
+            raise ValueError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(url)
 

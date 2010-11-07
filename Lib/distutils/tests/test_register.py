@@ -6,7 +6,7 @@ import getpass
 import urllib
 import warnings
 
-from test.support import check_warnings
+from test.support import check_warnings, run_unittest
 
 from distutils.command import register as register_module
 from distutils.command.register import register
@@ -118,8 +118,12 @@ class RegisterTestCase(PyPIRCCommandTestCase):
         self.assertTrue(os.path.exists(self.rc))
 
         # with the content similar to WANTED_PYPIRC
-        content = open(self.rc).read()
-        self.assertEquals(content, WANTED_PYPIRC)
+        f = open(self.rc)
+        try:
+            content = f.read()
+            self.assertEquals(content, WANTED_PYPIRC)
+        finally:
+            f.close()
 
         # now let's make sure the .pypirc file generated
         # really works : we shouldn't be asked anything
@@ -202,10 +206,10 @@ class RegisterTestCase(PyPIRCCommandTestCase):
         self.assertRaises(DistutilsSetupError, cmd.run)
 
         # we don't test the reSt feature if docutils
-        # is not installed or we our on py3k
+        # is not installed
         try:
             import docutils
-        except Exception:
+        except ImportError:
             return
 
         # metadata are OK but long_description is broken
@@ -224,24 +228,24 @@ class RegisterTestCase(PyPIRCCommandTestCase):
         cmd = self._get_cmd(metadata)
         cmd.ensure_finalized()
         cmd.strict = 1
-        inputs = RawInputs('1', 'tarek', 'y')
-        register_module.raw_input = inputs.__call__
+        inputs = Inputs('1', 'tarek', 'y')
+        register_module.input = inputs.__call__
         # let's run the command
         try:
             cmd.run()
         finally:
-            del register_module.raw_input
+            del register_module.input
 
         # strict is not by default
         cmd = self._get_cmd()
         cmd.ensure_finalized()
-        inputs = RawInputs('1', 'tarek', 'y')
-        register_module.raw_input = inputs.__call__
+        inputs = Inputs('1', 'tarek', 'y')
+        register_module.input = inputs.__call__
         # let's run the command
         try:
             cmd.run()
         finally:
-            del register_module.raw_input
+            del register_module.input
 
     def test_check_metadata_deprecated(self):
         # makes sure make_metadata is deprecated
@@ -255,4 +259,4 @@ def test_suite():
     return unittest.makeSuite(RegisterTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

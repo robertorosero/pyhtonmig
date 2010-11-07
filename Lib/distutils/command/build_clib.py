@@ -18,8 +18,8 @@ __revision__ = "$Id$"
 
 import os
 from distutils.core import Command
-from distutils.errors import DistutilsSetupError
-from distutils.ccompiler import customize_compiler
+from distutils.errors import *
+from distutils.sysconfig import customize_compiler
 from distutils import log
 
 def show_compilers():
@@ -32,9 +32,9 @@ class build_clib(Command):
     description = "build C/C++ libraries used by Python extensions"
 
     user_options = [
-        ('build-clib', 'b',
+        ('build-clib=', 'b',
          "directory to build C/C++ libraries to"),
-        ('build-temp', 't',
+        ('build-temp=', 't',
          "directory to put temporary build by-products"),
         ('debug', 'g',
          "compile with debugging information"),

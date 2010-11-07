@@ -36,16 +36,38 @@ the following command can be used to get the disassembly of :func:`myfunc`::
 The :mod:`dis` module defines the following functions and constants:
 
 
+.. function:: code_info(x)
+
+   Return a formatted multi-line string with detailed code object information
+   for the supplied function, method, source code string or code object.
+
+   Note that the exact contents of code info strings are highly implementation
+   dependent and they may change arbitrarily across Python VMs or Python
+   releases.
+
+   .. versionadded:: 3.2
+
+
+.. function:: show_code(x)
+
+   Print detailed code object information for the supplied function, method,
+   source code string or code object to stdout.
+
+   This is a convenient shorthand for ``print(code_info(x))``, intended for
+   interactive exploration at the interpreter prompt.
+
+   .. versionadded:: 3.2
+
 .. function:: dis(x=None)
 
-   Disassemble the *x* object.  *x* can denote either a module, a
-   class, a method, a function, a code object, a string of source code or a
-   byte sequence of raw bytecode.  For a module, it disassembles all
-   functions.  For a class, it disassembles all methods.  For a code object
-   or sequence of raw bytecode, it prints one line per bytecode instruction.
-   Strings are first compiled to code objects with the :func:`compile`
-   built-in function before being disassembled.  If no object is provided,
-   this function disassembles the last traceback.
+   Disassemble the *x* object.  *x* can denote either a module, a class, a
+   method, a function, a code object, a string of source code or a byte sequence
+   of raw bytecode.  For a module, it disassembles all functions.  For a class,
+   it disassembles all methods.  For a code object or sequence of raw bytecode,
+   it prints one line per bytecode instruction.  Strings are first compiled to
+   code objects with the :func:`compile` built-in function before being
+   disassembled.  If no object is provided, this function disassembles the last
+   traceback.
 
 
 .. function:: distb(tb=None)
@@ -93,7 +115,7 @@ The :mod:`dis` module defines the following functions and constants:
 
 .. data:: opmap
 
-   Dictionary mapping bytecodes to operation names.
+   Dictionary mapping operation names to bytecodes.
 
 
 .. data:: cmp_op
@@ -172,15 +194,15 @@ The Python compiler currently generates the following bytecode instructions.
    three.
 
 
-.. opcode:: ROT_FOUR
-
-   Lifts second, third and forth stack item one position up, moves top down to
-   position four.
-
-
 .. opcode:: DUP_TOP
 
    Duplicates the reference on top of the stack.
+
+
+.. opcode:: DUP_TOP_TWO
+
+   Duplicates the two references on top of the stack, leaving them in the
+   same order.
 
 
 **Unary operations**
@@ -519,12 +541,6 @@ the more significant byte last.
    are put onto the stack right-to-left.
 
 
-.. opcode:: DUP_TOPX (count)
-
-   Duplicate *count* items, keeping them in the same order. Due to implementation
-   limits, *count* should be between 1 and 5 inclusive.
-
-
 .. opcode:: STORE_ATTR (namei)
 
    Implements ``TOS.name = TOS1``, where *namei* is the index of name in
@@ -705,6 +721,12 @@ the more significant byte last.
 
    Stores TOS into the cell contained in slot *i* of the cell and free variable
    storage.
+
+
+.. opcode:: DELETE_DEREF (i)
+
+   Empties the cell contained in slot *i* of the cell and free variable storage.
+   Used by the :keyword:`del` statement.
 
 
 .. opcode:: SET_LINENO (lineno)

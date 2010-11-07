@@ -950,11 +950,12 @@ format_float_internal(PyObject *value,
     }
 
     if (type == '\0') {
-        /* Omitted type specifier. This is like 'g' but with at least one
-           digit after the decimal point, and different default precision.*/
-        type = 'g';
-        default_precision = PyFloat_STR_PRECISION;
+        /* Omitted type specifier.  Behaves in the same way as repr(x)
+           and str(x) if no precision is given, else like 'g', but with
+           at least one digit after the decimal point. */
         flags |= Py_DTSF_ADD_DOT_0;
+        type = 'r';
+        default_precision = 0;
     }
 
     if (type == 'n')
@@ -974,6 +975,8 @@ format_float_internal(PyObject *value,
 
     if (precision < 0)
         precision = default_precision;
+    else if (type == 'r')
+        type = 'g';
 
     /* Cast "type", because if we're in unicode we need to pass a
        8-bit char. This is safe, because we've restricted what "type"
@@ -1134,11 +1137,12 @@ format_complex_internal(PyObject *value,
 
     if (type == '\0') {
         /* Omitted type specifier. Should be like str(self). */
-        type = 'g';
-        default_precision = PyFloat_STR_PRECISION;
-        add_parens = 1;
-        if (re == 0.0)
+        type = 'r';
+        default_precision = 0;
+        if (re == 0.0 && copysign(1.0, re) == 1.0)
             skip_re = 1;
+        else
+            add_parens = 1;
     }
 
     if (type == 'n')
@@ -1148,6 +1152,8 @@ format_complex_internal(PyObject *value,
 
     if (precision < 0)
         precision = default_precision;
+    else if (type == 'r')
+        type = 'g';
 
     /* Cast "type", because if we're in unicode we need to pass a
        8-bit char. This is safe, because we've restricted what "type"
@@ -1223,8 +1229,11 @@ format_complex_internal(PyObject *value,
                                     n_re_digits, n_re_remainder,
                                     re_has_decimal, &locale, &tmp_format);
 
-    /* Same formatting, but always include a sign. */
-    tmp_format.sign = '+';
+    /* Same formatting, but always include a sign, unless the real part is
+     * going to be omitted, in which case we use whatever sign convention was
+     * requested by the original format. */
+    if (!skip_re)
+        tmp_format.sign = '+';
     n_im_total = calc_number_widths(&im_spec, 0, im_sign_char, p_im,
                                     n_im_digits, n_im_remainder,
                                     im_has_decimal, &locale, &tmp_format);

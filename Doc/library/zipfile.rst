@@ -12,10 +12,8 @@ advanced use of this module will require an understanding of the format, as
 defined in `PKZIP Application Note
 <http://www.pkware.com/documents/casestudies/APPNOTE.TXT>`_.
 
-This module does not currently handle multi-disk ZIP files, or ZIP files
-which have appended comments (although it correctly handles comments
-added to individual archive members---for which see the :ref:`zipinfo-objects`
-documentation). It can handle ZIP files that use the ZIP64 extensions
+This module does not currently handle multi-disk ZIP files.
+It can handle ZIP files that use the ZIP64 extensions
 (that is ZIP files that are more than 4 GByte in size).  It supports
 decryption of encrypted files in ZIP archives, but it currently cannot
 create an encrypted file.  Decryption is extremely slow as it is
@@ -26,9 +24,17 @@ For other archive formats, see the :mod:`bz2`, :mod:`gzip`, and
 
 The module defines the following items:
 
-.. exception:: BadZipfile
+.. exception:: BadZipFile
 
    The error raised for bad ZIP files (old name: ``zipfile.error``).
+
+   .. versionadded:: 3.2
+
+
+.. exception:: BadZipfile
+
+   This is an alias for :exc:`BadZipFile` that exists for compatibility with
+   Python versions prior to 3.2.  Usage is deprecated.
 
 
 .. exception:: LargeZipFile
@@ -64,10 +70,10 @@ The module defines the following items:
 
    Returns ``True`` if *filename* is a valid ZIP file based on its magic number,
    otherwise returns ``False``.  *filename* may be a file or file-like object too.
-   This module does not currently handle ZIP files which have appended comments.
 
    .. versionchanged:: 3.1
       Support for file and file-like objects.
+
 
 .. data:: ZIP_STORED
 
@@ -118,6 +124,10 @@ ZipFile Objects
    ZIP64 extensions are disabled by default because the default :program:`zip`
    and :program:`unzip` commands on Unix (the InfoZIP utilities) don't support
    these extensions.
+
+   If the file is created with mode ``'a'`` or ``'w'`` and then
+   :meth:`close`\ d without adding any files to the archive, the appropriate
+   ZIP structures for an empty archive will be written to the file.
 
    ZipFile is also a context manager and therefore supports the
    :keyword:`with` statement.  In the example, *myzip* is closed after the

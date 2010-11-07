@@ -1,6 +1,7 @@
 import errno
 from http import client
 import io
+import os
 import array
 import socket
 
@@ -8,6 +9,14 @@ import unittest
 TestCase = unittest.TestCase
 
 from test import support
+
+here = os.path.dirname(__file__)
+# Self-signed cert file for 'localhost'
+CERT_localhost = os.path.join(here, 'keycert.pem')
+# Self-signed cert file for 'fakehostname'
+CERT_fakehostname = os.path.join(here, 'keycert2.pem')
+# Root cert file (CA) for svn.python.org's cert
+CACERT_svn_python_org = os.path.join(here, 'https_svn_python_org_root.pem')
 
 HOST = support.HOST
 
@@ -89,6 +98,14 @@ class HeaderTests(TestCase):
                     headers[header] = str(len(body))
                 conn.request('POST', '/', body, headers)
                 self.assertEqual(conn._buffer.count[header.lower()], 1)
+
+    def test_putheader(self):
+        conn = client.HTTPConnection('example.com')
+        conn.sock = FakeSocket(None)
+        conn.putrequest('GET','/')
+        conn.putheader('Content-length', 42)
+        self.assertTrue(b'Content-length: 42' in conn._buffer)
+
 
 class BasicTest(TestCase):
     def test_status_lines(self):
@@ -172,13 +189,13 @@ class BasicTest(TestCase):
         expected = (b'GET /foo HTTP/1.1\r\nHost: example.com\r\n'
                     b'Accept-Encoding: identity\r\nContent-Length:')
 
-        body = open(__file__, 'rb')
-        conn = client.HTTPConnection('example.com')
-        sock = FakeSocket(body)
-        conn.sock = sock
-        conn.request('GET', '/foo', body)
-        self.assertTrue(sock.data.startswith(expected), '%r != %r' %
-                (sock.data[:len(expected)], expected))
+        with open(__file__, 'rb') as body:
+            conn = client.HTTPConnection('example.com')
+            sock = FakeSocket(body)
+            conn.sock = sock
+            conn.request('GET', '/foo', body)
+            self.assertTrue(sock.data.startswith(expected), '%r != %r' %
+                    (sock.data[:len(expected)], expected))
 
     def test_send(self):
         expected = b'this is a test this is only a test'
@@ -362,14 +379,97 @@ class TimeoutTest(TestCase):
         self.assertEqual(httpConn.sock.gettimeout(), 30)
         httpConn.close()
 
-class HTTPSTimeoutTest(TestCase):
-# XXX Here should be tests for HTTPS, there isn't any right now!
+
+class HTTPSTest(TestCase):
+
+    def setUp(self):
+        if not hasattr(client, 'HTTPSConnection'):
+            self.skipTest('ssl support required')
+
+    def make_server(self, certfile):
+        from test.ssl_servers import make_https_server
+        return make_https_server(self, certfile)
 
     def test_attributes(self):
-        # simple test to check it's storing it
-        if hasattr(client, 'HTTPSConnection'):
-            h = client.HTTPSConnection(HOST, TimeoutTest.PORT, timeout=30)
-            self.assertEqual(h.timeout, 30)
+        # simple test to check it's storing the timeout
+        h = client.HTTPSConnection(HOST, TimeoutTest.PORT, timeout=30)
+        self.assertEqual(h.timeout, 30)
+
+    def _check_svn_python_org(self, resp):
+        # Just a simple check that everything went fine
+        server_string = resp.getheader('server')
+        self.assertIn('Apache', server_string)
+
+    def test_networked(self):
+        # Default settings: no cert verification is done
+        support.requires('network')
+        with support.transient_internet('svn.python.org'):
+            h = client.HTTPSConnection('svn.python.org', 443)
+            h.request('GET', '/')
+            resp = h.getresponse()
+            self._check_svn_python_org(resp)
+
+    def test_networked_good_cert(self):
+        # We feed a CA cert that validates the server's cert
+        import ssl
+        support.requires('network')
+        with support.transient_internet('svn.python.org'):
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(CACERT_svn_python_org)
+            h = client.HTTPSConnection('svn.python.org', 443, context=context)
+            h.request('GET', '/')
+            resp = h.getresponse()
+            self._check_svn_python_org(resp)
+
+    def test_networked_bad_cert(self):
+        # We feed a "CA" cert that is unrelated to the server's cert
+        import ssl
+        support.requires('network')
+        with support.transient_internet('svn.python.org'):
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(CERT_localhost)
+            h = client.HTTPSConnection('svn.python.org', 443, context=context)
+            with self.assertRaises(ssl.SSLError):
+                h.request('GET', '/')
+
+    def test_local_good_hostname(self):
+        # The (valid) cert validates the HTTP hostname
+        import ssl
+        from test.ssl_servers import make_https_server
+        server = make_https_server(self, CERT_localhost)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+        context.verify_mode = ssl.CERT_REQUIRED
+        context.load_verify_locations(CERT_localhost)
+        h = client.HTTPSConnection('localhost', server.port, context=context)
+        h.request('GET', '/nonexistent')
+        resp = h.getresponse()
+        self.assertEqual(resp.status, 404)
+
+    def test_local_bad_hostname(self):
+        # The (valid) cert doesn't validate the HTTP hostname
+        import ssl
+        from test.ssl_servers import make_https_server
+        server = make_https_server(self, CERT_fakehostname)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+        context.verify_mode = ssl.CERT_REQUIRED
+        context.load_verify_locations(CERT_fakehostname)
+        h = client.HTTPSConnection('localhost', server.port, context=context)
+        with self.assertRaises(ssl.CertificateError):
+            h.request('GET', '/')
+        # Same with explicit check_hostname=True
+        h = client.HTTPSConnection('localhost', server.port, context=context,
+                                   check_hostname=True)
+        with self.assertRaises(ssl.CertificateError):
+            h.request('GET', '/')
+        # With check_hostname=False, the mismatching is ignored
+        h = client.HTTPSConnection('localhost', server.port, context=context,
+                                   check_hostname=False)
+        h.request('GET', '/nonexistent')
+        resp = h.getresponse()
+        self.assertEqual(resp.status, 404)
+
 
 class RequestBodyTest(TestCase):
     """Test cases where a request includes a message body."""
@@ -419,32 +519,67 @@ class RequestBodyTest(TestCase):
         self.assertEqual(b'body\xc1', f.read())
 
     def test_file_body(self):
-        f = open(support.TESTFN, "w")
-        f.write("body")
-        f.close()
-        f = open(support.TESTFN)
-        self.conn.request("PUT", "/url", f)
-        message, f = self.get_headers_and_fp()
-        self.assertEqual("text/plain", message.get_content_type())
-        self.assertEqual(None, message.get_charset())
-        self.assertEqual("4", message.get("content-length"))
-        self.assertEqual(b'body', f.read())
+        with open(support.TESTFN, "w") as f:
+            f.write("body")
+        with open(support.TESTFN) as f:
+            self.conn.request("PUT", "/url", f)
+            message, f = self.get_headers_and_fp()
+            self.assertEqual("text/plain", message.get_content_type())
+            self.assertEqual(None, message.get_charset())
+            self.assertEqual("4", message.get("content-length"))
+            self.assertEqual(b'body', f.read())
 
     def test_binary_file_body(self):
-        f = open(support.TESTFN, "wb")
-        f.write(b"body\xc1")
-        f.close()
-        f = open(support.TESTFN, "rb")
-        self.conn.request("PUT", "/url", f)
-        message, f = self.get_headers_and_fp()
-        self.assertEqual("text/plain", message.get_content_type())
-        self.assertEqual(None, message.get_charset())
-        self.assertEqual("5", message.get("content-length"))
-        self.assertEqual(b'body\xc1', f.read())
+        with open(support.TESTFN, "wb") as f:
+            f.write(b"body\xc1")
+        with open(support.TESTFN, "rb") as f:
+            self.conn.request("PUT", "/url", f)
+            message, f = self.get_headers_and_fp()
+            self.assertEqual("text/plain", message.get_content_type())
+            self.assertEqual(None, message.get_charset())
+            self.assertEqual("5", message.get("content-length"))
+            self.assertEqual(b'body\xc1', f.read())
+
+
+class HTTPResponseTest(TestCase):
+
+    def setUp(self):
+        body = "HTTP/1.1 200 Ok\r\nMy-Header: first-value\r\nMy-Header: \
+                second-value\r\n\r\nText"
+        sock = FakeSocket(body)
+        self.resp = client.HTTPResponse(sock)
+        self.resp.begin()
+
+    def test_getting_header(self):
+        header = self.resp.getheader('My-Header')
+        self.assertEqual(header, 'first-value, second-value')
+
+        header = self.resp.getheader('My-Header', 'some default')
+        self.assertEqual(header, 'first-value, second-value')
+
+    def test_getting_nonexistent_header_with_string_default(self):
+        header = self.resp.getheader('No-Such-Header', 'default-value')
+        self.assertEqual(header, 'default-value')
+
+    def test_getting_nonexistent_header_with_iterable_default(self):
+        header = self.resp.getheader('No-Such-Header', ['default', 'values'])
+        self.assertEqual(header, 'default, values')
+
+        header = self.resp.getheader('No-Such-Header', ('default', 'values'))
+        self.assertEqual(header, 'default, values')
+
+    def test_getting_nonexistent_header_without_default(self):
+        header = self.resp.getheader('No-Such-Header')
+        self.assertEqual(header, None)
+
+    def test_getting_header_defaultint(self):
+        header = self.resp.getheader('No-Such-Header',default=42)
+        self.assertEqual(header, 42)
 
 def test_main(verbose=None):
     support.run_unittest(HeaderTests, OfflineTest, BasicTest, TimeoutTest,
-                         HTTPSTimeoutTest, RequestBodyTest, SourceAddressTest)
+                         HTTPSTest, RequestBodyTest, SourceAddressTest,
+                         HTTPResponseTest)
 
 if __name__ == '__main__':
     test_main()

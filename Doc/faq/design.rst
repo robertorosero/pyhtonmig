@@ -28,7 +28,7 @@ coding-style conflicts.  In C there are many different ways to place the braces.
 If you're used to reading and writing code that uses one style, you will feel at
 least slightly uneasy when reading (or being required to write) another style.
 
-Many coding styles place begin/end brackets on a line by themself.  This makes
+Many coding styles place begin/end brackets on a line by themselves.  This makes
 programs considerably longer and wastes valuable screen space, making it harder
 to get a good overview of a program.  Ideally, a function should fit on one
 screen (say, 20-30 lines).  20 lines of Python can do a lot more work than 20
@@ -210,8 +210,8 @@ have to remember to change two places in your program -- the second occurrence
 is hidden at the bottom of the loop.
 
 The best approach is to use iterators, making it possible to loop through
-objects using the ``for`` statement.  For example, in the current version of
-Python file objects support the iterator protocol, so you can now write simply::
+objects using the ``for`` statement.  For example, :term:`file objects
+<file object>` support the iterator protocol, so you can write simply::
 
    for line in f:
        ... # do something with line...

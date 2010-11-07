@@ -51,6 +51,7 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   alterable precision (defaulting to 28 places) which can be as large as needed for
   a given problem:
 
+     >>> from decimal import *
      >>> getcontext().prec = 6
      >>> Decimal(1) / Decimal(7)
      Decimal('0.142857')
@@ -354,7 +355,8 @@ Decimal objects
    Once constructed, :class:`Decimal` objects are immutable.
 
    .. versionchanged:: 3.2
-      The argument to the constructor is now permitted to be a :class:`float` instance.
+      The argument to the constructor is now permitted to be a :class:`float`
+      instance.
 
    Decimal floating point objects share many properties with the other built-in
    numeric types such as :class:`float` and :class:`int`.  All of the usual math
@@ -372,8 +374,8 @@ Decimal objects
    when doing equality comparisons between numbers of different types.
 
    .. versionchanged:: 3.2
-      Mixed-type comparisons between :class:`Decimal` instances and
-      other numeric types are now fully supported.
+      Mixed-type comparisons between :class:`Decimal` instances and other
+      numeric types are now fully supported.
 
    In addition to the standard numeric properties, decimal floating point
    objects also have a number of specialized methods:
@@ -1006,7 +1008,6 @@ In addition to the three supplied contexts, new contexts can be created with the
       Returns a value equal to ``Emin - prec + 1`` which is the minimum exponent
       value for subnormal results.  When underflow occurs, the exponent is set
       to :const:`Etiny`.
-
 
    .. method:: Etop()
 

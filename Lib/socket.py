@@ -54,6 +54,8 @@ except ImportError:
     errno = None
 EBADF = getattr(errno, 'EBADF', 9)
 EINTR = getattr(errno, 'EINTR', 4)
+EAGAIN = getattr(errno, 'EAGAIN', 11)
+EWOULDBLOCK = getattr(errno, 'EWOULDBLOCK', 11)
 
 __all__ = ["getfqdn", "create_connection"]
 __all__.extend(os._get_exports_list(_socket))
@@ -93,13 +95,20 @@ class socket(_socket.socket):
         self._io_refs = 0
         self._closed = False
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self._closed:
+            self.close()
+
     def __repr__(self):
         """Wrap __repr__() to reveal the real class name."""
         s = _socket.socket.__repr__(self)
         if s.startswith("<socket object"):
             s = "<%s.%s%s%s" % (self.__class__.__module__,
                                 self.__class__.__name__,
-                                (self._closed and " [closed] ") or "",
+                                getattr(self, '_closed', False) and " [closed] " or "",
                                 s[7:])
         return s
 
@@ -124,7 +133,7 @@ class socket(_socket.socket):
         return socket(self.family, self.type, self.proto, fileno=fd), addr
 
     def makefile(self, mode="r", buffering=None, *,
-                 encoding=None, newline=None):
+                 encoding=None, errors=None, newline=None):
         """makefile(...) -> an I/O stream connected to the socket
 
         The arguments are as for io.open() after the filename,
@@ -162,7 +171,7 @@ class socket(_socket.socket):
             buffer = io.BufferedWriter(raw, buffering)
         if binary:
             return buffer
-        text = io.TextIOWrapper(buffer, encoding, newline)
+        text = io.TextIOWrapper(buffer, encoding, errors, newline)
         text.mode = mode
         return text
 
@@ -172,10 +181,12 @@ class socket(_socket.socket):
         if self._closed:
             self.close()
 
-    def _real_close(self):
-        _socket.socket.close(self)
+    def _real_close(self, _ss=_socket.socket):
+        # This function should not reference any globals. See issue #808164.
+        _ss.close(self)
 
     def close(self):
+        # This function should not reference any globals. See issue #808164.
         self._closed = True
         if self._io_refs <= 0:
             self._real_close()
@@ -190,6 +201,29 @@ def fromfd(fd, family, type, proto=0):
     return socket(family, type, proto, nfd)
 
 
+if hasattr(_socket, "socketpair"):
+
+    def socketpair(family=None, type=SOCK_STREAM, proto=0):
+        """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
+
+        Create a pair of socket objects from the sockets returned by the platform
+        socketpair() function.
+        The arguments are the same as for socket() except the default family is
+        AF_UNIX if defined on the platform; otherwise, the default is AF_INET.
+        """
+        if family is None:
+            try:
+                family = AF_UNIX
+            except NameError:
+                family = AF_INET
+        a, b = _socket.socketpair(family, type, proto)
+        a = socket(family, type, proto, a.detach())
+        b = socket(family, type, proto, b.detach())
+        return a, b
+
+
+_blocking_errnos = { EAGAIN, EWOULDBLOCK }
+
 class SocketIO(io.RawIOBase):
 
     """Raw I/O implementation for stream sockets.
@@ -197,6 +231,13 @@ class SocketIO(io.RawIOBase):
     This class supports the makefile() method on sockets.  It provides
     the raw I/O interface on top of a socket object.
     """
+
+    # One might wonder why not let FileIO do the job instead.  There are two
+    # main reasons why FileIO is not adapted:
+    # - it wouldn't work under Windows (where you can't used read() and
+    #   write() on a socket handle)
+    # - it wouldn't work with socket timeouts (FileIO would ignore the
+    #   timeout and consider the socket non-blocking)
 
     # XXX More docs
 
@@ -212,28 +253,55 @@ class SocketIO(io.RawIOBase):
         self._writing = "w" in mode
 
     def readinto(self, b):
+        """Read up to len(b) bytes into the writable buffer *b* and return
+        the number of bytes read.  If the socket is non-blocking and no bytes
+        are available, None is returned.
+
+        If *b* is non-empty, a 0 return value indicates that the connection
+        was shutdown at the other end.
+        """
         self._checkClosed()
         self._checkReadable()
         while True:
             try:
                 return self._sock.recv_into(b)
             except error as e:
-                if e.args[0] == EINTR:
+                n = e.args[0]
+                if n == EINTR:
                     continue
+                if n in _blocking_errnos:
+                    return None
                 raise
 
     def write(self, b):
+        """Write the given bytes or bytearray object *b* to the socket
+        and return the number of bytes written.  This can be less than
+        len(b) if not all data could be written.  If the socket is
+        non-blocking and no bytes could be written None is returned.
+        """
         self._checkClosed()
         self._checkWritable()
-        return self._sock.send(b)
+        try:
+            return self._sock.send(b)
+        except error as e:
+            # XXX what about EINTR?
+            if e.args[0] in _blocking_errnos:
+                return None
+            raise
 
     def readable(self):
+        """True if the SocketIO is open for reading.
+        """
         return self._reading and not self.closed
 
     def writable(self):
+        """True if the SocketIO is open for writing.
+        """
         return self._writing and not self.closed
 
     def fileno(self):
+        """Return the file descriptor of the underlying socket.
+        """
         self._checkClosed()
         return self._sock.fileno()
 
@@ -246,6 +314,9 @@ class SocketIO(io.RawIOBase):
         return self._mode
 
     def close(self):
+        """Close the SocketIO object.  This doesn't close the underlying
+        socket, except if all references to it have disappeared.
+        """
         if self.closed:
             return
         io.RawIOBase.close(self)
@@ -295,8 +366,8 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
     An host of '' or port 0 tells the OS to use the default.
     """
 
-    msg = "getaddrinfo returns an empty list"
     host, port = address
+    err = None
     for res in getaddrinfo(host, port, 0, SOCK_STREAM):
         af, socktype, proto, canonname, sa = res
         sock = None
@@ -309,9 +380,12 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
             sock.connect(sa)
             return sock
 
-        except error as err:
-            msg = err
+        except error as _:
+            err = _
             if sock is not None:
                 sock.close()
 
-    raise error(msg)
+    if err is not None:
+        raise err
+    else:
+        raise error("getaddrinfo returns an empty list")

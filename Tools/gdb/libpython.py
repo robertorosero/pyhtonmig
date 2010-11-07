@@ -88,6 +88,30 @@ def safe_range(val):
     # threshold in case the data was corrupted
     return xrange(safety_limit(val))
 
+def write_unicode(file, text):
+    # Write a byte or unicode string to file. Unicode strings are encoded to
+    # ENCODING encoding with 'backslashreplace' error handler to avoid
+    # UnicodeEncodeError.
+    if isinstance(text, unicode):
+        text = text.encode(ENCODING, 'backslashreplace')
+    file.write(text)
+
+def os_fsencode(filename):
+    if not isinstance(filename, unicode):
+        return filename
+    encoding = sys.getfilesystemencoding()
+    if encoding == 'mbcs':
+        # mbcs doesn't support surrogateescape
+        return filename.encode(encoding)
+    encoded = []
+    for char in filename:
+        # surrogateescape error handler
+        if 0xDC80 <= ord(char) <= 0xDCFF:
+            byte = chr(ord(char) - 0xDC00)
+        else:
+            byte = char.encode(encoding)
+        encoded.append(byte)
+    return ''.join(encoded)
 
 class StringTruncated(RuntimeError):
     pass
@@ -880,7 +904,8 @@ class PyFrameObjectPtr(PyObjectPtr):
         newline character'''
         if self.is_optimized_out():
             return '(frame information optimized out)'
-        with open(self.filename(), 'r') as f:
+        filename = self.filename()
+        with open(os_fsencode(filename), 'r') as f:
             all_lines = f.readlines()
             # Convert from 1-based current_line_num to 0-based list offset:
             return all_lines[self.current_line_num()-1]
@@ -1058,7 +1083,19 @@ def _unichr_is_printable(char):
     if char == u" ":
         return True
     import unicodedata
-    return unicodedata.category(char)[0] not in ("C", "Z")
+    return unicodedata.category(char) not in ("C", "Z")
+
+if sys.maxunicode >= 0x10000:
+    _unichr = unichr
+else:
+    # Needed for proper surrogate support if sizeof(Py_UNICODE) is 2 in gdb
+    def _unichr(x):
+        if x < 0x10000:
+            return unichr(x)
+        x -= 0x10000
+        ch1 = 0xD800 | (x >> 10)
+        ch2 = 0xDC00 | (x & 0x3FF)
+        return unichr(ch1) + unichr(ch2)
 
 
 class PyUnicodeObjectPtr(PyObjectPtr):
@@ -1077,11 +1114,34 @@ class PyUnicodeObjectPtr(PyObjectPtr):
 
         # Gather a list of ints from the Py_UNICODE array; these are either
         # UCS-2 or UCS-4 code points:
-        Py_UNICODEs = [int(field_str[i]) for i in safe_range(field_length)]
+        if self.char_width() > 2:
+            Py_UNICODEs = [int(field_str[i]) for i in safe_range(field_length)]
+        else:
+            # A more elaborate routine if sizeof(Py_UNICODE) is 2 in the
+            # inferior process: we must join surrogate pairs.
+            Py_UNICODEs = []
+            i = 0
+            limit = safety_limit(field_length)
+            while i < limit:
+                ucs = int(field_str[i])
+                i += 1
+                if ucs < 0xD800 or ucs >= 0xDC00 or i == field_length:
+                    Py_UNICODEs.append(ucs)
+                    continue
+                # This could be a surrogate pair.
+                ucs2 = int(field_str[i])
+                if ucs2 < 0xDC00 or ucs2 > 0xDFFF:
+                    continue
+                code = (ucs & 0x03FF) << 10
+                code |= ucs2 & 0x03FF
+                code += 0x00010000
+                Py_UNICODEs.append(code)
+                i += 1
 
         # Convert the int code points to unicode characters, and generate a
-        # local unicode instance:
-        result = u''.join([unichr(ucs) for ucs in Py_UNICODEs])
+        # local unicode instance.
+        # This splits surrogate pairs if sizeof(Py_UNICODE) is 2 here (in gdb).
+        result = u''.join([_unichr(ucs) for ucs in Py_UNICODEs])
         return result
 
     def write_repr(self, out, visited):
@@ -1129,38 +1189,37 @@ class PyUnicodeObjectPtr(PyObjectPtr):
             # Non-ASCII characters
             else:
                 ucs = ch
-                orig_ucs = None
-                if self.char_width() == 2:
-                    # Get code point from surrogate pair
+                ch2 = None
+                if sys.maxunicode < 0x10000:
+                    # If sizeof(Py_UNICODE) is 2 here (in gdb), join
+                    # surrogate pairs before calling _unichr_is_printable.
                     if (i < len(proxy)
                     and 0xD800 <= ord(ch) < 0xDC00 \
                     and 0xDC00 <= ord(proxy[i]) <= 0xDFFF):
                         ch2 = proxy[i]
-                        code = (ord(ch) & 0x03FF) << 10
-                        code |= ord(ch2) & 0x03FF
-                        code += 0x00010000
-                        orig_ucs = ucs
-                        ucs = unichr(code)
+                        ucs = ch + ch2
                         i += 1
-                    else:
-                        ch2 = None
 
+                # Unfortuately, Python 2's unicode type doesn't seem
+                # to expose the "isprintable" method
                 printable = _unichr_is_printable(ucs)
                 if printable:
                     try:
                         ucs.encode(ENCODING)
                     except UnicodeEncodeError:
                         printable = False
-                        if orig_ucs is not None:
-                            ucs = orig_ucs
-                            i -= 1
 
                 # Map Unicode whitespace and control characters
                 # (categories Z* and C* except ASCII space)
                 if not printable:
-                    # Unfortuately, Python 2's unicode type doesn't seem
-                    # to expose the "isprintable" method
-                    code = ord(ucs)
+                    if ch2 is not None:
+                        # Match Python 3's representation of non-printable
+                        # wide characters.
+                        code = (ord(ch) & 0x03FF) << 10
+                        code |= ord(ch2) & 0x03FF
+                        code += 0x00010000
+                    else:
+                        code = ord(ucs)
 
                     # Map 8-bit characters to '\\xhh'
                     if code <= 0xff:
@@ -1188,7 +1247,7 @@ class PyUnicodeObjectPtr(PyObjectPtr):
                 else:
                     # Copy characters as-is
                     out.write(ch)
-                    if self.char_width() == 2 and (ch2 is not None):
+                    if ch2 is not None:
                         out.write(ch2)
 
         out.write(quote)
@@ -1360,7 +1419,8 @@ class Frame(object):
         if self.is_evalframeex():
             pyop = self.get_pyop()
             if pyop:
-                sys.stdout.write('#%i %s\n' % (self.get_index(), pyop.get_truncated_repr(MAX_OUTPUT_LEN)))
+                line = pyop.get_truncated_repr(MAX_OUTPUT_LEN)
+                write_unicode(sys.stdout, '#%i %s\n' % (self.get_index(), line))
                 sys.stdout.write(pyop.current_line())
             else:
                 sys.stdout.write('#%i (unable to read python frame information)\n' % self.get_index())
@@ -1421,7 +1481,7 @@ class PyList(gdb.Command):
         if start<1:
             start = 1
 
-        with open(filename, 'r') as f:
+        with open(os_fsencode(filename), 'r') as f:
             all_lines = f.readlines()
             # start and end are 1-based, all_lines is 0-based;
             # so [start-1:end] as a python slice gives us [start, end] as a

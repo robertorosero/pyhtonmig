@@ -207,7 +207,9 @@ applications should use string objects to access all files.
 .. function:: normpath(path)
 
    Normalize a pathname.  This collapses redundant separators and up-level
-   references so that ``A//B``, ``A/./B`` and ``A/foo/../B`` all become ``A/B``.
+   references so that ``A//B``, ``A/B/``, ``A/./B`` and ``A/foo/../B`` all become
+   ``A/B``.
+
    It does not normalize the case (use :func:`normcase` for that).  On Windows, it
    converts forward slashes to backward slashes. It should be understood that this
    may change the meaning of the path if it contains symbolic links!
@@ -249,7 +251,9 @@ applications should use string objects to access all files.
 
    Return ``True`` if the file descriptors *fp1* and *fp2* refer to the same file.
 
-   Availability: Unix.
+   Availability: Unix, Windows.
+
+   .. versionchanged:: 3.2 Added Windows support.
 
 
 .. function:: samestat(stat1, stat2)
@@ -264,14 +268,14 @@ applications should use string objects to access all files.
 
 .. function:: split(path)
 
-   Split the pathname *path* into a pair, ``(head, tail)`` where *tail* is the last
-   pathname component and *head* is everything leading up to that.  The *tail* part
-   will never contain a slash; if *path* ends in a slash, *tail* will be empty.  If
-   there is no slash in *path*, *head* will be empty.  If *path* is empty, both
-   *head* and *tail* are empty.  Trailing slashes are stripped from *head* unless
-   it is the root (one or more slashes only).  In nearly all cases, ``join(head,
-   tail)`` equals *path* (the only exception being when there were multiple slashes
-   separating *head* from *tail*).
+   Split the pathname *path* into a pair, ``(head, tail)`` where *tail* is the
+   last pathname component and *head* is everything leading up to that.  The
+   *tail* part will never contain a slash; if *path* ends in a slash, *tail*
+   will be empty.  If there is no slash in *path*, *head* will be empty.  If
+   *path* is empty, both *head* and *tail* are empty.  Trailing slashes are
+   stripped from *head* unless it is the root (one or more slashes only).  In
+   all cases, ``join(head, tail)`` returns a path to the same location as *path*
+   (but the strings may differ).
 
 
 .. function:: splitdrive(path)
@@ -316,5 +320,4 @@ applications should use string objects to access all files.
 .. data:: supports_unicode_filenames
 
    True if arbitrary Unicode strings can be used as file names (within limitations
-   imposed by the file system), and if :func:`os.listdir` returns strings that
-   contain characters that cannot be represented by ASCII.
+   imposed by the file system).

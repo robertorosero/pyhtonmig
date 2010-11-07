@@ -92,8 +92,8 @@ Functions
 .. function:: iterparse(source, events=None, parser=None)
 
    Parses an XML section into an element tree incrementally, and reports what's
-   going on to the user.  *source* is a filename or file object containing XML
-   data.  *events* is a list of events to report back.  If omitted, only "end"
+   going on to the user.  *source* is a filename or :term:`file object` containing
+   XML data.  *events* is a list of events to report back.  If omitted, only "end"
    events are reported.  *parser* is an optional parser instance.  If not
    given, the standard :class:`XMLParser` parser is used.  Returns an
    :term:`iterator` providing ``(event, elem)`` pairs.
@@ -148,20 +148,22 @@ Functions
    arguments.  Returns an element instance.
 
 
-.. function:: tostring(element, encoding=None, method="xml")
+.. function:: tostring(element, encoding="us-ascii", method="xml")
 
    Generates a string representation of an XML element, including all
    subelements.  *element* is an :class:`Element` instance.  *encoding* [1]_ is
-   the output encoding (default is None).  *method* is either ``"xml"``,
+   the output encoding (default is US-ASCII).  Use ``encoding="unicode"`` to
+   generate a Unicode string.  *method* is either ``"xml"``,
    ``"html"`` or ``"text"`` (default is ``"xml"``).  Returns an (optionally)
    encoded string containing the XML data.
 
 
-.. function:: tostringlist(element, encoding=None, method="xml")
+.. function:: tostringlist(element, encoding="us-ascii", method="xml")
 
    Generates a string representation of an XML element, including all
    subelements.  *element* is an :class:`Element` instance.  *encoding* [1]_ is
-   the output encoding (default is None).   *method* is either ``"xml"``,
+   the output encoding (default is US-ASCII).  Use ``encoding="unicode"`` to
+   generate a Unicode string.  *method* is either ``"xml"``,
    ``"html"`` or ``"text"`` (default is ``"xml"``).  Returns a list of
    (optionally) encoded strings containing the XML data.  It does not guarantee
    any specific sequence, except that ``"".join(tostringlist(element)) ==
@@ -307,13 +309,13 @@ Element Objects
 
    .. method:: getchildren()
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.2
          Use ``list(elem)`` or iteration.
 
 
    .. method:: getiterator(tag=None)
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.2
          Use method :meth:`Element.iter` instead.
 
 
@@ -425,11 +427,12 @@ ElementTree Objects
 
    .. method:: getiterator(tag=None)
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.2
          Use method :meth:`ElementTree.iter` instead.
 
 
    .. method:: getroot()
+
       Returns the root element for this tree.
 
 
@@ -452,20 +455,21 @@ ElementTree Objects
    .. method:: parse(source, parser=None)
 
       Loads an external XML section into this element tree.  *source* is a file
-      name or file object.  *parser* is an optional parser instance.  If not
-      given, the standard XMLParser parser is used.  Returns the section
+      name or :term:`file object`.  *parser* is an optional parser instance.
+      If not given, the standard XMLParser parser is used.  Returns the section
       root element.
 
 
-   .. method:: write(file, encoding=None, xml_declaration=None, method="xml")
+   .. method:: write(file, encoding="us-ascii", xml_declaration=None, method="xml")
 
       Writes the element tree to a file, as XML.  *file* is a file name, or a
-      file object opened for writing.  *encoding* [1]_ is the output encoding
-      (default is None).  *xml_declaration* controls if an XML declaration
+      :term:`file object` opened for writing.  *encoding* [1]_ is the output encoding
+      (default is US-ASCII).  Use ``encoding="unicode"`` to write a Unicode string.
+      *xml_declaration* controls if an XML declaration
       should be added to the file.  Use False for never, True for always, None
-      for only if not US-ASCII or UTF-8 (default is None).  *method* is either
-      ``"xml"``, ``"html"`` or ``"text"`` (default is ``"xml"``).  Returns an
-      (optionally) encoded string.
+      for only if not US-ASCII or UTF-8 or Unicode (default is None).  *method* is
+      either ``"xml"``, ``"html"`` or ``"text"`` (default is ``"xml"``).
+      Returns an (optionally) encoded string.
 
 This is the XML file that is going to be manipulated::
 
@@ -585,7 +589,7 @@ XMLParser Objects
 
    .. method:: doctype(name, pubid, system)
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.2
          Define the :meth:`TreeBuilder.doctype` method on a custom TreeBuilder
          target.
 

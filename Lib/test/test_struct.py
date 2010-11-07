@@ -213,6 +213,7 @@ class StructTest(unittest.TestCase):
                     expected = '%x' % expected
                     if len(expected) & 1:
                         expected = "0" + expected
+                    expected = expected.encode('ascii')
                     expected = unhexlify(expected)
                     expected = (b"\x00" * (self.bytesize - len(expected)) +
                                 expected)
@@ -429,12 +430,12 @@ class StructTest(unittest.TestCase):
 
         # Test without offset
         s.pack_into(writable_buf, 0, test_string)
-        from_buf = writable_buf.tostring()[:len(test_string)]
+        from_buf = writable_buf.tobytes()[:len(test_string)]
         self.assertEqual(from_buf, test_string)
 
         # Test with offset.
         s.pack_into(writable_buf, 10, test_string)
-        from_buf = writable_buf.tostring()[:len(test_string)+10]
+        from_buf = writable_buf.tobytes()[:len(test_string)+10]
         self.assertEqual(from_buf, test_string[:10] + test_string)
 
         # Go beyond boundaries.
@@ -457,12 +458,12 @@ class StructTest(unittest.TestCase):
 
         # Test without offset.
         pack_into(writable_buf, 0, test_string)
-        from_buf = writable_buf.tostring()[:len(test_string)]
+        from_buf = writable_buf.tobytes()[:len(test_string)]
         self.assertEqual(from_buf, test_string)
 
         # Test with offset.
         pack_into(writable_buf, 10, test_string)
-        from_buf = writable_buf.tostring()[:len(test_string)+10]
+        from_buf = writable_buf.tobytes()[:len(test_string)+10]
         self.assertEqual(from_buf, test_string[:10] + test_string)
 
         # Go beyond boundaries.
@@ -559,7 +560,12 @@ class StructTest(unittest.TestCase):
                           'spam and eggs')
         self.assertRaises(struct.error, struct.unpack_from, '14s42', store, 0)
 
-
+    def test_Struct_reinitialization(self):
+        # Issue 9422: there was a memory leak when reinitializing a
+        # Struct instance.  This test can be used to detect the leak
+        # when running with regrtest -L.
+        s = struct.Struct('i')
+        s.__init__('ii')
 
 def test_main():
     run_unittest(StructTest)

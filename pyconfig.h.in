@@ -30,12 +30,18 @@
 /* Define if --enable-ipv6 is specified */
 #undef ENABLE_IPV6
 
+/* Define if flock needs to be linked with bsd library. */
+#undef FLOCK_NEEDS_LIBBSD
+
 /* Define if getpgrp() must be called as getpgrp(0). */
 #undef GETPGRP_HAVE_ARG
 
 /* Define if gettimeofday() does not have second (timezone) argument This is
    the case on Motorola V4 (R40V4.2) */
 #undef GETTIMEOFDAY_NO_TZ
+
+/* Define to 1 if you have the `accept4' function. */
+#undef HAVE_ACCEPT4
 
 /* Define to 1 if you have the `acosh' function. */
 #undef HAVE_ACOSH
@@ -77,6 +83,9 @@
 /* Define if nice() returns success/failure instead of the new priority. */
 #undef HAVE_BROKEN_NICE
 
+/* Define if the system reports an invalid PIPE_BUF value. */
+#undef HAVE_BROKEN_PIPE_BUF
+
 /* Define if poll() sets errno on invalid file descriptors. */
 #undef HAVE_BROKEN_POLL
 
@@ -103,6 +112,9 @@
 
 /* Define to 1 if you have the `clock' function. */
 #undef HAVE_CLOCK
+
+/* Define if the C compiler supports computed gotos. */
+#undef HAVE_COMPUTED_GOTOS
 
 /* Define to 1 if you have the `confstr' function. */
 #undef HAVE_CONFSTR
@@ -211,7 +223,7 @@
 /* Define to 1 if you have the `finite' function. */
 #undef HAVE_FINITE
 
-/* Define if you have the 'flock' function. */
+/* Define to 1 if you have the `flock' function. */
 #undef HAVE_FLOCK
 
 /* Define to 1 if you have the `fork' function. */
@@ -1046,6 +1058,9 @@
 /* Define if you want to use computed gotos in ceval.c. */
 #undef USE_COMPUTED_GOTOS
 
+/* Define to use the C99 inline keyword. */
+#undef USE_INLINE
+
 /* Enable extensions on AIX 3, Interix.  */
 #ifndef _ALL_SOURCE
 # undef _ALL_SOURCE
@@ -1073,10 +1088,6 @@
 
 /* Define if you want SIGFPE handled (see Include/pyfpe.h). */
 #undef WANT_SIGFPE_HANDLER
-
-/* Define if you want wctype.h functions to be used instead of the one
-   supplied by Python itself. (see Include/unicodectype.h). */
-#undef WANT_WCTYPE_FUNCTIONS
 
 /* Define if WINDOW in curses.h offers a field _flags. */
 #undef WINDOW_HAS_FLAGS
@@ -1198,6 +1209,12 @@
 
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t
+
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
+#undef inline
+#endif
 
 /* Define to the type of a signed integer type of width exactly 32 bits if
    such a type exists and the standard includes do not define it. */

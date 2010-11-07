@@ -8,9 +8,10 @@
 This module implements pseudo-random number generators for various
 distributions.
 
-For integers, uniform selection from a range. For sequences, uniform selection
-of a random element, a function to generate a random permutation of a list
-in-place, and a function for random sampling without replacement.
+For integers, there is uniform selection from a range. For sequences, there is
+uniform selection of a random element, a function to generate a random
+permutation of a list in-place, and a function for random sampling without
+replacement.
 
 On the real line, there are functions to compute uniform, normal (Gaussian),
 lognormal, negative exponential, gamma, and beta distributions. For generating
@@ -35,15 +36,6 @@ basic generator of your own devising: in that case, override the :meth:`random`,
 Optionally, a new generator can supply a :meth:`getrandbits` method --- this
 allows :meth:`randrange` to produce selections over an arbitrarily large range.
 
-As an example of subclassing, the :mod:`random` module provides the
-:class:`WichmannHill` class that implements an alternative generator in pure
-Python.  The class provides a backward compatible way to reproduce results from
-earlier versions of Python, which used the Wichmann-Hill algorithm as the core
-generator.  Note that this Wichmann-Hill generator can no longer be recommended:
-its period is too short by contemporary standards, and the sequence generated is
-known to fail some stringent randomness tests.  See the references below for a
-recent variant that repairs these flaws.
-
 The :mod:`random` module also provides the :class:`SystemRandom` class which
 uses the system function :func:`os.urandom` to generate random numbers
 from sources provided by the operating system.
@@ -51,18 +43,23 @@ from sources provided by the operating system.
 Bookkeeping functions:
 
 
-.. function:: seed([x])
+.. function:: seed([x], version=2)
 
-   Initialize the basic random number generator. Optional argument *x* can be any
-   :term:`hashable` object. If *x* is omitted or ``None``, current system time is used;
-   current system time is also used to initialize the generator when the module is
-   first imported.  If randomness sources are provided by the operating system,
-   they are used instead of the system time (see the :func:`os.urandom` function
-   for details on availability).
+   Initialize the random number generator.
 
-   If *x* is not ``None`` or an int, ``hash(x)`` is used instead. If *x* is an
-   int, *x* is used directly.
+   If *x* is omitted or ``None``, the current system time is used.  If
+   randomness sources are provided by the operating system, they are used
+   instead of the system time (see the :func:`os.urandom` function for details
+   on availability).
 
+   If *x* is an int, it is used directly.
+
+   With version 2 (the default), a :class:`str`, :class:`bytes`, or :class:`bytearray`
+   object gets converted to an :class:`int` and all of its bits are used.  With version 1,
+   the :func:`hash` of *x* is used instead.
+
+   .. versionchanged:: 3.2
+      Moved to the version 2 scheme which uses all of the bits in a string seed.
 
 .. function:: getstate()
 
@@ -93,6 +90,13 @@ Functions for integers:
    equivalent to ``choice(range(start, stop, step))``, but doesn't actually build a
    range object.
 
+   The positional argument pattern matches that of :func:`range`.  Keyword arguments
+   should not be used because the function may use them in unexpected ways.
+
+   .. versionchanged:: 3.2
+      :meth:`randrange` is more sophisticated about producing equally distributed
+      values.  Formerly it used a style like ``int(random()*n)`` which could produce
+      slightly uneven distributions.
 
 .. function:: randint(a, b)
 
@@ -270,3 +274,19 @@ Examples of basic usage::
    <http://code.activestate.com/recipes/576707/>`_ for a compatible alternative
    random number generator with a long period and comparatively simple update
    operations.
+
+Notes on Reproducibility
+========================
+
+Sometimes it is useful to be able to reproduce the sequences given by a pseudo
+random number generator.  By re-using a seed value, the same sequence should be
+reproducible from run to run as long as multiple threads are not running.
+
+Most of the random module's algorithms and seeding functions are subject to
+change across Python versions, but two aspects are guaranteed not to change:
+
+* If a new seeding method is added, then a backward compatible seeder will be
+  offered.
+
+* The generator's :meth:`random` method will continue to produce the same
+  sequence when the compatible seeder is given the same seed.

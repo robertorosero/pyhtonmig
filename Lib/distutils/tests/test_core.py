@@ -6,7 +6,7 @@ import os
 import shutil
 import sys
 import test.support
-from test.support import captured_stdout
+from test.support import captured_stdout, run_unittest
 import unittest
 from distutils.tests import support
 
@@ -52,7 +52,11 @@ class CoreTestCase(support.EnvironGuard, unittest.TestCase):
             shutil.rmtree(path)
 
     def write_setup(self, text, path=test.support.TESTFN):
-        open(path, "w").write(text)
+        f = open(path, "w")
+        try:
+            f.write(text)
+        finally:
+            f.close()
         return path
 
     def test_run_setup_provides_file(self):
@@ -101,4 +105,4 @@ def test_suite():
     return unittest.makeSuite(CoreTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

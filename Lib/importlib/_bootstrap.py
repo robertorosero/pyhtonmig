@@ -80,20 +80,6 @@ def _path_absolute(path):
             return _path_join(_os.getcwd(), path)
 
 
-class _closing:
-
-    """Simple replacement for contextlib.closing."""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __enter__(self):
-        return self.obj
-
-    def __exit__(self, *args):
-        self.obj.close()
-
-
 def _wrap(new, old):
     """Simple substitute for functools.wraps."""
     for replace in ['__module__', '__name__', '__doc__']:
@@ -468,7 +454,7 @@ class _FileLoader:
 
     def get_data(self, path):
         """Return the data from path as raw bytes."""
-        with _closing(_io.FileIO(path, 'r')) as file:
+        with _io.FileIO(path, 'r') as file:
             return file.read()
 
 
@@ -482,27 +468,38 @@ class _SourceFileLoader(_FileLoader, SourceLoader):
 
     def set_data(self, path, data):
         """Write bytes data to a file."""
+        parent, _, filename = path.rpartition(path_sep)
+        path_parts = []
+        # Figure out what directories are missing.
+        while parent and not _path_isdir(parent):
+            parent, _, part = parent.rpartition(path_sep)
+            path_parts.append(part)
+        # Create needed directories.
+        for part in reversed(path_parts):
+            parent = _path_join(parent, part)
+            try:
+                _os.mkdir(parent)
+            except OSError as exc:
+                # Probably another Python process already created the dir.
+                if exc.errno == errno.EEXIST:
+                    continue
+                else:
+                    raise
+            except IOError as exc:
+                # If can't get proper access, then just forget about writing
+                # the data.
+                if exc.errno == errno.EACCES:
+                    return
+                else:
+                    raise
         try:
-            with _closing(_io.FileIO(path, 'wb')) as file:
+            with _io.FileIO(path, 'wb') as file:
                 file.write(data)
         except IOError as exc:
-            if exc.errno == errno.ENOENT:
-                directory, _, filename = path.rpartition(path_sep)
-                sub_directories = []
-                while not _path_isdir(directory):
-                    directory, _, sub_dir = directory.rpartition(path_sep)
-                    sub_directories.append(sub_dir)
-                    for part in reversed(sub_directories):
-                        directory = _path_join(directory, part)
-                        try:
-                            _os.mkdir(directory)
-                        except IOError as exc:
-                            if exc.errno != errno.EACCES:
-                                raise
-                            else:
-                                return
-                return self.set_data(path, data)
-            elif exc.errno != errno.EACCES:
+            # Don't worry if you can't write bytecode.
+            if exc.errno == errno.EACCES:
+                return
+            else:
                 raise
 
 

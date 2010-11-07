@@ -498,23 +498,21 @@ setup_context(Py_ssize_t stack_level, PyObject **filename, int *lineno,
     *filename = PyDict_GetItemString(globals, "__file__");
     if (*filename != NULL) {
         Py_ssize_t len = PyUnicode_GetSize(*filename);
-        const char *file_str = _PyUnicode_AsString(*filename);
-            if (file_str == NULL || (len < 0 && PyErr_Occurred()))
-            goto handle_error;
+        Py_UNICODE *unicode = PyUnicode_AS_UNICODE(*filename);
 
         /* if filename.lower().endswith((".pyc", ".pyo")): */
         if (len >= 4 &&
-            file_str[len-4] == '.' &&
-            tolower(file_str[len-3]) == 'p' &&
-            tolower(file_str[len-2]) == 'y' &&
-            (tolower(file_str[len-1]) == 'c' ||
-                tolower(file_str[len-1]) == 'o'))
+            unicode[len-4] == '.' &&
+            Py_UNICODE_TOLOWER(unicode[len-3]) == 'p' &&
+            Py_UNICODE_TOLOWER(unicode[len-2]) == 'y' &&
+            (Py_UNICODE_TOLOWER(unicode[len-1]) == 'c' ||
+                Py_UNICODE_TOLOWER(unicode[len-1]) == 'o'))
         {
-            *filename = PyUnicode_FromStringAndSize(file_str, len-1);
-                if (*filename == NULL)
-                        goto handle_error;
-            }
-            else
+            *filename = PyUnicode_FromUnicode(unicode, len-1);
+            if (*filename == NULL)
+                goto handle_error;
+        }
+        else
             Py_INCREF(*filename);
     }
     else {
@@ -712,24 +710,58 @@ warnings_warn_explicit(PyObject *self, PyObject *args, PyObject *kwds)
 
 
 /* Function to issue a warning message; may raise an exception. */
-int
-PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+
+static int
+warn_unicode(PyObject *category, PyObject *message,
+             Py_ssize_t stack_level)
 {
     PyObject *res;
-    PyObject *message = PyUnicode_FromString(text);
-    if (message == NULL)
-        return -1;
 
     if (category == NULL)
         category = PyExc_RuntimeWarning;
 
     res = do_warn(message, category, stack_level);
-    Py_DECREF(message);
     if (res == NULL)
         return -1;
     Py_DECREF(res);
 
     return 0;
+}
+
+int
+PyErr_WarnFormat(PyObject *category, Py_ssize_t stack_level,
+                 const char *format, ...)
+{
+    int ret;
+    PyObject *message;
+    va_list vargs;
+
+#ifdef HAVE_STDARG_PROTOTYPES
+    va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
+    message = PyUnicode_FromFormatV(format, vargs);
+    if (message != NULL) {
+        ret = warn_unicode(category, message, stack_level);
+        Py_DECREF(message);
+    }
+    else
+        ret = -1;
+    va_end(vargs);
+    return ret;
+}
+
+int
+PyErr_WarnEx(PyObject *category, const char *text, Py_ssize_t stack_level)
+{
+    int ret;
+    PyObject *message = PyUnicode_FromString(text);
+    if (message == NULL)
+        return -1;
+    ret = warn_unicode(category, message, stack_level);
+    Py_DECREF(message);
+    return ret;
 }
 
 /* PyErr_Warn is only for backwards compatability and will be removed.
@@ -803,6 +835,7 @@ create_filter(PyObject *category, const char *action)
     static PyObject *ignore_str = NULL;
     static PyObject *error_str = NULL;
     static PyObject *default_str = NULL;
+    static PyObject *always_str = NULL;
     PyObject *action_obj = NULL;
     PyObject *lineno, *result;
 
@@ -830,6 +863,14 @@ create_filter(PyObject *category, const char *action)
         }
         action_obj = default_str;
     }
+    else if (!strcmp(action, "always")) {
+        if (always_str == NULL) {
+            always_str = PyUnicode_InternFromString("always");
+            if (always_str == NULL)
+                return NULL;
+        }
+        action_obj = always_str;
+    }
     else {
         Py_FatalError("unknown action");
     }
@@ -847,10 +888,10 @@ static PyObject *
 init_filters(void)
 {
     /* Don't silence DeprecationWarning if -3 was used. */
-    PyObject *filters = PyList_New(4);
+    PyObject *filters = PyList_New(5);
     unsigned int pos = 0;  /* Post-incremented in each use. */
     unsigned int x;
-    const char *bytes_action;
+    const char *bytes_action, *resource_action;
 
     if (filters == NULL)
         return NULL;
@@ -869,7 +910,14 @@ init_filters(void)
         bytes_action = "ignore";
     PyList_SET_ITEM(filters, pos++, create_filter(PyExc_BytesWarning,
                     bytes_action));
-
+    /* resource usage warnings are enabled by default in pydebug mode */
+#ifdef Py_DEBUG
+    resource_action = "always";
+#else
+    resource_action = "ignore";
+#endif
+    PyList_SET_ITEM(filters, pos++, create_filter(PyExc_ResourceWarning,
+                    resource_action));
     for (x = 0; x < pos; x += 1) {
         if (PyList_GET_ITEM(filters, x) == NULL) {
             Py_DECREF(filters);
@@ -913,13 +961,13 @@ _PyWarnings_Init(void)
     if (_once_registry == NULL)
         return NULL;
     Py_INCREF(_once_registry);
-    if (PyModule_AddObject(m, "once_registry", _once_registry) < 0)
+    if (PyModule_AddObject(m, "_onceregistry", _once_registry) < 0)
         return NULL;
 
     _default_action = PyUnicode_FromString("default");
     if (_default_action == NULL)
         return NULL;
-    if (PyModule_AddObject(m, "default_action", _default_action) < 0)
+    if (PyModule_AddObject(m, "_defaultaction", _default_action) < 0)
         return NULL;
     return m;
 }

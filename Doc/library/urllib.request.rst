@@ -11,10 +11,11 @@ The :mod:`urllib.request` module defines functions and classes which help in
 opening URLs (mostly HTTP) in a complex world --- basic and digest
 authentication, redirections, cookies and more.
 
+
 The :mod:`urllib.request` module defines the following functions:
 
 
-.. function:: urlopen(url, data=None[, timeout])
+.. function:: urlopen(url, data=None[, timeout], *, cafile=None, capath=None)
 
    Open the URL *url*, which can be either a string or a
    :class:`Request` object.
@@ -26,12 +27,23 @@ The :mod:`urllib.request` module defines the following functions:
    *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
    :func:`urllib.parse.urlencode` function takes a mapping or sequence
-   of 2-tuples and returns a string in this format.
+   of 2-tuples and returns a string in this format. urllib.request module uses
+   HTTP/1.1 and includes ``Connection:close`` header in its HTTP requests.
 
    The optional *timeout* parameter specifies a timeout in seconds for
    blocking operations like the connection attempt (if not specified,
    the global default timeout setting will be used).  This actually
-   only works for HTTP, HTTPS, FTP and FTPS connections.
+   only works for HTTP, HTTPS and FTP connections.
+
+   The optional *cafile* and *capath* parameters specify a set of trusted
+   CA certificates for HTTPS requests.  *cafile* should point to a single
+   file containing a bundle of CA certificates, whereas *capath* should
+   point to a directory of hashed certificate files.  More information can
+   be found in :meth:`ssl.SSLContext.load_verify_locations`.
+
+   .. warning::
+      If neither *cafile* nor *capath* is specified, an HTTPS request
+      will not do any verification of the server's certificate.
 
    This function returns a file-like object with two additional methods from
    the :mod:`urllib.response` module
@@ -56,6 +68,13 @@ The :mod:`urllib.request` module defines the following functions:
    discontinued; :func:`urlopen` corresponds to the old ``urllib2.urlopen``.
    Proxy handling, which was done by passing a dictionary parameter to
    ``urllib.urlopen``, can be obtained by using :class:`ProxyHandler` objects.
+
+   .. versionchanged:: 3.2
+      *cafile* and *capath* were added.
+
+   .. versionchanged:: 3.2
+      HTTPS virtual hosts are now supported if possible (that is, if
+      :data:`ssl.HAS_SNI` is true).
 
 .. function:: install_opener(opener)
 
@@ -140,7 +159,7 @@ The :mod:`urllib.request` module defines the following functions:
 
 .. function:: url2pathname(path)
 
-   Convert the path component *path* from an encoded URL to the local syntax for a
+   Convert the path component *path* from a percent-encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
 
@@ -416,9 +435,13 @@ The following classes are provided:
    A class to handle opening of HTTP URLs.
 
 
-.. class:: HTTPSHandler()
+.. class:: HTTPSHandler(debuglevel=0, context=None, check_hostname=None)
 
-   A class to handle opening of HTTPS URLs.
+   A class to handle opening of HTTPS URLs.  *context* and *check_hostname*
+   have the same meaning as in :class:`http.client.HTTPSConnection`.
+
+   .. versionchanged:: 3.2
+      *context* and *check_hostname* were added.
 
 
 .. class:: FileHandler()
@@ -605,7 +628,7 @@ OpenerDirector Objects
    optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
    timeout setting will be used). The timeout feature actually works only for
-   HTTP, HTTPS, FTP and FTPS connections).
+   HTTP, HTTPS and FTP connections).
 
 
 .. method:: OpenerDirector.error(proto, *args)
@@ -638,7 +661,8 @@ sorting the handler instances.
    :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
-   :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
+   :class:`OpenerDirector` instance's :meth:`~OpenerDirector.open` and
+   :meth:`~OpenerDirector.error` methods.
 
 #. Every handler with a method named like :meth:`protocol_response` has that
    method called to post-process the response.
@@ -984,8 +1008,12 @@ FileHandler Objects
 .. method:: FileHandler.file_open(req)
 
    Open the file locally, if there is no host name, or the host name is
-   ``'localhost'``. Change the protocol to ``ftp`` otherwise, and retry opening it
-   using :attr:`parent`.
+   ``'localhost'``.
+
+   This method is applicable only for local hostnames. When a remote hostname
+   is given, an :exc:`URLError` is raised.
+
+.. versionchanged:: 3.2
 
 
 .. _ftp-handler-objects:

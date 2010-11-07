@@ -200,6 +200,9 @@ def samestat(s1, s2):
 
 def ismount(path):
     """Test whether a path is a mount point"""
+    if islink(path):
+        # A symlink can never be a mount point
+        return False
     try:
         s1 = os.lstat(path)
         if isinstance(path, bytes):
@@ -259,7 +262,7 @@ def expanduser(path):
             return path
         userhome = pwent.pw_dir
     if isinstance(path, bytes):
-        userhome = userhome.encode(sys.getfilesystemencoding())
+        userhome = os.fsencode(userhome)
         root = b'/'
     else:
         root = '/'
@@ -424,7 +427,7 @@ def _resolve_link(path):
             path = normpath(resolved)
     return path
 
-supports_unicode_filenames = False
+supports_unicode_filenames = (sys.platform == 'darwin')
 
 def relpath(path, start=None):
     """Return a relative version of a path"""
@@ -444,8 +447,8 @@ def relpath(path, start=None):
     if start is None:
         start = curdir
 
-    start_list = abspath(start).split(sep)
-    path_list = abspath(path).split(sep)
+    start_list = [x for x in abspath(start).split(sep) if x]
+    path_list = [x for x in abspath(path).split(sep) if x]
 
     # Work out how much of the filepath is shared by start and path.
     i = len(commonprefix([start_list, path_list]))
