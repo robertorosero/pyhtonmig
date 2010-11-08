@@ -1,0 +1,19 @@
+
+
+Assuming that the module has been built as part of the Python build:
+
+
+cd python
+
+# gettests.bat
+./gettests.sh
+
+../../../../python deccheck.py [--short|--medium|--long|--all]
+../../../../python ctx-deccheck.py [--short|--medium|--long|--all]
+
+
+Small benchmark (requires gmpy):
+
+../../../../python bench.py
+
+
