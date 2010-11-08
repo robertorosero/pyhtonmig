@@ -2855,8 +2855,9 @@ class Coverage(unittest.TestCase):
                      '_flags', '_traps', '_allcr'):
             self.assertRaises(OverflowError, setattr, c, attr, int_max+1)
             self.assertRaises(OverflowError, setattr, c, attr, -int_max-2)
-            self.assertRaises(ValueError, setattr, c, attr, int_max)
-            self.assertRaises(ValueError, setattr, c, attr, -int_max-1)
+            if sys.platform != 'win32':
+                self.assertRaises(ValueError, setattr, c, attr, int_max)
+                self.assertRaises(ValueError, setattr, c, attr, -int_max-1)
 
         # OverflowError: unsafe_prec, unsafe_emin, unsafe_emax
         self.assertRaises(OverflowError, getattr(c, 'unsafe_setprec'), int_max+1)
