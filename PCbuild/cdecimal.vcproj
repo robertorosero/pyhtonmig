@@ -677,10 +677,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\cdecimal\transpose3.c"
-				>
-			</File>
-			<File
 				RelativePath="..\Modules\cdecimal\vcdiv64.asm"
 				>
 				<FileConfiguration
