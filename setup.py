@@ -1754,7 +1754,6 @@ class PyBuildExt(build_ext):
           'cdecimal/numbertheory.c',
           'cdecimal/sixstep.c',
           'cdecimal/transpose.c',
-          'cdecimal/transpose3.c'
         ]
         depends = [
           'cdecimal/basearith.h',
@@ -1784,21 +1783,22 @@ class PyBuildExt(build_ext):
         sizeof_size_t = sysconfig.get_config_var('SIZEOF_SIZE_T')
         if sizeof_size_t == 8:
             if sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X64'):
-                define_macros = [('CONFIG_64', '1')]
+                define_macros = [('CONFIG_64', '1'), ('ASM', '1')]
             elif sysconfig.get_config_var('HAVE_GCC_UINT128_T'):
-                define_macros = [('CONFIG_64', '1'), ('HAVE_UINT128_T', '1')]
+                define_macros = [('CONFIG_64', '1'), ('ANSI', '1'),
+                                 ('HAVE_UINT128_T', '1')]
             else:
-                define_macros = [('CONFIG_32', '1'), ('ANSI', '1')]
+                define_macros = [('CONFIG_64', '1'), ('ANSI', '1')]
         elif sizeof_size_t == 4:
-            define_macros = [('CONFIG_32', '1')]
             ppro = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
             if ppro and ('gcc' in cc or 'clang' in cc) and \
                platform != 'darwin':
-                # XXX icc >= 11.0 works as well.
-                # XXX darwin: problems with global constant in inline asm.
-                define_macros.append(('PPRO', '1'))
+                # darwin: problems with global constant in inline asm.
+                # icc >= 11.0 works as well.
+                define_macros = [('CONFIG_32', '1'), ('PPRO', '1'),
+                                 ('ASM', '1')]
             else:
-                define_macros.append(('ANSI', '1'))
+                define_macros = [('CONFIG_32', '1'), ('ANSI', '1')]
         else:
             raise DistutilsError("cdecimal: unsupported architecture")
         # Faster version without thread local contexts:
