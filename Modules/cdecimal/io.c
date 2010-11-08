@@ -161,13 +161,13 @@ void
 mpd_qset_string(mpd_t *dec, const char *s, const mpd_context_t *ctx,
                 uint32_t *status)
 {
-	mpd_ssize_t q, r, declen;
+	mpd_ssize_t q, r, len;
 	const char *coeff, *end;
 	const char *dpoint = NULL, *exp = NULL;
-	size_t len;
+	size_t digits;
 	uint8_t sign = MPD_POS;
 
-	dec->flags = 0;
+	mpd_set_flags(dec, 0);
 	dec->len = 0;
 	dec->exp = 0;
 
@@ -192,9 +192,9 @@ mpd_qset_string(mpd_t *dec, const char *s, const mpd_context_t *ctx,
 		/* payload consists entirely of zeros */
 		if (*coeff == '\0')
 			return;
-		len = end - coeff;
+		digits = end - coeff;
 		/* prec >= 1, clamp is 0 or 1 */
-		if (len > (size_t)(ctx->prec-ctx->clamp))
+		if (digits > (size_t)(ctx->prec-ctx->clamp))
 			goto conversion_error;
 	} /* sNaN */
 	else if (_mpd_strneq(s, "snan", "SNAN", 4)) {
@@ -208,8 +208,8 @@ mpd_qset_string(mpd_t *dec, const char *s, const mpd_context_t *ctx,
 		/* payload consists entirely of zeros */
 		if (*coeff == '\0')
 			return;
-		len = end - coeff;
-		if (len > (size_t)(ctx->prec-ctx->clamp))
+		digits = end - coeff;
+		if (digits > (size_t)(ctx->prec-ctx->clamp))
 			goto conversion_error;
 	}
 	else if (_mpd_strneq(s, "inf", "INF", 3)) {
@@ -231,39 +231,50 @@ mpd_qset_string(mpd_t *dec, const char *s, const mpd_context_t *ctx,
 			/* exponent-part */
 			end = exp; exp++;
 			dec->exp = strtoexp(exp);
-			if (errno == EINVAL)
-				goto conversion_error;
-			if ((errno == ERANGE && dec->exp == MPD_SSIZE_MAX)
-			    || dec->exp > MPD_EXP_INF)
-				dec->exp = MPD_EXP_INF;
-			else if ((errno == ERANGE && dec->exp == MPD_SSIZE_MIN)
-			         || dec->exp < MPD_EXP_CLAMP)
-				dec->exp = MPD_EXP_CLAMP;
+			if (errno) {
+				if (!(errno == ERANGE &&
+				     (dec->exp == MPD_SSIZE_MAX ||
+				      dec->exp == MPD_SSIZE_MIN)))
+					goto conversion_error;
+			}
 		}
 
-	        len = end - coeff;
+	        digits = end - coeff;
 		if (dpoint) {
-			dec->exp -= (end-dpoint-1);
-			if (dpoint > coeff) len--;
+			size_t fracdigits = end-dpoint-1;
+			if (dpoint > coeff) digits--;
+
+			if (fracdigits > MPD_MAX_PREC) {
+				goto conversion_error;
+			}
+ 			if (dec->exp < (MPD_SSIZE_MIN+1)+(mpd_ssize_t)fracdigits) {
+				dec->exp = MPD_SSIZE_MIN+1;
+			}
+			else {
+				dec->exp -= (mpd_ssize_t)fracdigits;
+			}
 		}
-		if (len > MPD_MAX_PREC) {
+		if (digits > MPD_MAX_PREC) {
 			goto conversion_error;
 		}
+		if (dec->exp > MPD_EXP_INF) {
+			dec->exp = MPD_EXP_INF;
+		}
 	}
 
-	_mpd_idiv_word(&q, &r, (mpd_ssize_t)len, MPD_RDIGITS);
+	_mpd_idiv_word(&q, &r, (mpd_ssize_t)digits, MPD_RDIGITS);
 
-	declen = (r == 0) ? q : q+1;
-	if (declen == 0) {
-		goto conversion_error;
+	len = (r == 0) ? q : q+1;
+	if (len == 0) {
+		goto conversion_error; /* GCOV_NOT_REACHED */
 	}
-	if (!mpd_qresize(dec, declen, status)) {
+	if (!mpd_qresize(dec, len, status)) {
 		mpd_seterror(dec, MPD_Malloc_error, status);
 		return;
 	}
-	dec->len = declen;
+	dec->len = len;
 
-	string_to_coeff(dec->data, coeff, dpoint, (int)r, declen);
+	string_to_coeff(dec->data, coeff, dpoint, (int)r, len);
 
 	mpd_setdigits(dec);
 	mpd_qfinalize(dec, ctx, status);
@@ -440,7 +451,7 @@ _mpd_to_string(const mpd_t *dec, int flags, mpd_ssize_t zeroexp)
 			cp += 8;
 		}
 		else { /* debug */
-			abort();
+			abort(); /* GCOV_NOT_REACHED */
 		}
 	}
 	else {
@@ -859,15 +870,16 @@ _mpd_add_sep_dot(mpd_mbstr_t *dest,
 	int pad = 0;
 
 	n_sign = sign ? 1 : 0;
-	n_sep = strlen(spec->sep);
+	n_sep = (mpd_ssize_t)strlen(spec->sep);
 	g = spec->grouping;
 	dest->cur = dest->nbytes;
 	dest->nbytes = dest->nchars = 0;
 
-	_mbstr_copy_ascii(dest, rest, strlen(rest));
+	/* rest <= MPD_MAX_PREC */
+	_mbstr_copy_ascii(dest, rest, (mpd_ssize_t)strlen(rest));
 	
 	if (dot) {
-		_mbstr_copy_char(dest, dot, strlen(dot));
+		_mbstr_copy_char(dest, dot, (mpd_ssize_t)strlen(dot));
 	}
 
 	consume = *g;
@@ -920,7 +932,7 @@ _mpd_apply_lconv(mpd_mbstr_t *result, char *decstring, mpd_spec_t *spec,
 	const char *sign = NULL, *intpart = NULL;
 	const char *dot = NULL, *rest = NULL;
 	const char *dp;
-	size_t n_int;
+	mpd_ssize_t n_int;
 
 	assert(result->data == NULL);
 
@@ -935,14 +947,14 @@ _mpd_apply_lconv(mpd_mbstr_t *result, char *decstring, mpd_spec_t *spec,
 		while (isdigit((uchar)*dp)) {
 			dp++;
 		}
-		n_int = dp-intpart;
+		n_int = (mpd_ssize_t)(dp-intpart);
 	}
 	if (*dp == '.') {
 		if (*spec->dot == '\0') {
 		        /* decimal point must be present */
-			*status |= MPD_Invalid_operation;
-			mpd_free(decstring);
-			return;
+			*status |= MPD_Invalid_operation; /* GCOV_NOT_REACHED */
+			mpd_free(decstring); /* GCOV_NOT_REACHED */
+			return; /* GCOV_NOT_REACHED */
 		}
 		dp++; dot = spec->dot;
 	}
@@ -951,7 +963,7 @@ _mpd_apply_lconv(mpd_mbstr_t *result, char *decstring, mpd_spec_t *spec,
 
 	if (!dot && !(intpart && *spec->sep && *spec->grouping)) {
 		result->data = decstring;
-		result->nbytes = result->nchars = strlen(decstring);
+		result->nbytes = result->nchars = (mpd_ssize_t)strlen(decstring);
 		return;
 	}
 
@@ -976,16 +988,16 @@ static void
 _mpd_add_pad(mpd_mbstr_t *result, mpd_spec_t *spec, uint32_t *status)
 {
 	if (result->nchars < spec->min_width) {
+		mpd_ssize_t add_chars, add_bytes;
 		size_t lpad = 0, rpad = 0;
-		size_t add_chars, add_bytes, n_fill;
-		size_t len, i, j;
+		size_t n_fill, len, i, j;
 		uint8_t err = 0;
 		char *cp;
 
 		n_fill = strlen(spec->fill);
 		add_chars = (spec->min_width - result->nchars);
 		/* max value: MPD_MAX_PREC * 4 */
-		add_bytes = add_chars * n_fill;
+		add_bytes = add_chars * (mpd_ssize_t)n_fill;
 
 		cp = result->data = mpd_realloc(result->data,
 		                                result->nbytes+add_bytes+1,
@@ -993,6 +1005,7 @@ _mpd_add_pad(mpd_mbstr_t *result, mpd_spec_t *spec, uint32_t *status)
 		if (err) {
 			*status |= MPD_Malloc_error;
 			mpd_free(result->data);
+			result->data = NULL;
 			return;
 		}
 
@@ -1057,6 +1070,7 @@ mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx,
 
 
 	if (spec->min_width > MPD_MAX_PREC) {
+		*status |= MPD_Invalid_operation;
 		return NULL;
 	}
 
@@ -1081,7 +1095,7 @@ mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx,
 		flags |= MPD_FMT_SIGN_PLUS;
 	}
 
-	mpd_maxcontext(&workctx);
+	mpd_maxcontext_plus(&workctx, ctx);
 	workctx.round = ctx->round;
 	if (mpd_isspecial(&tmp)) {
 		/* no percent formatting */
@@ -1148,7 +1162,8 @@ mpd_qformat_spec(const mpd_t *dec, mpd_spec_t *spec, const mpd_context_t *ctx,
 
 	if (spec->min_width) {
 		if (result.nbytes == 0) {
-			result.nbytes = result.nchars = strlen(result.data);
+			result.nbytes = result.nchars =
+			        (mpd_ssize_t)strlen(result.data);
 		}
 		_mpd_add_pad(&result, spec, status);
 	}
@@ -1328,6 +1343,7 @@ mpd_lsnprint_signals(char *dest, int nmemb, uint32_t flags, const char *signal_s
 	return (int)(cp-dest); /* strlen, without NUL terminator */
 }
 
+/* The following two functions are mainly intended for debugging. */
 void
 mpd_fprint(FILE *file, const mpd_t *dec)
 {
@@ -1339,7 +1355,7 @@ mpd_fprint(FILE *file, const mpd_t *dec)
 		mpd_free(decstring);
 	}
 	else {
-		fputs("mpd_fprint: output error\n", file);
+		fputs("mpd_fprint: output error\n", file); /* GCOV_NOT_REACHED */
 	}
 }
 
@@ -1354,7 +1370,7 @@ mpd_print(const mpd_t *dec)
 		mpd_free(decstring);
 	}
 	else {
-		fputs("mpd_fprint: output error", stderr);
+		fputs("mpd_fprint: output error\n", stderr); /* GCOV_NOT_REACHED */
 	}
 }
 

@@ -66,7 +66,7 @@ swap_halfrows_pow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols, int dir
 		r = 2;
 	}
 	else {
-		mpd_err_fatal("swap_halfrows_pow2: illegal argument for \"dir\"");
+		abort(); /* GCOV_NOT_REACHED */
 	}
 
 	m = cols - 1;
@@ -241,7 +241,7 @@ transpose_pow2(mpd_uint_t *matrix, mpd_size_t rows, mpd_size_t cols)
 		}
 	}
 	else {
-		mpd_err_fatal("transpose_pow2: illegal matrix size");
+		abort(); /* GCOV_NOT_REACHED */
 	}
 
 	return 1;

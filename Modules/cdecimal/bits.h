@@ -19,12 +19,13 @@ ispower2(mpd_size_t n)
 	return n != 0 && (n & (n-1)) == 0;
 }
 
+#if defined(ANSI)
 /*
  * Returns the most significant bit position of n from 0 to 32 (64).
  * Caller has to make sure that n is not 0.
  */
 static inline int
-std_bsr(mpd_size_t n)
+mpd_bsr(mpd_size_t n)
 {
 	int pos = 0;
 	mpd_size_t tmp;
@@ -47,13 +48,12 @@ std_bsr(mpd_size_t n)
 	return pos + (int)n - 1;
 }
 
-
 /*
  * Returns the least significant bit position of n from 0 to 32 (64).
  * Caller has to make sure that n is not 0.
  */
 static inline int
-std_bsf(mpd_size_t n)
+mpd_bsf(mpd_size_t n)
 {
 	int pos;
 
@@ -75,15 +75,15 @@ std_bsf(mpd_size_t n)
 #endif
 	return pos;
 }
+/* END ANSI */
 
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+#elif defined(ASM)
 /*
  * Bit scan reverse.
  * Caller has to make sure that a is not 0.
  */
 static inline int
-x86_bsr(mpd_size_t a) 
+mpd_bsr(mpd_size_t a) 
 {
 	mpd_size_t retval;
 
@@ -106,7 +106,7 @@ x86_bsr(mpd_size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int
-x86_bsf(mpd_size_t a) 
+mpd_bsf(mpd_size_t a) 
 {
 	mpd_size_t retval;
 
@@ -123,17 +123,16 @@ x86_bsf(mpd_size_t a)
 
 	return (int)retval;
 }
-#endif /* __GNUC__ (amd64|i386) */
+/* END ASM */
 
-
-#ifdef _MSC_VER
+#elif defined(MASM)
 #include <intrin.h>
 /*
  * Bit scan reverse.
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-x86_bsr(mpd_size_t a) 
+mpd_bsr(mpd_size_t a) 
 {
 	unsigned long retval;
 
@@ -151,7 +150,7 @@ x86_bsr(mpd_size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-x86_bsf(mpd_size_t a) 
+mpd_bsf(mpd_size_t a) 
 {
 	unsigned long retval;
 
@@ -163,7 +162,10 @@ x86_bsf(mpd_size_t a)
 
 	return (int)retval;
 }
-#endif /* _MSC_VER */
+/* END MASM (_MSC_VER) */
+#else
+  #error "missing preprocessor definitions"
+#endif /* BSR/BSF */
 
 
 #endif /* BITS_H */

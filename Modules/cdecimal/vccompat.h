@@ -26,6 +26,7 @@
   #define strcasecmp _stricmp
   #undef strtoll
   #define strtoll _strtoi64
+  #define strdup _strdup
 #endif
 
 

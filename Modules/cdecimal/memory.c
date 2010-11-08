@@ -19,6 +19,7 @@ void *(* mpd_callocfunc)(size_t nmemb, size_t size) = calloc;
 void (* mpd_free)(void *ptr) = free;
 
 
+
 /* emulate calloc if it is not available */
 void *
 mpd_callocfunc_em(size_t nmemb, size_t size)
@@ -27,11 +28,11 @@ mpd_callocfunc_em(size_t nmemb, size_t size)
 	size_t req;
 
 #if MPD_SIZE_MAX < SIZE_MAX
-	if (size > MPD_SIZE_MAX) {
+	if (nmemb > MPD_SIZE_MAX || size > MPD_SIZE_MAX) {
 		return NULL;
 	}
 #endif
-	req = mul_size_t(nmemb, size);
+	req = mul_size_t((mpd_size_t)nmemb, (mpd_size_t)size);
 	if ((ptr = mpd_mallocfunc(req)) == NULL) {
 		return NULL;
 	}
@@ -100,40 +101,6 @@ mpd_sh_alloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size)
 	}
 
 	return ptr;
-}
-
-/* mpd_callocfunc must have overflow checking */
-void *
-mpd_sh_calloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size)
-{
-	void *ptr;
-	mpd_size_t req;
-
-	req = mul_size_t(nmemb, size);
-	req = add_size_t(req, struct_size);
-	if ((ptr = mpd_callocfunc(req, 1)) == NULL) {
-		return NULL;
-	}
-
-	return ptr;
-}
-
-/* struct hack realloc with overflow checking */
-void *
-mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb,
-               mpd_size_t size, uint8_t *err)
-{
-	void *new;
-	mpd_size_t req;
-
-	req = mul_size_t(nmemb, size);
-	req = add_size_t(req, struct_size);
-	if ((new = mpd_reallocfunc(ptr, req)) == NULL) {
-		*err = 1;
-		return ptr;
-	}
-
-	return new;
 }
 
 

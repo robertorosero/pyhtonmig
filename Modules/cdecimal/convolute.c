@@ -20,8 +20,8 @@
 int
 fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, mpd_size_t n, int modnum)
 {
-	int (*fnt)(mpd_uint_t *, mpd_size_t, int, int);
-	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int, int);
+	int (*fnt)(mpd_uint_t *, mpd_size_t, int);
+	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int);
 #ifdef PPRO
 	double dmod;
 	uint32_t dinvmod[3];
@@ -48,10 +48,10 @@ fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, mpd_size_t n, int modnum)
 		inv_fnt = inv_four_step_fnt;
 	}
 
-	if (!fnt(c1, n, modnum, UNORDERED)) {
+	if (!fnt(c1, n, modnum)) {
 		return 0;
 	}
-	if (!fnt(c2, n, modnum, UNORDERED)) {
+	if (!fnt(c2, n, modnum)) {
 		return 0;
 	}
 	for (i = 0; i < n-1; i += 2) {
@@ -64,7 +64,7 @@ fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, mpd_size_t n, int modnum)
 		c1[i+1] = x1;
 	}
 
-	if (!inv_fnt(c1, n, modnum, UNORDERED)) {
+	if (!inv_fnt(c1, n, modnum)) {
 		return 0;
 	}
 	for (i = 0; i < n-3; i += 4) {
@@ -87,8 +87,8 @@ fnt_convolute(mpd_uint_t *c1, mpd_uint_t *c2, mpd_size_t n, int modnum)
 int
 fnt_autoconvolute(mpd_uint_t *c1, mpd_size_t n, int modnum)
 {
-	int (*fnt)(mpd_uint_t *, mpd_size_t, int, int);
-	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int, int);
+	int (*fnt)(mpd_uint_t *, mpd_size_t, int);
+	int (*inv_fnt)(mpd_uint_t *, mpd_size_t, int);
 #ifdef PPRO
 	double dmod;
 	uint32_t dinvmod[3];
@@ -115,7 +115,7 @@ fnt_autoconvolute(mpd_uint_t *c1, mpd_size_t n, int modnum)
 		inv_fnt = inv_four_step_fnt;
 	}
 
-	if (!fnt(c1, n, modnum, UNORDERED)) {
+	if (!fnt(c1, n, modnum)) {
 		return 0;
 	}
 	for (i = 0; i < n-1; i += 2) {
@@ -126,7 +126,7 @@ fnt_autoconvolute(mpd_uint_t *c1, mpd_size_t n, int modnum)
 		c1[i+1] = x1;
 	}
 
-	if (!inv_fnt(c1, n, modnum, UNORDERED)) {
+	if (!inv_fnt(c1, n, modnum)) {
 		return 0;
 	}
 	for (i = 0; i < n-3; i += 4) {

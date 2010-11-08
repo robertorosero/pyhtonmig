@@ -29,7 +29,6 @@ extern "C" {
 #define MPD_BITS_PER_UINT 64
 typedef uint64_t mpd_uint_t;  /* unsigned mod type */
 
-/* enable CONFIG_32+ANSI on 64-bit platforms without resorting to -m32 */
 #define MPD_SIZE_MAX SIZE_MAX
 typedef size_t mpd_size_t; /* unsigned size type */
 
@@ -52,9 +51,9 @@ typedef int64_t mpd_ssize_t;
 #define MPD_MAX_EMAX   999999999999999999LL    /* ELIMIT-1 */
 #define MPD_MIN_EMIN  (-999999999999999999LL)  /* -EMAX */
 #define MPD_MIN_ETINY (MPD_MIN_EMIN-(MPD_MAX_PREC-1))
-#define MPD_EXP_INF (MPD_ELIMIT+1)
-#define MPD_EXP_CLAMP (2*MPD_MIN_ETINY)
-#define MPD_MAXIMPORT 105263157894736842L /* (2*MPD_MAX_PREC)/MPD_RDIGITS */
+#define MPD_EXP_INF 2000000000000000001LL
+#define MPD_EXP_CLAMP (-4000000000000000001LL)
+#define MPD_MAXIMPORT 105263157894736842L /* ceil((2*MPD_MAX_PREC)/MPD_RDIGITS) */
 
 
 #if MPD_SIZE_MAX != MPD_UINT_MAX
@@ -149,11 +148,13 @@ typedef struct {
 #define MPD_MINALLOC_MAX 64
 extern mpd_ssize_t MPD_MINALLOC;
 extern void (* mpd_traphandler)(mpd_context_t *);
+void mpd_dflt_traphandler(mpd_context_t *);
 
 void mpd_setminalloc(mpd_ssize_t n);
 void mpd_init(mpd_context_t *ctx, mpd_ssize_t prec);
 
 void mpd_maxcontext(mpd_context_t *ctx);
+void mpd_maxcontext_plus(mpd_context_t *workctx, const mpd_context_t *ctx);
 void mpd_defaultcontext(mpd_context_t *ctx);
 void mpd_basiccontext(mpd_context_t *ctx);
 int mpd_ieee_context(mpd_context_t *ctx, int bits);
@@ -277,6 +278,7 @@ void mpd_qsset_u64(mpd_t *result, uint64_t a, const mpd_context_t *ctx, uint32_t
 mpd_ssize_t mpd_qget_ssize(const mpd_t *dec, uint32_t *status);
 int64_t mpd_qget_i64(const mpd_t *dec, uint32_t *status);
 mpd_uint_t mpd_qget_uint(const mpd_t *dec, uint32_t *status);
+mpd_uint_t mpd_qabs_uint(const mpd_t *dec, uint32_t *status);
 uint64_t mpd_qget_u64(const mpd_t *dec, uint32_t *status);
 
 
@@ -318,6 +320,7 @@ int mpd_compare_total_mag(mpd_t *result, const mpd_t *a, const mpd_t *b);
 
 void mpd_qround_to_intx(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status);
 void mpd_qround_to_int(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status);
+void mpd_qtrunc(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status);
 void mpd_qfloor(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status);
 void mpd_qceil(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx, uint32_t *status);
 
@@ -388,6 +391,116 @@ size_t mpd_qexport_u16(uint16_t *rdata, size_t rlen, uint32_t base,
                        const mpd_t *src, uint32_t *status);
 size_t mpd_qexport_u32(uint32_t *rdata, size_t rlen, uint32_t base,
                        const mpd_t *src, uint32_t *status);
+
+
+/******************************************************************************/
+/*                           Signalling functions                             */
+/******************************************************************************/
+
+char * mpd_format(const mpd_t *dec, const char *fmt, mpd_context_t *ctx);
+void mpd_import_u16(mpd_t *result, const uint16_t *srcdata, size_t srclen, uint8_t srcsign, uint32_t base, mpd_context_t *ctx);
+void mpd_import_u32(mpd_t *result, const uint32_t *srcdata, size_t srclen, uint8_t srcsign, uint32_t base, mpd_context_t *ctx);
+size_t mpd_export_u16(uint16_t *rdata, size_t rlen, uint32_t base, const mpd_t *src, mpd_context_t *ctx);
+size_t mpd_export_u32(uint32_t *rdata, size_t rlen, uint32_t base, const mpd_t *src, mpd_context_t *ctx);
+void mpd_finalize(mpd_t *result, mpd_context_t *ctx);
+int mpd_check_nan(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+int mpd_check_nans(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_set_string(mpd_t *result, const char *s, mpd_context_t *ctx);
+void mpd_maxcoeff(mpd_t *result, mpd_context_t *ctx);
+void mpd_sset_ssize(mpd_t *result, mpd_ssize_t a, mpd_context_t *ctx);
+void mpd_sset_i32(mpd_t *result, int32_t a, mpd_context_t *ctx);
+void mpd_sset_i64(mpd_t *result, int64_t a, mpd_context_t *ctx);
+void mpd_sset_uint(mpd_t *result, mpd_uint_t a, mpd_context_t *ctx);
+void mpd_sset_u32(mpd_t *result, uint32_t a, mpd_context_t *ctx);
+void mpd_sset_u64(mpd_t *result, uint64_t a, mpd_context_t *ctx);
+void mpd_set_ssize(mpd_t *result, mpd_ssize_t a, mpd_context_t *ctx);
+void mpd_set_i32(mpd_t *result, int32_t a, mpd_context_t *ctx);
+void mpd_set_i64(mpd_t *result, int64_t a, mpd_context_t *ctx);
+void mpd_set_uint(mpd_t *result, mpd_uint_t a, mpd_context_t *ctx);
+void mpd_set_u32(mpd_t *result, uint32_t a, mpd_context_t *ctx);
+void mpd_set_u64(mpd_t *result, uint64_t a, mpd_context_t *ctx);
+mpd_ssize_t mpd_get_ssize(const mpd_t *a, mpd_context_t *ctx);
+int64_t mpd_get_i64(const mpd_t *a, mpd_context_t *ctx);
+mpd_uint_t mpd_get_uint(const mpd_t *a, mpd_context_t *ctx);
+mpd_uint_t mpd_abs_uint(const mpd_t *a, mpd_context_t *ctx);
+uint64_t mpd_get_u64(const mpd_t *a, mpd_context_t *ctx);
+void mpd_and(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_copy(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_canonical(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_copy_abs(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_copy_negate(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_copy_sign(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_invert(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_logb(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_or(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_rotate(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_scaleb(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_shiftl(mpd_t *result, const mpd_t *a, mpd_ssize_t n, mpd_context_t *ctx);
+mpd_uint_t mpd_shiftr(mpd_t *result, const mpd_t *a, mpd_ssize_t n, mpd_context_t *ctx);
+void mpd_shiftn(mpd_t *result, const mpd_t *a, mpd_ssize_t n, mpd_context_t *ctx);
+void mpd_shift(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_xor(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_abs(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+int mpd_cmp(const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+int mpd_compare(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+int mpd_compare_signal(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_add(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_add_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, mpd_context_t *ctx);
+void mpd_add_i32(mpd_t *result, const mpd_t *a, int32_t b, mpd_context_t *ctx);
+void mpd_add_i64(mpd_t *result, const mpd_t *a, int64_t b, mpd_context_t *ctx);
+void mpd_add_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, mpd_context_t *ctx);
+void mpd_add_u32(mpd_t *result, const mpd_t *a, uint32_t b, mpd_context_t *ctx);
+void mpd_add_u64(mpd_t *result, const mpd_t *a, uint64_t b, mpd_context_t *ctx);
+void mpd_sub(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_sub_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, mpd_context_t *ctx);
+void mpd_sub_i32(mpd_t *result, const mpd_t *a, int32_t b, mpd_context_t *ctx);
+void mpd_sub_i64(mpd_t *result, const mpd_t *a, int64_t b, mpd_context_t *ctx);
+void mpd_sub_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, mpd_context_t *ctx);
+void mpd_sub_u32(mpd_t *result, const mpd_t *a, uint32_t b, mpd_context_t *ctx);
+void mpd_sub_u64(mpd_t *result, const mpd_t *a, uint64_t b, mpd_context_t *ctx);
+void mpd_div(mpd_t *q, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_div_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, mpd_context_t *ctx);
+void mpd_div_i32(mpd_t *result, const mpd_t *a, int32_t b, mpd_context_t *ctx);
+void mpd_div_i64(mpd_t *result, const mpd_t *a, int64_t b, mpd_context_t *ctx);
+void mpd_div_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, mpd_context_t *ctx);
+void mpd_div_u32(mpd_t *result, const mpd_t *a, uint32_t b, mpd_context_t *ctx);
+void mpd_div_u64(mpd_t *result, const mpd_t *a, uint64_t b, mpd_context_t *ctx);
+void mpd_divmod(mpd_t *q, mpd_t *r, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_divint(mpd_t *q, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_exp(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_fma(mpd_t *result, const mpd_t *a, const mpd_t *b, const mpd_t *c, mpd_context_t *ctx);
+void mpd_ln(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_log10(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_max(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_max_mag(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_min(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_min_mag(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_minus(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_mul(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_mul_ssize(mpd_t *result, const mpd_t *a, mpd_ssize_t b, mpd_context_t *ctx);
+void mpd_mul_i32(mpd_t *result, const mpd_t *a, int32_t b, mpd_context_t *ctx);
+void mpd_mul_i64(mpd_t *result, const mpd_t *a, int64_t b, mpd_context_t *ctx);
+void mpd_mul_uint(mpd_t *result, const mpd_t *a, mpd_uint_t b, mpd_context_t *ctx);
+void mpd_mul_u32(mpd_t *result, const mpd_t *a, uint32_t b, mpd_context_t *ctx);
+void mpd_mul_u64(mpd_t *result, const mpd_t *a, uint64_t b, mpd_context_t *ctx);
+void mpd_next_minus(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_next_plus(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_next_toward(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_plus(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_pow(mpd_t *result, const mpd_t *base, const mpd_t *exp, mpd_context_t *ctx);
+void mpd_powmod(mpd_t *result, const mpd_t *base, const mpd_t *exp, const mpd_t *mod, mpd_context_t *ctx);
+void mpd_quantize(mpd_t *result, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_rescale(mpd_t *result, const mpd_t *a, mpd_ssize_t exp, mpd_context_t *ctx);
+void mpd_reduce(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_rem(mpd_t *r, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_rem_near(mpd_t *r, const mpd_t *a, const mpd_t *b, mpd_context_t *ctx);
+void mpd_round_to_intx(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_round_to_int(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_trunc(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_floor(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_ceil(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_sqrt(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
+void mpd_invroot(mpd_t *result, const mpd_t *a, mpd_context_t *ctx);
 
 
 /******************************************************************************/
@@ -478,7 +591,7 @@ enum {MPD_ERR_EXIT, MPD_ERR_WARN};
 #define mpd_err_fatal(format, ...) \
 	mpd_err_doit(MPD_ERR_EXIT, "%s:%d: error: " format, __FILE__, __LINE__, ##__VA_ARGS__)
 #define mpd_err_warn(format, ...) \
-	mpd_err_doit(MPD_ERR_WARN, "%s:%d: error: " format, __FILE__, __LINE__, ##__VA_ARGS__)
+	mpd_err_doit(MPD_ERR_WARN, "%s:%d: warning: " format, __FILE__, __LINE__, ##__VA_ARGS__)
 
 void mpd_err_doit(int action, const char *fmt, ...);
 
@@ -498,8 +611,6 @@ void *mpd_alloc(mpd_size_t nmemb, mpd_size_t size);
 void *mpd_calloc(mpd_size_t nmemb, mpd_size_t size);
 void *mpd_realloc(void *ptr, mpd_size_t nmemb, mpd_size_t size, uint8_t *err);
 void *mpd_sh_alloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size);
-void *mpd_sh_calloc(mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size);
-void *mpd_sh_realloc(void *ptr, mpd_size_t struct_size, mpd_size_t nmemb, mpd_size_t size, uint8_t *err);
 
 mpd_t *mpd_qnew(void);
 mpd_t *mpd_new(mpd_context_t *ctx);

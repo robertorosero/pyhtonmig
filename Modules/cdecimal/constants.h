@@ -20,14 +20,6 @@
   #define POWMOD(base, exp) x64_powmod(base, exp, umod)
   #define SETMODULUS(modnum) std_setmodulus(modnum, &umod)
   #define SIZE3_NTT(x0, x1, x2, w3table) std_size3_ntt(x0, x1, x2, w3table, umod)
-
-  #if defined(__x86_64__)
-    #define BSR(a) x86_bsr(a)
-    #define BSF(a) x86_bsf(a)
-  #else
-    #define BSR(a) std_bsr(a)
-    #define BSF(a) std_bsf(a)
-  #endif
 #elif defined(PPRO)
 /* PentiumPro (or later) gcc inline asm */
   #define MULMOD(a, b) ppro_mulmod(a, b, &dmod, dinvmod)
@@ -36,9 +28,6 @@
   #define POWMOD(base, exp) ppro_powmod(base, exp, &dmod, dinvmod)
   #define SETMODULUS(modnum) ppro_setmodulus(modnum, &umod, &dmod, dinvmod)
   #define SIZE3_NTT(x0, x1, x2, w3table) ppro_size3_ntt(x0, x1, x2, w3table, umod, &dmod, dinvmod)
-
-  #define BSR(a) x86_bsr(a)
-  #define BSF(a) x86_bsf(a)
 #else
   /* ANSI C99 */
   #define MULMOD(a, b) std_mulmod(a, b, umod)
@@ -47,9 +36,6 @@
   #define POWMOD(base, exp) std_powmod(base, exp, umod)
   #define SETMODULUS(modnum) std_setmodulus(modnum, &umod)
   #define SIZE3_NTT(x0, x1, x2, w3table) std_size3_ntt(x0, x1, x2, w3table, umod)
-
-  #define BSR(a) std_bsr(a)
-  #define BSF(a) std_bsf(a)
 #endif
 
 /* PentiumPro (or later) gcc inline asm */
@@ -57,7 +43,6 @@ extern const float MPD_TWO63;
 extern const uint32_t mpd_invmoduli[3][3];
 
 enum {P1, P2, P3};
-enum {UNORDERED, ORDERED};
 
 extern const mpd_uint_t mpd_moduli[];
 extern const mpd_uint_t mpd_roots[];

@@ -92,87 +92,19 @@ dw_submod(mpd_uint_t a, mpd_uint_t hi, mpd_uint_t lo, mpd_uint_t m)
 	return d;
 }
 
-
-#if defined(ANSI)
-#if !defined(LEGACY_COMPILER)
-/* HAVE_UINT64_T */
-static inline
-mpd_uint_t std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
-{
-	return ((mpd_uuint_t) a * b) % m;
-}
-
-static inline void
-std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
-{
-	*a = ((mpd_uuint_t) *a * w) % m;
-	*b = ((mpd_uuint_t) *b * w) % m;
-}
-
-static inline void
-std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
-            mpd_uint_t m)
-{
-	*a0 = ((mpd_uuint_t) *a0 * b0) % m;
-	*a1 = ((mpd_uuint_t) *a1 * b1) % m;
-}
-/* END HAVE_UINT64_T */
-#else
-/* LEGACY_COMPILER */
-static inline
-mpd_uint_t std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
-{
-	mpd_uint_t hi, lo, q, r;
-	_mpd_mul_words(&hi, &lo, a, b);
-	_mpd_div_words(&q, &r, hi, lo, m);
-	return r;
-}
-
-static inline void
-std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
-{
-	*a = std_mulmod(*a, w, m);
-	*b = std_mulmod(*b, w, m);
-}
-
-static inline void
-std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
-            mpd_uint_t m)
-{
-	*a0 = std_mulmod(*a0, b0, m);
-	*a1 = std_mulmod(*a1, b1, m);
-}
-#endif /* LEGACY_COMPILER */
-
-static inline
-mpd_uint_t std_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
-{
-	mpd_uint_t r = 1;
-
-	while (exp > 0) {
-		if (exp & 1)
-			r = std_mulmod(r, base, umod);
-		base = std_mulmod(base, base, umod);
-		exp >>= 1;
-	}
-
-	return r;
-}
-#endif /* ANSI */
-
+#ifdef CONFIG_64
 
 /**************************************************************************/
-/*                        x64 modular arithmetic                          */
+/*                        64-bit modular arithmetic                       */
 /**************************************************************************/
 
 /*
- * Description of the algorithm in apfloat.pdf, Chapter 7.1.1, by Mikko Tommila.
- * http://www.apfloat.org/apfloat/2.41/
+ * Description of the algorithm in apfloat.pdf, Chapter 7.1.1,
+ * by Mikko Tommila:  http://www.apfloat.org/apfloat/2.41/
  *
  * ACL2 proof: umodarith.lisp: section "Fast modular reduction"
- */ 
+ */
 
-#ifdef CONFIG_64
 static inline mpd_uint_t
 x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 {
@@ -298,8 +230,8 @@ x64_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
 	*a1 = x64_mulmod(*a1, b1, m);
 }
 
-static inline
-mpd_uint_t x64_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
+static inline mpd_uint_t
+x64_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
 {
 	mpd_uint_t r = 1;
 
@@ -312,7 +244,82 @@ mpd_uint_t x64_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
 
 	return r;
 }
+
+/* END CONFIG_64 */
+#else /* CONFIG_32 */
+
+
+/**************************************************************************/
+/*                        32-bit modular arithmetic                       */
+/**************************************************************************/
+
+#if defined(ANSI)
+#if !defined(LEGACY_COMPILER)
+/* HAVE_UINT64_T */
+static inline mpd_uint_t
+std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
+{
+	return ((mpd_uuint_t) a * b) % m;
+}
+
+static inline void
+std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
+{
+	*a = ((mpd_uuint_t) *a * w) % m;
+	*b = ((mpd_uuint_t) *b * w) % m;
+}
+
+static inline void
+std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+            mpd_uint_t m)
+{
+	*a0 = ((mpd_uuint_t) *a0 * b0) % m;
+	*a1 = ((mpd_uuint_t) *a1 * b1) % m;
+}
+/* END HAVE_UINT64_T */
+#else
+/* LEGACY_COMPILER */
+static inline mpd_uint_t
+std_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
+{
+	mpd_uint_t hi, lo, q, r;
+	_mpd_mul_words(&hi, &lo, a, b);
+	_mpd_div_words(&q, &r, hi, lo, m);
+	return r;
+}
+
+static inline void
+std_mulmod2c(mpd_uint_t *a, mpd_uint_t *b, mpd_uint_t w, mpd_uint_t m)
+{
+	*a = std_mulmod(*a, w, m);
+	*b = std_mulmod(*b, w, m);
+}
+
+static inline void
+std_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
+            mpd_uint_t m)
+{
+	*a0 = std_mulmod(*a0, b0, m);
+	*a1 = std_mulmod(*a1, b1, m);
+}
+/* END LEGACY_COMPILER */
 #endif
+
+static inline mpd_uint_t
+std_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
+{
+	mpd_uint_t r = 1;
+
+	while (exp > 0) {
+		if (exp & 1)
+			r = std_mulmod(r, base, umod);
+		base = std_mulmod(base, base, umod);
+		exp >>= 1;
+	}
+
+	return r;
+}
+#endif /* ANSI CONFIG_32 */
 
 
 /**************************************************************************/
@@ -332,8 +339,8 @@ mpd_uint_t x64_powmod(mpd_uint_t base, mpd_uint_t exp, mpd_uint_t umod)
  *   - random tests are provided in tests/extended/ppro_mulmod.c
  */
 
-#ifdef PPRO
-#ifdef __GNUC__
+#if defined(PPRO)
+#if defined(ASM)
 
 /* all operands < dmod */
 static inline mpd_uint_t
@@ -440,8 +447,8 @@ ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
 	);
 
 }
-/* END PPRO __GNUC__ */
-#elif defined (_MSC_VER)
+/* END PPRO GCC ASM */
+#elif defined(MASM)
 
 /* all operands < dmod */
 static inline mpd_uint_t __cdecl
@@ -546,7 +553,7 @@ ppro_mulmod2(mpd_uint_t *a0, mpd_uint_t b0, mpd_uint_t *a1, mpd_uint_t b1,
 		fistp	DWORD PTR [eax]
 	}
 }
-#endif /* PPRO _MSC_VER */
+#endif /* PPRO MASM (_MSC_VER) */
 
 
 /* all operands < dmod */
@@ -565,6 +572,7 @@ ppro_powmod(mpd_uint_t base, mpd_uint_t exp, double *dmod, uint32_t *dinvmod)
 	return r;
 }
 #endif /* PPRO */
+#endif /* CONFIG_32 */
 
 
 #endif /* UMODARITH_H */

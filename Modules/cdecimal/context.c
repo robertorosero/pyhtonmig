@@ -10,7 +10,7 @@
 #include <signal.h>
 
 
-static void
+void
 mpd_dflt_traphandler(mpd_context_t *ctx UNUSED)
 {
 	raise(SIGFPE);
@@ -30,7 +30,7 @@ mpd_setminalloc(mpd_ssize_t n)
 		return;
 	}
 	if (n < MPD_MINALLOC_MIN || n > MPD_MINALLOC_MAX) {
-		mpd_err_fatal("illegal value for MPD_MINALLOC");
+		mpd_err_fatal("illegal value for MPD_MINALLOC"); /* GCOV_NOT_REACHED */
 	}
 	MPD_MINALLOC = n;
 	minalloc_is_set = 1;
@@ -67,6 +67,20 @@ mpd_maxcontext(mpd_context_t *ctx)
 	ctx->newtrap=0;
 	ctx->clamp=0;
 	ctx->allcr=1;
+}
+
+void
+mpd_maxcontext_plus(mpd_context_t *workctx, const mpd_context_t *ctx)
+{
+	workctx->prec = ctx->prec > MPD_MAX_PREC ? ctx->prec : MPD_MAX_PREC;
+	workctx->emax = ctx->emax > MPD_MAX_EMAX ? ctx->emax : MPD_MAX_EMAX;
+	workctx->emin = ctx->emin < MPD_MIN_EMIN ? ctx->emin : MPD_MIN_EMIN;
+	workctx->round=MPD_ROUND_HALF_EVEN;
+	workctx->traps=MPD_Traps;
+	workctx->status=0;
+	workctx->newtrap=0;
+	workctx->clamp=0;
+	workctx->allcr=1;
 }
 
 void

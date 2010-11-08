@@ -63,7 +63,7 @@ _crt_div3(mpd_uint_t *w, const mpd_uint_t *u, mpd_uint_t v)
 		w[2] = 0;
 	}
 	else {
-		_mpd_div_word(&w[2], &r1, u[2], v);
+		_mpd_div_word(&w[2], &r1, u[2], v); /* GCOV_NOT_REACHED */
 	}
 
 	_mpd_div_words(&w[1], &r2, r1, u[1], v);

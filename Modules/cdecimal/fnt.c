@@ -16,7 +16,7 @@
 
 /* forward transform, sign = -1 */
 int
-std_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered UNUSED)
+std_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	struct fnt_params *tparams;
 
@@ -35,7 +35,7 @@ std_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered UNUSED)
 
 /* reverse transform, sign = 1 */
 int
-std_inv_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered UNUSED)
+std_inv_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	struct fnt_params *tparams;
 

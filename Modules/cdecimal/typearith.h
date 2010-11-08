@@ -22,7 +22,164 @@
  */
 
 #if defined(CONFIG_64)
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(TEST_UINT128_T)
+#if defined(ANSI)
+#if defined(HAVE_UINT128_T)
+static inline void
+_mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
+{
+	__uint128_t hl;
+
+	hl = (__uint128_t)a * b;
+
+	*hi = hl >> 64;
+	*lo = (mpd_uint_t)hl;
+}
+
+static inline void
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
+               mpd_uint_t d)
+{
+	__uint128_t hl;
+
+	hl = ((__uint128_t)hi<<64) + lo;
+	*q = (mpd_uint_t)(hl / d); /* quotient is known to fit */
+	*r = (mpd_uint_t)(hl - (__uint128_t)(*q) * d);
+}
+#else
+static inline void
+_mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
+{
+	uint32_t w[4], carry;
+	uint32_t ah, al, bh, bl;
+	uint64_t hl;
+
+	ah = (uint32_t)(a>>32); al = (uint32_t)a;
+	bh = (uint32_t)(b>>32); bl = (uint32_t)b;
+
+	hl = (uint64_t)al * bl;
+	w[0] = (uint32_t)hl;
+	carry = (uint32_t)(hl>>32);
+
+	hl = (uint64_t)ah * bl + carry;
+	w[1] = (uint32_t)hl;
+	w[2] = (uint32_t)(hl>>32);
+
+	hl = (uint64_t)al * bh + w[1];
+	w[1] = (uint32_t)hl;
+	carry = (uint32_t)(hl>>32);
+
+	hl = ((uint64_t)ah * bh + w[2]) + carry;
+	w[2] = (uint32_t)hl;
+	w[3] = (uint32_t)(hl>>32);
+
+	*hi = ((uint64_t)w[3]<<32) + w[2];
+	*lo = ((uint64_t)w[1]<<32) + w[0];
+}
+
+/*
+ * By Henry S. Warren: http://www.hackersdelight.org/HDcode/divlu.c.txt
+ * http://www.hackersdelight.org/permissions.htm:
+ * "You are free to use, copy, and distribute any of the code on this web
+ *  site, whether modified by you or not. You need not give attribution."
+ *
+ * Slightly modified, comments are mine.
+ */
+static inline int
+nlz(uint64_t x)
+{
+	int n;
+
+	if (x == 0) return(64);
+
+	n = 0;
+	if (x <= 0x00000000FFFFFFFF) {n = n +32; x = x <<32;}
+	if (x <= 0x0000FFFFFFFFFFFF) {n = n +16; x = x <<16;}
+	if (x <= 0x00FFFFFFFFFFFFFF) {n = n + 8; x = x << 8;}
+	if (x <= 0x0FFFFFFFFFFFFFFF) {n = n + 4; x = x << 4;}
+	if (x <= 0x3FFFFFFFFFFFFFFF) {n = n + 2; x = x << 2;}
+	if (x <= 0x7FFFFFFFFFFFFFFF) {n = n + 1;}
+
+	return n;
+}
+
+static inline void
+_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t u1, mpd_uint_t u0,
+               mpd_uint_t v)
+{
+	const mpd_uint_t b = 4294967296;
+	mpd_uint_t un1, un0,
+	           vn1, vn0,
+	           q1, q0,
+	           un32, un21, un10,
+	           rhat, t;
+	int s;
+
+	assert(u1 < v);
+
+	s = nlz(v);
+	v = v << s;
+	vn1 = v >> 32;
+	vn0 = v & 0xFFFFFFFF;
+
+	t = (s == 0) ? 0 : u0 >> (64 - s);
+	un32 = (u1 << s) | t;
+	un10 = u0 << s;
+
+	un1 = un10 >> 32;
+	un0 = un10 & 0xFFFFFFFF;
+
+	q1 = un32 / vn1;
+	rhat = un32 - q1*vn1;
+again1:
+	if (q1 >= b || q1*vn0 > b*rhat + un1) {
+		q1 = q1 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b) goto again1;
+	}
+
+	/*
+	 *  Before again1 we had:
+	 *      (1) q1*vn1   + rhat         = un32
+	 *      (2) q1*vn1*b + rhat*b + un1 = un32*b + un1
+	 *
+	 *  The statements inside the if-clause do not change the value
+	 *  of the left-hand side of (2), and the loop is only exited
+	 *  if q1*vn0 <= rhat*b + un1, so:
+	 *
+	 *      (3) q1*vn1*b + q1*vn0 <= un32*b + un1
+	 *      (4)              q1*v <= un32*b + un1
+	 *      (5)                 0 <= un32*b + un1 - q1*v
+	 *
+	 *  By (5) we are certain that the possible add-back step from
+	 *  Knuth's algorithm D is never required.
+	 *
+	 *  Since the final quotient is less than 2**64, the following
+	 *  must be true:
+	 *
+	 *      (6) un32*b + un1 - q1*v <= UINT64_MAX
+	 *
+	 *  This means that in the following line, the high words
+	 *  of un32*b and q1*v can be discarded without any effect
+	 *  on the result.
+	 */
+	un21 = un32*b + un1 - q1*v;
+
+	q0 = un21 / vn1;
+	rhat = un21 - q0*vn1;
+again2:
+	if (q0 >= b || q0*vn0 > b*rhat + un0) {
+		q0 = q0 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b) goto again2;
+	}
+
+	*q = q1*b + q0;
+	*r = (un21*b + un0 - q0*v) >> s;
+}
+#endif
+
+/* END ANSI */
+#elif defined(ASM)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -53,31 +210,8 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 	*q = qq;
 	*r = rr;
 }
-/* END __GNUC__ (amd64) */
-#elif defined(HAVE_UINT128_T)
-static inline void
-_mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
-{
-	__uint128_t hl;
-
-	hl = (__uint128_t)a * b;
-
-	*hi = hl >> 64;
-	*lo = (mpd_uint_t)hl;
-}
-
-static inline void
-_mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
-               mpd_uint_t d)
-{
-	__uint128_t hl;
-
-	hl = ((__uint128_t)hi<<64) + lo;
-	*q = (mpd_uint_t)(hl / d); /* quotient is known to fit */
-	*r = (mpd_uint_t)(hl - (__uint128_t)(*q) * d);
-}
-/* END HAVE_UINT128_T */
-#elif defined(_MSC_VER)
+/* END GCC ASM */
+#elif defined(MASM)
 #include <intrin.h>
 #pragma intrinsic(_umul128)
 
@@ -89,8 +223,8 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 
 void _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
                     mpd_uint_t d);
-/* END _MSC_VER (amd64) */
 
+/* END MASM (_MSC_VER) */
 #else
   #error "need platform specific 128 bit multiplication and division"
 #endif
@@ -98,51 +232,51 @@ void _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 static inline void
 _mpd_divmod_pow10(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t v, mpd_uint_t exp)
 {
-	assert(exp <= 19);
+  assert(exp <= 19);
 
-	if (exp <= 9) {
-		if (exp <= 4) {
-			switch (exp) {
-			case 0: *q = v; *r = 0; break;
-			case 1: *q = v / 10ULL; *r = v - *q * 10ULL; break;
-			case 2: *q = v / 100ULL; *r = v - *q * 100ULL; break;
-			case 3: *q = v / 1000ULL; *r = v - *q * 1000ULL; break;
-			case 4: *q = v / 10000ULL; *r = v - *q * 10000ULL; break;
-			}
-		}
-		else {
-			switch (exp) {
-			case 5: *q = v / 100000ULL; *r = v - *q * 100000ULL; break;
-			case 6: *q = v / 1000000ULL; *r = v - *q * 1000000ULL; break;
-			case 7: *q = v / 10000000ULL; *r = v - *q * 10000000ULL; break;
-			case 8: *q = v / 100000000ULL; *r = v - *q * 100000000ULL; break;
-			case 9: *q = v / 1000000000ULL; *r = v - *q * 1000000000ULL; break;
-			}
-		}
-	}
-	else {
-		if (exp <= 14) {
-			switch (exp) {
-			case 10: *q = v / 10000000000ULL; *r = v - *q * 10000000000ULL; break;
-			case 11: *q = v / 100000000000ULL; *r = v - *q * 100000000000ULL; break;
-			case 12: *q = v / 1000000000000ULL; *r = v - *q * 1000000000000ULL; break;
-			case 13: *q = v / 10000000000000ULL; *r = v - *q * 10000000000000ULL; break;
-			case 14: *q = v / 100000000000000ULL; *r = v - *q * 100000000000000ULL; break;
-			}
-		}
-		else {
-			switch (exp) {
-			case 15: *q = v / 1000000000000000ULL; *r = v - *q * 1000000000000000ULL; break;
-			case 16: *q = v / 10000000000000000ULL; *r = v - *q * 10000000000000000ULL; break;
-			case 17: *q = v / 100000000000000000ULL; *r = v - *q * 100000000000000000ULL; break;
-			case 18: *q = v / 1000000000000000000ULL; *r = v - *q * 1000000000000000000ULL; break;
-			case 19: *q = v / 10000000000000000000ULL; *r = v - *q * 10000000000000000000ULL; break;
-			}
-		}
-	}
+  if (exp <= 9) {
+    if (exp <= 4) {
+      switch (exp) {
+      case 0: *q = v; *r = 0; break;
+      case 1: *q = v / 10ULL; *r = v - *q * 10ULL; break;
+      case 2: *q = v / 100ULL; *r = v - *q * 100ULL; break;
+      case 3: *q = v / 1000ULL; *r = v - *q * 1000ULL; break;
+      case 4: *q = v / 10000ULL; *r = v - *q * 10000ULL; break;
+      }
+    }
+    else {
+      switch (exp) {
+      case 5: *q = v / 100000ULL; *r = v - *q * 100000ULL; break;
+      case 6: *q = v / 1000000ULL; *r = v - *q * 1000000ULL; break;
+      case 7: *q = v / 10000000ULL; *r = v - *q * 10000000ULL; break;
+      case 8: *q = v / 100000000ULL; *r = v - *q * 100000000ULL; break;
+      case 9: *q = v / 1000000000ULL; *r = v - *q * 1000000000ULL; break;
+      }
+    }
+  }
+  else {
+    if (exp <= 14) {
+      switch (exp) {
+      case 10: *q = v / 10000000000ULL; *r = v - *q * 10000000000ULL; break;
+      case 11: *q = v / 100000000000ULL; *r = v - *q * 100000000000ULL; break;
+      case 12: *q = v / 1000000000000ULL; *r = v - *q * 1000000000000ULL; break;
+      case 13: *q = v / 10000000000000ULL; *r = v - *q * 10000000000000ULL; break;
+      case 14: *q = v / 100000000000000ULL; *r = v - *q * 100000000000000ULL; break;
+      }
+    }
+    else {
+      switch (exp) {
+      case 15: *q = v / 1000000000000000ULL; *r = v - *q * 1000000000000000ULL; break;
+      case 16: *q = v / 10000000000000000ULL; *r = v - *q * 10000000000000000ULL; break;
+      case 17: *q = v / 100000000000000000ULL; *r = v - *q * 100000000000000000ULL; break;
+      case 18: *q = v / 1000000000000000000ULL; *r = v - *q * 1000000000000000000ULL; break;
+      case 19: *q = v / 10000000000000000000ULL; *r = v - *q * 10000000000000000000ULL; break; /* GCOV_NOT_REACHED */
+      }
+    }
+  }
 }
-/* END CONFIG_64 */
 
+/* END CONFIG_64 */
 #elif defined(CONFIG_32)
 #if defined(ANSI)
 #if !defined(LEGACY_COMPILER)
@@ -179,19 +313,19 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 	ah = (uint16_t)(a>>16); al = (uint16_t)a;
 	bh = (uint16_t)(b>>16); bl = (uint16_t)b;
 
-	hl = al * bl;
+	hl = (uint32_t)al * bl;
 	w[0] = (uint16_t)hl;
 	carry = (uint16_t)(hl>>16);
 
-	hl = ah * bl + carry;
+	hl = (uint32_t)ah * bl + carry;
 	w[1] = (uint16_t)hl;
 	w[2] = (uint16_t)(hl>>16);
 
-	hl = al * bh + w[1];
+	hl = (uint32_t)al * bh + w[1];
 	w[1] = (uint16_t)hl;
 	carry = (uint16_t)(hl>>16);
 
-	hl = ah * bh + w[2] + carry;
+	hl = ((uint32_t)ah * bh + w[2]) + carry;
 	w[2] = (uint16_t)hl;
 	w[3] = (uint16_t)(hl>>16);
 
@@ -200,7 +334,7 @@ _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 }
 
 /*
- * By Henry S. Warren: http://www.hackersdelight.org/HDcode/divlu.c
+ * By Henry S. Warren: http://www.hackersdelight.org/HDcode/divlu.c.txt
  * http://www.hackersdelight.org/permissions.htm:
  * "You are free to use, copy, and distribute any of the code on this web
  *  site, whether modified by you or not. You need not give attribution."
@@ -233,7 +367,7 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t u1, mpd_uint_t u0,
 	           vn1, vn0,
 	           q1, q0,
 	           un32, un21, un10,
-	           rhat;
+	           rhat, t;
 	int s;
 
 	assert(u1 < v);
@@ -243,7 +377,8 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t u1, mpd_uint_t u0,
 	vn1 = v >> 16;
 	vn0 = v & 0xFFFF;
 
-	un32 = (u1 << s) | (u0 >> (32 - s));
+	t = (s == 0) ? 0 : u0 >> (32 - s);
+	un32 = (u1 << s) | t;
 	un10 = u0 << s;
 
 	un1 = un10 >> 16;
@@ -300,14 +435,13 @@ again2:
 #endif /* END ANSI + LEGACY_COMPILER */
 
 /* END ANSI */
-
-#elif defined(__GNUC__) && defined(__i386__)
+#elif defined(ASM)
 static inline void
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
 	mpd_uint_t h, l;
 
-	asm(	"mull %3\n\t"\
+	asm (	"mull %3\n\t"\
 		: "=d" (h), "=a" (l)\
 		: "%a" (a), "rm" (b)\
 		: "cc"
@@ -332,9 +466,8 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 	*q = qq;
 	*r = rr;
 }
-/* END __GNUC__ (i386) */
-
-#elif defined(_MSC_VER)
+/* END GCC ASM */
+#elif defined(MASM)
 static inline void __cdecl
 _mpd_mul_words(mpd_uint_t *hi, mpd_uint_t *lo, mpd_uint_t a, mpd_uint_t b)
 {
@@ -368,8 +501,7 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 	*q = qq;
 	*r = rr;
 }
-/* END _MSC_VER (i386) */
-
+/* END MASM (_MSC_VER) */
 #else
   #error "need platform specific 64 bit multiplication and division"
 #endif
@@ -377,26 +509,26 @@ _mpd_div_words(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo,
 static inline void
 _mpd_divmod_pow10(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t v, mpd_uint_t exp)
 {
-	assert(exp <= 9);
+  assert(exp <= 9);
 
-	if (exp <= 4) {
-		switch (exp) {
-		case 0: *q = v; *r = 0; break;
-		case 1: *q = v / 10ULL; *r = v - *q * 10ULL; break;
-		case 2: *q = v / 100ULL; *r = v - *q * 100ULL; break;
-		case 3: *q = v / 1000ULL; *r = v - *q * 1000ULL; break;
-		case 4: *q = v / 10000ULL; *r = v - *q * 10000ULL; break;
-		}
-	}
-	else {
-		switch (exp) {
-		case 5: *q = v / 100000ULL; *r = v - *q * 100000ULL; break;
-		case 6: *q = v / 1000000ULL; *r = v - *q * 1000000ULL; break;
-		case 7: *q = v / 10000000ULL; *r = v - *q * 10000000ULL; break;
-		case 8: *q = v / 100000000ULL; *r = v - *q * 100000000ULL; break;
-		case 9: *q = v / 1000000000ULL; *r = v - *q * 1000000000ULL; break;
-		}
-	}
+  if (exp <= 4) {
+    switch (exp) {
+    case 0: *q = v; *r = 0; break;
+    case 1: *q = v / 10ULL; *r = v - *q * 10ULL; break;
+    case 2: *q = v / 100ULL; *r = v - *q * 100ULL; break;
+    case 3: *q = v / 1000ULL; *r = v - *q * 1000ULL; break;
+    case 4: *q = v / 10000ULL; *r = v - *q * 10000ULL; break;
+    }
+  }
+  else {
+    switch (exp) {
+    case 5: *q = v / 100000ULL; *r = v - *q * 100000ULL; break;
+    case 6: *q = v / 1000000ULL; *r = v - *q * 1000000ULL; break;
+    case 7: *q = v / 10000000ULL; *r = v - *q * 10000000ULL; break;
+    case 8: *q = v / 100000000ULL; *r = v - *q * 100000000ULL; break;
+    case 9: *q = v / 1000000000ULL; *r = v - *q * 1000000000ULL; break; /* GCOV_NOT_REACHED */
+    }
+  }
 }
 /* END CONFIG_32 */
 
@@ -429,7 +561,7 @@ static inline mpd_size_t
 add_size_t(mpd_size_t a, mpd_size_t b)
 {
 	if (a > MPD_SIZE_MAX - b) {
-		mpd_err_fatal("add_size_t(): overflow: check the context");
+		mpd_err_fatal("add_size_t(): overflow: check the context"); /* GCOV_NOT_REACHED */
 	}
 	return a + b;
 }
@@ -438,7 +570,7 @@ static inline mpd_size_t
 sub_size_t(mpd_size_t a, mpd_size_t b)
 {
 	if (b > a) {
-		mpd_err_fatal("sub_size_t(): overflow: check the context");
+		mpd_err_fatal("sub_size_t(): overflow: check the context"); /* GCOV_NOT_REACHED */
 	}
 	return a - b;
 }
@@ -454,7 +586,7 @@ mul_size_t(mpd_size_t a, mpd_size_t b)
 
 	_mpd_mul_words(&hi, &lo, (mpd_uint_t)a, (mpd_uint_t)b);
 	if (hi) {
-		mpd_err_fatal("mul_size_t(): overflow: check the context");
+		mpd_err_fatal("mul_size_t(): overflow: check the context"); /* GCOV_NOT_REACHED */
 	}
 	return lo;
 }

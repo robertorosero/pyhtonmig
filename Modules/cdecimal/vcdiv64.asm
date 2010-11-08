@@ -21,8 +21,6 @@ _mpd_div_words PROC
 	ret	0
 _mpd_div_words ENDP
 _TEXT	ENDS
-
-
-end
+END
 
 

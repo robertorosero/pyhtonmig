@@ -12,8 +12,8 @@
 #include <stdio.h>
 
 
-int six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered);
-int inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered);
+int six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum);
+int inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum);
 
 
 #endif

@@ -7,6 +7,12 @@
 #ifndef MPTYPES_H
 #define MPTYPES_H
 
+#if defined(_MSC_VER)
+  #define PRIi64 "lld"
+  #define PRIu64 "llu"
+  #define PRIi32 "d"
+  #define PRIu32 "u"
+#endif
 
 #if defined(CONFIG_64)
   #if defined(_MSC_VER) || defined(__OpenBSD__)

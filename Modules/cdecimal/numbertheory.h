@@ -27,13 +27,6 @@ struct fnt_params *_mpd_init_fnt_params(mpd_size_t n, int sign, int modnum);
 void _mpd_init_w3table(mpd_uint_t w3table[3], int sign, int modnum);
 
 
-static inline void
-std_setmodulus(int modnum, mpd_uint_t *umod)
-{
-	*umod =  mpd_moduli[modnum];
-}
-
-
 #ifdef PPRO
 static inline void
 ppro_setmodulus(int modnum, mpd_uint_t *umod, double *dmod, uint32_t dinvmod[3])
@@ -42,6 +35,12 @@ ppro_setmodulus(int modnum, mpd_uint_t *umod, double *dmod, uint32_t dinvmod[3])
 	dinvmod[0] = mpd_invmoduli[modnum][0];
 	dinvmod[1] = mpd_invmoduli[modnum][1];
 	dinvmod[2] = mpd_invmoduli[modnum][2];
+}
+#else
+static inline void
+std_setmodulus(int modnum, mpd_uint_t *umod)
+{
+	*umod =  mpd_moduli[modnum];
 }
 #endif
 

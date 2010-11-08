@@ -32,7 +32,7 @@ bitreverse_permute(mpd_uint_t a[], mpd_size_t n)
 			a[r] = t;
 		}
 		x += 1;
-		r ^= (n - (n >> (BSF(x)+1)));
+		r ^= (n - (n >> (mpd_bsf(x)+1)));
 	} while (x < n);
 }
 

@@ -29,7 +29,7 @@
 
 /* forward transform with sign = -1 */
 int
-six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
+six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	struct fnt_params *tparams;
 	mpd_size_t log2n, C, R;
@@ -47,12 +47,15 @@ six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 	assert(n >= 16);
 	assert(n <= MPD_MAXTRANSFORM_2N);
 
-	log2n = BSR(n);
+	log2n = mpd_bsr(n);
 	C = (ONE_UM << (log2n / 2));  /* number of columns */
 	R = (ONE_UM << (log2n - (log2n / 2))); /* number of rows */
 
 
-	transpose_pow2(a, R, C); /* view a as a RxC matrix, tranpose */
+	/* view 'a' as an RxC matrix, transpose */
+	if (!transpose_pow2(a, R, C)) {
+		return 0;
+	}
 
 	if ((tparams = _mpd_init_fnt_params(R, -1, modnum)) == NULL) {
 		return 0;
@@ -61,7 +64,10 @@ six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 		fnt_dif2(x, R, tparams);
 	}
 
-	transpose_pow2(a, C, R);
+	if (!transpose_pow2(a, C, R)) {
+		mpd_free(tparams);
+		return 0;
+	}
 
 
 	SETMODULUS(modnum);
@@ -93,9 +99,14 @@ six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 	mpd_free(tparams);
 
 
+#if 0
+	/* An unordered transform is sufficient for convolution. */
 	if (ordered) {
-		transpose_pow2(a, R, C);
+		if (!transpose_pow2(a, R, C)) {
+			return 0;
+		}
 	}
+#endif
 
 	return 1;
 }
@@ -103,7 +114,7 @@ six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 
 /* reverse transform, sign = 1 */
 int
-inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
+inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	struct fnt_params *tparams;
 	mpd_size_t log2n, C, R;
@@ -121,14 +132,19 @@ inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 	assert(n >= 16);
 	assert(n <= MPD_MAXTRANSFORM_2N);
 
-	log2n = BSR(n);
+	log2n = mpd_bsr(n);
 	C = (ONE_UM << (log2n / 2)); /* number of columns */
 	R = (ONE_UM << (log2n - (log2n / 2))); /* number of rows */
 
 
+#if 0
+	/* An unordered transform is sufficient for convolution. */
 	if (ordered) {
-		transpose_pow2(a, C, R);
+		if (!transpose_pow2(a, C, R)) {
+			return 0;
+		}
 	}
+#endif
 
 	if ((tparams = _mpd_init_fnt_params(C, 1, modnum)) == NULL) {
 		return 0;
@@ -137,7 +153,10 @@ inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 		fnt_dif2(x, C, tparams);
 	}
 
-	transpose_pow2(a, R, C);
+	if (!transpose_pow2(a, R, C)) {
+		mpd_free(tparams);
+		return 0;
+	}
 
 
 	SETMODULUS(modnum);
@@ -168,7 +187,9 @@ inv_six_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 	}
 	mpd_free(tparams);
 
-	transpose_pow2(a, C, R);
+	if (!transpose_pow2(a, C, R)) {
+		return 0;
+	}
 
 	return 1;
 }

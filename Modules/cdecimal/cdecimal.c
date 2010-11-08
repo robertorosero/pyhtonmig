@@ -17,6 +17,10 @@
 #include "mptypes.h"
 
 
+#if PY_VERSION_HEX < 0x03000000
+  #error "Python versions < 3.0 not supported."
+#endif
+
 #if defined(_MSC_VER) && defined (CONFIG_64)
   #define _PyLong_AsMpdSsize PyLong_AsLongLong
   #define _PyLong_FromMpdSsize PyLong_FromSsize_t
@@ -25,13 +29,12 @@
   #define _PyLong_FromMpdSsize PyLong_FromLong
 #endif
 
-
-#if PY_VERSION_HEX < 0x03000000
-  #error "Python versions < 3.0 not supported"
-#endif
-
 #define Dec_INCREF_TRUE (Py_INCREF(Py_True), Py_True)
 #define Dec_INCREF_FALSE (Py_INCREF(Py_False), Py_False)
+
+#define MPD_Float_operation MPD_Not_implemented
+
+#define BOUNDS_CHECK(x, MIN, MAX) x = (x < MIN || MAX < x) ? MAX : x
 
 
 typedef struct {
@@ -103,6 +106,7 @@ static PyObject *DecimalException = NULL;
 /* Exceptions that correspond to IEEE signals; inherit from DecimalException */
 static DecCondMap signal_map[] = {
   {"InvalidOperation", "cdecimal.InvalidOperation", MPD_IEEE_Invalid_operation, NULL},
+  {"FloatOperation", "cdecimal.FloatOperation", MPD_Float_operation, NULL},
   {"DivisionByZero", "cdecimal.DivisionByZero", MPD_Division_by_zero, NULL},
   {"Overflow", "cdecimal.Overflow", MPD_Overflow, NULL},
   {"Underflow", "cdecimal.Underflow", MPD_Underflow, NULL},
@@ -136,16 +140,70 @@ static const char *dec_signal_string[MPD_NUM_FLAGS] = {
 	"InvalidOperation",
 	"InvalidOperation",
 	"InvalidOperation",
-	"NotImplemented",
+	"FloatOperation",
 	"Overflow",
 	"Rounded",
 	"Subnormal",
 	"Underflow",
 };
 
-static void
-dec_traphandler(mpd_context_t *ctx UNUSED)
+static const char *invalid_rounding_err =
+"valid values for rounding are:\n\
+  [ROUND_CEILING, ROUND_FLOOR, ROUND_UP, ROUND_DOWN,\n\
+   ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN,\n\
+   ROUND_05UP].";
+
+static const char *invalid_signals_err =
+"valid values for signals are:\n\
+  [InvalidOperation, FloatOperation, DivisionByZero,\n\
+   Overflow, Underflow, Subnormal, Inexact, Rounded,\n\
+   Clamped].";
+
+static const char *invalid_flags_err =
+"valid values for _flags or _traps are:\n\
+  signals:\n\
+    [DecIEEEInvalidOperation, DecFloatOperation, DecDivisionByZero,\n\
+     DecOverflow, DecUnderflow, DecSubnormal, DecInexact, DecRounded,\n\
+     DecClamped]\n\
+  conditions which trigger DecIEEEInvalidOperation:\n\
+    [DecInvalidOperation, DecConversionSyntax, DecDivisionImpossible,\n\
+     DecDivisionUndefined, DecFpuError, DecInvalidContext, DecMallocError]";
+
+static int
+value_error_int(const char *mesg)
 {
+	PyErr_SetString(PyExc_ValueError, mesg);
+	return -1;
+}
+
+static PyObject *
+value_error_ptr(const char *mesg)
+{
+	PyErr_SetString(PyExc_ValueError, mesg);
+	return NULL;
+}
+
+static int
+runtime_error_int(const char *mesg)
+{ /* GCOV_NOT_REACHED */
+	PyErr_SetString(PyExc_RuntimeError, mesg); /* GCOV_NOT_REACHED */
+	return -1; /* GCOV_NOT_REACHED */
+}
+#define INTERNAL_ERROR_INT(funcname) \
+    return runtime_error_int("internal error in " funcname ".")
+
+static PyObject *
+runtime_error_ptr(const char *mesg)
+{ /* GCOV_NOT_REACHED */
+	PyErr_SetString(PyExc_RuntimeError, mesg); /* GCOV_NOT_REACHED */
+	return NULL; /* GCOV_NOT_REACHED */
+}
+#define INTERNAL_ERROR_PTR(funcname) \
+    return runtime_error_ptr("internal error in " funcname ".")
+
+static void
+dec_traphandler(mpd_context_t *ctx UNUSED) /* GCOV_NOT_REACHED */
+{ /* GCOV_NOT_REACHED */
 	return;
 }
 
@@ -160,8 +218,7 @@ flags_as_exception(uint32_t flags)
 		}
 	}
 
-	PyErr_SetString(PyExc_ValueError, "invalid flag value");
-	return NULL;
+	INTERNAL_ERROR_PTR("flags_as_exception"); /* GCOV_NOT_REACHED */
 }
 
 static uint32_t
@@ -175,7 +232,7 @@ exception_as_flags(PyObject *ex)
 		}
 	}
 
-	PyErr_SetString(PyExc_ValueError, "invalid signal value");
+	PyErr_SetString(PyExc_ValueError, invalid_signals_err);
 	return UINT32_MAX;
 }
 
@@ -186,21 +243,29 @@ flags_as_list(uint32_t flags)
 	DecCondMap *cm;
 
 	if ((list = PyList_New(0)) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	for (cm = cond_map; cm->name != NULL; cm++) {
 		if (flags&cm->mpd_cond) {
-			PyList_Append(list, cm->dec_cond);
+			if (PyList_Append(list, cm->dec_cond) < 0) {
+				goto error; /* GCOV_UNLIKELY */
+			}
 		}
 	}
 	for (cm = signal_map+1; cm->name != NULL; cm++) {
 		if (flags&cm->mpd_cond) {
-			PyList_Append(list, cm->dec_cond);
+			if (PyList_Append(list, cm->dec_cond) < 0) {
+				goto error; /* GCOV_UNLIKELY */
+			}
 		}
 	}
 
 	return list;
+
+error: /* GCOV_UNLIKELY */
+	Py_DECREF(list); /* GCOV_UNLIKELY */
+	return NULL; /* GCOV_UNLIKELY */
 }
 
 static uint32_t
@@ -211,7 +276,8 @@ list_as_flags(PyObject *list)
 	ssize_t n, j;
 
 	if (!PyList_Check(list)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a signal list");
+		PyErr_SetString(PyExc_TypeError,
+		    "argument must be a list of signals.");
 		return UINT32_MAX;
 	}
 
@@ -238,19 +304,19 @@ dict_as_flags(PyObject *val)
 
 	if (!PyDict_Check(val)) {
 		PyErr_SetString(PyExc_TypeError,
-		                "argument must be a signal dict");
+		    "argument must be a signal dict.");
 		return -1;
 	}
 
 	for (cm = signal_map; cm->name != NULL; cm++) {
 		if ((b = PyDict_GetItem(val, cm->dec_cond)) == NULL) {
 			PyErr_SetString(PyExc_ValueError,
-			                "incomplete signal dict");
+			    "incomplete signal dict.");
 			return UINT32_MAX;
 		}
 
 		if ((x = PyObject_IsTrue(b)) < 0) {
-			return UINT32_MAX;
+			return UINT32_MAX; /* GCOV_UNLIKELY */
 		}
 		if (x == 1) {
 			flags |= cm->mpd_cond;
@@ -263,18 +329,14 @@ dict_as_flags(PyObject *val)
 static uint32_t
 PyLong_AsMpdFlags(PyObject *v)
 {
-	int overflow;
 	long x;
 
-	if (!PyLong_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "integer argument required");
+	x = PyLong_AsLong(v);
+	if (PyErr_Occurred()) {
 		return UINT32_MAX;
 	}
-
-	overflow = 0;
-	x = PyLong_AsLongAndOverflow(v, &overflow);
-	if (overflow != 0 || x < 0 || x > (long)MPD_Max_status) {
-		PyErr_SetString(PyExc_ValueError, "invalid flag value");
+	if (x < 0 || x > (long)MPD_Max_status) {
+		PyErr_SetString(PyExc_ValueError, invalid_flags_err);
 		return UINT32_MAX;
 	}
 
@@ -284,14 +346,11 @@ PyLong_AsMpdFlags(PyObject *v)
 static mpd_ssize_t
 PyLong_AsMpdSsize(PyObject *v)
 {
-#if MPD_SIZE_MAX == SIZE_MAX
 	mpd_ssize_t x;
-#else
-	int64_t x;
-#endif
 
 	if (!PyLong_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "integer argument required");
+		PyErr_SetString(PyExc_TypeError,
+		    "integer argument required.");
 		return MPD_SSIZE_MAX;
 	}
 
@@ -299,12 +358,6 @@ PyLong_AsMpdSsize(PyObject *v)
 	if (PyErr_Occurred()) {
 		return MPD_SSIZE_MAX;
 	}
-#if MPD_SIZE_MAX < SIZE_MAX
-	if (x < MPD_SSIZE_MIN || x > MPD_SSIZE_MAX) {
-		PyErr_SetString(PyExc_ValueError, "argument out of range");
-		return MPD_SSIZE_MAX;
-	}
-#endif
 
 	return x;
 }
@@ -316,11 +369,13 @@ dec_addstatus(mpd_context_t *ctx, uint32_t status)
 	if (ctx->traps&status) {
 		PyObject *ex, *siglist;
 
- 		if ((ex = flags_as_exception(ctx->traps&status)) == NULL) {
-			return 1;
+ 		ex = flags_as_exception(ctx->traps&status);
+		if (ex == NULL) {
+			return 1; /* GCOV_NOT_REACHED */
 		}
-		if ((siglist = flags_as_list(ctx->traps&status)) == NULL) {
-			return 1;
+		siglist = flags_as_list(ctx->traps&status);
+		if (siglist == NULL) {
+			return 1; /* GCOV_UNLIKELY */
 		}
 
 		PyErr_SetObject(ex, siglist);
@@ -339,7 +394,7 @@ static int
 signaldict_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	if (PyDict_Type.tp_init(self, args, kwds) < 0) {
-		return -1;
+		return -1; /* GCOV_UNLIKELY */
 	}
 
 	SdFlagAddr(self) = NULL;
@@ -372,7 +427,7 @@ signaldict_clear_all(PyObject *self)
 
 	for (cm = signal_map; cm->name != NULL; cm++) {
 		if (PyDict_SetItem(self, cm->dec_cond, Py_False) < 0) {
-			return -1;
+			return -1; /* GCOV_UNLIKELY */
 		}
 	}
 	return 0;
@@ -389,7 +444,7 @@ signaldict_setitem(PyObject *self, PyObject *key, PyObject *value)
 	}
 
 	if ((x = PyObject_IsTrue(value)) < 0) {
-		return -1;
+		return -1; /* GCOV_UNLIKELY */
 	}
 	if (x == 1) {
 		SdFlags(self) |= flag;
@@ -404,35 +459,10 @@ signaldict_setitem(PyObject *self, PyObject *key, PyObject *value)
 }
 
 static PyObject *
-signaldict_call_unary(PyObject *self, const char *name)
+signaldict_call_unary(PyObject *self, char *name)
 {
-	PyObject *result, *s;
-
-	if ((s = Py_BuildValue("s", name)) == NULL) {
-		return NULL;
-	}
-
 	signaldict_update(self);
-	result = PyObject_CallMethodObjArgs(self, s, NULL);
-
-	Py_DECREF(s);
-	return result;
-}
-
-static PyObject *
-signaldict_call_binary(PyObject *self, const char *name, PyObject *arg)
-{
-	PyObject *result, *s;
-
-	if ((s = Py_BuildValue("s", name)) == NULL) {
-		return NULL;
-	}
-
-	signaldict_update(self);
-	result = PyObject_CallMethodObjArgs(self, s, arg, NULL);
-
-	Py_DECREF(s);
-	return result;
+	return PyObject_CallMethod((PyObject *)&PyDict_Type, name, "O", self);
 }
 
 static PyObject *
@@ -464,13 +494,26 @@ signaldict_copy(PyObject *self)
 static PyObject *
 signaldict_get(PyObject *self, PyObject *args)
 {
-	return signaldict_call_binary(self, "get", args);
+	PyObject *key = NULL, *failobj = NULL;
+	if (!PyArg_ParseTuple(args, "O|O", &key, &failobj)) {
+		return NULL; /* GCOV_NOT_REACHED (why?) */
+	}
+	signaldict_update(self);
+	if (failobj) {
+		return PyObject_CallMethod((PyObject *)&PyDict_Type, "get",
+		                           "OOO", self, key, failobj);
+	}
+	return PyObject_CallMethod((PyObject *)&PyDict_Type, "get",
+		                   "OO", self, key);
 }
 
 static PyObject *
 signaldict_has_key(PyObject *self, PyObject *key)
 {
-	return signaldict_call_binary(self, "has_key", key);
+	int ret;
+	signaldict_update(self);
+	ret = PyDict_Contains(self, key);
+	return ret < 0 ? NULL : PyBool_FromLong(ret);
 }
 
 static PyObject *
@@ -483,25 +526,8 @@ signaldict_items(PyObject *self)
 static PyObject *
 signaldict_iter(PyObject *self)
 {
+	signaldict_update(self);
 	return PyDict_Type.tp_iter(self);
-}
-
-static PyObject *
-signaldict_iterkeys(PyObject *self)
-{
-	return signaldict_call_unary(self, "iterkeys");
-}
-
-static PyObject *
-signaldict_itervalues(PyObject *self)
-{
-	return signaldict_call_unary(self, "itervalues");
-}
-
-static PyObject *
-signaldict_iteritems(PyObject *self)
-{
-	return signaldict_call_unary(self, "iteritems");
 }
 
 static PyObject *
@@ -519,10 +545,10 @@ signaldict_length(PyObject *self)
 }
 
 static int
-signaldict_print(PyObject *self, FILE *fp, int flags)
-{
-	signaldict_update(self);
-	return PyDict_Type.tp_print(self, fp, flags);
+signaldict_print(PyObject *self, FILE *fp, int flags) /* GCOV_UNLIKELY */
+{ /* GCOV_UNLIKELY */
+	signaldict_update(self); /* GCOV_UNLIKELY */
+	return PyDict_Type.tp_print(self, fp, flags); /* GCOV_UNLIKELY */
 }
 
 static PyObject *
@@ -542,9 +568,7 @@ static int
 signaldict_ass_sub(PyObject *self, PyObject *v, PyObject *w)
 {
 	if (w == NULL) {
-		PyErr_SetString(PyExc_ValueError,
-		                "signal keys cannot be deleted");
-		return -1;
+		return value_error_int("signal keys cannot be deleted.");
 	}
 	else {
 		return signaldict_setitem(self, v, w);
@@ -595,9 +619,6 @@ static PyMethodDef mapp_methods[] = {
   {"items",        (PyCFunction)signaldict_items,      METH_NOARGS,         NULL},
   {"values",       (PyCFunction)signaldict_values,     METH_NOARGS,         NULL},
   {"copy",         (PyCFunction)signaldict_copy,       METH_NOARGS,         NULL},
-  {"iterkeys",     (PyCFunction)signaldict_iterkeys,   METH_NOARGS,         NULL},
-  {"itervalues",   (PyCFunction)signaldict_itervalues, METH_NOARGS,         NULL},
-  {"iteritems",    (PyCFunction)signaldict_iteritems,  METH_NOARGS,         NULL},
   {NULL, NULL}
 };
 
@@ -748,15 +769,15 @@ context_setprec(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetprec(ctx, x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int(
+		    "valid range for prec is [0, MAX_PREC].");
 	}
 
 	return 0;
@@ -768,15 +789,15 @@ context_setemin(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetemin(ctx, x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int(
+		    "valid range for Emin is [MIN_EMIN, 0].");
 	}
 
 	return 0;
@@ -788,15 +809,15 @@ context_setemax(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetemax(ctx, x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int(
+		    "valid range for Emax is [0, MAX_EMAX].");
 	}
 
 	return 0;
@@ -807,7 +828,8 @@ context_unsafe_setprec(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
-	if ((ctx->prec = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	ctx->prec = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return NULL;
 	}
 
@@ -819,7 +841,8 @@ context_unsafe_setemin(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
-	if ((ctx->emin = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	ctx->emin = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return NULL;
 	}
 
@@ -831,7 +854,8 @@ context_unsafe_setemax(PyObject *self, PyObject *value)
 {
 	mpd_context_t *ctx = CtxAddr(self);
 
-	if ((ctx->emax = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	ctx->emax = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return NULL;
 	}
 
@@ -844,20 +868,15 @@ context_setround(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
-	if (x < 0 || x >= MPD_ROUND_GUARD) {
-		PyErr_SetString(PyExc_ValueError,
-		                "invalid value for context.round");
-		return -1;
-	}
+	BOUNDS_CHECK(x, INT_MIN, INT_MAX);
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetround(ctx, (int)x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int(invalid_rounding_err);
 	}
 
 	return 0;
@@ -868,15 +887,16 @@ context_setcapitals(PyObject *self, PyObject *value, void *closure UNUSED)
 {
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
-	if (x != 0 && x != 1) {
-		PyErr_SetString(PyExc_ValueError,
-		                "invalid value for context.capitals");
-		return -1;
-	}
+	BOUNDS_CHECK(x, INT_MIN, INT_MAX);
 
+	if (x != 0 && x != 1) {
+		return value_error_int(
+		    "valid values for capitals are 0 or 1.");
+	}
 	CtxCaps(self) = (int)x;
 
 	return 0;
@@ -894,10 +914,8 @@ context_settraps(PyObject *self, PyObject *value, void *closure UNUSED)
 	}
 
 	ctx = CtxAddr(self);
-	if (!mpd_qsettraps(ctx, (uint32_t)flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+	if (!mpd_qsettraps(ctx, flags)) {
+		INTERNAL_ERROR_INT("context_settraps"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -909,15 +927,14 @@ context_settraps_list(PyObject *self, PyObject *value)
 	mpd_context_t *ctx;
 	uint32_t flags;
 
-	if ((flags = list_as_flags(value)) == UINT32_MAX) {
+	flags = list_as_flags(value);
+	if (flags == UINT32_MAX) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsettraps(ctx, flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		INTERNAL_ERROR_INT("context_settraps_list"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -929,15 +946,14 @@ context_settraps_dict(PyObject *self, PyObject *value)
 	mpd_context_t *ctx;
 	uint32_t flags;
 
-	if ((flags = dict_as_flags(value)) == UINT32_MAX) {
+	flags = dict_as_flags(value);
+	if (flags == UINT32_MAX) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsettraps(ctx, flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		INTERNAL_ERROR_INT("context_settraps_dict"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -955,10 +971,8 @@ context_setstatus(PyObject *self, PyObject *value, void *closure UNUSED)
 	}
 
 	ctx = CtxAddr(self);
-	if (!mpd_qsetstatus(ctx, (uint32_t)flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+	if (!mpd_qsetstatus(ctx, flags)) {
+		INTERNAL_ERROR_INT("context_setstatus"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -970,15 +984,14 @@ context_setstatus_list(PyObject *self, PyObject *value)
 	mpd_context_t *ctx;
 	uint32_t flags;
 
-	if ((flags = list_as_flags(value)) == UINT32_MAX) {
+	flags = list_as_flags(value);
+	if (flags == UINT32_MAX) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetstatus(ctx, flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		INTERNAL_ERROR_INT("context_setstatus_list"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -990,15 +1003,14 @@ context_setstatus_dict(PyObject *self, PyObject *value)
 	mpd_context_t *ctx;
 	uint32_t flags;
 
-	if ((flags = dict_as_flags(value)) == UINT32_MAX) {
+	flags = dict_as_flags(value);
+	if (flags == UINT32_MAX) {
 		return -1;
 	}
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetstatus(ctx, flags)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		INTERNAL_ERROR_INT("context_setstatus_dict"); /* GCOV_NOT_REACHED */
 	}
 
 	return 0;
@@ -1010,15 +1022,15 @@ context_setclamp(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
+	BOUNDS_CHECK(x, INT_MIN, INT_MAX);
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetclamp(ctx, (int)x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int("valid values for clamp are 0 or 1.");
 	}
 
 	return 0;
@@ -1030,15 +1042,15 @@ context_setallcr(PyObject *self, PyObject *value, void *closure UNUSED)
 	mpd_context_t *ctx;
 	mpd_ssize_t x;
 
-	if ((x = PyLong_AsMpdSsize(value)) == MPD_SSIZE_MAX) {
+	x = PyLong_AsMpdSsize(value);
+	if (PyErr_Occurred()) {
 		return -1;
 	}
+	BOUNDS_CHECK(x, INT_MIN, INT_MAX);
 
 	ctx = CtxAddr(self);
 	if (!mpd_qsetcr(ctx, (int)x)) {
-		if (dec_addstatus(ctx, MPD_Invalid_context)) {
-			return -1;
-		}
+		return value_error_int("valid values for _allcr are 0 or 1.");
 	}
 
 	return 0;
@@ -1050,10 +1062,10 @@ context_getattr(PyObject *self, PyObject *name)
 	PyObject *retval;
 
 	if (!PyUnicode_Check(name)) {
-		PyErr_Format(PyExc_TypeError,
+		PyErr_Format(PyExc_TypeError, /* GCOV_NOT_REACHED (why?) */
 		             "attribute name must be string, not '%.200s'",
-		             name->ob_type->tp_name);
-		return NULL;
+		             name->ob_type->tp_name); /* GCOV_NOT_REACHED */
+		return NULL; /* GCOV_NOT_REACHED */
 	}
 
 	if (PyUnicode_CompareWithASCIIString(name, "traps") == 0) {
@@ -1075,25 +1087,21 @@ static int
 context_setattr(PyObject *self, PyObject *name, PyObject *value)
 {
 	if (!PyUnicode_Check(name)) {
-		PyErr_Format(PyExc_TypeError,
+		PyErr_Format(PyExc_TypeError, /* GCOV_NOT_REACHED (why?) */
 		             "attribute name must be string, not '%.200s'",
-		             name->ob_type->tp_name);
-		return -1;
+		             name->ob_type->tp_name); /* GCOV_NOT_REACHED */
+		return -1; /* GCOV_NOT_REACHED */
 	}
 
 	if (PyUnicode_CompareWithASCIIString(name, "traps") == 0) {
 		if (value == NULL) {
-			PyErr_SetString(PyExc_ValueError,
-			                "traps cannot be deleted");
-			return -1;
+			return value_error_int("traps cannot be deleted.");
 		}
 		return context_settraps_dict(self, value);
 	}
 	else if (PyUnicode_CompareWithASCIIString(name, "flags") == 0) {
 		if (value == NULL) {
-			PyErr_SetString(PyExc_ValueError,
-			                "flags cannot be deleted");
-			return -1;
+			return value_error_int("flags cannot be deleted.");
 		}
 		return context_setstatus_dict(self, value);
 	}
@@ -1108,7 +1116,7 @@ context_clear_traps(PyObject *self, PyObject *dummy UNUSED)
 	PyDecContextObject *decctx = (PyDecContextObject *)self;
 
 	if (signaldict_clear_all(decctx->traps) < 0) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	Py_RETURN_NONE;
 }
@@ -1119,7 +1127,7 @@ context_clear_flags(PyObject *self, PyObject *dummy UNUSED)
 	PyDecContextObject *decctx = (PyDecContextObject *)self;
 
 	if (signaldict_clear_all(decctx->flags) < 0) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	Py_RETURN_NONE;
 }
@@ -1133,18 +1141,18 @@ context_new(PyTypeObject *type UNUSED, PyObject *args UNUSED,
 
 	self = PyObject_New(PyDecContextObject, &PyDecContext_Type);
 	if (self == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	self->traps = PyObject_CallObject((PyObject *)&PyDecSignalDict_Type, NULL);
 	if (self->traps == NULL) {
-		Py_DECREF(self);
-		return NULL;
+		Py_DECREF(self); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	self->flags = PyObject_CallObject((PyObject *)&PyDecSignalDict_Type, NULL);
 	if (self->flags == NULL) {
-		Py_DECREF(self->traps);
-		Py_DECREF(self);
-		return NULL;
+		Py_DECREF(self->traps); /* GCOV_UNLIKELY */
+		Py_DECREF(self); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ctx = CtxAddr(self);
@@ -1187,6 +1195,7 @@ context_init(PyObject *self, PyObject *args, PyObject *kwds)
 	PyObject *status = NULL;
 	mpd_context_t *ctx, t=dflt_ctx;
 	int capitals = 1;
+	int ret;
 
 	assert(PyTuple_Check(args));
 	ctx = CtxAddr(self);
@@ -1212,43 +1221,47 @@ context_init(PyObject *self, PyObject *args, PyObject *kwds)
 	    !mpd_qsetstatus(ctx, t.status) ||
 	    !mpd_qsetclamp(ctx, t.clamp) ||
 	    !mpd_qsetcr(ctx, t.allcr)) {
-		PyErr_SetString(PyExc_ValueError, "invalid context");
-		return -1;
+		return value_error_int("invalid context.");
 	}
 
 	if (capitals != 0 && capitals != 1) {
-		PyErr_SetString(PyExc_ValueError, "invalid context");
-		return -1;
+		return value_error_int("invalid context.");
 	}
 	CtxCaps(self) = capitals;
 
 	if (traps != NULL) {
 		if (PyLong_Check(traps)) {
-			return context_settraps(self, traps, NULL);
+			ret = context_settraps(self, traps, NULL);
 		}
 		else if (PyList_Check(traps)) {
-			return context_settraps_list(self, traps);
+			ret = context_settraps_list(self, traps);
 		}
 		else {
-			return context_settraps_dict(self, traps);
+			ret = context_settraps_dict(self, traps);
+		}
+		if (ret < 0) {
+			return ret;
 		}
 	}
 	if (status != NULL) {
 		if (PyLong_Check(status)) {
-			return context_setstatus(self, status, NULL);
+			ret = context_setstatus(self, status, NULL);
 		}
 		else if (PyList_Check(status)) {
-			return context_setstatus_list(self, status);
+			ret = context_setstatus_list(self, status);
 		}
 		else {
-			return context_setstatus_dict(self, status);
+			ret = context_setstatus_dict(self, status);
+		}
+		if (ret < 0) {
+			return ret;
 		}
 	}
 
 	return 0;
 }
 
-#define FD_CTX_LEN 400
+#define FD_CTX_LEN 432
 static PyObject *
 context_repr(PyDecContextObject *self)
 {
@@ -1288,9 +1301,8 @@ context_repr(PyDecContextObject *self)
 
 	return PyUnicode_FromString(s);
 
-error:
-	PyErr_SetString(PyExc_RuntimeError, "internal error in context_repr");
-	return NULL;
+error: /* GCOV_NOT_REACHED */
+	INTERNAL_ERROR_PTR("context_repr"); /* GCOV_NOT_REACHED */
 }
 
 static void
@@ -1339,7 +1351,7 @@ ieee_context(PyObject *dummy UNUSED, PyObject *v)
 
 	ctxobj = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (ctxobj == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	*CtxAddr(ctxobj) = ctx;
 
@@ -1347,8 +1359,8 @@ ieee_context(PyObject *dummy UNUSED, PyObject *v)
 
 error:
 	PyErr_Format(PyExc_ValueError,
-	             "argument must be a multiple of 32, with a maximum of %d",
-	             MPD_IEEE_CONTEXT_MAX_BITS
+	    "argument must be a multiple of 32, with a maximum of %d.",
+	    MPD_IEEE_CONTEXT_MAX_BITS
 	);
 	return NULL;
 }
@@ -1361,7 +1373,7 @@ context_copy(PyObject *self)
 
 	newob = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (newob == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ctx = CtxAddr(newob);
@@ -1423,15 +1435,15 @@ static PyGetSetDef context_getsets [] =
 
 #define CONTEXT_CHECK(obj) \
         if (!PyDecContext_Check(obj)) {             \
-                PyErr_SetString( PyExc_TypeError,   \
-                    "argument must be a context" ); \
+                PyErr_SetString(PyExc_TypeError,    \
+                    "argument must be a context."); \
                 return NULL;                        \
         }
 
 #define CONTEXT_CHECK_VA(obj) \
         if (!PyDecContext_Check(obj)) {                      \
-                PyErr_SetString( PyExc_TypeError,            \
-                    "optional argument must be a context" ); \
+                PyErr_SetString(PyExc_TypeError,             \
+                    "optional argument must be a context."); \
                 return NULL;                                 \
         }
 
@@ -1520,8 +1532,9 @@ current_context(void)
 
 	dict = PyThreadState_GetDict();
 	if (dict == NULL) {
-		PyErr_SetString(PyExc_RuntimeError, "cannot get thread state");
-		return NULL;
+		PyErr_SetString(PyExc_RuntimeError, /* GCOV_UNLIKELY */
+		    "cannot get thread state."); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	tl_context = PyDict_GetItem(dict, tls_context_key);
@@ -1535,11 +1548,11 @@ current_context(void)
 	/* Otherwise, set up a new thread local context. */
 	tl_context = (PyObject *)context_copy(default_context_template);
 	if (tl_context == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if (PyDict_SetItem(dict, tls_context_key, tl_context) < 0) {
-		Py_DECREF(tl_context);
-		return NULL;
+		Py_DECREF(tl_context); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	Py_DECREF(tl_context);
 
@@ -1569,7 +1582,7 @@ PyDec_GetCurrentContext(void)
 	PyObject *obj;
 
 	if ((obj = current_context()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	Py_INCREF(obj);
@@ -1586,8 +1599,9 @@ PyDec_SetCurrentContext(PyObject *self UNUSED, PyObject *v)
 
 	dict = PyThreadState_GetDict();
 	if (dict == NULL) {
-		PyErr_SetString(PyExc_RuntimeError, "cannot get thread state");
-		return NULL;
+		PyErr_SetString(PyExc_RuntimeError, /* GCOV_UNLIKELY */
+		    "cannot get thread state."); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	/* If the new context is one of the templates, make a copy.
@@ -1596,7 +1610,7 @@ PyDec_SetCurrentContext(PyObject *self UNUSED, PyObject *v)
 	    v == basic_context_template ||
 	    v == extended_context_template) {
 		if ((v = context_copy(v)) == NULL) {
-			return NULL;
+			return NULL; /* GCOV_UNLIKELY */
 		}
 	}
 	else {
@@ -1604,7 +1618,7 @@ PyDec_SetCurrentContext(PyObject *self UNUSED, PyObject *v)
 	}
 
 	if (PyDict_SetItem(dict, tls_context_key, v) < 0) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	Py_DECREF(v);
@@ -1625,20 +1639,20 @@ ctxmanager_new(PyTypeObject *type UNUSED, PyObject *args)
 	CURRENT_CONTEXT(global);
 	local = global;
 	if (!PyArg_ParseTuple(args, "|O", &local)) {
-		return NULL;
+		return NULL; /* GCOV_NOT_REACHED */
 	}
 	CONTEXT_CHECK_VA(local);
 
 	self = PyObject_New(PyDecContextManagerObject,
 	                    &PyDecContextManager_Type);
 	if (self == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	self->local = context_copy(local);
 	if (self->local == NULL) {
-		Py_DECREF(self);
-		return NULL;
+		Py_DECREF(self); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	self->global = global;
 	Py_INCREF(self->global);
@@ -1661,7 +1675,7 @@ ctxmanager_set_local(PyDecContextManagerObject *self, PyObject *args UNUSED)
 
 	ret = PyDec_SetCurrentContext(NULL, self->local);
 	if (ret == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	Py_DECREF(ret);
 
@@ -1677,7 +1691,7 @@ ctxmanager_restore_global(PyDecContextManagerObject *self,
 
 	ret = PyDec_SetCurrentContext(NULL, self->global);
 	if (ret == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	Py_DECREF(ret);
 
@@ -1734,12 +1748,12 @@ dec_alloc(void)
 	PyDecObject * self;
 
 	if ((self = PyObject_New(PyDecObject, &PyDec_Type)) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((self->dec = mpd_qnew()) == NULL) {
-		PyErr_NoMemory();
-		PyObject_Del(self);
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		PyObject_Del(self); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return self;
@@ -1766,19 +1780,19 @@ _PyDec_FromUnicode(PyObject *v, mpd_context_t *ctx)
 	char *cp;
 
 	if((newob = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((cp = PyMem_Malloc(PyUnicode_GET_SIZE(v)+1)) == NULL) {
-		Py_DECREF(newob);
-		PyErr_NoMemory();
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if (PyUnicode_EncodeDecimal(PyUnicode_AS_UNICODE(v),
 	                            PyUnicode_GET_SIZE(v),
 	                            cp, NULL)) {
-		Py_DECREF(newob);
-		PyMem_Free(cp);
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		PyMem_Free(cp); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qset_string(newob->dec, cp, ctx, &status);
@@ -1803,7 +1817,7 @@ _PyDec_FromLong(PyObject *v, mpd_context_t *ctx)
 	uint8_t sign;
 
 	if((newob = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ob_size = Py_SIZE(l);
@@ -1831,7 +1845,7 @@ _PyDec_FromLong(PyObject *v, mpd_context_t *ctx)
 	mpd_qimport_u16(newob->dec, l->ob_digit, len, sign, PyLong_BASE,
 	                ctx, &status);
 #else
-  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30"
+  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30."
 #endif
 	if (dec_addstatus(ctx, status)) {
 		Py_DECREF(newob);
@@ -1867,7 +1881,7 @@ strip_ws(const char *x)
 	if (s != x || t != y) {
 		n = t-s;
 		if ((y = PyMem_Malloc(n+1)) == NULL) {
-			return NULL;
+			return NULL; /* GCOV_UNLIKELY */
 		}
 		strncpy(y, s, n);
 		y[n] = '\0';
@@ -1887,27 +1901,27 @@ _PyDec_FromUnicode_Max(PyObject *v, mpd_context_t *ctx)
 	char *cp, *stripped;
 
 	if((newob = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((cp = PyMem_Malloc(PyUnicode_GET_SIZE(v)+1)) == NULL) {
-		Py_DECREF(newob);
-		PyErr_NoMemory();
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if (PyUnicode_EncodeDecimal(PyUnicode_AS_UNICODE(v),
 	                            PyUnicode_GET_SIZE(v),
 	                            cp, NULL)) {
-		Py_DECREF(newob);
-		PyMem_Free(cp);
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		PyMem_Free(cp); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_maxcontext(&maxctx);
 	if ((stripped = strip_ws(cp)) == NULL) {
-		Py_DECREF(newob);
-		PyMem_Free(cp);
-		PyErr_NoMemory();
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		PyMem_Free(cp); /* GCOV_UNLIKELY */
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qset_string(newob->dec, stripped, &maxctx, &status);
@@ -1921,8 +1935,8 @@ _PyDec_FromUnicode_Max(PyObject *v, mpd_context_t *ctx)
 	}
 	status &= MPD_Errors;
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(newob);
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *)newob;
@@ -1941,7 +1955,7 @@ _PyDec_FromLong_Max(PyObject *v, mpd_context_t *ctx)
 	uint8_t sign;
 
 	if((newob = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ob_size = Py_SIZE(l);
@@ -1971,17 +1985,17 @@ _PyDec_FromLong_Max(PyObject *v, mpd_context_t *ctx)
 	mpd_qimport_u16(newob->dec, l->ob_digit, len, sign, PyLong_BASE,
 	                &maxctx, &status);
 #else
-  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30"
+  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30."
 #endif
 
 	if (status&(MPD_Inexact|MPD_Rounded)) {
 		/* we want exact results */
-		mpd_seterror(newob->dec, MPD_Invalid_operation, &status);
+		mpd_seterror(newob->dec, MPD_Invalid_operation, &status); /* GCOV_UNLIKELY */
 	}
 	status &= MPD_Errors;
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(newob);
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *)newob;
@@ -2000,22 +2014,18 @@ string_from_tuple(PyObject *v)
 	int n;
 
 	if (PyTuple_Size(v) != 3) {
-		PyErr_SetString(PyExc_ValueError,
-		                "argument must be a tuple of length 3");
-		return NULL;
+		return value_error_ptr(
+		    "argument must be a tuple of length 3.");
 	}
 
 	tmp = PyTuple_GET_ITEM(v, 0);
 	if (!PyLong_Check(tmp)) {
-		PyErr_SetString(PyExc_TypeError,
-		                "sign must be 0 or 1");
+		PyErr_SetString(PyExc_TypeError, "sign must be 0 or 1.");
 		return NULL;
 	}
 	sign = PyLong_AsLong(tmp);
 	if (sign != 0 && sign != 1) {
-		PyErr_SetString(PyExc_ValueError,
-		                "sign must be 0 or 1");
-		return NULL;
+		return value_error_ptr("sign must be 0 or 1.");
 	}
 	sign_special[0] = sign ? '-' : '+';
 	sign_special[1] = '\0';
@@ -2032,10 +2042,9 @@ string_from_tuple(PyObject *v)
 			strcat(sign_special, "sNaN");
 		}
 		else {
-			PyErr_SetString(PyExc_ValueError,
-			                "string argument in the third position "
-			                "must be 'F', 'n' or 'N'");
-			return NULL;
+			return value_error_ptr(
+			    "string argument in the third position "
+			    "must be 'F', 'n' or 'N'.");
 		}
 	}
 	else {
@@ -2048,7 +2057,7 @@ string_from_tuple(PyObject *v)
 	dtuple = PyTuple_GET_ITEM(v, 1);
 	if (!PyTuple_Check(dtuple)) {
 		PyErr_SetString(PyExc_TypeError,
-		                "coefficient must be a tuple of digits");
+		    "coefficient must be a tuple of digits.");
 		return NULL;
 	}
 
@@ -2057,8 +2066,8 @@ string_from_tuple(PyObject *v)
 	mem = 1 + tsize + 3 + MPD_EXPDIGITS + 2;
 	cp = decstring = PyMem_Malloc(mem);
 	if (decstring == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	n = snprintf(cp, mem, "%s", sign_special);
@@ -2074,15 +2083,14 @@ string_from_tuple(PyObject *v)
 		if (!PyLong_Check(tmp)) {
 			PyMem_Free(decstring);
 			PyErr_SetString(PyExc_TypeError,
-			                "coefficient must be a tuple of digits");
+			    "coefficient must be a tuple of digits.");
 			return NULL;
 		}
 		l = PyLong_AsLong(tmp);
 		if (l < 0 || l > 9) {
 			PyMem_Free(decstring);
-			PyErr_SetString(PyExc_ValueError,
-			                "coefficient must be a tuple of digits");
-			return NULL;
+			return value_error_ptr(
+			    "coefficient must be a tuple of digits.");
 		}
 		*cp++ = (char)l + '0';
 	}
@@ -2131,6 +2139,145 @@ _PyDec_FromTuple(PyObject *v, mpd_context_t *ctx)
 	return result;
 }
 
+static PyObject *
+_PyDec_FromFloat_Max(PyObject *self, PyObject *v)
+{
+	PyObject *result, *tmp;
+	PyObject *n, *d, *n_d;
+	mpd_ssize_t k;
+	double x;
+	int sign;
+	mpd_t *d1, *d2;
+	uint32_t status = 0;
+	mpd_context_t *ctx, maxctx;
+
+
+	CURRENT_CONTEXT_ADDR(ctx);
+	if (PyLong_Check(v)) {
+		return _PyDec_FromLong_Max(v, ctx);
+	}
+
+	x = PyFloat_AsDouble(v);
+	if (x == -1.0 && PyErr_Occurred()) {
+		return NULL;
+	}
+	sign = (copysign(1.0, x) == 1.0) ? 0 : 1;
+
+	if (Py_IS_NAN(x) || Py_IS_INFINITY(x)) {
+		result = PyObject_CallObject(self, NULL);
+		if (result == NULL) {
+			return NULL; /* GCOV_UNLIKELY */
+		}
+		if (Py_IS_NAN(x)) {
+			/* decimal.py calls repr(float(+-nan)),
+			 * which always gives a positive result. */
+			mpd_setspecial(DecAddr(result), MPD_POS, MPD_NAN);
+		}
+		else {
+			mpd_setspecial(DecAddr(result), sign, MPD_INF);
+		}
+		return result;
+	}
+
+	if ((tmp = PyObject_CallMethod(v, "__abs__", NULL)) == NULL) {
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	n_d = PyObject_CallMethod(tmp, "as_integer_ratio", NULL);
+	Py_DECREF(tmp);
+	if (n_d == NULL) {
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	if ((n = PyTuple_GetItem(n_d, 0)) == NULL) {
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	if ((d = PyTuple_GetItem(n_d, 1)) == NULL) {
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+
+	if ((tmp = PyObject_CallMethod(d, "bit_length", NULL)) == NULL) {
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	k = PyLong_AsMpdSsize(tmp);
+	Py_DECREF(tmp);
+	if (k == MPD_SSIZE_MAX) {
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	k--;
+
+	if ((d1 = mpd_qnew()) == NULL) { 
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	if ((d2 = mpd_qnew()) == NULL) { 
+		mpd_del(d1); /* GCOV_UNLIKELY */
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+	mpd_maxcontext(&maxctx);
+	mpd_qset_uint(d1, 5, &maxctx, &status);
+	mpd_qset_ssize(d2, k, &maxctx, &status);
+	mpd_qpow(d1, d1, d2, &maxctx, &status);
+	if (dec_addstatus(ctx, status)) {
+		mpd_del(d1); /* GCOV_UNLIKELY */
+		mpd_del(d2); /* GCOV_UNLIKELY */
+		Py_DECREF(n_d); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+	tmp = Py_BuildValue("(O)", n);
+	result = PyObject_CallObject(self, tmp);
+	Py_DECREF(tmp);
+	Py_DECREF(n_d);
+	if (result == NULL) {
+		mpd_del(d1); /* GCOV_UNLIKELY */
+		mpd_del(d2); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+	/* result = n * 5**k */
+	mpd_qmul(DecAddr(result), DecAddr(result), d1, &maxctx, &status);
+	mpd_del(d1);
+	mpd_del(d2);
+	if (dec_addstatus(ctx, status)) {
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+	/* result = +- n * 5**k * 10**-k */
+	mpd_set_sign(DecAddr(result), sign);
+	DecAddr(result)->exp = -k;
+
+	return result;
+}
+
+static PyObject *
+PyDecContext_FromFloat(PyObject *self, PyObject *v)
+{
+	PyObject *result;
+	mpd_context_t *ctx;
+	uint32_t status = 0;
+
+	ctx = CtxAddr(self);
+
+	result = _PyDec_FromFloat_Max((PyObject *)&PyDec_Type, v);
+	if (result == NULL) {
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+	mpd_qfinalize(DecAddr(result), ctx, &status);
+	if (dec_addstatus(ctx, status)) {
+		Py_DECREF(result);
+		return NULL;
+	}
+
+	return result;
+}
+
 /* Caller guarantees types. */
 static PyObject *
 dec_apply(PyObject *v, mpd_context_t *ctx)
@@ -2139,13 +2286,13 @@ dec_apply(PyObject *v, mpd_context_t *ctx)
 	uint32_t status = 0;
 
 	if((newob = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy(newob->dec, ((PyDecObject *)v)->dec, &status);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(newob);
-		return NULL;
+		Py_DECREF(newob); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qfinalize(newob->dec, ctx, &status);
@@ -2180,7 +2327,8 @@ PyDecContext_Apply(PyObject *ctxobj, PyObject *decobj)
 	mpd_context_t *ctx;
 
 	if (!PyDec_Check(decobj)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
+		PyErr_SetString(PyExc_TypeError,
+		    "argument must be a Decimal.");
 		return NULL;
 	}
 
@@ -2201,19 +2349,19 @@ convert_op(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
 	if (PyDec_Check(v)) {
 		*a = (PyDecObject *) v;
 		Py_INCREF(v);
+		return 1;
 	}
-	else if (PyLong_Check(v)) {
-		if ((*a = (PyDecObject *) _PyDec_FromLong_Max(v, ctx)) == NULL) {
-			return 0;
+	if (PyLong_Check(v)) {
+		*a = (PyDecObject *) _PyDec_FromLong_Max(v, ctx);
+		if (*a == NULL) {
+			return 0; /* GCOV_UNLIKELY */
 		}
-	}
-	else {
-		Py_INCREF(Py_NotImplemented);
-		*a = (PyDecObject *) Py_NotImplemented;
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	Py_INCREF(Py_NotImplemented);
+	*a = (PyDecObject *) Py_NotImplemented;
+	return 0;
 }
 
 #define CONVERT_OP(v, a, ctx) \
@@ -2245,6 +2393,54 @@ convert_op(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
         }
 
 
+/* Convert for comparison */
+static int
+convert_op_cmp(PyObject *v, PyDecObject **a, int op, mpd_context_t *ctx)
+{
+	if (PyDec_Check(v)) {
+		*a = (PyDecObject *) v;
+		Py_INCREF(v);
+		return 1;
+	}
+	if (PyLong_Check(v)) {
+		*a = (PyDecObject *) _PyDec_FromLong_Max(v, ctx);
+		if (*a == NULL) {
+			return 0; /* GCOV_UNLIKELY */
+		}
+		return 1;
+	}
+	if (PyFloat_Check(v)) {
+		ctx->status |= MPD_Float_operation;
+		if (op != Py_EQ && op != Py_NE &&
+		    dec_addstatus(ctx, MPD_Float_operation)) {
+			*a = NULL;
+			return 0;
+		}
+#if PY_VERSION_HEX >= 0x03020000
+		*a = (PyDecObject *) _PyDec_FromFloat_Max(
+		                         (PyObject *)&PyDec_Type, v);
+		if (*a == NULL) {
+			return 0; /* GCOV_UNLIKELY */
+		}
+		return 1;
+#endif
+	}
+
+	Py_INCREF(Py_NotImplemented);
+	*a = (PyDecObject *) Py_NotImplemented;
+	return 0;
+}
+
+#define CONVERT_BINOP_CMP(v, w, a, b, op, ctx) \
+        if (!convert_op_cmp(v, a, op, ctx)) {  \
+                return (PyObject *) *(a);      \
+        }                                      \
+        if (!convert_op_cmp(w, b, op, ctx)) {  \
+                Py_DECREF(*(a));               \
+                return (PyObject *) *(b);      \
+        }
+
+
 /* Same as convert_op(), but set an error instead of returning
  * NotImplemented. */
 static int
@@ -2254,19 +2450,20 @@ convert_op_set(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
 	if (PyDec_Check(v)) {
 		*a = (PyDecObject *) v;
 		Py_INCREF(v);
+		return 1;
 	}
-	else if (PyLong_Check(v)) {
-		if ((*a = (PyDecObject *) _PyDec_FromLong_Max(v, ctx)) == NULL) {
-			return 0;
+	if (PyLong_Check(v)) {
+		*a = (PyDecObject *) _PyDec_FromLong_Max(v, ctx);
+		if (*a == NULL) {
+			return 0; /* GCOV_UNLIKELY */
 		}
-	}
-	else {
-		PyErr_Format(PyExc_TypeError, "conversion from %s to Decimal is"
-		             " not supported", v->ob_type->tp_name);
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	PyErr_Format(PyExc_TypeError,
+	    "conversion from %s to Decimal is not supported.",
+	    v->ob_type->tp_name);
+	return 0;
 }
 
 #define CONVERT_OP_SET(v, a, ctx) \
@@ -2296,6 +2493,7 @@ convert_op_set(PyObject *v, PyDecObject **a, mpd_context_t *ctx)
                 Py_DECREF(*(b));                  \
                 return NULL;                      \
         }
+
 
 static PyObject *dec_subtype_new(PyTypeObject *type, PyObject *args,
                                  PyObject *kwds);
@@ -2337,9 +2535,18 @@ dec_new(PyTypeObject *type, PyObject *args, PyObject *kwds UNUSED)
 	else if (PyTuple_Check(v)) {
 		return _PyDec_FromTuple_Max(v, ctx);
 	}
+#if PY_VERSION_HEX >= 0x03020000
+	else if (PyFloat_Check(v)) {
+		if (dec_addstatus(ctx, MPD_Float_operation)) {
+			return NULL;
+		}
+		return _PyDec_FromFloat_Max((PyObject *)&PyDec_Type, v);
+	}
+#endif
 	else {
-		PyErr_Format(PyExc_TypeError, "conversion from %s to Decimal is"
-		             " not supported", v->ob_type->tp_name);
+		PyErr_Format(PyExc_TypeError,
+		    "conversion from %s to Decimal is not supported.",
+		    v->ob_type->tp_name);
 		return NULL;
 	}
 }
@@ -2352,20 +2559,20 @@ dec_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	assert(PyType_IsSubtype(type, &PyDec_Type));
 	tmp = dec_new(&PyDec_Type, args, kwds);
 	if (tmp == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	newobj = type->tp_alloc(type, 0);
 	if (newobj == NULL) {
-		Py_DECREF(tmp);
-		return NULL;
+		Py_DECREF(tmp); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	DecAddr(newobj) = mpd_qncopy(DecAddr(tmp));
 	if (DecAddr(newobj) == NULL) {
-		PyErr_NoMemory();
-		Py_DECREF(tmp);
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		Py_DECREF(tmp); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	Py_DECREF(tmp);
@@ -2401,150 +2608,20 @@ PyDecContext_CreateDecimal(PyObject *self, PyObject *args)
 	else if (PyTuple_Check(v)) {
 		return _PyDec_FromTuple(v, ctx);
 	}
-	else {
-		PyErr_Format(PyExc_TypeError, "conversion from %s to Decimal is"
-		             " not supported", v->ob_type->tp_name);
-		return NULL;
-	}
-}
-
-static PyObject *
-_PyDec_FromFloat_Max(PyObject *self, PyObject *v)
-{
-	PyObject *result, *tmp;
-	PyObject *n, *d, *n_d;
-	mpd_ssize_t k;
-	double x;
-	int sign;
-	mpd_t *d1, *d2;
-	uint32_t status = 0;
-	mpd_context_t *ctx, maxctx;
-
-
-	CURRENT_CONTEXT_ADDR(ctx);
-	if (PyLong_Check(v)) {
-		return _PyDec_FromLong_Max(v, ctx);
-	}
-
-	x = PyFloat_AsDouble(v);
-	if (x == -1.0 && PyErr_Occurred()) {
-		return NULL;
-	}
-	sign = (copysign(1.0, x) == 1.0) ? 0 : 1;
-
-	if (Py_IS_NAN(x) || Py_IS_INFINITY(x)) {
-		result = PyObject_CallObject(self, NULL);
-		if (result == NULL) {
+#if PY_VERSION_HEX >= 0x03020000
+	else if (PyFloat_Check(v)) {
+		if (dec_addstatus(ctx, MPD_Float_operation)) {
 			return NULL;
 		}
-		if (Py_IS_NAN(x)) {
-			/* decimal.py calls repr(float(+-nan)),
-			 * which always gives a positive result */
-			mpd_setspecial(DecAddr(result), MPD_POS, MPD_NAN);
-		}
-		else {
-			mpd_setspecial(DecAddr(result), sign, MPD_INF);
-		}
-		return result;
+		return PyDecContext_FromFloat(self, v);
 	}
-
-	if ((tmp = PyObject_CallMethod(v, "__abs__", NULL)) == NULL) {
+#endif
+	else {
+		PyErr_Format(PyExc_TypeError,
+		    "conversion from %s to Decimal is not supported.",
+		    v->ob_type->tp_name);
 		return NULL;
 	}
-	n_d = PyObject_CallMethod(tmp, "as_integer_ratio", NULL);
-	Py_DECREF(tmp);
-	if (n_d == NULL) {
-		return NULL;
-	}
-	if ((n = PyTuple_GetItem(n_d, 0)) == NULL) {
-		Py_DECREF(n_d);
-		return NULL;
-	}
-	if ((d = PyTuple_GetItem(n_d, 1)) == NULL) {
-		Py_DECREF(n_d);
-		return NULL;
-	}
-
-
-	if ((tmp = PyObject_CallMethod(d, "bit_length", NULL)) == NULL) {
-		Py_DECREF(n_d);
-		return NULL;
-	}
-	k = PyLong_AsMpdSsize(tmp);
-	Py_DECREF(tmp);
-	if (k == MPD_SSIZE_MAX) {
-		Py_DECREF(n_d);
-		return NULL;
-	}
-	k--;
-
-	if ((d1 = mpd_qnew()) == NULL) { 
-		Py_DECREF(n_d);
-		return NULL;
-	}
-	if ((d2 = mpd_qnew()) == NULL) { 
-		mpd_del(d1);
-		Py_DECREF(n_d);
-		return NULL;
-	}
-
-	mpd_maxcontext(&maxctx);
-	mpd_qset_uint(d1, 5, &maxctx, &status);
-	mpd_qset_ssize(d2, k, &maxctx, &status);
-	mpd_qpow(d1, d1, d2, &maxctx, &status);
-	if (dec_addstatus(ctx, status)) {
-		mpd_del(d1);
-		mpd_del(d2);
-		Py_DECREF(n_d);
-		return NULL;
-	}
-
-	tmp = Py_BuildValue("(O)", n);
-	result = PyObject_CallObject(self, tmp);
-	Py_DECREF(tmp);
-	Py_DECREF(n_d);
-	if (result == NULL) {
-		mpd_del(d1);
-		mpd_del(d2);
-		return NULL;
-	}
-
-	/* result = n * 5**k */
-	mpd_qmul(DecAddr(result), DecAddr(result), d1, &maxctx, &status);
-	mpd_del(d1);
-	mpd_del(d2);
-	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
-	}
-	/* result = +- n * 5**k * 10**-k */
-	mpd_set_sign(DecAddr(result), sign);
-	DecAddr(result)->exp = -k;
-
-	return result;
-}
-
-static PyObject *
-PyDecContext_FromFloat(PyObject *self, PyObject *v)
-{
-	PyObject *result;
-	mpd_context_t *ctx;
-	uint32_t status = 0;
-
-	ctx = CtxAddr(self);
-
-	result = _PyDec_FromFloat_Max((PyObject *)&PyDec_Type, v);
-	if (result == NULL) {
-		return NULL;
-	}
-
-	mpd_qfinalize(DecAddr(result), ctx, &status);
-	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
-	}
-
-	return result;
 }
 
 
@@ -2566,50 +2643,52 @@ _PyInt_FromDec(PyDecObject *self, mpd_context_t *ctx, int round)
 	if (mpd_isspecial(self->dec)) {
 		if (mpd_isnan(self->dec)) {
 			PyErr_SetString(PyExc_ValueError,
-			                "cannot convert NaN to integer");
+			    "cannot convert NaN to integer.");
 		}
 		else {
 			PyErr_SetString(PyExc_OverflowError,
-			                "cannot convert Infinity to integer");
+			    "cannot convert Infinity to integer.");
 		}
 		return NULL;
 	}
 
 	if ((intdec = mpd_qnew()) == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	workctx = *ctx;
 	workctx.round = round;
 	mpd_qround_to_int(intdec, self->dec, &workctx, &status);
 	if (dec_addstatus(ctx, status)) {
-		mpd_del(intdec);
-		return NULL;
+		mpd_del(intdec); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	maxsize = mpd_sizeinbase(intdec, PyLong_BASE);
 	if (maxsize > PY_SSIZE_T_MAX) {
-		PyErr_NoMemory();
-		mpd_del(intdec);
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		mpd_del(intdec); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((newob = _PyLong_New(maxsize)) == NULL) {
-		mpd_del(intdec);
-		return NULL;
+		mpd_del(intdec); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	status = 0;
 #if PYLONG_BITS_IN_DIGIT == 30
-	n = mpd_qexport_u32(newob->ob_digit, maxsize, PyLong_BASE, intdec, &status);
+	n = mpd_qexport_u32(newob->ob_digit, maxsize, PyLong_BASE,
+	                    intdec, &status);
 #elif PYLONG_BITS_IN_DIGIT == 15
-	n = mpd_qexport_u16(newob->ob_digit, maxsize, PyLong_BASE, intdec, &status);
+	n = mpd_qexport_u16(newob->ob_digit, maxsize, PyLong_BASE,
+	                    intdec, &status);
 #else
-  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30"
+  #error "PYLONG_BITS_IN_DIGIT should be 15 or 30."
 #endif
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF((PyObject *) newob);
-		mpd_del(intdec);
-		return NULL;
+		Py_DECREF((PyObject *) newob); /* GCOV_UNLIKELY */
+		mpd_del(intdec); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	i = n;
@@ -2635,12 +2714,14 @@ PyLong_FromDec(PyDecObject *self)
 	return _PyInt_FromDec(self, ctx, MPD_ROUND_DOWN);
 }
 
+#if PY_VERSION_HEX < 0x03020000
 /* Caller guarantees type */
 static PyObject *
 PyLong_FromDecCtx(PyDecObject *self, mpd_context_t *ctx)
 {
 	return _PyInt_FromDec(self, ctx, MPD_ROUND_DOWN);
 }
+#endif
 
 /* Caller guarantees type. Uses default module context. */
 static PyObject *
@@ -2671,11 +2752,11 @@ PyDec_ToIntegralValue(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	if (!PyDecContext_Check(ctxobj)) {
 		PyErr_SetString(PyExc_TypeError,
-		                "optional second arg must be a context");
+		    "optional second arg must be a context.");
 		return NULL;
 	}
 	if ((result = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ctx = CtxAddr(ctxobj);
@@ -2686,8 +2767,8 @@ PyDec_ToIntegralValue(PyObject *self, PyObject *args, PyObject *kwds)
 
 	mpd_qround_to_int(result->dec, DecAddr(self), &workctx, &status);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *)result;
@@ -2712,11 +2793,11 @@ PyDec_ToIntegralExact(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	if (!PyDecContext_Check(ctxobj)) {
 		PyErr_SetString(PyExc_TypeError,
-		                "optional second arg must be a context");
+		    "optional second arg must be a context.");
 		return NULL;
 	}
 	if ((result = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	ctx = CtxAddr(ctxobj);
@@ -2749,8 +2830,8 @@ PyDec_AsTuple(PyObject *self, PyObject *dummy UNUSED)
 
 
 	if ((selfcpy = mpd_qncopy(DecAddr(self))) == NULL) {
-		PyErr_NoMemory();
-		goto error;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		goto error; /* GCOV_UNLIKELY */
 	}
 
 	o_sign = Py_BuildValue("i", mpd_sign(DecAddr(self)));
@@ -2758,10 +2839,10 @@ PyDec_AsTuple(PyObject *self, PyObject *dummy UNUSED)
 
 	if (mpd_isinfinite(selfcpy)) {
 		if ((o_exp = Py_BuildValue("s", "F")) == NULL) {
-			goto error;
+			goto error; /* GCOV_UNLIKELY */
 		}
 		if ((o_coeff = PyTuple_New(0)) == NULL) {
-			goto error;
+			goto error; /* GCOV_UNLIKELY */
 		}
 	}
 	else {
@@ -2784,13 +2865,13 @@ PyDec_AsTuple(PyObject *self, PyObject *dummy UNUSED)
 			mpd_clear_flags(selfcpy);
 			intstring = mpd_to_sci(selfcpy, 1);
 			if (intstring == NULL) {
-				PyErr_NoMemory();
-				goto error;
+				PyErr_NoMemory(); /* GCOV_UNLIKELY */
+				goto error; /* GCOV_UNLIKELY */
 			}
 
 			intlen = strlen(intstring);
 			if ((o_coeff = PyTuple_New(intlen)) == NULL) {
-				goto error;
+				goto error; /* GCOV_UNLIKELY */
 			}
 
 			for (i = 0; i < intlen; i++) {
@@ -2801,13 +2882,13 @@ PyDec_AsTuple(PyObject *self, PyObject *dummy UNUSED)
 		}
 		else {
 			if ((o_coeff = PyTuple_New(0)) == NULL) {
-				goto error;
+				goto error; /* GCOV_UNLIKELY */
 			}
 		}
 	}
 
 	if ((o_tuple = PyTuple_New(3)) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	PyTuple_SET_ITEM(o_tuple, 0, o_sign);
 	PyTuple_SET_ITEM(o_tuple, 1, o_coeff);
@@ -2819,11 +2900,11 @@ out:
 	if (intstring) mpd_free(intstring);
 	return o_tuple;
 
-error:
-	if (o_sign) { Py_DECREF(o_sign); }
-	if (o_coeff) { Py_DECREF(o_coeff); }
-	if (o_exp) { Py_DECREF(o_exp); }
-	goto out;
+error: /* GCOV_UNLIKELY */
+	if (o_sign) { Py_DECREF(o_sign); } /* GCOV_UNLIKELY */
+	if (o_coeff) { Py_DECREF(o_coeff); } /* GCOV_UNLIKELY */
+	if (o_exp) { Py_DECREF(o_exp); } /* GCOV_UNLIKELY */
+	goto out; /* GCOV_UNLIKELY */
 }
 
 /* Caller guarantees type. Uses default module context. */
@@ -2836,8 +2917,8 @@ dec_str(PyDecObject *self)
 	CURRENT_CONTEXT(c);
 	res = mpd_to_sci(self->dec, CtxCaps(c));
 	if (res == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	s = PyUnicode_FromString(res);
@@ -2861,17 +2942,17 @@ dec_repr(PyDecObject *self)
 	CURRENT_CONTEXT(c);
 	cp = mpd_to_sci(self->dec, CtxCaps(c));
 	if (cp == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	declen = strlen(cp);
 
 	err = 0;
 	cp = mpd_realloc(cp, (mpd_size_t)(declen+dtaglen+3), sizeof *cp, &err);
 	if (err) {
-		mpd_free(cp);
-		PyErr_NoMemory();
-		return NULL;
+		mpd_free(cp); /* GCOV_UNLIKELY */
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	memmove(cp+dtaglen, cp, declen);
@@ -2893,7 +2974,7 @@ PyFloat_FromDec(PyDecObject *self)
 	PyObject *f, *s;
 
 	if ((s = dec_str(self)) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	f = PyFloat_FromString(s);
@@ -2924,19 +3005,19 @@ PyDec_Round(PyObject *self, PyObject *args)
 
 		if (!PyLong_Check(x)) {
 			PyErr_SetString(PyExc_TypeError,
-			                "optional arg must be an integer");
+			    "optional arg must be an integer.");
 			return NULL;
 		}
 
 		y = PyLong_AsMpdSsize(x);
-		if (y == MPD_SSIZE_MAX || y == MPD_SSIZE_MIN) {
+		if (PyErr_Occurred()) {
 			return NULL;
 		}
 		if ((result = dec_alloc()) == NULL) {
-			return NULL;
+			return NULL; /* GCOV_UNLIKELY */
 		}
 
-		q.exp = -y;
+		q.exp = (y == MPD_SSIZE_MIN) ? MPD_SSIZE_MAX : -y;
 		mpd_qquantize(result->dec, a->dec, &q, ctx, &status);
 		if (dec_addstatus(ctx, status)) {
 			Py_DECREF(result);
@@ -2974,45 +3055,46 @@ dec_format(PyObject *self, PyObject *args)
 	}
 
 	if (PyBytes_Check(fmtarg)) {
-		fmt = fmtarg;
+		fmt = fmtarg; /* GCOV_NOT_REACHED */
 	}
 	else if (PyUnicode_Check(fmtarg)) {
 		if ((fmt = PyUnicode_AsUTF8String(fmtarg)) == NULL) {
-			return NULL;
+			return NULL; /* GCOV_UNLIKELY */
 		}
 	}
 	else {
-		PyErr_SetString(PyExc_TypeError, "format requires bytes or "
-		                                 "unicode arg");
+		PyErr_SetString(PyExc_TypeError,
+		    "format requires bytes or unicode arg.");
 		return NULL;
 	}
 
 	if (!mpd_parse_fmt_str(&spec, PyBytes_AS_STRING(fmt),
 	                       CtxCaps(ctxobj))) {
-		PyErr_SetString(PyExc_ValueError, "invalid format string");
+		PyErr_SetString(PyExc_ValueError,
+		    "invalid format string.");
 		goto finish;
 	}
 	if (override) {
 		if (!PyDict_Check(override)) {
-			PyErr_SetString(PyExc_TypeError, "optional argument "
-			                "must be a dict");
+			PyErr_SetString(PyExc_TypeError,
+			    "optional argument must be a dict.");
 			goto finish;
 		}
 		if ((dot = PyDict_GetItemString(override, "decimal_point"))) {
 			if ((dot = PyUnicode_AsUTF8String(dot)) == NULL) {
-				goto finish;
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			spec.dot = PyBytes_AS_STRING(dot);
 		}
 		if ((sep = PyDict_GetItemString(override, "thousands_sep"))) {
 			if ((sep = PyUnicode_AsUTF8String(sep)) == NULL) {
-				goto finish;
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			spec.sep = PyBytes_AS_STRING(sep);
 		}
 		if ((grouping = PyDict_GetItemString(override, "grouping"))) {
 			if ((grouping = PyUnicode_AsUTF8String(grouping)) == NULL) {
-				goto finish;
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			spec.grouping = PyBytes_AS_STRING(grouping);
 		}
@@ -3020,38 +3102,38 @@ dec_format(PyObject *self, PyObject *args)
 	else {
 		n = strlen(spec.dot);
 		if (n > 1 || (n == 1 && !isascii((uchar)spec.dot[0]))) {
-			n = mbstowcs(buf, spec.dot, 2);
-			if (n != 1) {
-				PyErr_SetString(PyExc_ValueError,
-				      "invalid decimal point or unsupported "
-				      "combination of LC_CTYPE and LC_NUMERIC");
-				goto finish;
+			n = mbstowcs(buf, spec.dot, 2); /* GCOV_UNLIKELY */
+			if (n != 1) { /* GCOV_UNLIKELY */
+				PyErr_SetString(PyExc_ValueError, /* GCOV_UNLIKELY */
+				    "invalid decimal point or unsupported "
+				    "combination of LC_CTYPE and LC_NUMERIC.");
+				goto finish; /* GCOV_UNLIKELY */
 			}
-			if ((tmp = PyUnicode_FromWideChar(buf, n)) == NULL) {
-				goto finish;
+			if ((tmp = PyUnicode_FromWideChar(buf, n)) == NULL) { /* GCOV_UNLIKELY */
+				goto finish; /* GCOV_UNLIKELY */
 			}
-			if ((dot = PyUnicode_AsUTF8String(tmp)) == NULL) {
-				Py_DECREF(tmp);
-				goto finish;
+			if ((dot = PyUnicode_AsUTF8String(tmp)) == NULL) { /* GCOV_UNLIKELY */
+				Py_DECREF(tmp); /* GCOV_UNLIKELY */
+				goto finish; /* GCOV_UNLIKELY */
 			}
-			spec.dot = PyBytes_AS_STRING(dot);
-			Py_DECREF(tmp);
+			spec.dot = PyBytes_AS_STRING(dot); /* GCOV_UNLIKELY */
+			Py_DECREF(tmp); /* GCOV_UNLIKELY */
 		}
 		n = strlen(spec.sep);
 		if (n > 1 || (n == 1 && !isascii((uchar)spec.sep[0]))) {
 			n = mbstowcs(buf, spec.sep, 2);
 			if (n != 1) {
-				PyErr_SetString(PyExc_ValueError,
-				      "invalid thousands separator or unsupported "
-				      "combination of LC_CTYPE and LC_NUMERIC");
-				goto finish;
+				PyErr_SetString(PyExc_ValueError, /* GCOV_UNLIKELY */
+				    "invalid thousands separator or unsupported "
+				    "combination of LC_CTYPE and LC_NUMERIC.");
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			if ((tmp = PyUnicode_FromWideChar(buf, n)) == NULL) {
-				goto finish;
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			if ((sep = PyUnicode_AsUTF8String(tmp)) == NULL) {
-				Py_DECREF(tmp);
-				goto finish;
+				Py_DECREF(tmp); /* GCOV_UNLIKELY */
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			spec.sep = PyBytes_AS_STRING(sep);
 			Py_DECREF(tmp);
@@ -3399,15 +3481,15 @@ _Dec_mpd_qdivmod(PyObject *v, PyObject *w)
 	CONVERT_BINOP(v, w, &a, &b, ctx);
 
 	if ((q = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((r = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		Py_DECREF(q);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		Py_DECREF(q); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qdivmod(q->dec, r->dec, a->dec, b->dec, ctx, &status);
@@ -3442,7 +3524,7 @@ _Dec_mpd_qpow(PyObject *base, PyObject *exp, PyObject *mod)
 	}
 
 	if ((result = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
  
 	if (c == NULL) {
@@ -3526,13 +3608,13 @@ _Dec_mpd_qcopy_abs(PyObject *self, PyObject *dummy UNUSED)
 
 	CURRENT_CONTEXT_ADDR(ctx);
 	if ((result = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_abs(result->dec, a->dec, &status);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -3548,13 +3630,13 @@ _Dec_mpd_qcopy_negate(PyObject *self, PyObject *dummy UNUSED)
 
 	CURRENT_CONTEXT_ADDR(ctx);
 	if ((result = dec_alloc()) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_negate(result->dec, a->dec, &status);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -3578,17 +3660,17 @@ _Dec_mpd_qcopy_sign(PyObject *v, PyObject *w)
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_sign(result->dec, a->dec, b->dec, &status);
 	Py_DECREF(a);
 	Py_DECREF(b);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -3656,15 +3738,15 @@ _DecOpt_mpd_qdivmod(PyObject *v, PyObject *args)
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((q = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((r = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		Py_DECREF(q);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		Py_DECREF(q); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qdivmod(q->dec, r->dec, a->dec, b->dec, ctx, &status);
@@ -3733,8 +3815,8 @@ _Dec_mpd_to_sci(PyObject *self, PyObject *args)
 
 	s = mpd_to_sci(a->dec, CtxCaps(c));
 	if (s == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	result = PyUnicode_FromString(s);
@@ -3758,8 +3840,8 @@ _Dec_mpd_to_eng(PyObject *self, PyObject *args)
 
 	s = mpd_to_eng(a->dec, CtxCaps(c));
 	if (s == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	result = PyUnicode_FromString(s);
@@ -3779,7 +3861,7 @@ dec_richcompare(PyObject *v, PyObject *w, int op)
 	int r;
 
 	CURRENT_CONTEXT_ADDR(ctx);
-	CONVERT_BINOP(v, w, &a, &b, ctx);
+	CONVERT_BINOP_CMP(v, w, &a, &b, op, ctx);
 
 	a_issnan = mpd_issnan(a->dec);
 	b_issnan = mpd_issnan(b->dec);
@@ -3823,6 +3905,7 @@ dec_richcompare(PyObject *v, PyObject *w, int op)
 	return PyBool_FromLong(r);
 }
 
+#if PY_VERSION_HEX < 0x03020000
 /* Always uses the module context */
 static long
 dec_hash(PyObject *v)
@@ -3850,25 +3933,25 @@ dec_hash(PyObject *v)
 	long result;
 
 	if ((a = dec_alloc()) == NULL) {
-		PyErr_NoMemory();
-		return -1;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return -1; /* GCOV_UNLIKELY */
 	}
-	if (!mpd_qcopy(a->dec, ((PyDecObject *) v)->dec, &status)) {
-		PyErr_NoMemory();
-		result = -1;
-		goto finish;
+	if (!mpd_qcopy(a->dec, DecAddr(v), &status)) {
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		result = -1; /* GCOV_UNLIKELY */
+		goto finish; /* GCOV_UNLIKELY */
 	}
 
 	if (mpd_isspecial(a->dec)) {
 		if (mpd_isnan(a->dec)) {
 			PyErr_SetString(PyExc_ValueError,
-			                "cannot hash a NaN value");
+			    "cannot hash a NaN value");
 			result = -1;
 		}
 		else {
 			if ((obj = dec_str(a)) == NULL) {
-				result = -1;
-				goto finish;
+				result = -1; /* GCOV_UNLIKELY */
+				goto finish; /* GCOV_UNLIKELY */
 			}
 			result = PyObject_Hash(obj);
 		}
@@ -3880,16 +3963,16 @@ dec_hash(PyObject *v)
 		PyObject *ctxobj = current_context();
 		mpd_context_t *ctx;
 		if (ctxobj == NULL) {
-			result = -1;
-			goto finish;
+			result = -1; /* GCOV_UNLIKELY */
+			goto finish; /* GCOV_UNLIKELY */
 		}
 		ctx = CtxAddr(ctxobj);
 		mpd_maxcontext(&maxcontext);
 
 		if ((tmp = mpd_qnew()) == NULL) {
-			PyErr_NoMemory();
-			result = -1;
-			goto finish;
+			PyErr_NoMemory(); /* GCOV_UNLIKELY */
+			result = -1; /* GCOV_UNLIKELY */
+			goto finish; /* GCOV_UNLIKELY */
 		}
 
 		/* clobbering a function scope object */
@@ -3900,15 +3983,15 @@ dec_hash(PyObject *v)
 		mpd_qmul(a->dec, a->dec, tmp, &maxcontext, &status);
 
 		if (status&MPD_Errors) {
-			if (dec_addstatus(ctx, status)) {
-				result = -1;
-				goto finish;
+			if (dec_addstatus(ctx, status)) { /* GCOV_UNLIKELY */
+				result = -1; /* GCOV_UNLIKELY */
+				goto finish; /* GCOV_UNLIKELY */
 			}
 		}
 
 		if ((obj = PyLong_FromDecCtx(a, &maxcontext)) == NULL) {
-			result = -1;
-			goto finish;
+			result = -1; /* GCOV_UNLIKELY */
+			goto finish; /* GCOV_UNLIKELY */
 		}
 		result = PyObject_Hash(obj);
 	}
@@ -3924,13 +4007,13 @@ dec_hash(PyObject *v)
 
 		mpd_qshiftr_inplace(a->dec, tz);
 		a->dec->exp = 0;
-		a->dec->flags = MPD_POS;
+		mpd_set_flags(a->dec, MPD_POS);
 
 		cp = mpd_to_sci(a->dec, 1);
 		obj = Py_BuildValue("(i"CONV_mpd_ssize_t"s)", sign, exp, cp);
 		if (obj == NULL) {
-			result = -1;
-			goto finish;
+			result = -1; /* GCOV_UNLIKELY */
+			goto finish; /* GCOV_UNLIKELY */
 		}
 		result =  PyObject_Hash(obj);
 	}
@@ -3943,6 +4026,120 @@ finish:
 	if (cp) mpd_free(cp);
 	return result;
 }
+#else
+/* Always uses the module context */
+static Py_hash_t
+dec_hash(PyObject *v)
+{
+#if defined(CONFIG_64) && _PyHASH_BITS == 61
+	/* 2**61 - 1 */
+	mpd_uint_t p_data[1] = {2305843009213693951ULL};
+	mpd_t p = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 19, 1, 1, p_data};
+	/* Inverse of 10 modulo p */
+	mpd_uint_t inv10_p_data[2] = {2075258708292324556ULL};
+	mpd_t inv10_p = {MPD_POS|MPD_STATIC|MPD_CONST_DATA,
+	                 0, 19, 1, 1, inv10_p_data};
+#elif defined(CONFIG_32) && _PyHASH_BITS == 31
+	/* 2**31 - 1 */
+	mpd_uint_t p_data[2] = {147483647UL, 2};
+	mpd_t p = {MPD_POS|MPD_STATIC|MPD_CONST_DATA, 0, 10, 2, 2, p_data};
+	/* Inverse of 10 modulo p */
+	mpd_uint_t inv10_p_data[2] = {503238553UL, 1};
+	mpd_t inv10_p = {MPD_POS|MPD_STATIC|MPD_CONST_DATA,
+	                 0, 10, 2, 2, inv10_p_data};
+#else
+	#error "No valid combination of CONFIG_64, CONFIG_32 and _PyHASH_BITS."
+#endif
+	const Py_hash_t py_hash_inf = 314159;
+	const Py_hash_t py_hash_nan = 0;
+	mpd_uint_t ten_data[1] = {10};
+	mpd_t ten = {MPD_POS|MPD_STATIC|MPD_CONST_DATA,
+	             0, 2, 1, 1, ten_data};
+	Py_hash_t result;
+	mpd_t *exp_hash = NULL;
+	mpd_t *tmp = NULL;
+	mpd_ssize_t exp;
+	uint32_t status = 0;
+	mpd_context_t *ctx, maxcontext;
+	PyObject *ctxobj;
+
+
+	ctxobj = current_context();
+	if (ctxobj == NULL) {
+		return -1; /* GCOV_UNLIKELY */
+	}
+	ctx = CtxAddr(ctxobj);
+
+	if (mpd_isspecial(DecAddr(v))) {
+		if (mpd_issnan(DecAddr(v))) {
+			return value_error_int(
+			    "Cannot hash a signaling NaN value.");
+		}
+		else if (mpd_isnan(DecAddr(v))) {
+			return py_hash_nan;
+		}
+		else {
+			return py_hash_inf * mpd_arith_sign(DecAddr(v));
+		}
+	}
+
+	mpd_maxcontext(&maxcontext);
+	if ((exp_hash = mpd_qnew()) == NULL) {
+		goto malloc_error; /* GCOV_UNLIKELY */
+	}
+	if ((tmp = mpd_qnew()) == NULL) {
+		goto malloc_error; /* GCOV_UNLIKELY */
+	}
+
+	/*
+	 * exp(v): exponent of v
+	 * int(v): coefficient of v
+	 */
+	exp = DecAddr(v)->exp;
+	if (exp >= 0) {
+		/* 10**exp(v) % p */
+		mpd_qsset_ssize(tmp, exp, &maxcontext, &status);
+		mpd_qpowmod(exp_hash, &ten, tmp, &p, &maxcontext, &status);
+	}
+	else {
+		/* inv10_p**(-exp(v)) % p */
+		mpd_qsset_ssize(tmp, -exp, &maxcontext, &status);
+		mpd_qpowmod(exp_hash, &inv10_p, tmp, &p, &maxcontext, &status);
+	}
+
+	/* hash = (int(v) * exp_hash) % p */
+	if (!mpd_qcopy(tmp, DecAddr(v), &status)) {
+		goto malloc_error; /* GCOV_UNLIKELY */
+	}
+	tmp->exp = 0;
+	mpd_set_positive(tmp);
+	mpd_qmul(tmp, tmp, exp_hash, &maxcontext, &status);
+	mpd_qrem(tmp, tmp, &p, &maxcontext, &status);
+
+	result = mpd_qget_ssize(tmp, &status);
+	result = mpd_ispositive(DecAddr(v)) ? result : -result;
+	result = (result == -1) ? -2 : result;
+
+	if (status != 0) {
+		status |= MPD_Invalid_operation; /* GCOV_UNLIKELY */
+		if (dec_addstatus(ctx, status)) { /* GCOV_UNLIKELY */
+			result = -1; /* GCOV_UNLIKELY */
+			goto finish; /* GCOV_UNLIKELY */
+		}
+	}
+
+
+finish:
+	if (exp_hash) mpd_del(exp_hash);
+	if (tmp) mpd_del(tmp);
+	return result;
+
+malloc_error: /* GCOV_UNLIKELY */
+	PyErr_NoMemory(); /* GCOV_UNLIKELY */
+	result = -1; /* GCOV_UNLIKELY */
+	goto finish; /* GCOV_UNLIKELY */
+}
+#endif
 
 static PyObject *
 dec_reduce(PyObject *self, PyObject *dummy UNUSED)
@@ -3950,7 +4147,7 @@ dec_reduce(PyObject *self, PyObject *dummy UNUSED)
 	PyObject *newob, *mpd_str;
 
 	if ((mpd_str = dec_str((PyDecObject *)self)) == NULL) {
-		return NULL;
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	newob = Py_BuildValue("O(N)", Py_TYPE(self), mpd_str);
@@ -3997,111 +4194,111 @@ static PyNumberMethods dec_number_methods =
 
 static PyMethodDef dec_methods [] =
 {
-	/* Unary arithmetic functions */
-	{ "abs", _DecOpt_mpd_qabs, METH_VARARGS, doc_abs },
-	{ "exp", _DecOpt_mpd_qexp, METH_VARARGS, doc_exp },
-	{ "invroot", _DecOpt_mpd_qinvroot, METH_VARARGS, doc_invroot },
-	{ "ln", _DecOpt_mpd_qln, METH_VARARGS, doc_ln },
-	{ "log10", _DecOpt_mpd_qlog10, METH_VARARGS, doc_log10 },
-	{ "minus", _DecOpt_mpd_qminus, METH_VARARGS, doc_minus },
-	{ "next_minus", _DecOpt_mpd_qnext_minus, METH_VARARGS, doc_next_minus },
-	{ "next_plus", _DecOpt_mpd_qnext_plus, METH_VARARGS, doc_next_plus },
-	{ "normalize", _DecOpt_mpd_qreduce, METH_VARARGS, doc_normalize }, /* alias for reduce */
-	{ "plus", _DecOpt_mpd_qplus, METH_VARARGS, doc_plus },
-	{ "reduce", _DecOpt_mpd_qreduce, METH_VARARGS, doc_reduce },
-	{ "to_integral", (PyCFunction)PyDec_ToIntegralValue, METH_VARARGS|METH_KEYWORDS, doc_to_integral },
-	{ "to_integral_exact", (PyCFunction)PyDec_ToIntegralExact, METH_VARARGS|METH_KEYWORDS, doc_to_integral_exact },
-	{ "to_integral_value", (PyCFunction)PyDec_ToIntegralValue, METH_VARARGS|METH_KEYWORDS, doc_to_integral_value },
-	{ "sqrt", _DecOpt_mpd_qsqrt, METH_VARARGS, doc_sqrt },
+  /* Unary arithmetic functions */
+  { "abs", _DecOpt_mpd_qabs, METH_VARARGS, doc_abs },
+  { "exp", _DecOpt_mpd_qexp, METH_VARARGS, doc_exp },
+  { "invroot", _DecOpt_mpd_qinvroot, METH_VARARGS, doc_invroot },
+  { "ln", _DecOpt_mpd_qln, METH_VARARGS, doc_ln },
+  { "log10", _DecOpt_mpd_qlog10, METH_VARARGS, doc_log10 },
+  { "minus", _DecOpt_mpd_qminus, METH_VARARGS, doc_minus },
+  { "next_minus", _DecOpt_mpd_qnext_minus, METH_VARARGS, doc_next_minus },
+  { "next_plus", _DecOpt_mpd_qnext_plus, METH_VARARGS, doc_next_plus },
+  { "normalize", _DecOpt_mpd_qreduce, METH_VARARGS, doc_normalize }, /* alias for reduce */
+  { "plus", _DecOpt_mpd_qplus, METH_VARARGS, doc_plus },
+  { "reduce", _DecOpt_mpd_qreduce, METH_VARARGS, doc_reduce },
+  { "to_integral", (PyCFunction)PyDec_ToIntegralValue, METH_VARARGS|METH_KEYWORDS, doc_to_integral },
+  { "to_integral_exact", (PyCFunction)PyDec_ToIntegralExact, METH_VARARGS|METH_KEYWORDS, doc_to_integral_exact },
+  { "to_integral_value", (PyCFunction)PyDec_ToIntegralValue, METH_VARARGS|METH_KEYWORDS, doc_to_integral_value },
+  { "sqrt", _DecOpt_mpd_qsqrt, METH_VARARGS, doc_sqrt },
 
-	/* Binary arithmetic functions */
-	{ "add", _DecOpt_mpd_qadd, METH_VARARGS, doc_add },
-	{ "compare", _DecOpt_mpd_qcompare, METH_VARARGS, doc_compare },
-	{ "compare_signal", _DecOpt_mpd_qcompare_signal, METH_VARARGS, doc_compare_signal },
-	{ "div", _DecOpt_mpd_qdiv, METH_VARARGS, doc_div }, /* alias for divide */
-	{ "divide", _DecOpt_mpd_qdiv, METH_VARARGS, doc_divide },
-	{ "divide_int", _DecOpt_mpd_qdivint, METH_VARARGS, doc_divide_int },
-	{ "divint", _DecOpt_mpd_qdivint, METH_VARARGS, doc_divint }, /* alias for divide_int */
-	{ "divmod", _DecOpt_mpd_qdivmod, METH_VARARGS, doc_divmod },
-	{ "max", _DecOpt_mpd_qmax, METH_VARARGS, doc_max },
-	{ "max_mag", _DecOpt_mpd_qmax_mag, METH_VARARGS, doc_max_mag },
-	{ "min", _DecOpt_mpd_qmin, METH_VARARGS, doc_min },
-	{ "min_mag", _DecOpt_mpd_qmin_mag, METH_VARARGS, doc_min_mag },
-	{ "mul", _DecOpt_mpd_qmul, METH_VARARGS, doc_mul }, /* alias for multiply */
-	{ "multiply", _DecOpt_mpd_qmul, METH_VARARGS, doc_multiply },
-	{ "next_toward", _DecOpt_mpd_qnext_toward, METH_VARARGS, doc_next_toward },
-	{ "pow", _DecOpt_mpd_qpow, METH_VARARGS, doc_pow }, /* alias for power */
-	{ "power", _DecOpt_mpd_qpow, METH_VARARGS, doc_power },
-	{ "quantize", _DecOpt_mpd_qquantize, METH_VARARGS, doc_quantize },
-	{ "rem", _DecOpt_mpd_qrem, METH_VARARGS, doc_rem }, /* alias for remainder */
-	{ "remainder", _DecOpt_mpd_qrem, METH_VARARGS, doc_remainder },
-	{ "remainder_near", _DecOpt_mpd_qrem_near, METH_VARARGS, doc_remainder_near },
-	{ "sub", _DecOpt_mpd_qsub, METH_VARARGS, doc_sub }, /* alias for subtract */
-	{ "subtract", _DecOpt_mpd_qsub, METH_VARARGS, doc_subtract },
+  /* Binary arithmetic functions */
+  { "add", _DecOpt_mpd_qadd, METH_VARARGS, doc_add },
+  { "compare", _DecOpt_mpd_qcompare, METH_VARARGS, doc_compare },
+  { "compare_signal", _DecOpt_mpd_qcompare_signal, METH_VARARGS, doc_compare_signal },
+  { "div", _DecOpt_mpd_qdiv, METH_VARARGS, doc_div }, /* alias for divide */
+  { "divide", _DecOpt_mpd_qdiv, METH_VARARGS, doc_divide },
+  { "divide_int", _DecOpt_mpd_qdivint, METH_VARARGS, doc_divide_int },
+  { "divint", _DecOpt_mpd_qdivint, METH_VARARGS, doc_divint }, /* alias for divide_int */
+  { "divmod", _DecOpt_mpd_qdivmod, METH_VARARGS, doc_divmod },
+  { "max", _DecOpt_mpd_qmax, METH_VARARGS, doc_max },
+  { "max_mag", _DecOpt_mpd_qmax_mag, METH_VARARGS, doc_max_mag },
+  { "min", _DecOpt_mpd_qmin, METH_VARARGS, doc_min },
+  { "min_mag", _DecOpt_mpd_qmin_mag, METH_VARARGS, doc_min_mag },
+  { "mul", _DecOpt_mpd_qmul, METH_VARARGS, doc_mul }, /* alias for multiply */
+  { "multiply", _DecOpt_mpd_qmul, METH_VARARGS, doc_multiply },
+  { "next_toward", _DecOpt_mpd_qnext_toward, METH_VARARGS, doc_next_toward },
+  { "pow", _DecOpt_mpd_qpow, METH_VARARGS, doc_pow }, /* alias for power */
+  { "power", _DecOpt_mpd_qpow, METH_VARARGS, doc_power },
+  { "quantize", _DecOpt_mpd_qquantize, METH_VARARGS, doc_quantize },
+  { "rem", _DecOpt_mpd_qrem, METH_VARARGS, doc_rem }, /* alias for remainder */
+  { "remainder", _DecOpt_mpd_qrem, METH_VARARGS, doc_remainder },
+  { "remainder_near", _DecOpt_mpd_qrem_near, METH_VARARGS, doc_remainder_near },
+  { "sub", _DecOpt_mpd_qsub, METH_VARARGS, doc_sub }, /* alias for subtract */
+  { "subtract", _DecOpt_mpd_qsub, METH_VARARGS, doc_subtract },
 
-	/* Ternary arithmetic functions */
-	{ "fma", _DecOpt_mpd_qfma, METH_VARARGS, doc_fma },
-	{ "powmod", _DecOpt_mpd_qpowmod, METH_VARARGS, doc_powmod },
+  /* Ternary arithmetic functions */
+  { "fma", _DecOpt_mpd_qfma, METH_VARARGS, doc_fma },
+  { "powmod", _DecOpt_mpd_qpowmod, METH_VARARGS, doc_powmod },
 
-	/* Boolean functions, no context arg */
-	{ "is_canonical", _Dec_CFunc_mpd_iscanonical, METH_NOARGS, doc_is_canonical },
-	{ "is_finite", _Dec_CFunc_mpd_isfinite, METH_NOARGS, doc_is_finite },
-	{ "is_infinite", _Dec_CFunc_mpd_isinfinite, METH_NOARGS, doc_is_infinite },
-	{ "is_integer", _Dec_CFunc_mpd_isinteger, METH_NOARGS, doc_is_integer },
-	{ "is_nan", _Dec_CFunc_mpd_isnan, METH_NOARGS, doc_is_nan },
-	{ "is_qnan", _Dec_CFunc_mpd_isqnan, METH_NOARGS, doc_is_qnan },
-	{ "is_snan", _Dec_CFunc_mpd_issnan, METH_NOARGS, doc_is_snan },
-	{ "is_signed", _Dec_CFunc_mpd_issigned, METH_NOARGS, doc_is_signed },
-	{ "is_special", _Dec_CFunc_mpd_isspecial, METH_NOARGS, doc_is_special },
-	{ "is_zero", _Dec_CFunc_mpd_iszero, METH_NOARGS, doc_is_zero },
+  /* Boolean functions, no context arg */
+  { "is_canonical", _Dec_CFunc_mpd_iscanonical, METH_NOARGS, doc_is_canonical },
+  { "is_finite", _Dec_CFunc_mpd_isfinite, METH_NOARGS, doc_is_finite },
+  { "is_infinite", _Dec_CFunc_mpd_isinfinite, METH_NOARGS, doc_is_infinite },
+  { "is_integer", _Dec_CFunc_mpd_isinteger, METH_NOARGS, doc_is_integer },
+  { "is_nan", _Dec_CFunc_mpd_isnan, METH_NOARGS, doc_is_nan },
+  { "is_qnan", _Dec_CFunc_mpd_isqnan, METH_NOARGS, doc_is_qnan },
+  { "is_snan", _Dec_CFunc_mpd_issnan, METH_NOARGS, doc_is_snan },
+  { "is_signed", _Dec_CFunc_mpd_issigned, METH_NOARGS, doc_is_signed },
+  { "is_special", _Dec_CFunc_mpd_isspecial, METH_NOARGS, doc_is_special },
+  { "is_zero", _Dec_CFunc_mpd_iszero, METH_NOARGS, doc_is_zero },
 
-	/* Boolean functions, optional context arg */
-	{ "is_normal", _DecOpt_mpd_isnormal, METH_VARARGS, doc_is_normal },
-	{ "is_subnormal", _DecOpt_mpd_issubnormal, METH_VARARGS, doc_is_subnormal },
+  /* Boolean functions, optional context arg */
+  { "is_normal", _DecOpt_mpd_isnormal, METH_VARARGS, doc_is_normal },
+  { "is_subnormal", _DecOpt_mpd_issubnormal, METH_VARARGS, doc_is_subnormal },
 
-	/* Unary functions, no context arg */
-	{ "adjusted", _Dec_mpd_adjexp, METH_NOARGS, doc_adjusted },
-	{ "canonical", _Dec_canonical, METH_NOARGS, doc_canonical },
-	{ "copy_abs", _Dec_mpd_qcopy_abs, METH_NOARGS, doc_copy_abs },
-	{ "copy_negate", _Dec_mpd_qcopy_negate, METH_NOARGS, doc_copy_negate },
-	{ "radix", _Dec_mpd_radix, METH_NOARGS, doc_radix },
-	{ "sign", _Dec_mpd_sign, METH_NOARGS, doc_sign },
+  /* Unary functions, no context arg */
+  { "adjusted", _Dec_mpd_adjexp, METH_NOARGS, doc_adjusted },
+  { "canonical", _Dec_canonical, METH_NOARGS, doc_canonical },
+  { "copy_abs", _Dec_mpd_qcopy_abs, METH_NOARGS, doc_copy_abs },
+  { "copy_negate", _Dec_mpd_qcopy_negate, METH_NOARGS, doc_copy_negate },
+  { "radix", _Dec_mpd_radix, METH_NOARGS, doc_radix },
+  { "sign", _Dec_mpd_sign, METH_NOARGS, doc_sign },
 
-	/* Unary functions, optional context arg */
-	{ "apply", PyDec_Apply, METH_VARARGS, doc_apply },
-	{ "logb", _DecOpt_mpd_qlogb, METH_VARARGS, doc_logb },
-	{ "logical_invert", _DecOpt_mpd_qinvert, METH_VARARGS, doc_logical_invert },
-	{ "number_class", _DecOpt_mpd_class, METH_VARARGS, doc_number_class },
-	{ "to_sci", _Dec_mpd_to_sci, METH_VARARGS, doc_to_sci }, /* alias for to_sci_string */
-	{ "to_sci_string", _Dec_mpd_to_sci, METH_VARARGS, doc_to_sci_string },
-	{ "to_eng", _Dec_mpd_to_eng, METH_VARARGS, doc_to_eng }, /* alias for to_eng_string */
-	{ "to_eng_string", _Dec_mpd_to_eng, METH_VARARGS, doc_to_eng_string },
+  /* Unary functions, optional context arg */
+  { "apply", PyDec_Apply, METH_VARARGS, doc_apply },
+  { "logb", _DecOpt_mpd_qlogb, METH_VARARGS, doc_logb },
+  { "logical_invert", _DecOpt_mpd_qinvert, METH_VARARGS, doc_logical_invert },
+  { "number_class", _DecOpt_mpd_class, METH_VARARGS, doc_number_class },
+  { "to_sci", _Dec_mpd_to_sci, METH_VARARGS, doc_to_sci }, /* alias for to_sci_string */
+  { "to_sci_string", _Dec_mpd_to_sci, METH_VARARGS, doc_to_sci_string },
+  { "to_eng", _Dec_mpd_to_eng, METH_VARARGS, doc_to_eng }, /* alias for to_eng_string */
+  { "to_eng_string", _Dec_mpd_to_eng, METH_VARARGS, doc_to_eng_string },
 
-	/* Binary functions, optional context arg */
-	{ "compare_total", _DecOpt_mpd_compare_total, METH_VARARGS, doc_compare_total },
-	{ "compare_total_mag", _DecOpt_mpd_compare_total_mag, METH_VARARGS, doc_compare_total_mag },
-	{ "copy_sign", _Dec_mpd_qcopy_sign, METH_O, doc_copy_sign },
-	{ "logical_and", _DecOpt_mpd_qand, METH_VARARGS, doc_logical_and },
-	{ "logical_or", _DecOpt_mpd_qor, METH_VARARGS, doc_logical_or },
-	{ "logical_xor", _DecOpt_mpd_qxor, METH_VARARGS, doc_logical_xor },
-	{ "rotate", _DecOpt_mpd_qrotate, METH_VARARGS, doc_rotate },
-	{ "same_quantum", _Dec_mpd_same_quantum, METH_VARARGS, doc_same_quantum },
-	{ "scaleb", _DecOpt_mpd_qscaleb, METH_VARARGS, doc_scaleb },
-	{ "shift", _DecOpt_mpd_qshift, METH_VARARGS, doc_shift },
+  /* Binary functions, optional context arg */
+  { "compare_total", _DecOpt_mpd_compare_total, METH_VARARGS, doc_compare_total },
+  { "compare_total_mag", _DecOpt_mpd_compare_total_mag, METH_VARARGS, doc_compare_total_mag },
+  { "copy_sign", _Dec_mpd_qcopy_sign, METH_O, doc_copy_sign },
+  { "logical_and", _DecOpt_mpd_qand, METH_VARARGS, doc_logical_and },
+  { "logical_or", _DecOpt_mpd_qor, METH_VARARGS, doc_logical_or },
+  { "logical_xor", _DecOpt_mpd_qxor, METH_VARARGS, doc_logical_xor },
+  { "rotate", _DecOpt_mpd_qrotate, METH_VARARGS, doc_rotate },
+  { "same_quantum", _Dec_mpd_same_quantum, METH_VARARGS, doc_same_quantum },
+  { "scaleb", _DecOpt_mpd_qscaleb, METH_VARARGS, doc_scaleb },
+  { "shift", _DecOpt_mpd_qshift, METH_VARARGS, doc_shift },
 
-	/* Miscellaneous */
-	{ "from_float", _PyDec_FromFloat_Max, METH_O|METH_CLASS, doc_from_float },
-	{ "as_tuple", PyDec_AsTuple, METH_NOARGS, doc_as_tuple },
+  /* Miscellaneous */
+  { "from_float", _PyDec_FromFloat_Max, METH_O|METH_CLASS, doc_from_float },
+  { "as_tuple", PyDec_AsTuple, METH_NOARGS, doc_as_tuple },
 
-	/* Generic stuff */
-	{ "__copy__", dec_copy, METH_NOARGS, NULL },
-	{ "__deepcopy__", dec_copy, METH_VARARGS, NULL },
-	{ "__format__", dec_format, METH_VARARGS, NULL },
-	{ "__reduce__", dec_reduce, METH_NOARGS, NULL },
-	{ "__round__", PyDec_Round, METH_VARARGS, NULL },
-	{ "__trunc__", PyDec_Trunc, METH_NOARGS, NULL },
+  /* Generic stuff */
+  { "__copy__", dec_copy, METH_NOARGS, NULL },
+  { "__deepcopy__", dec_copy, METH_VARARGS, NULL },
+  { "__format__", dec_format, METH_VARARGS, NULL },
+  { "__reduce__", dec_reduce, METH_NOARGS, NULL },
+  { "__round__", PyDec_Round, METH_VARARGS, NULL },
+  { "__trunc__", PyDec_Trunc, METH_NOARGS, NULL },
 
-	{ NULL, NULL, 1 }
+  { NULL, NULL, 1 }
 };
 
 static PyTypeObject PyDec_Type =
@@ -4405,15 +4602,15 @@ _DecCtx_mpd_qcopy_abs(PyObject *self, PyObject *v)
 	CONVERT_OP_SET(v, &a, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_abs(result->dec, a->dec, &status);
 	Py_DECREF(a);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -4430,15 +4627,15 @@ _DecCtx_mpd_qcopy_negate(PyObject *self, PyObject *v)
 	CONVERT_OP_SET(v, &a, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_negate(result->dec, a->dec, &status);
 	Py_DECREF(a);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -4467,17 +4664,17 @@ _DecCtx_mpd_qcopy_sign(PyObject *self, PyObject *args)
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((result = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qcopy_sign(result->dec, a->dec, b->dec, &status);
 	Py_DECREF(a);
 	Py_DECREF(b);
 	if (dec_addstatus(ctx, status)) {
-		Py_DECREF(result);
-		return NULL;
+		Py_DECREF(result); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	return (PyObject *) result;
@@ -4495,7 +4692,8 @@ static PyObject *
 _DecCtx_iscanonical(PyObject *self UNUSED, PyObject *v)
 {
 	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
+		PyErr_SetString(PyExc_TypeError,
+		    "argument must be a Decimal.");
 		return NULL;
 	}
 
@@ -4506,7 +4704,8 @@ static PyObject *
 _DecCtx_canonical(PyObject *self UNUSED, PyObject *v)
 {
 	if (!PyDec_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "argument must be a Decimal");
+		PyErr_SetString(PyExc_TypeError,
+		    "argument must be a Decimal.");
 		return NULL;
 	}
 
@@ -4547,15 +4746,15 @@ _DecCtx_mpd_qdivmod(PyObject *self, PyObject *args)
 	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
 
 	if ((q = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 	if ((r = dec_alloc()) == NULL) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		Py_DECREF(q);
-		return NULL;
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		Py_DECREF(q); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qdivmod(q->dec, r->dec, a->dec, b->dec, ctx, &status);
@@ -4584,8 +4783,8 @@ _DecCtx_mpd_to_sci(PyObject *self, PyObject *v)
 	s = mpd_to_sci(a->dec, CtxCaps(self));
 	Py_DECREF(a);
 	if (s == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	result = PyUnicode_FromString(s);
@@ -4608,8 +4807,8 @@ _DecCtx_mpd_to_eng(PyObject *self, PyObject *v)
 	s = mpd_to_eng(a->dec, CtxCaps(self));
 	Py_DECREF(a);
 	if (s == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+		PyErr_NoMemory(); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	result = PyUnicode_FromString(s);
@@ -4650,115 +4849,115 @@ _DecCtx_mpd_same_quantum(PyObject *self, PyObject *args)
 
 static PyMethodDef context_methods [] =
 {
-	/* Unary arithmetic functions */
-	{ "abs", _DecCtx_mpd_qabs, METH_O, doc_ctx_abs },
-	{ "exp", _DecCtx_mpd_qexp, METH_O, doc_ctx_exp },
-	{ "invroot", _DecCtx_mpd_qinvroot, METH_O, doc_ctx_invroot },
-	{ "ln", _DecCtx_mpd_qln, METH_O, doc_ctx_ln },
-	{ "log10", _DecCtx_mpd_qlog10, METH_O, doc_ctx_log10 },
-	{ "minus", _DecCtx_mpd_qminus, METH_O, doc_ctx_minus },
-	{ "next_minus", _DecCtx_mpd_qnext_minus, METH_O, doc_ctx_next_minus },
-	{ "next_plus", _DecCtx_mpd_qnext_plus, METH_O, doc_ctx_next_plus },
-	{ "normalize", _DecCtx_mpd_qreduce, METH_O, doc_ctx_normalize }, /* alias for reduce */
-	{ "plus", _DecCtx_mpd_qplus, METH_O, doc_ctx_plus },
-	{ "reduce", _DecCtx_mpd_qreduce, METH_O, doc_ctx_reduce },
-	{ "to_integral", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral },
-	{ "to_integral_exact", _DecCtx_mpd_qround_to_intx, METH_O, doc_ctx_to_integral_exact },
-	{ "to_integral_value", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral_value },
-	{ "sqrt", _DecCtx_mpd_qsqrt, METH_O, doc_ctx_sqrt },
+  /* Unary arithmetic functions */
+  { "abs", _DecCtx_mpd_qabs, METH_O, doc_ctx_abs },
+  { "exp", _DecCtx_mpd_qexp, METH_O, doc_ctx_exp },
+  { "invroot", _DecCtx_mpd_qinvroot, METH_O, doc_ctx_invroot },
+  { "ln", _DecCtx_mpd_qln, METH_O, doc_ctx_ln },
+  { "log10", _DecCtx_mpd_qlog10, METH_O, doc_ctx_log10 },
+  { "minus", _DecCtx_mpd_qminus, METH_O, doc_ctx_minus },
+  { "next_minus", _DecCtx_mpd_qnext_minus, METH_O, doc_ctx_next_minus },
+  { "next_plus", _DecCtx_mpd_qnext_plus, METH_O, doc_ctx_next_plus },
+  { "normalize", _DecCtx_mpd_qreduce, METH_O, doc_ctx_normalize }, /* alias for reduce */
+  { "plus", _DecCtx_mpd_qplus, METH_O, doc_ctx_plus },
+  { "reduce", _DecCtx_mpd_qreduce, METH_O, doc_ctx_reduce },
+  { "to_integral", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral },
+  { "to_integral_exact", _DecCtx_mpd_qround_to_intx, METH_O, doc_ctx_to_integral_exact },
+  { "to_integral_value", _DecCtx_mpd_qround_to_int, METH_O, doc_ctx_to_integral_value },
+  { "sqrt", _DecCtx_mpd_qsqrt, METH_O, doc_ctx_sqrt },
 
-	/* Binary arithmetic functions */
-	{ "add", _DecCtx_mpd_qadd, METH_VARARGS, doc_ctx_add },
-	{ "compare", _DecCtx_mpd_qcompare, METH_VARARGS, doc_ctx_compare },
-	{ "compare_signal", _DecCtx_mpd_qcompare_signal, METH_VARARGS, doc_ctx_compare_signal },
-	{ "div", _DecCtx_mpd_qdiv, METH_VARARGS, doc_ctx_div }, /* alias for divide */
-	{ "divide", _DecCtx_mpd_qdiv, METH_VARARGS, doc_ctx_divide },
-	{ "divide_int", _DecCtx_mpd_qdivint, METH_VARARGS, doc_ctx_divide_int },
-	{ "divint", _DecCtx_mpd_qdivint, METH_VARARGS, doc_ctx_divint }, /* alias for divide_int */
-	{ "divmod", _DecCtx_mpd_qdivmod, METH_VARARGS, doc_ctx_divmod },
-	{ "max", _DecCtx_mpd_qmax, METH_VARARGS, doc_ctx_max },
-	{ "max_mag", _DecCtx_mpd_qmax_mag, METH_VARARGS, doc_ctx_max_mag },
-	{ "min", _DecCtx_mpd_qmin, METH_VARARGS, doc_ctx_min },
-	{ "min_mag", _DecCtx_mpd_qmin_mag, METH_VARARGS, doc_ctx_min_mag },
-	{ "mul", _DecCtx_mpd_qmul, METH_VARARGS, doc_ctx_mul }, /* alias for multiply */
-	{ "multiply", _DecCtx_mpd_qmul, METH_VARARGS, doc_ctx_multiply },
-	{ "next_toward", _DecCtx_mpd_qnext_toward, METH_VARARGS, doc_ctx_next_toward },
-	{ "pow", _DecCtx_mpd_qpow, METH_VARARGS, doc_ctx_pow }, /* alias for power */
-	{ "power", _DecCtx_mpd_qpow, METH_VARARGS, doc_ctx_power },
-	{ "quantize", _DecCtx_mpd_qquantize, METH_VARARGS, doc_ctx_quantize },
-	{ "rem", _DecCtx_mpd_qrem, METH_VARARGS, doc_ctx_rem }, /* alias for remainder */
-	{ "remainder", _DecCtx_mpd_qrem, METH_VARARGS, doc_ctx_remainder },
-	{ "remainder_near", _DecCtx_mpd_qrem_near, METH_VARARGS, doc_ctx_remainder_near },
-	{ "sub", _DecCtx_mpd_qsub, METH_VARARGS, doc_ctx_sub }, /* alias for subtract */
-	{ "subtract", _DecCtx_mpd_qsub, METH_VARARGS, doc_ctx_subtract },
+  /* Binary arithmetic functions */
+  { "add", _DecCtx_mpd_qadd, METH_VARARGS, doc_ctx_add },
+  { "compare", _DecCtx_mpd_qcompare, METH_VARARGS, doc_ctx_compare },
+  { "compare_signal", _DecCtx_mpd_qcompare_signal, METH_VARARGS, doc_ctx_compare_signal },
+  { "div", _DecCtx_mpd_qdiv, METH_VARARGS, doc_ctx_div }, /* alias for divide */
+  { "divide", _DecCtx_mpd_qdiv, METH_VARARGS, doc_ctx_divide },
+  { "divide_int", _DecCtx_mpd_qdivint, METH_VARARGS, doc_ctx_divide_int },
+  { "divint", _DecCtx_mpd_qdivint, METH_VARARGS, doc_ctx_divint }, /* alias for divide_int */
+  { "divmod", _DecCtx_mpd_qdivmod, METH_VARARGS, doc_ctx_divmod },
+  { "max", _DecCtx_mpd_qmax, METH_VARARGS, doc_ctx_max },
+  { "max_mag", _DecCtx_mpd_qmax_mag, METH_VARARGS, doc_ctx_max_mag },
+  { "min", _DecCtx_mpd_qmin, METH_VARARGS, doc_ctx_min },
+  { "min_mag", _DecCtx_mpd_qmin_mag, METH_VARARGS, doc_ctx_min_mag },
+  { "mul", _DecCtx_mpd_qmul, METH_VARARGS, doc_ctx_mul }, /* alias for multiply */
+  { "multiply", _DecCtx_mpd_qmul, METH_VARARGS, doc_ctx_multiply },
+  { "next_toward", _DecCtx_mpd_qnext_toward, METH_VARARGS, doc_ctx_next_toward },
+  { "pow", _DecCtx_mpd_qpow, METH_VARARGS, doc_ctx_pow }, /* alias for power */
+  { "power", _DecCtx_mpd_qpow, METH_VARARGS, doc_ctx_power },
+  { "quantize", _DecCtx_mpd_qquantize, METH_VARARGS, doc_ctx_quantize },
+  { "rem", _DecCtx_mpd_qrem, METH_VARARGS, doc_ctx_rem }, /* alias for remainder */
+  { "remainder", _DecCtx_mpd_qrem, METH_VARARGS, doc_ctx_remainder },
+  { "remainder_near", _DecCtx_mpd_qrem_near, METH_VARARGS, doc_ctx_remainder_near },
+  { "sub", _DecCtx_mpd_qsub, METH_VARARGS, doc_ctx_sub }, /* alias for subtract */
+  { "subtract", _DecCtx_mpd_qsub, METH_VARARGS, doc_ctx_subtract },
 
-	/* Ternary arithmetic functions */
-	{ "fma", _DecCtx_mpd_qfma, METH_VARARGS, doc_ctx_fma },
-	{ "powmod", _DecCtx_mpd_qpowmod, METH_VARARGS, doc_ctx_powmod },
+  /* Ternary arithmetic functions */
+  { "fma", _DecCtx_mpd_qfma, METH_VARARGS, doc_ctx_fma },
+  { "powmod", _DecCtx_mpd_qpowmod, METH_VARARGS, doc_ctx_powmod },
 
-	/* No argument */
-	{ "Etiny", context_getetiny, METH_NOARGS, doc_ctx_Etiny },
-	{ "Etop", context_getetop, METH_NOARGS, doc_ctx_Etop },
-	{ "radix", _DecCtx_mpd_radix, METH_NOARGS, doc_ctx_radix },
+  /* No argument */
+  { "Etiny", context_getetiny, METH_NOARGS, doc_ctx_Etiny },
+  { "Etop", context_getetop, METH_NOARGS, doc_ctx_Etop },
+  { "radix", _DecCtx_mpd_radix, METH_NOARGS, doc_ctx_radix },
 
-	/* Boolean functions */
-	{ "is_canonical", _DecCtx_iscanonical, METH_O, doc_ctx_is_canonical },
-	{ "is_finite", _DecCtx_mpd_isfinite, METH_O, doc_ctx_is_finite },
-	{ "is_infinite", _DecCtx_mpd_isinfinite, METH_O, doc_ctx_is_infinite },
-	{ "is_nan", _DecCtx_mpd_isnan, METH_O, doc_ctx_is_nan },
-	{ "is_normal", _DecCtx_mpd_isnormal, METH_O, doc_ctx_is_normal },
-	{ "is_qnan", _DecCtx_mpd_isqnan, METH_O, doc_ctx_is_qnan },
-	{ "is_signed", _DecCtx_mpd_issigned, METH_O, doc_ctx_is_signed },
-	{ "is_snan", _DecCtx_mpd_issnan, METH_O, doc_ctx_is_snan },
-	{ "is_subnormal", _DecCtx_mpd_issubnormal, METH_O, doc_ctx_is_subnormal },
-	{ "is_zero", _DecCtx_mpd_iszero, METH_O, doc_ctx_is_zero },
+  /* Boolean functions */
+  { "is_canonical", _DecCtx_iscanonical, METH_O, doc_ctx_is_canonical },
+  { "is_finite", _DecCtx_mpd_isfinite, METH_O, doc_ctx_is_finite },
+  { "is_infinite", _DecCtx_mpd_isinfinite, METH_O, doc_ctx_is_infinite },
+  { "is_nan", _DecCtx_mpd_isnan, METH_O, doc_ctx_is_nan },
+  { "is_normal", _DecCtx_mpd_isnormal, METH_O, doc_ctx_is_normal },
+  { "is_qnan", _DecCtx_mpd_isqnan, METH_O, doc_ctx_is_qnan },
+  { "is_signed", _DecCtx_mpd_issigned, METH_O, doc_ctx_is_signed },
+  { "is_snan", _DecCtx_mpd_issnan, METH_O, doc_ctx_is_snan },
+  { "is_subnormal", _DecCtx_mpd_issubnormal, METH_O, doc_ctx_is_subnormal },
+  { "is_zero", _DecCtx_mpd_iszero, METH_O, doc_ctx_is_zero },
 
-	/* Functions with a single decimal argument */
-	{ "_apply", PyDecContext_Apply, METH_O, NULL }, /* alias for apply */
-	{ "apply", PyDecContext_Apply, METH_O, doc_ctx_apply },
-	{ "canonical", _DecCtx_canonical, METH_O, doc_ctx_canonical },
-	{ "copy_abs", _DecCtx_mpd_qcopy_abs, METH_O, doc_ctx_copy_abs },
-	{ "copy_decimal", _DecCtx_copy_decimal, METH_O, doc_ctx_copy_decimal },
-	{ "copy_negate", _DecCtx_mpd_qcopy_negate, METH_O, doc_ctx_copy_negate },
-	{ "logb", _DecCtx_mpd_qlogb, METH_O, doc_ctx_logb },
-	{ "logical_invert", _DecCtx_mpd_qinvert, METH_O, doc_ctx_logical_invert },
-	{ "number_class", _DecCtx_mpd_class, METH_O, doc_ctx_number_class },
-	{ "to_sci", _DecCtx_mpd_to_sci, METH_O, doc_ctx_to_sci }, /* alias for to_sci_string */
-	{ "to_sci_string", _DecCtx_mpd_to_sci, METH_O, doc_ctx_to_sci_string },
-	{ "to_eng", _DecCtx_mpd_to_eng, METH_O, doc_ctx_to_eng }, /* alias for to_eng_string */
-	{ "to_eng_string", _DecCtx_mpd_to_eng, METH_O, doc_ctx_to_eng_string },
+  /* Functions with a single decimal argument */
+  { "_apply", PyDecContext_Apply, METH_O, NULL }, /* alias for apply */
+  { "apply", PyDecContext_Apply, METH_O, doc_ctx_apply },
+  { "canonical", _DecCtx_canonical, METH_O, doc_ctx_canonical },
+  { "copy_abs", _DecCtx_mpd_qcopy_abs, METH_O, doc_ctx_copy_abs },
+  { "copy_decimal", _DecCtx_copy_decimal, METH_O, doc_ctx_copy_decimal },
+  { "copy_negate", _DecCtx_mpd_qcopy_negate, METH_O, doc_ctx_copy_negate },
+  { "logb", _DecCtx_mpd_qlogb, METH_O, doc_ctx_logb },
+  { "logical_invert", _DecCtx_mpd_qinvert, METH_O, doc_ctx_logical_invert },
+  { "number_class", _DecCtx_mpd_class, METH_O, doc_ctx_number_class },
+  { "to_sci", _DecCtx_mpd_to_sci, METH_O, doc_ctx_to_sci }, /* alias for to_sci_string */
+  { "to_sci_string", _DecCtx_mpd_to_sci, METH_O, doc_ctx_to_sci_string },
+  { "to_eng", _DecCtx_mpd_to_eng, METH_O, doc_ctx_to_eng }, /* alias for to_eng_string */
+  { "to_eng_string", _DecCtx_mpd_to_eng, METH_O, doc_ctx_to_eng_string },
 
-	/* Functions with two decimal arguments */
-	{ "compare_total", _DecCtx_mpd_compare_total, METH_VARARGS, doc_ctx_compare_total },
-	{ "compare_total_mag", _DecCtx_mpd_compare_total_mag, METH_VARARGS, doc_ctx_compare_total_mag },
-	{ "copy_sign", _DecCtx_mpd_qcopy_sign, METH_VARARGS, doc_ctx_copy_sign },
-	{ "logical_and", _DecCtx_mpd_qand, METH_VARARGS, doc_ctx_logical_and },
-	{ "logical_or", _DecCtx_mpd_qor, METH_VARARGS, doc_ctx_logical_or },
-	{ "logical_xor", _DecCtx_mpd_qxor, METH_VARARGS, doc_ctx_logical_xor },
-	{ "rotate", _DecCtx_mpd_qrotate, METH_VARARGS, doc_ctx_rotate },
-	{ "same_quantum", _DecCtx_mpd_same_quantum, METH_VARARGS, doc_ctx_same_quantum },
-	{ "scaleb", _DecCtx_mpd_qscaleb, METH_VARARGS, doc_ctx_scaleb },
-	{ "shift", _DecCtx_mpd_qshift, METH_VARARGS, doc_ctx_shift },
+  /* Functions with two decimal arguments */
+  { "compare_total", _DecCtx_mpd_compare_total, METH_VARARGS, doc_ctx_compare_total },
+  { "compare_total_mag", _DecCtx_mpd_compare_total_mag, METH_VARARGS, doc_ctx_compare_total_mag },
+  { "copy_sign", _DecCtx_mpd_qcopy_sign, METH_VARARGS, doc_ctx_copy_sign },
+  { "logical_and", _DecCtx_mpd_qand, METH_VARARGS, doc_ctx_logical_and },
+  { "logical_or", _DecCtx_mpd_qor, METH_VARARGS, doc_ctx_logical_or },
+  { "logical_xor", _DecCtx_mpd_qxor, METH_VARARGS, doc_ctx_logical_xor },
+  { "rotate", _DecCtx_mpd_qrotate, METH_VARARGS, doc_ctx_rotate },
+  { "same_quantum", _DecCtx_mpd_same_quantum, METH_VARARGS, doc_ctx_same_quantum },
+  { "scaleb", _DecCtx_mpd_qscaleb, METH_VARARGS, doc_ctx_scaleb },
+  { "shift", _DecCtx_mpd_qshift, METH_VARARGS, doc_ctx_shift },
 
-	/* Set context values */
-	{ "setflags", PyDec_SetStatusFromList, METH_O, doc_ctx_setflags },
-	{ "settraps", PyDec_SetTrapsFromList, METH_O, doc_ctx_settraps },
-	{ "clear_flags", context_clear_flags, METH_NOARGS, doc_ctx_clear_flags },
-	{ "clear_traps", context_clear_traps, METH_NOARGS, doc_ctx_clear_traps },
+  /* Set context values */
+  { "setflags", PyDec_SetStatusFromList, METH_O, doc_ctx_setflags },
+  { "settraps", PyDec_SetTrapsFromList, METH_O, doc_ctx_settraps },
+  { "clear_flags", context_clear_flags, METH_NOARGS, doc_ctx_clear_flags },
+  { "clear_traps", context_clear_traps, METH_NOARGS, doc_ctx_clear_traps },
 
-	/* Unsafe set functions with no range checks */
-	{ "unsafe_setprec", context_unsafe_setprec, METH_O, NULL },
-	{ "unsafe_setemin", context_unsafe_setemin, METH_O, NULL },
-	{ "unsafe_setemax", context_unsafe_setemax, METH_O, NULL },
+  /* Unsafe set functions with no range checks */
+  { "unsafe_setprec", context_unsafe_setprec, METH_O, NULL },
+  { "unsafe_setemin", context_unsafe_setemin, METH_O, NULL },
+  { "unsafe_setemax", context_unsafe_setemax, METH_O, NULL },
 
-	/* Miscellaneous */
-	{ "__copy__", (PyCFunction)context_copy, METH_NOARGS, NULL },
-	{ "__reduce__", context_reduce, METH_NOARGS, NULL },
-	{ "copy", (PyCFunction)context_copy, METH_NOARGS, doc_ctx_copy },
-	{ "create_decimal", PyDecContext_CreateDecimal, METH_VARARGS, doc_ctx_create_decimal },
-	{ "create_decimal_from_float", PyDecContext_FromFloat, METH_O, doc_ctx_create_decimal_from_float },
+  /* Miscellaneous */
+  { "__copy__", (PyCFunction)context_copy, METH_NOARGS, NULL },
+  { "__reduce__", context_reduce, METH_NOARGS, NULL },
+  { "copy", (PyCFunction)context_copy, METH_NOARGS, doc_ctx_copy },
+  { "create_decimal", PyDecContext_CreateDecimal, METH_VARARGS, doc_ctx_create_decimal },
+  { "create_decimal_from_float", PyDecContext_FromFloat, METH_O, doc_ctx_create_decimal_from_float },
 
-	{ NULL, NULL, 1 }
+  { NULL, NULL, 1 }
 };
 
 static PyTypeObject PyDecContext_Type =
@@ -4807,11 +5006,11 @@ static PyTypeObject PyDecContext_Type =
 
 static PyMethodDef cdecimal_methods [] =
 {
-	{ "getcontext", (PyCFunction)PyDec_GetCurrentContext, METH_NOARGS, doc_getcontext},
-	{ "setcontext", (PyCFunction)PyDec_SetCurrentContext, METH_O, doc_setcontext},
-	{ "localcontext", (PyCFunction)ctxmanager_new, METH_VARARGS, doc_localcontext},
-	{ "IEEEContext", (PyCFunction)ieee_context, METH_O, doc_ieee_context},
-	{ NULL, NULL, 1, NULL }
+  { "getcontext", (PyCFunction)PyDec_GetCurrentContext, METH_NOARGS, doc_getcontext},
+  { "setcontext", (PyCFunction)PyDec_SetCurrentContext, METH_O, doc_setcontext},
+  { "localcontext", (PyCFunction)ctxmanager_new, METH_VARARGS, doc_localcontext},
+  { "IEEEContext", (PyCFunction)ieee_context, METH_O, doc_ieee_context},
+  { NULL, NULL, 1, NULL }
 };
 
 static struct PyModuleDef cdecimal_module = {
@@ -4845,56 +5044,56 @@ PyInit_cdecimal(void)
 
 
 	if (PyType_Ready(&PyDec_Type) < 0) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if (PyType_Ready(&PyDecContext_Type) < 0) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if (PyType_Ready(&PyDecSignalDict_Type) < 0) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if (PyType_Ready(&PyDecContextManager_Type) < 0) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 
 
 	if ((obj = PyUnicode_FromString("cdecimal")) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if (PyDict_SetItemString(PyDec_Type.tp_dict, "__module__", obj) < 0) {
-		Py_DECREF(obj);
-		goto error;
+		Py_DECREF(obj); /* GCOV_UNLIKELY */
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if (PyDict_SetItemString(PyDecContext_Type.tp_dict, "__module__", obj) < 0) {
-		Py_DECREF(obj);
-		goto error;
+		Py_DECREF(obj); /* GCOV_UNLIKELY */
+		goto error; /* GCOV_UNLIKELY */
 	}
 	Py_DECREF(obj);
 
 
 	if ((_numbers = PyImport_ImportModule("numbers")) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if ((_Number = PyObject_GetAttrString(_numbers, "Number")) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if ((obj = Py_BuildValue("O",  &PyDec_Type)) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if ((s = Py_BuildValue("s", "register")) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	if ((ret = PyObject_CallMethodObjArgs(_Number, s, obj, NULL)) == NULL) {
-		Py_DECREF(s);
-		Py_DECREF(obj);
-		goto error;
+		Py_DECREF(s); /* GCOV_UNLIKELY */
+		Py_DECREF(obj); /* GCOV_UNLIKELY */
+		goto error; /* GCOV_UNLIKELY */
 	}
 	Py_DECREF(s);
 	Py_DECREF(obj);
 	Py_DECREF(ret);
 
 	if ((m = PyModule_Create(&cdecimal_module)) == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 
 	mpd_traphandler = dec_traphandler;
@@ -4946,7 +5145,7 @@ PyInit_cdecimal(void)
 	/* Default context template */
 	ctxobj = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (ctxobj == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	default_context_template = ctxobj;
 	Py_INCREF(ctxobj);
@@ -4956,14 +5155,14 @@ PyInit_cdecimal(void)
 	/* Module context */
 	ctxobj = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (ctxobj == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	module_context = ctxobj;
 	PyModule_AddIntConstant(m, "HAVE_THREADS", 0);
 #else
 	tls_context_key = Py_BuildValue("s", "__CDECIMAL_CTX__");
 	if (tls_context_key == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	PyModule_AddIntConstant(m, "HAVE_THREADS", 1);
 #endif
@@ -4971,7 +5170,7 @@ PyInit_cdecimal(void)
 	/* Basic context template */
 	ctxobj = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (ctxobj == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	init_basic_context(ctxobj);
 	basic_context_template = ctxobj;
@@ -4981,7 +5180,7 @@ PyInit_cdecimal(void)
 	/* Extended context template */
 	ctxobj = PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL);
 	if (ctxobj == NULL) {
-		goto error;
+		goto error; /* GCOV_UNLIKELY */
 	}
 	init_extended_context(ctxobj);
 	extended_context_template = ctxobj;
@@ -5022,7 +5221,7 @@ PyInit_cdecimal(void)
 	PyModule_AddIntConstant(m, "DecInvalidOperation", MPD_Invalid_operation);
 	PyModule_AddIntConstant(m, "DecIEEEInvalidOperation", MPD_IEEE_Invalid_operation);
 	PyModule_AddIntConstant(m, "DecMallocError", MPD_Malloc_error);
-	PyModule_AddIntConstant(m, "DecNotImplemented", MPD_Not_implemented);
+	PyModule_AddIntConstant(m, "DecFloatOperation", MPD_Float_operation);
 	PyModule_AddIntConstant(m, "DecOverflow", MPD_Overflow);
 	PyModule_AddIntConstant(m, "DecRounded", MPD_Rounded);
 	PyModule_AddIntConstant(m, "DecSubnormal", MPD_Subnormal);
@@ -5033,20 +5232,20 @@ PyInit_cdecimal(void)
 
 	return m;
 
-error:
-	if (_numbers) Py_DECREF(_numbers);
-	if (_Number) Py_DECREF(_Number);
+error: /* GCOV_UNLIKELY */
+	if (_numbers) Py_DECREF(_numbers); /* GCOV_UNLIKELY */
+	if (_Number) Py_DECREF(_Number); /* GCOV_UNLIKELY */
 #ifdef WITHOUT_THREADS
-	if (module_context) Py_DECREF(module_context);
+	if (module_context) Py_DECREF(module_context); /* GCOV_UNLIKELY */
 #else
-	if (default_context_template) Py_DECREF(default_context_template);
-	if (tls_context_key) Py_DECREF(tls_context_key);
+	if (default_context_template) Py_DECREF(default_context_template); /* GCOV_UNLIKELY */
+	if (tls_context_key) Py_DECREF(tls_context_key); /* GCOV_UNLIKELY */
 #endif
-	if (basic_context_template) Py_DECREF(basic_context_template);
-	if (extended_context_template) Py_DECREF(extended_context_template);
-	if (m) Py_DECREF(m);
+	if (basic_context_template) Py_DECREF(basic_context_template); /* GCOV_UNLIKELY */
+	if (extended_context_template) Py_DECREF(extended_context_template); /* GCOV_UNLIKELY */
+	if (m) Py_DECREF(m); /* GCOV_UNLIKELY */
 
-	return NULL;
+	return NULL; /* GCOV_UNLIKELY */
 }
 
 

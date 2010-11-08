@@ -19,7 +19,7 @@ void mpd_err_doit(int action, const char *fmt, ...)
 	va_end(ap);
 
 	if (action == MPD_ERR_EXIT) {
-		exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE); /* GCOV_NOT_REACHED */
 	}
 }
 

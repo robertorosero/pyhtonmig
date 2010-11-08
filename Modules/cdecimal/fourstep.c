@@ -118,7 +118,7 @@ ppro_size3_ntt(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, mpd_uint_t w3tabl
 
 /* forward transform, sign = -1; transform length = 3 * 2^n */
 int
-four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
+four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	mpd_size_t R = 3; /* number of rows */
 	mpd_size_t C = n / 3; /* number of columns */
@@ -163,21 +163,24 @@ four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 
 	/* transform rows */
 	for (s = a; s < a+n; s += C) {
-		if (!six_step_fnt(s, C, modnum, ordered)) {
+		if (!six_step_fnt(s, C, modnum)) {
 			return 0;
 		}
 	}
 
+#if 0
+	/* An unordered transform is sufficient for convolution. */
 	if (ordered) {
 		transpose_3xpow2(a, R, C);
 	}
+#endif
 
 	return 1;
 }
 
 /* backward transform, sign = 1; transform length = 3 * 2^n */
 int
-inv_four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
+inv_four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum)
 {
 	mpd_size_t R = 3; /* number of rows */
 	mpd_size_t C = n / 3; /* number of columns */
@@ -196,13 +199,16 @@ inv_four_step_fnt(mpd_uint_t *a, mpd_size_t n, int modnum, int ordered)
 	assert(n <= 3*MPD_MAXTRANSFORM_2N);
 
 
+#if 0
+	/* An unordered transform is sufficient for convolution. */
 	if (ordered) {
 		transpose_3xpow2(a, C, R);
 	}
+#endif
 
 	/* transform rows */
 	for (s = a; s < a+n; s += C) {
-		if (!inv_six_step_fnt(s, C, modnum, ordered)) {
+		if (!inv_six_step_fnt(s, C, modnum)) {
 			return 0;
 		}
 	}
