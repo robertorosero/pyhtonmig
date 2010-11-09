@@ -79,12 +79,12 @@ default: $(BUILDLIB)
 
 
 $(LIBSTATIC): Makefile $(OBJS)
-	if exist $@ del $(LIBSTATIC)
+	-@if exist $@ del $(LIBSTATIC)
 	lib $(LFLAGS) /out:$(LIBSTATIC) $(OBJS)
 
 
 $(LIBSHARED): Makefile $(OBJS)
-	if exist $@ del $(LIBSHARED)
+	-@if exist $@ del $(LIBSHARED)
 	link $(LFLAGS) /out:$(LIBSHARED) /implib:$(LIBIMPORT) $(OBJS)
 	mt -manifest $(LIBSHARED).manifest -outputresource:$(LIBSHARED);2
 
@@ -173,25 +173,25 @@ Makefile vcdiv64.asm
 
 check:\
 $(BUILDLIB)
-	copy /y $(BUILDLIB) tests && \
-        cd tests && \
-        copy /y Makefile.vc Makefile && \
-      	nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)" && \
-	runshort.bat
+	-@copy /y $(BUILDLIB) tests
+	-@cd tests
+	-@copy /y Makefile.vc Makefile
+	-@nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)"
+	-@runshort.bat
 
 extended:\
 Makefile $(BUILDLIB)
-	copy /y $(BUILDLIB) tests && \
-        cd tests && \
-        copy /y Makefile.vc Makefile && \
-       	nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)" extended
+	-@copy /y $(BUILDLIB) tests
+	-@cd tests
+	-@copy /y Makefile.vc Makefile
+	-@nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)" extended
 
 extended_gmp:\
 Makefile $(BUILDLIB)
-	copy /y $(BUILDLIB) tests && \
-	cd tests && \
-	copy /y Makefile.vc Makefile && \
-	nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)" GMPINC=$(GMPINC) GMPLIB=$(GMPLIB) extended_gmp
+	-@copy /y $(BUILDLIB) tests
+	-@cd tests
+	-@copy /y Makefile.vc Makefile
+	-@nmake UFLAGS="$(UFLAGS)" CFLAGS="$(CFLAGS)" USELIB="$(USELIB)" GMPINC=$(GMPINC) GMPLIB=$(GMPLIB) extended_gmp
 
 
 FORCE:
@@ -228,6 +228,6 @@ clean: FORCE
 	-@if exist *.exe del *.exe
 	-@if exist python\cdecimal.pyd del python\cdecimal.pyd
 	-@if exist python\*.pyc del python\*.pyc
-	cd tests && copy /y Makefile.vc Makefile && nmake clean
+	-@cd tests && copy /y Makefile.vc Makefile && nmake clean
 
 
