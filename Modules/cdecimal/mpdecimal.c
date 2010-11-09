@@ -25,7 +25,7 @@
   #if defined(_MSC_VER)
     #include <float.h>
     #pragma fenv_access(on)
-  #elif !defined(__OpenBSD__)
+  #elif !defined(__OpenBSD__) && !defined(__NetBSD__)
     /* C99 */
     #include <fenv.h>
     #pragma STDC FENV_ACCESS ON
