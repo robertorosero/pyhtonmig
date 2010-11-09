@@ -641,10 +641,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Modules\cdecimal\error.c"
-				>
-			</File>
-			<File
 				RelativePath="..\Modules\cdecimal\fnt.c"
 				>
 			</File>
