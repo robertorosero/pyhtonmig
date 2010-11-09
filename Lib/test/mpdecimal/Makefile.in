@@ -88,8 +88,8 @@ debug: default
 
 
 OBJS := basearith.o context.o constants.o convolute.o crt.o mpdecimal.o \
-        mpsignal.o difradix2.o error.o fnt.o fourstep.o io.o memory.o \
-        numbertheory.o sixstep.o transpose.o
+        mpsignal.o difradix2.o fnt.o fourstep.o io.o memory.o numbertheory.o \
+        sixstep.o transpose.o
 
 $(LIBSTATIC): Makefile vars.mk $(OBJS)
 	$(AR) rc $(LIBSTATIC) $(OBJS)
@@ -134,10 +134,6 @@ difradix2.o:\
 Makefile vars.mk difradix2.c mpdecimal.h bits.h numbertheory.h constants.h \
 umodarith.h typearith.h difradix2.h vccompat.h
 	$(CC) $(INC) $(CFLAGS) -c difradix2.c
-
-error.o:\
-Makefile vars.mk error.c mpdecimal.h
-	$(CC) $(INC) $(CFLAGS) -c error.c
 
 fnt.o:\
 Makefile vars.mk fnt.c bits.h mpdecimal.h difradix2.h numbertheory.h \

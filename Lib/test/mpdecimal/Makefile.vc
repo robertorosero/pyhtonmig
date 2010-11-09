@@ -11,9 +11,8 @@ LIBSHARED = libmpdec-2.0.dll
 
 
 OBJS = basearith.obj context.obj constants.obj convolute.obj crt.obj \
-       mpdecimal.obj mpsignal.obj difradix2.obj error.obj fnt.obj \
-       fourstep.obj io.obj memory.obj numbertheory.obj sixstep.obj \
-       transpose.obj
+       mpdecimal.obj mpsignal.obj difradix2.obj fnt.obj fourstep.obj \
+       io.obj memory.obj numbertheory.obj sixstep.obj transpose.obj
 
 
 MPD_PREC = 9
@@ -116,10 +115,6 @@ difradix2.obj:\
 Makefile difradix2.c bits.h mpdecimal.h numbertheory.h constants.h \
 umodarith.h typearith.h difradix2.h vccompat.h
 	$(CC) $(BFLAGS) $(CFLAGS) $(PFLAGS) -c difradix2.c
-
-error.obj:\
-Makefile error.c mpdecimal.h
-	$(CC) $(BFLAGS) $(CFLAGS) $(PFLAGS) -c error.c
 
 fnt.obj:\
 Makefile fnt.c bits.h mpdecimal.h difradix2.h numbertheory.h constants.h \

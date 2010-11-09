@@ -146,7 +146,7 @@ case $CC in
         MPD_OPT="-O2 -fpic"
         ;;
     suncc)
-        MPD_WARN="-erroff=E_ARGUEMENT_MISMATCH"
+        MPD_WARN=
         MPD_OPT="-O2 -fpic -s"
         ;;
 esac

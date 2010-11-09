@@ -572,13 +572,12 @@ EXTINLINE void mpd_copy_flags(mpd_t *result, const mpd_t *a);
 /*                              Error Macros                                  */
 /******************************************************************************/
 
-enum {MPD_ERR_EXIT, MPD_ERR_WARN};
-#define mpd_err_fatal(format, ...) \
-	mpd_err_doit(MPD_ERR_EXIT, "%s:%d: error: " format, __FILE__, __LINE__, ##__VA_ARGS__)
-#define mpd_err_warn(format, ...) \
-	mpd_err_doit(MPD_ERR_WARN, "%s:%d: warning: " format, __FILE__, __LINE__, ##__VA_ARGS__)
-
-void mpd_err_doit(int action, const char *fmt, ...);
+#define mpd_err_fatal(...) \
+        do {mpd_varerr("%s:%d: error: ", __VA_ARGS__, ""); exit(1);} while (0)
+#define mpd_err_warn(...) \
+        mpd_varerr("%s:%d: warning: ", __VA_ARGS__, "")
+#define mpd_varerr(intro, format, ...) \
+        fprintf(stderr, intro format "%s\n", __FILE__, __LINE__, __VA_ARGS__)
 
 
 /******************************************************************************/

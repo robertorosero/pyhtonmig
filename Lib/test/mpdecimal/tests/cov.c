@@ -1336,12 +1336,10 @@ main(void)
 	test_set_string();
 	test_output();
 
-	/* Test this, too */
-	mpd_err_doit(MPD_ERR_WARN, "%s", "\ncov: PASS\n");
-
 	/* Valgrind */
 	mpd_del(&mpd_ln10);
 
+	fprintf(stderr, "\ncov: PASS\n");
 	return 0;
 }
 

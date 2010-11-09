@@ -1745,7 +1745,6 @@ class PyBuildExt(build_ext):
           'cdecimal/convolute.c',
           'cdecimal/crt.c',
           'cdecimal/difradix2.c',
-          'cdecimal/error.c',
           'cdecimal/fnt.c',
           'cdecimal/fourstep.c',
           'cdecimal/io.c',
@@ -1804,8 +1803,6 @@ class PyBuildExt(build_ext):
         # Faster version without thread local contexts:
         if not sysconfig.get_config_var('WITH_THREAD'):
             define_macros.append(('WITHOUT_THREADS', 1))
-        if 'sunos' in platform and cc == 'cc': # suncc
-            extra_compile_args.extend(['-erroff=E_ARGUEMENT_MISMATCH']) # [sic]
         ext = Extension (
             'cdecimal',
             define_macros=define_macros,
