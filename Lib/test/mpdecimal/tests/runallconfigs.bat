@@ -15,7 +15,6 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal64vc.h mpdecimal.h
 nmake MACHINE=x64 extended_gmp
 cd tests
 call runalltests.bat
@@ -28,7 +27,6 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal64vc.h mpdecimal.h
 nmake MACHINE=ansi64 extended_gmp
 cd tests
 call runalltests.bat
@@ -41,8 +39,9 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal32vc.h mpdecimal.h
+patch < tests\fullcov_header.patch
 nmake MACHINE=full_coverage extended_gmp
+patch -R < tests\fullcov_header.patch
 cd tests
 call runalltests.bat
 
@@ -56,7 +55,6 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal32vc.h mpdecimal.h
 nmake MACHINE=ppro extended_gmp
 cd tests
 call runalltests.bat
@@ -68,7 +66,6 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal32vc.h mpdecimal.h
 nmake MACHINE=ansi32 extended_gmp
 cd tests
 call runalltests.bat
@@ -80,7 +77,6 @@ echo # ========================================================================
 echo.
 cd ..\
 nmake clean
-copy /y mpdecimal32vc.h mpdecimal.h
 nmake MACHINE=ansi-legacy extended_gmp
 cd tests
 call runalltests.bat

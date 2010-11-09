@@ -29,8 +29,11 @@ for config in $CONFIGS; do
     ./configure MACHINE=$config
     if [ X"$config" = X"full_coverage" ]; then
         patch < tests/fullcov_header.patch
+        $GMAKE extended
+        patch -R < tests/fullcov_header.patch
+    else
+        $GMAKE extended
     fi
-    $GMAKE extended
     cd tests
     printf "\n"
     if [ X"$config" = X"ppro" ]; then
@@ -41,11 +44,6 @@ for config in $CONFIGS; do
         VALGRIND=$savevg
     else
         ./runalltests.sh
-    fi
-    if [ X"$config" = X"full_coverage" ]; then
-        cd ..
-        patch -R < tests/fullcov_header.patch
-        cd tests
     fi
 done
 
