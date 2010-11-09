@@ -15,7 +15,7 @@
 #endif
 
 #if defined(CONFIG_64)
-  #if defined(_MSC_VER) || defined(__OpenBSD__)
+  #if defined(_MSC_VER) || defined(__OpenBSD__) || defined(__APPLE__)
     #define PRI_mpd_size_t "llu"
     #define PRI_mpd_ssize_t "lld"
   #else
