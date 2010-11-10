@@ -65,6 +65,7 @@ typedef struct {
     PyObject *myerrno;
     PyObject *strerror;
     PyObject *filename; /* Not used, but part of the IOError object */
+    PyObject *winerror; /* Same, only under Windows */
     Py_ssize_t written;
 } PyBlockingIOErrorObject;
 PyAPI_DATA(PyObject *) PyExc_BlockingIOError;

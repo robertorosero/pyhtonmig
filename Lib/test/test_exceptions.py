@@ -191,12 +191,34 @@ class ExceptionTests(unittest.TestCase):
         except NameError:
             pass
         else:
-            self.assertEqual(str(WindowsError(1001)),
-                                 "1001")
-            self.assertEqual(str(WindowsError(1001, "message")),
-                                 "[Error 1001] message")
-            self.assertEqual(WindowsError(1001, "message").errno, 22)
-            self.assertEqual(WindowsError(1001, "message").winerror, 1001)
+            self.assertIs(WindowsError, IOError)
+            self.assertEqual(str(IOError(1001)), "1001")
+            self.assertEqual(str(IOError(1001, "message")),
+                                         "[Errno 1001] message")
+            # POSIX errno (9 aka EBADF) is untranslated
+            w = IOError(9, 'foo', 'bar')
+            self.assertEqual(w.errno, 9)
+            self.assertEqual(w.winerror, None)
+            self.assertEqual("[Errno 9] foo: 'bar'", str(w))
+            # ERROR_PATH_NOT_FOUND (win error 3) becomes ENOENT (2)
+            w = IOError(0, 'foo', 'bar', 3)
+            self.assertEqual(w.errno, 2)
+            self.assertEqual(w.winerror, 3)
+            self.assertEqual(w.strerror, 'foo')
+            self.assertEqual(w.filename, 'bar')
+            # Unknown win error becomes EINVAL (22)
+            w = IOError(0, 'foo', None, 1001)
+            self.assertEqual(w.errno, 22)
+            self.assertEqual(w.winerror, 1001)
+            self.assertEqual(w.strerror, 'foo')
+            self.assertEqual(w.filename, None)
+            self.assertEqual("[Error 1001] foo", str(w))
+            # Non-numeric "errno"
+            w = IOError('bar', 'foo')
+            self.assertEqual(w.errno, 'bar')
+            self.assertEqual(w.winerror, None)
+            self.assertEqual(w.strerror, 'foo')
+            self.assertEqual(w.filename, None)
 
     def testAttributes(self):
         # test that exception attributes are happy
@@ -274,11 +296,12 @@ class ExceptionTests(unittest.TestCase):
                  'start' : 0, 'end' : 1}),
         ]
         try:
+            # More tests are in test_WindowsError
             exceptionList.append(
                 (WindowsError, (1, 'strErrorStr', 'filenameStr'),
                     {'args' : (1, 'strErrorStr'),
-                     'strerror' : 'strErrorStr', 'winerror' : 1,
-                     'errno' : 22, 'filename' : 'filenameStr'})
+                     'strerror' : 'strErrorStr', 'winerror' : None,
+                     'errno' : 1, 'filename' : 'filenameStr'})
             )
         except NameError:
             pass

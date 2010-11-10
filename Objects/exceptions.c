@@ -10,6 +10,16 @@
 #include "osdefs.h"
 
 
+/* Compatibility aliases */
+PyObject *PyExc_EnvironmentError = NULL;
+PyObject *PyExc_OSError = NULL;
+#ifdef MS_WINDOWS
+PyObject *PyExc_WindowsError = NULL;
+#endif
+#ifdef __VMS
+PyObject *PyExc_VMSError = NULL;
+#endif
+
 /* NOTE: If the exception class hierarchy changes, don't forget to update
  * Lib/test/exception_hierarchy.txt
  */
@@ -552,8 +562,12 @@ SimpleExtendsException(PyExc_Exception, ImportError,
 
 
 /*
- *    EnvironmentError extends Exception
+ *    IOError extends Exception
  */
+
+#ifdef MS_WINDOWS
+#include "errmap.h"
+#endif
 
 /* Where a function has a single filename, such as open() or some
  * of the os module functions, PyErr_SetFromErrnoWithFilename() is
@@ -567,23 +581,38 @@ SimpleExtendsException(PyExc_Exception, ImportError,
  * when it was supplied.
  */
 static int
-EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
+IOError_init(PyIOErrorObject *self, PyObject *args,
     PyObject *kwds)
 {
     PyObject *myerrno = NULL, *strerror = NULL, *filename = NULL;
     PyObject *subslice = NULL;
+#ifdef MS_WINDOWS
+    PyObject *winerror = NULL;
+#endif
 
     if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
         return -1;
 
+#ifdef MS_WINDOWS
+    if (PyTuple_GET_SIZE(args) <= 1 || PyTuple_GET_SIZE(args) > 4) {
+        return 0;
+    }
+    if (!PyArg_UnpackTuple(args, "IOError", 2, 4,
+                           &myerrno, &strerror, &filename, &winerror)) {
+        return -1;
+    }
+    /* 4-args form with non-int 4th arg; just store the args tuple */
+    if (winerror && !PyLong_Check(winerror))
+        return 0;
+#else
     if (PyTuple_GET_SIZE(args) <= 1 || PyTuple_GET_SIZE(args) > 3) {
         return 0;
     }
-
-    if (!PyArg_UnpackTuple(args, "EnvironmentError", 2, 3,
+    if (!PyArg_UnpackTuple(args, "IOError", 2, 3,
                            &myerrno, &strerror, &filename)) {
         return -1;
     }
+#endif
     Py_CLEAR(self->myerrno);       /* replacing */
     self->myerrno = myerrno;
     Py_INCREF(self->myerrno);
@@ -592,8 +621,41 @@ EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
     self->strerror = strerror;
     Py_INCREF(self->strerror);
 
+#ifdef MS_WINDOWS
+    /* NOTE: when calling the WindowsError constructor explicitly, behaviour
+       is changed compared to previous versions:
+       - previous signature:
+           WindowsError(winerror[, strerror[, filename]])
+       - new signature:
+           WindowsError(posix_errno[, strerror[, filename, [winerror]]])
+    */
+    Py_XINCREF(winerror);
+    Py_CLEAR(self->winerror);
+    self->winerror = winerror;
+    /* If the optional "winerror" is passed, set errno to the corresponding
+       POSIX errno. */
+    if (self->winerror != NULL) {
+        PyObject *o_errcode = NULL;
+        long errcode;
+        long posix_errno;
+
+        errcode = PyLong_AsLong(self->winerror);
+        if (errcode == -1 && PyErr_Occurred())
+            PyErr_Clear();
+        else {
+            posix_errno = winerror_to_errno(errcode);
+
+            o_errcode = PyLong_FromLong(posix_errno);
+            if (!o_errcode)
+                return -1;
+            Py_CLEAR(self->myerrno);
+            self->myerrno = o_errcode;
+        }
+    }
+#endif
+
     /* self->filename will remain Py_None otherwise */
-    if (filename != NULL) {
+    if (filename != NULL && filename != Py_None) {
         Py_CLEAR(self->filename);      /* replacing */
         self->filename = filename;
         Py_INCREF(self->filename);
@@ -609,67 +671,87 @@ EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
 }
 
 static int
-EnvironmentError_clear(PyEnvironmentErrorObject *self)
+IOError_clear(PyIOErrorObject *self)
 {
     Py_CLEAR(self->myerrno);
     Py_CLEAR(self->strerror);
     Py_CLEAR(self->filename);
+#ifdef MS_WINDOWS
+    Py_CLEAR(self->winerror);
+#endif
     return BaseException_clear((PyBaseExceptionObject *)self);
 }
 
 static void
-EnvironmentError_dealloc(PyEnvironmentErrorObject *self)
+IOError_dealloc(PyIOErrorObject *self)
 {
     _PyObject_GC_UNTRACK(self);
-    EnvironmentError_clear(self);
+    IOError_clear(self);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 static int
-EnvironmentError_traverse(PyEnvironmentErrorObject *self, visitproc visit,
+IOError_traverse(PyIOErrorObject *self, visitproc visit,
         void *arg)
 {
     Py_VISIT(self->myerrno);
     Py_VISIT(self->strerror);
     Py_VISIT(self->filename);
+#ifdef MS_WINDOWS
+    Py_VISIT(self->winerror);
+#endif
     return BaseException_traverse((PyBaseExceptionObject *)self, visit, arg);
 }
 
 static PyObject *
-EnvironmentError_str(PyEnvironmentErrorObject *self)
+IOError_str(PyIOErrorObject *self)
 {
+#ifdef MS_WINDOWS
+    /* If available, winerror has the priority over myerrno */
+    if (self->winerror && self->filename)
+        return PyUnicode_FromFormat("[Error %S] %S: %R",
+                                    self->winerror ? self->winerror: Py_None,
+                                    self->strerror ? self->strerror: Py_None,
+                                    self->filename);
+    if (self->winerror && self->strerror)
+        return PyUnicode_FromFormat("[Error %S] %S",
+                                    self->winerror ? self->winerror: Py_None,
+                                    self->strerror ? self->strerror: Py_None);
+#endif
     if (self->filename)
         return PyUnicode_FromFormat("[Errno %S] %S: %R",
                                     self->myerrno ? self->myerrno: Py_None,
                                     self->strerror ? self->strerror: Py_None,
                                     self->filename);
-    else if (self->myerrno && self->strerror)
+    if (self->myerrno && self->strerror)
         return PyUnicode_FromFormat("[Errno %S] %S",
                                     self->myerrno ? self->myerrno: Py_None,
                                     self->strerror ? self->strerror: Py_None);
-    else
-        return BaseException_str((PyBaseExceptionObject *)self);
+    return BaseException_str((PyBaseExceptionObject *)self);
 }
 
-static PyMemberDef EnvironmentError_members[] = {
-    {"errno", T_OBJECT, offsetof(PyEnvironmentErrorObject, myerrno), 0,
-        PyDoc_STR("exception errno")},
-    {"strerror", T_OBJECT, offsetof(PyEnvironmentErrorObject, strerror), 0,
+static PyMemberDef IOError_members[] = {
+    {"errno", T_OBJECT, offsetof(PyIOErrorObject, myerrno), 0,
+        PyDoc_STR("POSIX exception code")},
+    {"strerror", T_OBJECT, offsetof(PyIOErrorObject, strerror), 0,
         PyDoc_STR("exception strerror")},
-    {"filename", T_OBJECT, offsetof(PyEnvironmentErrorObject, filename), 0,
+    {"filename", T_OBJECT, offsetof(PyIOErrorObject, filename), 0,
         PyDoc_STR("exception filename")},
+#ifdef MS_WINDOWS
+    {"winerror", T_OBJECT, offsetof(PyIOErrorObject, winerror), 0,
+        PyDoc_STR("Win32 exception code")},
+#endif
     {NULL}  /* Sentinel */
 };
 
-
 static PyObject *
-EnvironmentError_reduce(PyEnvironmentErrorObject *self)
+IOError_reduce(PyIOErrorObject *self)
 {
     PyObject *args = self->args;
     PyObject *res = NULL, *tmp;
 
     /* self->args is only the first two real arguments if there was a
-     * file name given to EnvironmentError. */
+     * file name given to IOError. */
     if (PyTuple_GET_SIZE(args) == 2 && self->filename) {
         args = PyTuple_New(3);
         if (!args) return NULL;
@@ -696,142 +778,16 @@ EnvironmentError_reduce(PyEnvironmentErrorObject *self)
 }
 
 
-static PyMethodDef EnvironmentError_methods[] = {
-    {"__reduce__", (PyCFunction)EnvironmentError_reduce, METH_NOARGS},
+static PyMethodDef IOError_methods[] = {
+    {"__reduce__", (PyCFunction)IOError_reduce, METH_NOARGS},
     {NULL}
 };
 
-ComplexExtendsException(PyExc_Exception, EnvironmentError,
-                        EnvironmentError, EnvironmentError_dealloc,
-                        EnvironmentError_methods, EnvironmentError_members,
-                        EnvironmentError_str,
+ComplexExtendsException(PyExc_Exception, IOError,
+                        IOError, IOError_dealloc,
+                        IOError_methods, IOError_members,
+                        IOError_str,
                         "Base class for I/O related errors.");
-
-
-/*
- *    IOError extends EnvironmentError
- */
-MiddlingExtendsException(PyExc_EnvironmentError, IOError,
-                         EnvironmentError, "I/O operation failed.");
-
-
-/*
- *    OSError extends EnvironmentError
- */
-MiddlingExtendsException(PyExc_EnvironmentError, OSError,
-                         EnvironmentError, "OS system call failed.");
-
-
-/*
- *    WindowsError extends OSError
- */
-#ifdef MS_WINDOWS
-#include "errmap.h"
-
-static int
-WindowsError_clear(PyWindowsErrorObject *self)
-{
-    Py_CLEAR(self->myerrno);
-    Py_CLEAR(self->strerror);
-    Py_CLEAR(self->filename);
-    Py_CLEAR(self->winerror);
-    return BaseException_clear((PyBaseExceptionObject *)self);
-}
-
-static void
-WindowsError_dealloc(PyWindowsErrorObject *self)
-{
-    _PyObject_GC_UNTRACK(self);
-    WindowsError_clear(self);
-    Py_TYPE(self)->tp_free((PyObject *)self);
-}
-
-static int
-WindowsError_traverse(PyWindowsErrorObject *self, visitproc visit, void *arg)
-{
-    Py_VISIT(self->myerrno);
-    Py_VISIT(self->strerror);
-    Py_VISIT(self->filename);
-    Py_VISIT(self->winerror);
-    return BaseException_traverse((PyBaseExceptionObject *)self, visit, arg);
-}
-
-static int
-WindowsError_init(PyWindowsErrorObject *self, PyObject *args, PyObject *kwds)
-{
-    PyObject *o_errcode = NULL;
-    long errcode;
-    long posix_errno;
-
-    if (EnvironmentError_init((PyEnvironmentErrorObject *)self, args, kwds)
-            == -1)
-        return -1;
-
-    if (self->myerrno == NULL)
-        return 0;
-
-    /* Set errno to the POSIX errno, and winerror to the Win32
-       error code. */
-    errcode = PyLong_AsLong(self->myerrno);
-    if (errcode == -1 && PyErr_Occurred())
-        return -1;
-    posix_errno = winerror_to_errno(errcode);
-
-    Py_CLEAR(self->winerror);
-    self->winerror = self->myerrno;
-
-    o_errcode = PyLong_FromLong(posix_errno);
-    if (!o_errcode)
-        return -1;
-
-    self->myerrno = o_errcode;
-
-    return 0;
-}
-
-
-static PyObject *
-WindowsError_str(PyWindowsErrorObject *self)
-{
-    if (self->filename)
-        return PyUnicode_FromFormat("[Error %S] %S: %R",
-                                    self->winerror ? self->winerror: Py_None,
-                                    self->strerror ? self->strerror: Py_None,
-                                    self->filename);
-    else if (self->winerror && self->strerror)
-        return PyUnicode_FromFormat("[Error %S] %S",
-                                    self->winerror ? self->winerror: Py_None,
-                                    self->strerror ? self->strerror: Py_None);
-    else
-        return EnvironmentError_str((PyEnvironmentErrorObject *)self);
-}
-
-static PyMemberDef WindowsError_members[] = {
-    {"errno", T_OBJECT, offsetof(PyWindowsErrorObject, myerrno), 0,
-        PyDoc_STR("POSIX exception code")},
-    {"strerror", T_OBJECT, offsetof(PyWindowsErrorObject, strerror), 0,
-        PyDoc_STR("exception strerror")},
-    {"filename", T_OBJECT, offsetof(PyWindowsErrorObject, filename), 0,
-        PyDoc_STR("exception filename")},
-    {"winerror", T_OBJECT, offsetof(PyWindowsErrorObject, winerror), 0,
-        PyDoc_STR("Win32 exception code")},
-    {NULL}  /* Sentinel */
-};
-
-ComplexExtendsException(PyExc_OSError, WindowsError, WindowsError,
-                        WindowsError_dealloc, 0, WindowsError_members,
-                        WindowsError_str, "MS-Windows OS system call failed.");
-
-#endif /* MS_WINDOWS */
-
-
-/*
- *    VMSError extends OSError (I think)
- */
-#ifdef __VMS
-MiddlingExtendsException(PyExc_OSError, VMSError, EnvironmentError,
-                         "OpenVMS OS system call failed.");
-#endif
 
 
 /*
@@ -1966,6 +1922,11 @@ PyObject *PyExc_RecursionErrorInst = NULL;
     if (PyDict_SetItemString(bdict, # TYPE, PyExc_ ## TYPE)) \
         Py_FatalError("Module dictionary insertion problem.");
 
+#define INIT_ALIAS(NAME, TYPE) Py_INCREF(PyExc_ ## TYPE); \
+    PyExc_ ## NAME = PyExc_ ## TYPE; \
+    if (PyDict_SetItemString(bdict, # NAME, PyExc_ ## NAME)) \
+        Py_FatalError("Module dictionary insertion problem.");
+
 
 void
 _PyExc_Init(void)
@@ -1980,15 +1941,7 @@ _PyExc_Init(void)
     PRE_INIT(SystemExit)
     PRE_INIT(KeyboardInterrupt)
     PRE_INIT(ImportError)
-    PRE_INIT(EnvironmentError)
     PRE_INIT(IOError)
-    PRE_INIT(OSError)
-#ifdef MS_WINDOWS
-    PRE_INIT(WindowsError)
-#endif
-#ifdef __VMS
-    PRE_INIT(VMSError)
-#endif
     PRE_INIT(EOFError)
     PRE_INIT(RuntimeError)
     PRE_INIT(NotImplementedError)
@@ -2043,14 +1996,14 @@ _PyExc_Init(void)
     POST_INIT(SystemExit)
     POST_INIT(KeyboardInterrupt)
     POST_INIT(ImportError)
-    POST_INIT(EnvironmentError)
     POST_INIT(IOError)
-    POST_INIT(OSError)
+    INIT_ALIAS(EnvironmentError, IOError)
+    INIT_ALIAS(OSError, IOError)
 #ifdef MS_WINDOWS
-    POST_INIT(WindowsError)
+    INIT_ALIAS(WindowsError, IOError)
 #endif
 #ifdef __VMS
-    POST_INIT(VMSError)
+    INIT_ALIAS(VMSError, IOError)
 #endif
     POST_INIT(EOFError)
     POST_INIT(RuntimeError)

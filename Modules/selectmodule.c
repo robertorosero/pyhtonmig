@@ -54,8 +54,6 @@ extern void bzero(void *, int);
 #  endif
 #endif
 
-static PyObject *SelectError;
-
 /* list of Python objects and their file descriptor */
 typedef struct {
     PyObject *obj;                           /* owned reference */
@@ -277,11 +275,11 @@ select_select(PyObject *self, PyObject *args)
 
 #ifdef MS_WINDOWS
     if (n == SOCKET_ERROR) {
-        PyErr_SetExcFromWindowsErr(SelectError, WSAGetLastError());
+        PyErr_SetExcFromWindowsErr(PyExc_IOError, WSAGetLastError());
     }
 #else
     if (n < 0) {
-        PyErr_SetFromErrno(SelectError);
+        PyErr_SetFromErrno(PyExc_IOError);
     }
 #endif
     else {
@@ -527,7 +525,7 @@ poll_poll(pollObject *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (poll_result < 0) {
-        PyErr_SetFromErrno(SelectError);
+        PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     }
 
@@ -1781,9 +1779,8 @@ PyInit_select(void)
     if (m == NULL)
         return NULL;
 
-    SelectError = PyErr_NewException("select.error", NULL, NULL);
-    Py_INCREF(SelectError);
-    PyModule_AddObject(m, "error", SelectError);
+    Py_INCREF(PyExc_IOError);
+    PyModule_AddObject(m, "error", PyExc_IOError);
 
 #ifdef PIPE_BUF
 #ifdef HAVE_BROKEN_PIPE_BUF

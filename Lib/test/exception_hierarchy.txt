@@ -11,13 +11,9 @@ BaseException
       +-- AssertionError
       +-- AttributeError
       +-- BufferError
-      +-- EnvironmentError
-      |    +-- IOError
-      |    +-- OSError
-      |         +-- WindowsError (Windows)
-      |         +-- VMSError (VMS)
       +-- EOFError
       +-- ImportError
+      +-- IOError
       +-- LookupError
       |    +-- IndexError
       |    +-- KeyError

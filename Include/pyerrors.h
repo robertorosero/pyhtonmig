@@ -44,16 +44,15 @@ typedef struct {
     PyObject *myerrno;
     PyObject *strerror;
     PyObject *filename;
-} PyEnvironmentErrorObject;
-
 #ifdef MS_WINDOWS
-typedef struct {
-    PyException_HEAD
-    PyObject *myerrno;
-    PyObject *strerror;
-    PyObject *filename;
     PyObject *winerror;
-} PyWindowsErrorObject;
+#endif
+} PyIOErrorObject;
+
+/* Compatibility typedefs */
+typedef PyIOErrorObject PyEnvironmentErrorObject;
+#ifdef MS_WINDOWS
+typedef PyIOErrorObject PyWindowsErrorObject;
 #endif
 
 /* Error handling definitions */
@@ -119,11 +118,10 @@ PyAPI_DATA(PyObject *) PyExc_LookupError;
 
 PyAPI_DATA(PyObject *) PyExc_AssertionError;
 PyAPI_DATA(PyObject *) PyExc_AttributeError;
+PyAPI_DATA(PyObject *) PyExc_BufferError;
 PyAPI_DATA(PyObject *) PyExc_EOFError;
 PyAPI_DATA(PyObject *) PyExc_FloatingPointError;
-PyAPI_DATA(PyObject *) PyExc_EnvironmentError;
 PyAPI_DATA(PyObject *) PyExc_IOError;
-PyAPI_DATA(PyObject *) PyExc_OSError;
 PyAPI_DATA(PyObject *) PyExc_ImportError;
 PyAPI_DATA(PyObject *) PyExc_IndexError;
 PyAPI_DATA(PyObject *) PyExc_KeyError;
@@ -147,14 +145,16 @@ PyAPI_DATA(PyObject *) PyExc_UnicodeDecodeError;
 PyAPI_DATA(PyObject *) PyExc_UnicodeTranslateError;
 PyAPI_DATA(PyObject *) PyExc_ValueError;
 PyAPI_DATA(PyObject *) PyExc_ZeroDivisionError;
+
+/* Compatibility aliases */
+PyAPI_DATA(PyObject *) PyExc_EnvironmentError;
+PyAPI_DATA(PyObject *) PyExc_OSError;
 #ifdef MS_WINDOWS
 PyAPI_DATA(PyObject *) PyExc_WindowsError;
 #endif
 #ifdef __VMS
 PyAPI_DATA(PyObject *) PyExc_VMSError;
 #endif
-
-PyAPI_DATA(PyObject *) PyExc_BufferError;
 
 PyAPI_DATA(PyObject *) PyExc_RecursionErrorInst;
 

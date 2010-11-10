@@ -438,7 +438,6 @@ dup_socket(SOCKET handle)
 
 /* Global variable holding the exception type for errors detected
    by this module (but not argument type or memory errors, etc.). */
-static PyObject *socket_error;
 static PyObject *socket_herror;
 static PyObject *socket_gaierror;
 static PyObject *socket_timeout;
@@ -472,7 +471,7 @@ static PyTypeObject sock_type;
 static PyObject*
 select_error(void)
 {
-    PyErr_SetString(socket_error, "unable to select on socket");
+    PyErr_SetString(PyExc_IOError, "unable to select on socket");
     return NULL;
 }
 
@@ -499,7 +498,7 @@ set_error(void)
        recognizes the error codes used by both GetLastError() and
        WSAGetLastError */
     if (err_no)
-        return PyErr_SetExcFromWindowsErr(socket_error, err_no);
+        return PyErr_SetExcFromWindowsErr(PyExc_IOError, err_no);
 #endif
 
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
@@ -530,7 +529,7 @@ set_error(void)
             }
             v = Py_BuildValue("(is)", myerrorcode, outbuf);
             if (v != NULL) {
-                PyErr_SetObject(socket_error, v);
+                PyErr_SetObject(PyExc_IOError, v);
                 Py_DECREF(v);
             }
             return NULL;
@@ -538,7 +537,7 @@ set_error(void)
     }
 #endif
 
-    return PyErr_SetFromErrno(socket_error);
+    return PyErr_SetFromErrno(PyExc_IOError);
 }
 
 
@@ -857,13 +856,13 @@ setipaddr(char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int af)
 #endif
         default:
             freeaddrinfo(res);
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                 "unsupported address family");
             return -1;
         }
         if (res->ai_next) {
             freeaddrinfo(res);
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                 "wildcard resolved to multiple address");
             return -1;
         }
@@ -876,7 +875,7 @@ setipaddr(char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int af)
     if (name[0] == '<' && strcmp(name, "<broadcast>") == 0) {
         struct sockaddr_in *sin;
         if (af != AF_INET && af != AF_UNSPEC) {
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                 "address family mismatched");
             return -1;
         }
@@ -934,7 +933,7 @@ setipaddr(char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int af)
         return 16;
 #endif
     default:
-        PyErr_SetString(socket_error, "unknown address family");
+        PyErr_SetString(PyExc_IOError, "unknown address family");
         return -1;
     }
 }
@@ -983,7 +982,7 @@ setbdaddr(char *name, bdaddr_t *bdaddr)
         bdaddr->b[5] = b5;
         return 6;
     } else {
-        PyErr_SetString(socket_error, "bad bluetooth address");
+        PyErr_SetString(PyExc_IOError, "bad bluetooth address");
         return -1;
     }
 }
@@ -1233,7 +1232,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
         if (len > 0 && path[0] == 0) {
             /* Linux abstract namespace extension */
             if (len > sizeof addr->sun_path) {
-                PyErr_SetString(socket_error,
+                PyErr_SetString(PyExc_IOError,
                                 "AF_UNIX path too long");
                 return 0;
             }
@@ -1243,7 +1242,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
         {
             /* regular NULL-terminated string */
             if (len >= sizeof addr->sun_path) {
-                PyErr_SetString(socket_error,
+                PyErr_SetString(PyExc_IOError,
                                 "AF_UNIX path too long");
                 return 0;
             }
@@ -1373,7 +1372,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
             _BT_L2_MEMB(addr, family) = AF_BLUETOOTH;
             if (!PyArg_ParseTuple(args, "si", &straddr,
                                   &_BT_L2_MEMB(addr, psm))) {
-                PyErr_SetString(socket_error, "getsockaddrarg: "
+                PyErr_SetString(PyExc_IOError, "getsockaddrarg: "
                                 "wrong format");
                 return 0;
             }
@@ -1392,7 +1391,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
             _BT_RC_MEMB(addr, family) = AF_BLUETOOTH;
             if (!PyArg_ParseTuple(args, "si", &straddr,
                                   &_BT_RC_MEMB(addr, channel))) {
-                PyErr_SetString(socket_error, "getsockaddrarg: "
+                PyErr_SetString(PyExc_IOError, "getsockaddrarg: "
                                 "wrong format");
                 return 0;
             }
@@ -1410,7 +1409,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 
 			_BT_HCI_MEMB(addr, family) = AF_BLUETOOTH;
             if (straddr == NULL) {
-                PyErr_SetString(socket_error, "getsockaddrarg: "
+                PyErr_SetString(PyExc_IOError, "getsockaddrarg: "
                     "wrong format");
                 return 0;
             }
@@ -1419,7 +1418,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 #else
             _BT_HCI_MEMB(addr, family) = AF_BLUETOOTH;
             if (!PyArg_ParseTuple(args, "i", &_BT_HCI_MEMB(addr, dev))) {
-                PyErr_SetString(socket_error, "getsockaddrarg: "
+                PyErr_SetString(PyExc_IOError, "getsockaddrarg: "
                                 "wrong format");
                 return 0;
             }
@@ -1436,7 +1435,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
             addr = (struct sockaddr_sco *)addr_ret;
             _BT_SCO_MEMB(addr, family) = AF_BLUETOOTH;
             if (!PyBytes_Check(args)) {
-                PyErr_SetString(socket_error, "getsockaddrarg: "
+                PyErr_SetString(PyExc_IOError, "getsockaddrarg: "
                                 "wrong format");
                 return 0;
             }
@@ -1449,7 +1448,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
         }
 #endif
         default:
-            PyErr_SetString(socket_error, "getsockaddrarg: unknown Bluetooth protocol");
+            PyErr_SetString(PyExc_IOError, "getsockaddrarg: unknown Bluetooth protocol");
             return 0;
         }
     }
@@ -1564,7 +1563,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
     /* More cases here... */
 
     default:
-        PyErr_SetString(socket_error, "getsockaddrarg: bad family");
+        PyErr_SetString(PyExc_IOError, "getsockaddrarg: bad family");
         return 0;
 
     }
@@ -1630,7 +1629,7 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
             return 1;
 #endif
         default:
-            PyErr_SetString(socket_error, "getsockaddrlen: "
+            PyErr_SetString(PyExc_IOError, "getsockaddrlen: "
                             "unknown BT protocol");
             return 0;
 
@@ -1657,7 +1656,7 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
     /* More cases here... */
 
     default:
-        PyErr_SetString(socket_error, "getsockaddrlen: bad family");
+        PyErr_SetString(PyExc_IOError, "getsockaddrlen: bad family");
         return 0;
 
     }
@@ -1886,7 +1885,7 @@ sock_getsockopt(PySocketSockObject *s, PyObject *args)
 #else
     if (buflen <= 0 || buflen > 1024) {
 #endif
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
                         "getsockopt buflen out of range");
         return NULL;
     }
@@ -3181,7 +3180,7 @@ gethost_common(struct hostent *h, struct sockaddr *addr, int alen, int af)
 
     if (h->h_addrtype != af) {
         /* Let's get real error message to return */
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
                         (char *)strerror(EAFNOSUPPORT));
 
         return NULL;
@@ -3266,7 +3265,7 @@ gethost_common(struct hostent *h, struct sockaddr *addr, int alen, int af)
 #endif
 
         default:                /* can't happen */
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                             "unsupported address family");
             return NULL;
         }
@@ -3420,7 +3419,7 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
         break;
 #endif
     default:
-        PyErr_SetString(socket_error, "unsupported address family");
+        PyErr_SetString(PyExc_IOError, "unsupported address family");
         goto finally;
     }
     Py_BEGIN_ALLOW_THREADS
@@ -3476,7 +3475,7 @@ socket_getservbyname(PyObject *self, PyObject *args)
     sp = getservbyname(name, proto);
     Py_END_ALLOW_THREADS
     if (sp == NULL) {
-        PyErr_SetString(socket_error, "service/proto not found");
+        PyErr_SetString(PyExc_IOError, "service/proto not found");
         return NULL;
     }
     return PyLong_FromLong((long) ntohs(sp->s_port));
@@ -3513,7 +3512,7 @@ socket_getservbyport(PyObject *self, PyObject *args)
     sp = getservbyport(htons((short)port), proto);
     Py_END_ALLOW_THREADS
     if (sp == NULL) {
-        PyErr_SetString(socket_error, "port/proto not found");
+        PyErr_SetString(PyExc_IOError, "port/proto not found");
         return NULL;
     }
     return PyUnicode_FromString(sp->s_name);
@@ -3542,7 +3541,7 @@ socket_getprotobyname(PyObject *self, PyObject *args)
     sp = getprotobyname(name);
     Py_END_ALLOW_THREADS
     if (sp == NULL) {
-        PyErr_SetString(socket_error, "protocol not found");
+        PyErr_SetString(PyExc_IOError, "protocol not found");
         return NULL;
     }
     return PyLong_FromLong((long) sp->p_proto);
@@ -3797,7 +3796,7 @@ socket_inet_aton(PyObject *self, PyObject *args)
         return PyBytes_FromStringAndSize((char *)(&buf),
                                           sizeof(buf));
 
-    PyErr_SetString(socket_error,
+    PyErr_SetString(PyExc_IOError,
                     "illegal IP address string passed to inet_aton");
     return NULL;
 
@@ -3818,7 +3817,7 @@ socket_inet_aton(PyObject *self, PyObject *args)
         packed_addr = inet_addr(ip_addr);
 
         if (packed_addr == INADDR_NONE) {               /* invalid address */
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                 "illegal IP address string passed to inet_aton");
             return NULL;
         }
@@ -3850,7 +3849,7 @@ socket_inet_ntoa(PyObject *self, PyObject *args)
     }
 
     if (addr_len != sizeof(packed_addr)) {
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
             "packed IP wrong length for inet_ntoa");
         return NULL;
     }
@@ -3885,7 +3884,7 @@ socket_inet_pton(PyObject *self, PyObject *args)
 
 #if !defined(ENABLE_IPV6) && defined(AF_INET6)
     if(af == AF_INET6) {
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
                         "can't use AF_INET6, IPv6 is disabled");
         return NULL;
     }
@@ -3893,10 +3892,10 @@ socket_inet_pton(PyObject *self, PyObject *args)
 
     retval = inet_pton(af, ip, packed);
     if (retval < 0) {
-        PyErr_SetFromErrno(socket_error);
+        PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     } else if (retval == 0) {
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
             "illegal IP address string passed to inet_pton");
         return NULL;
     } else if (af == AF_INET) {
@@ -3908,7 +3907,7 @@ socket_inet_pton(PyObject *self, PyObject *args)
                                           sizeof(struct in6_addr));
 #endif
     } else {
-        PyErr_SetString(socket_error, "unknown address family");
+        PyErr_SetString(PyExc_IOError, "unknown address family");
         return NULL;
     }
 }
@@ -3960,7 +3959,7 @@ socket_inet_ntop(PyObject *self, PyObject *args)
 
     retval = inet_ntop(af, packed, ip, sizeof(ip));
     if (!retval) {
-        PyErr_SetFromErrno(socket_error);
+        PyErr_SetFromErrno(PyExc_IOError);
         return NULL;
     } else {
         return PyUnicode_FromString(retval);
@@ -4027,7 +4026,7 @@ socket_getaddrinfo(PyObject *self, PyObject *args, PyObject* kwargs)
     } else if (pobj == Py_None) {
         pptr = (char *)NULL;
     } else {
-        PyErr_SetString(socket_error, "Int or String expected");
+        PyErr_SetString(PyExc_IOError, "Int or String expected");
         goto err;
     }
     memset(&hints, 0, sizeof(hints));
@@ -4124,7 +4123,7 @@ socket_getnameinfo(PyObject *self, PyObject *args)
         goto fail;
     }
     if (res->ai_next) {
-        PyErr_SetString(socket_error,
+        PyErr_SetString(PyExc_IOError,
             "sockaddr resolved to multiple addresses");
         goto fail;
     }
@@ -4132,7 +4131,7 @@ socket_getnameinfo(PyObject *self, PyObject *args)
     case AF_INET:
         {
         if (PyTuple_GET_SIZE(sa) != 2) {
-            PyErr_SetString(socket_error,
+            PyErr_SetString(PyExc_IOError,
                 "IPv4 sockaddr must be 2 tuple");
             goto fail;
         }
@@ -4402,27 +4401,24 @@ PyInit__socket(void)
     if (m == NULL)
         return NULL;
 
-    socket_error = PyErr_NewException("socket.error",
-                                      PyExc_IOError, NULL);
-    if (socket_error == NULL)
-        return NULL;
-    PySocketModuleAPI.error = socket_error;
-    Py_INCREF(socket_error);
-    PyModule_AddObject(m, "error", socket_error);
+    Py_INCREF(PyExc_IOError);
+    PySocketModuleAPI.error = PyExc_IOError;
+    Py_INCREF(PyExc_IOError);
+    PyModule_AddObject(m, "error", PyExc_IOError);
     socket_herror = PyErr_NewException("socket.herror",
-                                       socket_error, NULL);
+                                       PyExc_IOError, NULL);
     if (socket_herror == NULL)
         return NULL;
     Py_INCREF(socket_herror);
     PyModule_AddObject(m, "herror", socket_herror);
-    socket_gaierror = PyErr_NewException("socket.gaierror", socket_error,
+    socket_gaierror = PyErr_NewException("socket.gaierror", PyExc_IOError,
         NULL);
     if (socket_gaierror == NULL)
         return NULL;
     Py_INCREF(socket_gaierror);
     PyModule_AddObject(m, "gaierror", socket_gaierror);
     socket_timeout = PyErr_NewException("socket.timeout",
-                                        socket_error, NULL);
+                                        PyExc_IOError, NULL);
     if (socket_timeout == NULL)
         return NULL;
     Py_INCREF(socket_timeout);

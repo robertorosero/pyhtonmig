@@ -496,10 +496,15 @@ PyObject *PyErr_SetExcFromWindowsErrWithFilenameObject(
         return NULL;
     }
 
-    if (filenameObject != NULL)
-        v = Py_BuildValue("(iOO)", err, message, filenameObject);
+    if (filenameObject == NULL)
+        filenameObject = Py_None;
+    /* errcodes >= 10000 correspond to socket error codes; no need to convert
+       them to a POSIX errno since they are natively recognized by Python
+       (also, trying to convert would end up with EINVAL) */
+    if (err < 10000)
+        v = Py_BuildValue("(iOOi)", err, message, filenameObject, err);
     else
-        v = Py_BuildValue("(iO)", err, message);
+        v = Py_BuildValue("(iOO)", err, message, filenameObject);
     Py_DECREF(message);
 
     if (v != NULL) {
