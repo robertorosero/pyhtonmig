@@ -72,7 +72,7 @@ extern "C" {
     #define ASM
   #else
     #error "unknown architecture for universal build."
-  #endif"
+  #endif
 #endif
 
 
