@@ -1767,8 +1767,6 @@ class PyBuildExt(build_ext):
           'cdecimal/io.h',
           'cdecimal/memory.h',
           'cdecimal/mpdecimal.h',
-          'cdecimal/mpdecimal32.h',
-          'cdecimal/mpdecimal64.h',
           'cdecimal/mptypes.h',
           'cdecimal/numbertheory.h',
           'cdecimal/sixstep.h',
@@ -1780,7 +1778,9 @@ class PyBuildExt(build_ext):
         platform = self.get_platform()
         cc = sysconfig.get_config_var('CC')
         sizeof_size_t = sysconfig.get_config_var('SIZEOF_SIZE_T')
-        if sizeof_size_t == 8:
+        if platform == 'darwin':
+            define_macros = [('UNIVERSAL', '1')]
+        elif sizeof_size_t == 8:
             if sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X64'):
                 define_macros = [('CONFIG_64', '1'), ('ASM', '1')]
             elif sysconfig.get_config_var('HAVE_GCC_UINT128_T'):
@@ -1790,8 +1790,7 @@ class PyBuildExt(build_ext):
                 define_macros = [('CONFIG_64', '1'), ('ANSI', '1')]
         elif sizeof_size_t == 4:
             ppro = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
-            if ppro and ('gcc' in cc or 'clang' in cc) and \
-               platform != 'darwin':
+            if ppro and ('gcc' in cc or 'clang' in cc):
                 # darwin: problems with global constant in inline asm.
                 # icc >= 11.0 works as well.
                 define_macros = [('CONFIG_32', '1'), ('PPRO', '1'),
