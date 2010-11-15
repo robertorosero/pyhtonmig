@@ -14,6 +14,10 @@ extern "C" {
 #endif
 
 
+#ifndef _MSC_VER
+  #include "pyconfig.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +31,6 @@ extern "C" {
   #endif
   #define EXTINLINE extern inline
 #else
-  #include "pyconfig.h"
   #ifdef HAVE_STDINT_H
     #include <stdint.h>
   #endif
