@@ -15,11 +15,18 @@ from imp import source_from_cache
 from test.support import make_legacy_pyc
 
 # Executing the interpreter in a subprocess
-def _assert_python(expected_success, *args):
-    cmd_line = [sys.executable, '-E']
+def _assert_python(expected_success, *args, **env_vars):
+    cmd_line = [sys.executable]
+    if not env_vars:
+        cmd_line.append('-E')
     cmd_line.extend(args)
+    # Need to preserve the original environment, for in-place testing of
+    # shared library builds.
+    env = os.environ.copy()
+    env.update(env_vars)
     p = subprocess.Popen(cmd_line, stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         env=env)
     try:
         out, err = p.communicate()
     finally:
@@ -33,11 +40,19 @@ def _assert_python(expected_success, *args):
             "stderr follows:\n%s" % (rc, err.decode('ascii', 'ignore')))
     return rc, out, err
 
-def assert_python_ok(*args):
-    return _assert_python(True, *args)
+def assert_python_ok(*args, **env_vars):
+    """
+    Assert that running the interpreter with `args` and optional environment
+    variables `env_vars` is ok and return a (return code, stdout, stderr) tuple.
+    """
+    return _assert_python(True, *args, **env_vars)
 
-def assert_python_failure(*args):
-    return _assert_python(False, *args)
+def assert_python_failure(*args, **env_vars):
+    """
+    Assert that running the interpreter with `args` and optional environment
+    variables `env_vars` fails and return a (return code, stdout, stderr) tuple.
+    """
+    return _assert_python(False, *args, **env_vars)
 
 def spawn_python(*args):
     cmd_line = [sys.executable, '-E']

@@ -76,7 +76,7 @@ collections         rhettinger, stutzbach
 colorsys
 compileall
 concurrent.futures  brian.quinlan
-configparser
+configparser        lukasz.langa
 contextlib
 copy                alexandre.vassalotti
 copyreg             alexandre.vassalotti
@@ -84,7 +84,7 @@ cProfile
 crypt
 csv
 ctypes              theller
-curses              akuchling
+curses
 datetime            alexander.belopolsky
 dbm
 decimal             facundobatista, rhettinger, mark.dickinson
@@ -133,7 +133,7 @@ linecache
 locale              loewis, lemburg
 logging             vinay.sajip
 macpath
-mailbox             akuchling
+mailbox
 mailcap
 marshal
 math                mark.dickinson, rhettinger, stutzbach
