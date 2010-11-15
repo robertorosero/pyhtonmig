@@ -1,6 +1,6 @@
---- a/mpdecimal32.h	2010-11-04 14:48:30.000000000 +0100
-+++ b/mpdecimal32.h	2010-11-04 16:03:35.000000000 +0100
-@@ -64,8 +64,9 @@
+--- a/mpdecimal.h	2010-11-15 12:28:32.000000000 +0100
++++ b/mpdecimal.h	2010-11-15 12:30:04.000000000 +0100
+@@ -110,8 +110,9 @@
  typedef uint64_t mpd_uuint_t; /* double width unsigned mod type */
  #endif
  
@@ -12,8 +12,8 @@
  
  /* type for dec->len, dec->exp, ctx->prec */
  #define MPD_SSIZE_MAX INT32_MAX
-@@ -91,8 +92,8 @@
- #define MPD_MAXIMPORT 94444445L      /* ceil((2*MPD_MAX_PREC)/MPD_RDIGITS) */
+@@ -139,8 +140,8 @@
+ /* END CONFIG_32 */
  
  
 -#if MPD_SIZE_MAX != MPD_UINT_MAX

@@ -10,7 +10,8 @@ version_required(2.67)
 
 AC_INIT(mpdecimal, 2.0, mpdecimal-bugs@bytereef.org, mpdecimal-2.0.tar.gz, http://www.bytereef.org/libmpdec.html)
 AC_CONFIG_HEADER(config.h)
-AC_ARG_VAR(MACHINE, [force configuration: x64, uint128, ansi64, ppro, ansi32, ansi-legacy])
+AC_CONFIG_FILES([Makefile tests/Makefile])
+AC_ARG_VAR(MACHINE, [force configuration: x64, uint128, ansi64, ppro, ansi32, ansi-legacy, universal])
 
 LIBSHARED=libmpdec.so.$PACKAGE_VERSION
 AC_SUBST(LIBSHARED)
@@ -41,7 +42,7 @@ AC_TYPE_INT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_CHECK_TYPE(__uint128_t, AC_DEFINE(HAVE_UINT128_T, 1,
-               [Define if your compiler provides __uint128_t]),,)
+              [Define if your compiler provides __uint128_t]),,)
 
 # Sizes of various types:
 AC_CHECK_SIZEOF(size_t, 4)
@@ -151,68 +152,84 @@ case $CC in
         ;;
 esac
 
-# Machine dependent settings
-MPD_CONFIG="-DCONFIG_32 -DANSI"
-MPD_HEADER="mpdecimal32.h"
+# Auto-detect machine dependent settings:
+M32=
+if test -n "$MACHINE"; then
+    M32="-m32 "
+    case "$MACHINE" in
+        x64|uint128|ansi64|full_coverage|ppro|ansi32|ansi-legacy|universal)
+            : ;;
+        *)
+            echo "configure: error: invalid MACHINE variable: $MACHINE"
+            exit 1 ;;
+    esac
+elif test $ac_cv_sizeof_size_t -eq 8; then
+    if test $have_gcc_asm_for_x64 = yes; then
+        MACHINE="x64"
+    elif test $ac_cv_sizeof__uint128_t -eq 8; then
+        MACHINE="uint128"
+    else
+        MACHINE="ansi64"
+    fi
+else
+    MACHINE="ansi32"
+    if test $have_gcc_asm_for_x87 = yes; then
+        case $CC in
+            gcc|clang) # icc >= 11.0 works as well
+                case $ac_sys_system in
+                    darwin|Darwin)
+                    ;;
+                *)
+                    MACHINE="ppro"
+                    ;;
+                esac
+            ;;
+        esac
+    fi
+fi
+
+# Set configuration variables:
 MPD_PREC=9
 MPD_DPREC=18
-if test $ac_cv_sizeof_size_t -eq 8; then
-    if test $have_gcc_asm_for_x64 = yes; then
-        MPD_CONFIG="-DCONFIG_64 -DASM"
-        MPD_HEADER="mpdecimal64.h"
-        MPD_PREC=19
-        MPD_DPREC=38
-    elif test $ac_cv_sizeof__uint128_t -eq 8; then
-        MPD_CONFIG="-DCONFIG_64 -DANSI -DHAVE_UINT128_T"
-        MPD_HEADER="mpdecimal64.h"
-        MPD_PREC=19
-        MPD_DPREC=38
-    fi # else: Use CONFIG_32/ANSI
-elif test $have_gcc_asm_for_x87 = yes; then
-    case $CC in
-        gcc|clang) # icc >= 11.0 works as well
-            case $ac_sys_system in
-                darwin|Darwin)
-                ;;
-            *)
-                MPD_CONFIG="-DCONFIG_32 -DPPRO -DASM"
-                ;;
-            esac
-        ;;
-    esac
-fi
-
-# Shortcuts for testing all configurations.
 CONFIGURE_LDFLAGS=
-if test -n "$MACHINE"; then
-   case "$MACHINE" in
-      x64)
-          MPD_CONFIG="-DCONFIG_64 -DASM"
-          ;;
-      uint128)
-          MPD_CONFIG="-DCONFIG_64 -DANSI -DHAVE_UINT128_T"
-          ;;
-      ansi64)
-          MPD_CONFIG="-DCONFIG_64 -DANSI"
-          ;;
-      full_coverage) # formerly ansi64c32, for testing only!
-          MPD_CONFIG="-DCONFIG_32 -DANSI"
-          ;;
-      ppro)
-          MPD_CONFIG="-m32 -DCONFIG_32 -DPPRO -DASM"
-          CONFIGURE_LDFLAGS="-m32"
-          ;;
-      ansi32)
-          MPD_CONFIG="-m32 -DCONFIG_32 -DANSI"
-          CONFIGURE_LDFLAGS="-m32"
-          ;;
-      ansi-legacy)
-          MPD_CONFIG="-m32 -DCONFIG_32 -DANSI -DLEGACY_COMPILER"
-          CONFIGURE_LDFLAGS="-m32"
-          ;;
-    esac
-fi
+case "$MACHINE" in
+    x64)
+        MPD_CONFIG="-DCONFIG_64 -DASM"
+        MPD_PREC=19
+        MPD_DPREC=38
+        ;;
+    uint128)
+        MPD_CONFIG="-DCONFIG_64 -DANSI -DHAVE_UINT128_T"
+        MPD_PREC=19
+        MPD_DPREC=38
+        ;;
+    ansi64)
+        MPD_CONFIG="-DCONFIG_64 -DANSI"
+        MPD_PREC=19
+        MPD_DPREC=38
+        ;;
+    full_coverage)
+        # Formerly ansi64c32, for testing only!
+        MPD_CONFIG="-DCONFIG_32 -DANSI"
+        ;;
+    ppro)
+        MPD_CONFIG=$M32"-DCONFIG_32 -DPPRO -DASM"
+        CONFIGURE_LDFLAGS=$M32
+        ;;
+    ansi32)
+        MPD_CONFIG=$M32"-DCONFIG_32 -DANSI"
+        CONFIGURE_LDFLAGS=$M32
+        ;;
+    ansi-legacy)
+        MPD_CONFIG=$M32"-DCONFIG_32 -DANSI -DLEGACY_COMPILER"
+        CONFIGURE_LDFLAGS=$M32
+        ;;
+    universal)
+        MPD_CONFIG="-DUNIVERSAL"
+esac
 
+
+# Substitute variables and generate output:
 AC_SUBST(AR)
 AC_SUBST(MPD_HEADER)
 AC_SUBST(MPD_WARN)
@@ -239,8 +256,7 @@ fi
 AC_SUBST(CONFIGURE_CFLAGS)
 AC_SUBST(CONFIGURE_LDFLAGS)
 
-AC_OUTPUT(Makefile)
-AC_OUTPUT(tests/Makefile)
+AC_OUTPUT
 
 
 

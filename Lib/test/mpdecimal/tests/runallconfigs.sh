@@ -11,7 +11,7 @@ export VALGRIND
 if [ -n "$1" ]; then
     CONFIGS="$@"
 else
-    CONFIGS="x64 uint128 ansi64 full_coverage ppro ansi32 ansi-legacy"
+    CONFIGS="x64 uint128 ansi64 full_coverage ppro ansi32 ansi-legacy universal"
 fi
 
 GMAKE=`which gmake`
