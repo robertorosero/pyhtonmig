@@ -178,8 +178,10 @@ if os.path.isfile("/etc/locale.alias"):
 
 if platform.system() == 'FreeBSD':
     # http://www.freebsd.org/cgi/query-pr.cgi?pr=142173
+    # en_GB.US-ASCII has 163 as the currency symbol.
     for loc in ['it_CH.ISO8859-1', 'it_CH.ISO8859-15', 'it_CH.UTF-8', 'it_IT.ISO8859-1',
-                'it_IT.ISO8859-15', 'it_IT.UTF-8', 'sl_SI.ISO8859-2', 'sl_SI.UTF-8']:
+                'it_IT.ISO8859-15', 'it_IT.UTF-8', 'sl_SI.ISO8859-2', 'sl_SI.UTF-8',
+                'en_GB.US-ASCII']:
         try:
             locale_list.remove(loc)
         except ValueError:
