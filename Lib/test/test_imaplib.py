@@ -60,7 +60,7 @@ class SimpleIMAPHandler(socketserver.StreamRequestHandler):
     timeout = 1
 
     def _send(self, message):
-        if verbose: print("SENT:", message.strip())
+        if verbose: print("SENT: %r" % message.strip())
         self.wfile.write(message)
 
     def handle(self):
@@ -84,7 +84,7 @@ class SimpleIMAPHandler(socketserver.StreamRequestHandler):
                 if line.endswith(b'\r\n'):
                     break
 
-            if verbose: print('GOT:', line.strip())
+            if verbose: print('GOT: %r' % line.strip())
             splitline = line.split()
             tag = splitline[0].decode('ASCII')
             cmd = splitline[1].decode('ASCII')
@@ -208,6 +208,8 @@ class RemoteIMAPTest(unittest.TestCase):
             self.server.logout()
 
     def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
         self.assertTrue('LOGINDISABLED' in self.server.capabilities)
         self.assertTrue('AUTH=ANONYMOUS' in self.server.capabilities)
         rs = self.server.login(self.username, self.password)
@@ -228,6 +230,8 @@ class RemoteIMAP_STARTTLSTest(RemoteIMAPTest):
         self.assertEqual(rs[0], 'OK')
 
     def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
         self.assertFalse('LOGINDISABLED' in self.server.capabilities)
 
 
@@ -237,6 +241,8 @@ class RemoteIMAP_SSLTest(RemoteIMAPTest):
     imap_class = IMAP4_SSL
 
     def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
         self.assertFalse('LOGINDISABLED' in self.server.capabilities)
         self.assertTrue('AUTH=PLAIN' in self.server.capabilities)
 

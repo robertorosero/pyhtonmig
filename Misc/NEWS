@@ -2,6 +2,24 @@
 Python News
 +++++++++++
 
+What's New in Python 3.2 Beta 1?
+================================
+
+*Release date: XX-Dec-2010*
+
+Core and Builtins
+-----------------
+
+Library
+-------
+
+- Issue #10440: Support RUSAGE_THREAD as a constant in the resource module.
+  Patch by Robert Collins.
+
+- Issue #10429: IMAP.starttls() stored the capabilities as bytes objects,
+  rather than strings.
+
+
 What's New in Python 3.2 Alpha 4?
 =================================
 
@@ -62,6 +80,8 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #10356: Decimal.__hash__(-1) should return -2.
 
 - Issue #1553375: logging: Added stack_info kwarg to display stack information.
 
