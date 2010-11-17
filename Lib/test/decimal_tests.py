@@ -94,9 +94,6 @@ else:
     def get_fmt(x, locale, fmt='n'):
         return Decimal.__format__(Decimal(x), fmt, _localeconv=locale)
 
-# Disagreement about TypeError vs. ValueError.
-TypeValueError = TypeError if HAVE_CDECIMAL else ValueError
-
 # Useful Test Constant
 Signals = tuple(getcontext().flags.keys())
 
@@ -614,20 +611,20 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
 
         #bad sign
         self.assertRaises(ValueError, Decimal, (8, (4, 3, 4, 9, 1), 2) )
-        self.assertRaises(TypeValueError, Decimal, (0., (4, 3, 4, 9, 1), 2) )
-        self.assertRaises(TypeValueError, Decimal, (Decimal(1), (4, 3, 4, 9, 1), 2))
+        self.assertRaises(ValueError, Decimal, (0., (4, 3, 4, 9, 1), 2) )
+        self.assertRaises(ValueError, Decimal, (Decimal(1), (4, 3, 4, 9, 1), 2))
 
         #bad exp
         self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, 9, 1), 'wrong!') )
-        self.assertRaises(TypeValueError, Decimal, (1, (4, 3, 4, 9, 1), 0.) )
+        self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, 9, 1), 0.) )
         self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, 9, 1), '1') )
 
         #bad coefficients
-        self.assertRaises(TypeValueError, Decimal, (1, "xyz", 2) )
-        self.assertRaises(TypeValueError, Decimal, (1, (4, 3, 4, None, 1), 2) )
+        self.assertRaises(ValueError, Decimal, (1, "xyz", 2) )
+        self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, None, 1), 2) )
         self.assertRaises(ValueError, Decimal, (1, (4, -3, 4, 9, 1), 2) )
         self.assertRaises(ValueError, Decimal, (1, (4, 10, 4, 9, 1), 2) )
-        self.assertRaises(TypeValueError, Decimal, (1, (4, 3, 4, 'a', 1), 2) )
+        self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, 'a', 1), 2) )
 
     def test_explicit_from_bool(self):
         self.assertIs(bool(Decimal(0)), False)
@@ -754,8 +751,9 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
 
         # invalid arguments
         self.assertRaises(InvalidOperation, nc.create_decimal, "xyz")
-        self.assertRaises(TypeValueError, nc.create_decimal, (1, "xyz", -25))
-        self.assertRaises(TypeValueError, nc.create_decimal, ["%"])
+        self.assertRaises(ValueError, nc.create_decimal, (1, "xyz", -25))
+        if HAVE_CDECIMAL: # decimal.py accepts lists.
+            self.assertRaises(TypeError, nc.create_decimal, ["%"])
         self.assertRaises(TypeError, nc.create_decimal, "1234", "5678")
 
     def test_explicit_context_create_from_float(self):
@@ -1626,19 +1624,26 @@ class DecimalUsabilityTest(unittest.TestCase):
         self.assertEqual(id(dc), id(d))
 
     def test_hash_method(self):
+        def hashit(d):
+            a = hash(d)
+            b = d.__hash__()
+            self.assertEqual(a, b)
+            return a
+
         #just that it's hashable
-        hash(Decimal(23))
-        hash(Decimal('Infinity'))
-        hash(Decimal('-Infinity'))
-        hash(Decimal('nan123'))
-        hash(Decimal('-NaN'))
+        hashit(Decimal(23))
+        hashit(Decimal('Infinity'))
+        hashit(Decimal('-Infinity'))
+        hashit(Decimal('nan123'))
+        hashit(Decimal('-NaN'))
 
         test_values = [Decimal(sign*(2**m + n))
                        for m in [0, 14, 15, 16, 17, 30, 31,
-                                 32, 33, 62, 63, 64, 65, 66]
+                                 32, 33, 61, 62, 63, 64, 65, 66]
                        for n in range(-10, 10)
                        for sign in [-1, 1]]
         test_values.extend([
+                Decimal("-1"), # ==> -2
                 Decimal("-0"), # zeros
                 Decimal("0.00"),
                 Decimal("-0.000"),
@@ -1662,14 +1667,14 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         # check that hash(d) == hash(int(d)) for integral values
         for value in test_values:
-            self.assertEqual(hash(value), hash(int(value)))
+            self.assertEqual(hashit(value), hashit(int(value)))
 
         #the same hash that to an int
-        self.assertEqual(hash(Decimal(23)), hash(23))
+        self.assertEqual(hashit(Decimal(23)), hashit(23))
         ex = ValueError if HAVE_CDECIMAL else TypeError
         self.assertRaises(ex, hash, Decimal('sNaN'))
-        self.assertTrue(hash(Decimal('Inf')))
-        self.assertTrue(hash(Decimal('-Inf')))
+        self.assertTrue(hashit(Decimal('Inf')))
+        self.assertTrue(hashit(Decimal('-Inf')))
 
         # check that the hashes of a Decimal float match when they
         # represent exactly the same values
@@ -1678,7 +1683,7 @@ class DecimalUsabilityTest(unittest.TestCase):
         for s in test_strings:
             f = float(s)
             d = Decimal(s)
-            self.assertEqual(hash(f), hash(d))
+            self.assertEqual(hashit(f), hashit(d))
 
         # check that the value of the hash doesn't depend on the
         # current context (issue #1757)
@@ -1687,11 +1692,11 @@ class DecimalUsabilityTest(unittest.TestCase):
         x = Decimal("123456789.1")
 
         c.prec = 6
-        h1 = hash(x)
+        h1 = hashit(x)
         c.prec = 10
-        h2 = hash(x)
+        h2 = hashit(x)
         c.prec = 16
-        h3 = hash(x)
+        h3 = hashit(x)
 
         self.assertEqual(h1, h2)
         self.assertEqual(h1, h3)
@@ -2870,16 +2875,19 @@ class Coverage(unittest.TestCase):
             self.assertEqual(getattr(c, attr), 999999)
             self.assertRaises(ValueError, setattr, c, attr, -1)
             self.assertRaises(ValueError, setattr, c, attr, gt_max_emax)
+            self.assertRaises(TypeError, setattr, c, attr, 'xyz')
 
         # Specific: Emin
         setattr(c, 'Emin', -999999)
         self.assertEqual(getattr(c, 'Emin'), -999999)
         self.assertRaises(ValueError, setattr, c, 'Emin', 1)
         self.assertRaises(ValueError, setattr, c, 'Emin', -gt_max_emax)
+        self.assertRaises(TypeError, setattr, c, 'Emin', (1,2,3))
 
         # Specific: rounding
         self.assertRaises(ValueError, setattr, c, 'rounding', -1)
         self.assertRaises(ValueError, setattr, c, 'rounding', 9)
+        self.assertRaises(TypeError, setattr, c, 'rounding', 1.0)
 
         # Specific: capitals, clamp, _allcr
         for attr in ['capitals', 'clamp', '_allcr']:
@@ -2888,6 +2896,7 @@ class Coverage(unittest.TestCase):
             if HAVE_CONFIG_64:
                 self.assertRaises(ValueError, setattr, c, attr, 2**32)
                 self.assertRaises(ValueError, setattr, c, attr, 2**32+1)
+                self.assertRaises(TypeError, setattr, c, attr, [1,2,3])
 
         # Specific: _flags, _traps
         for attr in ['_flags', '_traps']:
