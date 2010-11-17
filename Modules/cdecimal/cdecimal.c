@@ -2020,12 +2020,13 @@ string_from_tuple(PyObject *v)
 
 	tmp = PyTuple_GET_ITEM(v, 0);
 	if (!PyLong_Check(tmp)) {
-		PyErr_SetString(PyExc_TypeError, "sign must be 0 or 1.");
-		return NULL;
+		return value_error_ptr(
+		    "sign must be an integer with the value 0 or 1.");
 	}
 	sign = PyLong_AsLong(tmp);
 	if (sign != 0 && sign != 1) {
-		return value_error_ptr("sign must be 0 or 1.");
+		return value_error_ptr(
+		    "sign must be an integer with the value 0 or 1.");
 	}
 	sign_special[0] = sign ? '-' : '+';
 	sign_special[1] = '\0';
@@ -2048,17 +2049,20 @@ string_from_tuple(PyObject *v)
 		}
 	}
 	else {
+		if (!PyLong_Check(tmp)) {
+			return value_error_ptr(
+			    "exponent must be an integer.");
+		}
 		exp = PyLong_AsMpdSsize(tmp);
 		if (PyErr_Occurred()) {
-			return NULL;
+			return NULL; /* GCOV_UNLIKELY */
 		}
 	}
 
 	dtuple = PyTuple_GET_ITEM(v, 1);
 	if (!PyTuple_Check(dtuple)) {
-		PyErr_SetString(PyExc_TypeError,
+		return value_error_ptr(
 		    "coefficient must be a tuple of digits.");
-		return NULL;
 	}
 
 	tsize = PyTuple_Size(dtuple);
@@ -2082,9 +2086,8 @@ string_from_tuple(PyObject *v)
 		tmp = PyTuple_GET_ITEM(dtuple, i);
 		if (!PyLong_Check(tmp)) {
 			PyMem_Free(decstring);
-			PyErr_SetString(PyExc_TypeError,
+			return value_error_ptr(
 			    "coefficient must be a tuple of digits.");
-			return NULL;
 		}
 		l = PyLong_AsLong(tmp);
 		if (l < 0 || l > 9) {
