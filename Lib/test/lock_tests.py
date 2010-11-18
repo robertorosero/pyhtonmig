@@ -446,6 +446,46 @@ class ConditionTests(BaseTestCase):
             # In practice, this implementation has no spurious wakeups.
             self.assertFalse(result)
 
+    def test_waitfor(self):
+        cond = self.condtype()
+        state = 0
+        def f():
+            with cond:
+                result = cond.wait_for(lambda : state==4)
+                self.assertTrue(result)
+                self.assertEqual(state, 4)
+        b = Bunch(f, 1)
+        b.wait_for_started()
+        for i in range(5):
+            time.sleep(0.01)
+            with cond:
+                state += 1
+                cond.notify()
+        b.wait_for_finished()
+
+    def test_waitfor_timeout(self):
+        cond = self.condtype()
+        state = 0
+        success = []
+        def f():
+            with cond:
+                dt = time.time()
+                result = cond.wait_for(lambda : state==4, timeout=0.1)
+                dt = time.time() - dt
+                self.assertFalse(result)
+                self.assertTimeout(dt, 0.1)
+                success.append(None)
+        b = Bunch(f, 1)
+        b.wait_for_started()
+        # Only increment 3 times, so state == 4 is never reached.
+        for i in range(3):
+            time.sleep(0.01)
+            with cond:
+                state += 1
+                cond.notify()
+        b.wait_for_finished()
+        self.assertEqual(len(success), 1)
+
 
 class BaseSemaphoreTests(BaseTestCase):
     """
@@ -604,7 +644,7 @@ class BarrierTests(BaseTestCase):
     Tests for Barrier objects.
     """
     N = 5
-    defaultTimeout = 0.5
+    defaultTimeout = 2.0
 
     def setUp(self):
         self.barrier = self.barriertype(self.N, timeout=self.defaultTimeout)
@@ -766,10 +806,10 @@ class BarrierTests(BaseTestCase):
             i = self.barrier.wait()
             if i == self.N // 2:
                 # One thread is late!
-                time.sleep(0.1)
-            # Default timeout is 0.1, so this is shorter.
+                time.sleep(1.0)
+            # Default timeout is 2.0, so this is shorter.
             self.assertRaises(threading.BrokenBarrierError,
-                              self.barrier.wait, 0.05)
+                              self.barrier.wait, 0.5)
         self.run_threads(f)
 
     def test_default_timeout(self):
@@ -782,7 +822,7 @@ class BarrierTests(BaseTestCase):
             i = barrier.wait()
             if i == self.N // 2:
                 # One thread is later than the default timeout of 0.1s.
-                time.sleep(0.2)
+                time.sleep(1.0)
             self.assertRaises(threading.BrokenBarrierError, barrier.wait)
         self.run_threads(f)
 
