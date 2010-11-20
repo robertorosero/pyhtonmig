@@ -137,8 +137,10 @@ static char *GetPythonImport (HINSTANCE hModule)
 #ifndef _DEBUG
                 /* In a release version, don't claim that python3.dll is
                    a Python DLL. */
-                if (strcmp(import_name, "python3.dll") == 0)
+                if (strcmp(import_name, "python3.dll") == 0) {
+                    import_data += 20;
                     continue;
+                }
 #endif
 
                 /* Ensure python prefix is followed only
