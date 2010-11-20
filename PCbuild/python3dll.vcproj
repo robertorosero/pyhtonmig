@@ -46,6 +46,7 @@
 				EnableIntrinsicFunctions="true"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PYTHON3DLL_EXPORTS"
 				RuntimeLibrary="2"
+				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -65,11 +66,13 @@
 				AdditionalDependencies="..\PC\python32.lib"
 				OutputFile="$(OutDir)\python3.dll"
 				LinkIncremental="1"
+				IgnoreAllDefaultLibraries="true"
 				ModuleDefinitionFile="..\PC\python3.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				EntryPointSymbol="DllMain"
 				TargetMachine="1"
 			/>
 			<Tool
