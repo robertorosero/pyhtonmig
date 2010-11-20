@@ -1,4 +1,3 @@
-#include <Python.h>
 #include <windows.h>
 
 BOOL WINAPI
