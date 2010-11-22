@@ -3947,7 +3947,7 @@ dec_hash(PyObject *v)
 
 	if (mpd_isspecial(a->dec)) {
 		if (mpd_isnan(a->dec)) {
-			PyErr_SetString(PyExc_ValueError,
+			PyErr_SetString(PyExc_TypeError,
 			    "cannot hash a NaN value");
 			result = -1;
 		}
@@ -4075,8 +4075,9 @@ dec_hash(PyObject *v)
 
 	if (mpd_isspecial(DecAddr(v))) {
 		if (mpd_issnan(DecAddr(v))) {
-			return value_error_int(
+			PyErr_SetString(PyExc_TypeError,
 			    "Cannot hash a signaling NaN value.");
+			return -1;
 		}
 		else if (mpd_isnan(DecAddr(v))) {
 			return py_hash_nan;
