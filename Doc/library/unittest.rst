@@ -8,6 +8,8 @@
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
 .. sectionauthor:: Raymond Hettinger <python@rcn.com>
 
+(If you are already familiar with the basic concepts of testing, you might want
+to skip to :ref:`the list of assert methods <assert-methods>`.)
 
 The Python unit testing framework, sometimes referred to as "PyUnit," is a
 Python language version of JUnit, by Kent Beck and Erich Gamma. JUnit is, in
@@ -154,7 +156,7 @@ example, :meth:`~TestCase.setUp` was used to create a fresh sequence for each
 test.
 
 The final block shows a simple way to run the tests. :func:`unittest.main`
-provides a command line interface to the test script.  When run from the command
+provides a command-line interface to the test script.  When run from the command
 line, the above script produces an output that looks like this::
 
    ...
@@ -206,7 +208,11 @@ You can run tests with more detail (higher verbosity) by passing in the -v flag:
 
    python -m unittest -v test_module
 
-For a list of all the command line options::
+When executed without arguments :ref:`unittest-test-discovery` is started::
+
+   python -m unittest
+
+For a list of all the command-line options::
 
    python -m unittest -h
 
@@ -215,31 +221,33 @@ For a list of all the command line options::
    not modules or classes.
 
 
-failfast, catch and buffer command line options
+failfast, catch and buffer command-line options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-unittest supports three command options.
+:program:`unittest` supports these command-line options:
 
-* :option:`-b` / :option:`--buffer`
+.. program:: unittest
 
-  The standard output and standard error streams are buffered during the test
-  run. Output during a passing test is discarded. Output is echoed normally
-  on test fail or error and is added to the failure messages.
+.. cmdoption:: -b, --buffer
 
-* :option:`-c` / :option:`--catch`
+   The standard output and standard error streams are buffered during the test
+   run. Output during a passing test is discarded. Output is echoed normally
+   on test fail or error and is added to the failure messages.
 
-  Control-C during the test run waits for the current test to end and then
-  reports all the results so far. A second control-C raises the normal
-  :exc:`KeyboardInterrupt` exception.
+.. cmdoption:: -c, --catch
 
-  See `Signal Handling`_ for the functions that provide this functionality.
+   Control-C during the test run waits for the current test to end and then
+   reports all the results so far. A second control-C raises the normal
+   :exc:`KeyboardInterrupt` exception.
 
-* :option:`-f` / :option:`--failfast`
+   See `Signal Handling`_ for the functions that provide this functionality.
 
-  Stop the test run on the first error or failure.
+.. cmdoption:: -f, --failfast
+
+   Stop the test run on the first error or failure.
 
 .. versionadded:: 3.2
-   The command line options ``-c``, ``-b`` and ``-f`` were added.
+   The command-line options :option:`-c`, :option:`-b` and :option:`-f` were added.
 
 The command line can also be used for test discovery, for running all of the
 tests in a project or just a subset.
@@ -257,18 +265,36 @@ compatible with test discovery they must all be importable from the top level
 directory of the project (in other words, they must all be in Python packages).
 
 Test discovery is implemented in :meth:`TestLoader.discover`, but can also be
-used from the command line. The basic command line usage is::
+used from the command line. The basic command-line usage is::
 
    cd project_directory
    python -m unittest discover
 
+.. note::
+
+   As a shortcut, ``python -m unittest`` is the equivalent of
+   ``python -m unittest discover``. If you want to pass arguments to test
+   discovery the `discover` sub-command must be used explicitly.
+
 The ``discover`` sub-command has the following options:
 
-   -v, --verbose    Verbose output
-   -s directory     Directory to start discovery ('.' default)
-   -p pattern       Pattern to match test files ('test*.py' default)
-   -t directory     Top level directory of project (default to
-                    start directory)
+.. program:: unittest discover
+
+.. cmdoption:: -v, --verbose
+
+   Verbose output
+
+.. cmdoption:: -s directory
+
+   Directory to start discovery ('.' default)
+
+.. cmdoption:: -p pattern
+
+   Pattern to match test files ('test*.py' default)
+
+.. cmdoption:: -t directory
+
+   Top level directory of project (defaults to start directory)
 
 The :option:`-s`, :option:`-p`, and :option:`-t` options can be passed in
 as positional arguments in that order. The following two command lines
@@ -740,7 +766,7 @@ Test cases
    .. method:: run(result=None)
 
       Run the test, collecting the result into the test result object passed as
-      *result*.  If *result* is omitted or :const:`None`, a temporary result
+      *result*.  If *result* is omitted or ``None``, a temporary result
       object is created (by calling the :meth:`defaultTestResult` method) and
       used. The result object is not returned to :meth:`run`'s caller.
 
@@ -762,7 +788,7 @@ Test cases
       by the test to be propagated to the caller, and can be used to support
       running tests under a debugger.
 
-
+   .. _assert-methods:
 
    The :class:`TestCase` class provides a number of methods to check for and
    report failures, such as:
@@ -807,6 +833,10 @@ Test cases
    | <TestCase.assertNotIsInstance>`         |                             |               |
    +-----------------------------------------+-----------------------------+---------------+
 
+   All the assert methods (except :meth:`assertRaises`,
+   :meth:`assertRaisesRegexp`, :meth:`assertWarns`, :meth:`assertWarnsRegexp`)
+   accept a *msg* argument that, if specified, is used as the error message on
+   failure (see also :data:`longMessage`).
 
    .. method:: assertEqual(first, second, msg=None)
 
@@ -817,9 +847,8 @@ Test cases
       list, tuple, dict, set, frozenset or str or any type that a subclass
       registers with :meth:`addTypeEqualityFunc` the type specific equality
       function will be called in order to generate a more useful default
-      error message.
-
-      If specified, *msg* will be used as the error message on failure.
+      error message (see also the :ref:`list of type-specific methods
+      <type-specific-methods>`).
 
       .. versionchanged:: 3.1
          Added the automatic calling of type specific equality function.
@@ -1131,9 +1160,29 @@ Test cases
       .. deprecated:: 3.2
 
 
+   .. _type-specific-methods:
 
-   The following methods are used automatically by :meth:`~TestCase.assertEqual`
-   and usually is not necessary to invoke them directly:
+   The :meth:`assertEqual` method dispatches the equality check for objects of
+   the same type to different type-specific methods.  These methods are already
+   implemented for most of the built-in types, but it's also possible to
+   register new methods using :meth:`addTypeEqualityFunc`:
+
+   .. method:: addTypeEqualityFunc(typeobj, function)
+
+      Registers a type-specific method called by :meth:`assertEqual` to check
+      if two objects of exactly the same *typeobj* (not subclasses) compare
+      equal.  *function* must take two positional arguments and a third msg=None
+      keyword argument just as :meth:`assertEqual` does.  It must raise
+      :data:`self.failureException(msg) <failureException>` when inequality
+      between the first two parameters is detected -- possibly providing useful
+      information and explaining the inequalities in details in the error
+      message.
+
+      .. versionadded:: 3.1
+
+   The list of type-specific methods automatically used by
+   :meth:`~TestCase.assertEqual` are summarized in the following table.  Note
+   that it's usually not necessary to invoke these methods directly.
 
    +-----------------------------------------+-----------------------------+--------------+
    | Method                                  | Used to compare             | New in       |
@@ -1176,7 +1225,8 @@ Test cases
       be raised.  If the sequences are different an error message is
       constructed that shows the difference between the two.
 
-      This method is used to implement :meth:`assertListEqual` and
+      This method is not called directly by :meth:`assertEqual`, but
+      it's used to implement :meth:`assertListEqual` and
       :meth:`assertTupleEqual`.
 
       .. versionadded:: 3.1
@@ -1217,12 +1267,14 @@ Test cases
 
 
 
+   .. _other-methods-and-attrs:
+
    Finally the :class:`TestCase` provides the following methods and attributes:
 
 
    .. method:: fail(msg=None)
 
-      Signals a test failure unconditionally, with *msg* or :const:`None` for
+      Signals a test failure unconditionally, with *msg* or ``None`` for
       the error message.
 
 
@@ -1237,18 +1289,19 @@ Test cases
 
    .. attribute:: longMessage
 
-      If set to True then any explicit failure message you pass in to the
-      assert methods will be appended to the end of the normal failure message.
-      The normal messages contain useful information about the objects involved,
-      for example the message from assertEqual shows you the repr of the two
-      unequal objects. Setting this attribute to True allows you to have a
-      custom error message in addition to the normal one.
+      If set to ``True`` then any explicit failure message you pass in to the
+      :ref:`assert methods <assert-methods>` will be appended to the end of the
+      normal failure message.  The normal messages contain useful information
+      about the objects involved, for example the message from assertEqual
+      shows you the repr of the two unequal objects. Setting this attribute
+      to ``True`` allows you to have a custom error message in addition to the
+      normal one.
 
-      This attribute defaults to False, meaning that a custom message passed
+      This attribute defaults to ``False``, meaning that a custom message passed
       to an assert method will silence the normal message.
 
       The class setting can be overridden in individual tests by assigning an
-      instance attribute to True or False before calling the assert methods.
+      instance attribute to ``True`` or ``False`` before calling the assert methods.
 
       .. versionadded:: 3.1
 
@@ -1297,32 +1350,16 @@ Test cases
 
    .. method:: shortDescription()
 
-      Returns a description of the test, or :const:`None` if no description
+      Returns a description of the test, or ``None`` if no description
       has been provided.  The default implementation of this method
       returns the first line of the test method's docstring, if available,
-      or :const:`None`.
+      or ``None``.
 
       .. versionchanged:: 3.1,3.2
          In 3.1 this was changed to add the test name to the short description
          even in the presence of a docstring. This caused compatibility issues
          with unittest extensions and adding the test name was moved to the
          :class:`TextTestResult`.
-
-   .. method:: addTypeEqualityFunc(typeobj, function)
-
-      Registers a type specific :meth:`assertEqual` equality checking
-      function to be called by :meth:`assertEqual` when both objects it has
-      been asked to compare are exactly *typeobj* (not subclasses).
-      *function* must take two positional arguments and a third msg=None
-      keyword argument just as :meth:`assertEqual` does.  It must raise
-      ``self.failureException`` when inequality between the first two
-      parameters is detected.
-
-      One good use of custom equality checking functions for a type
-      is to raise ``self.failureException`` with an error message useful
-      for debugging the problem by explaining the inequalities in detail.
-
-      .. versionadded:: 3.1
 
 
    .. method:: addCleanup(function, *args, **kwargs)
@@ -1686,14 +1723,14 @@ Loading and running tests
 
    .. method:: wasSuccessful()
 
-      Return :const:`True` if all tests run so far have passed, otherwise returns
-      :const:`False`.
+      Return ``True`` if all tests run so far have passed, otherwise returns
+      ``False``.
 
 
    .. method:: stop()
 
       This method can be called to signal that the set of tests being run should
-      be aborted by setting the :attr:`shouldStop` attribute to :const:`True`.
+      be aborted by setting the :attr:`shouldStop` attribute to ``True``.
       :class:`TestRunner` objects should respect this flag and return without
       running any additional tests.
 
@@ -1850,7 +1887,7 @@ Loading and running tests
       >>> main(module='test_module', exit=False)
 
    The ``failfast``, ``catchbreak`` and ``buffer`` parameters have the same
-   effect as the `failfast, catch and buffer command line options`_.
+   effect as the `failfast, catch and buffer command-line options`_.
 
    Calling ``main`` actually returns an instance of the ``TestProgram`` class.
    This stores the result of the tests run as the ``result`` attribute.
@@ -2013,7 +2050,7 @@ instead of as an error.
 Signal Handling
 ---------------
 
-The :option:`-c`/:option:`--catch` command line option to unittest, along with the ``catchbreak``
+The ``-c``/``--catch`` command-line option to unittest, along with the ``catchbreak``
 parameter to :func:`unittest.main()`, provide more friendly handling of
 control-C during a test run. With catch break behavior enabled control-C will
 allow the currently running test to complete, and the test run will then end

@@ -1054,3 +1054,97 @@ def stack(context=1):
 def trace(context=1):
     """Return a list of records for the stack below the current exception."""
     return getinnerframes(sys.exc_info()[2], context)
+
+
+# ------------------------------------------------ static version of getattr
+
+_sentinel = object()
+
+def _static_getmro(klass):
+    return type.__dict__['__mro__'].__get__(klass)
+
+def _check_instance(obj, attr):
+    instance_dict = {}
+    try:
+        instance_dict = object.__getattribute__(obj, "__dict__")
+    except AttributeError:
+        pass
+    return instance_dict.get(attr, _sentinel)
+
+
+def _check_class(klass, attr):
+    for entry in _static_getmro(klass):
+        try:
+            return entry.__dict__[attr]
+        except KeyError:
+            pass
+    return _sentinel
+
+def _is_type(obj):
+    try:
+        _static_getmro(obj)
+    except TypeError:
+        return False
+    return True
+
+
+def getattr_static(obj, attr, default=_sentinel):
+    """Retrieve attributes without triggering dynamic lookup via the
+       descriptor protocol,  __getattr__ or __getattribute__.
+
+       Note: this function may not be able to retrieve all attributes
+       that getattr can fetch (like dynamically created attributes)
+       and may find attributes that getattr can't (like descriptors
+       that raise AttributeError). It can also return descriptor objects
+       instead of instance members in some cases. See the
+       documentation for details.
+    """
+    instance_result = _sentinel
+    if not _is_type(obj):
+        instance_result = _check_instance(obj, attr)
+        klass = type(obj)
+    else:
+        klass = obj
+
+    klass_result = _check_class(klass, attr)
+
+    if instance_result is not _sentinel and klass_result is not _sentinel:
+        if (_check_class(type(klass_result), '__get__') is not _sentinel and
+            _check_class(type(klass_result), '__set__') is not _sentinel):
+            return klass_result
+
+    if instance_result is not _sentinel:
+        return instance_result
+    if klass_result is not _sentinel:
+        return klass_result
+
+    if obj is klass:
+        # for types we check the metaclass too
+        for entry in _static_getmro(type(klass)):
+            try:
+                return entry.__dict__[attr]
+            except KeyError:
+                pass
+    if default is not _sentinel:
+        return default
+    raise AttributeError(attr)
+
+
+GEN_CREATED, GEN_RUNNING, GEN_SUSPENDED, GEN_CLOSED = range(4)
+
+def getgeneratorstate(generator):
+    """Get current state of a generator-iterator.
+
+    Possible states are:
+      GEN_CREATED: Waiting to start execution.
+      GEN_RUNNING: Currently being executed by the interpreter.
+      GEN_SUSPENDED: Currently suspended at a yield expression.
+      GEN_CLOSED: Execution has completed.
+    """
+    if generator.gi_running:
+        return GEN_RUNNING
+    if generator.gi_frame is None:
+        return GEN_CLOSED
+    if generator.gi_frame.f_lasti == -1:
+        return GEN_CREATED
+    return GEN_SUSPENDED

@@ -325,7 +325,8 @@ range_contains_long(rangeobject *r, PyObject *ob)
 }
 
 static int
-range_contains(rangeobject *r, PyObject *ob) {
+range_contains(rangeobject *r, PyObject *ob)
+{
     if (PyLong_CheckExact(ob) || PyBool_Check(ob))
         return range_contains_long(r, ob);
 
@@ -337,10 +338,13 @@ static PyObject *
 range_count(rangeobject *r, PyObject *ob)
 {
     if (PyLong_CheckExact(ob) || PyBool_Check(ob)) {
-        if (range_contains_long(r, ob))
-            Py_RETURN_TRUE;
+        int result = range_contains_long(r, ob);
+        if (result == -1)
+            return NULL;
+        else if (result)
+            return PyLong_FromLong(1);
         else
-            Py_RETURN_FALSE;
+            return PyLong_FromLong(0);
     } else {
         Py_ssize_t count;
         count = _PySequence_IterSearch((PyObject*)r, ob, PY_ITERSEARCH_COUNT);
@@ -353,10 +357,7 @@ range_count(rangeobject *r, PyObject *ob)
 static PyObject *
 range_index(rangeobject *r, PyObject *ob)
 {
-    PyObject *idx, *tmp;
     int contains;
-    PyObject *format_tuple, *err_string;
-    static PyObject *err_format = NULL;
 
     if (!PyLong_CheckExact(ob) && !PyBool_Check(ob)) {
         Py_ssize_t index;
@@ -370,35 +371,18 @@ range_index(rangeobject *r, PyObject *ob)
     if (contains == -1)
         return NULL;
 
-    if (!contains)
-        goto value_error;
-
-    tmp = PyNumber_Subtract(ob, r->start);
-    if (tmp == NULL)
-        return NULL;
-
-    /* idx = (ob - r.start) // r.step */
-    idx = PyNumber_FloorDivide(tmp, r->step);
-    Py_DECREF(tmp);
-    return idx;
-
-value_error:
+    if (contains) {
+        PyObject *idx, *tmp = PyNumber_Subtract(ob, r->start);
+        if (tmp == NULL)
+            return NULL;
+        /* idx = (ob - r.start) // r.step */
+        idx = PyNumber_FloorDivide(tmp, r->step);
+        Py_DECREF(tmp);
+        return idx;
+    }
 
     /* object is not in the range */
-    if (err_format == NULL) {
-        err_format = PyUnicode_FromString("%r is not in range");
-        if (err_format == NULL)
-            return NULL;
-    }
-    format_tuple = PyTuple_Pack(1, ob);
-    if (format_tuple == NULL)
-        return NULL;
-    err_string = PyUnicode_Format(err_format, format_tuple);
-    Py_DECREF(format_tuple);
-    if (err_string == NULL)
-        return NULL;
-    PyErr_SetObject(PyExc_ValueError, err_string);
-    Py_DECREF(err_string);
+    PyErr_Format(PyExc_ValueError, "%R is not in range", ob);
     return NULL;
 }
 

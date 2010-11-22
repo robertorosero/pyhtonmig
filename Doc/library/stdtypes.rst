@@ -846,7 +846,7 @@ operations have the same priorities as the comparison operations.  The ``+`` and
 
 This table lists the sequence operations sorted in ascending priority
 (operations in the same box have the same priority).  In the table, *s* and *t*
-are sequences of the same type; *n*, *i* and *j* are integers:
+are sequences of the same type; *n*, *i*, *j* and *k* are integers.
 
 +------------------+--------------------------------+----------+
 | Operation        | Result                         | Notes    |
@@ -875,6 +875,12 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 | ``min(s)``       | smallest item of *s*           |          |
 +------------------+--------------------------------+----------+
 | ``max(s)``       | largest item of *s*            |          |
++------------------+--------------------------------+----------+
+| ``s.index(i)``   | index of the first occurence   |          |
+|                  | of *i* in *s*                  |          |
++------------------+--------------------------------+----------+
+| ``s.count(i)``   | total number of occurences of  |          |
+|                  | *i* in *s*                     |          |
 +------------------+--------------------------------+----------+
 
 Sequence types also support comparisons.  In particular, tuples and lists are
@@ -1575,16 +1581,14 @@ Range Type
 The :class:`range` type is an immutable sequence which is commonly used for
 looping.  The advantage of the :class:`range` type is that an :class:`range`
 object will always take the same amount of memory, no matter the size of the
-range it represents.  There are no consistent performance advantages.
+range it represents.
 
-Range objects have relatively little behavior: they support indexing,
-iteration, the :func:`len` function, and the following methods.
+Range objects have relatively little behavior: they support indexing, contains,
+iteration, the :func:`len` function, and the following methods:
 
 .. method:: range.count(x)
 
-   Return the number of *i*'s for which ``s[i] == x``.  Normally the
-   result will be 0 or 1, but it could be greater if *x* defines an
-   unusual equality function.
+   Return the number of *i*'s for which ``s[i] == x``.
 
     .. versionadded:: 3.2
 
