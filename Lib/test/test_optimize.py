@@ -24,21 +24,31 @@ def compile_fn(src, fnname='f'):
     Compile src to a Module, return an (ast.FunctionDef, ast.Module) pair
     where the former is the named function
     """
-    node = ast.parse(src)
-    #print(ast.dump(node))
-    for f in node.body:
-        if isinstance(f, ast.FunctionDef):
-            if f.name == fnname:
-                return f, node
-    raise ValueError('Could not find function: %r' % fnname)
+    def _get_fn_single(mod, node, name):
+        for f in node.body:
+            if isinstance(f, (ast.ClassDef, ast.FunctionDef)):
+                if f.name == name:
+                    return f
+        raise ValueError('Could not find name: %r' % name)
+    mod = ast.parse(src)
+    path = fnname.split('.')
+    node = mod
+    for name in path:
+        node = _get_fn_single(mod, node, name)
+    return node, mod
 
 def get_code_for_fn(co, fnname):
-    for const in co.co_consts:
-        if isinstance(const, types.CodeType):
-            if const.co_name == fnname:
-                return const
-    raise ValueError('code for %r not found' % fnname)
+    def _get_code_single(co, fnname):
+        for const in co.co_consts:
+            if isinstance(const, types.CodeType):
+                if const.co_name == fnname:
+                    return const
+        raise ValueError('code for %r not found' % fnname)
 
+    path = fnname.split('.')
+    for name in path:
+        co = _get_code_single(co, name)
+    return co
 
 class TestFramework(unittest.TestCase):
     # Ensure that invoking the optimizer is working:
@@ -46,15 +56,32 @@ class TestFramework(unittest.TestCase):
         self.assertEqual(eval('42'), 42)
 
 class TestInlining(unittest.TestCase):
+    def assertHasLineWith(self, asm, items):
+        def _has_items(line, items):
+            for item in items:
+                if item not in line:
+                    return False
+            return True
+
+        for line in asm.splitlines():
+            if _has_items(line, items):
+                return
+        raise ValueError('Did not find a line containing all of %r within %s'
+                         % (items, asm))
+
+    def test_custom_assert(self):
+        with self.assertRaises(ValueError):
+            self.assertHasLineWith('Hello world', ('foo', 'bar'))
+
     def assertIsInlinable(self, src, fnname='f'):
         from __optimizer__ import fn_is_inlinable
-        fn, mod = compile_fn(src)
+        fn, mod = compile_fn(src, fnname)
         self.assert_(fn_is_inlinable(fn, mod),
                      msg='Unexpectedly not inlinable: %s\n%r' % (src, ast.dump(fn)))
 
     def assertIsNotInlinable(self, src, fnname='f'):
         from __optimizer__ import fn_is_inlinable
-        fn, mod = compile_fn(src)
+        fn, mod = compile_fn(src, fnname)
         self.assert_(not fn_is_inlinable(fn, mod),
                      msg='Unexpectedly inlinable: %s\n%r' % (src, ast.dump(fn)))
 
@@ -94,9 +121,9 @@ def callsite():
 ''')
         callsite = self.compile_to_code(src, 'callsite')
         asm = disassemble(callsite)
-        # print(asm)
+        self.assertHasLineWith(asm, ('LOAD_GLOBAL', '(__saved__function_to_be_inlined)'))
         self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
-        self.assertIn("('feefifofum')", asm)
+        self.assertHasLineWith(asm, ('LOAD_CONST', "('feefifofum')"))
 
     def test_keyword_args(self):
         src = (
