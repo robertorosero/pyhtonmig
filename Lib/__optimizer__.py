@@ -103,10 +103,13 @@ class NodePathEntry:
         self.index = index
 
     def __str__(self):
+        result = self.node.__class__.__name__
+        if hasattr(self.node, 'ste'):
+            result += '<%s>' % repr(self.node.ste.name)
+        result += '.%s' % self.field
         if self.index is not None:
-            return '%s.%s[%i]' % (self.node, self.field, self.index)
-        else:
-            return '%s.%s' % (self.node, self.field)
+            result += '[%i]' % self.index
+        return result
 
 class NodePath:
     '''
@@ -250,28 +253,33 @@ class InlineBodyFixups(ast.NodeTransformer):
         # replace (the final) return with "__returnval__ = expr":
         return make_assignment(self.varprefix + "__returnval__", node.value, node)
 
+
 class FunctionInliner(PathTransformer):
-    def __init__(self, tree, funcdef, dotted_name):
+    def __init__(self, tree, def_dict):
         self.tree = tree
-        self.funcdef = funcdef
-        self.dotted_name = dotted_name
-        assert hasattr(funcdef, 'ste')
+        self.def_dict = def_dict
+        # dict from dottedname to ast.FunctionDef
+
+        #self.funcdef = funcdef
+        #self.dotted_name = dotted_name
+        #assert hasattr(funcdef, 'ste')
+
         self.num_callsites = 0
-        self.log('inlining calls to %r' % dotted_name)
+        self.log('inlining calls to %r' % def_dict)
         #self.log('ste for body: %r' % funcdef.ste)
 
     def log(self, msg):
         if 0:
             print('%s: %s' % (self.__class__.__name__, msg))
 
-    def is_inlinable_callsite(self, call, path):
+    def guess_dotted_name_for_def_from_call(self, call, path):
         # Return the name of the stored global if this is inlinable, otherwise None
         assert isinstance(call, ast.Call)
 
         if isinstance(call.func, ast.Name):
             # Name must match:
-            if call.func.id == self.dotted_name:
-                return self.dotted_name
+            if call.func.id in self.def_dict:
+                return call.func.id
 
         if isinstance(call.func, ast.Attribute):
             # Handle simple "self.METHOD_NAME" case:
@@ -294,21 +302,22 @@ class FunctionInliner(PathTransformer):
     def visit_Call(self, call, path):
         # Stop inlining beyond an arbitrary cutoff
         # (bm_simplecall was exploding):
-        if self.num_callsites > 10:
+        if self.num_callsites > 1000:
             return call
 
         # Visit children:
         self.generic_visit(call, path)
 
-        stored_name = self.is_inlinable_callsite(call, path)
-        if stored_name is None:
+        dotted_name = self.guess_dotted_name_for_def_from_call(call, path)
+        if dotted_name is None:
             return call
 
-        self.log('Got inlinable callsite of %r' % stored_name)
+        self.log('Got inlinable callsite of:\n  dotted_name: %r\n  path: %s\n  node:%s'
+                 % (dotted_name, path, ast.dump(call)))
 
         if isinstance(call.func, ast.Attribute):
             # Don't try to inline method calls yet:
-            self.log('Got attribute %s' % ast.dump(call.func))
+            self.log('Not inlining attribute %s' % ast.dump(call.func))
             return call
 
         if not isinstance(call.func, (ast.Name, ast.Attribute)):
@@ -324,7 +333,7 @@ class FunctionInliner(PathTransformer):
         nsp = NamespacePath.from_node_path(path)
         self.log('NamespacePath for callsite: %r' % nsp)
 
-        if stored_name != self.dotted_name:
+        if dotted_name not in self.def_dict:
             return call
         #if call.func.id != self.funcdef.name:
         #    return call
@@ -332,11 +341,13 @@ class FunctionInliner(PathTransformer):
         # Locate innermost scope at callsite:
         ste = nsp.get_innermost_scope()
 
-        self.log('Inlining call to: %r within %r' % (self.dotted_name, ste.name))
+        self.log('Inlining call to: %r within %r' % (dotted_name, ste.name))
         self.num_callsites += 1
 
-        self.log(ast.dump(self.funcdef))
-        varprefix = '__inline_%s%x__' % (self.dotted_name, id(call))
+        funcdef = self.def_dict[dotted_name]
+
+        self.log(ast.dump(funcdef))
+        varprefix = '__inline_%s%x__' % (dotted_name, id(call))
         self.log('varprefix: %s' % varprefix)
 
         # Generate a body of specialized statements that can replace the call:
@@ -346,7 +357,7 @@ class FunctionInliner(PathTransformer):
         #    __inline__x = expr for x
         # for each parameter
         # We will insert before the callsite
-        for formal, actual in zip(self.funcdef.args.args, call.args):
+        for formal, actual in zip(funcdef.args.args, call.args):
             #log('formal: %s' % ast.dump(formal))
             #log('actual: %s' % ast.dump(actual))
             # FIXME: ste
@@ -372,8 +383,8 @@ class FunctionInliner(PathTransformer):
         # ending with:
         #    __inline____returnval = expr
         inline_body = []
-        fixer = InlineBodyFixups(varprefix, self.funcdef.ste)
-        for stmt in self.funcdef.body:
+        fixer = InlineBodyFixups(varprefix, funcdef.ste)
+        for stmt in funcdef.body:
             assert isinstance(stmt, ast.AST)
             inline_body.append(fixer.visit(ast_clone(stmt)))
         #log('inline_body:', inline_body)
@@ -401,6 +412,7 @@ class NotInlinable(Exception):
     pass
 
 class CheckInlinableVisitor(PathTransformer):
+    # Walk an ast.FunctionDef subtree, determining if it's inlinable
     def __init__(self, funcdef):
         self.funcdef = funcdef
         self.returns = []
@@ -531,15 +543,13 @@ class InlinableFunctionFinder(PathTransformer):
 def _inline_function_calls(t):
     v = InlinableFunctionFinder(t)
     v.visit(t)
-    inlinable_function_defs = v.funcdefs
+    def_dict = v.funcdefs
 
-    # print('inlinable_function_defs:%r' % inlinable_function_defs)
+    # print('def_dict:%r' % def_dict)
 
     # Locate call sites:
-    for dotted_name in inlinable_function_defs:
-        inliner = FunctionInliner(t, inlinable_function_defs[dotted_name],
-                                  dotted_name)
-        inliner.visit(t)
+    inliner = FunctionInliner(t, def_dict)
+    inliner.visit(t)
 
     return t
 
