@@ -1,7 +1,6 @@
 :mod:`reprlib` --- Alternate :func:`repr` implementation
 ========================================================
 
-
 .. module:: reprlib
    :synopsis: Alternate repr() implementation with size limits.
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
@@ -23,16 +22,40 @@ This module provides a class, an instance, and a function:
 
 .. data:: aRepr
 
-   This is an instance of :class:`Repr` which is used to provide the :func:`repr`
-   function described below.  Changing the attributes of this object will affect
-   the size limits used by :func:`repr` and the Python debugger.
+   This is an instance of :class:`Repr` which is used to provide the
+   :func:`.repr` function described below.  Changing the attributes of this
+   object will affect the size limits used by :func:`.repr` and the Python
+   debugger.
 
 
 .. function:: repr(obj)
 
-   This is the :meth:`repr` method of ``aRepr``.  It returns a string similar to
-   that returned by the built-in function of the same  name, but with limits on
-   most sizes.
+   This is the :meth:`~Repr.repr` method of ``aRepr``.  It returns a string
+   similar to that returned by the built-in function of the same name, but with
+   limits on most sizes.
+
+In addition to size-limiting tools, the module also provides a decorator for
+detecting recursive calls to :meth:`__repr__` and substituting a placeholder
+string instead.
+
+.. decorator:: recursive_repr(fillvalue="...")
+
+   Decorator for :meth:`__repr__` methods to detect recursive calls within the
+   same thread.  If a recursive call is made, the *fillvalue* is returned,
+   otherwise, the usual :meth:`__repr__` call is made.  For example:
+
+        >>> class MyList(list):
+        ...     @recursive_repr()
+        ...      def __repr__(self):
+        ...          return '<' + '|'.join(map(repr, self)) + '>'
+        ...
+        >>> m = MyList('abc')
+        >>> m.append(m)
+        >>> m.append('x')
+        >>> print(m)
+        <'a'|'b'|'c'|...|'x'>
+
+   .. versionadded:: 3.2
 
 
 .. _repr-objects:
@@ -62,13 +85,10 @@ which format specific object types.
    default is ``4`` for :attr:`maxdict`, ``5`` for :attr:`maxarray`, and  ``6`` for
    the others.
 
-   .. versionadded:: 2.4
-      :attr:`maxset`, :attr:`maxfrozenset`, and :attr:`set`.
-
 
 .. attribute:: Repr.maxlong
 
-   Maximum number of characters in the representation for a long integer.  Digits
+   Maximum number of characters in the representation for an integer.  Digits
    are dropped from the middle.  The default is ``40``.
 
 
@@ -95,7 +115,7 @@ which format specific object types.
 
 .. method:: Repr.repr1(obj, level)
 
-   Recursive implementation used by :meth:`repr`.  This uses the type of *obj* to
+   Recursive implementation used by :meth:`.repr`.  This uses the type of *obj* to
    determine which formatting method to call, passing it *obj* and *level*.  The
    type-specific methods should call :meth:`repr1` to perform recursive formatting,
    with ``level - 1`` for the value of *level* in the recursive  call.
@@ -121,16 +141,16 @@ The use of dynamic dispatching by :meth:`Repr.repr1` allows subclasses of
 the handling of types already supported. This example shows how special support
 for file objects could be added::
 
-   import repr
+   import reprlib
    import sys
 
-   class MyRepr(repr.Repr):
+   class MyRepr(reprlib.Repr):
        def repr_file(self, obj, level):
            if obj.name in ['<stdin>', '<stdout>', '<stderr>']:
                return obj.name
            else:
-               return `obj`
+               return repr(obj)
 
    aRepr = MyRepr()
-   print aRepr.repr(sys.stdin)          # prints '<stdin>'
+   print(aRepr.repr(sys.stdin))         # prints '<stdin>'
 

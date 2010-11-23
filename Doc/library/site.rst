@@ -1,4 +1,3 @@
-
 :mod:`site` --- Site-specific configuration hook
 ================================================
 
@@ -59,10 +58,11 @@ and :file:`bar.pth` contains::
 
    bar
 
-Then the following directories are added to ``sys.path``, in this order::
+Then the following version-specific directories are added to
+``sys.path``, in this order::
 
-   /usr/local/lib/python2.3/site-packages/bar
-   /usr/local/lib/python2.3/site-packages/foo
+   /usr/local/lib/pythonX.Y/site-packages/bar
+   /usr/local/lib/pythonX.Y/site-packages/foo
 
 Note that :file:`bletch` is omitted because it doesn't exist; the :file:`bar`
 directory precedes the :file:`foo` directory because :file:`bar.pth` comes
@@ -115,6 +115,32 @@ empty, and the path manipulations are skipped; however the import of
 
    Adds a directory to sys.path and processes its pth files.
 
+.. function:: getsitepackages()
 
-XXX Update documentation
-XXX document python -m site --user-base --user-site
+   Returns a list containing all global site-packages directories
+   (and possibly site-python).
+
+   .. versionadded:: 3.2
+
+.. function:: getuserbase()
+
+   Returns the "user base" directory path.
+
+   The "user base" directory can be used to store data. If the global
+   variable ``USER_BASE`` is not initialized yet, this function will also set
+   it.
+
+   .. versionadded:: 3.2
+
+.. function:: getusersitepackages()
+
+   Returns the user-specific site-packages directory path.
+
+   If the global variable ``USER_SITE`` is not initialized yet, this
+   function will also set it.
+
+   .. versionadded:: 3.2
+
+.. XXX Update documentation
+.. XXX document python -m site --user-base --user-site
+

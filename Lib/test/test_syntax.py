@@ -222,17 +222,17 @@ Traceback (most recent call last):
 SyntaxError: keyword can't be an expression
 
 
-From ast_for_expr_stmt():
+More set_context():
 
 >>> (x for x in x) += 1
 Traceback (most recent call last):
-SyntaxError: augmented assignment to generator expression not possible
+SyntaxError: can't assign to generator expression
 >>> None += 1
 Traceback (most recent call last):
 SyntaxError: assignment to keyword
 >>> f() += 1
 Traceback (most recent call last):
-SyntaxError: illegal expression for augmented assignment
+SyntaxError: can't assign to function call
 
 
 Test continue in finally in weird combinations.
@@ -470,6 +470,48 @@ Make sure that the old "raise X, Y[, Z]" form is gone:
      ...
    SyntaxError: invalid syntax
 
+
+>>> f(a=23, a=234)
+Traceback (most recent call last):
+   ...
+SyntaxError: keyword argument repeated
+
+>>> del ()
+Traceback (most recent call last):
+SyntaxError: can't delete ()
+
+>>> {1, 2, 3} = 42
+Traceback (most recent call last):
+SyntaxError: can't assign to literal
+
+Corner-cases that used to fail to raise the correct error:
+
+    >>> def f(*, x=lambda __debug__:0): pass
+    Traceback (most recent call last):
+    SyntaxError: assignment to keyword
+
+    >>> def f(*args:(lambda __debug__:0)): pass
+    Traceback (most recent call last):
+    SyntaxError: assignment to keyword
+
+    >>> def f(**kwargs:(lambda __debug__:0)): pass
+    Traceback (most recent call last):
+    SyntaxError: assignment to keyword
+
+    >>> with (lambda *:0): pass
+    Traceback (most recent call last):
+    SyntaxError: named arguments must follow bare *
+
+Corner-cases that used to crash:
+
+    >>> def f(**__debug__): pass
+    Traceback (most recent call last):
+    SyntaxError: assignment to keyword
+
+    >>> def f(*xx, __debug__): pass
+    Traceback (most recent call last):
+    SyntaxError: assignment to keyword
+
 """
 
 import re
@@ -508,28 +550,19 @@ class SyntaxTestCase(unittest.TestCase):
     def test_global_err_then_warn(self):
         # Bug tickler:  The SyntaxError raised for one global statement
         # shouldn't be clobbered by a SyntaxWarning issued for a later one.
-        source = re.sub('(?m)^ *:', '', """\
-            :def error(a):
-            :    global a  # SyntaxError
-            :def warning():
-            :    b = 1
-            :    global b  # SyntaxWarning
-            :""")
+        source = """if 1:
+            def error(a):
+                global a  # SyntaxError
+            def warning():
+                b = 1
+                global b  # SyntaxWarning
+            """
         warnings.filterwarnings(action='ignore', category=SyntaxWarning)
         self._check_error(source, "global")
         warnings.filters.pop(0)
 
     def test_break_outside_loop(self):
         self._check_error("break", "outside loop")
-
-    def test_delete_deref(self):
-        source = re.sub('(?m)^ *:', '', """\
-            :def foo(x):
-            :  def bar():
-            :    print(x)
-            :  del x
-            :""")
-        self._check_error(source, "nested scope")
 
     def test_unexpected_indent(self):
         self._check_error("foo()\n bar()\n", "unexpected indent",

@@ -43,8 +43,8 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 F90=df.exe
-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /Zi /O2 /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "USE_DL_EXPORT" /YX /FD /Zm200 /c
+# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "Py_BUILD_CORE_MODULE" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
+# ADD CPP /nologo /MD /W3 /GX /Zi /O2 /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "Py_BUILD_CORE_MODULE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "USE_DL_EXPORT" /YX /FD /Zm200 /c
 # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
@@ -54,7 +54,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
-# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python30.dll"
+# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python32.dll"
 # SUBTRACT LINK32 /pdb:none
 
 !ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
@@ -71,8 +71,8 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 F90=df.exe
-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "_DEBUG" /D "USE_DL_EXPORT" /D "WIN32" /D "_WINDOWS" /YX /FD /Zm200 /c
+# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "Py_BUILD_CORE_MODULE" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "Py_BUILD_CORE_MODULE" /D "_DEBUG" /D "USE_DL_EXPORT" /D "WIN32" /D "_WINDOWS" /YX /FD /Zm200 /c
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
@@ -82,7 +82,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python30_d.dll" /pdbtype:sept
+# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python32_d.dll" /pdbtype:sept
 # SUBTRACT LINK32 /pdb:none
 
 !ENDIF 
@@ -94,10 +94,6 @@ LINK32=link.exe
 # Begin Source File
 
 SOURCE=..\..\Modules\_bisectmodule.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_bytesio.c
 # End Source File
 # Begin Source File
 
@@ -137,7 +133,7 @@ SOURCE=..\..\Modules\_csv.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_fileio.c
+SOURCE=..\..\Modules\_datetimemodule.c
 # End Source File
 # Begin Source File
 
@@ -146,6 +142,10 @@ SOURCE=..\..\Modules\_functoolsmodule.c
 # Begin Source File
 
 SOURCE=..\..\Modules\_heapqmodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\_iomodule.c
 # End Source File
 # Begin Source File
 
@@ -161,6 +161,10 @@ SOURCE=..\..\Modules\_lsprof.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_math.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\_pickle.c
 # End Source File
 # Begin Source File
@@ -173,10 +177,6 @@ SOURCE=..\..\Modules\_sre.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_stringio.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\_struct.c
 # End Source File
 # Begin Source File
@@ -185,11 +185,19 @@ SOURCE=..\..\PC\_subprocess.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_weakref.c
+SOURCE=..\..\Modules\_threadmodule.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\winreg.c
+SOURCE=..\..\Modules\_time.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\_warnings.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_weakref.c
 # End Source File
 # Begin Source File
 
@@ -206,10 +214,6 @@ SOURCE=..\..\Modules\zlib\adler32.c
 # Begin Source File
 
 SOURCE=..\..\Modules\arraymodule.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Python\_warnings.c
 # End Source File
 # Begin Source File
 
@@ -245,6 +249,10 @@ SOURCE=..\..\Objects\boolobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\bufferedio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\bytearrayobject.c
 # End Source File
 # Begin Source File
@@ -253,7 +261,15 @@ SOURCE=..\..\Objects\bytes_methods.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\bytesio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\bytesobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Objects\capsule.c
 # End Source File
 # Begin Source File
 
@@ -270,10 +286,6 @@ SOURCE=..\..\Objects\classobject.c
 # Begin Source File
 
 SOURCE=..\..\Modules\cmathmodule.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Objects\cobject.c
 # End Source File
 # Begin Source File
 
@@ -305,19 +317,11 @@ SOURCE=..\..\Modules\zlib\crc32.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\datetimemodule.c
+SOURCE=..\..\Python\dynamic_annotations.c
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\Modules\zlib\deflate.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\zlib\gzio.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\zlib\infback.c
 # End Source File
 # Begin Source File
 
@@ -330,6 +334,10 @@ SOURCE=..\..\Objects\dictobject.c
 # Begin Source File
 
 SOURCE=..\dl_nt.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\dtoa.c
 # End Source File
 # Begin Source File
 
@@ -353,7 +361,15 @@ SOURCE=..\..\Objects\exceptions.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\fileio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\fileobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\fileutils.c
 # End Source File
 # Begin Source File
 
@@ -410,10 +426,6 @@ SOURCE=..\..\Python\getcopyright.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Python\getmtime.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Python\getopt.c
 # End Source File
 # Begin Source File
@@ -442,6 +454,10 @@ SOURCE=..\..\Parser\grammar1.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\zlib\gzio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\import.c
 # End Source File
 # Begin Source File
@@ -455,6 +471,10 @@ SOURCE=..\..\Python\importdl.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\zlib\infback.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\zlib\inffast.c
 # End Source File
 # Begin Source File
@@ -464,6 +484,10 @@ SOURCE=..\..\Modules\zlib\inflate.c
 # Begin Source File
 
 SOURCE=..\..\Modules\zlib\inftrees.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\iobase.c
 # End Source File
 # Begin Source File
 
@@ -503,11 +527,11 @@ SOURCE=..\..\Modules\md5module.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Parser\metagrammar.c
+SOURCE=..\..\Objects\memoryobject.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Objects\memoryobject.c
+SOURCE=..\..\Parser\metagrammar.c
 # End Source File
 # Begin Source File
 
@@ -587,6 +611,10 @@ SOURCE=..\..\Python\pyarena.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\pyctype.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\pyfpe.c
 # End Source File
 # Begin Source File
@@ -619,6 +647,10 @@ SOURCE=..\..\Python\pythonrun.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\pytime.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\rangeobject.c
 # End Source File
 # Begin Source File
@@ -631,6 +663,10 @@ SOURCE=..\..\Objects\setobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\sha1module.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\sha256module.c
 # End Source File
 # Begin Source File
@@ -639,15 +675,15 @@ SOURCE=..\..\Modules\sha512module.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\sha1module.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\signalmodule.c
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\Objects\sliceobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\stringio.c
 # End Source File
 # Begin Source File
 
@@ -671,11 +707,11 @@ SOURCE=..\..\Python\sysmodule.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Python\thread.c
+SOURCE=..\..\Modules\_io\textio.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_threadmodule.c
+SOURCE=..\..\Python\thread.c
 # End Source File
 # Begin Source File
 
@@ -695,15 +731,15 @@ SOURCE=..\..\Modules\zlib\trees.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\zlib\uncompr.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Objects\tupleobject.c
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\Objects\typeobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\zlib\uncompr.c
 # End Source File
 # Begin Source File
 
@@ -719,11 +755,11 @@ SOURCE=..\..\Objects\weakrefobject.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\xxsubtype.c
+SOURCE=..\winreg.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\yuvconvert.c
+SOURCE=..\..\Modules\xxsubtype.c
 # End Source File
 # Begin Source File
 

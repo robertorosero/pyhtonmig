@@ -134,10 +134,18 @@ An exception is defined as well:
 
 .. method:: HTMLParser.handle_decl(decl)
 
-   Method called when an SGML declaration is read by the parser.  The *decl*
-   parameter will be the entire contents of the declaration inside the ``<!``...\
-   ``>`` markup.  It is intended to be overridden by a derived class; the base
-   class implementation does nothing.
+   Method called when an SGML ``doctype`` declaration is read by the parser.
+   The *decl* parameter will be the entire contents of the declaration inside
+   the ``<!...>`` markup.  It is intended to be overridden by a derived class;
+   the base class implementation does nothing.
+
+
+.. method:: HTMLParser.unknown_decl(data)
+
+   Method called when an unrecognized SGML declaration is read by the parser.
+   The *data* parameter will be the entire contents of the declaration inside
+   the ``<!...>`` markup.  It is sometimes useful to be be overridden by a
+   derived class; the base class implementation raises an :exc:`HTMLParseError`.
 
 
 .. method:: HTMLParser.handle_pi(data)
@@ -163,13 +171,23 @@ Example HTML Parser Application
 As a basic example, below is a very basic HTML parser that uses the
 :class:`HTMLParser` class to print out tags as they are encountered::
 
-   from html.parser import HTMLParser
+   >>> from html.parser import HTMLParser
+   >>>
+   >>> class MyHTMLParser(HTMLParser):
+   ...     def handle_starttag(self, tag, attrs):
+   ...         print("Encountered a {} start tag".format(tag))
+   ...     def handle_endtag(self, tag):
+   ...         print("Encountered a {} end tag".format(tag))
+   ...
+   >>> page = """<html><h1>Title</h1><p>I'm a paragraph!</p></html>"""
+   >>>
+   >>> myparser = MyHTMLParser()
+   >>> myparser.feed(page)
+   Encountered a html start tag
+   Encountered a h1 start tag
+   Encountered a h1 end tag
+   Encountered a p start tag
+   Encountered a p end tag
+   Encountered a html end tag
 
-   class MyHTMLParser(HTMLParser):
-
-       def handle_starttag(self, tag, attrs):
-           print "Encountered the beginning of a %s tag" % tag
-
-       def handle_endtag(self, tag):
-           print "Encountered the end of a %s tag" % tag
 

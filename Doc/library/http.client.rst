@@ -17,23 +17,26 @@ HTTPS protocols.  It is normally not used directly --- the module
 
 .. note::
 
-   HTTPS support is only available if the :mod:`socket` module was compiled with
-   SSL support.
+   HTTPS support is only available if Python was compiled with SSL support
+   (through the :mod:`ssl` module).
 
 The module provides the following classes:
 
 
-.. class:: HTTPConnection(host[, port[, strict[, timeout]]])
+.. class:: HTTPConnection(host, port=None, strict=None[, timeout[, source_address]])
 
    An :class:`HTTPConnection` instance represents one transaction with an HTTP
    server.  It should be instantiated passing it a host and optional port
    number.  If no port number is passed, the port is extracted from the host
    string if it has the form ``host:port``, else the default HTTP port (80) is
-   used.  When True, the optional parameter *strict* causes ``BadStatusLine`` to
+   used.  When True, the optional parameter *strict* (which defaults to a false
+   value) causes ``BadStatusLine`` to
    be raised if the status line can't be parsed as a valid HTTP/1.0 or 1.1
    status line.  If the optional *timeout* parameter is given, blocking
    operations (like connection attempts) will timeout after that many seconds
    (if it is not given, the global default timeout setting is used).
+   The optional *source_address* parameter may be a typle of a (host, port)
+   to use as the source address the HTTP connection is made from.
 
    For example, the following calls all create instances that connect to the server
    at the same host and port::
@@ -43,23 +46,45 @@ The module provides the following classes:
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80)
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80, timeout=10)
 
+   .. versionchanged:: 3.2
+      *source_address* was added.
 
-.. class:: HTTPSConnection(host[, port[, key_file[, cert_file[, strict[, timeout]]]]])
+
+.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout[, source_address]], *, context=None, check_hostname=None)
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
-   secure servers.  Default port is ``443``. *key_file* is the name of a PEM
-   formatted file that contains your private key. *cert_file* is a PEM formatted
-   certificate chain file.
+   secure servers.  Default port is ``443``.  If *context* is specified, it
+   must be a :class:`ssl.SSLContext` instance describing the various SSL
+   options.  If *context* is specified and has a :attr:`~ssl.SSLContext.verify_mode`
+   of either :data:`~ssl.CERT_OPTIONAL` or :data:`~ssl.CERT_REQUIRED`, then
+   by default *host* is matched against the host name(s) allowed by the
+   server's certificate.  If you want to change that behaviour, you can
+   explicitly set *check_hostname* to False.
 
-   .. warning::
+   *key_file* and *cert_file* are deprecated, please use
+   :meth:`ssl.SSLContext.load_cert_chain` instead.
 
-      This does not do any certificate verification!
+   If you access arbitrary hosts on the Internet, it is recommended to
+   require certificate checking and feed the *context* with a set of
+   trusted CA certificates::
+
+      context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+      context.verify_mode = ssl.CERT_REQUIRED
+      context.load_verify_locations('/etc/pki/tls/certs/ca-bundle.crt')
+      h = client.HTTPSConnection('svn.python.org', 443, context=context)
+
+   .. versionchanged:: 3.2
+      *source_address*, *context* and *check_hostname* were added.
+
+   .. versionchanged:: 3.2
+      This class now supports HTTPS virtual hosts if possible (that is,
+      if :data:`ssl.HAS_SNI` is true).
 
 
-.. class:: HTTPResponse(sock[, debuglevel=0][, strict=0])
+.. class:: HTTPResponse(sock, debuglevel=0, strict=0, method=None, url=None)
 
-   Class whose instances are returned upon successful connection.  Not instantiated
-   directly by user.
+   Class whose instances are returned upon successful connection.  Not
+   instantiated directly by user.
 
 
 The following exceptions are raised as appropriate:
@@ -348,16 +373,24 @@ HTTPConnection Objects
 :class:`HTTPConnection` instances have the following methods:
 
 
-.. method:: HTTPConnection.request(method, url[, body[, headers]])
+.. method:: HTTPConnection.request(method, url, body=None, headers={})
 
-   This will send a request to the server using the HTTP request method *method*
-   and the selector *url*.  If the *body* argument is present, it should be a
-   string of data to send after the headers are finished. Alternatively, it may
-   be an open file object, in which case the contents of the file is sent; this
-   file object should support ``fileno()`` and ``read()`` methods. The header
-   Content-Length is automatically set to the correct value. The *headers*
-   argument should be a mapping of extra HTTP headers to send with the request.
+   This will send a request to the server using the HTTP request
+   method *method* and the selector *url*.  If the *body* argument is
+   present, it should be string or bytes object of data to send after
+   the headers are finished.  Strings are encoded as ISO-8859-1, the
+   default charset for HTTP.  To use other encodings, pass a bytes
+   object.  The Content-Length header is set to the length of the
+   string.
 
+   The *body* may also be an open :term:`file object`, in which case the
+   contents of the file is sent; this file object should support
+   ``fileno()`` and ``read()`` methods. The header Content-Length is
+   automatically set to the length of the file as reported by
+   stat.
+
+   The *headers* argument should be a mapping of extra HTTP
+   headers to send with the request.
 
 .. method:: HTTPConnection.getresponse()
 
@@ -375,6 +408,19 @@ HTTPConnection Objects
    Set the debugging level (the amount of debugging output printed). The default
    debug level is ``0``, meaning no debugging output is printed.
 
+   .. versionadded:: 3.1
+
+
+.. method:: HTTPConnection.set_tunnel(host, port=None, headers=None)
+
+   Set the host and the port for HTTP Connect Tunnelling. Normally used when it
+   is required to a HTTPS Connection through a proxy server.
+
+   The headers argument should be a mapping of extra HTTP headers to to sent
+   with the CONNECT request.
+
+   .. versionadded:: 3.2
+
 
 .. method:: HTTPConnection.connect()
 
@@ -389,7 +435,7 @@ As an alternative to using the :meth:`request` method described above, you can
 also send your request step by step, by using the four functions below.
 
 
-.. method:: HTTPConnection.putrequest(request, selector[, skip_host[, skip_accept_encoding]])
+.. method:: HTTPConnection.putrequest(request, selector, skip_host=False, skip_accept_encoding=False)
 
    This should be the first call after the connection to the server has been made.
    It sends a line to the server consisting of the *request* string, the *selector*
@@ -424,7 +470,10 @@ also send your request step by step, by using the four functions below.
 HTTPResponse Objects
 --------------------
 
-:class:`HTTPResponse` instances have the following methods and attributes:
+An :class:`HTTPResponse` instance wraps the HTTP response from the
+server.  It provides access to the request headers and the entity
+body.  The response is an iterable object and can be used in a with
+statement.
 
 
 .. method:: HTTPResponse.read([amt])
@@ -432,20 +481,27 @@ HTTPResponse Objects
    Reads and returns the response body, or up to the next *amt* bytes.
 
 
-.. method:: HTTPResponse.getheader(name[, default])
+.. method:: HTTPResponse.getheader(name, default=None)
 
-   Get the contents of the header *name*, or *default* if there is no matching
-   header.
+   Return the value of the header *name*, or *default* if there is no header
+   matching *name*.  If there is more than one  header with the name *name*,
+   return all of the values joined by ', '.  If 'default' is any iterable other
+   than a single string, its elements are similarly returned joined by commas.
 
 
 .. method:: HTTPResponse.getheaders()
 
    Return a list of (header, value) tuples.
 
+.. method:: HTTPResponse.fileno()
+
+   Return the ``fileno`` of the underlying socket.
 
 .. attribute:: HTTPResponse.msg
 
-   An :class:`email.message.Message` instance containing the response headers.
+   A :class:`http.client.HTTPMessage` instance containing the response
+   headers.  :class:`http.client.HTTPMessage` is a subclass of
+   :class:`email.message.Message`.
 
 
 .. attribute:: HTTPResponse.version
@@ -461,6 +517,12 @@ HTTPResponse Objects
 .. attribute:: HTTPResponse.reason
 
    Reason phrase returned by server.
+
+
+.. attribute:: HTTPResponse.debuglevel
+
+   A debugging hook.  If :attr:`debuglevel` is greater than zero, messages
+   will be printed to stdout as the response is read and parsed.
 
 
 Examples
@@ -482,6 +544,21 @@ Here is an example session that uses the ``GET`` method::
    >>> data2 = r2.read()
    >>> conn.close()
 
+Here is an example session that uses the ``HEAD`` method.  Note that the
+``HEAD`` method never returns any data. ::
+
+   >>> import http.client
+   >>> conn = http.client.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print(res.status, res.reason)
+   200 OK
+   >>> data = res.read()
+   >>> print(len(data))
+   0
+   >>> data == b''
+   True
+
 Here is an example session that shows how to ``POST`` requests::
 
    >>> import http.client, urllib.parse
@@ -496,3 +573,13 @@ Here is an example session that shows how to ``POST`` requests::
    >>> data = response.read()
    >>> conn.close()
 
+
+.. _httpmessage-objects:
+
+HTTPMessage Objects
+-------------------
+
+An :class:`http.client.HTTPMessage` instance holds the headers from an HTTP
+response.  It is implemented using the :class:`email.message.Message` class.
+
+.. XXX Define the methods that clients can depend upon between versions.

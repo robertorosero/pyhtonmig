@@ -24,11 +24,14 @@ try:
 except ImportError:
     pass
 else:
-    def idle_formatwarning_subproc(message, category, filename, lineno):
+    def idle_formatwarning_subproc(message, category, filename, lineno,
+                                   line=None):
         """Format warnings the IDLE way"""
         s = "\nWarning (from warnings module):\n"
         s += '  File \"%s\", line %s\n' % (filename, lineno)
-        line = linecache.getline(filename, lineno).strip()
+        if line is None:
+            line = linecache.getline(filename, lineno)
+        line = line.strip()
         if line:
             s += "    %s\n" % line
         s += "%s: %s\n" % (category.__name__, message)
@@ -65,15 +68,19 @@ def main(del_exitfunc=False):
     global quitting
     global no_exitfunc
     no_exitfunc = del_exitfunc
-    port = 8833
     #time.sleep(15) # test subprocess not responding
-    if sys.argv[1:]:
-        port = int(sys.argv[1])
+    try:
+        assert(len(sys.argv) > 1)
+        port = int(sys.argv[-1])
+    except:
+        print("IDLE Subprocess: no IP port passed in sys.argv.",
+              file=sys.__stderr__)
+        return
     sys.argv[:] = [""]
     sockthread = threading.Thread(target=manage_socket,
                                   name='SockThread',
                                   args=((LOCALHOST, port),))
-    sockthread.set_daemon(True)
+    sockthread.daemon = True
     sockthread.start()
     while 1:
         try:
@@ -117,10 +124,11 @@ def manage_socket(address):
         except socket.error as err:
             print("IDLE Subprocess: socket error: " + err.args[1] +
                   ", retrying....", file=sys.__stderr__)
+            socket_error = err
     else:
-        print("IDLE Subprocess: Connection to "\
-                               "IDLE GUI failed, exiting.", file=sys.__stderr__)
-        show_socket_error(err, address)
+        print("IDLE Subprocess: Connection to "
+              "IDLE GUI failed, exiting.", file=sys.__stderr__)
+        show_socket_error(socket_error, address)
         global exit_now
         exit_now = True
         return
@@ -227,7 +235,7 @@ class MyRPCServer(rpc.RPCServer):
             erf = sys.__stderr__
             print('\n' + '-'*40, file=erf)
             print('Unhandled server exception!', file=erf)
-            print('Thread: %s' % threading.current_thread().get_name(), file=erf)
+            print('Thread: %s' % threading.current_thread().name, file=erf)
             print('Client Address: ', client_address, file=erf)
             print('Request: ', repr(request), file=erf)
             traceback.print_exc(file=erf)

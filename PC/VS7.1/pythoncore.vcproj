@@ -25,7 +25,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="TRUE"
@@ -39,15 +39,15 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="getbuildinfo.o"
-				OutputFile="./python30.dll"
+				OutputFile="./python32.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				IgnoreDefaultLibraryNames="libc"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\./python30.pdb"
+				ProgramDatabaseFile=".\./python32.pdb"
 				SubSystem="2"
 				BaseAddress="0x1e000000"
-				ImportLibrary=".\./python30.lib"
+				ImportLibrary=".\./python32.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -87,7 +87,7 @@
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="_DEBUG;USE_DL_EXPORT;WIN32;_WINDOWS"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;_DEBUG;USE_DL_EXPORT;WIN32;_WINDOWS"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
@@ -99,15 +99,15 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="getbuildinfo.o"
-				OutputFile="./python30_d.dll"
+				OutputFile="./python32_d.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				IgnoreDefaultLibraryNames="libc"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\./python30_d.pdb"
+				ProgramDatabaseFile=".\./python32_d.pdb"
 				SubSystem="2"
 				BaseAddress="0x1e000000"
-				ImportLibrary=".\./python30_d.lib"
+				ImportLibrary=".\./python32_d.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -148,7 +148,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="2"
@@ -166,15 +166,15 @@
 				Name="VCLinkerTool"
 				AdditionalOptions=" /MACHINE:IA64 /USELINK:MS_SDK"
 				AdditionalDependencies="getbuildinfo.o"
-				OutputFile="./python30.dll"
+				OutputFile="./python32.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="FALSE"
 				IgnoreDefaultLibraryNames="libc"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\./python30.pdb"
+				ProgramDatabaseFile=".\./python32.pdb"
 				SubSystem="2"
 				BaseAddress="0x1e000000"
-				ImportLibrary=".\./python30.lib"
+				ImportLibrary=".\./python32.lib"
 				TargetMachine="0"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -215,7 +215,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="2"
@@ -233,15 +233,15 @@
 				Name="VCLinkerTool"
 				AdditionalOptions=" /MACHINE:AMD64 /USELINK:MS_SDK"
 				AdditionalDependencies="getbuildinfo.o"
-				OutputFile="./python30.dll"
+				OutputFile="./python32.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				IgnoreDefaultLibraryNames="libc"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\./python30.pdb"
+				ProgramDatabaseFile=".\./python32.pdb"
 				SubSystem="2"
 				BaseAddress="0x1e000000"
-				ImportLibrary=".\./python30.lib"
+				ImportLibrary=".\./python32.lib"
 				TargetMachine="0"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -273,6 +273,32 @@
 	<References>
 	</References>
 	<Files>
+		<Filter
+			Name="_io"
+            Filter="">
+			<File
+				RelativePath="..\..\Modules\_io\fileio.c">
+			</File>
+			<File
+				RelativePath="..\..\Modules\_io\bytesio.c">
+			</File>
+			<File
+				RelativePath="..\..\Modules\_io\stringio.c">
+			</File>
+			<File
+			    RelativePath="..\..\Modules\_io\bufferedio.c">
+			</File>
+			<File
+				RelativePath="..\..\Modules\_io\iobase.c">
+			</File>
+			<File
+				RelativePath="..\..\Modules\_io\textio.c">
+			</File>
+			<File
+				RelativePath="..\..\Modules\_io\_iomodule.c">
+			</File>
+		</Filter>
+
 		<Filter
 			Name="zlib"
 			Filter="">
@@ -365,13 +391,13 @@
 			RelativePath="..\..\Modules\_codecsmodule.c">
 		</File>
 		<File
+			RelativePath="..\..\Modules\_collectionsmodule.c">
+		</File>
+		<File
 			RelativePath="..\..\Modules\_csv.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_fileio.c">
-		</File>
-		<File
-			RelativePath="..\..\Modules\_bytesio.c">
+			RelativePath="..\..\Modules\_datetimemodule.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\_functoolsmodule.c">
@@ -380,13 +406,16 @@
 			RelativePath="..\..\Modules\_heapqmodule.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\json.c">
+			RelativePath="..\..\Modules\_json.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\_localemodule.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\_lsprof.c">
+		</File>
+		<File
+			RelativePath="..\..\Modules\_math.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\_pickle.c">
@@ -398,19 +427,19 @@
 			RelativePath="..\..\Modules\_sre.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_stringio.c">
-		</File>
-		<File
 			RelativePath="..\..\Modules\_struct.c">
 		</File>
 		<File
 			RelativePath="..\..\Pc\_subprocess.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_weakref.c">
+			RelativePath="..\..\Modules\_time.c">
 		</File>
 		<File
-			RelativePath="..\..\Pc\winreg.c">
+			RelativePath="..\..\Python\_warnings.c">
+		</File>
+		<File
+			RelativePath="..\..\Modules\_weakref.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\abstract.c">
@@ -420,9 +449,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Modules\arraymodule.c">
-		</File>
-		<File
-			RelativePath="..\..\Python\_warnings.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\asdl.c">
@@ -452,7 +478,13 @@
 			RelativePath="..\..\Objects\bytes_methods.c">
 		</File>
 		<File
+			RelativePath="..\..\Objects\bytearrayobject.c">
+		</File>
+		<File
 			RelativePath="..\..\Objects\bytesobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Objects\capsule.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\cellobject.c">
@@ -467,16 +499,10 @@
 			RelativePath="..\..\Modules\cmathmodule.c">
 		</File>
 		<File
-			RelativePath="..\..\Objects\cobject.c">
-		</File>
-		<File
 			RelativePath="..\..\Python\codecs.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\codeobject.c">
-		</File>
-		<File
-			RelativePath="..\..\Modules\_collectionsmodule.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\compile.c">
@@ -488,7 +514,7 @@
 			RelativePath="..\..\PC\config.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\datetimemodule.c">
+			RelativePath="..\..\Python\dynamic_annotations.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\descrobject.c">
@@ -498,6 +524,9 @@
 		</File>
 		<File
 			RelativePath="..\..\PC\dl_nt.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\dtoa.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\dynload_win.c">
@@ -516,6 +545,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\fileobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\fileutils.c">
 		</File>
 		<File
 			RelativePath="..\..\Parser\firstsets.c">
@@ -555,9 +587,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Python\getcopyright.c">
-		</File>
-		<File
-			RelativePath="..\..\Python\getmtime.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\getopt.c">
@@ -704,6 +733,9 @@
 			RelativePath="..\..\Python\pyarena.c">
 		</File>
 		<File
+			RelativePath="..\..\Python\pyctype.c">
+		</File>
+		<File
 			RelativePath="..\..\Python\pyfpe.c">
 		</File>
 		<File
@@ -718,6 +750,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Python\pystrtod.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\pytime.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\Python-ast.c">
@@ -751,9 +786,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\sliceobject.c">
-		</File>
-		<File
-			RelativePath="..\..\Objects\stringobject.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\structmember.c">
@@ -798,13 +830,13 @@
 			RelativePath="..\..\Objects\unicodeobject.c">
 		</File>
 		<File
+			RelativePath="..\..\Pc\winreg.c">
+		</File>
+		<File
 			RelativePath="..\..\Objects\weakrefobject.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\xxsubtype.c">
-		</File>
-		<File
-			RelativePath="..\..\Modules\yuvconvert.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\zipimport.c">

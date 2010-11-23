@@ -1,6 +1,5 @@
-
-:mod:`platform` ---  Access to underlying platform's identifying data.
-======================================================================
+:mod:`platform` ---  Access to underlying platform's identifying data
+=====================================================================
 
 .. module:: platform
    :synopsis: Retrieves as much platform identifying data as possible.
@@ -28,8 +27,8 @@ Cross Platform
    returned as strings.
 
    Values that cannot be determined are returned as given by the parameter presets.
-   If bits is given as ``''``, the :cfunc:`sizeof(pointer)` (or
-   :cfunc:`sizeof(long)` on Python version < 1.5.2) is used as indicator for the
+   If bits is given as ``''``, the :c:func:`sizeof(pointer)` (or
+   :c:func:`sizeof(long)` on Python version < 1.5.2) is used as indicator for the
    supported pointer size.
 
    The function relies on the system's :file:`file` command to do the actual work.
@@ -95,7 +94,7 @@ Cross Platform
 .. function:: python_implementation()
 
    Returns a string identifying the Python implementation. Possible return values
-   are: 'CPython', 'IronPython', 'Jython'
+   are: 'CPython', 'IronPython', 'Jython'.
 
 
 .. function:: python_revision()
@@ -161,7 +160,7 @@ Java Platform
 
 .. function:: java_ver(release='', vendor='', vminfo=('','',''), osinfo=('','',''))
 
-   Version interface for JPython.
+   Version interface for Jython.
 
    Returns a tuple ``(release, vendor, vminfo, osinfo)`` with *vminfo* being a
    tuple ``(vm_name, vm_release, vm_vendor)`` and *osinfo* being a tuple
@@ -216,7 +215,7 @@ Mac OS Platform
    Entries which cannot be determined are set to ``''``.  All tuple entries are
    strings.
 
-   Documentation for the underlying :cfunc:`gestalt` API is available online at
+   Documentation for the underlying :c:func:`gestalt` API is available online at
    http://www.rgaros.nl/gestalt/.
 
 
@@ -226,29 +225,23 @@ Unix Platforms
 
 .. function:: dist(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...))
 
-   Tries to determine the name of the OS distribution name Returns a tuple
-   ``(distname, version, id)`` which defaults to the args given as parameters.
-
-   ``supported_dists`` may be given to define the set of Linux
-   distributions to look for. It defaults to a list of currently
-   supported Linux distributions identified by their release file
-   name.
+   This is another name for :func:`linux_distribution`.
 
 .. function:: linux_distribution(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...), full_distribution_name=1)
 
    Tries to determine the name of the Linux OS distribution name.
 
-   ``supported_dists`` may be given to define the set of Linux
-   distributions to look for. It defaults to a list of currently
-   supported Linux distributions identified by their release file
-   name.
+   ``supported_dists`` may be given to define the set of Linux distributions to
+   look for. It defaults to a list of currently supported Linux distributions
+   identified by their release file name.
 
-   If ``full_distribution_name`` is true (default), the full
-   distribution read from the OS is returned. Otherwise the short name
-   taken from ``supported_dists`` is used.
+   If ``full_distribution_name`` is true (default), the full distribution read
+   from the OS is returned. Otherwise the short name taken from
+   ``supported_dists`` is used.
 
-   Returns a tuple ``(distname,version,id)`` which defaults to the
-   args given as parameters.
+   Returns a tuple ``(distname,version,id)`` which defaults to the args given as
+   parameters.  ``id`` is the item in parentheses after the version number.  It
+   is usually the version codename.
 
 .. function:: libc_ver(executable=sys.executable, lib='', version='', chunksize=2048)
 

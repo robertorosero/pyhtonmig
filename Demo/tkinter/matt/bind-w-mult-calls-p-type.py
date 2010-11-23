@@ -1,5 +1,4 @@
-from Tkinter import *
-import string
+from tkinter import *
 
 # This program  shows how to use a simple type-in box
 

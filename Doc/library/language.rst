@@ -1,4 +1,3 @@
-
 .. _language:
 
 ************************
@@ -16,6 +15,7 @@ These modules include:
 
    parser.rst
    ast.rst
+   symtable.rst
    symbol.rst
    token.rst
    keyword.rst
@@ -26,4 +26,3 @@ These modules include:
    compileall.rst
    dis.rst
    pickletools.rst
-   distutils.rst

@@ -1,4 +1,3 @@
-
 :mod:`rlcompleter` --- Completion function for GNU readline
 ===========================================================
 
@@ -20,9 +19,9 @@ Example::
    >>> import readline
    >>> readline.parse_and_bind("tab: complete")
    >>> readline. <TAB PRESSED>
-   readline.__doc__          readline.get_line_buffer  readline.read_init_file
-   readline.__file__         readline.insert_text      readline.set_completer
-   readline.__name__         readline.parse_and_bind
+   readline.__doc__          readline.get_line_buffer(  readline.read_init_file(
+   readline.__file__         readline.insert_text(      readline.set_completer(
+   readline.__name__         readline.parse_and_bind(
    >>> readline.
 
 The :mod:`rlcompleter` module is designed for use with Python's interactive
@@ -52,7 +51,7 @@ Completer objects have the following method:
 
 .. method:: Completer.complete(text, state)
 
-   Return the *state*th completion for *text*.
+   Return the *state*\ th completion for *text*.
 
    If called for *text* that doesn't include a period character (``'.'``), it will
    complete from names currently defined in :mod:`__main__`, :mod:`builtins` and
@@ -61,6 +60,6 @@ Completer objects have the following method:
    If called for a dotted name, it will try to evaluate anything without obvious
    side-effects (functions will not be evaluated, but it can generate calls to
    :meth:`__getattr__`) up to the last part, and find matches for the rest via the
-   :func:`dir` function.  Any exception raised during the evaluation of the 
+   :func:`dir` function.  Any exception raised during the evaluation of the
    expression is caught, silenced and :const:`None` is returned.
 

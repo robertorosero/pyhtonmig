@@ -1,10 +1,9 @@
-
 :mod:`tabnanny` --- Detection of ambiguous indentation
 ======================================================
 
 .. module:: tabnanny
-   :synopsis: Tool for detecting white space related problems in Python source files in a
-              directory tree.
+   :synopsis: Tool for detecting white space related problems in Python
+              source files in a directory tree.
 .. moduleauthor:: Tim Peters <tim_one@users.sourceforge.net>
 .. sectionauthor:: Peter Funk <pf@artcom-gmbh.de>
 
@@ -14,9 +13,9 @@ For the time being this module is intended to be called as a script. However it
 is possible to import it into an IDE and use the function :func:`check`
 described below.
 
-.. warning::
+.. note::
 
-   The API provided by this module is likely to change  in future releases; such
+   The API provided by this module is likely to change in future releases; such
    changes may not be backward compatible.
 
 

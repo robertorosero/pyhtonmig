@@ -1,8 +1,8 @@
 import unittest
 from test import support
-
-import resource
 import time
+
+resource = support.import_module('resource')
 
 # This test is checking a few specific problem spots with the resource module.
 
@@ -100,6 +100,10 @@ class ResourceTest(unittest.TestCase):
         # May not be available on all systems.
         try:
             usageboth = resource.getrusage(resource.RUSAGE_BOTH)
+        except (ValueError, AttributeError):
+            pass
+        try:
+            usage_thread = resource.getrusage(resource.RUSAGE_THREAD)
         except (ValueError, AttributeError):
             pass
 

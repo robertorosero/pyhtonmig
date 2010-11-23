@@ -121,7 +121,7 @@ def time2netscape(t=None):
 
 UTC_ZONES = {"GMT": None, "UTC": None, "UT": None, "Z": None}
 
-TIMEZONE_RE = re.compile(r"^([-+])?(\d\d?):?(\d\d)?$")
+TIMEZONE_RE = re.compile(r"^([-+])?(\d\d?):?(\d\d)?$", re.ASCII)
 def offset_from_tz_string(tz):
     offset = None
     if tz in UTC_ZONES:
@@ -191,9 +191,9 @@ def _str2time(day, mon, yr, hr, min, sec, tz):
 
 STRICT_DATE_RE = re.compile(
     r"^[SMTWF][a-z][a-z], (\d\d) ([JFMASOND][a-z][a-z]) "
-    "(\d\d\d\d) (\d\d):(\d\d):(\d\d) GMT$")
+    "(\d\d\d\d) (\d\d):(\d\d):(\d\d) GMT$", re.ASCII)
 WEEKDAY_RE = re.compile(
-    r"^(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*,?\s*", re.I)
+    r"^(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*,?\s*", re.I | re.ASCII)
 LOOSE_HTTP_DATE_RE = re.compile(
     r"""^
     (\d\d?)            # day
@@ -210,7 +210,7 @@ LOOSE_HTTP_DATE_RE = re.compile(
     ([-+]?\d{2,4}|(?![APap][Mm]\b)[A-Za-z]+)? # timezone
        \s*
     (?:\(\w+\))?       # ASCII representation of timezone in parens.
-       \s*$""", re.X)
+       \s*$""", re.X | re.ASCII)
 def http2time(text):
     """Returns time in seconds since epoch of time represented by a string.
 
@@ -282,7 +282,7 @@ ISO_DATE_RE = re.compile(
       \s*
    ([-+]?\d\d?:?(:?\d\d)?
     |Z|z)?               # timezone  (Z is "zero meridian", i.e. GMT)
-      \s*$""", re.X)
+      \s*$""", re.X | re. ASCII)
 def iso2time(text):
     """
     As for http2time, but parses the ISO 8601 formats:
@@ -436,6 +436,13 @@ def join_header_words(lists):
         if attr: headers.append("; ".join(attr))
     return ", ".join(headers)
 
+def strip_quotes(text):
+    if text.startswith('"'):
+        text = text[1:]
+    if text.endswith('"'):
+        text = text[:-1]
+    return text
+
 def parse_ns_headers(ns_headers):
     """Ad-hoc parser for Netscape protocol cookie-attributes.
 
@@ -453,7 +460,7 @@ def parse_ns_headers(ns_headers):
     """
     known_attrs = ("expires", "domain", "path", "secure",
                    # RFC 2109 attrs (may turn up in Netscape cookies, too)
-                   "port", "max-age")
+                   "version", "port", "max-age")
 
     result = []
     for ns_header in ns_headers:
@@ -473,12 +480,11 @@ def parse_ns_headers(ns_headers):
                     k = lc
                 if k == "version":
                     # This is an RFC 2109 cookie.
+                    v = strip_quotes(v)
                     version_set = True
                 if k == "expires":
                     # convert expires date to seconds since epoch
-                    if v.startswith('"'): v = v[1:]
-                    if v.endswith('"'): v = v[:-1]
-                    v = http2time(v)  # None if invalid
+                    v = http2time(strip_quotes(v))  # None if invalid
             pairs.append((k, v))
 
         if pairs:
@@ -489,7 +495,7 @@ def parse_ns_headers(ns_headers):
     return result
 
 
-IPV4_RE = re.compile(r"\.\d+$")
+IPV4_RE = re.compile(r"\.\d+$", re.ASCII)
 def is_HDN(text):
     """Return True if text is a host domain name."""
     # XXX
@@ -574,7 +580,7 @@ def user_domain_match(A, B):
         return True
     return False
 
-cut_port_re = re.compile(r":\d+$")
+cut_port_re = re.compile(r":\d+$", re.ASCII)
 def request_host(request):
     """Return request-host, as defined by RFC 2965.
 
@@ -603,17 +609,14 @@ def eff_request_host(request):
     return req_host, erhn
 
 def request_path(request):
-    """request-URI, as defined by RFC 2965."""
+    """Path component of request-URI, as defined by RFC 2965."""
     url = request.get_full_url()
-    path, parameters, query, frag = urllib.parse.urlparse(url)[2:]
-    if parameters:
-        path = "%s;%s" % (path, parameters)
-    path = escape_path(path)
-    req_path = urllib.parse.urlunparse(("", "", path, "", query, frag))
-    if not req_path.startswith("/"):
+    parts = urllib.parse.urlsplit(url)
+    path = escape_path(parts.path)
+    if not path.startswith("/"):
         # fix bad RFC 2396 absoluteURI
-        req_path = "/"+req_path
-    return req_path
+        path = "/" + path
+    return path
 
 def request_port(request):
     host = request.get_host()
@@ -1207,7 +1210,7 @@ class CookieJar:
     domain_re = re.compile(r"[^.]*")
     dots_re = re.compile(r"^\.+")
 
-    magic_re = r"^\#LWP-Cookies-(\d+\.\d+)"
+    magic_re = re.compile(r"^\#LWP-Cookies-(\d+\.\d+)", re.ASCII)
 
     def __init__(self, policy=None):
         if policy is None:
@@ -1446,7 +1449,11 @@ class CookieJar:
 
         # set the easy defaults
         version = standard.get("version", None)
-        if version is not None: version = int(version)
+        if version is not None:
+            try:
+                version = int(version)
+            except ValueError:
+                return None  # invalid version, ignore cookie
         secure = standard.get("secure", False)
         # (discard is also set if expires is Absent)
         discard = standard.get("discard", False)
@@ -1856,7 +1863,7 @@ class LWPCookieJar(FileCookieJar):
 
     def _really_load(self, f, filename, ignore_discard, ignore_expires):
         magic = f.readline()
-        if not re.search(self.magic_re, magic):
+        if not self.magic_re.search(magic):
             msg = ("%r does not look like a Set-Cookie3 (LWP) format "
                    "file" % filename)
             raise LoadError(msg)
@@ -1965,11 +1972,11 @@ class MozillaCookieJar(FileCookieJar):
     header by default (Mozilla can cope with that).
 
     """
-    magic_re = "#( Netscape)? HTTP Cookie File"
+    magic_re = re.compile("#( Netscape)? HTTP Cookie File")
     header = """\
-    # Netscape HTTP Cookie File
-    # http://www.netscape.com/newsref/std/cookie_spec.html
-    # This is a generated file!  Do not edit.
+# Netscape HTTP Cookie File
+# http://www.netscape.com/newsref/std/cookie_spec.html
+# This is a generated file!  Do not edit.
 
 """
 
@@ -1977,7 +1984,7 @@ class MozillaCookieJar(FileCookieJar):
         now = time.time()
 
         magic = f.readline()
-        if not re.search(self.magic_re, magic):
+        if not self.magic_re.search(magic):
             f.close()
             raise LoadError(
                 "%r does not look like a Netscape format cookies file" %

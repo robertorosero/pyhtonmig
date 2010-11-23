@@ -1,4 +1,3 @@
-
 :mod:`mailbox` --- Manipulate mailboxes in various formats
 ==========================================================
 
@@ -26,7 +25,6 @@ Maildir, mbox, MH, Babyl, and MMDF.
 
 :class:`Mailbox` objects
 ------------------------
-
 
 .. class:: Mailbox
 
@@ -154,7 +152,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
       when the :class:`Mailbox` instance was initialized.
 
 
-   .. method:: get(key[, default=None])
+   .. method:: get(key, default=None)
                __getitem__(key)
 
       Return a representation of the message corresponding to *key*. If no such
@@ -182,15 +180,19 @@ Maildir, mbox, MH, Babyl, and MMDF.
    .. method:: get_file(key)
 
       Return a file-like representation of the message corresponding to *key*,
-      or raise a :exc:`KeyError` exception if no such message exists. The
-      file-like object behaves as if open in binary mode. This file should be
+      or raise a :exc:`KeyError` exception if no such message exists.  The
+      file-like object behaves as if open in binary mode.  This file should be
       closed once it is no longer needed.
+
+      .. versionadded:: 3.2
+         The file-like object supports the context manager protocol, so that
+         you can use a :keyword:`with` statement to automatically close it.
 
       .. note::
 
          Unlike other representations of messages, file-like representations are
          not necessarily independent of the :class:`Mailbox` instance that
-         created them or of the underlying mailbox. More specific documentation
+         created them or of the underlying mailbox.  More specific documentation
          is provided by each subclass.
 
 
@@ -209,11 +211,10 @@ Maildir, mbox, MH, Babyl, and MMDF.
       Delete all messages from the mailbox.
 
 
-   .. method:: pop(key[, default])
+   .. method:: pop(key, default=None)
 
       Return a representation of the message corresponding to *key* and delete
-      the message. If no such message exists, return *default* if it was
-      supplied or else raise a :exc:`KeyError` exception. The message is
+      the message. If no such message exists, return *default*. The message is
       represented as an instance of the appropriate format-specific
       :class:`Message` subclass unless a custom message factory was specified
       when the :class:`Mailbox` instance was initialized.
@@ -277,7 +278,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^^^^^^
 
 
-.. class:: Maildir(dirname[, factory=None[, create=True]])
+.. class:: Maildir(dirname, factory=None, create=True)
 
    A subclass of :class:`Mailbox` for mailboxes in Maildir format. Parameter
    *factory* is a callable object that accepts a file-like message representation
@@ -332,7 +333,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
       Return a list of the names of all folders.
 
 
-   .. method:: .et_folder(folder)
+   .. method:: get_folder(folder)
 
       Return a :class:`Maildir` instance representing the folder whose name is
       *folder*. A :exc:`NoSuchMailboxError` exception is raised if the folder
@@ -419,7 +420,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^^^
 
 
-.. class:: mbox(path[, factory=None[, create=True]])
+.. class:: mbox(path, factory=None, create=True)
 
    A subclass of :class:`Mailbox` for mailboxes in mbox format. Parameter *factory*
    is a callable object that accepts a file-like message representation (which
@@ -455,7 +456,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::
@@ -479,7 +480,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^
 
 
-.. class:: MH(path[, factory=None[, create=True]])
+.. class:: MH(path, factory=None, create=True)
 
    A subclass of :class:`Mailbox` for mailboxes in MH format. Parameter *factory*
    is a callable object that accepts a file-like message representation (which
@@ -569,7 +570,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls. For MH mailboxes, locking
+      :c:func:`flock` and :c:func:`lockf` system calls. For MH mailboxes, locking
       the mailbox means locking the :file:`.mh_sequences` file and, only for the
       duration of any operations that affect them, locking individual message
       files.
@@ -598,7 +599,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
    `nmh - Message Handling System <http://www.nongnu.org/nmh/>`_
       Home page of :program:`nmh`, an updated version of the original :program:`mh`.
 
-   `MH & nmh: Email for Users & Programmers <http://www.ics.uci.edu/~mh/book/>`_
+   `MH & nmh: Email for Users & Programmers <http://rand-mh.sourceforge.net/book/>`_
       A GPL-licensed book on :program:`mh` and :program:`nmh`, with some information
       on the mailbox format.
 
@@ -609,7 +610,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^^^^
 
 
-.. class:: Babyl(path[, factory=None[, create=True]])
+.. class:: Babyl(path, factory=None, create=True)
 
    A subclass of :class:`Mailbox` for mailboxes in Babyl format. Parameter
    *factory* is a callable object that accepts a file-like message representation
@@ -667,7 +668,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::
@@ -685,7 +686,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^^^
 
 
-.. class:: MMDF(path[, factory=None[, create=True]])
+.. class:: MMDF(path, factory=None, create=True)
 
    A subclass of :class:`Mailbox` for mailboxes in MMDF format. Parameter *factory*
    is a callable object that accepts a file-like message representation (which
@@ -718,7 +719,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::
@@ -737,7 +738,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ------------------------
 
 
-.. class:: Message([message])
+.. class:: Message(message=None)
 
    A subclass of the :mod:`email.Message` module's :class:`Message`. Subclasses of
    :class:`mailbox.Message` add mailbox-format-specific state and behavior.
@@ -772,7 +773,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: MaildirMessage([message])
+.. class:: MaildirMessage(message=None)
 
    A message with Maildir-specific behaviors. Parameter *message* has the same
    meaning as with the :class:`Message` constructor.
@@ -940,7 +941,7 @@ When a :class:`MaildirMessage` instance is created based upon a
 ^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: mboxMessage([message])
+.. class:: mboxMessage(message=None)
 
    A message with mbox-specific behaviors. Parameter *message* has the same meaning
    as with the :class:`Message` constructor.
@@ -983,7 +984,7 @@ When a :class:`MaildirMessage` instance is created based upon a
       are excluded.
 
 
-   .. method:: set_from(from_[, time_=None])
+   .. method:: set_from(from_, time_=None)
 
       Set the "From " line to *from_*, which should be specified without a
       leading "From " or trailing newline. For convenience, *time_* may be
@@ -1094,7 +1095,7 @@ instance, the "From " line is copied and all flags directly correspond:
 ^^^^^^^^^^^^^^^^^^
 
 
-.. class:: MHMessage([message])
+.. class:: MHMessage(message=None)
 
    A message with MH-specific behaviors. Parameter *message* has the same meaning
    as with the :class:`Message` constructor.
@@ -1184,7 +1185,7 @@ When an :class:`MHMessage` instance is created based upon a
 ^^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: BabylMessage([message])
+.. class:: BabylMessage(message=None)
 
    A message with Babyl-specific behaviors. Parameter *message* has the same
    meaning as with the :class:`Message` constructor.
@@ -1312,7 +1313,7 @@ When a :class:`BabylMessage` instance is created based upon an
 ^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: MMDFMessage([message])
+.. class:: MMDFMessage(message=None)
 
    A message with MMDF-specific behaviors. Parameter *message* has the same meaning
    as with the :class:`Message` constructor.
@@ -1354,7 +1355,7 @@ When a :class:`BabylMessage` instance is created based upon an
       are excluded.
 
 
-   .. method:: set_from(from_[, time_=None])
+   .. method:: set_from(from_, time_=None)
 
       Set the "From " line to *from_*, which should be specified without a
       leading "From " or trailing newline. For convenience, *time_* may be
@@ -1478,7 +1479,7 @@ The following exception classes are defined in the :mod:`mailbox` module:
    parameter set to ``False``), or when opening a folder that does not exist.
 
 
-.. exception:: NotEmptyErrorError()
+.. exception:: NotEmptyError()
 
    Raised when a mailbox is not empty but is expected to be, such as when deleting
    a folder that contains messages.
@@ -1553,7 +1554,7 @@ due to malformed messages in the mailbox::
                # that's better than losing a message completely.
                box.lock()
                box.add(message)
-               box.flush()         
+               box.flush()
                box.unlock()
 
                # Remove original message

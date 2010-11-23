@@ -6,14 +6,7 @@ import tempfile
 
 from test import support
 
-try: set
-except NameError: from sets import Set as set
-
 import modulefinder
-
-# Note: To test modulefinder with Python 2.2, sets.py and
-# modulefinder.py must be available - they are not in the standard
-# library.
 
 TEST_DIR = tempfile.mkdtemp()
 TEST_PATH = [TEST_DIR, os.path.dirname(__future__.__file__)]
@@ -190,6 +183,19 @@ a/b/c/e.py
 a/b/c/f.py
 """]
 
+relative_import_test_3 = [
+    "a.module",
+    ["a", "a.module"],
+    ["a.bar"],
+    [],
+    """\
+a/__init__.py
+                                def foo(): pass
+a/module.py
+                                from . import foo
+                                from . import bar
+"""]
+
 def open_file(path):
     ##print "#", os.path.abspath(path)
     dirname = os.path.dirname(path)
@@ -198,11 +204,17 @@ def open_file(path):
 
 def create_package(source):
     ofi = None
-    for line in source.splitlines():
-        if line.startswith(" ") or line.startswith("\t"):
-            ofi.write(line.strip() + "\n")
-        else:
-            ofi = open_file(os.path.join(TEST_DIR, line.strip()))
+    try:
+        for line in source.splitlines():
+            if line.startswith(" ") or line.startswith("\t"):
+                ofi.write(line.strip() + "\n")
+            else:
+                if ofi:
+                    ofi.close()
+                ofi = open_file(os.path.join(TEST_DIR, line.strip()))
+    finally:
+        if ofi:
+            ofi.close()
 
 class ModuleFinderTest(unittest.TestCase):
     def _do_test(self, info, report=False):
@@ -227,12 +239,12 @@ class ModuleFinderTest(unittest.TestCase):
             more = list(found - modules)
             less = list(modules - found)
             # check if we found what we expected, not more, not less
-            self.failUnlessEqual((more, less), ([], []))
+            self.assertEqual((more, less), ([], []))
 
             # check for missing and maybe missing modules
             bad, maybe = mf.any_missing_maybe()
-            self.failUnlessEqual(bad, missing)
-            self.failUnlessEqual(maybe, maybe_missing)
+            self.assertEqual(bad, missing)
+            self.assertEqual(maybe, maybe_missing)
         finally:
             distutils.dir_util.remove_tree(TEST_DIR)
 
@@ -255,6 +267,9 @@ class ModuleFinderTest(unittest.TestCase):
 
         def test_relative_imports_2(self):
             self._do_test(relative_import_test_2)
+
+        def test_relative_imports_3(self):
+            self._do_test(relative_import_test_3)
 
 def test_main():
     distutils.log.set_threshold(distutils.log.WARN)

@@ -10,28 +10,28 @@ Using the Python Interpreter
 Invoking the Interpreter
 ========================
 
-The Python interpreter is usually installed as :file:`/usr/local/bin/python` on
-those machines where it is available; putting :file:`/usr/local/bin` in your
+The Python interpreter is usually installed as :file:`/usr/local/bin/python3.2`
+on those machines where it is available; putting :file:`/usr/local/bin` in your
 Unix shell's search path makes it possible to start it by typing the command ::
 
-   python
+   python3.2
 
-to the shell.  Since the choice of the directory where the interpreter lives is
-an installation option, other places are possible; check with your local Python
-guru or system administrator.  (E.g., :file:`/usr/local/python` is a popular
-alternative location.)
+to the shell. [#]_ Since the choice of the directory where the interpreter lives
+is an installation option, other places are possible; check with your local
+Python guru or system administrator.  (E.g., :file:`/usr/local/python` is a
+popular alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-:file:`C:\Python30`, though you can change this when you're running the
+:file:`C:\\Python32`, though you can change this when you're running the
 installer.  To add this directory to your path,  you can type the following
 command into the command prompt in a DOS box::
 
-   set path=%path%;C:\python30
+   set path=%path%;C:\python32
 
 Typing an end-of-file character (:kbd:`Control-D` on Unix, :kbd:`Control-Z` on
 Windows) at the primary prompt causes the interpreter to exit with a zero exit
 status.  If that doesn't work, you can exit the interpreter by typing the
-following commands: ``import sys; sys.exit()``.
+following command: ``quit()``.
 
 The interpreter's line-editing features usually aren't very sophisticated.  On
 Unix, whoever installed the interpreter may have enabled support for the GNU
@@ -58,8 +58,8 @@ Some Python modules are also useful as scripts.  These can be invoked using
 ``python -m module [arg] ...``, which executes the source file for *module* as
 if you had spelled out its full name on the command line.
 
-Note that there is a difference between ``python file`` and ``python <file``.
-In the latter case, input requests from the program, such as calling
+Note that there is a difference between ``python file`` and ``python
+<file``.  In the latter case, input requests from the program, such as calling
 ``sys.stdin.read()``, are satisfied from *file*.  Since this file has already
 been read until the end by the parser before the program starts executing, the
 program will encounter end-of-file immediately.  In the former case (which is
@@ -101,13 +101,13 @@ with the *secondary prompt*, by default three dots (``...``). The interpreter
 prints a welcome message stating its version number and a copyright notice
 before printing the first prompt::
 
-   $ python
-   Python 3.0a1 (py3k, Sep 12 2007, 12:21:02)
+   $ python3.2
+   Python 3.2 (py3k, Sep 12 2007, 12:21:02)
    [GCC 3.4.6 20060404 (Red Hat 3.4.6-8)] on linux2
    Type "help", "copyright", "credits" or "license" for more information.
    >>>
 
-.. XXX update for final release of Python 3.0
+.. XXX update for new releases
 
 Continuation lines are needed when entering a multi-line construct. As an
 example, take a look at this :keyword:`if` statement::
@@ -115,7 +115,7 @@ example, take a look at this :keyword:`if` statement::
    >>> the_world_is_flat = 1
    >>> if the_world_is_flat:
    ...     print("Be careful not to fall off!")
-   ... 
+   ...
    Be careful not to fall off!
 
 
@@ -155,14 +155,14 @@ Executable Python Scripts
 On BSD'ish Unix systems, Python scripts can be made directly executable, like
 shell scripts, by putting the line ::
 
-   #! /usr/bin/env python
+   #! /usr/bin/env python3.2
 
 (assuming that the interpreter is on the user's :envvar:`PATH`) at the beginning
 of the script and giving the file an executable mode.  The ``#!`` must be the
 first two characters of the file.  On some platforms, this first line must end
-with a Unix-style line ending (``'\n'``), not a Mac OS (``'\r'``) or Windows
-(``'\r\n'``) line ending.  Note that the hash, or pound, character, ``'#'``, is
-used to start a comment in Python.
+with a Unix-style line ending (``'\n'``), not a Windows (``'\r\n'``) line
+ending.  Note that the hash, or pound, character, ``'#'``, is used to start a
+comment in Python.
 
 The script can be given an executable mode, or permission, using the
 :program:`chmod` command::
@@ -191,7 +191,7 @@ It is also possible to specify a different encoding for source files.  In order
 to do this, put one more special comment line right after the ``#!`` line to
 define the source file encoding::
 
-   # -*- coding: encoding -*- 
+   # -*- coding: encoding -*-
 
 With that declaration, everything in the source file will be treated as having
 the encoding *encoding* instead of UTF-8.  The list of possible encodings can be
@@ -242,6 +242,10 @@ in the script::
 
 
 .. rubric:: Footnotes
+
+.. [#] On Unix, the Python 3.x interpreter is by default not installed with the
+   executable named ``python``, so that it does not conflict with a
+   simultaneously installed Python 2.x executable.
 
 .. [#] A problem with the GNU Readline package may prevent this.
 

@@ -16,6 +16,7 @@ __author__ = "Guido van Rossum <guido@python.org>"
 __all__ = ["Driver", "load_grammar"]
 
 # Python imports
+import codecs
 import os
 import logging
 import sys
@@ -77,7 +78,8 @@ class Driver(object):
                 column = 0
         else:
             # We never broke out -- EOF is too soon (how can this happen???)
-            raise parse.ParseError("incomplete input", t, v, x)
+            raise parse.ParseError("incomplete input",
+                                   type, value, (prefix, start))
         return p.rootnode
 
     def parse_stream_raw(self, stream, debug=False):
@@ -89,9 +91,9 @@ class Driver(object):
         """Parse a stream and return the syntax tree."""
         return self.parse_stream_raw(stream, debug)
 
-    def parse_file(self, filename, debug=False):
+    def parse_file(self, filename, encoding=None, debug=False):
         """Parse a file and return the syntax tree."""
-        stream = open(filename)
+        stream = codecs.open(filename, "r", encoding)
         try:
             return self.parse_stream(stream, debug)
         finally:

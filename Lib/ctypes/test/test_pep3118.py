@@ -12,6 +12,8 @@ else:
 def normalize(format):
     # Remove current endian specifier and white space from a format
     # string
+    if format is None:
+        return ""
     format = format.replace(OTHER_ENDIAN, THIS_ENDIAN)
     return re.sub(r"\s", "", format)
 
@@ -22,20 +24,23 @@ class Test(unittest.TestCase):
             ob = tp()
             v = memoryview(ob)
             try:
-                self.failUnlessEqual(normalize(v.format), normalize(fmt))
-                self.failUnlessEqual(v.size, sizeof(ob))
-                self.failUnlessEqual(v.itemsize, sizeof(itemtp))
-                self.failUnlessEqual(v.shape, shape)
+                self.assertEqual(normalize(v.format), normalize(fmt))
+                if shape is not None:
+                    self.assertEqual(len(v), shape[0])
+                else:
+                    self.assertEqual(len(v) * sizeof(itemtp), sizeof(ob))
+                self.assertEqual(v.itemsize, sizeof(itemtp))
+                self.assertEqual(v.shape, shape)
                 # ctypes object always have a non-strided memory block
-                self.failUnlessEqual(v.strides, None)
+                self.assertEqual(v.strides, None)
                 # they are always read/write
-                self.failIf(v.readonly)
+                self.assertFalse(v.readonly)
 
                 if v.shape:
                     n = 1
                     for dim in v.shape:
                         n = n * dim
-                    self.failUnlessEqual(v.itemsize * n, v.size)
+                    self.assertEqual(n * v.itemsize, len(v.tobytes()))
             except:
                 # so that we can see the failing type
                 print(tp)
@@ -46,20 +51,23 @@ class Test(unittest.TestCase):
             ob = tp()
             v = memoryview(ob)
             try:
-                self.failUnlessEqual(v.format, fmt)
-                self.failUnlessEqual(v.size, sizeof(ob))
-                self.failUnlessEqual(v.itemsize, sizeof(itemtp))
-                self.failUnlessEqual(v.shape, shape)
+                self.assertEqual(v.format, fmt)
+                if shape is not None:
+                    self.assertEqual(len(v), shape[0])
+                else:
+                    self.assertEqual(len(v) * sizeof(itemtp), sizeof(ob))
+                self.assertEqual(v.itemsize, sizeof(itemtp))
+                self.assertEqual(v.shape, shape)
                 # ctypes object always have a non-strided memory block
-                self.failUnlessEqual(v.strides, None)
+                self.assertEqual(v.strides, None)
                 # they are always read/write
-                self.failIf(v.readonly)
+                self.assertFalse(v.readonly)
 
                 if v.shape:
                     n = 1
                     for dim in v.shape:
                         n = n * dim
-                    self.failUnlessEqual(v.itemsize * n, v.size)
+                    self.assertEqual(n, len(v))
             except:
                 # so that we can see the failing type
                 print(tp)
@@ -83,6 +91,14 @@ class EmptyStruct(Structure):
 
 class aUnion(Union):
     _fields_ = [("a", c_int)]
+
+class Incomplete(Structure):
+    pass
+
+class Complete(Structure):
+    pass
+PComplete = POINTER(Complete)
+Complete._fields_ = [("a", c_long)]
 
 ################################################################
 #
@@ -140,6 +156,16 @@ native_types = [
     (EmptyStruct,               "T{}",                  None,           EmptyStruct),
     # the pep does't support unions
     (aUnion,                    "B",                    None,           aUnion),
+
+    ## pointer to incomplete structure
+    (Incomplete,                "B",                    None,           Incomplete),
+    (POINTER(Incomplete),       "&B",                   None,           POINTER(Incomplete)),
+
+    # 'Complete' is a structure that starts incomplete, but is completed after the
+    # pointer type to it has been created.
+    (Complete,                  "T{<l:a:}",             None,           Complete),
+    # Unfortunately the pointer format string is not fixed...
+    (POINTER(Complete),         "&B",                   None,           POINTER(Complete)),
 
     ## other
 

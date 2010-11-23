@@ -332,6 +332,7 @@ SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/ceval.c \
 		Python/compile.c \
 		Python/codecs.c \
+		Python/dynamic_annotations.c \
 		Python/errors.c \
 		Python/frozen.c \
 		Python/frozenmain.c \
@@ -339,7 +340,6 @@ SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/getargs.c \
 		Python/getcompiler.c \
 		Python/getcopyright.c \
-		Python/getmtime.c \
 		Python/getplatform.c \
 		Python/getversion.c \
 		Python/graminit.c \
@@ -350,6 +350,7 @@ SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/mysnprintf.c \
 		Python/mystrtoul.c \
 		Python/pyarena.c \
+		Python/pyctype.c \
 		Python/pyfpe.c \
 		Python/pystate.c \
 		Python/pystrtod.c \

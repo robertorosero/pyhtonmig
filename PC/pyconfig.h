@@ -80,7 +80,7 @@ WIN32 is still required for the locale module.
 #define MS_WIN32 /* only support win32 and greater. */
 #define MS_WINDOWS
 #ifndef PYTHONPATH
-#	define PYTHONPATH L".\\DLLs;.\\lib;.\\lib\\plat-win"
+#	define PYTHONPATH L".\\DLLs;.\\lib"
 #endif
 #define NT_THREADS
 #define WITH_THREAD
@@ -88,13 +88,13 @@ WIN32 is still required for the locale module.
 #define USE_SOCKET
 #endif
 
+/* CE6 doesn't have strdup() but _strdup(). Assume the same for earlier versions. */
+#if defined(MS_WINCE)
+#  include <stdlib.h>
+#  define strdup _strdup
+#endif
+
 #ifdef MS_WINCE
-/* Python uses GetVersion() to distinguish between
- * Windows NT and 9x/ME where OS Unicode support is concerned.
- * Windows CE supports Unicode in the same way as NT so we
- * define the missing GetVersion() accordingly.
- */
-#define GetVersion() (4)
 /* Windows CE does not support environment variables */
 #define getenv(v) (NULL)
 #define environ (NULL)
@@ -319,9 +319,9 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 			their Makefile (other compilers are generally
 			taken care of by distutils.) */
 #			ifdef _DEBUG
-#				pragma comment(lib,"python30_d.lib")
+#				pragma comment(lib,"python32_d.lib")
 #			else
-#				pragma comment(lib,"python30.lib")
+#				pragma comment(lib,"python32.lib")
 #			endif /* _DEBUG */
 #		endif /* _MSC_VER */
 #	endif /* Py_BUILD_CORE */
@@ -390,16 +390,52 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 
 #endif
 
+/* define signed and unsigned exact-width 32-bit and 64-bit types, used in the
+   implementation of Python long integers. */
+#ifndef PY_UINT32_T
+#if SIZEOF_INT == 4
+#define HAVE_UINT32_T 1
+#define PY_UINT32_T unsigned int
+#elif SIZEOF_LONG == 4
+#define HAVE_UINT32_T 1
+#define PY_UINT32_T unsigned long
+#endif
+#endif
+
+#ifndef PY_UINT64_T
+#if SIZEOF_LONG_LONG == 8
+#define HAVE_UINT64_T 1
+#define PY_UINT64_T unsigned PY_LONG_LONG
+#endif
+#endif
+
+#ifndef PY_INT32_T
+#if SIZEOF_INT == 4
+#define HAVE_INT32_T 1
+#define PY_INT32_T int
+#elif SIZEOF_LONG == 4
+#define HAVE_INT32_T 1
+#define PY_INT32_T long
+#endif
+#endif
+
+#ifndef PY_INT64_T
+#if SIZEOF_LONG_LONG == 8
+#define HAVE_INT64_T 1
+#define PY_INT64_T PY_LONG_LONG
+#endif
+#endif
+
 /* Fairly standard from here! */
 
 /* Define to 1 if you have the `copysign' function. */
 #define HAVE_COPYSIGN 1
 
-/* Define to 1 if you have the `isinf' function. */
-#define HAVE_ISINF 1
+/* Define to 1 if you have the `isinf' macro. */
+#define HAVE_DECL_ISINF 1
 
 /* Define to 1 if you have the `isnan' function. */
-#define HAVE_ISNAN 1
+#define HAVE_DECL_ISNAN 1
 
 /* Define if on AIX 3.
    System headers sometimes define this.
@@ -516,10 +552,6 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* This is enough for unicodeobject.h to do the "right thing" on Windows. */
 #define Py_UNICODE_SIZE 2
 
-/* Define to indicate that the Python Unicode representation can be passed
-   as-is to Win32 Wide API.  */
-#define Py_WIN_WIDE_FILENAMES
-
 /* Use Python's own small-block memory-allocator. */
 #define WITH_PYMALLOC 1
 
@@ -599,9 +631,19 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* Define if you have waitpid.  */
 /* #undef HAVE_WAITPID */
 
+/* Define to 1 if you have the `wcsftime' function. */
+#if defined(_MSC_VER) && _MSC_VER >= 1310
+#define HAVE_WCSFTIME 1
+#endif
+
 /* Define to 1 if you have the `wcscoll' function. */
 #ifndef MS_WINCE
 #define HAVE_WCSCOLL 1
+#endif
+
+/* Define to 1 if you have the `wcsxfrm' function. */
+#ifndef MS_WINCE
+#define HAVE_WCSXFRM 1
 #endif
 
 /* Define if you have the <dlfcn.h> header file.  */
@@ -679,6 +721,9 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* Define if the compiler provides a wchar.h header file. */
 #define HAVE_WCHAR_H 1
 
+/* The size of `wchar_t', as computed by sizeof. */
+#define SIZEOF_WCHAR_T 2
+
 /* Define if you have the dl library (-ldl).  */
 /* #undef HAVE_LIBDL */
 
@@ -709,5 +754,9 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* WinSock does not use a bitmask in select, and uses
    socket handles greater than FD_SETSIZE */
 #define Py_SOCKET_FD_CAN_BE_GE_FD_SETSIZE
+
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored with the
+   least significant byte first */
+#define DOUBLE_IS_LITTLE_ENDIAN_IEEE754 1
 
 #endif /* !Py_CONFIG_H */

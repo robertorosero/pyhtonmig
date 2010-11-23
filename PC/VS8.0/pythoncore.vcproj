@@ -59,11 +59,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -134,11 +134,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -212,11 +212,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Debug"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Debug $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName)_d.dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName)_d.pdb"
@@ -290,11 +290,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Debug"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Debug $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName)_d.dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName)_d.pdb"
@@ -364,11 +364,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -439,11 +439,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -514,11 +514,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release ($IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -589,11 +589,11 @@
 			<Tool
 				Name="VCPreLinkEventTool"
 				Description="Generate build information..."
-				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release"
+				CommandLine="&quot;$(SolutionDir)make_buildinfo.exe&quot; Release $(IntDir)"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="getbuildinfo.o"
+				AdditionalDependencies="$(IntDir)\getbuildinfo.o"
 				OutputFile="$(OutDir)\$(PyDllName).dll"
 				IgnoreDefaultLibraryNames="libc"
 				ProgramDatabaseFile="$(OutDir)$(PyDllName).pdb"
@@ -675,10 +675,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Include\cobject.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\Include\code.h"
 				>
 			</File>
@@ -707,6 +703,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Include\dynamic_annotations.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Include\enumobject.h"
 				>
 			</File>
@@ -720,6 +720,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\fileobject.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Include\fileutils.h"
 				>
 			</File>
 			<File
@@ -752,10 +756,6 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\import.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\Include\intobject.h"
 				>
 			</File>
 			<File
@@ -847,6 +847,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Include\pycapsule.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Include\pyctype.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Include\pydebug.h"
 				>
 			</File>
@@ -875,6 +883,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Include\pytime.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Include\pymem.h"
 				>
 			</File>
@@ -892,6 +904,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\pystrtod.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Include\dtoa.h"
 				>
 			</File>
 			<File
@@ -987,14 +1003,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\_fileio.c"
-				>
-			</File>
-                        <File
-                                RelativePath="..\..\Modules\_bytesio.c"
-                                >
-                        </File>
-			<File
 				RelativePath="..\..\Modules\_functoolsmodule.c"
 				>
 			</File>
@@ -1015,6 +1023,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Modules\_math.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Modules\_math.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Modules\_pickle.c"
 				>
 			</File>
@@ -1027,11 +1043,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\_stringio.c"
+				RelativePath="..\..\Modules\_struct.c"
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\_struct.c"
+				RelativePath="..\..\Modules\_time.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Modules\_time.h"
 				>
 			</File>
 			<File
@@ -1059,7 +1079,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\datetimemodule.c"
+				RelativePath="..\..\Modules\_datetimemodule.c"
 				>
 			</File>
 			<File
@@ -1143,14 +1163,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\Modules\yuv.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\Modules\yuvconvert.c"
-				>
-			</File>
-			<File
 				RelativePath="..\..\Modules\zipimport.c"
 				>
 			</File>
@@ -1158,6 +1170,42 @@
 				RelativePath="..\..\Modules\zlibmodule.c"
 				>
 			</File>
+			<Filter
+				Name="_io"
+				>
+				<File
+					RelativePath="..\..\Modules\_io\fileio.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\bytesio.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\stringio.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\bufferedio.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\iobase.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\textio.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\_iomodule.c"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Modules\_io\_iomodule.h"
+					>
+				</File>
+			</Filter>
 			<Filter
 				Name="zlib"
 				>
@@ -1188,6 +1236,70 @@
 				<File
 					RelativePath="..\..\Modules\zlib\gzio.c"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win64"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|Win64"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|Win64"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|Win64"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\..\Modules\zlib\infback.c"
@@ -1351,15 +1463,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Objects\capsule.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Objects\cellobject.c"
 				>
 			</File>
 			<File
 				RelativePath="..\..\Objects\classobject.c"
-				>
-			</File>
-			<File
-				RelativePath="..\..\Objects\cobject.c"
 				>
 			</File>
 			<File
@@ -1464,6 +1576,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Objects\sliceobject.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Objects\stringlib\split.h"
 				>
 			</File>
 			<File
@@ -1627,11 +1743,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Python\dynamic_annotations.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Python\dynload_win.c"
 				>
 			</File>
 			<File
 				RelativePath="..\..\Python\errors.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Python\fileutils.c"
 				>
 			</File>
 			<File
@@ -1656,10 +1780,6 @@
 			</File>
 			<File
 				RelativePath="..\..\Python\getcopyright.c"
-				>
-			</File>
-			<File
-				RelativePath="..\..\Python\getmtime.c"
 				>
 			</File>
 			<File
@@ -1715,11 +1835,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Python\pyctype.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Python\pyfpe.c"
 				>
 			</File>
 			<File
 				RelativePath="..\..\Python\pymath.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Python\pytime.c"
 				>
 			</File>
 			<File
@@ -1732,6 +1860,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Python\pystrtod.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Python\dtoa.c"
 				>
 			</File>
 			<File

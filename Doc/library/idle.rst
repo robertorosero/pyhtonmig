@@ -16,8 +16,7 @@ IDLE has the following features:
 
 * coded in 100% pure Python, using the :mod:`tkinter` GUI toolkit
 
-* cross-platform: works on Windows and Unix (on Mac OS, there are currently
-  problems with Tcl/Tk)
+* cross-platform: works on Windows and Unix
 
 * multi-window text editor with multiple undo, Python colorizing and many other
   features, e.g. smart indent and call tips
@@ -231,7 +230,7 @@ Python syntax colors:
    Keywords
       orange
 
-   Strings 
+   Strings
       green
 
    Comments
@@ -254,6 +253,24 @@ Shell colors:
       black
 
 
+Startup
+-------
+
+Upon startup with the ``-s`` option, IDLE will execute the file referenced by
+the environment variables :envvar:`IDLESTARTUP` or :envvar:`PYTHONSTARTUP`.
+Idle first checks for ``IDLESTARTUP``; if ``IDLESTARTUP`` is present the file
+referenced is run.  If ``IDLESTARTUP`` is not present, Idle checks for
+``PYTHONSTARTUP``.  Files referenced by these environment variables are
+convenient places to store functions that are used frequently from the Idle
+shell, or for executing import statements to import common modules.
+
+In addition, ``Tk`` also loads a startup file if it is present.  Note that the
+Tk file is loaded unconditionally.  This additional file is ``.Idle.py`` and is
+looked for in the user's home directory.  Statements in this file will be
+executed in the Tk namespace, so this file is not useful for importing functions
+to be used from Idle's Python shell.
+
+
 Command line usage
 ^^^^^^^^^^^^^^^^^^
 
@@ -269,13 +286,13 @@ Command line usage
 
 If there are arguments:
 
-#. If :option:`-e` is used, arguments are files opened for editing and
+#. If ``-e`` is used, arguments are files opened for editing and
    ``sys.argv`` reflects the arguments passed to IDLE itself.
 
-#. Otherwise, if :option:`-c` is used, all arguments are placed in
+#. Otherwise, if ``-c`` is used, all arguments are placed in
    ``sys.argv[1:...]``, with ``sys.argv[0]`` set to ``'-c'``.
 
-#. Otherwise, if neither :option:`-e` nor :option:`-c` is used, the first
+#. Otherwise, if neither ``-e`` nor ``-c`` is used, the first
    argument is a script which is executed with the remaining arguments in
    ``sys.argv[1:...]``  and ``sys.argv[0]`` set to the script name.  If the script
    name is '-', no script is executed but an interactive Python session is started;

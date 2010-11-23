@@ -21,6 +21,7 @@ from idlelib.tabbedpages import TabbedPageSet
 from idlelib.keybindingDialog import GetKeysDialog
 from idlelib.configSectionNameDialog import GetCfgSectionNameDialog
 from idlelib.configHelpSourceEdit import GetHelpSourceDialog
+from idlelib import macosxSupport
 
 class ConfigDialog(Toplevel):
 
@@ -29,6 +30,7 @@ class ConfigDialog(Toplevel):
         self.wm_withdraw()
 
         self.configure(borderwidth=5)
+        self.title('IDLE Preferences')
         self.geometry("+%d+%d" % (parent.winfo_rootx()+20,
                 parent.winfo_rooty()+30))
         #Theme Elements. Each theme element key is its display name.
@@ -71,18 +73,27 @@ class ConfigDialog(Toplevel):
                 page_names=['Fonts/Tabs','Highlighting','Keys','General'])
         frameActionButtons = Frame(self,pady=2)
         #action buttons
+
+        if macosxSupport.runningAsOSXApp():
+            # Surpress the padx and pady arguments when
+            # running as IDLE.app, otherwise the text
+            # on these buttons will not be readable.
+            extraKwds={}
+        else:
+            extraKwds=dict(padx=6, pady=3)
+
         self.buttonHelp = Button(frameActionButtons,text='Help',
                 command=self.Help,takefocus=FALSE,
-                padx=6,pady=3)
+                **extraKwds)
         self.buttonOk = Button(frameActionButtons,text='Ok',
                 command=self.Ok,takefocus=FALSE,
-                padx=6,pady=3)
+                **extraKwds)
         self.buttonApply = Button(frameActionButtons,text='Apply',
                 command=self.Apply,takefocus=FALSE,
-                padx=6,pady=3)
+                **extraKwds)
         self.buttonCancel = Button(frameActionButtons,text='Cancel',
                 command=self.Cancel,takefocus=FALSE,
-                padx=6,pady=3)
+                **extraKwds)
         self.CreatePageFontTab()
         self.CreatePageHighlight()
         self.CreatePageKeys()
@@ -336,7 +347,6 @@ class ConfigDialog(Toplevel):
                              text=' Autosave Preferences ')
         frameWinSize=Frame(frame,borderwidth=2,relief=GROOVE)
         frameParaSize=Frame(frame,borderwidth=2,relief=GROOVE)
-        frameEncoding=Frame(frame,borderwidth=2,relief=GROOVE)
         frameHelp=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                              text=' Additional Help Sources ')
         #frameRun
@@ -365,14 +375,6 @@ class ConfigDialog(Toplevel):
                 ' width (in characters)')
         entryParaWidth=Entry(frameParaSize,textvariable=self.paraWidth,
                 width=3)
-        #frameEncoding
-        labelEncodingTitle=Label(frameEncoding,text="Default Source Encoding")
-        radioEncLocale=Radiobutton(frameEncoding,variable=self.encoding,
-            value="locale",text="Locale-defined")
-        radioEncUTF8=Radiobutton(frameEncoding,variable=self.encoding,
-            value="utf-8",text="UTF-8")
-        radioEncNone=Radiobutton(frameEncoding,variable=self.encoding,
-            value="none",text="None")
         #frameHelp
         frameHelpList=Frame(frameHelp)
         frameHelpListButtons=Frame(frameHelpList)
@@ -394,7 +396,6 @@ class ConfigDialog(Toplevel):
         frameSave.pack(side=TOP,padx=5,pady=5,fill=X)
         frameWinSize.pack(side=TOP,padx=5,pady=5,fill=X)
         frameParaSize.pack(side=TOP,padx=5,pady=5,fill=X)
-        frameEncoding.pack(side=TOP,padx=5,pady=5,fill=X)
         frameHelp.pack(side=TOP,padx=5,pady=5,expand=TRUE,fill=BOTH)
         #frameRun
         labelRunChoiceTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
@@ -413,11 +414,6 @@ class ConfigDialog(Toplevel):
         #paragraphFormatWidth
         labelParaWidthTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
         entryParaWidth.pack(side=RIGHT,anchor=E,padx=10,pady=5)
-        #frameEncoding
-        labelEncodingTitle.pack(side=LEFT,anchor=W,padx=5,pady=5)
-        radioEncNone.pack(side=RIGHT,anchor=E,pady=5)
-        radioEncUTF8.pack(side=RIGHT,anchor=E,pady=5)
-        radioEncLocale.pack(side=RIGHT,anchor=E,pady=5)
         #frameHelp
         frameHelpListButtons.pack(side=RIGHT,padx=5,pady=5,fill=Y)
         frameHelpList.pack(side=TOP,padx=5,pady=5,expand=TRUE,fill=BOTH)

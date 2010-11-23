@@ -1,21 +1,43 @@
-
 :mod:`os.path` --- Common pathname manipulations
 ================================================
 
 .. module:: os.path
    :synopsis: Operations on pathnames.
 
-
 .. index:: single: path; operations
 
 This module implements some useful functions on pathnames. To read or
 write files see :func:`open`, and for accessing the filesystem see the
-:mod:`os` module.
+:mod:`os` module. The path parameters can be passed as either strings,
+or bytes. Applications are encouraged to represent file names as
+(Unicode) character strings. Unfortunately, some file names may not be
+representable as strings on Unix, so applications that need to support
+arbitrary file names on Unix should use bytes objects to represent
+path names. Vice versa, using bytes objects cannot represent all file
+names on Windows (in the standard ``mbcs`` encoding), hence Windows
+applications should use string objects to access all files.
 
-.. warning::
+.. note::
 
-   On Windows, many of these functions do not properly support UNC pathnames.
-   :func:`splitunc` and :func:`ismount` do handle them correctly.
+   All of these functions accept either only bytes or only string objects as
+   their parameters.  The result is an object of the same type, if a path or
+   file name is returned.
+
+
+.. note::
+
+   Since different operating systems have different path name conventions, there
+   are several versions of this module in the standard library.  The
+   :mod:`os.path` module is always the path module suitable for the operating
+   system Python is running on, and therefore usable for local paths.  However,
+   you can also import and use the individual modules if you want to manipulate
+   a path that is *always* in one of the different formats.  They all have the
+   same interface:
+
+   * :mod:`posixpath` for UNIX-style paths
+   * :mod:`ntpath` for Windows paths
+   * :mod:`macpath` for old-style MacOS paths
+   * :mod:`os2emxpath` for OS/2 EMX paths
 
 
 .. function:: abspath(path)
@@ -176,15 +198,18 @@ write files see :func:`open`, and for accessing the filesystem see the
 
 .. function:: normcase(path)
 
-   Normalize the case of a pathname.  On Unix, this returns the path unchanged; on
-   case-insensitive filesystems, it converts the path to lowercase.  On Windows, it
-   also converts forward slashes to backward slashes.
+   Normalize the case of a pathname.  On Unix and Mac OS X, this returns the
+   path unchanged; on case-insensitive filesystems, it converts the path to
+   lowercase.  On Windows, it also converts forward slashes to backward slashes.
+   Raise a TypeError if the type of *path* is not ``str`` or ``bytes``.
 
 
 .. function:: normpath(path)
 
    Normalize a pathname.  This collapses redundant separators and up-level
-   references so that ``A//B``, ``A/./B`` and ``A/foo/../B`` all become ``A/B``.
+   references so that ``A//B``, ``A/B/``, ``A/./B`` and ``A/foo/../B`` all become
+   ``A/B``.
+
    It does not normalize the case (use :func:`normcase` for that).  On Windows, it
    converts forward slashes to backward slashes. It should be understood that this
    may change the meaning of the path if it contains symbolic links!
@@ -196,25 +221,39 @@ write files see :func:`open`, and for accessing the filesystem see the
    links encountered in the path (if they are supported by the operating system).
 
 
-.. function:: relpath(path[, start])
+.. function:: relpath(path, start=None)
 
    Return a relative filepath to *path* either from the current directory or from
    an optional *start* point.
 
-   *start* defaults to :attr:`os.curdir`. Availability:  Windows, Unix.
+   *start* defaults to :attr:`os.curdir`.
+
+   Availability:  Windows, Unix.
 
 
 .. function:: samefile(path1, path2)
 
-   Return ``True`` if both pathname arguments refer to the same file or directory
-   (as indicated by device number and i-node number). Raise an exception if a
-   :func:`os.stat` call on either pathname fails. Availability:  Macintosh, Unix.
+   Return ``True`` if both pathname arguments refer to the same file or directory.
+   On Unix, this is determined by the device number and i-node number and raises an
+   exception if a :func:`os.stat` call on either pathname fails.
+
+   On Windows, two files are the same if they resolve to the same final path
+   name using the Windows API call GetFinalPathNameByHandle. This function
+   raises an exception if handles cannot be obtained to either file.
+
+   Availability: Windows, Unix.
+
+   .. versionchanged:: 3.2
+      Added Windows support.
 
 
 .. function:: sameopenfile(fp1, fp2)
 
    Return ``True`` if the file descriptors *fp1* and *fp2* refer to the same file.
-   Availability:  Macintosh, Unix.
+
+   Availability: Unix, Windows.
+
+   .. versionchanged:: 3.2 Added Windows support.
 
 
 .. function:: samestat(stat1, stat2)
@@ -222,27 +261,39 @@ write files see :func:`open`, and for accessing the filesystem see the
    Return ``True`` if the stat tuples *stat1* and *stat2* refer to the same file.
    These structures may have been returned by :func:`fstat`, :func:`lstat`, or
    :func:`stat`.  This function implements the underlying comparison used by
-   :func:`samefile` and :func:`sameopenfile`. Availability:  Macintosh, Unix.
+   :func:`samefile` and :func:`sameopenfile`.
+
+   Availability: Unix.
 
 
 .. function:: split(path)
 
-   Split the pathname *path* into a pair, ``(head, tail)`` where *tail* is the last
-   pathname component and *head* is everything leading up to that.  The *tail* part
-   will never contain a slash; if *path* ends in a slash, *tail* will be empty.  If
-   there is no slash in *path*, *head* will be empty.  If *path* is empty, both
-   *head* and *tail* are empty.  Trailing slashes are stripped from *head* unless
-   it is the root (one or more slashes only).  In nearly all cases, ``join(head,
-   tail)`` equals *path* (the only exception being when there were multiple slashes
-   separating *head* from *tail*).
+   Split the pathname *path* into a pair, ``(head, tail)`` where *tail* is the
+   last pathname component and *head* is everything leading up to that.  The
+   *tail* part will never contain a slash; if *path* ends in a slash, *tail*
+   will be empty.  If there is no slash in *path*, *head* will be empty.  If
+   *path* is empty, both *head* and *tail* are empty.  Trailing slashes are
+   stripped from *head* unless it is the root (one or more slashes only).  In
+   all cases, ``join(head, tail)`` returns a path to the same location as *path*
+   (but the strings may differ).
 
 
 .. function:: splitdrive(path)
 
    Split the pathname *path* into a pair ``(drive, tail)`` where *drive* is either
-   a drive specification or the empty string.  On systems which do not use drive
+   a mount point or the empty string.  On systems which do not use drive
    specifications, *drive* will always be the empty string.  In all cases, ``drive
    + tail`` will be the same as *path*.
+
+   On Windows, splits a pathname into drive/UNC sharepoint and relative path.
+
+   If the path contains a drive letter, drive will contain everything
+   up to and including the colon.
+   e.g. ``splitdrive("c:/dir")`` returns ``("c:", "/dir")``
+
+   If the path contains a UNC path, drive will contain the host name
+   and share, up to but not including the fourth separator.
+   e.g. ``splitdrive("//host/computer/dir")`` returns ``("//host/computer", "/dir")``
 
 
 .. function:: splitext(path)
@@ -255,14 +306,18 @@ write files see :func:`open`, and for accessing the filesystem see the
 
 .. function:: splitunc(path)
 
+   .. deprecated:: 3.1
+      Use *splitdrive* instead.
+
    Split the pathname *path* into a pair ``(unc, rest)`` so that *unc* is the UNC
    mount point (such as ``r'\\host\mount'``), if present, and *rest* the rest of
    the path (such as  ``r'\path\file.ext'``).  For paths containing drive letters,
-   *unc* will always be the empty string. Availability:  Windows.
+   *unc* will always be the empty string.
+
+   Availability:  Windows.
 
 
 .. data:: supports_unicode_filenames
 
    True if arbitrary Unicode strings can be used as file names (within limitations
-   imposed by the file system), and if :func:`os.listdir` returns strings that
-   contain characters that cannot be represented by ASCII.
+   imposed by the file system).

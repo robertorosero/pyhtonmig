@@ -1,7 +1,8 @@
 Building Python using VC++ 6.0 or 5.0
 -------------------------------------
 This directory is used to build Python for Win32 platforms, e.g. Windows
-95, 98 and NT.  It requires Microsoft Visual C++ 6.x or 5.x.
+2000 and XP.  It requires Microsoft Visual C++ 6.x or 5.x and Platform
+SDK February 2003 Edition (Core SDK).
 (For other Windows platforms and compilers, see ../readme.txt.)
 
 All you need to do is open the workspace "pcbuild.dsw" in MSVC++, select
@@ -11,9 +12,7 @@ and build the projects.
 The proper order to build subprojects:
 
 1) pythoncore (this builds the main Python DLL and library files,
-               python21.{dll, lib} in Release mode)
-              NOTE:  in previous releases, this subproject was
-              named after the release number, e.g. python20.
+               python32.{dll, lib} in Release mode)
 
 2) python (this builds the main Python executable,
            python.exe in Release mode)
@@ -24,7 +23,7 @@ The proper order to build subprojects:
    to the subsystems they implement; see SUBPROJECTS below)
 
 When using the Debug setting, the output files have a _d added to
-their name:  python21_d.dll, python_d.exe, parser_d.pyd, and so on.
+their name:  python32_d.dll, python_d.exe, pyexpat_d.pyd, and so on.
 
 SUBPROJECTS
 -----------
@@ -39,6 +38,8 @@ python
     .exe
 pythonw
     pythonw.exe, a variant of python.exe that doesn't pop up a DOS box
+_msi
+    _msi.c. You need to install Windows Installer SDK to build this module.
 _socket
     socketmodule.c
 _testcapi
@@ -62,18 +63,25 @@ unpack into new subdirectories of dist\.
 
 _tkinter
     Python wrapper for the Tk windowing system.  Requires building
-    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.4.12.
+    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.5.2.
 
     Get source
     ----------
     In the dist directory, run
-    svn export http://svn.python.org/projects/external/tcl8.4.12
-    svn export http://svn.python.org/projects/external/tk8.4.12
-    svn export http://svn.python.org/projects/external/tix-8.4.0
+    svn export http://svn.python.org/projects/external/tcl-8.5.2.1 tcl8.5.2
+    svn export http://svn.python.org/projects/external/tk-8.5.2.0 tk8.5.2
+    svn export http://svn.python.org/projects/external/tix-8.4.3.1 tix8.4.3
+
+    Debug Build
+    -----------
+    To build debug version, add DEBUG=1 to all nmake call bellow.
 
     Build Tcl first (done here w/ MSVC 6 on Win2K)
     ---------------
-    cd dist\tcl8.4.12\win
+    If your environment doesn't have struct _stat64, you need to apply
+    tcl852.patch in this directory to dist\tcl8.5.2\generic\tcl.h.
+
+    cd dist\tcl8.5.2\win
     run vcvars32.bat
     nmake -f makefile.vc
     nmake -f makefile.vc INSTALLDIR=..\..\tcltk install
@@ -83,16 +91,16 @@ _tkinter
     Optional:  run tests, via
         nmake -f makefile.vc test
 
-        all.tcl:        Total   10835   Passed  10096   Skipped 732     Failed  7
-        Sourced 129 Test Files.
-        Files with failing tests: exec.test expr.test io.test main.test string.test stri
+        all.tcl:        Total   24242   Passed  23358   Skipped 877     Failed  7
+        Sourced 137 Test Files.
+        Files with failing tests: exec.test http.test io.test main.test string.test stri
         ngObj.test
 
     Build Tk
     --------
-    cd dist\tk8.4.12\win
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.12
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.12 INSTALLDIR=..\..\tcltk install
+    cd dist\tk8.5.2\win
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.5.2
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.5.2 INSTALLDIR=..\..\tcltk install
 
     XXX Should we compile with OPTS=threads?
 
@@ -100,81 +108,38 @@ _tkinter
     XXX failed.  It popped up tons of little windows, and did lots of
     XXX stuff, and nothing blew up.
 
-   Built Tix
-   ---------
-   cd dist\tix-8.4.0\win
-   nmake -f python.mak
-   nmake -f python.mak install
+    Build Tix
+    ---------
+    cd dist\tix8.4.3\win
+    nmake -f python.mak TCL_MAJOR=8 TCL_MINOR=5 TCL_PATCH=2 MACHINE=IX86 DEBUG=0
+    nmake -f python.mak TCL_MAJOR=8 TCL_MINOR=5 TCL_PATCH=2 MACHINE=IX86 DEBUG=0 INSTALL_DIR=..\..\tcltk install
 
 bz2
     Python wrapper for the libbz2 compression library.  Homepage
-        http://sources.redhat.com/bzip2/
+        http://www.bzip.org/
     Download the source from the python.org copy into the dist
     directory:
 
-    svn export http://svn.python.org/projects/external/bzip2-1.0.3
+    svn export http://svn.python.org/projects/external/bzip2-1.0.5
 
     And requires building bz2 first.
 
-    cd dist\bzip2-1.0.3
+    cd dist\bzip2-1.0.5
     nmake -f makefile.msc
 
-    All of this managed to build bzip2-1.0.3\libbz2.lib, which the Python
+    All of this managed to build bzip2-1.0.5\libbz2.lib, which the Python
     project links in.
 
 
-_bsddb
-    To use the version of bsddb that Python is built with by default, invoke
-    (in the dist directory)
-
-     svn export http://svn.python.org/projects/external/db-4.4.20
-
-    Then open db-4.4.20\build_win32\Berkeley_DB.dsw and build the "db_static"
-    project for "Release" mode.
-
-    Alternatively, if you want to start with the original sources,
-    go to Sleepycat's download page:
-        http://www.sleepycat.com/downloads/releasehistorybdb.html
-
-    and download version 4.4.20.
-
-    With or without strong cryptography? You can choose either with or
-    without strong cryptography, as per the instructions below.  By
-    default, Python is built and distributed WITHOUT strong crypto.
-
-    Unpack the sources; if you downloaded the non-crypto version, rename
-    the directory from db-4.4.20.NC to db-4.4.20.
-
-    Now apply any patches that apply to your version.
-
-    To run extensive tests, pass "-u bsddb" to regrtest.py.  test_bsddb3.py
-    is then enabled.  Running in verbose mode may be helpful.
-
-    XXX The test_bsddb3 tests don't always pass, on Windows (according to
-    XXX me) or on Linux (according to Barry).  (I had much better luck
-    XXX on Win2K than on Win98SE.)  The common failure mode across platforms
-    XXX is
-    XXX     DBAgainError: (11, 'Resource temporarily unavailable -- unable
-    XXX                         to join the environment')
-    XXX
-    XXX and it appears timing-dependent.  On Win2K I also saw this once:
-    XXX
-    XXX test02_SimpleLocks (bsddb.test.test_thread.HashSimpleThreaded) ...
-    XXX Exception in thread reader 1:
-    XXX Traceback (most recent call last):
-    XXX File "C:\Code\python\lib\threading.py", line 411, in __bootstrap
-    XXX    self.run()
-    XXX File "C:\Code\python\lib\threading.py", line 399, in run
-    XXX    apply(self.__target, self.__args, self.__kwargs)
-    XXX File "C:\Code\python\lib\bsddb\test\test_thread.py", line 268, in
-    XXX                  readerThread
-    XXX    rec = c.next()
-    XXX DBLockDeadlockError: (-30996, 'DB_LOCK_DEADLOCK: Locker killed
-    XXX                                to resolve a deadlock')
-    XXX
-    XXX I'm told that DBLockDeadlockError is expected at times.  It
-    XXX doesn't cause a test to fail when it happens (exceptions in
-    XXX threads are invisible to unittest).
+_sqlite3
+    Python wrapper for SQLite library.
+    
+    Get the source code through
+    
+    svn export http://svn.python.org/projects/external/sqlite-source-3.3.4
+    
+    To use the extension module in a Python build tree, copy sqlite3.dll into
+    the PC/VC6 folder.
 
 
 _ssl
@@ -183,20 +148,18 @@ _ssl
     Get the latest source code for OpenSSL from
         http://www.openssl.org
 
-    You (probably) don't want the "engine" code.  For example, get
-        openssl-0.9.6g.tar.gz
-    not
+    You (probably) don't want the "engine" code.  For example, don't get
         openssl-engine-0.9.6g.tar.gz
 
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
-        dist/openssl-0.9.6g
+        dist/openssl-1.0.0a
 
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.
 
     You must also install ActivePerl from
-        http://www.activestate.com/Products/ActivePerl/
+        http://www.activestate.com/activeperl/
     as this is used by the OpenSSL build process.  Complain to them <wink>.
 
     The MSVC project simply invokes PC/VC6/build_ssl.py to perform

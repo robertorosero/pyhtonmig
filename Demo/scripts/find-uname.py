@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 For each argument on the command line, look for it in the set of all Unicode
@@ -21,20 +21,20 @@ import sys
 import re
 
 def main(args):
-    unicode_names= []
+    unicode_names = []
     for ix in range(sys.maxunicode+1):
         try:
-            unicode_names.append( (ix, unicodedata.name(chr(ix))) )
+            unicode_names.append((ix, unicodedata.name(chr(ix))))
         except ValueError: # no name for the character
             pass
     for arg in args:
         pat = re.compile(arg, re.I)
-        matches = [(x,y) for (x,y) in unicode_names
-                       if pat.search(y) is not None]
+        matches = [(y,x) for (x,y) in unicode_names
+                   if pat.search(y) is not None]
         if matches:
             print("***", arg, "matches", "***")
-            for (x,y) in matches:
-                print("%s (%d)" % (y,x))
+            for match in matches:
+                print("%s (%d)" % match)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

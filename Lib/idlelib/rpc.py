@@ -106,7 +106,7 @@ class RPCServer(socketserver.TCPServer):
             erf = sys.__stderr__
             print('\n' + '-'*40, file=erf)
             print('Unhandled server exception!', file=erf)
-            print('Thread: %s' % threading.current_thread().get_name(), file=erf)
+            print('Thread: %s' % threading.current_thread().name, file=erf)
             print('Client Address: ', client_address, file=erf)
             print('Request: ', repr(request), file=erf)
             traceback.print_exc(file=erf)
@@ -149,7 +149,7 @@ class SocketIO(object):
     def debug(self, *args):
         if not self.debugging:
             return
-        s = self.location + " " + str(threading.current_thread().get_name())
+        s = self.location + " " + str(threading.current_thread().name)
         for a in args:
             s = s + " " + str(a)
         print(s, file=sys.__stderr__)
@@ -518,8 +518,6 @@ class RPCClient(SocketIO):
 
     def __init__(self, address, family=socket.AF_INET, type=socket.SOCK_STREAM):
         self.listening_sock = socket.socket(family, type)
-        self.listening_sock.setsockopt(socket.SOL_SOCKET,
-                                       socket.SO_REUSEADDR, 1)
         self.listening_sock.bind(address)
         self.listening_sock.listen(1)
 
@@ -597,4 +595,4 @@ class MethodProxy(object):
 
 
 # XXX KBK 09Sep03  We need a proper unit test for this module.  Previously
-#                  existing test code was removed at Rev 1.27.
+#                  existing test code was removed at Rev 1.27 (r34098).

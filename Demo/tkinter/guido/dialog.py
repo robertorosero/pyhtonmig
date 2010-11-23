@@ -1,10 +1,10 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # A Python function that generates dialog boxes with a text message,
 # optional bitmap, and any number of buttons.
 # Cf. Ousterhout, Tcl and the Tk Toolkit, Figs. 27.2-3, pp. 269-270.
 
-from Tkinter import *
+from tkinter import *
 import sys
 
 
@@ -24,8 +24,7 @@ def dialog(master, title, text, bitmap, default, *args):
 
     # 2. Fill the top part with the bitmap and message.
 
-    msg = Message(top, width='3i', text=text,
-                  font='-Adobe-Times-Medium-R-Normal-*-180-*')
+    msg = Message(top, width='3i', text=text)
     msg.pack(side=RIGHT, expand=1, fill=BOTH, padx='3m', pady='3m')
     if bitmap:
         bm = Label(top, bitmap=bitmap)

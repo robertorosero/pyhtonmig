@@ -1,4 +1,3 @@
-
 :mod:`uu` --- Encode and decode uuencode files
 ==============================================
 
@@ -22,10 +21,14 @@ that, when required, the mode is ``'rb'`` or ``'wb'`` on Windows.
 
 This code was contributed by Lance Ellinghouse, and modified by Jack Jansen.
 
+.. seealso::
+
+   Latest version of the :source:`uu module Python source code <Lib/uu.py>`
+
 The :mod:`uu` module defines the following functions:
 
 
-.. function:: encode(in_file, out_file[, name[, mode]])
+.. function:: encode(in_file, out_file, name=None, mode=None)
 
    Uuencode file *in_file* into file *out_file*.  The uuencoded file will have
    the header specifying *name* and *mode* as the defaults for the results of
@@ -33,7 +36,7 @@ The :mod:`uu` module defines the following functions:
    and ``0o666`` respectively.
 
 
-.. function:: decode(in_file[, out_file[, mode[, quiet]]])
+.. function:: decode(in_file, out_file=None, mode=None, quiet=False)
 
    This call decodes uuencoded file *in_file* placing the result on file
    *out_file*. If *out_file* is a pathname, *mode* is used to set the permission

@@ -1,4 +1,3 @@
-
 :mod:`socketserver` --- A framework for network servers
 =======================================================
 
@@ -122,15 +121,21 @@ another way to manage this.
 Server Objects
 --------------
 
+.. class:: BaseServer
 
-.. function:: fileno()
+   This is the superclass of all Server objects in the module.  It defines the
+   interface, given below, but does not implement most of the methods, which is
+   done in subclasses.
+
+
+.. method:: BaseServer.fileno()
 
    Return an integer file descriptor for the socket on which the server is
    listening.  This function is most commonly passed to :func:`select.select`, to
    allow monitoring multiple servers in the same process.
 
 
-.. function:: handle_request()
+.. method:: BaseServer.handle_request()
 
    Process a single request.  This function calls the following methods in
    order: :meth:`get_request`, :meth:`verify_request`, and
@@ -141,30 +146,30 @@ Server Objects
    will return.
 
 
-.. function:: serve_forever(poll_interval=0.5)
+.. method:: BaseServer.serve_forever(poll_interval=0.5)
 
    Handle requests until an explicit :meth:`shutdown` request.  Polls for
    shutdown every *poll_interval* seconds.
 
 
-.. function:: shutdown()
+.. method:: BaseServer.shutdown()
 
    Tells the :meth:`serve_forever` loop to stop and waits until it does.
 
 
-.. data:: address_family
+.. attribute:: BaseServer.address_family
 
    The family of protocols to which the server's socket belongs.
    Common examples are :const:`socket.AF_INET` and :const:`socket.AF_UNIX`.
 
 
-.. data:: RequestHandlerClass
+.. attribute:: BaseServer.RequestHandlerClass
 
    The user-provided request handler class; an instance of this class is created
    for each request.
 
 
-.. data:: server_address
+.. attribute:: BaseServer.server_address
 
    The address on which the server is listening.  The format of addresses varies
    depending on the protocol family; see the documentation for the socket module
@@ -172,22 +177,22 @@ Server Objects
    the address, and an integer port number: ``('127.0.0.1', 80)``, for example.
 
 
-.. data:: socket
+.. attribute:: BaseServer.socket
 
    The socket object on which the server will listen for incoming requests.
+
 
 The server classes support the following class variables:
 
 .. XXX should class variables be covered before instance variables, or vice versa?
 
-
-.. data:: allow_reuse_address
+.. attribute:: BaseServer.allow_reuse_address
 
    Whether the server will allow the reuse of an address. This defaults to
    :const:`False`, and can be set in subclasses to change the policy.
 
 
-.. data:: request_queue_size
+.. attribute:: BaseServer.request_queue_size
 
    The size of the request queue.  If it takes a long time to process a single
    request, any requests that arrive while the server is busy are placed into a
@@ -196,16 +201,18 @@ The server classes support the following class variables:
    value is usually 5, but this can be overridden by subclasses.
 
 
-.. data:: socket_type
+.. attribute:: BaseServer.socket_type
 
    The type of socket used by the server; :const:`socket.SOCK_STREAM` and
    :const:`socket.SOCK_DGRAM` are two common values.
 
-.. data:: timeout
+
+.. attribute:: BaseServer.timeout
 
    Timeout duration, measured in seconds, or :const:`None` if no timeout is
    desired.  If :meth:`handle_request` receives no incoming requests within the
    timeout period, the :meth:`handle_timeout` method is called.
+
 
 There are various server methods that can be overridden by subclasses of base
 server classes like :class:`TCPServer`; these methods aren't useful to external
@@ -214,27 +221,27 @@ users of the server object.
 .. XXX should the default implementations of these be documented, or should
    it be assumed that the user will look at socketserver.py?
 
-
-.. function:: finish_request()
+.. method:: BaseServer.finish_request()
 
    Actually processes the request by instantiating :attr:`RequestHandlerClass` and
    calling its :meth:`handle` method.
 
 
-.. function:: get_request()
+.. method:: BaseServer.get_request()
 
    Must accept a request from the socket, and return a 2-tuple containing the *new*
    socket object to be used to communicate with the client, and the client's
    address.
 
 
-.. function:: handle_error(request, client_address)
+.. method:: BaseServer.handle_error(request, client_address)
 
    This function is called if the :attr:`RequestHandlerClass`'s :meth:`handle`
    method raises an exception.  The default action is to print the traceback to
    standard output and continue handling further requests.
 
-.. function:: handle_timeout()
+
+.. method:: BaseServer.handle_timeout()
 
    This function is called when the :attr:`timeout` attribute has been set to a
    value other than :const:`None` and the timeout period has passed with no
@@ -242,31 +249,32 @@ users of the server object.
    to collect the status of any child processes that have exited, while
    in threading servers this method does nothing.
 
-.. function:: process_request(request, client_address)
+
+.. method:: BaseServer.process_request(request, client_address)
 
    Calls :meth:`finish_request` to create an instance of the
    :attr:`RequestHandlerClass`.  If desired, this function can create a new process
    or thread to handle the request; the :class:`ForkingMixIn` and
    :class:`ThreadingMixIn` classes do this.
 
+
 .. Is there any point in documenting the following two functions?
    What would the purpose of overriding them be: initializing server
    instance variables, adding new network families?
 
-
-.. function:: server_activate()
+.. method:: BaseServer.server_activate()
 
    Called by the server's constructor to activate the server.  The default behavior
    just :meth:`listen`\ s to the server's socket. May be overridden.
 
 
-.. function:: server_bind()
+.. method:: BaseServer.server_bind()
 
    Called by the server's constructor to bind the socket to the desired address.
    May be overridden.
 
 
-.. function:: verify_request(request, client_address)
+.. method:: BaseServer.verify_request(request, client_address)
 
    Must return a Boolean value; if the value is :const:`True`, the request will be
    processed, and if it's :const:`False`, the request will be denied. This function
@@ -282,14 +290,14 @@ override any of the following methods.  A new instance is created for each
 request.
 
 
-.. function:: finish()
+.. method:: RequestHandler.finish()
 
    Called after the :meth:`handle` method to perform any clean-up actions
    required.  The default implementation does nothing.  If :meth:`setup` or
    :meth:`handle` raise an exception, this function will not be called.
 
 
-.. function:: handle()
+.. method:: RequestHandler.handle()
 
    This function must do all the work required to service a request.  The
    default implementation does nothing.  Several instance attributes are
@@ -308,7 +316,7 @@ request.
    data or return data to the client.
 
 
-.. function:: setup()
+.. method:: RequestHandler.setup()
 
    Called before the :meth:`handle` method to perform any initialization actions
    required.  The default implementation does nothing.
@@ -336,8 +344,8 @@ This is the server side::
        def handle(self):
            # self.request is the TCP socket connected to the client
            self.data = self.request.recv(1024).strip()
-           print "%s wrote:" % self.client_address[0]
-           print self.data
+           print("%s wrote:" % self.client_address[0])
+           print(self.data)
            # just send back the same data, but upper-cased
            self.request.send(self.data.upper())
 
@@ -360,8 +368,8 @@ objects that simplify communication by providing the standard file interface)::
            # self.rfile is a file-like object created by the handler;
            # we can now use e.g. readline() instead of raw recv() calls
            self.data = self.rfile.readline().strip()
-           print "%s wrote:" % self.client_address[0]
-           print self.data
+           print("%s wrote:" % self.client_address[0])
+           print(self.data)
            # Likewise, self.wfile is a file-like object used to write back
            # to the client
            self.wfile.write(self.data.upper())
@@ -385,14 +393,14 @@ This is the client side::
 
    # Connect to server and send data
    sock.connect((HOST, PORT))
-   sock.send(data + "\n")
+   sock.send(bytes(data + "\n","utf8"))
 
    # Receive data from the server and shut down
    received = sock.recv(1024)
    sock.close()
 
-   print "Sent:     %s" % data
-   print "Received: %s" % received
+   print("Sent:     %s" % data)
+   print("Received: %s" % received)
 
 
 The output of the example should look something like this:
@@ -401,18 +409,18 @@ Server::
 
    $ python TCPServer.py
    127.0.0.1 wrote:
-   hello world with TCP
+   b'hello world with TCP'
    127.0.0.1 wrote:
-   python is nice
+   b'python is nice'
 
 Client::
 
    $ python TCPClient.py hello world with TCP
    Sent:     hello world with TCP
-   Received: HELLO WORLD WITH TCP
+   Received: b'HELLO WORLD WITH TCP'
    $ python TCPClient.py python is nice
    Sent:     python is nice
-   Received: PYTHON IS NICE
+   Received: b'PYTHON IS NICE'
 
 
 :class:`socketserver.UDPServer` Example
@@ -433,21 +441,21 @@ This is the server side::
        def handle(self):
            data = self.request[0].strip()
            socket = self.request[1]
-           print "%s wrote:" % self.client_address[0]
-           print data
+           print("%s wrote:" % self.client_address[0])
+           print(data)
            socket.sendto(data.upper(), self.client_address)
 
    if __name__ == "__main__":
-      HOST, PORT = "localhost", 9999
-      server = socketserver.UDPServer((HOST, PORT), BaseUDPRequestHandler)
-      server.serve_forever()
+       HOST, PORT = "localhost", 9999
+       server = socketserver.UDPServer((HOST, PORT), MyUDPHandler)
+       server.serve_forever()
 
 This is the client side::
 
    import socket
    import sys
 
-   HOST, PORT = "localhost"
+   HOST, PORT = "localhost", 9999
    data = " ".join(sys.argv[1:])
 
    # SOCK_DGRAM is the socket type to use for UDP sockets
@@ -455,11 +463,11 @@ This is the client side::
 
    # As you can see, there is no connect() call; UDP has no connections.
    # Instead, data is directly sent to the recipient via sendto().
-   sock.sendto(data + "\n", (HOST, PORT))
+   sock.sendto(bytes(data + "\n","utf8"), (HOST, PORT))
    received = sock.recv(1024)
 
-   print "Sent:     %s" % data
-   print "Received: %s" % received
+   print("Sent:     %s" % data)
+   print("Received: %s" % received)
 
 The output of the example should look exactly like for the TCP server example.
 
@@ -481,7 +489,7 @@ An example for the :class:`ThreadingMixIn` class::
        def handle(self):
            data = self.request.recv(1024)
            cur_thread = threading.current_thread()
-           response = "%s: %s" % (cur_thread.get_name(), data)
+           response = bytes("%s: %s" % (cur_thread.getName(), data),'ascii')
            self.request.send(response)
 
    class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -492,7 +500,7 @@ An example for the :class:`ThreadingMixIn` class::
        sock.connect((ip, port))
        sock.send(message)
        response = sock.recv(1024)
-       print "Received: %s" % response
+       print("Received: %s" % response)
        sock.close()
 
    if __name__ == "__main__":
@@ -506,23 +514,24 @@ An example for the :class:`ThreadingMixIn` class::
        # more thread for each request
        server_thread = threading.Thread(target=server.serve_forever)
        # Exit the server thread when the main thread terminates
-       server_thread.set_daemon(True)
+       server_thread.setDaemon(True)
        server_thread.start()
-       print "Server loop running in thread:", t.get_name()
+       print("Server loop running in thread:", server_thread.name)
 
-       client(ip, port, "Hello World 1")
-       client(ip, port, "Hello World 2")
-       client(ip, port, "Hello World 3")
+       client(ip, port, b"Hello World 1")
+       client(ip, port, b"Hello World 2")
+       client(ip, port, b"Hello World 3")
 
        server.shutdown()
+
 
 The output of the example should look something like this::
 
    $ python ThreadedTCPServer.py
    Server loop running in thread: Thread-1
-   Received: Thread-2: Hello World 1
-   Received: Thread-3: Hello World 2
-   Received: Thread-4: Hello World 3
+   Received: b"Thread-2: b'Hello World 1'"
+   Received: b"Thread-3: b'Hello World 2'"
+   Received: b"Thread-4: b'Hello World 3'"
 
 
 The :class:`ForkingMixIn` class is used in the same way, except that the server

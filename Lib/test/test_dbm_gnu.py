@@ -1,4 +1,5 @@
-import dbm.gnu as gdbm
+from test import support
+gdbm = support.import_module("dbm.gnu") #skip if not supported
 import unittest
 import os
 from test.support import verbose, TESTFN, run_unittest, unlink
@@ -20,12 +21,14 @@ class TestGdbm(unittest.TestCase):
         self.assertEqual(self.g.keys(), [])
         self.g['a'] = 'b'
         self.g['12345678910'] = '019237410982340912840198242'
+        self.g[b'bytes'] = b'data'
         key_set = set(self.g.keys())
-        self.assertEqual(key_set, set([b'a', b'12345678910']))
-        self.assert_(b'a' in self.g)
+        self.assertEqual(key_set, set([b'a', b'bytes', b'12345678910']))
+        self.assertIn(b'a', self.g)
+        self.assertEqual(self.g[b'bytes'], b'data')
         key = self.g.firstkey()
         while key:
-            self.assert_(key in key_set)
+            self.assertIn(key, key_set)
             key_set.remove(key)
             key = self.g.nextkey(key)
         self.assertRaises(KeyError, lambda: self.g['xxx'])
@@ -63,7 +66,7 @@ class TestGdbm(unittest.TestCase):
 
         self.g['x'] = 'x' * 10000
         size1 = os.path.getsize(filename)
-        self.assert_(size0 < size1)
+        self.assertTrue(size0 < size1)
 
         del self.g['x']
         # 'size' is supposed to be the same even after deleting an entry.
@@ -71,7 +74,7 @@ class TestGdbm(unittest.TestCase):
 
         self.g.reorganize()
         size2 = os.path.getsize(filename)
-        self.assert_(size1 > size2 >= size0)
+        self.assertTrue(size1 > size2 >= size0)
 
 
 def test_main():

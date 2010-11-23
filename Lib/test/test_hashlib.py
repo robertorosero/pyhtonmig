@@ -2,13 +2,25 @@
 #
 # $Id$
 #
-#  Copyright (C) 2005   Gregory P. Smith (greg@krypto.org)
+#  Copyright (C) 2005-2010   Gregory P. Smith (greg@krypto.org)
 #  Licensed to PSF under a Contributor Agreement.
 #
 
+import array
 import hashlib
+import itertools
+import sys
+try:
+    import threading
+except ImportError:
+    threading = None
 import unittest
+import warnings
 from test import support
+from test.support import _4G, precisionbigmemtest
+
+# Were we compiled --with-pydebug or with #define Py_DEBUG?
+COMPILED_WITH_PYDEBUG = hasattr(sys, 'gettotalrefcount')
 
 
 def hexstr(s):
@@ -25,13 +37,86 @@ class HashLibTestCase(unittest.TestCase):
                              'sha224', 'SHA224', 'sha256', 'SHA256',
                              'sha384', 'SHA384', 'sha512', 'SHA512' )
 
+    _warn_on_extension_import = COMPILED_WITH_PYDEBUG
+
+    def _conditional_import_module(self, module_name):
+        """Import a module and return a reference to it or None on failure."""
+        try:
+            exec('import '+module_name)
+        except ImportError as error:
+            if self._warn_on_extension_import:
+                warnings.warn('Did a C extension fail to compile? %s' % error)
+        return locals().get(module_name)
+
+    def __init__(self, *args, **kwargs):
+        algorithms = set()
+        for algorithm in self.supported_hash_names:
+            algorithms.add(algorithm.lower())
+        self.constructors_to_test = {}
+        for algorithm in algorithms:
+            self.constructors_to_test[algorithm] = set()
+
+        # For each algorithm, test the direct constructor and the use
+        # of hashlib.new given the algorithm name.
+        for algorithm, constructors in self.constructors_to_test.items():
+            constructors.add(getattr(hashlib, algorithm))
+            def _test_algorithm_via_hashlib_new(data=None, _alg=algorithm):
+                if data is None:
+                    return hashlib.new(_alg)
+                return hashlib.new(_alg, data)
+            constructors.add(_test_algorithm_via_hashlib_new)
+
+        _hashlib = self._conditional_import_module('_hashlib')
+        if _hashlib:
+            # These two algorithms should always be present when this module
+            # is compiled.  If not, something was compiled wrong.
+            assert hasattr(_hashlib, 'openssl_md5')
+            assert hasattr(_hashlib, 'openssl_sha1')
+            for algorithm, constructors in self.constructors_to_test.items():
+                constructor = getattr(_hashlib, 'openssl_'+algorithm, None)
+                if constructor:
+                    constructors.add(constructor)
+
+        _md5 = self._conditional_import_module('_md5')
+        if _md5:
+            self.constructors_to_test['md5'].add(_md5.md5)
+        _sha1 = self._conditional_import_module('_sha1')
+        if _sha1:
+            self.constructors_to_test['sha1'].add(_sha1.sha1)
+        _sha256 = self._conditional_import_module('_sha256')
+        if _sha256:
+            self.constructors_to_test['sha224'].add(_sha256.sha224)
+            self.constructors_to_test['sha256'].add(_sha256.sha256)
+        _sha512 = self._conditional_import_module('_sha512')
+        if _sha512:
+            self.constructors_to_test['sha384'].add(_sha512.sha384)
+            self.constructors_to_test['sha512'].add(_sha512.sha512)
+
+        super(HashLibTestCase, self).__init__(*args, **kwargs)
+
+    def test_hash_array(self):
+        a = array.array("b", range(10))
+        constructors = self.constructors_to_test.values()
+        for cons in itertools.chain.from_iterable(constructors):
+            c = cons(a)
+            c.hexdigest()
+
+    def test_algorithms_guaranteed(self):
+        self.assertEqual(hashlib.algorithms_guaranteed,
+            tuple(_algo for _algo in self.supported_hash_names
+                  if _algo.islower()))
+
+    def test_algorithms_available(self):
+        self.assertTrue(set(hashlib.algorithms_guaranteed).
+                            issubset(hashlib.algorithms_available))
+
     def test_unknown_hash(self):
         try:
             hashlib.new('spam spam spam spam spam')
         except ValueError:
             pass
         else:
-            self.assert_(0 == "hashlib didn't reject bogus hash name")
+            self.assertTrue(0 == "hashlib didn't reject bogus hash name")
 
     def test_hexdigest(self):
         for name in self.supported_hash_names:
@@ -55,15 +140,32 @@ class HashLibTestCase(unittest.TestCase):
             m2.update(aas + bees + cees)
             self.assertEqual(m1.digest(), m2.digest())
 
-
     def check(self, name, data, digest):
-        # test the direct constructors
-        computed = getattr(hashlib, name)(data).hexdigest()
-        self.assertEqual(computed, digest)
-        # test the general new() interface
-        computed = hashlib.new(name, data).hexdigest()
-        self.assertEqual(computed, digest)
+        constructors = self.constructors_to_test[name]
+        # 2 is for hashlib.name(...) and hashlib.new(name, ...)
+        self.assertGreaterEqual(len(constructors), 2)
+        for hash_object_constructor in constructors:
+            computed = hash_object_constructor(data).hexdigest()
+            self.assertEqual(
+                    computed, digest,
+                    "Hash algorithm %s constructed using %s returned hexdigest"
+                    " %r for %d byte input data that should have hashed to %r."
+                    % (name, hash_object_constructor,
+                       computed, len(data), digest))
 
+    def check_no_unicode(self, algorithm_name):
+        # Unicode objects are not allowed as input.
+        constructors = self.constructors_to_test[algorithm_name]
+        for hash_object_constructor in constructors:
+            self.assertRaises(TypeError, hash_object_constructor, 'spam')
+
+    def test_no_unicode(self):
+        self.check_no_unicode('md5')
+        self.check_no_unicode('sha1')
+        self.check_no_unicode('sha224')
+        self.check_no_unicode('sha256')
+        self.check_no_unicode('sha384')
+        self.check_no_unicode('sha512')
 
     def test_case_md5_0(self):
         self.check('md5', b'', 'd41d8cd98f00b204e9800998ecf8427e')
@@ -76,6 +178,21 @@ class HashLibTestCase(unittest.TestCase):
                    b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
                    'd174ab98d277d9f5a5611c2c9f419d9f')
 
+    @precisionbigmemtest(size=_4G + 5, memuse=1)
+    def test_case_md5_huge(self, size):
+        if size == _4G + 5:
+            try:
+                self.check('md5', b'A'*size, 'c9af2dff37468ce5dfee8f2cfc0a9c6d')
+            except OverflowError:
+                pass # 32-bit arch
+
+    @precisionbigmemtest(size=_4G - 1, memuse=1)
+    def test_case_md5_uintmax(self, size):
+        if size == _4G - 1:
+            try:
+                self.check('md5', b'A'*size, '28138d306ff1b8281f1a9067e1a1a2b3')
+            except OverflowError:
+                pass # 32-bit arch
 
     # use the three examples from Federal Information Processing Standards
     # Publication 180-1, Secure Hash Standard,  1995 April 17
@@ -184,10 +301,59 @@ class HashLibTestCase(unittest.TestCase):
           "e718483d0ce769644e2e42c7bc15b4638e1f98b13b2044285632a803afa973eb"+
           "de0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b")
 
+    def test_gil(self):
+        # Check things work fine with an input larger than the size required
+        # for multithreaded operation (which is hardwired to 2048).
+        gil_minsize = 2048
+
+        m = hashlib.md5()
+        m.update(b'1')
+        m.update(b'#' * gil_minsize)
+        m.update(b'1')
+        self.assertEqual(m.hexdigest(), 'cb1e1a2cbc80be75e19935d621fb9b21')
+
+        m = hashlib.md5(b'x' * gil_minsize)
+        self.assertEqual(m.hexdigest(), 'cfb767f225d58469c5de3632a8803958')
+
+    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @support.reap_threads
+    def test_threaded_hashing(self):
+        # Updating the same hash object from several threads at once
+        # using data chunk sizes containing the same byte sequences.
+        #
+        # If the internal locks are working to prevent multiple
+        # updates on the same object from running at once, the resulting
+        # hash will be the same as doing it single threaded upfront.
+        hasher = hashlib.sha1()
+        num_threads = 5
+        smallest_data = b'swineflu'
+        data = smallest_data*200000
+        expected_hash = hashlib.sha1(data*num_threads).hexdigest()
+
+        def hash_in_chunks(chunk_size, event):
+            index = 0
+            while index < len(data):
+                hasher.update(data[index:index+chunk_size])
+                index += chunk_size
+            event.set()
+
+        events = []
+        for threadnum in range(num_threads):
+            chunk_size = len(data) // (10**threadnum)
+            assert chunk_size > 0
+            assert chunk_size % len(smallest_data) == 0
+            event = threading.Event()
+            events.append(event)
+            threading.Thread(target=hash_in_chunks,
+                             args=(chunk_size, event)).start()
+
+        for event in events:
+            event.wait()
+
+        self.assertEqual(expected_hash, hasher.hexdigest())
 
 def test_main():
     support.run_unittest(HashLibTestCase)
-
 
 if __name__ == "__main__":
     test_main()

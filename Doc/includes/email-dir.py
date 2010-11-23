@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """Send the contents of a directory as a MIME message."""
 
@@ -106,9 +106,8 @@ must be running an SMTP server.
         fp.close()
     else:
         s = smtplib.SMTP()
-        s.connect()
         s.sendmail(opts.sender, opts.recipients, composed)
-        s.close()
+        s.quit()
 
 
 if __name__ == '__main__':

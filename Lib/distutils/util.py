@@ -11,6 +11,7 @@ from distutils.errors import DistutilsPlatformError
 from distutils.dep_util import newer
 from distutils.spawn import spawn
 from distutils import log
+from distutils.errors import DistutilsByteCompileError
 
 def get_platform ():
     """Return a string that identifies the current platform.  This is used
@@ -81,7 +82,7 @@ def get_platform ():
         return "%s-%s.%s" % (osname, version, release)
     elif osname[:6] == "cygwin":
         osname = "cygwin"
-        rel_re = re.compile (r'[\d.]+')
+        rel_re = re.compile (r'[\d.]+', re.ASCII)
         m = rel_re.match(release)
         if m:
             release = m.group()
@@ -99,7 +100,11 @@ def get_platform ():
         if not macver:
             macver = cfgvars.get('MACOSX_DEPLOYMENT_TARGET')
 
-        if not macver:
+        if 1:
+            # Always calculate the release of the running machine,
+            # needed to determine if we can build fat binaries or not.
+
+            macrelease = macver
             # Get the system version. Reading this plist is a documented
             # way to get the system version (see the documentation for
             # the Gestalt Manager)
@@ -110,29 +115,68 @@ def get_platform ():
                 # behaviour.
                 pass
             else:
-                m = re.search(
-                        r'<key>ProductUserVisibleVersion</key>\s*' +
-                        r'<string>(.*?)</string>', f.read())
-                f.close()
-                if m is not None:
-                    macver = '.'.join(m.group(1).split('.')[:2])
-                # else: fall back to the default behaviour
+                try:
+                    m = re.search(
+                            r'<key>ProductUserVisibleVersion</key>\s*' +
+                            r'<string>(.*?)</string>', f.read())
+                    if m is not None:
+                        macrelease = '.'.join(m.group(1).split('.')[:2])
+                    # else: fall back to the default behaviour
+                finally:
+                    f.close()
+
+        if not macver:
+            macver = macrelease
 
         if macver:
             from distutils.sysconfig import get_config_vars
             release = macver
             osname = "macosx"
 
-
-            if (release + '.') < '10.4.' and \
-                    get_config_vars().get('UNIVERSALSDK', '').strip():
+            if (macrelease + '.') >= '10.4.' and \
+                    '-arch' in get_config_vars().get('CFLAGS', '').strip():
                 # The universal build will build fat binaries, but not on
                 # systems before 10.4
+                #
+                # Try to detect 4-way universal builds, those have machine-type
+                # 'universal' instead of 'fat'.
+
                 machine = 'fat'
+                cflags = get_config_vars().get('CFLAGS')
+
+                archs = re.findall('-arch\s+(\S+)', cflags)
+                archs = tuple(sorted(set(archs)))
+
+                if len(archs) == 1:
+                    machine = archs[0]
+                elif archs == ('i386', 'ppc'):
+                    machine = 'fat'
+                elif archs == ('i386', 'x86_64'):
+                    machine = 'intel'
+                elif archs == ('i386', 'ppc', 'x86_64'):
+                    machine = 'fat3'
+                elif archs == ('ppc64', 'x86_64'):
+                    machine = 'fat64'
+                elif archs == ('i386', 'ppc', 'ppc64', 'x86_64'):
+                    machine = 'universal'
+                else:
+                    raise ValueError(
+                       "Don't know machine value for archs=%r"%(archs,))
+
+            elif machine == 'i386':
+                # On OSX the machine type returned by uname is always the
+                # 32-bit variant, even if the executable architecture is
+                # the 64-bit variant
+                if sys.maxsize >= 2**32:
+                    machine = 'x86_64'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.
                 machine = 'ppc'
+
+                # See 'i386' case
+                if sys.maxsize >= 2**32:
+                    machine = 'ppc64'
 
     return "%s-%s-%s" % (osname, release, machine)
 
@@ -190,15 +234,6 @@ def change_root (new_root, pathname):
         if path[0] == os.sep:
             path = path[1:]
         return os.path.join(new_root, path)
-
-    elif os.name == 'mac':
-        if not os.path.isabs(pathname):
-            return os.path.join(new_root, pathname)
-        else:
-            # Chop off volume name from start of path
-            elements = pathname.split(":", 1)
-            pathname = ":" + elements[1]
-            return os.path.join(new_root, pathname)
 
     else:
         raise DistutilsPlatformError("nothing known about platform '%s'" % os.name)
@@ -411,6 +446,9 @@ def byte_compile (py_files,
     generated in indirect mode; unless you know what you're doing, leave
     it set to None.
     """
+    # nothing is done if sys.dont_write_bytecode is True
+    if sys.dont_write_bytecode:
+        raise DistutilsByteCompileError('byte-compiling is disabled.')
 
     # First, if the caller didn't force us into direct or indirect mode,
     # figure out which mode we should be in.  We take a conservative
@@ -521,6 +559,87 @@ def rfc822_escape (header):
     """Return a version of the string escaped for inclusion in an
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
-    lines = [x.strip() for x in header.split('\n')]
-    sep = '\n' + 8*' '
+    lines = header.split('\n')
+    sep = '\n' + 8 * ' '
     return sep.join(lines)
+
+# 2to3 support
+
+def run_2to3(files, fixer_names=None, options=None, explicit=None):
+    """Invoke 2to3 on a list of Python files.
+    The files should all come from the build area, as the
+    modification is done in-place. To reduce the build time,
+    only files modified since the last invocation of this
+    function should be passed in the files argument."""
+
+    if not files:
+        return
+
+    # Make this class local, to delay import of 2to3
+    from lib2to3.refactor import RefactoringTool, get_fixers_from_package
+    class DistutilsRefactoringTool(RefactoringTool):
+        def log_error(self, msg, *args, **kw):
+            log.error(msg, *args)
+
+        def log_message(self, msg, *args):
+            log.info(msg, *args)
+
+        def log_debug(self, msg, *args):
+            log.debug(msg, *args)
+
+    if fixer_names is None:
+        fixer_names = get_fixers_from_package('lib2to3.fixes')
+    r = DistutilsRefactoringTool(fixer_names, options=options)
+    r.refactor(files, write=True)
+
+def copydir_run_2to3(src, dest, template=None, fixer_names=None,
+                     options=None, explicit=None):
+    """Recursively copy a directory, only copying new and changed files,
+    running run_2to3 over all newly copied Python modules afterward.
+
+    If you give a template string, it's parsed like a MANIFEST.in.
+    """
+    from distutils.dir_util import mkpath
+    from distutils.file_util import copy_file
+    from distutils.filelist import FileList
+    filelist = FileList()
+    curdir = os.getcwd()
+    os.chdir(src)
+    try:
+        filelist.findall()
+    finally:
+        os.chdir(curdir)
+    filelist.files[:] = filelist.allfiles
+    if template:
+        for line in template.splitlines():
+            line = line.strip()
+            if not line: continue
+            filelist.process_template_line(line)
+    copied = []
+    for filename in filelist.files:
+        outname = os.path.join(dest, filename)
+        mkpath(os.path.dirname(outname))
+        res = copy_file(os.path.join(src, filename), outname, update=1)
+        if res[1]: copied.append(outname)
+    run_2to3([fn for fn in copied if fn.lower().endswith('.py')],
+             fixer_names=fixer_names, options=options, explicit=explicit)
+    return copied
+
+class Mixin2to3:
+    '''Mixin class for commands that run 2to3.
+    To configure 2to3, setup scripts may either change
+    the class variables, or inherit from individual commands
+    to override how 2to3 is invoked.'''
+
+    # provide list of fixers to run;
+    # defaults to all from lib2to3.fixers
+    fixer_names = None
+
+    # options dictionary
+    options = None
+
+    # list of fixers to invoke even though they are marked as explicit
+    explicit = None
+
+    def run_2to3(self, files):
+        return run_2to3(files, self.fixer_names, self.options, self.explicit)

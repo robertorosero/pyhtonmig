@@ -1,13 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # test_multibytecodec.py
 #   Unit test for multibytecodec itself
 #
 
 from test import support
-from test import test_multibytecodec_support
 from test.support import TESTFN
 import unittest, io, codecs, sys, os
+import _multibytecodec
 
 ALL_CJKENCODINGS = [
 # _codecs_cn
@@ -43,15 +43,27 @@ class Test_MultibyteCodec(unittest.TestCase):
         myreplace  = lambda exc: ('', sys.maxsize+1)
         codecs.register_error('test.cjktest', myreplace)
         self.assertRaises(IndexError, dec,
-                          'apple\x92ham\x93spam', 'test.cjktest')
+                          b'apple\x92ham\x93spam', 'test.cjktest')
 
     def test_codingspec(self):
         try:
             for enc in ALL_CJKENCODINGS:
-                print('# coding:', enc, file=io.open(TESTFN, 'w'))
-                exec(open(TESTFN).read())
+                code = '# coding: {}\n'.format(enc)
+                exec(code)
         finally:
             support.unlink(TESTFN)
+
+    def test_init_segfault(self):
+        # bug #3305: this used to segfault
+        self.assertRaises(AttributeError,
+                          _multibytecodec.MultibyteStreamReader, None)
+        self.assertRaises(AttributeError,
+                          _multibytecodec.MultibyteStreamWriter, None)
+
+    def test_decode_unicode(self):
+        # Trying to decode an unicode string should raise a TypeError
+        for enc in ALL_CJKENCODINGS:
+            self.assertRaises(TypeError, codecs.getdecoder(enc), "")
 
 class Test_IncrementalEncoder(unittest.TestCase):
 
@@ -99,6 +111,10 @@ class Test_IncrementalEncoder(unittest.TestCase):
         self.assertRaises(UnicodeEncodeError, encoder.encode, '\u0123')
         self.assertEqual(encoder.encode('', True), b'\xa9\xdc')
 
+    def test_issue5640(self):
+        encoder = codecs.getincrementalencoder('shift-jis')('backslashreplace')
+        self.assertEqual(encoder.encode('\xff'), b'\\xff')
+        self.assertEqual(encoder.encode('\n'), b'\n')
 
 class Test_IncrementalDecoder(unittest.TestCase):
 
@@ -136,6 +152,12 @@ class Test_IncrementalDecoder(unittest.TestCase):
         self.assertEqual(decoder.decode(ESC + b'$'), '')
         self.assertRaises(UnicodeDecodeError, decoder.decode, b'', True)
         self.assertEqual(decoder.decode(b'B@$'), '\u4e16')
+
+    def test_decode_unicode(self):
+        # Trying to decode an unicode string should raise a TypeError
+        for enc in ALL_CJKENCODINGS:
+            decoder = codecs.getincrementaldecoder(enc)()
+            self.assertRaises(TypeError, decoder.decode, "")
 
 class Test_StreamReader(unittest.TestCase):
     def test_bug1728403(self):
@@ -219,10 +241,10 @@ class Test_ISO2022(unittest.TestCase):
         self.assertEqual(iso2022jp2.decode('iso2022-jp-2'), uni)
 
     def test_iso2022_jp_g0(self):
-        self.failIf(b'\x0e' in '\N{SOFT HYPHEN}'.encode('iso-2022-jp-2'))
+        self.assertNotIn(b'\x0e', '\N{SOFT HYPHEN}'.encode('iso-2022-jp-2'))
         for encoding in ('iso-2022-jp-2004', 'iso-2022-jp-3'):
             e = '\u3406'.encode(encoding)
-            self.failIf(any(x > 0x80 for x in e))
+            self.assertFalse(any(x > 0x80 for x in e))
 
     def test_bug1572832(self):
         if sys.maxunicode >= 0x10000:

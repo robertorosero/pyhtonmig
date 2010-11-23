@@ -1,4 +1,3 @@
-
 :mod:`traceback` --- Print or retrieve a stack traceback
 ========================================================
 
@@ -15,13 +14,13 @@ interpreter.
 .. index:: object: traceback
 
 The module uses traceback objects --- this is the object type that is stored in
-the ``sys.last_traceback`` variable and returned as the third item from
+the :data:`sys.last_traceback` variable and returned as the third item from
 :func:`sys.exc_info`.
 
 The module defines the following functions:
 
 
-.. function:: print_tb(traceback[, limit[, file]])
+.. function:: print_tb(traceback, limit=None, file=None)
 
    Print up to *limit* stack trace entries from *traceback*.  If *limit* is omitted
    or ``None``, all entries are printed. If *file* is omitted or ``None``, the
@@ -29,35 +28,38 @@ The module defines the following functions:
    object to receive the output.
 
 
-.. function:: print_exception(type, value, traceback[, limit[, file]])
+.. function:: print_exception(type, value, traceback, limit=None, file=None, chain=True)
 
    Print exception information and up to *limit* stack trace entries from
-   *traceback* to *file*. This differs from :func:`print_tb` in the following ways:
-   (1) if *traceback* is not ``None``, it prints a header ``Traceback (most recent
-   call last):``; (2) it prints the exception *type* and *value* after the stack
-   trace; (3) if *type* is :exc:`SyntaxError` and *value* has the appropriate
-   format, it prints the line where the syntax error occurred with a caret
-   indicating the approximate position of the error.
+   *traceback* to *file*. This differs from :func:`print_tb` in the following
+   ways:
+
+   * if *traceback* is not ``None``, it prints a header ``Traceback (most recent
+     call last):``
+   * it prints the exception *type* and *value* after the stack trace
+   * if *type* is :exc:`SyntaxError` and *value* has the appropriate format, it
+     prints the line where the syntax error occurred with a caret indicating the
+     approximate position of the error.
+
+   If *chain* is true (the default), then chained exceptions (the
+   :attr:`__cause__` or :attr:`__context__` attributes of the exception) will be
+   printed as well, like the interpreter itself does when printing an unhandled
+   exception.
 
 
-.. function:: print_exc([limit[, file]])
+.. function:: print_exc(limit=None, file=None, chain=True)
 
    This is a shorthand for ``print_exception(*sys.exc_info())``.
 
 
-.. function:: format_exc([limit])
-
-   This is like ``print_exc(limit)`` but returns a string instead of printing to a
-   file.
-
-
-.. function:: print_last([limit[, file]])
+.. function:: print_last(limit=None, file=None, chain=True)
 
    This is a shorthand for ``print_exception(sys.last_type, sys.last_value,
-   sys.last_traceback, limit, file)``.
+   sys.last_traceback, limit, file)``.  In general it will work only after
+   an exception has reached an interactive prompt (see :data:`sys.last_type`).
 
 
-.. function:: print_stack([f[, limit[, file]]])
+.. function:: print_stack(f=None, limit=None, file=None)
 
    This function prints a stack trace from its invocation point.  The optional *f*
    argument can be used to specify an alternate stack frame to start.  The optional
@@ -65,7 +67,7 @@ The module defines the following functions:
    :func:`print_exception`.
 
 
-.. function:: extract_tb(traceback[, limit])
+.. function:: extract_tb(traceback, limit=None)
 
    Return a list of up to *limit* "pre-processed" stack trace entries extracted
    from the traceback object *traceback*.  It is useful for alternate formatting of
@@ -76,7 +78,7 @@ The module defines the following functions:
    stripped; if the source is not available it is ``None``.
 
 
-.. function:: extract_stack([f[, limit]])
+.. function:: extract_stack(f=None, limit=None)
 
    Extract the raw traceback from the current stack frame.  The return value has
    the same format as for :func:`extract_tb`.  The optional *f* and *limit*
@@ -103,7 +105,7 @@ The module defines the following functions:
    occurred is the always last string in the list.
 
 
-.. function:: format_exception(type, value, tb[, limit])
+.. function:: format_exception(type, value, tb, limit=None, chain=True)
 
    Format a stack trace and the exception information.  The arguments  have the
    same meaning as the corresponding arguments to :func:`print_exception`.  The
@@ -112,12 +114,18 @@ The module defines the following functions:
    same text is printed as does :func:`print_exception`.
 
 
-.. function:: format_tb(tb[, limit])
+.. function:: format_exc(limit=None, chain=True)
+
+   This is like ``print_exc(limit)`` but returns a string instead of printing to a
+   file.
+
+
+.. function:: format_tb(tb, limit=None)
 
    A shorthand for ``format_list(extract_tb(tb, limit))``.
 
 
-.. function:: format_stack([f[, limit]])
+.. function:: format_stack(f=None, limit=None)
 
    A shorthand for ``format_list(extract_stack(f, limit))``.
 
@@ -150,24 +158,26 @@ module. ::
 
 
 The following example demonstrates the different ways to print and format the
-exception and traceback::
+exception and traceback:
+
+.. testcode::
 
    import sys, traceback
 
    def lumberjack():
        bright_side_of_death()
-   
+
    def bright_side_of_death():
        return tuple()[0]
-   
+
    try:
        lumberjack()
-   except:
-       exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
+   except IndexError:
+       exc_type, exc_value, exc_traceback = sys.exc_info()
        print("*** print_tb:")
-       traceback.print_tb(exceptionTraceback, limit=1, file=sys.stdout)
+       traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
        print("*** print_exception:")
-       traceback.print_exception(exceptionType, exceptionValue, exceptionTraceback,
+       traceback.print_exception(exc_type, exc_value, exc_traceback,
                                  limit=2, file=sys.stdout)
        print("*** print_exc:")
        traceback.print_exc()
@@ -176,34 +186,34 @@ exception and traceback::
        print(formatted_lines[0])
        print(formatted_lines[-1])
        print("*** format_exception:")
-       print(repr(traceback.format_exception(exceptionType, exceptionValue,
-                                             exceptionTraceback)))
+       print(repr(traceback.format_exception(exc_type, exc_value,
+                                             exc_traceback)))
        print("*** extract_tb:")
-       print(repr(traceback.extract_tb(exceptionTraceback)))
+       print(repr(traceback.extract_tb(exc_traceback)))
        print("*** format_tb:")
-       print(repr(traceback.format_tb(exceptionTraceback)))
-       print("*** tb_lineno:", traceback.tb_lineno(exceptionTraceback))
-   print("*** print_last:")
-   traceback.print_last()
+       print(repr(traceback.format_tb(exc_traceback)))
+       print("*** tb_lineno:", exc_traceback.tb_lineno)
 
+The output for the example would look similar to this:
 
-The output for the example would look similar to this::
+.. testoutput::
+   :options: +NORMALIZE_WHITESPACE
 
    *** print_tb:
-     File "<doctest>", line 9, in <module>
+     File "<doctest...>", line 10, in <module>
        lumberjack()
    *** print_exception:
    Traceback (most recent call last):
-     File "<doctest>", line 9, in <module>
+     File "<doctest...>", line 10, in <module>
        lumberjack()
-     File "<doctest>", line 3, in lumberjack
+     File "<doctest...>", line 4, in lumberjack
        bright_side_of_death()
    IndexError: tuple index out of range
    *** print_exc:
    Traceback (most recent call last):
-     File "<doctest>", line 9, in <module>
+     File "<doctest...>", line 10, in <module>
        lumberjack()
-     File "<doctest>", line 3, in lumberjack
+     File "<doctest...>", line 4, in lumberjack
        bright_side_of_death()
    IndexError: tuple index out of range
    *** format_exc, first and last line:
@@ -211,26 +221,19 @@ The output for the example would look similar to this::
    IndexError: tuple index out of range
    *** format_exception:
    ['Traceback (most recent call last):\n',
-    '  File "<doctest>", line 9, in <module>\n    lumberjack()\n',
-    '  File "<doctest>", line 3, in lumberjack\n    bright_side_of_death()\n',
-    '  File "<doctest>", line 6, in bright_side_of_death\n    return tuple()[0]\n',
+    '  File "<doctest...>", line 10, in <module>\n    lumberjack()\n',
+    '  File "<doctest...>", line 4, in lumberjack\n    bright_side_of_death()\n',
+    '  File "<doctest...>", line 7, in bright_side_of_death\n    return tuple()[0]\n',
     'IndexError: tuple index out of range\n']
    *** extract_tb:
-   [('<doctest>', 9, '<module>', 'lumberjack()'),
-    ('<doctest>', 3, 'lumberjack', 'bright_side_of_death()'),
-    ('<doctest>', 6, 'bright_side_of_death', 'return tuple()[0]')]
+   [('<doctest...>', 10, '<module>', 'lumberjack()'),
+    ('<doctest...>', 4, 'lumberjack', 'bright_side_of_death()'),
+    ('<doctest...>', 7, 'bright_side_of_death', 'return tuple()[0]')]
    *** format_tb:
-   ['  File "<doctest>", line 9, in <module>\n    lumberjack()\n',
-    '  File "<doctest>", line 3, in lumberjack\n    bright_side_of_death()\n',
-    '  File "<doctest>", line 6, in bright_side_of_death\n    return tuple()[0]\n']
-   *** tb_lineno: 2
-   *** print_last:
-   Traceback (most recent call last):
-     File "<doctest>", line 9, in <module>
-       lumberjack()
-     File "<doctest>", line 3, in lumberjack
-       bright_side_of_death()
-   IndexError: tuple index out of range
+   ['  File "<doctest...>", line 10, in <module>\n    lumberjack()\n',
+    '  File "<doctest...>", line 4, in lumberjack\n    bright_side_of_death()\n',
+    '  File "<doctest...>", line 7, in bright_side_of_death\n    return tuple()[0]\n']
+   *** tb_lineno: 10
 
 
 The following example shows the different ways to print and format the stack::
@@ -238,12 +241,12 @@ The following example shows the different ways to print and format the stack::
    >>> import traceback
    >>> def another_function():
    ...     lumberstack()
-   ... 
+   ...
    >>> def lumberstack():
    ...     traceback.print_stack()
    ...     print(repr(traceback.extract_stack()))
    ...     print(repr(traceback.format_stack()))
-   ... 
+   ...
    >>> another_function()
      File "<doctest>", line 10, in <module>
        another_function()
@@ -259,13 +262,16 @@ The following example shows the different ways to print and format the stack::
     '  File "<doctest>", line 8, in lumberstack\n    print(repr(traceback.format_stack()))\n']
 
 
-This last example demonstrates the final few formatting functions::
+This last example demonstrates the final few formatting functions:
+
+.. doctest::
+   :options: +NORMALIZE_WHITESPACE
 
    >>> import traceback
-   >>> format_list([('spam.py', 3, '<module>', 'spam.eggs()'),
-   ...              ('eggs.py', 42, 'eggs', 'return "bacon"')])
+   >>> traceback.format_list([('spam.py', 3, '<module>', 'spam.eggs()'),
+   ...                        ('eggs.py', 42, 'eggs', 'return "bacon"')])
    ['  File "spam.py", line 3, in <module>\n    spam.eggs()\n',
     '  File "eggs.py", line 42, in eggs\n    return "bacon"\n']
-   >>> theError = IndexError('tuple indx out of range')
-   >>> traceback.format_exception_only(type(theError), theError)
+   >>> an_error = IndexError('tuple index out of range')
+   >>> traceback.format_exception_only(type(an_error), an_error)
    ['IndexError: tuple index out of range\n']

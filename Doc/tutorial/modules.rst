@@ -32,6 +32,7 @@ called :file:`fibo.py` in the current directory with the following contents::
        while b < n:
            print(b, end=' ')
            a, b = b, a+b
+       print()
 
    def fib2(n): # return Fibonacci series up to n
        result = []
@@ -102,16 +103,20 @@ There is even a variant to import all names that a module defines::
    1 1 2 3 5 8 13 21 34 55 89 144 233 377
 
 This imports all names except those beginning with an underscore (``_``).
-In most cases Python programmers do not use this facility since it introduces 
-an unknown set of names into the interpreter, possibly hiding some things 
+In most cases Python programmers do not use this facility since it introduces
+an unknown set of names into the interpreter, possibly hiding some things
 you have already defined.
+
+Note that in general the practice of importing ``*`` from a module or package is
+frowned upon, since it often causes poorly readable code. However, it is okay to
+use it to save typing in interactive sessions.
 
 .. note::
 
    For efficiency reasons, each module is only imported once per interpreter
    session.  Therefore, if you change your modules, you must restart the
    interpreter -- or, if it's just one module you want to test interactively,
-   use :func:`reload`, e.g. ``reload(modulename)``.
+   use :func:`imp.reload`, e.g. ``import imp; imp.reload(modulename)``.
 
 
 .. _tut-modulesasscripts:
@@ -286,7 +291,7 @@ defines.  It returns a sorted list of strings::
    ['__name__', 'fib', 'fib2']
    >>> dir(sys)
    ['__displayhook__', '__doc__', '__excepthook__', '__name__', '__stderr__',
-    '__stdin__', '__stdout__', '_getframe', 'api_version', 'argv', 
+    '__stdin__', '__stdout__', '_getframe', 'api_version', 'argv',
     'builtin_module_names', 'byteorder', 'callstats', 'copyright',
     'displayhook', 'exc_info', 'excepthook',
     'exec_prefix', 'executable', 'exit', 'getdefaultencoding', 'getdlopenflags',
@@ -316,25 +321,25 @@ want a list of those, they are defined in the standard module
    >>> dir(builtins)
 
    ['ArithmeticError', 'AssertionError', 'AttributeError', 'BaseException', 'Buffer
-   Error', 'DeprecationWarning', 'EOFError', 'Ellipsis', 'EnvironmentError', 'Excep   
-   tion', 'False', 'FloatingPointError', 'FutureWarning', 'GeneratorExit', 'IOError   
-   ', 'ImportError', 'ImportWarning', 'IndentationError', 'IndexError', 'KeyError',   
-    'KeyboardInterrupt', 'LookupError', 'MemoryError', 'NameError', 'None', 'NotImp   
-   lemented', 'NotImplementedError', 'OSError', 'OverflowError', 'PendingDeprecatio   
-   nWarning', 'ReferenceError', 'RuntimeError', 'RuntimeWarning', 'StopIteration',   
-   'SyntaxError', 'SyntaxWarning', 'SystemError', 'SystemExit', 'TabError', 'True',   
-    'TypeError', 'UnboundLocalError', 'UnicodeDecodeError', 'UnicodeEncodeError', '   
-   UnicodeError', 'UnicodeTranslateError', 'UnicodeWarning', 'UserWarning', 'ValueE   
-   rror', 'Warning', 'ZeroDivisionError', '__build_class__', '__debug__', '__doc__'   
-   , '__import__', '__name__', 'abs', 'all', 'any', 'basestring', 'bin', 'bool', 'b   
-   uffer', 'bytes', 'chr', 'chr8', 'classmethod', 'cmp', 'compile', 'complex', 'cop   
-   yright', 'credits', 'delattr', 'dict', 'dir', 'divmod', 'enumerate', 'eval', 'ex   
-   ec', 'exit', 'filter', 'float', 'frozenset', 'getattr', 'globals', 'hasattr', 'h   
-   ash', 'help', 'hex', 'id', 'input', 'int', 'isinstance', 'issubclass', 'iter', '   
-   len', 'license', 'list', 'locals', 'map', 'max', 'memoryview', 'min', 'next', 'o   
-   bject', 'oct', 'open', 'ord', 'pow', 'print', 'property', 'quit', 'range', 'repr   
-   ', 'reversed', 'round', 'set', 'setattr', 'slice', 'sorted', 'staticmethod', 'st   
-   r', 'str8', 'sum', 'super', 'trunc', 'tuple', 'type', 'vars', 'zip']   
+   Error', 'BytesWarning', 'DeprecationWarning', 'EOFError', 'Ellipsis', 'Environme
+   ntError', 'Exception', 'False', 'FloatingPointError', 'FutureWarning', 'Generato
+   rExit', 'IOError', 'ImportError', 'ImportWarning', 'IndentationError', 'IndexErr
+   or', 'KeyError', 'KeyboardInterrupt', 'LookupError', 'MemoryError', 'NameError',
+    'None', 'NotImplemented', 'NotImplementedError', 'OSError', 'OverflowError', 'P
+   endingDeprecationWarning', 'ReferenceError', 'RuntimeError', 'RuntimeWarning', '
+   StopIteration', 'SyntaxError', 'SyntaxWarning', 'SystemError', 'SystemExit', 'Ta
+   bError', 'True', 'TypeError', 'UnboundLocalError', 'UnicodeDecodeError', 'Unicod
+   eEncodeError', 'UnicodeError', 'UnicodeTranslateError', 'UnicodeWarning', 'UserW
+   arning', 'ValueError', 'Warning', 'ZeroDivisionError', '__build_class__', '__deb
+   ug__', '__doc__', '__import__', '__name__', '__package__', 'abs', 'all', 'any',
+   'ascii', 'bin', 'bool', 'bytearray', 'bytes', 'chr', 'classmethod', 'compile', '
+   complex', 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod', 'enumerate
+   ', 'eval', 'exec', 'exit', 'filter', 'float', 'format', 'frozenset', 'getattr',
+   'globals', 'hasattr', 'hash', 'help', 'hex', 'id', 'input', 'int', 'isinstance',
+    'issubclass', 'iter', 'len', 'license', 'list', 'locals', 'map', 'max', 'memory
+   view', 'min', 'next', 'object', 'oct', 'open', 'ord', 'pow', 'print', 'property'
+   , 'quit', 'range', 'repr', 'reversed', 'round', 'set', 'setattr', 'slice', 'sort
+   ed', 'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip']
 
 .. _tut-packages:
 
@@ -444,17 +449,12 @@ Importing \* From a Package
 
 Now what happens when the user writes ``from sound.effects import *``?  Ideally,
 one would hope that this somehow goes out to the filesystem, finds which
-submodules are present in the package, and imports them all.  Unfortunately,
-this operation does not work very well on Windows platforms, where the
-filesystem does not always have accurate information about the case of a
-filename!  On these platforms, there is no guaranteed way to know whether a file
-:file:`ECHO.PY` should be imported as a module :mod:`echo`, :mod:`Echo` or
-:mod:`ECHO`.  (For example, Windows 95 has the annoying practice of showing all
-file names with a capitalized first letter.)  The DOS 8+3 filename restriction
-adds another interesting problem for long module names.
+submodules are present in the package, and imports them all.  This could take a
+long time and importing sub-modules might have unwanted side-effects that should
+only happen when the sub-module is explicitly imported.
 
 The only solution is for the package author to provide an explicit index of the
-package.  The import statement uses the following convention: if a package's
+package.  The :keyword:`import` statement uses the following convention: if a package's
 :file:`__init__.py` code defines a list named ``__all__``, it is taken to be the
 list of module names that should be imported when ``from package import *`` is
 encountered.  It is up to the package author to keep this list up-to-date when a
@@ -475,21 +475,20 @@ been imported (possibly running any initialization code in :file:`__init__.py`)
 and then imports whatever names are defined in the package.  This includes any
 names defined (and submodules explicitly loaded) by :file:`__init__.py`.  It
 also includes any submodules of the package that were explicitly loaded by
-previous import statements.  Consider this code::
+previous :keyword:`import` statements.  Consider this code::
 
    import sound.effects.echo
    import sound.effects.surround
    from sound.effects import *
 
-In this example, the echo and surround modules are imported in the current
-namespace because they are defined in the :mod:`sound.effects` package when the
-``from...import`` statement is executed.  (This also works when ``__all__`` is
-defined.)
+In this example, the :mod:`echo` and :mod:`surround` modules are imported in the
+current namespace because they are defined in the :mod:`sound.effects` package
+when the ``from...import`` statement is executed.  (This also works when
+``__all__`` is defined.)
 
-Note that in general the practice of importing ``*`` from a module or package is
-frowned upon, since it often causes poorly readable code. However, it is okay to
-use it to save typing in interactive sessions, and certain modules are designed
-to export only names that follow certain patterns.
+Although certain modules are designed to export only names that follow certain
+patterns when you use ``import *``, it is still considered bad practise in
+production code.
 
 Remember, there is nothing wrong with using ``from Package import
 specific_submodule``!  In fact, this is the recommended notation unless the
@@ -536,5 +535,6 @@ modules found in a package.
 .. rubric:: Footnotes
 
 .. [#] In fact function definitions are also 'statements' that are 'executed'; the
-   execution enters the function name in the module's global symbol table.
+   execution of a module-level function enters the function name in the module's
+   global symbol table.
 

@@ -7,12 +7,6 @@ import os
 
 class BoolTest(unittest.TestCase):
 
-    def assertIs(self, a, b):
-        self.assert_(a is b)
-
-    def assertIsNot(self, a, b):
-        self.assert_(a is not b)
-
     def test_subclass(self):
         try:
             class C(bool):
@@ -50,6 +44,12 @@ class BoolTest(unittest.TestCase):
         self.assertIsNot(int(False), False)
         self.assertEqual(int(True), 1)
         self.assertIsNot(int(True), True)
+
+    def test_float(self):
+        self.assertEqual(float(False), 0.0)
+        self.assertIsNot(float(False), False)
+        self.assertEqual(float(True), 1.0)
+        self.assertIsNot(float(True), True)
 
     def test_math(self):
         self.assertEqual(+False, 0)
@@ -221,15 +221,15 @@ class BoolTest(unittest.TestCase):
 
     def test_boolean(self):
         self.assertEqual(True & 1, 1)
-        self.assert_(not isinstance(True & 1, bool))
+        self.assertNotIsInstance(True & 1, bool)
         self.assertIs(True & True, True)
 
         self.assertEqual(True | 1, 1)
-        self.assert_(not isinstance(True | 1, bool))
+        self.assertNotIsInstance(True | 1, bool)
         self.assertIs(True | True, True)
 
         self.assertEqual(True ^ 1, 0)
-        self.assert_(not isinstance(True ^ 1, bool))
+        self.assertNotIsInstance(True ^ 1, bool)
         self.assertIs(True ^ True, False)
 
     def test_fileclosed(self):
@@ -241,20 +241,20 @@ class BoolTest(unittest.TestCase):
         finally:
             os.remove(support.TESTFN)
 
+    def test_types(self):
+        # types are always true.
+        for t in [bool, complex, dict, float, int, list, object,
+                  set, str, tuple, type]:
+            self.assertIs(bool(t), True)
+
     def test_operator(self):
         import operator
         self.assertIs(operator.truth(0), False)
         self.assertIs(operator.truth(1), True)
-        self.assertIs(operator.isNumberType(None), False)
-        self.assertIs(operator.isNumberType(0), True)
         self.assertIs(operator.not_(1), False)
         self.assertIs(operator.not_(0), True)
-        self.assertIs(operator.isSequenceType(0), False)
-        self.assertIs(operator.isSequenceType([]), True)
         self.assertIs(operator.contains([], 1), False)
         self.assertIs(operator.contains([1], 1), True)
-        self.assertIs(operator.isMappingType(1), False)
-        self.assertIs(operator.isMappingType({}), True)
         self.assertIs(operator.lt(0, 0), False)
         self.assertIs(operator.lt(0, 1), True)
         self.assertIs(operator.is_(True, True), True)

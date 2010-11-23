@@ -1,4 +1,4 @@
-This package will install MacPython $FULL_VERSION for Mac OS X
+This package will install Python $FULL_VERSION for Mac OS X
 $MACOSX_DEPLOYMENT_TARGET for the following 
 architecture(s): $ARCHITECTURES.
 
@@ -12,20 +12,18 @@ You must install onto your current boot disk, even
 though the installer does not enforce this, otherwise
 things will not work.
 
-MacPython consists of the Python programming language
+Python consists of the Python programming language
 interpreter, plus a set of programs to allow easy
-access to it for Mac users (an integrated development
-environment, an applet builder), plus a set of pre-built 
-extension modules that open up specific Macintosh technologies 
-to Python programs (Carbon, AppleScript, Quicktime, more).
+access to it for Mac users including an integrated development
+environment, IDLE, plus a set of pre-built extension modules
+that open up specific Macintosh technologies to Python programs.
 
 The installer puts the applications in "Python $VERSION" 
-in your Applications folder, command-line tools in
-/usr/local/bin and the underlying machinery in
-$PYTHONFRAMEWORKINSTALLDIR.
+in your Applications folder, and the underlying machinery in
+$PYTHONFRAMEWORKINSTALLDIR. It can optionally place
+links to the command-line tools in /usr/local as well,
+by default you have to add the "bin" directory inside
+the framework to you shell's search path.
 
-More information on MacPython can be found at
-http://www.cwi.nl/~jack/macpython and
-http://pythonmac.org/.  More information on
-Python in general can be found at
+More information on Python in general can be found at
 http://www.python.org.

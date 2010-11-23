@@ -5,7 +5,7 @@
 #
 #	cd python/dist/src
 #	valgrind --tool=memcheck --suppressions=Misc/valgrind-python.supp \
-#		./python -E ./Lib/test/regrtest.py -u bsddb,network
+#		./python -E ./Lib/test/regrtest.py -u gui,network
 #
 # You must edit Objects/obmalloc.c and uncomment Py_USING_MEMORY_DEBUGGER
 # to use the preferred suppressions with Py_ADDRESS_IN_RANGE.
@@ -45,6 +45,39 @@
 #    Hmmm, I wonder if this masks some real leaks.  I think it does.
 #    Will need to fix that.
 #
+
+{
+   Suppress leaking the GIL.  Happens once per process, see comment in ceval.c.
+   Memcheck:Leak
+   fun:malloc
+   fun:PyThread_allocate_lock
+   fun:PyEval_InitThreads
+}
+
+{
+   Suppress leaking the GIL after a fork.
+   Memcheck:Leak
+   fun:malloc
+   fun:PyThread_allocate_lock
+   fun:PyEval_ReInitThreads
+}
+
+{
+   Suppress leaking the autoTLSkey.  This looks like it shouldn't leak though.
+   Memcheck:Leak
+   fun:malloc
+   fun:PyThread_create_key
+   fun:_PyGILState_Init
+   fun:Py_InitializeEx
+   fun:Py_Main
+}
+
+{
+   Hmmm, is this a real leak or like the GIL?
+   Memcheck:Leak
+   fun:malloc
+   fun:PyThread_ReInitTLS
+}
 
 {
    Handle PyMalloc confusing valgrind (possibly leaked)

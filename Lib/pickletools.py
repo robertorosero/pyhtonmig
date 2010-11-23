@@ -469,7 +469,7 @@ def read_unicodestring4(f):
         raise ValueError("unicodestring4 byte count < 0: %d" % n)
     data = f.read(n)
     if len(data) == n:
-        return str(data, 'utf-8')
+        return str(data, 'utf-8', 'surrogatepass')
     raise ValueError("expected %d bytes in a unicodestring4, but only %d "
                      "remain" % (n, len(data)))
 
@@ -527,6 +527,8 @@ def read_decimalnl_long(f):
     """
 
     s = read_stringnl(f, decode=False, stripquotes=False)
+    if s[-1:] == b'L':
+        s = s[:-1]
     return int(s)
 
 
@@ -731,7 +733,7 @@ pylong = StackObject(
 
 pyinteger_or_bool = StackObject(
                         name='int_or_bool',
-                        obtype=(int, int, bool),
+                        obtype=(int, bool),
                         doc="A Python integer object (short or long), or "
                             "a Python bool.")
 
@@ -1055,7 +1057,7 @@ opcodes = [
       arg=string1,
       stack_before=[],
       stack_after=[pybytes],
-      proto=1,
+      proto=3,
       doc="""Push a Python string object.
 
       There are two arguments:  the first is a 1-byte unsigned int giving
@@ -1248,10 +1250,11 @@ opcodes = [
       stack_before=[anyobject],
       stack_after=[pytuple],
       proto=2,
-      doc="""One-tuple.
+      doc="""Build a one-tuple out of the topmost item on the stack.
 
       This code pops one value off the stack and pushes a tuple of
-      length 1 whose one item is that value back onto it.  IOW:
+      length 1 whose one item is that value back onto it.  In other
+      words:
 
           stack[-1] = tuple(stack[-1:])
       """),
@@ -1262,10 +1265,11 @@ opcodes = [
       stack_before=[anyobject, anyobject],
       stack_after=[pytuple],
       proto=2,
-      doc="""One-tuple.
+      doc="""Build a two-tuple out of the top two items on the stack.
 
-      This code pops two values off the stack and pushes a tuple
-      of length 2 whose items are those values back onto it.  IOW:
+      This code pops two values off the stack and pushes a tuple of
+      length 2 whose items are those values back onto it.  In other
+      words:
 
           stack[-2:] = [tuple(stack[-2:])]
       """),
@@ -1276,10 +1280,11 @@ opcodes = [
       stack_before=[anyobject, anyobject, anyobject],
       stack_after=[pytuple],
       proto=2,
-      doc="""One-tuple.
+      doc="""Build a three-tuple out of the top three items on the stack.
 
-      This code pops three values off the stack and pushes a tuple
-      of length 3 whose items are those values back onto it.  IOW:
+      This code pops three values off the stack and pushes a tuple of
+      length 3 whose items are those values back onto it.  In other
+      words:
 
           stack[-3:] = [tuple(stack[-3:])]
       """),
@@ -1382,7 +1387,7 @@ opcodes = [
       arg=None,
       stack_before=[markobject, stackslice],
       stack_after=[],
-      proto=0,
+      proto=1,
       doc="""Pop all the stack objects at and above the topmost markobject.
 
       When an opcode using a variable number of stack objects is done,
@@ -1902,7 +1907,7 @@ def optimize(p):
 ##############################################################################
 # A symbolic pickle disassembler.
 
-def dis(pickle, out=None, memo=None, indentlevel=4):
+def dis(pickle, out=None, memo=None, indentlevel=4, annotate=0):
     """Produce a symbolic disassembly of a pickle.
 
     'pickle' is a file-like object, or string, containing a (at least one)
@@ -1918,8 +1923,14 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
     to proceed across multiple pickles that were all created by the same
     pickler with the same memo.  Ordinarily you don't need to worry about this.
 
-    Optional arg indentlevel is the number of blanks by which to indent
+    Optional arg 'indentlevel' is the number of blanks by which to indent
     a new MARK level.  It defaults to 4.
+
+    Optional arg 'annotate' if nonzero instructs dis() to add short
+    description of the opcode on each line of disassembled output.
+    The value given to 'annotate' must be an integer and is used as a
+    hint for the column where annotation should start.  The default
+    value is 0, meaning no annotations.
 
     In addition to printing the disassembly, some sanity checks are made:
 
@@ -1948,6 +1959,7 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
     markstack = []      # bytecode positions of MARK opcodes
     indentchunk = ' ' * indentlevel
     errormsg = None
+    annocol = annotate  # columnt hint for annotations
     for opcode, arg, pos in genops(pickle):
         if pos is not None:
             print("%5d:" % pos, end=' ', file=out)
@@ -2015,6 +2027,13 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
                 line += ' ' + repr(arg)
             if markmsg:
                 line += ' ' + markmsg
+        if annotate:
+            line += ' ' * (annocol - len(line))
+            # make a mild effort to align annotations
+            annocol = len(line)
+            if annocol > 50:
+                annocol = annotate
+            line += ' ' + opcode.doc.split('\n', 1)[0]
         print(line, file=out)
 
         if errormsg:
@@ -2052,39 +2071,39 @@ _dis_test = r"""
     1: l        LIST       (MARK at 0)
     2: p    PUT        0
     5: L    LONG       1
-    8: a    APPEND
-    9: L    LONG       2
-   12: a    APPEND
-   13: (    MARK
-   14: L        LONG       3
-   17: L        LONG       4
-   20: t        TUPLE      (MARK at 13)
-   21: p    PUT        1
-   24: a    APPEND
-   25: (    MARK
-   26: d        DICT       (MARK at 25)
-   27: p    PUT        2
-   30: c    GLOBAL     'builtins bytes'
-   46: p    PUT        3
-   49: (    MARK
-   50: (        MARK
-   51: l            LIST       (MARK at 50)
-   52: p        PUT        4
-   55: L        LONG       97
-   59: a        APPEND
-   60: L        LONG       98
-   64: a        APPEND
-   65: L        LONG       99
-   69: a        APPEND
-   70: t        TUPLE      (MARK at 49)
-   71: p    PUT        5
-   74: R    REDUCE
-   75: p    PUT        6
-   78: V    UNICODE    'def'
-   83: p    PUT        7
-   86: s    SETITEM
-   87: a    APPEND
-   88: .    STOP
+    9: a    APPEND
+   10: L    LONG       2
+   14: a    APPEND
+   15: (    MARK
+   16: L        LONG       3
+   20: L        LONG       4
+   24: t        TUPLE      (MARK at 15)
+   25: p    PUT        1
+   28: a    APPEND
+   29: (    MARK
+   30: d        DICT       (MARK at 29)
+   31: p    PUT        2
+   34: c    GLOBAL     '__builtin__ bytes'
+   53: p    PUT        3
+   56: (    MARK
+   57: (        MARK
+   58: l            LIST       (MARK at 57)
+   59: p        PUT        4
+   62: L        LONG       97
+   67: a        APPEND
+   68: L        LONG       98
+   73: a        APPEND
+   74: L        LONG       99
+   79: a        APPEND
+   80: t        TUPLE      (MARK at 56)
+   81: p    PUT        5
+   84: R    REDUCE
+   85: p    PUT        6
+   88: V    UNICODE    'def'
+   93: p    PUT        7
+   96: s    SETITEM
+   97: a    APPEND
+   98: .    STOP
 highest protocol among opcodes = 0
 
 Try again with a "binary" pickle.
@@ -2103,34 +2122,34 @@ Try again with a "binary" pickle.
    14: q        BINPUT     1
    16: }        EMPTY_DICT
    17: q        BINPUT     2
-   19: c        GLOBAL     'builtins bytes'
-   35: q        BINPUT     3
-   37: (        MARK
-   38: ]            EMPTY_LIST
-   39: q            BINPUT     4
-   41: (            MARK
-   42: K                BININT1    97
-   44: K                BININT1    98
-   46: K                BININT1    99
-   48: e                APPENDS    (MARK at 41)
-   49: t            TUPLE      (MARK at 37)
-   50: q        BINPUT     5
-   52: R        REDUCE
-   53: q        BINPUT     6
-   55: X        BINUNICODE 'def'
-   63: q        BINPUT     7
-   65: s        SETITEM
-   66: e        APPENDS    (MARK at 3)
-   67: .    STOP
+   19: c        GLOBAL     '__builtin__ bytes'
+   38: q        BINPUT     3
+   40: (        MARK
+   41: ]            EMPTY_LIST
+   42: q            BINPUT     4
+   44: (            MARK
+   45: K                BININT1    97
+   47: K                BININT1    98
+   49: K                BININT1    99
+   51: e                APPENDS    (MARK at 44)
+   52: t            TUPLE      (MARK at 40)
+   53: q        BINPUT     5
+   55: R        REDUCE
+   56: q        BINPUT     6
+   58: X        BINUNICODE 'def'
+   66: q        BINPUT     7
+   68: s        SETITEM
+   69: e        APPENDS    (MARK at 3)
+   70: .    STOP
 highest protocol among opcodes = 1
 
 Exercise the INST/OBJ/BUILD family.
 
->>> import random
->>> dis(pickle.dumps(random.getrandbits, 0))
-    0: c    GLOBAL     'random getrandbits'
-   20: p    PUT        0
-   23: .    STOP
+>>> import pickletools
+>>> dis(pickle.dumps(pickletools.dis, 0))
+    0: c    GLOBAL     'pickletools dis'
+   17: p    PUT        0
+   20: .    STOP
 highest protocol among opcodes = 0
 
 >>> from pickletools import _Example
@@ -2139,58 +2158,58 @@ highest protocol among opcodes = 0
     0: (    MARK
     1: l        LIST       (MARK at 0)
     2: p    PUT        0
-    5: c    GLOBAL     'copyreg _reconstructor'
-   29: p    PUT        1
-   32: (    MARK
-   33: c        GLOBAL     'pickletools _Example'
-   55: p        PUT        2
-   58: c        GLOBAL     'builtins object'
-   75: p        PUT        3
-   78: N        NONE
-   79: t        TUPLE      (MARK at 32)
-   80: p    PUT        4
-   83: R    REDUCE
-   84: p    PUT        5
-   87: (    MARK
-   88: d        DICT       (MARK at 87)
-   89: p    PUT        6
-   92: V    UNICODE    'value'
-   99: p    PUT        7
-  102: L    LONG       42
-  106: s    SETITEM
-  107: b    BUILD
-  108: a    APPEND
-  109: g    GET        5
-  112: a    APPEND
-  113: .    STOP
+    5: c    GLOBAL     'copy_reg _reconstructor'
+   30: p    PUT        1
+   33: (    MARK
+   34: c        GLOBAL     'pickletools _Example'
+   56: p        PUT        2
+   59: c        GLOBAL     '__builtin__ object'
+   79: p        PUT        3
+   82: N        NONE
+   83: t        TUPLE      (MARK at 33)
+   84: p    PUT        4
+   87: R    REDUCE
+   88: p    PUT        5
+   91: (    MARK
+   92: d        DICT       (MARK at 91)
+   93: p    PUT        6
+   96: V    UNICODE    'value'
+  103: p    PUT        7
+  106: L    LONG       42
+  111: s    SETITEM
+  112: b    BUILD
+  113: a    APPEND
+  114: g    GET        5
+  117: a    APPEND
+  118: .    STOP
 highest protocol among opcodes = 0
 
 >>> dis(pickle.dumps(x, 1))
     0: ]    EMPTY_LIST
     1: q    BINPUT     0
     3: (    MARK
-    4: c        GLOBAL     'copyreg _reconstructor'
-   28: q        BINPUT     1
-   30: (        MARK
-   31: c            GLOBAL     'pickletools _Example'
-   53: q            BINPUT     2
-   55: c            GLOBAL     'builtins object'
-   72: q            BINPUT     3
-   74: N            NONE
-   75: t            TUPLE      (MARK at 30)
-   76: q        BINPUT     4
-   78: R        REDUCE
-   79: q        BINPUT     5
-   81: }        EMPTY_DICT
-   82: q        BINPUT     6
-   84: X        BINUNICODE 'value'
-   94: q        BINPUT     7
-   96: K        BININT1    42
-   98: s        SETITEM
-   99: b        BUILD
-  100: h        BINGET     5
-  102: e        APPENDS    (MARK at 3)
-  103: .    STOP
+    4: c        GLOBAL     'copy_reg _reconstructor'
+   29: q        BINPUT     1
+   31: (        MARK
+   32: c            GLOBAL     'pickletools _Example'
+   54: q            BINPUT     2
+   56: c            GLOBAL     '__builtin__ object'
+   76: q            BINPUT     3
+   78: N            NONE
+   79: t            TUPLE      (MARK at 31)
+   80: q        BINPUT     4
+   82: R        REDUCE
+   83: q        BINPUT     5
+   85: }        EMPTY_DICT
+   86: q        BINPUT     6
+   88: X        BINUNICODE 'value'
+   98: q        BINPUT     7
+  100: K        BININT1    42
+  102: s        SETITEM
+  103: b        BUILD
+  104: h        BINGET     5
+  106: e        APPENDS    (MARK at 3)
+  107: .    STOP
 highest protocol among opcodes = 1
 
 Try "the canonical" recursive-object test.
@@ -2288,6 +2307,22 @@ highest protocol among opcodes = 2
    12: h    BINGET     1
    14: .    STOP
 highest protocol among opcodes = 2
+
+Try protocol 3 with annotations:
+
+>>> dis(pickle.dumps(T, 3), annotate=1)
+    0: \x80 PROTO      3 Protocol version indicator.
+    2: ]    EMPTY_LIST   Push an empty list.
+    3: q    BINPUT     0 Store the stack top into the memo.  The stack is not popped.
+    5: h    BINGET     0 Read an object from the memo and push it on the stack.
+    7: \x85 TUPLE1       Build a one-tuple out of the topmost item on the stack.
+    8: q    BINPUT     1 Store the stack top into the memo.  The stack is not popped.
+   10: a    APPEND       Append an object to a list.
+   11: 0    POP          Discard the top stack item, shrinking the stack by one item.
+   12: h    BINGET     1 Read an object from the memo and push it on the stack.
+   14: .    STOP         Stop the unpickling machine.
+highest protocol among opcodes = 2
+
 """
 
 _memo_test = r"""
@@ -2328,4 +2363,47 @@ def _test():
     return doctest.testmod()
 
 if __name__ == "__main__":
-    _test()
+    import sys, argparse
+    parser = argparse.ArgumentParser(
+        description='disassemble one or more pickle files')
+    parser.add_argument(
+        'pickle_file', type=argparse.FileType('br'),
+        nargs='*', help='the pickle file')
+    parser.add_argument(
+        '-o', '--output', default=sys.stdout, type=argparse.FileType('w'),
+        help='the file where the output should be written')
+    parser.add_argument(
+        '-m', '--memo', action='store_true',
+        help='preserve memo between disassemblies')
+    parser.add_argument(
+        '-l', '--indentlevel', default=4, type=int,
+        help='the number of blanks by which to indent a new MARK level')
+    parser.add_argument(
+        '-a', '--annotate',  action='store_true',
+        help='annotate each line with a short opcode description')
+    parser.add_argument(
+        '-p', '--preamble', default="==> {name} <==",
+        help='if more than one pickle file is specified, print this before'
+        ' each disassembly')
+    parser.add_argument(
+        '-t', '--test', action='store_true',
+        help='run self-test suite')
+    parser.add_argument(
+        '-v', action='store_true',
+        help='run verbosely; only affects self-test run')
+    args = parser.parse_args()
+    if args.test:
+        _test()
+    else:
+        annotate = 30 if args.annotate else 0
+        if not args.pickle_file:
+            parser.print_help()
+        elif len(args.pickle_file) == 1:
+            dis(args.pickle_file[0], args.output, None,
+                args.indentlevel, annotate)
+        else:
+            memo = {} if args.memo else None
+            for f in args.pickle_file:
+                preamble = args.preamble.format(name=f.name)
+                args.output.write(preamble + '\n')
+                dis(f, args.output, memo, args.indentlevel, annotate)

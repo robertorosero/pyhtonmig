@@ -1,6 +1,6 @@
-"""plistlib.py -- a tool to generate and parse MacOSX .plist files.
+r"""plistlib.py -- a tool to generate and parse MacOSX .plist files.
 
-The PropertList (.plist) file format is a simple XML pickle supporting
+The property list (.plist) file format is a simple XML pickle supporting
 basic object types, like dictionaries, lists, numbers and strings.
 Usually the top level object is a dictionary.
 
@@ -16,32 +16,31 @@ To work with plist data in bytes objects, you can use readPlistFromBytes()
 and writePlistToBytes().
 
 Values can be strings, integers, floats, booleans, tuples, lists,
-dictionaries, Data or datetime.datetime objects. String values (including
-dictionary keys) may be unicode strings -- they will be written out as
-UTF-8.
+dictionaries (but only with string keys), Data or datetime.datetime objects.
+String values (including dictionary keys) have to be unicode strings -- they
+will be written out as UTF-8.
 
 The <data> plist type is supported through the Data class. This is a
-thin wrapper around a Python bytes object.
+thin wrapper around a Python bytes object. Use 'Data' if your strings
+contain control characters.
 
 Generate Plist example:
 
     pl = dict(
-        aString="Doodah",
-        aList=["A", "B", 12, 32.1, [1, 2, 3]],
+        aString = "Doodah",
+        aList = ["A", "B", 12, 32.1, [1, 2, 3]],
         aFloat = 0.1,
         anInt = 728,
-        aDict=dict(
-            anotherString="<hello & hi there!>",
-            aUnicodeValue=u'M\xe4ssig, Ma\xdf',
-            aTrueValue=True,
-            aFalseValue=False,
+        aDict = dict(
+            anotherString = "<hello & hi there!>",
+            aUnicodeValue = "M\xe4ssig, Ma\xdf",
+            aTrueValue = True,
+            aFalseValue = False,
         ),
         someData = Data(b"<binary gunk>"),
         someMoreData = Data(b"<lots of binary gunk>" * 10),
         aDate = datetime.datetime.fromtimestamp(time.mktime(time.gmtime())),
     )
-    # unicode keys are possible, but a little awkward to use:
-    pl[u'\xc5benraa'] = "That was a unicode key."
     writePlist(pl, fileName)
 
 Parse Plist example:
@@ -147,7 +146,7 @@ class DumbXMLWriter:
 # Contents should conform to a subset of ISO 8601
 # (in particular, YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'.  Smaller units may be omitted with
 #  a loss of precision)
-_dateParser = re.compile(r"(?P<year>\d\d\d\d)(?:-(?P<month>\d\d)(?:-(?P<day>\d\d)(?:T(?P<hour>\d\d)(?::(?P<minute>\d\d)(?::(?P<second>\d\d))?)?)?)?)?Z")
+_dateParser = re.compile(r"(?P<year>\d\d\d\d)(?:-(?P<month>\d\d)(?:-(?P<day>\d\d)(?:T(?P<hour>\d\d)(?::(?P<minute>\d\d)(?::(?P<second>\d\d))?)?)?)?)?Z", re.ASCII)
 
 def _dateFromString(s):
     order = ('year', 'month', 'day', 'hour', 'minute', 'second')
@@ -187,7 +186,7 @@ def _escape(text):
 
 PLISTHEADER = b"""\
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 """
 
 class PlistWriter(DumbXMLWriter):
@@ -220,7 +219,7 @@ class PlistWriter(DumbXMLWriter):
         elif isinstance(value, (tuple, list)):
             self.writeArray(value)
         else:
-            raise TypeError("unsuported type: %s" % type(value))
+            raise TypeError("unsupported type: %s" % type(value))
 
     def writeData(self, data):
         self.beginElement("data")
@@ -263,13 +262,13 @@ class _InternalDict(dict):
             raise AttributeError(attr)
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
         return value
 
     def __setattr__(self, attr, value):
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
         self[attr] = value
 
     def __delattr__(self, attr):
@@ -279,14 +278,14 @@ class _InternalDict(dict):
             raise AttributeError(attr)
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
 
 class Dict(_InternalDict):
 
     def __init__(self, **kwargs):
         from warnings import warn
         warn("The plistlib.Dict class is deprecated, use builtin dict instead",
-             PendingDeprecationWarning)
+             PendingDeprecationWarning, 2)
         super().__init__(**kwargs)
 
 
@@ -299,7 +298,7 @@ class Plist(_InternalDict):
     def __init__(self, **kwargs):
         from warnings import warn
         warn("The Plist class is deprecated, use the readPlist() and "
-             "writePlist() functions instead", PendingDeprecationWarning)
+             "writePlist() functions instead", PendingDeprecationWarning, 2)
         super().__init__(**kwargs)
 
     def fromFile(cls, pathOrFile):
@@ -316,7 +315,7 @@ class Plist(_InternalDict):
 
 
 def _encodeBase64(s, maxlinelength=76):
-    # copied from base64.encodestring(), with added maxlinelength argument
+    # copied from base64.encodebytes(), with added maxlinelength argument
     maxbinsize = (maxlinelength//4)*3
     pieces = []
     for i in range(0, len(s), maxbinsize):
@@ -335,7 +334,7 @@ class Data:
 
     @classmethod
     def fromBase64(cls, data):
-        # base64.decodestring just calls binascii.a2b_base64;
+        # base64.decodebytes just calls binascii.a2b_base64;
         # it seems overkill to use both base64 and binascii.
         return cls(binascii.a2b_base64(data))
 

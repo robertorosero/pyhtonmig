@@ -53,11 +53,13 @@ Simple examples
 
 Most applications are probably going to want to log to a file, so let's start
 with that case. Using the :func:`basicConfig` function, we can set up the
-default handler so that debug messages are written to a file::
+default handler so that debug messages are written to a file (in the example,
+we assume that you have the appropriate permissions to create a file called
+*example.log* in the current directory)::
 
    import logging
-   LOG_FILENAME = '/tmp/logging_example.out'
-   logging.basicConfig(filename=LOG_FILENAME,level=logging.DEBUG,)
+   LOG_FILENAME = 'example.log'
+   logging.basicConfig(filename=LOG_FILENAME,level=logging.DEBUG)
 
    logging.debug('This message should go to the log file')
 
@@ -67,7 +69,7 @@ message::
    DEBUG:root:This message should go to the log file
 
 If you run the script repeatedly, the additional log messages are appended to
-the file.  To create a new file each time, you can pass a filemode argument to
+the file.  To create a new file each time, you can pass a *filemode* argument to
 :func:`basicConfig` with a value of ``'w'``.  Rather than managing the file size
 yourself, though, it is simpler to use a :class:`RotatingFileHandler`::
 
@@ -75,7 +77,7 @@ yourself, though, it is simpler to use a :class:`RotatingFileHandler`::
    import logging
    import logging.handlers
 
-   LOG_FILENAME = '/tmp/logging_rotatingfile_example.out'
+   LOG_FILENAME = 'logging_rotatingfile_example.out'
 
    # Set up a specific logger with our desired output level
    my_logger = logging.getLogger('MyLogger')
@@ -100,17 +102,17 @@ yourself, though, it is simpler to use a :class:`RotatingFileHandler`::
 The result should be 6 separate files, each with part of the log history for the
 application::
 
-   /tmp/logging_rotatingfile_example.out
-   /tmp/logging_rotatingfile_example.out.1
-   /tmp/logging_rotatingfile_example.out.2
-   /tmp/logging_rotatingfile_example.out.3
-   /tmp/logging_rotatingfile_example.out.4
-   /tmp/logging_rotatingfile_example.out.5
+   logging_rotatingfile_example.out
+   logging_rotatingfile_example.out.1
+   logging_rotatingfile_example.out.2
+   logging_rotatingfile_example.out.3
+   logging_rotatingfile_example.out.4
+   logging_rotatingfile_example.out.5
 
-The most current file is always :file:`/tmp/logging_rotatingfile_example.out`,
+The most current file is always :file:`logging_rotatingfile_example.out`,
 and each time it reaches the size limit it is renamed with the suffix
 ``.1``. Each of the existing backup files is renamed to increment the suffix
-(``.1`` becomes ``.2``, etc.)  and the ``.5`` file is erased.
+(``.1`` becomes ``.2``, etc.)  and the ``.6`` file is erased.
 
 Obviously this example sets the log length much much too small as an extreme
 example.  You would want to set *maxBytes* to an appropriate value.
@@ -119,7 +121,7 @@ Another useful feature of the logging API is the ability to produce different
 messages at different log levels.  This allows you to instrument your code with
 debug messages, for example, but turning the log level down so that those debug
 messages are not written for your production system.  The default levels are
-``CRITICAL``, ``ERROR``, ``WARNING``, ``INFO``, ``DEBUG`` and ``UNSET``.
+``NOTSET``, ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR`` and ``CRITICAL``.
 
 The logger, handler, and log message call each specify a level.  The log message
 is only emitted if the handler and logger are configured to emit messages of
@@ -244,16 +246,16 @@ With the logger object configured, the following methods create log messages:
   methods listed above, but this is how to log at custom log levels.
 
 :func:`getLogger` returns a reference to a logger instance with the specified
-if it it is provided, or ``root`` if not.  The names are period-separated
+name if it is provided, or ``root`` if not.  The names are period-separated
 hierarchical structures.  Multiple calls to :func:`getLogger` with the same name
 will return a reference to the same logger object.  Loggers that are further
 down in the hierarchical list are children of loggers higher up in the list.
 For example, given a logger with a name of ``foo``, loggers with names of
-``foo.bar``, ``foo.bar.baz``, and ``foo.bam`` are all children of ``foo``.
-Child loggers propagate messages up to their parent loggers.  Because of this,
-it is unnecessary to define and configure all the loggers an application uses.
-It is sufficient to configure a top-level logger and create child loggers as
-needed.
+``foo.bar``, ``foo.bar.baz``, and ``foo.bam`` are all descendants of ``foo``.
+Child loggers propagate messages up to the handlers associated with their
+ancestor loggers.  Because of this, it is unnecessary to define and configure
+handlers for all the loggers an application uses. It is sufficient to
+configure handlers for a top-level logger and create child loggers as needed.
 
 
 Handlers
@@ -281,15 +283,16 @@ custom handlers) are the following configuration methods:
   are there two :func:`setLevel` methods?  The level set in the logger
   determines which severity of messages it will pass to its handlers.  The level
   set in each handler determines which messages that handler will send on.
-  :func:`setFormatter` selects a Formatter object for this handler to use.
+
+* :func:`setFormatter` selects a Formatter object for this handler to use.
 
 * :func:`addFilter` and :func:`removeFilter` respectively configure and
   deconfigure filter objects on handlers.
 
-Application code should not directly instantiate and use handlers.  Instead, the
-:class:`Handler` class is a base class that defines the interface that all
-Handlers should have and establishes some default behavior that child classes
-can use (or override).
+Application code should not directly instantiate and use instances of
+:class:`Handler`.  Instead, the :class:`Handler` class is a base class that
+defines the interface that all handlers should have and establishes some
+default behavior that child classes can use (or override).
 
 
 Formatters
@@ -298,17 +301,29 @@ Formatters
 Formatter objects configure the final order, structure, and contents of the log
 message.  Unlike the base :class:`logging.Handler` class, application code may
 instantiate formatter classes, although you could likely subclass the formatter
-if your application needs special behavior.  The constructor takes two optional
-arguments: a message format string and a date format string.  If there is no
-message format string, the default is to use the raw message.  If there is no
-date format string, the default date format is::
+if your application needs special behavior.  The constructor takes three
+optional arguments -- a message format string, a date format string and a style
+indicator.
+
+.. method:: logging.Formatter.__init__(fmt=None, datefmt=None, style='%')
+
+If there is no message format string, the default is to use the
+raw message.  If there is no date format string, the default date format is::
 
     %Y-%m-%d %H:%M:%S
 
-with the milliseconds tacked on at the end.
+with the milliseconds tacked on at the end. The ``style`` is one of `%`, '{'
+or '$'. If one of these is not specified, then '%' will be used.
 
-The message format string uses ``%(<dictionary key>)s`` styled string
-substitution; the possible keys are documented in :ref:`formatter-objects`.
+If the ``style`` is '%', the message format string uses
+``%(<dictionary key>)s`` styled string substitution; the possible keys are
+documented in :ref:`formatter-objects`. If the style is '{', the message format
+string is assumed to be compatible with :meth:`str.format` (using keyword
+arguments), while if the style is '$' then the message format string should
+conform to what is expected by :meth:`string.Template.substitute`.
+
+.. versionchanged:: 3.2
+   Added the ``style`` parameter.
 
 The following message format string will log the time in a human-readable
 format, the severity of the message, and the contents of the message, in that
@@ -316,28 +331,46 @@ order::
 
     "%(asctime)s - %(levelname)s - %(message)s"
 
+Formatters use a user-configurable function to convert the creation time of a
+record to a tuple. By default, :func:`time.localtime` is used; to change this
+for a particular formatter instance, set the ``converter`` attribute of the
+instance to a function with the same signature as :func:`time.localtime` or
+:func:`time.gmtime`. To change it for all formatters, for example if you want
+all logging times to be shown in GMT, set the ``converter`` attribute in the
+Formatter class (to ``time.gmtime`` for GMT display).
+
 
 Configuring Logging
 ^^^^^^^^^^^^^^^^^^^
 
-Programmers can configure logging either by creating loggers, handlers, and
-formatters explicitly in a main module with the configuration methods listed
-above (using Python code), or by creating a logging config file.  The following
-code is an example of configuring a very simple logger, a console handler, and a
-simple formatter in a Python module::
+Programmers can configure logging in three ways:
+
+1. Creating loggers, handlers, and formatters explicitly using Python
+   code that calls the configuration methods listed above.
+2. Creating a logging config file and reading it using the :func:`fileConfig`
+   function.
+3. Creating a dictionary of configuration information and passing it
+   to the :func:`dictConfig` function.
+
+The following example configures a very simple logger, a console
+handler, and a simple formatter using Python code::
 
     import logging
 
     # create logger
     logger = logging.getLogger("simple_example")
     logger.setLevel(logging.DEBUG)
+
     # create console handler and set level to debug
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
+
     # create formatter
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
     # add formatter to ch
     ch.setFormatter(formatter)
+
     # add ch to logger
     logger.addHandler(ch)
 
@@ -420,6 +453,106 @@ You can see that the config file approach has a few advantages over the Python
 code approach, mainly separation of configuration and code and the ability of
 noncoders to easily modify the logging properties.
 
+Note that the class names referenced in config files need to be either relative
+to the logging module, or absolute values which can be resolved using normal
+import mechanisms. Thus, you could use either
+:class:`handlers.WatchedFileHandler` (relative to the logging module) or
+``mypackage.mymodule.MyHandler`` (for a class defined in package ``mypackage``
+and module ``mymodule``, where ``mypackage`` is available on the Python import
+path).
+
+In Python 3.2, a new means of configuring logging has been introduced, using
+dictionaries to hold configuration information. This provides a superset of the
+functionality of the config-file-based approach outlined above, and is the
+recommended configuration method for new applications and deployments. Because
+a Python dictionary is used to hold configuration information, and since you
+can populate that dictionary using different means, you have more options for
+configuration. For example, you can use a configuration file in JSON format,
+or, if you have access to YAML processing functionality, a file in YAML
+format, to populate the configuration dictionary. Or, of course, you can
+construct the dictionary in Python code, receive it in pickled form over a
+socket, or use whatever approach makes sense for your application.
+
+Here's an example of the same configuration as above, in YAML format for
+the new dictionary-based approach::
+
+    version: 1
+    formatters:
+      simple:
+        format: format=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: simple
+        stream: ext://sys.stdout
+    loggers:
+      simpleExample:
+        level: DEBUG
+        handlers: [console]
+        propagate: no
+    root:
+        level: DEBUG
+        handlers: [console]
+
+For more information about logging using a dictionary, see
+:ref:`logging-config-api`.
+
+.. _library-config:
+
+Configuring Logging for a Library
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When developing a library which uses logging, some consideration needs to be
+given to its configuration. If the using application does not use logging, and
+library code makes logging calls, then a one-off message "No handlers could be
+found for logger X.Y.Z" is printed to the console. This message is intended
+to catch mistakes in logging configuration, but will confuse an application
+developer who is not aware of logging by the library.
+
+In addition to documenting how a library uses logging, a good way to configure
+library logging so that it does not cause a spurious message is to add a
+handler which does nothing. This avoids the message being printed, since a
+handler will be found: it just doesn't produce any output. If the library user
+configures logging for application use, presumably that configuration will add
+some handlers, and if levels are suitably configured then logging calls made
+in library code will send output to those handlers, as normal.
+
+A do-nothing handler can be simply defined as follows::
+
+    import logging
+
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+
+An instance of this handler should be added to the top-level logger of the
+logging namespace used by the library. If all logging by a library *foo* is
+done using loggers with names matching "foo.x.y", then the code::
+
+    import logging
+
+    h = NullHandler()
+    logging.getLogger("foo").addHandler(h)
+
+should have the desired effect. If an organisation produces a number of
+libraries, then the logger name specified can be "orgname.foo" rather than
+just "foo".
+
+**PLEASE NOTE:** It is strongly advised that you *do not add any handlers other
+than* :class:`NullHandler` *to your library's loggers*. This is because the
+configuration of handlers is the prerogative of the application developer who
+uses your library. The application developer knows their target audience and
+what handlers are most appropriate for their application: if you add handlers
+"under the hood", you might well interfere with their ability to carry out
+unit tests and deliver logs which suit their requirements.
+
+.. versionadded:: 3.1
+
+The :class:`NullHandler` class was not present in previous versions, but is
+now included, so that it need not be defined in library code.
+
+
 
 Logging Levels
 --------------
@@ -467,7 +600,9 @@ support desk staff, system administrators, developers). Handlers are passed
 can have zero, one or more handlers associated with it (via the
 :meth:`addHandler` method of :class:`Logger`). In addition to any handlers
 directly associated with a logger, *all handlers associated with all ancestors
-of the logger* are called to dispatch the message.
+of the logger* are called to dispatch the message (unless the *propagate* flag
+for a logger is set to a false value, at which point the passing to ancestor
+handlers stops).
 
 Just as for loggers, handlers can have levels associated with them. A handler's
 level acts as a filter in the same way as a logger's level does. If a handler
@@ -475,47 +610,95 @@ decides to actually dispatch an event, the :meth:`emit` method is used to send
 the message to its destination. Most user-defined subclasses of :class:`Handler`
 will need to override this :meth:`emit`.
 
+.. _custom-levels:
+
+Custom Levels
+^^^^^^^^^^^^^
+
+Defining your own levels is possible, but should not be necessary, as the
+existing levels have been chosen on the basis of practical experience.
+However, if you are convinced that you need custom levels, great care should
+be exercised when doing this, and it is possibly *a very bad idea to define
+custom levels if you are developing a library*. That's because if multiple
+library authors all define their own custom levels, there is a chance that
+the logging output from such multiple libraries used together will be
+difficult for the using developer to control and/or interpret, because a
+given numeric value might mean different things for different libraries.
+
+
+Useful Handlers
+---------------
+
 In addition to the base :class:`Handler` class, many useful subclasses are
 provided:
 
-#. :class:`StreamHandler` instances send error messages to streams (file-like
+#. :class:`StreamHandler` instances send messages to streams (file-like
    objects).
 
-#. :class:`FileHandler` instances send error messages to disk files.
+#. :class:`FileHandler` instances send messages to disk files.
 
-#. :class:`BaseRotatingHandler` is the base class for handlers that rotate log
-   files at a certain point. It is not meant to be  instantiated directly. Instead,
-   use :class:`RotatingFileHandler` or :class:`TimedRotatingFileHandler`.
+.. module:: logging.handlers
 
-#. :class:`RotatingFileHandler` instances send error messages to disk files,
-   with support for maximum log file sizes and log file rotation.
+#. :class:`BaseRotatingHandler` is the base class for handlers that
+   rotate log files at a certain point. It is not meant to be  instantiated
+   directly. Instead, use :class:`RotatingFileHandler` or
+   :class:`TimedRotatingFileHandler`.
 
-#. :class:`TimedRotatingFileHandler` instances send error messages to disk files
-   rotating the log file at certain timed intervals.
+#. :class:`RotatingFileHandler` instances send messages to disk
+   files, with support for maximum log file sizes and log file rotation.
 
-#. :class:`SocketHandler` instances send error messages to TCP/IP sockets.
+#. :class:`TimedRotatingFileHandler` instances send messages to
+   disk files, rotating the log file at certain timed intervals.
 
-#. :class:`DatagramHandler` instances send error messages to UDP sockets.
+#. :class:`SocketHandler` instances send messages to TCP/IP
+   sockets.
 
-#. :class:`SMTPHandler` instances send error messages to a designated email
-   address.
+#. :class:`DatagramHandler` instances send messages to UDP
+   sockets.
 
-#. :class:`SysLogHandler` instances send error messages to a Unix syslog daemon,
-   possibly on a remote machine.
+#. :class:`SMTPHandler` instances send messages to a designated
+   email address.
 
-#. :class:`NTEventLogHandler` instances send error messages to a Windows
-   NT/2000/XP event log.
+#. :class:`SysLogHandler` instances send messages to a Unix
+   syslog daemon, possibly on a remote machine.
 
-#. :class:`MemoryHandler` instances send error messages to a buffer in memory,
-   which is flushed whenever specific criteria are met.
+#. :class:`NTEventLogHandler` instances send messages to a
+   Windows NT/2000/XP event log.
 
-#. :class:`HTTPHandler` instances send error messages to an HTTP server using
-   either ``GET`` or ``POST`` semantics.
+#. :class:`MemoryHandler` instances send messages to a buffer
+   in memory, which is flushed whenever specific criteria are met.
 
-The :class:`StreamHandler` and :class:`FileHandler` classes are defined in the
-core logging package. The other handlers are defined in a sub- module,
-:mod:`logging.handlers`. (There is also another sub-module,
-:mod:`logging.config`, for configuration functionality.)
+#. :class:`HTTPHandler` instances send messages to an HTTP
+   server using either ``GET`` or ``POST`` semantics.
+
+#. :class:`WatchedFileHandler` instances watch the file they are
+   logging to. If the file changes, it is closed and reopened using the file
+   name. This handler is only useful on Unix-like systems; Windows does not
+   support the underlying mechanism used.
+
+#. :class:`QueueHandler` instances send messages to a queue, such as
+   those implemented in the :mod:`queue` or :mod:`multiprocessing` modules.
+
+.. currentmodule:: logging
+
+#. :class:`NullHandler` instances do nothing with error messages. They are used
+   by library developers who want to use logging, but want to avoid the "No
+   handlers could be found for logger XXX" message which can be displayed if
+   the library user has not configured logging. See :ref:`library-config` for
+   more information.
+
+.. versionadded:: 3.1
+
+The :class:`NullHandler` class was not present in previous versions.
+
+.. versionadded:: 3.2
+
+The :class:`QueueHandler` class was not present in previous versions.
+
+The :class:`NullHandler`, :class:`StreamHandler` and :class:`FileHandler`
+classes are defined in the core logging package. The other handlers are
+defined in a sub- module, :mod:`logging.handlers`. (There is also another
+sub-module, :mod:`logging.config`, for configuration functionality.)
 
 Logged messages are formatted for presentation through instances of the
 :class:`Formatter` class. They are initialized with a format string suitable for
@@ -537,13 +720,16 @@ The basic :class:`Filter` functionality allows filtering by specific logger
 name. If this feature is used, messages sent to the named logger and its
 children are allowed through the filter, and all others dropped.
 
+Module-Level Functions
+----------------------
+
 In addition to the classes described above, there are a number of module- level
 functions.
 
 
-.. function:: getLogger([name])
+.. function:: getLogger(name=None)
 
-   Return a logger with the specified name or, if no name is specified, return a
+   Return a logger with the specified name or, if name is ``None``, return a
    logger which is the root logger of the hierarchy. If specified, the name is
    typically a dot-separated hierarchical name like *"a"*, *"a.b"* or *"a.b.c.d"*.
    Choice of these names is entirely up to the developer who is using logging.
@@ -564,20 +750,38 @@ functions.
           # ... override behaviour here
 
 
-.. function:: debug(msg[, *args[, **kwargs]])
+.. function:: debug(msg, *args, **kwargs)
 
    Logs a message with level :const:`DEBUG` on the root logger. The *msg* is the
    message format string, and the *args* are the arguments which are merged into
    *msg* using the string formatting operator. (Note that this means that you can
    use keywords in the format string, together with a single dictionary argument.)
 
-   There are two keyword arguments in *kwargs* which are inspected: *exc_info*
+   There are three keyword arguments in *kwargs* which are inspected: *exc_info*
    which, if it does not evaluate as false, causes exception information to be
    added to the logging message. If an exception tuple (in the format returned by
    :func:`sys.exc_info`) is provided, it is used; otherwise, :func:`sys.exc_info`
    is called to get the exception information.
 
-   The other optional keyword argument is *extra* which can be used to pass a
+   The second optional keyword argument is *stack_info*, which defaults to
+   False. If specified as True, stack information is added to the logging
+   message, including the actual logging call. Note that this is not the same
+   stack information as that displayed through specifying *exc_info*: The
+   former is stack frames from the bottom of the stack up to the logging call
+   in the current thread, whereas the latter is information about stack frames
+   which have been unwound, following an exception, while searching for
+   exception handlers.
+
+   You can specify *stack_info* independently of *exc_info*, e.g. to just show
+   how you got to a certain point in your code, even when no exceptions were
+   raised. The stack frames are printed following a header line which says::
+
+       Stack (most recent call last):
+
+   This mimics the `Traceback (most recent call last):` which is used when
+   displaying exception frames.
+
+   The third optional keyword argument is *extra* which can be used to pass a
    dictionary which is used to populate the __dict__ of the LogRecord created for
    the logging event with user-defined attributes. These custom attributes can then
    be used as you like. For example, they could be incorporated into logged
@@ -588,7 +792,7 @@ functions.
       d = {'clientip': '192.168.0.1', 'user': 'fbloggs'}
       logging.warning("Protocol problem: %s", "connection reset", extra=d)
 
-   would print something like  ::
+   would print something like::
 
       2006-02-08 22:20:02,165 192.168.0.1 fbloggs  Protocol problem: connection reset
 
@@ -610,49 +814,62 @@ functions.
    above example). In such circumstances, it is likely that specialized
    :class:`Formatter`\ s would be used with particular :class:`Handler`\ s.
 
+   .. versionadded:: 3.2
+      The *stack_info* parameter was added.
 
-.. function:: info(msg[, *args[, **kwargs]])
+.. function:: info(msg, *args, **kwargs)
 
    Logs a message with level :const:`INFO` on the root logger. The arguments are
    interpreted as for :func:`debug`.
 
 
-.. function:: warning(msg[, *args[, **kwargs]])
+.. function:: warning(msg, *args, **kwargs)
 
    Logs a message with level :const:`WARNING` on the root logger. The arguments are
    interpreted as for :func:`debug`.
 
 
-.. function:: error(msg[, *args[, **kwargs]])
+.. function:: error(msg, *args, **kwargs)
 
    Logs a message with level :const:`ERROR` on the root logger. The arguments are
    interpreted as for :func:`debug`.
 
 
-.. function:: critical(msg[, *args[, **kwargs]])
+.. function:: critical(msg, *args, **kwargs)
 
    Logs a message with level :const:`CRITICAL` on the root logger. The arguments
    are interpreted as for :func:`debug`.
 
 
-.. function:: exception(msg[, *args])
+.. function:: exception(msg, *args)
 
    Logs a message with level :const:`ERROR` on the root logger. The arguments are
    interpreted as for :func:`debug`. Exception info is added to the logging
    message. This function should only be called from an exception handler.
 
-
-.. function:: log(level, msg[, *args[, **kwargs]])
+.. function:: log(level, msg, *args, **kwargs)
 
    Logs a message with level *level* on the root logger. The other arguments are
    interpreted as for :func:`debug`.
 
+   PLEASE NOTE: The above module-level functions which delegate to the root
+   logger should *not* be used in threads, in versions of Python earlier than
+   2.7.1 and 3.2, unless at least one handler has been added to the root
+   logger *before* the threads are started. These convenience functions call
+   :func:`basicConfig` to ensure that at least one handler is available; in
+   earlier versions of Python, this can (under rare circumstances) lead to
+   handlers being added multiple times to the root logger, which can in turn
+   lead to multiple messages for the same event.
 
 .. function:: disable(lvl)
 
    Provides an overriding level *lvl* for all loggers which takes precedence over
    the logger's own level. When the need arises to temporarily throttle logging
-   output down across the whole application, this function can be useful.
+   output down across the whole application, this function can be useful. Its
+   effect is to disable all logging calls of severity *lvl* and below, so that
+   if you call it with a value of INFO, then all INFO and DEBUG events would be
+   discarded, whereas those of severity WARNING and above would be processed
+   according to the logger's effective level.
 
 
 .. function:: addLevelName(lvl, levelName)
@@ -664,6 +881,8 @@ functions.
    registered using this function, levels should be positive integers and they
    should increase in increasing order of severity.
 
+   NOTE: If you are thinking of defining your own levels, please see the section
+   on :ref:`custom-levels`.
 
 .. function:: getLevelName(lvl)
 
@@ -684,14 +903,23 @@ functions.
    it as a :class:`LogRecord` instance at the receiving end.
 
 
-.. function:: basicConfig([**kwargs])
+.. function:: basicConfig(**kwargs)
 
    Does basic configuration for the logging system by creating a
    :class:`StreamHandler` with a default :class:`Formatter` and adding it to the
-   root logger. The function does nothing if any handlers have been defined for
-   the root logger. The functions :func:`debug`, :func:`info`, :func:`warning`,
+   root logger. The functions :func:`debug`, :func:`info`, :func:`warning`,
    :func:`error` and :func:`critical` will call :func:`basicConfig` automatically
    if no handlers are defined for the root logger.
+
+   This function does nothing if the root logger already has handlers
+   configured for it.
+
+   PLEASE NOTE: This function should be called from the main thread
+   before other threads are started. In versions of Python prior to
+   2.7.1 and 3.2, if this function is called from multiple threads,
+   it is possible (in rare circumstances) that a handler will be added
+   to the root logger more than once, leading to unexpected results
+   such as messages being duplicated in the log.
 
    The following keyword arguments are supported.
 
@@ -711,6 +939,12 @@ functions.
    +--------------+---------------------------------------------+
    | ``datefmt``  | Use the specified date/time format.         |
    +--------------+---------------------------------------------+
+   | ``style``    | If ``format`` is specified, use this style  |
+   |              | for the format string. One of '%', '{' or   |
+   |              | '$' for %-formatting, :meth:`str.format` or |
+   |              | :class:`string.Template` respectively, and  |
+   |              | defaulting to '%' if not specified.         |
+   +--------------+---------------------------------------------+
    | ``level``    | Set the root logger level to the specified  |
    |              | level.                                      |
    +--------------+---------------------------------------------+
@@ -719,6 +953,9 @@ functions.
    |              | incompatible with 'filename' - if both are  |
    |              | present, 'stream' is ignored.               |
    +--------------+---------------------------------------------+
+
+   .. versionchanged:: 3.2
+      The ``style`` argument was added.
 
 
 .. function:: shutdown()
@@ -749,6 +986,7 @@ functions.
       and 2.2.x, which do not include the :mod:`logging` package in the standard
       library.
 
+.. _logger:
 
 Logger Objects
 --------------
@@ -757,12 +995,13 @@ Loggers have the following attributes and methods. Note that Loggers are never
 instantiated directly, but always through the module-level function
 ``logging.getLogger(name)``.
 
+.. class:: Logger
 
 .. attribute:: Logger.propagate
 
    If this evaluates to false, logging messages are not passed by this logger or by
-   child loggers to higher level (ancestor) loggers. The constructor sets this
-   attribute to 1.
+   its child loggers to the handlers of higher level (ancestor) loggers. The
+   constructor sets this attribute to 1.
 
 
 .. method:: Logger.setLevel(lvl)
@@ -801,20 +1040,49 @@ instantiated directly, but always through the module-level function
    :const:`NOTSET` is found, and that value is returned.
 
 
-.. method:: Logger.debug(msg[, *args[, **kwargs]])
+.. method:: Logger.getChild(suffix)
+
+   Returns a logger which is a descendant to this logger, as determined by the suffix.
+   Thus, ``logging.getLogger('abc').getChild('def.ghi')`` would return the same
+   logger as would be returned by ``logging.getLogger('abc.def.ghi')``. This is a
+   convenience method, useful when the parent logger is named using e.g. ``__name__``
+   rather than a literal string.
+
+   .. versionadded:: 3.2
+
+
+.. method:: Logger.debug(msg, *args, **kwargs)
 
    Logs a message with level :const:`DEBUG` on this logger. The *msg* is the
    message format string, and the *args* are the arguments which are merged into
    *msg* using the string formatting operator. (Note that this means that you can
    use keywords in the format string, together with a single dictionary argument.)
 
-   There are two keyword arguments in *kwargs* which are inspected: *exc_info*
+   There are three keyword arguments in *kwargs* which are inspected: *exc_info*
    which, if it does not evaluate as false, causes exception information to be
    added to the logging message. If an exception tuple (in the format returned by
    :func:`sys.exc_info`) is provided, it is used; otherwise, :func:`sys.exc_info`
    is called to get the exception information.
 
-   The other optional keyword argument is *extra* which can be used to pass a
+   The second optional keyword argument is *stack_info*, which defaults to
+   False. If specified as True, stack information is added to the logging
+   message, including the actual logging call. Note that this is not the same
+   stack information as that displayed through specifying *exc_info*: The
+   former is stack frames from the bottom of the stack up to the logging call
+   in the current thread, whereas the latter is information about stack frames
+   which have been unwound, following an exception, while searching for
+   exception handlers.
+
+   You can specify *stack_info* independently of *exc_info*, e.g. to just show
+   how you got to a certain point in your code, even when no exceptions were
+   raised. The stack frames are printed following a header line which says::
+
+       Stack (most recent call last):
+
+   This mimics the `Traceback (most recent call last):` which is used when
+   displaying exception frames.
+
+   The third keyword argument is *extra* which can be used to pass a
    dictionary which is used to populate the __dict__ of the LogRecord created for
    the logging event with user-defined attributes. These custom attributes can then
    be used as you like. For example, they could be incorporated into logged
@@ -848,38 +1116,41 @@ instantiated directly, but always through the module-level function
    above example). In such circumstances, it is likely that specialized
    :class:`Formatter`\ s would be used with particular :class:`Handler`\ s.
 
+   .. versionadded:: 3.2
+      The *stack_info* parameter was added.
 
-.. method:: Logger.info(msg[, *args[, **kwargs]])
+
+.. method:: Logger.info(msg, *args, **kwargs)
 
    Logs a message with level :const:`INFO` on this logger. The arguments are
    interpreted as for :meth:`debug`.
 
 
-.. method:: Logger.warning(msg[, *args[, **kwargs]])
+.. method:: Logger.warning(msg, *args, **kwargs)
 
    Logs a message with level :const:`WARNING` on this logger. The arguments are
    interpreted as for :meth:`debug`.
 
 
-.. method:: Logger.error(msg[, *args[, **kwargs]])
+.. method:: Logger.error(msg, *args, **kwargs)
 
    Logs a message with level :const:`ERROR` on this logger. The arguments are
    interpreted as for :meth:`debug`.
 
 
-.. method:: Logger.critical(msg[, *args[, **kwargs]])
+.. method:: Logger.critical(msg, *args, **kwargs)
 
    Logs a message with level :const:`CRITICAL` on this logger. The arguments are
    interpreted as for :meth:`debug`.
 
 
-.. method:: Logger.log(lvl, msg[, *args[, **kwargs]])
+.. method:: Logger.log(lvl, msg, *args, **kwargs)
 
    Logs a message with integer level *lvl* on this logger. The other arguments are
    interpreted as for :meth:`debug`.
 
 
-.. method:: Logger.exception(msg[, *args])
+.. method:: Logger.exception(msg, *args)
 
    Logs a message with level :const:`ERROR` on this logger. The arguments are
    interpreted as for :meth:`debug`. Exception info is added to the logging
@@ -912,10 +1183,11 @@ instantiated directly, but always through the module-level function
    Removes the specified handler *hdlr* from this logger.
 
 
-.. method:: Logger.findCaller()
+.. method:: Logger.findCaller(stack_info=False)
 
    Finds the caller's source filename and line number. Returns the filename, line
-   number and function name as a 3-element tuple.
+   number, function name and stack information as a 4-element tuple. The stack
+   information is returned as *None* unless *stack_info* is *True*.
 
 
 .. method:: Logger.handle(record)
@@ -923,14 +1195,26 @@ instantiated directly, but always through the module-level function
    Handles a record by passing it to all handlers associated with this logger and
    its ancestors (until a false value of *propagate* is found). This method is used
    for unpickled records received from a socket, as well as those created locally.
-   Logger-level filtering is applied using :meth:`filter`.
+   Logger-level filtering is applied using :meth:`~Logger.filter`.
 
 
-.. method:: Logger.makeRecord(name, lvl, fn, lno, msg, args, exc_info [, func, extra])
+.. method:: Logger.makeRecord(name, lvl, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None)
 
    This is a factory method which can be overridden in subclasses to create
    specialized :class:`LogRecord` instances.
 
+.. method:: Logger.hasHandlers()
+
+   Checks to see if this logger has any handlers configured. This is done by
+   looking for handlers in this logger and its parents in the logger hierarchy.
+   Returns True if a handler was found, else False. The method stops searching
+   up the hierarchy whenever a logger with the "propagate" attribute set to
+   False is found - that will be the last logger which is checked for the
+   existence of handlers.
+
+.. versionadded:: 3.2
+
+The :meth:`hasHandlers` method was not present in previous versions.
 
 .. _minimal-example:
 
@@ -964,14 +1248,14 @@ destination can be easily changed, as shown in the example below::
 
    logging.basicConfig(level=logging.DEBUG,
                        format='%(asctime)s %(levelname)s %(message)s',
-                       filename='/tmp/myapp.log',
+                       filename='myapp.log',
                        filemode='w')
    logging.debug('A debug message')
    logging.info('Some information')
    logging.warning('A shot across the bows')
 
 The :meth:`basicConfig` method is used to change the configuration defaults,
-which results in output (written to ``/tmp/myapp.log``) which should look
+which results in output (written to ``myapp.log``) which should look
 something like the following::
 
    2004-07-02 13:00:08,743 DEBUG A debug message
@@ -1118,6 +1402,28 @@ are sent to both destinations.
 This example uses console and file handlers, but you can use any number and
 combination of handlers you choose.
 
+.. _logging-exceptions:
+
+Exceptions raised during logging
+--------------------------------
+
+The logging package is designed to swallow exceptions which occur while logging
+in production. This is so that errors which occur while handling logging events
+- such as logging misconfiguration, network or other similar errors - do not
+cause the application using logging to terminate prematurely.
+
+:class:`SystemExit` and :class:`KeyboardInterrupt` exceptions are never
+swallowed. Other exceptions which occur during the :meth:`emit` method of a
+:class:`Handler` subclass are passed to its :meth:`handleError` method.
+
+The default implementation of :meth:`handleError` in :class:`Handler` checks
+to see if a module-level variable, :data:`raiseExceptions`, is set. If set, a
+traceback is printed to :data:`sys.stderr`. If not set, the exception is swallowed.
+
+**Note:** The default value of :data:`raiseExceptions` is ``True``. This is because
+during development, you typically want to be notified of any exceptions that
+occur. It's advised that you set :data:`raiseExceptions` to ``False`` for production
+usage.
 
 .. _context-info:
 
@@ -1136,6 +1442,10 @@ in practice, when the number of :class:`Logger` instances is dependent on the
 level of granularity you want to use in logging an application, it could
 be hard to manage if the number of :class:`Logger` instances becomes
 effectively unbounded.
+
+
+Using LoggerAdapters to impart contextual information
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An easy way in which you can pass contextual information to be output along
 with logging event information is to use the :class:`LoggerAdapter` class.
@@ -1241,6 +1551,229 @@ When this script is run, the output should look something like this::
    2008-01-18 14:49:54,033 d.e.f WARNING  IP: 127.0.0.1       User: jim      A message at WARNING level with 2 parameters
 
 
+.. _filters-contextual:
+
+Using Filters to impart contextual information
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can also add contextual information to log output using a user-defined
+:class:`Filter`. ``Filter`` instances are allowed to modify the ``LogRecords``
+passed to them, including adding additional attributes which can then be output
+using a suitable format string, or if needed a custom :class:`Formatter`.
+
+For example in a web application, the request being processed (or at least,
+the interesting parts of it) can be stored in a threadlocal
+(:class:`threading.local`) variable, and then accessed from a ``Filter`` to
+add, say, information from the request - say, the remote IP address and remote
+user's username - to the ``LogRecord``, using the attribute names 'ip' and
+'user' as in the ``LoggerAdapter`` example above. In that case, the same format
+string can be used to get similar output to that shown above. Here's an example
+script::
+
+    import logging
+    from random import choice
+
+    class ContextFilter(logging.Filter):
+        """
+        This is a filter which injects contextual information into the log.
+
+        Rather than use actual contextual information, we just use random
+        data in this demo.
+        """
+
+        USERS = ['jim', 'fred', 'sheila']
+        IPS = ['123.231.231.123', '127.0.0.1', '192.168.0.1']
+
+        def filter(self, record):
+
+            record.ip = choice(ContextFilter.IPS)
+            record.user = choice(ContextFilter.USERS)
+            return True
+
+    if __name__ == "__main__":
+       levels = (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)
+       a1 = logging.LoggerAdapter(logging.getLogger("a.b.c"),
+                                  { "ip" : "123.231.231.123", "user" : "sheila" })
+       logging.basicConfig(level=logging.DEBUG,
+                           format="%(asctime)-15s %(name)-5s %(levelname)-8s IP: %(ip)-15s User: %(user)-8s %(message)s")
+       a1 = logging.getLogger("a.b.c")
+       a2 = logging.getLogger("d.e.f")
+
+       f = ContextFilter()
+       a1.addFilter(f)
+       a2.addFilter(f)
+       a1.debug("A debug message")
+       a1.info("An info message with %s", "some parameters")
+       for x in range(10):
+           lvl = choice(levels)
+           lvlname = logging.getLevelName(lvl)
+           a2.log(lvl, "A message at %s level with %d %s", lvlname, 2, "parameters")
+
+which, when run, produces something like::
+
+    2010-09-06 22:38:15,292 a.b.c DEBUG    IP: 123.231.231.123 User: fred     A debug message
+    2010-09-06 22:38:15,300 a.b.c INFO     IP: 192.168.0.1     User: sheila   An info message with some parameters
+    2010-09-06 22:38:15,300 d.e.f CRITICAL IP: 127.0.0.1       User: sheila   A message at CRITICAL level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f ERROR    IP: 127.0.0.1       User: jim      A message at ERROR level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f DEBUG    IP: 127.0.0.1       User: sheila   A message at DEBUG level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f ERROR    IP: 123.231.231.123 User: fred     A message at ERROR level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f CRITICAL IP: 192.168.0.1     User: jim      A message at CRITICAL level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f CRITICAL IP: 127.0.0.1       User: sheila   A message at CRITICAL level with 2 parameters
+    2010-09-06 22:38:15,300 d.e.f DEBUG    IP: 192.168.0.1     User: jim      A message at DEBUG level with 2 parameters
+    2010-09-06 22:38:15,301 d.e.f ERROR    IP: 127.0.0.1       User: sheila   A message at ERROR level with 2 parameters
+    2010-09-06 22:38:15,301 d.e.f DEBUG    IP: 123.231.231.123 User: fred     A message at DEBUG level with 2 parameters
+    2010-09-06 22:38:15,301 d.e.f INFO     IP: 123.231.231.123 User: fred     A message at INFO level with 2 parameters
+
+
+.. _multiple-processes:
+
+Logging to a single file from multiple processes
+------------------------------------------------
+
+Although logging is thread-safe, and logging to a single file from multiple
+threads in a single process *is* supported, logging to a single file from
+*multiple processes* is *not* supported, because there is no standard way to
+serialize access to a single file across multiple processes in Python. If you
+need to log to a single file from multiple processes, one way of doing this is
+to have all the processes log to a :class:`SocketHandler`, and have a separate
+process which implements a socket server which reads from the socket and logs
+to file. (If you prefer, you can dedicate one thread in one of the existing
+processes to perform this function.) The following section documents this
+approach in more detail and includes a working socket receiver which can be
+used as a starting point for you to adapt in your own applications.
+
+If you are using a recent version of Python which includes the
+:mod:`multiprocessing` module, you could write your own handler which uses the
+:class:`Lock` class from this module to serialize access to the file from
+your processes. The existing :class:`FileHandler` and subclasses do not make
+use of :mod:`multiprocessing` at present, though they may do so in the future.
+Note that at present, the :mod:`multiprocessing` module does not provide
+working lock functionality on all platforms (see
+http://bugs.python.org/issue3770).
+
+.. currentmodule:: logging.handlers
+
+Alternatively, you can use a ``Queue`` and a :class:`QueueHandler` to send
+all logging events to one of the processes in your multi-process application.
+The following example script demonstrates how you can do this; in the example
+a separate listener process listens for events sent by other processes and logs
+them according to its own logging configuration. Although the example only
+demonstrates one way of doing it (for example, you may want to use a listener
+thread rather than a separate listener process - the implementation would be
+analogous) it does allow for completely different logging configurations for
+the listener and the other processes in your application, and can be used as
+the basis for code meeting your own specific requirements::
+
+    # You'll need these imports in your own code
+    import logging
+    import logging.handlers
+    import multiprocessing
+
+    # Next two import lines for this demo only
+    from random import choice, random
+    import time
+
+    #
+    # Because you'll want to define the logging configurations for listener and workers, the
+    # listener and worker process functions take a configurer parameter which is a callable
+    # for configuring logging for that process. These functions are also passed the queue,
+    # which they use for communication.
+    #
+    # In practice, you can configure the listener however you want, but note that in this
+    # simple example, the listener does not apply level or filter logic to received records.
+    # In practice, you would probably want to do ths logic in the worker processes, to avoid
+    # sending events which would be filtered out between processes.
+    #
+    # The size of the rotated files is made small so you can see the results easily.
+    def listener_configurer():
+        root = logging.getLogger()
+        h = logging.handlers.RotatingFileHandler('/tmp/mptest.log', 'a', 300, 10)
+        f = logging.Formatter('%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s')
+        h.setFormatter(f)
+        root.addHandler(h)
+
+    # This is the listener process top-level loop: wait for logging events
+    # (LogRecords)on the queue and handle them, quit when you get a None for a
+    # LogRecord.
+    def listener_process(queue, configurer):
+        configurer()
+        while True:
+            try:
+                record = queue.get()
+                if record is None: # We send this as a sentinel to tell the listener to quit.
+                    break
+                logger = logging.getLogger(record.name)
+                logger.handle(record) # No level or filter logic applied - just do it!
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                import sys, traceback
+                print >> sys.stderr, 'Whoops! Problem:'
+                traceback.print_exc(file=sys.stderr)
+
+    # Arrays used for random selections in this demo
+
+    LEVELS = [logging.DEBUG, logging.INFO, logging.WARNING,
+              logging.ERROR, logging.CRITICAL]
+
+    LOGGERS = ['a.b.c', 'd.e.f']
+
+    MESSAGES = [
+        'Random message #1',
+        'Random message #2',
+        'Random message #3',
+    ]
+
+    # The worker configuration is done at the start of the worker process run.
+    # Note that on Windows you can't rely on fork semantics, so each process
+    # will run the logging configuration code when it starts.
+    def worker_configurer(queue):
+        h = logging.handlers.QueueHandler(queue) # Just the one handler needed
+        root = logging.getLogger()
+        root.addHandler(h)
+        root.setLevel(logging.DEBUG) # send all messages, for demo; no other level or filter logic applied.
+
+    # This is the worker process top-level loop, which just logs ten events with
+    # random intervening delays before terminating.
+    # The print messages are just so you know it's doing something!
+    def worker_process(queue, configurer):
+        configurer(queue)
+        name = multiprocessing.current_process().name
+        print('Worker started: %s' % name)
+        for i in range(10):
+            time.sleep(random())
+            logger = logging.getLogger(choice(LOGGERS))
+            level = choice(LEVELS)
+            message = choice(MESSAGES)
+            logger.log(level, message)
+        print('Worker finished: %s' % name)
+
+    # Here's where the demo gets orchestrated. Create the queue, create and start
+    # the listener, create ten workers and start them, wait for them to finish,
+    # then send a None to the queue to tell the listener to finish.
+    def main():
+        queue = multiprocessing.Queue(-1)
+        listener = multiprocessing.Process(target=listener_process,
+                                           args=(queue, listener_configurer))
+        listener.start()
+        workers = []
+        for i in range(10):
+            worker = multiprocessing.Process(target=worker_process,
+                                           args=(queue, worker_configurer))
+            workers.append(worker)
+            worker.start()
+        for w in workers:
+            w.join()
+        queue.put_nowait(None)
+        listener.join()
+
+    if __name__ == '__main__':
+        main()
+
+
+.. currentmodule:: logging
+
+
 .. _network-logging:
 
 Sending and receiving logging events across a network
@@ -1277,7 +1810,7 @@ the receiving end. A simple way of doing this is attaching a
 At the receiving end, you can set up a receiver using the :mod:`socketserver`
 module. Here is a basic working example::
 
-   import cPickle
+   import pickle
    import logging
    import logging.handlers
    import socketserver
@@ -1310,7 +1843,7 @@ module. Here is a basic working example::
                self.handleLogRecord(record)
 
        def unPickle(self, data):
-           return cPickle.loads(data)
+           return pickle.loads(data)
 
        def handleLogRecord(self, record):
            # if a name is specified, we use the named logger rather than the one
@@ -1371,6 +1904,126 @@ printed on the console; on the server side, you should see something like::
       69 myapp.area2     WARNING  Jail zesty vixen who grabbed pay from quack.
       69 myapp.area2     ERROR    The five boxing wizards jump quickly.
 
+Note that there are some security issues with pickle in some scenarios. If
+these affect you, you can use an alternative serialization scheme by overriding
+the :meth:`makePickle` method and implementing your alternative there, as
+well as adapting the above script to use your alternative serialization.
+
+.. _arbitrary-object-messages:
+
+Using arbitrary objects as messages
+-----------------------------------
+
+In the preceding sections and examples, it has been assumed that the message
+passed when logging the event is a string. However, this is not the only
+possibility. You can pass an arbitrary object as a message, and its
+:meth:`__str__` method will be called when the logging system needs to convert
+it to a string representation. In fact, if you want to, you can avoid
+computing a string representation altogether - for example, the
+:class:`SocketHandler` emits an event by pickling it and sending it over the
+wire.
+
+Dealing with handlers that block
+--------------------------------
+
+.. currentmodule:: logging.handlers
+
+Sometimes you have to get your logging handlers to do their work without
+blocking the thread you’re logging from. This is common in Web applications,
+though of course it also occurs in other scenarios.
+
+A common culprit which demonstrates sluggish behaviour is the
+:class:`SMTPHandler`: sending emails can take a long time, for a
+number of reasons outside the developer’s control (for example, a poorly
+performing mail or network infrastructure). But almost any network-based
+handler can block: Even a :class:`SocketHandler` operation may do a
+DNS query under the hood which is too slow (and this query can be deep in the
+socket library code, below the Python layer, and outside your control).
+
+One solution is to use a two-part approach. For the first part, attach only a
+:class:`QueueHandler` to those loggers which are accessed from
+performance-critical threads. They simply write to their queue, which can be
+sized to a large enough capacity or initialized with no upper bound to their
+size. The write to the queue will typically be accepted quickly, though you
+will probably need to catch the :ref:`queue.Full` exception as a precaution
+in your code. If you are a library developer who has performance-critical
+threads in their code, be sure to document this (together with a suggestion to
+attach only ``QueueHandlers`` to your loggers) for the benefit of other
+developers who will use your code.
+
+The second part of the solution is :class:`QueueListener`, which has been
+designed as the counterpart to :class:`QueueHandler`.  A
+:class:`QueueListener` is very simple: it’s passed a queue and some handlers,
+and it fires up an internal thread which listens to its queue for LogRecords
+sent from ``QueueHandlers`` (or any other source of ``LogRecords``, for that
+matter). The ``LogRecords`` are removed from the queue and passed to the
+handlers for processing.
+
+The advantage of having a separate :class:`QueueListener` class is that you
+can use the same instance to service multiple ``QueueHandlers``. This is more
+resource-friendly than, say, having threaded versions of the existing handler
+classes, which would eat up one thread per handler for no particular benefit.
+
+An example of using these two classes follows (imports omitted)::
+
+    que = queue.Queue(-1) # no limit on size
+    queue_handler = QueueHandler(que)
+    handler = logging.StreamHandler()
+    listener = QueueListener(que, handler)
+    root = logging.getLogger()
+    root.addHandler(queue_handler)
+    formatter = logging.Formatter('%(threadName)s: %(message)s')
+    handler.setFormatter(formatter)
+    listener.start()
+    # The log output will display the thread which generated
+    # the event (the main thread) rather than the internal
+    # thread which monitors the internal queue. This is what
+    # you want to happen.
+    root.warning('Look out!')
+    listener.stop()
+
+which, when run, will produce::
+
+    MainThread: Look out!
+
+
+Optimization
+------------
+
+Formatting of message arguments is deferred until it cannot be avoided.
+However, computing the arguments passed to the logging method can also be
+expensive, and you may want to avoid doing it if the logger will just throw
+away your event. To decide what to do, you can call the :meth:`isEnabledFor`
+method which takes a level argument and returns true if the event would be
+created by the Logger for that level of call. You can write code like this::
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Message with %s, %s", expensive_func1(),
+                                            expensive_func2())
+
+so that if the logger's threshold is set above ``DEBUG``, the calls to
+:func:`expensive_func1` and :func:`expensive_func2` are never made.
+
+There are other optimizations which can be made for specific applications which
+need more precise control over what logging information is collected. Here's a
+list of things you can do to avoid processing during logging which you don't
+need:
+
++-----------------------------------------------+----------------------------------------+
+| What you don't want to collect                | How to avoid collecting it             |
++===============================================+========================================+
+| Information about where calls were made from. | Set ``logging._srcfile`` to ``None``.  |
++-----------------------------------------------+----------------------------------------+
+| Threading information.                        | Set ``logging.logThreads`` to ``0``.   |
++-----------------------------------------------+----------------------------------------+
+| Process information.                          | Set ``logging.logProcesses`` to ``0``. |
++-----------------------------------------------+----------------------------------------+
+
+Also note that the core logging module only includes the basic handlers. If
+you don't import :mod:`logging.handlers` and :mod:`logging.config`, they won't
+take up any memory.
+
+.. _handler:
 
 Handler Objects
 ---------------
@@ -1440,8 +2093,10 @@ subclasses. However, the :meth:`__init__` method in subclasses needs to call
 
 .. method:: Handler.close()
 
-   Tidy up any resources used by the handler. This version does nothing and is
-   intended to be implemented by subclasses.
+   Tidy up any resources used by the handler. This version does no output but
+   removes the handler from an internal list of handlers which is closed when
+   :func:`shutdown` is called. Subclasses should ensure that this gets called
+   from overridden :meth:`close` methods.
 
 
 .. method:: Handler.handle(record)
@@ -1475,6 +2130,8 @@ subclasses. However, the :meth:`__init__` method in subclasses needs to call
    :exc:`NotImplementedError`.
 
 
+.. _stream-handler:
+
 StreamHandler
 ^^^^^^^^^^^^^
 
@@ -1484,9 +2141,11 @@ file-like object (or, more precisely, any object which supports :meth:`write`
 and :meth:`flush` methods).
 
 
-.. class:: StreamHandler([strm])
+.. currentmodule:: logging
 
-   Returns a new instance of the :class:`StreamHandler` class. If *strm* is
+.. class:: StreamHandler(stream=None)
+
+   Returns a new instance of the :class:`StreamHandler` class. If *stream* is
    specified, the instance will use it for logging output; otherwise, *sys.stderr*
    will be used.
 
@@ -1503,8 +2162,15 @@ and :meth:`flush` methods).
 
       Flushes the stream by calling its :meth:`flush` method. Note that the
       :meth:`close` method is inherited from :class:`Handler` and so does
-      nothing, so an explicit :meth:`flush` call may be needed at times.
+      no output, so an explicit :meth:`flush` call may be needed at times.
 
+.. versionchanged:: 3.2
+   The ``StreamHandler`` class now has a ``terminator`` attribute, default
+   value ``"\n"``, which is used as the terminator when writing a formatted
+   record to a stream. If you don't want this newline termination, you can
+   set the handler instance's ``terminator`` attribute to the empty string.
+
+.. _file-handler:
 
 FileHandler
 ^^^^^^^^^^^
@@ -1514,7 +2180,7 @@ sends logging output to a disk file.  It inherits the output functionality from
 :class:`StreamHandler`.
 
 
-.. class:: FileHandler(filename[, mode[, encoding[, delay]]])
+.. class:: FileHandler(filename, mode='a', encoding=None, delay=False)
 
    Returns a new instance of the :class:`FileHandler` class. The specified file is
    opened and used as the stream for logging. If *mode* is not specified,
@@ -1532,9 +2198,46 @@ sends logging output to a disk file.  It inherits the output functionality from
 
       Outputs the record to the file.
 
+.. _null-handler:
+
+NullHandler
+^^^^^^^^^^^
+
+.. versionadded:: 3.1
+
+The :class:`NullHandler` class, located in the core :mod:`logging` package,
+does not do any formatting or output. It is essentially a "no-op" handler
+for use by library developers.
+
+
+.. class:: NullHandler()
+
+   Returns a new instance of the :class:`NullHandler` class.
+
+
+   .. method:: emit(record)
+
+      This method does nothing.
+
+   .. method:: handle(record)
+
+      This method does nothing.
+
+   .. method:: createLock()
+
+      This method returns ``None`` for the lock, since there is no
+      underlying I/O to which access needs to be serialized.
+
+
+See :ref:`library-config` for more information on how to use
+:class:`NullHandler`.
+
+.. _watched-file-handler:
 
 WatchedFileHandler
 ^^^^^^^^^^^^^^^^^^
+
+.. currentmodule:: logging.handlers
 
 The :class:`WatchedFileHandler` class, located in the :mod:`logging.handlers`
 module, is a :class:`FileHandler` which watches the file it is logging to. If
@@ -1569,6 +2272,7 @@ this value.
       changed.  If it has, the existing stream is flushed and closed and the
       file opened again, before outputting the record to the file.
 
+.. _rotating-file-handler:
 
 RotatingFileHandler
 ^^^^^^^^^^^^^^^^^^^
@@ -1577,7 +2281,7 @@ The :class:`RotatingFileHandler` class, located in the :mod:`logging.handlers`
 module, supports rotation of disk log files.
 
 
-.. class:: RotatingFileHandler(filename[, mode[, maxBytes[, backupCount[, encoding[, delay]]]]])
+.. class:: RotatingFileHandler(filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0)
 
    Returns a new instance of the :class:`RotatingFileHandler` class. The specified
    file is opened and used as the stream for logging. If *mode* is not specified,
@@ -1609,6 +2313,7 @@ module, supports rotation of disk log files.
       Outputs the record to the file, catering for rollover as described
       previously.
 
+.. _timed-rotating-file-handler:
 
 TimedRotatingFileHandler
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1618,7 +2323,7 @@ The :class:`TimedRotatingFileHandler` class, located in the
 timed intervals.
 
 
-.. class:: TimedRotatingFileHandler(filename [,when [,interval [,backupCount[, encoding[, delay[, utc]]]]]])
+.. class:: TimedRotatingFileHandler(filename, when='h', interval=1, backupCount=0, encoding=None, delay=False, utc=False)
 
    Returns a new instance of the :class:`TimedRotatingFileHandler` class. The
    specified file is opened and used as the stream for logging. On rotating it also
@@ -1647,7 +2352,12 @@ timed intervals.
    The system will save old log files by appending extensions to the filename.
    The extensions are date-and-time based, using the strftime format
    ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on the
-   rollover interval. 
+   rollover interval.
+
+   When computing the next rollover time for the first time (when the handler
+   is created), the last modification time of an existing log file, or else
+   the current time, is used to compute when the next rotation will occur.
+
    If the *utc* argument is true, times in UTC will be used; otherwise
    local time is used.
 
@@ -1655,6 +2365,9 @@ timed intervals.
    will be kept, and if more would be created when rollover occurs, the oldest
    one is deleted. The deletion logic uses the interval to determine which
    files to delete, so changing the interval may leave old files lying around.
+
+   If *delay* is true, then file opening is deferred until the first call to
+   :meth:`emit`.
 
 
    .. method:: doRollover()
@@ -1666,6 +2379,8 @@ timed intervals.
 
       Outputs the record to the file, catering for rollover as described above.
 
+
+.. _socket-handler:
 
 SocketHandler
 ^^^^^^^^^^^^^
@@ -1713,12 +2428,19 @@ sends logging output to a network socket. The base class uses a TCP socket.
       Pickles the record's attribute dictionary in binary format with a length
       prefix, and returns it ready for transmission across the socket.
 
+      Note that pickles aren't completely secure. If you are concerned about
+      security, you may want to override this method to implement a more secure
+      mechanism. For example, you can sign pickles using HMAC and then verify
+      them on the receiving end, or alternatively you can disable unpickling of
+      global objects on the receiving end.
 
    .. method:: send(packet)
 
       Send a pickled string *packet* to the socket. This function allows for
       partial sends which can happen when the network is busy.
 
+
+.. _datagram-handler:
 
 DatagramHandler
 ^^^^^^^^^^^^^^^
@@ -1753,6 +2475,8 @@ over UDP sockets.
       Send a pickled string to a socket.
 
 
+.. _syslog-handler:
+
 SysLogHandler
 ^^^^^^^^^^^^^
 
@@ -1760,16 +2484,31 @@ The :class:`SysLogHandler` class, located in the :mod:`logging.handlers` module,
 supports sending logging messages to a remote or local Unix syslog.
 
 
-.. class:: SysLogHandler([address[, facility]])
+.. class:: SysLogHandler(address=('localhost', SYSLOG_UDP_PORT), facility=LOG_USER, socktype=socket.SOCK_DGRAM)
 
    Returns a new instance of the :class:`SysLogHandler` class intended to
    communicate with a remote Unix machine whose address is given by *address* in
    the form of a ``(host, port)`` tuple.  If *address* is not specified,
-   ``('localhost', 514)`` is used.  The address is used to open a UDP socket.  An
+   ``('localhost', 514)`` is used.  The address is used to open a socket.  An
    alternative to providing a ``(host, port)`` tuple is providing an address as a
    string, for example "/dev/log". In this case, a Unix domain socket is used to
    send the message to the syslog. If *facility* is not specified,
-   :const:`LOG_USER` is used.
+   :const:`LOG_USER` is used. The type of socket opened depends on the
+   *socktype* argument, which defaults to :const:`socket.SOCK_DGRAM` and thus
+   opens a UDP socket. To open a TCP socket (for use with the newer syslog
+   daemons such as rsyslog), specify a value of :const:`socket.SOCK_STREAM`.
+
+   Note that if your server is not listening on UDP port 514,
+   :class:`SysLogHandler` may appear not to work. In that case, check what
+   address you should be using for a domain socket - it's system dependent.
+   For example, on Linux it's usually "/dev/log" but on OS/X it's
+   "/var/run/syslog". You'll need to check your platform and use the
+   appropriate address (you may need to do this check at runtime if your
+   application needs to run on several platforms). On Windows, you pretty
+   much have to use the UDP option.
+
+   .. versionchanged:: 3.2
+      *socktype* was added.
 
 
    .. method:: close()
@@ -1789,6 +2528,87 @@ supports sending logging messages to a remote or local Unix syslog.
       or integers - if strings are passed, internal mapping dictionaries are
       used to convert them to integers.
 
+      The symbolic ``LOG_`` values are defined in :class:`SysLogHandler` and
+      mirror the values defined in the ``sys/syslog.h`` header file.
+
+      **Priorities**
+
+      +--------------------------+---------------+
+      | Name (string)            | Symbolic value|
+      +==========================+===============+
+      | ``alert``                | LOG_ALERT     |
+      +--------------------------+---------------+
+      | ``crit`` or ``critical`` | LOG_CRIT      |
+      +--------------------------+---------------+
+      | ``debug``                | LOG_DEBUG     |
+      +--------------------------+---------------+
+      | ``emerg`` or ``panic``   | LOG_EMERG     |
+      +--------------------------+---------------+
+      | ``err`` or ``error``     | LOG_ERR       |
+      +--------------------------+---------------+
+      | ``info``                 | LOG_INFO      |
+      +--------------------------+---------------+
+      | ``notice``               | LOG_NOTICE    |
+      +--------------------------+---------------+
+      | ``warn`` or ``warning``  | LOG_WARNING   |
+      +--------------------------+---------------+
+
+      **Facilities**
+
+      +---------------+---------------+
+      | Name (string) | Symbolic value|
+      +===============+===============+
+      | ``auth``      | LOG_AUTH      |
+      +---------------+---------------+
+      | ``authpriv``  | LOG_AUTHPRIV  |
+      +---------------+---------------+
+      | ``cron``      | LOG_CRON      |
+      +---------------+---------------+
+      | ``daemon``    | LOG_DAEMON    |
+      +---------------+---------------+
+      | ``ftp``       | LOG_FTP       |
+      +---------------+---------------+
+      | ``kern``      | LOG_KERN      |
+      +---------------+---------------+
+      | ``lpr``       | LOG_LPR       |
+      +---------------+---------------+
+      | ``mail``      | LOG_MAIL      |
+      +---------------+---------------+
+      | ``news``      | LOG_NEWS      |
+      +---------------+---------------+
+      | ``syslog``    | LOG_SYSLOG    |
+      +---------------+---------------+
+      | ``user``      | LOG_USER      |
+      +---------------+---------------+
+      | ``uucp``      | LOG_UUCP      |
+      +---------------+---------------+
+      | ``local0``    | LOG_LOCAL0    |
+      +---------------+---------------+
+      | ``local1``    | LOG_LOCAL1    |
+      +---------------+---------------+
+      | ``local2``    | LOG_LOCAL2    |
+      +---------------+---------------+
+      | ``local3``    | LOG_LOCAL3    |
+      +---------------+---------------+
+      | ``local4``    | LOG_LOCAL4    |
+      +---------------+---------------+
+      | ``local5``    | LOG_LOCAL5    |
+      +---------------+---------------+
+      | ``local6``    | LOG_LOCAL6    |
+      +---------------+---------------+
+      | ``local7``    | LOG_LOCAL7    |
+      +---------------+---------------+
+
+   .. method:: mapPriority(levelname)
+
+      Maps a logging level name to a syslog priority name.
+      You may need to override this if you are using custom levels, or
+      if the default algorithm is not suitable for your needs. The
+      default algorithm maps ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR`` and
+      ``CRITICAL`` to the equivalent syslog names, and all other level
+      names to "warning".
+
+.. _nt-eventlog-handler:
 
 NTEventLogHandler
 ^^^^^^^^^^^^^^^^^
@@ -1799,7 +2619,7 @@ Windows XP event log. Before you can use it, you need Mark Hammond's Win32
 extensions for Python installed.
 
 
-.. class:: NTEventLogHandler(appname[, dllname[, logtype]])
+.. class:: NTEventLogHandler(appname, dllname=None, logtype='Application')
 
    Returns a new instance of the :class:`NTEventLogHandler` class. The *appname* is
    used to define the application name as it appears in the event log. An
@@ -1821,7 +2641,7 @@ extensions for Python installed.
       source of event log entries. However, if you do this, you will not be able
       to see the events as you intended in the Event Log Viewer - it needs to be
       able to access the registry to get the .dll name. The current version does
-      not do this (in fact it doesn't do anything).
+      not do this.
 
 
    .. method:: emit(record)
@@ -1855,6 +2675,7 @@ extensions for Python installed.
       lookup to get the message ID. This version returns 1, which is the base
       message ID in :file:`win32service.pyd`.
 
+.. _smtp-handler:
 
 SMTPHandler
 ^^^^^^^^^^^
@@ -1863,7 +2684,7 @@ The :class:`SMTPHandler` class, located in the :mod:`logging.handlers` module,
 supports sending logging messages to an email address via SMTP.
 
 
-.. class:: SMTPHandler(mailhost, fromaddr, toaddrs, subject[, credentials])
+.. class:: SMTPHandler(mailhost, fromaddr, toaddrs, subject, credentials=None)
 
    Returns a new instance of the :class:`SMTPHandler` class. The instance is
    initialized with the from and to addresses and subject line of the email. The
@@ -1883,6 +2704,7 @@ supports sending logging messages to an email address via SMTP.
       If you want to specify a subject line which is record-dependent, override
       this method.
 
+.. _memory-handler:
 
 MemoryHandler
 ^^^^^^^^^^^^^
@@ -1922,7 +2744,7 @@ should, then :meth:`flush` is expected to do the needful.
       overridden to implement custom flushing strategies.
 
 
-.. class:: MemoryHandler(capacity[, flushLevel [, target]])
+.. class:: MemoryHandler(capacity, flushLevel=ERROR, target=None)
 
    Returns a new instance of the :class:`MemoryHandler` class. The instance is
    initialized with a buffer size of *capacity*. If *flushLevel* is not specified,
@@ -1939,8 +2761,8 @@ should, then :meth:`flush` is expected to do the needful.
    .. method:: flush()
 
       For a :class:`MemoryHandler`, flushing means just sending the buffered
-      records to the target, if there is one. Override if you want different
-      behavior.
+      records to the target, if there is one. The buffer is also cleared when
+      this happens. Override if you want different behavior.
 
 
    .. method:: setTarget(target)
@@ -1953,6 +2775,8 @@ should, then :meth:`flush` is expected to do the needful.
       Checks for buffer full or a record at the *flushLevel* or higher.
 
 
+.. _http-handler:
+
 HTTPHandler
 ^^^^^^^^^^^
 
@@ -1961,23 +2785,209 @@ supports sending logging messages to a Web server, using either ``GET`` or
 ``POST`` semantics.
 
 
-.. class:: HTTPHandler(host, url[, method])
+.. class:: HTTPHandler(host, url, method='GET', secure=False, credentials=None)
 
-   Returns a new instance of the :class:`HTTPHandler` class. The instance is
-   initialized with a host address, url and HTTP method. The *host* can be of the
-   form ``host:port``, should you need to use a specific port number. If no
-   *method* is specified, ``GET`` is used.
+   Returns a new instance of the :class:`HTTPHandler` class. The *host* can be
+   of the form ``host:port``, should you need to use a specific port number.
+   If no *method* is specified, ``GET`` is used. If *secure* is True, an HTTPS
+   connection will be used. If *credentials* is specified, it should be a
+   2-tuple consisting of userid and password, which will be placed in an HTTP
+   'Authorization' header using Basic authentication. If you specify
+   credentials, you should also specify secure=True so that your userid and
+   password are not passed in cleartext across the wire.
 
 
    .. method:: emit(record)
 
-      Sends the record to the Web server as an URL-encoded dictionary.
+      Sends the record to the Web server as a percent-encoded dictionary.
 
+
+.. _queue-handler:
+
+
+QueueHandler
+^^^^^^^^^^^^
+
+The :class:`QueueHandler` class, located in the :mod:`logging.handlers` module,
+supports sending logging messages to a queue, such as those implemented in the
+:mod:`queue` or :mod:`multiprocessing` modules.
+
+Along with the :class:`QueueListener` class, :class:`QueueHandler` can be used
+to let handlers do their work on a separate thread from the one which does the
+logging. This is important in Web applications and also other service
+applications where threads servicing clients need to respond as quickly as
+possible, while any potentially slow operations (such as sending an email via
+:class:`SMTPHandler`) are done on a separate thread.
+
+.. class:: QueueHandler(queue)
+
+   Returns a new instance of the :class:`QueueHandler` class. The instance is
+   initialized with the queue to send messages to. The queue can be any queue-
+   like object; it's used as-is by the :meth:`enqueue` method, which needs
+   to know how to send messages to it.
+
+
+   .. method:: emit(record)
+
+      Enqueues the result of preparing the LogRecord.
+
+   .. method:: prepare(record)
+
+      Prepares a record for queuing. The object returned by this
+      method is enqueued.
+
+      The base implementation formats the record to merge the message
+      and arguments, and removes unpickleable items from the record
+      in-place.
+
+      You might want to override this method if you want to convert
+      the record to a dict or JSON string, or send a modified copy
+      of the record while leaving the original intact.
+
+   .. method:: enqueue(record)
+
+      Enqueues the record on the queue using ``put_nowait()``; you may
+      want to override this if you want to use blocking behaviour, or a
+      timeout, or a customised queue implementation.
+
+
+.. versionadded:: 3.2
+
+The :class:`QueueHandler` class was not present in previous versions.
+
+.. queue-listener:
+
+QueueListener
+^^^^^^^^^^^^^
+
+The :class:`QueueListener` class, located in the :mod:`logging.handlers`
+module, supports receiving logging messages from a queue, such as those
+implemented in the :mod:`queue` or :mod:`multiprocessing` modules. The
+messages are received from a queue in an internal thread and passed, on
+the same thread, to one or more handlers for processing.
+
+Along with the :class:`QueueHandler` class, :class:`QueueListener` can be used
+to let handlers do their work on a separate thread from the one which does the
+logging. This is important in Web applications and also other service
+applications where threads servicing clients need to respond as quickly as
+possible, while any potentially slow operations (such as sending an email via
+:class:`SMTPHandler`) are done on a separate thread.
+
+.. class:: QueueListener(queue, *handlers)
+
+   Returns a new instance of the :class:`QueueListener` class. The instance is
+   initialized with the queue to send messages to and a list of handlers which
+   will handle entries placed on the queue. The queue can be any queue-
+   like object; it's passed as-is to the :meth:`dequeue` method, which needs
+   to know how to get messages from it.
+
+   .. method:: dequeue(block)
+
+      Dequeues a record and return it, optionally blocking.
+
+      The base implementation uses ``get()``. You may want to override this
+      method if you want to use timeouts or work with custom queue
+      implementations.
+
+   .. method:: prepare(record)
+
+      Prepare a record for handling.
+
+      This implementation just returns the passed-in record. You may want to
+      override this method if you need to do any custom marshalling or
+      manipulation of the record before passing it to the handlers.
+
+   .. method:: handle(record)
+
+      Handle a record.
+
+      This just loops through the handlers offering them the record
+      to handle. The actual object passed to the handlers is that which
+      is returned from :meth:`prepare`.
+
+   .. method:: start()
+
+      Starts the listener.
+
+      This starts up a background thread to monitor the queue for
+      LogRecords to process.
+
+   .. method:: stop()
+
+      Stops the listener.
+
+      This asks the thread to terminate, and then waits for it to do so.
+      Note that if you don't call this before your application exits, there
+      may be some records still left on the queue, which won't be processed.
+
+.. versionadded:: 3.2
+
+The :class:`QueueListener` class was not present in previous versions.
+
+.. _zeromq-handlers:
+
+Subclassing QueueHandler
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can use a :class:`QueueHandler` subclass to send messages to other kinds
+of queues, for example a ZeroMQ "publish" socket. In the example below,the
+socket is created separately and passed to the handler (as its 'queue')::
+
+    import zmq # using pyzmq, the Python binding for ZeroMQ
+    import json # for serializing records portably
+
+    ctx = zmq.Context()
+    sock = zmq.Socket(ctx, zmq.PUB) # or zmq.PUSH, or other suitable value
+    sock.bind('tcp://*:5556') # or wherever
+
+    class ZeroMQSocketHandler(QueueHandler):
+        def enqueue(self, record):
+            data = json.dumps(record.__dict__)
+            self.queue.send(data)
+
+    handler = ZeroMQSocketHandler(sock)
+
+
+Of course there are other ways of organizing this, for example passing in the
+data needed by the handler to create the socket::
+
+    class ZeroMQSocketHandler(QueueHandler):
+        def __init__(self, uri, socktype=zmq.PUB, ctx=None):
+            self.ctx = ctx or zmq.Context()
+            socket = zmq.Socket(self.ctx, socktype)
+            socket.bind(uri)
+            QueueHandler.__init__(self, socket)
+
+        def enqueue(self, record):
+            data = json.dumps(record.__dict__)
+            self.queue.send(data)
+
+        def close(self):
+            self.queue.close()
+
+Subclassing QueueListener
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can also subclass :class:`QueueListener` to get messages from other kinds
+of queues, for example a ZeroMQ "subscribe" socket. Here's an example::
+
+    class ZeroMQSocketListener(QueueListener):
+        def __init__(self, uri, *handlers, **kwargs):
+            self.ctx = kwargs.get('ctx') or zmq.Context()
+            socket = zmq.Socket(self.ctx, zmq.SUB)
+            socket.setsockopt(zmq.SUBSCRIBE, '') # subscribe to everything
+            socket.connect(uri)
+
+        def dequeue(self):
+            msg = self.queue.recv()
+            return logging.makeLogRecord(json.loads(msg))
 
 .. _formatter-objects:
 
 Formatter Objects
 -----------------
+
+.. currentmodule:: logging
 
 :class:`Formatter`\ s have the following attributes and methods. They are
 responsible for converting a :class:`LogRecord` to (usually) a string which can
@@ -1989,7 +2999,7 @@ A Formatter can be initialized with a format string which makes use of knowledge
 of the :class:`LogRecord` attributes - such as the default value mentioned above
 making use of the fact that the user's message and arguments are pre-formatted
 into a :class:`LogRecord`'s *message* attribute.  This format string contains
-standard python %-style mapping keys. See section :ref:`old-string-formatting`
+standard Python %-style mapping keys. See section :ref:`old-string-formatting`
 for more information on string formatting.
 
 Currently, the useful mapping keys in a :class:`LogRecord` are:
@@ -2042,19 +3052,20 @@ Currently, the useful mapping keys in a :class:`LogRecord` are:
 +-------------------------+-----------------------------------------------+
 | ``%(process)d``         | Process ID (if available).                    |
 +-------------------------+-----------------------------------------------+
+| ``%(processName)s``     | Process name (if available).                  |
++-------------------------+-----------------------------------------------+
 | ``%(message)s``         | The logged message, computed as ``msg %       |
 |                         | args``.                                       |
 +-------------------------+-----------------------------------------------+
 
 
-.. class:: Formatter([fmt[, datefmt]])
+.. class:: Formatter(fmt=None, datefmt=None)
 
-   Returns a new instance of the :class:`Formatter` class. The instance is
-   initialized with a format string for the message as a whole, as well as a format
-   string for the date/time portion of a message. If no *fmt* is specified,
-   ``'%(message)s'`` is used. If no *datefmt* is specified, the ISO8601 date format
-   is used.
-
+   Returns a new instance of the :class:`Formatter` class.  The instance is
+   initialized with a format string for the message as a whole, as well as a
+   format string for the date/time portion of a message.  If no *fmt* is
+   specified, ``'%(message)s'`` is used.  If no *datefmt* is specified, the
+   ISO8601 date format is used.
 
    .. method:: format(record)
 
@@ -2074,8 +3085,11 @@ Currently, the useful mapping keys in a :class:`LogRecord` are:
       formatter to handle the event doesn't use the cached value but
       recalculates it afresh.
 
+      If stack information is available, it's appended after the exception
+      information, using :meth:`formatStack` to transform it if necessary.
 
-   .. method:: formatTime(record[, datefmt])
+
+   .. method:: formatTime(record, datefmt=None)
 
       This method should be called from :meth:`format` by a formatter which
       wants to make use of a formatted time. This method can be overridden in
@@ -2093,23 +3107,30 @@ Currently, the useful mapping keys in a :class:`LogRecord` are:
       just uses :func:`traceback.print_exception`. The resulting string is
       returned.
 
+   .. method:: formatStack(stack_info)
+
+      Formats the specified stack information (a string as returned by
+      :func:`traceback.print_stack`, but with the last newline removed) as a
+      string. This default implementation just returns the input value.
+
+.. _filter:
 
 Filter Objects
 --------------
 
-:class:`Filter`\ s can be used by :class:`Handler`\ s and :class:`Logger`\ s for
-more sophisticated filtering than is provided by levels. The base filter class
-only allows events which are below a certain point in the logger hierarchy. For
-example, a filter initialized with "A.B" will allow events logged by loggers
-"A.B", "A.B.C", "A.B.C.D", "A.B.D" etc. but not "A.BB", "B.A.B" etc. If
-initialized with the empty string, all events are passed.
+``Filters`` can be used by ``Handlers`` and ``Loggers`` for more sophisticated
+filtering than is provided by levels. The base filter class only allows events
+which are below a certain point in the logger hierarchy. For example, a filter
+initialized with "A.B" will allow events logged by loggers "A.B", "A.B.C",
+"A.B.C.D", "A.B.D" etc. but not "A.BB", "B.A.B" etc. If initialized with the
+empty string, all events are passed.
 
 
-.. class:: Filter([name])
+.. class:: Filter(name='')
 
    Returns an instance of the :class:`Filter` class. If *name* is specified, it
    names a logger which, together with its children, will have its events allowed
-   through the filter. If no name is specified, allows every event.
+   through the filter. If *name* is the empty string, allows every event.
 
 
    .. method:: filter(record)
@@ -2118,37 +3139,112 @@ initialized with the empty string, all events are passed.
       yes. If deemed appropriate, the record may be modified in-place by this
       method.
 
+Note that filters attached to handlers are consulted whenever an event is
+emitted by the handler, whereas filters attached to loggers are consulted
+whenever an event is logged to the handler (using :meth:`debug`, :meth:`info`,
+etc.) This means that events which have been generated by descendant loggers
+will not be filtered by a logger's filter setting, unless the filter has also
+been applied to those descendant loggers.
+
+You don't actually need to subclass ``Filter``: you can pass any instance
+which has a ``filter`` method with the same semantics.
+
+.. versionchanged:: 3.2
+   You don't need to create specialized ``Filter`` classes, or use other
+   classes with a ``filter`` method: you can use a function (or other
+   callable) as a filter. The filtering logic will check to see if the filter
+   object has a ``filter`` attribute: if it does, it's assumed to be a
+   ``Filter`` and its :meth:`~Filter.filter` method is called. Otherwise, it's
+   assumed to be a callable and called with the record as the single
+   parameter. The returned value should conform to that returned by
+   :meth:`~Filter.filter`.
+
+Other uses for filters
+^^^^^^^^^^^^^^^^^^^^^^
+
+Although filters are used primarily to filter records based on more
+sophisticated criteria than levels, they get to see every record which is
+processed by the handler or logger they're attached to: this can be useful if
+you want to do things like counting how many records were processed by a
+particular logger or handler, or adding, changing or removing attributes in
+the LogRecord being processed. Obviously changing the LogRecord needs to be
+done with some care, but it does allow the injection of contextual information
+into logs (see :ref:`filters-contextual`).
+
+.. _log-record:
 
 LogRecord Objects
 -----------------
 
-:class:`LogRecord` instances are created every time something is logged. They
-contain all the information pertinent to the event being logged. The main
-information passed in is in msg and args, which are combined using msg % args to
-create the message field of the record. The record also includes information
-such as when the record was created, the source line where the logging call was
-made, and any exception information to be logged.
+:class:`LogRecord` instances are created automatically by the :class:`Logger`
+every time something is logged, and can be created manually via
+:func:`makeLogRecord` (for example, from a pickled event received over the
+wire).
 
 
-.. class:: LogRecord(name, lvl, pathname, lineno, msg, args, exc_info [, func])
+.. class:: LogRecord(name, lvl, pathname, lineno, msg, args, exc_info, func=None, sinfo=None)
 
-   Returns an instance of :class:`LogRecord` initialized with interesting
-   information. The *name* is the logger name; *lvl* is the numeric level;
-   *pathname* is the absolute pathname of the source file in which the logging
-   call was made; *lineno* is the line number in that file where the logging
-   call is found; *msg* is the user-supplied message (a format string); *args*
-   is the tuple which, together with *msg*, makes up the user message; and
-   *exc_info* is the exception tuple obtained by calling :func:`sys.exc_info`
-   (or :const:`None`, if no exception information is available). The *func* is
-   the name of the function from which the logging call was made. If not
-   specified, it defaults to ``None``.
+   Contains all the information pertinent to the event being logged.
 
+   The primary information is passed in :attr:`msg` and :attr:`args`, which
+   are combined using ``msg % args`` to create the :attr:`message` field of the
+   record.
+
+   .. attribute:: args
+
+      Tuple of arguments to be used in formatting :attr:`msg`.
+
+   .. attribute:: exc_info
+
+      Exception tuple (à la :func:`sys.exc_info`) or ``None`` if no exception
+      information is available.
+
+   .. attribute:: func
+
+      Name of the function of origin (i.e. in which the logging call was made).
+
+   .. attribute:: lineno
+
+      Line number in the source file of origin.
+
+   .. attribute:: lvl
+
+      Numeric logging level.
+
+   .. attribute:: message
+
+      Bound to the result of :meth:`getMessage` when
+      :meth:`Formatter.format(record)<Formatter.format>` is invoked.
+
+   .. attribute:: msg
+
+      User-supplied :ref:`format string<string-formatting>` or arbitrary object
+      (see :ref:`arbitrary-object-messages`) used in :meth:`getMessage`.
+
+   .. attribute:: name
+
+      Name of the logger that emitted the record.
+
+   .. attribute:: pathname
+
+      Absolute pathname of the source file of origin.
+
+   .. attribute:: stack_info
+
+      Stack frame information (where available) from the bottom of the stack
+      in the current thread, up to and including the stack frame of the
+      logging call which resulted in the creation of this record.
 
    .. method:: getMessage()
 
       Returns the message for this :class:`LogRecord` instance after merging any
-      user-supplied arguments with the message.
+      user-supplied arguments with the message. If the user-supplied message
+      argument to the logging call is not a string, :func:`str` is called on it to
+      convert it to a string. This allows use of user-defined classes as
+      messages, whose ``__str__`` method can return the actual format string to
+      be used.
 
+.. _logger-adapter:
 
 LoggerAdapter Objects
 ---------------------
@@ -2172,11 +3268,18 @@ __ context-info_
     'extra'. The return value is a (*msg*, *kwargs*) tuple which has the
     (possibly modified) versions of the arguments passed in.
 
-In addition to the above, :class:`LoggerAdapter` supports all the logging
+In addition to the above, :class:`LoggerAdapter` supports the following
 methods of :class:`Logger`, i.e. :meth:`debug`, :meth:`info`, :meth:`warning`,
-:meth:`error`, :meth:`exception`, :meth:`critical` and :meth:`log`. These
-methods have the same signatures as their counterparts in :class:`Logger`, so
-you can use the two types of instances interchangeably.
+:meth:`error`, :meth:`exception`, :meth:`critical`, :meth:`log`,
+:meth:`isEnabledFor`, :meth:`getEffectiveLevel`, :meth:`setLevel`,
+:meth:`hasHandlers`. These methods have the same signatures as their
+counterparts in :class:`Logger`, so you can use the two types of instances
+interchangeably.
+
+.. versionchanged:: 3.2
+   The :meth:`isEnabledFor`, :meth:`getEffectiveLevel`, :meth:`setLevel` and
+   :meth:`hasHandlers` methods were added to :class:`LoggerAdapter`.  These
+   methods delegate to the underlying logger.
 
 
 Thread Safety
@@ -2186,6 +3289,32 @@ The logging module is intended to be thread-safe without any special work
 needing to be done by its clients. It achieves this though using threading
 locks; there is one lock to serialize access to the module's shared data, and
 each handler also creates a lock to serialize access to its underlying I/O.
+
+If you are implementing asynchronous signal handlers using the :mod:`signal`
+module, you may not be able to use logging from within such handlers. This is
+because lock implementations in the :mod:`threading` module are not always
+re-entrant, and so cannot be invoked from such signal handlers.
+
+
+Integration with the warnings module
+------------------------------------
+
+The :func:`captureWarnings` function can be used to integrate :mod:`logging`
+with the :mod:`warnings` module.
+
+.. function:: captureWarnings(capture)
+
+   This function is used to turn the capture of warnings by logging on and
+   off.
+
+   If *capture* is ``True``, warnings issued by the :mod:`warnings` module will
+   be redirected to the logging system. Specifically, a warning will be
+   formatted using :func:`warnings.formatwarning` and the resulting string
+   logged to a logger named "py.warnings" with a severity of `WARNING`.
+
+   If *capture* is ``False``, the redirection of warnings to the logging system
+   will stop, and warnings will be redirected to their original destinations
+   (i.e. those in effect before `captureWarnings(True)` was called).
 
 
 Configuration
@@ -2203,18 +3332,59 @@ logging module using these functions or by making calls to the main API (defined
 in :mod:`logging` itself) and defining handlers which are declared either in
 :mod:`logging` or :mod:`logging.handlers`.
 
+.. function:: dictConfig(config)
+
+    Takes the logging configuration from a dictionary.  The contents of
+    this dictionary are described in :ref:`logging-config-dictschema`
+    below.
+
+    If an error is encountered during configuration, this function will
+    raise a :exc:`ValueError`, :exc:`TypeError`, :exc:`AttributeError`
+    or :exc:`ImportError` with a suitably descriptive message.  The
+    following is a (possibly incomplete) list of conditions which will
+    raise an error:
+
+    * A ``level`` which is not a string or which is a string not
+      corresponding to an actual logging level.
+    * A ``propagate`` value which is not a boolean.
+    * An id which does not have a corresponding destination.
+    * A non-existent handler id found during an incremental call.
+    * An invalid logger name.
+    * Inability to resolve to an internal or external object.
+
+    Parsing is performed by the :class:`DictConfigurator` class, whose
+    constructor is passed the dictionary used for configuration, and
+    has a :meth:`configure` method.  The :mod:`logging.config` module
+    has a callable attribute :attr:`dictConfigClass`
+    which is initially set to :class:`DictConfigurator`.
+    You can replace the value of :attr:`dictConfigClass` with a
+    suitable implementation of your own.
+
+    :func:`dictConfig` calls :attr:`dictConfigClass` passing
+    the specified dictionary, and then calls the :meth:`configure` method on
+    the returned object to put the configuration into effect::
+
+          def dictConfig(config):
+              dictConfigClass(config).configure()
+
+    For example, a subclass of :class:`DictConfigurator` could call
+    ``DictConfigurator.__init__()`` in its own :meth:`__init__()`, then
+    set up custom prefixes which would be usable in the subsequent
+    :meth:`configure` call. :attr:`dictConfigClass` would be bound to
+    this new subclass, and then :func:`dictConfig` could be called exactly as
+    in the default, uncustomized state.
 
 .. function:: fileConfig(fname[, defaults])
 
    Reads the logging configuration from a :mod:`configparser`\-format file named
-   *fname*.  This function can be called several times from an application,
-   allowing an end user the ability to select from various pre-canned
+   *fname*. This function can be called several times from an application,
+   allowing an end user to select from various pre-canned
    configurations (if the developer provides a mechanism to present the choices
    and load the chosen configuration). Defaults to be passed to the ConfigParser
    can be specified in the *defaults* argument.
 
 
-.. function:: listen([port])
+.. function:: listen(port=DEFAULT_LOGGING_CONFIG_PORT)
 
    Starts up a socket server on the specified port, and listens for new
    configurations. If no port is specified, the module's default
@@ -2236,25 +3406,419 @@ in :mod:`logging` itself) and defining handlers which are declared either in
    :func:`listen`.
 
 
+.. _logging-config-dictschema:
+
+Configuration dictionary schema
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Describing a logging configuration requires listing the various
+objects to create and the connections between them; for example, you
+may create a handler named "console" and then say that the logger
+named "startup" will send its messages to the "console" handler.
+These objects aren't limited to those provided by the :mod:`logging`
+module because you might write your own formatter or handler class.
+The parameters to these classes may also need to include external
+objects such as ``sys.stderr``.  The syntax for describing these
+objects and connections is defined in :ref:`logging-config-dict-connections`
+below.
+
+Dictionary Schema Details
+"""""""""""""""""""""""""
+
+The dictionary passed to :func:`dictConfig` must contain the following
+keys:
+
+* *version* - to be set to an integer value representing the schema
+  version.  The only valid value at present is 1, but having this key
+  allows the schema to evolve while still preserving backwards
+  compatibility.
+
+All other keys are optional, but if present they will be interpreted
+as described below.  In all cases below where a 'configuring dict' is
+mentioned, it will be checked for the special ``'()'`` key to see if a
+custom instantiation is required.  If so, the mechanism described in
+:ref:`logging-config-dict-userdef` below is used to create an instance;
+otherwise, the context is used to determine what to instantiate.
+
+* *formatters* - the corresponding value will be a dict in which each
+  key is a formatter id and each value is a dict describing how to
+  configure the corresponding Formatter instance.
+
+  The configuring dict is searched for keys ``format`` and ``datefmt``
+  (with defaults of ``None``) and these are used to construct a
+  :class:`logging.Formatter` instance.
+
+* *filters* - the corresponding value will be a dict in which each key
+  is a filter id and each value is a dict describing how to configure
+  the corresponding Filter instance.
+
+  The configuring dict is searched for the key ``name`` (defaulting to the
+  empty string) and this is used to construct a :class:`logging.Filter`
+  instance.
+
+* *handlers* - the corresponding value will be a dict in which each
+  key is a handler id and each value is a dict describing how to
+  configure the corresponding Handler instance.
+
+  The configuring dict is searched for the following keys:
+
+  * ``class`` (mandatory).  This is the fully qualified name of the
+    handler class.
+
+  * ``level`` (optional).  The level of the handler.
+
+  * ``formatter`` (optional).  The id of the formatter for this
+    handler.
+
+  * ``filters`` (optional).  A list of ids of the filters for this
+    handler.
+
+  All *other* keys are passed through as keyword arguments to the
+  handler's constructor.  For example, given the snippet::
+
+      handlers:
+        console:
+          class : logging.StreamHandler
+          formatter: brief
+          level   : INFO
+          filters: [allow_foo]
+          stream  : ext://sys.stdout
+        file:
+          class : logging.handlers.RotatingFileHandler
+          formatter: precise
+          filename: logconfig.log
+          maxBytes: 1024
+          backupCount: 3
+
+  the handler with id ``console`` is instantiated as a
+  :class:`logging.StreamHandler`, using ``sys.stdout`` as the underlying
+  stream.  The handler with id ``file`` is instantiated as a
+  :class:`logging.handlers.RotatingFileHandler` with the keyword arguments
+  ``filename='logconfig.log', maxBytes=1024, backupCount=3``.
+
+* *loggers* - the corresponding value will be a dict in which each key
+  is a logger name and each value is a dict describing how to
+  configure the corresponding Logger instance.
+
+  The configuring dict is searched for the following keys:
+
+  * ``level`` (optional).  The level of the logger.
+
+  * ``propagate`` (optional).  The propagation setting of the logger.
+
+  * ``filters`` (optional).  A list of ids of the filters for this
+    logger.
+
+  * ``handlers`` (optional).  A list of ids of the handlers for this
+    logger.
+
+  The specified loggers will be configured according to the level,
+  propagation, filters and handlers specified.
+
+* *root* - this will be the configuration for the root logger.
+  Processing of the configuration will be as for any logger, except
+  that the ``propagate`` setting will not be applicable.
+
+* *incremental* - whether the configuration is to be interpreted as
+  incremental to the existing configuration.  This value defaults to
+  ``False``, which means that the specified configuration replaces the
+  existing configuration with the same semantics as used by the
+  existing :func:`fileConfig` API.
+
+  If the specified value is ``True``, the configuration is processed
+  as described in the section on :ref:`logging-config-dict-incremental`.
+
+* *disable_existing_loggers* - whether any existing loggers are to be
+  disabled. This setting mirrors the parameter of the same name in
+  :func:`fileConfig`. If absent, this parameter defaults to ``True``.
+  This value is ignored if *incremental* is ``True``.
+
+.. _logging-config-dict-incremental:
+
+Incremental Configuration
+"""""""""""""""""""""""""
+
+It is difficult to provide complete flexibility for incremental
+configuration.  For example, because objects such as filters
+and formatters are anonymous, once a configuration is set up, it is
+not possible to refer to such anonymous objects when augmenting a
+configuration.
+
+Furthermore, there is not a compelling case for arbitrarily altering
+the object graph of loggers, handlers, filters, formatters at
+run-time, once a configuration is set up; the verbosity of loggers and
+handlers can be controlled just by setting levels (and, in the case of
+loggers, propagation flags).  Changing the object graph arbitrarily in
+a safe way is problematic in a multi-threaded environment; while not
+impossible, the benefits are not worth the complexity it adds to the
+implementation.
+
+Thus, when the ``incremental`` key of a configuration dict is present
+and is ``True``, the system will completely ignore any ``formatters`` and
+``filters`` entries, and process only the ``level``
+settings in the ``handlers`` entries, and the ``level`` and
+``propagate`` settings in the ``loggers`` and ``root`` entries.
+
+Using a value in the configuration dict lets configurations to be sent
+over the wire as pickled dicts to a socket listener. Thus, the logging
+verbosity of a long-running application can be altered over time with
+no need to stop and restart the application.
+
+.. _logging-config-dict-connections:
+
+Object connections
+""""""""""""""""""
+
+The schema describes a set of logging objects - loggers,
+handlers, formatters, filters - which are connected to each other in
+an object graph.  Thus, the schema needs to represent connections
+between the objects.  For example, say that, once configured, a
+particular logger has attached to it a particular handler.  For the
+purposes of this discussion, we can say that the logger represents the
+source, and the handler the destination, of a connection between the
+two.  Of course in the configured objects this is represented by the
+logger holding a reference to the handler.  In the configuration dict,
+this is done by giving each destination object an id which identifies
+it unambiguously, and then using the id in the source object's
+configuration to indicate that a connection exists between the source
+and the destination object with that id.
+
+So, for example, consider the following YAML snippet::
+
+    formatters:
+      brief:
+        # configuration for formatter with id 'brief' goes here
+      precise:
+        # configuration for formatter with id 'precise' goes here
+    handlers:
+      h1: #This is an id
+       # configuration of handler with id 'h1' goes here
+       formatter: brief
+      h2: #This is another id
+       # configuration of handler with id 'h2' goes here
+       formatter: precise
+    loggers:
+      foo.bar.baz:
+        # other configuration for logger 'foo.bar.baz'
+        handlers: [h1, h2]
+
+(Note: YAML used here because it's a little more readable than the
+equivalent Python source form for the dictionary.)
+
+The ids for loggers are the logger names which would be used
+programmatically to obtain a reference to those loggers, e.g.
+``foo.bar.baz``.  The ids for Formatters and Filters can be any string
+value (such as ``brief``, ``precise`` above) and they are transient,
+in that they are only meaningful for processing the configuration
+dictionary and used to determine connections between objects, and are
+not persisted anywhere when the configuration call is complete.
+
+The above snippet indicates that logger named ``foo.bar.baz`` should
+have two handlers attached to it, which are described by the handler
+ids ``h1`` and ``h2``. The formatter for ``h1`` is that described by id
+``brief``, and the formatter for ``h2`` is that described by id
+``precise``.
+
+
+.. _logging-config-dict-userdef:
+
+User-defined objects
+""""""""""""""""""""
+
+The schema supports user-defined objects for handlers, filters and
+formatters.  (Loggers do not need to have different types for
+different instances, so there is no support in this configuration
+schema for user-defined logger classes.)
+
+Objects to be configured are described by dictionaries
+which detail their configuration.  In some places, the logging system
+will be able to infer from the context how an object is to be
+instantiated, but when a user-defined object is to be instantiated,
+the system will not know how to do this.  In order to provide complete
+flexibility for user-defined object instantiation, the user needs
+to provide a 'factory' - a callable which is called with a
+configuration dictionary and which returns the instantiated object.
+This is signalled by an absolute import path to the factory being
+made available under the special key ``'()'``.  Here's a concrete
+example::
+
+    formatters:
+      brief:
+        format: '%(message)s'
+      default:
+        format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      custom:
+          (): my.package.customFormatterFactory
+          bar: baz
+          spam: 99.9
+          answer: 42
+
+The above YAML snippet defines three formatters.  The first, with id
+``brief``, is a standard :class:`logging.Formatter` instance with the
+specified format string.  The second, with id ``default``, has a
+longer format and also defines the time format explicitly, and will
+result in a :class:`logging.Formatter` initialized with those two format
+strings.  Shown in Python source form, the ``brief`` and ``default``
+formatters have configuration sub-dictionaries::
+
+    {
+      'format' : '%(message)s'
+    }
+
+and::
+
+    {
+      'format' : '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+      'datefmt' : '%Y-%m-%d %H:%M:%S'
+    }
+
+respectively, and as these dictionaries do not contain the special key
+``'()'``, the instantiation is inferred from the context: as a result,
+standard :class:`logging.Formatter` instances are created.  The
+configuration sub-dictionary for the third formatter, with id
+``custom``, is::
+
+  {
+    '()' : 'my.package.customFormatterFactory',
+    'bar' : 'baz',
+    'spam' : 99.9,
+    'answer' : 42
+  }
+
+and this contains the special key ``'()'``, which means that
+user-defined instantiation is wanted.  In this case, the specified
+factory callable will be used. If it is an actual callable it will be
+used directly - otherwise, if you specify a string (as in the example)
+the actual callable will be located using normal import mechanisms.
+The callable will be called with the **remaining** items in the
+configuration sub-dictionary as keyword arguments.  In the above
+example, the formatter with id ``custom`` will be assumed to be
+returned by the call::
+
+    my.package.customFormatterFactory(bar='baz', spam=99.9, answer=42)
+
+The key ``'()'`` has been used as the special key because it is not a
+valid keyword parameter name, and so will not clash with the names of
+the keyword arguments used in the call.  The ``'()'`` also serves as a
+mnemonic that the corresponding value is a callable.
+
+
+.. _logging-config-dict-externalobj:
+
+Access to external objects
+""""""""""""""""""""""""""
+
+There are times where a configuration needs to refer to objects
+external to the configuration, for example ``sys.stderr``.  If the
+configuration dict is constructed using Python code, this is
+straightforward, but a problem arises when the configuration is
+provided via a text file (e.g. JSON, YAML).  In a text file, there is
+no standard way to distinguish ``sys.stderr`` from the literal string
+``'sys.stderr'``.  To facilitate this distinction, the configuration
+system looks for certain special prefixes in string values and
+treat them specially.  For example, if the literal string
+``'ext://sys.stderr'`` is provided as a value in the configuration,
+then the ``ext://`` will be stripped off and the remainder of the
+value processed using normal import mechanisms.
+
+The handling of such prefixes is done in a way analogous to protocol
+handling: there is a generic mechanism to look for prefixes which
+match the regular expression ``^(?P<prefix>[a-z]+)://(?P<suffix>.*)$``
+whereby, if the ``prefix`` is recognised, the ``suffix`` is processed
+in a prefix-dependent manner and the result of the processing replaces
+the string value.  If the prefix is not recognised, then the string
+value will be left as-is.
+
+
+.. _logging-config-dict-internalobj:
+
+Access to internal objects
+""""""""""""""""""""""""""
+
+As well as external objects, there is sometimes also a need to refer
+to objects in the configuration.  This will be done implicitly by the
+configuration system for things that it knows about.  For example, the
+string value ``'DEBUG'`` for a ``level`` in a logger or handler will
+automatically be converted to the value ``logging.DEBUG``, and the
+``handlers``, ``filters`` and ``formatter`` entries will take an
+object id and resolve to the appropriate destination object.
+
+However, a more generic mechanism is needed for user-defined
+objects which are not known to the :mod:`logging` module.  For
+example, consider :class:`logging.handlers.MemoryHandler`, which takes
+a ``target`` argument which is another handler to delegate to. Since
+the system already knows about this class, then in the configuration,
+the given ``target`` just needs to be the object id of the relevant
+target handler, and the system will resolve to the handler from the
+id.  If, however, a user defines a ``my.package.MyHandler`` which has
+an ``alternate`` handler, the configuration system would not know that
+the ``alternate`` referred to a handler.  To cater for this, a generic
+resolution system allows the user to specify::
+
+    handlers:
+      file:
+        # configuration of file handler goes here
+
+      custom:
+        (): my.package.MyHandler
+        alternate: cfg://handlers.file
+
+The literal string ``'cfg://handlers.file'`` will be resolved in an
+analogous way to strings with the ``ext://`` prefix, but looking
+in the configuration itself rather than the import namespace.  The
+mechanism allows access by dot or by index, in a similar way to
+that provided by ``str.format``.  Thus, given the following snippet::
+
+    handlers:
+      email:
+        class: logging.handlers.SMTPHandler
+        mailhost: localhost
+        fromaddr: my_app@domain.tld
+        toaddrs:
+          - support_team@domain.tld
+          - dev_team@domain.tld
+        subject: Houston, we have a problem.
+
+in the configuration, the string ``'cfg://handlers'`` would resolve to
+the dict with key ``handlers``, the string ``'cfg://handlers.email``
+would resolve to the dict with key ``email`` in the ``handlers`` dict,
+and so on.  The string ``'cfg://handlers.email.toaddrs[1]`` would
+resolve to ``'dev_team.domain.tld'`` and the string
+``'cfg://handlers.email.toaddrs[0]'`` would resolve to the value
+``'support_team@domain.tld'``. The ``subject`` value could be accessed
+using either ``'cfg://handlers.email.subject'`` or, equivalently,
+``'cfg://handlers.email[subject]'``.  The latter form only needs to be
+used if the key contains spaces or non-alphanumeric characters.  If an
+index value consists only of decimal digits, access will be attempted
+using the corresponding integer value, falling back to the string
+value if needed.
+
+Given a string ``cfg://handlers.myhandler.mykey.123``, this will
+resolve to ``config_dict['handlers']['myhandler']['mykey']['123']``.
+If the string is specified as ``cfg://handlers.myhandler.mykey[123]``,
+the system will attempt to retrieve the value from
+``config_dict['handlers']['myhandler']['mykey'][123]``, and fall back
+to ``config_dict['handlers']['myhandler']['mykey']['123']`` if that
+fails.
+
 .. _logging-config-fileformat:
 
 Configuration file format
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The configuration file format understood by :func:`fileConfig` is
-based on :mod:`configparser` functionality. The file must contain
-sections called ``[loggers]``, ``[handlers]`` and ``[formatters]``
-which identify by name the entities of each type which are defined in
-the file. For each such entity, there is a separate section which
-identified how that entity is configured. Thus, for a logger named
-``log01`` in the ``[loggers]`` section, the relevant configuration
-details are held in a section ``[logger_log01]``. Similarly, a handler
-called ``hand01`` in the ``[handlers]`` section will have its
-configuration held in a section called ``[handler_hand01]``, while a
-formatter called ``form01`` in the ``[formatters]`` section will have
-its configuration specified in a section called
-``[formatter_form01]``. The root logger configuration must be
-specified in a section called ``[logger_root]``.
+The configuration file format understood by :func:`fileConfig` is based on
+:mod:`configparser` functionality. The file must contain sections called
+``[loggers]``, ``[handlers]`` and ``[formatters]`` which identify by name the
+entities of each type which are defined in the file. For each such entity, there
+is a separate section which identifies how that entity is configured.  Thus, for
+a logger named ``log01`` in the ``[loggers]`` section, the relevant
+configuration details are held in a section ``[logger_log01]``. Similarly, a
+handler called ``hand01`` in the ``[handlers]`` section will have its
+configuration held in a section called ``[handler_hand01]``, while a formatter
+called ``form01`` in the ``[formatters]`` section will have its configuration
+specified in a section called ``[formatter_form01]``. The root logger
+configuration must be specified in a section called ``[logger_root]``.
 
 Examples of these sections in the file are given below. ::
 

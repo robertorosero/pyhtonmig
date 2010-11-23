@@ -111,8 +111,17 @@ pwd pwdmodule.c			# this is needed to find out the user's home dir
 				# if $HOME is not set
 _sre _sre.c			# Fredrik Lundh's new regular expressions
 _codecs _codecsmodule.c		# access to the builtin codecs and codec registry
-_fileio _fileio.c		# Standard I/O baseline
 _weakref _weakref.c		# weak references
+_functools _functoolsmodule.c   # Tools for working with functions and callable objects
+operator operator.c	        # operator.add() and similar goodies
+_collections _collectionsmodule.c # Container types
+itertools itertoolsmodule.c    # Functions creating iterators for efficient looping 
+
+# access to ISO C locale support
+_locale _localemodule.c  # -lintl
+
+# Standard I/O baseline
+_io -I$(srcdir)/Modules/_io _io/_iomodule.c _io/iobase.c _io/fileio.c _io/bytesio.c _io/bufferedio.c _io/textio.c _io/stringio.c
 
 # The zipimport module is always imported at startup. Having it as a
 # builtin module avoids some bootstrapping problems and reduces overhead.
@@ -151,22 +160,21 @@ _symtable symtablemodule.c
 # Modules that should always be present (non UNIX dependent):
 
 #array arraymodule.c	# array objects
-#cmath cmathmodule.c # -lm # complex math library functions
-#math mathmodule.c # -lm # math library functions, e.g. sin()
+#cmath cmathmodule.c _math.c # -lm # complex math library functions
+#math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
 #_struct _struct.c	# binary structure packing/unpacking
 #time timemodule.c # -lm # time operations and variables
-#operator operator.c	# operator.add() and similar goodies
 #_weakref _weakref.c	# basic weak reference support
 #_testcapi _testcapimodule.c    # Python C API test module
 #_random _randommodule.c	# Random number generator
-#collections collectionsmodule.c # Container types
-#itertools itertoolsmodule.c	# Functions creating iterators for efficient looping 
 #atexit atexitmodule.c      # Register functions to be run at interpreter-shutdown
+#_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
+#_pickle _pickle.c	# pickle accelerator
+#_datetime _datetimemodule.c	# datetime accelerator
+#_bisect _bisectmodule.c	# Bisection algorithms
+#_heapq _heapqmodule.c	# Heap queue algorithm
 
 #unicodedata unicodedata.c    # static Unicode character database
-
-# access to ISO C locale support
-#_locale _localemodule.c  # -lintl
 
 
 # Modules with some UNIX dependencies -- on by default:
@@ -209,6 +217,7 @@ _symtable symtablemodule.c
 #termios termios.c	# Steen Lumholt's termios module
 #resource resource.c	# Jeremy Hylton's rlimit interface
 
+#_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
 
 # Multimedia modules -- off by default.
 # These don't work for 64-bit platforms!!!
@@ -228,9 +237,11 @@ _symtable symtablemodule.c
 #_md5 md5module.c md5.c
 
 
-# The _sha module implements the SHA checksum algorithm.
-# (NIST's Secure Hash Algorithm.)
+# The _sha module implements the SHA checksum algorithms.
+# (NIST's Secure Hash Algorithms.)
 #_sha shamodule.c
+#_sha256 sha256module.c
+#_sha512 sha512module.c
 
 
 # The _tkinter module.
@@ -314,25 +325,6 @@ _symtable symtablemodule.c
 #_gdbm _gdbmmodule.c -I/usr/local/include -L/usr/local/lib -lgdbm
 
 
-# Sleepycat Berkeley DB interface.
-#
-# This requires the Sleepycat DB code, see http://www.sleepycat.com/
-# The earliest supported version of that library is 3.0, the latest
-# supported version is 4.0 (4.1 is specifically not supported, as that
-# changes the semantics of transactional databases). A list of available
-# releases can be found at
-#
-# http://www.sleepycat.com/update/index.html
-#
-# Edit the variables DB and DBLIBVERto point to the db top directory
-# and the subdirectory of PORT where you built it.
-#DB=/usr/local/BerkeleyDB.4.0
-#DBLIBVER=4.0
-#DBINC=$(DB)/include
-#DBLIB=$(DB)/lib
-#_bsddb _bsddb.c -I$(DBINC) -L$(DBLIB) -ldb-$(DBLIBVER)
-
-
 # Helper module for various ascii-encoders
 #binascii binascii.c
 
@@ -373,9 +365,7 @@ _symtable symtablemodule.c
 #
 # More information on Expat can be found at www.libexpat.org.
 #
-#EXPAT_DIR=/usr/local/src/expat-1.95.2
-#pyexpat pyexpat.c -DHAVE_EXPAT_H -I$(EXPAT_DIR)/lib -L$(EXPAT_DIR) -lexpat
-
+#pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
 
 # Hye-Shik Chang's CJKCodecs
 

@@ -6,6 +6,7 @@
 
 #include "patchlevel.h"
 #include "pyconfig.h"
+#include "pymacconfig.h"
 
 #include <limits.h>
 
@@ -48,6 +49,8 @@
 
 #include "pyport.h"
 
+#include "pyatomic.h"
+
 /* Debug-mode build with pymalloc implies PYMALLOC_DEBUG.
  *  PYMALLOC_DEBUG is in error if pymalloc is not in use.
  */
@@ -58,6 +61,7 @@
 #error "PYMALLOC_DEBUG requires WITH_PYMALLOC"
 #endif
 #include "pymath.h"
+#include "pytime.h"
 #include "pymem.h"
 
 #include "object.h"
@@ -72,9 +76,7 @@
 #include "longintrepr.h"
 #include "boolobject.h"
 #include "floatobject.h"
-#ifndef WITHOUT_COMPLEX
 #include "complexobject.h"
-#endif
 #include "rangeobject.h"
 #include "memoryobject.h"
 #include "tupleobject.h"
@@ -87,7 +89,7 @@
 #include "funcobject.h"
 #include "classobject.h"
 #include "fileobject.h"
-#include "cobject.h"
+#include "pycapsule.h"
 #include "traceback.h"
 #include "sliceobject.h"
 #include "cellobject.h"
@@ -111,23 +113,30 @@
 #include "import.h"
 
 #include "abstract.h"
+#include "bltinmodule.h"
 
 #include "compile.h"
 #include "eval.h"
 
+#include "pyctype.h"
 #include "pystrtod.h"
 #include "pystrcmp.h"
+#include "dtoa.h"
+#include "fileutils.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* _Py_Mangle is defined in compile.c */
 PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 
-/* Convert a possibly signed character to a nonnegative int */
-/* XXX This assumes characters are 8 bits wide */
-#ifdef __CHAR_UNSIGNED__
-#define Py_CHARMASK(c)		(c)
-#else
-#define Py_CHARMASK(c)		((unsigned char)((c) & 0xff))
+#ifdef __cplusplus
+}
 #endif
+
+/* Argument must be a char or an int in [-128, 127] or [0, 255]. */
+#define Py_CHARMASK(c)		((unsigned char)((c) & 0xff))
 
 #include "pyfpe.h"
 

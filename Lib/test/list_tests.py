@@ -66,13 +66,11 @@ class CommonTest(seq_tests.CommonTest):
         d.append(d)
         d.append(400)
         try:
-            fo = open(support.TESTFN, "w")
-            fo.write(str(d))
-            fo.close()
-            fo = open(support.TESTFN, "r")
-            self.assertEqual(fo.read(), repr(d))
+            with open(support.TESTFN, "w") as fo:
+                fo.write(str(d))
+            with open(support.TESTFN, "r") as fo:
+                self.assertEqual(fo.read(), repr(d))
         finally:
-            fo.close()
             os.remove(support.TESTFN)
 
     def test_set_subscript(self):
@@ -93,6 +91,8 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(StopIteration, next, r)
         self.assertEqual(list(reversed(self.type2test())),
                          self.type2test())
+        # Bug 3689: make sure list-reversed-iterator doesn't have __len__
+        self.assertRaises(TypeError, len, reversed([1,2,3]))
 
     def test_setitem(self):
         a = self.type2test([0, 1])
@@ -337,7 +337,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(BadExc, d.remove, 'c')
         for x, y in zip(d, e):
             # verify that original order and values are retained.
-            self.assert_(x is y)
+            self.assertIs(x, y)
 
     def test_count(self):
         a = self.type2test([0, 1, 2])*3
@@ -437,13 +437,24 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(TypeError, u.sort, 42, 42)
 
         def revcmp(a, b):
-            return cmp(b, a)
+            if a == b:
+                return 0
+            elif a < b:
+                return 1
+            else: # a > b
+                return -1
         u.sort(key=CmpToKey(revcmp))
         self.assertEqual(u, self.type2test([2,1,0,-1,-2]))
 
         # The following dumps core in unpatched Python 1.5:
         def myComparison(x,y):
-            return cmp(x%3, y%7)
+            xmod, ymod = x%3, y%7
+            if xmod == ymod:
+                return 0
+            elif xmod < ymod:
+                return -1
+            else: # xmod > ymod
+                return 1
         z = self.type2test(range(12))
         z.sort(key=CmpToKey(myComparison))
 
@@ -451,7 +462,12 @@ class CommonTest(seq_tests.CommonTest):
 
         def selfmodifyingComparison(x,y):
             z.append(1)
-            return cmp(x, y)
+            if x == y:
+                return 0
+            elif x < y:
+                return -1
+            else: # x > y
+                return 1
         self.assertRaises(ValueError, z.sort, key=CmpToKey(selfmodifyingComparison))
 
         self.assertRaises(TypeError, z.sort, 42, 42, 42, 42)
@@ -466,7 +482,7 @@ class CommonTest(seq_tests.CommonTest):
         u = self.type2test([0, 1])
         u2 = u
         u += [2, 3]
-        self.assert_(u is u2)
+        self.assertIs(u, u2)
 
         u = self.type2test("spam")
         u += "eggs"
@@ -522,6 +538,9 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test(range(10))
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
+        # test issue7788
+        a = self.type2test(range(10))
+        del a[9::1<<333]
 
     def test_constructor_exception_handling(self):
         # Bug #1242657

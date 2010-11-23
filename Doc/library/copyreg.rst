@@ -1,6 +1,5 @@
-
 :mod:`copyreg` --- Register :mod:`pickle` support functions
-============================================================
+===========================================================
 
 .. module:: copyreg
    :synopsis: Register pickle support functions.
@@ -8,14 +7,12 @@
 
 .. index::
    module: pickle
-   module: cPickle
    module: copy
 
-The :mod:`copyreg` module provides support for the :mod:`pickle` and
-:mod:`cPickle` modules.  The :mod:`copy` module is likely to use this in the
-future as well.  It provides configuration information about object constructors
-which are not classes.  Such constructors may be factory functions or class
-instances.
+The :mod:`copyreg` module provides support for the :mod:`pickle` module.  The
+:mod:`copy` module is likely to use this in the future as well.  It provides
+configuration information about object constructors which are not classes.
+Such constructors may be factory functions or class instances.
 
 
 .. function:: constructor(object)
@@ -24,7 +21,7 @@ instances.
    hence not valid as a constructor), raises :exc:`TypeError`.
 
 
-.. function:: pickle(type, function[, constructor])
+.. function:: pickle(type, function, constructor=None)
 
    Declares that *function* should be used as a "reduction" function for objects
    of type *type*.  *function* should return either a string or a tuple

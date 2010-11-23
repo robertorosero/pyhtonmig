@@ -1,6 +1,13 @@
+"""distutils.command.install_lib
+
+Implements the Distutils 'install_lib' command
+(install all Python modules)."""
+
 __revision__ = "$Id$"
 
-import sys, os
+import os
+import sys
+
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 
@@ -52,7 +59,6 @@ class install_lib(Command):
         self.skip_build = None
 
     def finalize_options(self):
-
         # Get all the information we need to install pure Python modules
         # from the umbrella 'install' command -- build (source) directory,
         # install (target) directory, and whether to compile .py files.
@@ -73,7 +79,8 @@ class install_lib(Command):
         if not isinstance(self.optimize, int):
             try:
                 self.optimize = int(self.optimize)
-                assert 0 <= self.optimize <= 2
+                if self.optimize not in (0, 1, 2):
+                    raise AssertionError
             except (ValueError, AssertionError):
                 raise DistutilsOptionError("optimize must be 0, 1, or 2")
 
@@ -89,7 +96,6 @@ class install_lib(Command):
         # (Optionally) compile .py to .pyc
         if outfiles is not None and self.distribution.has_pure_modules():
             self.byte_compile(outfiles)
-
 
     # -- Top-level worker functions ------------------------------------
     # (called from 'run()')
@@ -111,6 +117,10 @@ class install_lib(Command):
         return outfiles
 
     def byte_compile(self, files):
+        if sys.dont_write_bytecode:
+            self.warn('byte-compiling is disabled, skipping.')
+            return
+
         from distutils.util import byte_compile
 
         # Get the "--root" directory supplied to the "install" command,

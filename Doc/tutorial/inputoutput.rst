@@ -34,9 +34,7 @@ to substitute values into strings.
 
 One question remains, of course: how do you convert values to strings? Luckily,
 Python has ways to convert any value to a string: pass it to the :func:`repr`
-or :func:`str` functions.  Reverse quotes (``````) are equivalent to
-:func:`repr`, but they are no longer used in modern Python code and are removed
-in future versions of the language.
+or :func:`str` functions.
 
 The :func:`str` function is meant to return representations of values which are
 fairly human-readable, while :func:`repr` is meant to generate representations
@@ -54,10 +52,10 @@ Some examples::
    'Hello, world.'
    >>> repr(s)
    "'Hello, world.'"
-   >>> str(0.1)
-   '0.1'
-   >>> repr(0.1)
-   '0.10000000000000001'
+   >>> str(1.0/7.0)
+   '0.142857142857'
+   >>> repr(1.0/7.0)
+   '0.14285714285714285'
    >>> x = 10 * 3.25
    >>> y = 200 * 200
    >>> s = 'The value of x is ' + repr(x) + ', and y is ' + repr(y) + '...'
@@ -70,9 +68,6 @@ Some examples::
    'hello, world\n'
    >>> # The argument to repr() may be any Python object:
    ... repr((x, y, ('spam', 'eggs')))
-   "(32.5, 40000, ('spam', 'eggs'))"
-   >>> # reverse quotes are convenient in interactive sessions:
-   ... `x, y, ('spam', 'eggs')`
    "(32.5, 40000, ('spam', 'eggs'))"
 
 Here are two ways to write a table of squares and cubes::
@@ -95,7 +90,7 @@ Here are two ways to write a table of squares and cubes::
 
    >>> for x in range(1, 11):
    ...     print('{0:2d} {1:3d} {2:4d}'.format(x, x*x, x*x*x))
-   ... 
+   ...
     1   1    1
     2   4    8
     3   9   27
@@ -131,44 +126,56 @@ with zeros.  It understands about plus and minus signs::
 
 Basic usage of the :meth:`str.format` method looks like this::
 
-   >>> print 'We are the {0} who say "{1}!"'.format('knights', 'Ni')
+   >>> print('We are the {} who say "{}!"'.format('knights', 'Ni'))
    We are the knights who say "Ni!"
 
 The brackets and characters within them (called format fields) are replaced with
-the objects passed into the format method.  The number in the brackets refers to
-the position of the object passed into the format method. ::
+the objects passed into the :meth:`~str.format` method.  A number in the
+brackets can be used to refer to the position of the object passed into the
+:meth:`~str.format` method. ::
 
-   >>> print '{0} and {1}'.format('spam', 'eggs')
+   >>> print('{0} and {1}'.format('spam', 'eggs'))
    spam and eggs
-   >>> print '{1} and {0}'.format('spam', 'eggs')
+   >>> print('{1} and {0}'.format('spam', 'eggs'))
    eggs and spam
 
-If keyword arguments are used in the format method, their values are referred to
-by using the name of the argument. ::
+If keyword arguments are used in the :meth:`~str.format` method, their values
+are referred to by using the name of the argument. ::
 
-   >>> print 'This {food} is {adjective}.'.format(food='spam', adjective='absolutely horrible')
+   >>> print('This {food} is {adjective}.'.format(
+   ...       food='spam', adjective='absolutely horrible'))
    This spam is absolutely horrible.
 
 Positional and keyword arguments can be arbitrarily combined::
 
-   >>> print 'The story of {0}, {1}, and {other}.'.format('Bill', 'Manfred', other='Georg')
+   >>> print('The story of {0}, {1}, and {other}.'.format('Bill', 'Manfred',
+                                                          other='Georg'))
    The story of Bill, Manfred, and Georg.
 
-An optional ``':``` and format specifier can follow the field name. This also
+``'!a'`` (apply :func:`ascii`), ``'!s'`` (apply :func:`str`) and ``'!r'``
+(apply :func:`repr`) can be used to convert the value before it is formatted::
+
+   >>> import math
+   >>> print('The value of PI is approximately {}.'.format(math.pi))
+   The value of PI is approximately 3.14159265359.
+   >>> print('The value of PI is approximately {!r}.'.format(math.pi))
+   The value of PI is approximately 3.141592653589793.
+
+An optional ``':'`` and format specifier can follow the field name. This allows
 greater control over how the value is formatted.  The following example
-truncates the Pi to three places after the decimal.
+truncates Pi to three places after the decimal.
 
    >>> import math
    >>> print('The value of PI is approximately {0:.3f}.'.format(math.pi))
    The value of PI is approximately 3.142.
 
 Passing an integer after the ``':'`` will cause that field to be a minimum
-number of characters wide.  This is useful for making tables pretty.::
+number of characters wide.  This is useful for making tables pretty. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 7678}
    >>> for name, phone in table.items():
    ...     print('{0:10} ==> {1:10d}'.format(name, phone))
-   ... 
+   ...
    Jack       ==>       4098
    Dcab       ==>       7678
    Sjoerd     ==>       4127
@@ -179,11 +186,12 @@ instead of by position.  This can be done by simply passing the dict and using
 square brackets ``'[]'`` to access the keys ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
-   >>> print('Jack: {0[Jack]:d}; Sjoerd: {0[Sjoerd]:d}; Dcab: {0[Dcab]:d}'.format(table))
+   >>> print('Jack: {0[Jack]:d}; Sjoerd: {0[Sjoerd]:d}; '
+             'Dcab: {0[Dcab]:d}'.format(table))
    Jack: 4098; Sjoerd: 4127; Dcab: 8637678
 
 This could also be done by passing the table as keyword arguments with the '**'
-notation.::
+notation. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
    >>> print('Jack: {Jack:d}; Sjoerd: {Sjoerd:d}; Dcab: {Dcab:d}'.format(**table))
@@ -192,7 +200,7 @@ notation.::
 This is particularly useful in combination with the new built-in :func:`vars`
 function, which returns a dictionary containing all local variables.
 
-For a complete overview of string formating with :meth:`str.format`, see
+For a complete overview of string formatting with :meth:`str.format`, see
 :ref:`formatstrings`.
 
 
@@ -200,17 +208,17 @@ Old string formatting
 ---------------------
 
 The ``%`` operator can also be used for string formatting. It interprets the
-left argument much like a :cfunc:`sprintf`\ -style format string to be applied
+left argument much like a :c:func:`sprintf`\ -style format string to be applied
 to the right argument, and returns the string resulting from this formatting
 operation. For example::
 
    >>> import math
-   >>> print 'The value of PI is approximately %5.3f.' % math.pi
+   >>> print('The value of PI is approximately %5.3f.' % math.pi)
    The value of PI is approximately 3.142.
 
 Since :meth:`str.format` is quite new, a lot of Python code still uses the ``%``
-operator. However, because this old style of formatting will eventually removed
-from the language :meth:`str.format` should generally be used.
+operator. However, because this old style of formatting will eventually be
+removed from the language, :meth:`str.format` should generally be used.
 
 More information can be found in the :ref:`old-string-formatting` section.
 
@@ -224,12 +232,15 @@ Reading and Writing Files
    builtin: open
    object: file
 
-:func:`open` returns a file object, and is most commonly used with two
-arguments: ``open(filename, mode)``.
+:func:`open` returns a :term:`file object`, and is most commonly used with
+two arguments: ``open(filename, mode)``.
 
 ::
 
    >>> f = open('/tmp/workfile', 'w')
+
+.. XXX str(f) is <io.TextIOWrapper object at 0x82e8dc4>
+
    >>> print(f)
    <open file '/tmp/workfile', mode 'w' at 80a0960>
 
@@ -242,19 +253,18 @@ automatically added to the end.  ``'r+'`` opens the file for both reading and
 writing. The *mode* argument is optional; ``'r'`` will be assumed if it's
 omitted.
 
-On Windows and the Macintosh, ``'b'`` appended to the mode opens the file in
-binary mode, so there are also modes like ``'rb'``, ``'wb'``, and ``'r+b'``.
-Windows makes a distinction between text and binary files; the end-of-line
-characters in text files are automatically altered slightly when data is read or
-written.  This behind-the-scenes modification to file data is fine for ASCII
-text files, but it'll corrupt binary data like that in :file:`JPEG` or
-:file:`EXE` files.  Be very careful to use binary mode when reading and writing
-such files.  On Unix, it doesn't hurt to append a ``'b'`` to the mode, so
-you can use it platform-independently for all binary files.
+Normally, files are opened in :dfn:`text mode`, that means, you read and write
+strings from and to the file, which are encoded in a specific encoding (the
+default being UTF-8).  ``'b'`` appended to the mode opens the file in
+:dfn:`binary mode`: now the data is read and written in the form of bytes
+objects.  This mode should be used for all files that don't contain text.
 
-This behind-the-scenes modification to file data is fine for text files, but
-will corrupt binary data like that in :file:`JPEG` or :file:`EXE` files.  Be
-very careful to use binary mode when reading and writing such files.
+In text mode, the default is to convert platform-specific line endings (``\n``
+on Unix, ``\r\n`` on Windows) to just ``\n`` on reading and ``\n`` back to
+platform-specific line endings on writing.  This behind-the-scenes modification
+to file data is fine for text files, but will corrupt binary data like that in
+:file:`JPEG` or :file:`EXE` files.  Be very careful to use binary mode when
+reading and writing such files.
 
 
 .. _tut-filemethods:
@@ -266,12 +276,12 @@ The rest of the examples in this section will assume that a file object called
 ``f`` has already been created.
 
 To read a file's contents, call ``f.read(size)``, which reads some quantity of
-data and returns it as a string.  *size* is an optional numeric argument.  When
-*size* is omitted or negative, the entire contents of the file will be read and
-returned; it's your problem if the file is twice as large as your machine's
-memory. Otherwise, at most *size* bytes are read and returned.  If the end of
-the file has been reached, ``f.read()`` will return an empty string (``""``).
-::
+data and returns it as a string or bytes object.  *size* is an optional numeric
+argument.  When *size* is omitted or negative, the entire contents of the file
+will be read and returned; it's your problem if the file is twice as large as
+your machine's memory. Otherwise, at most *size* bytes are read and returned.
+If the end of the file has been reached, ``f.read()`` will return an empty
+string (``''``).  ::
 
    >>> f.read()
    'This is the entire file.\n'
@@ -283,7 +293,7 @@ is left at the end of the string, and is only omitted on the last line of the
 file if the file doesn't end in a newline.  This makes the return value
 unambiguous; if ``f.readline()`` returns an empty string, the end of the file
 has been reached, while a blank line is represented by ``'\n'``, a string
-containing only a single newline.   ::
+containing only a single newline.  ::
 
    >>> f.readline()
    'This is the first line of the file.\n'
@@ -306,8 +316,8 @@ An alternative approach to reading lines is to loop over the file object. This i
 memory efficient, fast, and leads to simpler code::
 
    >>> for line in f:
-           print(line, end='')
-
+   ...     print(line, end='')
+   ...
    This is the first line of the file.
    Second line of the file
 
@@ -316,9 +326,10 @@ control.  Since the two approaches manage line buffering differently, they
 should not be mixed.
 
 ``f.write(string)`` writes the contents of *string* to the file, returning
-``None``.   ::
+the number of characters written. ::
 
    >>> f.write('This is a test\n')
+   15
 
 To write something other than a string, it needs to be converted to a string
 first::
@@ -326,6 +337,7 @@ first::
    >>> value = ('the answer', 42)
    >>> s = str(value)
    >>> f.write(s)
+   18
 
 ``f.tell()`` returns an integer giving the file object's current position in the
 file, measured in bytes from the beginning of the file.  To change the file
@@ -336,14 +348,21 @@ of the file, 1 uses the current file position, and 2 uses the end of the file as
 the reference point.  *from_what* can be omitted and defaults to 0, using the
 beginning of the file as the reference point. ::
 
-   >>> f = open('/tmp/workfile', 'r+')
-   >>> f.write('0123456789abcdef')
+   >>> f = open('/tmp/workfile', 'rb+')
+   >>> f.write(b'0123456789abcdef')
+   16
    >>> f.seek(5)     # Go to the 6th byte in the file
-   >>> f.read(1)        
-   '5'
-   >>> f.seek(-3, 2) # Go to the 3rd byte before the end
+   5
    >>> f.read(1)
-   'd'
+   b'5'
+   >>> f.seek(-3, 2) # Go to the 3rd byte before the end
+   13
+   >>> f.read(1)
+   b'd'
+
+In text files (those opened without a ``b`` in the mode string), only seeks
+relative to the beginning of the file are allowed (the exception being seeking
+to the very file end with ``seek(0, 2)``).
 
 When you're done with a file, call ``f.close()`` to close it and free up any
 system resources taken up by the open file.  After calling ``f.close()``,
@@ -355,9 +374,19 @@ attempts to use the file object will automatically fail. ::
      File "<stdin>", line 1, in ?
    ValueError: I/O operation on closed file
 
-File objects have some additional methods, such as :meth:`isatty` and
-:meth:`truncate` which are less frequently used; consult the Library Reference
-for a complete guide to file objects.
+It is good practice to use the :keyword:`with` keyword when dealing with file
+objects.  This has the advantage that the file is properly closed after its
+suite finishes, even if an exception is raised on the way.  It is also much
+shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
+
+    >>> with open('/tmp/workfile', 'r') as f:
+    ...     read_data = f.read()
+    >>> f.closed
+    True
+
+File objects have some additional methods, such as :meth:`~file.isatty` and
+:meth:`~file.truncate` which are less frequently used; consult the Library
+Reference for a complete guide to file objects.
 
 
 .. _tut-pickle:

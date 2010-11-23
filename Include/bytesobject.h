@@ -29,7 +29,7 @@ functions should be applied to nil objects.
 
 typedef struct {
     PyObject_VAR_HEAD
-    long ob_shash;
+    Py_hash_t ob_shash;
     char ob_sval[1];
 
     /* Invariants:
@@ -48,6 +48,7 @@ PyAPI_DATA(PyTypeObject) PyBytesIter_Type;
 
 PyAPI_FUNC(PyObject *) PyBytes_FromStringAndSize(const char *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyBytes_FromString(const char *);
+PyAPI_FUNC(PyObject *) PyBytes_FromObject(PyObject *);
 PyAPI_FUNC(PyObject *) PyBytes_FromFormatV(const char*, va_list)
 				Py_GCC_ATTRIBUTE((format(printf, 1, 0)));
 PyAPI_FUNC(PyObject *) PyBytes_FromFormat(const char*, ...)
@@ -90,12 +91,22 @@ PyAPI_FUNC(int) PyBytes_AsStringAndSize(
    into the string pointed to by buffer.  For the argument descriptions,
    see Objects/stringlib/localeutil.h */
 
-PyAPI_FUNC(int) _PyBytes_InsertThousandsGrouping(char *buffer,
-						  Py_ssize_t n_buffer,
-						  Py_ssize_t n_digits,
-						  Py_ssize_t buf_size,
-						  Py_ssize_t *count,
-						  int append_zero_char);
+PyAPI_FUNC(Py_ssize_t) _PyBytes_InsertThousandsGroupingLocale(char *buffer,
+                                                   Py_ssize_t n_buffer,
+                                                   char *digits,
+                                                   Py_ssize_t n_digits,
+                                                   Py_ssize_t min_width);
+
+/* Using explicit passed-in values, insert the thousands grouping
+   into the string pointed to by buffer.  For the argument descriptions,
+   see Objects/stringlib/localeutil.h */
+PyAPI_FUNC(Py_ssize_t) _PyBytes_InsertThousandsGrouping(char *buffer,
+                                                   Py_ssize_t n_buffer,
+                                                   char *digits,
+                                                   Py_ssize_t n_digits,
+                                                   Py_ssize_t min_width,
+                                                   const char *grouping,
+                                                   const char *thousands_sep);
 
 /* Flags used by string formatting */
 #define F_LJUST (1<<0)

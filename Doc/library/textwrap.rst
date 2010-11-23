@@ -1,4 +1,3 @@
-
 :mod:`textwrap` --- Text wrapping and filling
 =============================================
 
@@ -14,17 +13,22 @@ and a utility function  :func:`dedent`.  If you're just wrapping or filling one
 or two  text strings, the convenience functions should be good enough;
 otherwise,  you should use an instance of :class:`TextWrapper` for efficiency.
 
+.. seealso::
 
-.. function:: wrap(text[, width[, ...]])
+   Latest version of the :source:`textwrap module Python source code
+   <Lib/textwrap.py>`
 
-   Wraps the single paragraph in *text* (a string) so every line is at most *width*
-   characters long.  Returns a list of output lines, without final newlines.
+.. function:: wrap(text, width=70, **kwargs)
+
+   Wraps the single paragraph in *text* (a string) so every line is at most
+   *width* characters long.  Returns a list of output lines, without final
+   newlines.
 
    Optional keyword arguments correspond to the instance attributes of
    :class:`TextWrapper`, documented below.  *width* defaults to ``70``.
 
 
-.. function:: fill(text[, width[, ...]])
+.. function:: fill(text, width=70, **kwargs)
 
    Wraps the single paragraph in *text*, and returns a single string containing the
    wrapped paragraph.  :func:`fill` is shorthand for  ::
@@ -70,11 +74,11 @@ indentation from strings that have unwanted whitespace to the left of the text.
           print(repr(dedent(s)))  # prints 'hello\n  world\n'
 
 
-.. class:: TextWrapper(...)
+.. class:: TextWrapper(**kwargs)
 
    The :class:`TextWrapper` constructor accepts a number of optional keyword
-   arguments.  Each argument corresponds to one instance attribute, so for example
-   ::
+   arguments.  Each keyword argument corresponds to an instance attribute, so
+   for example ::
 
       wrapper = TextWrapper(initial_indent="* ")
 
@@ -180,8 +184,6 @@ indentation from strings that have unwanted whitespace to the left of the text.
       for line breaks, but you need to set :attr:`break_long_words` to false if
       you want truly insecable words.  Default behaviour in previous versions
       was to always allow breaking hyphenated words.
-
-      .. versionadded:: 2.6
 
 
    :class:`TextWrapper` also provides two public methods, analogous to the

@@ -6,18 +6,18 @@
 
 
 Message object structures can be created in one of two ways: they can be created
-from whole cloth by instantiating :class:`Message` objects and stringing them
-together via :meth:`attach` and :meth:`set_payload` calls, or they can be
-created by parsing a flat text representation of the email message.
+from whole cloth by instantiating :class:`~email.message.Message` objects and
+stringing them together via :meth:`attach` and :meth:`set_payload` calls, or they
+can be created by parsing a flat text representation of the email message.
 
 The :mod:`email` package provides a standard parser that understands most email
 document structures, including MIME documents.  You can pass the parser a string
-or a file object, and the parser will return to you the root :class:`Message`
-instance of the object structure.  For simple, non-MIME messages the payload of
-this root object will likely be a string containing the text of the message.
-For MIME messages, the root object will return ``True`` from its
-:meth:`is_multipart` method, and the subparts can be accessed via the
-:meth:`get_payload` and :meth:`walk` methods.
+or a file object, and the parser will return to you the root
+:class:`~email.message.Message` instance of the object structure.  For simple,
+non-MIME messages the payload of this root object will likely be a string
+containing the text of the message.  For MIME messages, the root object will
+return ``True`` from its :meth:`is_multipart` method, and the subparts can be
+accessed via the :meth:`get_payload` and :meth:`walk` methods.
 
 There are actually two parser interfaces available for use, the classic
 :class:`Parser` API and the incremental :class:`FeedParser` API.  The classic
@@ -31,8 +31,8 @@ incrementally, and only returns the root object when you close the parser [#]_.
 Note that the parser can be extended in limited ways, and of course you can
 implement your own parser completely from scratch.  There is no magical
 connection between the :mod:`email` package's bundled parser and the
-:class:`Message` class, so your custom parser can create message object trees
-any way it finds necessary.
+:class:`~email.message.Message` class, so your custom parser can create message
+object trees any way it finds necessary.
 
 
 FeedParser API
@@ -58,12 +58,11 @@ list of defects that it can find.
 Here is the API for the :class:`FeedParser`:
 
 
-.. class:: FeedParser([_factory])
+.. class:: FeedParser(_factory=email.message.Message)
 
    Create a :class:`FeedParser` instance.  Optional *_factory* is a no-argument
    callable that will be called whenever a new message object is needed.  It
    defaults to the :class:`email.message.Message` class.
-
 
    .. method:: feed(data)
 
@@ -74,12 +73,19 @@ Here is the API for the :class:`FeedParser`:
       carriage return, newline, or carriage return and newline (they can even be
       mixed).
 
-
    .. method:: close()
 
       Closing a :class:`FeedParser` completes the parsing of all previously fed
       data, and returns the root message object.  It is undefined what happens
       if you feed more data to a closed :class:`FeedParser`.
+
+
+.. class:: BytesFeedParser(_factory=email.message.Message)
+
+   Works exactly like :class:`FeedParser` except that the input to the
+   :meth:`~FeedParser.feed` method must be bytes and not string.
+
+   .. versionadded:: 3.2
 
 
 Parser class API
@@ -96,13 +102,13 @@ as a string. :class:`HeaderParser` has the same API as the :class:`Parser`
 class.
 
 
-.. class:: Parser([_class])
+.. class:: Parser(_class=email.message.Message, strict=None)
 
    The constructor for the :class:`Parser` class takes an optional argument
    *_class*.  This must be a callable factory (such as a function or a class), and
    it is used whenever a sub-message object needs to be created.  It defaults to
-   :class:`Message` (see :mod:`email.message`).  The factory will be called without
-   arguments.
+   :class:`~email.message.Message` (see :mod:`email.message`).  The factory will
+   be called without arguments.
 
    The optional *strict* flag is ignored.
 
@@ -115,7 +121,7 @@ class.
    The other public :class:`Parser` methods are:
 
 
-   .. method:: parse(fp[, headersonly])
+   .. method:: parse(fp, headersonly=False)
 
       Read all the data from the file-like object *fp*, parse the resulting
       text, and return the root message object.  *fp* must support both the
@@ -129,11 +135,11 @@ class.
 
       Optional *headersonly* is as with the :meth:`parse` method.
 
-   .. method:: parsestr(text[, headersonly])
+   .. method:: parsestr(text, headersonly=False)
 
       Similar to the :meth:`parse` method, except it takes a string object
       instead of a file-like object.  Calling this method on a string is exactly
-      equivalent to wrapping *text* in a :class:`StringIO` instance first and
+      equivalent to wrapping *text* in a :class:`~io.StringIO` instance first and
       calling :meth:`parse`.
 
       Optional *headersonly* is a flag specifying whether to stop parsing after
@@ -141,23 +147,77 @@ class.
       the entire contents of the file.
 
 
+.. class:: BytesParser(_class=email.message.Message, strict=None)
+
+   This class is exactly parallel to :class:`Parser`, but handles bytes input.
+   The *_class* and *strict* arguments are interpreted in the same way as for
+   the :class:`Parser` constructor.  *strict* is supported only to make porting
+   code easier; it is deprecated.
+
+   .. method:: parse(fp, headeronly=False)
+
+      Read all the data from the binary file-like object *fp*, parse the
+      resulting bytes, and return the message object.  *fp* must support
+      both the :meth:`readline` and the :meth:`read` methods on file-like
+      objects.
+
+      The bytes contained in *fp* must be formatted as a block of :rfc:`2822`
+      style headers and header continuation lines, optionally preceded by a
+      envelope header.  The header block is terminated either by the end of the
+      data or by a blank line.  Following the header block is the body of the
+      message (which may contain MIME-encoded subparts, including subparts
+      with a :mailheader:`Content-Transfer-Encoding` of ``8bit``.
+
+      Optional *headersonly* is a flag specifying whether to stop parsing after
+      reading the headers or not.  The default is ``False``, meaning it parses
+      the entire contents of the file.
+
+   .. method:: parsebytes(bytes, headersonly=False)
+
+      Similar to the :meth:`parse` method, except it takes a byte string object
+      instead of a file-like object.  Calling this method on a byte string is
+      exactly equivalent to wrapping *text* in a :class:`~io.BytesIO` instance
+      first and calling :meth:`parse`.
+
+      Optional *headersonly* is as with the :meth:`parse` method.
+
+   .. versionadded:: 3.2
+
+
 Since creating a message object structure from a string or a file object is such
-a common task, two functions are provided as a convenience.  They are available
+a common task, four functions are provided as a convenience.  They are available
 in the top-level :mod:`email` package namespace.
 
+.. currentmodule:: email
 
-.. function:: message_from_string(s[, _class[, strict]])
+.. function:: message_from_string(s, _class=email.message.Message, strict=None)
 
    Return a message object structure from a string.  This is exactly equivalent to
    ``Parser().parsestr(s)``.  Optional *_class* and *strict* are interpreted as
    with the :class:`Parser` class constructor.
 
+.. function:: message_from_bytes(s, _class=email.message.Message, strict=None)
 
-.. function:: message_from_file(fp[, _class[, strict]])
+   Return a message object structure from a byte string.  This is exactly
+   equivalent to ``BytesParser().parsebytes(s)``.  Optional *_class* and
+   *strict* are interpreted as with the :class:`Parser` class constructor.
 
-   Return a message object structure tree from an open file object.  This is
-   exactly equivalent to ``Parser().parse(fp)``.  Optional *_class* and *strict*
-   are interpreted as with the :class:`Parser` class constructor.
+   .. versionadded:: 3.2
+
+.. function:: message_from_file(fp, _class=email.message.Message, strict=None)
+
+   Return a message object structure tree from an open :term:`file object`.
+   This is exactly equivalent to ``Parser().parse(fp)``.  Optional *_class*
+   and *strict* are interpreted as with the :class:`Parser` class constructor.
+
+.. function:: message_from_binary_file(fp, _class=email.message.Message, strict=None)
+
+   Return a message object structure tree from an open binary :term:`file
+   object`.  This is exactly equivalent to ``BytesParser().parse(fp)``.
+   Optional *_class* and *strict* are interpreted as with the :class:`Parser`
+   class constructor.
+
+   .. versionadded:: 3.2
 
 Here's an example of how you might use this at an interactive Python prompt::
 
@@ -178,7 +238,8 @@ Here are some notes on the parsing semantics:
 * All :mimetype:`multipart` type messages will be parsed as a container message
   object with a list of sub-message objects for their payload.  The outer
   container message will return ``True`` for :meth:`is_multipart` and their
-  :meth:`get_payload` method will return the list of :class:`Message` subparts.
+  :meth:`get_payload` method will return the list of :class:`~email.message.Message`
+  subparts.
 
 * Most messages with a content type of :mimetype:`message/\*` (e.g.
   :mimetype:`message/delivery-status` and :mimetype:`message/rfc822`) will also be

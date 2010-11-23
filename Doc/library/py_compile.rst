@@ -22,22 +22,26 @@ byte-code cache files in the directory containing the source code.
    Exception raised when an error occurs while attempting to compile the file.
 
 
-.. function:: compile(file[, cfile[, dfile[, doraise]]])
+.. function:: compile(file, cfile=None, dfile=None, doraise=False)
 
    Compile a source file to byte-code and write out the byte-code cache  file.  The
    source code is loaded from the file name *file*.  The  byte-code is written to
-   *cfile*, which defaults to *file* ``+`` ``'c'`` (``'o'`` if optimization is
-   enabled in the current interpreter).  If *dfile* is specified, it is used as the
+   *cfile*, which defaults to the :PEP:`3147` path, ending in ``.pyc``
+   (``'.pyo`` if optimization is enabled in the current interpreter).  For
+   example, if *file* is ``/foo/bar/baz.py`` *cfile* will default to
+   ``/foo/bar/__pycache__/baz.cpython-32.pyc`` for Python 3.2.  If *dfile* is specified, it is used as the
    name of the source file in error messages instead of *file*.  If *doraise* is
    true, a :exc:`PyCompileError` is raised when an error is encountered while
    compiling *file*. If *doraise* is false (the default), an error string is
-   written to ``sys.stderr``, but no exception is raised.
+   written to ``sys.stderr``, but no exception is raised.  This function
+   returns the path to byte-compiled file, i.e. whatever *cfile* value was
+   used.
 
 
-.. function:: main([args])
+.. function:: main(args=None)
 
    Compile several source files.  The files named in *args* (or on the command
-   line, if *args* is not specified) are compiled and the resulting bytecode is
+   line, if *args* is ``None``) are compiled and the resulting bytecode is
    cached in the normal manner.  This function does not search a directory
    structure to locate source files; it only compiles files named explicitly.
 

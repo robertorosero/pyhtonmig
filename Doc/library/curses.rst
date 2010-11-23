@@ -1,12 +1,12 @@
-
 :mod:`curses` --- Terminal handling for character-cell displays
 ===============================================================
 
 .. module:: curses
-   :synopsis: An interface to the curses library, providing portable terminal handling.
+   :synopsis: An interface to the curses library, providing portable
+              terminal handling.
+   :platform: Unix
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 .. sectionauthor:: Eric Raymond <esr@thyrsus.com>
-
 
 The :mod:`curses` module provides an interface to the curses library, the
 de-facto standard for portable advanced terminal handling.
@@ -183,7 +183,7 @@ The module :mod:`curses` defines the following functions:
 
 .. function:: filter()
 
-   The :func:`filter` routine, if used, must be called before :func:`initscr` is
+   The :func:`.filter` routine, if used, must be called before :func:`initscr` is
    called.  The effect is that, during those calls, LINES is set to 1; the
    capabilities clear, cup, cud, cud1, cuu1, cuu, vpa are disabled; and the home
    string is set to the value of cr. The effect is that the cursor is confined to
@@ -531,7 +531,7 @@ The module :mod:`curses` defines the following functions:
    capability, or is canceled or absent from the terminal description.
 
 
-.. function:: tparm(str[,...])
+.. function:: tparm(str[, ...])
 
    Instantiates the string *str* with the supplied parameters, where  *str* should
    be a parameterized string obtained from the terminfo  database.  E.g.
@@ -606,9 +606,9 @@ the following methods:
    .. note::
 
       A *character* means a C character (an ASCII code), rather then a Python
-      character (a string of length 1). (This note is true whenever the documentation
-      mentions a character.) The builtin :func:`ord` is handy for conveying strings to
-      codes.
+      character (a string of length 1). (This note is true whenever the
+      documentation mentions a character.) The built-in :func:`ord` is handy for
+      conveying strings to codes.
 
    Paint character *ch* at ``(y, x)`` with attributes *attr*, overwriting any
    character previously painter at that location.  By default, the character
@@ -793,7 +793,8 @@ the following methods:
 
    Get a character. Note that the integer returned does *not* have to be in ASCII
    range: function keys, keypad keys and so on return numbers higher than 256. In
-   no-delay mode, -1 is returned if there is  no input.
+   no-delay mode, -1 is returned if there is no input, else :func:`getch` waits
+   until a key is pressed.
 
 
 .. method:: window.getkey([y, x])

@@ -8,10 +8,12 @@ intern(s) -> sys.intern(s)"""
 # Local imports
 from .. import pytree
 from .. import fixer_base
-from ..fixer_util import Name, Attr
+from ..fixer_util import Name, Attr, touch_import
 
 
 class FixIntern(fixer_base.BaseFix):
+    BM_compatible = True
+    order = "pre"
 
     PATTERN = """
     power< 'intern'
@@ -39,5 +41,6 @@ class FixIntern(fixer_base.BaseFix):
                                        [results["lpar"].clone(),
                                         newarglist,
                                         results["rpar"].clone()])] + after)
-        new.set_prefix(node.get_prefix())
+        new.prefix = node.prefix
+        touch_import(None, 'sys', node)
         return new

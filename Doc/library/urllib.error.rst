@@ -3,7 +3,7 @@
 
 .. module:: urllib.error
    :synopsis: Exception classes raised by urllib.request.
-.. moduleauthor:: Jeremy Hylton <jhylton@users.sourceforge.net>
+.. moduleauthor:: Jeremy Hylton <jeremy@alum.mit.edu>
 .. sectionauthor:: Senthil Kumaran <orsenthil@gmail.com>
 
 
@@ -39,7 +39,7 @@ The following exceptions are raised by :mod:`urllib.error` as appropriate:
       to a value found in the dictionary of codes as found in
       :attr:`http.server.BaseHTTPRequestHandler.responses`.
 
-.. exception:: ContentTooShortError(msg[, content])
+.. exception:: ContentTooShortError(msg, content)
 
    This exception is raised when the :func:`urlretrieve` function detects that
    the amount of the downloaded data is less than the expected amount (given by

@@ -7,7 +7,7 @@ that name.
 
 import sys
 import os
-import re
+import tokenize
 
 __all__ = ["getline", "clearcache", "checkcache"]
 
@@ -73,14 +73,14 @@ def updatecache(filename, module_globals=None):
 
     if filename in cache:
         del cache[filename]
-    if not filename or filename[0] + filename[-1] == '<>':
+    if not filename or (filename.startswith('<') and filename.endswith('>')):
         return []
 
     fullname = filename
     try:
         stat = os.stat(fullname)
-    except os.error as msg:
-        basename = os.path.split(filename)[1]
+    except OSError:
+        basename = filename
 
         # Try for a __loader__, if available
         if module_globals and '__loader__' in module_globals:
@@ -89,59 +89,46 @@ def updatecache(filename, module_globals=None):
             get_source = getattr(loader, 'get_source', None)
 
             if name and get_source:
-                if basename.startswith(name.split('.')[-1]+'.'):
-                    try:
-                        data = get_source(name)
-                    except (ImportError, IOError):
-                        pass
-                    else:
-                        if data is None:
-                            # No luck, the PEP302 loader cannot find the source
-                            # for this module.
-                            return []
-                        cache[filename] = (
-                            len(data), None,
-                            [line+'\n' for line in data.splitlines()], fullname
-                        )
-                        return cache[filename][2]
+                try:
+                    data = get_source(name)
+                except (ImportError, IOError):
+                    pass
+                else:
+                    if data is None:
+                        # No luck, the PEP302 loader cannot find the source
+                        # for this module.
+                        return []
+                    cache[filename] = (
+                        len(data), None,
+                        [line+'\n' for line in data.splitlines()], fullname
+                    )
+                    return cache[filename][2]
 
-        # Try looking through the module search path.
+        # Try looking through the module search path, which is only useful
+        # when handling a relative filename.
+        if os.path.isabs(filename):
+            return []
 
         for dirname in sys.path:
             try:
                 fullname = os.path.join(dirname, basename)
             except (TypeError, AttributeError):
                 # Not sufficiently string-like to do anything useful with.
+                continue
+            try:
+                stat = os.stat(fullname)
+                break
+            except os.error:
                 pass
-            else:
-                try:
-                    stat = os.stat(fullname)
-                    break
-                except os.error:
-                    pass
         else:
-            # No luck
-##          print '*** Cannot stat', filename, ':', msg
             return []
-##  print("Refreshing cache for %s..." % fullname)
     try:
-        fp = open(fullname, 'rU')
-        lines = fp.readlines()
-        fp.close()
-    except Exception as msg:
-##      print '*** Cannot open', fullname, ':', msg
+        with tokenize.open(fullname) as fp:
+            lines = fp.readlines()
+    except IOError:
         return []
-    coding = "utf-8"
-    for line in lines[:2]:
-        m = re.search(r"coding[:=]\s*([-\w.]+)", line)
-        if m:
-            coding = m.group(1)
-            break
-    try:
-        lines = [line if isinstance(line, str) else str(line, coding)
-                 for line in lines]
-    except:
-        pass  # Hope for the best
+    if lines and not lines[-1].endswith('\n'):
+        lines[-1] += '\n'
     size, mtime = stat.st_size, stat.st_mtime
     cache[filename] = size, mtime, lines, fullname
     return lines

@@ -22,6 +22,8 @@ CYGWIN*) PYTHON=./python.exe;;
 *)      PYTHON=./python;;
 esac
 
+PYTHON="$PYTHON -bb"
+
 # Unset PYTHONPATH, just to be sure.
 unset PYTHONPATH
 
@@ -53,7 +55,7 @@ case "$#$EXCEPT" in
     TESTS=`(cd Lib/test; ls test_*.py | sed 's/\.py//')`
     ;;
 *-x)
-    PAT="^(`echo $@ | sed 's/\.py//' | sed 's/ /|/'`)$"
+    PAT="^(`echo $@ | sed 's/\.py//g' | sed 's/ /|/g'`)$"
     TESTS=`(cd Lib/test; ls test_*.py | sed 's/\.py//' | egrep -v "$PAT")`
     ;;
 *)

@@ -11,7 +11,7 @@ def abstractmethod(funcobj):
     Requires that the metaclass is ABCMeta or derived from it.  A
     class that has a metaclass derived from ABCMeta cannot be
     instantiated unless all of its abstract methods are overridden.
-    The abstract methods can be called using any of the the normal
+    The abstract methods can be called using any of the normal
     'super' call mechanisms.
 
     Usage:
@@ -25,13 +25,53 @@ def abstractmethod(funcobj):
     return funcobj
 
 
+class abstractclassmethod(classmethod):
+    """A decorator indicating abstract classmethods.
+
+    Similar to abstractmethod.
+
+    Usage:
+
+        class C(metaclass=ABCMeta):
+            @abstractclassmethod
+            def my_abstract_classmethod(cls, ...):
+                ...
+    """
+
+    __isabstractmethod__ = True
+
+    def __init__(self, callable):
+        callable.__isabstractmethod__ = True
+        super().__init__(callable)
+
+
+class abstractstaticmethod(staticmethod):
+    """A decorator indicating abstract staticmethods.
+
+    Similar to abstractmethod.
+
+    Usage:
+
+        class C(metaclass=ABCMeta):
+            @abstractstaticmethod
+            def my_abstract_staticmethod(...):
+                ...
+    """
+
+    __isabstractmethod__ = True
+
+    def __init__(self, callable):
+        callable.__isabstractmethod__ = True
+        super().__init__(callable)
+
+
 class abstractproperty(property):
     """A decorator indicating abstract properties.
 
     Requires that the metaclass is ABCMeta or derived from it.  A
     class that has a metaclass derived from ABCMeta cannot be
     instantiated unless all of its abstract properties are overridden.
-    The abstract properties can be called using any of the the normal
+    The abstract properties can be called using any of the normal
     'super' call mechanisms.
 
     Usage:
@@ -94,7 +134,7 @@ class ABCMeta(type):
 
     def register(cls, subclass):
         """Register a virtual subclass of an ABC."""
-        if not isinstance(cls, type):
+        if not isinstance(subclass, type):
             raise TypeError("Can only register classes")
         if issubclass(subclass, cls):
             return  # Already a subclass
@@ -159,12 +199,12 @@ class ABCMeta(type):
         # Check if it's a subclass of a registered class (recursive)
         for rcls in cls._abc_registry:
             if issubclass(subclass, rcls):
-                cls._abc_registry.add(subclass)
+                cls._abc_cache.add(subclass)
                 return True
         # Check if it's a subclass of a subclass (recursive)
         for scls in cls.__subclasses__():
             if issubclass(subclass, scls):
-                cls._abc_registry.add(subclass)
+                cls._abc_cache.add(subclass)
                 return True
         # No dice; update negative cache
         cls._abc_negative_cache.add(subclass)

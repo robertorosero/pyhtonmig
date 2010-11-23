@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- mode: python -*-
 
 # Re test suite and benchmark suite v1.5
@@ -661,14 +661,10 @@ xyzabc
     ('^([ab]*?)(?<!(a))c', 'abc', SUCCEED, 'g1+"-"+g2', 'ab-None'),
 ]
 
-try:
-    u = eval("u'\N{LATIN CAPITAL LETTER A WITH DIAERESIS}'")
-except SyntaxError:
-    pass
-else:
-    tests.extend([
+u = '\N{LATIN CAPITAL LETTER A WITH DIAERESIS}'
+tests.extend([
     # bug 410271: \b broken under locales
     (r'\b.\b', 'a', SUCCEED, 'found', 'a'),
     (r'(?u)\b.\b', u, SUCCEED, 'found', u),
     (r'(?u)\w', u, SUCCEED, 'found', u),
-    ])
+])

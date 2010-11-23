@@ -6,7 +6,8 @@
 
 import sys; rprt = sys.stderr.write #for debugging
 
-error = 'bitvec.error'
+class error(Exception):
+    pass
 
 
 def _check_value(value):
@@ -312,9 +313,6 @@ class BitVec:
                   self._len)
 
     def __int__(self):
-        return int(self._data)
-
-    def __long__(self):
         return int(self._data)
 
     def __float__(self):

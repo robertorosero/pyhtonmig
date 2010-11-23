@@ -223,7 +223,7 @@ A set display is denoted by curly braces and distinguishable from dictionary
 displays by the lack of colons separating keys and values:
 
 .. productionlist::
-   set_display: "{" [`expression_list` | `comprehension`] "}"
+   set_display: "{" (`expression_list` | `comprehension`) "}"
 
 A set display yields a new mutable set object, the contents being specified by
 either a sequence of expressions or a comprehension.  When a comma-separated
@@ -231,19 +231,8 @@ list of expressions is supplied, its elements are evaluated from left to right
 and added to the set object.  When a comprehension is supplied, the set is
 constructed from the elements resulting from the comprehension.
 
-
-Variables used in the generator expression are evaluated lazily in a separate
-scope when the :meth:`next` method is called for the generator object (in the
-same fashion as for normal generators).  However, the :keyword:`in` expression
-of the leftmost :keyword:`for` clause is immediately evaluated in the current
-scope so that an error produced by it can be seen before any other possible
-error in the code that handles the generator expression.  Subsequent
-:keyword:`for` and :keyword:`if` clauses cannot be evaluated immediately since
-they may depend on the previous :keyword:`for` loop.  For example:
-``(x*y for x in range(10) for y in bar(x))``.
-
-The parentheses can be omitted on calls with only one argument. See section
-:ref:`calls` for the detail.
+An empty set cannot be constructed with ``{}``; this literal constructs an empty
+dictionary.
 
 
 .. _dict:
@@ -355,7 +344,7 @@ All of this makes generator functions quite similar to coroutines; they yield
 multiple times, they have more than one entry point and their execution can be
 suspended.  The only difference is that a generator function cannot control
 where should the execution continue after it yields; the control is always
-transfered to the generator's caller.
+transferred to the generator's caller.
 
 The :keyword:`yield` statement is allowed in the :keyword:`try` clause of a
 :keyword:`try` ...  :keyword:`finally` construct.  If the generator is not
@@ -375,8 +364,8 @@ generator function:
 
    Starts the execution of a generator function or resumes it at the last
    executed :keyword:`yield` expression.  When a generator function is resumed
-   with a :meth:`next` method, the current :keyword:`yield` expression always
-   evaluates to :const:`None`.  The execution then continues to the next
+   with a :meth:`__next__` method, the current :keyword:`yield` expression
+   always evaluates to :const:`None`.  The execution then continues to the next
    :keyword:`yield` expression, where the generator is suspended again, and the
    value of the :token:`expression_list` is returned to :meth:`next`'s caller.
    If the generator exits without yielding another value, a :exc:`StopIteration`
@@ -427,7 +416,7 @@ generator functions::
    ...         while True:
    ...             try:
    ...                 value = (yield value)
-   ...             except Exception, e:
+   ...             except Exception as e:
    ...                 value = e
    ...     finally:
    ...         print("Don't forget to clean up when 'close()' is called.")
@@ -529,11 +518,18 @@ whose value is one of the keys of the mapping, and the subscription selects the
 value in the mapping that corresponds to that key.  (The expression list is a
 tuple except if it has exactly one item.)
 
-If the primary is a sequence, the expression (list) must evaluate to an integer.
-If this value is negative, the length of the sequence is added to it (so that,
-e.g., ``x[-1]`` selects the last item of ``x``.)  The resulting value must be a
-nonnegative integer less than the number of items in the sequence, and the
-subscription selects the item whose index is that value (counting from zero).
+If the primary is a sequence, the expression (list) must evaluate to an integer
+or a slice (as discussed in the following section).
+
+The formal syntax makes no special provision for negative indices in
+sequences; however, built-in sequences all provide a :meth:`__getitem__`
+method that interprets negative indices by adding the length of the sequence
+to the index (so that ``x[-1]`` selects the last item of ``x``).  The
+resulting value must be a nonnegative integer less than the number of items in
+the sequence, and the subscription selects the item whose index is that value
+(counting from zero). Since the support for negative indices and slicing
+occurs in the object's :meth:`__getitem__` method, subclasses overriding
+this method will need to explicitly add that support.
 
 .. index::
    single: character
@@ -563,7 +559,7 @@ or list).  Slicings may be used as expressions or as targets in assignment or
 :keyword:`del` statements.  The syntax for a slicing:
 
 .. productionlist::
-   slicing: `primary` "[" `slice_list` "]" 
+   slicing: `primary` "[" `slice_list` "]"
    slice_list: `slice_item` ("," `slice_item`)* [","]
    slice_item: `expression` | `proper_slice`
    proper_slice: [`lower_bound`] ":" [`upper_bound`] [ ":" [`stride`] ]
@@ -609,14 +605,13 @@ A call calls a callable object (e.g., a function) with a possibly empty series
 of arguments:
 
 .. productionlist::
-   call: `primary` "(" [`argument_list` [","]
-       : | `expression` `genexpr_for`] ")"
+   call: `primary` "(" [`argument_list` [","] | `comprehension`] ")"
    argument_list: `positional_arguments` ["," `keyword_arguments`]
-                : ["," "*" `expression`]
-                : ["," "**" `expression`]
+                :   ["," "*" `expression`] ["," `keyword_arguments`]
+                :   ["," "**" `expression`]
                 : | `keyword_arguments` ["," "*" `expression`]
-                : ["," "**" `expression`]
-                : | "*" `expression` ["," "**" `expression`]
+                :   ["," `keyword_arguments`] ["," "**" `expression`]
+                : | "*" `expression` ["," `keyword_arguments`] ["," "**" `expression`]
                 : | "**" `expression`
    positional_arguments: `expression` ("," `expression`)*
    keyword_arguments: `keyword_item` ("," `keyword_item`)*
@@ -651,13 +646,13 @@ slots for which no default value is specified, a :exc:`TypeError` exception is
 raised.  Otherwise, the list of filled slots is used as the argument list for
 the call.
 
-.. note::
-   
-   An implementation may provide builtin functions whose positional parameters do
-   not have names, even if they are 'named' for the purpose of documentation, and
-   which therefore cannot be supplied by keyword.  In CPython, this is the case for
-   functions implemented in C that use :cfunc:`PyArg_ParseTuple` to parse their
-   arguments.
+.. impl-detail::
+
+   An implementation may provide built-in functions whose positional parameters
+   do not have names, even if they are 'named' for the purpose of documentation,
+   and which therefore cannot be supplied by keyword.  In CPython, this is the
+   case for functions implemented in C that use :c:func:`PyArg_ParseTuple` to
+   parse their arguments.
 
 If there are more positional arguments than there are formal parameter slots, a
 :exc:`TypeError` exception is raised, unless a formal parameter using the syntax
@@ -674,12 +669,13 @@ there were no excess keyword arguments.
 
 If the syntax ``*expression`` appears in the function call, ``expression`` must
 evaluate to a sequence.  Elements from this sequence are treated as if they were
-additional positional arguments; if there are positional arguments *x1*,...,*xN*
-, and ``expression`` evaluates to a sequence *y1*,...,*yM*, this is equivalent
-to a call with M+N positional arguments *x1*,...,*xN*,*y1*,...,*yM*.
+additional positional arguments; if there are positional arguments *x1*,...,
+*xN*, and ``expression`` evaluates to a sequence *y1*, ..., *yM*, this is
+equivalent to a call with M+N positional arguments *x1*, ..., *xN*, *y1*, ...,
+*yM*.
 
-A consequence of this is that although the ``*expression`` syntax appears
-*after* any keyword arguments, it is processed *before* the keyword arguments
+A consequence of this is that although the ``*expression`` syntax may appear
+*after* some keyword arguments, it is processed *before* the keyword arguments
 (and the ``**expression`` argument, if any -- see below).  So::
 
    >>> def f(a, b):
@@ -796,14 +792,14 @@ number. (In earlier versions it raised a :exc:`ValueError`.)
 
 .. _unary:
 
-Unary arithmetic operations
-===========================
+Unary arithmetic and bitwise operations
+=======================================
 
 .. index::
    triple: unary; arithmetic; operation
    triple: unary; bitwise; operation
 
-All unary arithmetic (and bitwise) operations have the same priority:
+All unary arithmetic and bitwise operations have the same priority:
 
 .. productionlist::
    u_expr: `power` | "-" `u_expr` | "+" `u_expr` | "~" `u_expr`
@@ -925,6 +921,11 @@ the left or right by the number of bits given by the second argument.
 A right shift by *n* bits is defined as division by ``pow(2,n)``.  A left shift
 by *n* bits is defined as multiplication with ``pow(2,n)``.
 
+.. note::
+
+   In the current implementation, the right-hand operand is required
+   to be at most :attr:`sys.maxsize`.  If the right-hand operand is larger than
+   :attr:`sys.maxsize` an :exc:`OverflowError` exception is raised.
 
 .. _bitwise:
 
@@ -1002,20 +1003,23 @@ pretty).
 
 The operators ``<``, ``>``, ``==``, ``>=``, ``<=``, and ``!=`` compare the
 values of two objects.  The objects need not have the same type. If both are
-numbers, they are converted to a common type.  Otherwise, objects of different
-types *always* compare unequal, and are ordered consistently but arbitrarily.
-You can control comparison behavior of objects of non-builtin types by defining
-a :meth:`__cmp__` method or rich comparison methods like :meth:`__gt__`,
-described in section :ref:`specialnames`.
-
-(This unusual definition of comparison was used to simplify the definition of
-operations like sorting and the :keyword:`in` and :keyword:`not in` operators.
-In the future, the comparison rules for objects of different types are likely to
-change.)
+numbers, they are converted to a common type.  Otherwise, the ``==`` and ``!=``
+operators *always* consider objects of different types to be unequal, while the
+``<``, ``>``, ``>=`` and ``<=`` operators raise a :exc:`TypeError` when
+comparing objects of different types that do not implement these operators for
+the given pair of types.  You can control comparison behavior of objects of
+non-built-in types by defining rich comparison methods like :meth:`__gt__`,
+described in section :ref:`customization`.
 
 Comparison of objects of the same type depends on the type:
 
 * Numbers are compared arithmetically.
+
+* The values :const:`float('NaN')` and :const:`Decimal('NaN')` are special.
+  The are identical to themselves, ``x is x`` but are not equal to themselves,
+  ``x != x``.  Additionally, comparing any value to a not-a-number value
+  will return ``False``.  For example, both ``3 < float('NaN')`` and
+  ``float('NaN') < 3`` will return ``False``.
 
 * Bytes objects are compared lexicographically using the numeric values of their
   elements.
@@ -1030,27 +1034,46 @@ Comparison of objects of the same type depends on the type:
   length.
 
   If not equal, the sequences are ordered the same as their first differing
-  elements.  For example, ``cmp([1,2,x], [1,2,y])`` returns the same as
-  ``cmp(x,y)``.  If the corresponding element does not exist, the shorter
+  elements.  For example, ``[1,2,x] <= [1,2,y]`` has the same value as
+  ``x <= y``.  If the corresponding element does not exist, the shorter
   sequence is ordered first (for example, ``[1,2] < [1,2,3]``).
 
-* Mappings (dictionaries) compare equal if and only if their sorted ``(key,
-  value)`` lists compare equal. [#]_ Outcomes other than equality are resolved
-  consistently, but are not otherwise defined. [#]_
+* Mappings (dictionaries) compare equal if and only if they have the same
+  ``(key, value)`` pairs. Order comparisons ``('<', '<=', '>=', '>')``
+  raise :exc:`TypeError`.
 
-* Most other objects of builtin types compare unequal unless they are the same
+* Sets and frozensets define comparison operators to mean subset and superset
+  tests.  Those relations do not define total orderings (the two sets ``{1,2}``
+  and {2,3} are not equal, nor subsets of one another, nor supersets of one
+  another).  Accordingly, sets are not appropriate arguments for functions
+  which depend on total ordering.  For example, :func:`min`, :func:`max`, and
+  :func:`sorted` produce undefined results given a list of sets as inputs.
+
+* Most other objects of built-in types compare unequal unless they are the same
   object; the choice whether one object is considered smaller or larger than
   another one is made arbitrarily but consistently within one execution of a
   program.
+
+Comparison of objects of the differing types depends on whether either
+of the types provide explicit support for the comparison.  Most numeric types
+can be compared with one another, but comparisons of :class:`float` and
+:class:`Decimal` are not supported to avoid the inevitable confusion arising
+from representation issues such as ``float('1.1')`` being inexactly represented
+and therefore not exactly equal to ``Decimal('1.1')`` which is.  When
+cross-type comparison is not supported, the comparison method returns
+``NotImplemented``.  This can create the illusion of non-transitivity between
+supported cross-type comparisons and unsupported comparisons.  For example,
+``Decimal(2) == 2`` and ``2 == float(2)`` but ``Decimal(2) != float(2)``.
+
+.. _membership-test-details:
 
 The operators :keyword:`in` and :keyword:`not in` test for membership.  ``x in
 s`` evaluates to true if *x* is a member of *s*, and false otherwise.  ``x not
 in s`` returns the negation of ``x in s``.  All built-in sequences and set types
 support this as well as dictionary, for which :keyword:`in` tests whether a the
-dictionary has a given key.
-
-For the list and tuple types, ``x in y`` is true if and only if there exists an
-index *i* such that ``x == y[i]`` is true.
+dictionary has a given key. For container types such as list, tuple, set,
+frozenset, dict, or collections.deque, the expression ``x in y`` is equivalent
+to ``any(x is e or x == e for e in y)``.
 
 For the string and bytes types, ``x in y`` is true if and only if *x* is a
 substring of *y*.  An equivalent test is ``y.find(x) != -1``.  Empty strings are
@@ -1060,7 +1083,12 @@ return ``True``.
 For user-defined classes which define the :meth:`__contains__` method, ``x in
 y`` is true if and only if ``y.__contains__(x)`` is true.
 
-For user-defined classes which do not define :meth:`__contains__` and do define
+For user-defined classes which do not define :meth:`__contains__` but do define
+:meth:`__iter__`, ``x in y`` is true if some value ``z`` with ``x == z`` is
+produced while iterating over ``y``.  If an exception is raised during the
+iteration, it is as if :keyword:`in` raised that exception.
+
+Lastly, the old-style iteration protocol is tried: if a class defines
 :meth:`__getitem__`, ``x in y`` is true if and only if there is a non-negative
 integer index *i* such that ``x == y[i]``, and all lower integer indices do not
 raise :exc:`IndexError` exception.  (If any other exception is raised, it is as
@@ -1082,7 +1110,7 @@ The operator :keyword:`not in` is defined to have the inverse true value of
 
 The operators :keyword:`is` and :keyword:`is not` test for object identity: ``x
 is y`` is true if and only if *x* and *y* are the same object.  ``x is not y``
-yields the inverse truth value.
+yields the inverse truth value. [#]_
 
 
 .. _booleans:
@@ -1097,12 +1125,7 @@ Boolean operations
    pair: Conditional; expression
    pair: Boolean; operation
 
-Boolean operations have the lowest priority of all Python operations:
-
 .. productionlist::
-   expression: `conditional_expression` | `lambda_form`
-   expression_nocond: `or_test` | `lambda_form_nocond`
-   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
    or_test: `and_test` | `or_test` "or" `and_test`
    and_test: `not_test` | `and_test` "and" `not_test`
    not_test: `comparison` | "not" `not_test`
@@ -1118,10 +1141,6 @@ truth value by providing a :meth:`__bool__` method.
 
 The operator :keyword:`not` yields ``True`` if its argument is false, ``False``
 otherwise.
-
-The expression ``x if C else y`` first evaluates *C* (*not* *x*); if *C* is
-true, *x* is evaluated and its value is returned; otherwise, *y* is evaluated
-and its value is returned.
 
 .. index:: operator: and
 
@@ -1142,7 +1161,30 @@ not bother to return a value of the same type as its argument, so e.g., ``not
 'foo'`` yields ``False``, not ``''``.)
 
 
+Conditional Expressions
+=======================
+
+.. index::
+   pair: conditional; expression
+   pair: ternary; operator
+
+.. productionlist::
+   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
+   expression: `conditional_expression` | `lambda_form`
+   expression_nocond: `or_test` | `lambda_form_nocond`
+
+Conditional expressions (sometimes called a "ternary operator") have the lowest
+priority of all Python operations.
+
+The expression ``x if C else y`` first evaluates the condition, *C* (*not* *x*);
+if *C* is true, *x* is evaluated and its value is returned; otherwise, *y* is
+evaluated and its value is returned.
+
+See :pep:`308` for more details about conditional expressions.
+
+
 .. _lambdas:
+.. _lambda:
 
 Lambdas
 =======
@@ -1166,8 +1208,6 @@ behaves like a function object defined with ::
 
 See section :ref:`function` for the syntax of parameter lists.  Note that
 functions created with lambda forms cannot contain statements or annotations.
-
-.. _lambda:
 
 
 .. _exprlists:
@@ -1212,7 +1252,7 @@ their suffixes::
    (expr1, expr2, expr3, expr4)
    {expr1: expr2, expr3: expr4}
    expr1 + expr2 * (expr3 - expr4)
-   func(expr1, expr2, *expr3, **expr4)
+   expr1(expr2, expr3, *expr4, **expr5)
    expr3, expr4 = expr1, expr2
 
 
@@ -1231,56 +1271,50 @@ comparisons, including tests, which all have the same precedence and chain from
 left to right --- see section :ref:`comparisons` --- and exponentiation, which
 groups from right to left).
 
-+----------------------------------------------+-------------------------------------+
-| Operator                                     | Description                         |
-+==============================================+=====================================+
-| :keyword:`lambda`                            | Lambda expression                   |
-+----------------------------------------------+-------------------------------------+
-| :keyword:`or`                                | Boolean OR                          |
-+----------------------------------------------+-------------------------------------+
-| :keyword:`and`                               | Boolean AND                         |
-+----------------------------------------------+-------------------------------------+
-| :keyword:`not` *x*                           | Boolean NOT                         |
-+----------------------------------------------+-------------------------------------+
-| :keyword:`in`, :keyword:`not` :keyword:`in`  | Membership tests                    |
-+----------------------------------------------+-------------------------------------+
-| :keyword:`is`, :keyword:`is not`             | Identity tests                      |
-+----------------------------------------------+-------------------------------------+
-| ``<``, ``<=``, ``>``, ``>=``, ``!=``, ``==`` | Comparisons                         |
-+----------------------------------------------+-------------------------------------+
-| ``|``                                        | Bitwise OR                          |
-+----------------------------------------------+-------------------------------------+
-| ``^``                                        | Bitwise XOR                         |
-+----------------------------------------------+-------------------------------------+
-| ``&``                                        | Bitwise AND                         |
-+----------------------------------------------+-------------------------------------+
-| ``<<``, ``>>``                               | Shifts                              |
-+----------------------------------------------+-------------------------------------+
-| ``+``, ``-``                                 | Addition and subtraction            |
-+----------------------------------------------+-------------------------------------+
-| ``*``, ``/``, ``//``, ``%``                  | Multiplication, division, remainder |
-+----------------------------------------------+-------------------------------------+
-| ``+x``, ``-x``                               | Positive, negative                  |
-+----------------------------------------------+-------------------------------------+
-| ``~x``                                       | Bitwise not                         |
-+----------------------------------------------+-------------------------------------+
-| ``**``                                       | Exponentiation                      |
-+----------------------------------------------+-------------------------------------+
-| ``x.attribute``                              | Attribute reference                 |
-+----------------------------------------------+-------------------------------------+
-| ``x[index]``                                 | Subscription                        |
-+----------------------------------------------+-------------------------------------+
-| ``x[index:index]``                           | Slicing                             |
-+----------------------------------------------+-------------------------------------+
-| ``f(arguments...)``                          | Function call                       |
-+----------------------------------------------+-------------------------------------+
-| ``(expressions...)``                         | Binding, tuple display, generator   |
-|                                              | expressions                         |
-+----------------------------------------------+-------------------------------------+
-| ``[expressions...]``                         | List display                        |
-+----------------------------------------------+-------------------------------------+
-| ``{expressions...}``                         | Dictionary or set display           |
-+----------------------------------------------+-------------------------------------+
+
++-----------------------------------------------+-------------------------------------+
+| Operator                                      | Description                         |
++===============================================+=====================================+
+| :keyword:`lambda`                             | Lambda expression                   |
++-----------------------------------------------+-------------------------------------+
+| :keyword:`if` -- :keyword:`else`              | Conditional expression              |
++-----------------------------------------------+-------------------------------------+
+| :keyword:`or`                                 | Boolean OR                          |
++-----------------------------------------------+-------------------------------------+
+| :keyword:`and`                                | Boolean AND                         |
++-----------------------------------------------+-------------------------------------+
+| :keyword:`not` *x*                            | Boolean NOT                         |
++-----------------------------------------------+-------------------------------------+
+| :keyword:`in`, :keyword:`not` :keyword:`in`,  | Comparisons, including membership   |
+| :keyword:`is`, :keyword:`is not`, ``<``,      | tests and identity tests,           |
+| ``<=``, ``>``, ``>=``, ``!=``, ``==``         |                                     |
++-----------------------------------------------+-------------------------------------+
+| ``|``                                         | Bitwise OR                          |
++-----------------------------------------------+-------------------------------------+
+| ``^``                                         | Bitwise XOR                         |
++-----------------------------------------------+-------------------------------------+
+| ``&``                                         | Bitwise AND                         |
++-----------------------------------------------+-------------------------------------+
+| ``<<``, ``>>``                                | Shifts                              |
++-----------------------------------------------+-------------------------------------+
+| ``+``, ``-``                                  | Addition and subtraction            |
++-----------------------------------------------+-------------------------------------+
+| ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
+|                                               | [#]_                                |
++-----------------------------------------------+-------------------------------------+
+| ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
++-----------------------------------------------+-------------------------------------+
+| ``**``                                        | Exponentiation [#]_                 |
++-----------------------------------------------+-------------------------------------+
+| ``x[index]``, ``x[index:index]``,             | Subscription, slicing,              |
+| ``x(arguments...)``, ``x.attribute``          | call, attribute reference           |
++-----------------------------------------------+-------------------------------------+
+| ``(expressions...)``,                         | Binding or tuple display,           |
+| ``[expressions...]``,                         | list display,                       |
+| ``{key:datum...}``,                           | dictionary display,                 |
+| ``{expressions...}``                          | set display                         |
++-----------------------------------------------+-------------------------------------+
+
 
 .. rubric:: Footnotes
 
@@ -1301,16 +1335,16 @@ groups from right to left).
 .. [#] While comparisons between strings make sense at the byte level, they may
    be counter-intuitive to users.  For example, the strings ``"\u00C7"`` and
    ``"\u0327\u0043"`` compare differently, even though they both represent the
-   same unicode character (LATIN CAPTITAL LETTER C WITH CEDILLA).  To compare
+   same unicode character (LATIN CAPITAL LETTER C WITH CEDILLA).  To compare
    strings in a human recognizable way, compare using
    :func:`unicodedata.normalize`.
 
-.. [#] The implementation computes this efficiently, without constructing lists
-   or sorting.
+.. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
+   descriptors, you may notice seemingly unusual behaviour in certain uses of
+   the :keyword:`is` operator, like those involving comparisons between instance
+   methods, or constants.  Check their documentation for more info.
 
-.. [#] Earlier versions of Python used lexicographic comparison of the sorted (key,
-   value) lists, but this was very expensive for the common case of comparing
-   for equality.  An even earlier version of Python compared dictionaries by
-   identity only, but this caused surprises because people expected to be able
-   to test a dictionary for emptiness by comparing it to ``{}``.
+.. [#] The ``%`` is also used for string formatting; the same precedence applies.
 
+.. [#] The power operator ``**`` binds less tightly than an arithmetic or
+   bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

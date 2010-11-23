@@ -70,10 +70,11 @@ source distribution:
 * all C source files mentioned in the :option:`ext_modules` or
   :option:`libraries` options (
 
-  **\*\*** getting C library sources currently broken---no
-  :meth:`get_source_files` method in :file:`build_clib.py`! **\*\***)
+  .. XXX getting C library sources currently broken---no
+         :meth:`get_source_files` method in :file:`build_clib.py`!
 
 * scripts identified by the :option:`scripts` option
+  See :ref:`distutils-installing-scripts`.
 
 * anything that looks like a test script: :file:`test/test\*.py` (currently, the
   Distutils don't do anything with test scripts except include them in source
@@ -82,6 +83,12 @@ source distribution:
 
 * :file:`README.txt` (or :file:`README`), :file:`setup.py` (or whatever  you
   called your setup script), and :file:`setup.cfg`
+
+* all files that matches the ``package_data`` metadata.
+  See :ref:`distutils-installing-package-data`.
+
+* all files that matches the ``data_files`` metadata.
+  See :ref:`distutils-additional-files`.
 
 Sometimes this is enough, but usually you will want to specify additional files
 to distribute.  The typical way to do this is to write a *manifest template*,
@@ -95,6 +102,10 @@ If you prefer to roll your own manifest file, the format is simple: one filename
 per line, regular files (or symlinks to them) only.  If you do supply your own
 :file:`MANIFEST`, you must specify everything: the default set of files
 described above does not apply in this case.
+
+.. versionadded:: 3.1
+   :file:`MANIFEST` files start with a comment indicating they are generated.
+   Files without this comment are not overwritten or removed.
 
 The manifest template has one command per line, where each command specifies a
 set of files to include or exclude from the source distribution.  For an
@@ -180,10 +191,6 @@ The normal course of operations for the :command:`sdist` command is as follows:
 * if neither :file:`MANIFEST` nor :file:`MANIFEST.in` exist, create a manifest
   with just the default file set
 
-* if either :file:`MANIFEST.in` or the setup script (:file:`setup.py`) are more
-  recent than :file:`MANIFEST`, recreate :file:`MANIFEST` by reading
-  :file:`MANIFEST.in`
-
 * use the list of files now in :file:`MANIFEST` (either just generated or read
   in) to create the source distribution archive(s)
 
@@ -191,19 +198,14 @@ There are a couple of options that modify this behaviour.  First, use the
 :option:`--no-defaults` and :option:`--no-prune` to disable the standard
 "include" and "exclude" sets.
 
-Second, you might want to force the manifest to be regenerated---for example, if
-you have added or removed files or directories that match an existing pattern in
-the manifest template, you should regenerate the manifest::
-
-   python setup.py sdist --force-manifest
-
-Or, you might just want to (re)generate the manifest, but not create a source
+Second, you might just want to (re)generate the manifest, but not create a source
 distribution::
 
    python setup.py sdist --manifest-only
 
-:option:`--manifest-only` implies :option:`--force-manifest`. :option:`-o` is a
-shortcut for :option:`--manifest-only`, and :option:`-f` for
-:option:`--force-manifest`.
+:option:`-o` is a shortcut for :option:`--manifest-only`.
 
-
+.. versionchanged:: 3.1
+   An existing generated :file:`MANIFEST` will be regenerated without
+   :command:`sdist` comparing its modification time to the one of
+   :file:`MANIFEST.in` or :file:`setup.py`.

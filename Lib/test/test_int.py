@@ -34,6 +34,7 @@ class IntTestCases(unittest.TestCase):
         self.assertEqual(int(-3.9), -3)
         self.assertEqual(int(3.5), 3)
         self.assertEqual(int(-3.5), -3)
+        self.assertEqual(int("-3"), -3)
         # Different base:
         self.assertEqual(int("10",16), 16)
         # Test conversion from strings and various anomalies
@@ -52,15 +53,15 @@ class IntTestCases(unittest.TestCase):
         s = repr(-1-sys.maxsize)
         x = int(s)
         self.assertEqual(x+1, -sys.maxsize)
-        self.assert_(isinstance(x, int))
-        # should return long
+        self.assertIsInstance(x, int)
+        # should return int
         self.assertEqual(int(s[1:]), sys.maxsize+1)
 
-        # should return long
+        # should return int
         x = int(1e100)
-        self.assert_(isinstance(x, int))
+        self.assertIsInstance(x, int)
         x = int(-1e100)
-        self.assert_(isinstance(x, int))
+        self.assertIsInstance(x, int)
 
 
         # SF bug 434186:  0x80000000/2 != 0x80000000>>1.
@@ -78,7 +79,8 @@ class IntTestCases(unittest.TestCase):
         self.assertRaises(ValueError, int, '123\x00 245', 20)
 
         x = int('1' * 600)
-        self.assert_(isinstance(x, int))
+        self.assertIsInstance(x, int)
+
 
         self.assertRaises(TypeError, int, 1, 12)
 
@@ -96,8 +98,8 @@ class IntTestCases(unittest.TestCase):
         self.assertRaises(ValueError, int, "0b", 0)
 
         # Bug #3236: Return small longs from PyLong_FromString
-        self.assert_(int("10") is 10)
-        self.assert_(int("-1") is -1)
+        self.assertTrue(int("10") is 10)
+        self.assertTrue(int("-1") is -1)
 
         # SF bug 1334662: int(string, base) wrong answers
         # Various representations of 2**32 evaluated to 0
@@ -293,7 +295,7 @@ class IntTestCases(unittest.TestCase):
                 try:
                     int(TruncReturnsNonIntegral())
                 except TypeError as e:
-                    self.assertEquals(str(e),
+                    self.assertEqual(str(e),
                                       "__trunc__ returned non-Integral"
                                       " (type NonIntegral)")
                 else:

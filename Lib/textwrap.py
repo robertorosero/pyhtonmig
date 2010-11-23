@@ -9,7 +9,7 @@ __revision__ = "$Id$"
 
 import string, re
 
-__all__ = ['TextWrapper', 'wrap', 'fill']
+__all__ = ['TextWrapper', 'wrap', 'fill', 'dedent']
 
 # Hardcode the recognized whitespace characters to the US-ASCII
 # whitespace characters.  The main reason for doing this is that in
@@ -76,7 +76,7 @@ class TextWrapper:
     # (after stripping out empty strings).
     wordsep_re = re.compile(
         r'(\s+|'                                  # any whitespace
-        r'[^\s\w]*\w+[a-zA-Z]-(?=\w+[a-zA-Z])|'   # hyphenated words
+        r'[^\s\w]*\w+[^0-9\W]-(?=\w+[^0-9\W])|'   # hyphenated words
         r'(?<=[\w\!\"\'\&\.\,\?])-{2,}(?=\w))')   # em-dash
 
     # This less funky little regex just split on recognized spaces. E.g.
@@ -135,7 +135,7 @@ class TextWrapper:
         """_split(text : string) -> [string]
 
         Split the text to wrap into indivisible chunks.  Chunks are
-        not quite the same as words; see wrap_chunks() for full
+        not quite the same as words; see _wrap_chunks() for full
         details.  As an example, the text
           Look, goof-ball -- use the -b option!
         breaks into the following chunks:
@@ -163,9 +163,9 @@ class TextWrapper:
         space to two.
         """
         i = 0
-        pat = self.sentence_end_re
+        patsearch = self.sentence_end_re.search
         while i < len(chunks)-1:
-            if chunks[i+1] == " " and pat.search(chunks[i]):
+            if chunks[i+1] == " " and patsearch(chunks[i]):
                 chunks[i+1] = "  "
                 i += 2
             else:

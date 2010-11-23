@@ -113,7 +113,6 @@ Exported classes:
                  XML-RPC value
   Binary         binary data wrapper
 
-  SlowParser     Slow but safe standard parser (based on xmllib)
   Marshaller     Generate an XML-RPC params chunk from a Python data structure
   Unmarshaller   Unmarshal an XML-RPC response from incoming XML event message
   Transport      Handles an HTTP transaction to an XML-RPC server
@@ -136,6 +135,14 @@ Exported functions:
 
 import re, time, operator
 import http.client
+from xml.parsers import expat
+import socket
+import errno
+from io import BytesIO
+try:
+    import gzip
+except ImportError:
+    gzip = None #python can be built without zlib/gzip support
 
 # --------------------------------------------------------------------
 # Internal stuff
@@ -145,23 +152,10 @@ try:
 except ImportError:
     datetime = None
 
-def _decode(data, encoding, is8bit=re.compile("[\x80-\xff]").search):
-    # decode non-ascii string (if possible)
-    if encoding and is8bit(data):
-        data = str(data, encoding)
-    return data
-
 def escape(s):
     s = s.replace("&", "&amp;")
     s = s.replace("<", "&lt;")
     return s.replace(">", "&gt;",)
-
-def _stringify(string):
-    # convert to 7-bit ascii if possible
-    try:
-        return string.decode("ascii")
-    except (UnicodeError, TypeError, AttributeError):
-        return string
 
 __version__ = "1.0.1"
 
@@ -349,10 +343,6 @@ class DateTime:
     def timetuple(self):
         return time.strptime(self.value, "%Y%m%dT%H:%M:%S")
 
-    def __cmp__(self, other):
-        s, o = self.make_comparable(other)
-        return cmp(s, o)
-
     ##
     # Get date/time value.
     #
@@ -423,11 +413,11 @@ class Binary:
         return self.data != other
 
     def decode(self, data):
-        self.data = base64.decodestring(data)
+        self.data = base64.decodebytes(data)
 
     def encode(self, out):
         out.write("<value><base64>\n")
-        encoded = base64.encodestring(self.data)
+        encoded = base64.encodebytes(self.data)
         out.write(encoded.decode('ascii'))
         out.write('\n')
         out.write("</base64></value>\n")
@@ -443,81 +433,23 @@ WRAPPERS = (DateTime, Binary)
 # --------------------------------------------------------------------
 # XML parsers
 
-#
-# the SGMLOP parser is about 15x faster than Python's builtin
-# XML parser.  SGMLOP sources can be downloaded from:
-#
-#     http://www.pythonware.com/products/xml/sgmlop.htm
-#
+class ExpatParser:
+    # fast expat parser for Python 2.0 and later.
+    def __init__(self, target):
+        self._parser = parser = expat.ParserCreate(None, None)
+        self._target = target
+        parser.StartElementHandler = target.start
+        parser.EndElementHandler = target.end
+        parser.CharacterDataHandler = target.data
+        encoding = None
+        target.xml(encoding, None)
 
-try:
-    import sgmlop
-    if not hasattr(sgmlop, "XMLParser"):
-        raise ImportError
-except ImportError:
-    SgmlopParser = None # sgmlop accelerator not available
-else:
-    class SgmlopParser:
-        def __init__(self, target):
+    def feed(self, data):
+        self._parser.Parse(data, 0)
 
-            # setup callbacks
-            self.finish_starttag = target.start
-            self.finish_endtag = target.end
-            self.handle_data = target.data
-            self.handle_xml = target.xml
-
-            # activate parser
-            self.parser = sgmlop.XMLParser()
-            self.parser.register(self)
-            self.feed = self.parser.feed
-            self.entity = {
-                "amp": "&", "gt": ">", "lt": "<",
-                "apos": "'", "quot": '"'
-                }
-
-        def close(self):
-            try:
-                self.parser.close()
-            finally:
-                self.parser = self.feed = None # nuke circular reference
-
-        def handle_proc(self, tag, attr):
-            m = re.search("encoding\s*=\s*['\"]([^\"']+)[\"']", attr)
-            if m:
-                self.handle_xml(m.group(1), 1)
-
-        def handle_entityref(self, entity):
-            # <string> entity
-            try:
-                self.handle_data(self.entity[entity])
-            except KeyError:
-                self.handle_data("&%s;" % entity)
-
-try:
-    from xml.parsers import expat
-    if not hasattr(expat, "ParserCreate"):
-        raise ImportError
-except ImportError:
-    ExpatParser = None # expat not available
-else:
-    class ExpatParser:
-        # fast expat parser for Python 2.0 and later.  this is about
-        # 50% slower than sgmlop, on roundtrip testing
-        def __init__(self, target):
-            self._parser = parser = expat.ParserCreate(None, None)
-            self._target = target
-            parser.StartElementHandler = target.start
-            parser.EndElementHandler = target.end
-            parser.CharacterDataHandler = target.data
-            encoding = None
-            target.xml(encoding, None)
-
-        def feed(self, data):
-            self._parser.Parse(data, 0)
-
-        def close(self):
-            self._parser.Parse("", 1) # end of data
-            del self._target, self._parser # get rid of circular references
+    def close(self):
+        self._parser.Parse("", 1) # end of data
+        del self._target, self._parser # get rid of circular references
 
 # --------------------------------------------------------------------
 # XML-RPC marshalling and unmarshalling code
@@ -542,7 +474,7 @@ class Marshaller:
     # by the way, if you don't understand what's going on in here,
     # that's perfectly ok.
 
-    def __init__(self, encoding=None, allow_none=0):
+    def __init__(self, encoding=None, allow_none=False):
         self.memo = {}
         self.data = None
         self.encoding = encoding
@@ -715,7 +647,7 @@ class Unmarshaller:
     # and again, if you don't understand what's going on in here,
     # that's perfectly ok.
 
-    def __init__(self, use_datetime=0):
+    def __init__(self, use_datetime=False):
         self._type = None
         self._stack = []
         self._marks = []
@@ -810,8 +742,8 @@ class Unmarshaller:
 
     def end_string(self, data):
         if self._encoding:
-            data = _decode(data, self._encoding)
-        self.append(_stringify(data))
+            data = data.decode(self._encoding)
+        self.append(data)
         self._value = 0
     dispatch["string"] = end_string
     dispatch["name"] = end_string # struct keys are always strings
@@ -829,7 +761,7 @@ class Unmarshaller:
         dict = {}
         items = self._stack[mark:]
         for i in range(0, len(items), 2):
-            dict[_stringify(items[i])] = items[i+1]
+            dict[items[i]] = items[i+1]
         self._stack[mark:] = [dict]
         self._value = 0
     dispatch["struct"] = end_struct
@@ -866,7 +798,7 @@ class Unmarshaller:
 
     def end_methodName(self, data):
         if self._encoding:
-            data = _decode(data, self._encoding)
+            data = data.decode(self._encoding)
         self._methodname = data
         self._type = "methodName" # no params
     dispatch["methodName"] = end_methodName
@@ -948,7 +880,7 @@ FastMarshaller = FastParser = FastUnmarshaller = None
 #
 # return A (parser, unmarshaller) tuple.
 
-def getparser(use_datetime=0):
+def getparser(use_datetime=False):
     """getparser() -> parser, unmarshaller
 
     Create an instance of the fastest available parser, and attach it
@@ -967,12 +899,8 @@ def getparser(use_datetime=0):
         target = Unmarshaller(use_datetime=use_datetime)
         if FastParser:
             parser = FastParser(target)
-        elif SgmlopParser:
-            parser = SgmlopParser(target)
-        elif ExpatParser:
-            parser = ExpatParser(target)
         else:
-            parser = SlowParser(target)
+            parser = ExpatParser(target)
     return parser, target
 
 ##
@@ -989,7 +917,7 @@ def getparser(use_datetime=0):
 # @return A string containing marshalled data.
 
 def dumps(params, methodname=None, methodresponse=None, encoding=None,
-          allow_none=0):
+          allow_none=False):
     """data [,options] -> marshalled data
 
     Convert an argument tuple or a Fault instance to an XML-RPC
@@ -1065,7 +993,7 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
 #     (None if not present).
 # @see Fault
 
-def loads(data, use_datetime=0):
+def loads(data, use_datetime=False):
     """data -> unmarshalled data, method name
 
     Convert an XML-RPC packet to unmarshalled data plus a method
@@ -1078,6 +1006,78 @@ def loads(data, use_datetime=0):
     p.feed(data)
     p.close()
     return u.close(), u.getmethodname()
+
+##
+# Encode a string using the gzip content encoding such as specified by the
+# Content-Encoding: gzip
+# in the HTTP header, as described in RFC 1952
+#
+# @param data the unencoded data
+# @return the encoded data
+
+def gzip_encode(data):
+    """data -> gzip encoded data
+
+    Encode data using the gzip content encoding as described in RFC 1952
+    """
+    if not gzip:
+        raise NotImplementedError
+    f = BytesIO()
+    gzf = gzip.GzipFile(mode="wb", fileobj=f, compresslevel=1)
+    gzf.write(data)
+    gzf.close()
+    encoded = f.getvalue()
+    f.close()
+    return encoded
+
+##
+# Decode a string using the gzip content encoding such as specified by the
+# Content-Encoding: gzip
+# in the HTTP header, as described in RFC 1952
+#
+# @param data The encoded data
+# @return the unencoded data
+# @raises ValueError if data is not correctly coded.
+
+def gzip_decode(data):
+    """gzip encoded data -> unencoded data
+
+    Decode data using the gzip content encoding as described in RFC 1952
+    """
+    if not gzip:
+        raise NotImplementedError
+    f = BytesIO(data)
+    gzf = gzip.GzipFile(mode="rb", fileobj=f)
+    try:
+        decoded = gzf.read()
+    except IOError:
+        raise ValueError("invalid data")
+    f.close()
+    gzf.close()
+    return decoded
+
+##
+# Return a decoded file-like object for the gzip encoding
+# as described in RFC 1952.
+#
+# @param response A stream supporting a read() method
+# @return a file-like object that the decoded data can be read() from
+
+class GzipDecodedResponse(gzip.GzipFile if gzip else object):
+    """a file-like object to decode a response encoded with the gzip
+    method, as described in RFC 1952.
+    """
+    def __init__(self, response):
+        #response doesn't support tell() and read(), required by
+        #GzipFile
+        if not gzip:
+            raise NotImplementedError
+        self.io = BytesIO(response.read())
+        gzip.GzipFile.__init__(self, mode="rb", fileobj=self.io)
+
+    def close(self):
+        gzip.GzipFile.close(self)
+        self.io.close()
 
 
 # --------------------------------------------------------------------
@@ -1106,11 +1106,22 @@ class Transport:
     # client identifier (may be overridden)
     user_agent = "xmlrpclib.py/%s (by www.pythonware.com)" % __version__
 
-    def __init__(self, use_datetime=0):
+    #if true, we'll request gzip encoding
+    accept_gzip_encoding = True
+
+    # if positive, encode request using gzip if it exceeds this threshold
+    # note that many server will get confused, so only use it if you know
+    # that they can decode such a request
+    encode_threshold = None #None = don't encode
+
+    def __init__(self, use_datetime=False):
         self._use_datetime = use_datetime
+        self._connection = (None, None)
+        self._extra_headers = []
 
     ##
     # Send a complete request, and parse the response.
+    # Retry request if a cached connection has disconnected.
     #
     # @param host Target host.
     # @param handler Target PRC handler.
@@ -1118,22 +1129,45 @@ class Transport:
     # @param verbose Debugging flag.
     # @return Parsed response.
 
-    def request(self, host, handler, request_body, verbose=0):
+    def request(self, host, handler, request_body, verbose=False):
+        #retry request once if cached connection has gone cold
+        for i in (0, 1):
+            try:
+                return self.single_request(host, handler, request_body, verbose)
+            except socket.error as e:
+                if i or e.errno not in (errno.ECONNRESET, errno.ECONNABORTED, errno.EPIPE):
+                    raise
+            except http.client.BadStatusLine: #close after we sent request
+                if i:
+                    raise
+
+    def single_request(self, host, handler, request_body, verbose=False):
         # issue XML-RPC request
+        try:
+            http_conn = self.send_request(host, handler, request_body, verbose)
+            resp = http_conn.getresponse()
+            if resp.status == 200:
+                self.verbose = verbose
+                return self.parse_response(resp)
 
-        http_conn = self.send_request(host, handler, request_body, verbose)
-        resp = http_conn.getresponse()
+        except Fault:
+            raise
+        except Exception:
+            #All unexpected errors leave connection in
+            # a strange state, so we clear it.
+            self.close()
+            raise
 
-        if resp.status != 200:
-            raise ProtocolError(
-                host + handler,
-                resp.status, resp.reason,
-                dict(resp.getheaders())
-                )
+        #We got an error response.
+        #Discard any response data and raise exception
+        if resp.getheader("content-length", ""):
+            resp.read()
+        raise ProtocolError(
+            host + handler,
+            resp.status, resp.reason,
+            dict(resp.getheaders())
+            )
 
-        self.verbose = verbose
-
-        return self._parse_response(resp, None)
 
     ##
     # Create parser.
@@ -1165,13 +1199,14 @@ class Transport:
 
         if auth:
             import base64
-            auth = base64.encodestring(urllib.parse.unquote(auth))
+            auth = urllib.parse.unquote_to_bytes(auth)
+            auth = base64.encodebytes(auth).decode("utf-8")
             auth = "".join(auth.split()) # get rid of whitespace
             extra_headers = [
                 ("Authorization", "Basic " + auth)
                 ]
         else:
-            extra_headers = None
+            extra_headers = []
 
         return host, extra_headers, x509
 
@@ -1182,9 +1217,23 @@ class Transport:
     # @return An HTTPConnection object
 
     def make_connection(self, host):
+        #return an existing connection if possible.  This allows
+        #HTTP/1.1 keep-alive.
+        if self._connection and host == self._connection[0]:
+            return self._connection[1]
         # create a HTTP connection object from a host descriptor
-        host, extra_headers, x509 = self.get_host_info(host)
+        chost, self._extra_headers, x509 = self.get_host_info(host)
+        self._connection = host, http.client.HTTPConnection(chost)
+        return self._connection[1]
 
+    ##
+    # Clear any cached connection object.
+    # Used in the event of socket errors.
+    #
+    def close(self):
+        if self._connection[1]:
+            self._connection[1].close()
+            self._connection = (None, None)
 
     ##
     # Send HTTP request.
@@ -1196,18 +1245,49 @@ class Transport:
     # @return An HTTPConnection.
 
     def send_request(self, host, handler, request_body, debug):
-        host, extra_headers, x509 = self.get_host_info(host)
-        connection = http.client.HTTPConnection(host)
+        connection = self.make_connection(host)
+        headers = self._extra_headers[:]
         if debug:
             connection.set_debuglevel(1)
-        headers = {}
-        if extra_headers:
-            for key, val in extra_headers:
-                header[key] = val
-        headers["Content-Type"] = "text/xml"
-        headers["User-Agent"] = self.user_agent
-        connection.request("POST", handler, request_body, headers)
+        if self.accept_gzip_encoding and gzip:
+            connection.putrequest("POST", handler, skip_accept_encoding=True)
+            headers.append(("Accept-Encoding", "gzip"))
+        else:
+            connection.putrequest("POST", handler)
+        headers.append(("Content-Type", "text/xml"))
+        headers.append(("User-Agent", self.user_agent))
+        self.send_headers(connection, headers)
+        self.send_content(connection, request_body)
         return connection
+
+    ##
+    # Send request headers.
+    # This function provides a useful hook for subclassing
+    #
+    # @param connection httpConnection.
+    # @param headers list of key,value pairs for HTTP headers
+
+    def send_headers(self, connection, headers):
+        for key, val in headers:
+            connection.putheader(key, val)
+
+    ##
+    # Send request body.
+    # This function provides a useful hook for subclassing
+    #
+    # @param connection httpConnection.
+    # @param request_body XML-RPC request body.
+
+    def send_content(self, connection, request_body):
+        #optionally encode the request
+        if (self.encode_threshold is not None and
+            self.encode_threshold < len(request_body) and
+            gzip):
+            connection.putheader("Content-Encoding", "gzip")
+            request_body = gzip_encode(request_body)
+
+        connection.putheader("Content-Length", str(len(request_body)))
+        connection.endheaders(request_body)
 
     ##
     # Parse response.
@@ -1215,37 +1295,25 @@ class Transport:
     # @param file Stream.
     # @return Response tuple and target method.
 
-    def parse_response(self, file):
-        # compatibility interface
-        return self._parse_response(file, None)
-
-    ##
-    # Parse response (alternate interface).  This is similar to the
-    # parse_response method, but also provides direct access to the
-    # underlying socket object (where available).
-    #
-    # @param file Stream.
-    # @param sock Socket handle (or None, if the socket object
-    #    could not be accessed).
-    # @return Response tuple and target method.
-
-    def _parse_response(self, file, sock):
-        # read response from input file/socket, and parse it
+    def parse_response(self, response):
+        # read response data from httpresponse, and parse it
+        if response.getheader("Content-Encoding", "") == "gzip":
+            stream = GzipDecodedResponse(response)
+        else:
+            stream = response
 
         p, u = self.getparser()
 
         while 1:
-            if sock:
-                response = sock.recv(1024)
-            else:
-                response = file.read(1024)
-            if not response:
+            data = stream.read(1024)
+            if not data:
                 break
             if self.verbose:
-                print("body:", repr(response))
-            p.feed(response)
+                print("body:", repr(data))
+            p.feed(data)
 
-        file.close()
+        if stream is not response:
+            stream.close()
         p.close()
 
         return u.close()
@@ -1258,24 +1326,19 @@ class SafeTransport(Transport):
 
     # FIXME: mostly untested
 
-    def send_request(self, host, handler, request_body, debug):
-        import socket
-        if not hasattr(socket, "ssl"):
-            raise NotImplementedError(
-                "your version of http.client doesn't support HTTPS")
+    def make_connection(self, host):
+        if self._connection and host == self._connection[0]:
+            return self._connection[1]
 
-        host, extra_headers, x509 = self.get_host_info(host)
-        connection = http.client.HTTPSConnection(host, None, **(x509 or {}))
-        if debug:
-            connection.set_debuglevel(1)
-        headers = {}
-        if extra_headers:
-            for key, val in extra_headers:
-                header[key] = val
-        headers["Content-Type"] = "text/xml"
-        headers["User-Agent"] = self.user_agent
-        connection.request("POST", handler, request_body, headers)
-        return connection
+        if not hasattr(http.client, "HTTPSConnection"):
+            raise NotImplementedError(
+            "your version of http.client doesn't support HTTPS")
+        # create a HTTPS connection object from a host descriptor
+        # host may be a string, or a (host, x509-dict) tuple
+        chost, self._extra_headers, x509 = self.get_host_info(host)
+        self._connection = host, http.client.HTTPSConnection(chost,
+            None, **(x509 or {}))
+        return self._connection[1]
 
 ##
 # Standard server proxy.  This class establishes a virtual connection
@@ -1316,8 +1379,8 @@ class ServerProxy:
     the given encoding.
     """
 
-    def __init__(self, uri, transport=None, encoding=None, verbose=0,
-                 allow_none=0, use_datetime=0):
+    def __init__(self, uri, transport=None, encoding=None, verbose=False,
+                 allow_none=False, use_datetime=False):
         # establish a "logical" server connection
 
         # get the url
@@ -1336,15 +1399,18 @@ class ServerProxy:
                 transport = Transport(use_datetime=use_datetime)
         self.__transport = transport
 
-        self.__encoding = encoding
+        self.__encoding = encoding or 'utf-8'
         self.__verbose = verbose
         self.__allow_none = allow_none
+
+    def __close(self):
+        self.__transport.close()
 
     def __request(self, methodname, params):
         # call a method on the remote server
 
         request = dumps(params, methodname, encoding=self.__encoding,
-                        allow_none=self.__allow_none)
+                        allow_none=self.__allow_none).encode(self.__encoding)
 
         response = self.__transport.request(
             self.__host,
@@ -1372,6 +1438,16 @@ class ServerProxy:
 
     # note: to call a remote object with an non-standard name, use
     # result getattr(server, "strange-python-name")(args)
+
+    def __call__(self, attr):
+        """A workaround to get special attributes on the ServerProxy
+           without interfering with the magic __getattr__
+        """
+        if attr == "close":
+            return self.__close
+        elif attr == "transport":
+            return self.__transport
+        raise AttributeError("Attribute %r not found" % (attr,))
 
 # compatibility
 

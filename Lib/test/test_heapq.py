@@ -7,23 +7,8 @@ import sys
 
 # We do a bit of trickery here to be able to test both the C implementation
 # and the Python implementation of the module.
-
-# Make it impossible to import the C implementation anymore.
-sys.modules['_heapq'] = 0
-# We must also handle the case that heapq was imported before.
-if 'heapq' in sys.modules:
-    del sys.modules['heapq']
-
-# Now we can import the module and get the pure Python implementation.
-import heapq as py_heapq
-
-# Restore everything to normal.
-del sys.modules['_heapq']
-del sys.modules['heapq']
-
-# This is now the module with the C implementation.
 import heapq as c_heapq
-
+py_heapq = support.import_fresh_module('heapq', blocked=['_heapq'])
 
 class TestHeap(unittest.TestCase):
     module = None
@@ -61,7 +46,7 @@ class TestHeap(unittest.TestCase):
         for pos, item in enumerate(heap):
             if pos: # pos 0 has no parent
                 parentpos = (pos-1) >> 1
-                self.assert_(heap[parentpos] <= item)
+                self.assertTrue(heap[parentpos] <= item)
 
     def test_heapify(self):
         for size in range(30):
@@ -194,6 +179,13 @@ class TestHeap(unittest.TestCase):
 class TestHeapPython(TestHeap):
     module = py_heapq
 
+    # As an early adopter, we sanity check the
+    # test.support.import_fresh_module utility function
+    def test_pure_python(self):
+        self.assertFalse(sys.modules['heapq'] is self.module)
+        self.assertTrue(hasattr(self.module.heapify, '__code__'))
+
+
 class TestHeapC(TestHeap):
     module = c_heapq
 
@@ -219,6 +211,12 @@ class TestHeapC(TestHeap):
         self.assertEqual(hsort(data, LT), target)
         self.assertRaises(TypeError, data, LE)
 
+    # As an early adopter, we sanity check the
+    # test.support.import_fresh_module utility function
+    def test_accelerated(self):
+        self.assertTrue(sys.modules['heapq'] is self.module)
+        self.assertFalse(hasattr(self.module.heapify, '__code__'))
+
 
 #==============================================================================
 
@@ -234,9 +232,9 @@ class GetOnly:
 
 class CmpErr:
     "Dummy element that always raises an error during comparison"
-    def __cmp__(self, other):
+    def __eq__(self, other):
         raise ZeroDivisionError
-    __eq__ = __ne__ = __lt__ = __le__ = __gt__ = __ge__ = __cmp__
+    __ne__ = __lt__ = __le__ = __gt__ = __ge__ = __eq__
 
 def R(seqn):
     'Regular generator'
@@ -372,8 +370,6 @@ class TestErrorHandling(unittest.TestCase):
 
 
 def test_main(verbose=None):
-    from types import BuiltinFunctionType
-
     test_classes = [TestHeapPython, TestHeapC, TestErrorHandling]
     support.run_unittest(*test_classes)
 

@@ -128,7 +128,7 @@ Check for duplicate keywords.
     ...
     Traceback (most recent call last):
     [...]
-    TypeError: __build_class__() got multiple values for keyword argument 'metaclass'
+    SyntaxError: keyword argument repeated
     >>>
 
 Another way.
@@ -229,6 +229,20 @@ Make sure it works with subclassing.
     >>> print(C.hello)
     42
     >>>
+
+Test failures in looking up the __prepare__ method work.
+    >>> class ObscureException(Exception):
+    ...     pass
+    >>> class FailDescr:
+    ...     def __get__(self, instance, owner):
+    ...        raise ObscureException
+    >>> class Meta(type):
+    ...     __prepare__ = FailDescr()
+    >>> class X(metaclass=Meta):
+    ...     pass
+    Traceback (most recent call last):
+    [...]
+    test.test_metaclass.ObscureException
 
 """
 

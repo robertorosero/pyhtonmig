@@ -1,5 +1,5 @@
 import unittest
-from test.support import verbose, run_unittest
+from test.support import verbose, run_unittest, strip_python_stderr
 import sys
 import gc
 import weakref
@@ -244,7 +244,7 @@ class GCTests(unittest.TestCase):
     # - the call to assertEqual somehow avoids building its args tuple
     def test_get_count(self):
         # Avoid future allocation of method object
-        assertEqual = self.assertEqual
+        assertEqual = self._baseAssertEqual
         gc.collect()
         assertEqual(gc.get_count(), (0, 0, 0))
         a = dict()
@@ -415,6 +415,33 @@ class GCTests(unittest.TestCase):
 
         self.assertEqual(gc.get_referents(1, 'a', 4j), [])
 
+    def test_is_tracked(self):
+        # Atomic built-in types are not tracked, user-defined objects and
+        # mutable containers are.
+        # NOTE: types with special optimizations (e.g. tuple) have tests
+        # in their own test files instead.
+        self.assertFalse(gc.is_tracked(None))
+        self.assertFalse(gc.is_tracked(1))
+        self.assertFalse(gc.is_tracked(1.0))
+        self.assertFalse(gc.is_tracked(1.0 + 5.0j))
+        self.assertFalse(gc.is_tracked(True))
+        self.assertFalse(gc.is_tracked(False))
+        self.assertFalse(gc.is_tracked(b"a"))
+        self.assertFalse(gc.is_tracked("a"))
+        self.assertFalse(gc.is_tracked(bytearray(b"a")))
+        self.assertFalse(gc.is_tracked(type))
+        self.assertFalse(gc.is_tracked(int))
+        self.assertFalse(gc.is_tracked(object))
+        self.assertFalse(gc.is_tracked(object()))
+
+        class UserClass:
+            pass
+        self.assertTrue(gc.is_tracked(gc))
+        self.assertTrue(gc.is_tracked(UserClass))
+        self.assertTrue(gc.is_tracked(UserClass()))
+        self.assertTrue(gc.is_tracked([]))
+        self.assertTrue(gc.is_tracked(set()))
+
     def test_bug1055820b(self):
         # Corresponds to temp2b.py in the bug report.
 
@@ -438,6 +465,53 @@ class GCTests(unittest.TestCase):
             # If the callback resurrected one of these guys, the instance
             # would be damaged, with an empty __dict__.
             self.assertEqual(x, None)
+
+    def test_garbage_at_shutdown(self):
+        import subprocess
+        code = """if 1:
+            import gc
+            class X:
+                def __init__(self, name):
+                    self.name = name
+                def __repr__(self):
+                    return "<X %%r>" %% self.name
+                def __del__(self):
+                    pass
+
+            x = X('first')
+            x.x = x
+            x.y = X('second')
+            del x
+            gc.set_debug(%s)
+        """
+        def run_command(code):
+            p = subprocess.Popen([sys.executable, "-Wd", "-c", code],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+            stdout, stderr = p.communicate()
+            p.stdout.close()
+            p.stderr.close()
+            self.assertEqual(p.returncode, 0)
+            self.assertEqual(stdout.strip(), b"")
+            return strip_python_stderr(stderr)
+
+        stderr = run_command(code % "0")
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown; use", stderr)
+        self.assertNotIn(b"<X 'first'>", stderr)
+        # With DEBUG_UNCOLLECTABLE, the garbage list gets printed
+        stderr = run_command(code % "gc.DEBUG_UNCOLLECTABLE")
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown", stderr)
+        self.assertTrue(
+            (b"[<X 'first'>, <X 'second'>]" in stderr) or
+            (b"[<X 'second'>, <X 'first'>]" in stderr), stderr)
+        # With DEBUG_SAVEALL, no additional message should get printed
+        # (because gc.garbage also contains normally reclaimable cyclic
+        # references, and its elements get printed at runtime anyway).
+        stderr = run_command(code % "gc.DEBUG_SAVEALL")
+        self.assertNotIn(b"uncollectable objects at shutdown", stderr)
+
 
 class GCTogglingTests(unittest.TestCase):
     def setUp(self):

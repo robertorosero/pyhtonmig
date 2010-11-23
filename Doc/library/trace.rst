@@ -1,4 +1,3 @@
-
 :mod:`trace` --- Trace or track Python statement execution
 ==========================================================
 
@@ -11,6 +10,10 @@ annotated statement coverage listings, print caller/callee relationships and
 list functions executed during a program run.  It can be used in another program
 or from the command line.
 
+.. seealso::
+
+   Latest version of the :source:`trace module Python source code
+   <Lib/trace.py>`
 
 .. _trace-cli:
 
@@ -65,13 +68,13 @@ The following command-line arguments are supported:
 
 :option:`--ignore-module`
    Accepts comma separated list of module names. Ignore each of the named
-   module and its submodules (if it is a package).  May be given 
+   module and its submodules (if it is a package).  May be given
    multiple times.
 
 :option:`--ignore-dir`
    Ignore all modules and packages in the named directory and subdirectories
    (multiple directories can be joined by os.pathsep).  May be given multiple
-   times. 
+   times.
 
 
 .. _trace-api:
@@ -80,7 +83,7 @@ Programming Interface
 ---------------------
 
 
-.. class:: Trace([count=1[, trace=1[, countfuncs=0[, countcallers=0[, ignoremods=()[, ignoredirs=()[, infile=None[, outfile=None[, timing=False]]]]]]]]])
+.. class:: Trace(count=1, trace=1, countfuncs=0, countcallers=0, ignoremods=(), ignoredirs=(), infile=None, outfile=None, timing=False)
 
    Create an object to trace execution of a single statement or expression. All
    parameters are optional.  *count* enables counting of line numbers. *trace*
@@ -98,7 +101,7 @@ Programming Interface
    Run *cmd* under control of the Trace object with the current tracing parameters.
 
 
-.. method:: Trace.runctx(cmd[, globals=None[, locals=None]])
+.. method:: Trace.runctx(cmd, globals=None, locals=None)
 
    Run *cmd* under control of the Trace object with the current tracing parameters
    in the defined global and local environments.  If not defined, *globals* and

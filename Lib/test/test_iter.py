@@ -1,7 +1,7 @@
 # Test iterators.
 
 import unittest
-from test.support import run_unittest, TESTFN, unlink
+from test.support import run_unittest, TESTFN, unlink, cpython_only
 
 # Test result of triple loop (too big to inline)
 TRIPLETS = [(0, 0, 0), (0, 0, 1), (0, 0, 2),
@@ -75,7 +75,7 @@ class TestCase(unittest.TestCase):
         seq = list(range(10))
         it = iter(seq)
         it2 = iter(it)
-        self.assert_(it is it2)
+        self.assertTrue(it is it2)
 
     # Test that for loops over iterators work
     def test_iter_for_loop(self):
@@ -119,6 +119,13 @@ class TestCase(unittest.TestCase):
     # Test iter() on a sequence class without __iter__
     def test_seq_class_iter(self):
         self.check_iterator(iter(SequenceClass(10)), list(range(10)))
+
+    # Test a new_style class with __iter__ but no next() method
+    def test_new_style_iter_class(self):
+        class IterClass(object):
+            def __iter__(self):
+                return self
+        self.assertRaises(TypeError, iter, IterClass())
 
     # Test two-argument iter() with callable instance
     def test_iter_callable(self):
@@ -535,23 +542,23 @@ class TestCase(unittest.TestCase):
     def test_in_and_not_in(self):
         for sc5 in IteratingSequenceClass(5), SequenceClass(5):
             for i in range(5):
-                self.assert_(i in sc5)
+                self.assertIn(i, sc5)
             for i in "abc", -1, 5, 42.42, (3, 4), [], {1: 1}, 3-12j, sc5:
-                self.assert_(i not in sc5)
+                self.assertNotIn(i, sc5)
 
         self.assertRaises(TypeError, lambda: 3 in 12)
         self.assertRaises(TypeError, lambda: 3 not in map)
 
         d = {"one": 1, "two": 2, "three": 3, 1j: 2j}
         for k in d:
-            self.assert_(k in d)
-            self.assert_(k not in d.values())
+            self.assertIn(k, d)
+            self.assertNotIn(k, d.values())
         for v in d.values():
-            self.assert_(v in d.values())
-            self.assert_(v not in d)
+            self.assertIn(v, d.values())
+            self.assertNotIn(v, d)
         for k, v in d.items():
-            self.assert_((k, v) in d.items())
-            self.assert_((v, k) not in d.items())
+            self.assertIn((k, v), d.items())
+            self.assertNotIn((v, k), d.items())
 
         f = open(TESTFN, "w")
         try:
@@ -562,9 +569,9 @@ class TestCase(unittest.TestCase):
         try:
             for chunk in "abc":
                 f.seek(0, 0)
-                self.assert_(chunk not in f)
+                self.assertNotIn(chunk, f)
                 f.seek(0, 0)
-                self.assert_((chunk + "\n") in f)
+                self.assertIn((chunk + "\n"), f)
         finally:
             f.close()
             try:
@@ -754,8 +761,9 @@ class TestCase(unittest.TestCase):
         (a, b), (c,) = IteratingSequenceClass(2), {42: 24}
         self.assertEqual((a, b, c), (0, 1, 42))
 
-        # Test reference count behavior
 
+    @cpython_only
+    def test_ref_counting_behavior(self):
         class C(object):
             count = 0
             def __new__(cls):
@@ -852,6 +860,21 @@ class TestCase(unittest.TestCase):
         b = iter(e)
         self.assertEqual(list(b), list(zip(range(5), range(5))))
         self.assertEqual(list(b), [])
+
+    def test_3720(self):
+        # Avoid a crash, when an iterator deletes its next() method.
+        class BadIterator(object):
+            def __iter__(self):
+                return self
+            def __next__(self):
+                del BadIterator.__next__
+                return 1
+
+        try:
+            for i in BadIterator() :
+                pass
+        except TypeError:
+            pass
 
 
 def test_main():

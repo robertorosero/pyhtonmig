@@ -16,12 +16,6 @@ import sys
 
 from sre_constants import *
 
-def set(seq):
-    s = {}
-    for elem in seq:
-        s[elem] = 1
-    return s
-
 SPECIAL_CHARS = ".\\[{()*+?^$|"
 REPEAT_CHARS = "*+?{"
 
@@ -64,6 +58,7 @@ FLAGS = {
     "s": SRE_FLAG_DOTALL,
     "x": SRE_FLAG_VERBOSE,
     # extensions
+    "a": SRE_FLAG_ASCII,
     "t": SRE_FLAG_TEMPLATE,
     "u": SRE_FLAG_UNICODE,
 }
@@ -200,7 +195,7 @@ class Tokenizer:
             except IndexError:
                 raise error("bogus escape (end of line)")
             if isinstance(self.string, bytes):
-                char = chr(c)
+                c = chr(c)
             char = char + c
         self.index = self.index + len(char)
         self.next = char
@@ -672,6 +667,18 @@ def _parse(source, state):
 
     return subpattern
 
+def fix_flags(src, flags):
+    # Check and fix flags according to the type of pattern (str or bytes)
+    if isinstance(src, str):
+        if not flags & SRE_FLAG_ASCII:
+            flags |= SRE_FLAG_UNICODE
+        elif flags & SRE_FLAG_UNICODE:
+            raise ValueError("ASCII and UNICODE flags are incompatible")
+    else:
+        if flags & SRE_FLAG_UNICODE:
+            raise ValueError("can't use UNICODE flag with a bytes pattern")
+    return flags
+
 def parse(str, flags=0, pattern=None):
     # parse 're' pattern into list of (opcode, argument) tuples
 
@@ -683,6 +690,7 @@ def parse(str, flags=0, pattern=None):
     pattern.str = str
 
     p = _parse_sub(source, pattern, 0)
+    p.pattern.flags = fix_flags(str, p.pattern.flags)
 
     tail = source.get()
     if tail == ")":
@@ -778,12 +786,18 @@ def parse_template(source, pattern):
     groups = []
     groupsappend = groups.append
     literals = [None] * len(p)
+    if isinstance(source, str):
+        encode = lambda x: x
+    else:
+        # The tokenizer implicitly decodes bytes objects as latin-1, we must
+        # therefore re-encode the final representation.
+        encode = lambda x: x.encode('latin1')
     for c, s in p:
         if c is MARK:
             groupsappend((i, s))
             # literal[i] is already None
         else:
-            literals[i] = s
+            literals[i] = encode(s)
         i = i + 1
     return groups, literals
 

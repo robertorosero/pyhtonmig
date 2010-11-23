@@ -14,12 +14,13 @@ from _csv import Dialect as _Dialect
 from io import StringIO
 
 __all__ = [ "QUOTE_MINIMAL", "QUOTE_ALL", "QUOTE_NONNUMERIC", "QUOTE_NONE",
-            "Error", "Dialect", "excel", "excel_tab", "reader", "writer",
+            "Error", "Dialect", "__doc__", "excel", "excel_tab",
+            "field_size_limit", "reader", "writer",
             "register_dialect", "get_dialect", "list_dialects", "Sniffer",
             "unregister_dialect", "__version__", "DictReader", "DictWriter" ]
 
 class Dialect:
-    """Describe an Excel dialect.
+    """Describe a CSV dialect.
 
     This must be subclassed (see csv.excel).  Valid attributes are:
     delimiter, quotechar, escapechar, doublequote, skipinitialspace,
@@ -64,11 +65,21 @@ class excel_tab(excel):
     delimiter = '\t'
 register_dialect("excel-tab", excel_tab)
 
+class unix_dialect(Dialect):
+    """Describe the usual properties of Unix-generated CSV files."""
+    delimiter = ','
+    quotechar = '"'
+    doublequote = True
+    skipinitialspace = False
+    lineterminator = '\n'
+    quoting = QUOTE_ALL
+register_dialect("unix", unix_dialect)
+
 
 class DictReader:
     def __init__(self, f, fieldnames=None, restkey=None, restval=None,
                  dialect="excel", *args, **kwds):
-        self.fieldnames = fieldnames    # list of keys for the dict
+        self._fieldnames = fieldnames   # list of keys for the dict
         self.restkey = restkey          # key to catch long rows
         self.restval = restval          # default value for short rows
         self.reader = reader(f, dialect, *args, **kwds)
@@ -78,11 +89,25 @@ class DictReader:
     def __iter__(self):
         return self
 
+    @property
+    def fieldnames(self):
+        if self._fieldnames is None:
+            try:
+                self._fieldnames = next(self.reader)
+            except StopIteration:
+                pass
+        self.line_num = self.reader.line_num
+        return self._fieldnames
+
+    @fieldnames.setter
+    def fieldnames(self, value):
+        self._fieldnames = value
+
     def __next__(self):
+        if self.line_num == 0:
+            # Used only for its side effect.
+            self.fieldnames
         row = next(self.reader)
-        if self.fieldnames is None:
-            self.fieldnames = row
-            row = next(self.reader)
         self.line_num = self.reader.line_num
 
         # unlike the basic reader, we prefer not to return blanks,
@@ -111,6 +136,10 @@ class DictWriter:
                              % extrasaction)
         self.extrasaction = extrasaction
         self.writer = writer(f, dialect, *args, **kwds)
+
+    def writeheader(self):
+        header = dict(zip(self.fieldnames, self.fieldnames))
+        self.writerow(header)
 
     def _dict_to_list(self, rowdict):
         if self.extrasaction == "raise":
@@ -150,7 +179,7 @@ class Sniffer:
         Returns a dialect (or None) corresponding to the sample
         """
 
-        quotechar, delimiter, skipinitialspace = \
+        quotechar, doublequote, delimiter, skipinitialspace = \
                    self._guess_quote_and_delimiter(sample, delimiters)
         if not delimiter:
             delimiter, skipinitialspace = self._guess_delimiter(sample,
@@ -164,8 +193,8 @@ class Sniffer:
             lineterminator = '\r\n'
             quoting = QUOTE_MINIMAL
             # escapechar = ''
-            doublequote = False
 
+        dialect.doublequote = doublequote
         dialect.delimiter = delimiter
         # _csv.reader won't accept a quotechar of ''
         dialect.quotechar = quotechar or '"'
@@ -197,8 +226,8 @@ class Sniffer:
                 break
 
         if not matches:
-            return ('', None, 0) # (quotechar, delimiter, skipinitialspace)
-
+            # (quotechar, doublequote, delimiter, skipinitialspace)
+            return ('', False, None, 0)
         quotes = {}
         delims = {}
         spaces = 0
@@ -233,7 +262,19 @@ class Sniffer:
             delim = ''
             skipinitialspace = 0
 
-        return (quotechar, delim, skipinitialspace)
+        # if we see an extra quote between delimiters, we've got a
+        # double quoted format
+        dq_regexp = re.compile(r"((%(delim)s)|^)\W*%(quote)s[^%(delim)s\n]*%(quote)s[^%(delim)s\n]*%(quote)s\W*((%(delim)s)|$)" % \
+                               {'delim':delim, 'quote':quotechar}, re.MULTILINE)
+
+
+
+        if dq_regexp.search(data):
+            doublequote = True
+        else:
+            doublequote = False
+
+        return (quotechar, doublequote, delim, skipinitialspace)
 
 
     def _guess_delimiter(self, data, delimiters):

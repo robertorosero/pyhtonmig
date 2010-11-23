@@ -53,7 +53,7 @@ This command installs all (Python) scripts in the distribution.
 Creating a source distribution: the :command:`sdist` command
 ============================================================
 
-**\*\*** fragment moved down from above: needs context! **\*\***
+.. XXX fragment moved down from above: needs context!
 
 The manifest template commands are:
 
@@ -88,9 +88,9 @@ regular filename characters, ``?`` matches any single regular filename
 character, and ``[range]`` matches any of the characters in *range* (e.g.,
 ``a-z``, ``a-zA-Z``, ``a-f0-9_.``).  The definition of "regular filename
 character" is platform-specific: on Unix it is anything except slash; on Windows
-anything except backslash or colon; on Mac OS 9 anything except colon.
+anything except backslash or colon.
 
-**\*\*** Windows support not there yet **\*\***
+.. XXX Windows support not there yet
 
 .. % \section{Creating a built distribution: the
 .. % \protect\command{bdist} command family}

@@ -2,44 +2,57 @@
 
 #include "Python.h"
 
-void initxyzzy(void); /* Forward */
+PyObject* PyInit_xyzzy(void); /* Forward */
 
 main(int argc, char **argv)
 {
-	/* Pass argv[0] to the Python interpreter */
-	Py_SetProgramName(argv[0]);
+    /* Ignore passed-in argc/argv. If desired, conversion
+       should use mbstowcs to convert them. */
+    wchar_t *args[] = {L"embed", L"hello", 0};
 
-	/* Initialize the Python interpreter.  Required. */
-	Py_Initialize();
+    /* Pass argv[0] to the Python interpreter */
+    Py_SetProgramName(args[0]);
 
-	/* Add a static module */
-	initxyzzy();
+    /* Add a static module */
+    PyImport_AppendInittab("xyzzy", PyInit_xyzzy);
 
-	/* Define sys.argv.  It is up to the application if you
-	   want this; you can also let it undefined (since the Python 
-	   code is generally not a main program it has no business
-	   touching sys.argv...) */
-	PySys_SetArgv(argc, argv);
+    /* Initialize the Python interpreter.  Required. */
+    Py_Initialize();
 
-	/* Do some application specific code */
-	printf("Hello, brave new world\n\n");
+    /* Define sys.argv.  It is up to the application if you
+       want this; you can also leave it undefined (since the Python
+       code is generally not a main program it has no business
+       touching sys.argv...)
 
-	/* Execute some Python statements (in module __main__) */
-	PyRun_SimpleString("import sys\n");
-	PyRun_SimpleString("print sys.builtin_module_names\n");
-	PyRun_SimpleString("print sys.modules.keys()\n");
-	PyRun_SimpleString("print sys.executable\n");
-	PyRun_SimpleString("print sys.argv\n");
+       If the third argument is true, sys.path is modified to include
+       either the directory containing the script named by argv[0], or
+       the current working directory.  This can be risky; if you run
+       an application embedding Python in a directory controlled by
+       someone else, attackers could put a Trojan-horse module in the
+       directory (say, a file named os.py) that your application would
+       then import and run.
+    */
+    PySys_SetArgvEx(2, args, 0);
 
-	/* Note that you can call any public function of the Python
-	   interpreter here, e.g. call_object(). */
+    /* Do some application specific code */
+    printf("Hello, brave new world\n\n");
 
-	/* Some more application specific code */
-	printf("\nGoodbye, cruel world\n");
+    /* Execute some Python statements (in module __main__) */
+    PyRun_SimpleString("import sys\n");
+    PyRun_SimpleString("print(sys.builtin_module_names)\n");
+    PyRun_SimpleString("print(sys.modules.keys())\n");
+    PyRun_SimpleString("print(sys.executable)\n");
+    PyRun_SimpleString("print(sys.argv)\n");
 
-	/* Exit, cleaning up the interpreter */
-	Py_Exit(0);
-	/*NOTREACHED*/
+    /* Note that you can call any public function of the Python
+       interpreter here, e.g. call_object(). */
+
+    /* Some more application specific code */
+    printf("\nGoodbye, cruel world\n");
+
+    /* Exit, cleaning up the interpreter */
+    Py_Exit(0);
+    /*NOTREACHED*/
 }
 
 /* A static module */
@@ -48,18 +61,29 @@ main(int argc, char **argv)
 static PyObject *
 xyzzy_foo(PyObject *self, PyObject* args)
 {
-	return PyLong_FromLong(42L);
+    return PyLong_FromLong(42L);
 }
 
 static PyMethodDef xyzzy_methods[] = {
-	{"foo",		xyzzy_foo,	METH_NOARGS,
-	 "Return the meaning of everything."},
-	{NULL,		NULL}		/* sentinel */
+    {"foo",             xyzzy_foo,      METH_NOARGS,
+     "Return the meaning of everything."},
+    {NULL,              NULL}           /* sentinel */
 };
 
-void
-initxyzzy(void)
+static struct PyModuleDef xyzzymodule = {
+    {}, /* m_base */
+    "xyzzy",  /* m_name */
+    0,  /* m_doc */
+    0,  /* m_size */
+    xyzzy_methods,  /* m_methods */
+    0,  /* m_reload */
+    0,  /* m_traverse */
+    0,  /* m_clear */
+    0,  /* m_free */
+};
+
+PyObject*
+PyInit_xyzzy(void)
 {
-	PyImport_AddModule("xyzzy");
-	Py_InitModule("xyzzy", xyzzy_methods);
+    return PyModule_Create(&xyzzymodule);
 }

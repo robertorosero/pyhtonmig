@@ -30,31 +30,27 @@ def _copy_file_contents(src, dst, buffer_size=16*1024):
         try:
             fsrc = open(src, 'rb')
         except os.error as e:
-            (errno, errstr) = e
-            raise DistutilsFileError("could not open '%s': %s" % (src, errstr))
+            raise DistutilsFileError("could not open '%s': %s" % (src, e.strerror))
 
         if os.path.exists(dst):
             try:
                 os.unlink(dst)
             except os.error as e:
-                (errno, errstr) = e
                 raise DistutilsFileError(
-                      "could not delete '%s': %s" % (dst, errstr))
+                      "could not delete '%s': %s" % (dst, e.strerror))
 
         try:
             fdst = open(dst, 'wb')
         except os.error as e:
-            (errno, errstr) = e
             raise DistutilsFileError(
-                  "could not create '%s': %s" % (dst, errstr))
+                  "could not create '%s': %s" % (dst, e.strerror))
 
         while True:
             try:
                 buf = fsrc.read(buffer_size)
             except os.error as e:
-                (errno, errstr) = e
                 raise DistutilsFileError(
-                      "could not read from '%s': %s" % (src, errstr))
+                      "could not read from '%s': %s" % (src, e.strerror))
 
             if not buf:
                 break
@@ -62,9 +58,8 @@ def _copy_file_contents(src, dst, buffer_size=16*1024):
             try:
                 fdst.write(buf)
             except os.error as e:
-                (errno, errstr) = e
                 raise DistutilsFileError(
-                      "could not write to '%s': %s" % (dst, errstr))
+                      "could not write to '%s': %s" % (dst, e.strerror))
     finally:
         if fdst:
             fdst.close()
@@ -72,7 +67,7 @@ def _copy_file_contents(src, dst, buffer_size=16*1024):
             fsrc.close()
 
 def copy_file(src, dst, preserve_mode=1, preserve_times=1, update=0,
-              link=None, verbose=0, dry_run=0):
+              link=None, verbose=1, dry_run=0):
     """Copy a file 'src' to 'dst'.  If 'dst' is a directory, then 'src' is
     copied there with the same name; otherwise, it must be a filename.  (If
     the file exists, it will be ruthlessly clobbered.)  If 'preserve_mode'
@@ -117,29 +112,23 @@ def copy_file(src, dst, preserve_mode=1, preserve_times=1, update=0,
         dir = os.path.dirname(dst)
 
     if update and not newer(src, dst):
-        log.debug("not copying %s (output up-to-date)", src)
+        if verbose >= 1:
+            log.debug("not copying %s (output up-to-date)", src)
         return (dst, 0)
 
     try:
         action = _copy_action[link]
     except KeyError:
         raise ValueError("invalid value '%s' for 'link' argument" % link)
-    if os.path.basename(dst) == os.path.basename(src):
-        log.info("%s %s -> %s", action, src, dir)
-    else:
-        log.info("%s %s -> %s", action, src, dst)
+
+    if verbose >= 1:
+        if os.path.basename(dst) == os.path.basename(src):
+            log.info("%s %s -> %s", action, src, dir)
+        else:
+            log.info("%s %s -> %s", action, src, dst)
 
     if dry_run:
         return (dst, 1)
-
-    # On Mac OS, use the native file copy routine
-    if os.name == 'mac':
-        import macostools
-        try:
-            macostools.copy(src, dst, 0, preserve_times)
-        except os.error as exc:
-            raise DistutilsFileError(
-                  "could not copy '%s' to '%s': %s" % (src, dst, exc.args[-1]))
 
     # If linking (hard or symbolic), use the appropriate system call
     # (Unix only, of course, but that's the caller's responsibility)
@@ -169,7 +158,7 @@ def copy_file(src, dst, preserve_mode=1, preserve_times=1, update=0,
 
 # XXX I suspect this is Unix-specific -- need porting help!
 def move_file (src, dst,
-               verbose=0,
+               verbose=1,
                dry_run=0):
 
     """Move a file 'src' to 'dst'.  If 'dst' is a directory, the file will
@@ -182,7 +171,8 @@ def move_file (src, dst,
     from os.path import exists, isfile, isdir, basename, dirname
     import errno
 
-    log.info("moving %s -> %s", src, dst)
+    if verbose >= 1:
+        log.info("moving %s -> %s", src, dst)
 
     if dry_run:
         return dst
@@ -214,7 +204,7 @@ def move_file (src, dst,
                   "couldn't move '%s' to '%s': %s" % (src, dst, msg))
 
     if copy_it:
-        copy_file(src, dst)
+        copy_file(src, dst, verbose=verbose)
         try:
             os.unlink(src)
         except os.error as e:
@@ -235,6 +225,8 @@ def write_file (filename, contents):
     sequence of strings without line terminators) to it.
     """
     f = open(filename, "w")
-    for line in contents:
-        f.write(line + "\n")
-    f.close()
+    try:
+        for line in contents:
+            f.write(line + "\n")
+    finally:
+        f.close()

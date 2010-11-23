@@ -1,14 +1,18 @@
+from test.support import verbose, run_unittest, import_module
+
+#Skip these tests if either fcntl or termios is not available
+fcntl = import_module('fcntl')
+import_module('termios')
+
 import errno
-import fcntl
 import pty
 import os
 import sys
 import signal
-from test.support import verbose, TestSkipped, run_unittest
 import unittest
 
-TEST_STRING_1 = "I wish to buy a fish license.\n"
-TEST_STRING_2 = "For my pet fish, Eric.\n"
+TEST_STRING_1 = b"I wish to buy a fish license.\n"
+TEST_STRING_2 = b"For my pet fish, Eric.\n"
 
 if verbose:
     def debug(msg):
@@ -69,7 +73,7 @@ class PtyTest(unittest.TestCase):
             debug("Got slave_fd '%d'" % slave_fd)
         except OSError:
             # " An optional feature could not be imported " ... ?
-            raise TestSkipped("Pseudo-terminals (seemingly) not functional.")
+            raise unittest.SkipTest("Pseudo-terminals (seemingly) not functional.")
 
         self.assertTrue(os.isatty(slave_fd), 'slave_fd is not a tty')
 
@@ -82,7 +86,7 @@ class PtyTest(unittest.TestCase):
         fcntl.fcntl(master_fd, fcntl.F_SETFL, orig_flags | os.O_NONBLOCK)
         try:
             s1 = os.read(master_fd, 1024)
-            self.assertEquals(b'', s1)
+            self.assertEqual(b'', s1)
         except OSError as e:
             if e.errno != errno.EAGAIN:
                 raise
@@ -92,14 +96,14 @@ class PtyTest(unittest.TestCase):
         debug("Writing to slave_fd")
         os.write(slave_fd, TEST_STRING_1)
         s1 = os.read(master_fd, 1024)
-        self.assertEquals(b'I wish to buy a fish license.\n',
-                          normalize_output(s1))
+        self.assertEqual(b'I wish to buy a fish license.\n',
+                         normalize_output(s1))
 
         debug("Writing chunked output")
         os.write(slave_fd, TEST_STRING_2[:5])
         os.write(slave_fd, TEST_STRING_2[5:])
         s2 = os.read(master_fd, 1024)
-        self.assertEquals(b'For my pet fish, Eric.\n', normalize_output(s2))
+        self.assertEqual(b'For my pet fish, Eric.\n', normalize_output(s2))
 
         os.close(slave_fd)
         os.close(master_fd)

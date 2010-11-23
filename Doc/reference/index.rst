@@ -1,7 +1,7 @@
 .. _reference-index:
 
 #################################
-  The Python language reference
+  The Python Language Reference
 #################################
 
 :Release: |version|
@@ -18,6 +18,7 @@ interfaces available to C/C++ programmers in detail.
 
 .. toctree::
    :maxdepth: 2
+   :numbered:
 
    introduction.rst
    lexical_analysis.rst
@@ -27,4 +28,4 @@ interfaces available to C/C++ programmers in detail.
    simple_stmts.rst
    compound_stmts.rst
    toplevel_components.rst
-
+   grammar.rst

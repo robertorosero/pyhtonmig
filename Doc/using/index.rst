@@ -1,8 +1,8 @@
 .. _using-index:
 
-################
-  Using Python
-################
+##########################
+  Python Setup and Usage
+##########################
 
 
 This part of the documentation is devoted to general information on the setup
@@ -11,6 +11,7 @@ interpreter and things that make working with Python easier.
 
 
 .. toctree::
+   :numbered:
 
    cmdline.rst
    unix.rst

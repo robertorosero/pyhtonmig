@@ -17,14 +17,22 @@ class Log:
         self.threshold = threshold
 
     def _log(self, level, msg, args):
+        if level not in (DEBUG, INFO, WARN, ERROR, FATAL):
+            raise ValueError('%s wrong log level' % str(level))
+
         if level >= self.threshold:
-            if not args:
-                # msg may contain a '%'. If args is empty,
-                # don't even try to string-format
-                print(msg)
+            if args:
+                msg = msg % args
+            if level in (WARN, ERROR, FATAL):
+                stream = sys.stderr
             else:
-                print(msg % args)
-            sys.stdout.flush()
+                stream = sys.stdout
+            if stream.errors == 'strict':
+                # emulate backslashreplace error handler
+                encoding = stream.encoding
+                msg = msg.encode(encoding, "backslashreplace").decode(encoding)
+            stream.write('%s\n' % msg)
+            stream.flush()
 
     def log(self, level, msg, *args):
         self._log(level, msg, args)

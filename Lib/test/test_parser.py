@@ -1,6 +1,7 @@
 import parser
 import unittest
 import sys
+import operator
 from test import support
 
 #
@@ -19,11 +20,20 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         except parser.ParserError as why:
             self.fail("could not roundtrip %r: %s" % (s, why))
 
-        self.assertEquals(t, st2.totuple(),
-                          "could not re-generate syntax tree")
+        self.assertEqual(t, st2.totuple(),
+                         "could not re-generate syntax tree")
 
     def check_expr(self, s):
         self.roundtrip(parser.expr, s)
+
+    def test_flags_passed(self):
+        # The unicode literals flags has to be passed from the paser to AST
+        # generation.
+        suite = parser.suite("from __future__ import unicode_literals; x = ''")
+        code = suite.compile()
+        scope = {}
+        exec(code, {}, scope)
+        self.assertIsInstance(scope["x"], str)
 
     def check_suite(self, s):
         self.roundtrip(parser.suite, s)
@@ -66,6 +76,7 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_expr("foo(a, b, c, *args)")
         self.check_expr("foo(a, b, c, *args, **kw)")
         self.check_expr("foo(a, b, c, **kw)")
+        self.check_expr("foo(a, *args, keyword=23)")
         self.check_expr("foo + bar")
         self.check_expr("foo - bar")
         self.check_expr("foo * bar")
@@ -138,6 +149,13 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
     def test_class_defs(self):
         self.check_suite("class foo():pass")
         self.check_suite("class foo(object):pass")
+        self.check_suite("@class_decorator\n"
+                         "class foo():pass")
+        self.check_suite("@class_decorator(arg)\n"
+                         "class foo():pass")
+        self.check_suite("@decorator1\n"
+                         "@decorator2\n"
+                         "class foo():pass")
 
     def test_import_from_statement(self):
         self.check_suite("from sys.path import *")
@@ -162,6 +180,7 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
             "from sys.path import (dirname, basename as my_basename)")
         self.check_suite(
             "from sys.path import (dirname, basename as my_basename,)")
+        self.check_suite("from .bogus import x")
 
     def test_basic_import_statement(self):
         self.check_suite("import sys")
@@ -170,6 +189,18 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_suite("import sys as system, math")
         self.check_suite("import sys, math as my_math")
 
+    def test_relative_imports(self):
+        self.check_suite("from . import name")
+        self.check_suite("from .. import name")
+        # check all the way up to '....', since '...' is tokenized
+        # differently from '.' (it's an ellipsis token).
+        self.check_suite("from ... import name")
+        self.check_suite("from .... import name")
+        self.check_suite("from .pkg import name")
+        self.check_suite("from ..pkg import name")
+        self.check_suite("from ...pkg import name")
+        self.check_suite("from ....pkg import name")
+
     def test_pep263(self):
         self.check_suite("# -*- coding: iso-8859-1 -*-\n"
                          "pass\n")
@@ -177,10 +208,25 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
     def test_assert(self):
         self.check_suite("assert alo < ahi and blo < bhi\n")
 
+    def test_with(self):
+        self.check_suite("with open('x'): pass\n")
+        self.check_suite("with open('x') as f: pass\n")
+        self.check_suite("with open('x') as f, open('y') as g: pass\n")
+
+    def test_try_stmt(self):
+        self.check_suite("try: pass\nexcept: pass\n")
+        self.check_suite("try: pass\nfinally: pass\n")
+        self.check_suite("try: pass\nexcept A: pass\nfinally: pass\n")
+        self.check_suite("try: pass\nexcept A: pass\nexcept: pass\n"
+                         "finally: pass\n")
+        self.check_suite("try: pass\nexcept: pass\nelse: pass\n")
+        self.check_suite("try: pass\nexcept: pass\nelse: pass\n"
+                         "finally: pass\n")
+
     def test_position(self):
         # An absolutely minimal test of position information.  Better
         # tests would be a big project.
-        code = "def f(x):\n    return x + 1\n"
+        code = "def f(x):\n    return x + 1"
         st1 = parser.suite(code)
         st2 = st1.totuple(line_info=1, col_info=1)
 
@@ -213,6 +259,12 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
             (4, '', 2, -1),
             (0, '', 2, -1)],
                          terminals)
+
+    def test_extended_unpacking(self):
+        self.check_suite("*a = y")
+        self.check_suite("x, *b, = m")
+        self.check_suite("[*a, *b] = y")
+        self.check_suite("for [*x, b] in x: pass")
 
 
 #
@@ -424,6 +476,20 @@ class IllegalSyntaxTestCase(unittest.TestCase):
                 (0, ''))
         self.check_bad_tree(tree, "malformed global ast")
 
+    def test_missing_import_source(self):
+        # from import fred
+        tree = \
+            (257,
+             (268,
+              (269,
+               (270,
+                (282,
+                 (284, (1, 'from'), (1, 'import'),
+                  (287, (285, (1, 'fred')))))),
+               (4, ''))),
+             (4, ''), (0, ''))
+        self.check_bad_tree(tree, "from import fred")
+
 
 class CompileTestCase(unittest.TestCase):
 
@@ -432,14 +498,14 @@ class CompileTestCase(unittest.TestCase):
     def test_compile_expr(self):
         st = parser.expr('2 + 3')
         code = parser.compilest(st)
-        self.assertEquals(eval(code), 5)
+        self.assertEqual(eval(code), 5)
 
     def test_compile_suite(self):
         st = parser.suite('x = 2; y = x + 3')
         code = parser.compilest(st)
         globs = {}
         exec(code, globs)
-        self.assertEquals(globs['y'], 5)
+        self.assertEqual(globs['y'], 5)
 
     def test_compile_error(self):
         st = parser.suite('1 = 3 + 4')
@@ -451,8 +517,18 @@ class CompileTestCase(unittest.TestCase):
         st = parser.suite('a = "\\u1"')
         self.assertRaises(SyntaxError, parser.compilest, st)
 
+    def test_issue_9011(self):
+        # Issue 9011: compilation of an unary minus expression changed
+        # the meaning of the ST, so that a second compilation produced
+        # incorrect results.
+        st = parser.expr('-3')
+        code1 = parser.compilest(st)
+        self.assertEqual(eval(code1), -3)
+        code2 = parser.compilest(st)
+        self.assertEqual(eval(code2), -3)
+
 class ParserStackLimitTestCase(unittest.TestCase):
-    """try to push the parser to/over it's limits.
+    """try to push the parser to/over its limits.
     see http://bugs.python.org/issue1881 for a discussion
     """
     def _nested_expression(self, level):
@@ -468,7 +544,76 @@ class ParserStackLimitTestCase(unittest.TestCase):
         e = self._nested_expression(100)
         print("Expecting 's_push: parser stack overflow' in next line",
               file=sys.stderr)
+        sys.stderr.flush()
         self.assertRaises(MemoryError, parser.expr, e)
+
+class STObjectTestCase(unittest.TestCase):
+    """Test operations on ST objects themselves"""
+
+    def test_comparisons(self):
+        # ST objects should support order and equality comparisons
+        st1 = parser.expr('2 + 3')
+        st2 = parser.suite('x = 2; y = x + 3')
+        st3 = parser.expr('list(x**3 for x in range(20))')
+        st1_copy = parser.expr('2 + 3')
+        st2_copy = parser.suite('x = 2; y = x + 3')
+        st3_copy = parser.expr('list(x**3 for x in range(20))')
+
+        # exercise fast path for object identity
+        self.assertEqual(st1 == st1, True)
+        self.assertEqual(st2 == st2, True)
+        self.assertEqual(st3 == st3, True)
+        # slow path equality
+        self.assertEqual(st1, st1_copy)
+        self.assertEqual(st2, st2_copy)
+        self.assertEqual(st3, st3_copy)
+        self.assertEqual(st1 == st2, False)
+        self.assertEqual(st1 == st3, False)
+        self.assertEqual(st2 == st3, False)
+        self.assertEqual(st1 != st1, False)
+        self.assertEqual(st2 != st2, False)
+        self.assertEqual(st3 != st3, False)
+        self.assertEqual(st1 != st1_copy, False)
+        self.assertEqual(st2 != st2_copy, False)
+        self.assertEqual(st3 != st3_copy, False)
+        self.assertEqual(st2 != st1, True)
+        self.assertEqual(st1 != st3, True)
+        self.assertEqual(st3 != st2, True)
+        # we don't particularly care what the ordering is;  just that
+        # it's usable and self-consistent
+        self.assertEqual(st1 < st2, not (st2 <= st1))
+        self.assertEqual(st1 < st3, not (st3 <= st1))
+        self.assertEqual(st2 < st3, not (st3 <= st2))
+        self.assertEqual(st1 < st2, st2 > st1)
+        self.assertEqual(st1 < st3, st3 > st1)
+        self.assertEqual(st2 < st3, st3 > st2)
+        self.assertEqual(st1 <= st2, st2 >= st1)
+        self.assertEqual(st3 <= st1, st1 >= st3)
+        self.assertEqual(st2 <= st3, st3 >= st2)
+        # transitivity
+        bottom = min(st1, st2, st3)
+        top = max(st1, st2, st3)
+        mid = sorted([st1, st2, st3])[1]
+        self.assertTrue(bottom < mid)
+        self.assertTrue(bottom < top)
+        self.assertTrue(mid < top)
+        self.assertTrue(bottom <= mid)
+        self.assertTrue(bottom <= top)
+        self.assertTrue(mid <= top)
+        self.assertTrue(bottom <= bottom)
+        self.assertTrue(mid <= mid)
+        self.assertTrue(top <= top)
+        # interaction with other types
+        self.assertEqual(st1 == 1588.602459, False)
+        self.assertEqual('spanish armada' != st2, True)
+        self.assertRaises(TypeError, operator.ge, st3, None)
+        self.assertRaises(TypeError, operator.le, False, st1)
+        self.assertRaises(TypeError, operator.lt, st1, 1815)
+        self.assertRaises(TypeError, operator.gt, b'waterloo', st2)
+
+
+    # XXX tests for pickling and unpickling of ST objects should go here
+
 
 def test_main():
     support.run_unittest(
@@ -476,6 +621,7 @@ def test_main():
         IllegalSyntaxTestCase,
         CompileTestCase,
         ParserStackLimitTestCase,
+        STObjectTestCase,
     )
 
 

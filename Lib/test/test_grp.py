@@ -1,8 +1,9 @@
 """Test script for the grp module."""
 
-import grp
 import unittest
 from test import support
+
+grp = support.import_module('grp')
 
 class GroupDatabaseTestCase(unittest.TestCase):
 
@@ -11,13 +12,13 @@ class GroupDatabaseTestCase(unittest.TestCase):
         # attributes promised by the docs
         self.assertEqual(len(value), 4)
         self.assertEqual(value[0], value.gr_name)
-        self.assert_(isinstance(value.gr_name, str))
+        self.assertIsInstance(value.gr_name, str)
         self.assertEqual(value[1], value.gr_passwd)
-        self.assert_(isinstance(value.gr_passwd, str))
+        self.assertIsInstance(value.gr_passwd, str)
         self.assertEqual(value[2], value.gr_gid)
-        self.assert_(isinstance(value.gr_gid, int))
+        self.assertIsInstance(value.gr_gid, int)
         self.assertEqual(value[3], value.gr_mem)
-        self.assert_(isinstance(value.gr_mem, list))
+        self.assertIsInstance(value.gr_mem, list)
 
     def test_values(self):
         entries = grp.getgrall()

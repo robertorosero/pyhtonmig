@@ -1,4 +1,4 @@
-.. _tut-informal:
+﻿.. _tut-informal:
 
 **********************************
 An Informal Introduction to Python
@@ -13,9 +13,11 @@ end a multi-line command.
 
 Many of the examples in this manual, even those entered at the interactive
 prompt, include comments.  Comments in Python start with the hash character,
-``#``, and extend to the end of the physical line.  A comment may appear at
-the start of a line or following whitespace or code, but not within a string
+``#``, and extend to the end of the physical line.  A comment may appear at the
+start of a line or following whitespace or code, but not within a string
 literal.  A hash character within a string literal is just a hash character.
+Since comments are to clarify code and are not interpreted by Python, they may
+be omitted when typing in examples.
 
 Some examples::
 
@@ -54,24 +56,17 @@ operators ``+``, ``-``, ``*`` and ``/`` work just like in most other languages
    >>> (50-5*6)/4
    5.0
    >>> 8/5 # Fractions aren't lost when dividing integers
-   1.6000000000000001
-
-Note: You might not see exactly the same result; floating point results can 
-differ from one machine to another.  We will say more later about controlling
-the appearance of floating point output; what we see here is the most
-informative display but not as easy to read as we would get with::
-
-   >>> print(8/5)
    1.6
 
-For clarity in this tutorial we will show the simpler floating point output
-unless we are specifically discussing output formatting, and explain later
-why these two ways of displaying floating point data come to be different.
-See :ref:`tut-fp-issues` for a full discussion.
+Note: You might not see exactly the same result; floating point results can
+differ from one machine to another.  We will say more later about controlling
+the appearance of floating point output.  See also :ref:`tut-fp-issues` for a
+full discussion of some of the subtleties of floating point numbers and their
+representations.
 
-To do integer division and get an integer result, 
+To do integer division and get an integer result,
 discarding any fractional result, there is another operator, ``//``::
-   
+
    >>> # Integer division returns the floor:
    ... 7//3
    2
@@ -95,6 +90,15 @@ A value can be assigned to several variables simultaneously::
    0
    >>> z
    0
+
+Variables must be "defined" (assigned a value) before they can be used, or an
+error will occur::
+
+   >>> # try to access an undefined variable
+   ... n
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   NameError: name 'n' is not defined
 
 There is full support for floating point; operators with mixed type operands
 convert the integer operand to floating point::
@@ -146,7 +150,6 @@ convert a complex number to a real number.  Use ``abs(z)`` to get its magnitude
    4.0
    >>> abs(a)  # sqrt(a.real**2 + a.imag**2)
    5.0
-   >>>
 
 In interactive mode, the last printed expression is assigned to the variable
 ``_``.  This means that when you are using Python as a desk calculator, it is
@@ -160,7 +163,6 @@ somewhat easier to continue calculations, for example::
    113.0625
    >>> round(_, 2)
    113.06
-   >>>
 
 This variable should be treated as read-only by the user.  Don't explicitly
 assign a value to it --- you would create an independent local variable with the
@@ -192,8 +194,8 @@ The interpreter prints the result of string operations in the same way as they
 are typed for input: inside quotes, and with quotes and other funny characters
 escaped by backslashes, to show the precise value.  The string is enclosed in
 double quotes if the string contains a single quote and no double quotes, else
-it's enclosed in single quotes.  Once again, the :func:`print` function
-produces the more readable output.
+it's enclosed in single quotes.  The :func:`print` function produces a more
+readable output for such input strings.
 
 String literals can span multiple lines in several ways.  Continuation lines can
 be used, with a backslash as the last character on the line indicating that the
@@ -206,45 +208,50 @@ next line is a logical continuation of the line::
 
    print(hello)
 
-Note that newlines still need to be embedded in the string using ``\n``; the
+Note that newlines still need to be embedded in the string using ``\n`` -- the
 newline following the trailing backslash is discarded.  This example would print
-the following::
+the following:
+
+.. code-block:: text
 
    This is a rather long string containing
    several lines of text just as you would do in C.
        Note that whitespace at the beginning of the line is significant.
 
-If we make the string literal a "raw" string, however, the ``\n`` sequences are
-not converted to newlines, but the backslash at the end of the line, and the
-newline character in the source, are both included in the string as data.  Thus,
-the example::
+Or, strings can be surrounded in a pair of matching triple-quotes: ``"""`` or
+``'''``.  End of lines do not need to be escaped when using triple-quotes, but
+they will be included in the string.  So the following uses one escape to
+avoid an unwanted initial blank line.  ::
+
+   print("""\
+   Usage: thingy [OPTIONS]
+        -h                        Display this usage message
+        -H hostname               Hostname to connect to
+   """)
+
+produces the following output:
+
+.. code-block:: text
+
+   Usage: thingy [OPTIONS]
+        -h                        Display this usage message
+        -H hostname               Hostname to connect to
+
+If we make the string literal a "raw" string, ``\n`` sequences are not converted
+to newlines, but the backslash at the end of the line, and the newline character
+in the source, are both included in the string as data.  Thus, the example::
 
    hello = r"This is a rather long string containing\n\
    several lines of text much as you would do in C."
 
    print(hello)
 
-would print::
+would print:
+
+.. code-block:: text
 
    This is a rather long string containing\n\
    several lines of text much as you would do in C.
-
-Or, strings can be surrounded in a pair of matching triple-quotes: ``"""`` or
-``'''``.  End of lines do not need to be escaped when using triple-quotes, but
-they will be included in the string. ::
-
-   print("""
-   Usage: thingy [OPTIONS] 
-        -h                        Display this usage message
-        -H hostname               Hostname to connect to
-   """)
-
-produces the following output::
-
-   Usage: thingy [OPTIONS] 
-        -h                        Display this usage message
-        -H hostname               Hostname to connect to
-
 
 Strings can be concatenated (glued together) with the ``+`` operator, and
 repeated with ``*``::
@@ -290,17 +297,17 @@ omitted second index defaults to the size of the string being sliced. ::
    >>> word[2:]    # Everything except the first two characters
    'lpA'
 
-Unlike a C string, Python strings cannot be changed.  Assigning to an  indexed
+Unlike a C string, Python strings cannot be changed.  Assigning to an indexed
 position in the string results in an error::
 
    >>> word[0] = 'x'
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
-   TypeError: 'str' object doesn't support item assignment
+   TypeError: 'str' object does not support item assignment
    >>> word[:1] = 'Splat'
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
-   TypeError: 'str' object doesn't support slice assignment
+   TypeError: 'str' object does not support slice assignment
 
 However, creating a new string with the combined content is easy and efficient::
 
@@ -360,10 +367,10 @@ One way to remember how slices work is to think of the indices as pointing
 Then the right edge of the last character of a string of *n* characters has
 index *n*, for example::
 
-    +---+---+---+---+---+ 
+    +---+---+---+---+---+
     | H | e | l | p | A |
-    +---+---+---+---+---+ 
-    0   1   2   3   4   5 
+    +---+---+---+---+---+
+    0   1   2   3   4   5
    -5  -4  -3  -2  -1
 
 The first row of numbers gives the position of the indices 0...5 in the string;
@@ -385,7 +392,7 @@ The built-in function :func:`len` returns the length of a string::
 .. seealso::
 
    :ref:`typesseq`
-      Strings are examples of *sequence types*, and support the common 
+      Strings are examples of *sequence types*, and support the common
       operations supported by such types.
 
    :ref:`string-methods`
@@ -409,8 +416,8 @@ About Unicode
 .. sectionauthor:: Marc-Andre Lemburg <mal@lemburg.com>
 
 
-Starting with Python 3.0 all strings support Unicode. 
-(See http://www.unicode.org/) 
+Starting with Python 3.0 all strings support Unicode (see
+http://www.unicode.org/).
 
 Unicode has the advantage of providing one ordinal for every character in every
 script used in modern and ancient texts. Previously, there were only 256
@@ -475,6 +482,12 @@ concatenated and so on::
    ['spam', 'eggs', 'bacon', 4]
    >>> 3*a[:3] + ['Boo!']
    ['spam', 'eggs', 100, 'spam', 'eggs', 100, 'spam', 'eggs', 100, 'Boo!']
+
+All slice operations return a new list containing the requested elements.  This
+means that the following slice returns a shallow copy of the list *a*::
+
+   >>> a[:]
+   ['spam', 'eggs', 100, 1234]
 
 Unlike strings, which are *immutable*, it is possible to change individual
 elements of a list::
@@ -554,7 +567,7 @@ series as follows::
    >>> while b < 10:
    ...     print(b)
    ...     a, b = b, a+b
-   ... 
+   ...
    1
    1
    2
@@ -590,8 +603,8 @@ This example introduces several new features.
 
 * The :func:`print` function writes the value of the expression(s) it is
   given.  It differs from just writing the expression you want to write (as we did
-  earlier in the calculator examples) in the way it handles multiple 
-  expressions, floating point quantities, 
+  earlier in the calculator examples) in the way it handles multiple
+  expressions, floating point quantities,
   and strings.  Strings are printed without quotes, and a space is inserted
   between items, so you can format things nicely, like this::
 
@@ -599,16 +612,12 @@ This example introduces several new features.
      >>> print('The value of i is', i)
      The value of i is 65536
 
-   The keyword end can be used to avoid the newline after the output::
+  The keyword *end* can be used to avoid the newline after the output, or end
+  the output with a different string::
 
      >>> a, b = 0, 1
      >>> while b < 1000:
-     ...     print(b, ' ', end='')
+     ...     print(b, end=',')
      ...     a, b = b, a+b
-     ... 
-     >>> print()
-     1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
-
- Note that nothing appeared after the loop ended, until we printed
- a newline.
-
+     ...
+     1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,

@@ -20,22 +20,25 @@
 # 2002-11-25 mvl  add UNIDATA_VERSION
 # 2004-05-29 perky add east asian width information
 # 2006-03-10 mvl  update to Unicode 4.1; add UCD 3.2 delta
-# 2008-06-11 gb   add NONPRINTABLE_MASK for Atsuo Ishimoto's ascii() patch
+# 2008-06-11 gb   add PRINTABLE_MASK for Atsuo Ishimoto's ascii() patch
 #
 # written by Fredrik Lundh (fredrik@pythonware.com)
 #
 
-import sys
+import sys, os, zipfile
 
 SCRIPT = sys.argv[0]
-VERSION = "2.5"
+VERSION = "3.2"
 
 # The Unicode Database
-UNIDATA_VERSION = "4.1.0"
+UNIDATA_VERSION = "6.0.0"
 UNICODE_DATA = "UnicodeData%s.txt"
 COMPOSITION_EXCLUSIONS = "CompositionExclusions%s.txt"
 EASTASIAN_WIDTH = "EastAsianWidth%s.txt"
+UNIHAN = "Unihan%s.zip"
 DERIVED_CORE_PROPERTIES = "DerivedCoreProperties%s.txt"
+DERIVEDNORMALIZATION_PROPS = "DerivedNormalizationProps%s.txt"
+LINE_BREAK = "LineBreak%s.txt"
 
 old_versions = ["3.2.0"]
 
@@ -50,6 +53,8 @@ BIDIRECTIONAL_NAMES = [ "", "L", "LRE", "LRO", "R", "AL", "RLE", "RLO",
 
 EASTASIANWIDTH_NAMES = [ "F", "H", "W", "Na", "A", "N" ]
 
+MANDATORY_LINE_BREAKS = [ "BK", "CR", "LF", "NL" ]
+
 # note: should match definitions in Objects/unicodectype.c
 ALPHA_MASK = 0x01
 DECIMAL_MASK = 0x02
@@ -61,26 +66,31 @@ TITLE_MASK = 0x40
 UPPER_MASK = 0x80
 XID_START_MASK = 0x100
 XID_CONTINUE_MASK = 0x200
-NONPRINTABLE_MASK = 0x400
+PRINTABLE_MASK = 0x400
+NODELTA_MASK = 0x800
+NUMERIC_MASK = 0x1000
+
+# these ranges need to match unicodedata.c:is_unified_ideograph
+cjk_ranges = [
+    ('3400', '4DB5'),
+    ('4E00', '9FCB'),
+    ('20000', '2A6D6'),
+    ('2A700', '2B734'),
+    ('2B740', '2B81D')
+]
 
 def maketables(trace=0):
 
     print("--- Reading", UNICODE_DATA % "", "...")
 
     version = ""
-    unicode = UnicodeData(UNICODE_DATA % version,
-                          COMPOSITION_EXCLUSIONS % version,
-                          EASTASIAN_WIDTH % version,
-                          DERIVED_CORE_PROPERTIES % version)
+    unicode = UnicodeData(UNIDATA_VERSION)
 
     print(len(list(filter(None, unicode.table))), "characters")
 
     for version in old_versions:
         print("--- Reading", UNICODE_DATA % ("-"+version), "...")
-        old_unicode = UnicodeData(UNICODE_DATA % ("-"+version),
-                                  COMPOSITION_EXCLUSIONS % ("-"+version),
-                                  EASTASIAN_WIDTH % ("-"+version),
-                                  DERIVED_CORE_PROPERTIES % ("-"+version))
+        old_unicode = UnicodeData(version, cjk_check=False)
         print(len(list(filter(None, old_unicode.table))), "characters")
         merge_old_version(version, unicode, old_unicode)
 
@@ -93,7 +103,7 @@ def maketables(trace=0):
 
 def makeunicodedata(unicode, trace):
 
-    dummy = (0, 0, 0, 0, 0)
+    dummy = (0, 0, 0, 0, 0, 0)
     table = [dummy]
     cache = {0: dummy}
     index = [0] * len(unicode.chars)
@@ -113,8 +123,10 @@ def makeunicodedata(unicode, trace):
             bidirectional = BIDIRECTIONAL_NAMES.index(record[4])
             mirrored = record[9] == "Y"
             eastasianwidth = EASTASIANWIDTH_NAMES.index(record[15])
+            normalizationquickcheck = record[17]
             item = (
-                category, combining, bidirectional, mirrored, eastasianwidth
+                category, combining, bidirectional, mirrored, eastasianwidth,
+                normalizationquickcheck
                 )
             # add entry to index and item tables
             i = cache.get(item)
@@ -226,7 +238,7 @@ def makeunicodedata(unicode, trace):
     print("/* a list of unique database records */", file=fp)
     print("const _PyUnicode_DatabaseRecord _PyUnicode_Database_Records[] = {", file=fp)
     for item in table:
-        print("    {%d, %d, %d, %d, %d}," % item, file=fp)
+        print("    {%d, %d, %d, %d, %d, %d}," % item, file=fp)
     print("};", file=fp)
     print(file=fp)
 
@@ -352,6 +364,9 @@ def makeunicodetype(unicode, trace):
     table = [dummy]
     cache = {0: dummy}
     index = [0] * len(unicode.chars)
+    numeric = {}
+    spaces = []
+    linebreaks = []
 
     for char in unicode.chars:
         record = unicode.table[char]
@@ -361,45 +376,56 @@ def makeunicodetype(unicode, trace):
             bidirectional = record[4]
             properties = record[16]
             flags = 0
+            delta = True
             if category in ["Lm", "Lt", "Lu", "Ll", "Lo"]:
                 flags |= ALPHA_MASK
             if category == "Ll":
                 flags |= LOWER_MASK
-            if category == "Zl" or bidirectional == "B":
+            if 'Line_Break' in properties or bidirectional == "B":
                 flags |= LINEBREAK_MASK
+                linebreaks.append(char)
             if category == "Zs" or bidirectional in ("WS", "B", "S"):
                 flags |= SPACE_MASK
+                spaces.append(char)
             if category == "Lt":
                 flags |= TITLE_MASK
             if category == "Lu":
                 flags |= UPPER_MASK
-            if category[0] == "C":
-                flags |= NONPRINTABLE_MASK
-            if category[0] == "Z" and char != " ":
-                flags |= NONPRINTABLE_MASK
+            if char == ord(" ") or category[0] not in ("C", "Z"):
+                flags |= PRINTABLE_MASK
             if "XID_Start" in properties:
                 flags |= XID_START_MASK
             if "XID_Continue" in properties:
                 flags |= XID_CONTINUE_MASK
-            # use delta predictor for upper/lower/title
+            # use delta predictor for upper/lower/title if it fits
             if record[12]:
-                upper = int(record[12], 16) - char
-                assert -32768 <= upper <= 32767
-                upper = upper & 0xffff
+                upper = int(record[12], 16)
             else:
-                upper = 0
+                upper = char
             if record[13]:
-                lower = int(record[13], 16) - char
-                assert -32768 <= lower <= 32767
-                lower = lower & 0xffff
+                lower = int(record[13], 16)
             else:
-                lower = 0
+                lower = char
             if record[14]:
-                title = int(record[14], 16) - char
-                assert -32768 <= lower <= 32767
-                title = title & 0xffff
+                title = int(record[14], 16)
             else:
-                title = 0
+                # UCD.html says that a missing title char means that
+                # it defaults to the uppercase character, not to the
+                # character itself. Apparently, in the current UCD (5.x)
+                # this feature is never used
+                title = upper
+            upper_d = upper - char
+            lower_d = lower - char
+            title_d = title - char
+            if -32768 <= upper_d <= 32767 and \
+               -32768 <= lower_d <= 32767 and \
+               -32768 <= title_d <= 32767:
+                # use deltas
+                upper = upper_d & 0xffff
+                lower = lower_d & 0xffff
+                title = title_d & 0xffff
+            else:
+                flags |= NODELTA_MASK
             # decimal digit, integer digit
             decimal = 0
             if record[6]:
@@ -409,6 +435,9 @@ def makeunicodetype(unicode, trace):
             if record[7]:
                 flags |= DIGIT_MASK
                 digit = int(record[7])
+            if record[8]:
+                flags |= NUMERIC_MASK
+                numeric.setdefault(record[8], []).append(char)
             item = (
                 upper, lower, title, decimal, digit, flags
                 )
@@ -420,6 +449,9 @@ def makeunicodetype(unicode, trace):
             index[char] = i
 
     print(len(table), "unique character type entries")
+    print(sum(map(len, numeric.values())), "numeric code points")
+    print(len(spaces), "whitespace code points")
+    print(len(linebreaks), "linebreak code points")
 
     print("--- Writing", FILE, "...")
 
@@ -441,19 +473,67 @@ def makeunicodetype(unicode, trace):
     Array("index1", index1).dump(fp, trace)
     Array("index2", index2).dump(fp, trace)
 
+    # Generate code for _PyUnicode_ToNumeric()
+    numeric_items = sorted(numeric.items())
+    print('/* Returns the numeric value as double for Unicode characters', file=fp)
+    print(' * having this property, -1.0 otherwise.', file=fp)
+    print(' */', file=fp)
+    print('double _PyUnicode_ToNumeric(Py_UCS4 ch)', file=fp)
+    print('{', file=fp)
+    print('    switch (ch) {', file=fp)
+    for value, codepoints in numeric_items:
+        # Turn text into float literals
+        parts = value.split('/')
+        parts = [repr(float(part)) for part in parts]
+        value = '/'.join(parts)
+
+        codepoints.sort()
+        for codepoint in codepoints:
+            print('    case 0x%04X:' % (codepoint,), file=fp)
+        print('        return (double) %s;' % (value,), file=fp)
+    print('    }', file=fp)
+    print('    return -1.0;', file=fp)
+    print('}', file=fp)
+    print(file=fp)
+
+    # Generate code for _PyUnicode_IsWhitespace()
+    print("/* Returns 1 for Unicode characters having the bidirectional", file=fp)
+    print(" * type 'WS', 'B' or 'S' or the category 'Zs', 0 otherwise.", file=fp)
+    print(" */", file=fp)
+    print('int _PyUnicode_IsWhitespace(register const Py_UCS4 ch)', file=fp)
+    print('{', file=fp)
+    print('    switch (ch) {', file=fp)
+
+    for codepoint in sorted(spaces):
+        print('    case 0x%04X:' % (codepoint,), file=fp)
+    print('        return 1;', file=fp)
+
+    print('    }', file=fp)
+    print('    return 0;', file=fp)
+    print('}', file=fp)
+    print(file=fp)
+
+    # Generate code for _PyUnicode_IsLinebreak()
+    print("/* Returns 1 for Unicode characters having the line break", file=fp)
+    print(" * property 'BK', 'CR', 'LF' or 'NL' or having bidirectional", file=fp)
+    print(" * type 'B', 0 otherwise.", file=fp)
+    print(" */", file=fp)
+    print('int _PyUnicode_IsLinebreak(register const Py_UCS4 ch)', file=fp)
+    print('{', file=fp)
+    print('    switch (ch) {', file=fp)
+    for codepoint in sorted(linebreaks):
+        print('    case 0x%04X:' % (codepoint,), file=fp)
+    print('        return 1;', file=fp)
+
+    print('    }', file=fp)
+    print('    return 0;', file=fp)
+    print('}', file=fp)
+    print(file=fp)
+
     fp.close()
 
 # --------------------------------------------------------------------
 # unicode name database
-
-def CmpToKey(mycmp):
-    'Convert a cmp= function into a key= function'
-    class K(object):
-        def __init__(self, obj, *args):
-            self.obj = obj
-        def __lt__(self, other):
-            return mycmp(self.obj, other.obj) == -1
-    return K
 
 def makeunicodename(unicode, trace):
 
@@ -497,14 +577,10 @@ def makeunicodename(unicode, trace):
     wordlist = list(words.items())
 
     # sort on falling frequency, then by name
-    def cmpwords(a,b):
+    def word_key(a):
         aword, alist = a
-        bword, blist = b
-        r = -cmp(len(alist),len(blist))
-        if r:
-            return r
-        return cmp(aword, bword)
-    wordlist.sort(key=CmpToKey(cmpwords))
+        return -len(alist), aword
+    wordlist.sort(key=word_key)
 
     # figure out how many phrasebook escapes we need
     escapes = 0
@@ -628,6 +704,7 @@ def merge_old_version(version, new, old):
     bidir_changes = [0xFF]*0x110000
     category_changes = [0xFF]*0x110000
     decimal_changes = [0xFF]*0x110000
+    mirrored_changes = [0xFF]*0x110000
     # In numeric data, 0 means "no change",
     # -1 means "did not have a numeric value
     numeric_changes = [0] * 0x110000
@@ -668,12 +745,16 @@ def merge_old_version(version, new, old):
                     elif k == 8:
                         # print "NUMERIC",hex(i), `old.table[i][k]`, new.table[i][k]
                         # Since 0 encodes "no change", the old value is better not 0
-                        assert value != "0" and value != "-1"
                         if not value:
                             numeric_changes[i] = -1
                         else:
-                            assert re.match("^[0-9]+$", value)
-                            numeric_changes[i] = int(value)
+                            numeric_changes[i] = float(value)
+                            assert numeric_changes[i] not in (0, -1)
+                    elif k == 9:
+                        if value == 'Y':
+                            mirrored_changes[i] = '1'
+                        else:
+                            mirrored_changes[i] = '0'
                     elif k == 11:
                         # change to ISO comment, ignore
                         pass
@@ -689,21 +770,39 @@ def merge_old_version(version, new, old):
                     elif k == 16:
                         # derived property changes; not yet
                         pass
+                    elif k == 17:
+                        # normalization quickchecks are not performed
+                        # for older versions
+                        pass
                     else:
                         class Difference(Exception):pass
                         raise Difference(hex(i), k, old.table[i], new.table[i])
     new.changed.append((version, list(zip(bidir_changes, category_changes,
-                                     decimal_changes, numeric_changes)),
+                                     decimal_changes, mirrored_changes,
+                                     numeric_changes)),
                         normalization_changes))
 
+def open_data(template, version):
+    local = template % ('-'+version,)
+    if not os.path.exists(local):
+        import urllib.request
+        if version == '3.2.0':
+            # irregular url structure
+            url = 'http://www.unicode.org/Public/3.2-Update/' + local
+        else:
+            url = ('http://www.unicode.org/Public/%s/ucd/'+template) % (version, '')
+        urllib.request.urlretrieve(url, filename=local)
+    if local.endswith('.txt'):
+        return open(local, encoding='utf-8')
+    else:
+        # Unihan.zip
+        return open(local, 'rb')
 
 # --------------------------------------------------------------------
 # the following support code is taken from the unidb utilities
 # Copyright (c) 1999-2000 by Secret Labs AB
 
 # load a unicode-data file from disk
-
-import sys
 
 class UnicodeData:
     # Record structure:
@@ -712,10 +811,12 @@ class UnicodeData:
     #  ISO-comment, uppercase, lowercase, titlecase, ea-width, (16)
     #  derived-props] (17)
 
-    def __init__(self, filename, exclusions, eastasianwidth,
-                 derivedprops, expand=1):
+    def __init__(self, version,
+                 linebreakprops=False,
+                 expand=1,
+                 cjk_check=True):
         self.changed = []
-        file = open(filename)
+        file = open_data(UNICODE_DATA, version)
         table = [None] * 0x110000
         while 1:
             s = file.readline()
@@ -724,6 +825,8 @@ class UnicodeData:
             s = s.strip().split(";")
             char = int(s[0], 16)
             table[char] = s
+
+        cjk_ranges_found = []
 
         # expand first-last ranges
         if expand:
@@ -735,19 +838,24 @@ class UnicodeData:
                         s[1] = ""
                         field = s
                     elif s[1][-5:] == "Last>":
+                        if s[1].startswith("<CJK Ideograph"):
+                            cjk_ranges_found.append((field[0],
+                                                     s[0]))
                         s[1] = ""
                         field = None
                 elif field:
                     f2 = field[:]
                     f2[0] = "%X" % i
                     table[i] = f2
+            if cjk_check and cjk_ranges != cjk_ranges_found:
+                raise ValueError("CJK ranges deviate: have %r" % cjk_ranges_found)
 
         # public attributes
-        self.filename = filename
+        self.filename = UNICODE_DATA % ''
         self.table = table
         self.chars = list(range(0x110000)) # unicode 3.2
 
-        file = open(exclusions)
+        file = open_data(COMPOSITION_EXCLUSIONS, version)
         self.exclusions = {}
         for s in file:
             s = s.strip()
@@ -759,7 +867,7 @@ class UnicodeData:
             self.exclusions[char] = 1
 
         widths = [None] * 0x110000
-        for s in open(eastasianwidth):
+        for s in open_data(EASTASIAN_WIDTH, version):
             s = s.strip()
             if not s:
                 continue
@@ -780,7 +888,7 @@ class UnicodeData:
         for i in range(0, 0x110000):
             if table[i] is not None:
                 table[i].append(set())
-        for s in open(derivedprops):
+        for s in open_data(DERIVED_CORE_PROPERTIES, version):
             s = s.split('#', 1)[0].strip()
             if not s:
                 continue
@@ -798,6 +906,65 @@ class UnicodeData:
                     # Some properties (e.g. Default_Ignorable_Code_Point)
                     # apply to unassigned code points; ignore them
                     table[char][-1].add(p)
+
+        for s in open_data(LINE_BREAK, version):
+            s = s.partition('#')[0]
+            s = [i.strip() for i in s.split(';')]
+            if len(s) < 2 or s[1] not in MANDATORY_LINE_BREAKS:
+                continue
+            if '..' not in s[0]:
+                first = last = int(s[0], 16)
+            else:
+                first, last = [int(c, 16) for c in s[0].split('..')]
+            for char in range(first, last+1):
+                table[char][-1].add('Line_Break')
+
+        # We only want the quickcheck properties
+        # Format: NF?_QC; Y(es)/N(o)/M(aybe)
+        # Yes is the default, hence only N and M occur
+        # In 3.2.0, the format was different (NF?_NO)
+        # The parsing will incorrectly determine these as
+        # "yes", however, unicodedata.c will not perform quickchecks
+        # for older versions, and no delta records will be created.
+        quickchecks = [0] * 0x110000
+        qc_order = 'NFD_QC NFKD_QC NFC_QC NFKC_QC'.split()
+        for s in open_data(DERIVEDNORMALIZATION_PROPS, version):
+            if '#' in s:
+                s = s[:s.index('#')]
+            s = [i.strip() for i in s.split(';')]
+            if len(s) < 2 or s[1] not in qc_order:
+                continue
+            quickcheck = 'MN'.index(s[2]) + 1 # Maybe or No
+            quickcheck_shift = qc_order.index(s[1])*2
+            quickcheck <<= quickcheck_shift
+            if '..' not in s[0]:
+                first = last = int(s[0], 16)
+            else:
+                first, last = [int(c, 16) for c in s[0].split('..')]
+            for char in range(first, last+1):
+                assert not (quickchecks[char]>>quickcheck_shift)&3
+                quickchecks[char] |= quickcheck
+        for i in range(0, 0x110000):
+            if table[i] is not None:
+                table[i].append(quickchecks[i])
+
+        zip = zipfile.ZipFile(open_data(UNIHAN, version))
+        if version == '3.2.0':
+            data = zip.open('Unihan-3.2.0.txt').read()
+        else:
+            data = zip.open('Unihan_NumericValues.txt').read()
+        for line in data.decode("utf-8").splitlines():
+            if not line.startswith('U+'):
+                continue
+            code, tag, value = line.split(None, 3)[:3]
+            if tag not in ('kAccountingNumeric', 'kPrimaryNumeric',
+                           'kOtherNumeric'):
+                continue
+            value = value.strip().replace(',', '')
+            i = int(code[2:], 16)
+            # Patch the numeric field
+            if table[i] is not None:
+                table[i][8] = value
 
     def uselatin1(self):
         # restrict character range to ISO Latin 1
@@ -948,7 +1115,6 @@ def splitbins(t, trace=0):
     you'll get.
     """
 
-    import sys
     if trace:
         def dump(t1, t2, shift, bytes):
             print("%d+%d bins at shift %d; %d bytes" % (

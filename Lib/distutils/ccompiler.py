@@ -6,7 +6,6 @@ for the Distutils compiler abstraction model."""
 __revision__ = "$Id$"
 
 import sys, os, re
-from copy import copy
 from distutils.errors import *
 from distutils.spawn import spawn
 from distutils.file_util import move_file
@@ -233,7 +232,7 @@ class CCompiler:
         any list of standard include directories that the compiler may
         search by default.
         """
-        self.include_dirs = copy(dirs)
+        self.include_dirs = dirs[:]
 
     def add_library(self, libname):
         """Add 'libname' to the list of libraries that will be included in
@@ -257,7 +256,7 @@ class CCompiler:
         not affect any standard system libraries that the linker may
         include by default.
         """
-        self.libraries = copy(libnames)
+        self.libraries = libnames[:]
 
     def add_library_dir(self, dir):
         """Add 'dir' to the list of directories that will be searched for
@@ -272,7 +271,7 @@ class CCompiler:
         strings).  This does not affect any standard library search path
         that the linker may search by default.
         """
-        self.library_dirs = copy(dirs)
+        self.library_dirs = dirs[:]
 
     def add_runtime_library_dir(self, dir):
         """Add 'dir' to the list of directories that will be searched for
@@ -286,7 +285,7 @@ class CCompiler:
         standard search path that the runtime linker may search by
         default.
         """
-        self.runtime_library_dirs = copy(dirs)
+        self.runtime_library_dirs = dirs[:]
 
     def add_link_object(self, object):
         """Add 'object' to the list of object files (or analogues, such as
@@ -302,7 +301,7 @@ class CCompiler:
         files that the linker may include by default (such as system
         libraries).
         """
-        self.objects = copy(objects)
+        self.objects = objects[:]
 
 
     # -- Private utility methods --------------------------------------
@@ -312,10 +311,7 @@ class CCompiler:
 
     def _setup_compile(self, outdir, macros, incdirs, sources, depends,
                        extra):
-        """Process arguments and decide which source files to compile.
-
-        Merges _fix_compile_args() and _prep_compile().
-        """
+        """Process arguments and decide which source files to compile."""
         if outdir is None:
             outdir = self.output_dir
         elif not isinstance(outdir, str):
@@ -344,41 +340,6 @@ class CCompiler:
                                         output_dir=outdir)
         assert len(objects) == len(sources)
 
-        # XXX should redo this code to eliminate skip_source entirely.
-        # XXX instead create build and issue skip messages inline
-
-        if self.force:
-            skip_source = {}            # rebuild everything
-            for source in sources:
-                skip_source[source] = 0
-        elif depends is None:
-            # If depends is None, figure out which source files we
-            # have to recompile according to a simplistic check. We
-            # just compare the source and object file, no deep
-            # dependency checking involving header files.
-            skip_source = {}            # rebuild everything
-            for source in sources:      # no wait, rebuild nothing
-                skip_source[source] = 1
-
-            n_sources, n_objects = newer_pairwise(sources, objects)
-            for source in n_sources:    # no really, only rebuild what's
-                skip_source[source] = 0 # out-of-date
-        else:
-            # If depends is a list of files, then do a different
-            # simplistic check.  Assume that each object depends on
-            # its source and all files in the depends list.
-            skip_source = {}
-            # L contains all the depends plus a spot at the end for a
-            # particular source file
-            L = depends[:] + [None]
-            for i in range(len(objects)):
-                source = sources[i]
-                L[-1] = source
-                if newer_group(L, objects[i]):
-                    skip_source[source] = 0
-                else:
-                    skip_source[source] = 1
-
         pp_opts = gen_preprocess_options(macros, incdirs)
 
         build = {}
@@ -387,10 +348,7 @@ class CCompiler:
             obj = objects[i]
             ext = os.path.splitext(src)[1]
             self.mkpath(os.path.dirname(obj))
-            if skip_source[src]:
-                log.debug("skipping %s (%s up-to-date)", src, obj)
-            else:
-                build[obj] = src, ext
+            build[obj] = (src, ext)
 
         return macros, objects, extra, pp_opts, build
 
@@ -447,40 +405,9 @@ class CCompiler:
         objects = self.object_filenames(sources, output_dir=output_dir)
         assert len(objects) == len(sources)
 
-        if self.force:
-            skip_source = {}            # rebuild everything
-            for source in sources:
-                skip_source[source] = 0
-        elif depends is None:
-            # If depends is None, figure out which source files we
-            # have to recompile according to a simplistic check. We
-            # just compare the source and object file, no deep
-            # dependency checking involving header files.
-            skip_source = {}            # rebuild everything
-            for source in sources:      # no wait, rebuild nothing
-                skip_source[source] = 1
-
-            n_sources, n_objects = newer_pairwise(sources, objects)
-            for source in n_sources:    # no really, only rebuild what's
-                skip_source[source] = 0 # out-of-date
-        else:
-            # If depends is a list of files, then do a different
-            # simplistic check.  Assume that each object depends on
-            # its source and all files in the depends list.
-            skip_source = {}
-            # L contains all the depends plus a spot at the end for a
-            # particular source file
-            L = depends[:] + [None]
-            for i in range(len(objects)):
-                source = sources[i]
-                L[-1] = source
-                if newer_group(L, objects[i]):
-                    skip_source[source] = 0
-                else:
-                    skip_source[source] = 1
-
-        return objects, skip_source
-
+        # Return an empty dict for the "which source files can be skipped"
+        # return value to preserve API compatibility.
+        return objects, {}
 
     def _fix_object_args(self, objects, output_dir):
         """Typecheck and fix up some arguments supplied to various methods.
@@ -852,14 +779,16 @@ class CCompiler:
             library_dirs = []
         fd, fname = tempfile.mkstemp(".c", funcname, text=True)
         f = os.fdopen(fd, "w")
-        for incl in includes:
-            f.write("""#include "%s"\n""" % incl)
-        f.write("""\
+        try:
+            for incl in includes:
+                f.write("""#include "%s"\n""" % incl)
+            f.write("""\
 main (int argc, char **argv) {
     %s();
 }
 """ % funcname)
-        f.close()
+        finally:
+            f.close()
         try:
             objects = self.compile([fname], include_dirs=include_dirs)
         except CompileError:
@@ -984,8 +913,8 @@ main (int argc, char **argv) {
     def move_file(self, src, dst):
         return move_file(src, dst, dry_run=self.dry_run)
 
-    def mkpath(self, name, mode=0o777):
-        mkpath(name, mode, self.dry_run)
+    def mkpath (self, name, mode=0o777):
+        mkpath(name, mode, dry_run=self.dry_run)
 
 
 # Map a sys.platform/os.name ('posix', 'nt') to the default compiler
@@ -1004,7 +933,6 @@ _default_compilers = (
     # OS name mappings
     ('posix', 'unix'),
     ('nt', 'msvc'),
-    ('mac', 'mwerks'),
 
     )
 
@@ -1042,8 +970,6 @@ compiler_class = { 'unix':    ('unixccompiler', 'UnixCCompiler',
                                "Mingw32 port of GNU C Compiler for Win32"),
                    'bcpp':    ('bcppcompiler', 'BCPPCompiler',
                                "Borland C++ Compiler"),
-                   'mwerks':  ('mwerkscompiler', 'MWerksCompiler',
-                               "MetroWerks CodeWarrior"),
                    'emx':     ('emxccompiler', 'EMXCCompiler',
                                "EMX port of GNU C Compiler for OS/2"),
                  }

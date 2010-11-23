@@ -32,6 +32,8 @@ class FakeIO(io.TextIOWrapper):
                                      encoding=encoding,
                                      errors=errors,
                                      newline=newline)
+        self._encoding = encoding
+        self._errors = errors
         if initial_value:
             if not isinstance(initial_value, str):
                 initial_value = str(initial_value)
@@ -191,6 +193,23 @@ class UUFileTest(unittest.TestCase):
             f.close()
             self.assertEqual(s, plaintext)
             # XXX is there an xp way to verify the mode?
+        finally:
+            self._kill(f)
+
+    def test_decode_filename(self):
+        f = None
+        try:
+            support.unlink(self.tmpin)
+            f = open(self.tmpin, 'wb')
+            f.write(encodedtextwrapped(0o644, self.tmpout))
+            f.close()
+
+            uu.decode(self.tmpin)
+
+            f = open(self.tmpout, 'rb')
+            s = f.read()
+            f.close()
+            self.assertEqual(s, plaintext)
         finally:
             self._kill(f)
 

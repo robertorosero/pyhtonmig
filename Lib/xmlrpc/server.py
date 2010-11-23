@@ -67,7 +67,7 @@ class Math:
         elif method == 'add':
             return params[0] + params[1]
         else:
-            raise 'bad method'
+            raise ValueError('bad method')
 
 server = SimpleXMLRPCServer(("localhost", 8000))
 server.register_introspection_functions()
@@ -104,7 +104,7 @@ server.handle_request()
 # Written by Brian Quinlan (brian@sweetapp.com).
 # Based on code written by Fredrik Lundh.
 
-from xmlrpc.client import Fault, dumps, loads
+from xmlrpc.client import Fault, dumps, loads, gzip_encode, gzip_decode
 from http.server import BaseHTTPRequestHandler
 import http.server
 import socketserver
@@ -155,15 +155,16 @@ class SimpleXMLRPCDispatcher:
     """Mix-in class that dispatches XML-RPC requests.
 
     This class is used to register XML-RPC method handlers
-    and then to dispatch them. There should never be any
-    reason to instantiate this class directly.
+    and then to dispatch them. This class doesn't need to be
+    instanced directly when used by SimpleXMLRPCServer but it
+    can be instanced when used by the MultiPathXMLRPCServer
     """
 
-    def __init__(self, allow_none, encoding):
+    def __init__(self, allow_none=False, encoding=None):
         self.funcs = {}
         self.instance = None
         self.allow_none = allow_none
-        self.encoding = encoding
+        self.encoding = encoding or 'utf-8'
 
     def register_instance(self, instance, allow_dotted_names=False):
         """Registers an instance to respond to XML-RPC requests.
@@ -201,7 +202,7 @@ class SimpleXMLRPCDispatcher:
         self.instance = instance
         self.allow_dotted_names = allow_dotted_names
 
-    def register_function(self, function, name = None):
+    def register_function(self, function, name=None):
         """Registers a function to respond to XML-RPC requests.
 
         The optional name argument can be used to set a Unicode name
@@ -231,7 +232,7 @@ class SimpleXMLRPCDispatcher:
 
         self.funcs.update({'system.multicall' : self.system_multicall})
 
-    def _marshaled_dispatch(self, data, dispatch_method = None):
+    def _marshaled_dispatch(self, data, dispatch_method = None, path = None):
         """Dispatches an XML-RPC method from marshalled (XML) data.
 
         XML-RPC methods are dispatched from the marshalled (XML) data
@@ -266,7 +267,7 @@ class SimpleXMLRPCDispatcher:
                 encoding=self.encoding, allow_none=self.allow_none,
                 )
 
-        return response
+        return response.encode(self.encoding)
 
     def system_listMethods(self):
         """system.listMethods() => ['add', 'subtract', 'multiple']
@@ -420,6 +421,31 @@ class SimpleXMLRPCRequestHandler(BaseHTTPRequestHandler):
     # paths not on this list will result in a 404 error.
     rpc_paths = ('/', '/RPC2')
 
+    #if not None, encode responses larger than this, if possible
+    encode_threshold = 1400 #a common MTU
+
+    #Override form StreamRequestHandler: full buffering of output
+    #and no Nagle.
+    wbufsize = -1
+    disable_nagle_algorithm = True
+
+    # a re to match a gzip Accept-Encoding
+    aepattern = re.compile(r"""
+                            \s* ([^\s;]+) \s*            #content-coding
+                            (;\s* q \s*=\s* ([0-9\.]+))? #q
+                            """, re.VERBOSE | re.IGNORECASE)
+
+    def accept_encodings(self):
+        r = {}
+        ae = self.headers.get("Accept-Encoding", "")
+        for e in ae.split(","):
+            match = self.aepattern.match(e)
+            if match:
+                v = match.group(3)
+                v = float(v) if v else 1.0
+                r[match.group(1)] = v
+        return r
+
     def is_rpc_path_valid(self):
         if self.rpc_paths:
             return self.path in self.rpc_paths
@@ -453,13 +479,17 @@ class SimpleXMLRPCRequestHandler(BaseHTTPRequestHandler):
                 size_remaining -= len(L[-1])
             data = b''.join(L)
 
+            data = self.decode_request_content(data)
+            if data is None:
+                return #response has been sent
+
             # In previous versions of SimpleXMLRPCServer, _dispatch
             # could be overridden in this class, instead of in
             # SimpleXMLRPCDispatcher. To maintain backwards compatibility,
             # check to see if a subclass implements _dispatch and dispatch
             # using that method if present.
             response = self.server._marshaled_dispatch(
-                    data, getattr(self, '_dispatch', None)
+                    data, getattr(self, '_dispatch', None), self.path
                 )
         except Exception as e: # This should only happen if the module is buggy
             # internal error, report as HTTP server error
@@ -469,21 +499,44 @@ class SimpleXMLRPCRequestHandler(BaseHTTPRequestHandler):
             if hasattr(self.server, '_send_traceback_header') and \
                     self.server._send_traceback_header:
                 self.send_header("X-exception", str(e))
-                self.send_header("X-traceback", traceback.format_exc())
+                trace = traceback.format_exc()
+                trace = str(trace.encode('ASCII', 'backslashreplace'), 'ASCII')
+                self.send_header("X-traceback", trace)
 
+            self.send_header("Content-length", "0")
             self.end_headers()
         else:
-            # Got a valid XML RPC response; convert to bytes first
-            response = response.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-type", "text/xml")
+            if self.encode_threshold is not None:
+                if len(response) > self.encode_threshold:
+                    q = self.accept_encodings().get("gzip", 0)
+                    if q:
+                        try:
+                            response = gzip_encode(response)
+                            self.send_header("Content-Encoding", "gzip")
+                        except NotImplementedError:
+                            pass
             self.send_header("Content-length", str(len(response)))
             self.end_headers()
             self.wfile.write(response)
 
-            # shut down the connection
-            self.wfile.flush()
-            self.connection.shutdown(1)
+    def decode_request_content(self, data):
+        #support gzip encoding of request
+        encoding = self.headers.get("content-encoding", "identity").lower()
+        if encoding == "identity":
+            return data
+        if encoding == "gzip":
+            try:
+                return gzip_decode(data)
+            except NotImplementedError:
+                self.send_response(501, "encoding %r not supported" % encoding)
+            except ValueError:
+                self.send_response(400, "error decoding gzip content")
+        else:
+            self.send_response(501, "encoding %r not supported" % encoding)
+        self.send_header("Content-length", "0")
+        self.end_headers()
 
     def report_404 (self):
             # Report a 404 error
@@ -493,9 +546,6 @@ class SimpleXMLRPCRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-length", str(len(response)))
         self.end_headers()
         self.wfile.write(response)
-        # shut down the connection
-        self.wfile.flush()
-        self.connection.shutdown(1)
 
     def log_request(self, code='-', size='-'):
         """Selectively log an accepted request."""
@@ -537,6 +587,44 @@ class SimpleXMLRPCServer(socketserver.TCPServer,
             flags |= fcntl.FD_CLOEXEC
             fcntl.fcntl(self.fileno(), fcntl.F_SETFD, flags)
 
+class MultiPathXMLRPCServer(SimpleXMLRPCServer):
+    """Multipath XML-RPC Server
+    This specialization of SimpleXMLRPCServer allows the user to create
+    multiple Dispatcher instances and assign them to different
+    HTTP request paths.  This makes it possible to run two or more
+    'virtual XML-RPC servers' at the same port.
+    Make sure that the requestHandler accepts the paths in question.
+    """
+    def __init__(self, addr, requestHandler=SimpleXMLRPCRequestHandler,
+                 logRequests=True, allow_none=False, encoding=None, bind_and_activate=True):
+
+        SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests, allow_none,
+                                    encoding, bind_and_activate)
+        self.dispatchers = {}
+        self.allow_none = allow_none
+        self.encoding = encoding
+
+    def add_dispatcher(self, path, dispatcher):
+        self.dispatchers[path] = dispatcher
+        return dispatcher
+
+    def get_dispatcher(self, path):
+        return self.dispatchers[path]
+
+    def _marshaled_dispatch(self, data, dispatch_method = None, path = None):
+        try:
+            response = self.dispatchers[path]._marshaled_dispatch(
+               data, dispatch_method, path)
+        except:
+            # report low level exception back to server
+            # (each dispatcher should have handled their own
+            # exceptions)
+            exc_type, exc_value = sys.exc_info()[:2]
+            response = xmlrpclib.dumps(
+                xmlrpclib.Fault(1, "%s:%s" % (exc_type, exc_value)),
+                encoding=self.encoding, allow_none=self.allow_none)
+        return response
+
 class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
     """Simple handler for XML-RPC data passed through CGI."""
 
@@ -551,7 +639,9 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
         print('Content-Type: text/xml')
         print('Content-Length: %d' % len(response))
         print()
-        sys.stdout.write(response)
+        sys.stdout.flush()
+        sys.stdout.buffer.write(response)
+        sys.stdout.buffer.flush()
 
     def handle_get(self):
         """Handle a single HTTP GET request.
@@ -569,13 +659,16 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
              'message' : message,
              'explain' : explain
             }
+        response = response.encode('utf-8')
         print('Status: %d %s' % (code, message))
-        print('Content-Type: text/html')
+        print('Content-Type: %s' % http.server.DEFAULT_ERROR_CONTENT_TYPE)
         print('Content-Length: %d' % len(response))
         print()
-        sys.stdout.write(response)
+        sys.stdout.flush()
+        sys.stdout.buffer.write(response)
+        sys.stdout.buffer.flush()
 
-    def handle_request(self, request_text = None):
+    def handle_request(self, request_text=None):
         """Handle a single XML-RPC request passed through a CGI post method.
 
         If no XML data is given then it is read from stdin. The resulting
@@ -588,8 +681,12 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
             self.handle_get()
         else:
             # POST data is normally available through stdin
+            try:
+                length = int(os.environ.get('CONTENT_LENGTH', None))
+            except (ValueError, TypeError):
+                length = -1
             if request_text is None:
-                request_text = sys.stdin.read()
+                request_text = sys.stdin.read(length)
 
             self.handle_xmlrpc(request_text)
 
@@ -810,16 +907,12 @@ class DocXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
             self.report_404()
             return
 
-        response = self.server.generate_html_documentation()
+        response = self.server.generate_html_documentation().encode('utf-8')
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.send_header("Content-length", str(len(response)))
         self.end_headers()
-        self.wfile.write(response.encode())
-
-        # shut down the connection
-        self.wfile.flush()
-        self.connection.shutdown(1)
+        self.wfile.write(response)
 
 class DocXMLRPCServer(  SimpleXMLRPCServer,
                         XMLRPCDocGenerator):
@@ -830,7 +923,7 @@ class DocXMLRPCServer(  SimpleXMLRPCServer,
     """
 
     def __init__(self, addr, requestHandler=DocXMLRPCRequestHandler,
-                 logRequests=1, allow_none=False, encoding=None,
+                 logRequests=True, allow_none=False, encoding=None,
                  bind_and_activate=True):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests,
                                     allow_none, encoding, bind_and_activate)
@@ -848,12 +941,14 @@ class DocCGIXMLRPCRequestHandler(   CGIXMLRPCRequestHandler,
         documentation.
         """
 
-        response = self.generate_html_documentation()
+        response = self.generate_html_documentation().encode('utf-8')
 
         print('Content-Type: text/html')
         print('Content-Length: %d' % len(response))
         print()
-        sys.stdout.write(response)
+        sys.stdout.flush()
+        sys.stdout.buffer.write(response)
+        sys.stdout.buffer.flush()
 
     def __init__(self):
         CGIXMLRPCRequestHandler.__init__(self)

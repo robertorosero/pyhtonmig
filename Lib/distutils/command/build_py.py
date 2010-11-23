@@ -5,11 +5,12 @@ Implements the Distutils 'build_py' command."""
 __revision__ = "$Id$"
 
 import sys, os
+import sys
 from glob import glob
 
 from distutils.core import Command
 from distutils.errors import *
-from distutils.util import convert_path
+from distutils.util import convert_path, Mixin2to3
 from distutils import log
 
 class build_py (Command):
@@ -369,6 +370,10 @@ class build_py (Command):
                 self.build_module(module, module_file, package)
 
     def byte_compile(self, files):
+        if sys.dont_write_bytecode:
+            self.warn('byte-compiling is disabled, skipping.')
+            return
+
         from distutils.util import byte_compile
         prefix = self.build_lib
         if prefix[-1] != os.sep:
@@ -384,7 +389,7 @@ class build_py (Command):
             byte_compile(files, optimize=self.optimize,
                          force=self.force, prefix=prefix, dry_run=self.dry_run)
 
-class build_py_2to3(build_py):
+class build_py_2to3(build_py, Mixin2to3):
     def run(self):
         self.updated_files = []
 
@@ -396,18 +401,7 @@ class build_py_2to3(build_py):
             self.build_package_data()
 
         # 2to3
-        from lib2to3.refactor import RefactoringTool
-        class Options:
-            pass
-        o = Options()
-        o.doctests_only = False
-        o.fix = []
-        o.list_fixes = []
-        o.print_function = False
-        o.verbose = False
-        o.write = True
-        r = RefactoringTool(o)
-        r.refactor_args(self.updated_files)
+        self.run_2to3(self.updated_files)
 
         # Remaining base class code
         self.byte_compile(self.get_outputs(include_bytecode=0))

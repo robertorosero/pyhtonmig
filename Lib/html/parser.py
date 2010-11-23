@@ -175,6 +175,9 @@ class HTMLParser(_markupbase.ParserBase):
                     i = self.updatepos(i, k)
                     continue
                 else:
+                    if ";" in rawdata[i:]: #bail by consuming &#
+                        self.handle_data(rawdata[0:2])
+                        i = self.updatepos(i, 2)
                     break
             elif startswith('&', i):
                 match = entityref.match(rawdata, i)
@@ -385,4 +388,4 @@ class HTMLParser(_markupbase.ParserBase):
                     return '&'+s+';'
 
         return re.sub(r"&(#?[xX]?(?:[0-9a-fA-F]+|\w{1,8}));",
-                      replaceEntities, s)
+                      replaceEntities, s, re.ASCII)

@@ -1,6 +1,5 @@
-
-:mod:`cgi` --- Common Gateway Interface support.
-================================================
+:mod:`cgi` --- Common Gateway Interface support
+===============================================
 
 .. module:: cgi
    :synopsis: Helpers for running Python scripts via the Common Gateway Interface.
@@ -65,16 +64,18 @@ Using the cgi module
 
 Begin by writing ``import cgi``.
 
-When you write a new script, consider adding the line::
+When you write a new script, consider adding these lines::
 
-   import cgitb; cgitb.enable()
+   import cgitb
+   cgitb.enable()
 
 This activates a special exception handler that will display detailed reports in
 the Web browser if any errors occur.  If you'd rather not show the guts of your
 program to users of your script, you can have the reports saved to files
-instead, with a line like this::
+instead, with code like this::
 
-   import cgitb; cgitb.enable(display=0, logdir="/tmp")
+   import cgitb
+   cgitb.enable(display=0, logdir="/tmp")
 
 It's very helpful to use this feature during script development. The reports
 produced by :mod:`cgitb` provide information that can save you a lot of time in
@@ -87,12 +88,13 @@ input or the environment (depending on the value of various environment
 variables set according to the CGI standard).  Since it may consume standard
 input, it should be instantiated only once.
 
-The :class:`FieldStorage` instance can be indexed like a Python dictionary, and
-also supports the standard dictionary methods :meth:`__contains__` and
-:meth:`keys`.  The built-in :func:`len` is also supported.  Form fields
-containing empty strings are ignored and do not appear in the dictionary; to
-keep such values, provide a true value for the optional *keep_blank_values*
-keyword parameter when creating the :class:`FieldStorage` instance.
+The :class:`FieldStorage` instance can be indexed like a Python dictionary.
+It allows membership testing with the :keyword:`in` operator, and also supports
+the standard dictionary method :meth:`keys` and the built-in function
+:func:`len`.  Form fields containing empty strings are ignored and do not appear
+in the dictionary; to keep such values, provide a true value for the optional
+*keep_blank_values* keyword parameter when creating the :class:`FieldStorage`
+instance.
 
 For instance, the following code (which assumes that the
 :mailheader:`Content-Type` header and blank line have already been printed)
@@ -100,7 +102,7 @@ checks that the fields ``name`` and ``addr`` are both set to a non-empty
 string::
 
    form = cgi.FieldStorage()
-   if not ("name" in form and "addr" in form):
+   if "name" not in form or "addr" not in form:
        print("<H1>Error</H1>")
        print("Please fill in the name and addr fields.")
        return
@@ -131,8 +133,8 @@ commas::
 If a field represents an uploaded file, accessing the value via the
 :attr:`value` attribute or the :func:`getvalue` method reads the entire file in
 memory as a string.  This may not be what you want. You can test for an uploaded
-file by testing either the :attr:`filename` attribute or the :attr:`file`
-attribute.  You can then read the data at leisure from the :attr:`file`
+file by testing either the :attr:`filename` attribute or the :attr:`!file`
+attribute.  You can then read the data at leisure from the :attr:`!file`
 attribute::
 
    fileitem = form["userfile"]
@@ -152,7 +154,7 @@ field will be set to the value -1.
 The file upload draft standard entertains the possibility of uploading multiple
 files from one field (using a recursive :mimetype:`multipart/\*` encoding).
 When this occurs, the item will be a dictionary-like :class:`FieldStorage` item.
-This can be determined by testing its :attr:`type` attribute, which should be
+This can be determined by testing its :attr:`!type` attribute, which should be
 :mimetype:`multipart/form-data` (or perhaps another MIME type matching
 :mimetype:`multipart/\*`).  In this case, it can be iterated over recursively
 just like the top-level form object.
@@ -160,8 +162,10 @@ just like the top-level form object.
 When a form is submitted in the "old" format (as the query string or as a single
 data part of type :mimetype:`application/x-www-form-urlencoded`), the items will
 actually be instances of the class :class:`MiniFieldStorage`.  In this case, the
-:attr:`list`, :attr:`file`, and :attr:`filename` attributes are always ``None``.
+:attr:`!list`, :attr:`!file`, and :attr:`filename` attributes are always ``None``.
 
+A form submitted via POST that also has a query string will contain both
+:class:`FieldStorage` and :class:`MiniFieldStorage` items.
 
 Higher Level Interface
 ----------------------
@@ -204,7 +208,7 @@ The problem with the code is that you should never expect that a client will
 provide valid input to your scripts.  For example, if a curious user appends
 another ``user=foo`` pair to the query string, then the script would crash,
 because in this situation the ``getvalue("user")`` method call returns a list
-instead of a string.  Calling the :meth:`toupper` method on a list is not valid
+instead of a string.  Calling the :meth:`~str.upper` method on a list is not valid
 (since lists do not have a method of this name) and results in an
 :exc:`AttributeError` exception.
 
@@ -216,7 +220,7 @@ A more convenient approach is to use the methods :meth:`getfirst` and
 :meth:`getlist` provided by this higher level interface.
 
 
-.. method:: FieldStorage.getfirst(name[, default])
+.. method:: FieldStorage.getfirst(name, default=None)
 
    This method always returns only one value associated with form field *name*.
    The method returns only the first value in case that more values were posted
@@ -251,11 +255,22 @@ These are useful if you want more control, or if you want to employ some of the
 algorithms implemented in this module in other circumstances.
 
 
-.. function:: parse(fp[, keep_blank_values[, strict_parsing]])
+.. function:: parse(fp=None, environ=os.environ, keep_blank_values=False, strict_parsing=False)
 
    Parse a query in the environment or from a file (the file defaults to
    ``sys.stdin``).  The *keep_blank_values* and *strict_parsing* parameters are
    passed to :func:`urllib.parse.parse_qs` unchanged.
+
+
+.. function:: parse_qs(qs, keep_blank_values=False, strict_parsing=False)
+
+   This function is deprecated in this module. Use :func:`urllib.parse.parse_qs`
+   instead. It is maintained here only for backward compatibility.
+
+.. function:: parse_qsl(qs, keep_blank_values=False, strict_parsing=False)
+
+   This function is deprecated in this module. Use :func:`urllib.parse.parse_qs`
+   instead. It is maintained here only for backward compatibility.
 
 .. function:: parse_multipart(fp, pdict)
 
@@ -304,15 +319,18 @@ algorithms implemented in this module in other circumstances.
    Print a list of useful (used by CGI) environment variables in HTML.
 
 
-.. function:: escape(s[, quote])
+.. function:: escape(s, quote=False)
 
    Convert the characters ``'&'``, ``'<'`` and ``'>'`` in string *s* to HTML-safe
    sequences.  Use this if you need to display text that might contain such
    characters in HTML.  If the optional flag *quote* is true, the quotation mark
-   character (``'"'``) is also translated; this helps for inclusion in an HTML
-   attribute value, as in ``<A HREF="...">``.  If the value to be quoted might
-   include single- or double-quote characters, or both, consider using the
-   :func:`quoteattr` function in the :mod:`xml.sax.saxutils` module instead.
+   character (``"``) is also translated; this helps for inclusion in an HTML
+   attribute value delimited by double quotes, as in ``<a href="...">``.  Note
+   that single quotes are never translated.
+
+   .. deprecated:: 3.2
+      This function is unsafe because *quote* is false by default, and therefore
+      deprecated.  Use :func:`html.escape` instead.
 
 
 .. _cgi-security:
@@ -432,9 +450,10 @@ discarded altogether.
 
 Fortunately, once you have managed to get your script to execute *some* code,
 you can easily send tracebacks to the Web browser using the :mod:`cgitb` module.
-If you haven't done so already, just add the line::
+If you haven't done so already, just add the lines::
 
-   import cgitb; cgitb.enable()
+   import cgitb
+   cgitb.enable()
 
 to the top of your script.  Then try running it again; when a problem occurs,
 you should see a detailed report that will likely make apparent the cause of the
@@ -489,8 +508,8 @@ Common problems and solutions
 
 .. rubric:: Footnotes
 
-.. [#] Note that some recent versions of the HTML specification do state what order the
-   field values should be supplied in, but knowing whether a request was
-   received from a conforming browser, or even from a browser at all, is tedious
-   and error-prone.
+.. [#] Note that some recent versions of the HTML specification do state what
+   order the field values should be supplied in, but knowing whether a request
+   was received from a conforming browser, or even from a browser at all, is
+   tedious and error-prone.
 

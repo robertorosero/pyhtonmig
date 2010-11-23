@@ -7,7 +7,7 @@ in the distutils.command package.
 __revision__ = "$Id$"
 
 import sys, os, re
-from distutils.errors import *
+from distutils.errors import DistutilsOptionError
 from distutils import util, dir_util, file_util, archive_util, dep_util
 from distutils import log
 
@@ -93,9 +93,8 @@ class Command:
         # always calls 'finalize_options()', to respect/update it.
         self.finalized = 0
 
-
     # XXX A more explicit way to customize dry_run would be better.
-    def __getattr__ (self, attr):
+    def __getattr__(self, attr):
         if attr == 'dry_run':
             myval = getattr(self, "_" + attr)
             if myval is None:
@@ -105,7 +104,7 @@ class Command:
         else:
             raise AttributeError(attr)
 
-    def ensure_finalized (self):
+    def ensure_finalized(self):
         if not self.finalized:
             self.finalize_options()
         self.finalized = 1
@@ -155,15 +154,15 @@ class Command:
         from distutils.fancy_getopt import longopt_xlate
         if header is None:
             header = "command options for '%s':" % self.get_command_name()
-        print(indent + header)
+        self.announce(indent + header, level=log.INFO)
         indent = indent + "  "
         for (option, _, _) in self.user_options:
             option = option.translate(longopt_xlate)
             if option[-1] == "=":
                 option = option[:-1]
             value = getattr(self, option)
-            print(indent + "%s = %s" % (option, value))
-
+            self.announce(indent + "%s = %s" % (option, value),
+                          level=log.INFO)
 
     def run(self):
         """A command's raison d'etre: carry out the action it exists to
@@ -175,7 +174,6 @@ class Command:
 
         This method must be implemented by all command classes.
         """
-
         raise RuntimeError("abstract method -- subclass %s must override"
                            % self.__class__)
 
@@ -333,7 +331,8 @@ class Command:
     # -- External world manipulation -----------------------------------
 
     def warn(self, msg):
-        sys.stderr.write("warning: %s: %s\n" % (self.get_command_name(), msg))
+        log.warn("warning: %s: %s\n" %
+                (self.get_command_name(), msg))
 
     def execute(self, func, args, msg=None, level=1):
         util.execute(func, args, msg, dry_run=self.dry_run)
@@ -350,7 +349,7 @@ class Command:
                                    preserve_times, not self.force, link,
                                    dry_run=self.dry_run)
 
-    def copy_tree (self, infile, outfile, preserve_mode=1, preserve_times=1,
+    def copy_tree(self, infile, outfile, preserve_mode=1, preserve_times=1,
                    preserve_symlinks=0, level=1):
         """Copy an entire directory tree respecting verbose, dry-run,
         and force flags.
@@ -372,7 +371,6 @@ class Command:
         return archive_util.make_archive(base_name, format, root_dir, base_dir,
                                          dry_run=self.dry_run)
 
-
     def make_file(self, infiles, outfile, func, args,
                   exec_msg=None, skip_msg=None, level=1):
         """Special case of 'execute()' for operations that process one or
@@ -383,11 +381,8 @@ class Command:
         and it is true, then the command is unconditionally run -- does no
         timestamp checks.
         """
-        if exec_msg is None:
-            exec_msg = "generating %s from %s" % (outfile, ', '.join(infiles))
         if skip_msg is None:
             skip_msg = "skipping %s (inputs unchanged)" % outfile
-
 
         # Allow 'infiles' to be a single string
         if isinstance(infiles, str):
@@ -396,15 +391,17 @@ class Command:
             raise TypeError(
                   "'infiles' must be a string, or a list or tuple of strings")
 
+        if exec_msg is None:
+            exec_msg = "generating %s from %s" % (outfile, ', '.join(infiles))
+
         # If 'outfile' must be regenerated (either because it doesn't
         # exist, is out-of-date, or the 'force' flag is true) then
         # perform the action that presumably regenerates it
-        if self.force or dep_util.newer_group (infiles, outfile):
+        if self.force or dep_util.newer_group(infiles, outfile):
             self.execute(func, args, exec_msg, level)
         # Otherwise, print the "skip" message
         else:
             log.debug(skip_msg)
-
 
 # XXX 'install_misc' class not currently used -- it was the base class for
 # both 'install_scripts' and 'install_data', but they outgrew it.  It might
@@ -422,10 +419,10 @@ class install_misc(Command):
         self.install_dir = None
         self.outfiles = []
 
-    def _install_dir_from (self, dirname):
+    def _install_dir_from(self, dirname):
         self.set_undefined_options('install', (dirname, 'install_dir'))
 
-    def _copy_files (self, filelist):
+    def _copy_files(self, filelist):
         self.outfiles = []
         if not filelist:
             return
@@ -434,9 +431,5 @@ class install_misc(Command):
             self.copy_file(f, self.install_dir)
             self.outfiles.append(os.path.join(self.install_dir, f))
 
-    def get_outputs (self):
+    def get_outputs(self):
         return self.outfiles
-
-
-if __name__ == "__main__":
-    print("ok")

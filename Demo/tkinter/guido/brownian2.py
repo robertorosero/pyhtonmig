@@ -1,7 +1,7 @@
 # Brownian motion -- an example of a NON multi-threaded Tkinter program ;)
 # By Michele Simoniato, inspired by brownian.py
 
-from Tkinter import *
+from tkinter import *
 import random
 import sys
 
@@ -32,7 +32,7 @@ def particle(canvas):                   # particle = iterator over the moves
             yield None
 
 def move(particle): # move the particle at random time
-    particle.next()
+    next(particle)
     dt = random.expovariate(LAMBDA)
     root.after(int(dt*1000), move, particle)
 

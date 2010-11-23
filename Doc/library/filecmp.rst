@@ -1,4 +1,3 @@
-
 :mod:`filecmp` --- File and Directory Comparisons
 =================================================
 
@@ -11,10 +10,15 @@ The :mod:`filecmp` module defines functions to compare files and directories,
 with various optional time/correctness trade-offs. For comparing files,
 see also the :mod:`difflib` module.
 
+.. seealso::
+
+   Latest version of the :source:`filecmp Python source code
+   <Lib/filecmp.py>`
+
 The :mod:`filecmp` module defines the following functions:
 
 
-.. function:: cmp(f1, f2[, shallow])
+.. function:: cmp(f1, f2, shallow=True)
 
    Compare the files named *f1* and *f2*, returning ``True`` if they seem equal,
    ``False`` otherwise.
@@ -29,18 +33,25 @@ The :mod:`filecmp` module defines the following functions:
    portability and efficiency.
 
 
-.. function:: cmpfiles(dir1, dir2, common[, shallow])
+.. function:: cmpfiles(dir1, dir2, common, shallow=True)
 
-   Returns three lists of file names: *match*, *mismatch*, *errors*.  *match*
-   contains the list of files match in both directories, *mismatch* includes the
-   names of those that don't, and *errros* lists the names of files which could not
-   be compared.  Files may be listed in *errors* because the user may lack
-   permission to read them or many other reasons, but always that the comparison
-   could not be done for some reason.
+   Compare the files in the two directories *dir1* and *dir2* whose names are
+   given by *common*.
 
-   The *common* parameter is a list of file names found in both directories. The
-   *shallow* parameter has the same meaning and default value as for
+   Returns three lists of file names: *match*, *mismatch*,
+   *errors*.  *match* contains the list of files that match, *mismatch* contains
+   the names of those that don't, and *errors* lists the names of files which
+   could not be compared.  Files are listed in *errors* if they don't exist in
+   one of the directories, the user lacks permission to read them or if the
+   comparison could not be done for some other reason.
+
+   The *shallow* parameter has the same meaning and default value as for
    :func:`filecmp.cmp`.
+
+   For example, ``cmpfiles('a', 'b', ['c', 'd/e'])`` will compare ``a/c`` with
+   ``b/c`` and ``a/d/e`` with ``b/d/e``.  ``'c'`` and ``'d/e'`` will each be in
+   one of the three returned lists.
+
 
 Example::
 
@@ -59,7 +70,7 @@ The :class:`dircmp` class
 :class:`dircmp` instances are built using this constructor:
 
 
-.. class:: dircmp(a, b[, ignore[, hide]])
+.. class:: dircmp(a, b, ignore=None, hide=None)
 
    Construct a new directory comparison object, to compare the directories *a* and
    *b*. *ignore* is a list of names to ignore, and defaults to ``['RCS', 'CVS',
@@ -152,5 +163,6 @@ The :class:`dircmp` class
 
    .. attribute:: subdirs
 
-      A dictionary mapping names in :attr:`common_dirs` to :class:`dircmp` objects.
+      A dictionary mapping names in :attr:`common_dirs` to :class:`dircmp`
+      objects.
 

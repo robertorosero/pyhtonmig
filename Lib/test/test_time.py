@@ -1,7 +1,7 @@
 from test import support
 import time
 import unittest
-
+import locale
 
 class TimeTestCase(unittest.TestCase):
 
@@ -18,9 +18,9 @@ class TimeTestCase(unittest.TestCase):
         time.clock()
 
     def test_conversions(self):
-        self.assert_(time.ctime(self.t)
+        self.assertTrue(time.ctime(self.t)
                      == time.asctime(time.localtime(self.t)))
-        self.assert_(int(time.mktime(time.localtime(self.t)))
+        self.assertTrue(int(time.mktime(time.localtime(self.t)))
                      == int(self.t))
 
     def test_sleep(self):
@@ -37,61 +37,59 @@ class TimeTestCase(unittest.TestCase):
             except ValueError:
                 self.fail('conversion specifier: %r failed.' % format)
 
-    def test_strftime_bounds_checking(self):
+    def _bounds_checking(self, func=time.strftime):
         # Make sure that strftime() checks the bounds of the various parts
         #of the time tuple (0 is valid for *all* values).
 
         # Check year [1900, max(int)]
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1899, 1, 1, 0, 0, 0, 0, 1, -1))
         if time.accept2dyear:
-            self.assertRaises(ValueError, time.strftime, '',
+            self.assertRaises(ValueError, func,
                                 (-1, 1, 1, 0, 0, 0, 0, 1, -1))
-            self.assertRaises(ValueError, time.strftime, '',
+            self.assertRaises(ValueError, func,
                                 (100, 1, 1, 0, 0, 0, 0, 1, -1))
         # Check month [1, 12] + zero support
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, -1, 1, 0, 0, 0, 0, 1, -1))
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 13, 1, 0, 0, 0, 0, 1, -1))
         # Check day of month [1, 31] + zero support
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, -1, 0, 0, 0, 0, 1, -1))
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 32, 0, 0, 0, 0, 1, -1))
         # Check hour [0, 23]
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, -1, 0, 0, 0, 1, -1))
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 24, 0, 0, 0, 1, -1))
         # Check minute [0, 59]
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, -1, 0, 0, 1, -1))
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 60, 0, 0, 1, -1))
         # Check second [0, 61]
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 0, -1, 0, 1, -1))
         # C99 only requires allowing for one leap second, but Python's docs say
         # allow two leap seconds (0..61)
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 0, 62, 0, 1, -1))
         # No check for upper-bound day of week;
         #  value forced into range by a ``% 7`` calculation.
         # Start check at -2 since gettmarg() increments value before taking
         #  modulo.
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 0, 0, -2, 1, -1))
         # Check day of the year [1, 366] + zero support
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 0, 0, 0, -1, -1))
-        self.assertRaises(ValueError, time.strftime, '',
+        self.assertRaises(ValueError, func,
                             (1900, 1, 1, 0, 0, 0, 0, 367, -1))
-        # Check daylight savings flag [-1, 1]
-        self.assertRaises(ValueError, time.strftime, '',
-                            (1900, 1, 1, 0, 0, 0, 0, 1, -2))
-        self.assertRaises(ValueError, time.strftime, '',
-                            (1900, 1, 1, 0, 0, 0, 0, 1, 2))
+
+    def test_strftime_bounding_check(self):
+        self._bounds_checking(lambda tup: time.strftime('', tup))
 
     def test_default_values_for_zero(self):
         # Make sure that using all zeros uses the proper default values.
@@ -99,7 +97,7 @@ class TimeTestCase(unittest.TestCase):
         # based on its value.
         expected = "2000 01 01 00 00 00 1 001"
         result = time.strftime("%Y %m %d %H %M %S %w %j", (0,)*9)
-        self.assertEquals(expected, result)
+        self.assertEqual(expected, result)
 
     def test_strptime(self):
         # Should be able to go round-trip from strftime to strptime without
@@ -116,9 +114,17 @@ class TimeTestCase(unittest.TestCase):
                 self.fail("conversion specifier %r failed with '%s' input." %
                           (format, strf_output))
 
+    def test_strptime_bytes(self):
+        # Make sure only strings are accepted as arguments to strptime.
+        self.assertRaises(TypeError, time.strptime, b'2009', "%Y")
+        self.assertRaises(TypeError, time.strptime, '2009', b'%Y')
+
     def test_asctime(self):
         time.asctime(time.gmtime(self.t))
         self.assertRaises(TypeError, time.asctime, 0)
+
+    def test_asctime_bounding_check(self):
+        self._bounds_checking(time.asctime)
 
     def test_tzset(self):
         if not hasattr(time, "tzset"):
@@ -148,36 +154,36 @@ class TimeTestCase(unittest.TestCase):
             time.tzset()
             environ['TZ'] = utc
             time.tzset()
-            self.failUnlessEqual(
+            self.assertEqual(
                 time.gmtime(xmas2002), time.localtime(xmas2002)
                 )
-            self.failUnlessEqual(time.daylight, 0)
-            self.failUnlessEqual(time.timezone, 0)
-            self.failUnlessEqual(time.localtime(xmas2002).tm_isdst, 0)
+            self.assertEqual(time.daylight, 0)
+            self.assertEqual(time.timezone, 0)
+            self.assertEqual(time.localtime(xmas2002).tm_isdst, 0)
 
             # Make sure we can switch to US/Eastern
             environ['TZ'] = eastern
             time.tzset()
-            self.failIfEqual(time.gmtime(xmas2002), time.localtime(xmas2002))
-            self.failUnlessEqual(time.tzname, ('EST', 'EDT'))
-            self.failUnlessEqual(len(time.tzname), 2)
-            self.failUnlessEqual(time.daylight, 1)
-            self.failUnlessEqual(time.timezone, 18000)
-            self.failUnlessEqual(time.altzone, 14400)
-            self.failUnlessEqual(time.localtime(xmas2002).tm_isdst, 0)
-            self.failUnlessEqual(len(time.tzname), 2)
+            self.assertNotEqual(time.gmtime(xmas2002), time.localtime(xmas2002))
+            self.assertEqual(time.tzname, ('EST', 'EDT'))
+            self.assertEqual(len(time.tzname), 2)
+            self.assertEqual(time.daylight, 1)
+            self.assertEqual(time.timezone, 18000)
+            self.assertEqual(time.altzone, 14400)
+            self.assertEqual(time.localtime(xmas2002).tm_isdst, 0)
+            self.assertEqual(len(time.tzname), 2)
 
             # Now go to the southern hemisphere.
             environ['TZ'] = victoria
             time.tzset()
-            self.failIfEqual(time.gmtime(xmas2002), time.localtime(xmas2002))
-            self.failUnless(time.tzname[0] == 'AEST', str(time.tzname[0]))
-            self.failUnless(time.tzname[1] == 'AEDT', str(time.tzname[1]))
-            self.failUnlessEqual(len(time.tzname), 2)
-            self.failUnlessEqual(time.daylight, 1)
-            self.failUnlessEqual(time.timezone, -36000)
-            self.failUnlessEqual(time.altzone, -39600)
-            self.failUnlessEqual(time.localtime(xmas2002).tm_isdst, 1)
+            self.assertNotEqual(time.gmtime(xmas2002), time.localtime(xmas2002))
+            self.assertTrue(time.tzname[0] == 'AEST', str(time.tzname[0]))
+            self.assertTrue(time.tzname[1] == 'AEDT', str(time.tzname[1]))
+            self.assertEqual(len(time.tzname), 2)
+            self.assertEqual(time.daylight, 1)
+            self.assertEqual(time.timezone, -36000)
+            self.assertEqual(time.altzone, -39600)
+            self.assertEqual(time.localtime(xmas2002).tm_isdst, 1)
 
         finally:
             # Repair TZ environment variable in case any other tests
@@ -209,18 +215,33 @@ class TimeTestCase(unittest.TestCase):
         gt1 = time.gmtime(None)
         t0 = time.mktime(gt0)
         t1 = time.mktime(gt1)
-        self.assert_(0 <= (t1-t0) < 0.2)
+        self.assertTrue(0 <= (t1-t0) < 0.2)
 
     def test_localtime_without_arg(self):
         lt0 = time.localtime()
         lt1 = time.localtime(None)
         t0 = time.mktime(lt0)
         t1 = time.mktime(lt1)
-        self.assert_(0 <= (t1-t0) < 0.2)
+        self.assertTrue(0 <= (t1-t0) < 0.2)
+
+class TestLocale(unittest.TestCase):
+    def setUp(self):
+        self.oldloc = locale.setlocale(locale.LC_ALL)
+
+    def tearDown(self):
+        locale.setlocale(locale.LC_ALL, self.oldloc)
+
+    def test_bug_3061(self):
+        try:
+            tmp = locale.setlocale(locale.LC_ALL, "fr_FR")
+        except locale.Error:
+            # skip this test
+            return
+        # This should not cause an exception
+        time.strftime("%B", (2009,2,1,0,0,0,0,0,0))
 
 def test_main():
-    support.run_unittest(TimeTestCase)
-
+    support.run_unittest(TimeTestCase, TestLocale)
 
 if __name__ == "__main__":
     test_main()

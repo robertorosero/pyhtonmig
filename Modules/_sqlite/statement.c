@@ -1,6 +1,6 @@
 /* statement.c - the statement type
  *
- * Copyright (C) 2005-2007 Gerhard Häring <gh@ghaering.de>
+ * Copyright (C) 2005-2010 Gerhard HÃ¤ring <gh@ghaering.de>
  *
  * This file is part of pysqlite.
  *
@@ -43,7 +43,6 @@ typedef enum {
 typedef enum {
     TYPE_LONG,
     TYPE_FLOAT,
-    TYPE_STRING,
     TYPE_UNICODE,
     TYPE_BUFFER,
     TYPE_UNKNOWN
@@ -59,7 +58,7 @@ int pysqlite_statement_create(pysqlite_Statement* self, pysqlite_Connection* con
     self->st = NULL;
     self->in_use = 0;
 
-    sql_cstr = PyUnicode_AsStringAndSize(sql, &sql_cstr_len);
+    sql_cstr = _PyUnicode_AsStringAndSize(sql, &sql_cstr_len);
     if (sql_cstr == NULL) {
         rc = PYSQLITE_SQL_WRONG_TYPE;
         return rc;
@@ -69,11 +68,13 @@ int pysqlite_statement_create(pysqlite_Statement* self, pysqlite_Connection* con
     Py_INCREF(sql);
     self->sql = sql;
 
+    Py_BEGIN_ALLOW_THREADS
     rc = sqlite3_prepare(connection->db,
                          sql_cstr,
                          -1,
                          &self->st,
                          &tail);
+    Py_END_ALLOW_THREADS
 
     self->db = connection->db;
 
@@ -94,7 +95,6 @@ int pysqlite_statement_bind_parameter(pysqlite_Statement* self, int pos, PyObjec
     char* string;
     Py_ssize_t buflen;
     parameter_type paramtype;
-    char* c;
 
     if (parameter == Py_None) {
         rc = sqlite3_bind_null(self->st, pos);
@@ -112,22 +112,11 @@ int pysqlite_statement_bind_parameter(pysqlite_Statement* self, int pos, PyObjec
     } else if (PyFloat_Check(parameter)) {
         paramtype = TYPE_FLOAT;
     } else if (PyUnicode_Check(parameter)) {
-        paramtype = TYPE_STRING;
+        paramtype = TYPE_UNICODE;
     } else if (PyObject_CheckBuffer(parameter)) {
         paramtype = TYPE_BUFFER;
     } else {
         paramtype = TYPE_UNKNOWN;
-    }
-
-    if (paramtype == TYPE_STRING && !allow_8bit_chars) {
-        string = PyBytes_AS_STRING(parameter);
-        for (c = string; *c != 0; c++) {
-            if (*c & 0x80) {
-                PyErr_SetString(pysqlite_ProgrammingError, "You must not use 8-bit bytestrings unless you use a text_factory that can interpret 8-bit bytestrings (like text_factory = str). It is highly recommended that you instead just switch your application to Unicode strings.");
-                rc = -1;
-                goto final;
-            }
-        }
     }
 
     switch (paramtype) {
@@ -140,8 +129,11 @@ int pysqlite_statement_bind_parameter(pysqlite_Statement* self, int pos, PyObjec
             rc = sqlite3_bind_double(self->st, pos, PyFloat_AsDouble(parameter));
             break;
         case TYPE_UNICODE:
-            string = PyUnicode_AsString(parameter);
-            rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
+            string = _PyUnicode_AsString(parameter);
+            if (string != NULL)
+                rc = sqlite3_bind_text(self->st, pos, string, -1, SQLITE_TRANSIENT);
+            else
+                rc = -1;
             break;
         case TYPE_BUFFER:
             if (PyObject_AsCharBuffer(parameter, &buffer, &buflen) == 0) {
@@ -219,7 +211,7 @@ void pysqlite_statement_bind_parameters(pysqlite_Statement* self, PyObject* para
             if (!_need_adapt(current_param)) {
                 adapted = current_param;
             } else {
-                adapted = microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
+                adapted = pysqlite_microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
                 if (adapted) {
                     Py_DECREF(current_param);
                 } else {
@@ -264,7 +256,7 @@ void pysqlite_statement_bind_parameters(pysqlite_Statement* self, PyObject* para
             if (!_need_adapt(current_param)) {
                 adapted = current_param;
             } else {
-                adapted = microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
+                adapted = pysqlite_microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
                 if (adapted) {
                     Py_DECREF(current_param);
                 } else {
@@ -296,17 +288,19 @@ int pysqlite_statement_recompile(pysqlite_Statement* self, PyObject* params)
     Py_ssize_t sql_len;
     sqlite3_stmt* new_st;
 
-    sql_cstr = PyUnicode_AsStringAndSize(self->sql, &sql_len);
+    sql_cstr = _PyUnicode_AsStringAndSize(self->sql, &sql_len);
     if (sql_cstr == NULL) {
         rc = PYSQLITE_SQL_WRONG_TYPE;
         return rc;
     }
 
+    Py_BEGIN_ALLOW_THREADS
     rc = sqlite3_prepare(self->db,
                          sql_cstr,
                          -1,
                          &new_st,
                          &tail);
+    Py_END_ALLOW_THREADS
 
     if (rc == SQLITE_OK) {
         /* The efficient sqlite3_transfer_bindings is only available in SQLite
@@ -473,7 +467,7 @@ PyTypeObject pysqlite_StatementType = {
         0,                                              /* tp_print */
         0,                                              /* tp_getattr */
         0,                                              /* tp_setattr */
-        0,                                              /* tp_compare */
+        0,                                              /* tp_reserved */
         0,                                              /* tp_repr */
         0,                                              /* tp_as_number */
         0,                                              /* tp_as_sequence */

@@ -10,15 +10,11 @@ __revision__ = "$Id$"
 import os, string, getpass
 import io
 import urllib.parse, urllib.request
+from warnings import warn
 
 from distutils.core import PyPIRCCommand
 from distutils.errors import *
 from distutils import log
-
-def raw_input(prompt):
-    sys.stdout.write(prompt)
-    sys.stdout.flush()
-    return sys.stdin.readline()
 
 class register(PyPIRCCommand):
 
@@ -26,18 +22,34 @@ class register(PyPIRCCommand):
     user_options = PyPIRCCommand.user_options + [
         ('list-classifiers', None,
          'list the valid Trove classifiers'),
+        ('strict', None ,
+         'Will stop the registering if the meta-data are not fully compliant')
         ]
     boolean_options = PyPIRCCommand.boolean_options + [
-        'verify', 'list-classifiers']
+        'verify', 'list-classifiers', 'strict']
+
+    sub_commands = [('check', lambda self: True)]
 
     def initialize_options(self):
         PyPIRCCommand.initialize_options(self)
         self.list_classifiers = 0
+        self.strict = 0
+
+    def finalize_options(self):
+        PyPIRCCommand.finalize_options(self)
+        # setting options for the `check` subcommand
+        check_options = {'strict': ('register', self.strict),
+                         'restructuredtext': ('register', 1)}
+        self.distribution.command_options['check'] = check_options
 
     def run(self):
         self.finalize_options()
         self._set_config()
-        self.check_metadata()
+
+        # Run sub commands
+        for cmd_name in self.get_sub_commands():
+            self.run_command(cmd_name)
+
         if self.dry_run:
             self.verify_metadata()
         elif self.list_classifiers:
@@ -46,34 +58,14 @@ class register(PyPIRCCommand):
             self.send_metadata()
 
     def check_metadata(self):
-        """Ensure that all required elements of meta-data (name, version,
-           URL, (author and author_email) or (maintainer and
-           maintainer_email)) are supplied by the Distribution object; warn if
-           any are missing.
-        """
-        metadata = self.distribution.metadata
-
-        missing = []
-        for attr in ('name', 'version', 'url'):
-            if not (hasattr(metadata, attr) and getattr(metadata, attr)):
-                missing.append(attr)
-
-        if missing:
-            self.warn("missing required meta-data: " +
-                      ", ".join(missing))
-
-        if metadata.author:
-            if not metadata.author_email:
-                self.warn("missing meta-data: if 'author' supplied, " +
-                          "'author_email' must be supplied too")
-        elif metadata.maintainer:
-            if not metadata.maintainer_email:
-                self.warn("missing meta-data: if 'maintainer' supplied, " +
-                          "'maintainer_email' must be supplied too")
-        else:
-            self.warn("missing meta-data: either (author and author_email) " +
-                      "or (maintainer and maintainer_email) " +
-                      "must be supplied")
+        """Deprecated API."""
+        warn("distutils.command.register.check_metadata is deprecated, \
+              use the check command instead", PendingDeprecationWarning)
+        check = self.distribution.get_command_obj('check')
+        check.ensure_finalized()
+        check.strict = self.strict
+        check.restructuredtext = 1
+        check.run()
 
     def _set_config(self):
         ''' Reads the configuration file and set attributes.
@@ -97,15 +89,14 @@ class register(PyPIRCCommand):
         '''
         url = self.repository+'?:action=list_classifiers'
         response = urllib.request.urlopen(url)
-        print(response.read())
+        log.info(response.read())
 
     def verify_metadata(self):
         ''' Send the metadata to the package index server to be checked.
         '''
         # send the info to the server and report the result
         (code, result) = self.post_to_server(self.build_post_data('verify'))
-        print('Server response (%s): %s'%(code, result))
-
+        log.info('Server response (%s): %s' % (code, result))
 
     def send_metadata(self):
         ''' Send the metadata to the package index server.
@@ -148,13 +139,14 @@ class register(PyPIRCCommand):
         # get the user's login info
         choices = '1 2 3 4'.split()
         while choice not in choices:
-            print('''We need to know who you are, so please choose either:
+            self.announce('''\
+We need to know who you are, so please choose either:
  1. use your existing login,
  2. register as a new user,
  3. have the server generate a new password for you (and email it to you), or
  4. quit
-Your selection [default 1]: ''', end=' ')
-            choice = raw_input()
+Your selection [default 1]: ''', log.INFO)
+            choice = input()
             if not choice:
                 choice = '1'
             elif choice not in choices:
@@ -163,7 +155,7 @@ Your selection [default 1]: ''', end=' ')
         if choice == '1':
             # get the username and password
             while not username:
-                username = raw_input('Username: ')
+                username = input('Username: ')
             while not password:
                 password = getpass.getpass('Password: ')
 
@@ -174,26 +166,34 @@ Your selection [default 1]: ''', end=' ')
             # send the info to the server and report the result
             code, result = self.post_to_server(self.build_post_data('submit'),
                 auth)
-            print('Server response (%s): %s'%(code, result))
+            self.announce('Server response (%s): %s' % (code, result),
+                          log.INFO)
 
             # possibly save the login
-            if not self.has_config and code == 200:
-                print('I can store your PyPI login so future submissions will be faster.')
-                print('(the login will be stored in %s)' % self._get_rc_file())
-                choice = 'X'
-                while choice.lower() not in 'yn':
-                    choice = raw_input('Save your login (y/N)?')
-                    if not choice:
-                        choice = 'n'
-                if choice.lower() == 'y':
-                    self._store_pypirc(username, password)
+            if code == 200:
+                if self.has_config:
+                    # sharing the password in the distribution instance
+                    # so the upload command can reuse it
+                    self.distribution.password = password
+                else:
+                    self.announce(('I can store your PyPI login so future '
+                                   'submissions will be faster.'), log.INFO)
+                    self.announce('(the login will be stored in %s)' % \
+                                  self._get_rc_file(), log.INFO)
+                    choice = 'X'
+                    while choice.lower() not in 'yn':
+                        choice = input('Save your login (y/N)?')
+                        if not choice:
+                            choice = 'n'
+                    if choice.lower() == 'y':
+                        self._store_pypirc(username, password)
 
         elif choice == '2':
             data = {':action': 'user'}
             data['name'] = data['password'] = data['email'] = ''
             data['confirm'] = None
             while not data['name']:
-                data['name'] = raw_input('Username: ')
+                data['name'] = input('Username: ')
             while data['password'] != data['confirm']:
                 while not data['password']:
                     data['password'] = getpass.getpass('Password: ')
@@ -204,20 +204,21 @@ Your selection [default 1]: ''', end=' ')
                     data['confirm'] = None
                     print("Password and confirm don't match!")
             while not data['email']:
-                data['email'] = raw_input('   EMail: ')
+                data['email'] = input('   EMail: ')
             code, result = self.post_to_server(data)
             if code != 200:
-                print('Server response (%s): %s'%(code, result))
+                log.info('Server response (%s): %s' % (code, result))
             else:
-                print('You will receive an email shortly.')
-                print('Follow the instructions in it to complete registration.')
+                log.info('You will receive an email shortly.')
+                log.info(('Follow the instructions in it to '
+                          'complete registration.'))
         elif choice == '3':
             data = {':action': 'password_reset'}
             data['email'] = ''
             while not data['email']:
-                data['email'] = raw_input('Your email address: ')
+                data['email'] = input('Your email address: ')
             code, result = self.post_to_server(data)
-            print('Server response (%s): %s'%(code, result))
+            log.info('Server response (%s): %s' % (code, result))
 
     def build_post_data(self, action):
         # figure the data to send - the metadata plus some additional
@@ -250,8 +251,10 @@ Your selection [default 1]: ''', end=' ')
     def post_to_server(self, data, auth=None):
         ''' Post a query to the server, and return a string response.
         '''
-        self.announce('Registering %s to %s' % (data['name'],
-                                                self.repository), log.INFO)
+        if 'name' in data:
+            self.announce('Registering %s to %s' % (data['name'],
+                                                    self.repository),
+                                                    log.INFO)
         # Build up the MIME payload for the urllib2 POST data
         boundary = '--------------GHSKFJDLGDS7543FJKLFHRE75642756743254'
         sep_boundary = '\n--' + boundary
@@ -262,7 +265,7 @@ Your selection [default 1]: ''', end=' ')
             if type(value) not in (type([]), type( () )):
                 value = [value]
             for value in value:
-                value = str(value).encode("utf-8")
+                value = str(value)
                 body.write(sep_boundary)
                 body.write('\nContent-Disposition: form-data; name="%s"'%key)
                 body.write("\n\n")
@@ -271,7 +274,7 @@ Your selection [default 1]: ''', end=' ')
                     body.write('\n')  # write an extra newline (lurve Macs)
         body.write(end_boundary)
         body.write("\n")
-        body = body.getvalue()
+        body = body.getvalue().encode("utf-8")
 
         # build the Request
         headers = {
@@ -298,5 +301,6 @@ Your selection [default 1]: ''', end=' ')
                 data = result.read()
             result = 200, 'OK'
         if self.show_response:
-            print('-'*75, data, '-'*75)
+            dashes = '-' * 75
+            self.announce('%s%s%s' % (dashes, data, dashes))
         return result

@@ -14,7 +14,7 @@ from .. import fixer_base
 from ..fixer_util import Name, Call, ArgList, Attr, is_tuple
 
 class FixThrow(fixer_base.BaseFix):
-
+    BM_compatible = True
     PATTERN = """
     power< any trailer< '.' 'throw' >
            trailer< '(' args=arglist< exc=any ',' val=any [',' tb=any] > ')' >
@@ -40,14 +40,14 @@ class FixThrow(fixer_base.BaseFix):
         if is_tuple(val):
             args = [c.clone() for c in val.children[1:-1]]
         else:
-            val.set_prefix("")
+            val.prefix = ""
             args = [val]
 
         throw_args = results["args"]
 
         if "tb" in results:
             tb = results["tb"].clone()
-            tb.set_prefix("")
+            tb.prefix = ""
 
             e = Call(exc, args)
             with_tb = Attr(e, Name('with_traceback')) + [ArgList([tb])]

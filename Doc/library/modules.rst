@@ -1,4 +1,3 @@
-
 .. _modules:
 
 *****************
@@ -18,3 +17,4 @@ The full list of modules described in this chapter is:
    pkgutil.rst
    modulefinder.rst
    runpy.rst
+   importlib.rst

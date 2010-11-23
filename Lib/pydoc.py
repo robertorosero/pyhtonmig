@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: latin-1 -*-
+#!/usr/bin/env python3
 """Generate Python documentation in HTML or text for interactive use.
 
 In the Python interpreter, do "from pydoc import help" to provide online
@@ -27,13 +26,13 @@ to a file named "<name>.html".
 
 Module docs for core modules are assumed to be in
 
-    http://docs.python.org/library/
+    http://docs.python.org/X.Y/library/
 
 This can be overridden by setting the PYTHONDOCS environment variable
 to a different URL or to a local directory containing the Library
 Reference Manual pages.
 """
-
+__all__ = ['help']
 __author__ = "Ka-Ping Yee <ping@lfw.org>"
 __date__ = "26 February 2001"
 
@@ -54,14 +53,8 @@ Richard Chamberlain, for the first implementation of textdoc.
 
 import sys, imp, os, re, inspect, builtins, pkgutil
 from reprlib import Repr
-try:
-    from collections import deque
-except ImportError:
-    # Python 2.3 compatibility
-    class deque(list):
-        def popleft(self):
-            return self.pop(0)
-
+from traceback import extract_tb as _extract_tb
+from collections import deque
 # --------------------------------------------------------- common routines
 
 def pathdirs():
@@ -122,9 +115,7 @@ _re_stripid = re.compile(r' at 0x[0-9a-f]{6,16}(>+)$', re.IGNORECASE)
 def stripid(text):
     """Remove the hexadecimal id from a Python object representation."""
     # The behaviour of %p is implementation-dependent in terms of case.
-    if _re_stripid.search(repr(Exception)):
-        return _re_stripid.sub(r'\1', text)
-    return text
+    return _re_stripid.sub(r'\1', text)
 
 def _is_some_method(obj):
     return inspect.ismethod(obj) or inspect.ismethoddescriptor(obj)
@@ -159,8 +150,11 @@ def _split_list(s, predicate):
 def visiblename(name, all=None):
     """Decide whether to show documentation on a variable."""
     # Certain special names are redundant.
-    if name in ('__builtins__', '__doc__', '__file__', '__path__',
-                '__module__', '__name__', '__slots__'): return 0
+    _hidden_names = ('__builtins__', '__doc__', '__file__', '__path__',
+                     '__module__', '__name__', '__slots__', '__package__',
+                     '__cached__', '__author__', '__credits__', '__date__',
+                     '__version__')
+    if name in _hidden_names: return 0
     # Private names are hidden, but special names are displayed.
     if name.startswith('__') and name.endswith('__'): return 1
     if all is not None:
@@ -291,9 +285,9 @@ def safeimport(path, forceload=0, cache={}):
         elif exc is SyntaxError:
             # A SyntaxError occurred before we could execute the module.
             raise ErrorDuringImport(value.filename, info)
-        elif exc is ImportError and \
-             str(value).lower().split()[:2] == ['no', 'module']:
-            # The module was not found.
+        elif exc is ImportError and _extract_tb(tb)[-1][2]=='safeimport':
+            # The import error occurred directly in this function,
+            # which means there is no such module in the path.
             return None
         else:
             # Some other error occurred during the importing process.
@@ -306,6 +300,11 @@ def safeimport(path, forceload=0, cache={}):
 # ---------------------------------------------------- formatter base class
 
 class Doc:
+
+    PYTHONDOCS = os.environ.get("PYTHONDOCS",
+                                "http://docs.python.org/%d.%d/library"
+                                % sys.version_info[:2])
+
     def document(self, object, name=None, *args):
         """Generate documentation for an object."""
         args = (object, name) + args
@@ -340,16 +339,17 @@ class Doc:
         except TypeError:
             file = '(built-in)'
 
-        docloc = os.environ.get("PYTHONDOCS",
-                                "http://docs.python.org/library")
+        docloc = os.environ.get("PYTHONDOCS", self.PYTHONDOCS)
+
         basedir = os.path.join(sys.exec_prefix, "lib",
-                               "python"+sys.version[0:3])
+                               "python%d.%d" %  sys.version_info[:2])
         if (isinstance(object, type(os)) and
             (object.__name__ in ('errno', 'exceptions', 'gc', 'imp',
                                  'marshal', 'posix', 'signal', 'sys',
                                  '_thread', 'zipimport') or
              (file.startswith(basedir) and
-              not file.startswith(os.path.join(basedir, 'site-packages'))))):
+              not file.startswith(os.path.join(basedir, 'site-packages')))) and
+            object.__name__ not in ('xml.etree', 'test.pydoc_mod')):
             if docloc.startswith("http://"):
                 docloc = "%s/%s" % (docloc.rstrip("/"), object.__name__)
             else:
@@ -413,9 +413,10 @@ class HTMLDoc(Doc):
 
     def page(self, title, contents):
         """Format an HTML page."""
-        return '''
-<!doctype html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+        return '''\
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html><head><title>Python: %s</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 </head><body bgcolor="#f0f0f8">
 %s
 </body></html>''' % (title, contents)
@@ -605,7 +606,7 @@ class HTMLDoc(Doc):
             head = head + ' (%s)' % ', '.join(info)
         docloc = self.getdocloc(object)
         if docloc is not None:
-            docloc = '<br><a href="%(docloc)s">Module Docs</a>' % locals()
+            docloc = '<br><a href="%(docloc)s">Module Reference</a>' % locals()
         else:
             docloc = ''
         result = self.heading(
@@ -1014,21 +1015,16 @@ class TextDoc(Doc):
         name = object.__name__ # ignore the passed-in name
         synop, desc = splitdoc(getdoc(object))
         result = self.section('NAME', name + (synop and ' - ' + synop))
-
-        try:
-            all = object.__all__
-        except AttributeError:
-            all = None
-
-        try:
-            file = inspect.getabsfile(object)
-        except TypeError:
-            file = '(built-in)'
-        result = result + self.section('FILE', file)
-
+        all = getattr(object, '__all__', None)
         docloc = self.getdocloc(object)
         if docloc is not None:
-            result = result + self.section('MODULE DOCS', docloc)
+            result = result + self.section('MODULE REFERENCE', docloc + """
+
+The following documentation is automatically generated from the Python source
+files.  It may be incomplete, incorrect or include features that are considered
+implementation detail and may vary between Python implementations.  When in
+doubt, consult the module reference at the location listed above.
+""")
 
         if desc:
             result = result + self.section('DESCRIPTION', desc)
@@ -1107,6 +1103,11 @@ class TextDoc(Doc):
             result = result + self.section('AUTHOR', str(object.__author__))
         if hasattr(object, '__credits__'):
             result = result + self.section('CREDITS', str(object.__credits__))
+        try:
+            file = inspect.getabsfile(object)
+        except TypeError:
+            file = '(built-in)'
+        result = result + self.section('FILE', file)
         return result
 
     def docclass(self, object, name=None, mod=None):
@@ -1341,7 +1342,7 @@ def getpager():
     (fd, filename) = tempfile.mkstemp()
     os.close(fd)
     try:
-        if hasattr(os, 'system') and os.system('more %s' % filename) == 0:
+        if hasattr(os, 'system') and os.system('more "%s"' % filename) == 0:
             return lambda text: pipepager(text, 'more')
         else:
             return ttypager
@@ -1369,7 +1370,7 @@ def tempfilepager(text, cmd):
     file.write(text)
     file.close()
     try:
-        os.system(cmd + ' ' + filename)
+        os.system(cmd + ' "' + filename + '"')
     finally:
         os.unlink(filename)
 
@@ -1509,7 +1510,7 @@ def writedoc(thing, forceload=0):
     try:
         object, name = resolve(thing, forceload)
         page = html.page(describe(object), html.document(object, name))
-        file = open(name + '.html', 'w')
+        file = open(name + '.html', 'w', encoding='utf-8')
         file.write(page)
         file.close()
         print('wrote', name + '.html')
@@ -1528,11 +1529,11 @@ class Helper:
     # These dictionaries map a topic name to either an alias, or a tuple
     # (label, seealso-items).  The "label" is the label of the corresponding
     # section in the .rst file under Doc/ and an index into the dictionary
-    # in pydoc_topics.py.
+    # in pydoc_data/topics.py.
     #
     # CAUTION: if you change one of these dictionaries, be sure to adapt the
     #          list of needed labels in Doc/tools/sphinxext/pyspecific.py and
-    #          regenerate the pydoc_topics.py file by running
+    #          regenerate the pydoc_data/topics.py file by running
     #              make pydoc-topics
     #          in Doc/ and copying the output file into the Lib/ directory.
 
@@ -1547,16 +1548,17 @@ class Helper:
         'del': ('del', 'BASICMETHODS'),
         'elif': 'if',
         'else': ('else', 'while for'),
-        'except': 'except',
-        'finally': 'finally',
+        'except': 'try',
+        'finally': 'try',
         'for': ('for', 'break continue while'),
-        'from': 'from',
-        'global': ('global', 'NAMESPACES'),
+        'from': 'import',
+        'global': ('global', 'nonlocal NAMESPACES'),
         'if': ('if', 'TRUTHVALUE'),
         'import': ('import', 'MODULES'),
-        'in': ('in', 'SEQUENCEMETHODS2'),
+        'in': ('in', 'SEQUENCEMETHODS'),
         'is': 'COMPARISON',
         'lambda': ('lambda', 'FUNCTIONS'),
+        'nonlocal': ('nonlocal', 'global NAMESPACES'),
         'not': 'BOOLEAN',
         'or': 'BOOLEAN',
         'pass': ('pass', ''),
@@ -1567,6 +1569,42 @@ class Helper:
         'with': ('with', 'CONTEXTMANAGERS EXCEPTIONS yield'),
         'yield': ('yield', ''),
     }
+    # Either add symbols to this dictionary or to the symbols dictionary
+    # directly: Whichever is easier. They are merged later.
+    _symbols_inverse = {
+        'STRINGS' : ("'", "'''", "r'", "b'", '"""', '"', 'r"', 'b"'),
+        'OPERATORS' : ('+', '-', '*', '**', '/', '//', '%', '<<', '>>', '&',
+                       '|', '^', '~', '<', '>', '<=', '>=', '==', '!=', '<>'),
+        'COMPARISON' : ('<', '>', '<=', '>=', '==', '!=', '<>'),
+        'UNARY' : ('-', '~'),
+        'AUGMENTEDASSIGNMENT' : ('+=', '-=', '*=', '/=', '%=', '&=', '|=',
+                                '^=', '<<=', '>>=', '**=', '//='),
+        'BITWISE' : ('<<', '>>', '&', '|', '^', '~'),
+        'COMPLEX' : ('j', 'J')
+    }
+    symbols = {
+        '%': 'OPERATORS FORMATTING',
+        '**': 'POWER',
+        ',': 'TUPLES LISTS FUNCTIONS',
+        '.': 'ATTRIBUTES FLOAT MODULES OBJECTS',
+        '...': 'ELLIPSIS',
+        ':': 'SLICINGS DICTIONARYLITERALS',
+        '@': 'def class',
+        '\\': 'STRINGS',
+        '_': 'PRIVATENAMES',
+        '__': 'PRIVATENAMES SPECIALMETHODS',
+        '`': 'BACKQUOTES',
+        '(': 'TUPLES FUNCTIONS CALLS',
+        ')': 'TUPLES FUNCTIONS CALLS',
+        '[': 'LISTS SUBSCRIPTS SLICINGS',
+        ']': 'LISTS SUBSCRIPTS SLICINGS'
+    }
+    for topic, symbols_ in _symbols_inverse.items():
+        for symbol in symbols_:
+            topics = symbols.get(symbol, topic)
+            if topic not in topics:
+                topics = topics + ' ' + topic
+            symbols[symbol] = topics
 
     topics = {
         'TYPES': ('types', 'STRINGS UNICODE NUMBERS SEQUENCES MAPPINGS '
@@ -1604,18 +1642,18 @@ class Helper:
         'PRECEDENCE': 'EXPRESSIONS',
         'OBJECTS': ('objects', 'TYPES'),
         'SPECIALMETHODS': ('specialnames', 'BASICMETHODS ATTRIBUTEMETHODS '
-                           'CALLABLEMETHODS SEQUENCEMETHODS1 MAPPINGMETHODS '
-                           'SEQUENCEMETHODS2 NUMBERMETHODS CLASSES'),
-        'BASICMETHODS': ('customization', 'cmp hash repr str SPECIALMETHODS'),
+                           'CALLABLEMETHODS SEQUENCEMETHODS MAPPINGMETHODS '
+                           'NUMBERMETHODS CLASSES'),
+        'BASICMETHODS': ('customization', 'hash repr str SPECIALMETHODS'),
         'ATTRIBUTEMETHODS': ('attribute-access', 'ATTRIBUTES SPECIALMETHODS'),
         'CALLABLEMETHODS': ('callable-types', 'CALLS SPECIALMETHODS'),
-        'SEQUENCEMETHODS': ('sequence-types', 'SEQUENCES SEQUENCEMETHODS2 '
+        'SEQUENCEMETHODS': ('sequence-types', 'SEQUENCES SEQUENCEMETHODS '
                              'SPECIALMETHODS'),
         'MAPPINGMETHODS': ('sequence-types', 'MAPPINGS SPECIALMETHODS'),
         'NUMBERMETHODS': ('numeric-types', 'NUMBERS AUGMENTEDASSIGNMENT '
                           'SPECIALMETHODS'),
         'EXECUTION': ('execmodel', 'NAMESPACES DYNAMICFEATURES EXCEPTIONS'),
-        'NAMESPACES': ('naming', 'global ASSIGNMENT DELETION DYNAMICFEATURES'),
+        'NAMESPACES': ('naming', 'global nonlocal ASSIGNMENT DELETION DYNAMICFEATURES'),
         'DYNAMICFEATURES': ('dynamic-features', ''),
         'SCOPING': 'NAMESPACES',
         'FRAMES': 'NAMESPACES',
@@ -1633,8 +1671,8 @@ class Helper:
         'DICTIONARIES': ('typesmapping', 'DICTIONARYLITERALS'),
         'DICTIONARYLITERALS': ('dict', 'DICTIONARIES LITERALS'),
         'ATTRIBUTES': ('attribute-references', 'getattr hasattr setattr ATTRIBUTEMETHODS'),
-        'SUBSCRIPTS': ('subscriptions', 'SEQUENCEMETHODS1'),
-        'SLICINGS': ('slicings', 'SEQUENCEMETHODS2'),
+        'SUBSCRIPTS': ('subscriptions', 'SEQUENCEMETHODS'),
+        'SLICINGS': ('slicings', 'SEQUENCEMETHODS'),
         'CALLS': ('calls', 'EXPRESSIONS'),
         'POWER': ('power', 'EXPRESSIONS'),
         'UNARY': ('unary', 'EXPRESSIONS'),
@@ -1656,9 +1694,12 @@ class Helper:
         'CONTEXTMANAGERS': ('context-managers', 'with'),
     }
 
-    def __init__(self, input, output):
-        self.input = input
-        self.output = output
+    def __init__(self, input=None, output=None):
+        self._input = input
+        self._output = output
+
+    input  = property(lambda self: self._input or sys.stdin)
+    output = property(lambda self: self._output or sys.stdout)
 
     def __repr__(self):
         if inspect.stack()[1][3] == '?':
@@ -1666,8 +1707,9 @@ class Helper:
             return ''
         return '<pydoc.Helper instance>'
 
-    def __call__(self, request=None):
-        if request is not None:
+    _GoInteractive = object()
+    def __call__(self, request=_GoInteractive):
+        if request is not self._GoInteractive:
             self.help(request)
         else:
             self.intro()
@@ -1702,12 +1744,15 @@ has the same effect as typing a particular string at the help> prompt.
 
     def help(self, request):
         if type(request) is type(''):
+            request = request.strip()
             if request == 'help': self.intro()
             elif request == 'keywords': self.listkeywords()
+            elif request == 'symbols': self.listsymbols()
             elif request == 'topics': self.listtopics()
             elif request == 'modules': self.listmodules()
             elif request[:8] == 'modules ':
                 self.listmodules(request.split()[1])
+            elif request in self.symbols: self.showsymbol(request)
             elif request in self.keywords: self.showtopic(request)
             elif request in self.topics: self.showtopic(request)
             elif request: doc(request, 'Help on %s:')
@@ -1752,6 +1797,14 @@ Here is a list of the Python keywords.  Enter any keyword to get more help.
 ''')
         self.list(self.keywords.keys())
 
+    def listsymbols(self):
+        self.output.write('''
+Here is a list of the punctuation symbols which Python assigns special meaning
+to. Enter any symbol to get more help.
+
+''')
+        self.list(self.symbols.keys())
+
     def listtopics(self):
         self.output.write('''
 Here is a list of available topics.  Enter any topic name to get more help.
@@ -1759,13 +1812,13 @@ Here is a list of available topics.  Enter any topic name to get more help.
 ''')
         self.list(self.topics.keys())
 
-    def showtopic(self, topic):
+    def showtopic(self, topic, more_xrefs=''):
         try:
-            import pydoc_topics
+            import pydoc_data.topics
         except ImportError:
             self.output.write('''
 Sorry, topic and keyword documentation is not available because the
-module "pydoc_topics" could not be found.
+module "pydoc_data.topics" could not be found.
 ''')
             return
         target = self.topics.get(topic, self.keywords.get(topic))
@@ -1773,21 +1826,28 @@ module "pydoc_topics" could not be found.
             self.output.write('no documentation found for %s\n' % repr(topic))
             return
         if type(target) is type(''):
-            return self.showtopic(target)
+            return self.showtopic(target, more_xrefs)
 
         label, xrefs = target
         try:
-            doc = pydoc_topics.topics[label]
+            doc = pydoc_data.topics.topics[label]
         except KeyError:
             self.output.write('no documentation found for %s\n' % repr(topic))
             return
         pager(doc.strip() + '\n')
+        if more_xrefs:
+            xrefs = (xrefs or '') + ' ' + more_xrefs
         if xrefs:
             import io, formatter
             buffer = io.StringIO()
             formatter.DumbWriter(buffer).send_flowing_data(
                 'Related help topics: ' + ', '.join(xrefs.split()) + '\n')
             self.output.write('\n%s\n' % buffer.getvalue())
+
+    def showsymbol(self, symbol):
+        target = self.symbols[symbol]
+        topic, _, xrefs = target.partition(' ')
+        self.showtopic(topic, xrefs)
 
     def listmodules(self, key=''):
         if key:
@@ -1816,7 +1876,7 @@ Enter any module name to get more help.  Or, type "modules spam" to search
 for modules whose descriptions contain the word "spam".
 ''')
 
-help = Helper(sys.stdin, sys.stdout)
+help = Helper()
 
 class Scanner:
     """A generic tree iterator."""
@@ -1868,8 +1928,12 @@ class ModuleScanner:
             if key is None:
                 callback(None, modname, '')
             else:
-                loader = importer.find_module(modname)
-                if hasattr(loader,'get_source'):
+                try:
+                    loader = importer.find_module(modname)
+                except SyntaxError:
+                    # raised by tests for bad coding cookies or BOM
+                    continue
+                if hasattr(loader, 'get_source'):
                     try:
                         source = loader.get_source(modname)
                     except UnicodeDecodeError:
@@ -1878,7 +1942,7 @@ class ModuleScanner:
                         continue
                     import io
                     desc = source_synopsis(io.StringIO(source)) or ''
-                    if hasattr(loader,'get_filename'):
+                    if hasattr(loader, 'get_filename'):
                         path = loader.get_filename(modname)
                     else:
                         path = None
@@ -1963,8 +2027,8 @@ pydoc</strong> by Ka-Ping Yee &lt;ping@lfw.org&gt;</font>'''
 
     class DocServer(http.server.HTTPServer):
         def __init__(self, port, callback):
-            host = (sys.platform == 'mac') and '127.0.0.1' or 'localhost'
-            self.address = ('', port)
+            host = 'localhost'
+            self.address = (host, port)
             self.url = 'http://%s:%d/' % (host, port)
             self.callback = callback
             self.base.__init__(self, self.address, self.handler)
@@ -2080,10 +2144,6 @@ def gui():
             except ImportError: # pre-webbrowser.py compatibility
                 if sys.platform == 'win32':
                     os.system('start "%s"' % url)
-                elif sys.platform == 'mac':
-                    try: import ic
-                    except ImportError: pass
-                    else: ic.launchurl(url)
                 else:
                     rc = os.system('netscape -remote "openURL(%s)" &' % url)
                     if rc: os.system('netscape "%s" &' % url)
@@ -2188,11 +2248,13 @@ def cli():
     import getopt
     class BadUsage(Exception): pass
 
-    # Scripts don't get the current directory in their path by default.
-    scriptdir = os.path.dirname(sys.argv[0])
-    if scriptdir in sys.path:
-        sys.path.remove(scriptdir)
-    sys.path.insert(0, '.')
+    # Scripts don't get the current directory in their path by default
+    # unless they are run with the '-m' switch
+    if '' not in sys.path:
+        scriptdir = os.path.dirname(sys.argv[0])
+        if scriptdir in sys.path:
+            sys.path.remove(scriptdir)
+        sys.path.insert(0, '.')
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'gk:p:w')

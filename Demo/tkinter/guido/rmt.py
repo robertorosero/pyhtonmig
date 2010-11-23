@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # A Python program implementing rmt, an application for remotely
 # controlling other Tk applications.
@@ -11,7 +11,7 @@
 
 # XXX This should be written in a more Python-like style!!!
 
-from Tkinter import *
+from tkinter import *
 import sys
 
 # 1. Create basic application structure: menu bar on top of
@@ -28,7 +28,7 @@ s = Scrollbar(f, relief=FLAT)
 s.pack(side=RIGHT, fill=Y)
 t = Text(f, relief=RAISED, borderwidth=2, yscrollcommand=s.set, setgrid=1)
 t.pack(side=LEFT, fill=BOTH, expand=1)
-t.tag_config('bold', font='-Adobe-Courier-Bold-R-Normal-*-120-*')
+t.tag_config('bold')
 s['command'] = t.yview
 
 root.title('Tk Remote Controller')

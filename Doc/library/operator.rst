@@ -7,7 +7,7 @@
 
 
 .. testsetup::
-   
+
    import operator
    from operator import itemgetter
 
@@ -43,9 +43,9 @@ the rich comparison operators they support:
    equivalent to ``a < b``, ``le(a, b)`` is equivalent to ``a <= b``, ``eq(a,
    b)`` is equivalent to ``a == b``, ``ne(a, b)`` is equivalent to ``a != b``,
    ``gt(a, b)`` is equivalent to ``a > b`` and ``ge(a, b)`` is equivalent to ``a
-   >= b``.  Note that unlike the built-in :func:`cmp`, these functions can
-   return any value, which may or may not be interpretable as a Boolean value.
-   See :ref:`comparisons` for more information about rich comparisons.
+   >= b``.  Note that these functions can return any value, which may
+   or may not be interpretable as a Boolean value.  See
+   :ref:`comparisons` for more information about rich comparisons.
 
 
 The logical operations are also generally applicable to all objects, and support
@@ -104,6 +104,12 @@ The mathematical and bitwise operations are the most numerous:
    Return ``a // b``.
 
 
+.. function:: index(a)
+              __index__(a)
+
+   Return *a* converted to an integer.  Equivalent to ``a.__index__()``.
+
+
 .. function:: inv(obj)
               invert(obj)
               __inv__(obj)
@@ -133,7 +139,7 @@ The mathematical and bitwise operations are the most numerous:
 .. function:: neg(obj)
               __neg__(obj)
 
-   Return *obj* negated.
+   Return *obj* negated (``-obj``).
 
 
 .. function:: or_(a, b)
@@ -145,7 +151,7 @@ The mathematical and bitwise operations are the most numerous:
 .. function:: pos(obj)
               __pos__(obj)
 
-   Return *obj* positive.
+   Return *obj* positive (``+obj``).
 
 
 .. function:: pow(a, b)
@@ -179,13 +185,7 @@ The mathematical and bitwise operations are the most numerous:
    Return the bitwise exclusive or of *a* and *b*.
 
 
-.. function:: index(a)
-              __index__(a)
-
-   Return *a* converted to an integer.  Equivalent to ``a.__index__()``.
-
-
-Operations which work with sequences include:
+Operations which work with sequences (some of them with mappings too) include:
 
 .. function:: concat(a, b)
               __concat__(a, b)
@@ -209,7 +209,7 @@ Operations which work with sequences include:
 
    Remove the value of *a* at index *b*.
 
- 
+
 .. function:: getitem(a, b)
               __getitem__(a, b)
 
@@ -219,12 +219,6 @@ Operations which work with sequences include:
 .. function:: indexOf(a, b)
 
    Return the index of the first of occurrence of *b* in *a*.
-
-
-.. function:: repeat(a, b)
-              __repeat__(a, b)
-
-   Return ``a * b`` where *a* is a sequence and *b* is an integer.
 
 
 .. function:: setitem(a, b, c)
@@ -294,13 +288,6 @@ example, the :term:`statement` ``x += y`` is equivalent to
    ``a = ipow(a, b)`` is equivalent to ``a **= b``.
 
 
-.. function:: irepeat(a, b)
-              __irepeat__(a, b)
-
-   ``a = irepeat(a, b)`` is equivalent to ``a *= b`` where *a* is a sequence and
-   *b* is an integer.
-
-
 .. function:: irshift(a, b)
               __irshift__(a, b)
 
@@ -324,67 +311,6 @@ example, the :term:`statement` ``x += y`` is equivalent to
 
    ``a = ixor(a, b)`` is equivalent to ``a ^= b``.
 
-
-The :mod:`operator` module also defines a few predicates to test the type of
-objects.
-
-.. XXX just remove them?
-.. note::
-
-   Be careful not to misinterpret the results of these functions; none have any
-   measure of reliability with instance objects.
-   For example:
-
-      >>> class C:
-      ...     pass
-      ... 
-      >>> import operator
-      >>> obj = C()
-      >>> operator.isMappingType(obj)
-      True
-
-.. note::
-
-   Since there are now abstract classes for collection types, you should write,
-   for example, ``isinstance(obj, collections.Mapping)`` and ``isinstance(obj,
-   collections.Sequence)``.
-
-.. function:: isMappingType(obj)
-
-   Returns true if the object *obj* supports the mapping interface. This is true for
-   dictionaries and all instance objects defining :meth:`__getitem__`.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete mapping
-      protocol since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
-
-
-.. function:: isNumberType(obj)
-
-   Returns true if the object *obj* represents a number.  This is true for all
-   numeric types implemented in C.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete numeric
-      interface since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
-
-
-.. function:: isSequenceType(obj)
-
-   Returns true if the object *obj* supports the sequence protocol. This returns true
-   for all objects which define sequence methods in C, and for all instance objects
-   defining :meth:`__getitem__`.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete sequence
-      interface since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
-
 Example: Build a dictionary that maps the ordinals from ``0`` to ``255`` to
 their character equivalents.
 
@@ -407,7 +333,25 @@ expect a function argument.
    attribute is requested, returns a tuple of attributes. After,
    ``f = attrgetter('name')``, the call ``f(b)`` returns ``b.name``.  After,
    ``f = attrgetter('name', 'date')``, the call ``f(b)`` returns ``(b.name,
-   b.date)``.
+   b.date)``.  Equivalent to::
+
+      def attrgetter(*items):
+          if any(not isinstance(item, str) for item in items):
+              raise TypeError('attribute name must be a string')
+          if len(items) == 1:
+              attr = items[0]
+              def g(obj):
+                  return resolve_attr(obj, attr)
+          else:
+              def g(obj):
+                  return tuple(resolve_att(obj, attr) for attr in items)
+          return g
+
+      def resolve_attr(obj, attr):
+          for name in attr.split("."):
+              obj = getattr(obj, name)
+          return obj
+
 
    The attribute names can also contain dots; after ``f = attrgetter('date.month')``,
    the call ``f(b)`` returns ``b.date.month``.
@@ -418,18 +362,18 @@ expect a function argument.
    operand's :meth:`__getitem__` method.  If multiple items are specified,
    returns a tuple of lookup values.  Equivalent to::
 
-        def itemgetter(*items):
-            if len(items) == 1:
-                item = items[0]
-                def g(obj):
-                    return obj[item]
-            else:
-                def g(obj):
-                    return tuple(obj[item] for item in items)
-            return g
-   
-   The items can be any type accepted by the operand's :meth:`__getitem__` 
-   method.  Dictionaries accept any hashable value.  Lists, tuples, and 
+      def itemgetter(*items):
+          if len(items) == 1:
+              item = items[0]
+              def g(obj):
+                  return obj[item]
+          else:
+              def g(obj):
+                  return tuple(obj[item] for item in items)
+          return g
+
+   The items can be any type accepted by the operand's :meth:`__getitem__`
+   method.  Dictionaries accept any hashable value.  Lists, tuples, and
    strings accept an index or a slice:
 
       >>> itemgetter(1)('ABCDEFG')
@@ -443,12 +387,12 @@ expect a function argument.
    Example of using :func:`itemgetter` to retrieve specific fields from a
    tuple record:
 
-       >>> inventory = [('apple', 3), ('banana', 2), ('pear', 5), ('orange', 1)]
-       >>> getcount = itemgetter(1)
-       >>> map(getcount, inventory)
-       [3, 2, 5, 1]
-       >>> sorted(inventory, key=getcount)
-       [('orange', 1), ('banana', 2), ('apple', 3), ('pear', 5)]
+      >>> inventory = [('apple', 3), ('banana', 2), ('pear', 5), ('orange', 1)]
+      >>> getcount = itemgetter(1)
+      >>> list(map(getcount, inventory))
+      [3, 2, 5, 1]
+      >>> sorted(inventory, key=getcount)
+      [('orange', 1), ('banana', 2), ('apple', 3), ('pear', 5)]
 
 
 .. function:: methodcaller(name[, args...])
@@ -457,7 +401,12 @@ expect a function argument.
    additional arguments and/or keyword arguments are given, they will be given
    to the method as well.  After ``f = methodcaller('name')``, the call ``f(b)``
    returns ``b.name()``.  After ``f = methodcaller('name', 'foo', bar=1)``, the
-   call ``f(b)`` returns ``b.name('foo', bar=1)``.
+   call ``f(b)`` returns ``b.name('foo', bar=1)``.  Equivalent to::
+
+      def methodcaller(name, *args, **kwargs):
+          def caller(obj):
+              return getattr(obj, name)(*args, **kwargs)
+          return caller
 
 
 .. _operator-map:
@@ -468,69 +417,77 @@ Mapping Operators to Functions
 This table shows how abstract operations correspond to operator symbols in the
 Python syntax and the functions in the :mod:`operator` module.
 
-+-----------------------+-------------------------+---------------------------------+
-| Operation             | Syntax                  | Function                        |
-+=======================+=========================+=================================+
-| Addition              | ``a + b``               | ``add(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Concatenation         | ``seq1 + seq2``         | ``concat(seq1, seq2)``          |
-+-----------------------+-------------------------+---------------------------------+
-| Containment Test      | ``obj in seq``          | ``contains(seq, obj)``          |
-+-----------------------+-------------------------+---------------------------------+
-| Division              | ``a / b``               | ``truediv(a, b)``               |
-+-----------------------+-------------------------+---------------------------------+
-| Division              | ``a // b``              | ``floordiv(a, b)``              |
-+-----------------------+-------------------------+---------------------------------+
-| Bitwise And           | ``a & b``               | ``and_(a, b)``                  |
-+-----------------------+-------------------------+---------------------------------+
-| Bitwise Exclusive Or  | ``a ^ b``               | ``xor(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Bitwise Inversion     | ``~ a``                 | ``invert(a)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Bitwise Or            | ``a | b``               | ``or_(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Exponentiation        | ``a ** b``              | ``pow(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Identity              | ``a is b``              | ``is_(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Identity              | ``a is not b``          | ``is_not(a, b)``                |
-+-----------------------+-------------------------+---------------------------------+
-| Indexed Assignment    | ``obj[k] = v``          | ``setitem(obj, k, v)``          |
-+-----------------------+-------------------------+---------------------------------+
-| Indexed Deletion      | ``del obj[k]``          | ``delitem(obj, k)``             |
-+-----------------------+-------------------------+---------------------------------+
-| Indexing              | ``obj[k]``              | ``getitem(obj, k)``             |
-+-----------------------+-------------------------+---------------------------------+
-| Left Shift            | ``a << b``              | ``lshift(a, b)``                |
-+-----------------------+-------------------------+---------------------------------+
-| Modulo                | ``a % b``               | ``mod(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Multiplication        | ``a * b``               | ``mul(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Negation (Arithmetic) | ``- a``                 | ``neg(a)``                      |
-+-----------------------+-------------------------+---------------------------------+
-| Negation (Logical)    | ``not a``               | ``not_(a)``                     |
-+-----------------------+-------------------------+---------------------------------+
-| Right Shift           | ``a >> b``              | ``rshift(a, b)``                |
-+-----------------------+-------------------------+---------------------------------+
-| Sequence Repitition   | ``seq * i``             | ``repeat(seq, i)``              |
-+-----------------------+-------------------------+---------------------------------+
-| String Formatting     | ``s % obj``             | ``mod(s, obj)``                 |
-+-----------------------+-------------------------+---------------------------------+
-| Subtraction           | ``a - b``               | ``sub(a, b)``                   |
-+-----------------------+-------------------------+---------------------------------+
-| Truth Test            | ``obj``                 | ``truth(obj)``                  |
-+-----------------------+-------------------------+---------------------------------+
-| Ordering              | ``a < b``               | ``lt(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
-| Ordering              | ``a <= b``              | ``le(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
-| Equality              | ``a == b``              | ``eq(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
-| Difference            | ``a != b``              | ``ne(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
-| Ordering              | ``a >= b``              | ``ge(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
-| Ordering              | ``a > b``               | ``gt(a, b)``                    |
-+-----------------------+-------------------------+---------------------------------+
++-----------------------+-------------------------+---------------------------------------+
+| Operation             | Syntax                  | Function                              |
++=======================+=========================+=======================================+
+| Addition              | ``a + b``               | ``add(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Concatenation         | ``seq1 + seq2``         | ``concat(seq1, seq2)``                |
++-----------------------+-------------------------+---------------------------------------+
+| Containment Test      | ``obj in seq``          | ``contains(seq, obj)``                |
++-----------------------+-------------------------+---------------------------------------+
+| Division              | ``a / b``               | ``div(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Division              | ``a // b``              | ``floordiv(a, b)``                    |
++-----------------------+-------------------------+---------------------------------------+
+| Bitwise And           | ``a & b``               | ``and_(a, b)``                        |
++-----------------------+-------------------------+---------------------------------------+
+| Bitwise Exclusive Or  | ``a ^ b``               | ``xor(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Bitwise Inversion     | ``~ a``                 | ``invert(a)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Bitwise Or            | ``a | b``               | ``or_(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Exponentiation        | ``a ** b``              | ``pow(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Identity              | ``a is b``              | ``is_(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Identity              | ``a is not b``          | ``is_not(a, b)``                      |
++-----------------------+-------------------------+---------------------------------------+
+| Indexed Assignment    | ``obj[k] = v``          | ``setitem(obj, k, v)``                |
++-----------------------+-------------------------+---------------------------------------+
+| Indexed Deletion      | ``del obj[k]``          | ``delitem(obj, k)``                   |
++-----------------------+-------------------------+---------------------------------------+
+| Indexing              | ``obj[k]``              | ``getitem(obj, k)``                   |
++-----------------------+-------------------------+---------------------------------------+
+| Left Shift            | ``a << b``              | ``lshift(a, b)``                      |
++-----------------------+-------------------------+---------------------------------------+
+| Modulo                | ``a % b``               | ``mod(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Multiplication        | ``a * b``               | ``mul(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Negation (Arithmetic) | ``- a``                 | ``neg(a)``                            |
++-----------------------+-------------------------+---------------------------------------+
+| Negation (Logical)    | ``not a``               | ``not_(a)``                           |
++-----------------------+-------------------------+---------------------------------------+
+| Positive              | ``+ a``                 | ``pos(a)``                            |
++-----------------------+-------------------------+---------------------------------------+
+| Right Shift           | ``a >> b``              | ``rshift(a, b)``                      |
++-----------------------+-------------------------+---------------------------------------+
+| Sequence Repetition   | ``seq * i``             | ``repeat(seq, i)``                    |
++-----------------------+-------------------------+---------------------------------------+
+| Slice Assignment      | ``seq[i:j] = values``   | ``setitem(seq, slice(i, j), values)`` |
++-----------------------+-------------------------+---------------------------------------+
+| Slice Deletion        | ``del seq[i:j]``        | ``delitem(seq, slice(i, j))``         |
++-----------------------+-------------------------+---------------------------------------+
+| Slicing               | ``seq[i:j]``            | ``getitem(seq, slice(i, j))``         |
++-----------------------+-------------------------+---------------------------------------+
+| String Formatting     | ``s % obj``             | ``mod(s, obj)``                       |
++-----------------------+-------------------------+---------------------------------------+
+| Subtraction           | ``a - b``               | ``sub(a, b)``                         |
++-----------------------+-------------------------+---------------------------------------+
+| Truth Test            | ``obj``                 | ``truth(obj)``                        |
++-----------------------+-------------------------+---------------------------------------+
+| Ordering              | ``a < b``               | ``lt(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
+| Ordering              | ``a <= b``              | ``le(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
+| Equality              | ``a == b``              | ``eq(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
+| Difference            | ``a != b``              | ``ne(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
+| Ordering              | ``a >= b``              | ``ge(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
+| Ordering              | ``a > b``               | ``gt(a, b)``                          |
++-----------------------+-------------------------+---------------------------------------+
 

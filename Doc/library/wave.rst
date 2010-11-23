@@ -12,7 +12,7 @@ It does not support compression/decompression, but it does support mono/stereo.
 The :mod:`wave` module defines the following function and exception:
 
 
-.. function:: open(file[, mode])
+.. function:: open(file, mode=None)
 
    If *file* is a string, open the file by that name, other treat it as a seekable
    file-like object. *mode* can be any of
@@ -33,7 +33,7 @@ The :mod:`wave` module defines the following function and exception:
 
 .. function:: openfp(file, mode)
 
-   A synonym for :func:`open`, maintained for backwards compatibility.
+   A synonym for :func:`.open`, maintained for backwards compatibility.
 
 
 .. exception:: Error
@@ -47,7 +47,7 @@ The :mod:`wave` module defines the following function and exception:
 Wave_read Objects
 -----------------
 
-Wave_read objects, as returned by :func:`open`, have the following methods:
+Wave_read objects, as returned by :func:`.open`, have the following methods:
 
 
 .. method:: Wave_read.close()
@@ -134,7 +134,7 @@ them, and is otherwise implementation dependent.
 Wave_write Objects
 ------------------
 
-Wave_write objects, as returned by :func:`open`, have the following methods:
+Wave_write objects, as returned by :func:`.open`, have the following methods:
 
 
 .. method:: Wave_write.close()
@@ -156,6 +156,10 @@ Wave_write objects, as returned by :func:`open`, have the following methods:
 .. method:: Wave_write.setframerate(n)
 
    Set the frame rate to *n*.
+
+   .. versionchanged:: 3.2
+      A non-integral input to this method is rounded to the nearest
+      integer.
 
 
 .. method:: Wave_write.setnframes(n)

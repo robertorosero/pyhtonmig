@@ -1,5 +1,4 @@
 """Find modules used by a script, using introspection."""
-# This module should be kept compatible with Python 2.2, see PEP 291.
 
 from __future__ import generators
 import dis
@@ -10,11 +9,7 @@ import sys
 import types
 import struct
 
-if hasattr(sys.__stdout__, "newlines"):
-    READ_MODE = "U"  # universal line endings
-else:
-    # remain compatible with Python  < 2.3
-    READ_MODE = "r"
+READ_MODE = "rU"
 
 # XXX Clean up once str8's cstor matches bytes.
 LOAD_CONST = bytes([dis.opname.index('LOAD_CONST')])
@@ -110,16 +105,16 @@ class ModuleFinder:
 
     def run_script(self, pathname):
         self.msg(2, "run_script", pathname)
-        fp = open(pathname, READ_MODE)
-        stuff = ("", "r", imp.PY_SOURCE)
-        self.load_module('__main__', fp, pathname, stuff)
+        with open(pathname, READ_MODE) as fp:
+            stuff = ("", "r", imp.PY_SOURCE)
+            self.load_module('__main__', fp, pathname, stuff)
 
     def load_file(self, pathname):
         dir, name = os.path.split(pathname)
         name, ext = os.path.splitext(name)
-        fp = open(pathname, READ_MODE)
-        stuff = (ext, "r", imp.PY_SOURCE)
-        self.load_module(name, fp, pathname, stuff)
+        with open(pathname, READ_MODE) as fp:
+            stuff = (ext, "r", imp.PY_SOURCE)
+            self.load_module(name, fp, pathname, stuff)
 
     def import_hook(self, name, caller=None, fromlist=None, level=-1):
         self.msg(3, "import_hook", name, caller, fromlist, level)
@@ -310,7 +305,10 @@ class ModuleFinder:
     def _add_badmodule(self, name, caller):
         if name not in self.badmodules:
             self.badmodules[name] = {}
-        self.badmodules[name][caller.__name__] = 1
+        if caller:
+            self.badmodules[name][caller.__name__] = 1
+        else:
+            self.badmodules[name]["-"] = 1
 
     def _safe_import_hook(self, name, caller, fromlist, level=-1):
         # wrapper for self.import_hook() that won't raise ImportError
@@ -453,9 +451,13 @@ class ModuleFinder:
         m.__path__ = m.__path__ + packagePathMap.get(fqname, [])
 
         fp, buf, stuff = self.find_module("__init__", m.__path__)
-        self.load_module(fqname, fp, buf, stuff)
-        self.msgout(2, "load_package ->", m)
-        return m
+        try:
+            self.load_module(fqname, fp, buf, stuff)
+            self.msgout(2, "load_package ->", m)
+            return m
+        finally:
+            if fp:
+                fp.close()
 
     def add_module(self, fqname):
         if fqname in self.modules:

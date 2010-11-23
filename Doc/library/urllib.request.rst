@@ -3,7 +3,7 @@
 
 .. module:: urllib.request
    :synopsis: Next generation URL opening library.
-.. moduleauthor:: Jeremy Hylton <jhylton@users.sourceforge.net>
+.. moduleauthor:: Jeremy Hylton <jeremy@alum.mit.edu>
 .. sectionauthor:: Moshe Zadka <moshez@users.sourceforge.net>
 
 
@@ -11,47 +11,70 @@ The :mod:`urllib.request` module defines functions and classes which help in
 opening URLs (mostly HTTP) in a complex world --- basic and digest
 authentication, redirections, cookies and more.
 
+
 The :mod:`urllib.request` module defines the following functions:
 
 
-.. function:: urlopen(url[, data][, timeout])
+.. function:: urlopen(url, data=None[, timeout], *, cafile=None, capath=None)
 
-   Open the URL *url*, which can be either a string or a :class:`Request` object.
+   Open the URL *url*, which can be either a string or a
+   :class:`Request` object.
 
-   *data* may be a string specifying additional data to send to the server, or
-   ``None`` if no such data is needed.  Currently HTTP requests are the only ones
-   that use *data*; the HTTP request will be a POST instead of a GET when the
-   *data* parameter is provided.  *data* should be a buffer in the standard
+   *data* may be a string specifying additional data to send to the
+   server, or ``None`` if no such data is needed.  Currently HTTP
+   requests are the only ones that use *data*; the HTTP request will
+   be a POST instead of a GET when the *data* parameter is provided.
+   *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
-   :func:`urllib.urlencode` function takes a mapping or sequence of 2-tuples and
-   returns a string in this format.
+   :func:`urllib.parse.urlencode` function takes a mapping or sequence
+   of 2-tuples and returns a string in this format. urllib.request module uses
+   HTTP/1.1 and includes ``Connection:close`` header in its HTTP requests.
 
-   The optional *timeout* parameter specifies a timeout in seconds for blocking
-   operations like the connection attempt (if not specified, the global default
-   timeout setting will be used).  This actually only works for HTTP, HTTPS,
-   FTP and FTPS connections.
+   The optional *timeout* parameter specifies a timeout in seconds for
+   blocking operations like the connection attempt (if not specified,
+   the global default timeout setting will be used).  This actually
+   only works for HTTP, HTTPS and FTP connections.
+
+   The optional *cafile* and *capath* parameters specify a set of trusted
+   CA certificates for HTTPS requests.  *cafile* should point to a single
+   file containing a bundle of CA certificates, whereas *capath* should
+   point to a directory of hashed certificate files.  More information can
+   be found in :meth:`ssl.SSLContext.load_verify_locations`.
+
+   .. warning::
+      If neither *cafile* nor *capath* is specified, an HTTPS request
+      will not do any verification of the server's certificate.
 
    This function returns a file-like object with two additional methods from
    the :mod:`urllib.response` module
 
-   * :meth:`geturl` --- return the URL of the resource retrieved, commonly used to
-     determine if a redirect was followed
+   * :meth:`geturl` --- return the URL of the resource retrieved,
+     commonly used to determine if a redirect was followed
 
-   * :meth:`info` --- return the meta-information of the page, such as headers, in
-     the form of an ``http.client.HTTPMessage`` instance
-     (see `Quick Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
+   * :meth:`info` --- return the meta-information of the page, such as headers,
+     in the form of an :func:`email.message_from_string` instance (see
+     `Quick Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
 
    Raises :exc:`URLError` on errors.
 
-   Note that ``None`` may be returned if no handler handles the request (though the
-   default installed global :class:`OpenerDirector` uses :class:`UnknownHandler` to
-   ensure this never happens).
-   The urlopen function from the previous version, Python 2.6 and earlier,  of
-   the module  urllib has been discontinued as urlopen can return the
-   file-object as the previous. The proxy handling, which in earlier was passed
-   as a dict parameter to urlopen can be availed by the use of `ProxyHandler`
-   objects.
+   Note that ``None`` may be returned if no handler handles the request (though
+   the default installed global :class:`OpenerDirector` uses
+   :class:`UnknownHandler` to ensure this never happens).
 
+   In addition, default installed :class:`ProxyHandler` makes sure the requests
+   are handled through the proxy when they are set.
+
+   The legacy ``urllib.urlopen`` function from Python 2.6 and earlier has been
+   discontinued; :func:`urlopen` corresponds to the old ``urllib2.urlopen``.
+   Proxy handling, which was done by passing a dictionary parameter to
+   ``urllib.urlopen``, can be obtained by using :class:`ProxyHandler` objects.
+
+   .. versionchanged:: 3.2
+      *cafile* and *capath* were added.
+
+   .. versionchanged:: 3.2
+      HTTPS virtual hosts are now supported if possible (that is, if
+      :data:`ssl.HAS_SNI` is true).
 
 .. function:: install_opener(opener)
 
@@ -74,13 +97,14 @@ The :mod:`urllib.request` module defines the following functions:
    :class:`HTTPRedirectHandler`, :class:`FTPHandler`, :class:`FileHandler`,
    :class:`HTTPErrorProcessor`.
 
-   If the Python installation has SSL support (i.e., if the :mod:`ssl` module can be imported),
-   :class:`HTTPSHandler` will also be added.
+   If the Python installation has SSL support (i.e., if the :mod:`ssl` module
+   can be imported), :class:`HTTPSHandler` will also be added.
 
    A :class:`BaseHandler` subclass may also change its :attr:`handler_order`
    member variable to modify its position in the handlers list.
 
-.. function:: urlretrieve(url[, filename[, reporthook[, data]]])
+
+.. function:: urlretrieve(url, filename=None, reporthook=None, data=None)
 
    Copy a network object denoted by a URL to a local file, if necessary. If the URL
    points to a local file, or a valid cached copy of the object exists, the object
@@ -121,26 +145,6 @@ The :mod:`urllib.request` module defines the following functions:
    of the data it has downloaded, and just returns it.  In this case you just have
    to assume that the download was successful.
 
-
-.. data:: _urlopener
-
-   The public functions :func:`urlopen` and :func:`urlretrieve` create an instance
-   of the :class:`FancyURLopener` class and use it to perform their requested
-   actions.  To override this functionality, programmers can create a subclass of
-   :class:`URLopener` or :class:`FancyURLopener`, then assign an instance of that
-   class to the ``urllib._urlopener`` variable before calling the desired function.
-   For example, applications may want to specify a different
-   :mailheader:`User-Agent` header than :class:`URLopener` defines.  This can be
-   accomplished with the following code::
-
-      import urllib.request
-
-      class AppURLopener(urllib.request.FancyURLopener):
-          version = "App/1.7"
-
-      urllib._urlopener = AppURLopener()
-
-
 .. function:: urlcleanup()
 
    Clear the cache that may have been built up by previous calls to
@@ -155,51 +159,66 @@ The :mod:`urllib.request` module defines the following functions:
 
 .. function:: url2pathname(path)
 
-   Convert the path component *path* from an encoded URL to the local syntax for a
+   Convert the path component *path* from a percent-encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
 
+.. function:: getproxies()
+
+   This helper function returns a dictionary of scheme to proxy server URL
+   mappings. It scans the environment for variables named ``<scheme>_proxy``
+   for all operating systems first, and when it cannot find it, looks for proxy
+   information from Mac OSX System Configuration for Mac OS X and Windows
+   Systems Registry for Windows.
+
+
 The following classes are provided:
 
-.. class:: Request(url[, data][, headers][, origin_req_host][, unverifiable])
+.. class:: Request(url, data=None, headers={}, origin_req_host=None, unverifiable=False)
 
    This class is an abstraction of a URL request.
 
    *url* should be a string containing a valid URL.
 
-   *data* may be a string specifying additional data to send to the server, or
-   ``None`` if no such data is needed.  Currently HTTP requests are the only ones
-   that use *data*; the HTTP request will be a POST instead of a GET when the
-   *data* parameter is provided.  *data* should be a buffer in the standard
+   *data* may be a string specifying additional data to send to the
+   server, or ``None`` if no such data is needed.  Currently HTTP
+   requests are the only ones that use *data*; the HTTP request will
+   be a POST instead of a GET when the *data* parameter is provided.
+   *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
-   :func:`urllib.urlencode` function takes a mapping or sequence of 2-tuples and
-   returns a string in this format.
+   :func:`urllib.parse.urlencode` function takes a mapping or sequence
+   of 2-tuples and returns a string in this format.
 
-   *headers* should be a dictionary, and will be treated as if :meth:`add_header`
-   was called with each key and value as arguments.  This is often used to "spoof"
-   the ``User-Agent`` header, which is used by a browser to identify itself --
-   some HTTP servers only allow requests coming from common browsers as opposed
-   to scripts.  For example, Mozilla Firefox may identify itself as ``"Mozilla/5.0
-   (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11"``, while :mod:`urllib`'s
-   default user agent string is ``"Python-urllib/2.6"`` (on Python 2.6).
+   *headers* should be a dictionary, and will be treated as if
+   :meth:`add_header` was called with each key and value as arguments.
+   This is often used to "spoof" the ``User-Agent`` header, which is
+   used by a browser to identify itself -- some HTTP servers only
+   allow requests coming from common browsers as opposed to scripts.
+   For example, Mozilla Firefox may identify itself as ``"Mozilla/5.0
+   (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11"``, while
+   :mod:`urllib`'s default user agent string is
+   ``"Python-urllib/2.6"`` (on Python 2.6).
 
-   The final two arguments are only of interest for correct handling of third-party
-   HTTP cookies:
+   The final two arguments are only of interest for correct handling
+   of third-party HTTP cookies:
 
-   *origin_req_host* should be the request-host of the origin transaction, as
-   defined by :rfc:`2965`.  It defaults to ``http.cookiejar.request_host(self)``.
-   This is the host name or IP address of the original request that was
-   initiated by the user.  For example, if the request is for an image in an
-   HTML document, this should be the request-host of the request for the page
+   *origin_req_host* should be the request-host of the origin
+   transaction, as defined by :rfc:`2965`.  It defaults to
+   ``http.cookiejar.request_host(self)``.  This is the host name or IP
+   address of the original request that was initiated by the user.
+   For example, if the request is for an image in an HTML document,
+   this should be the request-host of the request for the page
    containing the image.
 
-   *unverifiable* should indicate whether the request is unverifiable, as defined
-   by RFC 2965.  It defaults to False.  An unverifiable request is one whose URL
-   the user did not have the option to approve.  For example, if the request is for
-   an image in an HTML document, and the user had no option to approve the
-   automatic fetching of the image, this should be true.
+   *unverifiable* should indicate whether the request is unverifiable,
+   as defined by RFC 2965.  It defaults to False.  An unverifiable
+   request is one whose URL the user did not have the option to
+   approve.  For example, if the request is for an image in an HTML
+   document, and the user had no option to approve the automatic
+   fetching of the image, this should be true.
 
-.. class:: URLopener([proxies[, **x509]])
+
+.. class:: URLopener(proxies=None, **x509)
 
    Base class for opening and reading URLs.  Unless you need to support opening
    objects using schemes other than :file:`http:`, :file:`ftp:`, or :file:`file:`,
@@ -224,7 +243,7 @@ The following classes are provided:
    :class:`URLopener` objects will raise an :exc:`IOError` exception if the server
    returns an error code.
 
-    .. method:: open(fullurl[, data])
+    .. method:: open(fullurl, data=None)
 
        Open *fullurl* using the appropriate protocol.  This method sets up cache and
        proxy information, then calls the appropriate open method with its input
@@ -233,12 +252,12 @@ The following classes are provided:
        :func:`urlopen`.
 
 
-    .. method:: open_unknown(fullurl[, data])
+    .. method:: open_unknown(fullurl, data=None)
 
        Overridable interface to open unknown URL types.
 
 
-    .. method:: retrieve(url[, filename[, reporthook[, data]]])
+    .. method:: retrieve(url, filename=None, reporthook=None, data=None)
 
        Retrieves the contents of *url* and places it in *filename*.  The return value
        is a tuple consisting of a local filename and either a
@@ -331,16 +350,21 @@ The following classes are provided:
    A class to handle redirections.
 
 
-.. class:: HTTPCookieProcessor([cookiejar])
+.. class:: HTTPCookieProcessor(cookiejar=None)
 
    A class to handle HTTP Cookies.
 
 
-.. class:: ProxyHandler([proxies])
+.. class:: ProxyHandler(proxies=None)
 
    Cause requests to go through a proxy. If *proxies* is given, it must be a
    dictionary mapping protocol names to URLs of proxies. The default is to read the
    list of proxies from the environment variables :envvar:`<protocol>_proxy`.
+   If no proxy environment variables are set, in a Windows environment, proxy
+   settings are obtained from the registry's Internet Settings section and in a
+   Mac OS X environment, proxy information is retrieved from the OS X System
+   Configuration Framework.
+
    To disable autodetected proxy pass an empty dictionary.
 
 
@@ -356,7 +380,7 @@ The following classes are provided:
    fits.
 
 
-.. class:: AbstractBasicAuthHandler([password_mgr])
+.. class:: AbstractBasicAuthHandler(password_mgr=None)
 
    This is a mixin class that helps with HTTP authentication, both to the remote
    host and to a proxy. *password_mgr*, if given, should be something that is
@@ -365,7 +389,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: HTTPBasicAuthHandler([password_mgr])
+.. class:: HTTPBasicAuthHandler(password_mgr=None)
 
    Handle authentication with the remote host. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -373,7 +397,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: ProxyBasicAuthHandler([password_mgr])
+.. class:: ProxyBasicAuthHandler(password_mgr=None)
 
    Handle authentication with the proxy. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -381,7 +405,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: AbstractDigestAuthHandler([password_mgr])
+.. class:: AbstractDigestAuthHandler(password_mgr=None)
 
    This is a mixin class that helps with HTTP authentication, both to the remote
    host and to a proxy. *password_mgr*, if given, should be something that is
@@ -390,7 +414,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: HTTPDigestAuthHandler([password_mgr])
+.. class:: HTTPDigestAuthHandler(password_mgr=None)
 
    Handle authentication with the remote host. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -398,7 +422,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: ProxyDigestAuthHandler([password_mgr])
+.. class:: ProxyDigestAuthHandler(password_mgr=None)
 
    Handle authentication with the proxy. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -411,9 +435,13 @@ The following classes are provided:
    A class to handle opening of HTTP URLs.
 
 
-.. class:: HTTPSHandler()
+.. class:: HTTPSHandler(debuglevel=0, context=None, check_hostname=None)
 
-   A class to handle opening of HTTPS URLs.
+   A class to handle opening of HTTPS URLs.  *context* and *check_hostname*
+   have the same meaning as in :class:`http.client.HTTPSConnection`.
+
+   .. versionchanged:: 3.2
+      *context* and *check_hostname* were added.
 
 
 .. class:: FileHandler()
@@ -441,9 +469,41 @@ The following classes are provided:
 Request Objects
 ---------------
 
-The following methods describe all of :class:`Request`'s public interface, and
-so all must be overridden in subclasses.
+The following methods describe :class:`Request`'s public interface,
+and so all may be overridden in subclasses.  It also defines several
+public attributes that can be used by clients to inspect the parsed
+request.
 
+.. attribute:: Request.full_url
+
+   The original URL passed to the constructor.
+
+.. attribute:: Request.type
+
+   The URI scheme.
+
+.. attribute:: Request.host
+
+   The URI authority, typically a host, but may also contain a port
+   separated by a colon.
+
+.. attribute:: Request.origin_req_host
+
+   The original host for the request, without port.
+
+.. attribute:: Request.selector
+
+   The URI path.  If the :class:`Request` uses a proxy, then selector
+   will be the full url that is passed to the proxy.
+
+.. attribute:: Request.data
+
+   The entity body for the request, or None if not specified.
+
+.. attribute:: Request.unverifiable
+
+   boolean, indicates whether the request is unverifiable as defined
+   by RFC 2965.
 
 .. method:: Request.add_data(data)
 
@@ -559,7 +619,7 @@ OpenerDirector Objects
      post-process *protocol* responses.
 
 
-.. method:: OpenerDirector.open(url[, data][, timeout])
+.. method:: OpenerDirector.open(url, data=None[, timeout])
 
    Open the given *url* (which can be a request object or a string), optionally
    passing the given *data*. Arguments, return values and exceptions raised are
@@ -567,11 +627,11 @@ OpenerDirector Objects
    method on the currently installed global :class:`OpenerDirector`).  The
    optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
-   timeout setting will be usedi). The timeout feature actually works only for
-   HTTP, HTTPS, FTP and FTPS connections).
+   timeout setting will be used). The timeout feature actually works only for
+   HTTP, HTTPS and FTP connections).
 
 
-.. method:: OpenerDirector.error(proto[, arg[, ...]])
+.. method:: OpenerDirector.error(proto, *args)
 
    Handle an error of the given protocol.  This will call the registered error
    handlers for the given protocol with the given arguments (which are protocol
@@ -601,7 +661,8 @@ sorting the handler instances.
    :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
-   :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
+   :class:`OpenerDirector` instance's :meth:`~OpenerDirector.open` and
+   :meth:`~OpenerDirector.error` methods.
 
 #. Every handler with a method named like :meth:`protocol_response` has that
    method called to post-process the response.
@@ -741,14 +802,15 @@ HTTPRedirectHandler Objects
    precise meanings of the various redirection codes.
 
 
-.. method:: HTTPRedirectHandler.redirect_request(req, fp, code, msg, hdrs)
+.. method:: HTTPRedirectHandler.redirect_request(req, fp, code, msg, hdrs, newurl)
 
    Return a :class:`Request` or ``None`` in response to a redirect. This is called
    by the default implementations of the :meth:`http_error_30\*` methods when a
    redirection is received from the server.  If a redirection should take place,
    return a new :class:`Request` to allow :meth:`http_error_30\*` to perform the
-   redirect.  Otherwise, raise :exc:`HTTPError` if no other handler should try to
-   handle this URL, or return ``None`` if you can't but another handler might.
+   redirect to *newurl*.  Otherwise, raise :exc:`HTTPError` if no other handler
+   should try to handle this URL, or return ``None`` if you can't but another
+   handler might.
 
    .. note::
 
@@ -761,8 +823,8 @@ HTTPRedirectHandler Objects
 
 .. method:: HTTPRedirectHandler.http_error_301(req, fp, code, msg, hdrs)
 
-   Redirect to the ``Location:`` URL.  This method is called by the parent
-   :class:`OpenerDirector` when getting an HTTP 'moved permanently' response.
+   Redirect to the ``Location:`` or ``URI:`` URL.  This method is called by the
+   parent :class:`OpenerDirector` when getting an HTTP 'moved permanently' response.
 
 
 .. method:: HTTPRedirectHandler.http_error_302(req, fp, code, msg, hdrs)
@@ -946,8 +1008,12 @@ FileHandler Objects
 .. method:: FileHandler.file_open(req)
 
    Open the file locally, if there is no host name, or the host name is
-   ``'localhost'``. Change the protocol to ``ftp`` otherwise, and retry opening it
-   using :attr:`parent`.
+   ``'localhost'``.
+
+   This method is applicable only for local hostnames. When a remote hostname
+   is given, an :exc:`URLError` is raised.
+
+.. versionchanged:: 3.2
 
 
 .. _ftp-handler-objects:
@@ -1014,24 +1080,47 @@ HTTPErrorProcessor Objects
 Examples
 --------
 
-This example gets the python.org main page and displays the first 100 bytes of
-it::
+This example gets the python.org main page and displays the first 300 bytes of
+it. ::
 
    >>> import urllib.request
    >>> f = urllib.request.urlopen('http://www.python.org/')
-   >>> print(f.read(100))
-   <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-   <?xml-stylesheet href="./css/ht2html
+   >>> print(f.read(300))
+   b'<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n\n\n<html
+   xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n\n<head>\n
+   <meta http-equiv="content-type" content="text/html; charset=utf-8" />\n
+   <title>Python Programming '
 
-Here we are sending a data-stream to the stdin of a CGI and reading the data it
-returns to us. Note that this example will only work when the Python
-installation supports SSL. ::
+Note that urlopen returns a bytes object.  This is because there is no way
+for urlopen to automatically determine the encoding of the byte stream
+it receives from the http server. In general, a program will decode
+the returned bytes object to string once it determines or guesses
+the appropriate encoding.
+
+The following W3C document, http://www.w3.org/International/O-charset  , lists
+the various ways in which a (X)HTML or a XML document could have specified its
+encoding information.
+
+As python.org website uses *utf-8* encoding as specified in it's meta tag, we
+will use same for decoding the bytes object. ::
+
+   >>> import urllib.request
+   >>> f = urllib.request.urlopen('http://www.python.org/')
+   >>> print(f.read(100).decode('utf-8'))
+   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtm
+
+
+In the following example, we are sending a data-stream to the stdin of a CGI
+and reading the data it returns to us. Note that this example will only work
+when the Python installation supports SSL. ::
 
    >>> import urllib.request
    >>> req = urllib.request.Request(url='https://localhost/cgi-bin/test.cgi',
    ...                       data='This data is passed to stdin of the CGI')
    >>> f = urllib.request.urlopen(req)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
    Got Data: "This data is passed to stdin of the CGI"
 
 The code for the sample CGI used in the above example is::
@@ -1062,14 +1151,14 @@ involved.  For example, the :envvar:`http_proxy` environment variable is read to
 obtain the HTTP proxy's URL.
 
 This example replaces the default :class:`ProxyHandler` with one that uses
-programatically-supplied proxy URLs, and adds proxy authorization support with
+programmatically-supplied proxy URLs, and adds proxy authorization support with
 :class:`ProxyBasicAuthHandler`. ::
 
    proxy_handler = urllib.request.ProxyHandler({'http': 'http://www.example.com:3128/'})
-   proxy_auth_handler = urllib.request.HTTPBasicAuthHandler()
+   proxy_auth_handler = urllib.request.ProxyBasicAuthHandler()
    proxy_auth_handler.add_password('realm', 'host', 'username', 'password')
 
-   opener = build_opener(proxy_handler, proxy_auth_handler)
+   opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler)
    # This time, rather than install the OpenerDirector, we use it directly:
    opener.open('http://www.example.com/login.html')
 
@@ -1103,7 +1192,7 @@ containing parameters::
    >>> import urllib.parse
    >>> params = urllib.parse.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
    >>> f = urllib.request.urlopen("http://www.musi-cal.com/cgi-bin/query?%s" % params)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
 
 The following example uses the ``POST`` method instead::
 
@@ -1111,7 +1200,7 @@ The following example uses the ``POST`` method instead::
    >>> import urllib.parse
    >>> params = urllib.parse.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
    >>> f = urllib.request.urlopen("http://www.musi-cal.com/cgi-bin/query", params)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
 
 The following example uses an explicitly specified HTTP proxy, overriding
 environment settings::
@@ -1120,14 +1209,14 @@ environment settings::
    >>> proxies = {'http': 'http://proxy.example.com:8080/'}
    >>> opener = urllib.request.FancyURLopener(proxies)
    >>> f = opener.open("http://www.python.org")
-   >>> f.read()
+   >>> f.read().decode('utf-8')
 
 The following example uses no proxies at all, overriding environment settings::
 
    >>> import urllib.request
    >>> opener = urllib.request.FancyURLopener({})
    >>> f = opener.open("http://www.python.org/")
-   >>> f.read()
+   >>> f.read().decode('utf-8')
 
 
 :mod:`urllib.request` Restrictions
@@ -1191,7 +1280,7 @@ The following example uses no proxies at all, overriding environment settings::
 
 The :mod:`urllib.response` module defines functions and classes which define a
 minimal file like interface, including ``read()`` and ``readline()``. The
-typical response object is an addinfourl instance, which defines and ``info()``
+typical response object is an addinfourl instance, which defines an ``info()``
 method and that returns headers and a ``geturl()`` method that returns the url.
 Functions defined by this module are used internally by the
 :mod:`urllib.request` module.

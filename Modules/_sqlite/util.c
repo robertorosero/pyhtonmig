@@ -1,6 +1,6 @@
 /* util.c - various utility functions
  *
- * Copyright (C) 2005-2007 Gerhard Häring <gh@ghaering.de>
+ * Copyright (C) 2005-2010 Gerhard HÃ¤ring <gh@ghaering.de>
  *
  * This file is part of pysqlite.
  *
@@ -24,7 +24,7 @@
 #include "module.h"
 #include "connection.h"
 
-int _sqlite_step_with_busyhandler(sqlite3_stmt* statement, pysqlite_Connection* connection)
+int pysqlite_step(sqlite3_stmt* statement, pysqlite_Connection* connection)
 {
     int rc;
 

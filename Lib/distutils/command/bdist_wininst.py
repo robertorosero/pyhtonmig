@@ -89,7 +89,7 @@ class bdist_wininst(Command):
             short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
                 raise DistutilsOptionError(
-                      "target version can only be %s, or the '--skip_build'" \
+                      "target version can only be %s, or the '--skip-build'" \
                       " option must be specified" % (short_version,))
             self.target_version = short_version
 
@@ -260,13 +260,18 @@ class bdist_wininst(Command):
             cfgdata = cfgdata.encode("mbcs")
 
         # Append the pre-install script
-        cfgdata = cfgdata + "\0"
+        cfgdata = cfgdata + b"\0"
         if self.pre_install_script:
-            script_data = open(self.pre_install_script, "r").read()
-            cfgdata = cfgdata + script_data + "\n\0"
+            # We need to normalize newlines, so we open in text mode and
+            # convert back to bytes. "latin1" simply avoids any possible
+            # failures.
+            with open(self.pre_install_script, "r",
+                encoding="latin1") as script:
+                script_data = script.read().encode("latin1")
+            cfgdata = cfgdata + script_data + b"\n\0"
         else:
             # empty pre-install script
-            cfgdata = cfgdata + "\0"
+            cfgdata = cfgdata + b"\0"
         file.write(cfgdata)
 
         # The 'magic number' 0x1234567B is used to make sure that the
@@ -325,9 +330,18 @@ class bdist_wininst(Command):
         directory = os.path.dirname(__file__)
         # we must use a wininst-x.y.exe built with the same C compiler
         # used for python.  XXX What about mingw, borland, and so on?
-        if self.plat_name == 'win32':
-            sfix = ''
+
+        # if plat_name starts with "win" but is not "win32"
+        # we want to strip "win" and leave the rest (e.g. -amd64)
+        # for all other cases, we don't want any suffix
+        if self.plat_name != 'win32' and self.plat_name[:3] == 'win':
+            sfix = self.plat_name[3:]
         else:
-            sfix = self.plat_name[3:] # strip 'win' - leaves eg '-amd64'
+            sfix = ''
+
         filename = os.path.join(directory, "wininst-%.1f%s.exe" % (bv, sfix))
-        return open(filename, "rb").read()
+        f = open(filename, "rb")
+        try:
+            return f.read()
+        finally:
+            f.close()

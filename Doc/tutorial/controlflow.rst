@@ -17,6 +17,7 @@ Perhaps the most well-known statement type is the :keyword:`if` statement.  For
 example::
 
    >>> x = int(input("Please enter an integer: "))
+   Please enter an integer: 42
    >>> if x < 0:
    ...      x = 0
    ...      print('Negative changed to zero')
@@ -26,7 +27,8 @@ example::
    ...      print('Single')
    ... else:
    ...      print('More')
-   ... 
+   ...
+   More
 
 There can be zero or more :keyword:`elif` parts, and the :keyword:`else` part is
 optional.  The keyword ':keyword:`elif`' is short for 'else if', and is useful
@@ -59,7 +61,7 @@ they appear in the sequence.  For example (no pun intended):
    ... a = ['cat', 'window', 'defenestrate']
    >>> for x in a:
    ...     print(x, len(x))
-   ... 
+   ...
    cat 3
    window 6
    defenestrate 12
@@ -72,7 +74,7 @@ convenient::
 
    >>> for x in a[:]: # make a slice copy of the entire list
    ...    if len(x) > 6: a.insert(0, x)
-   ... 
+   ...
    >>> a
    ['defenestrate', 'cat', 'window', 'defenestrate']
 
@@ -85,7 +87,6 @@ The :func:`range` Function
 If you do need to iterate over a sequence of numbers, the built-in function
 :func:`range` comes in handy.  It generates arithmetic progressions::
 
-
     >>> for i in range(5):
     ...     print(i)
     ...
@@ -94,35 +95,36 @@ If you do need to iterate over a sequence of numbers, the built-in function
     2
     3
     4
-    
 
-
-The given end point is never part of the generated list; ``range(10)`` generates
+The given end point is never part of the generated sequence; ``range(10)`` generates
 10 values, the legal indices for items of a sequence of length 10.  It
 is possible to let the range start at another number, or to specify a different
 increment (even negative; sometimes this is called the 'step')::
 
-    range(5, 10)          
+    range(5, 10)
        5 through 9
 
-    range(0, 10, 3)       
+    range(0, 10, 3)
        0, 3, 6, 9
 
-    range(-10, -100, -30) 
+    range(-10, -100, -30)
       -10, -40, -70
 
-To iterate over the indices of a sequence, combine :func:`range` and :func:`len`
-as follows::
+To iterate over the indices of a sequence, you can combine :func:`range` and
+:func:`len` as follows::
 
    >>> a = ['Mary', 'had', 'a', 'little', 'lamb']
    >>> for i in range(len(a)):
    ...     print(i, a[i])
-   ... 
+   ...
    0 Mary
    1 had
    2 a
    3 little
    4 lamb
+
+In most such cases, however, it is convenient to use the :func:`enumerate`
+function, see :ref:`tut-loopidioms`.
 
 A strange thing happens if you just print a range::
 
@@ -130,12 +132,12 @@ A strange thing happens if you just print a range::
    range(0, 10)
 
 In many ways the object returned by :func:`range` behaves as if it is a list,
-but in fact it isn't. It is an object which returns the successive items of 
-the desired sequence when you iterate over it, but it doesn't really make 
-the list, thus saving space. 
+but in fact it isn't. It is an object which returns the successive items of
+the desired sequence when you iterate over it, but it doesn't really make
+the list, thus saving space.
 
-We say such an object is *iterable*, that is, suitable as a target for 
-functions and constructs that expect something from which they can 
+We say such an object is *iterable*, that is, suitable as a target for
+functions and constructs that expect something from which they can
 obtain successive items until the supply is exhausted. We have seen that
 the :keyword:`for` statement is such an *iterator*. The function :func:`list`
 is another; it creates lists from iterables::
@@ -145,6 +147,7 @@ is another; it creates lists from iterables::
    [0, 1, 2, 3, 4]
 
 Later we will see more functions that return iterables and take iterables as argument.
+
 
 .. _tut-break:
 
@@ -171,7 +174,7 @@ following loop, which searches for prime numbers::
    ...     else:
    ...         # loop fell through without finding a factor
    ...         print(n, 'is a prime number')
-   ... 
+   ...
    2 is a prime number
    3 is a prime number
    4 equals 2 * 2
@@ -191,9 +194,22 @@ The :keyword:`pass` statement does nothing. It can be used when a statement is
 required syntactically but the program requires no action. For example::
 
    >>> while True:
-   ...       pass # Busy-wait for keyboard interrupt
-   ... 
+   ...     pass  # Busy-wait for keyboard interrupt (Ctrl+C)
+   ...
 
+This is commonly used for creating minimal classes::
+
+   >>> class MyEmptyClass:
+   ...     pass
+   ...
+
+Another place :keyword:`pass` can be used is as a place-holder for a function or
+conditional body when you are working on new code, allowing you to keep thinking
+at a more abstract level.  The :keyword:`pass` is silently ignored::
+
+   >>> def initlog(*args):
+   ...     pass   # Remember to implement this!
+   ...
 
 .. _tut-functions:
 
@@ -206,14 +222,14 @@ boundary::
    >>> def fib(n):    # write Fibonacci series up to n
    ...     """Print a Fibonacci series up to n."""
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         print(b, end=' ')
+   ...     while a < n:
+   ...         print(a, end=' ')
    ...         a, b = b, a+b
    ...     print()
-   ... 
+   ...
    >>> # Now call the function we just defined:
    ... fib(2000)
-   1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
+   0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
 
 .. index::
    single: documentation strings
@@ -223,14 +239,14 @@ boundary::
 The keyword :keyword:`def` introduces a function *definition*.  It must be
 followed by the function name and the parenthesized list of formal parameters.
 The statements that form the body of the function start at the next line, and
-must be indented.  The first statement of the function body can optionally be a
-string literal; this string literal is the function's documentation string, or
-:dfn:`docstring`.
+must be indented.
 
+The first statement of the function body can optionally be a string literal;
+this string literal is the function's documentation string, or :dfn:`docstring`.
+(More about docstrings can be found in the section :ref:`tut-docstrings`.)
 There are tools which use docstrings to automatically produce online or printed
 documentation, or to let the user interactively browse through code; it's good
-practice to include docstrings in code that you write, so try to make a habit of
-it.
+practice to include docstrings in code that you write, so make a habit of it.
 
 The *execution* of a function introduces a new symbol table used for the local
 variables of the function.  More precisely, all variable assignments in a
@@ -257,14 +273,14 @@ mechanism::
    <function fib at 10042ed0>
    >>> f = fib
    >>> f(100)
-   1 1 2 3 5 8 13 21 34 55 89
+   0 1 1 2 3 5 8 13 21 34 55 89
 
-You might object that ``fib`` is not a function but a procedure.  In Python,
-like in C, procedures are just functions that don't return a value.  In fact,
-technically speaking, procedures do return a value, albeit a rather boring one.
-This value is called ``None`` (it's a built-in name).  Writing the value
-``None`` is normally suppressed by the interpreter if it would be the only value
-written.  You can see it if you really want to using :func:`print`::
+Coming from other languages, you might object that ``fib`` is not a function but
+a procedure since it doesn't return a value.  In fact, even functions without a
+:keyword:`return` statement do return a value, albeit a rather boring one.  This
+value is called ``None`` (it's a built-in name).  Writing the value ``None`` is
+normally suppressed by the interpreter if it would be the only value written.
+You can see it if you really want to using :func:`print`::
 
    >>> fib(0)
    >>> print(fib(0))
@@ -277,31 +293,31 @@ Fibonacci series, instead of printing it::
    ...     """Return a list containing the Fibonacci series up to n."""
    ...     result = []
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         result.append(b)    # see below
+   ...     while a < n:
+   ...         result.append(a)    # see below
    ...         a, b = b, a+b
    ...     return result
-   ... 
+   ...
    >>> f100 = fib2(100)    # call it
    >>> f100                # write the result
-   [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+   [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 
 This example, as usual, demonstrates some new Python features:
 
 * The :keyword:`return` statement returns with a value from a function.
   :keyword:`return` without an expression argument returns ``None``. Falling off
-  the end of a procedure also returns ``None``.
+  the end of a function also returns ``None``.
 
-* The statement ``result.append(b)`` calls a *method* of the list object
+* The statement ``result.append(a)`` calls a *method* of the list object
   ``result``.  A method is a function that 'belongs' to an object and is named
   ``obj.methodname``, where ``obj`` is some object (this may be an expression),
   and ``methodname`` is the name of a method that is defined by the object's type.
   Different types define different methods.  Methods of different types may have
   the same name without causing ambiguity.  (It is possible to define your own
-  object types and methods, using *classes*, as discussed later in this tutorial.)
+  object types and methods, using *classes*, see :ref:`tut-classes`)
   The method :meth:`append` shown in the example is defined for list objects; it
   adds a new element at the end of the list.  In this example it is equivalent to
-  ``result = result + [b]``, but more efficient.
+  ``result = result + [a]``, but more efficient.
 
 
 .. _tut-defining:
@@ -325,15 +341,23 @@ defined to allow.  For example::
    def ask_ok(prompt, retries=4, complaint='Yes or no, please!'):
        while True:
            ok = input(prompt)
-           if ok in ('y', 'ye', 'yes'): return True
-           if ok in ('n', 'no', 'nop', 'nope'): return False
+           if ok in ('y', 'ye', 'yes'):
+               return True
+           if ok in ('n', 'no', 'nop', 'nope'):
+               return False
            retries = retries - 1
            if retries < 0:
                raise IOError('refusenik user')
            print(complaint)
 
-This function can be called either like this: ``ask_ok('Do you really want to
-quit?')`` or like this: ``ask_ok('OK to overwrite the file?', 2)``.
+This function can be called in several ways:
+
+* giving only the mandatory argument:
+  ``ask_ok('Do you really want to quit?')``
+* giving one of the optional arguments:
+  ``ask_ok('OK to overwrite the file?', 2)``
+* or even giving all arguments:
+  ``ask_ok('OK to overwrite the file?', 2, 'Come on, only yes or no!')``
 
 This example also introduces the :keyword:`in` keyword. This tests whether or
 not a sequence contains a certain value.
@@ -417,7 +441,7 @@ calls. Here's an example that fails due to this restriction::
 
    >>> def function(a):
    ...     pass
-   ... 
+   ...
    >>> function(0, a=0)
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
@@ -432,20 +456,22 @@ list.  (``*name`` must occur before ``**name``.) For example, if we define a
 function like this::
 
    def cheeseshop(kind, *arguments, **keywords):
-       print("-- Do you have any", kind, '?')
+       print("-- Do you have any", kind, "?")
        print("-- I'm sorry, we're all out of", kind)
-       for arg in arguments: print arg
-       print('-'*40)
+       for arg in arguments:
+           print(arg)
+       print("-" * 40)
        keys = sorted(keywords.keys())
-       for kw in keys: print(kw, ':', keywords[kw])
+       for kw in keys:
+           print(kw, ":", keywords[kw])
 
 It could be called like this::
 
-   cheeseshop('Limburger', "It's very runny, sir.",
+   cheeseshop("Limburger", "It's very runny, sir.",
               "It's really very, VERY runny, sir.",
-              client='John Cleese',
-              shopkeeper='Michael Palin',
-              sketch='Cheese Shop Sketch')
+              shopkeeper="Michael Palin",
+              client="John Cleese",
+              sketch="Cheese Shop Sketch")
 
 and of course it would print::
 
@@ -468,23 +494,23 @@ Arbitrary Argument Lists
 ------------------------
 
 .. index::
-  statement: *  
+  statement: *
 
 Finally, the least frequently used option is to specify that a function can be
 called with an arbitrary number of arguments.  These arguments will be wrapped
-up in a tuple.  Before the variable number of arguments, zero or more normal
-arguments may occur. ::
+up in a tuple (see :ref:`tut-tuples`).  Before the variable number of arguments,
+zero or more normal arguments may occur. ::
 
    def write_multiple_items(file, separator, *args):
        file.write(separator.join(args))
 
- 
+
 Normally, these ``variadic`` arguments will be last in the list of formal
-parameters, because they scoop up all remaining input arguments that are 
+parameters, because they scoop up all remaining input arguments that are
 passed to the function. Any formal parameters which occur after the ``*args``
-parameter are 'keyword-only' arguments, meaning that they can only be used as 
+parameter are 'keyword-only' arguments, meaning that they can only be used as
 keywords rather than positional arguments. ::
- 
+
    >>> def concat(*args, sep="/"):
    ...    return sep.join(args)
    ...
@@ -562,7 +588,7 @@ Documentation Strings
    single: strings, documentation
 
 Here are some conventions about the content and formatting of documentation
-strings. 
+strings.
 
 The first line should always be a short, concise summary of the object's
 purpose.  For brevity, it should not explicitly state the object's name or type,
@@ -591,11 +617,11 @@ Here is an example of a multi-line docstring::
 
    >>> def my_function():
    ...     """Do nothing, but document it.
-   ... 
+   ...
    ...     No, really, it doesn't do anything.
    ...     """
    ...     pass
-   ... 
+   ...
    >>> print(my_function.__doc__)
    Do nothing, but document it.
 
@@ -644,10 +670,16 @@ extracted for you:
 
 * Name your classes and functions consistently; the convention is to use
   ``CamelCase`` for classes and ``lower_case_with_underscores`` for functions
-  and methods.  Always use ``self`` as the name for the first method argument.
+  and methods.  Always use ``self`` as the name for the first method argument
+  (see :ref:`tut-firstclasses` for more on classes and methods).
 
 * Don't use fancy encodings if your code is meant to be used in international
-  environments.  Plain ASCII works best in any case.
+  environments.  Python's default, UTF-8, or even plain ASCII work best in any
+  case.
+
+* Likewise, don't use non-ASCII characters in identifiers if there is only the
+  slightest chance people speaking a different language will read or maintain
+  the code.
 
 
 .. rubric:: Footnotes

@@ -37,12 +37,12 @@ class CollationTests(unittest.TestCase):
             con.create_collation("X", 42)
             self.fail("should have raised a TypeError")
         except TypeError as e:
-            self.failUnlessEqual(e.args[0], "parameter must be callable")
+            self.assertEqual(e.args[0], "parameter must be callable")
 
     def CheckCreateCollationNotAscii(self):
         con = sqlite.connect(":memory:")
         try:
-            con.create_collation("collä", cmp)
+            con.create_collation("collä", lambda x, y: (x > y) - (x < y))
             self.fail("should have raised a ProgrammingError")
         except sqlite.ProgrammingError as e:
             pass
@@ -52,7 +52,7 @@ class CollationTests(unittest.TestCase):
             return
         def mycoll(x, y):
             # reverse order
-            return -cmp(x, y)
+            return -((x > y) - (x < y))
 
         con = sqlite.connect(":memory:")
         con.create_collation("mycoll", mycoll)
@@ -74,7 +74,7 @@ class CollationTests(unittest.TestCase):
             result = con.execute(sql).fetchall()
             self.fail("should have raised an OperationalError")
         except sqlite.OperationalError as e:
-            self.failUnlessEqual(e.args[0].lower(), "no such collation sequence: mycoll")
+            self.assertEqual(e.args[0].lower(), "no such collation sequence: mycoll")
 
     def CheckCollationRegisterTwice(self):
         """
@@ -82,8 +82,8 @@ class CollationTests(unittest.TestCase):
         Verify that the last one is actually used.
         """
         con = sqlite.connect(":memory:")
-        con.create_collation("mycoll", cmp)
-        con.create_collation("mycoll", lambda x, y: -cmp(x, y))
+        con.create_collation("mycoll", lambda x, y: (x > y) - (x < y))
+        con.create_collation("mycoll", lambda x, y: -((x > y) - (x < y)))
         result = con.execute("""
             select x from (select 'a' as x union select 'b' as x) order by x collate mycoll
             """).fetchall()
@@ -96,7 +96,7 @@ class CollationTests(unittest.TestCase):
         to use it.
         """
         con = sqlite.connect(":memory:")
-        con.create_collation("mycoll", cmp)
+        con.create_collation("mycoll", lambda x, y: (x > y) - (x < y))
         con.create_collation("mycoll", None)
         try:
             con.execute("select 'a' as x union select 'b' as x order by x collate mycoll")
@@ -119,7 +119,7 @@ class ProgressTests(unittest.TestCase):
         con.execute("""
             create table foo(a, b)
             """)
-        self.failUnless(progress_calls)
+        self.assertTrue(progress_calls)
 
 
     def CheckOpcodeCount(self):
@@ -143,7 +143,7 @@ class ProgressTests(unittest.TestCase):
             create table bar (a, b)
             """)
         second_count = len(progress_calls)
-        self.failUnless(first_count > second_count)
+        self.assertTrue(first_count > second_count)
 
     def CheckCancelOperation(self):
         """
@@ -173,7 +173,7 @@ class ProgressTests(unittest.TestCase):
         con.set_progress_handler(progress, 1)
         con.set_progress_handler(None, 1)
         con.execute("select 1 union select 2 union select 3").fetchall()
-        self.failUnlessEqual(action, 0, "progress handler was not cleared")
+        self.assertEqual(action, 0, "progress handler was not cleared")
 
 def suite():
     collation_suite = unittest.makeSuite(CollationTests, "Check")

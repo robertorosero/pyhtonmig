@@ -17,10 +17,12 @@ __revision__ = "$Id$"
 import os
 import subprocess
 import sys
-from distutils.errors import (DistutilsExecError, DistutilsPlatformError,
-    CompileError, LibError, LinkError)
-from distutils.ccompiler import (CCompiler, gen_preprocess_options,
-    gen_lib_options)
+import re
+
+from distutils.errors import DistutilsExecError, DistutilsPlatformError, \
+                             CompileError, LibError, LinkError
+from distutils.ccompiler import CCompiler, gen_preprocess_options, \
+                                gen_lib_options
 from distutils import log
 from distutils.util import get_platform
 
@@ -36,9 +38,18 @@ HKEYS = (winreg.HKEY_USERS,
          winreg.HKEY_LOCAL_MACHINE,
          winreg.HKEY_CLASSES_ROOT)
 
-VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
-WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
-NET_BASE = r"Software\Microsoft\.NETFramework"
+NATIVE_WIN64 = (sys.platform == 'win32' and sys.maxsize > 2**32)
+if NATIVE_WIN64:
+    # Visual C++ is a 32-bit application, so we need to look in
+    # the corresponding registry branch, if we're running a
+    # 64-bit Python on Win64
+    VS_BASE = r"Software\Wow6432Node\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Wow6432Node\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Wow6432Node\Microsoft\.NETFramework"
+else:
+    VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Microsoft\.NETFramework"
 
 # A map keyed by get_platform() return values to values accepted by
 # 'vcvarsall.bat'.  Note a cross-compile may combine these (eg, 'x86_amd64' is
@@ -53,15 +64,14 @@ class Reg:
     """Helper class to read values from the registry
     """
 
-    @classmethod
     def get_value(cls, path, key):
         for base in HKEYS:
             d = cls.read_values(base, path)
             if d and key in d:
                 return d[key]
         raise KeyError(key)
+    get_value = classmethod(get_value)
 
-    @classmethod
     def read_keys(cls, base, key):
         """Return list of registry keys."""
         try:
@@ -78,8 +88,8 @@ class Reg:
             L.append(k)
             i += 1
         return L
+    read_keys = classmethod(read_keys)
 
-    @classmethod
     def read_values(cls, base, key):
         """Return dict of registry keys and values.
 
@@ -100,8 +110,8 @@ class Reg:
             d[cls.convert_mbcs(name)] = cls.convert_mbcs(value)
             i += 1
         return d
+    read_values = classmethod(read_values)
 
-    @staticmethod
     def convert_mbcs(s):
         dec = getattr(s, "decode", None)
         if dec is not None:
@@ -110,6 +120,7 @@ class Reg:
             except UnicodeError:
                 pass
         return s
+    convert_mbcs = staticmethod(convert_mbcs)
 
 class MacroExpander:
 
@@ -131,7 +142,7 @@ class MacroExpander:
                                "sdkinstallrootv2.0")
             else:
                 raise KeyError("sdkinstallrootv2.0")
-        except KeyError as exc: #
+        except KeyError:
             raise DistutilsPlatformError(
             """Python was built with Visual Studio 2008;
 extensions must be built with a compiler than can generate compatible binaries.
@@ -193,6 +204,17 @@ def normalize_and_reduce_paths(paths):
             reduced_paths.append(np)
     return reduced_paths
 
+def removeDuplicates(variable):
+    """Remove duplicate values of an environment variable.
+    """
+    oldList = variable.split(os.pathsep)
+    newList = []
+    for i in oldList:
+        if i not in newList:
+            newList.append(i)
+    newVariable = os.pathsep.join(newList)
+    return newVariable
+
 def find_vcvarsall(version):
     """Find the vcvarsall.bat file
 
@@ -236,28 +258,32 @@ def query_vcvarsall(version, arch="x86"):
     result = {}
 
     if vcvarsall is None:
-        raise IOError("Unable to find vcvarsall.bat")
+        raise DistutilsPlatformError("Unable to find vcvarsall.bat")
     log.debug("Calling 'vcvarsall.bat %s' (version=%s)", arch, version)
     popen = subprocess.Popen('"%s" %s & set' % (vcvarsall, arch),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+    try:
+        stdout, stderr = popen.communicate()
+        if popen.wait() != 0:
+            raise DistutilsPlatformError(stderr.decode("mbcs"))
 
-    stdout, stderr = popen.communicate()
-    if popen.wait() != 0:
-        raise IOError(stderr.decode("mbcs"))
+        stdout = stdout.decode("mbcs")
+        for line in stdout.split("\n"):
+            line = Reg.convert_mbcs(line)
+            if '=' not in line:
+                continue
+            line = line.strip()
+            key, value = line.split('=', 1)
+            key = key.lower()
+            if key in interesting:
+                if value.endswith(os.pathsep):
+                    value = value[:-1]
+                result[key] = removeDuplicates(value)
 
-    stdout = stdout.decode("mbcs")
-    for line in stdout.split("\n"):
-        line = Reg.convert_mbcs(line)
-        if '=' not in line:
-            continue
-        line = line.strip()
-        key, value = line.split('=')
-        key = key.lower()
-        if key in interesting:
-            if value.endswith(os.pathsep):
-                value = value[:-1]
-            result[key] = value
+    finally:
+        popen.stdout.close()
+        popen.stderr.close()
 
     if len(result) != len(interesting):
         raise ValueError(str(list(result.keys())))
@@ -305,7 +331,7 @@ class MSVCCompiler(CCompiler) :
         self.__version = VERSION
         self.__root = r"Software\Microsoft\VisualStudio"
         # self.__macros = MACROS
-        self.__path = []
+        self.__paths = []
         # target platform (.plat_name is consistent with 'bdist')
         self.plat_name = None
         self.__arch = None # deprecated name
@@ -629,7 +655,12 @@ class MSVCCompiler(CCompiler) :
             # will still consider the DLL up-to-date, but it will not have a
             # manifest.  Maybe we should link to a temp file?  OTOH, that
             # implies a build environment error that shouldn't go undetected.
-            mfid = 1 if target_desc == CCompiler.EXECUTABLE else 2
+            if target_desc == CCompiler.EXECUTABLE:
+                mfid = 1
+            else:
+                mfid = 2
+                # Remove references to the Visual C runtime
+                self._remove_visual_c_ref(temp_manifest)
             out_arg = '-outputresource:%s;%s' % (output_filename, mfid)
             try:
                 self.spawn(['mt.exe', '-nologo', '-manifest',
@@ -639,6 +670,33 @@ class MSVCCompiler(CCompiler) :
         else:
             log.debug("skipping %s (up-to-date)", output_filename)
 
+    def _remove_visual_c_ref(self, manifest_file):
+        try:
+            # Remove references to the Visual C runtime, so they will
+            # fall through to the Visual C dependency of Python.exe.
+            # This way, when installed for a restricted user (e.g.
+            # runtimes are not in WinSxS folder, but in Python's own
+            # folder), the runtimes do not need to be in every folder
+            # with .pyd's.
+            manifest_f = open(manifest_file)
+            try:
+                manifest_buf = manifest_f.read()
+            finally:
+                manifest_f.close()
+            pattern = re.compile(
+                r"""<assemblyIdentity.*?name=("|')Microsoft\."""\
+                r"""VC\d{2}\.CRT("|').*?(/>|</assemblyIdentity>)""",
+                re.DOTALL)
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            pattern = "<dependentAssembly>\s*</dependentAssembly>"
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            manifest_f = open(manifest_file, 'w')
+            try:
+                manifest_f.write(manifest_buf)
+            finally:
+                manifest_f.close()
+        except IOError:
+            pass
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in

@@ -1,4 +1,3 @@
-
 :mod:`unicodedata` --- Unicode Database
 =======================================
 
@@ -16,12 +15,12 @@
 
 This module provides access to the Unicode Character Database which defines
 character properties for all Unicode characters. The data in this database is
-based on the :file:`UnicodeData.txt` file version 4.1.0 which is publicly
+based on the :file:`UnicodeData.txt` file version 5.2.0 which is publicly
 available from ftp://ftp.unicode.org/.
 
 The module uses the same names and symbols as defined by the UnicodeData File
-Format 4.1.0 (see http://www.unicode.org/Public/4.1.0/ucd/UCD.html).  It defines
-the following functions:
+Format 5.2.0 (see http://www.unicode.org/reports/tr44/tr44-4.html).
+It defines the following functions:
 
 
 .. function:: lookup(name)
@@ -146,7 +145,7 @@ Examples:
 
    >>> import unicodedata
    >>> unicodedata.lookup('LEFT CURLY BRACKET')
-   u'{'
+   '{'
    >>> unicodedata.name('/')
    'SOLIDUS'
    >>> unicodedata.decimal('9')
@@ -156,7 +155,7 @@ Examples:
      File "<stdin>", line 1, in ?
    ValueError: not a decimal
    >>> unicodedata.category('A')  # 'L'etter, 'u'ppercase
-   'Lu'   
+   'Lu'
    >>> unicodedata.bidirectional('\u0660') # 'A'rabic, 'N'umber
    'AN'
 

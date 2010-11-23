@@ -17,10 +17,10 @@ the IDE and the Package Manager that are worth pointing out.
 Getting and Installing MacPython
 ================================
 
-Mac OS X 10.5 comes with Python 2.5 pre-installed by Apple. However, you are
-encouraged to install the most recent version of Python from the Python website
-(http://www.python.org). A "universal binary" build of Python 2.5, which runs
-natively on the Mac's new Intel and legacy PPC CPU's, is available there.
+Mac OS X 10.5 comes with Python 2.5.1 pre-installed by Apple.  If you wish, you
+are invited to install the most recent version of Python from the Python website
+(http://www.python.org).  A current "universal binary" build of Python, which
+runs natively on the Mac's new Intel and legacy PPC CPU's, is available there.
 
 What you get after installing is a number of things:
 
@@ -38,7 +38,10 @@ What you get after installing is a number of things:
 The Apple-provided build of Python is installed in
 :file:`/System/Library/Frameworks/Python.framework` and :file:`/usr/bin/python`,
 respectively. You should never modify or delete these, as they are
-Apple-controlled and are used by Apple- or third-party software.
+Apple-controlled and are used by Apple- or third-party software.  Remember that
+if you choose to install a newer Python version from python.org, you will have
+two different but functional Python installations on your computer, so it will
+be important that your paths and usages are consistent with what you want to do.
 
 IDLE includes a help menu that allows you to access Python documentation. If you
 are completely new to Python you should start reading the tutorial introduction
@@ -63,7 +66,7 @@ number of standard Unix command line editors, :program:`vim` and
 http://www.barebones.com/products/bbedit/index.shtml) are good choices, as is
 :program:`TextMate` (see http://macromates.com/). Other editors include
 :program:`Gvim` (http://macvim.org) and :program:`Aquamacs`
-(http://aquamacs.org).
+(http://aquamacs.org/).
 
 To run your script from the Terminal window you must make sure that
 :file:`/usr/local/bin` is in your shell search path.
@@ -111,8 +114,8 @@ The IDE
 =======
 
 MacPython ships with the standard IDLE development environment. A good
-introduction to using IDLE can be found at http://hkn.eecs.berkeley.edu/
-dyoo/python/idle_intro/index.html.
+introduction to using IDLE can be found at
+http://hkn.eecs.berkeley.edu/~dyoo/python/idle_intro/index.html.
 
 
 .. _mac-package-manager:
@@ -140,7 +143,7 @@ There are several options for building GUI applications on the Mac with Python.
 the foundation of most modern Mac development. Information on PyObjC is
 available from http://pyobjc.sourceforge.net.
 
-The standard Python GUI toolkit is :mod:`Tkinter`, based on the cross-platform
+The standard Python GUI toolkit is :mod:`tkinter`, based on the cross-platform
 Tk toolkit (http://www.tcl.tk). An Aqua-native version of Tk is bundled with OS
 X by Apple, and the latest version can be downloaded and installed from
 http://www.activestate.com; it can also be built from source.
@@ -150,7 +153,7 @@ Mac OS X. Packages and documentation are available from http://www.wxpython.org.
 
 *PyQt* is another popular cross-platform GUI toolkit that runs natively on Mac
 OS X. More information can be found at
-http://www.riverbankcomputing.co.uk/pyqt/.
+http://www.riverbankcomputing.co.uk/software/pyqt/intro.
 
 
 Distributing Python Applications on the Mac

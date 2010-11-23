@@ -1,4 +1,3 @@
-
 :mod:`cgitb` --- Traceback manager for CGI scripts
 ==================================================
 
@@ -24,16 +23,17 @@ as well as the values of the arguments and local variables to currently running
 functions, to help you debug the problem.  Optionally, you can save this
 information to a file instead of sending it to the browser.
 
-To enable this feature, simply add one line to the top of your CGI script::
+To enable this feature, simply add this to the top of your CGI script::
 
-   import cgitb; cgitb.enable()
+   import cgitb
+   cgitb.enable()
 
 The options to the :func:`enable` function control whether the report is
 displayed in the browser and whether the report is logged to a file for later
 analysis.
 
 
-.. function:: enable([display[, logdir[, context[, format]]]])
+.. function:: enable(display=1, logdir=None, context=5, format="html")
 
    .. index:: single: excepthook() (in module sys)
 
@@ -50,7 +50,7 @@ analysis.
    value forces plain text output.  The default value is ``"html"``.
 
 
-.. function:: handler([info])
+.. function:: handler(info=None)
 
    This function handles an exception using the default settings (that is, show a
    report in the browser, but don't log to a file). This can be used when you've

@@ -7,6 +7,17 @@ from time import time as _time, sleep as _sleep
 from traceback import format_exc as _format_exc
 from collections import deque
 
+# Note regarding PEP 8 compliant names
+#  This threading model was originally inspired by Java, and inherited
+# the convention of camelCase function and method names from that
+# language. Those originaly names are not in any imminent danger of
+# being deprecated (even for Py3k),so this module provides them as an
+# alias for the PEP 8 compliant names
+# Note that using the new PEP 8 compliant names facilitates substitution
+# with the multiprocessing module, which doesn't provide the old
+# Java inspired names.
+
+
 # Rename some stuff so "from threading import *" is safe
 __all__ = ['active_count', 'Condition', 'current_thread', 'enumerate', 'Event',
            'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Thread',
@@ -16,6 +27,11 @@ _start_new_thread = _thread.start_new_thread
 _allocate_lock = _thread.allocate_lock
 _get_ident = _thread.get_ident
 ThreadError = _thread.error
+try:
+    _CRLock = _thread.RLock
+except AttributeError:
+    _CRLock = None
+TIMEOUT_MAX = _thread.TIMEOUT_MAX
 del _thread
 
 
@@ -40,7 +56,7 @@ if __debug__:
             if self._verbose:
                 format = format % args
                 format = "%s: %s\n" % (
-                    current_thread().get_name(), format)
+                    current_thread().name, format)
                 _sys.stderr.write(format)
 
 else:
@@ -68,8 +84,12 @@ def settrace(func):
 
 Lock = _allocate_lock
 
-def RLock(*args, **kwargs):
-    return _RLock(*args, **kwargs)
+def RLock(verbose=None, *args, **kwargs):
+    if verbose is None:
+        verbose = _VERBOSE
+    if (__debug__ and verbose) or _CRLock is None:
+        return _PyRLock(verbose, *args, **kwargs)
+    return _CRLock(*args, **kwargs)
 
 class _RLock(_Verbose):
 
@@ -81,19 +101,21 @@ class _RLock(_Verbose):
 
     def __repr__(self):
         owner = self._owner
-        return "<%s(%s, %d)>" % (
-                self.__class__.__name__,
-                owner and owner.get_name(),
-                self._count)
+        try:
+            owner = _active[owner].name
+        except KeyError:
+            pass
+        return "<%s owner=%r count=%d>" % (
+                self.__class__.__name__, owner, self._count)
 
-    def acquire(self, blocking=1):
-        me = current_thread()
-        if self._owner is me:
+    def acquire(self, blocking=True, timeout=-1):
+        me = _get_ident()
+        if self._owner == me:
             self._count = self._count + 1
             if __debug__:
                 self._note("%s.acquire(%s): recursive success", self, blocking)
             return 1
-        rc = self._block.acquire(blocking)
+        rc = self._block.acquire(blocking, timeout)
         if rc:
             self._owner = me
             self._count = 1
@@ -107,8 +129,8 @@ class _RLock(_Verbose):
     __enter__ = acquire
 
     def release(self):
-        if self._owner is not current_thread():
-            raise RuntimeError("cannot release un-aquired lock")
+        if self._owner != _get_ident():
+            raise RuntimeError("cannot release un-acquired lock")
         self._count = count = self._count - 1
         if not count:
             self._owner = None
@@ -141,7 +163,9 @@ class _RLock(_Verbose):
         return (count, owner)
 
     def _is_owned(self):
-        return self._owner is current_thread()
+        return self._owner == _get_ident()
+
+_PyRLock = _RLock
 
 
 def Condition(*args, **kwargs):
@@ -200,7 +224,7 @@ class _Condition(_Verbose):
 
     def wait(self, timeout=None):
         if not self._is_owned():
-            raise RuntimeError("cannot wait on un-aquired lock")
+            raise RuntimeError("cannot wait on un-acquired lock")
         waiter = _allocate_lock()
         waiter.acquire()
         self._waiters.append(waiter)
@@ -208,25 +232,14 @@ class _Condition(_Verbose):
         try:    # restore state no matter what (e.g., KeyboardInterrupt)
             if timeout is None:
                 waiter.acquire()
+                gotit = True
                 if __debug__:
                     self._note("%s.wait(): got it", self)
             else:
-                # Balancing act:  We can't afford a pure busy loop, so we
-                # have to sleep; but if we sleep the whole timeout time,
-                # we'll be unresponsive.  The scheme here sleeps very
-                # little at first, longer as time goes on, but never longer
-                # than 20 times per second (or the timeout time remaining).
-                endtime = _time() + timeout
-                delay = 0.0005 # 500 us -> initial delay of 1 ms
-                while True:
-                    gotit = waiter.acquire(0)
-                    if gotit:
-                        break
-                    remaining = endtime - _time()
-                    if remaining <= 0:
-                        break
-                    delay = min(delay * 2, remaining, .05)
-                    _sleep(delay)
+                if timeout > 0:
+                    gotit = waiter.acquire(True, timeout)
+                else:
+                    gotit = waiter.acquire(False)
                 if not gotit:
                     if __debug__:
                         self._note("%s.wait(%s): timed out", self, timeout)
@@ -237,12 +250,39 @@ class _Condition(_Verbose):
                 else:
                     if __debug__:
                         self._note("%s.wait(%s): got it", self, timeout)
+            return gotit
         finally:
             self._acquire_restore(saved_state)
 
+    def wait_for(self, predicate, timeout=None):
+        endtime = None
+        waittime = timeout
+        result = predicate()
+        while not result:
+            if waittime is not None:
+                if endtime is None:
+                    endtime = _time() + waittime
+                else:
+                    waittime = endtime - _time()
+                    if waittime <= 0:
+                        if __debug__:
+                            self._note("%s.wait_for(%r, %r): Timed out.",
+                                       self, predicate, timeout)
+                        break
+            if __debug__:
+                self._note("%s.wait_for(%r, %r): Waiting with timeout=%s.",
+                           self, predicate, timeout, waittime)
+            self.wait(waittime)
+            result = predicate()
+        else:
+            if __debug__:
+                self._note("%s.wait_for(%r, %r): Success.",
+                           self, predicate, timeout)
+        return result
+
     def notify(self, n=1):
         if not self._is_owned():
-            raise RuntimeError("cannot notify on un-aquired lock")
+            raise RuntimeError("cannot notify on un-acquired lock")
         __waiters = self._waiters
         waiters = __waiters[:n]
         if not waiters:
@@ -261,6 +301,8 @@ class _Condition(_Verbose):
     def notify_all(self):
         self.notify(len(self._waiters))
 
+    notifyAll = notify_all
+
 
 def Semaphore(*args, **kwargs):
     return _Semaphore(*args, **kwargs)
@@ -276,8 +318,11 @@ class _Semaphore(_Verbose):
         self._cond = Condition(Lock())
         self._value = value
 
-    def acquire(self, blocking=1):
+    def acquire(self, blocking=True, timeout=None):
+        if not blocking and timeout is not None:
+            raise ValueError("can't specify timeout for non-blocking acquire")
         rc = False
+        endtime = None
         self._cond.acquire()
         while self._value == 0:
             if not blocking:
@@ -285,7 +330,14 @@ class _Semaphore(_Verbose):
             if __debug__:
                 self._note("%s.acquire(%s): blocked waiting, value=%s",
                            self, blocking, self._value)
-            self._cond.wait()
+            if timeout is not None:
+                if endtime is None:
+                    endtime = _time() + timeout
+                else:
+                    timeout = endtime - _time()
+                    if timeout <= 0:
+                        break
+            self._cond.wait(timeout)
         else:
             self._value = self._value - 1
             if __debug__:
@@ -340,6 +392,8 @@ class _Event(_Verbose):
     def is_set(self):
         return self._flag
 
+    isSet = is_set
+
     def set(self):
         self._cond.acquire()
         try:
@@ -360,8 +414,180 @@ class _Event(_Verbose):
         try:
             if not self._flag:
                 self._cond.wait(timeout)
+            return self._flag
         finally:
             self._cond.release()
+
+
+# A barrier class.  Inspired in part by the pthread_barrier_* api and
+# the CyclicBarrier class from Java.  See
+# http://sourceware.org/pthreads-win32/manual/pthread_barrier_init.html and
+# http://java.sun.com/j2se/1.5.0/docs/api/java/util/concurrent/
+#        CyclicBarrier.html
+# for information.
+# We maintain two main states, 'filling' and 'draining' enabling the barrier
+# to be cyclic.  Threads are not allowed into it until it has fully drained
+# since the previous cycle.  In addition, a 'resetting' state exists which is
+# similar to 'draining' except that threads leave with a BrokenBarrierError,
+# and a 'broken' state in which all threads get get the exception.
+class Barrier(_Verbose):
+    """
+    Barrier.  Useful for synchronizing a fixed number of threads
+    at known synchronization points.  Threads block on 'wait()' and are
+    simultaneously once they have all made that call.
+    """
+    def __init__(self, parties, action=None, timeout=None, verbose=None):
+        """
+        Create a barrier, initialised to 'parties' threads.
+        'action' is a callable which, when supplied, will be called
+        by one of the threads after they have all entered the
+        barrier and just prior to releasing them all.
+        If a 'timeout' is provided, it is uses as the default for
+        all subsequent 'wait()' calls.
+        """
+        _Verbose.__init__(self, verbose)
+        self._cond = Condition(Lock())
+        self._action = action
+        self._timeout = timeout
+        self._parties = parties
+        self._state = 0 #0 filling, 1, draining, -1 resetting, -2 broken
+        self._count = 0
+
+    def wait(self, timeout=None):
+        """
+        Wait for the barrier.  When the specified number of threads have
+        started waiting, they are all simultaneously awoken. If an 'action'
+        was provided for the barrier, one of the threads will have executed
+        that callback prior to returning.
+        Returns an individual index number from 0 to 'parties-1'.
+        """
+        if timeout is None:
+            timeout = self._timeout
+        with self._cond:
+            self._enter() # Block while the barrier drains.
+            index = self._count
+            self._count += 1
+            try:
+                if index + 1 == self._parties:
+                    # We release the barrier
+                    self._release()
+                else:
+                    # We wait until someone releases us
+                    self._wait(timeout)
+                return index
+            finally:
+                self._count -= 1
+                # Wake up any threads waiting for barrier to drain.
+                self._exit()
+
+    # Block until the barrier is ready for us, or raise an exception
+    # if it is broken.
+    def _enter(self):
+        while self._state in (-1, 1):
+            # It is draining or resetting, wait until done
+            self._cond.wait()
+        #see if the barrier is in a broken state
+        if self._state < 0:
+            raise BrokenBarrierError
+        assert self._state == 0
+
+    # Optionally run the 'action' and release the threads waiting
+    # in the barrier.
+    def _release(self):
+        try:
+            if self._action:
+                self._action()
+            # enter draining state
+            self._state = 1
+            self._cond.notify_all()
+        except:
+            #an exception during the _action handler.  Break and reraise
+            self._break()
+            raise
+
+    # Wait in the barrier until we are relased.  Raise an exception
+    # if the barrier is reset or broken.
+    def _wait(self, timeout):
+        if not self._cond.wait_for(lambda : self._state != 0, timeout):
+            #timed out.  Break the barrier
+            self._break()
+            raise BrokenBarrierError
+        if self._state < 0:
+            raise BrokenBarrierError
+        assert self._state == 1
+
+    # If we are the last thread to exit the barrier, signal any threads
+    # waiting for the barrier to drain.
+    def _exit(self):
+        if self._count == 0:
+            if self._state in (-1, 1):
+                #resetting or draining
+                self._state = 0
+                self._cond.notify_all()
+
+    def reset(self):
+        """
+        Reset the barrier to the initial state.
+        Any threads currently waiting will get the BrokenBarrier exception
+        raised.
+        """
+        with self._cond:
+            if self._count > 0:
+                if self._state == 0:
+                    #reset the barrier, waking up threads
+                    self._state = -1
+                elif self._state == -2:
+                    #was broken, set it to reset state
+                    #which clears when the last thread exits
+                    self._state = -1
+            else:
+                self._state = 0
+            self._cond.notify_all()
+
+    def abort(self):
+        """
+        Place the barrier into a 'broken' state.
+        Useful in case of error.  Any currently waiting threads and
+        threads attempting to 'wait()' will have BrokenBarrierError
+        raised.
+        """
+        with self._cond:
+            self._break()
+
+    def _break(self):
+        # An internal error was detected.  The barrier is set to
+        # a broken state all parties awakened.
+        self._state = -2
+        self._cond.notify_all()
+
+    @property
+    def parties(self):
+        """
+        Return the number of threads required to trip the barrier.
+        """
+        return self._parties
+
+    @property
+    def n_waiting(self):
+        """
+        Return the number of threads that are currently waiting at the barrier.
+        """
+        # We don't need synchronization here since this is an ephemeral result
+        # anyway.  It returns the correct value in the steady state.
+        if self._state == 0:
+            return self._count
+        return 0
+
+    @property
+    def broken(self):
+        """
+        Return True if the barrier is in a broken state
+        """
+        return self._state == -2
+
+#exception raised by the Barrier class
+class BrokenBarrierError(RuntimeError): pass
+
 
 # Helper to generate new thread names
 _counter = 0
@@ -412,7 +638,7 @@ class Thread(_Verbose):
 
     def _set_daemon(self):
         # Overridden in _MainThread and _DummyThread
-        return current_thread().is_daemon()
+        return current_thread().daemon
 
     def __repr__(self):
         assert self._initialized, "Thread.__init__() was not called"
@@ -432,13 +658,17 @@ class Thread(_Verbose):
             raise RuntimeError("thread.__init__() not called")
 
         if self._started.is_set():
-            raise RuntimeError("thread already started")
+            raise RuntimeError("threads can only be started once")
         if __debug__:
             self._note("%s.start(): starting thread", self)
-        _active_limbo_lock.acquire()
-        _limbo[self] = self
-        _active_limbo_lock.release()
-        _start_new_thread(self._bootstrap, ())
+        with _active_limbo_lock:
+            _limbo[self] = self
+        try:
+            _start_new_thread(self._bootstrap, ())
+        except Exception:
+            with _active_limbo_lock:
+                del _limbo[self]
+            raise
         self._started.wait()
 
     def run(self):
@@ -470,14 +700,16 @@ class Thread(_Verbose):
                 return
             raise
 
+    def _set_ident(self):
+        self._ident = _get_ident()
+
     def _bootstrap_inner(self):
         try:
-            self._ident = _get_ident()
+            self._set_ident()
             self._started.set()
-            _active_limbo_lock.acquire()
-            _active[self._ident] = self
-            del _limbo[self]
-            _active_limbo_lock.release()
+            with _active_limbo_lock:
+                _active[self._ident] = self
+                del _limbo[self]
             if __debug__:
                 self._note("%s._bootstrap(): thread started", self)
 
@@ -502,7 +734,7 @@ class Thread(_Verbose):
                 # self.
                 if _sys:
                     _sys.stderr.write("Exception in thread %s:\n%s\n" %
-                                      (self.get_name(), _format_exc()))
+                                      (self.name, _format_exc()))
                 else:
                     # Do the best job possible w/o a huge amt. of code to
                     # approximate a traceback (code ideas from
@@ -510,7 +742,7 @@ class Thread(_Verbose):
                     exc_type, exc_value, exc_tb = self._exc_info()
                     try:
                         print((
-                            "Exception in thread " + self.get_name() +
+                            "Exception in thread " + self.name +
                             " (most likely raised during interpreter shutdown):"), file=self._stderr)
                         print((
                             "Traceback (most recent call last):"), file=self._stderr)
@@ -621,15 +853,18 @@ class Thread(_Verbose):
         finally:
             self._block.release()
 
-    def get_name(self):
+    @property
+    def name(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._name
 
-    def set_name(self, name):
+    @name.setter
+    def name(self, name):
         assert self._initialized, "Thread.__init__() not called"
         self._name = str(name)
 
-    def get_ident(self):
+    @property
+    def ident(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._ident
 
@@ -637,16 +872,32 @@ class Thread(_Verbose):
         assert self._initialized, "Thread.__init__() not called"
         return self._started.is_set() and not self._stopped
 
-    def is_daemon(self):
+    isAlive = is_alive
+
+    @property
+    def daemon(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._daemonic
 
-    def set_daemon(self, daemonic):
+    @daemon.setter
+    def daemon(self, daemonic):
         if not self._initialized:
             raise RuntimeError("Thread.__init__() not called")
         if self._started.is_set():
             raise RuntimeError("cannot set daemon status of active thread");
         self._daemonic = daemonic
+
+    def isDaemon(self):
+        return self.daemon
+
+    def setDaemon(self, daemonic):
+        self.daemon = daemonic
+
+    def getName(self):
+        return self.name
+
+    def setName(self, name):
+        self.name = name
 
 # The timer class was contributed by Itamar Shtull-Trauring
 
@@ -687,9 +938,9 @@ class _MainThread(Thread):
     def __init__(self):
         Thread.__init__(self, name="MainThread")
         self._started.set()
-        _active_limbo_lock.acquire()
-        _active[_get_ident()] = self
-        _active_limbo_lock.release()
+        self._set_ident()
+        with _active_limbo_lock:
+            _active[self._ident] = self
 
     def _set_daemon(self):
         return False
@@ -709,7 +960,7 @@ class _MainThread(Thread):
 
 def _pickSomeNonDaemonThread():
     for t in enumerate():
-        if not t.is_daemon() and t.is_alive():
+        if not t.daemon and t.is_alive():
             return t
     return None
 
@@ -734,9 +985,9 @@ class _DummyThread(Thread):
 
 
         self._started.set()
-        _active_limbo_lock.acquire()
-        _active[_get_ident()] = self
-        _active_limbo_lock.release()
+        self._set_ident()
+        with _active_limbo_lock:
+            _active[self._ident] = self
 
     def _set_daemon(self):
         return True
@@ -754,17 +1005,21 @@ def current_thread():
         ##print "current_thread(): no current thread for", _get_ident()
         return _DummyThread()
 
+currentThread = current_thread
+
 def active_count():
-    _active_limbo_lock.acquire()
-    count = len(_active) + len(_limbo)
-    _active_limbo_lock.release()
-    return count
+    with _active_limbo_lock:
+        return len(_active) + len(_limbo)
+
+activeCount = active_count
+
+def _enumerate():
+    # Same as enumerate(), but without the lock. Internal use only.
+    return list(_active.values()) + list(_limbo.values())
 
 def enumerate():
-    _active_limbo_lock.acquire()
-    active = list(_active.values()) + list(_limbo.values())
-    _active_limbo_lock.release()
-    return active
+    with _active_limbo_lock:
+        return list(_active.values()) + list(_limbo.values())
 
 from _thread import stack_size
 
@@ -783,89 +1038,35 @@ except ImportError:
     from _threading_local import local
 
 
-# Self-test code
+def _after_fork():
+    # This function is called by Python/ceval.c:PyEval_ReInitThreads which
+    # is called from PyOS_AfterFork.  Here we cleanup threading module state
+    # that should not exist after a fork.
 
-def _test():
+    # Reset _active_limbo_lock, in case we forked while the lock was held
+    # by another (non-forked) thread.  http://bugs.python.org/issue874900
+    global _active_limbo_lock
+    _active_limbo_lock = _allocate_lock()
 
-    class BoundedQueue(_Verbose):
+    # fork() only copied the current thread; clear references to others.
+    new_active = {}
+    current = current_thread()
+    with _active_limbo_lock:
+        for thread in _active.values():
+            if thread is current:
+                # There is only one active thread. We reset the ident to
+                # its new value since it can have changed.
+                ident = _get_ident()
+                thread._ident = ident
+                new_active[ident] = thread
+            else:
+                # All the others are already stopped.
+                # We don't call _Thread__stop() because it tries to acquire
+                # thread._Thread__block which could also have been held while
+                # we forked.
+                thread._stopped = True
 
-        def __init__(self, limit):
-            _Verbose.__init__(self)
-            self.mon = RLock()
-            self.rc = Condition(self.mon)
-            self.wc = Condition(self.mon)
-            self.limit = limit
-            self.queue = deque()
-
-        def put(self, item):
-            self.mon.acquire()
-            while len(self.queue) >= self.limit:
-                self._note("put(%s): queue full", item)
-                self.wc.wait()
-            self.queue.append(item)
-            self._note("put(%s): appended, length now %d",
-                       item, len(self.queue))
-            self.rc.notify()
-            self.mon.release()
-
-        def get(self):
-            self.mon.acquire()
-            while not self.queue:
-                self._note("get(): queue empty")
-                self.rc.wait()
-            item = self.queue.popleft()
-            self._note("get(): got %s, %d left", item, len(self.queue))
-            self.wc.notify()
-            self.mon.release()
-            return item
-
-    class ProducerThread(Thread):
-
-        def __init__(self, queue, quota):
-            Thread.__init__(self, name="Producer")
-            self.queue = queue
-            self.quota = quota
-
-        def run(self):
-            from random import random
-            counter = 0
-            while counter < self.quota:
-                counter = counter + 1
-                self.queue.put("%s.%d" % (self.get_name(), counter))
-                _sleep(random() * 0.00001)
-
-
-    class ConsumerThread(Thread):
-
-        def __init__(self, queue, count):
-            Thread.__init__(self, name="Consumer")
-            self.queue = queue
-            self.count = count
-
-        def run(self):
-            while self.count > 0:
-                item = self.queue.get()
-                print(item)
-                self.count = self.count - 1
-
-    NP = 3
-    QL = 4
-    NI = 5
-
-    Q = BoundedQueue(QL)
-    P = []
-    for i in range(NP):
-        t = ProducerThread(Q, NI)
-        t.set_name("Producer-%d" % (i+1))
-        P.append(t)
-    C = ConsumerThread(Q, NI*NP)
-    for t in P:
-        t.start()
-        _sleep(0.000001)
-    C.start()
-    for t in P:
-        t.join()
-    C.join()
-
-if __name__ == '__main__':
-    _test()
+        _limbo.clear()
+        _active.clear()
+        _active.update(new_active)
+        assert len(_active) == 1

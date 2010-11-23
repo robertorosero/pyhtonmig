@@ -1,4 +1,4 @@
-. _tut-errors:
+.. _tut-errors:
 
 *********************
 Errors and Exceptions
@@ -53,7 +53,7 @@ programs, however, and result in error messages as shown here::
    >>> '2' + 2
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
-   TypeError: coercing to Unicode: need string or buffer, int found
+   TypeError: Can't convert 'int' object to str implicitly
 
 The last line of the error message indicates what happened. Exceptions come in
 different types, and the type is printed as part of the message: the types in
@@ -91,7 +91,7 @@ is signalled by raising the :exc:`KeyboardInterrupt` exception. ::
    ...         break
    ...     except ValueError:
    ...         print("Oops!  That was no valid number.  Try again...")
-   ...     
+   ...
 
 The :keyword:`try` statement works as follows.
 
@@ -131,8 +131,8 @@ the exception (allowing a caller to handle the exception as well)::
        f = open('myfile.txt')
        s = f.readline()
        i = int(s.strip())
-   except IOError as (errno, strerror):
-       print("I/O error({0}): {1}".format(errno, strerror))
+   except IOError as err:
+       print("I/O error: {0}".format(err))
    except ValueError:
        print("Could not convert data to an integer.")
    except:
@@ -162,25 +162,21 @@ When an exception occurs, it may have an associated value, also known as the
 exception's *argument*. The presence and type of the argument depend on the
 exception type.
 
-The except clause may specify a variable after the exception name (or tuple).
-The variable is bound to an exception instance with the arguments stored in
+The except clause may specify a variable after the exception name.  The
+variable is bound to an exception instance with the arguments stored in
 ``instance.args``.  For convenience, the exception instance defines
-:meth:`__getitem__` and :meth:`__str__` so the arguments can be accessed or
-printed directly without having to reference ``.args``.
-
-But use of ``.args`` is discouraged.  Instead, the preferred use is to pass a
-single argument to an exception (which can be a tuple if multiple arguments are
-needed) and have it bound to the ``message`` attribute.  One may also
-instantiate an exception first before raising it and add any attributes to it as
-desired. ::
+:meth:`__str__` so the arguments can be printed directly without having to
+reference ``.args``.  One may also instantiate an exception first before
+raising it and add any attributes to it as desired. ::
 
    >>> try:
    ...    raise Exception('spam', 'eggs')
    ... except Exception as inst:
    ...    print(type(inst))    # the exception instance
    ...    print(inst.args)     # arguments stored in .args
-   ...    print(inst)          # __str__ allows args to be printed directly
-   ...    x, y = inst          # __getitem__ allows args to be unpacked directly
+   ...    print(inst)          # __str__ allows args to be printed directly,
+   ...                         # but may be overridden in exception subclasses
+   ...    x, y = inst.args     # unpack args
    ...    print('x =', x)
    ...    print('y =', y)
    ...
@@ -190,7 +186,7 @@ desired. ::
    x = spam
    y = eggs
 
-If an exception has an argument, it is printed as the last part ('detail') of
+If an exception has arguments, they are printed as the last part ('detail') of
 the message for unhandled exceptions.
 
 Exception handlers don't just handle exceptions if they occur immediately in the
@@ -199,13 +195,13 @@ indirectly) in the try clause. For example::
 
    >>> def this_fails():
    ...     x = 1/0
-   ... 
+   ...
    >>> try:
    ...     this_fails()
-   ... except ZeroDivisionError as detail:
-   ...     print('Handling run-time error:', detail)
-   ... 
-   Handling run-time error: integer division or modulo by zero
+   ... except ZeroDivisionError as err:
+   ...     print('Handling run-time error:', err)
+   ...
+   Handling run-time error: int division or modulo by zero
 
 
 .. _tut-raising:
@@ -246,21 +242,22 @@ re-raise the exception::
 User-defined Exceptions
 =======================
 
-Programs may name their own exceptions by creating a new exception class.
-Exceptions should typically be derived from the :exc:`Exception` class, either
-directly or indirectly.  For example::
+Programs may name their own exceptions by creating a new exception class (see
+:ref:`tut-classes` for more about Python classes).  Exceptions should typically
+be derived from the :exc:`Exception` class, either directly or indirectly.  For
+example::
 
    >>> class MyError(Exception):
    ...     def __init__(self, value):
    ...         self.value = value
    ...     def __str__(self):
    ...         return repr(self.value)
-   ... 
+   ...
    >>> try:
    ...     raise MyError(2*2)
    ... except MyError as e:
    ...     print('My exception occurred, value:', e.value)
-   ... 
+   ...
    My exception occurred, value: 4
    >>> raise MyError('oops!')
    Traceback (most recent call last):
@@ -330,7 +327,7 @@ example::
    ...     raise KeyboardInterrupt
    ... finally:
    ...     print('Goodbye, world!')
-   ... 
+   ...
    Goodbye, world!
    Traceback (most recent call last):
      File "<stdin>", line 2, in ?
@@ -357,7 +354,7 @@ complicated example::
    ...         print("executing finally clause")
    ...
    >>> divide(2, 1)
-   result is 2
+   result is 2.0
    executing finally clause
    >>> divide(2, 0)
    division by zero!
@@ -372,7 +369,7 @@ complicated example::
 As you can see, the :keyword:`finally` clause is executed in any event.  The
 :exc:`TypeError` raised by dividing two strings is not handled by the
 :keyword:`except` clause and therefore re-raised after the :keyword:`finally`
-clauses has been executed.
+clause has been executed.
 
 In real world applications, the :keyword:`finally` clause is useful for
 releasing external resources (such as files or network connections), regardless
@@ -393,9 +390,9 @@ and print its contents to the screen. ::
        print(line)
 
 The problem with this code is that it leaves the file open for an indeterminate
-amount of time after this part of the code has finished executing. 
-This is not an issue in simple scripts, but can be a problem for larger 
-applications. The :keyword:`with` statement allows objects like files to be 
+amount of time after this part of the code has finished executing.
+This is not an issue in simple scripts, but can be a problem for larger
+applications. The :keyword:`with` statement allows objects like files to be
 used in a way that ensures they are always cleaned up promptly and correctly. ::
 
    with open("myfile.txt") as f:

@@ -24,12 +24,6 @@ else:
 def _identityfunction(x):
     return x
 
-def set(seq):
-    s = {}
-    for elem in seq:
-        s[elem] = 1
-    return s
-
 _LITERAL_CODES = set([LITERAL, NOT_LITERAL])
 _REPEATING_CODES = set([REPEAT, MIN_REPEAT, MAX_REPEAT])
 _SUCCESS_CODES = set([SUCCESS, FAILURE])
@@ -349,7 +343,7 @@ def _optimize_unicode(charset, fixup):
     else:
         code = 'I'
     # Convert block indices to byte array of 256 bytes
-    mapping = array.array('b', mapping).tostring()
+    mapping = array.array('b', mapping).tobytes()
     # Convert byte array to word array
     mapping = array.array(code, mapping)
     assert mapping.itemsize == _sre.CODESIZE

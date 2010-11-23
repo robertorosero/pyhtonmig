@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 """The Tab Nanny despises ambiguous indentation.  She knows no mercy.
 
@@ -94,7 +94,7 @@ def check(file):
         return
 
     try:
-        f = open(file)
+        f = tokenize.open(file)
     except IOError as msg:
         errprint("%r: I/O Error: %s" % (file, msg))
         return

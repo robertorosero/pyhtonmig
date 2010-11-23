@@ -67,9 +67,9 @@ key features:
 `ActivePython <http://www.activestate.com/Products/activepython/>`_
     Installer with multi-platform compatibility, documentation, PyWin32
 
-`Python Enthought Edition <http://code.enthought.com/enthon/>`_
+`Enthought Python Distribution <http://www.enthought.com/products/epd.php>`_
     Popular modules (such as PyWin32) with their respective documentation, tool
-    suite for building extensible python applications
+    suite for building extensible Python applications
 
 Notice that these packages are likely to install *older* versions of Python.
 
@@ -86,9 +86,9 @@ Excursus: Setting environment variables
 ---------------------------------------
 
 Windows has a built-in dialog for changing environment variables (following
-guide applies to XP classical view): Right-click the icon for your machine 
-(usually located on your Desktop and called "My Computer") and choose 
-:menuselection:`Properties` there.  Then, open the :guilabel:`Advanced` tab 
+guide applies to XP classical view): Right-click the icon for your machine
+(usually located on your Desktop and called "My Computer") and choose
+:menuselection:`Properties` there.  Then, open the :guilabel:`Advanced` tab
 and click the :guilabel:`Environment Variables` button.
 
 In short, your path is:
@@ -140,7 +140,7 @@ directory of your Python distribution, delimited by a semicolon from other
 entries.  An example variable could look like this (assuming the first two
 entries are Windows' default)::
 
-    C:\WINNT\system32;C:\WINNT;C:\Python25
+    C:\WINDOWS\system32;C:\WINDOWS;C:\Python25
 
 Typing :command:`python` on your command prompt will now fire up the Python
 interpreter.  Thus, you can also execute your scripts with command line options,
@@ -156,22 +156,48 @@ installation directory.  So, if you had installed Python to
 :file:`C:\\Python\\Lib\\` and third-party modules should be stored in
 :file:`C:\\Python\\Lib\\site-packages\\`.
 
-.. `` this fixes syntax highlighting errors in some editors due to the \\ hackery
+This is how :data:`sys.path` is populated on Windows:
 
-You can add folders to your search path to make Python's import mechanism search
-in these directories as well.  Use :envvar:`PYTHONPATH`, as described in
-:ref:`using-on-envvars`, to modify :data:`sys.path`.  On Windows, paths are
-separated by semicolons, though, to distinguish them from drive identifiers
-(:file:`C:\\` etc.).
+* An empty entry is added at the start, which corresponds to the current
+  directory.
 
-.. ``
+* If the environment variable :envvar:`PYTHONPATH` exists, as described in
+  :ref:`using-on-envvars`, its entries are added next.  Note that on Windows,
+  paths in this variable must be separated by semicolons, to distinguish them
+  from the colon used in drive identifiers (``C:\`` etc.).
 
-Modifying the module search path can also be done through the Windows registry:
-Edit
-:file:`HKEY_LOCAL_MACHINE\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath\\`,
-as described above for the environment variable :envvar:`%PYTHONPATH%`.  A
-convenient registry editor is :program:`regedit` (start it by typing "regedit"
-into :menuselection:`Start --> Run`).
+* Additional "application paths" can be added in the registry as subkeys of
+  :samp:`\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath` under both the
+  ``HKEY_CURRENT_USER`` and ``HKEY_LOCAL_MACHINE`` hives.  Subkeys which have
+  semicolon-delimited path strings as their default value will cause each path
+  to be added to :data:`sys.path`.  (Note that all known installers only use
+  HKLM, so HKCU is typically empty.)
+
+* If the environment variable :envvar:`PYTHONHOME` is set, it is assumed as
+  "Python Home".  Otherwise, the path of the main Python executable is used to
+  locate a "landmark file" (``Lib\os.py``) to deduce the "Python Home".  If a
+  Python home is found, the relevant sub-directories added to :data:`sys.path`
+  (``Lib``, ``plat-win``, etc) are based on that folder.  Otherwise, the core
+  Python path is constructed from the PythonPath stored in the registry.
+
+* If the Python Home cannot be located, no :envvar:`PYTHONPATH` is specified in
+  the environment, and no registry entries can be found, a default path with
+  relative entries is used (e.g. ``.\Lib;.\plat-win``, etc).
+
+The end result of all this is:
+
+* When running :file:`python.exe`, or any other .exe in the main Python
+  directory (either an installed version, or directly from the PCbuild
+  directory), the core path is deduced, and the core paths in the registry are
+  ignored.  Other "application paths" in the registry are always read.
+
+* When Python is hosted in another .exe (different directory, embedded via COM,
+  etc), the "Python Home" will not be deduced, so the core path from the
+  registry is used.  Other "application paths" in the registry are always read.
+
+* If Python can't find its home and there is no registry (eg, frozen .exe, some
+  very strange installation setup) you get a path with some default, but
+  relative, paths.
 
 
 Executing scripts
@@ -186,16 +212,16 @@ of your Python installation directory).  This suppresses the terminal window on
 startup.
 
 You can also make all ``.py`` scripts execute with :program:`pythonw.exe`,
-setting this through the usual facilites, for example (might require
+setting this through the usual facilities, for example (might require
 administrative rights):
 
 #. Launch a command prompt.
 #. Associate the correct file group with ``.py`` scripts::
-   
+
       assoc .py=Python.File
 
 #. Redirect all Python files to the new executable::
-   
+
       ftype Python.File=C:\Path\to\pythonw.exe "%1" %*
 
 
@@ -215,14 +241,13 @@ PyWin32
 
 The `PyWin32 <http://python.net/crew/mhammond/win32/>`_ module by Mark Hammond
 is a collection of modules for advanced Windows-specific support.  This includes
-utilites for:
+utilities for:
 
 * `Component Object Model <http://www.microsoft.com/com/>`_ (COM)
 * Win32 API calls
 * Registry
 * Event log
-* `Microsoft Foundation Classes <http://msdn.microsoft.com/library/
-  en-us/vclib/html/_mfc_Class_Library_Reference_Introduction.asp>`_ (MFC)
+* `Microsoft Foundation Classes <http://msdn.microsoft.com/en-us/library/fe1cf721%28VS.80%29.aspx>`_ (MFC)
   user interfaces
 
 `PythonWin <http://web.archive.org/web/20060524042422/
@@ -276,11 +301,11 @@ releases are built, the source tree contains solutions/project files.  View the
 +====================+==============+=======================+
 | :file:`PC/VC6/`    | 6.0          | 97                    |
 +--------------------+--------------+-----------------------+
-| :file:`PCbuild/`   | 7.1          | 2003                  |
+| :file:`PC/VS7.1/`  | 7.1          | 2003                  |
 +--------------------+--------------+-----------------------+
-| :file:`PCbuild8/`  | 8.0          | 2005                  |
+| :file:`PC/VS8.0/`  | 8.0          | 2005                  |
 +--------------------+--------------+-----------------------+
-| :file:`PCbuild9/`  | 9.0          | 2008                  |
+| :file:`PCbuild/`   | 9.0          | 2008                  |
 +--------------------+--------------+-----------------------+
 
 Note that not all of these build directories are fully supported.  Read the
@@ -299,7 +324,7 @@ For extension modules, consult :ref:`building-on-windows`.
       MinGW gcc under Windows" or "Installing Python extension with distutils
       and without Microsoft Visual C++" by Sébastien Sauvage, 2003
 
-   `MingW -- Python extensions <http://www.mingw.org/MinGWiki/index.php/Python%20extensions>`_
+   `MingW -- Python extensions <http://oldwiki.mingw.org/index.php/Python%20extensions>`_
       by Trent Apted et al, 2007
 
 

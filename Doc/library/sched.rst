@@ -10,6 +10,10 @@
 The :mod:`sched` module defines a class which implements a general purpose event
 scheduler:
 
+.. seealso::
+
+   Latest version of the :source:`sched module Python source code
+   <Lib/sched.py>`
 
 .. class:: scheduler(timefunc, delayfunc)
 
@@ -42,7 +46,7 @@ Example::
    930343700.276
 
 In multi-threaded environments, the :class:`scheduler` class has limitations
-with respect to thread-safety, inability to insert a new task before 
+with respect to thread-safety, inability to insert a new task before
 the one currently pending in a running scheduler, and holding up the main
 thread until the event queue is empty.  Instead, the preferred approach
 is to use the :class:`threading.Timer` class instead.
@@ -58,7 +62,7 @@ Example::
     ...     print(time.time())
     ...     Timer(5, print_time, ()).start()
     ...     Timer(10, print_time, ()).start()
-    ...     time.sleep(11)	# sleep while time-delay events execute
+    ...     time.sleep(11)  # sleep while time-delay events execute
     ...     print(time.time())
     ...
     >>> print_some_times()
@@ -100,7 +104,7 @@ Scheduler Objects
 .. method:: scheduler.cancel(event)
 
    Remove the event from the queue. If *event* is not an event currently in the
-   queue, this method will raise a :exc:`RuntimeError`.
+   queue, this method will raise a :exc:`ValueError`.
 
 
 .. method:: scheduler.empty()

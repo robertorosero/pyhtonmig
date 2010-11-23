@@ -20,7 +20,7 @@ PyAPI_FUNC(char *) Py_UniversalNewlineFgets(char *, int, FILE*, PyObject *);
    If non-NULL, this is different than the default encoding for strings
 */
 PyAPI_DATA(const char *) Py_FileSystemDefaultEncoding;
-PyAPI_DATA(const int) Py_HasFileSystemDefaultEncoding;
+PyAPI_DATA(int) Py_HasFileSystemDefaultEncoding;
 
 /* Internal API
 
@@ -28,6 +28,17 @@ PyAPI_DATA(const int) Py_HasFileSystemDefaultEncoding;
    infrastructure is in place. */
 PyAPI_FUNC(PyObject *) PyFile_NewStdPrinter(int);
 PyAPI_DATA(PyTypeObject) PyStdPrinter_Type;
+
+#if defined _MSC_VER && _MSC_VER >= 1400
+/* A routine to check if a file descriptor is valid on Windows.  Returns 0
+ * and sets errno to EBADF if it isn't.  This is to avoid Assertions
+ * from various functions in the Windows CRT beginning with
+ * Visual Studio 2005
+ */
+int _PyVerify_fd(int fd);
+#else
+#define _PyVerify_fd(A) (1) /* dummy */
+#endif
 
 #ifdef __cplusplus
 }

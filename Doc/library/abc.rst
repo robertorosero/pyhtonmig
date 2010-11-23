@@ -1,4 +1,3 @@
-
 :mod:`abc` --- Abstract Base Classes
 ====================================
 
@@ -8,10 +7,10 @@
 .. sectionauthor:: Georg Brandl
 .. much of the content adapted from docstrings
 
-This module provides the infrastructure for defining abstract base classes
-(ABCs) in Python, as outlined in :pep:`3119`; see the PEP for why this was added
-to Python. (See also :pep:`3141` and the :mod:`numbers` module regarding a type
-hierarchy for numbers based on ABCs.)
+This module provides the infrastructure for defining an :term:`abstract base
+class` (ABCs) in Python, as outlined in :pep:`3119`; see the PEP for why this
+was added to Python. (See also :pep:`3141` and the :mod:`numbers` module
+regarding a type hierarchy for numbers based on ABCs.)
 
 The :mod:`collections` module has some concrete classes that derive from
 ABCs; these can, of course, be further derived. In addition the
@@ -42,15 +41,15 @@ This module provides the following class:
       Register *subclass* as a "virtual subclass" of this ABC. For
       example::
 
-	from abc import ABCMeta
+        from abc import ABCMeta
 
-	class MyABC(metaclass=ABCMeta):
-	    pass
+        class MyABC(metaclass=ABCMeta):
+            pass
 
-	MyABC.register(tuple)
+        MyABC.register(tuple)
 
-	assert issubclass(tuple, MyABC)
-	assert isinstance((), MyABC)
+        assert issubclass(tuple, MyABC)
+        assert isinstance((), MyABC)
 
    You can also override this method in an abstract base class:
 
@@ -123,16 +122,16 @@ This module provides the following class:
 
 It also provides the following decorators:
 
-.. function:: abstractmethod(function)
+.. decorator:: abstractmethod(function)
 
    A decorator indicating abstract methods.
 
    Using this decorator requires that the class's metaclass is :class:`ABCMeta` or
-   is derived from it. 
+   is derived from it.
    A class that has a metaclass derived from :class:`ABCMeta`
    cannot be instantiated unless all of its abstract methods and
    properties are overridden.
-   The abstract methods can be called using any of the the normal 'super' call
+   The abstract methods can be called using any of the normal 'super' call
    mechanisms.
 
    Dynamically adding abstract methods to a class, or attempting to modify the
@@ -150,7 +149,7 @@ It also provides the following decorators:
 
    .. note::
 
-      Unlike C++'s pure virtual functions, or Java abstract methods, these abstract
+      Unlike Java abstract methods, these abstract
       methods may have an implementation. This implementation can be
       called via the :func:`super` mechanism from the class that
       overrides it.  This could be useful as an end-point for a
@@ -158,12 +157,42 @@ It also provides the following decorators:
       multiple-inheritance.
 
 
-.. function:: abstractproperty(fget[, fset[, fdel[, doc]]])
+.. decorator:: abstractclassmethod(function)
+
+   A subclass of the built-in :func:`classmethod`, indicating an abstract
+   classmethod. Otherwise it is similar to :func:`abstractmethod`.
+
+   Usage::
+
+      class C(metaclass=ABCMeta):
+          @abstractclassmethod
+          def my_abstract_classmethod(cls, ...):
+              ...
+
+   .. versionadded:: 3.2
+
+
+.. decorator:: abstractstaticmethod(function)
+
+   A subclass of the built-in :func:`staticmethod`, indicating an abstract
+   staticmethod. Otherwise it is similar to :func:`abstractmethod`.
+
+   Usage::
+
+      class C(metaclass=ABCMeta):
+          @abstractstaticmethod
+          def my_abstract_staticmethod(...):
+              ...
+
+   .. versionadded:: 3.2
+
+
+.. function:: abstractproperty(fget=None, fset=None, fdel=None, doc=None)
 
    A subclass of the built-in :func:`property`, indicating an abstract property.
 
    Using this function requires that the class's metaclass is :class:`ABCMeta` or
-   is derived from it. 
+   is derived from it.
    A class that has a metaclass derived from :class:`ABCMeta` cannot be
    instantiated unless all of its abstract methods and properties are overridden.
    The abstract properties can be called using any of the normal
@@ -183,6 +212,7 @@ It also provides the following decorators:
           def getx(self): ...
           def setx(self, value): ...
           x = abstractproperty(getx, setx)
+
 
 .. rubric:: Footnotes
 

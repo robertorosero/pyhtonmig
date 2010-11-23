@@ -1,12 +1,13 @@
 # Python MSI Generator
 # (C) 2003 Martin v. Loewis
 # See "FOO" in comments refers to MSDN sections with the title FOO.
-import msilib, schema, sequence, os, glob, time, re, shutil
+import msilib, schema, sequence, os, glob, time, re, shutil, zipfile
 from msilib import Feature, CAB, Directory, Dialog, Binary, add_data
 import uisample
 from win32com.client import constants
 from distutils.spawn import find_executable
 from uuids import product_codes
+import tempfile
 
 # Settings can be overridden in config.py below
 # 0 for official python.org releases
@@ -28,6 +29,10 @@ have_tcl = True
 PCBUILD="PCbuild"
 # msvcrt version
 MSVCR = "90"
+# Name of certificate in default store to sign MSI with
+certname = None
+# Make a zip file containing the PDB files for this build?
+pdbzip = True
 
 try:
     from config import *
@@ -64,8 +69,11 @@ current_version = "%s.%d" % (short_version, FIELD3)
 # This should never change. The UpgradeCode of this package can be
 # used in the Upgrade table of future packages to make the future
 # package replace this one. See "UpgradeCode Property".
+# upgrade_code gets set to upgrade_code_64 when we have determined
+# that the target is Win64.
 upgrade_code_snapshot='{92A24481-3ECB-40FC-8836-04B7966EC0D5}'
 upgrade_code='{65E6DE48-A358-434D-AA4F-4AF72DB4718F}'
+upgrade_code_64='{6A965A0C-6EE6-4E3A-9983-3263F56311EC}'
 
 if snapshot:
     current_version = "%s.%s.%s" % (major, minor, int(time.time()/3600/24))
@@ -83,7 +91,6 @@ extensions = [
     'unicodedata.pyd',
     'winsound.pyd',
     '_elementtree.pyd',
-    '_bsddb.pyd',
     '_socket.pyd',
     '_ssl.pyd',
     '_testcapi.pyd',
@@ -108,13 +115,21 @@ pythondll_uuid = {
     "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
     "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}",
     "26":"{34ebecac-f046-4e1c-b0e3-9bac3cdaacfa}",
+    "27":"{4fe21c76-1760-437b-a2f2-99909130a175}",
     "30":"{6953bc3b-6768-4291-8410-7914ce6e2ca8}",
+    "31":"{4afcba0b-13e4-47c3-bebe-477428b46913}",
+    "32":"{3ff95315-1096-4d31-bd86-601d5438ad5e}",
     } [major+minor]
 
 # Compute the name that Sphinx gives to the docfile
 docfile = ""
+if int(micro):
+    docfile = micro
 if level < 0xf:
-    docfile = '%x%s' % (level, serial)
+    if level == 0xC:
+        docfile += "rc%s" % (serial,)
+    else:
+        docfile += '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
 
 # Build the mingw import library, libpythonXY.a
@@ -168,6 +183,12 @@ dll_path = os.path.join(srcdir, PCBUILD, dll_file)
 msilib.set_arch_from_file(dll_path)
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
     raise SystemError("msisupport.dll for incorrect architecture")
+if msilib.Win64:
+    upgrade_code = upgrade_code_64
+    # Bump the last digit of the code by one, so that 32-bit and 64-bit
+    # releases get separate product codes
+    digit = hex((int(product_code[-2],16)+1)%16)[-1]
+    product_code = product_code[:-2] + digit + '}'
 
 if testpackage:
     ext = 'px'
@@ -197,14 +218,20 @@ def build_database():
         uc = upgrade_code_snapshot
     else:
         uc = upgrade_code
+    if msilib.Win64:
+        productsuffix = " (64-bit)"
+    else:
+        productsuffix = ""
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
-                  schema, ProductName="Python "+full_current_version,
+    msiname = "python-%s%s.msi" % (full_current_version, msilib.arch_ext)
+    db = msilib.init_database(msiname,
+                  schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer="Python Software Foundation")
+                  Manufacturer=u"Python Software Foundation",
+                  request_uac = True)
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -222,7 +249,7 @@ def build_database():
                               ("ProductLine", "Python%s%s" % (major, minor)),
                              ])
     db.Commit()
-    return db
+    return db, msiname
 
 def remove_old_versions(db):
     "Fill the upgrade table."
@@ -251,6 +278,8 @@ def remove_old_versions(db):
              (upgrade_code_snapshot, start, "%s.%d.0" % (major, int(minor)+1),
               None, migrate_features, None, "REMOVEOLDSNAPSHOT")])
         props = "REMOVEOLDSNAPSHOT;REMOVEOLDVERSION"
+
+    props += ";TARGETDIR;DLLDIR"
     # Installer collects the product codes of the earlier releases in
     # these properties. In order to allow modification of the properties,
     # they must be declared as secure. See "SecureCustomProperties Property"
@@ -381,7 +410,7 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py2_ "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x "bad_coding|badsyntax|site-packages|py2_|lib2to3\\tests" "[TARGETDIR]Lib"'
     lib2to3args = r'-c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
@@ -682,10 +711,11 @@ def add_ui(db):
                         "AdminInstall", "Next", "Cancel")
     whichusers.title("Select whether to install [ProductName] for all users of this computer.")
     # A radio group with two options: allusers, justme
-    g = whichusers.radiogroup("AdminInstall", 135, 60, 160, 50, 3,
+    g = whichusers.radiogroup("AdminInstall", 135, 60, 235, 80, 3,
                               "WhichUsers", "", "Next")
+    g.condition("Disable", "VersionNT=600") # Not available on Vista and Windows 2008
     g.add("ALL", 0, 5, 150, 20, "Install for all users")
-    g.add("JUSTME", 0, 25, 150, 20, "Install just for me")
+    g.add("JUSTME", 0, 25, 235, 20, "Install just for me (not available on Windows Vista)")
 
     whichusers.back("Back", None, active=0)
 
@@ -699,17 +729,14 @@ def add_ui(db):
     #####################################################################
     # Advanced Dialog.
     advanced = PyDialog(db, "AdvancedDlg", x, y, w, h, modal, title,
-                        "CompilePyc", "Next", "Cancel")
+                        "CompilePyc", "Ok", "Ok")
     advanced.title("Advanced Options for [ProductName]")
     # A radio group with two options: allusers, justme
     advanced.checkbox("CompilePyc", 135, 60, 230, 50, 3,
-                      "COMPILEALL", "Compile .py files to byte code after installation", "Next")
+                      "COMPILEALL", "Compile .py files to byte code after installation", "Ok")
 
-    c = advanced.next("Finish", "Cancel")
+    c = advanced.cancel("Ok", "CompilePyc", name="Ok") # Button just has location of cancel button.
     c.event("EndDialog", "Return")
-
-    c = advanced.cancel("Cancel", "CompilePyc")
-    c.event("SpawnDialog", "CancelDlg")
 
     #####################################################################
     # Existing Directory dialog
@@ -829,7 +856,11 @@ def add_features(db):
 
 def extract_msvcr90():
     # Find the redistributable files
-    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\x86\Microsoft.VC90.CRT")
+    if msilib.Win64:
+        arch = "amd64"
+    else:
+        arch = "x86"
+    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\%s\Microsoft.VC90.CRT" % arch)
 
     result = []
     installer = msilib.MakeInstaller()
@@ -848,8 +879,8 @@ def generate_license():
     import shutil, glob
     out = open("LICENSE.txt", "w")
     shutil.copyfileobj(open(os.path.join(srcdir, "LICENSE")), out)
+    shutil.copyfileobj(open("crtlicense.txt"), out)
     for name, pat, file in (("bzip2","bzip2-*", "LICENSE"),
-                      ("Berkeley DB", "db-*", "LICENSE"),
                       ("openssl", "openssl-*", "LICENSE"),
                       ("Tcl", "tcl8*", "license.terms"),
                       ("Tk", "tk8*", "license.terms"),
@@ -873,6 +904,13 @@ class PyDirectory(Directory):
             kw['componentflags'] = 2 #msidbComponentAttributesOptional
         Directory.__init__(self, *args, **kw)
 
+    def check_unpackaged(self):
+        self.unpackaged_files.discard('__pycache__')
+        self.unpackaged_files.discard('.svn')
+        if self.unpackaged_files:
+            print "Warning: Unpackaged files in %s" % self.absolute
+            print self.unpackaged_files
+
 # See "File Table", "Component Table", "Directory Table",
 # "FeatureComponents Table"
 def add_files(db):
@@ -893,9 +931,7 @@ def add_files(db):
     root.add_file("%s/pythonw.exe" % PCBUILD)
 
     # msidbComponentAttributesSharedDllRefCount = 8, see "Component Table"
-    #dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
-    #install python30.dll into root dir for now
-    dlldir = root
+    dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
 
     pydll = "python%s%s.dll" % (major, minor)
     pydllsrc = os.path.join(srcdir, PCBUILD, pydll)
@@ -920,10 +956,12 @@ def add_files(db):
     root.add_file(manifest[0], **manifest[1])
     root.add_file(crtdll[0], **crtdll[1])
     # Copy the manifest
-    manifest_dlls = manifest[0]+".root"
-    open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
-    DLLs.start_component("msvcr90_dlls", feature=private_crt)
-    DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
+    # Actually, don't do that anymore - no DLL in DLLs should have a manifest
+    # dependency on msvcr90.dll anymore, so this should not be necessary
+    #manifest_dlls = manifest[0]+".root"
+    #open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
+    #DLLs.start_component("msvcr90_dlls", feature=private_crt)
+    #DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
 
     # Now start the main component for the DLLs directory;
     # no regular files have been added to the directory yet.
@@ -936,20 +974,20 @@ def add_files(db):
         extensions.remove("_ctypes.pyd")
 
     # Add all .py files in Lib, except tkinter, test
-    dirs={}
+    dirs = []
     pydirs = [(root,"Lib")]
     while pydirs:
         # Commit every now and then, or else installer will complain
         db.Commit()
         parent, dir = pydirs.pop()
-        if dir == ".svn" or dir.startswith("plat-"):
+        if dir == ".svn" or dir == '__pycache__' or dir.startswith("plat-"):
             continue
         elif dir in ["tkinter", "idlelib", "Icons"]:
             if not have_tcl:
                 continue
             tcltk.set_current()
         elif dir in ['test', 'tests', 'data', 'output']:
-            # test: Lib, Lib/email, Lib/bsddb, Lib/ctypes, Lib/sqlite3
+            # test: Lib, Lib/email, Lib/ctypes, Lib/sqlite3
             # tests: Lib/distutils
             # data: Lib/email/test
             # output: Lib/test
@@ -960,7 +998,7 @@ def add_files(db):
             default_feature.set_current()
         lib = PyDirectory(db, cab, parent, dir, dir, "%s|%s" % (parent.make_short(dir), dir))
         # Add additional files
-        dirs[dir]=lib
+        dirs.append(lib)
         lib.glob("*.txt")
         if dir=='site-packages':
             lib.add_file("README.txt", src="README")
@@ -970,44 +1008,52 @@ def add_files(db):
         if files:
             # Add an entry to the RemoveFile table to remove bytecode files.
             lib.remove_pyc()
-        if dir.endswith('.egg-info'):
-            lib.add_file('entry_points.txt')
-            lib.add_file('PKG-INFO')
-            lib.add_file('top_level.txt')
-            lib.add_file('zip-safe')
-            continue
+        # package READMEs if present
+        lib.glob("README")
+        if dir=='Lib':
+            lib.add_file('wsgiref.egg-info')
         if dir=='test' and parent.physical=='Lib':
             lib.add_file("185test.db")
             lib.add_file("audiotest.au")
-            lib.add_file("cfgparser.1")
             lib.add_file("sgml_input.html")
-            lib.add_file("test.xml")
-            lib.add_file("test.xml.out")
             lib.add_file("testtar.tar")
             lib.add_file("test_difflib_expect.html")
             lib.add_file("check_soundcard.vbs")
             lib.add_file("empty.vbs")
+            lib.add_file("Sine-1000Hz-300ms.aif")
             lib.glob("*.uue")
             lib.glob("*.pem")
             lib.glob("*.pck")
-            lib.add_file("readme.txt", src="README")
+            lib.glob("cfgparser.*")
+            lib.add_file("zipdir.zip")
+        if dir=='capath':
+            lib.glob("*.0")
+        if dir=='tests' and parent.physical=='distutils':
+            lib.add_file("Setup.sample")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
+        if dir=='xmltestdata':
+            lib.glob("*.xml")
+            lib.add_file("test.xml.out")
         if dir=='output':
             lib.glob("test_*")
+        if dir=='sndhdrdata':
+            lib.glob("sndhdr.*")
         if dir=='idlelib':
             lib.glob("*.def")
             lib.add_file("idle.bat")
+            lib.add_file("ChangeLog")
         if dir=="Icons":
             lib.glob("*.gif")
             lib.add_file("idle.icns")
         if dir=="command" and parent.physical=="distutils":
             lib.glob("wininst*.exe")
-        if dir=="setuptools":
-            lib.add_file("cli.exe")
-            lib.add_file("gui.exe")
+            lib.add_file("command_template")
         if dir=="lib2to3":
             lib.removefile("pickle", "*.pickle")
+        if dir=="macholib":
+            lib.add_file("README.ctypes")
+            lib.glob("fetch_macholib*")
         if dir=="data" and parent.physical=="test" and parent.basedir.physical=="email":
             # This should contain all non-.svn files listed in subversion
             for f in os.listdir(lib.absolute):
@@ -1019,6 +1065,8 @@ def add_files(db):
         for f in os.listdir(lib.absolute):
             if os.path.isdir(os.path.join(lib.absolute, f)):
                 pydirs.append((lib, f))
+    for d in dirs:
+        d.check_unpackaged()
     # Add DLLs
     default_feature.set_current()
     lib = DLLs
@@ -1090,7 +1138,7 @@ def add_files(db):
     # Add tools
     tools.set_current()
     tooldir = PyDirectory(db, cab, root, "Tools", "Tools", "TOOLS|Tools")
-    for f in ['i18n', 'pynche', 'Scripts', 'versioncheck', 'webchecker']:
+    for f in ['i18n', 'pynche', 'Scripts']:
         lib = PyDirectory(db, cab, tooldir, f, f, "%s|%s" % (tooldir.make_short(f), f))
         lib.glob("*.py")
         lib.glob("*.pyw", exclude=['pydocgui.pyw'])
@@ -1102,6 +1150,7 @@ def add_files(db):
         if os.path.exists(os.path.join(lib.absolute, "README")):
             lib.add_file("README.txt", src="README")
         if f == 'Scripts':
+            lib.add_file("2to3.py", src="2to3")
             if have_tcl:
                 lib.start_component("pydocgui.pyw", tcltk, keyfile="pydocgui.pyw")
                 lib.add_file("pydocgui.pyw")
@@ -1159,14 +1208,15 @@ def add_registry(db):
     ewi = "Edit with IDLE"
     pat2 = r"Software\Classes\%sPython.%sFile\DefaultIcon"
     pat3 = r"Software\Classes\%sPython.%sFile"
+    pat4 = r"Software\Classes\%sPython.%sFile\shellex\DropHandler"
     tcl_verbs = []
     if have_tcl:
         tcl_verbs=[
              ("py.IDLE", -1, pat % (testprefix, "", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
              ("pyw.IDLE", -1, pat % (testprefix, "NoCon", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
         ]
     add_data(db, "Registry",
@@ -1206,6 +1256,13 @@ def add_registry(db):
               "Python File (no console)", "REGISTRY.def"),
              ("pyc.txt", -1, pat3 % (testprefix, "Compiled"), "",
               "Compiled Python File", "REGISTRY.def"),
+             # Drop Handler
+             ("py.drop", -1, pat4 % (testprefix, ""), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyw.drop", -1, pat4 % (testprefix, "NoCon"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyc.drop", -1, pat4 % (testprefix, "Compiled"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
             ])
 
     # Registry keys
@@ -1220,7 +1277,10 @@ def add_registry(db):
                "[TARGETDIR]Doc\\"+docfile , "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
-               "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
+               "", r"[TARGETDIR]Python.exe", "REGISTRY.def"),
+              ("DisplayIcon", -1,
+               r"Software\Microsoft\Windows\CurrentVersion\Uninstall\%s" % product_code,
+               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY")
               ])
     # Shortcuts, see "Shortcut Table"
     add_data(db, "Directory",
@@ -1255,7 +1315,17 @@ def add_registry(db):
               ])
     db.Commit()
 
-db = build_database()
+def build_pdbzip():
+    pdbexclude = ['kill_python.pdb', 'make_buildinfo.pdb',
+                  'make_versioninfo.pdb']
+    path = "python-%s%s-pdb.zip" % (full_current_version, msilib.arch_ext)
+    pdbzip = zipfile.ZipFile(path, 'w')
+    for f in glob.glob1(os.path.join(srcdir, PCBUILD), "*.pdb"):
+        if f not in pdbexclude and not f.endswith('_d.pdb'):
+            pdbzip.write(os.path.join(srcdir, PCBUILD, f), f)
+    pdbzip.close()
+
+db,msiname = build_database()
 try:
     add_features(db)
     add_ui(db)
@@ -1265,3 +1335,78 @@ try:
     db.Commit()
 finally:
     del db
+
+# Merge CRT into MSI file. This requires the database to be closed.
+mod_dir = os.path.join(os.environ["ProgramFiles"], "Common Files", "Merge Modules")
+if msilib.Win64:
+    modules = ["Microsoft_VC90_CRT_x86_x64.msm", "policy_9_0_Microsoft_VC90_CRT_x86_x64.msm"]
+else:
+    modules = ["Microsoft_VC90_CRT_x86.msm","policy_9_0_Microsoft_VC90_CRT_x86.msm"]
+
+for i, n in enumerate(modules):
+    modules[i] = os.path.join(mod_dir, n)
+
+def merge(msi, feature, rootdir, modules):
+    cab_and_filecount = []
+    # Step 1: Merge databases, extract cabfiles
+    m = msilib.MakeMerge2()
+    m.OpenLog("merge.log")
+    m.OpenDatabase(msi)
+    for module in modules:
+        print module
+        m.OpenModule(module,0)
+        m.Merge(feature, rootdir)
+        print "Errors:"
+        for e in m.Errors:
+            print e.Type, e.ModuleTable, e.DatabaseTable
+            print "   Modkeys:",
+            for s in e.ModuleKeys: print s,
+            print
+            print "   DBKeys:",
+            for s in e.DatabaseKeys: print s,
+            print
+        cabname = tempfile.mktemp(suffix=".cab")
+        m.ExtractCAB(cabname)
+        cab_and_filecount.append((cabname, len(m.ModuleFiles)))
+        m.CloseModule()
+    m.CloseDatabase(True)
+    m.CloseLog()
+
+    # Step 2: Add CAB files
+    i = msilib.MakeInstaller()
+    db = i.OpenDatabase(msi, constants.msiOpenDatabaseModeTransact)
+
+    v = db.OpenView("SELECT LastSequence FROM Media")
+    v.Execute(None)
+    maxmedia = -1
+    while 1:
+        r = v.Fetch()
+        if not r: break
+        seq = r.IntegerData(1)
+        if seq > maxmedia:
+            maxmedia = seq
+    print "Start of Media", maxmedia
+
+    for cabname, count in cab_and_filecount:
+        stream = "merged%d" % maxmedia
+        msilib.add_data(db, "Media",
+                [(maxmedia+1, maxmedia+count, None, "#"+stream, None, None)])
+        msilib.add_stream(db, stream,  cabname)
+        os.unlink(cabname)
+        maxmedia += count
+    # The merge module sets ALLUSERS to 1 in the property table.
+    # This is undesired; delete that
+    v = db.OpenView("DELETE FROM Property WHERE Property='ALLUSERS'")
+    v.Execute(None)
+    v.Close()
+    db.Commit()
+
+merge(msiname, "SharedCRT", "TARGETDIR", modules)
+
+# certname (from config.py) should be (a substring of)
+# the certificate subject, e.g. "Python Software Foundation"
+if certname:
+    os.system('signtool sign /n "%s" /t http://timestamp.verisign.com/scripts/timestamp.dll %s' % (certname, msiname))
+
+if pdbzip:
+    build_pdbzip()

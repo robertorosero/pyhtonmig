@@ -19,7 +19,7 @@ This module also provides some data items to the user:
 
 __all__ = [
     "NamedTemporaryFile", "TemporaryFile", # high level safe interfaces
-    "SpooledTemporaryFile",
+    "SpooledTemporaryFile", "TemporaryDirectory",
     "mkstemp", "mkdtemp",                  # low level safe interfaces
     "mktemp",                              # deprecated unsafe interface
     "TMP_MAX", "gettempprefix",            # constants
@@ -108,30 +108,19 @@ class _RandomNameSequence:
 
     _RandomNameSequence is an iterator."""
 
-    characters = ("abcdefghijklmnopqrstuvwxyz" +
-                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-                  "0123456789_")
+    characters = "abcdefghijklmnopqrstuvwxyz0123456789_"
 
     def __init__(self):
-        self.mutex = _allocate_lock()
         self.rng = _Random()
-        self.normcase = _os.path.normcase
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        m = self.mutex
         c = self.characters
         choose = self.rng.choice
-
-        m.acquire()
-        try:
-            letters = [choose(c) for dummy in "123456"]
-        finally:
-            m.release()
-
-        return self.normcase(''.join(letters))
+        letters = [choose(c) for dummy in "123456"]
+        return ''.join(letters)
 
 def _candidate_tempdir_list():
     """Generate a list of candidate temporary directories which
@@ -169,7 +158,6 @@ def _get_default_tempdir():
 
     namer = _RandomNameSequence()
     dirlist = _candidate_tempdir_list()
-    flags = _text_openflags
 
     for dir in dirlist:
         if dir != _os.curdir:
@@ -179,7 +167,7 @@ def _get_default_tempdir():
             name = next(namer)
             filename = _os.path.join(dir, name)
             try:
-                fd = _os.open(filename, flags, 0o600)
+                fd = _os.open(filename, _bin_openflags, 0o600)
                 fp = _io.open(fd, 'wb')
                 fp.write(b'blat')
                 fp.close()
@@ -408,6 +396,9 @@ class _TemporaryFileWrapper:
             result = self.file.__exit__(exc, value, tb)
             self.close()
             return result
+    else:
+        def __exit__(self, exc, value, tb):
+            self.file.__exit__(exc, value, tb)
 
 
 def NamedTemporaryFile(mode='w+b', buffering=-1, encoding=None,
@@ -431,10 +422,7 @@ def NamedTemporaryFile(mode='w+b', buffering=-1, encoding=None,
     if dir is None:
         dir = gettempdir()
 
-    if 'b' in mode:
-        flags = _bin_openflags
-    else:
-        flags = _text_openflags
+    flags = _bin_openflags
 
     # Setting O_TEMPORARY in the flags causes the OS to delete
     # the file when it is closed.  This is only supported by Windows.
@@ -472,10 +460,7 @@ else:
         if dir is None:
             dir = gettempdir()
 
-        if 'b' in mode:
-            flags = _bin_openflags
-        else:
-            flags = _text_openflags
+        flags = _bin_openflags
 
         (fd, name) = _mkstemp_inner(dir, prefix, suffix, flags)
         try:
@@ -617,3 +602,66 @@ class SpooledTemporaryFile:
 
     def xreadlines(self, *args):
         return self._file.xreadlines(*args)
+
+
+class TemporaryDirectory(object):
+    """Create and return a temporary directory.  This has the same
+    behavior as mkdtemp but can be used as a context manager.  For
+    example:
+
+        with TemporaryDirectory() as tmpdir:
+            ...
+
+    Upon exiting the context, the directory and everthing contained
+    in it are removed.
+    """
+
+    def __init__(self, suffix="", prefix=template, dir=None):
+        self.name = mkdtemp(suffix, prefix, dir)
+        self._closed = False
+
+    def __enter__(self):
+        return self.name
+
+    def cleanup(self):
+        if not self._closed:
+            self._rmtree(self.name)
+            self._closed = True
+
+    def __exit__(self, exc, value, tb):
+        self.cleanup()
+
+    __del__ = cleanup
+
+
+    # XXX (ncoghlan): The following code attempts to make
+    # this class tolerant of the module nulling out process
+    # that happens during CPython interpreter shutdown
+    # Alas, it doesn't actually manage it. See issue #10188
+    _listdir = staticmethod(_os.listdir)
+    _path_join = staticmethod(_os.path.join)
+    _isdir = staticmethod(_os.path.isdir)
+    _remove = staticmethod(_os.remove)
+    _rmdir = staticmethod(_os.rmdir)
+    _os_error = _os.error
+
+    def _rmtree(self, path):
+        # Essentially a stripped down version of shutil.rmtree.  We can't
+        # use globals because they may be None'ed out at shutdown.
+        for name in self._listdir(path):
+            fullname = self._path_join(path, name)
+            try:
+                isdir = self._isdir(fullname)
+            except self._os_error:
+                isdir = False
+            if isdir:
+                self._rmtree(fullname)
+            else:
+                try:
+                    self._remove(fullname)
+                except self._os_error:
+                    pass
+        try:
+            self._rmdir(path)
+        except self._os_error:
+            pass

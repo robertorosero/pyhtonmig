@@ -1,4 +1,3 @@
-
 :mod:`msvcrt` -- Useful routines from the MS VC++ runtime
 =========================================================
 
@@ -18,7 +17,7 @@ documentation.
 
 The module implements both the normal and wide char variants of the console I/O
 api. The normal API deals only with ASCII characters and is of limited use
-for internationalized applications. The wide char API should be used where 
+for internationalized applications. The wide char API should be used where
 ever possible
 
 .. _msvcrt-files:
@@ -91,18 +90,18 @@ Console I/O
 
 .. function:: getch()
 
-   Read a keypress and return the resulting character.  Nothing is echoed to the
-   console.  This call will block if a keypress is not already available, but will
-   not wait for :kbd:`Enter` to be pressed. If the pressed key was a special
-   function key, this will return ``'\000'`` or ``'\xe0'``; the next call will
-   return the keycode.  The :kbd:`Control-C` keypress cannot be read with this
-   function.
+   Read a keypress and return the resulting character as a byte string.
+   Nothing is echoed to the console.  This call will block if a keypress
+   is not already available, but will not wait for :kbd:`Enter` to be
+   pressed. If the pressed key was a special function key, this will
+   return ``'\000'`` or ``'\xe0'``; the next call will return the keycode.
+   The :kbd:`Control-C` keypress cannot be read with this function.
 
-   
+
 .. function:: getwch()
 
    Wide char variant of :func:`getch`, returning a Unicode value.
-   
+
 
 .. function:: getche()
 
@@ -113,28 +112,28 @@ Console I/O
 .. function:: getwche()
 
    Wide char variant of :func:`getche`, returning a Unicode value.
-   
+
 
 .. function:: putch(char)
 
-   Print the character *char* to the console without buffering.
+   Print the byte string *char* to the console without buffering.
 
-   
+
 .. function:: putwch(unicode_char)
 
    Wide char variant of :func:`putch`, accepting a Unicode value.
-   
+
 
 .. function:: ungetch(char)
 
-   Cause the character *char* to be "pushed back" into the console buffer; it will
-   be the next character read by :func:`getch` or :func:`getche`.
+   Cause the byte string *char* to be "pushed back" into the console buffer;
+   it will be the next character read by :func:`getch` or :func:`getche`.
 
-   
+
 .. function:: ungetwch(unicode_char)
 
    Wide char variant of :func:`ungetch`, accepting a Unicode value.
-   
+
 
 .. _msvcrt-other:
 
@@ -144,7 +143,5 @@ Other Functions
 
 .. function:: heapmin()
 
-   Force the :cfunc:`malloc` heap to clean itself up and return unused blocks to
-   the operating system.  This only works on Windows NT.  On failure, this raises
-   :exc:`IOError`.
-
+   Force the :c:func:`malloc` heap to clean itself up and return unused blocks to
+   the operating system.  On failure, this raises :exc:`IOError`.

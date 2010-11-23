@@ -1,4 +1,3 @@
-
 :mod:`queue` --- A synchronized queue class
 ===========================================
 
@@ -20,17 +19,21 @@ the first retrieved (operating like a stack).  With a priority queue,
 the entries are kept sorted (using the :mod:`heapq` module) and the
 lowest valued entry is retrieved first.
 
+.. seealso::
+
+   Latest version of the :source:`queue module Python source code
+   <Lib/queue.py>`
+
 The :mod:`queue` module defines the following classes and exceptions:
 
-.. class:: Queue(maxsize)
+.. class:: Queue(maxsize=0)
 
    Constructor for a FIFO queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
    block once this size has been reached, until queue items are consumed.  If
    *maxsize* is less than or equal to zero, the queue size is infinite.
 
-
-.. class:: LifoQueue(maxsize)
+.. class:: LifoQueue(maxsize=0)
 
    Constructor for a LIFO queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
@@ -38,7 +41,7 @@ The :mod:`queue` module defines the following classes and exceptions:
    *maxsize* is less than or equal to zero, the queue size is infinite.
 
 
-.. class:: PriorityQueue(maxsize)
+.. class:: PriorityQueue(maxsize=0)
 
    Constructor for a priority queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
@@ -61,6 +64,12 @@ The :mod:`queue` module defines the following classes and exceptions:
    Exception raised when non-blocking :meth:`put` (or :meth:`put_nowait`) is called
    on a :class:`Queue` object which is full.
 
+.. seealso::
+
+   :class:`collections.deque` is an alternative implementation of unbounded
+   queues with fast atomic :func:`append` and :func:`popleft` operations that
+   do not require locking.
+
 
 .. _queueobjects:
 
@@ -68,7 +77,7 @@ Queue Objects
 -------------
 
 Queue objects (:class:`Queue`, :class:`LifoQueue`, or :class:`PriorityQueue`)
-provide the public methods described below.  
+provide the public methods described below.
 
 
 .. method:: Queue.qsize()
@@ -78,7 +87,23 @@ provide the public methods described below.
    guarantee that put() will not block.
 
 
-.. method:: Queue.put(item[, block[, timeout]])
+.. method:: Queue.empty()
+
+   Return ``True`` if the queue is empty, ``False`` otherwise.  If empty()
+   returns ``True`` it doesn't guarantee that a subsequent call to put()
+   will not block.  Similarly, if empty() returns ``False`` it doesn't
+   guarantee that a subsequent call to get() will not block.
+
+
+.. method:: Queue.full()
+
+   Return ``True`` if the queue is full, ``False`` otherwise.  If full()
+   returns ``True`` it doesn't guarantee that a subsequent call to get()
+   will not block.  Similarly, if full() returns ``False`` it doesn't
+   guarantee that a subsequent call to put() will not block.
+
+
+.. method:: Queue.put(item, block=True, timeout=None)
 
    Put *item* into the queue. If optional args *block* is true and *timeout* is
    None (the default), block if necessary until a free slot is available. If
@@ -94,7 +119,7 @@ provide the public methods described below.
    Equivalent to ``put(item, False)``.
 
 
-.. method:: Queue.get([block[, timeout]])
+.. method:: Queue.get(block=True, timeout=None)
 
    Remove and return an item from the queue. If optional args *block* is true and
    *timeout* is None (the default), block if necessary until an item is available.
@@ -133,25 +158,25 @@ fully processed by daemon consumer threads.
    The count of unfinished tasks goes up whenever an item is added to the queue.
    The count goes down whenever a consumer thread calls :meth:`task_done` to
    indicate that the item was retrieved and all work on it is complete. When the
-   count of unfinished tasks drops to zero, join() unblocks.
+   count of unfinished tasks drops to zero, :meth:`join` unblocks.
 
 
 Example of how to wait for enqueued tasks to be completed::
 
-   def worker(): 
-       while True: 
-           item = q.get() 
-           do_work(item) 
-           q.task_done() 
+   def worker():
+       while True:
+           item = q.get()
+           do_work(item)
+           q.task_done()
 
-   q = Queue() 
-   for i in range(num_worker_threads): 
+   q = Queue()
+   for i in range(num_worker_threads):
         t = Thread(target=worker)
-        t.set_daemon(True)
-        t.start() 
+        t.daemon = True
+        t.start()
 
    for item in source():
-       q.put(item) 
+       q.put(item)
 
    q.join()       # block until all tasks are done
 

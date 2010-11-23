@@ -51,8 +51,8 @@ definition occurs in a function block, the scope extends to any blocks contained
 within the defining one, unless a contained block introduces a different binding
 for the name.  The scope of names defined in a class block is limited to the
 class block; it does not extend to the code blocks of methods -- this includes
-generator expressions since they are implemented using a function scope.  This
-means that the following will fail::
+comprehensions and generator expressions since they are implemented using a
+function scope.  This means that the following will fail::
 
    class A:
        a = 42
@@ -86,9 +86,10 @@ subclass of :exc:`NameError`.
 The following constructs bind names: formal parameters to functions,
 :keyword:`import` statements, class and function definitions (these bind the
 class or function name in the defining block), and targets that are identifiers
-if occurring in an assignment, :keyword:`for` loop header, or in the second
-position of an :keyword:`except` clause header.  The :keyword:`import` statement
-of the form "``from ...import *``" binds all names defined in the imported
+if occurring in an assignment, :keyword:`for` loop header, or after
+:keyword:`as` in a :keyword:`with` statement or :keyword:`except` clause.
+The :keyword:`import` statement
+of the form ``from ... import *`` binds all names defined in the imported
 module, except those beginning with an underscore.  This form may only be used
 at the module level.
 
@@ -111,15 +112,15 @@ If the :keyword:`global` statement occurs within a block, all uses of the name
 specified in the statement refer to the binding of that name in the top-level
 namespace.  Names are resolved in the top-level namespace by searching the
 global namespace, i.e. the namespace of the module containing the code block,
-and the builtin namespace, the namespace of the module :mod:`builtins`.  The
-global namespace is searched first.  If the name is not found there, the builtin
+and the builtins namespace, the namespace of the module :mod:`builtins`.  The
+global namespace is searched first.  If the name is not found there, the builtins
 namespace is searched.  The global statement must precede all uses of the name.
 
 .. XXX document "nonlocal" semantics here
 
 .. index:: pair: restricted; execution
 
-The built-in namespace associated with the execution of a code block is actually
+The builtins namespace associated with the execution of a code block is actually
 found by looking up the name ``__builtins__`` in its global namespace; this
 should be a dictionary or a module (in the latter case the module's dictionary
 is used).  By default, when in the :mod:`__main__` module, ``__builtins__`` is
@@ -128,10 +129,10 @@ the built-in module :mod:`builtins`; when in any other module,
 itself.  ``__builtins__`` can be set to a user-created dictionary to create a
 weak form of restricted execution.
 
-.. note::
+.. impl-detail::
 
    Users should not touch ``__builtins__``; it is strictly an implementation
-   detail.  Users wanting to override values in the built-in namespace should
+   detail.  Users wanting to override values in the builtins namespace should
    :keyword:`import` the :mod:`builtins` module and modify its
    attributes appropriately.
 
@@ -221,7 +222,7 @@ selected depending on the class of the instance: it must reference the class of
 the instance or a base class thereof.  The instance can be received by the
 handler and can carry additional information about the exceptional condition.
 
-.. warning::
+.. note::
 
    Exception messages are not part of the Python API.  Their contents may change
    from one version of Python to the next without warning and should not be
@@ -229,6 +230,7 @@ handler and can carry additional information about the exceptional condition.
 
 See also the description of the :keyword:`try` statement in section :ref:`try`
 and :keyword:`raise` statement in section :ref:`raise`.
+
 
 .. rubric:: Footnotes
 

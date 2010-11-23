@@ -1,5 +1,6 @@
 import sys
 import os
+import os.path
 import difflib
 import subprocess
 import re
@@ -7,16 +8,20 @@ import pydoc
 import inspect
 import unittest
 import test.support
+import xml.etree
+from contextlib import contextmanager
+from test.support import (
+    TESTFN, forget, rmtree, EnvironmentVarGuard, reap_children)
 
 from test import pydoc_mod
 
-expected_text_pattern = \
-"""
+# Just in case sys.modules["test"] has the optional attribute __loader__.
+if hasattr(pydoc_mod, "__loader__"):
+    del pydoc_mod.__loader__
+
+expected_text_pattern = """
 NAME
     test.pydoc_mod - This is a test module for test_pydoc
-
-FILE
-    %s
 %s
 CLASSES
     builtins.object
@@ -64,10 +69,7 @@ FUNCTIONS
     nodoc_func()
 
 DATA
-    __author__ = 'Benjamin Peterson'
-    __credits__ = 'Nobody'
-    __package__ = None
-    __version__ = '1.2.3.4'
+    __xyz__ = 'X, Y and Z'
 
 VERSION
     1.2.3.4
@@ -77,10 +79,12 @@ AUTHOR
 
 CREDITS
     Nobody
+
+FILE
+    %s
 """.strip()
 
-expected_html_pattern = \
-"""
+expected_html_pattern = """
 <table width="100%%" cellspacing=0 cellpadding=2 border=0 summary="heading">
 <tr bgcolor="#7799ee">
 <td valign=bottom>&nbsp;<br>
@@ -161,10 +165,7 @@ war</tt></dd></dl>
 <font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
 \x20\x20\x20\x20
 <tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
-<td width="100%%"><strong>__author__</strong> = 'Benjamin Peterson'<br>
-<strong>__credits__</strong> = 'Nobody'<br>
-<strong>__package__</strong> = None<br>
-<strong>__version__</strong> = '1.2.3.4'</td></tr></table><p>
+<td width="100%%"><strong>__xyz__</strong> = 'X, Y and Z'</td></tr></table><p>
 <table width="100%%" cellspacing=0 cellpadding=2 border=0 summary="section">
 <tr bgcolor="#7799ee">
 <td colspan=3 valign=bottom>&nbsp;<br>
@@ -179,11 +180,14 @@ war</tt></dd></dl>
 \x20\x20\x20\x20
 <tr><td bgcolor="#7799ee"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
 <td width="100%%">Nobody</td></tr></table>
-""".strip()
+""".strip() # ' <- emacs turd
 
 
 # output pattern for missing module
 missing_pattern = "no Python documentation found for '%s'"
+
+# output pattern for module with bad imports
+badimport_pattern = "problem in %s - ImportError: No module named %s"
 
 def run_pydoc(module_name, *args):
     """
@@ -191,8 +195,11 @@ def run_pydoc(module_name, *args):
     output of pydoc.
     """
     cmd = [sys.executable, pydoc.__file__, " ".join(args), module_name]
-    output = subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout.read()
-    return output.strip()
+    try:
+        output = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
+        return output.strip()
+    finally:
+        reap_children()
 
 def get_pydoc_html(module):
     "Returns pydoc generated output as html"
@@ -228,6 +235,8 @@ def print_diffs(text1, text2):
 
 class PyDocDocTest(unittest.TestCase):
 
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
     def test_html_doc(self):
         result, doc_loc = get_pydoc_html(pydoc_mod)
         mod_file = inspect.getabsfile(pydoc_mod)
@@ -241,13 +250,20 @@ class PyDocDocTest(unittest.TestCase):
             print_diffs(expected_html, result)
             self.fail("outputs are not equal, see diff above")
 
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
     def test_text_doc(self):
         result, doc_loc = get_pydoc_text(pydoc_mod)
         expected_text = expected_text_pattern % \
-                        (inspect.getabsfile(pydoc_mod), doc_loc)
+                        (doc_loc, inspect.getabsfile(pydoc_mod))
         if result != expected_text:
             print_diffs(expected_text, result)
             self.fail("outputs are not equal, see diff above")
+
+    def test_issue8225(self):
+        # Test issue8225 to ensure no doc link appears for xml.etree
+        result, doc_loc = get_pydoc_text(xml.etree)
+        self.assertEqual(doc_loc, "", "MODULE DOCS incorrectly includes a link")
 
     def test_not_here(self):
         missing_module = "test.i_am_not_here"
@@ -256,6 +272,61 @@ class PyDocDocTest(unittest.TestCase):
         self.assertEqual(expected, result,
             "documentation for missing module found")
 
+    def test_badimport(self):
+        # This tests the fix for issue 5230, where if pydoc found the module
+        # but the module had an internal import error pydoc would report no doc
+        # found.
+        modname = 'testmod_xyzzy'
+        testpairs = (
+            ('i_am_not_here', 'i_am_not_here'),
+            ('test.i_am_not_here_either', 'i_am_not_here_either'),
+            ('test.i_am_not_here.neither_am_i', 'i_am_not_here.neither_am_i'),
+            ('i_am_not_here.{}'.format(modname),
+             'i_am_not_here.{}'.format(modname)),
+            ('test.{}'.format(modname), modname),
+            )
+
+        @contextmanager
+        def newdirinpath(dir):
+            os.mkdir(dir)
+            sys.path.insert(0, dir)
+            yield
+            sys.path.pop(0)
+            rmtree(dir)
+
+        with newdirinpath(TESTFN), EnvironmentVarGuard() as env:
+            env['PYTHONPATH'] = TESTFN
+            fullmodname = os.path.join(TESTFN, modname)
+            sourcefn = fullmodname + os.extsep + "py"
+            for importstring, expectedinmsg in testpairs:
+                with open(sourcefn, 'w') as f:
+                    f.write("import {}\n".format(importstring))
+                try:
+                    result = run_pydoc(modname).decode("ascii")
+                finally:
+                    forget(modname)
+                expected = badimport_pattern % (modname, expectedinmsg)
+                self.assertEqual(expected, result)
+
+    def test_input_strip(self):
+        missing_module = " test.i_am_not_here "
+        result = str(run_pydoc(missing_module), 'ascii')
+        expected = missing_pattern % missing_module.strip()
+        self.assertEqual(expected, result)
+
+    def test_stripid(self):
+        # test with strings, other implementations might have different repr()
+        stripid = pydoc.stripid
+        # strip the id
+        self.assertEqual(stripid('<function stripid at 0x88dcee4>'),
+                         '<function stripid>')
+        self.assertEqual(stripid('<function stripid at 0x01F65390>'),
+                         '<function stripid>')
+        # nothing to strip, return the same text
+        self.assertEqual(stripid('42'), '42')
+        self.assertEqual(stripid("<type 'exceptions.Exception'>"),
+                         "<type 'exceptions.Exception'>")
+
 
 class TestDescriptions(unittest.TestCase):
 
@@ -263,7 +334,7 @@ class TestDescriptions(unittest.TestCase):
         # Check that pydocfodder module can be described
         from test import pydocfodder
         doc = pydoc.render_doc(pydocfodder)
-        self.assert_("pydocfodder" in doc)
+        self.assertIn("pydocfodder", doc)
 
     def test_classic_class(self):
         class C: "Classic class"
@@ -271,7 +342,7 @@ class TestDescriptions(unittest.TestCase):
         self.assertEqual(pydoc.describe(C), 'class C')
         self.assertEqual(pydoc.describe(c), 'C')
         expected = 'C in module %s' % __name__
-        self.assert_(expected in pydoc.render_doc(c))
+        self.assertIn(expected, pydoc.render_doc(c))
 
     def test_class(self):
         class C(object): "New-style class"
@@ -280,7 +351,7 @@ class TestDescriptions(unittest.TestCase):
         self.assertEqual(pydoc.describe(C), 'class C')
         self.assertEqual(pydoc.describe(c), 'C')
         expected = 'C in module %s object' % __name__
-        self.assert_(expected in pydoc.render_doc(c))
+        self.assertIn(expected, pydoc.render_doc(c))
 
 
 def test_main():

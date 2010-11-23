@@ -3,7 +3,6 @@ import os
 import re
 import string
 import imp
-from itertools import count
 from tkinter import *
 import tkinter.simpledialog as tkSimpleDialog
 import tkinter.messagebox as tkMessageBox
@@ -23,6 +22,18 @@ from idlelib import macosxSupport
 
 # The default tab setting for a Text widget, in average-width characters.
 TK_TABWIDTH_DEFAULT = 8
+
+def _sphinx_version():
+    "Format sys.version_info to produce the Sphinx version string used to install the chm docs"
+    major, minor, micro, level, serial = sys.version_info
+    release = '%s%s' % (major, minor)
+    if micro:
+        release += '%s' % (micro,)
+    if level == 'candidate':
+        release += 'rc%s' % (serial,)
+    elif level != 'final':
+        release += '%s%s' % (level[0], serial)
+    return release
 
 def _find_module(fullname, path=None):
     """Version of imp.find_module() that handles hierarchical module names"""
@@ -66,15 +77,13 @@ class EditorWindow(object):
                                            'Doc', 'index.html')
             elif sys.platform[:3] == 'win':
                 chmfile = os.path.join(sys.prefix, 'Doc',
-                                       'Python%d%d.chm' % sys.version_info[:2])
+                                       'Python%s.chm' % _sphinx_version())
                 if os.path.isfile(chmfile):
                     dochome = chmfile
-
             elif macosxSupport.runningAsOSXApp():
                 # documentation is stored inside the python framework
                 dochome = os.path.join(sys.prefix,
                         'Resources/English.lproj/Documentation/index.html')
-
             dochome = os.path.normpath(dochome)
             if os.path.isfile(dochome):
                 EditorWindow.help_url = dochome
@@ -82,7 +91,7 @@ class EditorWindow(object):
                     # Safari requires real file:-URLs
                     EditorWindow.help_url = 'file://' + EditorWindow.help_url
             else:
-                EditorWindow.help_url = "http://docs.python.org/dev/3.0/"
+                EditorWindow.help_url = "http://docs.python.org/%d.%d" % sys.version_info[:2]
         currentTheme=idleConf.CurrentTheme()
         self.flist = flist
         root = root or flist.root
@@ -107,10 +116,18 @@ class EditorWindow(object):
         self.text_frame = text_frame = Frame(top)
         self.vbar = vbar = Scrollbar(text_frame, name='vbar')
         self.width = idleConf.GetOption('main','EditorWindow','width')
-        self.text = text = MultiCallCreator(Text)(
-                text_frame, name='text', padx=5, wrap='none',
-                width=self.width,
-                height=idleConf.GetOption('main','EditorWindow','height') )
+        text_options = {
+                'name': 'text',
+                'padx': 5,
+                'wrap': 'none',
+                'width': self.width,
+                'height': idleConf.GetOption('main', 'EditorWindow', 'height')}
+        if TkVersion >= 8.5:
+            # Starting with tk 8.5 we have to set the new tabstyle option
+            # to 'wordprocessor' to achieve the same display of tabs as in
+            # older tk versions.
+            text_options['tabstyle'] = 'wordprocessor'
+        self.text = text = MultiCallCreator(Text)(text_frame, **text_options)
         self.top.focused_widget = self.text
 
         self.createmenubar()
@@ -289,7 +306,7 @@ class EditorWindow(object):
             insertpt = int(self.text.index("iomark").split(".")[1])
         else:
             line = self.text.get("insert linestart", "insert lineend")
-            for insertpt in xrange(len(line)):
+            for insertpt in range(len(line)):
                 if line[insertpt] not in (' ','\t'):
                     break
             else:
@@ -363,7 +380,7 @@ class EditorWindow(object):
             underline, label = prepstr(label)
             menudict[name] = menu = Menu(mbar, name=name)
             mbar.add_cascade(label=label, menu=menu, underline=underline)
-        if sys.platform == 'darwin' and '.framework' in sys.executable:
+        if macosxSupport.runningAsOSXApp():
             # Insert the application menu
             menudict['application'] = menu = Menu(mbar, name='apple')
             mbar.add_cascade(label='IDLE', menu=menu)
@@ -767,8 +784,8 @@ class EditorWindow(object):
         for instance in self.top.instance_dict:
             menu = instance.recent_files_menu
             menu.delete(1, END)  # clear, and rebuild:
-            for i, file in zip(count(), rf_list):
-                file_name = file[0:-1]  # zap \n
+            for i, file_name in enumerate(rf_list):
+                file_name = file_name.rstrip()  # zap \n
                 # make unicode string to display non-ASCII chars correctly
                 ufile_name = self._filename_to_unicode(file_name)
                 callback = instance.__recent_file_callback(file_name)

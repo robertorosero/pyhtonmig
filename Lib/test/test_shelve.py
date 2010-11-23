@@ -47,6 +47,21 @@ class TestCase(unittest.TestCase):
         for f in glob.glob(self.fn+"*"):
             support.unlink(f)
 
+    def test_close(self):
+        d1 = {}
+        s = shelve.Shelf(d1, protocol=2, writeback=False)
+        s['key1'] = [1,2,3,4]
+        self.assertEqual(s['key1'], [1,2,3,4])
+        self.assertEqual(len(s), 1)
+        s.close()
+        self.assertRaises(ValueError, len, s)
+        try:
+            s['key1']
+        except ValueError:
+            pass
+        else:
+            self.fail('Closed shelf should not find a key')
+
     def test_ascii_file_shelf(self):
         s = shelve.open(self.fn, protocol=0)
         try:
@@ -106,6 +121,19 @@ class TestCase(unittest.TestCase):
 
         self.assertEqual(len(d1), 1)
         self.assertEqual(len(d2), 1)
+
+    def test_writeback_also_writes_immediately(self):
+        # Issue 5754
+        d = {}
+        key = 'key'
+        encodedkey = key.encode('utf-8')
+        s = shelve.Shelf(d, writeback=True)
+        s[key] = [1]
+        p1 = d[encodedkey]  # Will give a KeyError if backing store not updated
+        s['key'].append(2)
+        s.close()
+        p2 = d[encodedkey]
+        self.assertNotEqual(p1, p2)  # Write creates new object in store
 
 
 from test import mapping_tests

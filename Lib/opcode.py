@@ -48,7 +48,7 @@ def_op('POP_TOP', 1)
 def_op('ROT_TWO', 2)
 def_op('ROT_THREE', 3)
 def_op('DUP_TOP', 4)
-def_op('ROT_FOUR', 5)
+def_op('DUP_TOP_TWO', 5)
 
 def_op('NOP', 9)
 def_op('UNARY_POSITIVE', 10)
@@ -57,8 +57,6 @@ def_op('UNARY_NOT', 12)
 
 def_op('UNARY_INVERT', 15)
 
-def_op('SET_ADD', 17)
-def_op('LIST_APPEND', 18)
 def_op('BINARY_POWER', 19)
 def_op('BINARY_MULTIPLY', 20)
 
@@ -101,7 +99,7 @@ def_op('WITH_CLEANUP', 81)
 
 def_op('RETURN_VALUE', 83)
 def_op('IMPORT_STAR', 84)
-def_op('MAKE_BYTES', 85)
+
 def_op('YIELD_VALUE', 86)
 def_op('POP_BLOCK', 87)
 def_op('END_FINALLY', 88)
@@ -118,7 +116,6 @@ name_op('STORE_ATTR', 95)       # Index in name list
 name_op('DELETE_ATTR', 96)      # ""
 name_op('STORE_GLOBAL', 97)     # ""
 name_op('DELETE_GLOBAL', 98)    # ""
-def_op('DUP_TOPX', 99)          # number of items to duplicate
 def_op('LOAD_CONST', 100)       # Index in const list
 hasconst.append(100)
 name_op('LOAD_NAME', 101)       # Index in name list
@@ -133,9 +130,11 @@ name_op('IMPORT_NAME', 108)     # Index in name list
 name_op('IMPORT_FROM', 109)     # Index in name list
 
 jrel_op('JUMP_FORWARD', 110)    # Number of bytes to skip
-jrel_op('JUMP_IF_FALSE', 111)   # ""
-jrel_op('JUMP_IF_TRUE', 112)    # ""
-jabs_op('JUMP_ABSOLUTE', 113)   # Target byte offset from beginning of code
+jabs_op('JUMP_IF_FALSE_OR_POP', 111) # Target byte offset from beginning of code
+jabs_op('JUMP_IF_TRUE_OR_POP', 112)  # ""
+jabs_op('JUMP_ABSOLUTE', 113)        # ""
+jabs_op('POP_JUMP_IF_FALSE', 114)    # ""
+jabs_op('POP_JUMP_IF_TRUE', 115)     # ""
 
 name_op('LOAD_GLOBAL', 116)     # Index in name list
 
@@ -162,11 +161,20 @@ def_op('LOAD_DEREF', 136)
 hasfree.append(136)
 def_op('STORE_DEREF', 137)
 hasfree.append(137)
+def_op('DELETE_DEREF', 138)
+hasfree.append(138)
 
 def_op('CALL_FUNCTION_VAR', 140)     # #args + (#kwargs << 8)
 def_op('CALL_FUNCTION_KW', 141)      # #args + (#kwargs << 8)
 def_op('CALL_FUNCTION_VAR_KW', 142)  # #args + (#kwargs << 8)
-def_op('EXTENDED_ARG', 143)
-EXTENDED_ARG = 143
+
+jrel_op('SETUP_WITH', 143)
+
+def_op('LIST_APPEND', 145)
+def_op('SET_ADD', 146)
+def_op('MAP_ADD', 147)
+
+def_op('EXTENDED_ARG', 144)
+EXTENDED_ARG = 144
 
 del def_op, name_op, jrel_op, jabs_op

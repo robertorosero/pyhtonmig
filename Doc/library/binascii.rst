@@ -1,4 +1,3 @@
-
 :mod:`binascii` --- Convert between binary and ASCII
 ====================================================
 
@@ -18,6 +17,11 @@ use these functions directly but use wrapper modules like :mod:`uu`,
 :mod:`base64`, or :mod:`binhex` instead. The :mod:`binascii` module contains
 low-level functions written in C for greater speed that are used by the
 higher-level modules.
+
+.. note::
+
+   Encoding and decoding functions do not accept Unicode strings.  Only bytestring
+   and bytearray objects can be processed.
 
 The :mod:`binascii` module defines the following functions:
 
@@ -49,14 +53,17 @@ The :mod:`binascii` module defines the following functions:
    should be at most 57 to adhere to the base64 standard.
 
 
-.. function:: a2b_qp(string[, header])
+.. function:: a2b_qp(string, header=False)
 
    Convert a block of quoted-printable data back to binary and return the binary
    data. More than one line may be passed at a time. If the optional argument
    *header* is present and true, underscores will be decoded as spaces.
 
+   .. versionchanged:: 3.2
+      Accept only bytestring or bytearray objects as input.
 
-.. function:: b2a_qp(data[, quotetabs, istext, header])
+
+.. function:: b2a_qp(data, quotetabs=False, istext=True, header=False)
 
    Convert binary data to a line(s) of ASCII characters in quoted-printable
    encoding.  The return value is the converted line(s). If the optional argument
@@ -84,6 +91,9 @@ The :mod:`binascii` module defines the following functions:
    decompressed data, unless data input data ends in an orphaned repeat indicator,
    in which case the :exc:`Incomplete` exception is raised.
 
+   .. versionchanged:: 3.2
+      Accept only bytestring or bytearray objects as input.
+
 
 .. function:: rlecode_hqx(data)
 
@@ -110,11 +120,18 @@ The :mod:`binascii` module defines the following functions:
    use as a checksum algorithm, it is not suitable for use as a general hash
    algorithm.  Use as follows::
 
-      print(binascii.crc32("hello world"))
+      print(binascii.crc32(b"hello world"))
       # Or, in two pieces:
-      crc = binascii.crc32("hello")
-      crc = binascii.crc32(" world", crc)
-      print(crc)
+      crc = binascii.crc32(b"hello")
+      crc = binascii.crc32(b" world", crc) & 0xffffffff
+      print('crc32 = {:#010x}'.format(crc))
+
+.. note::
+   To generate the same numeric value across all Python versions and
+   platforms use crc32(data) & 0xffffffff.  If you are only using
+   the checksum in packed binary format this is not necessary as the
+   return value is the correct 32bit binary representation
+   regardless of sign.
 
 
 .. function:: b2a_hex(data)
@@ -132,6 +149,9 @@ The :mod:`binascii` module defines the following functions:
    function is the inverse of :func:`b2a_hex`. *hexstr* must contain an even number
    of hexadecimal digits (which can be upper or lower case), otherwise a
    :exc:`TypeError` is raised.
+
+   .. versionchanged:: 3.2
+      Accept only bytestring or bytearray objects as input.
 
 
 .. exception:: Error
@@ -158,4 +178,3 @@ The :mod:`binascii` module defines the following functions:
 
    Module :mod:`quopri`
       Support for quoted-printable encoding used in MIME email messages.
-

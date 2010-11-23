@@ -85,13 +85,13 @@ class FileList:
             if len(words) < 2:
                 raise DistutilsTemplateError(
                       "'%s' expects <pattern1> <pattern2> ..." % action)
-            patterns = map(convert_path, words[1:])
+            patterns = [convert_path(w) for w in words[1:]]
         elif action in ('recursive-include', 'recursive-exclude'):
             if len(words) < 3:
                 raise DistutilsTemplateError(
                       "'%s' expects <dir> <pattern1> <pattern2> ..." % action)
             dir = convert_path(words[1])
-            patterns = map(convert_path, words[2:])
+            patterns = [convert_path(w) for w in words[2:]]
         elif action in ('graft', 'prune'):
             if len(words) != 2:
                 raise DistutilsTemplateError(
@@ -289,7 +289,8 @@ def glob_to_re(pattern):
     # character except the special characters.
     # XXX currently the "special characters" are just slash -- i.e. this is
     # Unix-only.
-    pattern_re = re.sub(r'(^|[^\\])\.', r'\1[^/]', pattern_re)
+    pattern_re = re.sub(r'((?<!\\)(\\\\)*)\.', r'\1[^/]', pattern_re)
+
     return pattern_re
 
 
@@ -311,7 +312,9 @@ def translate_pattern(pattern, anchor=1, prefix=None, is_regex=0):
         pattern_re = ''
 
     if prefix is not None:
-        prefix_re = (glob_to_re(prefix))[0:-1] # ditch trailing $
+        # ditch end of pattern character
+        empty_pattern = glob_to_re('')
+        prefix_re = (glob_to_re(prefix))[:-len(empty_pattern)]
         pattern_re = "^" + os.path.join(prefix_re, ".*" + pattern_re)
     else:                               # no prefix -- respect anchor flag
         if anchor:

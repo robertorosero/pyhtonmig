@@ -31,12 +31,13 @@ __version__ = "2.6"
 # Imports
 # =======
 
-from operator import attrgetter
 from io import StringIO
 import sys
 import os
 import urllib.parse
 import email.parser
+from warnings import warn
+import html
 
 __all__ = ["MiniFieldStorage", "FieldStorage",
            "parse", "parse_qs", "parse_qsl", "parse_multipart",
@@ -113,7 +114,7 @@ def parse(fp=None, environ=os.environ, keep_blank_values=0, strict_parsing=0):
         environ         : environment dictionary; default: os.environ
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded forms should be treated as blank strings.
+            percent-encoded forms should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -153,7 +154,23 @@ def parse(fp=None, environ=os.environ, keep_blank_values=0, strict_parsing=0):
         else:
             qs = ""
         environ['QUERY_STRING'] = qs    # XXX Shouldn't, really
-    return parse_qs(qs, keep_blank_values, strict_parsing)
+    return urllib.parse.parse_qs(qs, keep_blank_values, strict_parsing)
+
+
+# parse query string function called from urlparse,
+# this is done in order to maintain backward compatiblity.
+
+def parse_qs(qs, keep_blank_values=0, strict_parsing=0):
+    """Parse a query given as a string argument."""
+    warn("cgi.parse_qs is deprecated, use urllib.parse.parse_qs instead",
+         DeprecationWarning, 2)
+    return urllib.parse.parse_qs(qs, keep_blank_values, strict_parsing)
+
+def parse_qsl(qs, keep_blank_values=0, strict_parsing=0):
+    """Parse a query given as a string argument."""
+    warn("cgi.parse_qsl is deprecated, use urllib.parse.parse_qsl instead",
+         DeprecationWarning, 2)
+    return urllib.parse.parse_qsl(qs, keep_blank_values, strict_parsing)
 
 def parse_multipart(fp, pdict):
     """Parse multipart input.
@@ -255,16 +272,28 @@ def parse_multipart(fp, pdict):
     return partdict
 
 
+def _parseparam(s):
+    while s[:1] == ';':
+        s = s[1:]
+        end = s.find(';')
+        while end > 0 and s.count('"', 0, end) % 2:
+            end = s.find(';', end + 1)
+        if end < 0:
+            end = len(s)
+        f = s[:end]
+        yield f.strip()
+        s = s[end:]
+
 def parse_header(line):
     """Parse a Content-type like header.
 
     Return the main content-type and a dictionary of options.
 
     """
-    plist = [x.strip() for x in line.split(';')]
-    key = plist.pop(0).lower()
+    parts = _parseparam(';' + line)
+    key = parts.__next__()
     pdict = {}
-    for p in plist:
+    for p in parts:
         i = p.find('=')
         if i >= 0:
             name = p[:i].strip().lower()
@@ -274,10 +303,6 @@ def parse_header(line):
                 value = value.replace('\\\\', '\\').replace('\\"', '"')
             pdict[name] = value
     return key, pdict
-
-# parse query string functions from urllib.parse
-parse_qs = urllib.parse.parse_qs
-parse_qsl = urllib.parse.parse_qsl
 
 
 # Classes for field storage
@@ -369,7 +394,7 @@ class FieldStorage:
         environ         : environment dictionary; default: os.environ
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded forms should be treated as blank strings.
+            percent-encoded forms should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -385,6 +410,7 @@ class FieldStorage:
         self.strict_parsing = strict_parsing
         if 'REQUEST_METHOD' in environ:
             method = environ['REQUEST_METHOD'].upper()
+        self.qs_on_post = None
         if method == 'GET' or method == 'HEAD':
             if 'QUERY_STRING' in environ:
                 qs = environ['QUERY_STRING']
@@ -403,6 +429,8 @@ class FieldStorage:
                 headers['content-type'] = "application/x-www-form-urlencoded"
             if 'CONTENT_TYPE' in environ:
                 headers['content-type'] = environ['CONTENT_TYPE']
+            if 'QUERY_STRING' in environ:
+                self.qs_on_post = environ['QUERY_STRING']
             if 'CONTENT_LENGTH' in environ:
                 headers['content-length'] = environ['CONTENT_LENGTH']
         self.fp = fp or sys.stdin
@@ -554,9 +582,11 @@ class FieldStorage:
     def read_urlencoded(self):
         """Internal: read data in query string format."""
         qs = self.fp.read(self.length)
+        if self.qs_on_post:
+            qs += '&' + self.qs_on_post
         self.list = list = []
-        for key, value in parse_qsl(qs, self.keep_blank_values,
-                                    self.strict_parsing):
+        for key, value in urllib.parse.parse_qsl(qs, self.keep_blank_values,
+                                self.strict_parsing):
             list.append(MiniFieldStorage(key, value))
         self.skip_lines()
 
@@ -568,6 +598,12 @@ class FieldStorage:
         if not valid_boundary(ib):
             raise ValueError('Invalid boundary in multipart form: %r' % (ib,))
         self.list = []
+        if self.qs_on_post:
+            for key, value in urllib.parse.parse_qsl(self.qs_on_post,
+                                    self.keep_blank_values, self.strict_parsing):
+                self.list.append(MiniFieldStorage(key, value))
+            FieldStorageClass = None
+
         klass = self.FieldStorageClass or self.__class__
         parser = email.parser.FeedParser()
         # Create bogus content-type header for proper multipart parsing
@@ -764,8 +800,8 @@ def print_exception(type=None, value=None, tb=None, limit=None):
     list = traceback.format_tb(tb, limit) + \
            traceback.format_exception_only(type, value)
     print("<PRE>%s<B>%s</B></PRE>" % (
-        escape("".join(list[:-1])),
-        escape(list[-1]),
+        html.escape("".join(list[:-1])),
+        html.escape(list[-1]),
         ))
     del tb
 
@@ -776,7 +812,7 @@ def print_environ(environ=os.environ):
     print("<H3>Shell Environment:</H3>")
     print("<DL>")
     for key in keys:
-        print("<DT>", escape(key), "<DD>", escape(environ[key]))
+        print("<DT>", html.escape(key), "<DD>", html.escape(environ[key]))
     print("</DL>")
     print()
 
@@ -789,10 +825,10 @@ def print_form(form):
         print("<P>No form fields.")
     print("<DL>")
     for key in keys:
-        print("<DT>" + escape(key) + ":", end=' ')
+        print("<DT>" + html.escape(key) + ":", end=' ')
         value = form[key]
-        print("<i>" + escape(repr(type(value))) + "</i>")
-        print("<DD>" + escape(repr(value)))
+        print("<i>" + html.escape(repr(type(value))) + "</i>")
+        print("<DD>" + html.escape(repr(value)))
     print("</DL>")
     print()
 
@@ -803,9 +839,9 @@ def print_directory():
     try:
         pwd = os.getcwd()
     except os.error as msg:
-        print("os.error:", escape(str(msg)))
+        print("os.error:", html.escape(str(msg)))
     else:
-        print(escape(pwd))
+        print(html.escape(pwd))
     print()
 
 def print_arguments():
@@ -863,15 +899,16 @@ environment as well.  Here are some common variable names:
 # =========
 
 def escape(s, quote=None):
-    '''Replace special characters "&", "<" and ">" to HTML-safe sequences.
-    If the optional flag quote is true, the quotation mark character (")
-    is also translated.'''
+    """Deprecated API."""
+    warn("cgi.escape is deprecated, use html.escape instead",
+         PendingDeprecationWarning, stacklevel=2)
     s = s.replace("&", "&amp;") # Must be done first!
     s = s.replace("<", "&lt;")
     s = s.replace(">", "&gt;")
     if quote:
         s = s.replace('"', "&quot;")
     return s
+
 
 def valid_boundary(s, _vb_pattern="^[ -~]{0,200}[!-~]$"):
     import re

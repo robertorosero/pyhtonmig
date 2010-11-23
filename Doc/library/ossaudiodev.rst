@@ -1,4 +1,3 @@
-
 :mod:`ossaudiodev` --- Access to OSS-compatible audio devices
 =============================================================
 
@@ -16,26 +15,26 @@ the standard audio interface for Linux and recent versions of FreeBSD.
    use ALSA, you'll have to make sure its OSS compatibility layer
    is active to use ossaudiodev, but you're gonna need it for the vast
    majority of Linux audio apps anyways.
-   
+
    Sounds like things are also complicated for other BSDs.  In response
    to my python-dev query, Thomas Wouters said:
-   
+
    > Likewise, googling shows OpenBSD also uses OSS/Free -- the commercial
    > OSS installation manual tells you to remove references to OSS/Free from the
    > kernel :)
-   
+
    but Aleksander Piotrowsk actually has an OpenBSD box, and he quotes
    from its <soundcard.h>:
    >  * WARNING!  WARNING!
    >  * This is an OSS (Linux) audio emulator.
    >  * Use the Native NetBSD API for developing new code, and this
    >  * only for compiling Linux programs.
-   
+
    There's also an ossaudio manpage on OpenBSD that explains things
    further.  Presumably NetBSD and OpenBSD have a different standard
    audio interface.  That's the great thing about standards, there are so
    many to choose from ... ;-)
-   
+
    This probably all warrants a footnote or two, but I don't understand
    things well enough right now to write it!   --GPW
 
@@ -57,7 +56,7 @@ the standard audio interface for Linux and recent versions of FreeBSD.
    what went wrong.
 
    (If :mod:`ossaudiodev` receives an error from a system call such as
-   :cfunc:`open`, :cfunc:`write`, or :cfunc:`ioctl`, it raises :exc:`IOError`.
+   :c:func:`open`, :c:func:`write`, or :c:func:`ioctl`, it raises :exc:`IOError`.
    Errors detected directly by :mod:`ossaudiodev` result in :exc:`OSSAudioError`.)
 
    (For backwards compatibility, the exception class is also available as
@@ -118,7 +117,7 @@ Alternately, you can use the :meth:`setparameters` method to set all three audio
 parameters at once.  This is more convenient, but may not be as flexible in all
 cases.
 
-The audio device objects returned by :func:`open` define the following methods
+The audio device objects returned by :func:`.open` define the following methods
 and (read-only) attributes:
 
 
@@ -159,6 +158,11 @@ and (read-only) attributes:
    mode (the default), this has the same effect as :meth:`write`; :meth:`writeall`
    is only useful in non-blocking mode.  Has no return value, since the amount of
    data written is always equal to the amount of data supplied.
+
+.. versionchanged:: 3.2
+   Audio device objects also support the context manager protocol, i.e. they can
+   be used in a :keyword:`with` statement.
+
 
 The following methods each map to exactly one :func:`ioctl` system call.  The
 correspondence is obvious: for example, :meth:`setfmt` corresponds to the
@@ -346,6 +350,10 @@ The mixer object provides two file-like methods:
 .. method:: oss_mixer_device.fileno()
 
    Returns the file handle number of the open mixer device file.
+
+.. versionchanged:: 3.2
+   Mixer objects also support the context manager protocol.
+
 
 The remaining methods are specific to audio mixing:
 

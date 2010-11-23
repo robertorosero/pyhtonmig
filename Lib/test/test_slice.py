@@ -73,7 +73,7 @@ class SliceTest(unittest.TestCase):
 
         obj = AnyClass()
         s = slice(obj)
-        self.assert_(s.stop is obj)
+        self.assertTrue(s.stop is obj)
 
     def test_indices(self):
         self.assertEqual(slice(None           ).indices(10), (0, 10,  1))
@@ -82,6 +82,20 @@ class SliceTest(unittest.TestCase):
         self.assertEqual(slice(None,  None, -1).indices(10), (9, -1, -1))
         self.assertEqual(slice(None,  None, -2).indices(10), (9, -1, -2))
         self.assertEqual(slice(3,     None, -2).indices(10), (3, -1, -2))
+        # issue 3004 tests
+        self.assertEqual(slice(None, -9).indices(10), (0, 1, 1))
+        self.assertEqual(slice(None, -10).indices(10), (0, 0, 1))
+        self.assertEqual(slice(None, -11).indices(10), (0, 0, 1))
+        self.assertEqual(slice(None, -10, -1).indices(10), (9, 0, -1))
+        self.assertEqual(slice(None, -11, -1).indices(10), (9, -1, -1))
+        self.assertEqual(slice(None, -12, -1).indices(10), (9, -1, -1))
+        self.assertEqual(slice(None, 9).indices(10), (0, 9, 1))
+        self.assertEqual(slice(None, 10).indices(10), (0, 10, 1))
+        self.assertEqual(slice(None, 11).indices(10), (0, 10, 1))
+        self.assertEqual(slice(None, 8, -1).indices(10), (9, 8, -1))
+        self.assertEqual(slice(None, 9, -1).indices(10), (9, 9, -1))
+        self.assertEqual(slice(None, 10, -1).indices(10), (9, 9, -1))
+
         self.assertEqual(
             slice(-100,  100     ).indices(10),
             slice(None).indices(10)
@@ -104,7 +118,7 @@ class SliceTest(unittest.TestCase):
 
         x = X()
         x[1:2] = 42
-        self.assertEquals(tmp, [(slice(1, 2), 42)])
+        self.assertEqual(tmp, [(slice(1, 2), 42)])
 
     def test_pickle(self):
         s = slice(10, 20, 3)

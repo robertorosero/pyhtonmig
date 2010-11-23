@@ -27,6 +27,7 @@ typedef struct _is {
     PyObject *codec_search_path;
     PyObject *codec_search_cache;
     PyObject *codec_error_registry;
+    int codecs_initialized;
 
 #ifdef HAVE_DLOPEN
     int dlopenflags;
@@ -87,6 +88,8 @@ typedef struct _ts {
 
     PyObject *dict;  /* Stores per-thread state */
 
+    /* XXX doesn't mean anything anymore (the comment below is obsolete)
+       => deprecate or remove? */
     /* tick_counter is incremented whenever the check_interval ticker
      * reaches zero. The purpose is to give a useful measure of the number
      * of interpreted bytecode instructions in a given thread.  This
@@ -112,6 +115,8 @@ PyAPI_FUNC(int) _PyState_AddModule(PyObject*, struct PyModuleDef*);
 PyAPI_FUNC(PyObject*) PyState_FindModule(struct PyModuleDef*);
 
 PyAPI_FUNC(PyThreadState *) PyThreadState_New(PyInterpreterState *);
+PyAPI_FUNC(PyThreadState *) _PyThreadState_Prealloc(PyInterpreterState *);
+PyAPI_FUNC(void) _PyThreadState_Init(PyThreadState *);
 PyAPI_FUNC(void) PyThreadState_Clear(PyThreadState *);
 PyAPI_FUNC(void) PyThreadState_Delete(PyThreadState *);
 #ifdef WITH_THREAD
@@ -126,12 +131,15 @@ PyAPI_FUNC(int) PyThreadState_SetAsyncExc(long, PyObject *);
 
 /* Variable and macro for in-line access to current thread state */
 
-PyAPI_DATA(PyThreadState *) _PyThreadState_Current;
+/* Assuming the current thread holds the GIL, this is the
+   PyThreadState for the current thread. */
+PyAPI_DATA(_Py_atomic_address) _PyThreadState_Current;
 
 #ifdef Py_DEBUG
 #define PyThreadState_GET() PyThreadState_Get()
 #else
-#define PyThreadState_GET() (_PyThreadState_Current)
+#define PyThreadState_GET() \
+    ((PyThreadState*)_Py_atomic_load_relaxed(&_PyThreadState_Current))
 #endif
 
 typedef

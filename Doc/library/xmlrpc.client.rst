@@ -17,7 +17,7 @@ supports writing XML-RPC client code; it handles all the details of translating
 between conformable Python objects and XML on the wire.
 
 
-.. class:: ServerProxy(uri[, transport[, encoding[, verbose[,  allow_none[, use_datetime]]]]])
+.. class:: ServerProxy(uri, transport=None, encoding=None, verbose=False, allow_none=False, use_datetime=False)
 
    A :class:`ServerProxy` instance is an object that manages communication with a
    remote XML-RPC server.  The required first argument is a URI (Uniform Resource
@@ -87,7 +87,7 @@ between conformable Python objects and XML on the wire.
    :exc:`ProtocolError` used to signal an error in the HTTP/HTTPS transport layer.
    Both :exc:`Fault` and :exc:`ProtocolError` derive from a base class called
    :exc:`Error`.  Note that the xmlrpc client module currently does not marshal
-   instances of subclasses of builtin types.
+   instances of subclasses of built-in types.
 
    When passing strings, characters special to XML such as ``<``, ``>``, and ``&``
    will be automatically escaped.  However, it's the caller's responsibility to
@@ -144,7 +144,7 @@ grouped under the reserved :attr:`system` member:
 .. method:: ServerProxy.system.methodSignature(name)
 
    This method takes one parameter, the name of a method implemented by the XML-RPC
-   server.It returns an array of possible signatures for this method. A signature
+   server. It returns an array of possible signatures for this method. A signature
    is an array of types. The first of these types is the return type of the method,
    the rest are parameters.
 
@@ -158,7 +158,7 @@ grouped under the reserved :attr:`system` member:
 
    If no signature is defined for the method, a non-array value is returned. In
    Python this means that the type of the returned  value will be something other
-   that list.
+   than list.
 
 
 .. method:: ServerProxy.system.methodHelp(name)
@@ -210,7 +210,7 @@ use by the marshalling/unmarshalling code:
    Write the XML-RPC encoding of this :class:`DateTime` item to the *out* stream
    object.
 
-It also supports certain of Python's built-in operators through  :meth:`__cmp__`
+It also supports certain of Python's built-in operators through rich comparison
 and :meth:`__repr__` methods.
 
 A working example follows. The server code::
@@ -273,8 +273,8 @@ internal use by the marshalling/unmarshalling code:
    which was the de facto standard base64 specification when the
    XML-RPC spec was written.
 
-It also supports certain of Python's built-in operators through a
-:meth:`__cmp__` method.
+It also supports certain of Python's built-in operators through :meth:`__eq__`
+and :meth:`__ne__` methods.
 
 Example usage of the binary objects.  We're going to transfer an image over
 XMLRPC::
@@ -283,9 +283,8 @@ XMLRPC::
    import xmlrpc.client
 
    def python_logo():
-        handle = open("python_logo.jpg")
-        return xmlrpc.client.Binary(handle.read())
-        handle.close()
+       with open("python_logo.jpg", "rb") as handle:
+           return xmlrpc.client.Binary(handle.read())
 
    server = SimpleXMLRPCServer(("localhost", 8000))
    print("Listening on port 8000...")
@@ -298,9 +297,8 @@ The client gets the image and saves it to a file::
    import xmlrpc.client
 
    proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
-   handle = open("fetched_python_logo.jpg", "w")
-   handle.write(proxy.python_logo().data)
-   handle.close()
+   with open("fetched_python_logo.jpg", "wb") as handle:
+       handle.write(proxy.python_logo().data)
 
 .. _fault-objects:
 
@@ -343,8 +341,8 @@ The client code for the preceding server::
    proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
    try:
        proxy.add(2, 5)
-   except xmlrpc.client.Fault, err:
-       print("A fault occured")
+   except xmlrpc.client.Fault as err:
+       print("A fault occurred")
        print("Fault code: %d" % err.faultCode)
        print("Fault string: %s" % err.faultString)
 
@@ -385,13 +383,13 @@ by providing an invalid URI::
 
    import xmlrpc.client
 
-   # create a ServerProxy with an invalid URI
-   proxy = xmlrpc.client.ServerProxy("http://invalidaddress/")
+   # create a ServerProxy with an URI that doesn't respond to XMLRPC requests
+   proxy = xmlrpc.client.ServerProxy("http://google.com/")
 
    try:
        proxy.some_method()
-   except xmlrpc.client.ProtocolError, err:
-       print("A protocol error occured")
+   except xmlrpc.client.ProtocolError as err:
+       print("A protocol error occurred")
        print("URL: %s" % err.url)
        print("HTTP/HTTPS headers: %s" % err.headers)
        print("Error code: %d" % err.errcode)
@@ -458,7 +456,7 @@ The client code for the preceding server::
 Convenience Functions
 ---------------------
 
-.. function:: dumps(params[, methodname[,  methodresponse[, encoding[, allow_none]]]])
+.. function:: dumps(params, methodname=None, methodresponse=None, encoding=None, allow_none=False)
 
    Convert *params* into an XML-RPC request. or into a response if *methodresponse*
    is true. *params* can be either a tuple of arguments or an instance of the
@@ -469,7 +467,7 @@ Convenience Functions
    it via an extension,  provide a true value for *allow_none*.
 
 
-.. function:: loads(data[, use_datetime])
+.. function:: loads(data, use_datetime=False)
 
    Convert an XML-RPC request or response into Python objects, a ``(params,
    methodname)``.  *params* is a tuple of argument; *methodname* is a string, or
@@ -513,8 +511,8 @@ transport.  The following example shows how:
            self.proxy = proxy
        def make_connection(self, host):
            self.realhost = host
-   	h = http.client.HTTP(self.proxy)
-   	return h
+           h = http.client.HTTP(self.proxy)
+           return h
        def send_request(self, connection, handler, request_body):
            connection.putrequest("POST", 'http://%s%s' % (self.realhost, handler))
        def send_host(self, connection, host):

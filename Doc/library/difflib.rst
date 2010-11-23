@@ -72,7 +72,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    The constructor for this class is:
 
 
-   .. function:: __init__([tabsize][, wrapcolumn][, linejunk][, charjunk])
+   .. method:: __init__(tabsize=8, wrapcolumn=None, linejunk=None, charjunk=IS_CHARACTER_JUNK)
 
       Initializes instance of :class:`HtmlDiff`.
 
@@ -88,8 +88,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
    The following methods are public:
 
-
-   .. function:: make_file(fromlines, tolines [, fromdesc][, todesc][, context][, numlines])
+   .. method:: make_file(fromlines, tolines, fromdesc='', todesc='', context=False, numlines=5)
 
       Compares *fromlines* and *tolines* (lists of strings) and returns a string which
       is a complete HTML file containing a table showing line by line differences with
@@ -108,8 +107,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
       the next difference highlight at the top of the browser without any leading
       context).
 
-
-   .. function:: make_table(fromlines, tolines [, fromdesc][, todesc][, context][, numlines])
+   .. method:: make_table(fromlines, tolines, fromdesc='', todesc='', context=False, numlines=5)
 
       Compares *fromlines* and *tolines* (lists of strings) and returns a string which
       is a complete HTML table showing line by line differences with inter-line and
@@ -122,7 +120,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    contains a good example of its use.
 
 
-.. function:: context_diff(a, b[, fromfile][, tofile][, fromfiledate][, tofiledate][, n][, lineterm])
+.. function:: context_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='', n=3, lineterm='\\n')
 
    Compare *a* and *b* (lists of strings); return a delta (a :term:`generator`
    generating the delta lines) in context diff format.
@@ -142,8 +140,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
    The context diff format normally has a header for filenames and modification
    times.  Any or all of these may be specified using strings for *fromfile*,
-   *tofile*, *fromfiledate*, and *tofiledate*. The modification times are normally
-   expressed in the format returned by :func:`time.ctime`.  If not specified, the
+   *tofile*, *fromfiledate*, and *tofiledate*.  The modification times are normally
+   expressed in the ISO 8601 format. If not specified, the
    strings default to blanks.
 
       >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
@@ -167,7 +165,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    See :ref:`difflib-interface` for a more detailed example.
 
 
-.. function:: get_close_matches(word, possibilities[, n][, cutoff])
+.. function:: get_close_matches(word, possibilities, n=3, cutoff=0.6)
 
    Return a list of the best "good enough" matches.  *word* is a sequence for which
    close matches are desired (typically a string), and *possibilities* is a list of
@@ -193,7 +191,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
       ['except']
 
 
-.. function:: ndiff(a, b[, linejunk][, charjunk])
+.. function:: ndiff(a, b, linejunk=None, charjunk=IS_CHARACTER_JUNK)
 
    Compare *a* and *b* (lists of strings); return a :class:`Differ`\ -style
    delta (a :term:`generator` generating the delta lines).
@@ -253,7 +251,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
       emu
 
 
-.. function:: unified_diff(a, b[, fromfile][, tofile][, fromfiledate][, tofiledate][, n][, lineterm])
+.. function:: unified_diff(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='', n=3, lineterm='\\n')
 
    Compare *a* and *b* (lists of strings); return a delta (a :term:`generator`
    generating the delta lines) in unified diff format.
@@ -274,8 +272,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
    The context diff format normally has a header for filenames and modification
    times.  Any or all of these may be specified using strings for *fromfile*,
-   *tofile*, *fromfiledate*, and *tofiledate*. The modification times are normally
-   expressed in the format returned by :func:`time.ctime`.  If not specified, the
+   *tofile*, *fromfiledate*, and *tofiledate*.  The modification times are normally
+   expressed in the ISO 8601 format. If not specified, the
    strings default to blanks.
 
 
@@ -326,7 +324,7 @@ SequenceMatcher Objects
 The :class:`SequenceMatcher` class has this constructor:
 
 
-.. class:: SequenceMatcher([isjunk[, a[, b]]])
+.. class:: SequenceMatcher(isjunk=None, a='', b='')
 
    Optional argument *isjunk* must be ``None`` (the default) or a one-argument
    function that takes a sequence element and returns true if and only if the
@@ -467,7 +465,7 @@ The :class:`SequenceMatcher` class has this constructor:
          insert a[6:6] () b[5:6] (f)
 
 
-   .. method:: get_grouped_opcodes([n])
+   .. method:: get_grouped_opcodes(n=3)
 
       Return a :term:`generator` of groups with up to *n* lines of context.
 
@@ -497,16 +495,11 @@ The :class:`SequenceMatcher` class has this constructor:
 
       Return an upper bound on :meth:`ratio` relatively quickly.
 
-      This isn't defined beyond that it is an upper bound on :meth:`ratio`, and
-      is faster to compute.
-
 
    .. method:: real_quick_ratio()
 
       Return an upper bound on :meth:`ratio` very quickly.
 
-      This isn't defined beyond that it is an upper bound on :meth:`ratio`, and
-      is faster to compute than either :meth:`ratio` or :meth:`quick_ratio`.
 
 The three methods that return the ratio of matching to total characters can give
 different results due to differing levels of approximation, although
@@ -562,8 +555,15 @@ If you want to know how to change the first sequence into the second, use
    insert a[8:8] b[8:17]
     equal a[8:29] b[17:38]
 
-See also the function :func:`get_close_matches` in this module, which shows how
-simple code building on :class:`SequenceMatcher` can be used to do useful work.
+.. seealso::
+
+   * The :func:`get_close_matches` function in this module which shows how
+     simple code building on :class:`SequenceMatcher` can be used to do useful
+     work.
+
+   * `Simple version control recipe
+     <http://code.activestate.com/recipes/576729/>`_ for a small application
+     built with :class:`SequenceMatcher`.
 
 
 .. _differ-objects:
@@ -580,7 +580,7 @@ locality, at the occasional cost of producing a longer diff.
 The :class:`Differ` class has this constructor:
 
 
-.. class:: Differ([linejunk[, charjunk]])
+.. class:: Differ(linejunk=None, charjunk=None)
 
    Optional keyword parameters *linejunk* and *charjunk* are for filter functions
    (or ``None``):

@@ -1,4 +1,3 @@
-
 :mod:`random` --- Generate pseudo-random numbers
 ================================================
 
@@ -9,9 +8,15 @@
 This module implements pseudo-random number generators for various
 distributions.
 
-For integers, uniform selection from a range. For sequences, uniform selection
-of a random element, a function to generate a random permutation of a list
-in-place, and a function for random sampling without replacement.
+.. seealso::
+
+   Latest version of the :source:`random module Python source code
+   <Lib/random.py>`
+
+For integers, there is uniform selection from a range. For sequences, there is
+uniform selection of a random element, a function to generate a random
+permutation of a list in-place, and a function for random sampling without
+replacement.
 
 On the real line, there are functions to compute uniform, normal (Gaussian),
 lognormal, negative exponential, gamma, and beta distributions. For generating
@@ -32,26 +37,34 @@ instances of :class:`Random` to get generators that don't share state.
 
 Class :class:`Random` can also be subclassed if you want to use a different
 basic generator of your own devising: in that case, override the :meth:`random`,
-:meth:`seed`, :meth:`getstate`, and :meth:`setstate`.
-Optionally, a new generator can supply a :meth:`getrandombits` method --- this
+:meth:`seed`, :meth:`getstate`, and :meth:`setstate` methods.
+Optionally, a new generator can supply a :meth:`getrandbits` method --- this
 allows :meth:`randrange` to produce selections over an arbitrarily large range.
 
+The :mod:`random` module also provides the :class:`SystemRandom` class which
+uses the system function :func:`os.urandom` to generate random numbers
+from sources provided by the operating system.
 
 Bookkeeping functions:
 
 
-.. function:: seed([x])
+.. function:: seed([x], version=2)
 
-   Initialize the basic random number generator. Optional argument *x* can be any
-   :term:`hashable` object. If *x* is omitted or ``None``, current system time is used;
-   current system time is also used to initialize the generator when the module is
-   first imported.  If randomness sources are provided by the operating system,
-   they are used instead of the system time (see the :func:`os.urandom` function
-   for details on availability).
+   Initialize the random number generator.
 
-   If *x* is not ``None`` or an int, ``hash(x)`` is used instead. If *x* is an
-   int, *x* is used directly.
+   If *x* is omitted or ``None``, the current system time is used.  If
+   randomness sources are provided by the operating system, they are used
+   instead of the system time (see the :func:`os.urandom` function for details
+   on availability).
 
+   If *x* is an int, it is used directly.
+
+   With version 2 (the default), a :class:`str`, :class:`bytes`, or :class:`bytearray`
+   object gets converted to an :class:`int` and all of its bits are used.  With version 1,
+   the :func:`hash` of *x* is used instead.
+
+   .. versionchanged:: 3.2
+      Moved to the version 2 scheme which uses all of the bits in a string seed.
 
 .. function:: getstate()
 
@@ -66,20 +79,9 @@ Bookkeeping functions:
    the time :func:`setstate` was called.
 
 
-.. function:: jumpahead(n)
-
-   Change the internal state to one different from and likely far away from the
-   current state.  *n* is a non-negative integer which is used to scramble the
-   current state vector.  This is most useful in multi-threaded programs, in
-   conjunction with multiple instances of the :class:`Random` class:
-   :meth:`setstate` or :meth:`seed` can be used to force all instances into the
-   same internal state, and then :meth:`jumpahead` can be used to force the
-   instances' states far apart.
-
-
 .. function:: getrandbits(k)
 
-   Returns a python integer with *k* random bits. This method is supplied with
+   Returns a Python integer with *k* random bits. This method is supplied with
    the MersenneTwister generator and some other generators may also provide it
    as an optional part of the API. When available, :meth:`getrandbits` enables
    :meth:`randrange` to handle arbitrarily large ranges.
@@ -93,10 +95,18 @@ Functions for integers:
    equivalent to ``choice(range(start, stop, step))``, but doesn't actually build a
    range object.
 
+   The positional argument pattern matches that of :func:`range`.  Keyword arguments
+   should not be used because the function may use them in unexpected ways.
+
+   .. versionchanged:: 3.2
+      :meth:`randrange` is more sophisticated about producing equally distributed
+      values.  Formerly it used a style like ``int(random()*n)`` which could produce
+      slightly uneven distributions.
 
 .. function:: randint(a, b)
 
-   Return a random integer *N* such that ``a <= N <= b``.
+   Return a random integer *N* such that ``a <= N <= b``.  Alias for
+   ``randrange(a, b+1)``.
 
 
 Functions for sequences:
@@ -149,12 +159,15 @@ be found in any statistics text.
 
 .. function:: uniform(a, b)
 
-   Return a random floating point number *N* such that ``a <= N < b``.
+   Return a random floating point number *N* such that ``a <= N <= b`` for
+   ``a <= b`` and ``b <= N <= a`` for ``b < a``.
 
+   The end-point value ``b`` may or may not be included in the range
+   depending on floating-point rounding in the equation ``a + (b-a) * random()``.
 
 .. function:: triangular(low, high, mode)
 
-   Return a random floating point number *N* such that ``low <= N < high`` and
+   Return a random floating point number *N* such that ``low <= N <= high`` and
    with the specified *mode* between those bounds.  The *low* and *high* bounds
    default to zero and one.  The *mode* argument defaults to the midpoint
    between the bounds, giving a symmetric distribution.
@@ -162,27 +175,30 @@ be found in any statistics text.
 
 .. function:: betavariate(alpha, beta)
 
-   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and ``beta >
-   0``. Returned values range between 0 and 1.
+   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and
+   ``beta > 0``. Returned values range between 0 and 1.
 
 
 .. function:: expovariate(lambd)
 
-   Exponential distribution.  *lambd* is 1.0 divided by the desired mean.  (The
-   parameter would be called "lambda", but that is a reserved word in Python.)
-   Returned values range from 0 to positive infinity.
+   Exponential distribution.  *lambd* is 1.0 divided by the desired
+   mean.  It should be nonzero.  (The parameter would be called
+   "lambda", but that is a reserved word in Python.)  Returned values
+   range from 0 to positive infinity if *lambd* is positive, and from
+   negative infinity to 0 if *lambd* is negative.
 
 
 .. function:: gammavariate(alpha, beta)
 
-   Gamma distribution.  (*Not* the gamma function!)  Conditions on the parameters
-   are ``alpha > 0`` and ``beta > 0``.
+   Gamma distribution.  (*Not* the gamma function!)  Conditions on the
+   parameters are ``alpha > 0`` and ``beta > 0``.
 
 
 .. function:: gauss(mu, sigma)
 
-   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard deviation.
-   This is slightly faster than the :func:`normalvariate` function defined below.
+   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard
+   deviation.  This is slightly faster than the :func:`normalvariate` function
+   defined below.
 
 
 .. function:: lognormvariate(mu, sigma)
@@ -224,7 +240,7 @@ Alternative Generators:
    Class that uses the :func:`os.urandom` function for generating random numbers
    from sources provided by the operating system. Not available on all systems.
    Does not rely on software state and sequences are not reproducible. Accordingly,
-   the :meth:`seed` and :meth:`jumpahead` methods have no effect and are ignored.
+   the :meth:`seed` method has no effect and is ignored.
    The :meth:`getstate` and :meth:`setstate` methods raise
    :exc:`NotImplementedError` if called.
 
@@ -259,3 +275,23 @@ Examples of basic usage::
    Modeling and Computer Simulation Vol. 8, No. 1, January pp.3-30 1998.
 
 
+   `Complementary-Multiply-with-Carry recipe
+   <http://code.activestate.com/recipes/576707/>`_ for a compatible alternative
+   random number generator with a long period and comparatively simple update
+   operations.
+
+Notes on Reproducibility
+========================
+
+Sometimes it is useful to be able to reproduce the sequences given by a pseudo
+random number generator.  By re-using a seed value, the same sequence should be
+reproducible from run to run as long as multiple threads are not running.
+
+Most of the random module's algorithms and seeding functions are subject to
+change across Python versions, but two aspects are guaranteed not to change:
+
+* If a new seeding method is added, then a backward compatible seeder will be
+  offered.
+
+* The generator's :meth:`random` method will continue to produce the same
+  sequence when the compatible seeder is given the same seed.

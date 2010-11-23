@@ -11,7 +11,7 @@ character set, but that includes some 8-bit characters that are normally not
 allowed in email bodies or headers.
 
 Quoted-printable is very space-inefficient for encoding binary files; use the
-email.base64MIME module for that instead.
+email.base64mime module for that instead.
 
 This module provides an interface to encode and decode both headers and bodies
 with quoted-printable encoding.
@@ -23,7 +23,7 @@ in To:/From:/Cc: etc. fields, as well as Subject: lines.
 This module does not do the line wrapping or end-of-line character
 conversion necessary for proper internationalized headers; it only
 does dumb encoding and decoding.  To deal with the various line
-wrapping issues, use the email.Header module.
+wrapping issues, use the email.header module.
 """
 
 __all__ = [
@@ -32,8 +32,6 @@ __all__ = [
     'body_length',
     'decode',
     'decodestring',
-    'encode',
-    'encodestring',
     'header_decode',
     'header_encode',
     'header_length',
@@ -70,7 +68,7 @@ for c in (b' !"#$%&\'()*+,-./0123456789:;<>'
     _QUOPRI_BODY_MAP[c] = chr(c)
 
 
-
+
 # Helpers
 def header_check(octet):
     """Return True if the octet should be escaped with header quopri."""
@@ -125,7 +123,7 @@ def quote(c):
     return '=%02X' % ord(c)
 
 
-
+
 def header_encode(header_bytes, charset='iso-8859-1'):
     """Encode a single header line with quoted-printable (like) encoding.
 
@@ -149,7 +147,7 @@ def header_encode(header_bytes, charset='iso-8859-1'):
     return '=?%s?q?%s?=' % (charset, EMPTYSTRING.join(encoded))
 
 
-
+
 def body_encode(body, maxlinelen=76, eol=NL):
     """Encode with quoted-printable, wrapping at maxlinelen characters.
 
@@ -225,7 +223,7 @@ def body_encode(body, maxlinelen=76, eol=NL):
     return encoded_body
 
 
-
+
 # BAW: I'm not sure if the intent was for the signature of this function to be
 # the same as base64MIME.decode() or not...
 def decode(encoded, eol=NL):
@@ -280,7 +278,7 @@ body_decode = decode
 decodestring = decode
 
 
-
+
 def _unquote_match(match):
     """Turn a match in the form =AB to the ASCII character with value 0xab"""
     s = match.group(0)
@@ -293,7 +291,7 @@ def header_decode(s):
 
     This function does not parse a full MIME header value encoded with
     quoted-printable (like =?iso-8895-1?q?Hello_World?=) -- please use
-    the high level email.Header class for that functionality.
+    the high level email.header class for that functionality.
     """
     s = s.replace('_', ' ')
-    return re.sub(r'=\w{2}', _unquote_match, s)
+    return re.sub(r'=[a-fA-F0-9]{2}', _unquote_match, s, re.ASCII)

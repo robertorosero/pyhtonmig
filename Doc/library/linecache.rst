@@ -1,4 +1,3 @@
-
 :mod:`linecache` --- Random access to text lines
 ================================================
 
@@ -12,12 +11,17 @@ attempting to optimize internally, using a cache, the common case where many
 lines are read from a single file.  This is used by the :mod:`traceback` module
 to retrieve source lines for inclusion in  the formatted traceback.
 
+.. seealso::
+
+   Latest version of the :source:`linecache module Python source code
+   <Lib/linecache.py>`
+
 The :mod:`linecache` module defines the following functions:
 
 
-.. function:: getline(filename, lineno[, module_globals])
+.. function:: getline(filename, lineno, module_globals=None)
 
-   Get line *lineno* from file named *filename*. This function will never throw an
+   Get line *lineno* from file named *filename*. This function will never raise an
    exception --- it will return ``''`` on errors (the terminating newline character
    will be included for lines that are found).
 
@@ -35,11 +39,12 @@ The :mod:`linecache` module defines the following functions:
    previously read using :func:`getline`.
 
 
-.. function:: checkcache([filename])
+.. function:: checkcache(filename=None)
 
    Check the cache for validity.  Use this function if files in the cache  may have
    changed on disk, and you require the updated version.  If *filename* is omitted,
    it will check all the entries in the cache.
+
 
 Example::
 

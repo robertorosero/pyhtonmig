@@ -9,7 +9,9 @@ from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, demo_app
 from wsgiref.simple_server import make_server
 from io import StringIO, BytesIO, BufferedReader
 from socketserver import BaseServer
-import re, sys
+import os
+import re
+import sys
 
 from test import support
 
@@ -45,12 +47,12 @@ def hello_app(environ,start_response):
         ('Content-Type','text/plain'),
         ('Date','Mon, 05 Jun 2006 18:49:54 GMT')
     ])
-    return ["Hello, world!"]
+    return [b"Hello, world!"]
 
 def run_amock(app=hello_app, data=b"GET / HTTP/1.0\n\n"):
     server = make_server("", 80, app, MockServer, MockHandler)
     inp = BufferedReader(BytesIO(data))
-    out = StringIO()
+    out = BytesIO()
     olderr = sys.stderr
     err = sys.stderr = StringIO()
 
@@ -128,13 +130,13 @@ class IntegrationTests(TestCase):
 
     def check_hello(self, out, has_length=True):
         self.assertEqual(out,
-            "HTTP/1.0 200 OK\r\n"
-            "Server: WSGIServer/0.1 Python/"+sys.version.split()[0]+"\r\n"
+            ("HTTP/1.0 200 OK\r\n"
+            "Server: WSGIServer/0.2 Python/"+sys.version.split()[0]+"\r\n"
             "Content-Type: text/plain\r\n"
             "Date: Mon, 05 Jun 2006 18:49:54 GMT\r\n" +
             (has_length and  "Content-Length: 13\r\n" or "") +
             "\r\n"
-            "Hello, world!"
+            "Hello, world!").encode("iso-8859-1")
         )
 
     def test_plain_hello(self):
@@ -151,8 +153,8 @@ class IntegrationTests(TestCase):
             start_response("200 OK", ('Content-Type','text/plain'))
             return ["Hello, world!"]
         out, err = run_amock(validator(bad_app))
-        self.failUnless(out.endswith(
-            "A server error occurred.  Please contact the administrator."
+        self.assertTrue(out.endswith(
+            b"A server error occurred.  Please contact the administrator."
         ))
         self.assertEqual(
             err.splitlines()[-2],
@@ -160,7 +162,37 @@ class IntegrationTests(TestCase):
             " be of type list: <class 'tuple'>"
         )
 
+    def test_wsgi_input(self):
+        def bad_app(e,s):
+            e["wsgi.input"].read()
+            s("200 OK", [("Content-Type", "text/plain; charset=utf-8")])
+            return [b"data"]
+        out, err = run_amock(validator(bad_app))
+        self.assertTrue(out.endswith(
+            b"A server error occurred.  Please contact the administrator."
+        ))
+        self.assertEqual(
+            err.splitlines()[-2], "AssertionError"
+        )
 
+    def test_bytes_validation(self):
+        def app(e, s):
+            s("200 OK", [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ("Date", "Wed, 24 Dec 2008 13:29:32 GMT"),
+                ])
+            return [b"data"]
+        out, err = run_amock(validator(app))
+        self.assertTrue(err.endswith('"GET / HTTP/1.0" 200 4\n'))
+        ver = sys.version.split()[0].encode('ascii')
+        self.assertEqual(
+                b"HTTP/1.0 200 OK\r\n"
+                b"Server: WSGIServer/0.2 Python/" + ver + b"\r\n"
+                b"Content-Type: text/plain; charset=utf-8\r\n"
+                b"Date: Wed, 24 Dec 2008 13:29:32 GMT\r\n"
+                b"\r\n"
+                b"data",
+                out)
 
 
 
@@ -179,15 +211,17 @@ class UtilityTests(TestCase):
         # Check defaulting when empty
         env = {}
         util.setup_testing_defaults(env)
-        if isinstance(value,StringIO):
-            self.failUnless(isinstance(env[key],StringIO))
+        if isinstance(value, StringIO):
+            self.assertIsInstance(env[key], StringIO)
+        elif isinstance(value,BytesIO):
+            self.assertIsInstance(env[key],BytesIO)
         else:
-            self.assertEqual(env[key],value)
+            self.assertEqual(env[key], value)
 
         # Check existing value
         env = {key:alt}
         util.setup_testing_defaults(env)
-        self.failUnless(env[key] is alt)
+        self.assertTrue(env[key] is alt)
 
     def checkCrossDefault(self,key,value,**kw):
         util.setup_testing_defaults(kw)
@@ -214,15 +248,15 @@ class UtilityTests(TestCase):
         compare_generic_iter(make_it,match)
 
         it = make_it()
-        self.failIf(it.filelike.closed)
+        self.assertFalse(it.filelike.closed)
 
         for item in it:
             pass
 
-        self.failIf(it.filelike.closed)
+        self.assertFalse(it.filelike.closed)
 
         it.close()
-        self.failUnless(it.filelike.closed)
+        self.assertTrue(it.filelike.closed)
 
 
     def testSimpleShifts(self):
@@ -260,7 +294,7 @@ class UtilityTests(TestCase):
             ('wsgi.run_once', 0),
             ('wsgi.multithread', 0),
             ('wsgi.multiprocess', 0),
-            ('wsgi.input', StringIO("")),
+            ('wsgi.input', BytesIO()),
             ('wsgi.errors', StringIO()),
             ('wsgi.url_scheme','http'),
         ]:
@@ -291,6 +325,7 @@ class UtilityTests(TestCase):
     def testAppURIs(self):
         self.checkAppURI("http://127.0.0.1/")
         self.checkAppURI("http://127.0.0.1/spam", SCRIPT_NAME="/spam")
+        self.checkAppURI("http://127.0.0.1/sp%C3%A4m", SCRIPT_NAME="/späm")
         self.checkAppURI("http://spam.example.com:2071/",
             HTTP_HOST="spam.example.com:2071", SERVER_PORT="2071")
         self.checkAppURI("http://spam.example.com/",
@@ -304,6 +339,7 @@ class UtilityTests(TestCase):
     def testReqURIs(self):
         self.checkReqURI("http://127.0.0.1/")
         self.checkReqURI("http://127.0.0.1/spam", SCRIPT_NAME="/spam")
+        self.checkReqURI("http://127.0.0.1/sp%C3%A4m", SCRIPT_NAME="/späm")
         self.checkReqURI("http://127.0.0.1/spammity/spam",
             SCRIPT_NAME="/spammity", PATH_INFO="/spam")
         self.checkReqURI("http://127.0.0.1/spammity/spam?say=ni",
@@ -320,14 +356,14 @@ class UtilityTests(TestCase):
             "TE Trailers Transfer-Encoding Upgrade"
         ).split():
             for alt in hop, hop.title(), hop.upper(), hop.lower():
-                self.failUnless(util.is_hop_by_hop(alt))
+                self.assertTrue(util.is_hop_by_hop(alt))
 
         # Not comprehensive, just a few random header names
         for hop in (
             "Accept Cache-Control Date Pragma Trailer Via Warning"
         ).split():
             for alt in hop, hop.title(), hop.upper(), hop.lower():
-                self.failIf(util.is_hop_by_hop(alt))
+                self.assertFalse(util.is_hop_by_hop(alt))
 
 class HeaderTests(TestCase):
 
@@ -338,17 +374,17 @@ class HeaderTests(TestCase):
         self.assertEqual(Headers(test[:]).keys(), ['x'])
         self.assertEqual(Headers(test[:]).values(), ['y'])
         self.assertEqual(Headers(test[:]).items(), test)
-        self.failIf(Headers(test).items() is test)  # must be copy!
+        self.assertFalse(Headers(test).items() is test)  # must be copy!
 
         h=Headers([])
         del h['foo']   # should not raise an error
 
         h['Foo'] = 'bar'
         for m in h.__contains__, h.get, h.get_all, h.__getitem__:
-            self.failUnless(m('foo'))
-            self.failUnless(m('Foo'))
-            self.failUnless(m('FOO'))
-            self.failIf(m('bar'))
+            self.assertTrue(m('foo'))
+            self.assertTrue(m('Foo'))
+            self.assertTrue(m('FOO'))
+            self.assertFalse(m('bar'))
 
         self.assertEqual(h['foo'],'bar')
         h['foo'] = 'baz'
@@ -384,14 +420,18 @@ class HeaderTests(TestCase):
             '\r\n'
         )
 
-
 class ErrorHandler(BaseCGIHandler):
     """Simple handler subclass for testing BaseHandler"""
+
+    # BaseHandler records the OS environment at import time, but envvars
+    # might have been changed later by other tests, which trips up
+    # HandlerTests.testEnviron().
+    os_environ = dict(os.environ.items())
 
     def __init__(self,**kw):
         setup_testing_defaults(kw)
         BaseCGIHandler.__init__(
-            self, StringIO(''), StringIO(), StringIO(), kw,
+            self, BytesIO(), BytesIO(), StringIO(), kw,
             multithread=True, multiprocess=True
         )
 
@@ -430,7 +470,7 @@ class HandlerTests(TestCase):
             if k not in empty:
                 self.assertEqual(env[k],v)
         for k,v in empty.items():
-            self.failUnless(k in env)
+            self.assertIn(k, env)
 
     def testEnviron(self):
         h = TestHandler(X="Y")
@@ -443,7 +483,7 @@ class HandlerTests(TestCase):
         h = BaseCGIHandler(None,None,None,{})
         h.setup_environ()
         for key in 'wsgi.url_scheme', 'wsgi.input', 'wsgi.errors':
-            self.assert_(key in h.environ)
+            self.assertIn(key, h.environ)
 
     def testScheme(self):
         h=TestHandler(HTTPS="on"); h.setup_environ()
@@ -466,27 +506,38 @@ class HandlerTests(TestCase):
 
         def trivial_app1(e,s):
             s('200 OK',[])
-            return [e['wsgi.url_scheme']]
+            return [e['wsgi.url_scheme'].encode('iso-8859-1')]
 
         def trivial_app2(e,s):
-            s('200 OK',[])(e['wsgi.url_scheme'])
+            s('200 OK',[])(e['wsgi.url_scheme'].encode('iso-8859-1'))
             return []
+
+        def trivial_app3(e,s):
+            s('200 OK',[])
+            return ['\u0442\u0435\u0441\u0442'.encode("utf-8")]
 
         h = TestHandler()
         h.run(trivial_app1)
         self.assertEqual(h.stdout.getvalue(),
-            "Status: 200 OK\r\n"
+            ("Status: 200 OK\r\n"
             "Content-Length: 4\r\n"
             "\r\n"
-            "http")
+            "http").encode("iso-8859-1"))
 
         h = TestHandler()
         h.run(trivial_app2)
         self.assertEqual(h.stdout.getvalue(),
-            "Status: 200 OK\r\n"
+            ("Status: 200 OK\r\n"
             "\r\n"
-            "http")
+            "http").encode("iso-8859-1"))
 
+        h = TestHandler()
+        h.run(trivial_app3)
+        self.assertEqual(h.stdout.getvalue(),
+            b'Status: 200 OK\r\n'
+            b'Content-Length: 8\r\n'
+            b'\r\n'
+            b'\xd1\x82\xd0\xb5\xd1\x81\xd1\x82')
 
 
 
@@ -505,23 +556,24 @@ class HandlerTests(TestCase):
         h = ErrorHandler()
         h.run(non_error_app)
         self.assertEqual(h.stdout.getvalue(),
-            "Status: 200 OK\r\n"
+            ("Status: 200 OK\r\n"
             "Content-Length: 0\r\n"
-            "\r\n")
+            "\r\n").encode("iso-8859-1"))
         self.assertEqual(h.stderr.getvalue(),"")
 
         h = ErrorHandler()
         h.run(error_app)
         self.assertEqual(h.stdout.getvalue(),
-            "Status: %s\r\n"
+            ("Status: %s\r\n"
             "Content-Type: text/plain\r\n"
             "Content-Length: %d\r\n"
-            "\r\n%s" % (h.error_status,len(h.error_body),h.error_body))
+            "\r\n" % (h.error_status,len(h.error_body))).encode('iso-8859-1')
+            + h.error_body)
 
-        self.failUnless("AssertionError" in h.stderr.getvalue())
+        self.assertIn("AssertionError", h.stderr.getvalue())
 
     def testErrorAfterOutput(self):
-        MSG = "Some output has been sent"
+        MSG = b"Some output has been sent"
         def error_app(e,s):
             s("200 OK",[])(MSG)
             raise AssertionError("This should be caught by handler")
@@ -529,9 +581,9 @@ class HandlerTests(TestCase):
         h = ErrorHandler()
         h.run(error_app)
         self.assertEqual(h.stdout.getvalue(),
-            "Status: 200 OK\r\n"
-            "\r\n"+MSG)
-        self.failUnless("AssertionError" in h.stderr.getvalue())
+            ("Status: 200 OK\r\n"
+            "\r\n".encode("iso-8859-1")+MSG))
+        self.assertIn("AssertionError", h.stderr.getvalue())
 
 
     def testHeaderFormats(self):
@@ -547,7 +599,7 @@ class HandlerTests(TestCase):
         )
         shortpat = (
             "Status: 200 OK\r\n" "Content-Length: 0\r\n" "\r\n"
-        )
+        ).encode("iso-8859-1")
 
         for ssw in "FooBar/1.0", None:
             sw = ssw and "Server: %s\r\n" % ssw or ""
@@ -568,12 +620,30 @@ class HandlerTests(TestCase):
                     h.server_software = ssw
                     h.run(non_error_app)
                     if proto=="HTTP/0.9":
-                        self.assertEqual(h.stdout.getvalue(),"")
+                        self.assertEqual(h.stdout.getvalue(),b"")
                     else:
-                        self.failUnless(
-                            re.match(stdpat%(version,sw), h.stdout.getvalue()),
-                            (stdpat%(version,sw), h.stdout.getvalue())
+                        self.assertTrue(
+                            re.match((stdpat%(version,sw)).encode("iso-8859-1"),
+                                h.stdout.getvalue()),
+                            ((stdpat%(version,sw)).encode("iso-8859-1"),
+                                h.stdout.getvalue())
                         )
+
+    def testBytesData(self):
+        def app(e, s):
+            s("200 OK", [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ])
+            return [b"data"]
+
+        h = TestHandler()
+        h.run(app)
+        self.assertEqual(b"Status: 200 OK\r\n"
+            b"Content-Type: text/plain; charset=utf-8\r\n"
+            b"Content-Length: 4\r\n"
+            b"\r\n"
+            b"data",
+            h.stdout.getvalue())
 
 # This epilogue is needed for compatibility with the Python 2.5 regrtest module
 

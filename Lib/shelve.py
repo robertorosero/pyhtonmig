@@ -60,9 +60,18 @@ from pickle import Pickler, Unpickler
 from io import BytesIO
 
 import collections
-import warnings
 
 __all__ = ["Shelf","BsdDbShelf","DbfilenameShelf","open"]
+
+class _ClosedDict(collections.MutableMapping):
+    'Marker for a closed dict.  Access attempts raise a ValueError.'
+
+    def closed(self, *args):
+        raise ValueError('invalid operation on closed shelf')
+    __iter__ = __len__ = __getitem__ = __setitem__ = __delitem__ = keys = closed
+
+    def __repr__(self):
+        return '<Closed Dictionary>'
 
 class Shelf(collections.MutableMapping):
     """Base class for shelf implementations.
@@ -75,7 +84,7 @@ class Shelf(collections.MutableMapping):
                  keyencoding="utf-8"):
         self.dict = dict
         if protocol is None:
-            protocol = 2
+            protocol = 3
         self._protocol = protocol
         self.writeback = writeback
         self.cache = {}
@@ -127,7 +136,12 @@ class Shelf(collections.MutableMapping):
             self.dict.close()
         except AttributeError:
             pass
-        self.dict = 0
+        # Catch errors that may happen when close is called from __del__
+        # because CPython is in interpreter shutdown.
+        try:
+            self.dict = _ClosedDict()
+        except (NameError, TypeError):
+            self.dict = None
 
     def __del__(self):
         if not hasattr(self, 'writeback'):

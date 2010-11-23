@@ -20,18 +20,40 @@ from email.charset import Charset
 
 SEMISPACE = '; '
 
-# Regular expression used to split header parameters.  BAW: this may be too
-# simple.  It isn't strictly RFC 2045 (section 5.1) compliant, but it catches
-# most headers found in the wild.  We may eventually need a full fledged
-# parser eventually.
-paramre = re.compile(r'\s*;\s*')
 # Regular expression that matches `special' characters in parameters, the
-# existance of which force quoting of the parameter value.
+# existence of which force quoting of the parameter value.
 tspecials = re.compile(r'[ \(\)<>@,;:\\"/\[\]\?=]')
 
+# How to figure out if we are processing strings that come from a byte
+# source with undecodable characters.
+_has_surrogates = re.compile(
+    '([^\ud800-\udbff]|\A)[\udc00-\udfff]([^\udc00-\udfff]|\Z)').search
 
-
+
 # Helper functions
+def _sanitize_surrogates(value):
+    # If the value contains surrogates, re-decode and replace the original
+    # non-ascii bytes with '?'s.  Used to sanitize header values before letting
+    # them escape as strings.
+    if not isinstance(value, str):
+        # Header object
+        return value
+    if _has_surrogates(value):
+        original_bytes = value.encode('ascii', 'surrogateescape')
+        return original_bytes.decode('ascii', 'replace').replace('\ufffd', '?')
+    else:
+        return value
+
+def _splitparam(param):
+    # Split header parameters.  BAW: this may be too simple.  It isn't
+    # strictly RFC 2045 (section 5.1) compliant, but it catches most headers
+    # found in the wild.  We may eventually need a full fledged parser
+    # eventually.
+    a, sep, b = param.partition(';')
+    if not sep:
+        return a.strip(), None
+    return a.strip(), b.strip()
+
 def _formatparam(param, value=None, quote=True):
     """Convenience function to format and return a key=value pair.
 
@@ -59,7 +81,7 @@ def _parseparam(s):
     while s[:1] == ';':
         s = s[1:]
         end = s.find(';')
-        while end > 0 and s.count('"', 0, end) % 2:
+        while end > 0 and (s.count('"', 0, end) - s.count('\\"', 0, end)) % 2:
             end = s.find(';', end + 1)
         if end < 0:
             end = len(s)
@@ -94,7 +116,7 @@ class Message:
     objects, otherwise it is a string.
 
     Message objects implement part of the `mapping' interface, which assumes
-    there is exactly one occurrance of the header per message.  Some headers
+    there is exactly one occurrence of the header per message.  Some headers
     do in fact appear multiple times (e.g. Received) and for those headers,
     you must use the explicit API to set or get all the headers.  Not all of
     the mapping methods are implemented.
@@ -180,43 +202,72 @@ class Message:
         If the message is a multipart and the decode flag is True, then None
         is returned.
         """
-        if i is None:
-            payload = self._payload
-        elif not isinstance(self._payload, list):
+        # Here is the logic table for this code, based on the email5.0.0 code:
+        #   i     decode  is_multipart  result
+        # ------  ------  ------------  ------------------------------
+        #  None   True    True          None
+        #   i     True    True          None
+        #  None   False   True          _payload (a list)
+        #   i     False   True          _payload element i (a Message)
+        #   i     False   False         error (not a list)
+        #   i     True    False         error (not a list)
+        #  None   False   False         _payload
+        #  None   True    False         _payload decoded (bytes)
+        # Note that Barry planned to factor out the 'decode' case, but that
+        # isn't so easy now that we handle the 8 bit data, which needs to be
+        # converted in both the decode and non-decode path.
+        if self.is_multipart():
+            if decode:
+                return None
+            if i is None:
+                return self._payload
+            else:
+                return self._payload[i]
+        # For backward compatibility, Use isinstance and this error message
+        # instead of the more logical is_multipart test.
+        if i is not None and not isinstance(self._payload, list):
             raise TypeError('Expected list, got %s' % type(self._payload))
-        else:
-            payload = self._payload[i]
+        payload = self._payload
+        cte = self.get('content-transfer-encoding', '').lower()
+        # payload can be bytes here, (I wonder if that is actually a bug?)
+        if isinstance(payload, str):
+            if _has_surrogates(payload):
+                bpayload = payload.encode('ascii', 'surrogateescape')
+                if not decode:
+                    try:
+                        payload = bpayload.decode(self.get_param('charset', 'ascii'), 'replace')
+                    except LookupError:
+                        payload = bpayload.decode('ascii', 'replace')
+            elif decode:
+                try:
+                    bpayload = payload.encode('ascii')
+                except UnicodeError:
+                    # This won't happen for RFC compliant messages (messages
+                    # containing only ASCII codepoints in the unicode input).
+                    # If it does happen, turn the string into bytes in a way
+                    # guaranteed not to fail.
+                    bpayload = payload.encode('raw-unicode-escape')
         if not decode:
             return payload
-        # Decoded payloads always return bytes.  XXX split this part out into
-        # a new method called .get_decoded_payload().
-        if self.is_multipart():
-            return None
-        cte = self.get('content-transfer-encoding', '').lower()
         if cte == 'quoted-printable':
-            return utils._qdecode(payload)
+            return utils._qdecode(bpayload)
         elif cte == 'base64':
             try:
-                if isinstance(payload, str):
-                    payload = payload.encode('raw-unicode-escape')
-                return base64.b64decode(payload)
-                #return utils._bdecode(payload)
+                return base64.b64decode(bpayload)
             except binascii.Error:
                 # Incorrect padding
-                pass
+                return bpayload
         elif cte in ('x-uuencode', 'uuencode', 'uue', 'x-uue'):
-            in_file = BytesIO(payload.encode('raw-unicode-escape'))
+            in_file = BytesIO(bpayload)
             out_file = BytesIO()
             try:
                 uu.decode(in_file, out_file, quiet=True)
                 return out_file.getvalue()
             except uu.Error:
                 # Some decoding problem
-                pass
-        # Is there a better way to do this?  We can't use the bytes
-        # constructor.
+                return bpayload
         if isinstance(payload, str):
-            return payload.encode('raw-unicode-escape')
+            return bpayload
         return payload
 
     def set_payload(self, payload, charset=None):
@@ -285,7 +336,7 @@ class Message:
         Return None if the header is missing instead of raising an exception.
 
         Note that if the header appeared multiple times, exactly which
-        occurrance gets returned is undefined.  Use get_all() to get all
+        occurrence gets returned is undefined.  Use get_all() to get all
         the values matching a header field name.
         """
         return self.get(name)
@@ -317,9 +368,6 @@ class Message:
         for field, value in self._headers:
             yield field
 
-    def __len__(self):
-        return len(self._headers)
-
     def keys(self):
         """Return a list of all the message's header field names.
 
@@ -338,7 +386,7 @@ class Message:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
-        return [v for k, v in self._headers]
+        return [_sanitize_surrogates(v) for k, v in self._headers]
 
     def items(self):
         """Get all the message's header fields and values.
@@ -348,7 +396,7 @@ class Message:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
-        return self._headers[:]
+        return [(k, _sanitize_surrogates(v)) for k, v in self._headers]
 
     def get(self, name, failobj=None):
         """Get a header value.
@@ -359,7 +407,7 @@ class Message:
         name = name.lower()
         for k, v in self._headers:
             if k.lower() == name:
-                return v
+                return _sanitize_surrogates(v)
         return failobj
 
     #
@@ -379,7 +427,7 @@ class Message:
         name = name.lower()
         for k, v in self._headers:
             if k.lower() == name:
-                values.append(v)
+                values.append(_sanitize_surrogates(v))
         if not values:
             return failobj
         return values
@@ -443,7 +491,7 @@ class Message:
         if value is missing:
             # This should have no parameters
             return self.get_default_type()
-        ctype = paramre.split(value)[0].lower().strip()
+        ctype = _splitparam(value)[0].lower()
         # RFC 2045, section 5.2 says if its invalid, use text/plain
         if ctype.count('/') != 1:
             return 'text/plain'
@@ -677,7 +725,7 @@ class Message:
         missing = object()
         filename = self.get_param('filename', missing, 'content-disposition')
         if filename is missing:
-            filename = self.get_param('name', missing, 'content-disposition')
+            filename = self.get_param('name', missing, 'content-type')
         if filename is missing:
             return failobj
         return utils.collapse_rfc2231_value(filename).strip()

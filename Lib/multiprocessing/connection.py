@@ -11,12 +11,13 @@ __all__ = [ 'Client', 'Listener', 'Pipe' ]
 import os
 import sys
 import socket
+import errno
 import time
 import tempfile
 import itertools
 
 import _multiprocessing
-from multiprocessing import current_process
+from multiprocessing import current_process, AuthenticationError
 from multiprocessing.util import get_temp_dir, Finalize, sub_debug, debug
 from multiprocessing.forking import duplicate, close
 
@@ -26,6 +27,8 @@ from multiprocessing.forking import duplicate, close
 #
 
 BUFSIZE = 8192
+# A very generous timeout when it comes to local connections...
+CONNECTION_TIMEOUT = 20.
 
 _mmap_counter = itertools.count()
 
@@ -39,6 +42,13 @@ if hasattr(socket, 'AF_UNIX'):
 if sys.platform == 'win32':
     default_family = 'AF_PIPE'
     families += ['AF_PIPE']
+
+
+def _init_timeout(timeout=CONNECTION_TIMEOUT):
+    return time.time() + timeout
+
+def _check_timeout(t):
+    return time.time() > t
 
 #
 #
@@ -163,7 +173,7 @@ if sys.platform != 'win32':
 
 else:
 
-    from ._multiprocessing import win32
+    from _multiprocessing import win32
 
     def Pipe(duplex=True):
         '''
@@ -209,24 +219,20 @@ else:
 
 class SocketListener(object):
     '''
-    Represtation of a socket which is bound to an address and listening
+    Representation of a socket which is bound to an address and listening
     '''
     def __init__(self, address, family, backlog=1):
         self._socket = socket.socket(getattr(socket, family))
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.bind(address)
         self._socket.listen(backlog)
-        address = self._socket.getsockname()
-        if type(address) is tuple:
-            address = (socket.getfqdn(address[0]),) + address[1:]
-        self._address = address
+        self._address = self._socket.getsockname()
         self._family = family
         self._last_accepted = None
 
-        sub_debug('listener bound to address %r', self._address)
-
         if family == 'AF_UNIX':
             self._unlink = Finalize(
-                self, os.unlink, args=(self._address,), exitpriority=0
+                self, os.unlink, args=(address,), exitpriority=0
                 )
         else:
             self._unlink = None
@@ -250,12 +256,13 @@ def SocketClient(address):
     '''
     family = address_type(address)
     s = socket.socket( getattr(socket, family) )
+    t = _init_timeout()
 
     while 1:
         try:
             s.connect(address)
         except socket.error as e:
-            if e.args[0] != 10061:    # 10061 => connection refused
+            if e.args[0] != errno.ECONNREFUSED or _check_timeout(t):
                 debug('failed to connect to address %s', address)
                 raise
             time.sleep(0.01)
@@ -325,6 +332,7 @@ if sys.platform == 'win32':
         '''
         Return a connection object connected to the pipe given by `address`
         '''
+        t = _init_timeout()
         while 1:
             try:
                 win32.WaitNamedPipe(address, 1000)
@@ -334,7 +342,7 @@ if sys.platform == 'win32':
                     )
             except WindowsError as e:
                 if e.args[0] not in (win32.ERROR_SEM_TIMEOUT,
-                                     win32.ERROR_PIPE_BUSY):
+                                     win32.ERROR_PIPE_BUSY) or _check_timeout(t):
                     raise
             else:
                 break

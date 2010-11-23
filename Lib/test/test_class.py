@@ -92,10 +92,6 @@ def __float__(self, *args):
     return 1.0
 
 @trackCall
-def __cmp__(self, *args):
-    return 0
-
-@trackCall
 def __eq__(self, *args):
     return True
 
@@ -440,7 +436,7 @@ class ClassTests(unittest.TestCase):
         del testme
         import gc
         gc.collect()
-        self.assertEquals(["crab people, crab people"], x)
+        self.assertEqual(["crab people, crab people"], x)
 
     def testBadTypeReturned(self):
         # return values of some method are type-checked
@@ -464,11 +460,6 @@ class ClassTests(unittest.TestCase):
             pass
 
         hash(C0()) # This should work; the next two should raise TypeError
-
-        class C1:
-            def __cmp__(self, other): return 0
-
-        self.assertRaises(TypeError, hash, C1())
 
         class C2:
             def __eq__(self, other): return 1
@@ -538,17 +529,17 @@ class ClassTests(unittest.TestCase):
 
         a1 = A(1)
         a2 = A(2)
-        self.assertEquals(a1.f, a1.f)
-        self.assertNotEquals(a1.f, a2.f)
-        self.assertNotEquals(a1.f, a1.g)
-        self.assertEquals(a1.f, A(1).f)
-        self.assertEquals(hash(a1.f), hash(a1.f))
-        self.assertEquals(hash(a1.f), hash(A(1).f))
+        self.assertEqual(a1.f, a1.f)
+        self.assertNotEqual(a1.f, a2.f)
+        self.assertNotEqual(a1.f, a1.g)
+        self.assertEqual(a1.f, A(1).f)
+        self.assertEqual(hash(a1.f), hash(a1.f))
+        self.assertEqual(hash(a1.f), hash(A(1).f))
 
-        self.assertNotEquals(A.f, a1.f)
-        self.assertNotEquals(A.f, A.g)
-        self.assertEquals(B.f, A.f)
-        self.assertEquals(hash(B.f), hash(A.f))
+        self.assertNotEqual(A.f, a1.f)
+        self.assertNotEqual(A.f, A.g)
+        self.assertEqual(B.f, A.f)
+        self.assertEqual(hash(B.f), hash(A.f))
 
         # the following triggers a SystemError in 2.4
         a = A(hash(A.f)^(-1))

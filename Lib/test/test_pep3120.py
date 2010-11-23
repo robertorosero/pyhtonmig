@@ -19,12 +19,29 @@ class PEP3120Test(unittest.TestCase):
         try:
             import test.badsyntax_pep3120
         except SyntaxError as msg:
-            self.assert_(str(msg).find("Non-UTF-8 code starting with") >= 0)
+            msg = str(msg)
+            self.assertTrue('UTF-8' in msg or 'utf8' in msg)
         else:
             self.fail("expected exception didn't occur")
 
+
+class BuiltinCompileTests(unittest.TestCase):
+
+    # Issue 3574.
+    def test_latin1(self):
+        # Allow compile() to read Latin-1 source.
+        source_code = '# coding: Latin-1\nu = "Ç"\n'.encode("Latin-1")
+        try:
+            code = compile(source_code, '<dummy>', 'exec')
+        except SyntaxError:
+            self.fail("compile() cannot handle Latin-1 source")
+        ns = {}
+        exec(code, ns)
+        self.assertEqual('Ç', ns['u'])
+
+
 def test_main():
-    support.run_unittest(PEP3120Test)
+    support.run_unittest(PEP3120Test, BuiltinCompileTests)
 
 if __name__=="__main__":
     test_main()

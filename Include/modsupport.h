@@ -27,6 +27,7 @@ PyAPI_FUNC(int) PyArg_Parse(PyObject *, const char *, ...);
 PyAPI_FUNC(int) PyArg_ParseTuple(PyObject *, const char *, ...) Py_FORMAT_PARSETUPLE(PyArg_ParseTuple, 2, 3);
 PyAPI_FUNC(int) PyArg_ParseTupleAndKeywords(PyObject *, PyObject *,
                                                   const char *, char **, ...);
+PyAPI_FUNC(int) PyArg_ValidateKeywordArguments(PyObject *);
 PyAPI_FUNC(int) PyArg_UnpackTuple(PyObject *, const char *, Py_ssize_t, Py_ssize_t, ...);
 PyAPI_FUNC(PyObject *) Py_BuildValue(const char *, ...);
 PyAPI_FUNC(PyObject *) _Py_BuildValue_SizeT(const char *, ...);
@@ -42,6 +43,8 @@ PyAPI_FUNC(int) PyModule_AddIntConstant(PyObject *, const char *, long);
 PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char *);
 #define PyModule_AddIntMacro(m, c) PyModule_AddIntConstant(m, #c, c)
 #define PyModule_AddStringMacro(m, c) PyModule_AddStringConstant(m, #c, c)
+
+#define Py_CLEANUP_SUPPORTED 0x20000
 
 #define PYTHON_API_VERSION 1013
 #define PYTHON_API_STRING "1013"
@@ -90,10 +93,10 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
 */
 
 #ifdef Py_TRACE_REFS
- /* When we are tracing reference counts, rename PyModule_New2 so
+ /* When we are tracing reference counts, rename PyModule_Create2 so
     modules compiled with incompatible settings will generate a
     link-time error. */
- #define PyModule_New2 PyModule_Create2TraceRefs
+ #define PyModule_Create2 PyModule_Create2TraceRefs
 #endif
 
 PyAPI_FUNC(PyObject *) PyModule_Create2(struct PyModuleDef*,

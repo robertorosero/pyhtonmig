@@ -6,6 +6,7 @@ from test import support
 from test.pickletester import AbstractPickleTests
 from test.pickletester import AbstractPickleModuleTests
 from test.pickletester import AbstractPersistentPicklerTests
+from test.pickletester import AbstractPicklerUnpicklerObjectTests
 
 try:
     import _pickle
@@ -36,6 +37,18 @@ class PyPicklerTests(AbstractPickleTests):
         return u.load()
 
 
+class InMemoryPickleTests(AbstractPickleTests):
+
+    pickler = pickle._Pickler
+    unpickler = pickle._Unpickler
+
+    def dumps(self, arg, proto=None):
+        return pickle.dumps(arg, proto)
+
+    def loads(self, buf):
+        return pickle.loads(buf)
+
+
 class PyPersPicklerTests(AbstractPersistentPicklerTests):
 
     pickler = pickle._Pickler
@@ -60,6 +73,12 @@ class PyPersPicklerTests(AbstractPersistentPicklerTests):
         return u.load()
 
 
+class PyPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests):
+
+    pickler_class = pickle._Pickler
+    unpickler_class = pickle._Unpickler
+
+
 if has_c_implementation:
     class CPicklerTests(PyPicklerTests):
         pickler = _pickle.Pickler
@@ -69,11 +88,27 @@ if has_c_implementation:
         pickler = _pickle.Pickler
         unpickler = _pickle.Unpickler
 
+    class CDumpPickle_LoadPickle(PyPicklerTests):
+        pickler = _pickle.Pickler
+        unpickler = pickle._Unpickler
+
+    class DumpPickle_CLoadPickle(PyPicklerTests):
+        pickler = pickle._Pickler
+        unpickler = _pickle.Unpickler
+
+    class CPicklerUnpicklerObjectTests(AbstractPicklerUnpicklerObjectTests):
+        pickler_class = _pickle.Pickler
+        unpickler_class = _pickle.Unpickler
+
 
 def test_main():
     tests = [PickleTests, PyPicklerTests, PyPersPicklerTests]
     if has_c_implementation:
-        tests.extend([CPicklerTests, CPersPicklerTests])
+        tests.extend([CPicklerTests, CPersPicklerTests,
+                      CDumpPickle_LoadPickle, DumpPickle_CLoadPickle,
+                      PyPicklerUnpicklerObjectTests,
+                      CPicklerUnpicklerObjectTests,
+                      InMemoryPickleTests])
     support.run_unittest(*tests)
     support.run_doctest(pickle)
 

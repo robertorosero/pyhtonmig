@@ -1,3 +1,4 @@
+from collections import deque
 from test.support import run_unittest
 import unittest
 
@@ -6,7 +7,7 @@ class base_set:
     def __init__(self, el):
         self.el = el
 
-class set(base_set):
+class myset(base_set):
     def __contains__(self, el):
         return self.el == el
 
@@ -17,21 +18,21 @@ class seq(base_set):
 class TestContains(unittest.TestCase):
     def test_common_tests(self):
         a = base_set(1)
-        b = set(1)
+        b = myset(1)
         c = seq(1)
-        self.assert_(1 in b)
-        self.assert_(0 not in b)
-        self.assert_(1 in c)
-        self.assert_(0 not in c)
+        self.assertIn(1, b)
+        self.assertNotIn(0, b)
+        self.assertIn(1, c)
+        self.assertNotIn(0, c)
         self.assertRaises(TypeError, lambda: 1 in a)
         self.assertRaises(TypeError, lambda: 1 not in a)
 
         # test char in string
-        self.assert_('c' in 'abc')
-        self.assert_('d' not in 'abc')
+        self.assertIn('c', 'abc')
+        self.assertNotIn('d', 'abc')
 
-        self.assert_('' in '')
-        self.assert_('' in 'abc')
+        self.assertIn('', '')
+        self.assertIn('', 'abc')
 
         self.assertRaises(TypeError, lambda: None in 'abc')
 
@@ -39,15 +40,15 @@ class TestContains(unittest.TestCase):
         # a collection of tests on builtin sequence types
         a = range(10)
         for i in a:
-            self.assert_(i in a)
-        self.assert_(16 not in a)
-        self.assert_(a not in a)
+            self.assertIn(i, a)
+        self.assertNotIn(16, a)
+        self.assertNotIn(a, a)
 
         a = tuple(a)
         for i in a:
-            self.assert_(i in a)
-        self.assert_(16 not in a)
-        self.assert_(a not in a)
+            self.assertIn(i, a)
+        self.assertNotIn(16, a)
+        self.assertNotIn(a, a)
 
         class Deviant1:
             """Behaves strangely when compared
@@ -55,30 +56,34 @@ class TestContains(unittest.TestCase):
             This class is designed to make sure that the contains code
             works when the list is modified during the check.
             """
-            aList = range(15)
-            def __cmp__(self, other):
+            aList = list(range(15))
+            def __eq__(self, other):
                 if other == 12:
                     self.aList.remove(12)
                     self.aList.remove(13)
                     self.aList.remove(14)
-                return 1
+                return 0
 
-        self.assert_(Deviant1() not in Deviant1.aList)
+        self.assertNotIn(Deviant1(), Deviant1.aList)
 
-        class Deviant2:
-            """Behaves strangely when compared
+    def test_nonreflexive(self):
+        # containment and equality tests involving elements that are
+        # not necessarily equal to themselves
 
-            This class raises an exception during comparison.  That in
-            turn causes the comparison to fail with a TypeError.
-            """
-            def __cmp__(self, other):
-                if other == 4:
-                    raise RuntimeError("gotcha")
+        class MyNonReflexive(object):
+            def __eq__(self, other):
+                return False
+            def __hash__(self):
+                return 28
 
-        try:
-            self.assert_(Deviant2() not in a)
-        except TypeError:
-            pass
+        values = float('nan'), 1, None, 'abc', MyNonReflexive()
+        constructors = list, tuple, dict.fromkeys, set, frozenset, deque
+        for constructor in constructors:
+            container = constructor(values)
+            for elem in container:
+                self.assertIn(elem, container)
+            self.assertTrue(container == constructor(values))
+            self.assertTrue(container == container)
 
 
 def test_main():

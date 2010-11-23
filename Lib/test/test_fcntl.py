@@ -3,25 +3,25 @@
 OS/2+EMX doesn't support the file locking operations.
 
 """
-import fcntl
 import os
 import struct
 import sys
 import unittest
-from test.support import verbose, TESTFN, unlink, run_unittest
+from test.support import verbose, TESTFN, unlink, run_unittest, import_module
+
+# Skip test if no fnctl module.
+fcntl = import_module('fcntl')
+
 
 # TODO - Write tests for flock() and lockf().
 
 def get_lockdata():
-    if sys.platform.startswith('atheos'):
-        start_len = "qq"
+    try:
+        os.O_LARGEFILE
+    except AttributeError:
+        start_len = "ll"
     else:
-        try:
-            os.O_LARGEFILE
-        except AttributeError:
-            start_len = "ll"
-        else:
-            start_len = "qq"
+        start_len = "qq"
 
     if sys.platform in ('netbsd1', 'netbsd2', 'netbsd3',
                         'Darwin1.2', 'darwin',
@@ -56,7 +56,7 @@ class TestFcntl(unittest.TestCase):
         self.f = None
 
     def tearDown(self):
-        if not self.f.closed:
+        if self.f and not self.f.closed:
             self.f.close()
         unlink(TESTFN)
 
@@ -79,6 +79,21 @@ class TestFcntl(unittest.TestCase):
         if sys.platform not in ['os2emx']:
             rv = fcntl.fcntl(self.f, fcntl.F_SETLKW, lockdata)
         self.f.close()
+
+    def test_fcntl_64_bit(self):
+        # Issue #1309352: fcntl shouldn't fail when the third arg fits in a
+        # C 'long' but not in a C 'int'.
+        try:
+            cmd = fcntl.F_NOTIFY
+            # This flag is larger than 2**31 in 64-bit builds
+            flags = fcntl.DN_MULTISHOT
+        except AttributeError:
+            self.skipTest("F_NOTIFY or DN_MULTISHOT unavailable")
+        fd = os.open(os.path.dirname(os.path.abspath(TESTFN)), os.O_RDONLY)
+        try:
+            fcntl.fcntl(fd, cmd, flags)
+        finally:
+            os.close(fd)
 
 
 def test_main():

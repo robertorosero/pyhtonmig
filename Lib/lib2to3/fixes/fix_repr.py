@@ -5,11 +5,12 @@
 
 # Local imports
 from .. import fixer_base
-from ..fixer_util import Call, Name
+from ..fixer_util import Call, Name, parenthesize
 
 
 class FixRepr(fixer_base.BaseFix):
 
+    BM_compatible = True
     PATTERN = """
               atom < '`' expr=any '`' >
               """
@@ -18,5 +19,5 @@ class FixRepr(fixer_base.BaseFix):
         expr = results["expr"].clone()
 
         if expr.type == self.syms.testlist1:
-            expr = self.parenthesize(expr)
-        return Call(Name("repr"), [expr], prefix=node.get_prefix())
+            expr = parenthesize(expr)
+        return Call(Name("repr"), [expr], prefix=node.prefix)

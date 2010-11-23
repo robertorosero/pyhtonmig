@@ -13,6 +13,7 @@ __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "devnull","realpath","supports_unicode_filenames"]
 
 # strings representing various path-related bits and pieces
+# These are primarily for export; internally, they are hardcoded.
 curdir = ':'
 pardir = '::'
 extsep = '.'
@@ -22,9 +23,18 @@ defpath = ':'
 altsep = None
 devnull = 'Dev:Null'
 
+def _get_colon(path):
+    if isinstance(path, bytes):
+        return b':'
+    else:
+        return ':'
+
 # Normalize the case of a pathname.  Dummy in Posix, but <s>.lower() here.
 
 def normcase(path):
+    if not isinstance(path, (bytes, str)):
+        raise TypeError("normcase() argument must be str or bytes, "
+                        "not '{}'".format(path.__class__.__name__))
     return path.lower()
 
 
@@ -35,21 +45,23 @@ def isabs(s):
     Anything else is absolute (the string up to the first colon is the
     volume name)."""
 
-    return ':' in s and s[0] != ':'
+    colon = _get_colon(s)
+    return colon in s and s[:1] != colon
 
 
 def join(s, *p):
+    colon = _get_colon(s)
     path = s
     for t in p:
         if (not s) or isabs(t):
             path = t
             continue
-        if t[:1] == ':':
+        if t[:1] == colon:
             t = t[1:]
-        if ':' not in path:
-            path = ':' + path
-        if path[-1:] != ':':
-            path = path + ':'
+        if colon not in path:
+            path = colon + path
+        if path[-1:] != colon:
+            path = path + colon
         path = path + t
     return path
 
@@ -59,18 +71,22 @@ def split(s):
     bit, and the basename (the filename, without colons, in that directory).
     The result (s, t) is such that join(s, t) yields the original argument."""
 
-    if ':' not in s: return '', s
-    colon = 0
+    colon = _get_colon(s)
+    if colon not in s: return s[:0], s
+    col = 0
     for i in range(len(s)):
-        if s[i] == ':': colon = i + 1
-    path, file = s[:colon-1], s[colon:]
-    if path and not ':' in path:
-        path = path + ':'
+        if s[i:i+1] == colon: col = i + 1
+    path, file = s[:col-1], s[col:]
+    if path and not colon in path:
+        path = path + colon
     return path, file
 
 
 def splitext(p):
-    return genericpath._splitext(p, sep, altsep, extsep)
+    if isinstance(p, bytes):
+        return genericpath._splitext(p, b':', altsep, b'.')
+    else:
+        return genericpath._splitext(p, sep, altsep, extsep)
 splitext.__doc__ = genericpath._splitext.__doc__
 
 def splitdrive(p):
@@ -80,7 +96,7 @@ def splitdrive(p):
     syntactic and semantic oddities as DOS drive letters, such as there
     being a separate current directory per drive)."""
 
-    return '', p
+    return p[:0], p
 
 
 # Short interfaces to split()
@@ -92,7 +108,7 @@ def ismount(s):
     if not isabs(s):
         return False
     components = split(s)
-    return len(components) == 2 and components[1] == ''
+    return len(components) == 2 and not components[1]
 
 def islink(s):
     """Return true if the pathname refers to a symbolic link."""
@@ -131,13 +147,15 @@ def normpath(s):
     """Normalize a pathname.  Will return the same result for
     equivalent paths."""
 
-    if ":" not in s:
-        return ":"+s
+    colon = _get_colon(s)
 
-    comps = s.split(":")
+    if colon not in s:
+        return colon + s
+
+    comps = s.split(colon)
     i = 1
     while i < len(comps)-1:
-        if comps[i] == "" and comps[i-1] != "":
+        if not comps[i] and comps[i-1]:
             if i > 1:
                 del comps[i-1:i+1]
                 i = i - 1
@@ -147,17 +165,21 @@ def normpath(s):
         else:
             i = i + 1
 
-    s = ":".join(comps)
+    s = colon.join(comps)
 
     # remove trailing ":" except for ":" and "Volume:"
-    if s[-1] == ":" and len(comps) > 2 and s != ":"*len(s):
+    if s[-1:] == colon and len(comps) > 2 and s != colon*len(s):
         s = s[:-1]
     return s
 
 def abspath(path):
     """Return an absolute path."""
     if not isabs(path):
-        path = join(os.getcwd(), path)
+        if isinstance(path, bytes):
+            cwd = os.getcwdb()
+        else:
+            cwd = os.getcwd()
+        path = join(cwd, path)
     return normpath(path)
 
 # realpath is a no-op on systems without islink support
@@ -169,11 +191,15 @@ def realpath(path):
         return path
     if not path:
         return path
-    components = path.split(':')
-    path = components[0] + ':'
+    colon = _get_colon(path)
+    components = path.split(colon)
+    path = components[0] + colon
     for c in components[1:]:
         path = join(path, c)
-        path = Carbon.File.FSResolveAliasFile(path, 1)[0].as_pathname()
+        try:
+            path = Carbon.File.FSResolveAliasFile(path, 1)[0].as_pathname()
+        except Carbon.File.Error:
+            pass
     return path
 
-supports_unicode_filenames = False
+supports_unicode_filenames = True

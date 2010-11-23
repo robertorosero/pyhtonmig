@@ -19,6 +19,7 @@ from .. import fixer_base
 from ..fixer_util import Name, Call, ListComp, in_special_context
 
 class FixFilter(fixer_base.ConditionalFix):
+    BM_compatible = True
 
     PATTERN = """
     filter_lambda=power<
@@ -69,7 +70,7 @@ class FixFilter(fixer_base.ConditionalFix):
             if in_special_context(node):
                 return None
             new = node.clone()
-            new.set_prefix("")
+            new.prefix = ""
             new = Call(Name("list"), [new])
-        new.set_prefix(node.get_prefix())
+        new.prefix = node.prefix
         return new

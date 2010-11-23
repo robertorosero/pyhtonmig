@@ -1,6 +1,4 @@
-from Tkinter import *
-
-import string
+from tkinter import *
 
 
 class Pong(Frame):

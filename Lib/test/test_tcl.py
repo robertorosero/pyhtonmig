@@ -1,10 +1,23 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
+import sys
 import os
 from test import support
+
+# Skip this test if the _tkinter module wasn't built.
+_tkinter = support.import_module('_tkinter')
+
 from tkinter import Tcl
 from _tkinter import TclError
+
+
+class TkinterTest(unittest.TestCase):
+
+    def testFlattenLen(self):
+        # flatten(<object with no length>)
+        self.assertRaises(TypeError, _tkinter._flatten, True)
+
 
 class TclTest(unittest.TestCase):
 
@@ -115,43 +128,33 @@ class TclTest(unittest.TestCase):
         tcl = self.interp
         self.assertRaises(TclError,tcl.eval,'package require DNE')
 
-    def testLoadTk(self):
-        import os
-        if 'DISPLAY' not in os.environ:
-            # skipping test of clean upgradeability
-            return
-        tcl = Tcl()
-        self.assertRaises(TclError,tcl.winfo_geometry)
-        tcl.loadtk()
-        self.assertEqual('1x1+0+0', tcl.winfo_geometry())
-        tcl.destroy()
+    @unittest.skipUnless(sys.platform == 'win32', 'Requires Windows')
+    def testLoadWithUNC(self):
+        # Build a UNC path from the regular path.
+        # Something like
+        #   \\%COMPUTERNAME%\c$\python27\python.exe
 
-    def testLoadTkFailure(self):
-        import os
-        old_display = None
-        import sys
-        if sys.platform.startswith(('win', 'darwin', 'cygwin')):
-            return  # no failure possible on windows?
-        if 'DISPLAY' in os.environ:
-            old_display = os.environ['DISPLAY']
-            del os.environ['DISPLAY']
-            # on some platforms, deleting environment variables
-            # doesn't actually carry through to the process level
-            # because they don't support unsetenv
-            # If that's the case, abort.
-            display = os.popen('echo $DISPLAY').read().strip()
-            if display:
-                return
-        try:
-            tcl = Tcl()
-            self.assertRaises(TclError, tcl.winfo_geometry)
-            self.assertRaises(TclError, tcl.loadtk)
-        finally:
-            if old_display is not None:
-                os.environ['DISPLAY'] = old_display
+        fullname = os.path.abspath(sys.executable)
+        if fullname[1] != ':':
+            raise unittest.SkipTest('Absolute path should have drive part')
+        unc_name = r'\\%s\%s$\%s' % (os.environ['COMPUTERNAME'],
+                                    fullname[0],
+                                    fullname[3:])
+        if not os.path.exists(unc_name):
+            raise unittest.SkipTest('Cannot connect to UNC Path')
+
+        with support.EnvironmentVarGuard() as env:
+            env.unset("TCL_LIBRARY")
+            f = os.popen('%s -c "import tkinter; print(tkinter)"' % (unc_name,))
+
+        self.assertIn('tkinter', f.read())
+        # exit code must be zero
+        self.assertEqual(f.close(), None)
+
+
 
 def test_main():
-    support.run_unittest(TclTest)
+    support.run_unittest(TclTest, TkinterTest)
 
 if __name__ == "__main__":
     test_main()

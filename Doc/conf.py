@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Python documentation build configuration file
 #
@@ -41,17 +40,13 @@ today_fmt = '%B %d, %Y'
 
 # List of files that shouldn't be included in the build.
 unused_docs = [
-    'whatsnew/2.0',
-    'whatsnew/2.1',
-    'whatsnew/2.2',
-    'whatsnew/2.3',
-    'whatsnew/2.4',
-    'whatsnew/2.5',
-    'whatsnew/2.6',
     'maclib/scrap',
     'library/xmllib',
     'library/xml.etree',
 ]
+
+# Ignore .rst in Sphinx its self.
+exclude_trees = ['tools/sphinx']
 
 # Relative filename of the reference count data file.
 refcount_file = 'data/refcounts.dat'
@@ -63,9 +58,15 @@ add_function_parentheses = True
 # unit titles (such as .. function::).
 add_module_names = True
 
+# By default, highlight as Python 3.
+highlight_language = 'python3'
+
 
 # Options for HTML output
 # -----------------------
+
+html_theme = 'default'
+html_theme_options = {'collapsiblesidebar': True}
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -87,7 +88,7 @@ html_additional_pages = {
 }
 
 # Output an OpenSearch description file.
-html_use_opensearch = 'http://docs.python.org/dev/3.0'
+html_use_opensearch = 'http://docs.python.org/dev/py3k'
 
 # Additional static files.
 html_static_path = ['tools/sphinxext/static']
@@ -129,13 +130,15 @@ latex_documents = [
     ('tutorial/index', 'tutorial.tex',
      'Python Tutorial', _stdauthor, 'manual'),
     ('using/index', 'using.tex',
-     'Using Python', _stdauthor, 'manual'),
+     'Python Setup and Usage', _stdauthor, 'manual'),
+    ('faq/index', 'faq.tex',
+     'Python Frequently Asked Questions', _stdauthor, 'manual'),
     ('whatsnew/' + version, 'whatsnew.tex',
      'What\'s New in Python', 'A. M. Kuchling', 'howto'),
 ]
 # Collect all HOWTOs individually
 latex_documents.extend(('howto/' + fn[:-4], 'howto-' + fn[:-4] + '.tex',
-                        'HOWTO', _stdauthor, 'howto')
+                        '', _stdauthor, 'howto')
                        for fn in os.listdir('howto')
                        if fn.endswith('.rst') and fn != 'index.rst')
 
@@ -145,10 +148,15 @@ latex_preamble = r'''
   \strong{Python Software Foundation}\\
   Email: \email{docs@python.org}
 }
+\let\Verbatim=\OriginalVerbatim
+\let\endVerbatim=\endOriginalVerbatim
 '''
 
 # Documents to append as an appendix to all manuals.
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
+
+# Get LaTeX to handle Unicode correctly
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}', 'utf8extra': ''}
 
 # Options for the coverage checker
 # --------------------------------

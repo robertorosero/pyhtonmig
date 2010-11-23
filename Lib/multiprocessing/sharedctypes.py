@@ -9,10 +9,9 @@
 import sys
 import ctypes
 import weakref
-import copyreg
 
 from multiprocessing import heap, RLock
-from multiprocessing.forking import assert_spawning
+from multiprocessing.forking import assert_spawning, ForkingPickler
 
 __all__ = ['RawValue', 'RawArray', 'Value', 'Array', 'copy', 'synchronized']
 
@@ -67,9 +66,12 @@ def Value(typecode_or_type, *args, lock=None):
     Return a synchronization wrapper for a Value
     '''
     obj = RawValue(typecode_or_type, *args)
-    if lock is None:
+    if lock is False:
+        return obj
+    if lock in (True, None):
         lock = RLock()
-    assert hasattr(lock, 'acquire')
+    if not hasattr(lock, 'acquire'):
+        raise AttributeError("'%r' has no method 'acquire'" % lock)
     return synchronized(obj, lock)
 
 def Array(typecode_or_type, size_or_initializer, **kwds):
@@ -80,9 +82,12 @@ def Array(typecode_or_type, size_or_initializer, **kwds):
     if kwds:
         raise ValueError('unrecognized keyword argument(s): %s' % list(kwds.keys()))
     obj = RawArray(typecode_or_type, size_or_initializer)
-    if lock is None:
+    if lock is False:
+        return obj
+    if lock in (True, None):
         lock = RLock()
-    assert hasattr(lock, 'acquire')
+    if not hasattr(lock, 'acquire'):
+        raise AttributeError("'%r' has no method 'acquire'" % lock)
     return synchronized(obj, lock)
 
 def copy(obj):
@@ -124,8 +129,7 @@ def reduce_ctype(obj):
 def rebuild_ctype(type_, wrapper, length):
     if length is not None:
         type_ = type_ * length
-    if sys.platform == 'win32' and type_ not in copyreg.dispatch_table:
-        copyreg.pickle(type_, reduce_ctype)
+    ForkingPickler.register(type_, reduce_ctype)
     obj = type_.from_address(wrapper.get_address())
     obj._wrapper = wrapper
     return obj

@@ -72,22 +72,20 @@ def get_python_inc(plat_specific=0, prefix=None):
         prefix = plat_specific and EXEC_PREFIX or PREFIX
     if os.name == "posix":
         if python_build:
+            # Assume the executable is in the build directory.  The
+            # pyconfig.h file should be in the same directory.  Since
+            # the build directory may not be the source directory, we
+            # must use "srcdir" from the makefile to find the "Include"
+            # directory.
             base = os.path.dirname(os.path.abspath(sys.executable))
             if plat_specific:
-                inc_dir = base
+                return base
             else:
-                inc_dir = os.path.join(base, "Include")
-                if not os.path.exists(inc_dir):
-                    inc_dir = os.path.join(os.path.dirname(base), "Include")
-            return inc_dir
+                incdir = os.path.join(get_config_var('srcdir'), 'Include')
+                return os.path.normpath(incdir)
         return os.path.join(prefix, "include", "python" + get_python_version())
     elif os.name == "nt":
         return os.path.join(prefix, "include")
-    elif os.name == "mac":
-        if plat_specific:
-            return os.path.join(prefix, "Mac", "Include")
-        else:
-            return os.path.join(prefix, "Include")
     elif os.name == "os2":
         return os.path.join(prefix, "Include")
     else:
@@ -127,23 +125,12 @@ def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
             if get_python_version() < "2.2":
                 return prefix
             else:
-                return os.path.join(PREFIX, "Lib", "site-packages")
-    elif os.name == "mac":
-        if plat_specific:
-            if standard_lib:
-                return os.path.join(prefix, "Lib", "lib-dynload")
-            else:
-                return os.path.join(prefix, "Lib", "site-packages")
-        else:
-            if standard_lib:
-                return os.path.join(prefix, "Lib")
-            else:
                 return os.path.join(prefix, "Lib", "site-packages")
     elif os.name == "os2":
         if standard_lib:
-            return os.path.join(PREFIX, "Lib")
+            return os.path.join(prefix, "Lib")
         else:
-            return os.path.join(PREFIX, "Lib", "site-packages")
+            return os.path.join(prefix, "Lib", "site-packages")
     else:
         raise DistutilsPlatformError(
             "I don't know where Python installs its library "
@@ -157,9 +144,9 @@ def customize_compiler(compiler):
     varies across Unices and is stored in Python's Makefile.
     """
     if compiler.compiler_type == "unix":
-        (cc, cxx, opt, cflags, ccshared, ldshared, so_ext) = \
+        (cc, cxx, opt, cflags, ccshared, ldshared, so_ext, ar, ar_flags) = \
             get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
-                            'CCSHARED', 'LDSHARED', 'SO')
+                            'CCSHARED', 'LDSHARED', 'SO', 'AR', 'ARFLAGS')
 
         if 'CC' in os.environ:
             cc = os.environ['CC']
@@ -180,6 +167,12 @@ def customize_compiler(compiler):
             cpp = cpp + ' ' + os.environ['CPPFLAGS']
             cflags = cflags + ' ' + os.environ['CPPFLAGS']
             ldshared = ldshared + ' ' + os.environ['CPPFLAGS']
+        if 'AR' in os.environ:
+            ar = os.environ['AR']
+        if 'ARFLAGS' in os.environ:
+            archiver = ar + ' ' + os.environ['ARFLAGS']
+        else:
+            archiver = ar + ' ' + ar_flags
 
         cc_cmd = cc + ' ' + cflags
         compiler.set_executables(
@@ -188,7 +181,8 @@ def customize_compiler(compiler):
             compiler_so=cc_cmd + ' ' + ccshared,
             compiler_cxx=cxx,
             linker_so=ldshared,
-            linker_exe=cc)
+            linker_exe=cc,
+            archiver=archiver)
 
         compiler.shared_lib_extension = so_ext
 
@@ -261,7 +255,7 @@ def parse_makefile(fn, g=None):
     used instead of a new dictionary.
     """
     from distutils.text_file import TextFile
-    fp = TextFile(fn, strip_comments=1, skip_blanks=1, join_lines=1)
+    fp = TextFile(fn, strip_comments=1, skip_blanks=1, join_lines=1, errors="surrogateescape")
 
     if g is None:
         g = {}
@@ -276,12 +270,25 @@ def parse_makefile(fn, g=None):
         if m:
             n, v = m.group(1, 2)
             v = v.strip()
-            if "$" in v:
+            # `$$' is a literal `$' in make
+            tmpv = v.replace('$$', '')
+
+            if "$" in tmpv:
                 notdone[n] = v
             else:
-                try: v = int(v)
-                except ValueError: pass
-                done[n] = v
+                try:
+                    v = int(v)
+                except ValueError:
+                    # insert literal `$'
+                    done[n] = v.replace('$$', '$')
+                else:
+                    done[n] = v
+
+    # Variables with a 'PY_' prefix in the makefile. These need to
+    # be made available without that prefix through sysconfig.
+    # Special care is needed to ensure that variable expansion works, even
+    # if the expansion uses the name without a prefix.
+    renamed_variables = ('CFLAGS', 'LDFLAGS', 'CPPFLAGS')
 
     # do variable interpolation here
     while notdone:
@@ -299,6 +306,16 @@ def parse_makefile(fn, g=None):
                 elif n in os.environ:
                     # do it like make: fall back to environment
                     item = os.environ[n]
+
+                elif n in renamed_variables:
+                    if name.startswith('PY_') and name[3:] in renamed_variables:
+                        item = ""
+
+                    elif 'PY_' + n in notdone:
+                        found = False
+
+                    else:
+                        item = str(done['PY_' + n])
                 else:
                     done[n] = item = ""
                 if found:
@@ -313,11 +330,23 @@ def parse_makefile(fn, g=None):
                         else:
                             done[name] = value
                         del notdone[name]
+
+                        if name.startswith('PY_') \
+                            and name[3:] in renamed_variables:
+
+                            name = name[3:]
+                            if name not in done:
+                                done[name] = value
             else:
                 # bogus variable reference; just drop it since we can't deal
                 del notdone[name]
 
     fp.close()
+
+    # strip spurious spaces
+    for k, v in done.items():
+        if isinstance(v, str):
+            done[k] = v.strip()
 
     # save the results in the global dictionary
     g.update(done)
@@ -368,7 +397,8 @@ def _init_posix():
     # load the installed pyconfig.h:
     try:
         filename = get_config_h_filename()
-        parse_config_h(io.open(filename), g)
+        with open(filename) as file:
+            parse_config_h(file, g)
     except IOError as msg:
         my_msg = "invalid Python installation: unable to open %s" % filename
         if hasattr(msg, "strerror"):
@@ -431,32 +461,6 @@ def _init_nt():
     _config_vars = g
 
 
-def _init_mac():
-    """Initialize the module as appropriate for Macintosh systems"""
-    g = {}
-    # set basic install directories
-    g['LIBDEST'] = get_python_lib(plat_specific=0, standard_lib=1)
-    g['BINLIBDEST'] = get_python_lib(plat_specific=1, standard_lib=1)
-
-    # XXX hmmm.. a normal install puts include files here
-    g['INCLUDEPY'] = get_python_inc(plat_specific=0)
-
-    import MacOS
-    if not hasattr(MacOS, 'runtimemodel'):
-        g['SO'] = '.ppc.slb'
-    else:
-        g['SO'] = '.%s.slb' % MacOS.runtimemodel
-
-    # XXX are these used anywhere?
-    g['install_lib'] = os.path.join(EXEC_PREFIX, "Lib")
-    g['install_platlib'] = os.path.join(EXEC_PREFIX, "Mac", "Lib")
-
-    # These are used by the extension module build
-    g['srcdir'] = ':'
-    global _config_vars
-    _config_vars = g
-
-
 def _init_os2():
     """Initialize the module as appropriate for OS/2"""
     g = {}
@@ -498,6 +502,20 @@ def get_config_vars(*args):
         _config_vars['prefix'] = PREFIX
         _config_vars['exec_prefix'] = EXEC_PREFIX
 
+        # Convert srcdir into an absolute path if it appears necessary.
+        # Normally it is relative to the build directory.  However, during
+        # testing, for example, we might be running a non-installed python
+        # from a different directory.
+        if python_build and os.name == "posix":
+            base = os.path.dirname(os.path.abspath(sys.executable))
+            if (not os.path.isabs(_config_vars['srcdir']) and
+                base != os.getcwd()):
+                # srcdir is relative and we are not in the same directory
+                # as the executable. Assume executable is in the build
+                # directory and make srcdir absolute.
+                srcdir = os.path.join(base, _config_vars['srcdir'])
+                _config_vars['srcdir'] = os.path.normpath(srcdir)
+
         if sys.platform == 'darwin':
             kernel_version = os.uname()[2] # Kernel version (8.4.3)
             major_version = int(kernel_version.split('.')[0])
@@ -512,9 +530,29 @@ def get_config_vars(*args):
                         # patched up as well.
                         'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
                     flags = _config_vars[key]
-                    flags = re.sub('-arch\s+\w+\s', ' ', flags)
+                    flags = re.sub('-arch\s+\w+\s', ' ', flags, re.ASCII)
                     flags = re.sub('-isysroot [^ \t]*', ' ', flags)
                     _config_vars[key] = flags
+
+            else:
+
+                # Allow the user to override the architecture flags using
+                # an environment variable.
+                # NOTE: This name was introduced by Apple in OSX 10.5 and
+                # is used by several scripting languages distributed with
+                # that OS release.
+
+                if 'ARCHFLAGS' in os.environ:
+                    arch = os.environ['ARCHFLAGS']
+                    for key in ('LDFLAGS', 'BASECFLAGS',
+                        # a number of derived variables. These need to be
+                        # patched up as well.
+                        'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
+
+                        flags = _config_vars[key]
+                        flags = re.sub('-arch\s+\w+\s', ' ', flags)
+                        flags = flags + ' ' + arch
+                        _config_vars[key] = flags
 
     if args:
         vals = []

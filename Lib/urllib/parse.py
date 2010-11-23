@@ -1,11 +1,39 @@
 """Parse (absolute and relative) URLs.
 
-See RFC 1808: "Relative Uniform Resource Locators", by R. Fielding,
-UC Irvine, June 1995.
+urlparse module is based upon the following RFC specifications.
+
+RFC 3986 (STD66): "Uniform Resource Identifiers" by T. Berners-Lee, R. Fielding
+and L.  Masinter, January 2005.
+
+RFC 2732 : "Format for Literal IPv6 Addresses in URL's by R.Hinden, B.Carpenter
+and L.Masinter, December 1999.
+
+RFC 2396:  "Uniform Resource Identifiers (URI)": Generic Syntax by T.
+Berners-Lee, R. Fielding, and L. Masinter, August 1998.
+
+RFC 2368: "The mailto URL scheme", by P.Hoffman , L Masinter, J. Zwinski, July 1998.
+
+RFC 1808: "Relative Uniform Resource Locators", by R. Fielding, UC Irvine, June
+1995.
+
+RFC 1738: "Uniform Resource Locators (URL)" by T. Berners-Lee, L. Masinter, M.
+McCahill, December 1994
+
+RFC 3986 is considered the current standard and any future changes to
+urlparse module should conform with it.  The urlparse module is
+currently not entirely compliant with this RFC due to defacto
+scenarios for parsing, and for backward compatibility purposes, some
+parsing quirks from older RFCs are retained. The testcases in
+test_urlparse.py provides a good indicator of parsing behavior.
 """
 
+import sys
+import collections
+
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag",
-           "urlsplit", "urlunsplit","parse_qs","parse_qsl"]
+           "urlsplit", "urlunsplit", "urlencode", "parse_qs",
+           "parse_qsl", "quote", "quote_plus", "quote_from_bytes",
+           "unquote", "unquote_plus", "unquote_to_bytes"]
 
 # A classification of schemes ('' means apply by default)
 uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
@@ -14,7 +42,7 @@ uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
 uses_netloc = ['ftp', 'http', 'gopher', 'nntp', 'telnet',
                'imap', 'wais', 'file', 'mms', 'https', 'shttp',
                'snews', 'prospero', 'rtsp', 'rtspu', 'rsync', '',
-               'svn', 'svn+ssh', 'sftp']
+               'svn', 'svn+ssh', 'sftp', 'nfs', 'git', 'git+ssh']
 non_hierarchical = ['gopher', 'hdl', 'mailto', 'news',
                     'telnet', 'wais', 'imap', 'snews', 'sip', 'sips']
 uses_params = ['ftp', 'hdl', 'prospero', 'http', 'imap',
@@ -36,8 +64,9 @@ MAX_CACHE_SIZE = 20
 _parse_cache = {}
 
 def clear_cache():
-    """Clear the parse cache."""
+    """Clear the parse cache and the quoters cache."""
     _parse_cache.clear()
+    _safe_quoters.clear()
 
 
 class ResultMixin(object):
@@ -64,22 +93,24 @@ class ResultMixin(object):
 
     @property
     def hostname(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            netloc = netloc.split(":", 1)[0]
-        return netloc.lower() or None
+        netloc = self.netloc.split('@')[-1]
+        if '[' in netloc and ']' in netloc:
+            return netloc.split(']')[0][1:].lower()
+        elif ':' in netloc:
+            return netloc.split(':')[0].lower()
+        elif netloc == '':
+            return None
+        else:
+            return netloc.lower()
 
     @property
     def port(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            port = netloc.split(":", 1)[1]
+        netloc = self.netloc.split('@')[-1].split(']')[-1]
+        if ':' in netloc:
+            port = netloc.split(':')[1]
             return int(port, 10)
-        return None
+        else:
+            return None
 
 from collections import namedtuple
 
@@ -151,6 +182,9 @@ def urlsplit(url, scheme='', allow_fragments=True):
             url = url[i+1:]
             if url[:2] == '//':
                 netloc, url = _splitnetloc(url, 2)
+                if (('[' in netloc and ']' not in netloc) or
+                        (']' in netloc and '[' not in netloc)):
+                    raise ValueError("Invalid IPv6 URL")
             if allow_fragments and '#' in url:
                 url, fragment = url.split('#', 1)
             if '?' in url:
@@ -158,13 +192,17 @@ def urlsplit(url, scheme='', allow_fragments=True):
             v = SplitResult(scheme, netloc, url, query, fragment)
             _parse_cache[key] = v
             return v
-        for c in url[:i]:
-            if c not in scheme_chars:
-                break
-        else:
-            scheme, url = url[:i].lower(), url[i+1:]
-    if scheme in uses_netloc and url[:2] == '//':
+        if url.endswith(':') or not url[i+1].isdigit():
+            for c in url[:i]:
+                if c not in scheme_chars:
+                    break
+            else:
+                scheme, url = url[:i].lower(), url[i+1:]
+    if url[:2] == '//':
         netloc, url = _splitnetloc(url, 2)
+        if (('[' in netloc and ']' not in netloc) or
+                (']' in netloc and '[' not in netloc)):
+            raise ValueError("Invalid IPv6 URL")
     if allow_fragments and scheme in uses_fragment and '#' in url:
         url, fragment = url.split('#', 1)
     if scheme in uses_query and '?' in url:
@@ -184,6 +222,11 @@ def urlunparse(components):
     return urlunsplit((scheme, netloc, url, query, fragment))
 
 def urlunsplit(components):
+    """Combine the elements of a tuple as returned by urlsplit() into a
+    complete URL as a string. The data argument can be any five-item iterable.
+    This may result in a slightly different, but equivalent URL, if the URL that
+    was parsed originally had unnecessary delimiters (for example, a ? with an
+    empty query; the RFC states that these are equivalent)."""
     scheme, netloc, url, query, fragment = components
     if netloc or (scheme and scheme in uses_netloc and url[:2] != '//'):
         if url and url[:1] != '/': url = '/' + url
@@ -217,9 +260,18 @@ def urljoin(base, url, allow_fragments=True):
     if path[:1] == '/':
         return urlunparse((scheme, netloc, path,
                            params, query, fragment))
-    if not (path or params or query):
-        return urlunparse((scheme, netloc, bpath,
-                           bparams, bquery, fragment))
+    if not path:
+        path = bpath
+        if not params:
+            params = bparams
+        else:
+            path = path[:-1]
+            return urlunparse((scheme, netloc, path,
+                                params, query, fragment))
+        if not query:
+            query = bquery
+        return urlunparse((scheme, netloc, path,
+                           params, query, fragment))
     segments = bpath.split('/')[:-1] + path.split('/')
     # XXX The stuff below is bogus in various ways...
     if segments[-1] == '.':
@@ -258,95 +310,80 @@ def urldefrag(url):
     else:
         return url, ''
 
-
-_hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
-_hextochr.update(('%02X' % i, chr(i)) for i in range(256))
-
-def unquote(s):
-    """unquote('abc%20def') -> 'abc def'."""
-    res = s.split('%')
-    for i in range(1, len(res)):
-        item = res[i]
+def unquote_to_bytes(string):
+    """unquote_to_bytes('abc%20def') -> b'abc def'."""
+    # Note: strings are encoded as UTF-8. This is only an issue if it contains
+    # unescaped non-ASCII characters, which URIs should not.
+    if not string:
+        # Is it a string-like object?
+        string.split
+        return b''
+    if isinstance(string, str):
+        string = string.encode('utf-8')
+    res = string.split(b'%')
+    if len(res) == 1:
+        return string
+    string = res[0]
+    for item in res[1:]:
         try:
-            res[i] = _hextochr[item[:2]] + item[2:]
-        except KeyError:
-            res[i] = '%' + item
-        except UnicodeDecodeError:
-            res[i] = chr(int(item[:2], 16)) + item[2:]
-    return "".join(res)
+            string += bytes([int(item[:2], 16)]) + item[2:]
+        except ValueError:
+            string += b'%' + item
+    return string
 
-def unquote_plus(s):
-    """unquote('%7e/abc+def') -> '~/abc def'"""
-    s = s.replace('+', ' ')
-    return unquote(s)
+def unquote(string, encoding='utf-8', errors='replace'):
+    """Replace %xx escapes by their single-character equivalent. The optional
+    encoding and errors parameters specify how to decode percent-encoded
+    sequences into Unicode characters, as accepted by the bytes.decode()
+    method.
+    By default, percent-encoded sequences are decoded with UTF-8, and invalid
+    sequences are replaced by a placeholder character.
 
-always_safe = ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-               'abcdefghijklmnopqrstuvwxyz'
-               '0123456789' '_.-')
-_safe_quoters= {}
-
-class Quoter:
-    def __init__(self, safe):
-        self.cache = {}
-        self.safe = safe + always_safe
-
-    def __call__(self, c):
-        try:
-            return self.cache[c]
-        except KeyError:
-            if ord(c) < 256:
-                res = (c in self.safe) and c or ('%%%02X' % ord(c))
-                self.cache[c] = res
-                return res
-            else:
-                return "".join(['%%%02X' % i for i in c.encode("utf-8")])
-
-def quote(s, safe = '/'):
-    """quote('abc def') -> 'abc%20def'
-
-    Each part of a URL, e.g. the path info, the query, etc., has a
-    different set of reserved characters that must be quoted.
-
-    RFC 2396 Uniform Resource Identifiers (URI): Generic Syntax lists
-    the following reserved characters.
-
-    reserved    = ";" | "/" | "?" | ":" | "@" | "&" | "=" | "+" |
-                  "$" | ","
-
-    Each of these characters is reserved in some component of a URL,
-    but not necessarily in all of them.
-
-    By default, the quote function is intended for quoting the path
-    section of a URL.  Thus, it will not encode '/'.  This character
-    is reserved, but in typical usage the quote function is being
-    called on a path where the existing slash characters are used as
-    reserved characters.
+    unquote('abc%20def') -> 'abc def'.
     """
-    cachekey = (safe, always_safe)
-    try:
-        quoter = _safe_quoters[cachekey]
-    except KeyError:
-        quoter = Quoter(safe)
-        _safe_quoters[cachekey] = quoter
-    res = map(quoter, s)
-    return ''.join(res)
+    if string == '':
+        return string
+    res = string.split('%')
+    if len(res) == 1:
+        return string
+    if encoding is None:
+        encoding = 'utf-8'
+    if errors is None:
+        errors = 'replace'
+    # pct_sequence: contiguous sequence of percent-encoded bytes, decoded
+    pct_sequence = b''
+    string = res[0]
+    for item in res[1:]:
+        try:
+            if not item:
+                raise ValueError
+            pct_sequence += bytes.fromhex(item[:2])
+            rest = item[2:]
+            if not rest:
+                # This segment was just a single percent-encoded character.
+                # May be part of a sequence of code units, so delay decoding.
+                # (Stored in pct_sequence).
+                continue
+        except ValueError:
+            rest = '%' + item
+        # Encountered non-percent-encoded characters. Flush the current
+        # pct_sequence.
+        string += pct_sequence.decode(encoding, errors) + rest
+        pct_sequence = b''
+    if pct_sequence:
+        # Flush the final pct_sequence
+        string += pct_sequence.decode(encoding, errors)
+    return string
 
-def quote_plus(s, safe = ''):
-    """Quote the query fragment of a URL; replacing ' ' with '+'"""
-    if ' ' in s:
-        s = quote(s, safe + ' ')
-        return s.replace(' ', '+')
-    return quote(s, safe)
-
-def parse_qs(qs, keep_blank_values=0, strict_parsing=0):
+def parse_qs(qs, keep_blank_values=False, strict_parsing=False):
     """Parse a query given as a string argument.
 
         Arguments:
 
-        qs: URL-encoded query string to be parsed
+        qs: percent-encoded query string to be parsed
 
         keep_blank_values: flag indicating whether blank values in
-            URL encoded queries should be treated as blank strings.
+            percent-encoded queries should be treated as blank strings.
             A true value indicates that blanks should be retained as
             blank strings.  The default false value indicates that
             blank values are to be ignored and treated as if they were
@@ -364,15 +401,15 @@ def parse_qs(qs, keep_blank_values=0, strict_parsing=0):
             dict[name] = [value]
     return dict
 
-def parse_qsl(qs, keep_blank_values=0, strict_parsing=0):
+def parse_qsl(qs, keep_blank_values=False, strict_parsing=False):
     """Parse a query given as a string argument.
 
     Arguments:
 
-    qs: URL-encoded query string to be parsed
+    qs: percent-encoded query string to be parsed
 
     keep_blank_values: flag indicating whether blank values in
-        URL encoded queries should be treated as blank strings.  A
+        percent-encoded queries should be treated as blank strings.  A
         true value indicates that blanks should be retained as blank
         strings.  The default false value indicates that blank values
         are to be ignored and treated as if they were  not included.
@@ -404,9 +441,128 @@ def parse_qsl(qs, keep_blank_values=0, strict_parsing=0):
 
     return r
 
+def unquote_plus(string, encoding='utf-8', errors='replace'):
+    """Like unquote(), but also replace plus signs by spaces, as required for
+    unquoting HTML form values.
 
+    unquote_plus('%7e/abc+def') -> '~/abc def'
+    """
+    string = string.replace('+', ' ')
+    return unquote(string, encoding, errors)
 
-def urlencode(query,doseq=0):
+_ALWAYS_SAFE = frozenset(b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                         b'abcdefghijklmnopqrstuvwxyz'
+                         b'0123456789'
+                         b'_.-')
+_ALWAYS_SAFE_BYTES = bytes(_ALWAYS_SAFE)
+_safe_quoters = {}
+
+class Quoter(collections.defaultdict):
+    """A mapping from bytes (in range(0,256)) to strings.
+
+    String values are percent-encoded byte values, unless the key < 128, and
+    in the "safe" set (either the specified safe set, or default set).
+    """
+    # Keeps a cache internally, using defaultdict, for efficiency (lookups
+    # of cached keys don't call Python code at all).
+    def __init__(self, safe):
+        """safe: bytes object."""
+        self.safe = _ALWAYS_SAFE.union(safe)
+
+    def __repr__(self):
+        # Without this, will just display as a defaultdict
+        return "<Quoter %r>" % dict(self)
+
+    def __missing__(self, b):
+        # Handle a cache miss. Store quoted string in cache and return.
+        res = chr(b) if b in self.safe else '%{:02X}'.format(b)
+        self[b] = res
+        return res
+
+def quote(string, safe='/', encoding=None, errors=None):
+    """quote('abc def') -> 'abc%20def'
+
+    Each part of a URL, e.g. the path info, the query, etc., has a
+    different set of reserved characters that must be quoted.
+
+    RFC 2396 Uniform Resource Identifiers (URI): Generic Syntax lists
+    the following reserved characters.
+
+    reserved    = ";" | "/" | "?" | ":" | "@" | "&" | "=" | "+" |
+                  "$" | ","
+
+    Each of these characters is reserved in some component of a URL,
+    but not necessarily in all of them.
+
+    By default, the quote function is intended for quoting the path
+    section of a URL.  Thus, it will not encode '/'.  This character
+    is reserved, but in typical usage the quote function is being
+    called on a path where the existing slash characters are used as
+    reserved characters.
+
+    string and safe may be either str or bytes objects. encoding must
+    not be specified if string is a str.
+
+    The optional encoding and errors parameters specify how to deal with
+    non-ASCII characters, as accepted by the str.encode method.
+    By default, encoding='utf-8' (characters are encoded with UTF-8), and
+    errors='strict' (unsupported characters raise a UnicodeEncodeError).
+    """
+    if isinstance(string, str):
+        if not string:
+            return string
+        if encoding is None:
+            encoding = 'utf-8'
+        if errors is None:
+            errors = 'strict'
+        string = string.encode(encoding, errors)
+    else:
+        if encoding is not None:
+            raise TypeError("quote() doesn't support 'encoding' for bytes")
+        if errors is not None:
+            raise TypeError("quote() doesn't support 'errors' for bytes")
+    return quote_from_bytes(string, safe)
+
+def quote_plus(string, safe='', encoding=None, errors=None):
+    """Like quote(), but also replace ' ' with '+', as required for quoting
+    HTML form values. Plus signs in the original string are escaped unless
+    they are included in safe. It also does not have safe default to '/'.
+    """
+    # Check if ' ' in string, where string may either be a str or bytes.  If
+    # there are no spaces, the regular quote will produce the right answer.
+    if ((isinstance(string, str) and ' ' not in string) or
+        (isinstance(string, bytes) and b' ' not in string)):
+        return quote(string, safe, encoding, errors)
+    if isinstance(safe, str):
+        space = ' '
+    else:
+        space = b' '
+    string = quote(string, safe + space, encoding, errors)
+    return string.replace(' ', '+')
+
+def quote_from_bytes(bs, safe='/'):
+    """Like quote(), but accepts a bytes object rather than a str, and does
+    not perform string-to-bytes encoding.  It always returns an ASCII string.
+    quote_from_bytes(b'abc def\xab') -> 'abc%20def%AB'
+    """
+    if not isinstance(bs, (bytes, bytearray)):
+        raise TypeError("quote_from_bytes() expected bytes")
+    if not bs:
+        return ''
+    if isinstance(safe, str):
+        # Normalize 'safe' by converting to bytes and removing non-ASCII chars
+        safe = safe.encode('ascii', 'ignore')
+    else:
+        safe = bytes([c for c in safe if c < 128])
+    if not bs.rstrip(_ALWAYS_SAFE_BYTES + safe):
+        return bs.decode()
+    try:
+        quoter = _safe_quoters[safe]
+    except KeyError:
+        _safe_quoters[safe] = quoter = Quoter(safe).__getitem__
+    return ''.join([quoter(char) for char in bs])
+
+def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
     """Encode a sequence of two-element tuples or dictionary into a URL query string.
 
     If any values in the query arg are sequences and doseq is true, each
@@ -415,58 +571,73 @@ def urlencode(query,doseq=0):
     If the query arg is a sequence of two-element tuples, the order of the
     parameters in the output will match the order of parameters in the
     input.
+
+    The query arg may be either a string or a bytes type. When query arg is a
+    string, the safe, encoding and error parameters are sent the quote_plus for
+    encoding.
     """
 
-    if hasattr(query,"items"):
-        # mapping objects
+    if hasattr(query, "items"):
         query = query.items()
     else:
-        # it's a bother at times that strings and string-like objects are
-        # sequences...
+        # It's a bother at times that strings and string-like objects are
+        # sequences.
         try:
             # non-sequence items should not work with len()
             # non-empty strings will fail this
             if len(query) and not isinstance(query[0], tuple):
                 raise TypeError
-            # zero-length sequences of all types will get here and succeed,
-            # but that's a minor nit - since the original implementation
+            # Zero-length sequences of all types will get here and succeed,
+            # but that's a minor nit.  Since the original implementation
             # allowed empty dicts that type of behavior probably should be
             # preserved for consistency
         except TypeError:
-            ty,va,tb = sys.exc_info()
-            raise TypeError("not a valid non-string sequence or mapping object").with_traceback(tb)
+            ty, va, tb = sys.exc_info()
+            raise TypeError("not a valid non-string sequence "
+                            "or mapping object").with_traceback(tb)
 
     l = []
     if not doseq:
-        # preserve old behavior
         for k, v in query:
-            k = quote_plus(str(k))
-            v = quote_plus(str(v))
+            if isinstance(k, bytes):
+                k = quote_plus(k, safe)
+            else:
+                k = quote_plus(str(k), safe, encoding, errors)
+
+            if isinstance(v, bytes):
+                v = quote_plus(v, safe)
+            else:
+                v = quote_plus(str(v), safe, encoding, errors)
             l.append(k + '=' + v)
     else:
         for k, v in query:
-            k = quote_plus(str(k))
-            if isinstance(v, str):
-                v = quote_plus(v)
+            if isinstance(k, bytes):
+                k = quote_plus(k, safe)
+            else:
+                k = quote_plus(str(k), safe, encoding, errors)
+
+            if isinstance(v, bytes):
+                v = quote_plus(v, safe)
                 l.append(k + '=' + v)
             elif isinstance(v, str):
-                # is there a reasonable way to convert to ASCII?
-                # encode generates a string, but "replace" or "ignore"
-                # lose information and "strict" can raise UnicodeError
-                v = quote_plus(v.encode("ASCII","replace"))
+                v = quote_plus(v, safe, encoding, errors)
                 l.append(k + '=' + v)
             else:
                 try:
-                    # is this a sufficient test for sequence-ness?
+                    # Is this a sufficient test for sequence-ness?
                     x = len(v)
                 except TypeError:
                     # not a sequence
-                    v = quote_plus(str(v))
+                    v = quote_plus(str(v), safe, encoding, errors)
                     l.append(k + '=' + v)
                 else:
                     # loop over the sequence
                     for elt in v:
-                        l.append(k + '=' + quote_plus(str(elt)))
+                        if isinstance(elt, bytes):
+                            elt = quote_plus(elt, safe)
+                        else:
+                            elt = quote_plus(str(elt), safe, encoding, errors)
+                        l.append(k + '=' + elt)
     return '&'.join(l)
 
 # Utilities to parse URLs (most of these return None for missing parts):
@@ -484,11 +655,11 @@ def urlencode(query,doseq=0):
 # urllib.parse.unquote('abc%20def') -> 'abc def'
 # quote('abc def') -> 'abc%20def')
 
-def toBytes(url):
-    """toBytes(u"URL") --> 'URL'."""
+def to_bytes(url):
+    """to_bytes(u"URL") --> 'URL'."""
     # Most URL schemes require ASCII. If that changes, the conversion
     # can be relaxed.
-    # XXX get rid of toBytes()
+    # XXX get rid of to_bytes()
     if isinstance(url, str):
         try:
             url = url.encode("ASCII").decode()
@@ -528,7 +699,12 @@ def splithost(url):
         _hostprog = re.compile('^//([^/?]*)(.*)$')
 
     match = _hostprog.match(url)
-    if match: return match.group(1, 2)
+    if match:
+        host_port = match.group(1)
+        path = match.group(2)
+        if path and not path.startswith('/'):
+            path = '/' + path
+        return host_port, path
     return None, url
 
 _userprog = None
@@ -540,7 +716,7 @@ def splituser(host):
         _userprog = re.compile('^(.*)@(.*)$')
 
     match = _userprog.match(host)
-    if match: return map(unquote, match.group(1, 2))
+    if match: return match.group(1, 2)
     return None, host
 
 _passwdprog = None
@@ -549,7 +725,7 @@ def splitpasswd(user):
     global _passwdprog
     if _passwdprog is None:
         import re
-        _passwdprog = re.compile('^([^:]*):(.*)$')
+        _passwdprog = re.compile('^([^:]*):(.*)$',re.S)
 
     match = _passwdprog.match(user)
     if match: return match.group(1, 2)
@@ -631,68 +807,3 @@ def splitvalue(attr):
     match = _valueprog.match(attr)
     if match: return match.group(1, 2)
     return attr, None
-
-test_input = """
-      http://a/b/c/d
-
-      g:h        = <URL:g:h>
-      http:g     = <URL:http://a/b/c/g>
-      http:      = <URL:http://a/b/c/d>
-      g          = <URL:http://a/b/c/g>
-      ./g        = <URL:http://a/b/c/g>
-      g/         = <URL:http://a/b/c/g/>
-      /g         = <URL:http://a/g>
-      //g        = <URL:http://g>
-      ?y         = <URL:http://a/b/c/d?y>
-      g?y        = <URL:http://a/b/c/g?y>
-      g?y/./x    = <URL:http://a/b/c/g?y/./x>
-      .          = <URL:http://a/b/c/>
-      ./         = <URL:http://a/b/c/>
-      ..         = <URL:http://a/b/>
-      ../        = <URL:http://a/b/>
-      ../g       = <URL:http://a/b/g>
-      ../..      = <URL:http://a/>
-      ../../g    = <URL:http://a/g>
-      ../../../g = <URL:http://a/../g>
-      ./../g     = <URL:http://a/b/g>
-      ./g/.      = <URL:http://a/b/c/g/>
-      /./g       = <URL:http://a/./g>
-      g/./h      = <URL:http://a/b/c/g/h>
-      g/../h     = <URL:http://a/b/c/h>
-      http:g     = <URL:http://a/b/c/g>
-      http:      = <URL:http://a/b/c/d>
-      http:?y         = <URL:http://a/b/c/d?y>
-      http:g?y        = <URL:http://a/b/c/g?y>
-      http:g?y/./x    = <URL:http://a/b/c/g?y/./x>
-"""
-
-def test():
-    import sys
-    base = ''
-    if sys.argv[1:]:
-        fn = sys.argv[1]
-        if fn == '-':
-            fp = sys.stdin
-        else:
-            fp = open(fn)
-    else:
-        from io import StringIO
-        fp = StringIO(test_input)
-    for line in fp:
-        words = line.split()
-        if not words:
-            continue
-        url = words[0]
-        parts = urlparse(url)
-        print('%-10s : %s' % (url, parts))
-        abs = urljoin(base, url)
-        if not base:
-            base = abs
-        wrapped = '<URL:%s>' % abs
-        print('%-10s = %s' % (url, wrapped))
-        if len(words) == 3 and words[1] == '=':
-            if wrapped != words[2]:
-                print('EXPECTED', words[2], '!!!!!!!!!!')
-
-if __name__ == '__main__':
-    test()

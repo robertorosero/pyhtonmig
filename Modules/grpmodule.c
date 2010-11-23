@@ -10,8 +10,8 @@
 static PyStructSequence_Field struct_group_type_fields[] = {
    {"gr_name", "group name"},
    {"gr_passwd", "password"},
-   {"gr_gid", "group id"}, 
-   {"gr_mem", "group memebers"}, 
+   {"gr_gid", "group id"},
+   {"gr_mem", "group memebers"},
    {0}
 };
 
@@ -47,7 +47,7 @@ mkgrent(struct group *p)
         return NULL;
     }
     for (member = p->gr_mem; *member != NULL; member++) {
-        PyObject *x = PyUnicode_FromString(*member);
+        PyObject *x = PyUnicode_DecodeFSDefault(*member);
         if (x == NULL || PyList_Append(w, x) != 0) {
             Py_XDECREF(x);
             Py_DECREF(w);
@@ -58,16 +58,16 @@ mkgrent(struct group *p)
     }
 
 #define SET(i,val) PyStructSequence_SET_ITEM(v, i, val)
-    SET(setIndex++, PyUnicode_FromString(p->gr_name));
+    SET(setIndex++, PyUnicode_DecodeFSDefault(p->gr_name));
 #ifdef __VMS
     SET(setIndex++, Py_None);
     Py_INCREF(Py_None);
 #else
     if (p->gr_passwd)
-	    SET(setIndex++, PyUnicode_FromString(p->gr_passwd));
+            SET(setIndex++, PyUnicode_DecodeFSDefault(p->gr_passwd));
     else {
-	    SET(setIndex++, Py_None);
-	    Py_INCREF(Py_None);
+            SET(setIndex++, Py_None);
+            Py_INCREF(Py_None);
     }
 #endif
     SET(setIndex++, PyLong_FromLong((long) p->gr_gid));
@@ -76,7 +76,6 @@ mkgrent(struct group *p)
 
     if (PyErr_Occurred()) {
         Py_DECREF(v);
-        Py_DECREF(w);
         return NULL;
     }
 
@@ -90,39 +89,41 @@ grp_getgrgid(PyObject *self, PyObject *pyo_id)
     unsigned int gid;
     struct group *p;
 
-    py_int_id = PyNumber_Int(pyo_id);
+    py_int_id = PyNumber_Long(pyo_id);
     if (!py_int_id)
-	    return NULL;
+            return NULL;
     gid = PyLong_AS_LONG(py_int_id);
     Py_DECREF(py_int_id);
 
     if ((p = getgrgid(gid)) == NULL) {
-	PyErr_Format(PyExc_KeyError, "getgrgid(): gid not found: %d", gid);
+        PyErr_Format(PyExc_KeyError, "getgrgid(): gid not found: %d", gid);
         return NULL;
     }
     return mkgrent(p);
 }
 
 static PyObject *
-grp_getgrnam(PyObject *self, PyObject *pyo_name)
+grp_getgrnam(PyObject *self, PyObject *args)
 {
-    PyObject *py_str_name;
     char *name;
     struct group *p;
+    PyObject *arg, *bytes, *retval = NULL;
 
-    py_str_name = PyObject_Str(pyo_name);
-    if (!py_str_name)
-	    return NULL;
-    name = PyUnicode_AsString(py_str_name);
-    
-    if ((p = getgrnam(name)) == NULL) {
-	PyErr_Format(PyExc_KeyError, "getgrnam(): name not found: %s", name);
-	Py_DECREF(py_str_name);
+    if (!PyArg_ParseTuple(args, "U:getgrnam", &arg))
         return NULL;
-    }
+    if ((bytes = PyUnicode_EncodeFSDefault(arg)) == NULL)
+        return NULL;
+    if (PyBytes_AsStringAndSize(bytes, &name, NULL) == -1)
+        goto out;
 
-    Py_DECREF(py_str_name);
-    return mkgrent(p);
+    if ((p = getgrnam(name)) == NULL) {
+        PyErr_Format(PyExc_KeyError, "getgrnam(): name not found: %s", name);
+        goto out;
+    }
+    retval = mkgrent(p);
+out:
+    Py_DECREF(bytes);
+    return retval;
 }
 
 static PyObject *
@@ -139,6 +140,7 @@ grp_getgrall(PyObject *self, PyObject *ignore)
         if (v == NULL || PyList_Append(d, v) != 0) {
             Py_XDECREF(v);
             Py_DECREF(d);
+            endgrent();
             return NULL;
         }
         Py_DECREF(v);
@@ -148,18 +150,18 @@ grp_getgrall(PyObject *self, PyObject *ignore)
 }
 
 static PyMethodDef grp_methods[] = {
-    {"getgrgid",	grp_getgrgid,	METH_O,
+    {"getgrgid",        grp_getgrgid,   METH_O,
      "getgrgid(id) -> tuple\n\
 Return the group database entry for the given numeric group ID.  If\n\
 id is not valid, raise KeyError."},
-    {"getgrnam",	grp_getgrnam,	METH_O,
+    {"getgrnam",        grp_getgrnam,   METH_VARARGS,
      "getgrnam(name) -> tuple\n\
 Return the group database entry for the given group name.  If\n\
 name is not valid, raise KeyError."},
-    {"getgrall",	grp_getgrall,	METH_NOARGS,
+    {"getgrall",        grp_getgrall,   METH_NOARGS,
      "getgrall() -> list of tuples\n\
 Return a list of all available group entries, in arbitrary order."},
-    {NULL,		NULL}		/* sentinel */
+    {NULL,              NULL}           /* sentinel */
 };
 
 PyDoc_STRVAR(grp__doc__,
@@ -181,15 +183,15 @@ complete membership information.)");
 
 
 static struct PyModuleDef grpmodule = {
-	PyModuleDef_HEAD_INIT,
-	"grp",
-	grp__doc__,
-	-1,
-	grp_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "grp",
+        grp__doc__,
+        -1,
+        grp_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
 PyMODINIT_FUNC
@@ -201,7 +203,7 @@ PyInit_grp(void)
         return NULL;
     d = PyModule_GetDict(m);
     if (!initialized)
-	    PyStructSequence_InitType(&StructGrpType, &struct_group_type_desc);
+            PyStructSequence_InitType(&StructGrpType, &struct_group_type_desc);
     PyDict_SetItemString(d, "struct_group", (PyObject *) &StructGrpType);
     initialized = 1;
     return m;

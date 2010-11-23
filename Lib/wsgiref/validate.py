@@ -127,6 +127,12 @@ def assert_(cond, *args):
     if not cond:
         raise AssertionError(*args)
 
+def check_string_type(value, title):
+    if type (value) is str:
+        return value
+    raise AssertionError(
+        "{0} must be of type str (got {1})".format(title, repr(value)))
+
 def validator(application):
 
     """
@@ -188,22 +194,23 @@ class InputWrapper:
         self.input = wsgi_input
 
     def read(self, *args):
-        assert_(len(args) <= 1)
+        assert_(len(args) == 1)
         v = self.input.read(*args)
-        assert_(isinstance(v, str))
+        assert_(type(v) is bytes)
         return v
 
-    def readline(self):
-        v = self.input.readline()
-        assert_(isinstance(v, str))
+    def readline(self, *args):
+        assert_(len(args) <= 1)
+        v = self.input.readline(*args)
+        assert_(type(v) is bytes)
         return v
 
     def readlines(self, *args):
         assert_(len(args) <= 1)
         lines = self.input.readlines(*args)
-        assert_(isinstance(lines, list))
+        assert_(type(lines) is list)
         for line in lines:
-            assert_(isinstance(line, str))
+            assert_(type(line) is bytes)
         return lines
 
     def __iter__(self):
@@ -222,7 +229,7 @@ class ErrorWrapper:
         self.errors = wsgi_errors
 
     def write(self, s):
-        assert_(isinstance(s, str))
+        assert_(type(s) is str)
         self.errors.write(s)
 
     def flush(self):
@@ -241,7 +248,7 @@ class WriteWrapper:
         self.writer = wsgi_writer
 
     def __call__(self, s):
-        assert_(isinstance(s, str))
+        assert_(type(s) is bytes)
         self.writer(s)
 
 class PartialIteratorWrapper:
@@ -268,6 +275,8 @@ class IteratorWrapper:
         assert_(not self.closed,
             "Iterator read after closed")
         v = next(self.iterator)
+        if type(v) is not bytes:
+            assert_(False, "Iterator yielded non-bytestring (%r)" % (v,))
         if self.check_start_response is not None:
             assert_(self.check_start_response,
                 "The application returns and we started iterating over its body, but start_response has not yet been called")
@@ -287,7 +296,7 @@ class IteratorWrapper:
             "Iterator garbage collected without being closed")
 
 def check_environ(environ):
-    assert_(isinstance(environ, dict),
+    assert_(type(environ) is dict,
         "Environment is not of the right type: %r (environment: %r)"
         % (type(environ), environ))
 
@@ -314,11 +323,11 @@ def check_environ(environ):
         if '.' in key:
             # Extension, we don't care about its type
             continue
-        assert_(isinstance(environ[key], str),
+        assert_(type(environ[key]) is str,
             "Environmental variable %s is not a string: %r (value: %r)"
             % (key, type(environ[key]), environ[key]))
 
-    assert_(isinstance(environ['wsgi.version'], tuple),
+    assert_(type(environ['wsgi.version']) is tuple,
         "wsgi.version should be a tuple (%r)" % (environ['wsgi.version'],))
     assert_(environ['wsgi.url_scheme'] in ('http', 'https'),
         "wsgi.url_scheme unknown: %r" % environ['wsgi.url_scheme'])
@@ -364,8 +373,7 @@ def check_errors(wsgi_errors):
             % (wsgi_errors, attr))
 
 def check_status(status):
-    assert_(isinstance(status, str),
-        "Status must be a string (not %r)" % status)
+    status = check_string_type(status, "Status")
     # Implicitly check that we can turn it into an integer:
     status_code = status.split(None, 1)[0]
     assert_(len(status_code) == 3,
@@ -379,16 +387,18 @@ def check_status(status):
             % status, WSGIWarning)
 
 def check_headers(headers):
-    assert_(isinstance(headers, list),
+    assert_(type(headers) is list,
         "Headers (%r) must be of type list: %r"
         % (headers, type(headers)))
     header_names = {}
     for item in headers:
-        assert_(isinstance(item, tuple),
+        assert_(type(item) is tuple,
             "Individual headers (%r) must be of type tuple: %r"
             % (item, type(item)))
         assert_(len(item) == 2)
         name, value = item
+        name = check_string_type(name, "Header name")
+        value = check_string_type(value, "Header value")
         assert_(name.lower() != 'status',
             "The Status header cannot be used; it conflicts with CGI "
             "script, and HTTP status is not given through headers "
@@ -404,11 +414,13 @@ def check_headers(headers):
             % (value, bad_header_value_re.search(value).group(0)))
 
 def check_content_type(status, headers):
+    status = check_string_type(status, "Status")
     code = int(status.split(None, 1)[0])
     # @@: need one more person to verify this interpretation of RFC 2616
     #     http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
     NO_MESSAGE_BODY = (204, 304)
     for name, value in headers:
+        name = check_string_type(name, "Header name")
         if name.lower() == 'content-type':
             if code not in NO_MESSAGE_BODY:
                 return
@@ -418,14 +430,14 @@ def check_content_type(status, headers):
         assert_(0, "No Content-Type header found in headers (%s)" % headers)
 
 def check_exc_info(exc_info):
-    assert_(exc_info is None or isinstance(exc_info, tuple),
+    assert_(exc_info is None or type(exc_info) is tuple,
         "exc_info (%r) is not a tuple: %r" % (exc_info, type(exc_info)))
     # More exc_info checks?
 
 def check_iterator(iterator):
-    # Technically a string is legal, which is why it's a really bad
+    # Technically a bytestring is legal, which is why it's a really bad
     # idea, because it may cause the response to be returned
     # character-by-character
-    assert_(not isinstance(iterator, str),
+    assert_(not isinstance(iterator, (str, bytes)),
         "You should not return a string as your application iterator, "
-        "instead return a single-item list containing that string.")
+        "instead return a single-item list containing a bytestring.")

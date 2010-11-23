@@ -9,12 +9,13 @@
 from ..pgen2 import token
 from ..pygram import python_symbols as syms
 from .. import fixer_base
-from ..fixer_util import Name, Call, find_binding, any
+from ..fixer_util import Name, Call, find_binding
 
 bind_warning = "Calls to builtin next() possibly shadowed by global binding"
 
 
 class FixNext(fixer_base.BaseFix):
+    BM_compatible = True
     PATTERN = """
     power< base=any+ trailer< '.' attr='next' > trailer< '(' ')' > >
     |
@@ -28,15 +29,19 @@ class FixNext(fixer_base.BaseFix):
                      any* > >
     |
     global=global_stmt< 'global' any* 'next' any* >
-    |
-    mod=file_input< any+ >
     """
 
     order = "pre" # Pre-order tree traversal
 
     def start_tree(self, tree, filename):
         super(FixNext, self).start_tree(tree, filename)
-        self.shadowed_next = False
+
+        n = find_binding('next', tree)
+        if n:
+            self.warning(n, bind_warning)
+            self.shadowed_next = True
+        else:
+            self.shadowed_next = False
 
     def transform(self, node, results):
         assert results
@@ -44,17 +49,16 @@ class FixNext(fixer_base.BaseFix):
         base = results.get("base")
         attr = results.get("attr")
         name = results.get("name")
-        mod = results.get("mod")
 
         if base:
             if self.shadowed_next:
-                attr.replace(Name("__next__", prefix=attr.get_prefix()))
+                attr.replace(Name("__next__", prefix=attr.prefix))
             else:
                 base = [n.clone() for n in base]
-                base[0].set_prefix("")
-                node.replace(Call(Name("next", prefix=node.get_prefix()), base))
+                base[0].prefix = ""
+                node.replace(Call(Name("next", prefix=node.prefix), base))
         elif name:
-            n = Name("__next__", prefix=name.get_prefix())
+            n = Name("__next__", prefix=name.prefix)
             name.replace(n)
         elif attr:
             # We don't do this transformation if we're assigning to "x.next".
@@ -69,11 +73,6 @@ class FixNext(fixer_base.BaseFix):
         elif "global" in results:
             self.warning(node, bind_warning)
             self.shadowed_next = True
-        elif mod:
-            n = find_binding('next', mod)
-            if n:
-                self.warning(n, bind_warning)
-                self.shadowed_next = True
 
 
 ### The following functions help test if node is part of an assignment
@@ -101,4 +100,4 @@ def find_assign(node):
 def is_subtree(root, node):
     if root == node:
         return True
-    return any([is_subtree(c, node) for c in root.children])
+    return any(is_subtree(c, node) for c in root.children)

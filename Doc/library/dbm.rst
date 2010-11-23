@@ -5,9 +5,10 @@
    :synopsis: Interfaces to various Unix "database" formats.
 
 :mod:`dbm` is a generic interface to variants of the DBM database ---
-:mod:`dbm.bsd` (requires :mod:`bsddb`), :mod:`dbm.gnu`, or :mod:`dbm.ndbm`.  If
-none of these modules is installed, the slow-but-simple implementation in module
-:mod:`dbm.dumb` will be used.
+:mod:`dbm.gnu` or :mod:`dbm.ndbm`.  If none of these modules is installed, the
+slow-but-simple implementation in module :mod:`dbm.dumb` will be used.  There
+is a `third party interface <http://www.jcea.es/programacion/pybsddb.htm>`_ to
+the Oracle Berkeley DB.
 
 
 .. exception:: error
@@ -20,8 +21,8 @@ none of these modules is installed, the slow-but-simple implementation in module
 .. function:: whichdb(filename)
 
    This functionattempts to guess which of the several simple database modules
-   available --- :mod:`dbm.bsd`, :mod:`dbm.gnu`, :mod:`dbm.ndbm` or
-   :mod:`dbm.dumb` --- should be used to open a given file.
+   available --- :mod:`dbm.gnu`, :mod:`dbm.ndbm` or :mod:`dbm.dumb` --- should
+   be used to open a given file.
 
    Returns one of the following values: ``None`` if the file can't be opened
    because it's unreadable or doesn't exist; the empty string (``''``) if the
@@ -29,7 +30,7 @@ none of these modules is installed, the slow-but-simple implementation in module
    name, such as ``'dbm.ndbm'`` or ``'dbm.gnu'``.
 
 
-.. function:: open(filename[, flag[, mode]])
+.. function:: open(filename, flag='r', mode=0o666)
 
    Open the database file *filename* and return a corresponding object.
 
@@ -37,21 +38,35 @@ none of these modules is installed, the slow-but-simple implementation in module
    determine its type and the appropriate module is used; if it does not exist,
    the first module listed above that can be imported is used.
 
-   The optional *flag* argument can be ``'r'`` to open an existing database for
-   reading only, ``'w'`` to open an existing database for reading and writing,
-   ``'c'`` to create the database if it doesn't exist, or ``'n'``, which will
-   always create a new empty database.  If not specified, the default value is
-   ``'r'``.
+   The optional *flag* argument can be:
+
+   +---------+-------------------------------------------+
+   | Value   | Meaning                                   |
+   +=========+===========================================+
+   | ``'r'`` | Open existing database for reading only   |
+   |         | (default)                                 |
+   +---------+-------------------------------------------+
+   | ``'w'`` | Open existing database for reading and    |
+   |         | writing                                   |
+   +---------+-------------------------------------------+
+   | ``'c'`` | Open database for reading and writing,    |
+   |         | creating it if it doesn't exist           |
+   +---------+-------------------------------------------+
+   | ``'n'`` | Always create a new, empty database, open |
+   |         | for reading and writing                   |
+   +---------+-------------------------------------------+
 
    The optional *mode* argument is the Unix mode of the file, used only when the
    database has to be created.  It defaults to octal ``0o666`` (and will be
    modified by the prevailing umask).
 
 
-The object returned by :func:`open` supports most of the same functionality as
+The object returned by :func:`.open` supports most of the same functionality as
 dictionaries; keys and their corresponding values can be stored, retrieved, and
 deleted, and the :keyword:`in` operator and the :meth:`keys` method are
-available.  Keys and values must always be strings.
+available. Key and values are always stored as bytes. This means that when
+strings are used they are implicitly converted to the default encoding before
+being stored.
 
 The following example records some hostnames and a corresponding title,  and
 then prints out the contents of the database::
@@ -62,8 +77,14 @@ then prints out the contents of the database::
    db = dbm.open('cache', 'c')
 
    # Record some values
+   db[b'hello'] = b'there'
    db['www.python.org'] = 'Python Website'
    db['www.cnn.com'] = 'Cable News Network'
+
+   # Note that the keys are considered bytes now.
+   assert db[b'www.python.org'] == b'Python Website'
+   # Notice how the value is now in bytes.
+   assert db['www.cnn.com'] == b'Cable News Network'
 
    # Loop through contents.  Other dictionary methods
    # such as .keys(), .values() also work.
@@ -87,93 +108,6 @@ then prints out the contents of the database::
 The individual submodules are described in the following sections.
 
 
-:mod:`dbm.bsd` --- DBM-style interface to the BSD database library
-------------------------------------------------------------------
-
-.. module:: dbm.bsd
-   :synopsis: DBM-style interface to the BSD database library.
-.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
-
-.. index:: module: bsddb
-
-The :mod:`dbm.bsd` module provides a function to open databases using the BSD
-``db`` library.  This module mirrors the interface of the other Python database
-modules that provide access to DBM-style databases.  The :mod:`bsddb` module is
-required  to use :mod:`dbm.bsd`.
-
-.. exception:: error
-
-   Exception raised on database errors other than :exc:`KeyError`.  It is a synonym
-   for :exc:`bsddb.error`.
-
-
-.. function:: open(path[, flag[, mode]])
-
-   Open a ``db`` database and return the database object.  The *path* argument is
-   the name of the database file.
-
-   The *flag* argument can be:
-
-   +---------+-------------------------------------------+
-   | Value   | Meaning                                   |
-   +=========+===========================================+
-   | ``'r'`` | Open existing database for reading only   |
-   |         | (default)                                 |
-   +---------+-------------------------------------------+
-   | ``'w'`` | Open existing database for reading and    |
-   |         | writing                                   |
-   +---------+-------------------------------------------+
-   | ``'c'`` | Open database for reading and writing,    |
-   |         | creating it if it doesn't exist           |
-   +---------+-------------------------------------------+
-   | ``'n'`` | Always create a new, empty database, open |
-   |         | for reading and writing                   |
-   +---------+-------------------------------------------+
-
-   For platforms on which the BSD ``db`` library supports locking, an ``'l'``
-   can be appended to indicate that locking should be used.
-
-   The optional *mode* parameter is used to indicate the Unix permission bits that
-   should be set if a new database must be created; this will be masked by the
-   current umask value for the process.
-
-   The database objects returned by :func:`open` provide the methods common to all
-   the DBM-style databases and mapping objects.  The following methods are
-   available in addition to the standard methods:
-
-   .. method:: dbhash.first()
-
-      It's possible to loop over every key/value pair in the database using this
-      method   and the :meth:`next` method.  The traversal is ordered by the databases
-      internal hash values, and won't be sorted by the key values.  This method
-      returns the starting key.
-
-   .. method:: dbhash.last()
-
-      Return the last key/value pair in a database traversal.  This may be used to
-      begin a reverse-order traversal; see :meth:`previous`.
-
-   .. method:: dbhash.next()
-
-      Returns the key next key/value pair in a database traversal.  The following code
-      prints every key in the database ``db``, without having to create a list in
-      memory that contains them all::
-
-         print(db.first())
-         for i in range(1, len(db)):
-             print(db.next())
-
-   .. method:: dbhash.previous()
-
-      Returns the previous key/value pair in a forward-traversal of the database. In
-      conjunction with :meth:`last`, this may be used to implement a reverse-order
-      traversal.
-
-   .. method:: dbhash.sync()
-
-      This method forces any unwritten data to be written to the disk.
-
-
 :mod:`dbm.gnu` --- GNU's reinterpretation of dbm
 ------------------------------------------------
 
@@ -184,21 +118,22 @@ required  to use :mod:`dbm.bsd`.
 
 This module is quite similar to the :mod:`dbm` module, but uses the GNU library
 ``gdbm`` instead to provide some additional functionality.  Please note that the
-file formats created by ``gdbm`` and ``dbm`` are incompatible.
+file formats created by :mod:`dbm.gnu` and :mod:`dbm.ndbm` are incompatible.
 
 The :mod:`dbm.gnu` module provides an interface to the GNU DBM library.
-``gdbm`` objects behave like mappings (dictionaries), except that keys and
-values are always strings.  Printing a :mod:`dbm.gnu` object doesn't print the
+``dbm.gnu.gdbm`` objects behave like mappings (dictionaries), except that keys and
+values are always converted to bytes before storing.  Printing a ``gdbm``
+object doesn't print the
 keys and values, and the :meth:`items` and :meth:`values` methods are not
 supported.
 
 .. exception:: error
 
-   Raised on ``gdbm``\ -specific errors, such as I/O errors. :exc:`KeyError` is
+   Raised on :mod:`dbm.gnu`-specific errors, such as I/O errors. :exc:`KeyError` is
    raised for general mapping errors like specifying an incorrect key.
 
 
-.. function:: open(filename, [flag, [mode]])
+.. function:: open(filename[, flag[, mode]])
 
    Open a ``gdbm`` database and return a :class:`gdbm` object.  The *filename*
    argument is the name of the database file.
@@ -269,7 +204,7 @@ supported.
 
       If you have carried out a lot of deletions and would like to shrink the space
       used by the ``gdbm`` file, this routine will reorganize the database.  ``gdbm``
-      will not shorten the length of a database file except by using this
+      objects will not shorten the length of a database file except by using this
       reorganization; otherwise, deleted file space will be kept and reused as new
       (key, value) pairs are added.
 
@@ -289,17 +224,16 @@ supported.
 
 The :mod:`dbm.ndbm` module provides an interface to the Unix "(n)dbm" library.
 Dbm objects behave like mappings (dictionaries), except that keys and values are
-always strings. Printing a dbm object doesn't print the keys and values, and the
-:meth:`items` and :meth:`values` methods are not supported.
+always stored as bytes. Printing a ``dbm`` object doesn't print the keys and
+values, and the :meth:`items` and :meth:`values` methods are not supported.
 
-This module can be used with the "classic" ndbm interface, the BSD DB
-compatibility interface, or the GNU GDBM compatibility interface. On Unix, the
-:program:`configure` script will attempt to locate the appropriate header file
-to simplify building this module.
+This module can be used with the "classic" ndbm interface or the GNU GDBM
+compatibility interface. On Unix, the :program:`configure` script will attempt
+to locate the appropriate header file to simplify building this module.
 
 .. exception:: error
 
-   Raised on dbm-specific errors, such as I/O errors. :exc:`KeyError` is raised
+   Raised on :mod:`dbm.ndbm`-specific errors, such as I/O errors. :exc:`KeyError` is raised
    for general mapping errors like specifying an incorrect key.
 
 
@@ -310,10 +244,8 @@ to simplify building this module.
 
 .. function:: open(filename[, flag[, mode]])
 
-   Open a dbm database and return a dbm object.  The *filename* argument is the
-   name of the database file (without the :file:`.dir` or :file:`.pag` extensions;
-   note that the BSD DB implementation of the interface will append the extension
-   :file:`.db` and only create one file).
+   Open a dbm database and return a ``dbm`` object.  The *filename* argument is the
+   name of the database file (without the :file:`.dir` or :file:`.pag` extensions).
 
    The optional *flag* argument must be one of these values:
 
@@ -350,27 +282,27 @@ to simplify building this module.
 .. note::
 
    The :mod:`dbm.dumb` module is intended as a last resort fallback for the
-   :mod:`dbm` module when no more robust module is available. The :mod:`dbm.dumb`
+   :mod:`dbm` module when a more robust module is not available. The :mod:`dbm.dumb`
    module is not written for speed and is not nearly as heavily used as the other
    database modules.
 
 The :mod:`dbm.dumb` module provides a persistent dictionary-like interface which
-is written entirely in Python.  Unlike other modules such as :mod:`gdbm` and
-:mod:`bsddb`, no external library is required.  As with other persistent
-mappings, the keys and values must always be strings.
+is written entirely in Python.  Unlike other modules such as :mod:`dbm.gnu` no
+external library is required.  As with other persistent mappings, the keys and
+values are always stored as bytes.
 
 The module defines the following:
 
 
 .. exception:: error
 
-   Raised on dbm.dumb-specific errors, such as I/O errors.  :exc:`KeyError` is
+   Raised on :mod:`dbm.dumb`-specific errors, such as I/O errors.  :exc:`KeyError` is
    raised for general mapping errors like specifying an incorrect key.
 
 
 .. function:: open(filename[, flag[, mode]])
 
-   Open a dumbdbm database and return a dumbdbm object.  The *filename* argument is
+   Open a ``dumbdbm`` database and return a dumbdbm object.  The *filename* argument is
    the basename of the database file (without any specific extensions).  When a
    dumbdbm database is created, files with :file:`.dat` and :file:`.dir` extensions
    are created.

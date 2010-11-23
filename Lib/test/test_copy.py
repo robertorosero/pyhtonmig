@@ -2,17 +2,23 @@
 
 import copy
 import copyreg
+import weakref
+from operator import le, lt, ge, gt, eq, ne
 
 import unittest
 from test import support
+
+order_comparisons = le, lt, ge, gt
+equality_comparisons = eq, ne
+comparisons = order_comparisons + equality_comparisons
 
 class TestCopy(unittest.TestCase):
 
     # Attempt full line coverage of copy.py from top to bottom
 
     def test_exceptions(self):
-        self.assert_(copy.Error is copy.error)
-        self.assert_(issubclass(copy.Error, Exception))
+        self.assertTrue(copy.Error is copy.error)
+        self.assertTrue(issubclass(copy.Error, Exception))
 
     # The copy() method
 
@@ -53,7 +59,7 @@ class TestCopy(unittest.TestCase):
                 raise support.TestFailed("shouldn't call this")
         x = C()
         y = copy.copy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
 
     def test_copy_reduce(self):
         class C(object):
@@ -61,7 +67,7 @@ class TestCopy(unittest.TestCase):
                 return ""
         x = C()
         y = copy.copy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
 
     def test_copy_cant(self):
         class C(object):
@@ -85,7 +91,7 @@ class TestCopy(unittest.TestCase):
                  "hello", "hello\u1234", f.__code__,
                  NewStyle, range(10), Classic, max]
         for x in tests:
-            self.assert_(copy.copy(x) is x, repr(x))
+            self.assertTrue(copy.copy(x) is x, repr(x))
 
     def test_copy_list(self):
         x = [1, 2, 3]
@@ -179,9 +185,9 @@ class TestCopy(unittest.TestCase):
         x = [x, x]
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y[0] is not x[0])
-        self.assert_(y[0] is y[1])
+        self.assertTrue(y is not x)
+        self.assertTrue(y[0] is not x[0])
+        self.assertTrue(y[0] is y[1])
 
     def test_deepcopy_issubclass(self):
         # XXX Note: there's no way to test the TypeError coming out of
@@ -226,7 +232,7 @@ class TestCopy(unittest.TestCase):
                 raise support.TestFailed("shouldn't call this")
         x = C()
         y = copy.deepcopy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
 
     def test_deepcopy_reduce(self):
         class C(object):
@@ -234,7 +240,7 @@ class TestCopy(unittest.TestCase):
                 return ""
         x = C()
         y = copy.deepcopy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
 
     def test_deepcopy_cant(self):
         class C(object):
@@ -258,61 +264,66 @@ class TestCopy(unittest.TestCase):
                  "hello", "hello\u1234", f.__code__,
                  NewStyle, range(10), Classic, max]
         for x in tests:
-            self.assert_(copy.deepcopy(x) is x, repr(x))
+            self.assertTrue(copy.deepcopy(x) is x, repr(x))
 
     def test_deepcopy_list(self):
         x = [[1, 2], 3]
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(x is not y)
-        self.assert_(x[0] is not y[0])
+        self.assertTrue(x is not y)
+        self.assertTrue(x[0] is not y[0])
 
     def test_deepcopy_reflexive_list(self):
         x = []
         x.append(x)
         y = copy.deepcopy(x)
-        self.assertRaises(RuntimeError, cmp, y, x)
-        self.assert_(y is not x)
-        self.assert_(y[0] is y)
+        for op in comparisons:
+            self.assertRaises(RuntimeError, op, y, x)
+        self.assertTrue(y is not x)
+        self.assertTrue(y[0] is y)
         self.assertEqual(len(y), 1)
 
     def test_deepcopy_tuple(self):
         x = ([1, 2], 3)
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(x is not y)
-        self.assert_(x[0] is not y[0])
+        self.assertTrue(x is not y)
+        self.assertTrue(x[0] is not y[0])
 
     def test_deepcopy_reflexive_tuple(self):
         x = ([],)
         x[0].append(x)
         y = copy.deepcopy(x)
-        self.assertRaises(RuntimeError, cmp, y, x)
-        self.assert_(y is not x)
-        self.assert_(y[0] is not x[0])
-        self.assert_(y[0][0] is y)
+        for op in comparisons:
+            self.assertRaises(RuntimeError, op, y, x)
+        self.assertTrue(y is not x)
+        self.assertTrue(y[0] is not x[0])
+        self.assertTrue(y[0][0] is y)
 
     def test_deepcopy_dict(self):
         x = {"foo": [1, 2], "bar": 3}
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(x is not y)
-        self.assert_(x["foo"] is not y["foo"])
+        self.assertTrue(x is not y)
+        self.assertTrue(x["foo"] is not y["foo"])
 
     def test_deepcopy_reflexive_dict(self):
         x = {}
         x['foo'] = x
         y = copy.deepcopy(x)
-        self.assertRaises(TypeError, cmp, y, x)
-        self.assert_(y is not x)
-        self.assert_(y['foo'] is y)
+        for op in order_comparisons:
+            self.assertRaises(TypeError, op, y, x)
+        for op in equality_comparisons:
+            self.assertRaises(RuntimeError, op, y, x)
+        self.assertTrue(y is not x)
+        self.assertTrue(y['foo'] is y)
         self.assertEqual(len(y), 1)
 
     def test_deepcopy_keepalive(self):
         memo = {}
         x = 42
         y = copy.deepcopy(x, memo)
-        self.assert_(memo[id(x)] is x)
+        self.assertTrue(memo[id(x)] is x)
 
     def test_deepcopy_inst_vanilla(self):
         class C:
@@ -323,7 +334,7 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_inst_deepcopy(self):
         class C:
@@ -336,8 +347,8 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_inst_getinitargs(self):
         class C:
@@ -350,8 +361,8 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_inst_getstate(self):
         class C:
@@ -364,8 +375,8 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_inst_setstate(self):
         class C:
@@ -378,8 +389,8 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_inst_getstate_setstate(self):
         class C:
@@ -394,8 +405,8 @@ class TestCopy(unittest.TestCase):
         x = C([42])
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_deepcopy_reflexive_inst(self):
         class C:
@@ -403,8 +414,8 @@ class TestCopy(unittest.TestCase):
         x = C()
         x.foo = x
         y = copy.deepcopy(x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is y)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is y)
 
     # _reconstruct()
 
@@ -414,9 +425,9 @@ class TestCopy(unittest.TestCase):
                 return ""
         x = C()
         y = copy.copy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
         y = copy.deepcopy(x)
-        self.assert_(y is x)
+        self.assertTrue(y is x)
 
     def test_reconstruct_nostate(self):
         class C(object):
@@ -425,9 +436,9 @@ class TestCopy(unittest.TestCase):
         x = C()
         x.foo = 42
         y = copy.copy(x)
-        self.assert_(y.__class__ is x.__class__)
+        self.assertTrue(y.__class__ is x.__class__)
         y = copy.deepcopy(x)
-        self.assert_(y.__class__ is x.__class__)
+        self.assertTrue(y.__class__ is x.__class__)
 
     def test_reconstruct_state(self):
         class C(object):
@@ -441,7 +452,7 @@ class TestCopy(unittest.TestCase):
         self.assertEqual(y, x)
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_reconstruct_state_setstate(self):
         class C(object):
@@ -457,7 +468,7 @@ class TestCopy(unittest.TestCase):
         self.assertEqual(y, x)
         y = copy.deepcopy(x)
         self.assertEqual(y, x)
-        self.assert_(y.foo is not x.foo)
+        self.assertTrue(y.foo is not x.foo)
 
     def test_reconstruct_reflexive(self):
         class C(object):
@@ -465,8 +476,8 @@ class TestCopy(unittest.TestCase):
         x = C()
         x.foo = x
         y = copy.deepcopy(x)
-        self.assert_(y is not x)
-        self.assert_(y.foo is y)
+        self.assertTrue(y is not x)
+        self.assertTrue(y.foo is y)
 
     # Additions for Python 2.3 and pickle protocol 2
 
@@ -480,12 +491,12 @@ class TestCopy(unittest.TestCase):
         x = C([[1, 2], 3])
         y = copy.copy(x)
         self.assertEqual(x, y)
-        self.assert_(x is not y)
-        self.assert_(x[0] is y[0])
+        self.assertTrue(x is not y)
+        self.assertTrue(x[0] is y[0])
         y = copy.deepcopy(x)
         self.assertEqual(x, y)
-        self.assert_(x is not y)
-        self.assert_(x[0] is not y[0])
+        self.assertTrue(x is not y)
+        self.assertTrue(x[0] is not y[0])
 
     def test_reduce_5tuple(self):
         class C(dict):
@@ -497,12 +508,12 @@ class TestCopy(unittest.TestCase):
         x = C([("foo", [1, 2]), ("bar", 3)])
         y = copy.copy(x)
         self.assertEqual(x, y)
-        self.assert_(x is not y)
-        self.assert_(x["foo"] is y["foo"])
+        self.assertTrue(x is not y)
+        self.assertTrue(x["foo"] is y["foo"])
         y = copy.deepcopy(x)
         self.assertEqual(x, y)
-        self.assert_(x is not y)
-        self.assert_(x["foo"] is not y["foo"])
+        self.assertTrue(x is not y)
+        self.assertTrue(x["foo"] is not y["foo"])
 
     def test_copy_slots(self):
         class C(object):
@@ -510,7 +521,7 @@ class TestCopy(unittest.TestCase):
         x = C()
         x.foo = [42]
         y = copy.copy(x)
-        self.assert_(x.foo is y.foo)
+        self.assertTrue(x.foo is y.foo)
 
     def test_deepcopy_slots(self):
         class C(object):
@@ -519,7 +530,27 @@ class TestCopy(unittest.TestCase):
         x.foo = [42]
         y = copy.deepcopy(x)
         self.assertEqual(x.foo, y.foo)
-        self.assert_(x.foo is not y.foo)
+        self.assertTrue(x.foo is not y.foo)
+
+    def test_deepcopy_dict_subclass(self):
+        class C(dict):
+            def __init__(self, d=None):
+                if not d:
+                    d = {}
+                self._keys = list(d.keys())
+                super().__init__(d)
+            def __setitem__(self, key, item):
+                super().__setitem__(key, item)
+                if key not in self._keys:
+                    self._keys.append(key)
+        x = C(d={'foo':0})
+        y = copy.deepcopy(x)
+        self.assertEqual(x, y)
+        self.assertEqual(x._keys, y._keys)
+        self.assertTrue(x is not y)
+        x['bar'] = 1
+        self.assertNotEqual(x, y)
+        self.assertNotEqual(x._keys, y._keys)
 
     def test_copy_list_subclass(self):
         class C(list):
@@ -529,8 +560,8 @@ class TestCopy(unittest.TestCase):
         y = copy.copy(x)
         self.assertEqual(list(x), list(y))
         self.assertEqual(x.foo, y.foo)
-        self.assert_(x[0] is y[0])
-        self.assert_(x.foo is y.foo)
+        self.assertTrue(x[0] is y[0])
+        self.assertTrue(x.foo is y.foo)
 
     def test_deepcopy_list_subclass(self):
         class C(list):
@@ -540,8 +571,8 @@ class TestCopy(unittest.TestCase):
         y = copy.deepcopy(x)
         self.assertEqual(list(x), list(y))
         self.assertEqual(x.foo, y.foo)
-        self.assert_(x[0] is not y[0])
-        self.assert_(x.foo is not y.foo)
+        self.assertTrue(x[0] is not y[0])
+        self.assertTrue(x.foo is not y.foo)
 
     def test_copy_tuple_subclass(self):
         class C(tuple):
@@ -558,8 +589,8 @@ class TestCopy(unittest.TestCase):
         self.assertEqual(tuple(x), ([1, 2], 3))
         y = copy.deepcopy(x)
         self.assertEqual(tuple(y), ([1, 2], 3))
-        self.assert_(x is not y)
-        self.assert_(x[0] is not y[0])
+        self.assertTrue(x is not y)
+        self.assertTrue(x[0] is not y[0])
 
     def test_getstate_exc(self):
         class EvilState(object):
@@ -580,6 +611,103 @@ class TestCopy(unittest.TestCase):
         self.assertEqual(copy.deepcopy(foo), foo)
         bar = lambda: None
         self.assertEqual(copy.deepcopy(bar), bar)
+
+    def _check_weakref(self, _copy):
+        class C(object):
+            pass
+        obj = C()
+        x = weakref.ref(obj)
+        y = _copy(x)
+        self.assertTrue(y is x)
+        del obj
+        y = _copy(x)
+        self.assertTrue(y is x)
+
+    def test_copy_weakref(self):
+        self._check_weakref(copy.copy)
+
+    def test_deepcopy_weakref(self):
+        self._check_weakref(copy.deepcopy)
+
+    def _check_copy_weakdict(self, _dicttype):
+        class C(object):
+            pass
+        a, b, c, d = [C() for i in range(4)]
+        u = _dicttype()
+        u[a] = b
+        u[c] = d
+        v = copy.copy(u)
+        self.assertFalse(v is u)
+        self.assertEqual(v, u)
+        self.assertEqual(v[a], b)
+        self.assertEqual(v[c], d)
+        self.assertEqual(len(v), 2)
+        del c, d
+        self.assertEqual(len(v), 1)
+        x, y = C(), C()
+        # The underlying containers are decoupled
+        v[x] = y
+        self.assertNotIn(x, u)
+
+    def test_copy_weakkeydict(self):
+        self._check_copy_weakdict(weakref.WeakKeyDictionary)
+
+    def test_copy_weakvaluedict(self):
+        self._check_copy_weakdict(weakref.WeakValueDictionary)
+
+    def test_deepcopy_weakkeydict(self):
+        class C(object):
+            def __init__(self, i):
+                self.i = i
+        a, b, c, d = [C(i) for i in range(4)]
+        u = weakref.WeakKeyDictionary()
+        u[a] = b
+        u[c] = d
+        # Keys aren't copied, values are
+        v = copy.deepcopy(u)
+        self.assertNotEqual(v, u)
+        self.assertEqual(len(v), 2)
+        self.assertFalse(v[a] is b)
+        self.assertFalse(v[c] is d)
+        self.assertEqual(v[a].i, b.i)
+        self.assertEqual(v[c].i, d.i)
+        del c
+        self.assertEqual(len(v), 1)
+
+    def test_deepcopy_weakvaluedict(self):
+        class C(object):
+            def __init__(self, i):
+                self.i = i
+        a, b, c, d = [C(i) for i in range(4)]
+        u = weakref.WeakValueDictionary()
+        u[a] = b
+        u[c] = d
+        # Keys are copied, values aren't
+        v = copy.deepcopy(u)
+        self.assertNotEqual(v, u)
+        self.assertEqual(len(v), 2)
+        (x, y), (z, t) = sorted(v.items(), key=lambda pair: pair[0].i)
+        self.assertFalse(x is a)
+        self.assertEqual(x.i, a.i)
+        self.assertTrue(y is b)
+        self.assertFalse(z is c)
+        self.assertEqual(z.i, c.i)
+        self.assertTrue(t is d)
+        del x, y, z, t
+        del d
+        self.assertEqual(len(v), 1)
+
+    def test_deepcopy_bound_method(self):
+        class Foo(object):
+            def m(self):
+                pass
+        f = Foo()
+        f.b = f.m
+        g = copy.deepcopy(f)
+        self.assertEqual(g.m, g.b)
+        self.assertTrue(g.b.__self__ is g)
+        g.b()
+
 
 def global_foo(x, y): return x+y
 

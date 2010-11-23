@@ -1,12 +1,13 @@
 from test import support
 support.requires('audio')
 
-from test.support import findfile, TestSkipped
+from test.support import findfile
+
+ossaudiodev = support.import_module('ossaudiodev')
 
 import errno
-import ossaudiodev
 import sys
-import sunaudio
+import sunau
 import time
 import audioop
 import unittest
@@ -22,15 +23,16 @@ except ImportError:
         AFMT_S16_NE = ossaudiodev.AFMT_S16_BE
 
 
-SND_FORMAT_MULAW_8 = 1
-
 def read_sound_file(path):
-    fp = open(path, 'rb')
-    size, enc, rate, nchannels, extra = sunaudio.gethdr(fp)
-    data = fp.read()
-    fp.close()
+    with open(path, 'rb') as fp:
+        au = sunau.open(fp)
+        rate = au.getframerate()
+        nchannels = au.getnchannels()
+        encoding = au._encoding
+        fp.seek(0)
+        data = fp.read()
 
-    if enc != SND_FORMAT_MULAW_8:
+    if encoding != sunau.AUDIO_FILE_ENCODING_MULAW_8:
         raise RuntimeError("Expect .au file with 8-bit mu-law samples")
 
     # Convert the data to 16-bit signed.
@@ -45,7 +47,7 @@ class OSSAudioDevTests(unittest.TestCase):
         except IOError as msg:
             if msg.args[0] in (errno.EACCES, errno.ENOENT,
                                errno.ENODEV, errno.EBUSY):
-                raise TestSkipped(msg)
+                raise unittest.SkipTest(msg)
             raise
 
         # at least check that these methods can be invoked
@@ -56,7 +58,7 @@ class OSSAudioDevTests(unittest.TestCase):
         dsp.fileno()
 
         # Make sure the read-only attributes work.
-        self.failUnless(dsp.close)
+        self.assertFalse(dsp.closed)
         self.assertEqual(dsp.name, "/dev/dsp")
         self.assertEqual(dsp.mode, "w", "bad dsp.mode: %r" % dsp.mode)
 
@@ -64,7 +66,7 @@ class OSSAudioDevTests(unittest.TestCase):
         for attr in ('closed', 'name', 'mode'):
             try:
                 setattr(dsp, attr, 42)
-            except TypeError:
+            except (TypeError, AttributeError):
                 pass
             else:
                 self.fail("dsp.%s not read-only" % attr)
@@ -74,7 +76,7 @@ class OSSAudioDevTests(unittest.TestCase):
 
         # set parameters based on .au file headers
         dsp.setparameters(AFMT_S16_NE, nchannels, rate)
-        self.assertEquals("%.2f" % expected_time, "2.93")
+        self.assertTrue(abs(expected_time - 3.51) < 1e-2, expected_time)
         t1 = time.time()
         dsp.write(data)
         dsp.close()
@@ -82,7 +84,7 @@ class OSSAudioDevTests(unittest.TestCase):
         elapsed_time = t2 - t1
 
         percent_diff = (abs(elapsed_time - expected_time) / expected_time) * 100
-        self.failUnless(percent_diff <= 10.0,
+        self.assertTrue(percent_diff <= 10.0,
                         "elapsed time (%s) > 10%% off of expected time (%s)" %
                         (elapsed_time, expected_time))
 
@@ -131,7 +133,7 @@ class OSSAudioDevTests(unittest.TestCase):
                       ]:
             (fmt, channels, rate) = config
             result = dsp.setparameters(fmt, channels, rate, False)
-            self.failIfEqual(result, config,
+            self.assertNotEqual(result, config,
                              "unexpectedly got requested configuration")
 
             try:
@@ -155,7 +157,18 @@ class OSSAudioDevTests(unittest.TestCase):
             #self.set_bad_parameters(dsp)
         finally:
             dsp.close()
-            self.failUnless(dsp.closed)
+            self.assertTrue(dsp.closed)
+
+    def test_mixer_methods(self):
+        # Issue #8139: ossaudiodev didn't initialize its types properly,
+        # therefore some methods were unavailable.
+        with ossaudiodev.openmixer() as mixer:
+            self.assertGreaterEqual(mixer.fileno(), 0)
+
+    def test_with(self):
+        with ossaudiodev.open('w') as dsp:
+            pass
+        self.assertTrue(dsp.closed)
 
 
 def test_main():
@@ -164,7 +177,7 @@ def test_main():
     except (ossaudiodev.error, IOError) as msg:
         if msg.args[0] in (errno.EACCES, errno.ENOENT,
                            errno.ENODEV, errno.EBUSY):
-            raise TestSkipped(msg)
+            raise unittest.SkipTest(msg)
         raise
     dsp.close()
     support.run_unittest(__name__)

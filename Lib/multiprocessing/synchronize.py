@@ -21,6 +21,17 @@ from multiprocessing.process import current_process
 from multiprocessing.util import Finalize, register_after_fork, debug
 from multiprocessing.forking import assert_spawning, Popen
 
+# Try to import the mp.synchronize module cleanly, if it fails
+# raise ImportError for platforms lacking a working sem_open implementation.
+# See issue 3770
+try:
+    from _multiprocessing import SemLock
+except (ImportError):
+    raise ImportError("This platform lacks a functioning sem_open" +
+                      " implementation, therefore, the required" +
+                      " synchronization primitives needed will not" +
+                      " function, see issue 3770.")
+
 #
 # Constants
 #
@@ -47,8 +58,12 @@ class SemLock(object):
     def _make_methods(self):
         self.acquire = self._semlock.acquire
         self.release = self._semlock.release
-        self.__enter__ = self._semlock.__enter__
-        self.__exit__ = self._semlock.__exit__
+
+    def __enter__(self):
+        return self._semlock.__enter__()
+
+    def __exit__(self, *args):
+        return self._semlock.__exit__(*args)
 
     def __getstate__(self):
         assert_spawning(self)
@@ -108,9 +123,9 @@ class Lock(SemLock):
     def __repr__(self):
         try:
             if self._semlock._is_mine():
-                name = current_process().get_name()
-                if threading.current_thread().get_name() != 'MainThread':
-                    name += '|' + threading.current_thread().get_name()
+                name = current_process().name
+                if threading.current_thread().name != 'MainThread':
+                    name += '|' + threading.current_thread().name
             elif self._semlock._get_value() == 1:
                 name = 'None'
             elif self._semlock._count() > 0:
@@ -133,9 +148,9 @@ class RLock(SemLock):
     def __repr__(self):
         try:
             if self._semlock._is_mine():
-                name = current_process().get_name()
-                if threading.current_thread().get_name() != 'MainThread':
-                    name += '|' + threading.current_thread().get_name()
+                name = current_process().name
+                if threading.current_thread().name != 'MainThread':
+                    name += '|' + threading.current_thread().name
                 count = self._semlock._count()
             elif self._semlock._get_value() == 1:
                 name, count = 'None', 0
@@ -170,11 +185,15 @@ class Condition(object):
          self._woken_count, self._wait_semaphore) = state
         self._make_methods()
 
+    def __enter__(self):
+        return self._lock.__enter__()
+
+    def __exit__(self, *args):
+        return self._lock.__exit__(*args)
+
     def _make_methods(self):
         self.acquire = self._lock.acquire
         self.release = self._lock.release
-        self.__enter__ = self._lock.__enter__
-        self.__exit__ = self._lock.__exit__
 
     def __repr__(self):
         try:
@@ -198,7 +217,7 @@ class Condition(object):
 
         try:
             # wait for notification or timeout
-            self._wait_semaphore.acquire(True, timeout)
+            ret = self._wait_semaphore.acquire(True, timeout)
         finally:
             # indicate that this thread has woken
             self._woken_count.release()
@@ -206,6 +225,7 @@ class Condition(object):
             # reacquire lock
             for i in range(count):
                 self._lock.acquire()
+            return ret
 
     def notify(self):
         assert self._lock._semlock._is_mine(), 'lock is not owned'
@@ -290,5 +310,10 @@ class Event(object):
                 self._flag.release()
             else:
                 self._cond.wait(timeout)
+
+            if self._flag.acquire(False):
+                self._flag.release()
+                return True
+            return False
         finally:
             self._cond.release()

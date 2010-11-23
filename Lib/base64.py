@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 """RFC 3548: Base16, Base32, Base64 Data Encodings"""
 
@@ -13,7 +13,7 @@ import binascii
 
 __all__ = [
     # Legacy interface exports traditional RFC 1521 Base64 encodings
-    'encode', 'decode', 'encodestring', 'decodestring',
+    'encode', 'decode', 'encodebytes', 'decodebytes',
     # Generalized interface for other encodings
     'b64encode', 'b64decode', 'b32encode', 'b32decode',
     'b16encode', 'b16decode',
@@ -39,7 +39,7 @@ def _translate(s, altchars):
     return s.translate(translation)
 
 
-
+
 # Base64 encoding/decoding uses binascii
 
 def b64encode(s, altchars=None):
@@ -58,23 +58,26 @@ def b64encode(s, altchars=None):
     encoded = binascii.b2a_base64(s)[:-1]
     if altchars is not None:
         if not isinstance(altchars, bytes_types):
-            altchars = TypeError("expected bytes, not %s"
-                                 % altchars.__class__.__name__)
+            raise TypeError("expected bytes, not %s"
+                            % altchars.__class__.__name__)
         assert len(altchars) == 2, repr(altchars)
         return _translate(encoded, {'+': altchars[0:1], '/': altchars[1:2]})
     return encoded
 
 
-def b64decode(s, altchars=None):
+def b64decode(s, altchars=None, validate=False):
     """Decode a Base64 encoded byte string.
 
     s is the byte string to decode.  Optional altchars must be a
     string of length 2 which specifies the alternative alphabet used
     instead of the '+' and '/' characters.
 
-    The decoded byte string is returned.  binascii.Error is raised if
-    s were incorrectly padded or if there are non-alphabet characters
-    present in the string.
+    The decoded string is returned.  A binascii.Error is raised if s is
+    incorrectly padded.
+
+    If validate is False (the default), non-base64-alphabet characters are
+    discarded prior to the padding check.  If validate is True,
+    non-base64-alphabet characters in the input result in a binascii.Error.
     """
     if not isinstance(s, bytes_types):
         raise TypeError("expected bytes, not %s" % s.__class__.__name__)
@@ -84,6 +87,8 @@ def b64decode(s, altchars=None):
                             % altchars.__class__.__name__)
         assert len(altchars) == 2, repr(altchars)
         s = _translate(s, {chr(altchars[0]): b'+', chr(altchars[1]): b'/'})
+    if validate and not re.match(b'^[A-Za-z0-9+/]*={0,2}$', s):
+        raise binascii.Error('Non-base64 digit found')
     return binascii.a2b_base64(s)
 
 
@@ -126,7 +131,7 @@ def urlsafe_b64decode(s):
     return b64decode(s, b'-_')
 
 
-
+
 # Base32 encoding/decoding must be done in Python
 _b32alphabet = {
     0: b'A',  9: b'J', 18: b'S', 27: b'3',
@@ -225,7 +230,7 @@ def b32decode(s, casefold=False, map01=None):
     # characters because this will tell us how many null bytes to remove from
     # the end of the decoded string.
     padchars = 0
-    mo = re.search('(?P<pad>[=]*)$', s)
+    mo = re.search(b'(?P<pad>[=]*)$', s)
     if mo:
         padchars = len(mo.group('pad'))
         if padchars > 0:
@@ -241,7 +246,7 @@ def b32decode(s, casefold=False, map01=None):
         acc += _b32rev[c] << shift
         shift -= 5
         if shift < 0:
-            parts.append(binascii.unhexlify('%010x' % acc))
+            parts.append(binascii.unhexlify(bytes('%010x' % acc, "ascii")))
             acc = 0
             shift = 35
     # Process the last, partial quanta
@@ -262,7 +267,7 @@ def b32decode(s, casefold=False, map01=None):
     return b''.join(parts)
 
 
-
+
 # RFC 3548, Base 16 Alphabet specifies uppercase, but hexlify() returns
 # lowercase.  The RFC also recommends against accepting input case
 # insensitively.
@@ -291,12 +296,12 @@ def b16decode(s, casefold=False):
         raise TypeError("expected bytes, not %s" % s.__class__.__name__)
     if casefold:
         s = s.upper()
-    if re.search('[^0-9A-F]', s):
+    if re.search(b'[^0-9A-F]', s):
         raise binascii.Error('Non-base16 digit found')
     return binascii.unhexlify(s)
 
 
-
+
 # Legacy interface.  This code could be cleaned up since I don't believe
 # binascii has any line length limitations.  It just doesn't seem worth it
 # though.  The files should be opened in binary mode.
@@ -329,11 +334,9 @@ def decode(input, output):
         output.write(s)
 
 
-def encodestring(s):
-    """Encode a string into multiple lines of base-64 data.
-
-    Argument and return value are bytes.
-    """
+def encodebytes(s):
+    """Encode a bytestring into a bytestring containing multiple lines
+    of base-64 data."""
     if not isinstance(s, bytes_types):
         raise TypeError("expected bytes, not %s" % s.__class__.__name__)
     pieces = []
@@ -342,18 +345,28 @@ def encodestring(s):
         pieces.append(binascii.b2a_base64(chunk))
     return b"".join(pieces)
 
+def encodestring(s):
+    """Legacy alias of encodebytes()."""
+    import warnings
+    warnings.warn("encodestring() is a deprecated alias, use encodebytes()",
+                  DeprecationWarning, 2)
+    return encodebytes(s)
 
-def decodestring(s):
-    """Decode a string.
 
-    Argument and return value are bytes.
-    """
+def decodebytes(s):
+    """Decode a bytestring of base-64 data into a bytestring."""
     if not isinstance(s, bytes_types):
         raise TypeError("expected bytes, not %s" % s.__class__.__name__)
     return binascii.a2b_base64(s)
 
+def decodestring(s):
+    """Legacy alias of decodebytes()."""
+    import warnings
+    warnings.warn("decodestring() is a deprecated alias, use decodebytes()",
+                  DeprecationWarning, 2)
+    return decodebytes(s)
 
-
+
 # Usable as a script...
 def main():
     """Small main program"""
@@ -375,17 +388,18 @@ def main():
         if o == '-u': func = decode
         if o == '-t': test(); return
     if args and args[0] != '-':
-        func(open(args[0], 'rb'), sys.stdout)
+        with open(args[0], 'rb') as f:
+            func(f, sys.stdout.buffer)
     else:
-        func(sys.stdin, sys.stdout)
+        func(sys.stdin.buffer, sys.stdout.buffer)
 
 
 def test():
     s0 = b"Aladdin:open sesame"
     print(repr(s0))
-    s1 = encodestring(s0)
+    s1 = encodebytes(s0)
     print(repr(s1))
-    s2 = decodestring(s1)
+    s2 = decodebytes(s1)
     print(repr(s2))
     assert s0 == s2
 

@@ -1,11 +1,13 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """Test script for the dbm.open function based on testdumbdbm.py"""
 
 import os
 import unittest
-import dbm
 import glob
 import test.support
+
+# Skip tests if dbm module doesn't exist.
+dbm = test.support.import_module('dbm')
 
 _fname = test.support.TESTFN
 
@@ -55,7 +57,10 @@ class AnyDBMTestCase(unittest.TestCase):
         return keys
 
     def test_error(self):
-        self.assert_(issubclass(self.module.error, IOError))
+        self.assertTrue(issubclass(self.module.error, IOError))
+
+    def test_anydbm_not_existing(self):
+        self.assertRaises(dbm.error, dbm.open, _fname)
 
     def test_anydbm_creation(self):
         f = dbm.open(_fname, 'c')
@@ -88,7 +93,7 @@ class AnyDBMTestCase(unittest.TestCase):
         self.init_db()
         f = dbm.open(_fname, 'r')
         key = "a".encode("ascii")
-        assert(key in f)
+        self.assertIn(key, f)
         assert(f[key] == b"Python:")
         f.close()
 
@@ -126,7 +131,7 @@ class WhichDBTestCase(unittest.TestCase):
             f = module.open(_fname, 'w')
             f[b"1"] = b"1"
             # and test that we can find it
-            self.assertTrue(b"1" in f)
+            self.assertIn(b"1", f)
             # and read it
             self.assertTrue(f[b"1"] == b"1")
             f.close()
@@ -137,6 +142,23 @@ class WhichDBTestCase(unittest.TestCase):
 
     def setUp(self):
         delete_files()
+        self.filename = test.support.TESTFN
+        self.d = dbm.open(self.filename, 'c')
+        self.d.close()
+
+    def test_keys(self):
+        self.d = dbm.open(self.filename, 'c')
+        self.assertEqual(self.d.keys(), [])
+        a = [(b'a', b'b'), (b'12345678910', b'019237410982340912840198242')]
+        for k, v in a:
+            self.d[k] = v
+        self.assertEqual(sorted(self.d.keys()), sorted(k for (k, v) in a))
+        for k, v in a:
+            self.assertIn(k, self.d)
+            self.assertEqual(self.d[k], v)
+        self.assertNotIn(b'xxx', self.d)
+        self.assertRaises(KeyError, lambda: self.d[b'xxx'])
+        self.d.close()
 
 
 def test_main():

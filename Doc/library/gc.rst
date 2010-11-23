@@ -1,4 +1,3 @@
-
 :mod:`gc` --- Garbage Collector interface
 =========================================
 
@@ -37,12 +36,17 @@ The :mod:`gc` module provides the following functions:
    Returns true if automatic collection is enabled.
 
 
-.. function:: collect([generation])
+.. function:: collect(generations=2)
 
    With no arguments, run a full collection.  The optional argument *generation*
    may be an integer specifying which generation to collect (from 0 to 2).  A
    :exc:`ValueError` is raised if the generation number  is invalid. The number of
    unreachable objects found is returned.
+
+   The free lists maintained for a number of built-in types are cleared
+   whenever a full collection or collection of the highest generation (2)
+   is run.  Not all items in some free lists may be freed due to the
+   particular implementation, in particular :class:`float`.
 
 
 .. function:: set_debug(flags)
@@ -124,6 +128,31 @@ The :mod:`gc` module provides the following functions:
    from an argument, that integer object may or may not appear in the result list.
 
 
+.. function:: is_tracked(obj)
+
+   Returns True if the object is currently tracked by the garbage collector,
+   False otherwise.  As a general rule, instances of atomic types aren't
+   tracked and instances of non-atomic types (containers, user-defined
+   objects...) are.  However, some type-specific optimizations can be present
+   in order to suppress the garbage collector footprint of simple instances
+   (e.g. dicts containing only atomic keys and values)::
+
+      >>> gc.is_tracked(0)
+      False
+      >>> gc.is_tracked("a")
+      False
+      >>> gc.is_tracked([])
+      True
+      >>> gc.is_tracked({})
+      False
+      >>> gc.is_tracked({"a": 1})
+      False
+      >>> gc.is_tracked({"a": []})
+      True
+
+   .. versionadded:: 3.1
+
+
 The following variable is provided for read-only access (you can mutate its
 value but should not rebind it):
 
@@ -145,8 +174,15 @@ value but should not rebind it):
    with :meth:`__del__` methods, and *garbage* can be examined in that case to
    verify that no such cycles are being created.
 
-   If :const:`DEBUG_SAVEALL` is set, then all unreachable objects will be added to
-   this list rather than freed.
+   If :const:`DEBUG_SAVEALL` is set, then all unreachable objects will be added
+   to this list rather than freed.
+
+   .. versionchanged:: 3.2
+      If this list is non-empty at interpreter shutdown, a
+      :exc:`ResourceWarning` is emitted, which is silent by default.  If
+      :const:`DEBUG_UNCOLLECTABLE` is set, in addition all uncollectable objects
+      are printed.
+
 
 The following constants are provided for use with :func:`set_debug`:
 
@@ -165,9 +201,12 @@ The following constants are provided for use with :func:`set_debug`:
 .. data:: DEBUG_UNCOLLECTABLE
 
    Print information of uncollectable objects found (objects which are not
-   reachable but cannot be freed by the collector).  These objects will be added to
-   the ``garbage`` list.
+   reachable but cannot be freed by the collector).  These objects will be added
+   to the ``garbage`` list.
 
+   .. versionchanged:: 3.2
+      Also print the contents of the :data:`garbage` list at interpreter
+      shutdown, if it isn't empty.
 
 .. data:: DEBUG_SAVEALL
 
@@ -180,5 +219,3 @@ The following constants are provided for use with :func:`set_debug`:
    The debugging flags necessary for the collector to print information about a
    leaking program (equal to ``DEBUG_COLLECTABLE | DEBUG_UNCOLLECTABLE |
    DEBUG_SAVEALL``).
-
-.. rubric:: Footnotes

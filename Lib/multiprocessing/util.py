@@ -8,7 +8,6 @@
 
 import itertools
 import weakref
-import copyreg
 import atexit
 import threading        # we want threading to install it's
                         # cleanup function before multiprocessing does
@@ -18,7 +17,8 @@ from multiprocessing.process import current_process, active_children
 __all__ = [
     'sub_debug', 'debug', 'info', 'sub_warning', 'get_logger',
     'log_to_stderr', 'get_temp_dir', 'register_after_fork',
-    'is_exiting', 'Finalize', 'ForkAwareThreadLock', 'ForkAwareLocal'
+    'is_exiting', 'Finalize', 'ForkAwareThreadLock', 'ForkAwareLocal',
+    'SUBDEBUG', 'SUBWARNING',
     ]
 
 #
@@ -58,45 +58,29 @@ def get_logger():
     Returns logger used by multiprocessing
     '''
     global _logger
-
-    if not _logger:
-        import logging, atexit
-
-        # XXX multiprocessing should cleanup before logging
-        if hasattr(atexit, 'unregister'):
-            atexit.unregister(_exit_function)
-            atexit.register(_exit_function)
-        else:
-            atexit._exithandlers.remove((_exit_function, (), {}))
-            atexit._exithandlers.append((_exit_function, (), {}))
-
-        _check_logger_class()
-        _logger = logging.getLogger(LOGGER_NAME)
-
-    return _logger
-
-def _check_logger_class():
-    '''
-    Make sure process name is recorded when loggers are used
-    '''
-    # XXX This function is unnecessary once logging is patched
-    import logging
-    if hasattr(logging, 'multiprocessing'):
-        return
+    import logging, atexit
 
     logging._acquireLock()
     try:
-        OldLoggerClass = logging.getLoggerClass()
-        if not getattr(OldLoggerClass, '_process_aware', False):
-            class ProcessAwareLogger(OldLoggerClass):
-                _process_aware = True
-                def makeRecord(self, *args, **kwds):
-                    record = OldLoggerClass.makeRecord(self, *args, **kwds)
-                    record.processName = current_process()._name
-                    return record
-            logging.setLoggerClass(ProcessAwareLogger)
+        if not _logger:
+
+            _logger = logging.getLogger(LOGGER_NAME)
+            _logger.propagate = 0
+            logging.addLevelName(SUBDEBUG, 'SUBDEBUG')
+            logging.addLevelName(SUBWARNING, 'SUBWARNING')
+
+            # XXX multiprocessing should cleanup before logging
+            if hasattr(atexit, 'unregister'):
+                atexit.unregister(_exit_function)
+                atexit.register(_exit_function)
+            else:
+                atexit._exithandlers.remove((_exit_function, (), {}))
+                atexit._exithandlers.append((_exit_function, (), {}))
+
     finally:
         logging._releaseLock()
+
+    return _logger
 
 def log_to_stderr(level=None):
     '''
@@ -104,14 +88,17 @@ def log_to_stderr(level=None):
     '''
     global _log_to_stderr
     import logging
+
     logger = get_logger()
     formatter = logging.Formatter(DEFAULT_LOGGING_FORMAT)
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    if level is not None:
+
+    if level:
         logger.setLevel(level)
     _log_to_stderr = True
+    return _logger
 
 #
 # Function returning a temp directory which will be removed on exit
@@ -274,11 +261,11 @@ def _exit_function():
 
     for p in active_children():
         if p._daemonic:
-            info('calling terminate() for daemon %s', p.get_name())
+            info('calling terminate() for daemon %s', p.name)
             p._popen.terminate()
 
     for p in active_children():
-        info('calling join() for process %s', p.get_name())
+        info('calling join() for process %s', p.name)
         p.join()
 
     debug('running the remaining "atexit" finalizers')
@@ -302,35 +289,3 @@ class ForkAwareLocal(threading.local):
         register_after_fork(self, lambda obj : obj.__dict__.clear())
     def __reduce__(self):
         return type(self), ()
-
-#
-# Try making some callable types picklable
-#
-
-def _reduce_method(m):
-    if m.__self__ is None:
-        return getattr, (m.__self__.__class__, m.__func__.__name__)
-    else:
-        return getattr, (m.__self__, m.__func__.__name__)
-copyreg.pickle(type(Finalize.__init__), _reduce_method)
-
-def _reduce_method_descriptor(m):
-    return getattr, (m.__objclass__, m.__name__)
-copyreg.pickle(type(list.append), _reduce_method_descriptor)
-copyreg.pickle(type(int.__add__), _reduce_method_descriptor)
-
-def _reduce_builtin_function_or_method(m):
-    return getattr, (m.__self__, m.__name__)
-copyreg.pickle(type(list().append), _reduce_builtin_function_or_method)
-copyreg.pickle(type(int().__add__), _reduce_builtin_function_or_method)
-
-try:
-    from functools import partial
-except ImportError:
-    pass
-else:
-    def _reduce_partial(p):
-        return _rebuild_partial, (p.func, p.args, p.keywords or {})
-    def _rebuild_partial(func, args, keywords):
-        return partial(func, *args, **keywords)
-    copyreg.pickle(partial, _reduce_partial)
