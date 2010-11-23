@@ -281,6 +281,7 @@ struct _expr {
                 
                 struct {
                         expr_ty name;
+                        identifier expected_value;
                         asdl_seq *specialized_body;
                         expr_ty specialized_result;
                         expr_ty generalized;
@@ -513,10 +514,10 @@ expr_ty _Py_Str(string s, int lineno, int col_offset, PyArena *arena);
 expr_ty _Py_Bytes(string s, int lineno, int col_offset, PyArena *arena);
 #define Ellipsis(a0, a1, a2) _Py_Ellipsis(a0, a1, a2)
 expr_ty _Py_Ellipsis(int lineno, int col_offset, PyArena *arena);
-#define Specialize(a0, a1, a2, a3, a4, a5, a6) _Py_Specialize(a0, a1, a2, a3, a4, a5, a6)
-expr_ty _Py_Specialize(expr_ty name, asdl_seq * specialized_body, expr_ty
-                       specialized_result, expr_ty generalized, int lineno, int
-                       col_offset, PyArena *arena);
+#define Specialize(a0, a1, a2, a3, a4, a5, a6, a7) _Py_Specialize(a0, a1, a2, a3, a4, a5, a6, a7)
+expr_ty _Py_Specialize(expr_ty name, identifier expected_value, asdl_seq *
+                       specialized_body, expr_ty specialized_result, expr_ty
+                       generalized, int lineno, int col_offset, PyArena *arena);
 #define Attribute(a0, a1, a2, a3, a4, a5) _Py_Attribute(a0, a1, a2, a3, a4, a5)
 expr_ty _Py_Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int
                       lineno, int col_offset, PyArena *arena);

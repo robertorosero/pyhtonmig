@@ -398,7 +398,7 @@ static mod_ty optimize_mod(struct compiler *c, mod_ty m, enum PyCompilationMode 
                                               NULL);
     if (!py_ast_out)
         goto finally;
-     
+
     /* 4. Convert the python objects back to an AST: */
     new_mod = PyAST_obj2mod(py_ast_out, c->c_arena, mode);
     if (!new_mod)
@@ -3252,7 +3252,7 @@ compiler_specialize(struct compiler *c, expr_ty e)
 {
     basicblock *specialized, *generalized, *end;
     expr_ty call;
-    identifier id;
+    identifier expected_value;
     PyObject *saved_name = NULL;
 
     assert(e->kind == Specialize_kind);
@@ -3267,12 +3267,9 @@ compiler_specialize(struct compiler *c, expr_ty e)
     VISIT(c, expr, e->v.Specialize.name);
 
     /* Push the expected version of the name, it will be the new TOS */
-    /* For now, look for a global named "__saved__" + funcname */
-    if (e->v.Specialize.name->kind != Name_kind)
-        return 0;
-    id = e->v.Specialize.name->v.Name.id;
-    assert(id);
-    saved_name = PyUnicode_FromFormat("__internal__.saved.%U", id);
+    expected_value = e->v.Specialize.expected_value;
+    assert(expected_value);
+    saved_name = PyUnicode_FromFormat("%U", expected_value); // FIXME
     if (!saved_name)
         return 0;
     ADDOP_O(c, LOAD_GLOBAL, saved_name, names); /* takes ownership of the reference */

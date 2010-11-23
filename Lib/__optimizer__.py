@@ -293,6 +293,7 @@ class FunctionInliner(PathTransformer):
                     parent_nsp = NamespacePath.from_node_path(path).get_parent_path()
                     return parent_nsp.as_dotted_str() + '.' + attr.attr
 # FIXME: only makes sense to traverse within this class and within subclasses
+# FIXME: fake the MRO and pick an appropriate class
 
         # Don't try to inline where the function is a non-trivial
         # expression e.g. "f()()", or for other awkward cases
@@ -315,18 +316,17 @@ class FunctionInliner(PathTransformer):
         self.log('Got inlinable callsite of:\n  dotted_name: %r\n  path: %s\n  node:%s'
                  % (dotted_name, path, ast.dump(call)))
 
-        if isinstance(call.func, ast.Attribute):
-            # Don't try to inline method calls yet:
-            self.log('Not inlining attribute %s' % ast.dump(call.func))
-            return call
-
         if not isinstance(call.func, (ast.Name, ast.Attribute)):
             # Don't try to inline where the function is a non-trivial
             # expression e.g. "f()()"
             print('foo!')
             return call
 
-        # FIXME
+        if isinstance(call.func, ast.Attribute):
+            # Emergency cutoff for method inlining:
+            if 0:
+                self.log('Not inlining attribute %s' % ast.dump(call.func))
+                return call
 
         self.log('Considering call to: %s' % ast.dump(call.func))
         self.log('NodePath: %r' % path)
@@ -347,7 +347,7 @@ class FunctionInliner(PathTransformer):
         funcdef = self.def_dict[dotted_name]
 
         self.log(ast.dump(funcdef))
-        varprefix = '__inline_%s%x__' % (dotted_name, id(call))
+        varprefix = '__internal__inline_%s%x__' % (dotted_name.replace('.', '_'), id(call))
         self.log('varprefix: %s' % varprefix)
 
         # Generate a body of specialized statements that can replace the call:
@@ -399,6 +399,7 @@ class FunctionInliner(PathTransformer):
                                                call)
 
         return ast.copy_location(ast.Specialize(name=call.func,
+                                                expected_value='__internal__.saved.' + dotted_name,
                                                 generalized=call,
                                                 specialized_body=specialized,
                                                 specialized_result=specialized_result),
@@ -792,11 +793,19 @@ def _remove_redundant_locals(t):
 
 # For now restrict ourselves to just a few places:
 def is_test_code(t, filename):
-    if filename.endswith('test_optimize.py'):
+    if filename == 'optimizable.py':
         return True
     for n in ast.walk(t):
         if isinstance(n, ast.FunctionDef):
             if n.name == 'function_to_be_inlined':
+                return True
+    return False
+
+def dump_dot(t, filename):
+    return False
+    for n in ast.walk(t):
+        if isinstance(n, ast.FunctionDef):
+            if n.name == 'simple_method':
                 return True
     return False
 
@@ -815,9 +824,10 @@ def optimize_ast(t, filename, st_blocks):
             # pprint(t)
             # log(ast.dump(t))
 
-            #dot_to_png(to_dot(t), 'before.png')
-
             if isinstance(t, ast.Module):
+                if dump_dot(t, filename):
+                    dot_to_png(to_dot(t), 'before.png')
+
                 t = _inline_function_calls(t)
                 #cfg = CFG.from_ast(t)
                 #print(cfg.to_dot())
@@ -827,11 +837,14 @@ def optimize_ast(t, filename, st_blocks):
 
                 t = _remove_redundant_locals(t)
 
-            #dot_to_png(to_dot(t), 'after.png')
+                if dump_dot(t, filename):
+                    dot_to_png(to_dot(t), 'after.png')
 
         except:
             print('Exception during optimization of %r' % filename)
             # dot_to_png(dot_before, 'before.png')
             raise
     #print('finished optimizing')
+    #if filename == 'optimizable.py':
+    #    print(ast.dump(t))
     return t

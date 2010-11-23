@@ -88,7 +88,7 @@ class TestInlining(TestOptimization):
 
     def compile_to_code(self, src, fnname):
         # Compile the given source code, returning the code object for the given function name
-        co = compile(src, 'test_optimize.py', 'exec')
+        co = compile(src, 'optimizable.py', 'exec')
         return get_code_for_fn(co, fnname)
 
     def test_simple_inlining(self):
@@ -233,7 +233,7 @@ def g(x, y, z):
 def h(x, y):
     return g(x, y, 0)
 '''
-        co = compile(src, 'test_optimize.py', 'exec')
+        co = compile(src, 'optimizable.py', 'exec')
         g = get_code_for_fn(co, 'g')
         h = get_code_for_fn(co, 'h')
         co_asm = disassemble(co)
@@ -407,9 +407,7 @@ class Foo:
          return self.bar + a + self.baz
 
     def user_of_method(self):
-         print(self.simple_method(1))
-         print(self.simple_method(2))
-         print(self.simple_method(3))
+         return self.simple_method(10)
 '''
 
         # "Foo.simple_method" should be inlinable
@@ -426,6 +424,11 @@ class Foo:
         fn = self.compile_to_code(src, 'Foo.user_of_method')
         asm = disassemble(fn)
         #print(asm)
+        self.assertHasLineWith(asm,
+                               ('LOAD_GLOBAL', '(__internal__.saved.Foo.simple_method)'))
+        self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
+
+
 
 
     def test_namespaces(self):

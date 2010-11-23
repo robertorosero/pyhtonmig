@@ -244,6 +244,7 @@ static PyTypeObject *Ellipsis_type;
 static PyTypeObject *Specialize_type;
 static char *Specialize_fields[]={
         "name",
+        "expected_value",
         "specialized_body",
         "specialized_result",
         "generalized",
@@ -758,7 +759,7 @@ static int init_types(void)
         Ellipsis_type = make_type("Ellipsis", expr_type, NULL, 0);
         if (!Ellipsis_type) return 0;
         Specialize_type = make_type("Specialize", expr_type, Specialize_fields,
-                                    4);
+                                    5);
         if (!Specialize_type) return 0;
         Attribute_type = make_type("Attribute", expr_type, Attribute_fields, 3);
         if (!Attribute_type) return 0;
@@ -1831,14 +1832,19 @@ Ellipsis(int lineno, int col_offset, PyArena *arena)
 }
 
 expr_ty
-Specialize(expr_ty name, asdl_seq * specialized_body, expr_ty
-           specialized_result, expr_ty generalized, int lineno, int col_offset,
-           PyArena *arena)
+Specialize(expr_ty name, identifier expected_value, asdl_seq *
+           specialized_body, expr_ty specialized_result, expr_ty generalized,
+           int lineno, int col_offset, PyArena *arena)
 {
         expr_ty p;
         if (!name) {
                 PyErr_SetString(PyExc_ValueError,
                                 "field name is required for Specialize");
+                return NULL;
+        }
+        if (!expected_value) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field expected_value is required for Specialize");
                 return NULL;
         }
         if (!specialized_result) {
@@ -1856,6 +1862,7 @@ Specialize(expr_ty name, asdl_seq * specialized_body, expr_ty
                 return NULL;
         p->kind = Specialize_kind;
         p->v.Specialize.name = name;
+        p->v.Specialize.expected_value = expected_value;
         p->v.Specialize.specialized_body = specialized_body;
         p->v.Specialize.specialized_result = specialized_result;
         p->v.Specialize.generalized = generalized;
@@ -2973,6 +2980,12 @@ ast2obj_expr(void* _o, struct symtable *st)
                 value = ast2obj_expr(o->v.Specialize.name, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "name", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_identifier(o->v.Specialize.expected_value, st);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "expected_value", value) ==
+                    -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.Specialize.specialized_body,
@@ -5760,6 +5773,7 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
         }
         if (isinstance) {
                 expr_ty name;
+                identifier expected_value;
                 asdl_seq* specialized_body;
                 expr_ty specialized_result;
                 expr_ty generalized;
@@ -5774,6 +5788,18 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                         tmp = NULL;
                 } else {
                         PyErr_SetString(PyExc_TypeError, "required field \"name\" missing from Specialize");
+                        return 1;
+                }
+                if (PyObject_HasAttrString(obj, "expected_value")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "expected_value");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_identifier(tmp, &expected_value, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"expected_value\" missing from Specialize");
                         return 1;
                 }
                 if (PyObject_HasAttrString(obj, "specialized_body")) {
@@ -5825,8 +5851,9 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                         PyErr_SetString(PyExc_TypeError, "required field \"generalized\" missing from Specialize");
                         return 1;
                 }
-                *out = Specialize(name, specialized_body, specialized_result,
-                                  generalized, lineno, col_offset, arena);
+                *out = Specialize(name, expected_value, specialized_body,
+                                  specialized_result, generalized, lineno,
+                                  col_offset, arena);
                 if (*out == NULL) goto failed;
                 return 0;
         }
