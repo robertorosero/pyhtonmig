@@ -731,6 +731,30 @@ _Py_CheckRecursiveCall(char *where)
     return 0;
 }
 
+/* Compare two functions, one dynamically looked up, the other the expected
+   version.
+
+   If they're equal, then we can use specialized bytecode that assumes that
+   they were.
+*/
+static int
+is_specializable(PyObject *dynamic, PyObject *expected)
+{
+#if 0
+    if (!PyFunction_Check(dynamic)) 
+        return 0;
+
+    if (!PyFunction_Check(expected)) 
+        return 0;
+#endif
+
+    /* If they're the same object, we have a match: */
+    if (dynamic == expected)
+        return 1;
+    
+    return 0; // FIXME!
+}
+
 /* Status code for main loop (reason for stack unwind) */
 enum why_code {
         WHY_NOT =       0x0001, /* No error */
@@ -2834,6 +2858,25 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             Py_XDECREF(w);
             SET_TOP(x);
             if (x != NULL) DISPATCH();
+            break;
+
+        TARGET(JUMP_IF_SPECIALIZABLE)
+            v = POP(); /* ...expected implementation */
+            u = TOP(); /* ...dynamic lookup of implementation */
+
+            if (is_specializable(u, v)) {
+                /* Jump to specialized implementation, popping u */
+                JUMPTO(oparg);
+                Py_DECREF(v);
+                STACKADJ(-1);
+                Py_DECREF(u);
+                FAST_DISPATCH();
+            } else {
+                /* Generalized implementation; fall through to next opcode,
+                   keeping u on TOS */
+                Py_DECREF(v);
+                DISPATCH();
+            }
             break;
 
         TARGET(EXTENDED_ARG)

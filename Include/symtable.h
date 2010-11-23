@@ -62,6 +62,7 @@ PyAPI_FUNC(int) PyST_GetScope(PySTEntryObject *, PyObject *);
 PyAPI_FUNC(struct symtable *) PySymtable_Build(mod_ty, const char *,
                                               PyFutureFeatures *);
 PyAPI_FUNC(PySTEntryObject *) PySymtable_Lookup(struct symtable *, void *);
+PyAPI_FUNC(PySTEntryObject *) PySymtable_TryLookup(struct symtable *, void *);
 
 PyAPI_FUNC(void) PySymtable_Free(struct symtable *);
 

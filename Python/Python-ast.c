@@ -11,10 +11,12 @@
 
 #include "Python.h"
 #include "Python-ast.h"
+#include "symtable.h"
 
 static PyTypeObject AST_type;
+int obj2ast_write_scope(void *ast_obj, PyObject *py_obj, struct symtable *st);
 static PyTypeObject *mod_type;
-static PyObject* ast2obj_mod(void*);
+static PyObject* ast2obj_mod(void*, struct symtable *st);
 static PyTypeObject *Module_type;
 static char *Module_fields[]={
         "body",
@@ -36,7 +38,7 @@ static char *stmt_attributes[] = {
         "lineno",
         "col_offset",
 };
-static PyObject* ast2obj_stmt(void*);
+static PyObject* ast2obj_stmt(void*, struct symtable *st);
 static PyTypeObject *FunctionDef_type;
 static char *FunctionDef_fields[]={
         "name",
@@ -150,7 +152,7 @@ static char *expr_attributes[] = {
         "lineno",
         "col_offset",
 };
-static PyObject* ast2obj_expr(void*);
+static PyObject* ast2obj_expr(void*, struct symtable *st);
 static PyTypeObject *BoolOp_type;
 static char *BoolOp_fields[]={
         "op",
@@ -239,6 +241,13 @@ static char *Bytes_fields[]={
         "s",
 };
 static PyTypeObject *Ellipsis_type;
+static PyTypeObject *Specialize_type;
+static char *Specialize_fields[]={
+        "name",
+        "specialized_body",
+        "specialized_result",
+        "generalized",
+};
 static PyTypeObject *Attribute_type;
 static char *Attribute_fields[]={
         "value",
@@ -274,7 +283,7 @@ static char *Tuple_fields[]={
 static PyTypeObject *expr_context_type;
 static PyObject *Load_singleton, *Store_singleton, *Del_singleton,
 *AugLoad_singleton, *AugStore_singleton, *Param_singleton;
-static PyObject* ast2obj_expr_context(expr_context_ty);
+static PyObject* ast2obj_expr_context(expr_context_ty, struct symtable *st);
 static PyTypeObject *Load_type;
 static PyTypeObject *Store_type;
 static PyTypeObject *Del_type;
@@ -282,7 +291,7 @@ static PyTypeObject *AugLoad_type;
 static PyTypeObject *AugStore_type;
 static PyTypeObject *Param_type;
 static PyTypeObject *slice_type;
-static PyObject* ast2obj_slice(void*);
+static PyObject* ast2obj_slice(void*, struct symtable *st);
 static PyTypeObject *Slice_type;
 static char *Slice_fields[]={
         "lower",
@@ -299,7 +308,7 @@ static char *Index_fields[]={
 };
 static PyTypeObject *boolop_type;
 static PyObject *And_singleton, *Or_singleton;
-static PyObject* ast2obj_boolop(boolop_ty);
+static PyObject* ast2obj_boolop(boolop_ty, struct symtable *st);
 static PyTypeObject *And_type;
 static PyTypeObject *Or_type;
 static PyTypeObject *operator_type;
@@ -307,7 +316,7 @@ static PyObject *Add_singleton, *Sub_singleton, *Mult_singleton,
 *Div_singleton, *Mod_singleton, *Pow_singleton, *LShift_singleton,
 *RShift_singleton, *BitOr_singleton, *BitXor_singleton, *BitAnd_singleton,
 *FloorDiv_singleton;
-static PyObject* ast2obj_operator(operator_ty);
+static PyObject* ast2obj_operator(operator_ty, struct symtable *st);
 static PyTypeObject *Add_type;
 static PyTypeObject *Sub_type;
 static PyTypeObject *Mult_type;
@@ -323,7 +332,7 @@ static PyTypeObject *FloorDiv_type;
 static PyTypeObject *unaryop_type;
 static PyObject *Invert_singleton, *Not_singleton, *UAdd_singleton,
 *USub_singleton;
-static PyObject* ast2obj_unaryop(unaryop_ty);
+static PyObject* ast2obj_unaryop(unaryop_ty, struct symtable *st);
 static PyTypeObject *Invert_type;
 static PyTypeObject *Not_type;
 static PyTypeObject *UAdd_type;
@@ -332,7 +341,7 @@ static PyTypeObject *cmpop_type;
 static PyObject *Eq_singleton, *NotEq_singleton, *Lt_singleton, *LtE_singleton,
 *Gt_singleton, *GtE_singleton, *Is_singleton, *IsNot_singleton, *In_singleton,
 *NotIn_singleton;
-static PyObject* ast2obj_cmpop(cmpop_ty);
+static PyObject* ast2obj_cmpop(cmpop_ty, struct symtable *st);
 static PyTypeObject *Eq_type;
 static PyTypeObject *NotEq_type;
 static PyTypeObject *Lt_type;
@@ -344,7 +353,7 @@ static PyTypeObject *IsNot_type;
 static PyTypeObject *In_type;
 static PyTypeObject *NotIn_type;
 static PyTypeObject *comprehension_type;
-static PyObject* ast2obj_comprehension(void*);
+static PyObject* ast2obj_comprehension(void*, struct symtable *st);
 static char *comprehension_fields[]={
         "target",
         "iter",
@@ -355,7 +364,7 @@ static char *excepthandler_attributes[] = {
         "lineno",
         "col_offset",
 };
-static PyObject* ast2obj_excepthandler(void*);
+static PyObject* ast2obj_excepthandler(void*, struct symtable *st);
 static PyTypeObject *ExceptHandler_type;
 static char *ExceptHandler_fields[]={
         "type",
@@ -363,7 +372,7 @@ static char *ExceptHandler_fields[]={
         "body",
 };
 static PyTypeObject *arguments_type;
-static PyObject* ast2obj_arguments(void*);
+static PyObject* ast2obj_arguments(void*, struct symtable *st);
 static char *arguments_fields[]={
         "args",
         "vararg",
@@ -375,19 +384,19 @@ static char *arguments_fields[]={
         "kw_defaults",
 };
 static PyTypeObject *arg_type;
-static PyObject* ast2obj_arg(void*);
+static PyObject* ast2obj_arg(void*, struct symtable *st);
 static char *arg_fields[]={
         "arg",
         "annotation",
 };
 static PyTypeObject *keyword_type;
-static PyObject* ast2obj_keyword(void*);
+static PyObject* ast2obj_keyword(void*, struct symtable *st);
 static char *keyword_fields[]={
         "arg",
         "value",
 };
 static PyTypeObject *alias_type;
-static PyObject* ast2obj_alias(void*);
+static PyObject* ast2obj_alias(void*, struct symtable *st);
 static char *alias_fields[]={
         "name",
         "asname",
@@ -554,7 +563,7 @@ static int add_attributes(PyTypeObject* type, char**attrs, int num_fields)
 
 /* Conversion AST -> Python */
 
-static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
+static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*, struct symtable*), struct symtable *st)
 {
     int i, n = asdl_seq_LEN(seq);
     PyObject *result = PyList_New(n);
@@ -562,7 +571,7 @@ static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
     if (!result)
         return NULL;
     for (i = 0; i < n; i++) {
-        value = func(asdl_seq_GET(seq, i));
+        value = func(asdl_seq_GET(seq, i), st);
         if (!value) {
             Py_DECREF(result);
             return NULL;
@@ -572,7 +581,7 @@ static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
     return result;
 }
 
-static PyObject* ast2obj_object(void *o)
+static PyObject* ast2obj_object(void *o, struct symtable *st)
 {
     if (!o)
         o = Py_None;
@@ -582,7 +591,7 @@ static PyObject* ast2obj_object(void *o)
 #define ast2obj_identifier ast2obj_object
 #define ast2obj_string ast2obj_object
 
-static PyObject* ast2obj_int(long b)
+static PyObject* ast2obj_int(long b, struct symtable *st)
 {
     return PyLong_FromLong(b);
 }
@@ -610,7 +619,7 @@ static int obj2ast_int(PyObject* obj, int* out, PyArena* arena)
         PyObject *s = PyObject_Repr(obj);
         if (s == NULL) return 1;
         PyErr_Format(PyExc_ValueError, "invalid integer value: %.400s",
-                     PyBytes_AS_STRING(s));
+                     _PyUnicode_AsString(s));
         Py_DECREF(s);
         return 1;
     }
@@ -748,6 +757,9 @@ static int init_types(void)
         if (!Bytes_type) return 0;
         Ellipsis_type = make_type("Ellipsis", expr_type, NULL, 0);
         if (!Ellipsis_type) return 0;
+        Specialize_type = make_type("Specialize", expr_type, Specialize_fields,
+                                    4);
+        if (!Specialize_type) return 0;
         Attribute_type = make_type("Attribute", expr_type, Attribute_fields, 3);
         if (!Attribute_type) return 0;
         Subscript_type = make_type("Subscript", expr_type, Subscript_fields, 3);
@@ -1819,6 +1831,40 @@ Ellipsis(int lineno, int col_offset, PyArena *arena)
 }
 
 expr_ty
+Specialize(expr_ty name, asdl_seq * specialized_body, expr_ty
+           specialized_result, expr_ty generalized, int lineno, int col_offset,
+           PyArena *arena)
+{
+        expr_ty p;
+        if (!name) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field name is required for Specialize");
+                return NULL;
+        }
+        if (!specialized_result) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field specialized_result is required for Specialize");
+                return NULL;
+        }
+        if (!generalized) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field generalized is required for Specialize");
+                return NULL;
+        }
+        p = (expr_ty)PyArena_Malloc(arena, sizeof(*p));
+        if (!p)
+                return NULL;
+        p->kind = Specialize_kind;
+        p->v.Specialize.name = name;
+        p->v.Specialize.specialized_body = specialized_body;
+        p->v.Specialize.specialized_result = specialized_result;
+        p->v.Specialize.generalized = generalized;
+        p->lineno = lineno;
+        p->col_offset = col_offset;
+        return p;
+}
+
+expr_ty
 Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int lineno, int
           col_offset, PyArena *arena)
 {
@@ -2137,7 +2183,7 @@ alias(identifier name, identifier asname, PyArena *arena)
 
 
 PyObject*
-ast2obj_mod(void* _o)
+ast2obj_mod(void* _o, struct symtable *st)
 {
         mod_ty o = (mod_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -2150,7 +2196,9 @@ ast2obj_mod(void* _o)
         case Module_kind:
                 result = PyType_GenericNew(Module_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Module.body, ast2obj_stmt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Module.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2159,7 +2207,9 @@ ast2obj_mod(void* _o)
         case Interactive_kind:
                 result = PyType_GenericNew(Interactive_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Interactive.body, ast2obj_stmt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Interactive.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2168,7 +2218,9 @@ ast2obj_mod(void* _o)
         case Expression_kind:
                 result = PyType_GenericNew(Expression_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Expression.body);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Expression.body, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2177,7 +2229,9 @@ ast2obj_mod(void* _o)
         case Suite_kind:
                 result = PyType_GenericNew(Suite_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Suite.body, ast2obj_stmt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Suite.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2192,7 +2246,7 @@ failed:
 }
 
 PyObject*
-ast2obj_stmt(void* _o)
+ast2obj_stmt(void* _o, struct symtable *st)
 {
         stmt_ty o = (stmt_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -2205,29 +2259,31 @@ ast2obj_stmt(void* _o)
         case FunctionDef_kind:
                 result = PyType_GenericNew(FunctionDef_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_identifier(o->v.FunctionDef.name);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_identifier(o->v.FunctionDef.name, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "name", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_arguments(o->v.FunctionDef.args);
+                value = ast2obj_arguments(o->v.FunctionDef.args, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "args", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.FunctionDef.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.FunctionDef.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.FunctionDef.decorator_list,
-                                     ast2obj_expr);
+                                     ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "decorator_list", value) ==
                     -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.FunctionDef.returns);
+                value = ast2obj_expr(o->v.FunctionDef.returns, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "returns", value) == -1)
                         goto failed;
@@ -2236,38 +2292,41 @@ ast2obj_stmt(void* _o)
         case ClassDef_kind:
                 result = PyType_GenericNew(ClassDef_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_identifier(o->v.ClassDef.name);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_identifier(o->v.ClassDef.name, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "name", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.ClassDef.bases, ast2obj_expr);
+                value = ast2obj_list(o->v.ClassDef.bases, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "bases", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.ClassDef.keywords, ast2obj_keyword);
+                value = ast2obj_list(o->v.ClassDef.keywords, ast2obj_keyword,
+                                     st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "keywords", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.ClassDef.starargs);
+                value = ast2obj_expr(o->v.ClassDef.starargs, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "starargs", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.ClassDef.kwargs);
+                value = ast2obj_expr(o->v.ClassDef.kwargs, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "kwargs", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.ClassDef.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.ClassDef.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.ClassDef.decorator_list,
-                                     ast2obj_expr);
+                                     ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "decorator_list", value) ==
                     -1)
@@ -2277,7 +2336,9 @@ ast2obj_stmt(void* _o)
         case Return_kind:
                 result = PyType_GenericNew(Return_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Return.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Return.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -2286,7 +2347,9 @@ ast2obj_stmt(void* _o)
         case Delete_kind:
                 result = PyType_GenericNew(Delete_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Delete.targets, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Delete.targets, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "targets", value) == -1)
                         goto failed;
@@ -2295,12 +2358,14 @@ ast2obj_stmt(void* _o)
         case Assign_kind:
                 result = PyType_GenericNew(Assign_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Assign.targets, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Assign.targets, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "targets", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Assign.value);
+                value = ast2obj_expr(o->v.Assign.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -2309,17 +2374,19 @@ ast2obj_stmt(void* _o)
         case AugAssign_kind:
                 result = PyType_GenericNew(AugAssign_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.AugAssign.target);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.AugAssign.target, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "target", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_operator(o->v.AugAssign.op);
+                value = ast2obj_operator(o->v.AugAssign.op, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "op", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.AugAssign.value);
+                value = ast2obj_expr(o->v.AugAssign.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -2328,22 +2395,24 @@ ast2obj_stmt(void* _o)
         case For_kind:
                 result = PyType_GenericNew(For_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.For.target);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.For.target, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "target", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.For.iter);
+                value = ast2obj_expr(o->v.For.iter, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "iter", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.For.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.For.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.For.orelse, ast2obj_stmt);
+                value = ast2obj_list(o->v.For.orelse, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "orelse", value) == -1)
                         goto failed;
@@ -2352,17 +2421,19 @@ ast2obj_stmt(void* _o)
         case While_kind:
                 result = PyType_GenericNew(While_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.While.test);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.While.test, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "test", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.While.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.While.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.While.orelse, ast2obj_stmt);
+                value = ast2obj_list(o->v.While.orelse, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "orelse", value) == -1)
                         goto failed;
@@ -2371,17 +2442,19 @@ ast2obj_stmt(void* _o)
         case If_kind:
                 result = PyType_GenericNew(If_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.If.test);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.If.test, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "test", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.If.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.If.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.If.orelse, ast2obj_stmt);
+                value = ast2obj_list(o->v.If.orelse, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "orelse", value) == -1)
                         goto failed;
@@ -2390,18 +2463,20 @@ ast2obj_stmt(void* _o)
         case With_kind:
                 result = PyType_GenericNew(With_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.With.context_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.With.context_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "context_expr", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.With.optional_vars);
+                value = ast2obj_expr(o->v.With.optional_vars, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "optional_vars", value) ==
                     -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.With.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.With.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2410,12 +2485,14 @@ ast2obj_stmt(void* _o)
         case Raise_kind:
                 result = PyType_GenericNew(Raise_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Raise.exc);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Raise.exc, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "exc", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Raise.cause);
+                value = ast2obj_expr(o->v.Raise.cause, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "cause", value) == -1)
                         goto failed;
@@ -2424,18 +2501,20 @@ ast2obj_stmt(void* _o)
         case TryExcept_kind:
                 result = PyType_GenericNew(TryExcept_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.TryExcept.body, ast2obj_stmt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.TryExcept.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.TryExcept.handlers,
-                                     ast2obj_excepthandler);
+                                     ast2obj_excepthandler, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "handlers", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.TryExcept.orelse, ast2obj_stmt);
+                value = ast2obj_list(o->v.TryExcept.orelse, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "orelse", value) == -1)
                         goto failed;
@@ -2444,12 +2523,15 @@ ast2obj_stmt(void* _o)
         case TryFinally_kind:
                 result = PyType_GenericNew(TryFinally_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.TryFinally.body, ast2obj_stmt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.TryFinally.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.TryFinally.finalbody, ast2obj_stmt);
+                value = ast2obj_list(o->v.TryFinally.finalbody, ast2obj_stmt,
+                                     st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "finalbody", value) == -1)
                         goto failed;
@@ -2458,12 +2540,14 @@ ast2obj_stmt(void* _o)
         case Assert_kind:
                 result = PyType_GenericNew(Assert_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Assert.test);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Assert.test, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "test", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Assert.msg);
+                value = ast2obj_expr(o->v.Assert.msg, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "msg", value) == -1)
                         goto failed;
@@ -2472,7 +2556,9 @@ ast2obj_stmt(void* _o)
         case Import_kind:
                 result = PyType_GenericNew(Import_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Import.names, ast2obj_alias);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Import.names, ast2obj_alias, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "names", value) == -1)
                         goto failed;
@@ -2481,17 +2567,19 @@ ast2obj_stmt(void* _o)
         case ImportFrom_kind:
                 result = PyType_GenericNew(ImportFrom_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_identifier(o->v.ImportFrom.module);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_identifier(o->v.ImportFrom.module, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "module", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.ImportFrom.names, ast2obj_alias);
+                value = ast2obj_list(o->v.ImportFrom.names, ast2obj_alias, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "names", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_int(o->v.ImportFrom.level);
+                value = ast2obj_int(o->v.ImportFrom.level, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "level", value) == -1)
                         goto failed;
@@ -2500,7 +2588,9 @@ ast2obj_stmt(void* _o)
         case Global_kind:
                 result = PyType_GenericNew(Global_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Global.names, ast2obj_identifier);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Global.names, ast2obj_identifier, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "names", value) == -1)
                         goto failed;
@@ -2509,7 +2599,10 @@ ast2obj_stmt(void* _o)
         case Nonlocal_kind:
                 result = PyType_GenericNew(Nonlocal_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Nonlocal.names, ast2obj_identifier);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Nonlocal.names, ast2obj_identifier,
+                                     st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "names", value) == -1)
                         goto failed;
@@ -2518,7 +2611,9 @@ ast2obj_stmt(void* _o)
         case Expr_kind:
                 result = PyType_GenericNew(Expr_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Expr.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Expr.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -2527,22 +2622,28 @@ ast2obj_stmt(void* _o)
         case Pass_kind:
                 result = PyType_GenericNew(Pass_type, NULL, NULL);
                 if (!result) goto failed;
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
                 break;
         case Break_kind:
                 result = PyType_GenericNew(Break_type, NULL, NULL);
                 if (!result) goto failed;
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
                 break;
         case Continue_kind:
                 result = PyType_GenericNew(Continue_type, NULL, NULL);
                 if (!result) goto failed;
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
                 break;
         }
-        value = ast2obj_int(o->lineno);
+        value = ast2obj_int(o->lineno, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "lineno", value) < 0)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_int(o->col_offset);
+        value = ast2obj_int(o->col_offset, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
@@ -2555,7 +2656,7 @@ failed:
 }
 
 PyObject*
-ast2obj_expr(void* _o)
+ast2obj_expr(void* _o, struct symtable *st)
 {
         expr_ty o = (expr_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -2568,12 +2669,14 @@ ast2obj_expr(void* _o)
         case BoolOp_kind:
                 result = PyType_GenericNew(BoolOp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_boolop(o->v.BoolOp.op);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_boolop(o->v.BoolOp.op, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "op", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.BoolOp.values, ast2obj_expr);
+                value = ast2obj_list(o->v.BoolOp.values, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "values", value) == -1)
                         goto failed;
@@ -2582,17 +2685,19 @@ ast2obj_expr(void* _o)
         case BinOp_kind:
                 result = PyType_GenericNew(BinOp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.BinOp.left);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.BinOp.left, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "left", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_operator(o->v.BinOp.op);
+                value = ast2obj_operator(o->v.BinOp.op, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "op", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.BinOp.right);
+                value = ast2obj_expr(o->v.BinOp.right, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "right", value) == -1)
                         goto failed;
@@ -2601,12 +2706,14 @@ ast2obj_expr(void* _o)
         case UnaryOp_kind:
                 result = PyType_GenericNew(UnaryOp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_unaryop(o->v.UnaryOp.op);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_unaryop(o->v.UnaryOp.op, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "op", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.UnaryOp.operand);
+                value = ast2obj_expr(o->v.UnaryOp.operand, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "operand", value) == -1)
                         goto failed;
@@ -2615,12 +2722,14 @@ ast2obj_expr(void* _o)
         case Lambda_kind:
                 result = PyType_GenericNew(Lambda_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_arguments(o->v.Lambda.args);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_arguments(o->v.Lambda.args, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "args", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Lambda.body);
+                value = ast2obj_expr(o->v.Lambda.body, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
@@ -2629,17 +2738,19 @@ ast2obj_expr(void* _o)
         case IfExp_kind:
                 result = PyType_GenericNew(IfExp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.IfExp.test);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.IfExp.test, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "test", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.IfExp.body);
+                value = ast2obj_expr(o->v.IfExp.body, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.IfExp.orelse);
+                value = ast2obj_expr(o->v.IfExp.orelse, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "orelse", value) == -1)
                         goto failed;
@@ -2648,12 +2759,14 @@ ast2obj_expr(void* _o)
         case Dict_kind:
                 result = PyType_GenericNew(Dict_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Dict.keys, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Dict.keys, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "keys", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.Dict.values, ast2obj_expr);
+                value = ast2obj_list(o->v.Dict.values, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "values", value) == -1)
                         goto failed;
@@ -2662,7 +2775,9 @@ ast2obj_expr(void* _o)
         case Set_kind:
                 result = PyType_GenericNew(Set_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Set.elts, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Set.elts, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elts", value) == -1)
                         goto failed;
@@ -2671,13 +2786,15 @@ ast2obj_expr(void* _o)
         case ListComp_kind:
                 result = PyType_GenericNew(ListComp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.ListComp.elt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.ListComp.elt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elt", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.ListComp.generators,
-                                     ast2obj_comprehension);
+                                     ast2obj_comprehension, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "generators", value) == -1)
                         goto failed;
@@ -2686,13 +2803,15 @@ ast2obj_expr(void* _o)
         case SetComp_kind:
                 result = PyType_GenericNew(SetComp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.SetComp.elt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.SetComp.elt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elt", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.SetComp.generators,
-                                     ast2obj_comprehension);
+                                     ast2obj_comprehension, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "generators", value) == -1)
                         goto failed;
@@ -2701,18 +2820,20 @@ ast2obj_expr(void* _o)
         case DictComp_kind:
                 result = PyType_GenericNew(DictComp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.DictComp.key);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.DictComp.key, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "key", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.DictComp.value);
+                value = ast2obj_expr(o->v.DictComp.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.DictComp.generators,
-                                     ast2obj_comprehension);
+                                     ast2obj_comprehension, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "generators", value) == -1)
                         goto failed;
@@ -2721,13 +2842,15 @@ ast2obj_expr(void* _o)
         case GeneratorExp_kind:
                 result = PyType_GenericNew(GeneratorExp_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.GeneratorExp.elt);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.GeneratorExp.elt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elt", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 value = ast2obj_list(o->v.GeneratorExp.generators,
-                                     ast2obj_comprehension);
+                                     ast2obj_comprehension, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "generators", value) == -1)
                         goto failed;
@@ -2736,7 +2859,9 @@ ast2obj_expr(void* _o)
         case Yield_kind:
                 result = PyType_GenericNew(Yield_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Yield.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Yield.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -2745,7 +2870,9 @@ ast2obj_expr(void* _o)
         case Compare_kind:
                 result = PyType_GenericNew(Compare_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Compare.left);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Compare.left, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "left", value) == -1)
                         goto failed;
@@ -2755,13 +2882,14 @@ ast2obj_expr(void* _o)
                         value = PyList_New(n);
                         if (!value) goto failed;
                         for(i = 0; i < n; i++)
-                                PyList_SET_ITEM(value, i, ast2obj_cmpop((cmpop_ty)asdl_seq_GET(o->v.Compare.ops, i)));
+                                PyList_SET_ITEM(value, i, ast2obj_cmpop((cmpop_ty)asdl_seq_GET(o->v.Compare.ops, i), st));
                 }
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ops", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.Compare.comparators, ast2obj_expr);
+                value = ast2obj_list(o->v.Compare.comparators, ast2obj_expr,
+                                     st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "comparators", value) == -1)
                         goto failed;
@@ -2770,27 +2898,29 @@ ast2obj_expr(void* _o)
         case Call_kind:
                 result = PyType_GenericNew(Call_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Call.func);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Call.func, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "func", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.Call.args, ast2obj_expr);
+                value = ast2obj_list(o->v.Call.args, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "args", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.Call.keywords, ast2obj_keyword);
+                value = ast2obj_list(o->v.Call.keywords, ast2obj_keyword, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "keywords", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Call.starargs);
+                value = ast2obj_expr(o->v.Call.starargs, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "starargs", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Call.kwargs);
+                value = ast2obj_expr(o->v.Call.kwargs, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "kwargs", value) == -1)
                         goto failed;
@@ -2799,7 +2929,9 @@ ast2obj_expr(void* _o)
         case Num_kind:
                 result = PyType_GenericNew(Num_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_object(o->v.Num.n);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_object(o->v.Num.n, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "n", value) == -1)
                         goto failed;
@@ -2808,7 +2940,9 @@ ast2obj_expr(void* _o)
         case Str_kind:
                 result = PyType_GenericNew(Str_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_string(o->v.Str.s);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_string(o->v.Str.s, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "s", value) == -1)
                         goto failed;
@@ -2817,7 +2951,9 @@ ast2obj_expr(void* _o)
         case Bytes_kind:
                 result = PyType_GenericNew(Bytes_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_string(o->v.Bytes.s);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_string(o->v.Bytes.s, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "s", value) == -1)
                         goto failed;
@@ -2826,21 +2962,54 @@ ast2obj_expr(void* _o)
         case Ellipsis_kind:
                 result = PyType_GenericNew(Ellipsis_type, NULL, NULL);
                 if (!result) goto failed;
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                break;
+        case Specialize_kind:
+                result = PyType_GenericNew(Specialize_type, NULL, NULL);
+                if (!result) goto failed;
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Specialize.name, st);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "name", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_list(o->v.Specialize.specialized_body,
+                                     ast2obj_stmt, st);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "specialized_body", value)
+                    == -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_expr(o->v.Specialize.specialized_result, st);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "specialized_result", value)
+                    == -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_expr(o->v.Specialize.generalized, st);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "generalized", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
                 break;
         case Attribute_kind:
                 result = PyType_GenericNew(Attribute_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Attribute.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Attribute.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_identifier(o->v.Attribute.attr);
+                value = ast2obj_identifier(o->v.Attribute.attr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "attr", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.Attribute.ctx);
+                value = ast2obj_expr_context(o->v.Attribute.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
@@ -2849,17 +3018,19 @@ ast2obj_expr(void* _o)
         case Subscript_kind:
                 result = PyType_GenericNew(Subscript_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Subscript.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Subscript.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_slice(o->v.Subscript.slice);
+                value = ast2obj_slice(o->v.Subscript.slice, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "slice", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.Subscript.ctx);
+                value = ast2obj_expr_context(o->v.Subscript.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
@@ -2868,12 +3039,14 @@ ast2obj_expr(void* _o)
         case Starred_kind:
                 result = PyType_GenericNew(Starred_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Starred.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Starred.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.Starred.ctx);
+                value = ast2obj_expr_context(o->v.Starred.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
@@ -2882,12 +3055,14 @@ ast2obj_expr(void* _o)
         case Name_kind:
                 result = PyType_GenericNew(Name_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_identifier(o->v.Name.id);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_identifier(o->v.Name.id, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "id", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.Name.ctx);
+                value = ast2obj_expr_context(o->v.Name.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
@@ -2896,12 +3071,14 @@ ast2obj_expr(void* _o)
         case List_kind:
                 result = PyType_GenericNew(List_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.List.elts, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.List.elts, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elts", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.List.ctx);
+                value = ast2obj_expr_context(o->v.List.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
@@ -2910,24 +3087,26 @@ ast2obj_expr(void* _o)
         case Tuple_kind:
                 result = PyType_GenericNew(Tuple_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.Tuple.elts, ast2obj_expr);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.Tuple.elts, ast2obj_expr, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "elts", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr_context(o->v.Tuple.ctx);
+                value = ast2obj_expr_context(o->v.Tuple.ctx, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "ctx", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 break;
         }
-        value = ast2obj_int(o->lineno);
+        value = ast2obj_int(o->lineno, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "lineno", value) < 0)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_int(o->col_offset);
+        value = ast2obj_int(o->col_offset, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
@@ -2939,7 +3118,7 @@ failed:
         return NULL;
 }
 
-PyObject* ast2obj_expr_context(expr_context_ty o)
+PyObject* ast2obj_expr_context(expr_context_ty o, struct symtable *st)
 {
         switch(o) {
                 case Load:
@@ -2967,7 +3146,7 @@ PyObject* ast2obj_expr_context(expr_context_ty o)
         }
 }
 PyObject*
-ast2obj_slice(void* _o)
+ast2obj_slice(void* _o, struct symtable *st)
 {
         slice_ty o = (slice_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -2980,17 +3159,19 @@ ast2obj_slice(void* _o)
         case Slice_kind:
                 result = PyType_GenericNew(Slice_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Slice.lower);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Slice.lower, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "lower", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Slice.upper);
+                value = ast2obj_expr(o->v.Slice.upper, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "upper", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_expr(o->v.Slice.step);
+                value = ast2obj_expr(o->v.Slice.step, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "step", value) == -1)
                         goto failed;
@@ -2999,7 +3180,9 @@ ast2obj_slice(void* _o)
         case ExtSlice_kind:
                 result = PyType_GenericNew(ExtSlice_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_list(o->v.ExtSlice.dims, ast2obj_slice);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_list(o->v.ExtSlice.dims, ast2obj_slice, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "dims", value) == -1)
                         goto failed;
@@ -3008,7 +3191,9 @@ ast2obj_slice(void* _o)
         case Index_kind:
                 result = PyType_GenericNew(Index_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.Index.value);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.Index.value, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "value", value) == -1)
                         goto failed;
@@ -3022,7 +3207,7 @@ failed:
         return NULL;
 }
 
-PyObject* ast2obj_boolop(boolop_ty o)
+PyObject* ast2obj_boolop(boolop_ty o, struct symtable *st)
 {
         switch(o) {
                 case And:
@@ -3037,7 +3222,7 @@ PyObject* ast2obj_boolop(boolop_ty o)
                         return NULL;
         }
 }
-PyObject* ast2obj_operator(operator_ty o)
+PyObject* ast2obj_operator(operator_ty o, struct symtable *st)
 {
         switch(o) {
                 case Add:
@@ -3082,7 +3267,7 @@ PyObject* ast2obj_operator(operator_ty o)
                         return NULL;
         }
 }
-PyObject* ast2obj_unaryop(unaryop_ty o)
+PyObject* ast2obj_unaryop(unaryop_ty o, struct symtable *st)
 {
         switch(o) {
                 case Invert:
@@ -3103,7 +3288,7 @@ PyObject* ast2obj_unaryop(unaryop_ty o)
                         return NULL;
         }
 }
-PyObject* ast2obj_cmpop(cmpop_ty o)
+PyObject* ast2obj_cmpop(cmpop_ty o, struct symtable *st)
 {
         switch(o) {
                 case Eq:
@@ -3143,7 +3328,7 @@ PyObject* ast2obj_cmpop(cmpop_ty o)
         }
 }
 PyObject*
-ast2obj_comprehension(void* _o)
+ast2obj_comprehension(void* _o, struct symtable *st)
 {
         comprehension_ty o = (comprehension_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3154,17 +3339,19 @@ ast2obj_comprehension(void* _o)
 
         result = PyType_GenericNew(comprehension_type, NULL, NULL);
         if (!result) return NULL;
-        value = ast2obj_expr(o->target);
+        if (!obj2ast_write_scope(o, result, st))
+                goto failed;
+        value = ast2obj_expr(o->target, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "target", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_expr(o->iter);
+        value = ast2obj_expr(o->iter, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "iter", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_list(o->ifs, ast2obj_expr);
+        value = ast2obj_list(o->ifs, ast2obj_expr, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "ifs", value) == -1)
                 goto failed;
@@ -3177,7 +3364,7 @@ failed:
 }
 
 PyObject*
-ast2obj_excepthandler(void* _o)
+ast2obj_excepthandler(void* _o, struct symtable *st)
 {
         excepthandler_ty o = (excepthandler_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3190,29 +3377,31 @@ ast2obj_excepthandler(void* _o)
         case ExceptHandler_kind:
                 result = PyType_GenericNew(ExceptHandler_type, NULL, NULL);
                 if (!result) goto failed;
-                value = ast2obj_expr(o->v.ExceptHandler.type);
+                if (!obj2ast_write_scope(o, result, st))
+                        goto failed;
+                value = ast2obj_expr(o->v.ExceptHandler.type, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "type", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_identifier(o->v.ExceptHandler.name);
+                value = ast2obj_identifier(o->v.ExceptHandler.name, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "name", value) == -1)
                         goto failed;
                 Py_DECREF(value);
-                value = ast2obj_list(o->v.ExceptHandler.body, ast2obj_stmt);
+                value = ast2obj_list(o->v.ExceptHandler.body, ast2obj_stmt, st);
                 if (!value) goto failed;
                 if (PyObject_SetAttrString(result, "body", value) == -1)
                         goto failed;
                 Py_DECREF(value);
                 break;
         }
-        value = ast2obj_int(o->lineno);
+        value = ast2obj_int(o->lineno, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "lineno", value) < 0)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_int(o->col_offset);
+        value = ast2obj_int(o->col_offset, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "col_offset", value) < 0)
                 goto failed;
@@ -3225,7 +3414,7 @@ failed:
 }
 
 PyObject*
-ast2obj_arguments(void* _o)
+ast2obj_arguments(void* _o, struct symtable *st)
 {
         arguments_ty o = (arguments_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3236,42 +3425,44 @@ ast2obj_arguments(void* _o)
 
         result = PyType_GenericNew(arguments_type, NULL, NULL);
         if (!result) return NULL;
-        value = ast2obj_list(o->args, ast2obj_arg);
+        if (!obj2ast_write_scope(o, result, st))
+                goto failed;
+        value = ast2obj_list(o->args, ast2obj_arg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "args", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_identifier(o->vararg);
+        value = ast2obj_identifier(o->vararg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "vararg", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_expr(o->varargannotation);
+        value = ast2obj_expr(o->varargannotation, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "varargannotation", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_list(o->kwonlyargs, ast2obj_arg);
+        value = ast2obj_list(o->kwonlyargs, ast2obj_arg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "kwonlyargs", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_identifier(o->kwarg);
+        value = ast2obj_identifier(o->kwarg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "kwarg", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_expr(o->kwargannotation);
+        value = ast2obj_expr(o->kwargannotation, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "kwargannotation", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_list(o->defaults, ast2obj_expr);
+        value = ast2obj_list(o->defaults, ast2obj_expr, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "defaults", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_list(o->kw_defaults, ast2obj_expr);
+        value = ast2obj_list(o->kw_defaults, ast2obj_expr, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "kw_defaults", value) == -1)
                 goto failed;
@@ -3284,7 +3475,7 @@ failed:
 }
 
 PyObject*
-ast2obj_arg(void* _o)
+ast2obj_arg(void* _o, struct symtable *st)
 {
         arg_ty o = (arg_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3295,12 +3486,14 @@ ast2obj_arg(void* _o)
 
         result = PyType_GenericNew(arg_type, NULL, NULL);
         if (!result) return NULL;
-        value = ast2obj_identifier(o->arg);
+        if (!obj2ast_write_scope(o, result, st))
+                goto failed;
+        value = ast2obj_identifier(o->arg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "arg", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_expr(o->annotation);
+        value = ast2obj_expr(o->annotation, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "annotation", value) == -1)
                 goto failed;
@@ -3313,7 +3506,7 @@ failed:
 }
 
 PyObject*
-ast2obj_keyword(void* _o)
+ast2obj_keyword(void* _o, struct symtable *st)
 {
         keyword_ty o = (keyword_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3324,12 +3517,14 @@ ast2obj_keyword(void* _o)
 
         result = PyType_GenericNew(keyword_type, NULL, NULL);
         if (!result) return NULL;
-        value = ast2obj_identifier(o->arg);
+        if (!obj2ast_write_scope(o, result, st))
+                goto failed;
+        value = ast2obj_identifier(o->arg, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "arg", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_expr(o->value);
+        value = ast2obj_expr(o->value, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "value", value) == -1)
                 goto failed;
@@ -3342,7 +3537,7 @@ failed:
 }
 
 PyObject*
-ast2obj_alias(void* _o)
+ast2obj_alias(void* _o, struct symtable *st)
 {
         alias_ty o = (alias_ty)_o;
         PyObject *result = NULL, *value = NULL;
@@ -3353,12 +3548,14 @@ ast2obj_alias(void* _o)
 
         result = PyType_GenericNew(alias_type, NULL, NULL);
         if (!result) return NULL;
-        value = ast2obj_identifier(o->name);
+        if (!obj2ast_write_scope(o, result, st))
+                goto failed;
+        value = ast2obj_identifier(o->name, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "name", value) == -1)
                 goto failed;
         Py_DECREF(value);
-        value = ast2obj_identifier(o->asname);
+        value = ast2obj_identifier(o->asname, st);
         if (!value) goto failed;
         if (PyObject_SetAttrString(result, "asname", value) == -1)
                 goto failed;
@@ -5557,6 +5754,82 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 if (*out == NULL) goto failed;
                 return 0;
         }
+        isinstance = PyObject_IsInstance(obj, (PyObject*)Specialize_type);
+        if (isinstance == -1) {
+                return 1;
+        }
+        if (isinstance) {
+                expr_ty name;
+                asdl_seq* specialized_body;
+                expr_ty specialized_result;
+                expr_ty generalized;
+
+                if (PyObject_HasAttrString(obj, "name")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "name");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_expr(tmp, &name, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"name\" missing from Specialize");
+                        return 1;
+                }
+                if (PyObject_HasAttrString(obj, "specialized_body")) {
+                        int res;
+                        Py_ssize_t len;
+                        Py_ssize_t i;
+                        tmp = PyObject_GetAttrString(obj, "specialized_body");
+                        if (tmp == NULL) goto failed;
+                        if (!PyList_Check(tmp)) {
+                                PyErr_Format(PyExc_TypeError, "Specialize field \"specialized_body\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                                goto failed;
+                        }
+                        len = PyList_GET_SIZE(tmp);
+                        specialized_body = asdl_seq_new(len, arena);
+                        if (specialized_body == NULL) goto failed;
+                        for (i = 0; i < len; i++) {
+                                stmt_ty value;
+                                res = obj2ast_stmt(PyList_GET_ITEM(tmp, i), &value, arena);
+                                if (res != 0) goto failed;
+                                asdl_seq_SET(specialized_body, i, value);
+                        }
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"specialized_body\" missing from Specialize");
+                        return 1;
+                }
+                if (PyObject_HasAttrString(obj, "specialized_result")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "specialized_result");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_expr(tmp, &specialized_result, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"specialized_result\" missing from Specialize");
+                        return 1;
+                }
+                if (PyObject_HasAttrString(obj, "generalized")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "generalized");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_expr(tmp, &generalized, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"generalized\" missing from Specialize");
+                        return 1;
+                }
+                *out = Specialize(name, specialized_body, specialized_result,
+                                  generalized, lineno, col_offset, arena);
+                if (*out == NULL) goto failed;
+                return 0;
+        }
         isinstance = PyObject_IsInstance(obj, (PyObject*)Attribute_type);
         if (isinstance == -1) {
                 return 1;
@@ -6834,6 +7107,8 @@ PyInit__ast(void)
             NULL;
         if (PyDict_SetItemString(d, "Ellipsis", (PyObject*)Ellipsis_type) < 0)
             return NULL;
+        if (PyDict_SetItemString(d, "Specialize", (PyObject*)Specialize_type) <
+            0) return NULL;
         if (PyDict_SetItemString(d, "Attribute", (PyObject*)Attribute_type) <
             0) return NULL;
         if (PyDict_SetItemString(d, "Subscript", (PyObject*)Subscript_type) <
@@ -6944,10 +7219,24 @@ PyInit__ast(void)
 }
 
 
-PyObject* PyAST_mod2obj(mod_ty t)
+int obj2ast_write_scope(void *ast_obj, PyObject *py_obj, struct symtable *st)
+{
+    PySTEntryObject * ste;
+    if (st) {
+        ste = PySymtable_TryLookup(st, ast_obj);
+        if (ste) {
+            /* This AST node has a symtable entry: */
+            if (PyObject_SetAttrString(py_obj, "ste", (PyObject*)ste) == -1)
+                return 0;
+        }
+    }
+    return 1;
+}
+
+PyObject* PyAST_mod2obj(mod_ty t, struct symtable *st)
 {
     init_types();
-    return ast2obj_mod(t);
+    return ast2obj_mod(t, st);
 }
 
 /* mode is 0 for "exec", 1 for "eval" and 2 for "single" input */

@@ -1110,7 +1110,8 @@ parse_source_module(const char *pathname, FILE *fp)
                                Py_file_input, 0, 0, &flags,
                                NULL, arena);
     if (mod) {
-        co = PyAST_Compile(mod, pathname, NULL, arena);
+        co = PyAST_Compile(mod, pathname, NULL, arena,
+                           PyCompilationMode_Exec_Module);
     }
     PyArena_Free(arena);
     return co;

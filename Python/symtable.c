@@ -310,6 +310,26 @@ PySymtable_Lookup(struct symtable *st, void *key)
     return (PySTEntryObject *)v;
 }
 
+/* As per PySymtable_TryLookup, but doesn't set an exception if the key is not
+found (could set an exception for other reasons e.g. out of memory, though) */
+PySTEntryObject *
+PySymtable_TryLookup(struct symtable *st, void *key)
+{
+    PyObject *k, *v;
+
+    k = PyLong_FromVoidPtr(key);
+    if (k == NULL)
+        return NULL;
+    v = PyDict_GetItemWithError(st->st_blocks, k);
+    if (v) {
+        assert(PySTEntry_Check(v));
+        Py_INCREF(v);
+    }
+
+    Py_DECREF(k);
+    return (PySTEntryObject *)v;
+}
+
 int
 PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 {
@@ -1402,6 +1422,12 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
     case Bytes_kind:
     case Ellipsis_kind:
         /* Nothing to do here. */
+        break;
+    case Specialize_kind:
+        VISIT(st, expr, e->v.Specialize.name);
+        VISIT_SEQ(st, stmt, e->v.Specialize.specialized_body);
+        VISIT(st, expr, e->v.Specialize.specialized_result);
+        VISIT(st, expr, e->v.Specialize.generalized);
         break;
     /* The following exprs can be assignment targets. */
     case Attribute_kind:

@@ -33,6 +33,7 @@
 #include "opcode.h"
 
 int Py_OptimizeFlag = 0;
+static int ready_to_optimize = 0;
 
 #define DEFAULT_BLOCK_SIZE 16
 #define DEFAULT_BLOCKS 8
@@ -149,6 +150,8 @@ struct compiler {
     PyArena *c_arena;            /* pointer to memory allocation arena */
 };
 
+static mod_ty optimize_mod(struct compiler *, mod_ty, enum PyCompilationMode);
+
 static int compiler_enter_scope(struct compiler *, identifier, void *, int);
 static void compiler_free(struct compiler *);
 static basicblock *compiler_new_block(struct compiler *);
@@ -180,6 +183,7 @@ static int inplace_binop(struct compiler *, operator_ty);
 static int expr_constant(expr_ty e);
 
 static int compiler_with(struct compiler *, stmt_ty);
+static int compiler_specialize(struct compiler *, expr_ty);
 static int compiler_call_helper(struct compiler *c, int n,
                                 asdl_seq *args,
                                 asdl_seq *keywords,
@@ -257,7 +261,7 @@ compiler_init(struct compiler *c)
 
 PyCodeObject *
 PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
-              PyArena *arena)
+              PyArena *arena, enum PyCompilationMode mode)
 {
     struct compiler c;
     PyCodeObject *co = NULL;
@@ -294,6 +298,10 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
         goto finally;
     }
 
+    mod = optimize_mod(&c, mod, mode);
+    if (!mod)
+        goto finally;
+
     co = compiler_mod(&c, mod);
 
  finally:
@@ -312,10 +320,124 @@ PyNode_Compile(struct _node *n, const char *filename)
         return NULL;
     mod = PyAST_FromNode(n, NULL, filename, arena);
     if (mod)
-        co = PyAST_Compile(mod, filename, NULL, arena);
+        co = PyAST_Compile(mod, filename, NULL, arena, PyCompilationMode_Exec_Module);
     PyArena_Free(arena);
     return co;
 }
+
+/*
+ *  Overview of the AST optimizer:
+ *    1. Convert the AST to python objects
+ *    2. Import __optimizer__ and invoke __optimizer__.optimize_ast() on the
+ *       python form of the tree
+ *    3. This will returns a potentially modified version of the tree (in
+ *       python form)
+ *    4. Convert the python objects back to an AST
+ *    5. Return the resulting AST back, for use by the compiler.
+ *
+ * TODO: how does this interract with symbol tables? 
+ * TODO: what about the GIL?
+ * TODO: which errors should be fatal, if any?  how to report errors?
+ */
+static int within_optimizer = 0;
+static mod_ty optimize_mod(struct compiler *c, mod_ty m, enum PyCompilationMode mode)
+{
+    PyObject *optimizer_module = NULL;
+    PyObject *optimize_ast_str = NULL;
+    PyObject *optimize_ast_fn = NULL;
+    PyObject *py_ast_in = NULL;
+    PyObject *filename = NULL;
+    PyObject *py_ast_out = NULL;
+    mod_ty new_mod = NULL;
+    PyObject *exc = NULL;
+    struct symtable *new_st = NULL;
+
+    assert(c);
+    assert(m);
+
+    /* Avoid running optimizer until the end of Py_InitializeEx: */
+    if (!ready_to_optimize)
+       return m;
+
+    /* Avoid infinite recursion: don't try to optimize the optimizer (or
+       modules imported during the import of the optimizer): */
+    if (within_optimizer)
+       return m;
+    within_optimizer = 1;
+  
+    /* printf("Optimizing: %s\n", c->c_filename); */
+
+    /* Import "__optimizer__.optimize_ast" -> optimize_ast_fn: */
+    optimizer_module = PyImport_ImportModule("__optimizer__");
+    if (!optimizer_module)
+        goto finally;
+
+    optimize_ast_str= PyUnicode_InternFromString("optimize_ast");
+    if (!optimize_ast_str)
+        goto finally; 
+
+    optimize_ast_fn = PyObject_GetAttr(optimizer_module, optimize_ast_str);
+    if (!optimize_ast_fn) {
+//PyErr_SetObject(PyExc_ImportError, optimize_ast_str);
+        goto finally;
+    }
+
+    /* Convert the AST repr to Python objects: */
+    py_ast_in = PyAST_mod2obj(m, c->c_st);
+    if (!py_ast_in)
+        goto finally;
+
+    /* Invoke the "__optimizer__.optimize_ast(ast, filename)": */
+    filename = PyUnicode_DecodeFSDefault(c->c_filename); /* FIXME: is this the correct encoding? */
+    if (!filename)
+        goto finally;
+
+    assert(c->c_st);
+    py_ast_out = PyObject_CallFunctionObjArgs(optimize_ast_fn,
+                                              py_ast_in, filename, c->c_st->st_blocks,
+                                              NULL);
+    if (!py_ast_out)
+        goto finally;
+     
+    /* 4. Convert the python objects back to an AST: */
+    new_mod = PyAST_obj2mod(py_ast_out, c->c_arena, mode);
+    if (!new_mod)
+        goto finally;
+
+    /* 5. Rebuild the symbol table, using the new AST: */
+    new_st = PySymtable_Build(new_mod, c->c_filename, c->c_future);
+    if (new_st == NULL) {
+        if (!PyErr_Occurred())
+            PyErr_SetString(PyExc_SystemError, "no symtable");
+        
+        goto finally;
+    }
+
+    /* 6. Use the optimizer's version of the AST and the new symtable: */
+    m = new_mod;
+    PySymtable_Free(c->c_st);
+    c->c_st = new_st;
+
+finally:
+    exc = PyErr_Occurred();
+    //if (exc) {
+    //    PyErr_PrintEx(0);
+#if 0
+        PyObject *tb = PyException_GetTraceback(exc);
+        if (exc && optimize_ast_fn)
+            PyTraceBack_Print(tb, optimize_ast_fn);
+#endif
+//    }
+    Py_XDECREF(py_ast_out);
+    Py_XDECREF(filename);
+    Py_XDECREF(py_ast_in);
+    Py_XDECREF(optimize_ast_fn);
+    Py_XDECREF(optimize_ast_str);
+    Py_XDECREF(optimizer_module);
+    within_optimizer = 0;
+    return m;
+}
+
 
 static void
 compiler_free(struct compiler *c)
@@ -861,6 +983,10 @@ opcode_stack_effect(int opcode, int oparg)
             return -1;
         case DELETE_DEREF:
             return 0;
+
+        case JUMP_IF_SPECIALIZABLE:
+            return -2; /* -1 if jump not taken */
+
         default:
             fprintf(stderr, "opcode = %d\n", opcode);
             Py_FatalError("opcode_stack_effect()");
@@ -3114,6 +3240,74 @@ compiler_with(struct compiler *c, stmt_ty s)
     return 1;
 }
 
+
+/*
+   FIXME: need a PEP for this
+
+   This one's unusual, in that it's an expression, but it contains statements
+   and control flow.
+*/
+static int
+compiler_specialize(struct compiler *c, expr_ty e)
+{
+    basicblock *specialized, *generalized, *end;
+    expr_ty call;
+    identifier id;
+    PyObject *saved_name = NULL;
+
+    assert(e->kind == Specialize_kind);
+
+    specialized = compiler_new_block(c);
+    generalized = compiler_new_block(c);
+    end = compiler_new_block(c);
+    if (!specialized || !generalized || !end)
+        return 0;
+
+    /* Do the dynamic name lookup, it will be the new TOS */
+    VISIT(c, expr, e->v.Specialize.name);
+
+    /* Push the expected version of the name, it will be the new TOS */
+    /* For now, look for a global named "__saved__" + funcname */
+    if (e->v.Specialize.name->kind != Name_kind)
+        return 0;
+    id = e->v.Specialize.name->v.Name.id;
+    assert(id);
+    saved_name = PyUnicode_FromFormat("__saved__%U", id);
+    if (!saved_name)
+        return 0;
+    ADDOP_O(c, LOAD_GLOBAL, saved_name, names); /* takes ownership of the reference */
+
+    /* JUMP_IF_SPECIALIZABLE; pops the expected, and peeks the dynamic,
+       leaving dynamically-looked-up fn as TOS */
+    ADDOP_JABS(c, JUMP_IF_SPECIALIZABLE, specialized);
+
+    /* The generalized version */
+    compiler_use_next_block(c, generalized);
+
+    call = e->v.Specialize.generalized;
+    if (call->kind != Call_kind)
+        return 0;
+    /* Dynamic lookup will be on TOS, don't need to look it up again; go
+       ahead with args: */
+    if (!compiler_call_helper(c, 0,
+                              call->v.Call.args,
+                              call->v.Call.keywords,
+                              call->v.Call.starargs,
+                              call->v.Call.kwargs))
+        return 0;
+    ADDOP_JREL(c, JUMP_FORWARD, end);
+
+    /* The specialized version */
+    compiler_use_next_block(c, specialized);
+    VISIT_SEQ(c, stmt, e->v.Specialize.specialized_body);
+    VISIT(c, expr, e->v.Specialize.specialized_result);
+
+    /* Fall through to "end" */    
+    compiler_use_next_block(c, end);
+
+    return 1;
+}
+
 static int
 compiler_visit_expr(struct compiler *c, expr_ty e)
 {
@@ -3194,6 +3388,9 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         break;
     case Ellipsis_kind:
         ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
+        break;
+    case Specialize_kind:
+        return compiler_specialize(c, e);
         break;
     /* The following exprs can be assignment targets. */
     case Attribute_kind:
@@ -3676,7 +3873,9 @@ assemble_lnotab(struct assembler *a, struct instr *i)
     d_lineno = i->i_lineno - a->a_lineno;
 
     assert(d_bytecode >= 0);
-    assert(d_lineno >= 0);
+    /* FIXME: currently the lineno implementation assumes monotonically
+       increasing line nums, which isn't true with function inlining: */
+    /* assert(d_lineno >= 0); */
 
     if(d_bytecode == 0 && d_lineno == 0)
         return 1;
@@ -4081,4 +4280,13 @@ assemble(struct compiler *c, int addNone)
  error:
     assemble_free(&a);
     return co;
+}
+
+void _PyOptimizer_Init(void)
+{
+    /* Don't try to optimize until early initialization is done.
+       This prevents us from e.g. trying to optimize the "encodings" module
+       before there's a "sys" module:
+    */
+    ready_to_optimize = 1;
 }

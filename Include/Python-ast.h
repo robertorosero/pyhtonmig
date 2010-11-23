@@ -2,6 +2,7 @@
 
 #include "asdl.h"
 
+struct symtable;
 typedef struct _mod *mod_ty;
 
 typedef struct _stmt *stmt_ty;
@@ -186,8 +187,8 @@ enum _expr_kind {BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
                   SetComp_kind=9, DictComp_kind=10, GeneratorExp_kind=11,
                   Yield_kind=12, Compare_kind=13, Call_kind=14, Num_kind=15,
                   Str_kind=16, Bytes_kind=17, Ellipsis_kind=18,
-                  Attribute_kind=19, Subscript_kind=20, Starred_kind=21,
-                  Name_kind=22, List_kind=23, Tuple_kind=24};
+                  Specialize_kind=19, Attribute_kind=20, Subscript_kind=21,
+                  Starred_kind=22, Name_kind=23, List_kind=24, Tuple_kind=25};
 struct _expr {
         enum _expr_kind kind;
         union {
@@ -277,6 +278,13 @@ struct _expr {
                 struct {
                         string s;
                 } Bytes;
+                
+                struct {
+                        expr_ty name;
+                        asdl_seq *specialized_body;
+                        expr_ty specialized_result;
+                        expr_ty generalized;
+                } Specialize;
                 
                 struct {
                         expr_ty value;
@@ -505,6 +513,10 @@ expr_ty _Py_Str(string s, int lineno, int col_offset, PyArena *arena);
 expr_ty _Py_Bytes(string s, int lineno, int col_offset, PyArena *arena);
 #define Ellipsis(a0, a1, a2) _Py_Ellipsis(a0, a1, a2)
 expr_ty _Py_Ellipsis(int lineno, int col_offset, PyArena *arena);
+#define Specialize(a0, a1, a2, a3, a4, a5, a6) _Py_Specialize(a0, a1, a2, a3, a4, a5, a6)
+expr_ty _Py_Specialize(expr_ty name, asdl_seq * specialized_body, expr_ty
+                       specialized_result, expr_ty generalized, int lineno, int
+                       col_offset, PyArena *arena);
 #define Attribute(a0, a1, a2, a3, a4, a5) _Py_Attribute(a0, a1, a2, a3, a4, a5)
 expr_ty _Py_Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int
                       lineno, int col_offset, PyArena *arena);
@@ -548,6 +560,6 @@ keyword_ty _Py_keyword(identifier arg, expr_ty value, PyArena *arena);
 #define alias(a0, a1, a2) _Py_alias(a0, a1, a2)
 alias_ty _Py_alias(identifier name, identifier asname, PyArena *arena);
 
-PyObject* PyAST_mod2obj(mod_ty t);
+PyObject* PyAST_mod2obj(mod_ty t, struct symtable *st);
 mod_ty PyAST_obj2mod(PyObject* ast, PyArena* arena, int mode);
 int PyAST_Check(PyObject* obj);

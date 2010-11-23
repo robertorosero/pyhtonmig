@@ -433,6 +433,13 @@ if 1:
         ast.body = [_ast.BoolOp()]
         self.assertRaises(TypeError, compile, ast, '<ast>', 'exec')
 
+        # raise exception when expr is not an expression:
+        self.assertRaises(TypeError, compile,
+                          _ast.Module(body=[_ast.Expr(_ast.Assign(lineno=0,
+                                                                  col_offset=0),
+                                                      lineno=0, col_offset=0)],
+                                      lineno=0),
+                          'test', 'exec')
 
 def test_main():
     support.run_unittest(TestSpecifics)

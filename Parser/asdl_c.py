@@ -550,7 +550,7 @@ class PyTypesDeclareVisitor(PickleVisitor):
 
     def visitProduct(self, prod, name):
         self.emit("static PyTypeObject *%s_type;" % name, 0)
-        self.emit("static PyObject* ast2obj_%s(void*);" % name, 0)
+        self.emit("static PyObject* ast2obj_%s(void*, struct symtable *st);" % name, 0)
         if prod.fields:
             self.emit("static char *%s_fields[]={" % name,0)
             for f in prod.fields:
@@ -572,7 +572,7 @@ class PyTypesDeclareVisitor(PickleVisitor):
                 tnames.append(str(t.name)+"_singleton")
             tnames = ", *".join(tnames)
             self.emit("static PyObject *%s;" % tnames, 0)
-        self.emit("static PyObject* ast2obj_%s(%s);" % (name, ptype), 0)
+        self.emit("static PyObject* ast2obj_%s(%s, struct symtable *st);" % (name, ptype), 0)
         for t in sum.types:
             self.visitConstructor(t, name)
 
@@ -748,7 +748,7 @@ static int add_attributes(PyTypeObject* type, char**attrs, int num_fields)
 
 /* Conversion AST -> Python */
 
-static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
+static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*, struct symtable*), struct symtable *st)
 {
     int i, n = asdl_seq_LEN(seq);
     PyObject *result = PyList_New(n);
@@ -756,7 +756,7 @@ static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
     if (!result)
         return NULL;
     for (i = 0; i < n; i++) {
-        value = func(asdl_seq_GET(seq, i));
+        value = func(asdl_seq_GET(seq, i), st);
         if (!value) {
             Py_DECREF(result);
             return NULL;
@@ -766,7 +766,7 @@ static PyObject* ast2obj_list(asdl_seq *seq, PyObject* (*func)(void*))
     return result;
 }
 
-static PyObject* ast2obj_object(void *o)
+static PyObject* ast2obj_object(void *o, struct symtable *st)
 {
     if (!o)
         o = Py_None;
@@ -776,7 +776,7 @@ static PyObject* ast2obj_object(void *o)
 #define ast2obj_identifier ast2obj_object
 #define ast2obj_string ast2obj_object
 
-static PyObject* ast2obj_int(long b)
+static PyObject* ast2obj_int(long b, struct symtable *st)
 {
     return PyLong_FromLong(b);
 }
@@ -804,7 +804,7 @@ static int obj2ast_int(PyObject* obj, int* out, PyArena* arena)
         PyObject *s = PyObject_Repr(obj);
         if (s == NULL) return 1;
         PyErr_Format(PyExc_ValueError, "invalid integer value: %.400s",
-                     PyBytes_AS_STRING(s));
+                     _PyUnicode_AsString(s));
         Py_DECREF(s);
         return 1;
     }
@@ -957,7 +957,7 @@ class ObjVisitor(PickleVisitor):
     def func_begin(self, name):
         ctype = get_c_type(name)
         self.emit("PyObject*", 0)
-        self.emit("ast2obj_%s(void* _o)" % (name), 0)
+        self.emit("ast2obj_%s(void* _o, struct symtable *st)" % (name), 0)
         self.emit("{", 0)
         self.emit("%s o = (%s)_o;" % (ctype, ctype), 1)
         self.emit("PyObject *result = NULL, *value = NULL;", 1)
@@ -987,7 +987,7 @@ class ObjVisitor(PickleVisitor):
             self.visitConstructor(t, i + 1, name)
         self.emit("}", 1)
         for a in sum.attributes:
-            self.emit("value = ast2obj_%s(o->%s);" % (a.type, a.name), 1)
+            self.emit("value = ast2obj_%s(o->%s, st);" % (a.type, a.name), 1)
             self.emit("if (!value) goto failed;", 1)
             self.emit('if (PyObject_SetAttrString(result, "%s", value) < 0)' % a.name, 1)
             self.emit('goto failed;', 2)
@@ -995,7 +995,7 @@ class ObjVisitor(PickleVisitor):
         self.func_end()
 
     def simpleSum(self, sum, name):
-        self.emit("PyObject* ast2obj_%s(%s_ty o)" % (name, name), 0)
+        self.emit("PyObject* ast2obj_%s(%s_ty o, struct symtable *st)" % (name, name), 0)
         self.emit("{", 0)
         self.emit("switch(o) {", 1)
         for t in sum.types:
@@ -1014,6 +1014,8 @@ class ObjVisitor(PickleVisitor):
         self.func_begin(name)
         self.emit("result = PyType_GenericNew(%s_type, NULL, NULL);" % name, 1);
         self.emit("if (!result) return NULL;", 1)
+        self.emit("if (!obj2ast_write_scope(o, result, st))", 1)
+        self.emit("goto failed;", 2)
         for field in prod.fields:
             self.visitField(field, name, 1, True)
         self.func_end()
@@ -1022,6 +1024,8 @@ class ObjVisitor(PickleVisitor):
         self.emit("case %s_kind:" % cons.name, 1)
         self.emit("result = PyType_GenericNew(%s_type, NULL, NULL);" % cons.name, 2);
         self.emit("if (!result) goto failed;", 2)
+        self.emit("if (!obj2ast_write_scope(o, result, st))", 2)
+        self.emit("goto failed;", 3)
         for f in cons.fields:
             self.visitField(f, cons.name, 2, False)
         self.emit("break;", 2)
@@ -1063,23 +1067,37 @@ class ObjVisitor(PickleVisitor):
                 self.emit("if (!value) goto failed;", depth+1)
                 self.emit("for(i = 0; i < n; i++)", depth+1)
                 # This cannot fail, so no need for error handling
-                self.emit("PyList_SET_ITEM(value, i, ast2obj_cmpop((cmpop_ty)asdl_seq_GET(%s, i)));" % value,
+                self.emit("PyList_SET_ITEM(value, i, ast2obj_cmpop((cmpop_ty)asdl_seq_GET(%s, i), st));" % value,
                           depth+2, reflow=False)
                 self.emit("}", depth)
             else:
-                self.emit("value = ast2obj_list(%s, ast2obj_%s);" % (value, field.type), depth)
+                self.emit("value = ast2obj_list(%s, ast2obj_%s, st);" % (value, field.type), depth)
         else:
             ctype = get_c_type(field.type)
-            self.emit("value = ast2obj_%s(%s);" % (field.type, value), depth, reflow=False)
+            self.emit("value = ast2obj_%s(%s, st);" % (field.type, value), depth, reflow=False)
 
 
 class PartingShots(StaticVisitor):
 
     CODE = """
-PyObject* PyAST_mod2obj(mod_ty t)
+int obj2ast_write_scope(void *ast_obj, PyObject *py_obj, struct symtable *st)
+{
+    PySTEntryObject * ste;
+    if (st) {
+        ste = PySymtable_TryLookup(st, ast_obj);
+        if (ste) {
+            /* This AST node has a symtable entry: */
+            if (PyObject_SetAttrString(py_obj, "ste", (PyObject*)ste) == -1)
+                return 0;
+        }
+    }
+    return 1;
+}
+
+PyObject* PyAST_mod2obj(mod_ty t, struct symtable *st)
 {
     init_types();
-    return ast2obj_mod(t);
+    return ast2obj_mod(t, st);
 }
 
 /* mode is 0 for "exec", 1 for "eval" and 2 for "single" input */
@@ -1150,12 +1168,13 @@ def main(srcfile):
         f = open(p, "w")
         f.write(auto_gen_msg)
         f.write('#include "asdl.h"\n\n')
+        f.write("struct symtable;\n")
         c = ChainOfVisitors(TypeDefVisitor(f),
                             StructVisitor(f),
                             PrototypeVisitor(f),
                             )
         c.visit(mod)
-        f.write("PyObject* PyAST_mod2obj(mod_ty t);\n")
+        f.write("PyObject* PyAST_mod2obj(mod_ty t, struct symtable *st);\n")
         f.write("mod_ty PyAST_obj2mod(PyObject* ast, PyArena* arena, int mode);\n")
         f.write("int PyAST_Check(PyObject* obj);\n")
         f.close()
@@ -1167,8 +1186,10 @@ def main(srcfile):
         f.write(c_file_msg % parse_version(mod))
         f.write('#include "Python.h"\n')
         f.write('#include "%s-ast.h"\n' % mod.name)
+        f.write('#include "symtable.h"\n')
         f.write('\n')
         f.write("static PyTypeObject AST_type;\n")
+        f.write("int obj2ast_write_scope(void *ast_obj, PyObject *py_obj, struct symtable *st);\n");
         v = ChainOfVisitors(
             PyTypesDeclareVisitor(f),
             PyTypesVisitor(f),

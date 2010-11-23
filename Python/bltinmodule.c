@@ -592,7 +592,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
                 goto error;
             }
             result = (PyObject*)PyAST_Compile(mod, filename,
-                                              &cf, arena);
+                                              &cf, arena, mode);
             PyArena_Free(arena);
         }
         goto finally;

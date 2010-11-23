@@ -62,7 +62,7 @@ static void initsite(void);
 static int initstdio(void);
 static void flush_io(void);
 static PyObject *run_mod(mod_ty, const char *, PyObject *, PyObject *,
-                          PyCompilerFlags *, PyArena *);
+                         PyCompilerFlags *, PyArena *, enum PyCompilationMode);
 static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
                               PyCompilerFlags *);
 static void err_input(perrdetail *);
@@ -316,6 +316,10 @@ Py_InitializeEx(int install_sigs)
 
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
+
+    /* It should now be safe to run the optimizer when importing modules: */
+    _PyOptimizer_Init();
+
 }
 
 void
@@ -1148,7 +1152,8 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
         return -1;
     }
     d = PyModule_GetDict(m);
-    v = run_mod(mod, filename, d, d, flags, arena);
+    v = run_mod(mod, filename, d, d, flags, arena,
+                PyCompilationMode_Single_Interactive);
     PyArena_Free(arena);
     flush_io();
     if (v == NULL) {
@@ -1693,7 +1698,8 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 
     mod = PyParser_ASTFromString(str, "<string>", start, flags, arena);
     if (mod != NULL)
-        ret = run_mod(mod, "<string>", globals, locals, flags, arena);
+        ret = run_mod(mod, "<string>", globals, locals, flags, arena,
+                      PyAST_CompilationModeFromStartToken(start));
     PyArena_Free(arena);
     return ret;
 }
@@ -1716,7 +1722,8 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
         PyArena_Free(arena);
         return NULL;
     }
-    ret = run_mod(mod, filename, globals, locals, flags, arena);
+    ret = run_mod(mod, filename, globals, locals, flags, arena,
+                  PyAST_CompilationModeFromStartToken(start));
     PyArena_Free(arena);
     return ret;
 }
@@ -1752,11 +1759,11 @@ flush_io(void)
 
 static PyObject *
 run_mod(mod_ty mod, const char *filename, PyObject *globals, PyObject *locals,
-         PyCompilerFlags *flags, PyArena *arena)
+        PyCompilerFlags *flags, PyArena *arena, enum PyCompilationMode mode)
 {
     PyCodeObject *co;
     PyObject *v;
-    co = PyAST_Compile(mod, filename, flags, arena);
+    co = PyAST_Compile(mod, filename, flags, arena, mode);
     if (co == NULL)
         return NULL;
     v = PyEval_EvalCode(co, globals, locals);
@@ -1796,6 +1803,25 @@ run_pyc_file(FILE *fp, const char *filename, PyObject *globals,
     return v;
 }
 
+enum PyCompilationMode
+PyAST_CompilationModeFromStartToken(int start)
+{
+    switch (start) {
+        case Py_single_input:
+            return PyCompilationMode_Single_Interactive;
+
+        case Py_file_input:
+            return PyCompilationMode_Exec_Module;
+
+        case Py_eval_input:
+            return PyCompilationMode_Eval_Expression;
+
+    }
+
+    Py_FatalError("Unknown start token");
+    assert(0);
+}
+
 PyObject *
 Py_CompileStringFlags(const char *str, const char *filename, int start,
                       PyCompilerFlags *flags)
@@ -1812,11 +1838,23 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
         return NULL;
     }
     if (flags && (flags->cf_flags & PyCF_ONLY_AST)) {
-        PyObject *result = PyAST_mod2obj(mod);
+        struct symtable *st = NULL;
+        PyObject *result = NULL;
+        
+        st = PySymtable_Build(mod, filename, NULL); /* c.c_future); FIXME */
+        if (st == NULL) {
+            if (!PyErr_Occurred())
+                PyErr_SetString(PyExc_SystemError, "no symtable");
+            return NULL;
+        }
+        result = PyAST_mod2obj(mod, st);
+        PySymtable_Free(st);
         PyArena_Free(arena);
         return result;
     }
-    co = PyAST_Compile(mod, filename, flags, arena);
+
+    co = PyAST_Compile(mod, filename, flags, arena,
+                       PyAST_CompilationModeFromStartToken(start));
     PyArena_Free(arena);
     return (PyObject *)co;
 }
