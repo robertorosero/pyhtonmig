@@ -2866,10 +2866,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
             if (is_specializable(u, v)) {
                 /* Jump to specialized implementation, popping u */
-                JUMPTO(oparg);
                 Py_DECREF(v);
                 STACKADJ(-1);
                 Py_DECREF(u);
+                JUMPTO(oparg);
                 FAST_DISPATCH();
             } else {
                 /* Generalized implementation; fall through to next opcode,

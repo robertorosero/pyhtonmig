@@ -3272,7 +3272,7 @@ compiler_specialize(struct compiler *c, expr_ty e)
         return 0;
     id = e->v.Specialize.name->v.Name.id;
     assert(id);
-    saved_name = PyUnicode_FromFormat("__saved__%U", id);
+    saved_name = PyUnicode_FromFormat("__internal__.saved.%U", id);
     if (!saved_name)
         return 0;
     ADDOP_O(c, LOAD_GLOBAL, saved_name, names); /* takes ownership of the reference */

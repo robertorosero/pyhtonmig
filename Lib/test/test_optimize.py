@@ -121,7 +121,7 @@ def callsite():
 ''')
         callsite = self.compile_to_code(src, 'callsite')
         asm = disassemble(callsite)
-        self.assertHasLineWith(asm, ('LOAD_GLOBAL', '(__saved__function_to_be_inlined)'))
+        self.assertHasLineWith(asm, ('LOAD_GLOBAL', '(__internal__.saved.function_to_be_inlined)'))
         self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
         self.assertHasLineWith(asm, ('LOAD_CONST', "('feefifofum')"))
 
@@ -386,6 +386,43 @@ def g():
         asm = disassemble(fn)
         #print(asm)
 
+    def test_method(self):
+        src = '''
+class Foo:
+    def simple_method(self, a):
+         return self.bar + a + self.baz
+
+    def user_of_method(self):
+         print(self.simple_method(1))
+         print(self.simple_method(2))
+         print(self.simple_method(3))
+'''
+
+        # "Foo.simple_method" should be inlinable
+
+        # Ensure that we're saving the inlinable function as a global for use
+        # by JUMP_IF_SPECIALIZABLE at callsites:
+        fn = self.compile_to_code(src, 'Foo')
+        asm = disassemble(fn)
+        self.assertHasLineWith(asm,
+            ('STORE_GLOBAL', '(__internal__.saved.Foo.simple_method)'))
+        #print(asm)
+
+        self.assertIsInlinable(src, fnname='Foo.simple_method')
+        fn = self.compile_to_code(src, 'Foo.user_of_method')
+        asm = disassemble(fn)
+        #print(asm)
+
+
+    def test_namespaces(self):
+        src = '''
+class Foo:
+    def simple_method(self, a):
+         return self.bar + a + self.baz
+'''
+        fn = self.compile_to_code(src, 'Foo.simple_method')
+        asm = disassemble(fn)
+        #from __optimizer__ import get_dotted_name
 
 
 def function_to_be_inlined():
@@ -406,7 +443,7 @@ class TestRebinding(unittest.TestCase):
         #print(asm)
         # Should have logic for detecting if it can specialize:
         self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
-        self.assertIn('(__saved__function_to_be_inlined)', asm)
+        self.assertIn('(__internal__.saved.function_to_be_inlined)', asm)
         # Should have inlined constant value:
         self.assertIn("('I am the original implementation')", asm)
 
