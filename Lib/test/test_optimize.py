@@ -50,12 +50,7 @@ def get_code_for_fn(co, fnname):
         co = _get_code_single(co, name)
     return co
 
-class TestFramework(unittest.TestCase):
-    # Ensure that invoking the optimizer is working:
-    def test_eval(self):
-        self.assertEqual(eval('42'), 42)
-
-class TestInlining(unittest.TestCase):
+class TestOptimization(unittest.TestCase):
     def assertHasLineWith(self, asm, items):
         def _has_items(line, items):
             for item in items:
@@ -73,6 +68,12 @@ class TestInlining(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.assertHasLineWith('Hello world', ('foo', 'bar'))
 
+class TestFramework(TestOptimization):
+    # Ensure that invoking the optimizer is working:
+    def test_eval(self):
+        self.assertEqual(eval('42'), 42)
+
+class TestInlining(TestOptimization):
     def assertIsInlinable(self, src, fnname='f'):
         from __optimizer__ import fn_is_inlinable
         fn, mod = compile_fn(src, fnname)
@@ -235,14 +236,27 @@ def h(x, y):
         co = compile(src, 'test_optimize.py', 'exec')
         g = get_code_for_fn(co, 'g')
         h = get_code_for_fn(co, 'h')
+        co_asm = disassemble(co)
         g_asm = disassemble(g)
         h_asm = disassemble(h)
-        #print(disassemble(co))
-        #print('\n\ng')
-        #print(g_asm)
+        # Verify co_asm:
+        self.assertHasLineWith(co_asm,
+                               ('STORE_GLOBAL', '(__internal__.saved.f)'))
+        self.assertHasLineWith(co_asm,
+                               ('STORE_GLOBAL', '(__internal__.saved.g)'))
+        self.assertHasLineWith(co_asm,
+                               ('STORE_GLOBAL', '(__internal__.saved.h)'))
+
+        # Verify g_asm:
+        self.assertHasLineWith(g_asm,
+                               ('LOAD_GLOBAL', '(__internal__.saved.f)'))
         self.assertIn('JUMP_IF_SPECIALIZABLE', g_asm)
-        #print('\n\nh')
-        #print(h_asm)
+
+        # Verify h_asm:
+        self.assertHasLineWith(h_asm,
+                               ('LOAD_GLOBAL', '(__internal__.saved.g)'))
+        self.assertHasLineWith(h_asm,
+                               ('LOAD_GLOBAL', '(__internal__.saved.f)'))
         self.assertIn('JUMP_IF_SPECIALIZABLE', h_asm)
 
     def test_ignore_implicit_return(self):
@@ -434,7 +448,7 @@ def new_version():
 def call_inlinable_function():
     return function_to_be_inlined()
 
-class TestRebinding(unittest.TestCase):
+class TestRebinding(TestOptimization):
 
     def test_rebinding(self):
         # "call_inlinable_function" should have an inlined copy
@@ -443,9 +457,11 @@ class TestRebinding(unittest.TestCase):
         #print(asm)
         # Should have logic for detecting if it can specialize:
         self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
-        self.assertIn('(__internal__.saved.function_to_be_inlined)', asm)
+        self.assertHasLineWith(asm,
+                               ('LOAD_GLOBAL', '(__internal__.saved.function_to_be_inlined)'))
         # Should have inlined constant value:
-        self.assertIn("('I am the original implementation')", asm)
+        self.assertHasLineWith(asm,
+                               ('LOAD_CONST', "('I am the original implementation')"))
 
         # Try calling it:
         self.assertEquals(call_inlinable_function(),
