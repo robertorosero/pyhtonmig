@@ -243,6 +243,7 @@ class InlineBodyFixups(ast.NodeTransformer):
 
     def visit_Name(self, node):
         # Replace local names with prefixed versions:
+        self.generic_visit(node)
         scope = get_scope(self.ste, node.id)
         if scope == LOCAL:
             node.id = self.varprefix + node.id
@@ -299,6 +300,35 @@ class FunctionInliner(PathTransformer):
         # expression e.g. "f()()", or for other awkward cases
         return None
 
+    def _setup_args(self, ste, varprefix, funcdef, call, instance):
+        # Create assignment statements of the form:
+        #    __inline__x = expr for x
+        # for each parameter
+        # We will insert before the callsite
+
+        assignments = []
+
+        formalparams = funcdef.args.args
+        actualparams = call.args
+        if instance:
+            # Synthesize a "self" at the front of the params:
+            # Note that this must be just a load of a local name, to avoid,
+            # say, injecting a 2nd getattr:
+            assert is_read_from_local(ste, instance)
+            actualparams = [instance] + actualparams
+
+        for formal, actual in zip(formalparams, actualparams):
+            self.log('  formal: %s' % ast.dump(formal))
+            self.log('    actual: %s' % ast.dump(actual))
+            add_local(ste, varprefix+formal.arg)
+
+            assign = make_assignment(varprefix+formal.arg, actual, call)
+            assignments.append(assign)
+
+            # FIXME: these seem to be being done using LOAD_NAME/STORE_NAME; why isn't it using _FAST?
+            # aha: because they're in module scope, not within a function.
+
+        return assignments
 
     def visit_Call(self, call, path):
         # Stop inlining beyond an arbitrary cutoff
@@ -347,27 +377,18 @@ class FunctionInliner(PathTransformer):
         funcdef = self.def_dict[dotted_name]
 
         self.log(ast.dump(funcdef))
-        varprefix = '__internal__inline_%s%x__' % (dotted_name.replace('.', '_'), id(call))
+        varprefix = '__internal__inline_%s%x__' % (dotted_name, id(call))
         self.log('varprefix: %s' % varprefix)
 
         # Generate a body of specialized statements that can replace the call:
-        specialized = []
-
-        # Create assignment statements of the form:
-        #    __inline__x = expr for x
-        # for each parameter
-        # We will insert before the callsite
-        for formal, actual in zip(funcdef.args.args, call.args):
-            #log('formal: %s' % ast.dump(formal))
-            #log('actual: %s' % ast.dump(actual))
-            # FIXME: ste
-            add_local(ste, varprefix+formal.arg)
-
-            assign = make_assignment(varprefix+formal.arg, actual, call)
-            specialized.append(assign)
-
-            # FIXME: these seem to be being done using LOAD_NAME/STORE_NAME; why isn't it using _FAST?
-            # aha: because they're in module scope, not within a function.
+        if isinstance(call.func, ast.Attribute):
+            attr = call.func
+            value = attr.value
+            assert isinstance(value, ast.Name) and isinstance(value.ctx, ast.Load)
+            instance = value
+        else:
+            instance = None
+        specialized = self._setup_args(ste, varprefix, funcdef, call, instance)
 
         # Introduce __returnval__; initialize it to None, equivalent to
         # implicit "return None" if there are no "Return" nodes:
@@ -397,6 +418,10 @@ class FunctionInliner(PathTransformer):
         specialized_result = ast.copy_location(ast.Name(id=returnval,
                                                         ctx=ast.Load()),
                                                call)
+
+        self.log('  specialized:')
+        for stmt in specialized:
+            self.log('    %s' % ast.dump(stmt))
 
         return ast.copy_location(ast.Specialize(name=call.func,
                                                 expected_value='__internal__.saved.' + dotted_name,
@@ -760,7 +785,7 @@ class RedundantLocalRemover(PathTransformer):
 
     def log(self, msg):
         if 0:
-            print(msg)
+            print('%s: %s' % (self.__class__.__name__, msg))
 
     def visit_FunctionDef(self, funcdef, path):
         self.log('got function def: %r' % funcdef.name)
@@ -844,7 +869,8 @@ def optimize_ast(t, filename, st_blocks):
             print('Exception during optimization of %r' % filename)
             # dot_to_png(dot_before, 'before.png')
             raise
-    #print('finished optimizing')
-    #if filename == 'optimizable.py':
-    #    print(ast.dump(t))
+    if 0:
+        print('finished optimizing')
+        if filename == 'optimizable.py':
+            print(ast.dump(t))
     return t
