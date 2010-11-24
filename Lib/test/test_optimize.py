@@ -404,30 +404,84 @@ def g():
         src = '''
 class Foo:
     def simple_method(self, a):
-         return self.bar + a + self.baz
+         return 'I am Foo.simple_method' + self.bar + a + self.baz
 
     def user_of_method(self):
          return self.simple_method(10)
+
+    def overridable_method(self, a):
+         return 'I am Foo.overridable_method'
+
+class Bar(Foo):
+    def user_of_base_class_method(self):
+         return self.simple_method(10)
+
+    def overridable_method(self, a):
+         return 'I am Bar.overridable_method'
+
+    def user_of_overridden_method(self, a):
+         return self.overridable_method(a)
 '''
 
-        # "Foo.simple_method" should be inlinable
+        # Various methods should be inlinable:
+        self.assertIsInlinable(src, fnname='Foo.simple_method')
+        self.assertIsInlinable(src, fnname='Foo.overridable_method')
+        self.assertIsInlinable(src, fnname='Bar.overridable_method')
 
-        # Ensure that we're saving the inlinable function as a global for use
+        saved_foo_simple_method = '(__internal__.saved.Foo.simple_method)'
+        saved_foo_overridable_method = '(__internal__.saved.Foo.overridable_method)'
+        saved_bar_overridable_method = '(__internal__.saved.Bar.overridable_method)'
+
+
+        # Ensure that we're saving the inlinable functions as global for use
         # by JUMP_IF_SPECIALIZABLE at callsites:
         fn = self.compile_to_code(src, 'Foo')
         asm = disassemble(fn)
-        self.assertHasLineWith(asm,
-            ('STORE_GLOBAL', '(__internal__.saved.Foo.simple_method)'))
-        #print(asm)
+        self.assertHasLineWith(asm, ('STORE_GLOBAL', saved_foo_simple_method))
+        self.assertHasLineWith(asm, ('STORE_GLOBAL', saved_foo_overridable_method))
+        if 0:
+            print('\nFoo')
+            print(asm)
 
-        self.assertIsInlinable(src, fnname='Foo.simple_method')
+        fn = self.compile_to_code(src, 'Bar')
+        asm = disassemble(fn)
+        self.assertHasLineWith(asm, ('STORE_GLOBAL', saved_bar_overridable_method))
+        if 0:
+            print('\nBar')
+            print(asm)
+
+        # Ensure that the various callsites use these globals:
         fn = self.compile_to_code(src, 'Foo.user_of_method')
         asm = disassemble(fn)
-        #print(asm)
-        self.assertHasLineWith(asm,
-                               ('LOAD_GLOBAL', '(__internal__.saved.Foo.simple_method)'))
+        if 0:
+            print('\nFoo.user_of_method')
+            print(asm)
+        self.assertHasLineWith(asm, ('LOAD_GLOBAL', saved_foo_simple_method))
         self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
+        self.assertHasLineWith(asm, ('LOAD_CONST', "('I am Foo.simple_method')"))
 
+        # Verify a subclass method that inlines a call to a base class method:
+        fn = self.compile_to_code(src, 'Bar.user_of_base_class_method')
+        asm = disassemble(fn)
+        if 0:
+            print('\nBar.user_of_base_class_method')
+            print(asm)
+        if 0:
+            # FIXME: doesn't inline these yet:
+            self.assertHasLineWith(asm, ('LOAD_GLOBAL', saved_foo_simple_method))
+            self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
+
+        # Verify a subclass method that inlines a call to an overridden base class method:
+        fn = self.compile_to_code(src, 'Bar.user_of_overridden_method')
+        asm = disassemble(fn)
+        if 0:
+            print('\nBar.user_of_overridden_method')
+            print(asm)
+        self.assertHasLineWith(asm, ('LOAD_GLOBAL', saved_bar_overridable_method))
+        self.assertIn('JUMP_IF_SPECIALIZABLE', asm)
+        self.assertHasLineWith(asm, ('LOAD_CONST', "('I am Bar.overridable_method')"))
+
+        # FIXME: execute it, verify both paths
 
 
 

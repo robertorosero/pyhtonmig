@@ -748,10 +748,25 @@ is_specializable(PyObject *dynamic, PyObject *expected)
         return 0;
 #endif
 
-    /* If they're the same object, we have a match: */
-    if (dynamic == expected)
-        return 1;
-    
+    /*FIXME PyMethodObject */
+
+    if (PyMethod_Check(dynamic)) {
+        if (PyMethod_GET_FUNCTION(dynamic) == expected) {
+            /* FIXME: need to check that "self" is as expected */
+            return 1;
+        }
+    }
+
+/* FIXME: 
+   if (PyInstanceMethod_Check(op)) {
+   }
+*/
+
+    if (PyFunction_Check(dynamic)) {
+        /* If they're the same object, we have a match: */
+        return (dynamic == expected);
+    }
+
     return 0; // FIXME!
 }
 

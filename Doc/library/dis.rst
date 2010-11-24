@@ -808,10 +808,25 @@ the more significant byte last.
    element on the stack contains the keyword arguments dictionary, followed by the
    variable-arguments tuple, followed by explicit keyword and positional arguments.
 
-
 .. opcode:: HAVE_ARGUMENT
 
    This is not really an opcode.  It identifies the dividing line between opcodes
    which don't take arguments ``< HAVE_ARGUMENT`` and those which do ``>=
    HAVE_ARGUMENT``.
+
+** Optimization Instructions **
+.. opcode:: JUMP_IF_SPECIALIZABLE (target)
+
+   Inserted by the optimizer, potentially branching to an optimized version of the code.
+
+   Compares values on the top of the stack, to determine if the assumptions held by the optimized branch are valid.
+
+   Inputs:
+   * TOP: A: code object we inlined for (via a LOAD_CONST, injected by the inliner)
+   * SECOND: B: dynamically queried object, located by usual runtime lookup
+     (LOAD_GLOBAL, or e.g. LOAD_LOCAL "self"; GET_ATTR "do_something")
+
+   If B is A, we can specialize, setting bytecode counter to *target* and popping both TOP and SECOND from the stack.
+
+   Otherwise the assumption is not true, and we fall through to the generic implementation, popping TOP, leaving SECOND on top of the stack.
 
