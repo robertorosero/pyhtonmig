@@ -1790,8 +1790,9 @@ class PyBuildExt(build_ext):
                 define_macros = [('CONFIG_64', '1'), ('ANSI', '1')]
         elif sizeof_size_t == 4:
             ppro = sysconfig.get_config_var('HAVE_GCC_ASM_FOR_X87')
-            if ppro and ('gcc' in cc or 'clang' in cc):
-                # darwin: problems with global constant in inline asm.
+            if ppro and ('gcc' in cc or 'clang' in cc) and \
+               not 'sunos' in platform:
+                # darwin, solaris: problems with global constant in inline asm.
                 # icc >= 11.0 works as well.
                 define_macros = [('CONFIG_32', '1'), ('PPRO', '1'),
                                  ('ASM', '1')]
