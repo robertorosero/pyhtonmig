@@ -1074,6 +1074,10 @@ class AbstractHTTPHandler(BaseHandler):
         headers = dict(req.unredirected_hdrs)
         headers.update(dict((k, v) for k, v in req.headers.items()
                             if k not in headers))
+        hasAcceptEncoding = ("Accept-Encoding" in headers or
+                "Accept-encoding" in headers)
+        if not hasAcceptEncoding:
+            headers["Accept-Encoding"] = "gzip"
 
         # TODO(jhylton): Should this be redesigned to handle
         # persistent connections?
@@ -1104,6 +1108,7 @@ class AbstractHTTPHandler(BaseHandler):
             raise URLError(err)
 
         r.url = req.full_url
+
         # This line replaces the .msg attribute of the HTTPResponse
         # with .headers, because urllib clients expect the response to
         # have the reason in .msg.  It would be good to mark this

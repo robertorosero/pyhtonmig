@@ -71,6 +71,7 @@ import email.message
 import io
 import os
 import socket
+import gzip
 from urllib.parse import urlsplit
 import warnings
 
@@ -490,6 +491,11 @@ class HTTPResponse(io.RawIOBase):
         if self._method == "HEAD":
             self.close()
             return b""
+
+        if self.getheader('Content-Encoding') == 'gzip':
+            self.fp = gzip.GzipFile(fileobj=self.fp, mode='rb')
+            self.length = None
+            amt=None
 
         if self.chunked:
             return self._read_chunked(amt)
