@@ -495,7 +495,6 @@ class HTTPResponse(io.RawIOBase):
         if self.getheader('Content-Encoding') == 'gzip':
             self.fp = gzip.GzipFile(fileobj=self.fp, mode='rb')
             self.length = None
-            amt=None
 
         if self.chunked:
             return self._read_chunked(amt)
