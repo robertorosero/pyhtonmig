@@ -1160,7 +1160,23 @@ class Win32SymlinkTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.filelink))
         self.assertTrue(os.path.islink(self.filelink))
         self.check_stat(self.filelink, self.filelink_target)
-        self.assertFalse(os.stat(self.filelink).st_mode & stat.S_IEXEC)
+        def f(s):
+            print("-------->", s, oct(s.st_mode))
+            self.assertFalse(s.st_mode & stat.S_IEXEC)
+        print("======================")
+        print(">>>>", oct(stat.S_IEXEC))
+        f(os.stat(self.filelink))
+        f(os.lstat(self.filelink))
+        f(os.stat(self.filelink_target))
+        f(os.lstat(self.filelink_target))
+        print("=====================")
+        path = "foobarbaz.bat"
+        with open(path, "w") as w:
+            w.write(path)
+        f(os.stat(path))
+        f(os.lstat(path))
+        os.remove(path)
+        print("======================")
 
     def _create_missing_dir_link(self):
         'Create a "directory" link to a non-existent target'
