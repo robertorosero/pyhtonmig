@@ -878,6 +878,7 @@ class LinkTests(unittest.TestCase):
             f1.write("test")
 
         os.link(file1, file2)
+        self.assertTrue(os.path.samefile(file1, file2))
         with open(file1, "r") as f1, open(file2, "r") as f2:
             self.assertTrue(os.path.sameopenfile(f1.fileno(), f2.fileno()))
 
