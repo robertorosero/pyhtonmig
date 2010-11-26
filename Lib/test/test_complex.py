@@ -432,8 +432,8 @@ class ComplexTest(unittest.TestCase):
         def test_plus_minus_0j(self):
             # test that -0j and 0j literals are not identified
             z1, z2 = 0j, -0j
-            self.assertEquals(atan2(z1.imag, -1.), atan2(0., -1.))
-            self.assertEquals(atan2(z2.imag, -1.), atan2(-0., -1.))
+            self.assertEqual(atan2(z1.imag, -1.), atan2(0., -1.))
+            self.assertEqual(atan2(z2.imag, -1.), atan2(-0., -1.))
 
     @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
                          "test requires IEEE 754 doubles")
@@ -555,8 +555,28 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(format(1.5e21+3j, '^40,.2f'), ' 1,500,000,000,000,000,000,000.00+3.00j ')
         self.assertEqual(format(1.5e21+3000j, ',.2f'), '1,500,000,000,000,000,000,000.00+3,000.00j')
 
-        # alternate is invalid
-        self.assertRaises(ValueError, (1.5+0.5j).__format__, '#f')
+        # Issue 7094: Alternate formatting (specified by #)
+        self.assertEqual(format(1+1j, '.0e'), '1e+00+1e+00j')
+        self.assertEqual(format(1+1j, '#.0e'), '1.e+00+1.e+00j')
+        self.assertEqual(format(1+1j, '.0f'), '1+1j')
+        self.assertEqual(format(1+1j, '#.0f'), '1.+1.j')
+        self.assertEqual(format(1.1+1.1j, 'g'), '1.1+1.1j')
+        self.assertEqual(format(1.1+1.1j, '#g'), '1.10000+1.10000j')
+
+        # Alternate doesn't make a difference for these, they format the same with or without it
+        self.assertEqual(format(1+1j, '.1e'),  '1.0e+00+1.0e+00j')
+        self.assertEqual(format(1+1j, '#.1e'), '1.0e+00+1.0e+00j')
+        self.assertEqual(format(1+1j, '.1f'),  '1.0+1.0j')
+        self.assertEqual(format(1+1j, '#.1f'), '1.0+1.0j')
+
+        # Misc. other alternate tests
+        self.assertEqual(format((-1.5+0.5j), '#f'), '-1.500000+0.500000j')
+        self.assertEqual(format((-1.5+0.5j), '#.0f'), '-2.+0.j')
+        self.assertEqual(format((-1.5+0.5j), '#e'), '-1.500000e+00+5.000000e-01j')
+        self.assertEqual(format((-1.5+0.5j), '#.0e'), '-2.e+00+5.e-01j')
+        self.assertEqual(format((-1.5+0.5j), '#g'), '-1.50000+0.500000j')
+        self.assertEqual(format((-1.5+0.5j), '.0g'), '-2+0.5j')
+        self.assertEqual(format((-1.5+0.5j), '#.0g'), '-2.+0.5j')
 
         # zero padding is invalid
         self.assertRaises(ValueError, (1.5+0.5j).__format__, '010f')

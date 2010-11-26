@@ -156,7 +156,6 @@ PyAPI_DATA(PyObject *) PyExc_VMSError;
 
 PyAPI_DATA(PyObject *) PyExc_BufferError;
 
-PyAPI_DATA(PyObject *) PyExc_MemoryErrorInst;
 PyAPI_DATA(PyObject *) PyExc_RecursionErrorInst;
 
 /* Predefined warning categories */
@@ -170,6 +169,7 @@ PyAPI_DATA(PyObject *) PyExc_FutureWarning;
 PyAPI_DATA(PyObject *) PyExc_ImportWarning;
 PyAPI_DATA(PyObject *) PyExc_UnicodeWarning;
 PyAPI_DATA(PyObject *) PyExc_BytesWarning;
+PyAPI_DATA(PyObject *) PyExc_ResourceWarning;
 
 
 /* Convenience functions */

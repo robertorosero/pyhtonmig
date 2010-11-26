@@ -1,8 +1,9 @@
 from test.support import run_unittest
-from test.test_math import parse_testfile, test_file
+from test.test_math import parse_testfile, test_file, requires_IEEE_754
 import unittest
 import cmath, math
 from cmath import phase, polar, rect, pi
+import sysconfig
 
 INF = float('inf')
 NAN = float('nan')
@@ -60,6 +61,39 @@ class CMathTests(unittest.TestCase):
 
     def tearDown(self):
         self.test_values.close()
+
+    def assertFloatIdentical(self, x, y):
+        """Fail unless floats x and y are identical, in the sense that:
+        (1) both x and y are nans, or
+        (2) both x and y are infinities, with the same sign, or
+        (3) both x and y are zeros, with the same sign, or
+        (4) x and y are both finite and nonzero, and x == y
+
+        """
+        msg = 'floats {!r} and {!r} are not identical'
+
+        if math.isnan(x) or math.isnan(y):
+            if math.isnan(x) and math.isnan(y):
+                return
+        elif x == y:
+            if x != 0.0:
+                return
+            # both zero; check that signs match
+            elif math.copysign(1.0, x) == math.copysign(1.0, y):
+                return
+            else:
+                msg += ': zeros have different signs'
+        self.fail(msg.format(x, y))
+
+    def assertComplexIdentical(self, x, y):
+        """Fail unless complex numbers x and y have equal values and signs.
+
+        In particular, if x and y both have real (or imaginary) part
+        zero, but the zeros have different signs, this test will fail.
+
+        """
+        self.assertFloatIdentical(x.real, y.real)
+        self.assertFloatIdentical(x.imag, y.imag)
 
     def rAssertAlmostEqual(self, a, b, rel_err = 2e-15, abs_err = 5e-323,
                            msg=None):
@@ -472,6 +506,31 @@ class CMathTests(unittest.TestCase):
         self.assertTrue(cmath.isinf(complex(INF, INF)))
         self.assertTrue(cmath.isinf(complex(NAN, INF)))
         self.assertTrue(cmath.isinf(complex(INF, NAN)))
+
+    @requires_IEEE_754
+    @unittest.skipIf(sysconfig.get_config_var('TANH_PRESERVES_ZERO_SIGN') == 0,
+                     "system tanh() function doesn't copy the sign")
+    def testTanhSign(self):
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.tanh(z), z)
+
+    # The algorithm used for atan and atanh makes use of the system
+    # log1p function; If that system function doesn't respect the sign
+    # of zero, then atan and atanh will also have difficulties with
+    # the sign of complex zeros.
+    @requires_IEEE_754
+    @unittest.skipIf(sysconfig.get_config_var('LOG1P_DROPS_ZERO_SIGN'),
+                     "system log1p() function doesn't preserve the sign")
+    def testAtanSign(self):
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.atan(z), z)
+
+    @requires_IEEE_754
+    @unittest.skipIf(sysconfig.get_config_var('LOG1P_DROPS_ZERO_SIGN'),
+                     "system log1p() function doesn't preserve the sign")
+    def testAtanhSign(self):
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.atanh(z), z)
 
 
 def test_main():

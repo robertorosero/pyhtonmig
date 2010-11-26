@@ -52,21 +52,39 @@ headers, and that you have right to post on the particular newsgroup)::
 The module itself defines the following classes:
 
 
-.. class:: NNTP(host, port=119, user=None, password=None, readermode=None, usenetrc=True, [timeout])
+.. class:: NNTP(host, port=119, user=None, password=None, readermode=None, usenetrc=False, [timeout])
 
-   Return a new instance of the :class:`NNTP` class, representing a connection
+   Return a new :class:`NNTP` object, representing a connection
    to the NNTP server running on host *host*, listening at port *port*.
    An optional *timeout* can be specified for the socket connection.
    If the optional *user* and *password* are provided, or if suitable
    credentials are present in :file:`/.netrc` and the optional flag *usenetrc*
-   is true (the default), the ``AUTHINFO USER`` and ``AUTHINFO PASS`` commands
-   are used to identify and authenticate the user to the server.  If the optional
+   is true, the ``AUTHINFO USER`` and ``AUTHINFO PASS`` commands are used
+   to identify and authenticate the user to the server.  If the optional
    flag *readermode* is true, then a ``mode reader`` command is sent before
    authentication is performed.  Reader mode is sometimes necessary if you are
    connecting to an NNTP server on the local machine and intend to call
    reader-specific commands, such as ``group``.  If you get unexpected
    :exc:`NNTPPermanentError`\ s, you might need to set *readermode*.
-   *readermode* defaults to ``None``. *usenetrc* defaults to ``True``.
+
+   .. versionchanged:: 3.2
+      *usenetrc* is now False by default.
+
+
+.. class:: NNTP_SSL(host, port=563, user=None, password=None, ssl_context=None, readermode=None, usenetrc=False, [timeout])
+
+   Return a new :class:`NNTP_SSL` object, representing an encrypted
+   connection to the NNTP server running on host *host*, listening at
+   port *port*.  :class:`NNTP_SSL` objects have the same methods as
+   :class:`NNTP` objects.  If *port* is omitted, port 563 (NNTPS) is used.
+   *ssl_context* is also optional, and is a :class:`~ssl.SSLContext` object.
+   All other parameters behave the same as for :class:`NNTP`.
+
+   Note that SSL-on-563 is discouraged per :rfc:`4642`, in favor of
+   STARTTLS as described below.  However, some servers only support the
+   former.
+
+   .. versionadded:: 3.2
 
 
 .. exception:: NNTPError
@@ -111,19 +129,41 @@ The module itself defines the following classes:
 NNTP Objects
 ------------
 
-:class:`NNTP` instances have the following methods.  The *response* that is
-returned as the first item in the return tuple of almost all methods is the
-server's response: a string beginning with a three-digit code. If the server's
-response indicates an error, the method raises one of the above exceptions.
+When connected, :class:`NNTP` and :class:`NNTP_SSL` objects support the
+following methods and attributes.
 
-.. note::
-   Many of the following methods take an optional keyword-only argument *file*.
-   When the *file* argument is supplied, it must be either a :term:`file object`
-   opened for binary writing, or the name of an on-disk file to be written to.
-   The method will then write any data returned by the server (except for the
-   response line and the terminating dot) to the file; any list of lines,
-   tuples or objects that the method normally returns will be empty.
+Attributes
+^^^^^^^^^^
 
+.. attribute:: NNTP.nntp_version
+
+   An integer representing the version of the NNTP protocol supported by the
+   server.  In practice, this should be ``2`` for servers advertising
+   :rfc:`3977` compliance and ``1`` for others.
+
+   .. versionadded:: 3.2
+
+.. attribute:: NNTP.nntp_implementation
+
+   A string describing the software name and version of the NNTP server,
+   or :const:`None` if not advertised by the server.
+
+   .. versionadded:: 3.2
+
+Methods
+^^^^^^^
+
+The *response* that is returned as the first item in the return tuple of almost
+all methods is the server's response: a string beginning with a three-digit
+code.  If the server's response indicates an error, the method raises one of
+the above exceptions.
+
+Many of the following methods take an optional keyword-only argument *file*.
+When the *file* argument is supplied, it must be either a :term:`file object`
+opened for binary writing, or the name of an on-disk file to be written to.
+The method will then write any data returned by the server (except for the
+response line and the terminating dot) to the file; any list of lines,
+tuples or objects that the method normally returns will be empty.
 
 .. versionchanged:: 3.2
    Many of the following methods have been reworked and fixed, which makes
@@ -157,6 +197,35 @@ response indicates an error, the method raises one of the above exceptions.
    .. versionadded:: 3.2
 
 
+.. method:: NNTP.login(user=None, password=None, usenetrc=True)
+
+   Send ``AUTHINFO`` commands with the user name and password.  If *user*
+   and *password* are None and *usenetrc* is True, credentials from
+   ``~/.netrc`` will be used if possible.
+
+   Unless intentionally delayed, login is normally performed during the
+   :class:`NNTP` object initialization and separately calling this function
+   is unnecessary.  To force authentication to be delayed, you must not set
+   *user* or *password* when creating the object, and must set *usenetrc* to
+   False.
+
+   .. versionadded:: 3.2
+
+
+.. method:: NNTP.starttls(ssl_context=None)
+
+   Send a ``STARTTLS`` command.  The *ssl_context* argument is optional
+   and should be a :class:`ssl.SSLContext` object.  This will enable
+   encryption on the NNTP connection.
+
+   Note that this may not be done after authentication information has
+   been transmitted, and authentication occurs by default if possible during a
+   :class:`NNTP` object initialization.  See :meth:`NNTP.login` for information
+   on suppressing this behavior.
+
+   .. versionadded:: 3.2
+
+
 .. method:: NNTP.newgroups(date, *, file=None)
 
    Send a ``NEWGROUPS`` command.  The *date* argument should be a
@@ -182,17 +251,32 @@ response indicates an error, the method raises one of the above exceptions.
    This command is frequently disabled by NNTP server administrators.
 
 
-.. method:: NNTP.list(*, file=None)
+.. method:: NNTP.list(group_pattern=None, *, file=None)
 
-   Send a ``LIST`` command.  Return a pair ``(response, list)`` where *list* is a
-   list of tuples representing all the groups available from this NNTP server.
-   Each tuple has the form ``(group, last, first, flag)``, where
-   *group* is a group name, *last* and *first* are the last and first article
-   numbers, and *flag* is ``'y'`` if posting is allowed, ``'n'`` if not,
-   and ``'m'`` if the newsgroup is moderated.  (Note the ordering: *last*, *first*.)
+   Send a ``LIST`` or ``LIST ACTIVE`` command.  Return a pair
+   ``(response, list)`` where *list* is a list of tuples representing all
+   the groups available from this NNTP server, optionally matching the
+   pattern string *group_pattern*.  Each tuple has the form
+   ``(group, last, first, flag)``, where *group* is a group name, *last*
+   and *first* are the last and first article numbers, and *flag* usually
+   takes one of these values:
 
-   This command will often return very large results.  It is best to cache the
-   results offline unless you really need to refresh them.
+   * ``y``: Local postings and articles from peers are allowed.
+   * ``m``: The group is moderated and all postings must be approved.
+   * ``n``: No local postings are allowed, only articles from peers.
+   * ``j``: Articles from peers are filed in the junk group instead.
+   * ``x``: No local postings, and articles from peers are ignored.
+   * ``=foo.bar``: Articles are filed in the ``foo.bar`` group instead.
+
+   If *flag* has another value, then the status of the newsgroup should be
+   considered unknown.
+
+   This command can return very large results, especially if *group_pattern*
+   is not specified.  It is best to cache the results offline unless you
+   really need to refresh them.
+
+   .. versionchanged:: 3.2
+      *group_pattern* was added.
 
 
 .. method:: NNTP.descriptions(grouppattern)
@@ -251,6 +335,8 @@ response indicates an error, the method raises one of the above exceptions.
    * the ``:bytes`` metadata: the number of bytes in the entire raw article
      (including headers and body)
    * the ``:lines`` metadata: the number of lines in the article body
+
+   The value of each item is either a string, or :const:`None` if not present.
 
    It is advisable to use the :func:`decode_header` function on header
    values when they may contain non-ASCII characters::

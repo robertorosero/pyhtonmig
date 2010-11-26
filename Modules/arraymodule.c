@@ -22,7 +22,7 @@ struct arrayobject; /* Forward */
  * functions aren't visible yet.
  */
 struct arraydescr {
-    int typecode;
+    Py_UNICODE typecode;
     int itemsize;
     PyObject * (*getitem)(struct arrayobject *, Py_ssize_t);
     int (*setitem)(struct arrayobject *, Py_ssize_t, PyObject *);
@@ -1428,7 +1428,7 @@ representation.");
 static PyObject *
 array_tostring(arrayobject *self, PyObject *unused)
 {
-    if (PyErr_WarnEx(PyExc_DeprecationWarning, 
+    if (PyErr_WarnEx(PyExc_DeprecationWarning,
             "tostring() is deprecated. Use tobytes() instead.", 2) != 0)
         return NULL;
     return array_tobytes(self, unused);
@@ -1448,7 +1448,7 @@ array_fromunicode(arrayobject *self, PyObject *args)
 {
     Py_UNICODE *ustr;
     Py_ssize_t n;
-    char typecode;
+    Py_UNICODE typecode;
 
     if (!PyArg_ParseTuple(args, "u#:fromunicode", &ustr, &n))
         return NULL;
@@ -1483,7 +1483,7 @@ append Unicode data to an array of some other type.");
 static PyObject *
 array_tounicode(arrayobject *self, PyObject *unused)
 {
-    char typecode;
+    Py_UNICODE typecode;
     typecode = self->ob_descr->typecode;
     if ((typecode != 'u')) {
         PyErr_SetString(PyExc_ValueError,
@@ -1680,17 +1680,16 @@ static PyObject *array_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
  * NULL is returned to indicate a failure.
  */
 static PyObject *
-make_array(PyTypeObject *arraytype, int typecode, PyObject *items)
+make_array(PyTypeObject *arraytype, Py_UNICODE typecode, PyObject *items)
 {
     PyObject *new_args;
     PyObject *array_obj;
     PyObject *typecode_obj;
-    Py_UNICODE typecode_str[1] = {typecode};
 
     assert(arraytype != NULL);
     assert(items != NULL);
 
-    typecode_obj = PyUnicode_FromUnicode(typecode_str, 1);
+    typecode_obj = PyUnicode_FromUnicode(&typecode, 1);
     if (typecode_obj == NULL)
         return NULL;
 
@@ -1720,13 +1719,16 @@ array_reconstructor(PyObject *self, PyObject *args)
     PyObject *items;
     PyObject *converted_items;
     PyObject *result;
-    int typecode;
+    int typecode_int;
+    Py_UNICODE typecode;
     enum machine_format_code mformat_code;
     struct arraydescr *descr;
 
     if (!PyArg_ParseTuple(args, "OCiO:array._array_reconstructor",
-                    &arraytype, &typecode, &mformat_code, &items))
+                    &arraytype, &typecode_int, &mformat_code, &items))
         return NULL;
+
+    typecode = (Py_UNICODE)typecode_int;
 
     if (!PyType_Check(arraytype)) {
         PyErr_Format(PyExc_TypeError,
@@ -2000,8 +2002,8 @@ PyDoc_STRVAR(reduce_doc, "Return state information for pickling.");
 static PyObject *
 array_get_typecode(arrayobject *a, void *closure)
 {
-    char tc = a->ob_descr->typecode;
-    return PyUnicode_FromStringAndSize(&tc, 1);
+    Py_UNICODE tc = a->ob_descr->typecode;
+    return PyUnicode_FromUnicode(&tc, 1);
 }
 
 static PyObject *
@@ -2073,21 +2075,21 @@ static PyMethodDef array_methods[] = {
 static PyObject *
 array_repr(arrayobject *a)
 {
-    char typecode;
+    Py_UNICODE typecode;
     PyObject *s, *v = NULL;
     Py_ssize_t len;
 
     len = Py_SIZE(a);
     typecode = a->ob_descr->typecode;
     if (len == 0) {
-        return PyUnicode_FromFormat("array('%c')", typecode);
+        return PyUnicode_FromFormat("array('%c')", (int)typecode);
     }
     if ((typecode == 'u'))
         v = array_tounicode(a, NULL);
     else
         v = array_tolist(a, NULL);
 
-    s = PyUnicode_FromFormat("array('%c', %R)", typecode, v);
+    s = PyUnicode_FromFormat("array('%c', %R)", (int)typecode, v);
     Py_DECREF(v);
     return s;
 }

@@ -25,8 +25,10 @@ _INSTALL_SCHEMES = {
         'platstdlib': '{platbase}/lib/python{py_version_short}',
         'purelib': '{base}/lib/python{py_version_short}/site-packages',
         'platlib': '{platbase}/lib/python{py_version_short}/site-packages',
-        'include': '{base}/include/python{py_version_short}',
-        'platinclude': '{platbase}/include/python{py_version_short}',
+        'include':
+            '{base}/include/python{py_version_short}{abiflags}',
+        'platinclude':
+            '{platbase}/include/python{py_version_short}{abiflags}',
         'scripts': '{base}/bin',
         'data': '{base}',
         },
@@ -215,7 +217,7 @@ def _parse_makefile(filename, vars=None):
     done = {}
     notdone = {}
 
-    with open(filename) as f:
+    with open(filename, errors="surrogateescape") as f:
         lines = f.readlines()
 
     for line in lines:
@@ -314,9 +316,12 @@ def _parse_makefile(filename, vars=None):
 
 
 def get_makefile_filename():
+    """Return the path of the Makefile."""
     if _PYTHON_BUILD:
         return os.path.join(_PROJECT_BASE, "Makefile")
-    return os.path.join(get_path('stdlib'), "config", "Makefile")
+    return os.path.join(get_path('stdlib'),
+                        'config-{}{}'.format(_PY_VERSION_SHORT, sys.abiflags),
+                        'Makefile')
 
 
 def _init_posix(vars):
@@ -407,7 +412,7 @@ def parse_config_h(fp, vars=None):
     return vars
 
 def get_config_h_filename():
-    """Returns the path of pyconfig.h."""
+    """Return the path of pyconfig.h."""
     if _PYTHON_BUILD:
         if os.name == "nt":
             inc_dir = os.path.join(_PROJECT_BASE, "PC")
@@ -418,17 +423,17 @@ def get_config_h_filename():
     return os.path.join(inc_dir, 'pyconfig.h')
 
 def get_scheme_names():
-    """Returns a tuple containing the schemes names."""
+    """Return a tuple containing the schemes names."""
     schemes = list(_INSTALL_SCHEMES.keys())
     schemes.sort()
     return tuple(schemes)
 
 def get_path_names():
-    """Returns a tuple containing the paths names."""
+    """Return a tuple containing the paths names."""
     return _SCHEME_KEYS
 
 def get_paths(scheme=_get_default_scheme(), vars=None, expand=True):
-    """Returns a mapping containing an install scheme.
+    """Return a mapping containing an install scheme.
 
     ``scheme`` is the install scheme name. If not provided, it will
     return the default scheme for the current platform.
@@ -439,7 +444,7 @@ def get_paths(scheme=_get_default_scheme(), vars=None, expand=True):
         return _INSTALL_SCHEMES[scheme]
 
 def get_path(name, scheme=_get_default_scheme(), vars=None, expand=True):
-    """Returns a path corresponding to the scheme.
+    """Return a path corresponding to the scheme.
 
     ``scheme`` is the install scheme name.
     """
@@ -470,6 +475,11 @@ def get_config_vars(*args):
         _CONFIG_VARS['base'] = _PREFIX
         _CONFIG_VARS['platbase'] = _EXEC_PREFIX
         _CONFIG_VARS['projectbase'] = _PROJECT_BASE
+        try:
+            _CONFIG_VARS['abiflags'] = sys.abiflags
+        except AttributeError:
+            # sys.abiflags may not be defined on all platforms.
+            _CONFIG_VARS['abiflags'] = ''
 
         if os.name in ('nt', 'os2'):
             _init_non_posix(_CONFIG_VARS)
@@ -680,13 +690,16 @@ def get_platform():
                 # behaviour.
                 pass
             else:
-                m = re.search(
-                        r'<key>ProductUserVisibleVersion</key>\s*' +
-                        r'<string>(.*?)</string>', f.read())
-                f.close()
-                if m is not None:
-                    macrelease = '.'.join(m.group(1).split('.')[:2])
-                # else: fall back to the default behaviour
+                try:
+                    m = re.search(
+                            r'<key>ProductUserVisibleVersion</key>\s*' +
+                            r'<string>(.*?)</string>', f.read())
+                    f.close()
+                    if m is not None:
+                        macrelease = '.'.join(m.group(1).split('.')[:2])
+                    # else: fall back to the default behaviour
+                finally:
+                    f.close()
 
         if not macver:
             macver = macrelease
@@ -753,7 +766,7 @@ def _print_dict(title, data):
         print('\t{0} = "{1}"'.format(key, value))
 
 def _main():
-    """Displays all information sysconfig detains."""
+    """Display all information sysconfig detains."""
     print('Platform: "{0}"'.format(get_platform()))
     print('Python version: "{0}"'.format(get_python_version()))
     print('Current installation scheme: "{0}"'.format(_get_default_scheme()))

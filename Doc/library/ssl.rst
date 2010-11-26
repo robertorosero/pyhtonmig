@@ -338,6 +338,15 @@ Constants
 
    .. versionadded:: 3.2
 
+.. data:: HAS_SNI
+
+   Whether the OpenSSL library has built-in support for the *Server Name
+   Indication* extension to the SSLv3 and TLSv1 protocols (as defined in
+   :rfc:`4366`).  When true, you can use the *server_hostname* argument to
+   :meth:`SSLContext.wrap_socket`.
+
+   .. versionadded:: 3.2
+
 .. data:: OPENSSL_VERSION
 
    The version string of the OpenSSL library loaded by the interpreter::
@@ -424,11 +433,9 @@ They also have the following additional methods and attributes:
    certificate was not validated, the dict is empty.  If the certificate was
    validated, it returns a dict with the keys ``subject`` (the principal for
    which the certificate was issued), and ``notAfter`` (the time after which the
-   certificate should not be trusted).  The certificate was already validated,
-   so the ``notBefore`` and ``issuer`` fields are not returned.  If a
-   certificate contains an instance of the *Subject Alternative Name* extension
-   (see :rfc:`3280`), there will also be a ``subjectAltName`` key in the
-   dictionary.
+   certificate should not be trusted).  If a certificate contains an instance
+   of the *Subject Alternative Name* extension (see :rfc:`3280`), there will
+   also be a ``subjectAltName`` key in the dictionary.
 
    The "subject" field is a tuple containing the sequence of relative
    distinguished names (RDNs) given in the certificate's data structure for the
@@ -449,6 +456,10 @@ They also have the following additional methods and attributes:
    was required (:const:`CERT_OPTIONAL` or :const:`CERT_REQUIRED`), it will have
    been validated, but if :const:`CERT_NONE` was used to establish the
    connection, the certificate, if present, will not have been validated.
+
+   .. versionchanged:: 3.2
+      The returned dictionary includes additional items such as ``issuer``
+      and ``notBefore``.
 
 .. method:: SSLSocket.cipher()
 
@@ -525,6 +536,15 @@ to speed up repeated connections from the same clients.
    following an `OpenSSL specific layout
    <http://www.openssl.org/docs/ssl/SSL_CTX_load_verify_locations.html>`_.
 
+.. method:: SSLContext.set_default_verify_paths()
+
+   Load a set of default "certification authority" (CA) certificates from
+   a filesystem path defined when building the OpenSSL library.  Unfortunately,
+   there's no easy way to know whether this method succeeds: no error is
+   returned if no certificates are to be found.  When the OpenSSL library is
+   provided as part of the operating system, though, it is likely to be
+   configured properly.
+
 .. method:: SSLContext.set_ciphers(ciphers)
 
    Set the available ciphers for sockets created with this context.
@@ -538,13 +558,24 @@ to speed up repeated connections from the same clients.
       when connected, the :meth:`SSLSocket.cipher` method of SSL sockets will
       give the currently selected cipher.
 
-.. method:: SSLContext.wrap_socket(sock, server_side=False, do_handshake_on_connect=True, suppress_ragged_eofs=True)
+.. method:: SSLContext.wrap_socket(sock, server_side=False, \
+      do_handshake_on_connect=True, suppress_ragged_eofs=True, \
+      server_hostname=None)
 
    Wrap an existing Python socket *sock* and return an :class:`SSLSocket`
    object.  The SSL socket is tied to the context, its settings and
    certificates.  The parameters *server_side*, *do_handshake_on_connect*
    and *suppress_ragged_eofs* have the same meaning as in the top-level
    :func:`wrap_socket` function.
+
+   On client connections, the optional parameter *server_hostname* specifies
+   the hostname of the service which we are connecting to.  This allows a
+   single server to host multiple SSL-based services with distinct certificates,
+   quite similarly to HTTP virtual hosts.  Specifying *server_hostname*
+   will raise a :exc:`ValueError` if the OpenSSL library doesn't have support
+   for it (that is, if :data:`HAS_SNI` is :const:`False`).  Specifying
+   *server_hostname* will also raise a :exc:`ValueError` if *server_side*
+   is true.
 
 .. method:: SSLContext.session_stats()
 
@@ -937,3 +968,6 @@ not SSLv2.
 
    `RFC 3280: Internet X.509 Public Key Infrastructure Certificate and CRL Profile <http://www.ietf.org/rfc/rfc3280>`_
        Housley et. al.
+
+   `RFC 4366: Transport Layer Security (TLS) Extensions <http://www.ietf.org/rfc/rfc4366>`_
+       Blake-Wilson et. al.

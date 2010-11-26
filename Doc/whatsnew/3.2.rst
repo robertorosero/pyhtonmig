@@ -97,6 +97,11 @@ and called with code like this::
    :pep:`391` - Dictionary Based Configuration for Logging
       PEP written by Vinay Sajip.
 
+PEP 3148:  The ``concurrent.futures`` module
+============================================
+
+.. (Stub section)
+
 
 PEP 3147:  PYC Repository Directories
 =====================================
@@ -245,12 +250,6 @@ Some smaller changes made to the core Python language are:
 
   (Added by Antoine Pitrou; :issue:`9757`.)
 
-* A warning message will now get printed at interpreter shutdown if the
-  :data:`gc.garbage` list isn't empty.  This is meant to make the programmer
-  aware that their code contains object finalization issues.
-
-  (Added by Antoine Pitrou; :issue:`477863`.)
-
 * Mark Dickinson crafted an elegant and efficient scheme for assuring that
   different numeric datatypes will have the same hash value whenever their
   actual values are equal::
@@ -283,6 +282,36 @@ Some smaller changes made to the core Python language are:
    ...        # implicit "del e" here
 
   (See :issue:`4617`.)
+
+* A new warning category, :exc:`ResourceWarning`, has been added.  It is
+  emitted when certain potential issues with resource consumption or cleanup
+  are detected.  It is silenced by default in normal release builds, but
+  can be easily enabled through the means provided by the :mod:`warnings`
+  module, or on the command line.
+
+  :exc:`ResourceWarning` is issued at interpreter shutdown if the
+  :data:`gc.garbage` list isn't empty.  This is meant to make the programmer
+  aware that their code contains object finalization issues.
+
+  (Added by Antoine Pitrou and Georg Brandl; :issue:`477863`.)
+
+  :exc:`ResourceWarning` is also issued when a :term:`file object` is destroyed
+  without having been explicitly closed.  While the deallocator for such
+  object ensures it closes the underlying operating system resource
+  (usually, a file descriptor), the delay in deallocating the object could
+  produce various issues, especially under Windows.  Here is an example
+  of enabling the warning from the command line::
+
+      $ ./python -Wdefault
+      Python 3.2a3+ (py3k, Nov  5 2010, 22:58:04)
+      [GCC 4.4.3] on linux2
+      Type "help", "copyright", "credits" or "license" for more information.
+      >>> f = open("foo", "wb")
+      >>> del f
+      __main__:1: ResourceWarning: unclosed file <_io.BufferedWriter name='foo'>
+      >>>
+
+  (Added by Antoine Pitrou, :issue:`10093`.)
 
 
 New, Improved, and Deprecated Modules
@@ -442,6 +471,14 @@ New, Improved, and Deprecated Modules
   <http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT>`__.  (Added
   by Antoine Pitrou; :issue:`8322`.)
 
+  When linked against a recent enough version of OpenSSL, the :mod:`ssl`
+  module now supports the Server Name Indication extension to the TLS
+  protocol, allowing for several "virtual hosts" using different certificates
+  on a single IP/port.  This extension is only supported in client mode,
+  and is activated by passing the *server_hostname* argument to
+  :meth:`SSLContext.wrap_socket`.
+  (Added by Antoine Pitrou, :issue:`5639`.)
+
   Various options have been added to the :mod:`ssl` module, such as
   :data:`~ssl.OP_NO_SSLv2` which allows to force disabling of the insecure and
   obsolete SSLv2 protocol.  (Added by Antoine Pitrou; :issue:`4870`.)
@@ -456,6 +493,12 @@ New, Improved, and Deprecated Modules
   5-tuple), and :data:`ssl.OPENSSL_VERSION_NUMBER` (an integer).  (Added by
   Antoine Pitrou; :issue:`8321`.)
 
+* :class:`http.client.HTTPSConnection`, :class:`urllib.request.HTTPSHandler`
+  and :func:`urllib.request.urlopen` now take optional arguments to allow for
+  server certificate checking against a set of Certificate Authorities,
+  as recommended in public uses of HTTPS.
+  (Added by Antoine Pitrou, :issue:`9003`.)
+
 * Instances of :class:`unittest.TestCase` have two new methods
   :meth:`~unittest.TestCase.assertWarns` and :meth:`~unittest.TestCase.assertWarnsRegexp`
   to check that a given warning type was triggered by the code under test::
@@ -463,6 +506,18 @@ New, Improved, and Deprecated Modules
       with self.assertWarns(DeprecationWarning):
           legacy_function('XYZ')
 
+* The following :class:`unittest.TestCase` methods are now deprecated:
+   * :meth:`assert_` (use :meth:`.assertTrue` instead);
+   * :meth:`assertEquals` (use :meth:`.assertEqual` instead);
+   * :meth:`assertNotEquals` (use :meth:`.assertNotEqual` instead);
+   * :meth:`assertAlmostEquals` (use :meth:`.assertAlmostEqual` instead);
+   * :meth:`assertNotAlmostEquals` (use :meth:`.assertNotAlmostEqual` instead);
+
+  The ``TestCase.fail*`` methods deprecated in Python 3.1 will be removed in
+  Python 3.3. See also the :ref:`deprecated-aliases` section in the
+  :mod:`unittest` documentation.
+
+  (Contributed by Ezio Melotti; :issue:`9424`.)
 
 * The previously deprecated :func:`string.maketrans` function has been removed
   in favor of the static methods, :meth:`bytes.maketrans` and
@@ -495,6 +550,29 @@ New, Improved, and Deprecated Modules
   the user  to call :meth:`~asyncore.dispatcher.accept()` directly.
 
   (Contributed by Giampaolo Rodolà; :issue:`6706`.)
+
+* The :mod:`tempfile` module has a new context manager,
+  :class:`~tempfile.TemporaryDirectory` which provides easy deterministic
+  cleanup of temporary directories.
+
+  (Contributed by Neil Schemenauer and Nick Coghlan; :issue:`5178`.)
+
+* The :mod:`smtplib` :class:`~smtplib.SMTP` class now accepts a byte string
+  for the *msg* argument to the :meth:`~smtplib.SMTP.sendmail` method,
+  and a new method, :meth:`~smtplib.SMTP.send_message` accepts a
+  :class:`~email.message.Message` object and can optionally obtain the
+  *from_addr* and *to_addrs* addresses directly from the object.
+
+  (Contributed by R. David Murray, :issue:`10321`.)
+
+
+* The :mod:`inspect` module has a new function :func:`getgenatorstate`
+  to easily identify the current state of a generator as one of
+  ``GEN_CREATED``, ``GEN_RUNNING``, ``GEN_SUSPENDED`` or ``GEN_CLOSED``.
+
+  (Contributed by Rodolpho Eckhardt and Nick Coghlan, :issue:`10220`.)
+
+.. XXX: Mention inspect.getattr_static (Michael Foord)
 
 Multi-threading
 ===============
@@ -539,6 +617,11 @@ A number of small performance enhancements have been added:
 
   (Contributed by Antoine Pitrou; :issue:`7451`.)
 
+* JSON encoding now uses the C speedups also when the ``sort_keys`` argument
+  is true.
+
+  (Contributed by Raymond Hettinger and Antoine Pitrou, :issue:`10314`.)
+
 * Python's peephole optimizer now recognizes patterns such ``x in {1, 2, 3}`` as
   being a test for membership in a set of constants.  The optimizer recasts the
   :class:`set` as a :class:`frozenset` and stores the pre-built constant.
@@ -566,13 +649,29 @@ A number of small performance enhancements have been added:
   and the Unladen Swallow team in :issue:`9410` and :issue:`3873`.)
 
 
-Filenames and Unicode
-=====================
+Unicode
+=======
 
 The :mod:`os` module has two new functions: :func:`~os.fsencode` and
-:func:`~os.fsdecode`.
+:func:`~os.fsdecode`. Add :data:`os.environb`: bytes version of
+:data:`os.environ`, :func:`os.getenvb` function and
+:data:`os.supports_bytes_environ` constant.
 
-.. XXX mention Victor's improvements for support of undecodable filenames.
+``'mbcs'`` encoding doesn't ignore the error handler argument anymore. By
+default (strict mode), it raises an UnicodeDecodeError on undecodable byte
+sequence and UnicodeEncodeError on unencodable character. To get the ``'mbcs'``
+encoding of Python 3.1, use ``'ignore'`` error handler to decode and
+``'replace'`` error handler to encode. ``'mbcs'`` supports ``'strict'`` and
+``'ignore'`` error handlers for decoding, and ``'strict'`` and ``'replace'``
+for encoding.
+
+On Mac OS X, Python uses ``'utf-8'`` to decode the command line arguments,
+instead of the locale encoding (which is ISO-8859-1 if the ``LANG`` environment
+variable is not set).
+
+By default, tarfile uses ``'utf-8'`` encoding on Windows (instead of
+``'mbcs'``), and the ``'surrogateescape'`` error handler on all operating
+systems.
 
 
 .. IDLE
@@ -635,9 +734,4 @@ require changes to your code:
   instead; the new type has a well-defined interface for passing typing safety
   information and a less complicated signature for calling a destructor.
 
-* mbcs encoding doesn't ignore the error handler argument anymore. By default
-  (strict mode), it raises an UnicodeDecodeError on undecodable byte sequence
-  and UnicodeEncodeError on unencodable character. To get the mbcs encoding of
-  Python 3.1, use ``'ignore'`` error handler to decode and ``'replace'`` error
-  handler to encode. mbcs now supports ``'strict'`` and ``'ignore'`` error
-  handlers for decoding, and ``'strict'`` and ``'replace'`` for encoding.
+ * Remove sys.setfilesystemencoding() function: it was broken by design.

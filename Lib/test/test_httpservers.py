@@ -182,6 +182,7 @@ class BaseHTTPServerTestCase(BaseTestCase):
         res = self.con.getresponse()
         self.assertEqual(res.getheader('Connection'), 'keep-alive')
         self.con.request('TEST', '/')
+        self.addCleanup(self.con.close)
 
     def test_internal_key_error(self):
         self.con.request('KEYERROR', '/')
@@ -206,9 +207,8 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         self.data = b'We are the knights who say Ni!'
         self.tempdir = tempfile.mkdtemp(dir=basetempdir)
         self.tempdir_name = os.path.basename(self.tempdir)
-        temp = open(os.path.join(self.tempdir, 'test'), 'wb')
-        temp.write(self.data)
-        temp.close()
+        with open(os.path.join(self.tempdir, 'test'), 'wb') as temp:
+            temp.write(self.data)
 
     def tearDown(self):
         try:
@@ -240,15 +240,15 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         self.check_status_and_reason(response, 404)
         response = self.request('/' + 'ThisDoesNotExist' + '/')
         self.check_status_and_reason(response, 404)
-        f = open(os.path.join(self.tempdir_name, 'index.html'), 'w')
-        response = self.request('/' + self.tempdir_name + '/')
-        self.check_status_and_reason(response, 200)
-        if os.name == 'posix':
-            # chmod won't work as expected on Windows platforms
-            os.chmod(self.tempdir, 0)
-            response = self.request(self.tempdir_name + '/')
-            self.check_status_and_reason(response, 404)
-            os.chmod(self.tempdir, 0o755)
+        with open(os.path.join(self.tempdir_name, 'index.html'), 'w') as f:
+            response = self.request('/' + self.tempdir_name + '/')
+            self.check_status_and_reason(response, 200)
+            if os.name == 'posix':
+                # chmod won't work as expected on Windows platforms
+                os.chmod(self.tempdir, 0)
+                response = self.request(self.tempdir_name + '/')
+                self.check_status_and_reason(response, 404)
+                os.chmod(self.tempdir, 0o755)
 
     def test_head(self):
         response = self.request(
@@ -510,6 +510,49 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
         self.verify_expected_headers(result[2:-1])
         self.verify_get_called()
         self.assertEqual(result[-1], b'<html><body>Data</body></html>\r\n')
+
+    def test_header_buffering(self):
+
+        def _readAndReseek(f):
+            pos = f.tell()
+            f.seek(0)
+            data = f.read()
+            f.seek(pos)
+            return data
+
+        input = BytesIO(b'GET / HTTP/1.1\r\n\r\n')
+        output = BytesIO()
+        self.handler.rfile = input
+        self.handler.wfile = output
+        self.handler.request_version = 'HTTP/1.1'
+
+        self.handler.send_header('Foo', 'foo')
+        self.handler.send_header('bar', 'bar')
+        self.assertEqual(_readAndReseek(output), b'')
+        self.handler.end_headers()
+        self.assertEqual(_readAndReseek(output),
+                         b'Foo: foo\r\nbar: bar\r\n\r\n')
+
+    def test_header_unbuffered_when_continue(self):
+
+        def _readAndReseek(f):
+            pos = f.tell()
+            f.seek(0)
+            data = f.read()
+            f.seek(pos)
+            return data
+
+        input = BytesIO(b'GET / HTTP/1.1\r\nExpect: 100-continue\r\n\r\n')
+        output = BytesIO()
+        self.handler.rfile = input
+        self.handler.wfile = output
+        self.handler.request_version = 'HTTP/1.1'
+
+        self.handler.handle_one_request()
+        self.assertNotEqual(_readAndReseek(output), b'')
+        result = _readAndReseek(output).split(b'\r\n')
+        self.assertEqual(result[0], b'HTTP/1.1 100 Continue')
+        self.assertEqual(result[1], b'HTTP/1.1 200 OK')
 
     def test_with_continue_rejected(self):
         usual_handler = self.handler        # Save to avoid breaking any subsequent tests.

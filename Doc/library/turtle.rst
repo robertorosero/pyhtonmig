@@ -1,9 +1,9 @@
-========================================
-:mod:`turtle` --- Turtle graphics for Tk
-========================================
+=================================
+:mod:`turtle` --- Turtle graphics
+=================================
 
 .. module:: turtle
-   :synopsis: Turtle graphics for Tk
+   :synopsis: An educational framework for simple graphics applications
 .. sectionauthor:: Gregor Lingl <gregor.lingl@aon.at>
 
 .. testsetup:: default
@@ -22,6 +22,16 @@ Imagine a robotic turtle starting at (0, 0) in the x-y plane.  Give it the
 command ``turtle.forward(15)``, and it moves (on-screen!) 15 pixels in the
 direction it is facing, drawing a line as it moves.  Give it the command
 ``turtle.left(25)``, and it rotates in-place 25 degrees clockwise.
+
+.. sidebar:: Turtle star
+
+   Turtle can draw intricate shapes using programs that repeat simple
+   moves.
+
+   .. image:: turtle-star.*
+      :align: center
+
+   .. literalinclude:: ../includes/turtle-star.py
 
 By combining together these and similar commands, intricate shapes and pictures
 can easily be drawn.
@@ -645,8 +655,8 @@ Tell Turtle's state
       >>> turtle.forward(100)
       >>> turtle.pos()
       (64.28,76.60)
-      >>> print(turtle.xcor())
-      64.2787609687
+      >>> print(round(turtle.xcor(), 5))
+      64.27876
 
 
 .. function:: ycor()
@@ -660,8 +670,8 @@ Tell Turtle's state
       >>> turtle.forward(100)
       >>> print(turtle.pos())
       (50.00,86.60)
-      >>> print(turtle.ycor())
-      86.6025403784
+      >>> print(round(turtle.ycor(), 5))
+      86.60254
 
 
 .. function:: heading()
@@ -714,7 +724,10 @@ Settings for measurement
       >>> turtle.left(90)
       >>> turtle.heading()
       90.0
-      >>> turtle.degrees(400.0)  # angle measurement in gon
+
+      Change angle measurement unit to grad (also known as gon,
+      grade, or gradian and equals 1/100-th of the right angle.)
+      >>> turtle.degrees(400.0)
       >>> turtle.heading()
       100.0
       >>> turtle.degrees(360)
@@ -810,20 +823,16 @@ Drawing state
       >>> sorted(turtle.pen().items())
       [('fillcolor', 'black'), ('outline', 1), ('pencolor', 'red'),
        ('pendown', True), ('pensize', 10), ('resizemode', 'noresize'),
-       ('shown', True), ('speed', 9), ('stretchfactor', (1, 1)), ('tilt', 0)]
+       ('shearfactor', 0.0), ('shown', True), ('speed', 9),
+       ('stretchfactor', (1.0, 1.0)), ('tilt', 0.0)]
       >>> penstate=turtle.pen()
       >>> turtle.color("yellow", "")
       >>> turtle.penup()
-      >>> sorted(turtle.pen().items())
-      [('fillcolor', ''), ('outline', 1), ('pencolor', 'yellow'),
-       ('pendown', False), ('pensize', 10), ('resizemode', 'noresize'),
-       ('shown', True), ('speed', 9), ('stretchfactor', (1, 1)), ('tilt', 0)]
+      >>> sorted(turtle.pen().items())[:3]
+      [('fillcolor', ''), ('outline', 1), ('pencolor', 'yellow')]
       >>> turtle.pen(penstate, fillcolor="green")
-      >>> sorted(turtle.pen().items())
-      [('fillcolor', 'green'), ('outline', 1), ('pencolor', 'red'),
-       ('pendown', True), ('pensize', 10), ('resizemode', 'noresize'),
-       ('shown', True), ('speed', 9), ('stretchfactor', (1, 1)), ('tilt', 0)]
-
+      >>> sorted(turtle.pen().items())[:3]
+      [('fillcolor', 'green'), ('outline', 1), ('pencolor', 'red')]
 
 .. function:: isdown()
 
@@ -884,10 +893,10 @@ Color control
        (0.2, 0.8, 0.5490196078431373)
        >>> colormode(255)
        >>> turtle.pencolor()
-       (51, 204, 140)
+       (51.0, 204.0, 140.0)
        >>> turtle.pencolor('#32c18f')
        >>> turtle.pencolor()
-       (50, 193, 143)
+       (50.0, 193.0, 143.0)
 
 
 .. function:: fillcolor(*args)
@@ -924,13 +933,13 @@ Color control
        'violet'
        >>> col = turtle.pencolor()
        >>> col
-       (50, 193, 143)
+       (50.0, 193.0, 143.0)
        >>> turtle.fillcolor(col)
        >>> turtle.fillcolor()
-       (50, 193, 143)
+       (50.0, 193.0, 143.0)
        >>> turtle.fillcolor('#ffffff')
        >>> turtle.fillcolor()
-       (255, 255, 255)
+       (255.0, 255.0, 255.0)
 
 
 .. function:: color(*args)
@@ -963,7 +972,7 @@ Color control
        ('red', 'green')
        >>> color("#285078", "#a0c8f0")
        >>> color()
-       ((40, 80, 120), (160, 200, 240))
+       ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
 
 
 See also: Screen method :func:`colormode`.
@@ -1157,7 +1166,7 @@ Appearance
    .. doctest::
 
       >>> turtle.shapesize()
-      (1, 1, 1)
+      (1.0, 1.0, 1)
       >>> turtle.resizemode("user")
       >>> turtle.shapesize(5, 5, 12)
       >>> turtle.shapesize()
@@ -1184,7 +1193,7 @@ Appearance
        >>> turtle.shapesize(5,2)
        >>> turtle.shearfactor(0.5)
        >>> turtle.shearfactor()
-       >>> 0.5
+       0.5
 
 
 .. function:: tilt(angle)
@@ -1268,11 +1277,12 @@ Appearance
 
    .. doctest::
 
+      >>> turtle = Turtle()
       >>> turtle.shape("square")
       >>> turtle.shapesize(4,2)
       >>> turtle.shearfactor(-0.5)
       >>> turtle.shapetransform()
-      >>> (4.0, -1.0, -0.0, 2.0)
+      (4.0, -1.0, -0.0, 2.0)
 
 
 .. function:: get_shapepoly()
@@ -1457,7 +1467,7 @@ Special Turtle methods
 .. _compoundshapes:
 
 Compound shapes
------------------------------------------
+---------------
 
 To use compound turtle shapes, which consist of several polygons of different
 color, you must use the helper class :class:`Shape` explicitly as described
@@ -1511,6 +1521,7 @@ Window control
    :param args: a color string or three numbers in the range 0..colormode or a
                 3-tuple of such numbers
 
+
    Set or return background color of the TurtleScreen.
 
    .. doctest::
@@ -1520,7 +1531,7 @@ Window control
       'orange'
       >>> screen.bgcolor("#800080")
       >>> screen.bgcolor()
-      (128, 0, 128)
+      (128.0, 0.0, 128.0)
 
 
 .. function:: bgpic(picname=None)
@@ -1993,8 +2004,8 @@ Methods specific to Screen, not inherited from TurtleScreen
       >>> screen.title("Welcome to the turtle zoo!")
 
 
-The public classes of the module :mod:`turtle`
-==============================================
+Public classes
+==============
 
 
 .. class:: RawTurtle(canvas)
@@ -2265,29 +2276,35 @@ not from within the demo-viewer).
 Demo scripts
 ============
 
-There is a set of demo scripts in the turtledemo directory located in the
-:file:`Demo/turtle` directory in the source distribution.
+There is a set of demo scripts in the :mod:`turtledemo` package.  These
+scripts can be run and viewed using the supplied demo viewer as follows::
 
-It contains:
+   python -m turtledemo
+
+Alternatively, you can run the demo scripts individually.  For example, ::
+
+   python -m turtledemo.bytedesign
+
+The :mod:`turtledemo` package directory contains:
 
 - a set of 15 demo scripts demonstrating different features of the new module
-  :mod:`turtle`
-- a demo viewer :file:`turtleDemo.py` which can be used to view the sourcecode
+  :mod:`turtle`;
+- a demo viewer :file:`__main__.py` which can be used to view the sourcecode
   of the scripts and run them at the same time. 14 of the examples can be
   accessed via the Examples menu; all of them can also be run standalone.
-- The example :file:`turtledemo_two_canvases.py` demonstrates the simultaneous
+- The example :mod:`turtledemo.two_canvases` demonstrates the simultaneous
   use of two canvases with the turtle module.  Therefore it only can be run
   standalone.
-- There is a :file:`turtle.cfg` file in this directory, which also serves as an
+- There is a :file:`turtle.cfg` file in this directory, which serves as an
   example for how to write and use such files.
 
-The demoscripts are:
+The demo scripts are:
 
 +----------------+------------------------------+-----------------------+
 | Name           | Description                  | Features              |
 +----------------+------------------------------+-----------------------+
 | bytedesign     | complex classical            | :func:`tracer`, delay,|
-|                | turtlegraphics pattern       | :func:`update`        |
+|                | turtle graphics pattern      | :func:`update`        |
 +----------------+------------------------------+-----------------------+
 | chaos          | graphs verhust dynamics,     | world coordinates     |
 |                | proves that you must not     |                       |
@@ -2325,7 +2342,7 @@ The demoscripts are:
 +----------------+------------------------------+-----------------------+
 | round_dance    | dancing turtles rotating     | compound shapes, clone|
 |                | pairwise in opposite         | shapesize, tilt,      |
-|                | direction                    | get_polyshape, update |
+|                | direction                    | get_shapepoly, update |
 +----------------+------------------------------+-----------------------+
 | tree           | a (graphical) breadth        | :func:`clone`         |
 |                | first tree (using generators)|                       |

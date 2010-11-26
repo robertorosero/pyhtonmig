@@ -13,9 +13,14 @@ The :mod:`functools` module is for higher-order functions: functions that act on
 or return other functions. In general, any callable object can be treated as a
 function for the purposes of this module.
 
+.. seealso::
+
+   Latest version of the :source:`functools Python source code
+   <Lib/functools.py>`
+
 The :mod:`functools` module defines the following functions:
 
-..  function:: cmp_to_key(func)
+.. function:: cmp_to_key(func)
 
    Transform an old-style comparison function to a key-function.  Used with
    tools that accept key functions (such as :func:`sorted`, :func:`min`,
@@ -150,7 +155,7 @@ The :mod:`functools` module defines the following functions:
 
    To allow access to the original function for introspection and other purposes
    (e.g. bypassing a caching decorator such as :func:`lru_cache`), this function
-   automatically adds a __wrapped__ attribute to the the wrapped that refers to
+   automatically adds a __wrapped__ attribute to the wrapper that refers to
    the original function.
 
    The main intended use for this function is in :term:`decorator` functions which

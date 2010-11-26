@@ -2,10 +2,14 @@ import io
 import datetime
 import textwrap
 import unittest
+import functools
 import contextlib
+import collections
 from test import support
-from nntplib import NNTP, GroupInfo
+from nntplib import NNTP, GroupInfo, _have_ssl
 import nntplib
+if _have_ssl:
+    import ssl
 
 TIMEOUT = 30
 
@@ -22,16 +26,22 @@ class NetworkedNNTPTestsMixin:
         self.assertEqual(str, type(welcome))
 
     def test_help(self):
-        resp, list = self.server.help()
+        resp, lines = self.server.help()
         self.assertTrue(resp.startswith("100 "), resp)
-        for line in list:
+        for line in lines:
             self.assertEqual(str, type(line))
 
     def test_list(self):
-        resp, list = self.server.list()
-        if len(list) > 0:
-            self.assertEqual(GroupInfo, type(list[0]))
-            self.assertEqual(str, type(list[0].group))
+        resp, groups = self.server.list()
+        if len(groups) > 0:
+            self.assertEqual(GroupInfo, type(groups[0]))
+            self.assertEqual(str, type(groups[0].group))
+
+    def test_list_active(self):
+        resp, groups = self.server.list(self.GROUP_PAT)
+        if len(groups) > 0:
+            self.assertEqual(GroupInfo, type(groups[0]))
+            self.assertEqual(str, type(groups[0].group))
 
     def test_unknown_command(self):
         with self.assertRaises(nntplib.NNTPPermanentError) as cm:
@@ -100,13 +110,17 @@ class NetworkedNNTPTestsMixin:
              "references", ":bytes", ":lines"}
             )
         for v in art_dict.values():
-            self.assertIsInstance(v, str)
+            self.assertIsInstance(v, (str, type(None)))
 
     def test_xover(self):
         resp, count, first, last, name = self.server.group(self.GROUP_NAME)
-        resp, lines = self.server.xover(last, last)
+        resp, lines = self.server.xover(last - 5, last)
+        if len(lines) == 0:
+            self.skipTest("no articles retrieved")
+        # The 'last' article is not necessarily part of the output (cancelled?)
         art_num, art_dict = lines[0]
-        self.assertEqual(art_num, last)
+        self.assertGreaterEqual(art_num, last - 5)
+        self.assertLessEqual(art_num, last)
         self._check_art_dict(art_dict)
 
     def test_over(self):
@@ -119,7 +133,9 @@ class NetworkedNNTPTestsMixin:
         # The "start-end" article range form
         resp, lines = self.server.over((start, last))
         art_num, art_dict = lines[-1]
-        self.assertEqual(art_num, last)
+        # The 'last' article is not necessarily part of the output (cancelled?)
+        self.assertGreaterEqual(art_num, start)
+        self.assertLessEqual(art_num, last)
         self._check_art_dict(art_dict)
         # XXX The "message_id" form is unsupported by gmane
         # 503 Overview by message-ID unsupported
@@ -141,41 +157,30 @@ class NetworkedNNTPTestsMixin:
 
     def test_article_head_body(self):
         resp, count, first, last, name = self.server.group(self.GROUP_NAME)
-        resp, head = self.server.head(last)
+        # Try to find an available article
+        for art_num in (last, first, last - 1):
+            try:
+                resp, head = self.server.head(art_num)
+            except nntplib.NNTPTemporaryError as e:
+                if not e.response.startswith("423 "):
+                    raise
+                # "423 No such article" => choose another one
+                continue
+            break
+        else:
+            self.skipTest("could not find a suitable article number")
         self.assertTrue(resp.startswith("221 "), resp)
-        self.check_article_resp(resp, head, last)
-        resp, body = self.server.body(last)
+        self.check_article_resp(resp, head, art_num)
+        resp, body = self.server.body(art_num)
         self.assertTrue(resp.startswith("222 "), resp)
-        self.check_article_resp(resp, body, last)
-        resp, article = self.server.article(last)
+        self.check_article_resp(resp, body, art_num)
+        resp, article = self.server.article(art_num)
         self.assertTrue(resp.startswith("220 "), resp)
-        self.check_article_resp(resp, article, last)
+        self.check_article_resp(resp, article, art_num)
         self.assertEqual(article.lines, head.lines + [b''] + body.lines)
 
-    def test_quit(self):
-        self.server.quit()
-        self.server = None
-
-
-class NetworkedNNTPTests(NetworkedNNTPTestsMixin, unittest.TestCase):
-    NNTP_HOST = 'news.gmane.org'
-    GROUP_NAME = 'gmane.comp.python.devel'
-    GROUP_PAT = 'gmane.comp.python.d*'
-
-    def setUp(self):
-        support.requires("network")
-        with support.transient_internet(self.NNTP_HOST):
-            self.server = NNTP(self.NNTP_HOST, timeout=TIMEOUT, usenetrc=False)
-
-    def tearDown(self):
-        if self.server is not None:
-            self.server.quit()
-
-    # Disabled with gmane as it produces too much data
-    test_list = None
-
     def test_capabilities(self):
-        # As of this writing, gmane implements NNTP version 2 and has a
+        # The server under test implements NNTP version 2 and has a
         # couple of well-known capabilities. Just sanity check that we
         # got them.
         def _check_caps(caps):
@@ -187,6 +192,107 @@ class NetworkedNNTPTests(NetworkedNNTPTestsMixin, unittest.TestCase):
         # This re-emits the command
         resp, caps = self.server.capabilities()
         _check_caps(caps)
+
+    if _have_ssl:
+        def test_starttls(self):
+            file = self.server.file
+            sock = self.server.sock
+            try:
+                self.server.starttls()
+            except nntplib.NNTPPermanentError:
+                self.skipTest("STARTTLS not supported by server.")
+            else:
+                # Check that the socket and internal pseudo-file really were
+                # changed.
+                self.assertNotEqual(file, self.server.file)
+                self.assertNotEqual(sock, self.server.sock)
+                # Check that the new socket really is an SSL one
+                self.assertIsInstance(self.server.sock, ssl.SSLSocket)
+                # Check that trying starttls when it's already active fails.
+                self.assertRaises(ValueError, self.server.starttls)
+
+    def test_zlogin(self):
+        # This test must be the penultimate because further commands will be
+        # refused.
+        baduser = "notarealuser"
+        badpw = "notarealpassword"
+        # Check that bogus credentials cause failure
+        self.assertRaises(nntplib.NNTPError, self.server.login,
+                          user=baduser, password=badpw, usenetrc=False)
+        # FIXME: We should check that correct credentials succeed, but that
+        # would require valid details for some server somewhere to be in the
+        # test suite, I think. Gmane is anonymous, at least as used for the
+        # other tests.
+
+    def test_zzquit(self):
+        # This test must be called last, hence the name
+        cls = type(self)
+        try:
+            self.server.quit()
+        finally:
+            cls.server = None
+
+    @classmethod
+    def wrap_methods(cls):
+        # Wrap all methods in a transient_internet() exception catcher
+        # XXX put a generic version in test.support?
+        def wrap_meth(meth):
+            @functools.wraps(meth)
+            def wrapped(self):
+                with support.transient_internet(self.NNTP_HOST):
+                    meth(self)
+            return wrapped
+        for name in dir(cls):
+            if not name.startswith('test_'):
+                continue
+            meth = getattr(cls, name)
+            if not isinstance(meth, collections.Callable):
+                continue
+            # Need to use a closure so that meth remains bound to its current
+            # value
+            setattr(cls, name, wrap_meth(meth))
+
+NetworkedNNTPTestsMixin.wrap_methods()
+
+
+class NetworkedNNTPTests(NetworkedNNTPTestsMixin, unittest.TestCase):
+    # This server supports STARTTLS (gmane doesn't)
+    NNTP_HOST = 'news.trigofacile.com'
+    GROUP_NAME = 'fr.comp.lang.python'
+    GROUP_PAT = 'fr.comp.lang.*'
+
+    NNTP_CLASS = NNTP
+
+    @classmethod
+    def setUpClass(cls):
+        support.requires("network")
+        with support.transient_internet(cls.NNTP_HOST):
+            cls.server = cls.NNTP_CLASS(cls.NNTP_HOST, timeout=TIMEOUT, usenetrc=False)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.server is not None:
+            cls.server.quit()
+
+
+if _have_ssl:
+    class NetworkedNNTP_SSLTests(NetworkedNNTPTests):
+
+        # Technical limits for this public NNTP server (see http://www.aioe.org):
+        # "Only two concurrent connections per IP address are allowed and
+        # 400 connections per day are accepted from each IP address."
+
+        NNTP_HOST = 'nntp.aioe.org'
+        GROUP_NAME = 'comp.lang.python'
+        GROUP_PAT = 'comp.lang.*'
+
+        NNTP_CLASS = nntplib.NNTP_SSL
+
+        # Disabled as it produces too much data
+        test_list = None
+
+        # Disabled as the connection will already be encrypted.
+        test_starttls = None
 
 
 #
@@ -255,7 +361,6 @@ class MockedNNTPTestsMixin:
         # Using BufferedRWPair instead of BufferedRandom ensures the file
         # isn't seekable.
         file = io.BufferedRWPair(self.sio, self.sio)
-        kwargs.setdefault('usenetrc', False)
         self.server = nntplib._NNTPBase(file, 'test.server', *args, **kwargs)
         return self.server
 
@@ -383,6 +488,17 @@ class NNTPv1Handler:
                 free.it.comp.lang.python.learner 0000000000 0000000001 y
                 tw.bbs.comp.lang.python 0000000304 0000000304 y
                 .""")
+        elif action == "ACTIVE":
+            if param == "*distutils*":
+                self.push_lit("""\
+                    215 Newsgroups in form "group high low flags"
+                    gmane.comp.python.distutils.devel 0000014104 0000000001 m
+                    gmane.comp.python.distutils.cvs 0000000000 0000000001 m
+                    .""")
+            else:
+                self.push_lit("""\
+                    215 Newsgroups in form "group high low flags"
+                    .""")
         elif action == "OVERVIEW.FMT":
             self.push_lit("""\
                 215 Order of fields in overview database.
@@ -457,7 +573,7 @@ class NNTPv1Handler:
                     "\tThu, 22 Jul 2010 09:14:14 -0400"
                     "\t<A29863FA-F388-40C3-AA25-0FD06B09B5BF@gmail.com>"
                     "\t\t6683\t16"
-                    "\tXref: news.gmane.org gmane.comp.python.authors:58"
+                    "\t"
                     "\n"
                 # An UTF-8 overview line from fr.comp.lang.python
                 "59\tRe: Message d'erreur incompréhensible (par moi)"
@@ -558,7 +674,7 @@ class NNTPv2Handler(NNTPv1Handler):
     def handle_CAPABILITIES(self):
         self.push_lit("""\
             101 Capability list:
-            VERSION 2
+            VERSION 2 3
             IMPLEMENTATION INN 2.5.1
             AUTHINFO USER
             HDR
@@ -608,6 +724,12 @@ class NNTPv1v2TestsMixin:
         self.assertEqual(g,
             GroupInfo("comp.lang.python.announce", "0000001153",
                       "0000000993", "m"))
+        resp, groups = self.server.list("*distutils*")
+        self.assertEqual(len(groups), 2)
+        g = groups[0]
+        self.assertEqual(g,
+            GroupInfo("gmane.comp.python.distutils.devel", "0000014104",
+                      "0000000001", "m"))
 
     def test_stat(self):
         resp, art_num, message_id = self.server.stat(3000234)
@@ -824,6 +946,8 @@ class NNTPv1v2TestsMixin:
             ":lines": "16",
             "xref": "news.gmane.org gmane.comp.python.authors:57"
             })
+        art_num, over = overviews[1]
+        self.assertEqual(over["xref"], None)
         art_num, over = overviews[2]
         self.assertEqual(over["subject"],
                          "Re: Message d'erreur incompréhensible (par moi)")
@@ -924,6 +1048,7 @@ class NNTPv1Tests(NNTPv1v2TestsMixin, MockedNNTPTestsMixin, unittest.TestCase):
         caps = self.server.getcapabilities()
         self.assertEqual(caps, {})
         self.assertEqual(self.server.nntp_version, 1)
+        self.assertEqual(self.server.nntp_implementation, None)
 
 
 class NNTPv2Tests(NNTPv1v2TestsMixin, MockedNNTPTestsMixin, unittest.TestCase):
@@ -935,7 +1060,7 @@ class NNTPv2Tests(NNTPv1v2TestsMixin, MockedNNTPTestsMixin, unittest.TestCase):
     def test_caps(self):
         caps = self.server.getcapabilities()
         self.assertEqual(caps, {
-            'VERSION': ['2'],
+            'VERSION': ['2', '3'],
             'IMPLEMENTATION': ['INN', '2.5.1'],
             'AUTHINFO': ['USER'],
             'HDR': [],
@@ -945,7 +1070,8 @@ class NNTPv2Tests(NNTPv1v2TestsMixin, MockedNNTPTestsMixin, unittest.TestCase):
             'POST': [],
             'READER': [],
             })
-        self.assertEqual(self.server.nntp_version, 2)
+        self.assertEqual(self.server.nntp_version, 3)
+        self.assertEqual(self.server.nntp_implementation, 'INN 2.5.1')
 
 
 class MiscTests(unittest.TestCase):
@@ -1028,6 +1154,29 @@ class MiscTests(unittest.TestCase):
             ':lines': '17',
             'xref': 'news.example.com misc.test:3000363',
         })
+        # Second example; here the "Xref" field is totally absent (including
+        # the header name) and comes out as None
+        lines = [
+            '3000234\tI am just a test article\t"Demo User" '
+            '<nobody@example.com>\t6 Oct 1998 04:38:40 -0500\t'
+            '<45223423@example.com>\t<45454@example.net>\t1234\t'
+            '17\t\t',
+        ]
+        overview = nntplib._parse_overview(lines, fmt)
+        (art_num, fields), = overview
+        self.assertEqual(fields['xref'], None)
+        # Third example; the "Xref" is an empty string, while "references"
+        # is a single space.
+        lines = [
+            '3000234\tI am just a test article\t"Demo User" '
+            '<nobody@example.com>\t6 Oct 1998 04:38:40 -0500\t'
+            '<45223423@example.com>\t \t1234\t'
+            '17\tXref: \t',
+        ]
+        overview = nntplib._parse_overview(lines, fmt)
+        (art_num, fields), = overview
+        self.assertEqual(fields['references'], ' ')
+        self.assertEqual(fields['xref'], '')
 
     def test_parse_datetime(self):
         def gives(a, b, *c):
@@ -1084,9 +1233,10 @@ class MiscTests(unittest.TestCase):
 
 
 def test_main():
-    support.run_unittest(MiscTests, NNTPv1Tests, NNTPv2Tests,
-                         NetworkedNNTPTests
-                         )
+    tests = [MiscTests, NNTPv1Tests, NNTPv2Tests, NetworkedNNTPTests]
+    if _have_ssl:
+        tests.append(NetworkedNNTP_SSLTests)
+    support.run_unittest(*tests)
 
 
 if __name__ == "__main__":

@@ -397,7 +397,8 @@ class DispatcherWithSendTests_UsePoll(DispatcherWithSendTests):
 class FileWrapperTest(unittest.TestCase):
     def setUp(self):
         self.d = b"It's not dead, it's sleeping!"
-        open(TESTFN, 'wb').write(self.d)
+        with open(TESTFN, 'wb') as file:
+            file.write(self.d)
 
     def tearDown(self):
         unlink(TESTFN)
@@ -424,7 +425,8 @@ class FileWrapperTest(unittest.TestCase):
         w.write(d1)
         w.send(d2)
         w.close()
-        self.assertEqual(open(TESTFN, 'rb').read(), self.d + d1 + d2)
+        with open(TESTFN, 'rb') as file:
+            self.assertEqual(file.read(), self.d + d1 + d2)
 
     @unittest.skipUnless(hasattr(asyncore, 'file_dispatcher'),
                          'asyncore.file_dispatcher required')
@@ -562,6 +564,7 @@ class BaseTestAPI(unittest.TestCase):
                 asyncore.dispatcher.handle_accept(self)
 
             def handle_accepted(self, sock, addr):
+                sock.close()
                 self.flag = True
 
         server = TestListener()
@@ -719,6 +722,7 @@ class BaseTestAPI(unittest.TestCase):
             s = asyncore.dispatcher(socket.socket())
             self.assertFalse(s.socket.getsockopt(socket.SOL_SOCKET,
                                                  socket.SO_REUSEADDR))
+            s.socket.close()
             s.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             s.set_reuse_addr()
             self.assertTrue(s.socket.getsockopt(socket.SOL_SOCKET,

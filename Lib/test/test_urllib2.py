@@ -631,22 +631,32 @@ class HandlerTests(unittest.TestCase):
         h = NullFTPHandler(data)
         o = h.parent = MockOpener()
 
-        for url, host, port, type_, dirs, filename, mimetype in [
+        for url, host, port, user, passwd, type_, dirs, filename, mimetype in [
             ("ftp://localhost/foo/bar/baz.html",
-             "localhost", ftplib.FTP_PORT, "I",
+             "localhost", ftplib.FTP_PORT, "", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "parrot", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://%25parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "%parrot", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://%2542parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "%42parrot", "", "I",
              ["foo", "bar"], "baz.html", "text/html"),
             ("ftp://localhost:80/foo/bar/",
-             "localhost", 80, "D",
+             "localhost", 80, "", "", "D",
              ["foo", "bar"], "", None),
             ("ftp://localhost/baz.gif;type=a",
-             "localhost", ftplib.FTP_PORT, "A",
+             "localhost", ftplib.FTP_PORT, "", "", "A",
              [], "baz.gif", None),  # XXX really this should guess image/gif
             ]:
             req = Request(url)
             req.timeout = None
             r = h.ftp_open(req)
             # ftp authentication not yet implemented by FTPHandler
-            self.assertTrue(h.user == h.passwd == "")
+            self.assertEqual(h.user, user)
+            self.assertEqual(h.passwd, passwd)
             self.assertEqual(h.host, socket.gethostbyname(host))
             self.assertEqual(h.port, port)
             self.assertEqual(h.dirs, dirs)
@@ -837,6 +847,25 @@ class HandlerTests(unittest.TestCase):
             ds_req.set_proxy("someproxy:3128",None)
             p_ds_req = h.do_request_(ds_req)
             self.assertEqual(p_ds_req.unredirected_hdrs["Host"],"example.com")
+
+    def test_fixpath_in_weirdurls(self):
+        # Issue4493: urllib2 to supply '/' when to urls where path does not
+        # start with'/'
+
+        h = urllib.request.AbstractHTTPHandler()
+        o = h.parent = MockOpener()
+
+        weird_url = 'http://www.python.org?getspam'
+        req = Request(weird_url)
+        newreq = h.do_request_(req)
+        self.assertEqual(newreq.host,'www.python.org')
+        self.assertEqual(newreq.selector,'/?getspam')
+
+        url_without_path = 'http://www.python.org'
+        req = Request(url_without_path)
+        newreq = h.do_request_(req)
+        self.assertEqual(newreq.host,'www.python.org')
+        self.assertEqual(newreq.selector,'')
 
 
     def test_errors(self):

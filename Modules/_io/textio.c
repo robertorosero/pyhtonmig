@@ -658,6 +658,7 @@ typedef struct
     char writetranslate;
     char seekable;
     char telling;
+    char deallocating;
     /* Specialized encoding func (see below) */
     encodefunc_t encodefunc;
     /* Whether or not it's the start of the stream */
@@ -1094,6 +1095,7 @@ _textiowrapper_clear(textio *self)
 static void
 textiowrapper_dealloc(textio *self)
 {
+    self->deallocating = 1;
     if (_textiowrapper_clear(self) < 0)
         return;
     _PyObject_GC_UNTRACK(self);
@@ -2381,6 +2383,14 @@ textiowrapper_isatty(textio *self, PyObject *args)
 }
 
 static PyObject *
+textiowrapper_getstate(textio *self, PyObject *args)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "cannot serialize '%s' object", Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
+static PyObject *
 textiowrapper_flush(textio *self, PyObject *args)
 {
     CHECK_INITIALIZED(self);
@@ -2410,6 +2420,13 @@ textiowrapper_close(textio *self, PyObject *args)
         Py_RETURN_NONE; /* stream already closed */
     }
     else {
+        if (self->deallocating) {
+            res = PyObject_CallMethod(self->buffer, "_dealloc_warn", "O", self);
+            if (res)
+                Py_DECREF(res);
+            else
+                PyErr_Clear();
+        }
         res = PyObject_CallMethod((PyObject *)self, "flush", NULL);
         if (res == NULL) {
             return NULL;
@@ -2537,6 +2554,7 @@ static PyMethodDef textiowrapper_methods[] = {
     {"readable", (PyCFunction)textiowrapper_readable, METH_NOARGS},
     {"writable", (PyCFunction)textiowrapper_writable, METH_NOARGS},
     {"isatty", (PyCFunction)textiowrapper_isatty, METH_NOARGS},
+    {"__getstate__", (PyCFunction)textiowrapper_getstate, METH_NOARGS},
 
     {"seek", (PyCFunction)textiowrapper_seek, METH_VARARGS},
     {"tell", (PyCFunction)textiowrapper_tell, METH_NOARGS},

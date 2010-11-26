@@ -5,18 +5,8 @@
 import test.support, unittest
 import os
 import sys
-from test.script_helper import spawn_python, kill_python, assert_python_ok, assert_python_failure
-
-# spawn_python normally enforces use of -E to avoid environmental effects
-# but one test checks PYTHONPATH behaviour explicitly
-# XXX (ncoghlan): Give script_helper.spawn_python an option to switch
-# off the -E flag that is normally inserted automatically
 import subprocess
-def _spawn_python_with_env(*args):
-    cmd_line = [sys.executable]
-    cmd_line.extend(args)
-    return subprocess.Popen(cmd_line, stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+from test.script_helper import spawn_python, kill_python, assert_python_ok, assert_python_failure
 
 
 # XXX (ncoghlan): Move to script_helper and make consistent with run_python
@@ -67,6 +57,15 @@ class CmdLineTest(unittest.TestCase):
         rc, out, err = assert_python_ok('-vv')
         self.assertNotIn(b'stack overflow', err)
 
+    def test_xoptions(self):
+        rc, out, err = assert_python_ok('-c', 'import sys; print(sys._xoptions)')
+        opts = eval(out.splitlines()[0])
+        self.assertEqual(opts, {})
+        rc, out, err = assert_python_ok(
+            '-Xa', '-Xb=c,d=e', '-c', 'import sys; print(sys._xoptions)')
+        opts = eval(out.splitlines()[0])
+        self.assertEqual(opts, {'a': True, 'b': 'c,d=e'})
+
     def test_run_module(self):
         # Test expected operation of the '-m' switch
         # Switch needs an argument
@@ -99,14 +98,86 @@ class CmdLineTest(unittest.TestCase):
         # All good if execution is successful
         assert_python_ok('-c', 'pass')
 
+    @unittest.skipIf(sys.getfilesystemencoding() == 'ascii',
+                     'need a filesystem encoding different than ASCII')
+    def test_non_ascii(self):
         # Test handling of non-ascii data
-        if sys.getfilesystemencoding() != 'ascii':
-            if test.support.verbose:
-                import locale
-                print('locale encoding = %s, filesystem encoding = %s'
-                      % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
-            command = "assert(ord('\xe9') == 0xe9)"
-            assert_python_ok('-c', command)
+        if test.support.verbose:
+            import locale
+            print('locale encoding = %s, filesystem encoding = %s'
+                  % (locale.getpreferredencoding(), sys.getfilesystemencoding()))
+        command = "assert(ord('\xe9') == 0xe9)"
+        assert_python_ok('-c', command)
+
+    # On Windows, pass bytes to subprocess doesn't test how Python decodes the
+    # command line, but how subprocess does decode bytes to unicode. Python
+    # doesn't decode the command line because Windows provides directly the
+    # arguments as unicode (using wmain() instead of main()).
+    @unittest.skipIf(sys.platform == 'win32',
+                     'Windows has a native unicode API')
+    def test_undecodable_code(self):
+        undecodable = b"\xff"
+        env = os.environ.copy()
+        # Use C locale to get ascii for the locale encoding
+        env['LC_ALL'] = 'C'
+        code = (
+            b'import locale; '
+            b'print(ascii("' + undecodable + b'"), '
+                b'locale.getpreferredencoding())')
+        p = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            env=env)
+        stdout, stderr = p.communicate()
+        if p.returncode == 1:
+            # _Py_char2wchar() decoded b'\xff' as '\udcff' (b'\xff' is not
+            # decodable from ASCII) and run_command() failed on
+            # PyUnicode_AsUTF8String(). This is the expected behaviour on
+            # Linux.
+            pattern = b"Unable to decode the command from the command line:"
+        elif p.returncode == 0:
+            # _Py_char2wchar() decoded b'\xff' as '\xff' even if the locale is
+            # C and the locale encoding is ASCII. It occurs on FreeBSD, Solaris
+            # and Mac OS X.
+            pattern = b"'\\xff' "
+            # The output is followed by the encoding name, an alias to ASCII.
+            # Examples: "US-ASCII" or "646" (ISO 646, on Solaris).
+        else:
+            raise AssertionError("Unknown exit code: %s, output=%a" % (p.returncode, stdout))
+        if not stdout.startswith(pattern):
+            raise AssertionError("%a doesn't start with %a" % (stdout, pattern))
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'test specific to Mac OS X')
+    def test_osx_utf8(self):
+        def check_output(text):
+            decoded = text.decode('utf8', 'surrogateescape')
+            expected = ascii(decoded).encode('ascii') + b'\n'
+
+            env = os.environ.copy()
+            # C locale gives ASCII locale encoding, but Python uses UTF-8
+            # to parse the command line arguments on Mac OS X
+            env['LC_ALL'] = 'C'
+
+            p = subprocess.Popen(
+                (sys.executable, "-c", "import sys; print(ascii(sys.argv[1]))", text),
+                stdout=subprocess.PIPE,
+                env=env)
+            stdout, stderr = p.communicate()
+            self.assertEqual(stdout, expected)
+            self.assertEqual(p.returncode, 0)
+
+        # test valid utf-8
+        text = 'e:\xe9, euro:\u20ac, non-bmp:\U0010ffff'.encode('utf-8')
+        check_output(text)
+
+        # test invalid utf-8
+        text = (
+            b'\xff'         # invalid byte
+            b'\xc3\xa9'     # valid utf-8 character
+            b'\xc3\xff'     # invalid byte sequence
+            b'\xed\xa0\x80' # lone surrogate character (invalid)
+        )
+        check_output(text)
 
     def test_unbuffered_output(self):
         # Test expected operation of the '-u' switch
@@ -136,22 +207,19 @@ class CmdLineTest(unittest.TestCase):
         self.assertTrue(data.startswith(b'x'), data)
 
     def test_large_PYTHONPATH(self):
-        with test.support.EnvironmentVarGuard() as env:
-            path1 = "ABCDE" * 100
-            path2 = "FGHIJ" * 100
-            env['PYTHONPATH'] = path1 + os.pathsep + path2
+        path1 = "ABCDE" * 100
+        path2 = "FGHIJ" * 100
+        path = path1 + os.pathsep + path2
 
-            code = """
-import sys
-path = ":".join(sys.path)
-path = path.encode("ascii", "backslashreplace")
-sys.stdout.buffer.write(path)"""
-            code = code.strip().splitlines()
-            code = '; '.join(code)
-            p = _spawn_python_with_env('-S', '-c', code)
-            stdout, _ = p.communicate()
-            self.assertIn(path1.encode('ascii'), stdout)
-            self.assertIn(path2.encode('ascii'), stdout)
+        code = """if 1:
+            import sys
+            path = ":".join(sys.path)
+            path = path.encode("ascii", "backslashreplace")
+            sys.stdout.buffer.write(path)"""
+        rc, out, err = assert_python_ok('-S', '-c', code,
+                                        PYTHONPATH=path)
+        self.assertIn(path1.encode('ascii'), out)
+        self.assertIn(path2.encode('ascii'), out)
 
 
 def test_main():

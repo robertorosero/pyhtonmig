@@ -197,6 +197,7 @@ typedef struct {
     int detached;
     int readable;
     int writable;
+    int deallocating;
     
     /* True if this is a vanilla Buffered object (rather than a user derived
        class) *and* the raw stream is a vanilla FileIO object. */
@@ -342,6 +343,7 @@ typedef struct {
 static void
 buffered_dealloc(buffered *self)
 {
+    self->deallocating = 1;
     if (self->ok && _PyIOBase_finalize((PyObject *) self) < 0)
         return;
     _PyObject_GC_UNTRACK(self);
@@ -380,6 +382,23 @@ buffered_clear(buffered *self)
     Py_CLEAR(self->raw);
     Py_CLEAR(self->dict);
     return 0;
+}
+
+/* Because this can call arbitrary code, it shouldn't be called when
+   the refcount is 0 (that is, not directly from tp_dealloc unless
+   the refcount has been temporarily re-incremented). */
+static PyObject *
+buffered_dealloc_warn(buffered *self, PyObject *source)
+{
+    if (self->ok && self->raw) {
+        PyObject *r;
+        r = PyObject_CallMethod(self->raw, "_dealloc_warn", "O", source);
+        if (r)
+            Py_DECREF(r);
+        else
+            PyErr_Clear();
+    }
+    Py_RETURN_NONE;
 }
 
 /*
@@ -434,6 +453,14 @@ buffered_close(buffered *self, PyObject *args)
         res = Py_None;
         Py_INCREF(res);
         goto end;
+    }
+
+    if (self->deallocating) {
+        PyObject *r = buffered_dealloc_warn(self, (PyObject *) self);
+        if (r)
+            Py_DECREF(r);
+        else
+            PyErr_Clear();
     }
     /* flush() will most probably re-take the lock, so drop it first */
     LEAVE_BUFFERED(self)
@@ -522,6 +549,15 @@ buffered_isatty(buffered *self, PyObject *args)
     return PyObject_CallMethodObjArgs(self->raw, _PyIO_str_isatty, NULL);
 }
 
+/* Serialization */
+
+static PyObject *
+buffered_getstate(buffered *self, PyObject *args)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "cannot serialize '%s' object", Py_TYPE(self)->tp_name);
+    return NULL;
+}
 
 /* Forward decls */
 static PyObject *
@@ -1461,6 +1497,8 @@ static PyMethodDef bufferedreader_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"read", (PyCFunction)buffered_read, METH_VARARGS},
     {"peek", (PyCFunction)buffered_peek, METH_VARARGS},
@@ -1843,6 +1881,8 @@ static PyMethodDef bufferedwriter_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"write", (PyCFunction)bufferedwriter_write, METH_VARARGS},
     {"truncate", (PyCFunction)buffered_truncate, METH_VARARGS},
@@ -2108,6 +2148,8 @@ static PyMethodDef bufferedrwpair_methods[] = {
     {"close", (PyCFunction)bufferedrwpair_close, METH_NOARGS},
     {"isatty", (PyCFunction)bufferedrwpair_isatty, METH_NOARGS},
 
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
+
     {NULL, NULL}
 };
 
@@ -2227,6 +2269,8 @@ static PyMethodDef bufferedrandom_methods[] = {
     {"writable", (PyCFunction)buffered_writable, METH_NOARGS},
     {"fileno", (PyCFunction)buffered_fileno, METH_NOARGS},
     {"isatty", (PyCFunction)buffered_isatty, METH_NOARGS},
+    {"_dealloc_warn", (PyCFunction)buffered_dealloc_warn, METH_O},
+    {"__getstate__", (PyCFunction)buffered_getstate, METH_NOARGS},
 
     {"flush", (PyCFunction)buffered_flush, METH_NOARGS},
 
@@ -2296,4 +2340,3 @@ PyTypeObject PyBufferedRandom_Type = {
     0,                          /* tp_alloc */
     PyType_GenericNew,          /* tp_new */
 };
-

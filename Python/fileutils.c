@@ -16,7 +16,10 @@
    Return a pointer to a newly allocated wide character string (use
    PyMem_Free() to free the memory) and write the number of written wide
    characters excluding the null character into *size if size is not NULL, or
-   NULL on error (conversion error or memory error). */
+   NULL on error (conversion or memory allocation error).
+
+   Conversion errors should never happen, unless there is a bug in the C
+   library. */
 wchar_t*
 _Py_char2wchar(const char* arg, size_t *size)
 {
@@ -64,7 +67,8 @@ _Py_char2wchar(const char* arg, size_t *size)
        actual output could use less memory. */
     argsize = strlen(arg) + 1;
     res = (wchar_t*)PyMem_Malloc(argsize*sizeof(wchar_t));
-    if (!res) goto oom;
+    if (!res)
+        goto oom;
     in = (unsigned char*)arg;
     out = res;
     memset(&mbs, 0, sizeof mbs);
@@ -79,6 +83,7 @@ _Py_char2wchar(const char* arg, size_t *size)
                unless there is a bug in the C library, or I
                misunderstood how mbrtowc works. */
             fprintf(stderr, "unexpected mbrtowc result -2\n");
+            PyMem_Free(res);
             return NULL;
         }
         if (converted == (size_t)-1) {
@@ -132,14 +137,20 @@ oom:
    This function is the reverse of _Py_char2wchar().
 
    Return a pointer to a newly allocated byte string (use PyMem_Free() to free
-   the memory), or NULL on error (conversion error or memory error). */
+   the memory), or NULL on conversion or memory allocation error.
+
+   If error_pos is not NULL: *error_pos is the index of the invalid character
+   on conversion error, or (size_t)-1 otherwise. */
 char*
-_Py_wchar2char(const wchar_t *text)
+_Py_wchar2char(const wchar_t *text, size_t *error_pos)
 {
     const size_t len = wcslen(text);
     char *result = NULL, *bytes = NULL;
     size_t i, size, converted;
     wchar_t c, buf[2];
+
+    if (error_pos != NULL)
+        *error_pos = (size_t)-1;
 
     /* The function works in two steps:
        1. compute the length of the output buffer in bytes (size)
@@ -168,6 +179,8 @@ _Py_wchar2char(const wchar_t *text)
                 if (converted == (size_t)-1) {
                     if (result != NULL)
                         PyMem_Free(result);
+                    if (error_pos != NULL)
+                        *error_pos = i;
                     return NULL;
                 }
                 if (bytes != NULL) {
@@ -208,7 +221,7 @@ _Py_wstat(const wchar_t* path, struct stat *buf)
 {
     int err;
     char *fname;
-    fname = _Py_wchar2char(path);
+    fname = _Py_wchar2char(path, NULL);
     if (fname == NULL) {
         errno = EINVAL;
         return -1;
@@ -263,7 +276,7 @@ _Py_wfopen(const wchar_t *path, const wchar_t *mode)
         errno = EINVAL;
         return NULL;
     }
-    cpath = _Py_wchar2char(path);
+    cpath = _Py_wchar2char(path, NULL);
     if (cpath == NULL)
         return NULL;
     f = fopen(cpath, cmode);
@@ -317,7 +330,7 @@ _Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t bufsiz)
     int res;
     size_t r1;
 
-    cpath = _Py_wchar2char(path);
+    cpath = _Py_wchar2char(path, NULL);
     if (cpath == NULL) {
         errno = EINVAL;
         return -1;
@@ -361,7 +374,7 @@ _Py_wrealpath(const wchar_t *path,
     wchar_t *wresolved_path;
     char *res;
     size_t r;
-    cpath = _Py_wchar2char(path);
+    cpath = _Py_wchar2char(path, NULL);
     if (cpath == NULL) {
         errno = EINVAL;
         return NULL;

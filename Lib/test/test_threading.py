@@ -327,6 +327,8 @@ class ThreadTests(BaseTestCase):
             """],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.stderr.close)
         stdout, stderr = p.communicate()
         rc = p.returncode
         self.assertFalse(rc == 2, "interpreted was blocked")
@@ -352,6 +354,8 @@ class ThreadTests(BaseTestCase):
             """],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.stderr.close)
         stdout, stderr = p.communicate()
         self.assertEqual(stdout.strip(),
             b"Woke up, sleep function is: <built-in function sleep>")
@@ -394,17 +398,17 @@ class ThreadTests(BaseTestCase):
         weak_cyclic_object = weakref.ref(cyclic_object)
         cyclic_object.thread.join()
         del cyclic_object
-        self.assertEquals(None, weak_cyclic_object(),
-                          msg=('%d references still around' %
-                               sys.getrefcount(weak_cyclic_object())))
+        self.assertEqual(None, weak_cyclic_object(),
+                         msg=('%d references still around' %
+                              sys.getrefcount(weak_cyclic_object())))
 
         raising_cyclic_object = RunSelfFunction(should_raise=True)
         weak_raising_cyclic_object = weakref.ref(raising_cyclic_object)
         raising_cyclic_object.thread.join()
         del raising_cyclic_object
-        self.assertEquals(None, weak_raising_cyclic_object(),
-                          msg=('%d references still around' %
-                               sys.getrefcount(weak_raising_cyclic_object())))
+        self.assertEqual(None, weak_raising_cyclic_object(),
+                         msg=('%d references still around' %
+                              sys.getrefcount(weak_raising_cyclic_object())))
 
     def test_old_threading_api(self):
         # Just a quick sanity check to make sure the old method names are
@@ -445,6 +449,7 @@ class ThreadJoinOnShutdown(BaseTestCase):
         p = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE)
         rc = p.wait()
         data = p.stdout.read().decode().replace('\r', '')
+        p.stdout.close()
         self.assertEqual(data, "end of main\nend of thread\n")
         self.assertFalse(rc == 2, "interpreter was blocked")
         self.assertTrue(rc == 0, "Unexpected error")
@@ -555,6 +560,8 @@ class SemaphoreTests(lock_tests.SemaphoreTests):
 class BoundedSemaphoreTests(lock_tests.BoundedSemaphoreTests):
     semtype = staticmethod(threading.BoundedSemaphore)
 
+class BarrierTests(lock_tests.BarrierTests):
+    barriertype = staticmethod(threading.Barrier)
 
 def test_main():
     test.support.run_unittest(LockTests, PyRLockTests, CRLockTests, EventTests,
@@ -563,6 +570,7 @@ def test_main():
                               ThreadTests,
                               ThreadJoinOnShutdown,
                               ThreadingExceptionTests,
+                              BarrierTests
                               )
 
 if __name__ == "__main__":

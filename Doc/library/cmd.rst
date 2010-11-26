@@ -11,6 +11,9 @@ command interpreters.  These are often useful for test harnesses, administrative
 tools, and prototypes that will later be wrapped in a more sophisticated
 interface.
 
+.. seealso::
+
+   Latest version of the :source:`cmd module Python source code <Lib/cmd.py>`
 
 .. class:: Cmd(completekey='tab', stdin=None, stdout=None)
 
@@ -204,7 +207,7 @@ Instances of :class:`Cmd` subclasses have some public instance variables:
    support :program:`Emacs`\ -like line editing  and command-history keystrokes.)
 
 Cmd Example
-===========
+-----------
 
 .. sectionauthor:: Raymond Hettinger <python at rcn dot com>
 

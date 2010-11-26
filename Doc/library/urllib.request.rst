@@ -72,6 +72,10 @@ The :mod:`urllib.request` module defines the following functions:
    .. versionchanged:: 3.2
       *cafile* and *capath* were added.
 
+   .. versionchanged:: 3.2
+      HTTPS virtual hosts are now supported if possible (that is, if
+      :data:`ssl.HAS_SNI` is true).
+
 .. function:: install_opener(opener)
 
    Install an :class:`OpenerDirector` instance as the default global opener.
@@ -1276,7 +1280,7 @@ The following example uses no proxies at all, overriding environment settings::
 
 The :mod:`urllib.response` module defines functions and classes which define a
 minimal file like interface, including ``read()`` and ``readline()``. The
-typical response object is an addinfourl instance, which defines and ``info()``
+typical response object is an addinfourl instance, which defines an ``info()``
 method and that returns headers and a ``geturl()`` method that returns the url.
 Functions defined by this module are used internally by the
 :mod:`urllib.request` module.

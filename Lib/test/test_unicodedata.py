@@ -225,6 +225,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         error = "SyntaxError: (unicode error) \\N escapes not supported " \
             "(can't load unicodedata module)"
         self.assertIn(error, popen.stderr.read().decode("ascii"))
+        popen.stderr.close()
 
     def test_decimal_numeric_consistent(self):
         # Test that decimal and numeric are consistent,
@@ -253,7 +254,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertTrue(count >= 10) # should have tested at least the ASCII digits
 
     def test_bug_1704793(self):
-        self.assertEquals(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
+        self.assertEqual(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
 
     def test_ucd_510(self):
         import unicodedata

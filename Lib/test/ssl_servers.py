@@ -3,13 +3,13 @@ import sys
 import ssl
 import pprint
 import socket
-import threading
 import urllib.parse
 # Rename HTTPServer to _HTTPServer so as to avoid confusion with HTTPSServer.
 from http.server import (HTTPServer as _HTTPServer,
     SimpleHTTPRequestHandler, BaseHTTPRequestHandler)
 
 from test import support
+threading = support.import_module("threading")
 
 here = os.path.dirname(__file__)
 
@@ -133,7 +133,10 @@ class HTTPSServerThread(threading.Thread):
     def run(self):
         if self.flag:
             self.flag.set()
-        self.server.serve_forever(0.05)
+        try:
+            self.server.serve_forever(0.05)
+        finally:
+            self.server.server_close()
 
     def stop(self):
         self.server.shutdown()
@@ -181,4 +184,6 @@ if __name__ == "__main__":
     context.load_cert_chain(CERTFILE)
 
     server = HTTPSServer(("", args.port), handler_class, context)
+    if args.verbose:
+        print("Listening on https://localhost:{0.port}".format(args))
     server.serve_forever(0.1)

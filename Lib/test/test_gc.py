@@ -485,20 +485,24 @@ class GCTests(unittest.TestCase):
             gc.set_debug(%s)
         """
         def run_command(code):
-            p = subprocess.Popen([sys.executable, "-c", code],
+            p = subprocess.Popen([sys.executable, "-Wd", "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
             stdout, stderr = p.communicate()
+            p.stdout.close()
+            p.stderr.close()
             self.assertEqual(p.returncode, 0)
             self.assertEqual(stdout.strip(), b"")
             return strip_python_stderr(stderr)
 
         stderr = run_command(code % "0")
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown; use", stderr)
         self.assertNotIn(b"<X 'first'>", stderr)
         # With DEBUG_UNCOLLECTABLE, the garbage list gets printed
         stderr = run_command(code % "gc.DEBUG_UNCOLLECTABLE")
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown", stderr)
         self.assertTrue(
             (b"[<X 'first'>, <X 'second'>]" in stderr) or
             (b"[<X 'second'>, <X 'first'>]" in stderr), stderr)

@@ -67,7 +67,6 @@ Iterator                                         Arguments                  Resu
 :func:`permutations`                             p[, r]                     r-length tuples, all possible orderings, no repeated elements
 :func:`combinations`                             p, r                       r-length tuples, in sorted order, no repeated elements
 :func:`combinations_with_replacement`            p, r                       r-length tuples, in sorted order, with repeated elements
-|
 ``product('ABCD', repeat=2)``                                               ``AA AB AC AD BA BB BC BD CA CB CC CD DA DB DC DD``
 ``permutations('ABCD', 2)``                                                 ``AB AC AD BA BC BD CA CB CD DA DB DC``
 ``combinations('ABCD', 2)``                                                 ``AB AC AD BC BD CD``
@@ -323,7 +322,7 @@ loops that truncate the stream.
 
    :func:`groupby` is equivalent to::
 
-      class groupby(object):
+      class groupby:
           # [k for k, g in groupby('AAAABBBCCDAABBB')] --> A B C D A B
           # [list(g) for k, g in groupby('AAAABBBCCD')] --> AAAA BBB CC D
           def __init__(self, iterable, key=None):

@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-1 -*-
 """ Test script for the Unicode implementation.
 
 Written by Marc-Andre Lemburg (mal@lemburg.com).
@@ -403,11 +402,11 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertTrue("b0".isidentifier())
         self.assertTrue("bc".isidentifier())
         self.assertTrue("b_".isidentifier())
-        self.assertTrue("µ".isidentifier())
+        self.assertTrue("Âµ".isidentifier())
 
         self.assertFalse(" ".isidentifier())
         self.assertFalse("[".isidentifier())
-        self.assertFalse("©".isidentifier())
+        self.assertFalse("Â©".isidentifier())
         self.assertFalse("0".isidentifier())
 
     def test_isprintable(self):
@@ -695,6 +694,46 @@ class UnicodeTest(string_tests.CommonTest,
         # Alternate formatting is not supported
         self.assertRaises(ValueError, format, '', '#')
         self.assertRaises(ValueError, format, '', '#20')
+
+    def test_format_map(self):
+        self.assertEqual(''.format_map({}), '')
+        self.assertEqual('a'.format_map({}), 'a')
+        self.assertEqual('ab'.format_map({}), 'ab')
+        self.assertEqual('a{{'.format_map({}), 'a{')
+        self.assertEqual('a}}'.format_map({}), 'a}')
+        self.assertEqual('{{b'.format_map({}), '{b')
+        self.assertEqual('}}b'.format_map({}), '}b')
+        self.assertEqual('a{{b'.format_map({}), 'a{b')
+
+        # using mappings
+        class Mapping(dict):
+            def __missing__(self, key):
+                return key
+        self.assertEqual('{hello}'.format_map(Mapping()), 'hello')
+        self.assertEqual('{a} {world}'.format_map(Mapping(a='hello')), 'hello world')
+
+        class InternalMapping:
+            def __init__(self):
+                self.mapping = {'a': 'hello'}
+            def __getitem__(self, key):
+                return self.mapping[key]
+        self.assertEqual('{a}'.format_map(InternalMapping()), 'hello')
+
+
+        class C:
+            def __init__(self, x=100):
+                self._x = x
+            def __format__(self, spec):
+                return spec
+        self.assertEqual('{foo._x}'.format_map({'foo': C(20)}), '20')
+
+        # test various errors
+        self.assertRaises(TypeError, '{'.format_map)
+        self.assertRaises(TypeError, '}'.format_map)
+        self.assertRaises(TypeError, 'a{'.format_map)
+        self.assertRaises(TypeError, 'a}'.format_map)
+        self.assertRaises(TypeError, '{a'.format_map)
+        self.assertRaises(TypeError, '}a'.format_map)
 
     def test_format_auto_numbering(self):
         class C:
@@ -1400,27 +1439,28 @@ class UnicodeTest(string_tests.CommonTest,
     # Test PyUnicode_AsWideChar()
     def test_aswidechar(self):
         from _testcapi import unicode_aswidechar
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidechar('abcdef', 2)
-        self.assertEquals(size, 2)
-        self.assertEquals(wchar, 'ab')
+        self.assertEqual(size, 2)
+        self.assertEqual(wchar, 'ab')
 
         wchar, size = unicode_aswidechar('abc', 3)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc')
 
         wchar, size = unicode_aswidechar('abc', 4)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidechar('abc', 10)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidechar('abc\0def', 20)
-        self.assertEquals(size, 7)
-        self.assertEquals(wchar, 'abc\0def\0')
+        self.assertEqual(size, 7)
+        self.assertEqual(wchar, 'abc\0def\0')
 
         nonbmp = chr(0x10ffff)
         if sizeof(c_wchar) == 2:
@@ -1430,21 +1470,22 @@ class UnicodeTest(string_tests.CommonTest,
             buflen = 2
             nchar = 1
         wchar, size = unicode_aswidechar(nonbmp, buflen)
-        self.assertEquals(size, nchar)
-        self.assertEquals(wchar, nonbmp + '\0')
+        self.assertEqual(size, nchar)
+        self.assertEqual(wchar, nonbmp + '\0')
 
     # Test PyUnicode_AsWideCharString()
     def test_aswidecharstring(self):
         from _testcapi import unicode_aswidecharstring
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidecharstring('abc')
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidecharstring('abc\0def')
-        self.assertEquals(size, 7)
-        self.assertEquals(wchar, 'abc\0def\0')
+        self.assertEqual(size, 7)
+        self.assertEqual(wchar, 'abc\0def\0')
 
         nonbmp = chr(0x10ffff)
         if sizeof(c_wchar) == 2:
@@ -1452,8 +1493,8 @@ class UnicodeTest(string_tests.CommonTest,
         else: # sizeof(c_wchar) == 4
             nchar = 1
         wchar, size = unicode_aswidecharstring(nonbmp)
-        self.assertEquals(size, nchar)
-        self.assertEquals(wchar, nonbmp + '\0')
+        self.assertEqual(size, nchar)
+        self.assertEqual(wchar, nonbmp + '\0')
 
 
 def test_main():

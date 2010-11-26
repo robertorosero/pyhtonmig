@@ -61,9 +61,10 @@ define lineno
       set $__p = $__p + 1
       if ($__ad > $__lasti)
 	set $__continue = 0
+      else
+        set $__li = $__li + *$__p
+        set $__p = $__p + 1
       end
-      set $__li = $__li + *$__p
-      set $__p = $__p + 1
     end
     printf "%d", $__li
 end

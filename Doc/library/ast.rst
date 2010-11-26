@@ -1,7 +1,5 @@
-.. _ast:
-
-Abstract Syntax Trees
-=====================
+:mod:`ast` --- Abstract Syntax Trees
+====================================
 
 .. module:: ast
    :synopsis: Abstract Syntax Tree classes and manipulation.
@@ -21,6 +19,9 @@ helper provided in this module.  The result will be a tree of objects whose
 classes all inherit from :class:`ast.AST`.  An abstract syntax tree can be
 compiled into a Python code object using the built-in :func:`compile` function.
 
+.. seealso::
+
+   Latest version of the :source:`ast module Python source code <Lib/ast.py>`
 
 Node classes
 ------------

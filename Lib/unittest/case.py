@@ -191,6 +191,27 @@ class _AssertWarnsContext(_AssertRaisesBaseContext):
                 .format(exc_name))
 
 
+class _TypeEqualityDict(object):
+
+    def __init__(self, testcase):
+        self.testcase = testcase
+        self._store = {}
+
+    def __setitem__(self, key, value):
+        self._store[key] = value
+
+    def __getitem__(self, key):
+        value = self._store[key]
+        if isinstance(value, str):
+            return getattr(self.testcase, value)
+        return value
+
+    def get(self, key, default=None):
+        if key in self._store:
+            return self[key]
+        return default
+
+
 class TestCase(object):
     """A class whose instances are single test cases.
 
@@ -253,13 +274,13 @@ class TestCase(object):
         # Map types to custom assertEqual functions that will compare
         # instances of said type in more detail to generate a more useful
         # error message.
-        self._type_equality_funcs = {}
-        self.addTypeEqualityFunc(dict, self.assertDictEqual)
-        self.addTypeEqualityFunc(list, self.assertListEqual)
-        self.addTypeEqualityFunc(tuple, self.assertTupleEqual)
-        self.addTypeEqualityFunc(set, self.assertSetEqual)
-        self.addTypeEqualityFunc(frozenset, self.assertSetEqual)
-        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
+        self._type_equality_funcs = _TypeEqualityDict(self)
+        self.addTypeEqualityFunc(dict, 'assertDictEqual')
+        self.addTypeEqualityFunc(list, 'assertListEqual')
+        self.addTypeEqualityFunc(tuple, 'assertTupleEqual')
+        self.addTypeEqualityFunc(set, 'assertSetEqual')
+        self.addTypeEqualityFunc(frozenset, 'assertSetEqual')
+        self.addTypeEqualityFunc(str, 'assertMultiLineEqual')
 
     def addTypeEqualityFunc(self, typeobj, function):
         """Add a type specific assertEqual style function to compare a type.
@@ -595,7 +616,7 @@ class TestCase(object):
                                                           safe_repr(second)))
             raise self.failureException(msg)
 
-    def assertAlmostEqual(self, first, second, *, places=None, msg=None,
+    def assertAlmostEqual(self, first, second, places=None, msg=None,
                           delta=None):
         """Fail if the two objects are unequal as determined by their
            difference rounded to the given number of decimal places
@@ -634,7 +655,7 @@ class TestCase(object):
         msg = self._formatMessage(msg, standardMsg)
         raise self.failureException(msg)
 
-    def assertNotAlmostEqual(self, first, second, *, places=None, msg=None,
+    def assertNotAlmostEqual(self, first, second, places=None, msg=None,
                              delta=None):
         """Fail if the two objects are equal as determined by their
            difference rounded to the given number of decimal places
@@ -666,19 +687,7 @@ class TestCase(object):
         msg = self._formatMessage(msg, standardMsg)
         raise self.failureException(msg)
 
-    # Synonyms for assertion methods
 
-    # The plurals are undocumented.  Keep them that way to discourage use.
-    # Do not add more.  Do not remove.
-    # Going through a deprecation cycle on these would annoy many people.
-    assertEquals = assertEqual
-    assertNotEquals = assertNotEqual
-    assertAlmostEquals = assertAlmostEqual
-    assertNotAlmostEquals = assertNotAlmostEqual
-    assert_ = assertTrue
-
-    # These fail* assertion method names are pending deprecation and will
-    # be a DeprecationWarning in 3.2; http://bugs.python.org/issue2578
     def _deprecate(original_func):
         def deprecated_func(*args, **kwargs):
             warnings.warn(
@@ -687,11 +696,13 @@ class TestCase(object):
             return original_func(*args, **kwargs)
         return deprecated_func
 
-    failUnlessEqual = _deprecate(assertEqual)
-    failIfEqual = _deprecate(assertNotEqual)
-    failUnlessAlmostEqual = _deprecate(assertAlmostEqual)
-    failIfAlmostEqual = _deprecate(assertNotAlmostEqual)
-    failUnless = _deprecate(assertTrue)
+    # The fail* methods can be removed in 3.3, the 5 assert* methods will
+    # have to stay around for a few more versions.  See #9424.
+    failUnlessEqual = assertEquals = _deprecate(assertEqual)
+    failIfEqual = assertNotEquals = _deprecate(assertNotEqual)
+    failUnlessAlmostEqual = assertAlmostEquals = _deprecate(assertAlmostEqual)
+    failIfAlmostEqual = assertNotAlmostEquals = _deprecate(assertNotAlmostEqual)
+    failUnless = assert_ = _deprecate(assertTrue)
     failUnlessRaises = _deprecate(assertRaises)
     failIf = _deprecate(assertFalse)
 
@@ -899,8 +910,8 @@ class TestCase(object):
             self.fail(self._formatMessage(msg, standardMsg))
 
     def assertDictEqual(self, d1, d2, msg=None):
-        self.assert_(isinstance(d1, dict), 'First argument is not a dictionary')
-        self.assert_(isinstance(d2, dict), 'Second argument is not a dictionary')
+        self.assertIsInstance(d1, dict, 'First argument is not a dictionary')
+        self.assertIsInstance(d2, dict, 'Second argument is not a dictionary')
 
         if d1 != d2:
             standardMsg = '%s != %s' % (safe_repr(d1, True), safe_repr(d2, True))
@@ -1018,10 +1029,8 @@ class TestCase(object):
 
     def assertMultiLineEqual(self, first, second, msg=None):
         """Assert that two multi-line strings are equal."""
-        self.assert_(isinstance(first, str), (
-                'First argument is not a string'))
-        self.assert_(isinstance(second, str), (
-                'Second argument is not a string'))
+        self.assertIsInstance(first, str, 'First argument is not a string')
+        self.assertIsInstance(second, str, 'Second argument is not a string')
 
         if first != second:
             firstlines = first.splitlines(True)

@@ -62,15 +62,20 @@ Used in:  PY_LONG_LONG
 #define PY_LLONG_MAX LLONG_MAX
 #define PY_ULLONG_MAX ULLONG_MAX
 #elif defined(__LONG_LONG_MAX__)
-/* Otherwise, if GCC has a builtin define, use that. */
+/* Otherwise, if GCC has a builtin define, use that.  (Definition of
+ * PY_LLONG_MIN assumes two's complement with no trap representation.) */
 #define PY_LLONG_MAX __LONG_LONG_MAX__
-#define PY_LLONG_MIN (-PY_LLONG_MAX-1)
-#define PY_ULLONG_MAX (__LONG_LONG_MAX__*2ULL + 1ULL)
-#else
-/* Otherwise, rely on two's complement. */
-#define PY_ULLONG_MAX (~0ULL)
-#define PY_LLONG_MAX  ((long long)(PY_ULLONG_MAX>>1))
-#define PY_LLONG_MIN (-PY_LLONG_MAX-1)
+#define PY_LLONG_MIN (-PY_LLONG_MAX - 1)
+#define PY_ULLONG_MAX (PY_LLONG_MAX * Py_ULL(2) + 1)
+#elif defined(SIZEOF_LONG_LONG)
+/* Otherwise compute from SIZEOF_LONG_LONG, assuming two's complement, no
+   padding bits, and no trap representation.  Note: PY_ULLONG_MAX was
+   previously #defined as (~0ULL) here; but that'll give the wrong value in a
+   preprocessor expression on systems where long long != intmax_t. */
+#define PY_LLONG_MAX                                                    \
+    (1 + 2 * ((Py_LL(1) << (CHAR_BIT * SIZEOF_LONG_LONG - 2)) - 1))
+#define PY_LLONG_MIN (-PY_LLONG_MAX - 1)
+#define PY_ULLONG_MAX (PY_LLONG_MAX * Py_ULL(2) + 1)
 #endif /* LLONG_MAX */
 #endif
 #endif /* HAVE_LONG_LONG */
@@ -135,7 +140,7 @@ Used in:  PY_LONG_LONG
 #else
 #define _PyHASH_BITS 31
 #endif
-#define _PyHASH_MODULUS ((1UL << _PyHASH_BITS) - 1)
+#define _PyHASH_MODULUS (((size_t)1 << _PyHASH_BITS) - 1)
 #define _PyHASH_INF 314159
 #define _PyHASH_NAN 0
 #define _PyHASH_IMAG 1000003UL
@@ -179,6 +184,8 @@ typedef Py_intptr_t     Py_ssize_t;
 
 /* Py_hash_t is the same size as a pointer. */
 typedef Py_ssize_t Py_hash_t;
+/* Py_uhash_t is the unsigned equivalent needed to calculate numeric hash. */
+typedef size_t Py_uhash_t;
 
 /* Largest possible value of size_t.
    SIZE_MAX is part of C99, so it might be defined on some

@@ -164,7 +164,7 @@ access further features, you have to do this yourself:
 .. _debugger-commands:
 
 Debugger Commands
-=================
+-----------------
 
 The commands recognized by the debugger are listed below.  Most commands can be
 abbreviated to one or two letters as indicated; e.g. ``h(elp)`` means that

@@ -424,7 +424,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if fromfile:
         tests = []
         fp = open(os.path.join(support.SAVEDCWD, fromfile))
+        count_pat = re.compile(r'\[\s*\d+/\s*\d+\]')
         for line in fp:
+            line = count_pat.sub('', line)
             guts = line.split() # assuming no test has whitespace in its name
             if guts and not guts[0].startswith('#'):
                 tests.extend(guts)
@@ -872,11 +874,12 @@ class saved_test_environment:
 
     def get_asyncore_socket_map(self):
         asyncore = sys.modules.get('asyncore')
-        return asyncore and asyncore.socket_map or {}
+        # XXX Making a copy keeps objects alive until __exit__ gets called.
+        return asyncore and asyncore.socket_map.copy() or {}
     def restore_asyncore_socket_map(self, saved_map):
         asyncore = sys.modules.get('asyncore')
         if asyncore is not None:
-            asyncore.socket_map.clear()
+            asyncore.close_all(ignore_all=True)
             asyncore.socket_map.update(saved_map)
 
     def resource_info(self):
@@ -892,9 +895,11 @@ class saved_test_environment:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        saved_values = self.saved_values
+        del self.saved_values
         for name, get, restore in self.resource_info():
             current = get()
-            original = self.saved_values[name]
+            original = saved_values.pop(name)
             # Check for changes to the resource's value
             if current != original:
                 self.changed = True
@@ -975,6 +980,12 @@ def runtest_inner(test, verbose, quiet,
 def cleanup_test_droppings(testname, verbose):
     import shutil
     import stat
+    import gc
+
+    # First kill any dangling references to open files etc.
+    # This can also issue some ResourceWarnings which would otherwise get
+    # triggered during the following test run, and possibly produce failures.
+    gc.collect()
 
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
@@ -1269,6 +1280,7 @@ _expectations = {
         test_curses
         test_epoll
         test_dbm_gnu
+        test_gdb
         test_largefile
         test_locale
         test_minidom
@@ -1430,14 +1442,16 @@ class _ExpectedSkips:
             if sys.platform != "win32":
                 # test_sqlite is only reliable on Windows where the library
                 # is distributed with Python
-                WIN_ONLY = ["test_unicode_file", "test_winreg",
+                WIN_ONLY = {"test_unicode_file", "test_winreg",
                             "test_winsound", "test_startfile",
-                            "test_sqlite"]
-                for skip in WIN_ONLY:
-                    self.expected.add(skip)
+                            "test_sqlite"}
+                self.expected |= WIN_ONLY
 
             if sys.platform != 'sunos5':
                 self.expected.add('test_nis')
+
+            if support.python_is_optimized():
+                self.expected.add("test_gdb")
 
             self.valid = True
 

@@ -283,6 +283,7 @@ Py_InitializeEx(int install_sigs)
         Py_FatalError("Py_Initialize: can't set preliminary stderr");
     PySys_SetObject("stderr", pstderr);
     PySys_SetObject("__stderr__", pstderr);
+    Py_DECREF(pstderr);
 
     _PyImport_Init();
 
@@ -298,18 +299,20 @@ Py_InitializeEx(int install_sigs)
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
-    /* Initialize warnings. */
-    if (PySys_HasWarnOptions()) {
-        PyObject *warnings_module = PyImport_ImportModule("warnings");
-        if (!warnings_module)
-            PyErr_Clear();
-        Py_XDECREF(warnings_module);
-    }
-
     initmain(); /* Module __main__ */
     if (initstdio() < 0)
         Py_FatalError(
             "Py_Initialize: can't initialize sys standard streams");
+
+    /* Initialize warnings. */
+    if (PySys_HasWarnOptions()) {
+        PyObject *warnings_module = PyImport_ImportModule("warnings");
+        if (warnings_module == NULL) {
+            fprintf(stderr, "'import warnings' failed; traceback:\n");
+            PyErr_Print();
+        }
+        Py_XDECREF(warnings_module);
+    }
 
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
@@ -605,6 +608,7 @@ Py_NewInterpreter(void)
             Py_FatalError("Py_Initialize: can't set preliminary stderr");
         PySys_SetObject("stderr", pstderr);
         PySys_SetObject("__stderr__", pstderr);
+        Py_DECREF(pstderr);
 
         _PyImportHooks_Init();
         if (initstdio() < 0)
@@ -889,8 +893,10 @@ initstdio(void)
 
     /* Set builtins.open */
     if (PyObject_SetAttrString(bimod, "open", wrapper) == -1) {
+        Py_DECREF(wrapper);
         goto error;
     }
+    Py_DECREF(wrapper);
 
     encoding = Py_GETENV("PYTHONIOENCODING");
     errors = NULL;
@@ -971,6 +977,7 @@ initstdio(void)
         if (encoding != NULL) {
             _PyCodec_Lookup(encoding);
         }
+        Py_DECREF(encoding_attr);
     }
     PyErr_Clear();  /* Not a fatal error if codec isn't available */
 
@@ -1344,7 +1351,7 @@ print_error_text(PyObject *f, int offset, const char *text)
 {
     char *nl;
     if (offset >= 0) {
-        if (offset > 0 && offset == (int)strlen(text))
+        if (offset > 0 && offset == strlen(text) && text[offset - 1] == '\n')
             offset--;
         for (;;) {
             nl = strchr(text, '\n');
@@ -1365,11 +1372,8 @@ print_error_text(PyObject *f, int offset, const char *text)
     if (offset == -1)
         return;
     PyFile_WriteString("    ", f);
-    offset--;
-    while (offset > 0) {
+    while (--offset > 0)
         PyFile_WriteString(" ", f);
-        offset--;
-    }
     PyFile_WriteString("^\n", f);
 }
 

@@ -563,3 +563,84 @@ line.
    entry in the list represents the caller; the last entry represents where the
    exception was raised.
 
+
+Fetching attributes statically
+------------------------------
+
+Both :func:`getattr` and :func:`hasattr` can trigger code execution when
+fetching or checking for the existence of attributes. Descriptors, like
+properties, will be invoked and :meth:`__getattr__` and :meth:`__getattribute__`
+may be called.
+
+For cases where you want passive introspection, like documentation tools, this
+can be inconvenient. `getattr_static` has the same signature as :func:`getattr`
+but avoids executing code when it fetches attributes.
+
+.. function:: getattr_static(obj, attr, default=None)
+
+   Retrieve attributes without triggering dynamic lookup via the
+   descriptor protocol, `__getattr__` or `__getattribute__`.
+
+   Note: this function may not be able to retrieve all attributes
+   that getattr can fetch (like dynamically created attributes)
+   and may find attributes that getattr can't (like descriptors
+   that raise AttributeError). It can also return descriptors objects
+   instead of instance members.
+
+   .. versionadded:: 3.2
+
+The only known case that can cause `getattr_static` to trigger code execution,
+and cause it to return incorrect results (or even break), is where a class uses
+:data:`~object.__slots__` and provides a `__dict__` member using a property or
+descriptor. If you find other cases please report them so they can be fixed
+or documented.
+
+`getattr_static` does not resolve descriptors, for example slot descriptors or
+getset descriptors on objects implemented in C. The descriptor object
+is returned instead of the underlying attribute.
+
+You can handle these with code like the following. Note that
+for arbitrary getset descriptors invoking these may trigger
+code execution::
+
+   # example code for resolving the builtin descriptor types
+   class _foo:
+       __slots__ = ['foo']
+
+   slot_descriptor = type(_foo.foo)
+   getset_descriptor = type(type(open(__file__)).name)
+   wrapper_descriptor = type(str.__dict__['__add__'])
+   descriptor_types = (slot_descriptor, getset_descriptor, wrapper_descriptor)
+
+   result = getattr_static(some_object, 'foo')
+   if type(result) in descriptor_types:
+       try:
+           result = result.__get__()
+       except AttributeError:
+           # descriptors can raise AttributeError to
+           # indicate there is no underlying value
+           # in which case the descriptor itself will
+           # have to do
+           pass
+
+
+Current State of a Generator
+----------------------------
+
+When implementing coroutine schedulers and for other advanced uses of
+generators, it is useful to determine whether a generator is currently
+executing, is waiting to start or resume or execution, or has already
+terminated. func:`getgeneratorstate` allows the current state of a
+generator to be determined easily.
+
+.. function:: getgeneratorstate(generator)
+
+    Get current state of a generator-iterator.
+
+    Possible states are:
+      GEN_CREATED: Waiting to start execution.
+      GEN_RUNNING: Currently being executed by the interpreter.
+      GEN_SUSPENDED: Currently suspended at a yield expression.
+      GEN_CLOSED: Execution has completed.
+
+   .. versionadded:: 3.2

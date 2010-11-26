@@ -1139,7 +1139,7 @@ makesockaddr(SOCKET_T sockfd, struct sockaddr *addr, size_t addrlen, int proto)
         }
 #endif
 
-#ifdef HAVE_NETPACKET_PACKET_H
+#if defined(HAVE_NETPACKET_PACKET_H) && defined(SIOCGIFNAME)
     case AF_PACKET:
     {
         struct sockaddr_ll *a = (struct sockaddr_ll *)addr;
@@ -1455,7 +1455,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
     }
 #endif
 
-#ifdef HAVE_NETPACKET_PACKET_H
+#if defined(HAVE_NETPACKET_PACKET_H) && defined(SIOCGIFINDEX)
     case AF_PACKET:
     {
         struct sockaddr_ll* addr;
@@ -1676,9 +1676,6 @@ sock_accept(PySocketSockObject *s)
     PyObject *addr = NULL;
     PyObject *res = NULL;
     int timeout;
-#ifdef HAVE_ACCEPT4
-    int flags = 0;
-#endif
     if (!getsockaddrlen(s, &addrlen))
         return NULL;
     memset(&addrbuf, 0, addrlen);
@@ -1690,13 +1687,7 @@ sock_accept(PySocketSockObject *s)
     Py_BEGIN_ALLOW_THREADS
     timeout = internal_select_ex(s, 0, interval);
     if (!timeout) {
-#ifdef HAVE_ACCEPT4
-        /* inherit socket flags and use accept4 call */
-        flags = s->sock_type & (SOCK_CLOEXEC | SOCK_NONBLOCK);
-        newfd = accept4(s->sock_fd, SAS2SA(&addrbuf), &addrlen, flags);
-#else
         newfd = accept(s->sock_fd, SAS2SA(&addrbuf), &addrlen);
-#endif /* HAVE_ACCEPT4  */
     }
     Py_END_ALLOW_THREADS
 
@@ -2950,8 +2941,20 @@ static PyMemberDef sock_memberlist[] = {
 static void
 sock_dealloc(PySocketSockObject *s)
 {
-    if (s->sock_fd != -1)
+    if (s->sock_fd != -1) {
+        PyObject *exc, *val, *tb;
+        Py_ssize_t old_refcount = Py_REFCNT(s);
+        ++Py_REFCNT(s);
+        PyErr_Fetch(&exc, &val, &tb);
+        if (PyErr_WarnFormat(PyExc_ResourceWarning, 1,
+                             "unclosed %R", s))
+            /* Spurious errors can appear at shutdown */
+            if (PyErr_ExceptionMatches(PyExc_Warning))
+                PyErr_WriteUnraisable((PyObject *) s);
+        PyErr_Restore(exc, val, tb);
         (void) SOCKETCLOSE(s->sock_fd);
+        Py_REFCNT(s) = old_refcount;
+    }
     Py_TYPE(s)->tp_free((PyObject *)s);
 }
 
@@ -3090,6 +3093,31 @@ static PyTypeObject sock_type = {
 static PyObject *
 socket_gethostname(PyObject *self, PyObject *unused)
 {
+#ifdef MS_WINDOWS
+    /* Don't use winsock's gethostname, as this returns the ANSI
+       version of the hostname, whereas we need a Unicode string.
+       Otherwise, gethostname apparently also returns the DNS name. */
+    wchar_t buf[MAX_COMPUTERNAME_LENGTH + 1];
+    DWORD size = sizeof(buf) / sizeof(wchar_t);
+    PyObject *result;
+    if (!GetComputerNameExW(ComputerNamePhysicalDnsHostname, buf, &size)) {
+        if (GetLastError() == ERROR_MORE_DATA) {
+            /* MSDN says this may occur "because DNS allows longer names */
+            if (size == 0) /* XXX: I'm not sure how to handle this */
+                return PyUnicode_FromUnicode(NULL, 0);
+            result = PyUnicode_FromUnicode(NULL, size - 1);
+            if (!result)
+                return NULL;
+            if (GetComputerNameExW(ComputerNamePhysicalDnsHostname,
+                                   PyUnicode_AS_UNICODE(result),
+                                   &size))
+                return result;
+            Py_DECREF(result);
+        }
+        return PyErr_SetExcFromWindowsErr(PyExc_WindowsError, GetLastError());
+    }
+    return PyUnicode_FromUnicode(buf, size);            
+#else
     char buf[1024];
     int res;
     Py_BEGIN_ALLOW_THREADS
@@ -3099,6 +3127,7 @@ socket_gethostname(PyObject *self, PyObject *unused)
         return set_error();
     buf[sizeof buf - 1] = '\0';
     return PyUnicode_FromString(buf);
+#endif
 }
 
 PyDoc_STRVAR(gethostname_doc,
@@ -4578,16 +4607,32 @@ PyInit__socket(void)
     PyModule_AddStringConstant(m, "BDADDR_LOCAL", "00:00:00:FF:FF:FF");
 #endif
 
-#ifdef HAVE_NETPACKET_PACKET_H
-    PyModule_AddIntConstant(m, "AF_PACKET", AF_PACKET);
-    PyModule_AddIntConstant(m, "PF_PACKET", PF_PACKET);
-    PyModule_AddIntConstant(m, "PACKET_HOST", PACKET_HOST);
-    PyModule_AddIntConstant(m, "PACKET_BROADCAST", PACKET_BROADCAST);
-    PyModule_AddIntConstant(m, "PACKET_MULTICAST", PACKET_MULTICAST);
-    PyModule_AddIntConstant(m, "PACKET_OTHERHOST", PACKET_OTHERHOST);
-    PyModule_AddIntConstant(m, "PACKET_OUTGOING", PACKET_OUTGOING);
-    PyModule_AddIntConstant(m, "PACKET_LOOPBACK", PACKET_LOOPBACK);
-    PyModule_AddIntConstant(m, "PACKET_FASTROUTE", PACKET_FASTROUTE);
+#ifdef AF_PACKET
+    PyModule_AddIntMacro(m, AF_PACKET);
+#endif
+#ifdef PF_PACKET
+    PyModule_AddIntMacro(m, PF_PACKET);
+#endif
+#ifdef PACKET_HOST
+    PyModule_AddIntMacro(m, PACKET_HOST);
+#endif
+#ifdef PACKET_BROADCAST
+    PyModule_AddIntMacro(m, PACKET_BROADCAST);
+#endif
+#ifdef PACKET_MULTICAST
+    PyModule_AddIntMacro(m, PACKET_MULTICAST);
+#endif
+#ifdef PACKET_OTHERHOST
+    PyModule_AddIntMacro(m, PACKET_OTHERHOST);
+#endif
+#ifdef PACKET_OUTGOING
+    PyModule_AddIntMacro(m, PACKET_OUTGOING);
+#endif
+#ifdef PACKET_LOOPBACK
+    PyModule_AddIntMacro(m, PACKET_LOOPBACK);
+#endif
+#ifdef PACKET_FASTROUTE
+    PyModule_AddIntMacro(m, PACKET_FASTROUTE);
 #endif
 
 #ifdef HAVE_LINUX_TIPC_H

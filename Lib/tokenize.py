@@ -29,12 +29,12 @@ import sys
 from token import *
 from codecs import lookup, BOM_UTF8
 import collections
+from io import TextIOWrapper
 cookie_re = re.compile("coding[:=]\s*([-\w.]+)")
 
 import token
-__all__ = [x for x in dir(token) if not x.startswith("_")]
-__all__.extend(["COMMENT", "tokenize", "detect_encoding", "NL", "untokenize",
-                "ENCODING", "TokenInfo"])
+__all__ = token.__all__ + ["COMMENT", "tokenize", "detect_encoding",
+                           "NL", "untokenize", "ENCODING", "TokenInfo"]
 del token
 
 COMMENT = N_TOKENS
@@ -333,6 +333,20 @@ def detect_encoding(readline):
         return encoding, [first, second]
 
     return default, [first, second]
+
+
+_builtin_open = open
+
+def open(filename):
+    """Open a file in read only mode using the encoding detected by
+    detect_encoding().
+    """
+    buffer = _builtin_open(filename, 'rb')
+    encoding, lines = detect_encoding(buffer.readline)
+    buffer.seek(0)
+    text = TextIOWrapper(buffer, encoding, line_buffering=True)
+    text.mode = 'r'
+    return text
 
 
 def tokenize(readline):

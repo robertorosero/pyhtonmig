@@ -24,9 +24,17 @@ For other archive formats, see the :mod:`bz2`, :mod:`gzip`, and
 
 The module defines the following items:
 
-.. exception:: BadZipfile
+.. exception:: BadZipFile
 
    The error raised for bad ZIP files (old name: ``zipfile.error``).
+
+   .. versionadded:: 3.2
+
+
+.. exception:: BadZipfile
+
+   This is an alias for :exc:`BadZipFile` that exists for compatibility with
+   Python versions prior to 3.2.  Usage is deprecated.
 
 
 .. exception:: LargeZipFile
@@ -36,6 +44,7 @@ The module defines the following items:
 
 
 .. class:: ZipFile
+   :noindex:
 
    The class for reading and writing ZIP files.  See section
    :ref:`zipfile-objects` for constructor details.

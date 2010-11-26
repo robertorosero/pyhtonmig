@@ -105,7 +105,7 @@ from urllib.response import addinfourl, addclosehook
 # check for SSL
 try:
     import ssl
-except:
+except ImportError:
     _have_ssl = False
 else:
     _have_ssl = True
@@ -1300,8 +1300,8 @@ class FTPHandler(BaseHandler):
         else:
             passwd = None
         host = unquote(host)
-        user = unquote(user or '')
-        passwd = unquote(passwd or '')
+        user = user or ''
+        passwd = passwd or ''
 
         try:
             host = socket.gethostbyname(host)

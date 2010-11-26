@@ -322,7 +322,7 @@ Glossary
       slowly.  See also :term:`interactive`.
 
    iterable
-      A container object capable of returning its members one at a
+      An object capable of returning its members one at a
       time. Examples of iterables include all sequence types (such as
       :class:`list`, :class:`str`, and :class:`tuple`) and some non-sequence
       types like :class:`dict` and :class:`file` and objects of any classes you
@@ -354,6 +354,26 @@ Glossary
       in the previous iteration pass, making it appear like an empty container.
 
       More information can be found in :ref:`typeiter`.
+
+   key function
+      A key function or collation function is a callable that returns a value
+      used for sorting or ordering.  For example, :func:`locale.strxfrm` is
+      used to produce a sort key that is aware of locale specific sort
+      conventions.
+
+      A number of tools in Python accept key functions to control how elements
+      are ordered or grouped.  They include :func:`min`, :func:`max`,
+      :func:`sorted`, :meth:`list.sort`, :func:`heapq.nsmallest`,
+      :func:`heapq.nlargest`, and :func:`itertools.groupby`.
+
+      There are several ways to create a key function.  For example. the
+      :meth:`str.lower` method can serve as a key function for case insensitive
+      sorts.  Alternatively, an ad-hoc key function can be built from a
+      :keyword:`lambda` expression such as ``lambda r: (r[0], r[2])``.  Also,
+      the :mod:`operator` module provides three key function constuctors:
+      :func:`~operator.attrgetter`, :func:`~operator.itemgetter`, and
+      :func:`~operator.methodcaller`.  See the :ref:`Sorting HOW TO
+      <sortinghowto>` for examples of how to create and use key functions.
 
    keyword argument
       Arguments which are preceded with a ``variable_name=`` in the call.
@@ -414,6 +434,14 @@ Glossary
       of an instance of that class, the method will get the instance object as
       its first :term:`argument` (which is usually called ``self``).
       See :term:`function` and :term:`nested scope`.
+
+   method resolution order
+      Method Resolution Order is the order in which base classes are searched
+      for a member during lookup. See `The Python 2.3 Method Resolution Order
+      <http://www.python.org/download/releases/2.3/mro/>`_.
+
+   MRO
+      See :term:`method resolution order`.
 
    mutable
       Mutable objects can change their value but keep their :func:`id`.  See

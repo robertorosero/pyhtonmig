@@ -89,6 +89,7 @@ class BasicSocketTests(unittest.TestCase):
         ssl.CERT_NONE
         ssl.CERT_OPTIONAL
         ssl.CERT_REQUIRED
+        self.assertIn(ssl.HAS_SNI, {True, False})
 
     def test_random(self):
         v = ssl.RAND_status()
@@ -108,7 +109,7 @@ class BasicSocketTests(unittest.TestCase):
         # note that this uses an 'unofficial' function in _ssl.c,
         # provided solely for this test, to exercise the certificate
         # parsing code
-        p = ssl._ssl._test_decode_cert(CERTFILE, False)
+        p = ssl._ssl._test_decode_cert(CERTFILE)
         if support.verbose:
             sys.stdout.write("\n" + pprint.pformat(p) + "\n")
 
@@ -197,13 +198,16 @@ class BasicSocketTests(unittest.TestCase):
         self.assertRaisesRegexp(ValueError, "can't connect in server-side mode",
                                 s.connect, (HOST, 8080))
         with self.assertRaises(IOError) as cm:
-            ssl.wrap_socket(socket.socket(), certfile=WRONGCERT)
+            with socket.socket() as sock:
+                ssl.wrap_socket(sock, certfile=WRONGCERT)
         self.assertEqual(cm.exception.errno, errno.ENOENT)
         with self.assertRaises(IOError) as cm:
-            ssl.wrap_socket(socket.socket(), certfile=CERTFILE, keyfile=WRONGCERT)
+            with socket.socket() as sock:
+                ssl.wrap_socket(sock, certfile=CERTFILE, keyfile=WRONGCERT)
         self.assertEqual(cm.exception.errno, errno.ENOENT)
         with self.assertRaises(IOError) as cm:
-            ssl.wrap_socket(socket.socket(), certfile=WRONGCERT, keyfile=WRONGCERT)
+            with socket.socket() as sock:
+                ssl.wrap_socket(sock, certfile=WRONGCERT, keyfile=WRONGCERT)
         self.assertEqual(cm.exception.errno, errno.ENOENT)
 
     def test_match_hostname(self):
@@ -277,6 +281,12 @@ class BasicSocketTests(unittest.TestCase):
         self.assertRaises(ValueError, ssl.match_hostname, None, 'example.com')
         self.assertRaises(ValueError, ssl.match_hostname, {}, 'example.com')
 
+    def test_server_side(self):
+        # server_hostname doesn't work for server sockets
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        with socket.socket() as sock:
+            self.assertRaises(ValueError, ctx.wrap_socket, sock, True,
+                              server_hostname="some.hostname")
 
 class ContextTests(unittest.TestCase):
 
@@ -384,6 +394,7 @@ class ContextTests(unittest.TestCase):
         ctx.load_verify_locations(CERTFILE, CAPATH)
         ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
 
+    @skip_if_broken_ubuntu_ssl
     def test_session_stats(self):
         for proto in PROTOCOLS:
             ctx = ssl.SSLContext(proto)
@@ -400,6 +411,12 @@ class ContextTests(unittest.TestCase):
                 'timeouts': 0,
                 'cache_full': 0,
             })
+
+    def test_set_default_verify_paths(self):
+        # There's not much we can do to test that it acts as expected,
+        # so just check it doesn't crash or raise an exception.
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+        ctx.set_default_verify_paths()
 
 
 class NetworkedTests(unittest.TestCase):
@@ -441,6 +458,14 @@ class NetworkedTests(unittest.TestCase):
                 self.assertEqual({}, s.getpeercert())
             finally:
                 s.close()
+            # Same with a server hostname
+            s = ctx.wrap_socket(socket.socket(socket.AF_INET),
+                                server_hostname="svn.python.org")
+            if ssl.HAS_SNI:
+                s.connect(("svn.python.org", 443))
+                s.close()
+            else:
+                self.assertRaises(ValueError, s.connect, ("svn.python.org", 443))
             # This should fail because we have no verification certs
             ctx.verify_mode = ssl.CERT_REQUIRED
             s = ctx.wrap_socket(socket.socket(socket.AF_INET))
@@ -563,9 +588,10 @@ class NetworkedTests(unittest.TestCase):
             s.connect(remote)
             # Error checking can happen at instantiation or when connecting
             with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
-                s = ssl.wrap_socket(socket.socket(socket.AF_INET),
-                                    cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
-                s.connect(remote)
+                with socket.socket(socket.AF_INET) as sock:
+                    s = ssl.wrap_socket(sock,
+                                        cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
+                    s.connect(remote)
 
     def test_algorithms(self):
         # Issue #8484: all algorithms should be available when verifying a
@@ -887,16 +913,17 @@ else:
         # try to connect
         try:
             try:
-                s = ssl.wrap_socket(socket.socket(),
-                                    certfile=certfile,
-                                    ssl_version=ssl.PROTOCOL_TLSv1)
-                s.connect((HOST, server.port))
+                with socket.socket() as sock:
+                    s = ssl.wrap_socket(sock,
+                                        certfile=certfile,
+                                        ssl_version=ssl.PROTOCOL_TLSv1)
+                    s.connect((HOST, server.port))
             except ssl.SSLError as x:
                 if support.verbose:
                     sys.stdout.write("\nSSLError is %s\n" % x.args[1])
             except socket.error as x:
                 if support.verbose:
-                    sys.stdout.write("\nsocket.error is %s\n" % x[1])
+                    sys.stdout.write("\nsocket.error is %s\n" % x.args[1])
             except IOError as x:
                 if x.errno != errno.ENOENT:
                     raise
@@ -1038,6 +1065,11 @@ else:
                     self.fail(
                         "Missing or invalid 'organizationName' field in certificate subject; "
                         "should be 'Python Software Foundation'.")
+                self.assertIn('notBefore', cert)
+                self.assertIn('notAfter', cert)
+                before = ssl.cert_time_to_seconds(cert['notBefore'])
+                after = ssl.cert_time_to_seconds(cert['notAfter'])
+                self.assertLess(before, after)
                 s.close()
             finally:
                 server.stop()
@@ -1077,21 +1109,22 @@ else:
             def listener():
                 s.listen(5)
                 listener_ready.set()
-                s.accept()
+                newsock, addr = s.accept()
+                newsock.close()
                 s.close()
                 listener_gone.set()
 
             def connector():
                 listener_ready.wait()
-                c = socket.socket()
-                c.connect((HOST, port))
-                listener_gone.wait()
-                try:
-                    ssl_sock = ssl.wrap_socket(c)
-                except IOError:
-                    pass
-                else:
-                    self.fail('connecting to closed SSL socket should have failed')
+                with socket.socket() as c:
+                    c.connect((HOST, port))
+                    listener_gone.wait()
+                    try:
+                        ssl_sock = ssl.wrap_socket(c)
+                    except IOError:
+                        pass
+                    else:
+                        self.fail('connecting to closed SSL socket should have failed')
 
             t = threading.Thread(target=listener)
             t.start()
@@ -1453,6 +1486,8 @@ else:
                         # Let the socket hang around rather than having
                         # it closed by garbage collection.
                         conns.append(server.accept()[0])
+                for sock in conns:
+                    sock.close()
 
             t = threading.Thread(target=serve)
             t.start()
@@ -1500,6 +1535,7 @@ def test_main(verbose=False):
         print("test_ssl: testing with %r %r" %
             (ssl.OPENSSL_VERSION, ssl.OPENSSL_VERSION_INFO))
         print("          under %s" % plat)
+        print("          HAS_SNI = %r" % ssl.HAS_SNI)
 
     for filename in [
         CERTFILE, SVN_PYTHON_ORG_ROOT_CERT, BYTES_CERTFILE,
