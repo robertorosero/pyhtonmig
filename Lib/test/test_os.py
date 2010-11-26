@@ -15,6 +15,7 @@ from test import support
 import contextlib
 import mmap
 import uuid
+import stat
 
 # Detect whether we're on a Linux system that uses the (now outdated
 # and unmaintained) linuxthreads threading library.  There's an issue
@@ -1124,7 +1125,7 @@ def skipUnlessWindows6(test):
 @unittest.skipUnless(sys.platform == "win32", "Win32 specific tests")
 @support.skip_unless_symlink
 class Win32SymlinkTests(unittest.TestCase):
-    filelink = 'filelinktest'
+    filelink = 'filelinktest.bat'
     filelink_target = os.path.abspath(__file__)
     dirlink = 'dirlinktest'
     dirlink_target = os.path.dirname(filelink_target)
@@ -1158,6 +1159,7 @@ class Win32SymlinkTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.filelink))
         self.assertTrue(os.path.islink(self.filelink))
         self.check_stat(self.filelink, self.filelink_target)
+        self.assertFalse(os.stat(self.filelink).st_mode & stat.S_IEXEC)
 
     def _create_missing_dir_link(self):
         'Create a "directory" link to a non-existent target'
@@ -1191,7 +1193,6 @@ class Win32SymlinkTests(unittest.TestCase):
     def check_stat(self, link, target):
         self.assertEqual(os.stat(link), os.stat(target))
         self.assertNotEqual(os.lstat(link), os.stat(link))
-
 
 class FSEncodingTests(unittest.TestCase):
     def test_nop(self):
