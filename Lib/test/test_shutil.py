@@ -271,24 +271,32 @@ class TestShutil(unittest.TestCase):
             shutil.rmtree(src_dir)
             shutil.rmtree(os.path.dirname(dst_dir))
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
     def test_dont_copy_file_onto_link_to_itself(self):
         # bug 851123.
         os.mkdir(TESTFN)
         src = os.path.join(TESTFN, 'cheese')
         dst = os.path.join(TESTFN, 'shop')
         try:
-            f = open(src, 'w')
-            f.write('cheddar')
-            f.close()
+            with open(src, 'w') as f:
+                f.write('cheddar')
+            os.link(src, dst)
+            self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
+            with open(src, 'r') as f:
+                self.assertEqual(f.read(), 'cheddar')
+            os.remove(dst)
+        finally:
+            shutil.rmtree(TESTFN, ignore_errors=True)
 
-            if hasattr(os, "link"):
-                os.link(src, dst)
-                self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
-                with open(src, 'r') as f:
-                    self.assertEqual(f.read(), 'cheddar')
-                os.remove(dst)
-
+    @support.skip_unless_symlink
+    def test_dont_copy_file_onto_symlink_to_itself(self):
+        # bug 851123.
+        os.mkdir(TESTFN)
+        src = os.path.join(TESTFN, 'cheese')
+        dst = os.path.join(TESTFN, 'shop')
+        try:
+            with open(src, 'w') as f:
+                f.write('cheddar')
             # Using `src` here would mean we end up with a symlink pointing
             # to TESTFN/TESTFN/cheese, while it should point at
             # TESTFN/cheese.
@@ -298,10 +306,7 @@ class TestShutil(unittest.TestCase):
                 self.assertEqual(f.read(), 'cheddar')
             os.remove(dst)
         finally:
-            try:
-                shutil.rmtree(TESTFN)
-            except OSError:
-                pass
+            shutil.rmtree(TESTFN, ignore_errors=True)
 
     @support.skip_unless_symlink
     def test_rmtree_on_symlink(self):
