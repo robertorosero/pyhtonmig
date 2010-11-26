@@ -1213,7 +1213,7 @@ static int
 win32_xstat_for_handle(HANDLE hFile, struct win32_stat *result, BOOL traverse, int depth)
 {
     int code;
-    BOOL reparse_tag;
+    ULONG reparse_tag;
     wchar_t *target_path;
     BY_HANDLE_FILE_INFORMATION info;
 
