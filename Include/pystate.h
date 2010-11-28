@@ -213,9 +213,9 @@ PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_Head(void);
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_Next(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyInterpreterState_ThreadHead(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyThreadState_Next(PyThreadState *);
-#endif
 
 typedef struct _frame *(*PyThreadFrameGetter)(PyThreadState *self_);
+#endif
 
 /* hook for PyEval_GetFrame(), requested for Psyco */
 #ifndef Py_LIMITED_API
