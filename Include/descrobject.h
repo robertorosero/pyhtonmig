@@ -16,13 +16,13 @@ typedef struct PyGetSetDef {
     void *closure;
 } PyGetSetDef;
 
+#ifndef Py_LIMITED_API
 typedef PyObject *(*wrapperfunc)(PyObject *self, PyObject *args,
                                  void *wrapped);
 
 typedef PyObject *(*wrapperfunc_kwds)(PyObject *self, PyObject *args,
                                       void *wrapped, PyObject *kwds);
 
-#ifndef Py_LIMITED_API
 struct wrapperbase {
     char *name;
     int offset;
