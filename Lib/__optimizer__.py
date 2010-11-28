@@ -837,11 +837,21 @@ def dump_dot(t, filename):
 #class OptimizationError(Exception):
 #    def __init__(self
 
+timing = 0
+if timing:
+    try:
+        import time
+    except ImportError:
+        # "time" doesn't exist during the build process
+        timing = 0
+
 from pprint import pprint
 def optimize_ast(t, filename, st_blocks):
     if 0:
         print("optimize_ast called: %s" % filename)
     if is_test_code(t, filename):
+        if timing:
+            t0 = time.time()
         dot_before = to_dot(t)
         try:
             # pprint(st_blocks)
@@ -869,6 +879,9 @@ def optimize_ast(t, filename, st_blocks):
             print('Exception during optimization of %r' % filename)
             # dot_to_png(dot_before, 'before.png')
             raise
+        if timing:
+            t1 = time.time()
+            print('Optimizing %r took %ss' % (filename, t1 - t0))
     if 0:
         print('finished optimizing')
         if filename == 'optimizable.py':
