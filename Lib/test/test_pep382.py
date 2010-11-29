@@ -19,11 +19,12 @@ def restore_sys_path_importer_cache():
     original_value = sys.path_importer_cache.copy()
     original_object = sys.path_importer_cache
 
-    yield
-
-    sys.path_importer_cache = original_object
-    sys.path_importer_cache.clear()
-    sys.path_importer_cache.update(original_value)
+    try:
+        yield
+    finally:
+        sys.path_importer_cache = original_object
+        sys.path_importer_cache.clear()
+        sys.path_importer_cache.update(original_value)
 
 
 @contextlib.contextmanager
@@ -38,12 +39,12 @@ def restore_sys_modules(module_prefix):
     for key in matching_modules():
         assert False, '{} already in sys.modules'.format(key)
 
-    yield
-
-    # delete all matching modules
-    for key in matching_modules():
-        del sys.modules[key]
-
+    try:
+        yield
+    finally:
+        # delete all matching modules
+        for key in matching_modules():
+            del sys.modules[key]
 
 class PthTestsBase(unittest.TestCase):
     """Try various combinations of __init__ and .pth files.
