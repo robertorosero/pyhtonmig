@@ -94,6 +94,12 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
    9-Jan-1995	GvR	Initial version (incompatible with older API)
 */
 
+/* The PYTHON_ABI_VERSION is introduced in PEP 384. For the lifetime of
+   Python 3, it will stay at the value of 3; changes to the limited API
+   must be performed in a strictly backwards-compatible manner. */
+#define PYTHON_ABI_VERSION 3
+#define PYTHON_ABI_STRING "3"
+
 #ifdef Py_TRACE_REFS
  /* When we are tracing reference counts, rename PyModule_Create2 so
     modules compiled with incompatible settings will generate a
@@ -104,8 +110,13 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
 PyAPI_FUNC(PyObject *) PyModule_Create2(struct PyModuleDef*,
                                      int apiver);
 
+#ifdef Py_LIMITED_API
+#define PyModule_Create(module) \
+	PyModule_Create2(module, PYTHON_ABI_VERSION)
+#else
 #define PyModule_Create(module) \
 	PyModule_Create2(module, PYTHON_API_VERSION)
+#endif
 
 #ifndef Py_LIMITED_API
 PyAPI_DATA(char *) _Py_PackageContext;
