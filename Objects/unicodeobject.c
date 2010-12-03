@@ -9222,7 +9222,7 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
         Py_UNICODE* result_buf;
         PyObject* result;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, PyUnicode_GET_SIZE(self),
+        if (PySlice_GetIndicesEx(item, PyUnicode_GET_SIZE(self),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }

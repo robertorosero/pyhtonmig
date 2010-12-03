@@ -320,6 +320,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
    _Py_ascii_whitespace (see below) with an inlined check.
 
  */
+#ifndef Py_LIMITED_API
 #define Py_UNICODE_ISSPACE(ch) \
     ((ch) < 128U ? _Py_ascii_whitespace[(ch)] : _PyUnicode_IsWhitespace(ch))
 
@@ -1644,7 +1645,6 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
     const Py_UNICODE *s,
     Py_UNICODE c
     );
-#endif /* Py_LIMITED_API */
 
 /* Create a copy of a unicode string ending with a nul character. Return NULL
    and raise a MemoryError exception on memory allocation failure, otherwise
@@ -1653,6 +1653,7 @@ PyAPI_FUNC(Py_UNICODE*) Py_UNICODE_strrchr(
 PyAPI_FUNC(Py_UNICODE*) PyUnicode_AsUnicodeCopy(
     PyObject *unicode
     );
+#endif /* Py_LIMITED_API */
 
 #ifdef __cplusplus
 }

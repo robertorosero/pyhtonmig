@@ -1214,7 +1214,7 @@ u_set(void *ptr, PyObject *value, Py_ssize_t size)
     } else
         Py_INCREF(value);
 
-    len = PyUnicode_AsWideChar((PyUnicodeObject *)value, chars, 2);
+    len = PyUnicode_AsWideChar(value, chars, 2);
     if (len != 1) {
         Py_DECREF(value);
         PyErr_SetString(PyExc_TypeError,
