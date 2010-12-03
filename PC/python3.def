@@ -481,6 +481,10 @@ EXPORTS
   PySlice_Type=python32.PySlice_Type DATA
   PySortWrapper_Type=python32.PySortWrapper_Type DATA
   PyState_FindModule=python32.PyState_FindModule
+  PyStructSequence_GetItem=python32.PyStructSequence_GetItem
+  PyStructSequence_New=python32.PyStructSequence_New
+  PyStructSequence_NewType=python32.PyStructSequence_NewType
+  PyStructSequence_SetItem=python32.PyStructSequence_SetItem
   PySuper_Type=python32.PySuper_Type DATA
   PySys_AddWarnOption=python32.PySys_AddWarnOption
   PySys_AddWarnOptionUnicode=python32.PySys_AddWarnOptionUnicode
