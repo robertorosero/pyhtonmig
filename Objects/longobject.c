@@ -4,7 +4,6 @@
 
 #include "Python.h"
 #include "longintrepr.h"
-#include "structseq.h"
 
 #include <float.h>
 #include <ctype.h>
@@ -2552,10 +2551,10 @@ long_richcompare(PyObject *self, PyObject *other, int op)
     return v;
 }
 
-static long
+static Py_hash_t
 long_hash(PyLongObject *v)
 {
-    unsigned long x;
+    Py_uhash_t x;
     Py_ssize_t i;
     int sign;
 
@@ -2604,9 +2603,9 @@ long_hash(PyLongObject *v)
             x -= _PyHASH_MODULUS;
     }
     x = x * sign;
-    if (x == (unsigned long)-1)
-        x = (unsigned long)-2;
-    return (long)x;
+    if (x == (Py_uhash_t)-1)
+        x = (Py_uhash_t)-2;
+    return (Py_hash_t)x;
 }
 
 

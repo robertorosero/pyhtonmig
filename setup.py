@@ -27,11 +27,19 @@ disabled_module_list = []
 _BUILDDIR_COOKIE = "pybuilddir.txt"
 
 def add_dir_to_list(dirlist, dir):
-    """Add the directory 'dir' to the list 'dirlist' (at the front) if
+    """Add the directory 'dir' to the list 'dirlist' (after any relative
+    directories) if:
+
     1) 'dir' is not already in 'dirlist'
-    2) 'dir' actually exists, and is a directory."""
-    if dir is not None and os.path.isdir(dir) and dir not in dirlist:
-        dirlist.insert(0, dir)
+    2) 'dir' actually exists, and is a directory.
+    """
+    if dir is None or not os.path.isdir(dir) or dir in dirlist:
+        return
+    for i, path in enumerate(dirlist):
+        if not os.path.isabs(path):
+            dirlist.insert(i + 1, dir)
+            return
+    dirlist.insert(0, dir)
 
 def macosx_sdk_root():
     """
@@ -152,7 +160,13 @@ class PyBuildExt(build_ext):
     def build_extensions(self):
 
         # Detect which modules should be compiled
-        missing = self.detect_modules()
+        old_so = self.compiler.shared_lib_extension
+        # Workaround PEP 3149 stuff
+        self.compiler.shared_lib_extension = os.environ.get("SO", ".so")
+        try:
+            missing = self.detect_modules()
+        finally:
+            self.compiler.shared_lib_extension = old_so
 
         # Remove modules that are present on the disabled list
         extensions = [ext for ext in self.extensions
@@ -356,7 +370,9 @@ class PyBuildExt(build_ext):
         return sys.platform
 
     def detect_modules(self):
-        # Ensure that /usr/local is always used
+        # Ensure that /usr/local is always used, but the local build
+        # directories (i.e. '.' and 'Include') must be first.  See issue
+        # 10520.
         add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
         add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
 
@@ -394,7 +410,12 @@ class PyBuildExt(build_ext):
                     for directory in reversed(options.dirs):
                         add_dir_to_list(dir_list, directory)
 
-        if os.path.normpath(sys.prefix) != '/usr':
+        if os.path.normpath(sys.prefix) != '/usr' \
+                and not sysconfig.get_config_var('PYTHONFRAMEWORK'):
+            # OSX note: Don't add LIBDIR and INCLUDEDIR to building a framework
+            # (PYTHONFRAMEWORK is set) to avoid # linking problems when
+            # building a framework with different architectures than
+            # the one that is currently installed (issue #7473)
             add_dir_to_list(self.compiler.library_dirs,
                             sysconfig.get_config_var("LIBDIR"))
             add_dir_to_list(self.compiler.include_dirs,
@@ -412,7 +433,8 @@ class PyBuildExt(build_ext):
         missing = []
 
         config_h = sysconfig.get_config_h_filename()
-        config_h_vars = sysconfig.parse_config_h(open(config_h))
+        with open(config_h) as file:
+            config_h_vars = sysconfig.parse_config_h(file)
 
         platform = self.get_platform()
         srcdir = sysconfig.get_config_var('srcdir')
@@ -425,9 +447,10 @@ class PyBuildExt(build_ext):
             # This should work on any unixy platform ;-)
             # If the user has bothered specifying additional -I and -L flags
             # in OPT and LDFLAGS we might as well use them here.
-            #   NOTE: using shlex.split would technically be more correct, but
-            # also gives a bootstrap problem. Let's hope nobody uses directories
-            # with whitespace in the name to store libraries.
+            #
+            # NOTE: using shlex.split would technically be more correct, but
+            # also gives a bootstrap problem. Let's hope nobody uses
+            # directories with whitespace in the name to store libraries.
             cflags, ldflags = sysconfig.get_config_vars(
                     'CFLAGS', 'LDFLAGS')
             for item in cflags.split():
@@ -449,9 +472,6 @@ class PyBuildExt(build_ext):
         # The following modules are all pretty straightforward, and compile
         # on pretty much any POSIXish platform.
         #
-
-        # Some modules that are normally always on:
-        exts.append( Extension('_weakref', ['_weakref.c']) )
 
         # array objects
         exts.append( Extension('array', ['arraymodule.c']) )
@@ -493,7 +513,11 @@ class PyBuildExt(build_ext):
         # supported...)
 
         # fcntl(2) and ioctl(2)
-        exts.append( Extension('fcntl', ['fcntlmodule.c']) )
+        libs = []
+        if (config_h_vars.get('FLOCK_NEEDS_LIBBSD', False)):
+            # May be necessary on AIX for flock function
+            libs = ['bsd']
+        exts.append( Extension('fcntl', ['fcntlmodule.c'], libraries=libs) )
         # pwd(3)
         exts.append( Extension('pwd', ['pwdmodule.c']) )
         # grp(3)
@@ -544,17 +568,17 @@ class PyBuildExt(build_ext):
                 os.makedirs(self.build_temp)
             ret = os.system("ldd %s > %s" % (do_readline, tmpfile))
             if ret >> 8 == 0:
-                fp = open(tmpfile)
-                for ln in fp:
-                    if 'curses' in ln:
-                        readline_termcap_library = re.sub(
-                            r'.*lib(n?cursesw?)\.so.*', r'\1', ln
-                        ).rstrip()
-                        break
-                    if 'tinfo' in ln: # termcap interface split out from ncurses
-                        readline_termcap_library = 'tinfo'
-                        break
-                fp.close()
+                with open(tmpfile) as fp:
+                    for ln in fp:
+                        if 'curses' in ln:
+                            readline_termcap_library = re.sub(
+                                r'.*lib(n?cursesw?)\.so.*', r'\1', ln
+                            ).rstrip()
+                            break
+                        # termcap interface split out from ncurses
+                        if 'tinfo' in ln:
+                            readline_termcap_library = 'tinfo'
+                            break
             os.unlink(tmpfile)
         # Issue 7384: If readline is already linked against curses,
         # use the same library for the readline and curses modules.
@@ -663,11 +687,11 @@ class PyBuildExt(build_ext):
             if sys.platform == 'darwin' and is_macosx_sdk_path(name):
                 name = os.path.join(macosx_sdk_root(), name[1:])
             try:
-                incfile = open(name, 'r')
-                for line in incfile:
-                    m = openssl_ver_re.match(line)
-                    if m:
-                        openssl_ver = eval(m.group(1))
+                with open(name, 'r') as incfile:
+                    for line in incfile:
+                        m = openssl_ver_re.match(line)
+                        if m:
+                            openssl_ver = eval(m.group(1))
             except IOError as msg:
                 print("IOError while reading opensshv.h:", msg)
                 pass
@@ -722,7 +746,7 @@ class PyBuildExt(build_ext):
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 8)
+        max_db_ver = (5, 1)
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -813,7 +837,8 @@ class PyBuildExt(build_ext):
 
                 if db_setup_debug: print("db: looking for db.h in", f)
                 if os.path.exists(f):
-                    f = open(f, "rb").read()
+                    with open(f, 'rb') as file:
+                        f = file.read()
                     m = re.search(br"#define\WDB_VERSION_MAJOR\W(\d+)", f)
                     if m:
                         db_major = int(m.group(1))
@@ -933,7 +958,8 @@ class PyBuildExt(build_ext):
 
             if os.path.exists(f):
                 if sqlite_setup_debug: print("sqlite: found %s"%f)
-                incf = open(f).read()
+                with open(f) as file:
+                    incf = file.read()
                 m = re.search(
                     r'\s*.*#\s*.*define\s.*SQLITE_VERSION\W*"(.*)"', incf)
                 if m:
@@ -982,8 +1008,10 @@ class PyBuildExt(build_ext):
             else:
                 sqlite_defines.append(('MODULE_NAME', '\\"sqlite3\\"'))
 
-            # Comment this out if you want the sqlite3 module to be able to load extensions.
-            sqlite_defines.append(("SQLITE_OMIT_LOAD_EXTENSION", "1"))
+            # Enable support for loadable extensions in the sqlite3 module
+            # if --enable-loadable-sqlite-extensions configure option is used.
+            if '--enable-loadable-sqlite-extensions' not in sysconfig.get_config_var("CONFIG_ARGS"):
+                sqlite_defines.append(("SQLITE_OMIT_LOAD_EXTENSION", "1"))
 
             if sys.platform == 'darwin':
                 # In every directory on the search path search for a dynamic
@@ -1158,14 +1186,14 @@ class PyBuildExt(build_ext):
             zlib_h = zlib_inc[0] + '/zlib.h'
             version = '"0.0.0"'
             version_req = '"1.1.3"'
-            fp = open(zlib_h)
-            while 1:
-                line = fp.readline()
-                if not line:
-                    break
-                if line.startswith('#define ZLIB_VERSION'):
-                    version = line.split()[2]
-                    break
+            with open(zlib_h) as fp:
+                while 1:
+                    line = fp.readline()
+                    if not line:
+                        break
+                    if line.startswith('#define ZLIB_VERSION'):
+                        version = line.split()[2]
+                        break
             if version >= version_req:
                 if (self.compiler.find_library_file(lib_dirs, 'z')):
                     if sys.platform == "darwin":
@@ -1217,7 +1245,7 @@ class PyBuildExt(build_ext):
         # The pyexpat module was written by Paul Prescod after a prototype by
         # Jack Jansen.  The Expat source is included in Modules/expat/.  Usage
         # of a system shared libexpat.so is possible with --with-system-expat
-        # cofigure option.
+        # configure option.
         #
         # More information on Expat can be found at www.libexpat.org.
         #
@@ -1418,14 +1446,13 @@ class PyBuildExt(build_ext):
             os.system("file %s/Tk.framework/Tk | grep 'for architecture' > %s"%(os.path.join(sysroot, F[1:]), tmpfile))
         else:
             os.system("file %s/Tk.framework/Tk | grep 'for architecture' > %s"%(F, tmpfile))
-        fp = open(tmpfile)
 
-        detected_archs = []
-        for ln in fp:
-            a = ln.split()[-1]
-            if a in archs:
-                detected_archs.append(ln.split()[-1])
-        fp.close()
+        with open(tmpfile) as fp:
+            detected_archs = []
+            for ln in fp:
+                a = ln.split()[-1]
+                if a in archs:
+                    detected_archs.append(ln.split()[-1])
         os.unlink(tmpfile)
 
         for a in detected_archs:
@@ -1654,6 +1681,7 @@ class PyBuildExt(build_ext):
         depends = ['_ctypes/ctypes.h']
 
         if sys.platform == 'darwin':
+            sources.append('_ctypes/malloc_closure.c')
             sources.append('_ctypes/darwin/dlfcn_simple.c')
             extra_compile_args.append('-DMACOSX')
             include_dirs.append('_ctypes/darwin')
@@ -1698,14 +1726,14 @@ class PyBuildExt(build_ext):
             ffi_inc = find_file('ffi.h', [], inc_dirs)
         if ffi_inc is not None:
             ffi_h = ffi_inc[0] + '/ffi.h'
-            fp = open(ffi_h)
-            while 1:
-                line = fp.readline()
-                if not line:
-                    ffi_inc = None
-                    break
-                if line.startswith('#define LIBFFI_H'):
-                    break
+            with open(ffi_h) as fp:
+                while 1:
+                    line = fp.readline()
+                    if not line:
+                        ffi_inc = None
+                        break
+                    if line.startswith('#define LIBFFI_H'):
+                        break
         ffi_lib = None
         if ffi_inc is not None:
             for lib_name in ('ffi_convenience', 'ffi_pic', 'ffi'):

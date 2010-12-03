@@ -146,6 +146,32 @@ class TestPartial(unittest.TestCase):
         join = self.thetype(''.join)
         self.assertEqual(join(data), '0123456789')
 
+    def test_repr(self):
+        args = (object(), object())
+        args_repr = ', '.join(repr(a) for a in args)
+        kwargs = {'a': object(), 'b': object()}
+        kwargs_repr = ', '.join("%s=%r" % (k, v) for k, v in kwargs.items())
+        if self.thetype is functools.partial:
+            name = 'functools.partial'
+        else:
+            name = self.thetype.__name__
+
+        f = self.thetype(capture)
+        self.assertEqual('{}({!r})'.format(name, capture),
+                         repr(f))
+
+        f = self.thetype(capture, *args)
+        self.assertEqual('{}({!r}, {})'.format(name, capture, args_repr),
+                         repr(f))
+
+        f = self.thetype(capture, **kwargs)
+        self.assertEqual('{}({!r}, {})'.format(name, capture, kwargs_repr),
+                         repr(f))
+
+        f = self.thetype(capture, *args, **kwargs)
+        self.assertEqual('{}({!r}, {}, {})'.format(name, capture, args_repr, kwargs_repr),
+                         repr(f))
+
     def test_pickle(self):
         f = self.thetype(signature, 'asdf', bar=True)
         f.add_something_to__dict__ = True
@@ -162,6 +188,9 @@ class TestPartialSubclass(TestPartial):
 class TestPythonPartial(TestPartial):
 
     thetype = PythonPartial
+
+    # the python version hasn't a nice repr
+    def test_repr(self): pass
 
     # the python version isn't picklable
     def test_pickle(self): pass
@@ -428,12 +457,12 @@ class TestTotalOrdering(unittest.TestCase):
                 self.value = value
             def __lt__(self, other):
                 return self.value < other.value
-        self.assert_(A(1) < A(2))
-        self.assert_(A(2) > A(1))
-        self.assert_(A(1) <= A(2))
-        self.assert_(A(2) >= A(1))
-        self.assert_(A(2) <= A(2))
-        self.assert_(A(2) >= A(2))
+        self.assertTrue(A(1) < A(2))
+        self.assertTrue(A(2) > A(1))
+        self.assertTrue(A(1) <= A(2))
+        self.assertTrue(A(2) >= A(1))
+        self.assertTrue(A(2) <= A(2))
+        self.assertTrue(A(2) >= A(2))
 
     def test_total_ordering_le(self):
         @functools.total_ordering
@@ -442,12 +471,12 @@ class TestTotalOrdering(unittest.TestCase):
                 self.value = value
             def __le__(self, other):
                 return self.value <= other.value
-        self.assert_(A(1) < A(2))
-        self.assert_(A(2) > A(1))
-        self.assert_(A(1) <= A(2))
-        self.assert_(A(2) >= A(1))
-        self.assert_(A(2) <= A(2))
-        self.assert_(A(2) >= A(2))
+        self.assertTrue(A(1) < A(2))
+        self.assertTrue(A(2) > A(1))
+        self.assertTrue(A(1) <= A(2))
+        self.assertTrue(A(2) >= A(1))
+        self.assertTrue(A(2) <= A(2))
+        self.assertTrue(A(2) >= A(2))
 
     def test_total_ordering_gt(self):
         @functools.total_ordering
@@ -456,12 +485,12 @@ class TestTotalOrdering(unittest.TestCase):
                 self.value = value
             def __gt__(self, other):
                 return self.value > other.value
-        self.assert_(A(1) < A(2))
-        self.assert_(A(2) > A(1))
-        self.assert_(A(1) <= A(2))
-        self.assert_(A(2) >= A(1))
-        self.assert_(A(2) <= A(2))
-        self.assert_(A(2) >= A(2))
+        self.assertTrue(A(1) < A(2))
+        self.assertTrue(A(2) > A(1))
+        self.assertTrue(A(1) <= A(2))
+        self.assertTrue(A(2) >= A(1))
+        self.assertTrue(A(2) <= A(2))
+        self.assertTrue(A(2) >= A(2))
 
     def test_total_ordering_ge(self):
         @functools.total_ordering
@@ -470,24 +499,24 @@ class TestTotalOrdering(unittest.TestCase):
                 self.value = value
             def __ge__(self, other):
                 return self.value >= other.value
-        self.assert_(A(1) < A(2))
-        self.assert_(A(2) > A(1))
-        self.assert_(A(1) <= A(2))
-        self.assert_(A(2) >= A(1))
-        self.assert_(A(2) <= A(2))
-        self.assert_(A(2) >= A(2))
+        self.assertTrue(A(1) < A(2))
+        self.assertTrue(A(2) > A(1))
+        self.assertTrue(A(1) <= A(2))
+        self.assertTrue(A(2) >= A(1))
+        self.assertTrue(A(2) <= A(2))
+        self.assertTrue(A(2) >= A(2))
 
     def test_total_ordering_no_overwrite(self):
         # new methods should not overwrite existing
         @functools.total_ordering
         class A(int):
             pass
-        self.assert_(A(1) < A(2))
-        self.assert_(A(2) > A(1))
-        self.assert_(A(1) <= A(2))
-        self.assert_(A(2) >= A(1))
-        self.assert_(A(2) <= A(2))
-        self.assert_(A(2) >= A(2))
+        self.assertTrue(A(1) < A(2))
+        self.assertTrue(A(2) > A(1))
+        self.assertTrue(A(1) <= A(2))
+        self.assertTrue(A(2) >= A(1))
+        self.assertTrue(A(2) <= A(2))
+        self.assertTrue(A(2) >= A(2))
 
     def test_no_operations_defined(self):
         with self.assertRaises(ValueError):
@@ -501,28 +530,41 @@ class TestLRU(unittest.TestCase):
         def orig(x, y):
             return 3*x+y
         f = functools.lru_cache(maxsize=20)(orig)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(maxsize, 20)
+        self.assertEqual(currsize, 0)
+        self.assertEqual(hits, 0)
+        self.assertEqual(misses, 0)
 
         domain = range(5)
         for i in range(1000):
             x, y = choice(domain), choice(domain)
             actual = f(x, y)
             expected = orig(x, y)
-            self.assertEquals(actual, expected)
-        self.assert_(f.hits > f.misses)
-        self.assertEquals(f.hits + f.misses, 1000)
+            self.assertEqual(actual, expected)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertTrue(hits > misses)
+        self.assertEqual(hits + misses, 1000)
+        self.assertEqual(currsize, 20)
 
-        f.clear()   # test clearing
-        self.assertEqual(f.hits, 0)
-        self.assertEqual(f.misses, 0)
+        f.cache_clear()   # test clearing
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 0)
+        self.assertEqual(misses, 0)
+        self.assertEqual(currsize, 0)
         f(x, y)
-        self.assertEqual(f.hits, 0)
-        self.assertEqual(f.misses, 1)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 0)
+        self.assertEqual(misses, 1)
+        self.assertEqual(currsize, 1)
 
         # Test bypassing the cache
         self.assertIs(f.__wrapped__, orig)
         f.__wrapped__(x, y)
-        self.assertEqual(f.hits, 0)
-        self.assertEqual(f.misses, 1)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 0)
+        self.assertEqual(misses, 1)
+        self.assertEqual(currsize, 1)
 
         # test size zero (which means "never-cache")
         @functools.lru_cache(0)
@@ -530,10 +572,15 @@ class TestLRU(unittest.TestCase):
             nonlocal f_cnt
             f_cnt += 1
             return 20
+        self.assertEqual(f.cache_info().maxsize, 0)
         f_cnt = 0
         for i in range(5):
             self.assertEqual(f(), 20)
         self.assertEqual(f_cnt, 5)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 0)
+        self.assertEqual(misses, 5)
+        self.assertEqual(currsize, 0)
 
         # test size one
         @functools.lru_cache(1)
@@ -541,10 +588,15 @@ class TestLRU(unittest.TestCase):
             nonlocal f_cnt
             f_cnt += 1
             return 20
+        self.assertEqual(f.cache_info().maxsize, 1)
         f_cnt = 0
         for i in range(5):
             self.assertEqual(f(), 20)
         self.assertEqual(f_cnt, 1)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 4)
+        self.assertEqual(misses, 1)
+        self.assertEqual(currsize, 1)
 
         # test size two
         @functools.lru_cache(2)
@@ -552,11 +604,30 @@ class TestLRU(unittest.TestCase):
             nonlocal f_cnt
             f_cnt += 1
             return x*10
+        self.assertEqual(f.cache_info().maxsize, 2)
         f_cnt = 0
         for x in 7, 9, 7, 9, 7, 9, 8, 8, 8, 9, 9, 9, 8, 8, 8, 7:
             #    *  *              *                          *
             self.assertEqual(f(x), x*10)
         self.assertEqual(f_cnt, 4)
+        hits, misses, maxsize, currsize = f.cache_info()
+        self.assertEqual(hits, 12)
+        self.assertEqual(misses, 4)
+        self.assertEqual(currsize, 2)
+
+    def test_lru_with_maxsize_none(self):
+        @functools.lru_cache(maxsize=None)
+        def fib(n):
+            if n < 2:
+                return n
+            return fib(n-1) + fib(n-2)
+        self.assertEqual([fib(n) for n in range(16)],
+            [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610])
+        self.assertEqual(fib.cache_info(),
+            functools._CacheInfo(hits=28, misses=16, maxsize=None, currsize=16))
+        fib.cache_clear()
+        self.assertEqual(fib.cache_info(),
+            functools._CacheInfo(hits=0, misses=0, maxsize=None, currsize=0))
 
 def test_main(verbose=None):
     test_classes = (

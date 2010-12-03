@@ -76,6 +76,24 @@ This module defines one class called :class:`Popen`:
 
       Popen(['/bin/sh', '-c', args[0], args[1], ...])
 
+   .. warning::
+
+      Executing shell commands that incorporate unsanitized input from an
+      untrusted source makes a program vulnerable to `shell injection
+      <http://en.wikipedia.org/wiki/Shell_injection#Shell_injection>`_,
+      a serious security flaw which can result in arbitrary command execution.
+      For this reason, the use of *shell=True* is **strongly discouraged** in cases
+      where the command string is constructed from external input::
+
+         >>> from subprocess import call
+         >>> filename = input("What file would you like to display?\n")
+         What file would you like to display?
+         non_existent; rm -rf / #
+         >>> call("cat " + filename, shell=True) # Uh-oh. This will end badly...
+
+      *shell=False* does not suffer from this vulnerability; the above Note may be
+      helpful in getting code using *shell=False* to work.
+
    On Windows: the :class:`Popen` class uses CreateProcess() to execute the child
    program, which operates on strings.  If *args* is a sequence, it will be
    converted to a string using the :meth:`list2cmdline` method.  Please note that
@@ -108,9 +126,9 @@ This module defines one class called :class:`Popen`:
    *stdin*, *stdout* and *stderr* specify the executed programs' standard input,
    standard output and standard error file handles, respectively.  Valid values
    are :data:`PIPE`, an existing file descriptor (a positive integer), an
-   existing file object, and ``None``.  :data:`PIPE` indicates that a new pipe
-   to the child should be created.  With ``None``, no redirection will occur;
-   the child's file handles will be inherited from the parent.  Additionally,
+   existing :term:`file object`, and ``None``.  :data:`PIPE` indicates that a
+   new pipe to the child should be created.  With ``None``, no redirection will
+   occur; the child's file handles will be inherited from the parent.  Additionally,
    *stderr* can be :data:`STDOUT`, which indicates that the stderr data from the
    applications should be captured into the same file handle as for stdout.
 
@@ -189,6 +207,16 @@ This module defines one class called :class:`Popen`:
    The *startupinfo* and *creationflags*, if given, will be passed to the
    underlying CreateProcess() function.  They can specify things such as appearance
    of the main window and priority for the new process.  (Windows only)
+
+   Popen objects are supported as context managers via the :keyword:`with` statement,
+   closing any open file descriptors on exit.
+   ::
+
+      with Popen(["ifconfig"], stdout=PIPE) as proc:
+          log.write(proc.stdout.read())
+
+   .. versionchanged:: 3.2
+      Added context manager support.
 
 
 .. data:: PIPE
@@ -271,13 +299,14 @@ This module also defines four shortcut functions:
 
 
 .. function:: getstatusoutput(cmd)
+
    Return ``(status, output)`` of executing *cmd* in a shell.
 
    Execute the string *cmd* in a shell with :func:`os.popen` and return a 2-tuple
    ``(status, output)``.  *cmd* is actually run as ``{ cmd ; } 2>&1``, so that the
    returned output will contain output or error messages.  A trailing newline is
    stripped from the output.  The exit status for the command can be interpreted
-   according to the rules for the C function :cfunc:`wait`.  Example::
+   according to the rules for the C function :c:func:`wait`.  Example::
 
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
@@ -290,6 +319,7 @@ This module also defines four shortcut functions:
 
 
 .. function:: getoutput(cmd)
+
    Return output (stdout and stderr) of executing *cmd* in a shell.
 
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
@@ -380,14 +410,14 @@ Instances of the :class:`Popen` class have the following methods:
    .. note::
 
       On Windows, SIGTERM is an alias for :meth:`terminate`. CTRL_C_EVENT and
-      CTRL_BREAK_EVENT can be sent to processes started with a `creationflags`
+      CTRL_BREAK_EVENT can be sent to processes started with a *creationflags*
       parameter which includes `CREATE_NEW_PROCESS_GROUP`.
 
 
 .. method:: Popen.terminate()
 
    Stop the child. On Posix OSs the method sends SIGTERM to the
-   child. On Windows the Win32 API function :cfunc:`TerminateProcess` is called
+   child. On Windows the Win32 API function :c:func:`TerminateProcess` is called
    to stop the child.
 
 
@@ -409,20 +439,20 @@ The following attributes are also available:
 
 .. attribute:: Popen.stdin
 
-   If the *stdin* argument was :data:`PIPE`, this attribute is a file object
-   that provides input to the child process.  Otherwise, it is ``None``.
+   If the *stdin* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides input to the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stdout
 
-   If the *stdout* argument was :data:`PIPE`, this attribute is a file object
-   that provides output from the child process.  Otherwise, it is ``None``.
+   If the *stdout* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides output from the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stderr
 
-   If the *stderr* argument was :data:`PIPE`, this attribute is a file object
-   that provides error output from the child process.  Otherwise, it is
+   If the *stderr* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides error output from the child process.  Otherwise, it is
    ``None``.
 
 

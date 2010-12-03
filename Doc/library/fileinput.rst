@@ -44,6 +44,11 @@ hook must be a function that takes two arguments, *filename* and *mode*, and
 returns an accordingly opened file-like object. Two useful hooks are already
 provided by this module.
 
+.. seealso::
+
+   Latest version of the :source:`fileinput Python source code
+   <Lib/fileinput.py>`
+
 The following function is the primary interface of this module:
 
 
@@ -58,8 +63,9 @@ The following function is the primary interface of this module:
    :keyword:`with` statement.  In this example, *input* is closed after the
    :keyword:`with` statement is exited, even if an exception occurs::
 
-      with fileinput.input(files=('spam.txt', 'eggs.txt')) as input:
-          process(input)
+      with fileinput.input(files=('spam.txt', 'eggs.txt')) as f:
+          for line in f:
+              process(line)
 
    .. versionchanged:: 3.2
       Can be used as a context manager.

@@ -9,6 +9,7 @@
 
 #define CTYPES_CFIELD_CAPSULE_NAME_PYMEM "_ctypes/cfield.c pymem"
 
+#if Py_UNICODE_SIZE != SIZEOF_WCHAR_T
 static void pymem_destructor(PyObject *ptr)
 {
     void *p = PyCapsule_GetPointer(ptr, CTYPES_CFIELD_CAPSULE_NAME_PYMEM);
@@ -16,6 +17,7 @@ static void pymem_destructor(PyObject *ptr)
         PyMem_Free(p);
     }
 }
+#endif
 
 
 /******************************************************************/
@@ -1203,6 +1205,7 @@ static PyObject *
 u_set(void *ptr, PyObject *value, Py_ssize_t size)
 {
     Py_ssize_t len;
+    wchar_t chars[2];
     if (!PyUnicode_Check(value)) {
         PyErr_Format(PyExc_TypeError,
                         "unicode string expected instead of %s instance",
@@ -1211,7 +1214,7 @@ u_set(void *ptr, PyObject *value, Py_ssize_t size)
     } else
         Py_INCREF(value);
 
-    len = PyUnicode_GET_SIZE(value);
+    len = PyUnicode_AsWideChar((PyUnicodeObject *)value, chars, 2);
     if (len != 1) {
         Py_DECREF(value);
         PyErr_SetString(PyExc_TypeError,
@@ -1219,7 +1222,7 @@ u_set(void *ptr, PyObject *value, Py_ssize_t size)
         return NULL;
     }
 
-    *(wchar_t *)ptr = PyUnicode_AS_UNICODE(value)[0];
+    *(wchar_t *)ptr = chars[0];
     Py_DECREF(value);
 
     _RET(value);
@@ -1433,15 +1436,11 @@ Z_set(void *ptr, PyObject *value, Py_ssize_t size)
         PyObject *keep;
         wchar_t *buffer;
 
-        int size = PyUnicode_GET_SIZE(value);
-        size += 1; /* terminating NUL */
-        size *= sizeof(wchar_t);
-        buffer = (wchar_t *)PyMem_Malloc(size);
+        buffer = PyUnicode_AsWideCharString(value, NULL);
         if (!buffer) {
             Py_DECREF(value);
-            return PyErr_NoMemory();
+            return NULL;
         }
-        memset(buffer, 0, size);
         keep = PyCapsule_New(buffer, CTYPES_CFIELD_CAPSULE_NAME_PYMEM, pymem_destructor);
         if (!keep) {
             Py_DECREF(value);
@@ -1449,12 +1448,6 @@ Z_set(void *ptr, PyObject *value, Py_ssize_t size)
             return NULL;
         }
         *(wchar_t **)ptr = (wchar_t *)buffer;
-        if (-1 == PyUnicode_AsWideChar(value,
-                                       buffer, PyUnicode_GET_SIZE(value))) {
-            Py_DECREF(value);
-            Py_DECREF(keep);
-            return NULL;
-        }
         Py_DECREF(value);
         return keep;
     }

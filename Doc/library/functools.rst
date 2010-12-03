@@ -13,9 +13,14 @@ The :mod:`functools` module is for higher-order functions: functions that act on
 or return other functions. In general, any callable object can be treated as a
 function for the purposes of this module.
 
+.. seealso::
+
+   Latest version of the :source:`functools Python source code
+   <Lib/functools.py>`
+
 The :mod:`functools` module defines the following functions:
 
-..  function:: cmp_to_key(func)
+.. function:: cmp_to_key(func)
 
    Transform an old-style comparison function to a key-function.  Used with
    tools that accept key functions (such as :func:`sorted`, :func:`min`,
@@ -27,7 +32,7 @@ The :mod:`functools` module defines the following functions:
    A compare function is any callable that accept two arguments, compares them,
    and returns a negative number for less-than, zero for equality, or a positive
    number for greater-than.  A key function is a callable that accepts one
-   argument and returns another value that indicates the position in the desired
+   argument and returns another value indicating the position in the desired
    collation sequence.
 
    Example::
@@ -37,37 +42,76 @@ The :mod:`functools` module defines the following functions:
    .. versionadded:: 3.2
 
 
-.. decorator:: lru_cache(maxsize)
+.. decorator:: lru_cache(maxsize=100)
 
    Decorator to wrap a function with a memoizing callable that saves up to the
    *maxsize* most recent calls.  It can save time when an expensive or I/O bound
    function is periodically called with the same arguments.
 
-   The *maxsize* parameter defaults to 100.  Since a dictionary is used to cache
-   results, the positional and keyword arguments to the function must be
-   hashable.
+   Since a dictionary is used to cache results, the positional and keyword
+   arguments to the function must be hashable.
 
-   The wrapped function is instrumented with two attributes, :attr:`hits`
-   and :attr:`misses` which count the number of successful or unsuccessful
-   cache lookups.  These statistics are helpful for tuning the *maxsize*
-   parameter and for measuring the cache's effectiveness.
+   If *maxsize* is set to None, the LRU feature is disabled and the cache
+   can grow without bound.
 
-   The wrapped function also has a :attr:`clear` attribute which can be
-   called (with no arguments) to clear the cache.
+   To help measure the effectiveness of the cache and tune the *maxsize*
+   parameter, the wrapped function is instrumented with a :func:`cache_info`
+   function that returns a :term:`named tuple` showing *hits*, *misses*,
+   *maxsize* and *currsize*.  In a multi-threaded environment, the hits
+   and misses are approximate.
+
+   The decorator also provides a :func:`cache_clear` function for clearing or
+   invalidating the cache.
 
    The original underlying function is accessible through the
-   :attr:`__wrapped__` attribute.  This allows introspection, bypassing
-   the cache, or rewrapping the function with a different caching tool.
+   :attr:`__wrapped__` attribute.  This is useful for introspection, for
+   bypassing the cache, or for rewrapping the function with a different cache.
 
-   A `LRU (least recently used) cache
-   <http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used>`_
-   is indicated when the pattern of calls changes over time, such as
-   when more recent calls are the best predictors of upcoming calls
-   (for example, the most popular articles on a news server tend to
-   change every day).
+   An `LRU (least recently used) cache
+   <http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used>`_ works
+   best when more recent calls are the best predictors of upcoming calls (for
+   example, the most popular articles on a news server tend to change daily).
+   The cache's size limit assures that the cache does not grow without bound on
+   long-running processes such as web servers.
+
+   Example of an LRU cache for static web content::
+
+        @lru_cache(maxsize=20)
+        def get_pep(num):
+            'Retrieve text of a Python Enhancement Proposal'
+            resource = 'http://www.python.org/dev/peps/pep-%04d/' % num
+            try:
+                with urllib.request.urlopen(resource) as s:
+                    return s.read()
+            except urllib.error.HTTPError:
+                return 'Not Found'
+
+        >>> for n in 8, 290, 308, 320, 8, 218, 320, 279, 289, 320, 9991:
+        ...     pep = get_pep(n)
+        ...     print(n, len(pep))
+
+        >>> print(get_pep.cache_info())
+        CacheInfo(hits=3, misses=8, maxsize=20, currsize=8)
+
+   Example of efficiently computing
+   `Fibonacci numbers <http://en.wikipedia.org/wiki/Fibonacci_number>`_
+   using a cache to implement a
+   `dynamic programming <http://en.wikipedia.org/wiki/Dynamic_programming>`_
+   technique::
+
+        @lru_cache(maxsize=None)
+        def fib(n):
+            if n < 2:
+                return n
+            return fib(n-1) + fib(n-2)
+
+        >>> print([fib(n) for n in range(16)])
+        [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610]
+
+        >>> print(fib.cache_info())
+        CacheInfo(hits=28, misses=16, maxsize=None, currsize=16)
 
    .. versionadded:: 3.2
-
 
 .. decorator:: total_ordering
 
@@ -150,7 +194,7 @@ The :mod:`functools` module defines the following functions:
 
    To allow access to the original function for introspection and other purposes
    (e.g. bypassing a caching decorator such as :func:`lru_cache`), this function
-   automatically adds a __wrapped__ attribute to the the wrapped that refers to
+   automatically adds a __wrapped__ attribute to the wrapper that refers to
    the original function.
 
    The main intended use for this function is in :term:`decorator` functions which

@@ -16,7 +16,7 @@ to this, the :mod:`multiprocessing` module allows the programmer to fully
 leverage multiple processors on a given machine.  It runs on both Unix and
 Windows.
 
-.. warning::
+.. note::
 
     Some of this package's functionality requires a functioning shared semaphore
     implementation on the host operating system. Without one, the
@@ -120,7 +120,9 @@ processes:
           print(q.get())    # prints "[42, None, 'hello']"
           p.join()
 
-   Queues are thread and process safe.
+   Queues are thread and process safe, but note that they must never
+   be instantiated as a side effect of importing a module: this can lead
+   to a deadlock!  (see :ref:`threaded-imports`)
 
 **Pipes**
 
@@ -214,7 +216,7 @@ However, if you really do need to use some shared data then
    The ``'d'`` and ``'i'`` arguments used when creating ``num`` and ``arr`` are
    typecodes of the kind used by the :mod:`array` module: ``'d'`` indicates a
    double precision float and ``'i'`` indicates a signed integer.  These shared
-   objects will be process and thread safe.
+   objects will be process and thread-safe.
 
    For more flexibility in using shared memory one can use the
    :mod:`multiprocessing.sharedctypes` module which supports the creation of
@@ -374,7 +376,7 @@ The :mod:`multiprocessing` package mostly replicates the API of the
       Otherwise a daemonic process would leave its children orphaned if it gets
       terminated when its parent process exits. Additionally, these are **not**
       Unix daemons or services, they are normal processes that will be
-      terminated (and not joined) if non-dameonic processes have exited.
+      terminated (and not joined) if non-daemonic processes have exited.
 
    In addition to the  :class:`Threading.Thread` API, :class:`Process` objects
    also support the following attributes and methods:
@@ -406,7 +408,7 @@ The :mod:`multiprocessing` package mostly replicates the API of the
    .. method:: terminate()
 
       Terminate the process.  On Unix this is done using the ``SIGTERM`` signal;
-      on Windows :cfunc:`TerminateProcess` is used.  Note that exit handlers and
+      on Windows :c:func:`TerminateProcess` is used.  Note that exit handlers and
       finally clauses, etc., will not be executed.
 
       Note that descendant processes of the process will *not* be terminated --
@@ -420,9 +422,9 @@ The :mod:`multiprocessing` package mostly replicates the API of the
          acquired a lock or semaphore etc. then terminating it is liable to
          cause other processes to deadlock.
 
-   Note that the :meth:`start`, :meth:`join`, :meth:`is_alive` and
-   :attr:`exit_code` methods should only be called by the process that created
-   the process object.
+   Note that the :meth:`start`, :meth:`join`, :meth:`is_alive`,
+   :meth:`terminate` and :attr:`exit_code` methods should only be called by
+   the process that created the process object.
 
    Example usage of some of the methods of :class:`Process`:
 
@@ -792,9 +794,9 @@ For example:
     >>> a.send([1, 'hello', None])
     >>> b.recv()
     [1, 'hello', None]
-    >>> b.send_bytes('thank you')
+    >>> b.send_bytes(b'thank you')
     >>> a.recv_bytes()
-    'thank you'
+    b'thank you'
     >>> import array
     >>> arr1 = array.array('i', range(5))
     >>> arr2 = array.array('i', [0] * 10)
@@ -1284,6 +1286,24 @@ their parent process exits.  The manager classes are defined in the
 
       Create a shared ``list`` object and return a proxy for it.
 
+   .. note::
+
+      Modifications to mutable values or items in dict and list proxies will not
+      be propagated through the manager, because the proxy has no way of knowing
+      when its values or items are modified.  To modify such an item, you can
+      re-assign the modified object to the container proxy::
+
+         # create a list proxy and append a mutable object (a dictionary)
+         lproxy = manager.list()
+         lproxy.append({})
+         # now mutate the dictionary
+         d = lproxy[0]
+         d['a'] = 1
+         d['b'] = 2
+         # at this point, the changes to d are not yet synced, but by
+         # reassigning the dictionary, the proxy is notified of the change
+         lproxy[0] = d
+
 
 Namespace objects
 >>>>>>>>>>>>>>>>>
@@ -1314,7 +1334,7 @@ callables with the manager class.  For example::
 
    from multiprocessing.managers import BaseManager
 
-   class MathsClass(object):
+   class MathsClass:
        def add(self, x, y):
            return x + y
        def mul(self, x, y):
@@ -1541,20 +1561,21 @@ with the :class:`Pool` class.
    *initializer* is not ``None`` then each worker process will call
    ``initializer(*initargs)`` when it starts.
 
-   *maxtasksperchild* is the number of tasks a worker process can complete
-   before it will exit and be replaced with a fresh worker process, to enable
-   unused resources to be freed. The default *maxtasksperchild* is None, which
-   means worker processes will live as long as the pool.
+   .. versionadded:: 3.2
+      *maxtasksperchild* is the number of tasks a worker process can complete
+      before it will exit and be replaced with a fresh worker process, to enable
+      unused resources to be freed. The default *maxtasksperchild* is None, which
+      means worker processes will live as long as the pool.
 
    .. note::
 
-        Worker processes within a :class:`Pool` typically live for the complete
-        duration of the Pool's work queue. A frequent pattern found in other
-        systems (such as Apache, mod_wsgi, etc) to free resources held by
-        workers is to allow a worker within a pool to complete only a set
-        amount of work before being exiting, being cleaned up and a new
-        process spawned to replace the old one. The *maxtasksperchild*
-        argument to the :class:`Pool` exposes this ability to the end user.
+      Worker processes within a :class:`Pool` typically live for the complete
+      duration of the Pool's work queue. A frequent pattern found in other
+      systems (such as Apache, mod_wsgi, etc) to free resources held by
+      workers is to allow a worker within a pool to complete only a set
+      amount of work before being exiting, being cleaned up and a new
+      process spawned to replace the old one. The *maxtasksperchild*
+      argument to the :class:`Pool` exposes this ability to the end user.
 
    .. method:: apply(func[, args[, kwds]])
 
@@ -1563,14 +1584,21 @@ with the :class:`Pool` class.
       suited for performing work in parallel. Additionally, the passed in
       function is only executed in one of the workers of the pool.
 
-   .. method:: apply_async(func[, args[, kwds[, callback]]])
+   .. method:: apply_async(func[, args[, kwds[, callback[, error_callback]]]])
 
       A variant of the :meth:`apply` method which returns a result object.
 
       If *callback* is specified then it should be a callable which accepts a
       single argument.  When the result becomes ready *callback* is applied to
-      it (unless the call failed).  *callback* should complete immediately since
-      otherwise the thread which handles the results will get blocked.
+      it, that is unless the call failed, in which case the *error_callback*
+      is applied instead
+
+      If *error_callback* is specified then it should be a callable which
+      accepts a single argument.  If the target function fails, then
+      the *error_callback* is called with the exception instance.
+
+      Callbacks should complete immediately since otherwise the thread which
+      handles the results will get blocked.
 
    .. method:: map(func, iterable[, chunksize])
 
@@ -1587,8 +1615,15 @@ with the :class:`Pool` class.
 
       If *callback* is specified then it should be a callable which accepts a
       single argument.  When the result becomes ready *callback* is applied to
-      it (unless the call failed).  *callback* should complete immediately since
-      otherwise the thread which handles the results will get blocked.
+      it, that is unless the call failed, in which case the *error_callback*
+      is applied instead
+
+      If *error_callback* is specified then it should be a callable which
+      accepts a single argument.  If the target function fails, then
+      the *error_callback* is called with the exception instance.
+
+      Callbacks should complete immediately since otherwise the thread which
+      handles the results will get blocked.
 
    .. method:: imap(func, iterable[, chunksize])
 
@@ -1807,14 +1842,14 @@ the client::
    from array import array
 
    address = ('localhost', 6000)     # family is deduced to be 'AF_INET'
-   listener = Listener(address, authkey='secret password')
+   listener = Listener(address, authkey=b'secret password')
 
    conn = listener.accept()
    print('connection accepted from', listener.last_accepted)
 
    conn.send([2.25, None, 'junk', float])
 
-   conn.send_bytes('hello')
+   conn.send_bytes(b'hello')
 
    conn.send_bytes(array('i', [42, 1729]))
 
@@ -1828,7 +1863,7 @@ server::
    from array import array
 
    address = ('localhost', 6000)
-   conn = Client(address, authkey='secret password')
+   conn = Client(address, authkey=b'secret password')
 
    print(conn.recv())                  # => [2.25, None, 'junk', float]
 
@@ -2221,8 +2256,8 @@ Synchronization types like locks, conditions and queues:
 .. literalinclude:: ../includes/mp_synchronize.py
 
 
-An showing how to use queues to feed tasks to a collection of worker process and
-collect the results:
+An example showing how to use queues to feed tasks to a collection of worker
+process and collect the results:
 
 .. literalinclude:: ../includes/mp_workers.py
 

@@ -12,12 +12,14 @@ PS: In the standard Python distribution, this file is encoded in UTF-8
 and the list is in rough alphabetical order by last names.
 
 David Abrahams
+Ron Adam
 Jim Ahlstrom
 Farhan Ahmad
 Matthew Ahrens
 Nir Aides
 Yaniv Aknin
 Jyrki Alakuijala
+Ray Allen
 Billy G. Allie
 Kevin Altis
 Joe Amenta
@@ -28,6 +30,7 @@ John Anderson
 Erik Andersén
 Oliver Andrich
 Ross Andrus
+Jon Anglin
 Éric Araujo
 Jason Asbahr
 David Ascher
@@ -62,6 +65,7 @@ David Beazley
 Robin Becker
 Neal Becker
 Bill Bedford
+Stefan Behnel
 Reimer Behrends
 Ben Bell
 Thomas Bellman
@@ -74,6 +78,7 @@ Eric Beser
 Steven Bethard
 Stephen Bevan
 Ron Bickers
+Adrian von Bidder
 David Binger
 Dominic Binks
 Philippe Biondi
@@ -128,6 +133,7 @@ Tony Campbell
 Brett Cannon
 Mike Carlton
 Terry Carroll
+Lorenzo M. Catucci
 Donn Cave
 Charles Cazabon
 Per Cederqvist
@@ -232,10 +238,12 @@ Josip Dzolonga
 Maxim Dzumanenko
 Walter Dörwald
 Hans Eckardt
+Rodolpho Eckhardt
 Grant Edwards
 John Ehresman
 Eric Eisner
 Andrew Eland
+Julien Élie
 Lance Ellinghaus
 David Ely
 Jeff Epler
@@ -255,9 +263,11 @@ Greg Ewing
 Martijn Faassen
 Andreas Faerber
 Bill Fancher
+Troy J. Farrell
 Mark Favas
 Niels Ferguson
 Sebastian Fernandez
+Florian Festi
 Vincent Fiack
 Tomer Filiba
 Jeffrey Finkelstein
@@ -280,6 +290,7 @@ Peter Funk
 Geoff Furnish
 Ulisses Furquim
 Hagen Fürstenau
+Hallvard B Furuseth
 Achim Gaedke
 Martin von Gagern
 Lele Gaifax
@@ -310,6 +321,7 @@ David Goodger
 Hans de Graaff
 Eddy De Greef
 Duncan Grisby
+Eric Groo
 Dag Gruneau
 Michael Guravage
 Lars Gustäbel
@@ -330,6 +342,7 @@ Barry Hantman
 Lynda Hardman
 Derek Harland
 Jason Harper
+Brian Harring
 Larry Hastings
 Shane Hathaway
 Rycharde Hawkes
@@ -402,7 +415,7 @@ Jack Jansen
 Bill Janssen
 Drew Jenkins
 Flemming Kjær Jensen
-Jiba
+MunSic Jeong
 Orjan Johansen
 Fredrik Johansson
 Gregory K. Johnson
@@ -432,8 +445,10 @@ Randall Kern
 Magnus Kessler
 Lawrence Kesteloot
 Vivek Khera
+Akira Kitada
 Mads Kiilerich
 Taek Joo Kim
+W. Trevor King
 Paul Kippes
 Steve Kirsch
 Sebastian Kirsche
@@ -446,6 +461,7 @@ Lenny Kneler
 Pat Knight
 Greg Kochanski
 Damon Kohler
+Vlad Korolev
 Joseph Koshy
 Maksim Kozyarchuk
 Stefan Krah
@@ -459,6 +475,7 @@ Ivan Krstić
 Andrew Kuchling
 Vladimir Kushnir
 Cameron Laird
+Jean-Baptiste "Jiba" Lamy
 Torsten Landschoff
 Łukasz Langa
 Tino Lange
@@ -487,13 +504,14 @@ John Lenton
 Christopher Tur Lesniewski-Laas
 Mark Levinson
 William Lewis
+Xuanji Li
 Robert van Liere
 Ross Light
 Shawn Ligocki
 Martin Ligr
 Grant Limberg
 Christopher Lindblad
-Bjorn Lindqvist
+Björn Lindqvist
 Per Lindqvist
 Eric Lindvall
 Gregor Lingl
@@ -524,6 +542,7 @@ David Marek
 Doug Marien
 Alex Martelli
 Anthony Martin
+Owen Martin
 Sébastien Martini
 Roger Masse
 Nick Mathewson
@@ -683,6 +702,7 @@ Anthony Roach
 Mark Roberts
 Jim Robinson
 Andy Robinson
+Mark Roddy
 Kevin Rodgers
 Giampaolo Rodola
 Mike Romberg
@@ -699,12 +719,14 @@ Craig Rowland
 Clinton Roy
 Paul Rubin
 Sam Ruby
+Demur Rumed
 Audun S. Runde
 Rauli Ruohonen
 Jeff Rush
 Sam Rushing
 Mark Russell
 Nick Russo
+Sébastien Sablé
 Hajime Saitou
 George Sakkis
 Rich Salz
@@ -713,10 +735,12 @@ Ilya Sandler
 Mark Sapiro
 Ty Sarna
 Ben Sayer
+Andrew Schaaf
 Michael Scharf
 Andreas Schawo
 Neil Schemenauer
 David Scherer
+Bob Schmertz
 Gregor Schmid
 Ralf Schmitt
 Michael Schneider
@@ -792,6 +816,7 @@ Paul Swartz
 Thenault Sylvain
 Péter Szabó
 Arfrever Frehtes Taifersar Arahesis
+Neil Tallim
 Geoff Talvola
 Musashi Tamura
 William Tanksley
@@ -803,6 +828,7 @@ Anatoly Techtonik
 Tobias Thelen
 James Thomas
 Robin Thomas
+Jeremy Thurgood
 Eric Tiedemann
 Tracy Tims
 Oren Tirosh
@@ -812,6 +838,7 @@ Frank J. Tobin
 R Lindsay Todd
 Bennett Todd
 Matias Torchinsky
+Sandro Tosi
 Richard Townsend
 Laurence Tratt
 John Tromp
@@ -830,12 +857,14 @@ Hector Urtubia
 Andi Vajda
 Case Van Horsen
 Kyle VanderBeek
+Andrew Vant
 Atul Varma
 Dmitry Vasiliev
 Alexandre Vassalotti
 Frank Vercruesse
 Mike Verdone
 Jaap Vermeulen
+Nikita Vetoshkin
 Al Vezza
 Jacques A. Vidrine
 John Viega
@@ -897,6 +926,7 @@ Thomas Wouters
 Heiko Wundram
 Doug Wyatt
 Florent Xicluna
+Hirokazu Yamamoto
 Ka-Ping Yee
 Bob Yodlowski
 Danny Yoo
@@ -909,5 +939,6 @@ Artur Zaprzala
 Mike Zarnstorff
 Siebren van der Zee
 Uwe Zessin
+Kai Zhu
 Tarek Ziadé
 Peter Åstrand

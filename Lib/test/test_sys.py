@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-1 -*-
 import unittest, test.support
 import sys, io, os
 import struct
@@ -94,7 +93,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit(0)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 0)
+            self.assertEqual(exc.code, 0)
         except:
             self.fail("wrong exception")
         else:
@@ -105,7 +104,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit(42)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -115,7 +114,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((42,))
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -125,7 +124,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit("exit")
         except SystemExit as exc:
-            self.assertEquals(exc.code, "exit")
+            self.assertEqual(exc.code, "exit")
         except:
             self.fail("wrong exception")
         else:
@@ -135,7 +134,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((17, 23))
         except SystemExit as exc:
-            self.assertEquals(exc.code, (17, 23))
+            self.assertEqual(exc.code, (17, 23))
         except:
             self.fail("wrong exception")
         else:
@@ -189,7 +188,7 @@ class SysModuleTest(unittest.TestCase):
             orig = sys.getcheckinterval()
             for n in 0, 100, 120, orig: # orig last to restore starting state
                 sys.setcheckinterval(n)
-                self.assertEquals(sys.getcheckinterval(), n)
+                self.assertEqual(sys.getcheckinterval(), n)
 
     @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_switchinterval(self):
@@ -203,7 +202,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             for n in 0.00001, 0.05, 3.0, orig:
                 sys.setswitchinterval(n)
-                self.assertAlmostEquals(sys.getswitchinterval(), n)
+                self.assertAlmostEqual(sys.getswitchinterval(), n)
         finally:
             sys.setswitchinterval(orig)
 
@@ -469,6 +468,8 @@ class SysModuleTest(unittest.TestCase):
         self.assertTrue(vi > (1,0,0))
         self.assertIsInstance(sys.float_repr_style, str)
         self.assertIn(sys.float_repr_style, ('short', 'legacy'))
+        if not sys.platform.startswith('win'):
+            self.assertIsInstance(sys.abiflags, str)
 
     def test_43581(self):
         # Can't use sys.stdout, as this is a StringIO object when
@@ -494,47 +495,6 @@ class SysModuleTest(unittest.TestCase):
                 return 123
 
         self.assertRaises(TypeError, sys.intern, S("abc"))
-
-    # On Windows, pass bytes to subprocess doesn't test how Python decodes the
-    # command line, but how subprocess does decode bytes to unicode. Python
-    # doesn't decode the command line because Windows provides directly the
-    # arguments as unicode (using wmain() instead of main()).
-    @unittest.skipIf(sys.platform == 'win32',
-                     'Windows has a native unicode API')
-    def test_undecodable_code(self):
-        # Raise SkipTest() if sys.executable is not encodable to ascii
-        test.support.workaroundIssue8611()
-
-        undecodable = b"\xff"
-        env = os.environ.copy()
-        # Use C locale to get ascii for the locale encoding
-        env['LC_ALL'] = 'C'
-        code = (
-            b'import locale; '
-            b'print(ascii("' + undecodable + b'"), '
-                b'locale.getpreferredencoding())')
-        p = subprocess.Popen(
-            [sys.executable, "-c", code],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            env=env)
-        stdout, stderr = p.communicate()
-        if p.returncode == 1:
-            # _Py_char2wchar() decoded b'\xff' as '\udcff' (b'\xff' is not
-            # decodable from ASCII) and run_command() failed on
-            # PyUnicode_AsUTF8String(). This is the expected behaviour on
-            # Linux.
-            pattern = b"Unable to decode the command from the command line:"
-        elif p.returncode == 0:
-            # _Py_char2wchar() decoded b'\xff' as '\xff' even if the locale is
-            # C and the locale encoding is ASCII. It occurs on FreeBSD, Solaris
-            # and Mac OS X.
-            pattern = b"'\\xff' "
-            # The output is followed by the encoding name, an alias to ASCII.
-            # Examples: "US-ASCII" or "646" (ISO 646, on Solaris).
-        else:
-            raise AssertionError("Unknown exit code: %s, output=%a" % (p.returncode, stdout))
-        if not stdout.startswith(pattern):
-            raise AssertionError("%a doesn't start with %a" % (stdout, pattern))
 
     def test_sys_flags(self):
         self.assertTrue(sys.flags)
@@ -601,46 +561,6 @@ class SysModuleTest(unittest.TestCase):
         else:
             expected = None
         self.check_fsencoding(fs_encoding, expected)
-
-    @unittest.skipIf(sys.platform in ('win32', 'darwin'),
-                     'PYTHONFSENCODING is ignored on Windows and Mac OS X')
-    def test_pythonfsencoding(self):
-        def get_fsencoding(env):
-            output = subprocess.check_output(
-                [sys.executable, "-c",
-                 "import sys; print(sys.getfilesystemencoding())"],
-                env=env)
-            return output.rstrip().decode('ascii')
-
-        # Raise SkipTest() if sys.executable is not encodable to ascii
-        test.support.workaroundIssue8611()
-
-        # Use C locale to get ascii for the locale encoding
-        env = os.environ.copy()
-        env['LC_ALL'] = 'C'
-        try:
-            del env['PYTHONFSENCODING']
-        except KeyError:
-            pass
-        self.check_fsencoding(get_fsencoding(env), 'ascii')
-
-        # Filesystem encoding is hardcoded on Windows and Mac OS X
-        for encoding in ('ascii', 'cp850', 'iso8859-1', 'utf-8'):
-            env = os.environ.copy()
-            env['PYTHONFSENCODING'] = encoding
-            self.check_fsencoding(get_fsencoding(env), encoding)
-
-    def test_setfilesystemencoding(self):
-        old = sys.getfilesystemencoding()
-        try:
-            sys.setfilesystemencoding("iso-8859-1")
-            self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
-        finally:
-            sys.setfilesystemencoding(old)
-        try:
-            self.assertRaises(LookupError, sys.setfilesystemencoding, "xxx")
-        finally:
-            sys.setfilesystemencoding(old)
 
 
 class SizeofTest(unittest.TestCase):
@@ -839,7 +759,7 @@ class SizeofTest(unittest.TestCase):
         check(int(PyLong_BASE**2-1), size(vh) + 2*self.longdigit)
         check(int(PyLong_BASE**2), size(vh) + 3*self.longdigit)
         # memory
-        check(memoryview(b''), size(h + 'P PP2P2i7P'))
+        check(memoryview(b''), size(h + 'PP2P2i7P'))
         # module
         check(unittest, size(h + '3P'))
         # None
@@ -862,8 +782,8 @@ class SizeofTest(unittest.TestCase):
         # reverse
         check(reversed(''), size(h + 'PP'))
         # range
-        check(range(1), size(h + '3P'))
-        check(range(66000), size(h + '3P'))
+        check(range(1), size(h + '4P'))
+        check(range(66000), size(h + '4P'))
         # set
         # frozenset
         PySet_MINSIZE = 8
@@ -907,7 +827,7 @@ class SizeofTest(unittest.TestCase):
         # we need to test for both sizes, because we don't know if the string
         # has been cached
         for s in samples:
-            basicsize =  size(h + 'PPliP') + usize * (len(s) + 1)
+            basicsize =  size(h + 'PPPiP') + usize * (len(s) + 1)
             check(s, basicsize)
         # weakref
         import weakref

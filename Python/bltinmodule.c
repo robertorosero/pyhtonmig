@@ -5,7 +5,6 @@
 
 #include "node.h"
 #include "code.h"
-#include "eval.h"
 
 #include <ctype.h>
 
@@ -32,29 +31,6 @@ int Py_HasFileSystemDefaultEncoding = 0;
 const char *Py_FileSystemDefaultEncoding = "utf-8";
 int Py_HasFileSystemDefaultEncoding = 1;
 #endif
-
-int
-_Py_SetFileSystemEncoding(PyObject *s)
-{
-    PyObject *defenc, *codec;
-    if (!PyUnicode_Check(s)) {
-        PyErr_BadInternalCall();
-        return -1;
-    }
-    defenc = _PyUnicode_AsDefaultEncodedString(s, NULL);
-    if (!defenc)
-        return -1;
-    codec = _PyCodec_Lookup(PyBytes_AsString(defenc));
-    if (codec == NULL)
-        return -1;
-    Py_DECREF(codec);
-    if (!Py_HasFileSystemDefaultEncoding && Py_FileSystemDefaultEncoding)
-        /* A file system encoding was set at run-time */
-        free((char*)Py_FileSystemDefaultEncoding);
-    Py_FileSystemDefaultEncoding = strdup(PyBytes_AsString(defenc));
-    Py_HasFileSystemDefaultEncoding = 0;
-    return 0;
-}
 
 static PyObject *
 builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
@@ -196,8 +172,12 @@ builtin___import__(PyObject *self, PyObject *args, PyObject *kwds)
 PyDoc_STRVAR(import_doc,
 "__import__(name, globals={}, locals={}, fromlist=[], level=-1) -> module\n\
 \n\
-Import a module.  The globals are only used to determine the context;\n\
-they are not modified.  The locals are currently unused.  The fromlist\n\
+Import a module. Because this function is meant for use by the Python\n\
+interpreter and not for general use it is better to use\n\
+importlib.import_module() to programmatically import a module.\n\
+\n\
+The globals argument is only used to determine the context;\n\
+they are not modified.  The locals argument is unused.  The fromlist\n\
 should be a list of names to emulate ``from name import ...'', or an\n\
 empty list to emulate ``import name''.\n\
 When importing a module from a package, note that __import__('A.B', ...)\n\
@@ -328,6 +308,20 @@ PyDoc_STRVAR(bin_doc,
 "bin(number) -> string\n\
 \n\
 Return the binary representation of an integer or long integer.");
+
+
+static PyObject *
+builtin_callable(PyObject *self, PyObject *v)
+{
+    return PyBool_FromLong((long)PyCallable_Check(v));
+}
+
+PyDoc_STRVAR(callable_doc,
+"callable(object) -> bool\n\
+\n\
+Return whether the object is callable (i.e., some kind of function).\n\
+Note that classes are callable, as are instances of classes with a\n\
+__call__() method.");
 
 
 typedef struct {
@@ -543,6 +537,7 @@ static PyObject *
 builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 {
     char *str;
+    PyObject *filename_obj;
     char *filename;
     char *startstr;
     int mode = -1;
@@ -554,12 +549,16 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"source", "filename", "mode", "flags",
                              "dont_inherit", NULL};
     int start[] = {Py_file_input, Py_eval_input, Py_single_input};
+    PyObject *result;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oss|ii:compile",
-                                     kwlist, &cmd, &filename, &startstr,
-                                     &supplied_flags, &dont_inherit))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&s|ii:compile",  kwlist,
+                                     &cmd,
+                                     PyUnicode_FSConverter, &filename_obj,
+                                     &startstr, &supplied_flags,
+                                     &dont_inherit))
         return NULL;
 
+    filename = PyBytes_AS_STRING(filename_obj);
     cf.cf_flags = supplied_flags | PyCF_SOURCE_IS_UTF8;
 
     if (supplied_flags &
@@ -567,7 +566,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     {
         PyErr_SetString(PyExc_ValueError,
                         "compile(): unrecognised flags");
-        return NULL;
+        goto error;
     }
     /* XXX Warn if (supplied_flags & PyCF_MASK_OBSOLETE) != 0? */
 
@@ -584,14 +583,13 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     else {
         PyErr_SetString(PyExc_ValueError,
                         "compile() arg 3 must be 'exec', 'eval' or 'single'");
-        return NULL;
+        goto error;
     }
 
     is_ast = PyAST_Check(cmd);
     if (is_ast == -1)
-        return NULL;
+        goto error;
     if (is_ast) {
-        PyObject *result;
         if (supplied_flags & PyCF_ONLY_AST) {
             Py_INCREF(cmd);
             result = cmd;
@@ -604,20 +602,27 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
             mod = PyAST_obj2mod(cmd, arena, mode);
             if (mod == NULL) {
                 PyArena_Free(arena);
-                return NULL;
+                goto error;
             }
             result = (PyObject*)PyAST_Compile(mod, filename,
                                               &cf, arena);
             PyArena_Free(arena);
         }
-        return result;
+        goto finally;
     }
 
     str = source_as_string(cmd, "compile", "string, bytes, AST or code", &cf);
     if (str == NULL)
-        return NULL;
+        goto error;
 
-    return Py_CompileStringFlags(str, filename, start[mode], &cf);
+    result = Py_CompileStringFlags(str, filename, start[mode], &cf);
+    goto finally;
+
+error:
+    result = NULL;
+finally:
+    Py_DECREF(filename_obj);
+    return result;
 }
 
 PyDoc_STRVAR(compile_doc,
@@ -1156,12 +1161,12 @@ Delete a named attribute on an object; delattr(x, 'y') is equivalent to\n\
 static PyObject *
 builtin_hash(PyObject *self, PyObject *v)
 {
-    long x;
+    Py_hash_t x;
 
     x = PyObject_Hash(v);
     if (x == -1)
         return NULL;
-    return PyLong_FromLong(x);
+    return PyLong_FromSsize_t(x);
 }
 
 PyDoc_STRVAR(hash_doc,
@@ -2250,6 +2255,7 @@ static PyMethodDef builtin_methods[] = {
     {"any",             builtin_any,        METH_O, any_doc},
     {"ascii",           builtin_ascii,      METH_O, ascii_doc},
     {"bin",             builtin_bin,        METH_O, bin_doc},
+    {"callable",        builtin_callable,   METH_O, callable_doc},
     {"chr",             builtin_chr,        METH_VARARGS, chr_doc},
     {"compile",         (PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
     {"delattr",         builtin_delattr,    METH_VARARGS, delattr_doc},

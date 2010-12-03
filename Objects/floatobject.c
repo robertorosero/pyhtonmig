@@ -5,7 +5,6 @@
    for any kind of float exception without losing portability. */
 
 #include "Python.h"
-#include "structseq.h"
 
 #include <ctype.h>
 #include <float.h>
@@ -522,7 +521,7 @@ float_richcompare(PyObject *v, PyObject *w, int op)
     return Py_NotImplemented;
 }
 
-static long
+static Py_hash_t
 float_hash(PyFloatObject *v)
 {
     return _Py_HashDouble(v->ob_fval);

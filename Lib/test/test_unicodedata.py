@@ -21,7 +21,7 @@ errors = 'surrogatepass'
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
-    expectedchecksum = '4504dffd035baea02c5b9de82bebc3d65e0e0baf'
+    expectedchecksum = '21b90f1aed00081b81ca7942b22196af090015a0'
 
     def test_method_checksum(self):
         h = hashlib.sha1()
@@ -80,7 +80,7 @@ class UnicodeDatabaseTest(unittest.TestCase):
 class UnicodeFunctionsTest(UnicodeDatabaseTest):
 
     # update this, if the database changes
-    expectedchecksum = 'e89a6380093a00a7685ac7b92e7367d737fcb79b'
+    expectedchecksum = 'c23dfc0b5eaf3ca2aad32d733de96bb182ccda50'
     def test_function_checksum(self):
         data = []
         h = hashlib.sha1()
@@ -225,6 +225,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         error = "SyntaxError: (unicode error) \\N escapes not supported " \
             "(can't load unicodedata module)"
         self.assertIn(error, popen.stderr.read().decode("ascii"))
+        popen.stderr.close()
 
     def test_decimal_numeric_consistent(self):
         # Test that decimal and numeric are consistent,
@@ -253,7 +254,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertTrue(count >= 10) # should have tested at least the ASCII digits
 
     def test_bug_1704793(self):
-        self.assertEquals(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
+        self.assertEqual(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
 
     def test_ucd_510(self):
         import unicodedata

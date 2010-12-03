@@ -105,7 +105,7 @@ from urllib.response import addinfourl, addclosehook
 # check for SSL
 try:
     import ssl
-except:
+except ImportError:
     _have_ssl = False
 else:
     _have_ssl = True
@@ -114,11 +114,27 @@ else:
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+            *, cafile=None, capath=None):
     global _opener
-    if _opener is None:
-        _opener = build_opener()
-    return _opener.open(url, data, timeout)
+    if cafile or capath:
+        if not _have_ssl:
+            raise ValueError('SSL support not available')
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.options |= ssl.OP_NO_SSLv2
+        if cafile or capath:
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile, capath)
+            check_hostname = True
+        else:
+            check_hostname = False
+        https_handler = HTTPSHandler(context=context, check_hostname=check_hostname)
+        opener = build_opener(https_handler)
+    elif _opener is None:
+        _opener = opener = build_opener()
+    else:
+        opener = _opener
+    return opener.open(url, data, timeout)
 
 def install_opener(opener):
     global _opener
@@ -1053,7 +1069,7 @@ class AbstractHTTPHandler(BaseHandler):
 
         return request
 
-    def do_open(self, http_class, req):
+    def do_open(self, http_class, req, **http_conn_args):
         """Return an HTTPResponse object for the request, using http_class.
 
         http_class must implement the HTTPConnection API from http.client.
@@ -1062,9 +1078,12 @@ class AbstractHTTPHandler(BaseHandler):
         if not host:
             raise URLError('no host given')
 
-        h = http_class(host, timeout=req.timeout) # will parse host:port
-        headers = dict(req.headers)
-        headers.update(req.unredirected_hdrs)
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+
+        headers = dict(req.unredirected_hdrs)
+        headers.update(dict((k, v) for k, v in req.headers.items()
+                            if k not in headers))
 
         # TODO(jhylton): Should this be redesigned to handle
         # persistent connections?
@@ -1112,10 +1131,18 @@ class HTTPHandler(AbstractHTTPHandler):
     http_request = AbstractHTTPHandler.do_request_
 
 if hasattr(http.client, 'HTTPSConnection'):
+    import ssl
+
     class HTTPSHandler(AbstractHTTPHandler):
 
+        def __init__(self, debuglevel=0, context=None, check_hostname=None):
+            AbstractHTTPHandler.__init__(self, debuglevel)
+            self._context = context
+            self._check_hostname = check_hostname
+
         def https_open(self, req):
-            return self.do_open(http.client.HTTPSConnection, req)
+            return self.do_open(http.client.HTTPSConnection, req,
+                context=self._context, check_hostname=self._check_hostname)
 
         https_request = AbstractHTTPHandler.do_request_
 
@@ -1201,8 +1228,8 @@ class FileHandler(BaseHandler):
         url = req.selector
         if url[:2] == '//' and url[2:3] != '/' and (req.host and
                 req.host != 'localhost'):
-            req.type = 'ftp'
-            return self.parent.open(req)
+            if not req.host is self.get_names():
+                raise URLError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(req)
 
@@ -1273,8 +1300,8 @@ class FTPHandler(BaseHandler):
         else:
             passwd = None
         host = unquote(host)
-        user = unquote(user or '')
-        passwd = unquote(passwd or '')
+        user = user or ''
+        passwd = passwd or ''
 
         try:
             host = socket.gethostbyname(host)
@@ -1685,7 +1712,7 @@ class URLopener:
         if not isinstance(url, str):
             raise URLError('file error', 'proxy support for file protocol currently not implemented')
         if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
-            return self.open_ftp(url)
+            raise ValueError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(url)
 

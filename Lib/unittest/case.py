@@ -6,6 +6,7 @@ import difflib
 import pprint
 import re
 import warnings
+import collections
 
 from . import result
 from .util import (strclass, safe_repr, sorted_list_difference,
@@ -90,11 +91,10 @@ def expectedFailure(func):
     return wrapper
 
 
-class _AssertRaisesContext(object):
-    """A context manager used to implement TestCase.assertRaises* methods."""
+class _AssertRaisesBaseContext(object):
 
     def __init__(self, expected, test_case, callable_obj=None,
-                  expected_regexp=None):
+                  expected_regex=None):
         self.expected = expected
         self.failureException = test_case.failureException
         if callable_obj is not None:
@@ -104,7 +104,13 @@ class _AssertRaisesContext(object):
                 self.obj_name = str(callable_obj)
         else:
             self.obj_name = None
-        self.expected_regexp = expected_regexp
+        if isinstance(expected_regex, (bytes, str)):
+            expected_regex = re.compile(expected_regex)
+        self.expected_regex = expected_regex
+
+
+class _AssertRaisesContext(_AssertRaisesBaseContext):
+    """A context manager used to implement TestCase.assertRaises* methods."""
 
     def __enter__(self):
         return self
@@ -126,16 +132,85 @@ class _AssertRaisesContext(object):
             return False
         # store exception, without traceback, for later retrieval
         self.exception = exc_value.with_traceback(None)
-        if self.expected_regexp is None:
+        if self.expected_regex is None:
             return True
 
-        expected_regexp = self.expected_regexp
-        if isinstance(expected_regexp, (bytes, str)):
-            expected_regexp = re.compile(expected_regexp)
-        if not expected_regexp.search(str(exc_value)):
+        expected_regex = self.expected_regex
+        if not expected_regex.search(str(exc_value)):
             raise self.failureException('"%s" does not match "%s"' %
-                     (expected_regexp.pattern, str(exc_value)))
+                     (expected_regex.pattern, str(exc_value)))
         return True
+
+
+class _AssertWarnsContext(_AssertRaisesBaseContext):
+    """A context manager used to implement TestCase.assertWarns* methods."""
+
+    def __enter__(self):
+        # The __warningregistry__'s need to be in a pristine state for tests
+        # to work properly.
+        for v in sys.modules.values():
+            if getattr(v, '__warningregistry__', None):
+                v.__warningregistry__ = {}
+        self.warnings_manager = warnings.catch_warnings(record=True)
+        self.warnings = self.warnings_manager.__enter__()
+        warnings.simplefilter("always", self.expected)
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.warnings_manager.__exit__(exc_type, exc_value, tb)
+        if exc_type is not None:
+            # let unexpected exceptions pass through
+            return
+        try:
+            exc_name = self.expected.__name__
+        except AttributeError:
+            exc_name = str(self.expected)
+        first_matching = None
+        for m in self.warnings:
+            w = m.message
+            if not isinstance(w, self.expected):
+                continue
+            if first_matching is None:
+                first_matching = w
+            if (self.expected_regex is not None and
+                not self.expected_regex.search(str(w))):
+                continue
+            # store warning for later retrieval
+            self.warning = w
+            self.filename = m.filename
+            self.lineno = m.lineno
+            return
+        # Now we simply try to choose a helpful failure message
+        if first_matching is not None:
+            raise self.failureException('"%s" does not match "%s"' %
+                     (self.expected_regex.pattern, str(first_matching)))
+        if self.obj_name:
+            raise self.failureException("{0} not triggered by {1}"
+                .format(exc_name, self.obj_name))
+        else:
+            raise self.failureException("{0} not triggered"
+                .format(exc_name))
+
+
+class _TypeEqualityDict(object):
+
+    def __init__(self, testcase):
+        self.testcase = testcase
+        self._store = {}
+
+    def __setitem__(self, key, value):
+        self._store[key] = value
+
+    def __getitem__(self, key):
+        value = self._store[key]
+        if isinstance(value, str):
+            return getattr(self.testcase, value)
+        return value
+
+    def get(self, key, default=None):
+        if key in self._store:
+            return self[key]
+        return default
 
 
 class TestCase(object):
@@ -170,7 +245,7 @@ class TestCase(object):
     # objects used in assert methods) will be printed on failure in *addition*
     # to any explicit message passed.
 
-    longMessage = False
+    longMessage = True
 
     # This attribute sets the maximum length of a diff in failure messages
     # by assert methods using difflib. It is looked up as an instance attribute
@@ -200,13 +275,13 @@ class TestCase(object):
         # Map types to custom assertEqual functions that will compare
         # instances of said type in more detail to generate a more useful
         # error message.
-        self._type_equality_funcs = {}
-        self.addTypeEqualityFunc(dict, self.assertDictEqual)
-        self.addTypeEqualityFunc(list, self.assertListEqual)
-        self.addTypeEqualityFunc(tuple, self.assertTupleEqual)
-        self.addTypeEqualityFunc(set, self.assertSetEqual)
-        self.addTypeEqualityFunc(frozenset, self.assertSetEqual)
-        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
+        self._type_equality_funcs = _TypeEqualityDict(self)
+        self.addTypeEqualityFunc(dict, 'assertDictEqual')
+        self.addTypeEqualityFunc(list, 'assertListEqual')
+        self.addTypeEqualityFunc(tuple, 'assertTupleEqual')
+        self.addTypeEqualityFunc(set, 'assertSetEqual')
+        self.addTypeEqualityFunc(frozenset, 'assertSetEqual')
+        self.addTypeEqualityFunc(str, 'assertMultiLineEqual')
 
     def addTypeEqualityFunc(self, typeobj, function):
         """Add a type specific assertEqual style function to compare a type.
@@ -464,6 +539,37 @@ class TestCase(object):
         with context:
             callableObj(*args, **kwargs)
 
+    def assertWarns(self, expected_warning, callable_obj=None, *args, **kwargs):
+        """Fail unless a warning of class warnClass is triggered
+           by callableObj when invoked with arguments args and keyword
+           arguments kwargs.  If a different type of warning is
+           triggered, it will not be handled: depending on the other
+           warning filtering rules in effect, it might be silenced, printed
+           out, or raised as an exception.
+
+           If called with callableObj omitted or None, will return a
+           context object used like this::
+
+                with self.assertWarns(SomeWarning):
+                    do_something()
+
+           The context manager keeps a reference to the first matching
+           warning as the 'warning' attribute; similarly, the 'filename'
+           and 'lineno' attributes give you information about the line
+           of Python code from which the warning was triggered.
+           This allows you to inspect the warning after the assertion::
+
+               with self.assertWarns(SomeWarning) as cm:
+                   do_something()
+               the_warning = cm.warning
+               self.assertEqual(the_warning.some_attribute, 147)
+        """
+        context = _AssertWarnsContext(expected_warning, self, callable_obj)
+        if callable_obj is None:
+            return context
+        with context:
+            callable_obj(*args, **kwargs)
+
     def _getAssertEqualityFunc(self, first, second):
         """Get a detailed comparison function for the types of the two args.
 
@@ -511,7 +617,7 @@ class TestCase(object):
                                                           safe_repr(second)))
             raise self.failureException(msg)
 
-    def assertAlmostEqual(self, first, second, *, places=None, msg=None,
+    def assertAlmostEqual(self, first, second, places=None, msg=None,
                           delta=None):
         """Fail if the two objects are unequal as determined by their
            difference rounded to the given number of decimal places
@@ -550,7 +656,7 @@ class TestCase(object):
         msg = self._formatMessage(msg, standardMsg)
         raise self.failureException(msg)
 
-    def assertNotAlmostEqual(self, first, second, *, places=None, msg=None,
+    def assertNotAlmostEqual(self, first, second, places=None, msg=None,
                              delta=None):
         """Fail if the two objects are equal as determined by their
            difference rounded to the given number of decimal places
@@ -582,34 +688,6 @@ class TestCase(object):
         msg = self._formatMessage(msg, standardMsg)
         raise self.failureException(msg)
 
-    # Synonyms for assertion methods
-
-    # The plurals are undocumented.  Keep them that way to discourage use.
-    # Do not add more.  Do not remove.
-    # Going through a deprecation cycle on these would annoy many people.
-    assertEquals = assertEqual
-    assertNotEquals = assertNotEqual
-    assertAlmostEquals = assertAlmostEqual
-    assertNotAlmostEquals = assertNotAlmostEqual
-    assert_ = assertTrue
-
-    # These fail* assertion method names are pending deprecation and will
-    # be a DeprecationWarning in 3.2; http://bugs.python.org/issue2578
-    def _deprecate(original_func):
-        def deprecated_func(*args, **kwargs):
-            warnings.warn(
-                'Please use {0} instead.'.format(original_func.__name__),
-                DeprecationWarning, 2)
-            return original_func(*args, **kwargs)
-        return deprecated_func
-
-    failUnlessEqual = _deprecate(assertEqual)
-    failIfEqual = _deprecate(assertNotEqual)
-    failUnlessAlmostEqual = _deprecate(assertAlmostEqual)
-    failIfAlmostEqual = _deprecate(assertNotAlmostEqual)
-    failUnless = _deprecate(assertTrue)
-    failUnlessRaises = _deprecate(assertRaises)
-    failIf = _deprecate(assertFalse)
 
     def assertSequenceEqual(self, seq1, seq2, msg=None, seq_type=None):
         """An equality assertion for ordered sequences (like lists and tuples).
@@ -815,8 +893,8 @@ class TestCase(object):
             self.fail(self._formatMessage(msg, standardMsg))
 
     def assertDictEqual(self, d1, d2, msg=None):
-        self.assert_(isinstance(d1, dict), 'First argument is not a dictionary')
-        self.assert_(isinstance(d2, dict), 'Second argument is not a dictionary')
+        self.assertIsInstance(d1, dict, 'First argument is not a dictionary')
+        self.assertIsInstance(d2, dict, 'Second argument is not a dictionary')
 
         if d1 != d2:
             standardMsg = '%s != %s' % (safe_repr(d1, True), safe_repr(d2, True))
@@ -895,15 +973,13 @@ class TestCase(object):
             self.fail(self._formatMessage(msg, standardMsg))
 
 
-    def assertItemsEqual(self, expected_seq, actual_seq, msg=None):
-        """An unordered sequence / set specific comparison. It asserts that
-        expected_seq and actual_seq contain the same elements. It is
-        the equivalent of::
+    def assertCountEqual(self, expected_seq, actual_seq, msg=None):
+        """An unordered sequence specific comparison. It asserts that
+        expected_seq and actual_seq have the same element counts.
+        Equivalent to::
 
-            self.assertEqual(sorted(expected_seq), sorted(actual_seq))
-
-        Raises with an error message listing which elements of expected_seq
-        are missing from actual_seq and vice versa if any.
+            self.assertEqual(Counter(iter(expected_seq)),
+                             Counter(iter(actual_seq)))
 
         Asserts that each element has the same count in both sequences.
         Example:
@@ -911,15 +987,18 @@ class TestCase(object):
             - [0, 0, 1] and [0, 1] compare unequal.
         """
         try:
-            expected = sorted(expected_seq)
-            actual = sorted(actual_seq)
+            expected = collections.Counter(iter(expected_seq))
+            actual = collections.Counter(iter(actual_seq))
         except TypeError:
             # Unsortable items (example: set(), complex(), ...)
             expected = list(expected_seq)
             actual = list(actual_seq)
             missing, unexpected = unorderable_list_difference(expected, actual)
         else:
-            return self.assertSequenceEqual(expected, actual, msg=msg)
+            if expected == actual:
+                return
+            missing = list(expected - actual)
+            unexpected = list(actual - expected)
 
         errors = []
         if missing:
@@ -934,10 +1013,8 @@ class TestCase(object):
 
     def assertMultiLineEqual(self, first, second, msg=None):
         """Assert that two multi-line strings are equal."""
-        self.assert_(isinstance(first, str), (
-                'First argument is not a string'))
-        self.assert_(isinstance(second, str), (
-                'Second argument is not a string'))
+        self.assertIsInstance(first, str, 'First argument is not a string')
+        self.assertIsInstance(second, str, 'Second argument is not a string')
 
         if first != second:
             firstlines = first.splitlines(True)
@@ -1000,46 +1077,90 @@ class TestCase(object):
             standardMsg = '%s is an instance of %r' % (safe_repr(obj), cls)
             self.fail(self._formatMessage(msg, standardMsg))
 
-    def assertRaisesRegexp(self, expected_exception, expected_regexp,
-                           callable_obj=None, *args, **kwargs):
-        """Asserts that the message in a raised exception matches a regexp.
+    def assertRaisesRegex(self, expected_exception, expected_regex,
+                          callable_obj=None, *args, **kwargs):
+        """Asserts that the message in a raised exception matches a regex.
 
         Args:
             expected_exception: Exception class expected to be raised.
-            expected_regexp: Regexp (re pattern object or string) expected
+            expected_regex: Regex (re pattern object or string) expected
                     to be found in error message.
             callable_obj: Function to be called.
             args: Extra args.
             kwargs: Extra kwargs.
         """
         context = _AssertRaisesContext(expected_exception, self, callable_obj,
-                                       expected_regexp)
+                                       expected_regex)
         if callable_obj is None:
             return context
         with context:
             callable_obj(*args, **kwargs)
 
-    def assertRegexpMatches(self, text, expected_regexp, msg=None):
+    def assertWarnsRegex(self, expected_warning, expected_regex,
+                         callable_obj=None, *args, **kwargs):
+        """Asserts that the message in a triggered warning matches a regexp.
+        Basic functioning is similar to assertWarns() with the addition
+        that only warnings whose messages also match the regular expression
+        are considered successful matches.
+
+        Args:
+            expected_warning: Warning class expected to be triggered.
+            expected_regex: Regex (re pattern object or string) expected
+                    to be found in error message.
+            callable_obj: Function to be called.
+            args: Extra args.
+            kwargs: Extra kwargs.
+        """
+        context = _AssertWarnsContext(expected_warning, self, callable_obj,
+                                      expected_regex)
+        if callable_obj is None:
+            return context
+        with context:
+            callable_obj(*args, **kwargs)
+
+    def assertRegex(self, text, expected_regex, msg=None):
         """Fail the test unless the text matches the regular expression."""
-        if isinstance(expected_regexp, (str, bytes)):
-            expected_regexp = re.compile(expected_regexp)
-        if not expected_regexp.search(text):
-            msg = msg or "Regexp didn't match"
-            msg = '%s: %r not found in %r' % (msg, expected_regexp.pattern, text)
+        if isinstance(expected_regex, (str, bytes)):
+            expected_regex = re.compile(expected_regex)
+        if not expected_regex.search(text):
+            msg = msg or "Regex didn't match"
+            msg = '%s: %r not found in %r' % (msg, expected_regex.pattern, text)
             raise self.failureException(msg)
 
-    def assertNotRegexpMatches(self, text, unexpected_regexp, msg=None):
+    def assertNotRegexMatches(self, text, unexpected_regex, msg=None):
         """Fail the test if the text matches the regular expression."""
-        if isinstance(unexpected_regexp, (str, bytes)):
-            unexpected_regexp = re.compile(unexpected_regexp)
-        match = unexpected_regexp.search(text)
+        if isinstance(unexpected_regex, (str, bytes)):
+            unexpected_regex = re.compile(unexpected_regex)
+        match = unexpected_regex.search(text)
         if match:
-            msg = msg or "Regexp matched"
+            msg = msg or "Regex matched"
             msg = '%s: %r matches %r in %r' % (msg,
                                                text[match.start():match.end()],
-                                               unexpected_regexp.pattern,
+                                               unexpected_regex.pattern,
                                                text)
             raise self.failureException(msg)
+
+
+    def _deprecate(original_func):
+        def deprecated_func(*args, **kwargs):
+            warnings.warn(
+                'Please use {0} instead.'.format(original_func.__name__),
+                DeprecationWarning, 2)
+            return original_func(*args, **kwargs)
+        return deprecated_func
+
+    # The fail* methods can be removed in 3.3, the 5 assert* methods will
+    # have to stay around for a few more versions.  See #9424.
+    failUnlessEqual = assertEquals = _deprecate(assertEqual)
+    failIfEqual = assertNotEquals = _deprecate(assertNotEqual)
+    failUnlessAlmostEqual = assertAlmostEquals = _deprecate(assertAlmostEqual)
+    failIfAlmostEqual = assertNotAlmostEquals = _deprecate(assertNotAlmostEqual)
+    failUnless = assert_ = _deprecate(assertTrue)
+    failUnlessRaises = _deprecate(assertRaises)
+    failIf = _deprecate(assertFalse)
+    assertRaisesRegexp = _deprecate(assertRaisesRegex)
+    assertRegexpMatches = _deprecate(assertRegex)
+
 
 
 class FunctionTestCase(TestCase):

@@ -321,6 +321,17 @@ Miscellaneous options
 
    .. note:: The line numbers in error messages will be off by one.
 
+
+.. cmdoption:: -X
+
+   Reserved for various implementation-specific options.  CPython currently
+   defines none of them, but allows to pass arbitrary values and retrieve
+   them through the :data:`sys._xoptions` dictionary.
+
+   .. versionchanged:: 3.2
+      It is now allowed to pass :option:`-X` with CPython.
+
+
 Options you shouldn't use
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -329,11 +340,6 @@ Options you shouldn't use
    Reserved for use by Jython_.
 
 .. _Jython: http://jython.org
-
-.. cmdoption:: -X
-
-    Reserved for alternative implementations of Python to use for their own
-    purposes.
 
 .. _using-on-envvars:
 
@@ -440,18 +446,6 @@ These environment variables influence Python's behavior.
 
    If this is set, Python won't try to write ``.pyc`` or ``.pyo`` files on the
    import of source modules.
-
-
-.. envvar:: PYTHONFSENCODING
-
-   If this is set before running the interpreter, it overrides the encoding used
-   for the filesystem encoding (see :func:`sys.getfilesystemencoding`).
-
-   This variable is not available (ignored) on Windows and Mac OS X: the
-   filesystem encoding is pinned to ``'mbcs'`` on Windows and ``'utf-8'`` on
-   Mac OS X.
-
-   .. versionadded:: 3.2
 
 
 .. envvar:: PYTHONIOENCODING

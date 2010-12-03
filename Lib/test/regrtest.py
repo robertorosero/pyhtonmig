@@ -138,8 +138,7 @@ resources to test.  Currently only the following are defined:
     decimal -   Test the decimal module against a large suite that
                 verifies compliance with standards.
 
-    compiler -  Allow test_tokenize to verify round-trip lexing on
-                every file in the test library.
+    cpu -       Used for certain CPU-heavy tests.
 
     subprocess  Run all tests for the subprocess module.
 
@@ -214,7 +213,7 @@ INTERRUPTED = -4
 from test import support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
-                  'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
+                  'decimal', 'cpu', 'subprocess', 'urlfetch', 'gui')
 
 TEMPDIR = os.path.abspath(tempfile.gettempdir())
 
@@ -391,9 +390,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         usage("-T and -j don't go together!")
     if use_mp and findleaks:
         usage("-l and -j don't go together!")
-    if use_mp and max(sys.flags):
-        # TODO: inherit the environment and the flags
-        print("Warning: flags and environment variables are ignored with -j option")
 
     good = []
     bad = []
@@ -428,7 +424,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if fromfile:
         tests = []
         fp = open(os.path.join(support.SAVEDCWD, fromfile))
+        count_pat = re.compile(r'\[\s*\d+/\s*\d+\]')
         for line in fp:
+            line = count_pat.sub('', line)
             guts = line.split() # assuming no test has whitespace in its name
             if guts and not guts[0].startswith('#'):
                 tests.extend(guts)
@@ -534,6 +532,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                 )
                 yield (test, args_tuple)
         pending = tests_and_args()
+        opt_args = support.args_from_interpreter_flags()
+        base_cmd = [sys.executable] + opt_args + ['-m', 'test.regrtest']
         def work():
             # A worker thread.
             try:
@@ -544,8 +544,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         output.put((None, None, None, None))
                         return
                     # -E is needed by some tests, e.g. test_import
-                    popen = Popen([sys.executable, '-E', '-m', 'test.regrtest',
-                                   '--slaveargs', json.dumps(args_tuple)],
+                    popen = Popen(base_cmd + ['--slaveargs', json.dumps(args_tuple)],
                                    stdout=PIPE, stderr=PIPE,
                                    universal_newlines=True,
                                    close_fds=(os.name != 'nt'))
@@ -875,11 +874,12 @@ class saved_test_environment:
 
     def get_asyncore_socket_map(self):
         asyncore = sys.modules.get('asyncore')
-        return asyncore and asyncore.socket_map or {}
+        # XXX Making a copy keeps objects alive until __exit__ gets called.
+        return asyncore and asyncore.socket_map.copy() or {}
     def restore_asyncore_socket_map(self, saved_map):
         asyncore = sys.modules.get('asyncore')
         if asyncore is not None:
-            asyncore.socket_map.clear()
+            asyncore.close_all(ignore_all=True)
             asyncore.socket_map.update(saved_map)
 
     def resource_info(self):
@@ -895,9 +895,11 @@ class saved_test_environment:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        saved_values = self.saved_values
+        del self.saved_values
         for name, get, restore in self.resource_info():
             current = get()
-            original = self.saved_values[name]
+            original = saved_values.pop(name)
             # Check for changes to the resource's value
             if current != original:
                 self.changed = True
@@ -957,16 +959,16 @@ def runtest_inner(test, verbose, quiet,
     except KeyboardInterrupt:
         raise
     except support.TestFailed as msg:
-        print("test", test, "failed --", msg)
-        sys.stdout.flush()
+        print("test", test, "failed --", msg, file=sys.stderr)
+        sys.stderr.flush()
         return FAILED, test_time
     except:
         type, value = sys.exc_info()[:2]
-        print("test", test, "crashed --", str(type) + ":", value)
-        sys.stdout.flush()
+        print("test", test, "crashed --", str(type) + ":", value, file=sys.stderr)
+        sys.stderr.flush()
         if verbose or debug:
-            traceback.print_exc(file=sys.stdout)
-            sys.stdout.flush()
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
         return FAILED, test_time
     else:
         if refleak:
@@ -978,6 +980,12 @@ def runtest_inner(test, verbose, quiet,
 def cleanup_test_droppings(testname, verbose):
     import shutil
     import stat
+    import gc
+
+    # First kill any dangling references to open files etc.
+    # This can also issue some ResourceWarnings which would otherwise get
+    # triggered during the following test run, and possibly produce failures.
+    gc.collect()
 
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
@@ -1272,6 +1280,7 @@ _expectations = {
         test_curses
         test_epoll
         test_dbm_gnu
+        test_gdb
         test_largefile
         test_locale
         test_minidom
@@ -1433,14 +1442,16 @@ class _ExpectedSkips:
             if sys.platform != "win32":
                 # test_sqlite is only reliable on Windows where the library
                 # is distributed with Python
-                WIN_ONLY = ["test_unicode_file", "test_winreg",
+                WIN_ONLY = {"test_unicode_file", "test_winreg",
                             "test_winsound", "test_startfile",
-                            "test_sqlite"]
-                for skip in WIN_ONLY:
-                    self.expected.add(skip)
+                            "test_sqlite"}
+                self.expected |= WIN_ONLY
 
             if sys.platform != 'sunos5':
                 self.expected.add('test_nis')
+
+            if support.python_is_optimized():
+                self.expected.add("test_gdb")
 
             self.valid = True
 
@@ -1457,10 +1468,7 @@ class _ExpectedSkips:
         assert self.isvalid()
         return self.expected
 
-if __name__ == '__main__':
-    # Simplification for findtestdir().
-    assert __file__ == os.path.abspath(sys.argv[0])
-
+def _make_temp_dir_for_build(TEMPDIR):
     # When tests are run from the Python build directory, it is best practice
     # to keep the test files in a subfolder.  It eases the cleanup of leftover
     # files using command "make distclean".
@@ -1476,6 +1484,31 @@ if __name__ == '__main__':
     TESTCWD = 'test_python_{}'.format(os.getpid())
 
     TESTCWD = os.path.join(TEMPDIR, TESTCWD)
+    return TEMPDIR, TESTCWD
+
+if __name__ == '__main__':
+    # Remove regrtest.py's own directory from the module search path. Despite
+    # the elimination of implicit relative imports, this is still needed to
+    # ensure that submodules of the test package do not inappropriately appear
+    # as top-level modules even when people (or buildbots!) invoke regrtest.py
+    # directly instead of using the -m switch
+    mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
+    i = len(sys.path)
+    while i >= 0:
+        i -= 1
+        if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
+            del sys.path[i]
+
+    # findtestdir() gets the dirname out of __file__, so we have to make it
+    # absolute before changing the working directory.
+    # For example __file__ may be relative when running trace or profile.
+    # See issue #9323.
+    __file__ = os.path.abspath(__file__)
+
+    # sanity check
+    assert __file__ == os.path.abspath(sys.argv[0])
+
+    TEMPDIR, TESTCWD = _make_temp_dir_for_build(TEMPDIR)
 
     # Run the tests in a context manager that temporary changes the CWD to a
     # temporary and writable directory. If it's not possible to create or

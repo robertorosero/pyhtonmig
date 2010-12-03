@@ -2465,10 +2465,10 @@ bytearray_rstrip(PyByteArrayObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(decode_doc,
-"B.decode([encoding[, errors]]) -> str\n\
+"B.decode(encoding='utf-8', errors='strict') -> str\n\
 \n\
-Decode B using the codec registered for encoding. encoding defaults\n\
-to the default encoding. errors may be given to set a different error\n\
+Decode B using the codec registered for encoding. Default encoding\n\
+is 'utf-8'. errors may be given to set a different error\n\
 handling scheme.  Default is 'strict' meaning that encoding errors raise\n\
 a UnicodeDecodeError.  Other possible values are 'ignore' and 'replace'\n\
 as well as any other name registered with codecs.register_error that is\n\
@@ -2486,6 +2486,75 @@ bytearray_decode(PyObject *self, PyObject *args, PyObject *kwargs)
     if (encoding == NULL)
         encoding = PyUnicode_GetDefaultEncoding();
     return PyUnicode_FromEncodedObject(self, encoding, errors);
+}
+
+PyDoc_STRVAR(transform__doc__,
+"B.transform(encoding, errors='strict') -> bytearray\n\
+\n\
+Transform B using the codec registered for encoding. errors may be given\n\
+to set a different error handling scheme.");
+
+static PyObject *
+bytearray_transform(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    static char *kwlist[] = {"encoding", "errors", 0};
+    PyObject *v, *w;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|s:transform",
+                                     kwlist, &encoding, &errors))
+        return NULL;
+
+    v = PyCodec_Encode(self, encoding, errors);
+    if (v == NULL)
+        return NULL;
+    if (!PyBytes_Check(v)) {
+        PyErr_Format(PyExc_TypeError,
+                     "encoder did not return a bytes object (type=%.400s)",
+                     Py_TYPE(v)->tp_name);
+        Py_DECREF(v);
+        return NULL;
+    }
+    w = PyByteArray_FromStringAndSize(PyBytes_AS_STRING(v),
+                                      PyBytes_GET_SIZE(v));
+    Py_DECREF(v);
+    return w;
+}
+
+
+PyDoc_STRVAR(untransform__doc__,
+"B.untransform(encoding, errors='strict') -> bytearray\n\
+\n\
+Reverse-transform B using the codec registered for encoding. errors may\n\
+be given to set a different error handling scheme.");
+
+static PyObject *
+bytearray_untransform(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    static char *kwlist[] = {"encoding", "errors", 0};
+    PyObject *v, *w;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|s:untransform",
+                                     kwlist, &encoding, &errors))
+        return NULL;
+
+    v = PyCodec_Decode(self, encoding, errors);
+    if (v == NULL)
+        return NULL;
+    if (!PyBytes_Check(v)) {
+        PyErr_Format(PyExc_TypeError,
+                     "decoder did not return a bytes object (type=%.400s)",
+                     Py_TYPE(v)->tp_name);
+        Py_DECREF(v);
+        return NULL;
+    }
+    w = PyByteArray_FromStringAndSize(PyBytes_AS_STRING(v),
+                                      PyBytes_GET_SIZE(v));
+    Py_DECREF(v);
+    return w;
 }
 
 PyDoc_STRVAR(alloc_doc,
@@ -2782,8 +2851,12 @@ bytearray_methods[] = {
     {"swapcase", (PyCFunction)stringlib_swapcase, METH_NOARGS,
      _Py_swapcase__doc__},
     {"title", (PyCFunction)stringlib_title, METH_NOARGS, _Py_title__doc__},
+    {"transform", (PyCFunction)bytearray_transform, METH_VARARGS | METH_KEYWORDS,
+     transform__doc__},
     {"translate", (PyCFunction)bytearray_translate, METH_VARARGS,
      translate__doc__},
+    {"untransform", (PyCFunction)bytearray_untransform, METH_VARARGS | METH_KEYWORDS,
+     untransform__doc__},
     {"upper", (PyCFunction)stringlib_upper, METH_NOARGS, _Py_upper__doc__},
     {"zfill", (PyCFunction)stringlib_zfill, METH_VARARGS, zfill__doc__},
     {NULL}

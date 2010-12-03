@@ -64,7 +64,8 @@
 /* Whether or not to use semaphores directly rather than emulating them with
  * mutexes and condition variables:
  */
-#if defined(_POSIX_SEMAPHORES) && !defined(HAVE_BROKEN_POSIX_SEMAPHORES)
+#if (defined(_POSIX_SEMAPHORES) && !defined(HAVE_BROKEN_POSIX_SEMAPHORES) && \
+     defined(HAVE_SEM_TIMEDWAIT))
 #  define USE_SEMAPHORES
 #else
 #  undef USE_SEMAPHORES
@@ -558,3 +559,46 @@ _pythread_pthread_set_stacksize(size_t size)
 }
 
 #define THREAD_SET_STACKSIZE(x) _pythread_pthread_set_stacksize(x)
+
+#define Py_HAVE_NATIVE_TLS
+
+int
+PyThread_create_key(void)
+{
+    pthread_key_t key;
+    int fail = pthread_key_create(&key, NULL);
+    return fail ? -1 : key;
+}
+
+void
+PyThread_delete_key(int key)
+{
+    pthread_key_delete(key);
+}
+
+void
+PyThread_delete_key_value(int key)
+{
+    pthread_setspecific(key, NULL);
+}
+
+int
+PyThread_set_key_value(int key, void *value)
+{
+    int fail;
+    void *oldValue = pthread_getspecific(key);
+    if (oldValue != NULL)
+        return 0;
+    fail = pthread_setspecific(key, value);
+    return fail ? -1 : 0;
+}
+
+void *
+PyThread_get_key_value(int key)
+{
+    return pthread_getspecific(key);
+}
+
+void
+PyThread_ReInitTLS(void)
+{}

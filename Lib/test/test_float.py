@@ -540,22 +540,23 @@ class FormatTestCase(unittest.TestCase):
 
     @requires_IEEE_754
     def test_format_testfile(self):
-        for line in open(format_testfile):
-            if line.startswith('--'):
-                continue
-            line = line.strip()
-            if not line:
-                continue
+        with open(format_testfile) as testfile:
+            for line in testfile:
+                if line.startswith('--'):
+                    continue
+                line = line.strip()
+                if not line:
+                    continue
 
-            lhs, rhs = map(str.strip, line.split('->'))
-            fmt, arg = lhs.split()
-            self.assertEqual(fmt % float(arg), rhs)
-            self.assertEqual(fmt % -float(arg), '-' + rhs)
+                lhs, rhs = map(str.strip, line.split('->'))
+                fmt, arg = lhs.split()
+                self.assertEqual(fmt % float(arg), rhs)
+                self.assertEqual(fmt % -float(arg), '-' + rhs)
 
     def test_issue5864(self):
-        self.assertEquals(format(123.456, '.4'), '123.5')
-        self.assertEquals(format(1234.56, '.4'), '1.235e+03')
-        self.assertEquals(format(12345.6, '.4'), '1.235e+04')
+        self.assertEqual(format(123.456, '.4'), '123.5')
+        self.assertEqual(format(1234.56, '.4'), '1.235e+03')
+        self.assertEqual(format(12345.6, '.4'), '1.235e+04')
 
 class ReprTestCase(unittest.TestCase):
     def test_repr(self):
@@ -705,11 +706,8 @@ class RoundTestCase(unittest.TestCase):
         def test(fmt, value, expected):
             # Test with both % and format().
             self.assertEqual(fmt % value, expected, fmt)
-            if not '#' in fmt:
-                # Until issue 7094 is implemented, format() for floats doesn't
-                #  support '#' formatting
-                fmt = fmt[1:] # strip off the %
-                self.assertEqual(format(value, fmt), expected, fmt)
+            fmt = fmt[1:] # strip off the %
+            self.assertEqual(format(value, fmt), expected, fmt)
 
         for fmt in ['%e', '%f', '%g', '%.0e', '%.6f', '%.20g',
                     '%#e', '%#f', '%#g', '%#.20e', '%#.15f', '%#.3g']:

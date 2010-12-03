@@ -2,7 +2,6 @@
 /* Generic object operations; and implementation of None (NoObject) */
 
 #include "Python.h"
-#include "sliceobject.h" /* For PyEllipsis_Type */
 #include "frameobject.h"
 
 #ifdef __cplusplus
@@ -479,13 +478,13 @@ PyObject_Bytes(PyObject *v)
         result = PyObject_CallFunctionObjArgs(func, NULL);
         Py_DECREF(func);
         if (result == NULL)
-        return NULL;
+            return NULL;
         if (!PyBytes_Check(result)) {
-        PyErr_Format(PyExc_TypeError,
-                     "__bytes__ returned non-bytes (type %.200s)",
-                     Py_TYPE(result)->tp_name);
-        Py_DECREF(result);
-        return NULL;
+            PyErr_Format(PyExc_TypeError,
+                         "__bytes__ returned non-bytes (type %.200s)",
+                         Py_TYPE(result)->tp_name);
+            Py_DECREF(result);
+            return NULL;
         }
         return result;
     }
@@ -687,12 +686,12 @@ PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 
    */
 
-long
+Py_hash_t
 _Py_HashDouble(double v)
 {
     int e, sign;
     double m;
-    unsigned long x, y;
+    Py_uhash_t x, y;
 
     if (!Py_IS_FINITE(v)) {
         if (Py_IS_INFINITY(v))
@@ -716,7 +715,7 @@ _Py_HashDouble(double v)
         x = ((x << 28) & _PyHASH_MODULUS) | x >> (_PyHASH_BITS - 28);
         m *= 268435456.0;  /* 2**28 */
         e -= 28;
-        y = (unsigned long)m;  /* pull out integer part */
+        y = (Py_uhash_t)m;  /* pull out integer part */
         m -= y;
         x += y;
         if (x >= _PyHASH_MODULUS)
@@ -728,26 +727,26 @@ _Py_HashDouble(double v)
     x = ((x << e) & _PyHASH_MODULUS) | x >> (_PyHASH_BITS - e);
 
     x = x * sign;
-    if (x == (unsigned long)-1)
-        x = (unsigned long)-2;
-    return (long)x;
+    if (x == (Py_uhash_t)-1)
+        x = (Py_uhash_t)-2;
+    return (Py_hash_t)x;
 }
 
-long
+Py_hash_t
 _Py_HashPointer(void *p)
 {
-    long x;
+    Py_hash_t x;
     size_t y = (size_t)p;
     /* bottom 3 or 4 bits are likely to be 0; rotate y by 4 to avoid
        excessive hash collisions for dicts and sets */
     y = (y >> 4) | (y << (8 * SIZEOF_VOID_P - 4));
-    x = (long)y;
+    x = (Py_hash_t)y;
     if (x == -1)
         x = -2;
     return x;
 }
 
-long
+Py_hash_t
 PyObject_HashNotImplemented(PyObject *v)
 {
     PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
@@ -755,7 +754,7 @@ PyObject_HashNotImplemented(PyObject *v)
     return -1;
 }
 
-long
+Py_hash_t
 PyObject_Hash(PyObject *v)
 {
     PyTypeObject *tp = Py_TYPE(v);
@@ -954,7 +953,7 @@ _PyObject_NextNotImplemented(PyObject *self)
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *
-PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
+_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name, PyObject *dict)
 {
     PyTypeObject *tp = Py_TYPE(obj);
     PyObject *descr = NULL;
@@ -990,36 +989,37 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
         }
     }
 
-    /* Inline _PyObject_GetDictPtr */
-    dictoffset = tp->tp_dictoffset;
-    if (dictoffset != 0) {
-        PyObject *dict;
-        if (dictoffset < 0) {
-            Py_ssize_t tsize;
-            size_t size;
+    if (dict == NULL) {
+        /* Inline _PyObject_GetDictPtr */
+        dictoffset = tp->tp_dictoffset;
+        if (dictoffset != 0) {
+            if (dictoffset < 0) {
+                Py_ssize_t tsize;
+                size_t size;
 
-            tsize = ((PyVarObject *)obj)->ob_size;
-            if (tsize < 0)
-                tsize = -tsize;
-            size = _PyObject_VAR_SIZE(tp, tsize);
+                tsize = ((PyVarObject *)obj)->ob_size;
+                if (tsize < 0)
+                    tsize = -tsize;
+                size = _PyObject_VAR_SIZE(tp, tsize);
 
-            dictoffset += (long)size;
-            assert(dictoffset > 0);
-            assert(dictoffset % SIZEOF_VOID_P == 0);
-        }
-        dictptr = (PyObject **) ((char *)obj + dictoffset);
-        dict = *dictptr;
-        if (dict != NULL) {
-            Py_INCREF(dict);
-            res = PyDict_GetItem(dict, name);
-            if (res != NULL) {
-                Py_INCREF(res);
-                Py_XDECREF(descr);
-                Py_DECREF(dict);
-                goto done;
+                dictoffset += (long)size;
+                assert(dictoffset > 0);
+                assert(dictoffset % SIZEOF_VOID_P == 0);
             }
-            Py_DECREF(dict);
+            dictptr = (PyObject **) ((char *)obj + dictoffset);
+            dict = *dictptr;
         }
+    }
+    if (dict != NULL) {
+        Py_INCREF(dict);
+        res = PyDict_GetItem(dict, name);
+        if (res != NULL) {
+            Py_INCREF(res);
+            Py_XDECREF(descr);
+            Py_DECREF(dict);
+            goto done;
+        }
+        Py_DECREF(dict);
     }
 
     if (f != NULL) {
@@ -1042,8 +1042,15 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
     return res;
 }
 
+PyObject *
+PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
+{
+    return _PyObject_GenericGetAttrWithDict(obj, name, NULL);
+}
+
 int
-PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
+_PyObject_GenericSetAttrWithDict(PyObject *obj, PyObject *name,
+                                 PyObject *value, PyObject *dict)
 {
     PyTypeObject *tp = Py_TYPE(obj);
     PyObject *descr;
@@ -1075,26 +1082,28 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
         }
     }
 
-    dictptr = _PyObject_GetDictPtr(obj);
-    if (dictptr != NULL) {
-        PyObject *dict = *dictptr;
-        if (dict == NULL && value != NULL) {
-            dict = PyDict_New();
-            if (dict == NULL)
-                goto done;
-            *dictptr = dict;
+    if (dict == NULL) {
+        dictptr = _PyObject_GetDictPtr(obj);
+        if (dictptr != NULL) {
+            dict = *dictptr;
+            if (dict == NULL && value != NULL) {
+                dict = PyDict_New();
+                if (dict == NULL)
+                    goto done;
+                *dictptr = dict;
+            }
         }
-        if (dict != NULL) {
-            Py_INCREF(dict);
-            if (value == NULL)
-                res = PyDict_DelItem(dict, name);
-            else
-                res = PyDict_SetItem(dict, name, value);
-            if (res < 0 && PyErr_ExceptionMatches(PyExc_KeyError))
-                PyErr_SetObject(PyExc_AttributeError, name);
-            Py_DECREF(dict);
-            goto done;
-        }
+    }
+    if (dict != NULL) {
+        Py_INCREF(dict);
+        if (value == NULL)
+            res = PyDict_DelItem(dict, name);
+        else
+            res = PyDict_SetItem(dict, name, value);
+        if (res < 0 && PyErr_ExceptionMatches(PyExc_KeyError))
+            PyErr_SetObject(PyExc_AttributeError, name);
+        Py_DECREF(dict);
+        goto done;
     }
 
     if (f != NULL) {
@@ -1116,6 +1125,13 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
     Py_DECREF(name);
     return res;
 }
+
+int
+PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
+{
+    return _PyObject_GenericSetAttrWithDict(obj, name, value, NULL);
+}
+
 
 /* Test a value used as condition, e.g., in a for or if statement.
    Return -1 if an error occurred */

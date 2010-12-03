@@ -125,7 +125,6 @@ mmap_object_dealloc(mmap_object *m_obj)
     if (m_obj->fd >= 0)
         (void) close(m_obj->fd);
     if (m_obj->data!=NULL) {
-        msync(m_obj->data, m_obj->size, MS_SYNC);
         munmap(m_obj->data, m_obj->size);
     }
 #endif /* UNIX */
@@ -205,7 +204,7 @@ mmap_read_byte_method(mmap_object *self,
     if (self->pos < self->size) {
         char value = self->data[self->pos];
         self->pos += 1;
-        return Py_BuildValue("b", value);
+        return Py_BuildValue("B", (unsigned char)value);
     } else {
         PyErr_SetString(PyExc_ValueError, "read byte out of range");
         return NULL;
@@ -570,6 +569,10 @@ mmap_flush_method(mmap_object *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "flush values out of range");
         return NULL;
     }
+
+    if (self->access == ACCESS_READ || self->access == ACCESS_COPY)
+        return PyLong_FromLong(0);
+
 #ifdef MS_WINDOWS
     return PyLong_FromLong((long) FlushViewOfFile(self->data+offset, size));
 #elif defined(UNIX)

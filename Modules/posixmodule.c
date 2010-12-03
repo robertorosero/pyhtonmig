@@ -28,7 +28,6 @@
 #define PY_SSIZE_T_CLEAN
 
 #include "Python.h"
-#include "structseq.h"
 
 #if defined(__VMS)
 #    include <unixio.h>
@@ -121,6 +120,8 @@ corresponding Unix manual entries for more information on calls.");
 #else
 #ifdef _MSC_VER         /* Microsoft compiler */
 #define HAVE_GETCWD     1
+#define HAVE_GETPPID    1
+#define HAVE_GETLOGIN   1 
 #define HAVE_SPAWNV     1
 #define HAVE_EXECV      1
 #define HAVE_PIPE       1
@@ -275,6 +276,10 @@ extern int lstat(const char *, struct stat *);
 #include <malloc.h>
 #include <windows.h>
 #include <shellapi.h>   /* for ShellExecute() */
+#include <lmcons.h>     /* for UNLEN */
+#ifdef SE_CREATE_SYMBOLIC_LINK_NAME /* Available starting with Vista */
+#define HAVE_SYMLINK
+#endif
 #endif /* _MSC_VER */
 
 #if defined(PYCC_VACPP) && defined(PYOS_OS2)
@@ -434,6 +439,98 @@ _PyVerify_fd_dup2(int fd1, int fd2)
 #define _PyVerify_fd_dup2(A, B) (1)
 #endif
 
+#ifdef MS_WINDOWS
+/* The following structure was copied from
+   http://msdn.microsoft.com/en-us/library/ms791514.aspx as the required
+   include doesn't seem to be present in the Windows SDK (at least as included
+   with Visual Studio Express). */
+typedef struct _REPARSE_DATA_BUFFER {
+    ULONG ReparseTag;
+    USHORT ReparseDataLength;
+    USHORT Reserved;
+    union {
+        struct {
+            USHORT SubstituteNameOffset;
+            USHORT SubstituteNameLength;
+            USHORT PrintNameOffset;
+            USHORT PrintNameLength;
+            ULONG Flags;
+            WCHAR PathBuffer[1];
+        } SymbolicLinkReparseBuffer;
+
+        struct {
+            USHORT SubstituteNameOffset;
+            USHORT  SubstituteNameLength;
+            USHORT  PrintNameOffset;
+            USHORT  PrintNameLength;
+            WCHAR  PathBuffer[1];
+        } MountPointReparseBuffer;
+
+        struct {
+            UCHAR  DataBuffer[1];
+        } GenericReparseBuffer;
+    };
+} REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
+
+#define REPARSE_DATA_BUFFER_HEADER_SIZE  FIELD_OFFSET(REPARSE_DATA_BUFFER,\
+                                                      GenericReparseBuffer)
+#define MAXIMUM_REPARSE_DATA_BUFFER_SIZE  ( 16 * 1024 )
+
+static int
+_Py_ReadLink(HANDLE reparse_point_handle, ULONG *reparse_tag, wchar_t **target_path)
+{
+    char target_buffer[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
+    REPARSE_DATA_BUFFER *rdb = (REPARSE_DATA_BUFFER *)target_buffer;
+    DWORD n_bytes_returned;
+    const wchar_t *ptr;
+    wchar_t *buf;
+    size_t len;
+
+    if (0 == DeviceIoControl(
+        reparse_point_handle,
+        FSCTL_GET_REPARSE_POINT,
+        NULL, 0, /* in buffer */
+        target_buffer, sizeof(target_buffer),
+        &n_bytes_returned,
+        NULL)) /* we're not using OVERLAPPED_IO */
+        return 0;
+
+    if (reparse_tag)
+        *reparse_tag = rdb->ReparseTag;
+
+    if (target_path) {
+        switch (rdb->ReparseTag) {
+        case IO_REPARSE_TAG_SYMLINK:
+            /* XXX: Maybe should use SubstituteName? */
+            ptr = rdb->SymbolicLinkReparseBuffer.PathBuffer +
+                  rdb->SymbolicLinkReparseBuffer.PrintNameOffset/sizeof(WCHAR);
+            len = rdb->SymbolicLinkReparseBuffer.PrintNameLength/sizeof(WCHAR);
+            break;
+        case IO_REPARSE_TAG_MOUNT_POINT:
+            ptr = rdb->MountPointReparseBuffer.PathBuffer +
+                  rdb->MountPointReparseBuffer.SubstituteNameOffset/sizeof(WCHAR);
+            len = rdb->MountPointReparseBuffer.SubstituteNameLength/sizeof(WCHAR);
+            break;
+        default:
+            SetLastError(ERROR_REPARSE_TAG_MISMATCH); /* XXX: Proper error code? */
+            return 0;
+        }
+        buf = (wchar_t *)malloc(sizeof(wchar_t)*(len+1));
+        if (!buf) {
+            SetLastError(ERROR_OUTOFMEMORY);
+            return 0;
+        }
+        wcsncpy(buf, ptr, len);
+        buf[len] = L'\0';
+        if (wcsncmp(buf, L"\\??\\", 4) == 0)
+            buf[1] = L'\\';
+        *target_path = buf;
+    }
+
+    return 1;
+}
+#endif /* MS_WINDOWS */
+
 /* Return a dictionary corresponding to the POSIX environment table */
 #ifdef WITH_NEXT_FRAMEWORK
 /* On Darwin/MacOSX a shared library or framework has no access to
@@ -555,14 +652,6 @@ posix_error_with_filename(char* name)
 {
     return PyErr_SetFromErrnoWithFilename(PyExc_OSError, name);
 }
-
-#ifdef MS_WINDOWS
-static PyObject *
-posix_error_with_unicode_filename(Py_UNICODE* name)
-{
-    return PyErr_SetFromErrnoWithUnicodeFilename(PyExc_OSError, name);
-}
-#endif /* MS_WINDOWS */
 
 
 static PyObject *
@@ -939,7 +1028,7 @@ attributes_to_mode(DWORD attr)
 }
 
 static int
-attribute_data_to_stat(WIN32_FILE_ATTRIBUTE_DATA *info, struct win32_stat *result)
+attribute_data_to_stat(BY_HANDLE_FILE_INFORMATION *info, struct win32_stat *result)
 {
     memset(result, 0, sizeof(*result));
     result->st_mode = attributes_to_mode(info->dwFileAttributes);
@@ -947,12 +1036,14 @@ attribute_data_to_stat(WIN32_FILE_ATTRIBUTE_DATA *info, struct win32_stat *resul
     FILE_TIME_to_time_t_nsec(&info->ftCreationTime, &result->st_ctime, &result->st_ctime_nsec);
     FILE_TIME_to_time_t_nsec(&info->ftLastWriteTime, &result->st_mtime, &result->st_mtime_nsec);
     FILE_TIME_to_time_t_nsec(&info->ftLastAccessTime, &result->st_atime, &result->st_atime_nsec);
+    result->st_nlink = info->nNumberOfLinks;
+    result->st_ino = (((__int64)info->nFileIndexHigh)<<32) + info->nFileIndexLow;
 
     return 0;
 }
 
 static BOOL
-attributes_from_dir(LPCSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
+attributes_from_dir(LPCSTR pszFile, BY_HANDLE_FILE_INFORMATION *info)
 {
     HANDLE hFindFile;
     WIN32_FIND_DATAA FileData;
@@ -960,17 +1051,19 @@ attributes_from_dir(LPCSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
     if (hFindFile == INVALID_HANDLE_VALUE)
         return FALSE;
     FindClose(hFindFile);
-    pfad->dwFileAttributes = FileData.dwFileAttributes;
-    pfad->ftCreationTime   = FileData.ftCreationTime;
-    pfad->ftLastAccessTime = FileData.ftLastAccessTime;
-    pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
-    pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
-    pfad->nFileSizeLow     = FileData.nFileSizeLow;
+    memset(info, 0, sizeof(*info));
+    info->dwFileAttributes = FileData.dwFileAttributes;
+    info->ftCreationTime   = FileData.ftCreationTime;
+    info->ftLastAccessTime = FileData.ftLastAccessTime;
+    info->ftLastWriteTime  = FileData.ftLastWriteTime;
+    info->nFileSizeHigh    = FileData.nFileSizeHigh;
+    info->nFileSizeLow     = FileData.nFileSizeLow;
+/*  info->nNumberOfLinks   = 1; */
     return TRUE;
 }
 
 static BOOL
-attributes_from_dir_w(LPCWSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
+attributes_from_dir_w(LPCWSTR pszFile, BY_HANDLE_FILE_INFORMATION *info)
 {
     HANDLE hFindFile;
     WIN32_FIND_DATAW FileData;
@@ -978,13 +1071,183 @@ attributes_from_dir_w(LPCWSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
     if (hFindFile == INVALID_HANDLE_VALUE)
         return FALSE;
     FindClose(hFindFile);
-    pfad->dwFileAttributes = FileData.dwFileAttributes;
-    pfad->ftCreationTime   = FileData.ftCreationTime;
-    pfad->ftLastAccessTime = FileData.ftLastAccessTime;
-    pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
-    pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
-    pfad->nFileSizeLow     = FileData.nFileSizeLow;
+    memset(info, 0, sizeof(*info));
+    info->dwFileAttributes = FileData.dwFileAttributes;
+    info->ftCreationTime   = FileData.ftCreationTime;
+    info->ftLastAccessTime = FileData.ftLastAccessTime;
+    info->ftLastWriteTime  = FileData.ftLastWriteTime;
+    info->nFileSizeHigh    = FileData.nFileSizeHigh;
+    info->nFileSizeLow     = FileData.nFileSizeLow;
+/*  info->nNumberOfLinks   = 1; */
     return TRUE;
+}
+
+#ifndef SYMLOOP_MAX
+#define SYMLOOP_MAX ( 88 )
+#endif
+
+static int
+win32_xstat_for_handle(HANDLE hFile, struct win32_stat *result, BOOL traverse, int depth);
+
+static int
+win32_xstat(const char *path, struct win32_stat *result, BOOL traverse, int depth)
+{
+    int code;
+    HANDLE hFile;
+    BY_HANDLE_FILE_INFORMATION info;
+    const char *dot;
+
+    hFile = CreateFileA(
+        path,
+        0, /* desired access */
+        0, /* share mode */
+        NULL, /* security attributes */
+        OPEN_EXISTING,
+        /* FILE_FLAG_BACKUP_SEMANTICS is required to open a directory */
+        FILE_ATTRIBUTE_NORMAL|FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,
+        NULL);
+
+    if(hFile == INVALID_HANDLE_VALUE) {
+        /* Either the target doesn't exist, or we don't have access to
+           get a handle to it. If the former, we need to return an error.
+           If the latter, we can use attributes_from_dir. */
+        if (GetLastError() != ERROR_SHARING_VIOLATION)
+            goto err;
+        else {
+            /* Could not get attributes on open file. Fall back to
+               reading the directory. */
+            if (!attributes_from_dir(path, &info))
+                /* Very strange. This should not fail now */
+                goto err;
+            if (traverse && (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+                /* Should traverse, but cannot open reparse point handle */
+                SetLastError(ERROR_SHARING_VIOLATION);
+                goto err;
+            }
+            attribute_data_to_stat(&info, result);
+        }
+    }
+    else {
+        code = win32_xstat_for_handle(hFile, result, traverse, depth);
+        CloseHandle(hFile);
+        if (code != 0)
+            return code;
+    }
+
+    /* Set S_IEXEC if it is an .exe, .bat, ... */
+    dot = strrchr(path, '.');
+    if (dot) {
+        if (stricmp(dot, ".bat") == 0 || stricmp(dot, ".cmd") == 0 ||
+            stricmp(dot, ".exe") == 0 || stricmp(dot, ".com") == 0)
+            result->st_mode |= 0111;
+    }
+    return 0;
+
+err:
+    /* Protocol violation: we explicitly clear errno, instead of
+       setting it to a POSIX error. Callers should use GetLastError. */
+    errno = 0;
+    return -1;
+}
+
+static int
+win32_xstat_w(const wchar_t *path, struct win32_stat *result, BOOL traverse, int depth)
+{
+    int code;
+    HANDLE hFile;
+    BY_HANDLE_FILE_INFORMATION info;
+    const wchar_t *dot;
+
+    hFile = CreateFileW(
+        path,
+        0, /* desired access */
+        0, /* share mode */
+        NULL, /* security attributes */
+        OPEN_EXISTING,
+        /* FILE_FLAG_BACKUP_SEMANTICS is required to open a directory */
+        FILE_ATTRIBUTE_NORMAL|FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,
+        NULL);
+
+    if(hFile == INVALID_HANDLE_VALUE) {
+        /* Either the target doesn't exist, or we don't have access to
+           get a handle to it. If the former, we need to return an error.
+           If the latter, we can use attributes_from_dir. */
+        if (GetLastError() != ERROR_SHARING_VIOLATION)
+            goto err;
+        else {
+            /* Could not get attributes on open file. Fall back to
+               reading the directory. */
+            if (!attributes_from_dir_w(path, &info))
+                /* Very strange. This should not fail now */
+                goto err;
+            if (traverse && (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+                /* Should traverse, but cannot open reparse point handle */
+                SetLastError(ERROR_SHARING_VIOLATION);
+                goto err;
+            }
+            attribute_data_to_stat(&info, result);
+        }
+    }
+    else {
+        code = win32_xstat_for_handle(hFile, result, traverse, depth);
+        CloseHandle(hFile);
+        if (code != 0)
+            return code;
+    }
+
+    /* Set S_IEXEC if it is an .exe, .bat, ... */
+    dot = wcsrchr(path, '.');
+    if (dot) {
+        if (_wcsicmp(dot, L".bat") == 0 || _wcsicmp(dot, L".cmd") == 0 ||
+            _wcsicmp(dot, L".exe") == 0 || _wcsicmp(dot, L".com") == 0)
+            result->st_mode |= 0111;
+    }
+    return 0;
+
+err:
+    /* Protocol violation: we explicitly clear errno, instead of
+       setting it to a POSIX error. Callers should use GetLastError. */
+    errno = 0;
+    return -1;
+}
+
+static int
+win32_xstat_for_handle(HANDLE hFile, struct win32_stat *result, BOOL traverse, int depth)
+{
+    int code;
+    BOOL reparse_tag;
+    wchar_t *target_path;
+    BY_HANDLE_FILE_INFORMATION info;
+
+    if (!GetFileInformationByHandle(hFile, &info))
+        return -1;
+
+    if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        if (traverse) {
+            if (depth + 1 > SYMLOOP_MAX) {
+                SetLastError(ERROR_CANT_RESOLVE_FILENAME); /* XXX: ELOOP? */
+                return -1;
+            }
+            if (!_Py_ReadLink(hFile, NULL, &target_path))
+                return -1;
+            code = win32_xstat_w(target_path, result, traverse, depth + 1);
+            free(target_path);
+            return code;
+        } else {
+            if (!_Py_ReadLink(hFile, &reparse_tag, NULL))
+                return -1;
+            attribute_data_to_stat(&info, result);
+            if (reparse_tag == IO_REPARSE_TAG_SYMLINK) {
+                /* first clear the S_IFMT bits */
+                result->st_mode ^= (result->st_mode & 0170000);
+                /* now set the bits that make this a symlink */
+                result->st_mode |= 0120000;
+            }
+        }
+    } else {
+        attribute_data_to_stat(&info, result);
+    }
+    return 0;
 }
 
 /* About the following functions: win32_lstat, win32_lstat_w, win32_stat,
@@ -1004,275 +1267,25 @@ attributes_from_dir_w(LPCWSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
 static int 
 win32_lstat(const char* path, struct win32_stat *result)
 {
-    WIN32_FILE_ATTRIBUTE_DATA info;
-    int code;
-    char *dot;
-    WIN32_FIND_DATAA find_data;
-    HANDLE find_data_handle;
-    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &info)) {
-        if (GetLastError() != ERROR_SHARING_VIOLATION) {
-            /* Protocol violation: we explicitly clear errno, instead of
-               setting it to a POSIX error. Callers should use GetLastError. */
-            errno = 0;
-            return -1;
-        } else {
-            /* Could not get attributes on open file. Fall back to
-               reading the directory. */
-            if (!attributes_from_dir(path, &info)) {
-                /* Very strange. This should not fail now */
-                errno = 0;
-                return -1;
-            }
-        }
-    }
-
-    code = attribute_data_to_stat(&info, result);
-    if (code != 0)
-        return code;
-
-    /* Get WIN32_FIND_DATA structure for the path to determine if
-       it is a symlink */
-    if(info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-        find_data_handle = FindFirstFileA(path, &find_data);
-        if(find_data_handle != INVALID_HANDLE_VALUE) {
-            if(find_data.dwReserved0 == IO_REPARSE_TAG_SYMLINK) {
-                /* first clear the S_IFMT bits */
-                result->st_mode ^= (result->st_mode & 0170000);
-                /* now set the bits that make this a symlink */
-                result->st_mode |= 0120000;
-            }
-            FindClose(find_data_handle);
-        }
-    }
-
-    /* Set S_IFEXEC if it is an .exe, .bat, ... */
-    dot = strrchr(path, '.');
-    if (dot) {
-        if (stricmp(dot, ".bat") == 0 || stricmp(dot, ".cmd") == 0 ||
-            stricmp(dot, ".exe") == 0 || stricmp(dot, ".com") == 0)
-            result->st_mode |= 0111;
-    }
-    return code;
+    return win32_xstat(path, result, FALSE, 0);
 }
 
 static int
 win32_lstat_w(const wchar_t* path, struct win32_stat *result)
 {
-    int code;
-    const wchar_t *dot;
-    WIN32_FILE_ATTRIBUTE_DATA info;
-    WIN32_FIND_DATAW find_data;
-    HANDLE find_data_handle;
-    if (!GetFileAttributesExW(path, GetFileExInfoStandard, &info)) {
-        if (GetLastError() != ERROR_SHARING_VIOLATION) {
-            /* Protocol violation: we explicitly clear errno, instead of
-               setting it to a POSIX error. Callers should use GetLastError. */
-            errno = 0;
-            return -1;
-        } else {
-            /* Could not get attributes on open file. Fall back to reading
-            the directory. */
-            if (!attributes_from_dir_w(path, &info)) {
-                /* Very strange. This should not fail now */
-                errno = 0;
-                return -1;
-            }
-        }
-    }
-    code = attribute_data_to_stat(&info, result);
-    if (code < 0)
-        return code;
-
-    /* Get WIN32_FIND_DATA structure for the path to determine if
-       it is a symlink */
-    if(info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-        find_data_handle = FindFirstFileW(path, &find_data);
-        if(find_data_handle != INVALID_HANDLE_VALUE) {
-            if(find_data.dwReserved0 == IO_REPARSE_TAG_SYMLINK) {
-                /* first clear the S_IFMT bits */
-                result->st_mode ^= (result->st_mode & 0170000);
-                /* now set the bits that make this a symlink */
-                result->st_mode |= 0120000;
-            }
-            FindClose(find_data_handle);
-        }
-    }
-
-    /* Set IFEXEC if it is an .exe, .bat, ... */
-    dot = wcsrchr(path, '.');
-    if (dot) {
-        if (_wcsicmp(dot, L".bat") == 0 || _wcsicmp(dot, L".cmd") == 0 ||
-            _wcsicmp(dot, L".exe") == 0 || _wcsicmp(dot, L".com") == 0)
-            result->st_mode |= 0111;
-    }
-    return code;
-}
-
-/* Grab GetFinalPathNameByHandle dynamically from kernel32 */
-static int has_GetFinalPathNameByHandle = 0;
-static DWORD (CALLBACK *Py_GetFinalPathNameByHandleA)(HANDLE, LPSTR, DWORD,
-                                                      DWORD);
-static DWORD (CALLBACK *Py_GetFinalPathNameByHandleW)(HANDLE, LPWSTR, DWORD,
-                                                      DWORD);
-static int
-check_GetFinalPathNameByHandle()
-{
-    HINSTANCE hKernel32;
-    /* only recheck */
-    if (!has_GetFinalPathNameByHandle)
-    {
-        hKernel32 = GetModuleHandle("KERNEL32");
-        *(FARPROC*)&Py_GetFinalPathNameByHandleA = GetProcAddress(hKernel32,
-                                                "GetFinalPathNameByHandleA");
-        *(FARPROC*)&Py_GetFinalPathNameByHandleW = GetProcAddress(hKernel32,
-                                                "GetFinalPathNameByHandleW");
-        has_GetFinalPathNameByHandle = Py_GetFinalPathNameByHandleA &&
-                                       Py_GetFinalPathNameByHandleW;
-    }
-    return has_GetFinalPathNameByHandle;
+    return win32_xstat_w(path, result, FALSE, 0);
 }
 
 static int
 win32_stat(const char* path, struct win32_stat *result)
 {
-    /* Traverse the symlink to the target using
-    GetFinalPathNameByHandle()
-    */
-    int code;
-    HANDLE hFile;
-    int buf_size;
-    char *target_path;
-    int result_length;
-    WIN32_FILE_ATTRIBUTE_DATA info;
-    
-    if(!check_GetFinalPathNameByHandle()) {
-        /* if the OS doesn't have GetFinalPathNameByHandle, it doesn't
-           have symlinks, so just fall back to the traditional behavior
-           found in lstat. */
-        return win32_lstat(path, result);
-    }
-
-    hFile = CreateFileA(
-        path,
-        0, /* desired access */
-        0, /* share mode */
-        NULL, /* security attributes */
-        OPEN_EXISTING,
-        /* FILE_FLAG_BACKUP_SEMANTICS is required to open a directory */
-        FILE_FLAG_BACKUP_SEMANTICS,
-        NULL);
-    
-    if(hFile == INVALID_HANDLE_VALUE) {
-        /* Either the target doesn't exist, or we don't have access to
-           get a handle to it. If the former, we need to return an error.
-           If the latter, we can use attributes_from_dir. */
-        if (GetLastError() != ERROR_SHARING_VIOLATION) {
-            /* Protocol violation: we explicitly clear errno, instead of
-               setting it to a POSIX error. Callers should use GetLastError. */
-            errno = 0;
-            return -1;
-        } else {
-            /* Could not get attributes on open file. Fall back to
-               reading the directory. */
-            if (!attributes_from_dir(path, &info)) {
-                /* Very strange. This should not fail now */
-                errno = 0;
-                return -1;
-            }
-        }
-        code = attribute_data_to_stat(&info, result);
-    }
-    
-    buf_size = Py_GetFinalPathNameByHandleA(hFile, 0, 0, VOLUME_NAME_DOS);
-    if(!buf_size) return -1;
-    target_path = (char *)malloc((buf_size+1)*sizeof(char));
-    result_length = Py_GetFinalPathNameByHandleA(hFile, target_path,
-                                                 buf_size, VOLUME_NAME_DOS);
-    
-    if(!result_length)
-        return -1;
-
-    if(!CloseHandle(hFile))
-        return -1;
-
-    target_path[result_length] = 0;
-    code = win32_lstat(target_path, result);
-    free(target_path);
-    
-    return code;
+    return win32_xstat(path, result, TRUE, 0);
 }
 
 static int 
 win32_stat_w(const wchar_t* path, struct win32_stat *result)
 {
-    /* Traverse the symlink to the target using GetFinalPathNameByHandle() */
-    int code;
-    HANDLE hFile;
-    int buf_size;
-    wchar_t *target_path;
-    int result_length;
-    WIN32_FILE_ATTRIBUTE_DATA info;
-    
-    if(!check_GetFinalPathNameByHandle()) {
-        /* If the OS doesn't have GetFinalPathNameByHandle, it doesn't have
-           symlinks, so just fall back to the traditional behavior found
-           in lstat. */
-        return win32_lstat_w(path, result);
-    }
-
-    hFile = CreateFileW(
-        path,
-        0, /* desired access */
-        0, /* share mode */
-        NULL, /* security attributes */
-        OPEN_EXISTING,
-        /* FILE_FLAG_BACKUP_SEMANTICS is required to open a directory */
-        FILE_ATTRIBUTE_NORMAL|FILE_FLAG_BACKUP_SEMANTICS,
-        NULL);
-
-    if(hFile == INVALID_HANDLE_VALUE) {
-        /* Either the target doesn't exist, or we don't have access to
-           get a handle to it. If the former, we need to return an error.
-           If the latter, we can use attributes_from_dir. */
-        if (GetLastError() != ERROR_SHARING_VIOLATION) {
-            /* Protocol violation: we explicitly clear errno, instead of
-               setting it to a POSIX error. Callers should use GetLastError. */
-            errno = 0;
-            return -1;
-        } else {
-            /* Could not get attributes on open file. Fall back to
-               reading the directory. */
-            if (!attributes_from_dir_w(path, &info)) {
-                /* Very strange. This should not fail now */
-                errno = 0;
-                return -1;
-            }
-        }
-        code = attribute_data_to_stat(&info, result);
-    }
-    else {
-        /* We have a good handle to the target, use it to determine the target
-           path name (then we'll call lstat on it). */
-        buf_size = Py_GetFinalPathNameByHandleW(hFile, 0, 0, VOLUME_NAME_DOS);
-        if(!buf_size)
-            return -1;
-
-        target_path = (wchar_t *)malloc((buf_size+1)*sizeof(wchar_t));
-        result_length = Py_GetFinalPathNameByHandleW(hFile, target_path,
-                                                buf_size, VOLUME_NAME_DOS);
-        
-        if(!result_length)
-            return -1;
-
-        if(!CloseHandle(hFile))
-            return -1;
-
-        target_path[result_length] = 0;
-        code = win32_lstat_w(target_path, result);
-        free(target_path);
-    }
-    
-    return code;
+    return win32_xstat_w(path, result, TRUE, 0);
 }
 
 static int
@@ -1300,7 +1313,7 @@ win32_fstat(int file_number, struct win32_stat *result)
     if (type == FILE_TYPE_UNKNOWN) {
         DWORD error = GetLastError();
         if (error != 0) {
-        return -1;
+            return -1;
         }
         /* else: valid but unknown file */
     }
@@ -1317,17 +1330,8 @@ win32_fstat(int file_number, struct win32_stat *result)
         return -1;
     }
 
-    /* similar to stat() */
-    result->st_mode = attributes_to_mode(info.dwFileAttributes);
-    result->st_size = (((__int64)info.nFileSizeHigh)<<32) + info.nFileSizeLow;
-    FILE_TIME_to_time_t_nsec(&info.ftCreationTime, &result->st_ctime,
-                             &result->st_ctime_nsec);
-    FILE_TIME_to_time_t_nsec(&info.ftLastWriteTime, &result->st_mtime,
-                             &result->st_mtime_nsec);
-    FILE_TIME_to_time_t_nsec(&info.ftLastAccessTime, &result->st_atime,
-                             &result->st_atime_nsec);
+    attribute_data_to_stat(&info, result);
     /* specific to fstat() */
-    result->st_nlink = info.nNumberOfLinks;
     result->st_ino = (((__int64)info.nFileIndexHigh)<<32) + info.nFileIndexLow;
     return 0;
 }
@@ -1626,66 +1630,6 @@ _pystat_fromstructstat(STRUCT_STAT *st)
 
     return v;
 }
-
-#ifdef MS_WINDOWS
-
-/* IsUNCRoot -- test whether the supplied path is of the form \\SERVER\SHARE\,
-   where / can be used in place of \ and the trailing slash is optional.
-   Both SERVER and SHARE must have at least one character.
-*/
-
-#define ISSLASHA(c) ((c) == '\\' || (c) == '/')
-#define ISSLASHW(c) ((c) == L'\\' || (c) == L'/')
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(a) (sizeof(a) / sizeof(a[0]))
-#endif
-
-static BOOL
-IsUNCRootA(char *path, int pathlen)
-{
-    #define ISSLASH ISSLASHA
-
-    int i, share;
-
-    if (pathlen < 5 || !ISSLASH(path[0]) || !ISSLASH(path[1]))
-        /* minimum UNCRoot is \\x\y */
-        return FALSE;
-    for (i = 2; i < pathlen ; i++)
-        if (ISSLASH(path[i])) break;
-    if (i == 2 || i == pathlen)
-        /* do not allow \\\SHARE or \\SERVER */
-        return FALSE;
-    share = i+1;
-    for (i = share; i < pathlen; i++)
-        if (ISSLASH(path[i])) break;
-    return (i != share && (i == pathlen || i == pathlen-1));
-
-    #undef ISSLASH
-}
-
-static BOOL
-IsUNCRootW(Py_UNICODE *path, int pathlen)
-{
-    #define ISSLASH ISSLASHW
-
-    int i, share;
-
-    if (pathlen < 5 || !ISSLASH(path[0]) || !ISSLASH(path[1]))
-        /* minimum UNCRoot is \\x\y */
-        return FALSE;
-    for (i = 2; i < pathlen ; i++)
-        if (ISSLASH(path[i])) break;
-    if (i == 2 || i == pathlen)
-        /* do not allow \\\SHARE or \\SERVER */
-        return FALSE;
-    share = i+1;
-    for (i = share; i < pathlen; i++)
-        if (ISSLASH(path[i])) break;
-    return (i != share && (i == pathlen || i == pathlen-1));
-
-    #undef ISSLASH
-}
-#endif /* MS_WINDOWS */
 
 static PyObject *
 posix_do_stat(PyObject *self, PyObject *args,
@@ -2108,7 +2052,7 @@ force write of file with filedescriptor to disk.");
 static PyObject *
 posix_fsync(PyObject *self, PyObject *fdobj)
 {
-       return posix_fildes(fdobj, fsync);
+    return posix_fildes(fdobj, fsync);
 }
 #endif /* HAVE_FSYNC */
 
@@ -2126,7 +2070,7 @@ force write of file with filedescriptor to disk.\n\
 static PyObject *
 posix_fdatasync(PyObject *self, PyObject *fdobj)
 {
-       return posix_fildes(fdobj, fdatasync);
+    return posix_fildes(fdobj, fdatasync);
 }
 #endif /* HAVE_FDATASYNC */
 
@@ -2298,6 +2242,54 @@ posix_link(PyObject *self, PyObject *args)
 }
 #endif /* HAVE_LINK */
 
+#ifdef MS_WINDOWS
+PyDoc_STRVAR(win32_link__doc__,
+"link(src, dst)\n\n\
+Create a hard link to a file.");
+
+static PyObject *
+win32_link(PyObject *self, PyObject *args)
+{
+    PyObject *osrc, *odst;
+    char *src, *dst;
+    BOOL rslt;
+
+    PyUnicodeObject *usrc, *udst;
+    if (PyArg_ParseTuple(args, "UU:link", &usrc, &udst)) {
+        Py_BEGIN_ALLOW_THREADS
+        rslt = CreateHardLinkW(PyUnicode_AS_UNICODE(udst),
+                               PyUnicode_AS_UNICODE(usrc), NULL);
+        Py_END_ALLOW_THREADS
+
+        if (rslt == 0)
+            return win32_error("link", NULL);
+
+        Py_RETURN_NONE;
+    }
+
+    /* Narrow strings also valid. */
+    PyErr_Clear();
+
+    if (!PyArg_ParseTuple(args, "O&O&:link", PyUnicode_FSConverter, &osrc,
+                          PyUnicode_FSConverter, &odst))
+        return NULL;
+
+    src = PyBytes_AsString(osrc);
+    dst = PyBytes_AsString(odst);
+
+    Py_BEGIN_ALLOW_THREADS
+    rslt = CreateHardLinkA(dst, src, NULL);
+    Py_END_ALLOW_THREADS
+
+    Py_DECREF(osrc);
+    Py_DECREF(odst);
+    if (rslt == 0)
+        return win32_error("link", NULL);
+
+    Py_RETURN_NONE;
+}
+#endif /* MS_WINDOWS */
+
 
 PyDoc_STRVAR(posix_listdir__doc__,
 "listdir([path]) -> list_of_strings\n\n\
@@ -2329,7 +2321,7 @@ posix_listdir(PyObject *self, PyObject *args)
         WIN32_FIND_DATAW wFileData;
         Py_UNICODE *wnamebuf, *po_wchars;
         
-        if (po == NULL) { // Default arg: "."
+        if (po == NULL) { /* Default arg: "." */
             po_wchars = L".";
             len = 1;
         } else {
@@ -2422,6 +2414,7 @@ posix_listdir(PyObject *self, PyObject *args)
     }
     strcpy(namebuf, PyBytes_AsString(opath));
     len = PyObject_Size(opath);
+    Py_DECREF(opath);
     if (len > 0) {
         char ch = namebuf[len-1];
         if (ch != SEP && ch != ALTSEP && ch != ':')
@@ -2576,15 +2569,20 @@ posix_listdir(PyObject *self, PyObject *args)
     oname = NULL;
     if (!PyArg_ParseTuple(args, "|O&:listdir", PyUnicode_FSConverter, &oname))
         return NULL;
-    if (oname == NULL) { // Default arg: "."
-      oname = PyBytes_FromString(".");
+    if (oname == NULL) { /* Default arg: "." */
+        oname = PyBytes_FromString(".");
     }
     name = PyBytes_AsString(oname);
-    if ((dirp = opendir(name)) == NULL) {
+    Py_BEGIN_ALLOW_THREADS
+    dirp = opendir(name);
+    Py_END_ALLOW_THREADS
+    if (dirp == NULL) {
         return posix_error_with_allocated_filename(oname);
     }
     if ((d = PyList_New(0)) == NULL) {
+        Py_BEGIN_ALLOW_THREADS
         closedir(dirp);
+        Py_END_ALLOW_THREADS
         Py_DECREF(oname);
         return NULL;
     }
@@ -2597,7 +2595,9 @@ posix_listdir(PyObject *self, PyObject *args)
             if (errno == 0) {
                 break;
             } else {
+                Py_BEGIN_ALLOW_THREADS
                 closedir(dirp);
+                Py_END_ALLOW_THREADS
                 Py_DECREF(d);
                 return posix_error_with_allocated_filename(oname);
             }
@@ -2621,7 +2621,9 @@ posix_listdir(PyObject *self, PyObject *args)
         }
         Py_DECREF(v);
     }
+    Py_BEGIN_ALLOW_THREADS
     closedir(dirp);
+    Py_END_ALLOW_THREADS
     Py_DECREF(oname);
 
     return d;
@@ -2686,6 +2688,30 @@ posix__getfullpathname(PyObject *self, PyObject *args)
     return PyBytes_FromString(outbuf);
 } /* end of posix__getfullpathname */
 
+/* Grab GetFinalPathNameByHandle dynamically from kernel32 */
+static int has_GetFinalPathNameByHandle = 0;
+static DWORD (CALLBACK *Py_GetFinalPathNameByHandleA)(HANDLE, LPSTR, DWORD,
+                                                      DWORD);
+static DWORD (CALLBACK *Py_GetFinalPathNameByHandleW)(HANDLE, LPWSTR, DWORD,
+                                                      DWORD);
+static int
+check_GetFinalPathNameByHandle()
+{
+    HINSTANCE hKernel32;
+    /* only recheck */
+    if (!has_GetFinalPathNameByHandle)
+    {
+        hKernel32 = GetModuleHandle("KERNEL32");
+        *(FARPROC*)&Py_GetFinalPathNameByHandleA = GetProcAddress(hKernel32,
+                                                "GetFinalPathNameByHandleA");
+        *(FARPROC*)&Py_GetFinalPathNameByHandleW = GetProcAddress(hKernel32,
+                                                "GetFinalPathNameByHandleW");
+        has_GetFinalPathNameByHandle = Py_GetFinalPathNameByHandleA &&
+                                       Py_GetFinalPathNameByHandleW;
+    }
+    return has_GetFinalPathNameByHandle;
+}
+
 /* A helper function for samepath on windows */
 static PyObject *
 posix__getfinalpathname(PyObject *self, PyObject *args)
@@ -2697,7 +2723,7 @@ posix__getfinalpathname(PyObject *self, PyObject *args)
     PyObject *result;
     wchar_t *path;
     
-    if (!PyArg_ParseTuple(args, "u|:_getfullpathname", &path)) {
+    if (!PyArg_ParseTuple(args, "u|:_getfinalpathname", &path)) {
         return NULL;
     }
 
@@ -2749,6 +2775,33 @@ posix__getfinalpathname(PyObject *self, PyObject *args)
     return result;
 
 } /* end of posix__getfinalpathname */
+
+static PyObject *
+posix__getfileinformation(PyObject *self, PyObject *args)
+{
+    HANDLE hFile;
+    BY_HANDLE_FILE_INFORMATION info;
+    int fd;
+
+    if (!PyArg_ParseTuple(args, "i:_getfileinformation", &fd))
+        return NULL;
+
+    if (!_PyVerify_fd(fd)) {
+        PyErr_SetString(PyExc_ValueError, "received invalid file descriptor");
+        return NULL;
+    }
+
+    hFile = (HANDLE)_get_osfhandle(fd);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return win32_error("_getfileinformation", NULL);
+
+    if (!GetFileInformationByHandle(hFile, &info))
+        return win32_error("_getfileinformation", NULL);
+
+    return Py_BuildValue("iii", info.dwVolumeSerialNumber,
+                                info.nFileIndexHigh,
+                                info.nFileIndexLow);
+}
 #endif /* MS_WINDOWS */
 
 PyDoc_STRVAR(posix_mkdir__doc__,
@@ -3156,7 +3209,7 @@ posix_utime(PyObject *self, PyObject *args)
             !SystemTimeToFileTime(&now, &atime)) {
             win32_error("utime", NULL);
             goto done;
-            }
+        }
     }
     else if (!PyTuple_Check(arg) || PyTuple_Size(arg) != 2) {
         PyErr_SetString(PyExc_TypeError,
@@ -4224,9 +4277,9 @@ posix_getgroups(PyObject *self, PyObject *noargs)
         for (i = 0; i < n; ++i) {
             PyObject *o = PyLong_FromLong((long)alt_grouplist[i]);
             if (o == NULL) {
-            Py_DECREF(result);
-            result = NULL;
-            break;
+                Py_DECREF(result);
+                result = NULL;
+                break;
             }
             PyList_SET_ITEM(result, i, o);
         }
@@ -4327,16 +4380,65 @@ posix_setpgrp(PyObject *self, PyObject *noargs)
 #endif /* HAVE_SETPGRP */
 
 #ifdef HAVE_GETPPID
+
+#ifdef MS_WINDOWS
+#include <tlhelp32.h>
+
+static PyObject*
+win32_getppid()
+{
+    HANDLE snapshot;
+    pid_t mypid;
+    PyObject* result = NULL;
+    BOOL have_record;
+    PROCESSENTRY32 pe;
+
+    mypid = getpid(); /* This function never fails */
+
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return PyErr_SetFromWindowsErr(GetLastError());
+
+    pe.dwSize = sizeof(pe);
+    have_record = Process32First(snapshot, &pe);
+    while (have_record) {
+        if (mypid == (pid_t)pe.th32ProcessID) {
+            /* We could cache the ulong value in a static variable. */
+            result = PyLong_FromPid((pid_t)pe.th32ParentProcessID);
+            break;
+        }
+
+        have_record = Process32Next(snapshot, &pe);
+    }
+
+    /* If our loop exits and our pid was not found (result will be NULL)
+     * then GetLastError will return ERROR_NO_MORE_FILES. This is an
+     * error anyway, so let's raise it. */
+    if (!result)
+        result = PyErr_SetFromWindowsErr(GetLastError());
+
+    CloseHandle(snapshot);
+
+    return result;
+}
+#endif /*MS_WINDOWS*/
+
 PyDoc_STRVAR(posix_getppid__doc__,
 "getppid() -> ppid\n\n\
-Return the parent's process id.");
+Return the parent's process id.  If the parent process has already exited,\n\
+Windows machines will still return its id; others systems will return the id\n\
+of the 'init' process (1).");
 
 static PyObject *
 posix_getppid(PyObject *self, PyObject *noargs)
 {
+#ifdef MS_WINDOWS
+    return win32_getppid();
+#else
     return PyLong_FromPid(getppid());
-}
 #endif
+}
+#endif /* HAVE_GETPPID */
 
 
 #ifdef HAVE_GETLOGIN
@@ -4348,6 +4450,17 @@ static PyObject *
 posix_getlogin(PyObject *self, PyObject *noargs)
 {
     PyObject *result = NULL;
+#ifdef MS_WINDOWS    
+    wchar_t user_name[UNLEN + 1];
+    DWORD num_chars = sizeof(user_name)/sizeof(user_name[0]);
+
+    if (GetUserNameW(user_name, &num_chars)) {
+        /* num_chars is the number of unicode chars plus null terminator */
+        result = PyUnicode_FromWideChar(user_name, num_chars - 1);
+    } 
+    else 
+        result = PyErr_SetFromWindowsErr(GetLastError());
+#else
     char *name;
     int old_errno = errno;
 
@@ -4362,10 +4475,10 @@ posix_getlogin(PyObject *self, PyObject *noargs)
     else
         result = PyUnicode_DecodeFSDefault(name);
     errno = old_errno;
-
+#endif
     return result;
 }
-#endif
+#endif /* HAVE_GETLOGIN */
 
 #ifdef HAVE_GETUID
 PyDoc_STRVAR(posix_getuid__doc__,
@@ -4981,7 +5094,7 @@ posix_readlink(PyObject *self, PyObject *args)
 #endif /* HAVE_READLINK */
 
 
-#ifdef HAVE_SYMLINK
+#if defined(HAVE_SYMLINK) && !defined(MS_WINDOWS)
 PyDoc_STRVAR(posix_symlink__doc__,
 "symlink(src, dst)\n\n\
 Create a symbolic link pointing to src named dst.");
@@ -4998,43 +5111,6 @@ posix_symlink(PyObject *self, PyObject *args)
 PyDoc_STRVAR(win_readlink__doc__,
 "readlink(path) -> path\n\n\
 Return a string representing the path to which the symbolic link points.");
-
-/* The following structure was copied from
-   http://msdn.microsoft.com/en-us/library/ms791514.aspx as the required
-   include doesn't seem to be present in the Windows SDK (at least as included
-   with Visual Studio Express). */
-typedef struct _REPARSE_DATA_BUFFER {
-    ULONG ReparseTag;
-    USHORT ReparseDataLength;
-    USHORT Reserved;
-    union {
-        struct {
-            USHORT SubstituteNameOffset;
-            USHORT SubstituteNameLength;
-            USHORT PrintNameOffset;
-            USHORT PrintNameLength;
-            ULONG Flags;
-            WCHAR PathBuffer[1];
-        } SymbolicLinkReparseBuffer;
-
-        struct {
-            USHORT SubstituteNameOffset;
-            USHORT  SubstituteNameLength;
-            USHORT  PrintNameOffset;
-            USHORT  PrintNameLength;
-            WCHAR  PathBuffer[1];
-        } MountPointReparseBuffer;
-
-        struct {
-            UCHAR  DataBuffer[1];
-        } GenericReparseBuffer;
-    };
-} REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
-
-#define REPARSE_DATA_BUFFER_HEADER_SIZE  FIELD_OFFSET(REPARSE_DATA_BUFFER,\
-                                                      GenericReparseBuffer)
-
-#define MAXIMUM_REPARSE_DATA_BUFFER_SIZE  ( 16 * 1024 )
 
 /* Windows readlink implementation */
 static PyObject *
@@ -5106,7 +5182,7 @@ win_readlink(PyObject *self, PyObject *args)
 
 #endif /* !defined(HAVE_READLINK) && defined(MS_WINDOWS) */
 
-#if !defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
+#if defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
 
 /* Grab CreateSymbolicLinkW dynamically from kernel32 */
 static int has_CreateSymbolicLinkW = 0;
@@ -5184,7 +5260,7 @@ win_symlink(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_INCREF(Py_None);
     return Py_None;
 }
-#endif /* !defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
+#endif /* defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
 
 #ifdef HAVE_TIMES
 #if defined(PYCC_VACPP) && defined(PYOS_OS2)
@@ -5565,8 +5641,10 @@ posix_read(PyObject *self, PyObject *args)
     buffer = PyBytes_FromStringAndSize((char *)NULL, size);
     if (buffer == NULL)
         return NULL;
-    if (!_PyVerify_fd(fd))
+    if (!_PyVerify_fd(fd)) {
+        Py_DECREF(buffer);
         return posix_error();
+    }
     Py_BEGIN_ALLOW_THREADS
     n = read(fd, PyBytes_AS_STRING(buffer), size);
     Py_END_ALLOW_THREADS
@@ -5593,12 +5671,14 @@ posix_write(PyObject *self, PyObject *args)
 
     if (!PyArg_ParseTuple(args, "iy*:write", &fd, &pbuf))
         return NULL;
-    if (!_PyVerify_fd(fd))
+    if (!_PyVerify_fd(fd)) {
+        PyBuffer_Release(&pbuf);
         return posix_error();
+    }
     Py_BEGIN_ALLOW_THREADS
     size = write(fd, pbuf.buf, (size_t)pbuf.len);
     Py_END_ALLOW_THREADS
-        PyBuffer_Release(&pbuf);
+    PyBuffer_Release(&pbuf);
     if (size < 0)
         return posix_error();
     return PyLong_FromSsize_t(size);
@@ -6303,38 +6383,38 @@ conv_confname(PyObject *arg, int *valuep, struct constdef *table,
               size_t tablesize)
 {
     if (PyLong_Check(arg)) {
-    *valuep = PyLong_AS_LONG(arg);
-    return 1;
+        *valuep = PyLong_AS_LONG(arg);
+        return 1;
     }
     else {
-    /* look up the value in the table using a binary search */
-    size_t lo = 0;
-    size_t mid;
-    size_t hi = tablesize;
-    int cmp;
-    const char *confname;
-    if (!PyUnicode_Check(arg)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "configuration names must be strings or integers");
-        return 0;
-    }
-    confname = _PyUnicode_AsString(arg);
-    if (confname == NULL)
-        return 0;
-    while (lo < hi) {
-        mid = (lo + hi) / 2;
-        cmp = strcmp(confname, table[mid].name);
-        if (cmp < 0)
-        hi = mid;
-        else if (cmp > 0)
-        lo = mid + 1;
-        else {
-        *valuep = table[mid].value;
-        return 1;
+        /* look up the value in the table using a binary search */
+        size_t lo = 0;
+        size_t mid;
+        size_t hi = tablesize;
+        int cmp;
+        const char *confname;
+        if (!PyUnicode_Check(arg)) {
+            PyErr_SetString(PyExc_TypeError,
+                "configuration names must be strings or integers");
+            return 0;
         }
-    }
-    PyErr_SetString(PyExc_ValueError, "unrecognized configuration name");
-    return 0;
+        confname = _PyUnicode_AsString(arg);
+        if (confname == NULL)
+            return 0;
+        while (lo < hi) {
+            mid = (lo + hi) / 2;
+            cmp = strcmp(confname, table[mid].name);
+            if (cmp < 0)
+                hi = mid;
+            else if (cmp > 0)
+                lo = mid + 1;
+            else {
+                *valuep = table[mid].value;
+                return 1;
+            }
+        }
+        PyErr_SetString(PyExc_ValueError, "unrecognized configuration name");
+        return 0;
     }
 }
 
@@ -6392,6 +6472,39 @@ static struct constdef  posix_constants_pathconf[] = {
 #ifdef _PC_VDISABLE
     {"PC_VDISABLE",     _PC_VDISABLE},
 #endif
+#ifdef _PC_ACL_ENABLED
+    {"PC_ACL_ENABLED",  _PC_ACL_ENABLED},
+#endif
+#ifdef _PC_MIN_HOLE_SIZE
+    {"PC_MIN_HOLE_SIZE",    _PC_MIN_HOLE_SIZE},
+#endif
+#ifdef _PC_ALLOC_SIZE_MIN
+    {"PC_ALLOC_SIZE_MIN",   _PC_ALLOC_SIZE_MIN},
+#endif
+#ifdef _PC_REC_INCR_XFER_SIZE
+    {"PC_REC_INCR_XFER_SIZE",   _PC_REC_INCR_XFER_SIZE},
+#endif
+#ifdef _PC_REC_MAX_XFER_SIZE
+    {"PC_REC_MAX_XFER_SIZE",    _PC_REC_MAX_XFER_SIZE},
+#endif
+#ifdef _PC_REC_MIN_XFER_SIZE
+    {"PC_REC_MIN_XFER_SIZE",    _PC_REC_MIN_XFER_SIZE},
+#endif
+#ifdef _PC_REC_XFER_ALIGN
+    {"PC_REC_XFER_ALIGN",   _PC_REC_XFER_ALIGN},
+#endif
+#ifdef _PC_SYMLINK_MAX
+    {"PC_SYMLINK_MAX",  _PC_SYMLINK_MAX},
+#endif
+#ifdef _PC_XATTR_ENABLED
+    {"PC_XATTR_ENABLED",    _PC_XATTR_ENABLED},
+#endif
+#ifdef _PC_XATTR_EXISTS
+    {"PC_XATTR_EXISTS", _PC_XATTR_EXISTS},
+#endif
+#ifdef _PC_TIMESTAMP_RESOLUTION
+    {"PC_TIMESTAMP_RESOLUTION", _PC_TIMESTAMP_RESOLUTION},
+#endif
 };
 
 static int
@@ -6417,14 +6530,14 @@ posix_fpathconf(PyObject *self, PyObject *args)
 
     if (PyArg_ParseTuple(args, "iO&:fpathconf", &fd,
                          conv_path_confname, &name)) {
-    long limit;
+        long limit;
 
-    errno = 0;
-    limit = fpathconf(fd, name);
-    if (limit == -1 && errno != 0)
-        posix_error();
-    else
-        result = PyLong_FromLong(limit);
+        errno = 0;
+        limit = fpathconf(fd, name);
+        if (limit == -1 && errno != 0)
+            posix_error();
+        else
+            result = PyLong_FromLong(limit);
     }
     return result;
 }
@@ -6452,10 +6565,10 @@ posix_pathconf(PyObject *self, PyObject *args)
     limit = pathconf(path, name);
     if (limit == -1 && errno != 0) {
         if (errno == EINVAL)
-        /* could be a path or name problem */
-        posix_error();
+            /* could be a path or name problem */
+            posix_error();
         else
-        posix_error_with_filename(path);
+            posix_error_with_filename(path);
     }
     else
         result = PyLong_FromLong(limit);
@@ -6635,32 +6748,34 @@ posix_confstr(PyObject *self, PyObject *args)
 {
     PyObject *result = NULL;
     int name;
-    char buffer[256];
+    char buffer[255];
+    int len;
 
-    if (PyArg_ParseTuple(args, "O&:confstr", conv_confstr_confname, &name)) {
-        int len;
+    if (!PyArg_ParseTuple(args, "O&:confstr", conv_confstr_confname, &name))
+        return NULL;
 
-        errno = 0;
-        len = confstr(name, buffer, sizeof(buffer));
-        if (len == 0) {
-            if (errno) {
-                posix_error();
-            }
-            else {
-                result = Py_None;
-                Py_INCREF(Py_None);
-            }
+    errno = 0;
+    len = confstr(name, buffer, sizeof(buffer));
+    if (len == 0) {
+        if (errno) {
+            posix_error();
+            return NULL;
         }
         else {
-            if ((unsigned int)len >= sizeof(buffer)) {
-                result = PyUnicode_FromStringAndSize(NULL, len-1);
-                if (result != NULL)
-                    confstr(name, _PyUnicode_AsString(result), len);
-            }
-            else
-                result = PyUnicode_FromStringAndSize(buffer, len-1);
+            Py_RETURN_NONE;
         }
     }
+
+    if ((unsigned int)len >= sizeof(buffer)) {
+        char *buf = PyMem_Malloc(len);
+        if (buf == NULL)
+            return PyErr_NoMemory();
+        confstr(name, buf, len);
+        result = PyUnicode_DecodeFSDefaultAndSize(buf, len-1);
+        PyMem_Free(buf);
+    }
+    else
+        result = PyUnicode_DecodeFSDefaultAndSize(buffer, len-1);
     return result;
 }
 #endif
@@ -7249,21 +7364,21 @@ setup_confname_tables(PyObject *module)
                              sizeof(posix_constants_pathconf)
                                / sizeof(struct constdef),
                              "pathconf_names", module))
-    return -1;
+        return -1;
 #endif
 #ifdef HAVE_CONFSTR
     if (setup_confname_table(posix_constants_confstr,
                              sizeof(posix_constants_confstr)
                                / sizeof(struct constdef),
                              "confstr_names", module))
-    return -1;
+        return -1;
 #endif
 #ifdef HAVE_SYSCONF
     if (setup_confname_table(posix_constants_sysconf,
                              sizeof(posix_constants_sysconf)
                                / sizeof(struct constdef),
                              "sysconf_names", module))
-    return -1;
+        return -1;
 #endif
     return 0;
 }
@@ -7376,10 +7491,10 @@ posix_getloadavg(PyObject *self, PyObject *noargs)
 {
     double loadavg[3];
     if (getloadavg(loadavg, 3)!=3) {
-    PyErr_SetString(PyExc_OSError, "Load averages are unobtainable");
-    return NULL;
+        PyErr_SetString(PyExc_OSError, "Load averages are unobtainable");
+        return NULL;
     } else
-    return Py_BuildValue("ddd", loadavg[0], loadavg[1], loadavg[2]);
+        return Py_BuildValue("ddd", loadavg[0], loadavg[1], loadavg[2]);
 }
 #endif
 
@@ -7591,7 +7706,7 @@ posix_getresuid (PyObject *self, PyObject *noargs)
 #ifdef HAVE_GETRESGID
 PyDoc_STRVAR(posix_getresgid__doc__,
 "getresgid() -> (rgid, egid, sgid)\n\n\
-Get tuple of the current process's real, effective, and saved user ids.");
+Get tuple of the current process's real, effective, and saved group ids.");
 
 static PyObject*
 posix_getresgid (PyObject *self, PyObject *noargs)
@@ -7667,13 +7782,13 @@ static PyMethodDef posix_methods[] = {
     {"rmdir",           posix_rmdir, METH_VARARGS, posix_rmdir__doc__},
     {"stat",            posix_stat, METH_VARARGS, posix_stat__doc__},
     {"stat_float_times", stat_float_times, METH_VARARGS, stat_float_times__doc__},
-#ifdef HAVE_SYMLINK
+#if defined(HAVE_SYMLINK) && !defined(MS_WINDOWS)
     {"symlink",         posix_symlink, METH_VARARGS, posix_symlink__doc__},
 #endif /* HAVE_SYMLINK */
-#if !defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
-    {"symlink", (PyCFunction)win_symlink, METH_VARARGS | METH_KEYWORDS,
-                win_symlink__doc__},
-#endif /* !defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
+#if defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
+    {"_symlink", (PyCFunction)win_symlink, METH_VARARGS | METH_KEYWORDS,
+                 win_symlink__doc__},
+#endif /* defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
 #ifdef HAVE_SYSTEM
     {"system",          posix_system, METH_VARARGS, posix_system__doc__},
 #endif
@@ -7749,6 +7864,7 @@ static PyMethodDef posix_methods[] = {
 #ifdef MS_WINDOWS
     {"startfile",       win32_startfile, METH_VARARGS, win32_startfile__doc__},
     {"kill",    win32_kill, METH_VARARGS, win32_kill__doc__},
+    {"link",    win32_link, METH_VARARGS, win32_link__doc__},
 #endif
 #ifdef HAVE_SETUID
     {"setuid",          posix_setuid, METH_VARARGS, posix_setuid__doc__},
@@ -7899,6 +8015,7 @@ static PyMethodDef posix_methods[] = {
 #ifdef MS_WINDOWS
     {"_getfullpathname",        posix__getfullpathname, METH_VARARGS, NULL},
     {"_getfinalpathname",       posix__getfinalpathname, METH_VARARGS, NULL},
+    {"_getfileinformation",     posix__getfileinformation, METH_VARARGS, NULL},
 #endif
 #ifdef HAVE_GETLOADAVG
     {"getloadavg",      posix_getloadavg, METH_NOARGS, posix_getloadavg__doc__},
@@ -7984,6 +8101,46 @@ static int insertvalues(PyObject *module)
     return PyModule_AddStringConstant(module, "bootdrive", tmp);
 }
 #endif
+
+#if defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
+void
+enable_symlink()
+{
+    HANDLE tok;
+    TOKEN_PRIVILEGES tok_priv;
+    LUID luid;
+    int meth_idx = 0;
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &tok))
+        return;
+
+    if (!LookupPrivilegeValue(NULL, SE_CREATE_SYMBOLIC_LINK_NAME, &luid))
+        return;
+
+    tok_priv.PrivilegeCount = 1;
+    tok_priv.Privileges[0].Luid = luid;
+    tok_priv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (!AdjustTokenPrivileges(tok, FALSE, &tok_priv,
+                               sizeof(TOKEN_PRIVILEGES),
+                               (PTOKEN_PRIVILEGES) NULL, (PDWORD) NULL))
+        return;
+
+    if(GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
+        /* We couldn't acquire the necessary privilege, so leave the
+           method hidden for this user. */
+        return;
+    } else {
+        /* We've successfully acquired the symlink privilege so rename
+           the method to it's proper "os.symlink" name. */
+        while(posix_methods[meth_idx].ml_meth != (PyCFunction)win_symlink)
+            meth_idx++;
+        posix_methods[meth_idx].ml_name = "symlink";
+
+        return;
+    }
+}
+#endif /* defined(HAVE_SYMLINK) && defined(MS_WINDOWS) */
 
 static int
 all_ins(PyObject *d)
@@ -8169,12 +8326,12 @@ all_ins(PyObject *d)
     if (ins(d, "EX_NOTFOUND", (long)EX_NOTFOUND)) return -1;
 #endif /* EX_NOTFOUND */
 
-	/* statvfs */
+    /* statvfs */
 #ifdef ST_RDONLY
-	if (ins(d, "ST_RDONLY", (long)ST_RDONLY)) return -1;
+    if (ins(d, "ST_RDONLY", (long)ST_RDONLY)) return -1;
 #endif /* ST_RDONLY */
 #ifdef ST_NOSUID
-	if (ins(d, "ST_NOSUID", (long)ST_NOSUID)) return -1;
+    if (ins(d, "ST_NOSUID", (long)ST_NOSUID)) return -1;
 #endif /* ST_NOSUID */
 
 #ifdef HAVE_SPAWNV
@@ -8245,6 +8402,10 @@ PyMODINIT_FUNC
 INITFUNC(void)
 {
     PyObject *m, *v;
+
+#if defined(HAVE_SYMLINK) && defined(MS_WINDOWS)
+    enable_symlink();
+#endif
 
     m = PyModule_Create(&posixmodule);
     if (m == NULL)

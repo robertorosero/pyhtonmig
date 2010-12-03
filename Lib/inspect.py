@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-1 -*-
 """Get useful information from live Python objects.
 
 This module encapsulates the interface provided by the internal special
@@ -339,22 +338,10 @@ def classify_class_attrs(cls):
     return result
 
 # ----------------------------------------------------------- class helpers
-def _searchbases(cls, accum):
-    # Simulate the "classic class" search order.
-    if cls in accum:
-        return
-    accum.append(cls)
-    for base in cls.__bases__:
-        _searchbases(base, accum)
 
 def getmro(cls):
     "Return tuple of base classes (including cls) in method resolution order."
-    if hasattr(cls, "__mro__"):
-        return cls.__mro__
-    else:
-        result = []
-        _searchbases(cls, result)
-        return tuple(result)
+    return cls.__mro__
 
 # -------------------------------------------------- source code extraction
 def indentsize(line):
@@ -749,9 +736,9 @@ def getargs(co):
     """Get information about the arguments accepted by a code object.
 
     Three things are returned: (args, varargs, varkw), where
-    'args' is the list of argument names, possibly containing nested
-    lists. Keyword-only arguments are appended. 'varargs' and 'varkw'
-    are the names of the * and ** arguments or None."""
+    'args' is the list of argument names. Keyword-only arguments are
+    appended. 'varargs' and 'varkw' are the names of the * and **
+    arguments or None."""
     args, varargs, kwonlyargs, varkw = _getfullargs(co)
     return Arguments(args + kwonlyargs, varargs, varkw)
 
@@ -759,9 +746,8 @@ def _getfullargs(co):
     """Get information about the arguments accepted by a code object.
 
     Four things are returned: (args, varargs, kwonlyargs, varkw), where
-    'args' and 'kwonlyargs' are lists of argument names (with 'args'
-    possibly containing nested lists), and 'varargs' and 'varkw' are the
-    names of the * and ** arguments or None."""
+    'args' and 'kwonlyargs' are lists of argument names, and 'varargs'
+    and 'varkw' are the names of the * and ** arguments or None."""
 
     if not iscode(co):
         raise TypeError('{!r} is not a code object'.format(co))
@@ -790,7 +776,7 @@ def getargspec(func):
     """Get the names and default values of a function's arguments.
 
     A tuple of four things is returned: (args, varargs, varkw, defaults).
-    'args' is a list of the argument names (it may contain nested lists).
+    'args' is a list of the argument names.
     'args' will include keyword-only argument names.
     'varargs' and 'varkw' are the names of the * and ** arguments or None.
     'defaults' is an n-tuple of the default values of the last n arguments.
@@ -815,7 +801,7 @@ def getfullargspec(func):
 
     A tuple of seven things is returned:
     (args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults annotations).
-    'args' is a list of the argument names (it may contain nested lists).
+    'args' is a list of the argument names.
     'varargs' and 'varkw' are the names of the * and ** arguments or None.
     'defaults' is an n-tuple of the default values of the last n arguments.
     'kwonlyargs' is a list of keyword-only argument names.
@@ -839,24 +825,11 @@ def getargvalues(frame):
     """Get information about arguments passed into a particular frame.
 
     A tuple of four things is returned: (args, varargs, varkw, locals).
-    'args' is a list of the argument names (it may contain nested lists).
+    'args' is a list of the argument names.
     'varargs' and 'varkw' are the names of the * and ** arguments or None.
     'locals' is the locals dictionary of the given frame."""
     args, varargs, varkw = getargs(frame.f_code)
     return ArgInfo(args, varargs, varkw, frame.f_locals)
-
-def joinseq(seq):
-    if len(seq) == 1:
-        return '(' + seq[0] + ',)'
-    else:
-        return '(' + ', '.join(seq) + ')'
-
-def strseq(object, convert, join=joinseq):
-    """Recursively walk a sequence, stringifying each element."""
-    if type(object) in (list, tuple):
-        return join(map(lambda o, c=convert, j=join: strseq(o, c, j), object))
-    else:
-        return convert(object)
 
 def formatannotation(annotation, base_module=None):
     if isinstance(annotation, type):
@@ -878,8 +851,7 @@ def formatargspec(args, varargs=None, varkw=None, defaults=None,
                   formatvarkw=lambda name: '**' + name,
                   formatvalue=lambda value: '=' + repr(value),
                   formatreturns=lambda text: ' -> ' + text,
-                  formatannotation=formatannotation,
-                  join=joinseq):
+                  formatannotation=formatannotation):
     """Format an argument spec from the values returned by getargspec
     or getfullargspec.
 
@@ -897,7 +869,7 @@ def formatargspec(args, varargs=None, varkw=None, defaults=None,
     if defaults:
         firstdefault = len(args) - len(defaults)
     for i, arg in enumerate(args):
-        spec = strseq(arg, formatargandannotation, join)
+        spec = formatargandannotation(arg)
         if defaults and i >= firstdefault:
             spec = spec + formatvalue(defaults[i - firstdefault])
         specs.append(spec)
@@ -923,8 +895,7 @@ def formatargvalues(args, varargs, varkw, locals,
                     formatarg=str,
                     formatvarargs=lambda name: '*' + name,
                     formatvarkw=lambda name: '**' + name,
-                    formatvalue=lambda value: '=' + repr(value),
-                    join=joinseq):
+                    formatvalue=lambda value: '=' + repr(value)):
     """Format an argument spec from the 4 values returned by getargvalues.
 
     The first four arguments are (args, varargs, varkw, locals).  The
@@ -936,7 +907,7 @@ def formatargvalues(args, varargs, varkw, locals,
         return formatarg(name) + formatvalue(locals[name])
     specs = []
     for i in range(len(args)):
-        specs.append(strseq(args[i], convert, join))
+        specs.append(convert(args[i]))
     if varargs:
         specs.append(formatvarargs(varargs) + formatvalue(locals[varargs]))
     if varkw:
@@ -1083,3 +1054,100 @@ def stack(context=1):
 def trace(context=1):
     """Return a list of records for the stack below the current exception."""
     return getinnerframes(sys.exc_info()[2], context)
+
+
+# ------------------------------------------------ static version of getattr
+
+_sentinel = object()
+
+def _static_getmro(klass):
+    return type.__dict__['__mro__'].__get__(klass)
+
+def _check_instance(obj, attr):
+    instance_dict = {}
+    try:
+        instance_dict = object.__getattribute__(obj, "__dict__")
+    except AttributeError:
+        pass
+    return instance_dict.get(attr, _sentinel)
+
+
+def _check_class(klass, attr):
+    for entry in _static_getmro(klass):
+        try:
+            return entry.__dict__[attr]
+        except KeyError:
+            pass
+    return _sentinel
+
+def _is_type(obj):
+    try:
+        _static_getmro(obj)
+    except TypeError:
+        return False
+    return True
+
+
+def getattr_static(obj, attr, default=_sentinel):
+    """Retrieve attributes without triggering dynamic lookup via the
+       descriptor protocol,  __getattr__ or __getattribute__.
+
+       Note: this function may not be able to retrieve all attributes
+       that getattr can fetch (like dynamically created attributes)
+       and may find attributes that getattr can't (like descriptors
+       that raise AttributeError). It can also return descriptor objects
+       instead of instance members in some cases. See the
+       documentation for details.
+    """
+    instance_result = _sentinel
+    if not _is_type(obj):
+        instance_result = _check_instance(obj, attr)
+        klass = type(obj)
+    else:
+        klass = obj
+
+    klass_result = _check_class(klass, attr)
+
+    if instance_result is not _sentinel and klass_result is not _sentinel:
+        if (_check_class(type(klass_result), '__get__') is not _sentinel and
+            _check_class(type(klass_result), '__set__') is not _sentinel):
+            return klass_result
+
+    if instance_result is not _sentinel:
+        return instance_result
+    if klass_result is not _sentinel:
+        return klass_result
+
+    if obj is klass:
+        # for types we check the metaclass too
+        for entry in _static_getmro(type(klass)):
+            try:
+                return entry.__dict__[attr]
+            except KeyError:
+                pass
+    if default is not _sentinel:
+        return default
+    raise AttributeError(attr)
+
+
+GEN_CREATED = 'GEN_CREATED'
+GEN_RUNNING = 'GEN_RUNNING'
+GEN_SUSPENDED = 'GEN_SUSPENDED'
+GEN_CLOSED = 'GEN_CLOSED'
+
+def getgeneratorstate(generator):
+    """Get current state of a generator-iterator.
+
+    Possible states are:
+      GEN_CREATED: Waiting to start execution.
+      GEN_RUNNING: Currently being executed by the interpreter.
+      GEN_SUSPENDED: Currently suspended at a yield expression.
+      GEN_CLOSED: Execution has completed.
+    """
+    if generator.gi_running:
+        return GEN_RUNNING
+    if generator.gi_frame is None:
+        return GEN_CLOSED
+    if generator.gi_frame.f_lasti == -1:
+        return GEN_CREATED
+    return GEN_SUSPENDED

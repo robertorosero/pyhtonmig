@@ -24,9 +24,17 @@ For other archive formats, see the :mod:`bz2`, :mod:`gzip`, and
 
 The module defines the following items:
 
-.. exception:: BadZipfile
+.. exception:: BadZipFile
 
    The error raised for bad ZIP files (old name: ``zipfile.error``).
+
+   .. versionadded:: 3.2
+
+
+.. exception:: BadZipfile
+
+   This is an alias for :exc:`BadZipFile` that exists for compatibility with
+   Python versions prior to 3.2.  Usage is deprecated.
 
 
 .. exception:: LargeZipFile
@@ -36,6 +44,7 @@ The module defines the following items:
 
 
 .. class:: ZipFile
+   :noindex:
 
    The class for reading and writing ZIP files.  See section
    :ref:`zipfile-objects` for constructor details.
@@ -117,6 +126,10 @@ ZipFile Objects
    and :program:`unzip` commands on Unix (the InfoZIP utilities) don't support
    these extensions.
 
+   If the file is created with mode ``'a'`` or ``'w'`` and then
+   :meth:`close`\ d without adding any files to the archive, the appropriate
+   ZIP structures for an empty archive will be written to the file.
+
    ZipFile is also a context manager and therefore supports the
    :keyword:`with` statement.  In the example, *myzip* is closed after the
    :keyword:`with` statement's suite is finished---even if an exception occurs::
@@ -165,8 +178,8 @@ ZipFile Objects
    .. note::
 
       The file-like object is read-only and provides the following methods:
-      :meth:`read`, :meth:`readline`, :meth:`readlines`, :meth:`__iter__`,
-      :meth:`__next__`.
+      :meth:`!read`, :meth:`!readline`, :meth:`!readlines`, :meth:`!__iter__`,
+      :meth:`!__next__`.
 
    .. note::
 

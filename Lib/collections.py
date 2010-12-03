@@ -11,11 +11,16 @@ from operator import itemgetter as _itemgetter
 from keyword import iskeyword as _iskeyword
 import sys as _sys
 import heapq as _heapq
+from weakref import proxy as _proxy
 from itertools import repeat as _repeat, chain as _chain, starmap as _starmap
+from reprlib import recursive_repr as _recursive_repr
 
 ################################################################################
 ### OrderedDict
 ################################################################################
+
+class _Link(object):
+    __slots__ = 'prev', 'next', 'key', '__weakref__'
 
 class OrderedDict(dict, MutableMapping):
     'Dictionary that remembers insertion order'
@@ -27,7 +32,10 @@ class OrderedDict(dict, MutableMapping):
     # The internal self.__map dictionary maps keys to links in a doubly linked list.
     # The circular doubly linked list starts and ends with a sentinel element.
     # The sentinel element never gets deleted (this simplifies the algorithm).
-    # Each link is stored as a list of length three:  [PREV, NEXT, KEY].
+    # The sentinel is stored in self.__hardroot with a weakref proxy in self.__root.
+    # The prev/next links are weakref proxies (to prevent circular references).
+    # Individual links are kept alive by the hard reference in self.__map.
+    # Those hard references disappear when a key is deleted from an OrderedDict.
 
     def __init__(self, *args, **kwds):
         '''Initialize an ordered dictionary.  Signature is the same as for
@@ -40,73 +48,128 @@ class OrderedDict(dict, MutableMapping):
         try:
             self.__root
         except AttributeError:
-            self.__root = root = [None, None, None]     # sentinel node
-            PREV = 0
-            NEXT = 1
-            root[PREV] = root[NEXT] = root
+            self.__hardroot = _Link()
+            self.__root = root = _proxy(self.__hardroot)
+            root.prev = root.next = root
             self.__map = {}
         self.update(*args, **kwds)
 
-    def __setitem__(self, key, value, PREV=0, NEXT=1, dict_setitem=dict.__setitem__):
+    def __setitem__(self, key, value,
+                    dict_setitem=dict.__setitem__, proxy=_proxy, Link=_Link):
         'od.__setitem__(i, y) <==> od[i]=y'
         # Setting a new item creates a new link which goes at the end of the linked
         # list, and the inherited dictionary is updated with the new key/value pair.
         if key not in self:
+            self.__map[key] = link = Link()
             root = self.__root
-            last = root[PREV]
-            last[NEXT] = root[PREV] = self.__map[key] = [last, root, key]
+            last = root.prev
+            link.prev, link.next, link.key = last, root, key
+            last.next = link
+            root.prev = proxy(link)
         dict_setitem(self, key, value)
 
-    def __delitem__(self, key, PREV=0, NEXT=1, dict_delitem=dict.__delitem__):
+    def __delitem__(self, key, dict_delitem=dict.__delitem__):
         'od.__delitem__(y) <==> del od[y]'
         # Deleting an existing item uses self.__map to find the link which is
         # then removed by updating the links in the predecessor and successor nodes.
         dict_delitem(self, key)
         link = self.__map.pop(key)
-        link_prev = link[PREV]
-        link_next = link[NEXT]
-        link_prev[NEXT] = link_next
-        link_next[PREV] = link_prev
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
 
-    def __iter__(self, NEXT=1, KEY=2):
+    def __iter__(self):
         'od.__iter__() <==> iter(od)'
         # Traverse the linked list in order.
         root = self.__root
-        curr = root[NEXT]
+        curr = root.next
         while curr is not root:
-            yield curr[KEY]
-            curr = curr[NEXT]
+            yield curr.key
+            curr = curr.next
 
-    def __reversed__(self, PREV=0, KEY=2):
+    def __reversed__(self):
         'od.__reversed__() <==> reversed(od)'
         # Traverse the linked list in reverse order.
         root = self.__root
-        curr = root[PREV]
+        curr = root.prev
         while curr is not root:
-            yield curr[KEY]
-            curr = curr[PREV]
+            yield curr.key
+            curr = curr.prev
+
+    def clear(self):
+        'od.clear() -> None.  Remove all items from od.'
+        root = self.__root
+        root.prev = root.next = root
+        self.__map.clear()
+        dict.clear(self)
+
+    def popitem(self, last=True):
+        '''od.popitem() -> (k, v), return and remove a (key, value) pair.
+        Pairs are returned in LIFO order if last is true or FIFO order if false.
+
+        '''
+        if not self:
+            raise KeyError('dictionary is empty')
+        root = self.__root
+        if last:
+            link = root.prev
+            link_prev = link.prev
+            link_prev.next = root
+            root.prev = link_prev
+        else:
+            link = root.next
+            link_next = link.next
+            root.next = link_next
+            link_next.prev = root
+        key = link.key
+        del self.__map[key]
+        value = dict.pop(self, key)
+        return key, value
+
+    def move_to_end(self, key, last=True):
+        '''Move an existing element to the end (or beginning if last==False).
+
+        Raises KeyError if the element does not exist.
+        When last=True, acts like a fast version of self[key]=self.pop(key).
+
+        '''
+        link = self.__map[key]
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
+        root = self.__root
+        if last:
+            last = root.prev
+            link.prev = last
+            link.next = root
+            last.next = root.prev = link
+        else:
+            first = root.next
+            link.prev = root
+            link.next = first
+            root.next = first.prev = link
 
     def __reduce__(self):
         'Return state information for pickling'
         items = [[k, self[k]] for k in self]
-        tmp = self.__map, self.__root
-        del self.__map, self.__root
+        tmp = self.__map, self.__root, self.__hardroot
+        del self.__map, self.__root, self.__hardroot
         inst_dict = vars(self).copy()
-        self.__map, self.__root = tmp
+        self.__map, self.__root, self.__hardroot = tmp
         if inst_dict:
             return (self.__class__, (items,), inst_dict)
         return self.__class__, (items,)
 
-    def clear(self):
-        'od.clear() -> None.  Remove all items from od.'
-        try:
-            for node in self.__map.values():
-                del node[:]
-            self.__root[:] = [self.__root, self.__root, None]
-            self.__map.clear()
-        except AttributeError:
-            pass
-        dict.clear(self)
+    def __sizeof__(self):
+        sizeof = _sys.getsizeof
+        n = len(self) + 1                       # number of links including root
+        size = sizeof(self.__dict__)            # instance dictionary
+        size += sizeof(self.__map) * 2          # internal dict and inherited dict
+        size += sizeof(self.__hardroot) * n     # link objects
+        size += sizeof(self.__root) * n         # proxy objects
+        return size
 
     setdefault = MutableMapping.setdefault
     update = MutableMapping.update
@@ -116,17 +179,7 @@ class OrderedDict(dict, MutableMapping):
     items = MutableMapping.items
     __ne__ = MutableMapping.__ne__
 
-    def popitem(self, last=True):
-        '''od.popitem() -> (k, v), return and remove a (key, value) pair.
-        Pairs are returned in LIFO order if last is true or FIFO order if false.
-
-        '''
-        if not self:
-            raise KeyError('dictionary is empty')
-        key = next(reversed(self) if last else iter(self))
-        value = self.pop(key)
-        return key, value
-
+    @_recursive_repr()
     def __repr__(self):
         'od.__repr__() <==> repr(od)'
         if not self:
@@ -157,9 +210,6 @@ class OrderedDict(dict, MutableMapping):
             return len(self)==len(other) and \
                    all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
-
-    def __del__(self):
-        self.clear()                # eliminate cyclical references
 
 
 ################################################################################
@@ -265,7 +315,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
     try:
         exec(template, namespace)
     except SyntaxError as e:
-        raise SyntaxError(e.msg + ':\n' + template) from e
+        raise SyntaxError(e.msg + ':\n\n' + template)
     result = namespace[typename]
 
     # For pickling to work, the __module__ variable needs to be set to the frame

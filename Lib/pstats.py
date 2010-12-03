@@ -89,22 +89,21 @@ class Stats:
         self.total_calls = 0
         self.prim_calls = 0
         self.max_name_len = 0
-        self.top_level = {}
+        self.top_level = set()
         self.stats = {}
         self.sort_arg_dict = {}
         self.load_stats(arg)
-        trouble = 1
         try:
             self.get_top_level_stats()
-            trouble = 0
-        finally:
-            if trouble:
-                print("Invalid timing data", end=' ', file=self.stream)
-                if self.files: print(self.files[-1], end=' ', file=self.stream)
-                print(file=self.stream)
+        except Exception:
+            print("Invalid timing data %s" %
+                  (self.files[-1] if self.files else ''), file=self.stream)
+            raise
 
     def load_stats(self, arg):
-        if not arg:  self.stats = {}
+        if arg is None:
+            self.stats = {}
+            return
         elif isinstance(arg, str):
             f = open(arg, 'rb')
             self.stats = marshal.load(f)
@@ -114,13 +113,13 @@ class Stats:
                 arg = time.ctime(file_stats.st_mtime) + "    " + arg
             except:  # in case this is not unix
                 pass
-            self.files = [ arg ]
+            self.files = [arg]
         elif hasattr(arg, 'create_stats'):
             arg.create_stats()
             self.stats = arg.stats
             arg.stats = {}
         if not self.stats:
-            raise TypeError("Cannot create or construct a %r object from '%r''"
+            raise TypeError("Cannot create or construct a %r object from %r"
                             % (self.__class__, arg))
         return
 
@@ -130,34 +129,34 @@ class Stats:
             self.prim_calls  += cc
             self.total_tt    += tt
             if ("jprofile", 0, "profiler") in callers:
-                self.top_level[func] = None
+                self.top_level.add(func)
             if len(func_std_string(func)) > self.max_name_len:
                 self.max_name_len = len(func_std_string(func))
 
     def add(self, *arg_list):
-        if not arg_list: return self
-        if len(arg_list) > 1: self.add(*arg_list[1:])
-        other = arg_list[0]
-        if type(self) != type(other):
-            other = Stats(other)
-        self.files += other.files
-        self.total_calls += other.total_calls
-        self.prim_calls += other.prim_calls
-        self.total_tt += other.total_tt
-        for func in other.top_level:
-            self.top_level[func] = None
+        if not arg_list:
+            return self
+        for item in reversed(arg_list):
+            if type(self) != type(item):
+                item = Stats(item)
+            self.files += item.files
+            self.total_calls += item.total_calls
+            self.prim_calls += item.prim_calls
+            self.total_tt += item.total_tt
+            for func in item.top_level:
+                self.top_level.add(func)
 
-        if self.max_name_len < other.max_name_len:
-            self.max_name_len = other.max_name_len
+            if self.max_name_len < item.max_name_len:
+                self.max_name_len = item.max_name_len
 
-        self.fcn_list = None
+            self.fcn_list = None
 
-        for func, stat in other.stats.items():
-            if func in self.stats:
-                old_func_stat = self.stats[func]
-            else:
-                old_func_stat = (0, 0, 0, 0, {},)
-            self.stats[func] = add_func_stats(old_func_stat, stat)
+            for func, stat in item.stats.items():
+                if func in self.stats:
+                    old_func_stat = self.stats[func]
+                else:
+                    old_func_stat = (0, 0, 0, 0, {},)
+                self.stats[func] = add_func_stats(old_func_stat, stat)
         return self
 
     def dump_stats(self, filename):
@@ -258,9 +257,9 @@ class Stats:
             else:
                 newstats[newfunc] = (cc, nc, tt, ct, newcallers)
         old_top = self.top_level
-        self.top_level = new_top = {}
+        self.top_level = new_top = set()
         for func in old_top:
-            new_top[func_strip_path(func)] = None
+            new_top.add(func_strip_path(func))
 
         self.max_name_len = max_name_len
 
@@ -269,7 +268,8 @@ class Stats:
         return self
 
     def calc_callees(self):
-        if self.all_callees: return
+        if self.all_callees:
+            return
         self.all_callees = all_callees = {}
         for func, (cc, nc, tt, ct, callers) in self.stats.items():
             if not func in all_callees:
@@ -339,7 +339,8 @@ class Stats:
     def print_stats(self, *amount):
         for filename in self.files:
             print(filename, file=self.stream)
-        if self.files: print(file=self.stream)
+        if self.files:
+            print(file=self.stream)
         indent = ' ' * 8
         for func in self.top_level:
             print(indent, func_get_function_name(func), file=self.stream)
@@ -347,7 +348,7 @@ class Stats:
         print(indent, self.total_calls, "function calls", end=' ', file=self.stream)
         if self.total_calls != self.prim_calls:
             print("(%d primitive calls)" % self.prim_calls, end=' ', file=self.stream)
-        print("in %.3f CPU seconds" % self.total_tt, file=self.stream)
+        print("in %.3f seconds" % self.total_tt, file=self.stream)
         print(file=self.stream)
         width, list = self.get_print_list(amount)
         if list:
@@ -425,7 +426,7 @@ class Stats:
         print('   ncalls  tottime  percall  cumtime  percall', end=' ', file=self.stream)
         print('filename:lineno(function)', file=self.stream)
 
-    def print_line(self, func):  # hack : should print percentages
+    def print_line(self, func):  # hack: should print percentages
         cc, nc, tt, ct, callers = self.stats[func]
         c = str(nc)
         if nc != cc:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Python documentation build configuration file
 #
@@ -131,7 +130,9 @@ latex_documents = [
     ('tutorial/index', 'tutorial.tex',
      'Python Tutorial', _stdauthor, 'manual'),
     ('using/index', 'using.tex',
-     'Using Python', _stdauthor, 'manual'),
+     'Python Setup and Usage', _stdauthor, 'manual'),
+    ('faq/index', 'faq.tex',
+     'Python Frequently Asked Questions', _stdauthor, 'manual'),
     ('whatsnew/' + version, 'whatsnew.tex',
      'What\'s New in Python', 'A. M. Kuchling', 'howto'),
 ]

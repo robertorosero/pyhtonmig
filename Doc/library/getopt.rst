@@ -7,13 +7,13 @@
 
 .. note::
    The :mod:`getopt` module is a parser for command line options whose API is
-   designed to be familiar to users of the C :cfunc:`getopt` function. Users who
-   are unfamiliar with the C :cfunc:`getopt` function or who would like to write
+   designed to be familiar to users of the C :c:func:`getopt` function. Users who
+   are unfamiliar with the C :c:func:`getopt` function or who would like to write
    less code and get better help and error messages should consider using the
    :mod:`argparse` module instead.
 
 This module helps scripts to parse the command line arguments in ``sys.argv``.
-It supports the same conventions as the Unix :cfunc:`getopt` function (including
+It supports the same conventions as the Unix :c:func:`getopt` function (including
 the special meanings of arguments of the form '``-``' and '``--``').  Long
 options similar to those supported by GNU software may be used as well via an
 optional third argument.
@@ -31,11 +31,11 @@ exception:
    be parsed, without the leading reference to the running program. Typically, this
    means ``sys.argv[1:]``. *shortopts* is the string of option letters that the
    script wants to recognize, with options that require an argument followed by a
-   colon (``':'``; i.e., the same format that Unix :cfunc:`getopt` uses).
+   colon (``':'``; i.e., the same format that Unix :c:func:`getopt` uses).
 
    .. note::
 
-      Unlike GNU :cfunc:`getopt`, after a non-option argument, all further
+      Unlike GNU :c:func:`getopt`, after a non-option argument, all further
       arguments are considered also non-options. This is similar to the way
       non-GNU Unix systems work.
 
@@ -47,7 +47,7 @@ exception:
    empty string.  Long options on the command line can be recognized so long as
    they provide a prefix of the option name that matches exactly one of the
    accepted options.  For example, if *longopts* is ``['foo', 'frob']``, the
-   option :option:`--fo` will match as :option:`--foo`, but :option:`--f` will
+   option ``--fo`` will match as ``--foo``, but ``--f`` will
    not match uniquely, so :exc:`GetoptError` will be raised.
 
    The return value consists of two elements: the first is a list of ``(option,
@@ -68,7 +68,7 @@ exception:
    intermixed. The :func:`getopt` function stops processing options as soon as a
    non-option argument is encountered.
 
-   If the first character of the option string is '+', or if the environment
+   If the first character of the option string is ``'+'``, or if the environment
    variable :envvar:`POSIXLY_CORRECT` is set, then option processing stops as
    soon as a non-option argument is encountered.
 

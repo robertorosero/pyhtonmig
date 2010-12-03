@@ -163,24 +163,23 @@ tests in the :mod:`test` package. It does this by finding all modules in the
 package whose name starts with ``test_``, importing them, and executing the
 function :func:`test_main` if present. The names of tests to execute may also
 be passed to the script. Specifying a single regression test (:program:`python
-regrtest.py` :option:`test_spam.py`) will minimize output and only print
+regrtest.py test_spam.py`) will minimize output and only print
 whether the test passed or failed and thus minimize output.
 
 Running :mod:`test.regrtest` directly allows what resources are available for
-tests to use to be set. You do this by using the :option:`-u` command-line
-option. Run :program:`python regrtest.py` :option:`-uall` to turn on all
-resources; specifying :option:`all` as an option for :option:`-u` enables all
+tests to use to be set. You do this by using the ``-u`` command-line
+option. Run :program:`python regrtest.py -uall` to turn on all
+resources; specifying ``all`` as an option for ``-u`` enables all
 possible resources. If all but one resource is desired (a more common case), a
 comma-separated list of resources that are not desired may be listed after
-:option:`all`. The command :program:`python regrtest.py`
-:option:`-uall,-audio,-largefile` will run :mod:`test.regrtest` with all
-resources except the :option:`audio` and :option:`largefile` resources. For a
-list of all resources and more command-line options, run :program:`python
-regrtest.py` :option:`-h`.
+``all``. The command :program:`python regrtest.py -uall,-audio,-largefile`
+will run :mod:`test.regrtest` with all resources except the ``audio`` and
+``largefile`` resources. For a list of all resources and more command-line
+options, run :program:`python regrtest.py -h`.
 
 Some other ways to execute the regression tests depend on what platform the
-tests are being executed on. On Unix, you can run :program:`make`
-:option:`test` at the top-level directory where Python was built. On Windows,
+tests are being executed on. On Unix, you can run :program:`make test` at the
+top-level directory where Python was built. On Windows,
 executing :program:`rt.bat` from your :file:`PCBuild` directory will run all
 regression tests.
 
@@ -262,7 +261,7 @@ The :mod:`test.support` module defines the following functions:
    path to the file.
 
 
-.. function:: run_unittest(*classes)
+.. function:: run_unittest(\*classes)
 
    Execute :class:`unittest.TestCase` subclasses passed to the function. The
    function scans the classes for methods starting with the prefix ``test_``
@@ -279,7 +278,7 @@ The :mod:`test.support` module defines the following functions:
    This will run all tests defined in the named module.
 
 
-.. function:: check_warnings(*filters, quiet=True)
+.. function:: check_warnings(\*filters, quiet=True)
 
    A convenience wrapper for :func:`warnings.catch_warnings()` that makes it
    easier to test that a warning was correctly raised.  It is approximately

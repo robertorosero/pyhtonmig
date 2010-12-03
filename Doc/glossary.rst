@@ -19,7 +19,7 @@ Glossary
 
    2to3
       A tool that tries to convert Python 2.x code to Python 3.x code by
-      handling most of the incompatibilites which can be detected by parsing the
+      handling most of the incompatibilities which can be detected by parsing the
       source and traversing the parse tree.
 
       2to3 is available in the standard library as :mod:`lib2to3`; a standalone
@@ -27,7 +27,7 @@ Glossary
       :ref:`2to3-reference`.
 
    abstract base class
-      Abstract Base Classes (abbreviated ABCs) complement :term:`duck-typing` by
+      :ref:`abstract-base-classes` complement :term:`duck-typing` by
       providing a way to define interfaces when other techniques like
       :func:`hasattr` would be clumsy. Python comes with many built-in ABCs for
       data structures (in the :mod:`collections` module), numbers (in the
@@ -140,10 +140,9 @@ Glossary
       For more information about descriptors' methods, see :ref:`descriptors`.
 
    dictionary
-      An associative array, where arbitrary keys are mapped to values.  The use
-      of :class:`dict` closely resembles that for :class:`list`, but the keys can
-      be any object with a :meth:`__hash__` function, not just integers.
-      Called a hash in Perl.
+      An associative array, where arbitrary keys are mapped to values.  The keys
+      can be any object with :meth:`__hash__` function and :meth:`__eq__`
+      methods. Called a hash in Perl.
 
    docstring
       A string literal which appears as the first expression in a class,
@@ -185,6 +184,23 @@ Glossary
       A module written in C or C++, using Python's C API to interact with the core and
       with user code.
 
+   file object
+      An object exposing a file-oriented API (with methods such as
+      :meth:`read()` or :meth:`write()`) to an underlying resource.
+      Depending on the way it was created, a file object can mediate access
+      to a real on-disk file or to another other type of storage or
+      communication device (for example standard input/output, in-memory
+      buffers, sockets, pipes, etc.).  File objects are also called
+      :dfn:`file-like objects` or :dfn:`streams`.
+
+      There are actually three categories of file objects: raw binary
+      files, buffered binary files and text files.  Their interfaces are
+      defined in the :mod:`io` module.  The canonical way to create a
+      file object is by using the :func:`open` function.
+
+   file-like object
+      A synonym for :term:`file object`.
+
    finder
       An object that tries to find the :term:`loader` for a module. It must
       implement a method named :meth:`find_module`. See :pep:`302` for
@@ -192,9 +208,11 @@ Glossary
       :term:`abstract base class`.
 
    floor division
-      Mathematical division discarding any remainder.  The floor division
-      operator is ``//``.  For example, the expression ``11//4`` evaluates to
-      ``2`` in contrast to the ``2.75`` returned by float true division.
+      Mathematical division that rounds down to nearest integer.  The floor
+      division operator is ``//``.  For example, the expression ``11 // 4``
+      evaluates to ``2`` in contrast to the ``2.75`` returned by float true
+      division.  Note that ``(-11) // 4`` is ``-3`` because that is ``-2.75``
+      rounded *downward*. See :pep:`238`.
 
    function
       A series of statements which returns some value to a caller. It can also
@@ -202,7 +220,7 @@ Glossary
       the body. See also :term:`argument` and :term:`method`.
 
    __future__
-      A pseudo module which programmers can use to enable new language features
+      A pseudo-module which programmers can use to enable new language features
       which are not compatible with the current interpreter.
 
       By importing the :mod:`__future__` module and evaluating its variables,
@@ -222,13 +240,13 @@ Glossary
 
    generator
       A function which returns an iterator.  It looks like a normal function
-      except that values are returned to the caller using a :keyword:`yield`
-      statement instead of a :keyword:`return` statement.  Generator functions
-      often contain one or more :keyword:`for` or :keyword:`while` loops which
-      :keyword:`yield` elements back to the caller.  The function execution is
-      stopped at the :keyword:`yield` keyword (returning the result) and is
-      resumed there when the next element is requested by calling the
-      :meth:`__next__` method of the returned iterator.
+      except that it contains :keyword:`yield` statements for producing a series
+      a values usable in a for-loop or that can be retrieved one at a time with
+      the :func:`next` function. Each :keyword:`yield` temporarily suspends
+      processing, remembering the location execution state (including local
+      variables and pending try-statements).  When the generator resumes, it
+      picks-up where it left-off (in contrast to functions which start fresh on
+      every invocation.
 
       .. index:: single: generator expression
 
@@ -273,9 +291,7 @@ Glossary
    IDLE
       An Integrated Development Environment for Python.  IDLE is a basic editor
       and interpreter environment which ships with the standard distribution of
-      Python.  Good for beginners, it also serves as clear example code for
-      those wanting to implement a moderately sophisticated, multi-platform GUI
-      application.
+      Python.
 
    immutable
       An object with a fixed value.  Immutable objects include numbers, strings and
@@ -306,7 +322,7 @@ Glossary
       slowly.  See also :term:`interactive`.
 
    iterable
-      A container object capable of returning its members one at a
+      An object capable of returning its members one at a
       time. Examples of iterables include all sequence types (such as
       :class:`list`, :class:`str`, and :class:`tuple`) and some non-sequence
       types like :class:`dict` and :class:`file` and objects of any classes you
@@ -338,6 +354,26 @@ Glossary
       in the previous iteration pass, making it appear like an empty container.
 
       More information can be found in :ref:`typeiter`.
+
+   key function
+      A key function or collation function is a callable that returns a value
+      used for sorting or ordering.  For example, :func:`locale.strxfrm` is
+      used to produce a sort key that is aware of locale specific sort
+      conventions.
+
+      A number of tools in Python accept key functions to control how elements
+      are ordered or grouped.  They include :func:`min`, :func:`max`,
+      :func:`sorted`, :meth:`list.sort`, :func:`heapq.nsmallest`,
+      :func:`heapq.nlargest`, and :func:`itertools.groupby`.
+
+      There are several ways to create a key function.  For example. the
+      :meth:`str.lower` method can serve as a key function for case insensitive
+      sorts.  Alternatively, an ad-hoc key function can be built from a
+      :keyword:`lambda` expression such as ``lambda r: (r[0], r[2])``.  Also,
+      the :mod:`operator` module provides three key function constuctors:
+      :func:`~operator.attrgetter`, :func:`~operator.itemgetter`, and
+      :func:`~operator.methodcaller`.  See the :ref:`Sorting HOW TO
+      <sortinghowto>` for examples of how to create and use key functions.
 
    keyword argument
       Arguments which are preceded with a ``variable_name=`` in the call.
@@ -377,7 +413,8 @@ Glossary
 
    mapping
       A container object (such as :class:`dict`) which supports arbitrary key
-      lookups using the special method :meth:`__getitem__`.
+      lookups using the special method :meth:`__getitem__`.  Mappings also
+      support :meth:`__len__`, :meth:`__iter__`, and :meth:`__contains__`.
 
    metaclass
       The class of a class.  Class definitions create a class name, a class
@@ -397,6 +434,14 @@ Glossary
       of an instance of that class, the method will get the instance object as
       its first :term:`argument` (which is usually called ``self``).
       See :term:`function` and :term:`nested scope`.
+
+   method resolution order
+      Method Resolution Order is the order in which base classes are searched
+      for a member during lookup. See `The Python 2.3 Method Resolution Order
+      <http://www.python.org/download/releases/2.3/mro/>`_.
+
+   MRO
+      See :term:`method resolution order`.
 
    mutable
       Mutable objects can change their value but keep their :func:`id`.  See

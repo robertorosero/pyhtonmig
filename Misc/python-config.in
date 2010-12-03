@@ -1,4 +1,5 @@
 #!@EXENAME@
+# -*- python -*-
 
 import getopt
 import os
@@ -6,7 +7,7 @@ import sys
 import sysconfig
 
 valid_opts = ['prefix', 'exec-prefix', 'includes', 'libs', 'cflags',
-              'ldflags', 'help']
+              'ldflags', 'extension-suffix', 'help', 'abiflags']
 
 def exit_with_usage(code=1):
     print("Usage: {0} [{1}]".format(
@@ -45,7 +46,7 @@ for opt in opt_flags:
 
     elif opt in ('--libs', '--ldflags'):
         libs = getvar('LIBS').split() + getvar('SYSLIBS').split()
-        libs.append('-lpython'+pyver)
+        libs.append('-lpython' + pyver + sys.abiflags)
         # add the prefix/lib/pythonX.Y/config dir, but only if there is no
         # shared library in prefix/lib/.
         if opt == '--ldflags':
@@ -54,3 +55,8 @@ for opt in opt_flags:
             libs.extend(getvar('LINKFORSHARED').split())
         print(' '.join(libs))
 
+    elif opt == '--extension-suffix':
+        print(sysconfig.get_config_var('SO'))
+
+    elif opt == '--abiflags':
+        print(sys.abiflags)

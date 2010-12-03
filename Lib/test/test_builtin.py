@@ -179,28 +179,67 @@ class BuiltinTest(unittest.TestCase):
         a = {}
         a[0] = a
         self.assertEqual(ascii(a), '{0: {...}}')
+        # Advanced checks for unicode strings
+        def _check_uni(s):
+            self.assertEqual(ascii(s), repr(s))
+        _check_uni("'")
+        _check_uni('"')
+        _check_uni('"\'')
+        _check_uni('\0')
+        _check_uni('\r\n\t .')
+        # Unprintable non-ASCII characters
+        _check_uni('\x85')
+        _check_uni('\u1fff')
+        _check_uni('\U00012fff')
+        # Lone surrogates
+        _check_uni('\ud800')
+        _check_uni('\udfff')
+        # Issue #9804: surrogates should be joined even for printable
+        # wide characters (UCS-2 builds).
+        self.assertEqual(ascii('\U0001d121'), "'\\U0001d121'")
+        # All together
+        s = "'\0\"\n\r\t abcd\x85é\U00012fff\uD800\U0001D121xxx."
+        self.assertEqual(ascii(s),
+            r"""'\'\x00"\n\r\t abcd\x85\xe9\U00012fff\ud800\U0001d121xxx.'""")
 
     def test_neg(self):
         x = -sys.maxsize-1
         self.assertTrue(isinstance(x, int))
         self.assertEqual(-x, sys.maxsize+1)
 
-    # XXX(nnorwitz): This test case for callable should probably be removed.
     def test_callable(self):
-        self.assertTrue(hasattr(len, '__call__'))
+        self.assertTrue(callable(len))
+        self.assertFalse(callable("a"))
+        self.assertTrue(callable(callable))
+        self.assertTrue(callable(lambda x, y: x + y))
+        self.assertFalse(callable(__builtins__))
         def f(): pass
-        self.assertTrue(hasattr(f, '__call__'))
-        class C:
+        self.assertTrue(callable(f))
+
+        class C1:
             def meth(self): pass
-        self.assertTrue(hasattr(C, '__call__'))
-        x = C()
-        self.assertTrue(hasattr(x.meth, '__call__'))
-        self.assertTrue(not hasattr(x, '__call__'))
-        class D(C):
+        self.assertTrue(callable(C1))
+        c = C1()
+        self.assertTrue(callable(c.meth))
+        self.assertFalse(callable(c))
+
+        # __call__ is looked up on the class, not the instance
+        c.__call__ = None
+        self.assertFalse(callable(c))
+        c.__call__ = lambda self: 0
+        self.assertFalse(callable(c))
+        del c.__call__
+        self.assertFalse(callable(c))
+
+        class C2(object):
             def __call__(self): pass
-        y = D()
-        self.assertTrue(hasattr(y, '__call__'))
-        y()
+        c2 = C2()
+        self.assertTrue(callable(c2))
+        c2.__call__ = None
+        self.assertTrue(callable(c2))
+        class C3(C2): pass
+        c3 = C3()
+        self.assertTrue(callable(c3))
 
     def test_chr(self):
         self.assertEqual(chr(32), ' ')
@@ -520,11 +559,11 @@ class BuiltinTest(unittest.TestCase):
         class X:
             def __hash__(self):
                 return 2**100
-        self.assertEquals(type(hash(X())), int)
+        self.assertEqual(type(hash(X())), int)
         class Z(int):
             def __hash__(self):
                 return self
-        self.assertEquals(hash(Z(42)), hash(42))
+        self.assertEqual(hash(Z(42)), hash(42))
 
     def test_hex(self):
         self.assertEqual(hex(16), '0x10')
@@ -755,7 +794,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
         class Iter(object):
             def __iter__(self):
@@ -764,7 +803,7 @@ class BuiltinTest(unittest.TestCase):
                 raise StopIteration
 
         it = iter(Iter())
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
         self.assertRaises(StopIteration, next, it)
 
         def gen():
@@ -772,9 +811,9 @@ class BuiltinTest(unittest.TestCase):
             return
 
         it = gen()
-        self.assertEquals(next(it), 1)
+        self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
     def test_oct(self):
         self.assertEqual(oct(100), '0o144')
@@ -883,128 +922,6 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, pow, 1, 2, 0)
 
         self.assertRaises(TypeError, pow)
-
-    def test_range(self):
-        self.assertEqual(list(range(3)), [0, 1, 2])
-        self.assertEqual(list(range(1, 5)), [1, 2, 3, 4])
-        self.assertEqual(list(range(0)), [])
-        self.assertEqual(list(range(-3)), [])
-        self.assertEqual(list(range(1, 10, 3)), [1, 4, 7])
-        #self.assertEqual(list(range(5, -5, -3)), [5, 2, -1, -4])
-
-        #issue 6334: the internal stored range length was being
-        #computed incorrectly in some cases involving large arguments.
-        x = range(10**20, 10**20+10, 3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
-
-        x = range(10**20+10, 10**20, 3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
-
-        x = range(10**20, 10**20+10, -3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
-
-        x = range(10**20+10, 10**20, -3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
-
-        # Now test range() with longs
-        self.assertEqual(list(range(-2**100)), [])
-        self.assertEqual(list(range(0, -2**100)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
-
-        a = int(10 * sys.maxsize)
-        b = int(100 * sys.maxsize)
-        c = int(50 * sys.maxsize)
-
-        self.assertEqual(list(range(a, a+2)), [a, a+1])
-        self.assertEqual(list(range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(range(a+4, a, -2)), [a+4, a+2])
-
-        seq = list(range(a, b, c))
-        self.assertIn(a, seq)
-        self.assertNotIn(b, seq)
-        self.assertEqual(len(seq), 2)
-
-        seq = list(range(b, a, -c))
-        self.assertIn(b, seq)
-        self.assertNotIn(a, seq)
-        self.assertEqual(len(seq), 2)
-
-        seq = list(range(-a, -b, -c))
-        self.assertIn(-a, seq)
-        self.assertNotIn(-b, seq)
-        self.assertEqual(len(seq), 2)
-
-        self.assertRaises(TypeError, range)
-        self.assertRaises(TypeError, range, 1, 2, 3, 4)
-        self.assertRaises(ValueError, range, 1, 2, 0)
-        self.assertRaises(ValueError, range, a, a + 1, int(0))
-
-        """ XXX(nnorwitz):
-        class badzero(int):
-            def __eq__(self, other):
-                raise RuntimeError
-            __ne__ = __lt__ = __gt__ = __le__ = __ge__ = __eq__
-
-        # XXX This won't (but should!) raise RuntimeError if a is an int...
-        self.assertRaises(RuntimeError, range, a, a + 1, badzero(1))
-        """
-
-        # Reject floats.
-        self.assertRaises(TypeError, range, 1., 1., 1.)
-        self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
-
-        self.assertRaises(TypeError, range, 0, "spam")
-        self.assertRaises(TypeError, range, 0, 42, "spam")
-
-        #NEAL self.assertRaises(OverflowError, range, -sys.maxsize, sys.maxsize)
-        #NEAL self.assertRaises(OverflowError, range, 0, 2*sys.maxsize)
-
-        self.assertRaises(OverflowError, len, range(0, sys.maxsize**10))
-
-        bignum = 2*sys.maxsize
-        smallnum = 42
-
-        # User-defined class with an __index__ method
-        class I:
-            def __init__(self, n):
-                self.n = int(n)
-            def __index__(self):
-                return self.n
-        self.assertEqual(list(range(I(bignum), I(bignum + 1))), [bignum])
-        self.assertEqual(list(range(I(smallnum), I(smallnum + 1))), [smallnum])
-
-        # User-defined class with a failing __index__ method
-        class IX:
-            def __index__(self):
-                raise RuntimeError
-        self.assertRaises(RuntimeError, range, IX())
-
-        # User-defined class with an invalid __index__ method
-        class IN:
-            def __index__(self):
-                return "not a number"
-
-        self.assertRaises(TypeError, range, IN())
-        # Exercise various combinations of bad arguments, to check
-        # refcounting logic
-        self.assertRaises(TypeError, range, 0.0)
-
-        self.assertRaises(TypeError, range, 0, 0.0)
-        self.assertRaises(TypeError, range, 0.0, 0)
-        self.assertRaises(TypeError, range, 0.0, 0.0)
-
-        self.assertRaises(TypeError, range, 0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0, 0.0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1.0)
 
     def test_input(self):
         self.write_testfile()
@@ -1256,6 +1173,116 @@ class BuiltinTest(unittest.TestCase):
                 else:
                     return i
         self.assertRaises(ValueError, list, zip(BadSeq(), BadSeq()))
+
+    def test_format(self):
+        # Test the basic machinery of the format() builtin.  Don't test
+        #  the specifics of the various formatters
+        self.assertEqual(format(3, ''), '3')
+
+        # Returns some classes to use for various tests.  There's
+        #  an old-style version, and a new-style version
+        def classes_new():
+            class A(object):
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromA(A):
+                pass
+
+            class Simple(object): pass
+            class DerivedFromSimple(Simple):
+                def __init__(self, x):
+                    self.x = x
+                def __format__(self, format_spec):
+                    return str(self.x) + format_spec
+            class DerivedFromSimple2(DerivedFromSimple): pass
+            return A, DerivedFromA, DerivedFromSimple, DerivedFromSimple2
+
+        def class_test(A, DerivedFromA, DerivedFromSimple, DerivedFromSimple2):
+            self.assertEqual(format(A(3), 'spec'), '3spec')
+            self.assertEqual(format(DerivedFromA(4), 'spec'), '4spec')
+            self.assertEqual(format(DerivedFromSimple(5), 'abc'), '5abc')
+            self.assertEqual(format(DerivedFromSimple2(10), 'abcdef'),
+                             '10abcdef')
+
+        class_test(*classes_new())
+
+        def empty_format_spec(value):
+            # test that:
+            #  format(x, '') == str(x)
+            #  format(x) == str(x)
+            self.assertEqual(format(value, ""), str(value))
+            self.assertEqual(format(value), str(value))
+
+        # for builtin types, format(x, "") == str(x)
+        empty_format_spec(17**13)
+        empty_format_spec(1.0)
+        empty_format_spec(3.1415e104)
+        empty_format_spec(-3.1415e104)
+        empty_format_spec(3.1415e-104)
+        empty_format_spec(-3.1415e-104)
+        empty_format_spec(object)
+        empty_format_spec(None)
+
+        # TypeError because self.__format__ returns the wrong type
+        class BadFormatResult:
+            def __format__(self, format_spec):
+                return 1.0
+        self.assertRaises(TypeError, format, BadFormatResult(), "")
+
+        # TypeError because format_spec is not unicode or str
+        self.assertRaises(TypeError, format, object(), 4)
+        self.assertRaises(TypeError, format, object(), object())
+
+        # tests for object.__format__ really belong elsewhere, but
+        #  there's no good place to put them
+        x = object().__format__('')
+        self.assertTrue(x.startswith('<object object at'))
+
+        # first argument to object.__format__ must be string
+        self.assertRaises(TypeError, object().__format__, 3)
+        self.assertRaises(TypeError, object().__format__, object())
+        self.assertRaises(TypeError, object().__format__, None)
+
+        # --------------------------------------------------------------------
+        # Issue #7994: object.__format__ with a non-empty format string is
+        #  pending deprecated
+        def test_deprecated_format_string(obj, fmt_str, should_raise_warning):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always", PendingDeprecationWarning)
+                format(obj, fmt_str)
+            if should_raise_warning:
+                self.assertEqual(len(w), 1)
+                self.assertIsInstance(w[0].message, PendingDeprecationWarning)
+                self.assertIn('object.__format__ with a non-empty format '
+                              'string', str(w[0].message))
+            else:
+                self.assertEqual(len(w), 0)
+
+        fmt_strs = ['', 's']
+
+        class A:
+            def __format__(self, fmt_str):
+                return format('', fmt_str)
+
+        for fmt_str in fmt_strs:
+            test_deprecated_format_string(A(), fmt_str, False)
+
+        class B:
+            pass
+
+        class C(object):
+            pass
+
+        for cls in [object, B, C]:
+            for fmt_str in fmt_strs:
+                test_deprecated_format_string(cls(), fmt_str, len(fmt_str) != 0)
+        # --------------------------------------------------------------------
+
+        # make sure we can take a subclass of str as a format spec
+        class DerivedFromStr(str): pass
+        self.assertEqual(format(0, DerivedFromStr('10')), '         0')
 
     def test_bin(self):
         self.assertEqual(bin(0), '0b0')

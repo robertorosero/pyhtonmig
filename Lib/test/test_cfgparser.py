@@ -4,6 +4,7 @@ import io
 import os
 import unittest
 import textwrap
+import warnings
 
 from test import support
 
@@ -31,6 +32,8 @@ class CfgParserTestCaseClass(unittest.TestCase):
     empty_lines_in_values = True
     dict_type = configparser._default_dict
     strict = False
+    default_section = configparser.DEFAULTSECT
+    interpolation = configparser._UNSET
 
     def newconfig(self, defaults=None):
         arguments = dict(
@@ -41,8 +44,13 @@ class CfgParserTestCaseClass(unittest.TestCase):
             empty_lines_in_values=self.empty_lines_in_values,
             dict_type=self.dict_type,
             strict=self.strict,
+            default_section=self.default_section,
+            interpolation=self.interpolation,
         )
-        return self.config_class(**arguments)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=DeprecationWarning)
+            instance = self.config_class(**arguments)
+        return instance
 
     def fromstring(self, string, defaults=None):
         cf = self.newconfig(defaults)
@@ -52,8 +60,6 @@ class CfgParserTestCaseClass(unittest.TestCase):
 class BasicTestCase(CfgParserTestCaseClass):
 
     def basic_test(self, cf):
-        L = cf.sections()
-        L.sort()
         E = ['Commented Bar',
              'Foo Bar',
              'Internationalized Stuff',
@@ -62,32 +68,101 @@ class BasicTestCase(CfgParserTestCaseClass):
              'Spaces',
              'Spacey Bar',
              'Spacey Bar From The Beginning',
+             'Types',
              ]
+
         if self.allow_no_value:
-            E.append(r'NoValue')
+            E.append('NoValue')
         E.sort()
+
+        # API access
+        L = cf.sections()
+        L.sort()
         eq = self.assertEqual
+        eq(L, E)
+
+        # mapping access
+        L = [section for section in cf]
+        L.sort()
+        E.append(self.default_section)
+        E.sort()
         eq(L, E)
 
         # The use of spaces in the section names serves as a
         # regression test for SourceForge bug #583248:
         # http://www.python.org/sf/583248
-        eq(cf.get('Foo Bar', 'foo'), 'bar')
-        eq(cf.get('Spacey Bar', 'foo'), 'bar')
-        eq(cf.get('Spacey Bar From The Beginning', 'foo'), 'bar')
+
+        # API access
+        eq(cf.get('Foo Bar', 'foo'), 'bar1')
+        eq(cf.get('Spacey Bar', 'foo'), 'bar2')
+        eq(cf.get('Spacey Bar From The Beginning', 'foo'), 'bar3')
         eq(cf.get('Spacey Bar From The Beginning', 'baz'), 'qwe')
-        eq(cf.get('Commented Bar', 'foo'), 'bar')
+        eq(cf.get('Commented Bar', 'foo'), 'bar4')
         eq(cf.get('Commented Bar', 'baz'), 'qwe')
         eq(cf.get('Spaces', 'key with spaces'), 'value')
         eq(cf.get('Spaces', 'another with spaces'), 'splat!')
+        eq(cf.getint('Types', 'int'), 42)
+        eq(cf.get('Types', 'int'), "42")
+        self.assertAlmostEqual(cf.getfloat('Types', 'float'), 0.44)
+        eq(cf.get('Types', 'float'), "0.44")
+        eq(cf.getboolean('Types', 'boolean'), False)
         if self.allow_no_value:
             eq(cf.get('NoValue', 'option-without-value'), None)
 
-        self.assertNotIn('__name__', cf.options("Foo Bar"),
-                         '__name__ "option" should not be exposed by the API!')
+        # test vars= and fallback=
+        eq(cf.get('Foo Bar', 'foo', fallback='baz'), 'bar1')
+        eq(cf.get('Foo Bar', 'foo', vars={'foo': 'baz'}), 'baz')
+        with self.assertRaises(configparser.NoSectionError):
+            cf.get('No Such Foo Bar', 'foo')
+        with self.assertRaises(configparser.NoOptionError):
+            cf.get('Foo Bar', 'no-such-foo')
+        eq(cf.get('No Such Foo Bar', 'foo', fallback='baz'), 'baz')
+        eq(cf.get('Foo Bar', 'no-such-foo', fallback='baz'), 'baz')
+        eq(cf.get('Spacey Bar', 'foo', fallback=None), 'bar2')
+        eq(cf.get('No Such Spacey Bar', 'foo', fallback=None), None)
+        eq(cf.getint('Types', 'int', fallback=18), 42)
+        eq(cf.getint('Types', 'no-such-int', fallback=18), 18)
+        eq(cf.getint('Types', 'no-such-int', fallback="18"), "18") # sic!
+        self.assertAlmostEqual(cf.getfloat('Types', 'float',
+                                           fallback=0.0), 0.44)
+        self.assertAlmostEqual(cf.getfloat('Types', 'no-such-float',
+                                           fallback=0.0), 0.0)
+        eq(cf.getfloat('Types', 'no-such-float', fallback="0.0"), "0.0") # sic!
+        eq(cf.getboolean('Types', 'boolean', fallback=True), False)
+        eq(cf.getboolean('Types', 'no-such-boolean', fallback="yes"),
+           "yes") # sic!
+        eq(cf.getboolean('Types', 'no-such-boolean', fallback=True), True)
+        eq(cf.getboolean('No Such Types', 'boolean', fallback=True), True)
+        if self.allow_no_value:
+            eq(cf.get('NoValue', 'option-without-value', fallback=False), None)
+            eq(cf.get('NoValue', 'no-such-option-without-value',
+                      fallback=False), False)
+
+        # mapping access
+        eq(cf['Foo Bar']['foo'], 'bar1')
+        eq(cf['Spacey Bar']['foo'], 'bar2')
+        section = cf['Spacey Bar From The Beginning']
+        eq(section.name, 'Spacey Bar From The Beginning')
+        self.assertIs(section.parser, cf)
+        with self.assertRaises(AttributeError):
+            section.name = 'Name is read-only'
+        with self.assertRaises(AttributeError):
+            section.parser = 'Parser is read-only'
+        eq(section['foo'], 'bar3')
+        eq(section['baz'], 'qwe')
+        eq(cf['Commented Bar']['foo'], 'bar4')
+        eq(cf['Commented Bar']['baz'], 'qwe')
+        eq(cf['Spaces']['key with spaces'], 'value')
+        eq(cf['Spaces']['another with spaces'], 'splat!')
+        eq(cf['Long Line']['foo'],
+           'this line is much, much longer than my editor\nlikes it.')
+        if self.allow_no_value:
+            eq(cf['NoValue']['option-without-value'], None)
 
         # Make sure the right things happen for remove_option();
         # added to include check for SourceForge bug #123324:
+
+        # API acceess
         self.assertTrue(cf.remove_option('Foo Bar', 'foo'),
                         "remove_option() failed to report existence of option")
         self.assertFalse(cf.has_option('Foo Bar', 'foo'),
@@ -103,17 +178,25 @@ class BasicTestCase(CfgParserTestCaseClass):
         eq(cf.get('Long Line', 'foo'),
            'this line is much, much longer than my editor\nlikes it.')
 
+        # mapping access
+        del cf['Spacey Bar']['foo']
+        self.assertFalse('foo' in cf['Spacey Bar'])
+        with self.assertRaises(KeyError):
+            del cf['Spacey Bar']['foo']
+        with self.assertRaises(KeyError):
+            del cf['No Such Section']['foo']
+
     def test_basic(self):
         config_string = """\
 [Foo Bar]
-foo{0[0]}bar
+foo{0[0]}bar1
 [Spacey Bar]
-foo {0[0]} bar
+foo {0[0]} bar2
 [Spacey Bar From The Beginning]
-  foo {0[0]} bar
+  foo {0[0]} bar3
   baz {0[0]} qwe
 [Commented Bar]
-foo{0[1]} bar {1[1]} comment
+foo{0[1]} bar4 {1[1]} comment
 baz{0[0]}qwe {1[0]}another one
 [Long Line]
 foo{0[1]} this line is much, much longer than my editor
@@ -127,6 +210,10 @@ foo[de]{0[0]}Deutsch
 [Spaces]
 key with spaces {0[1]} value
 another with spaces {0[0]} splat!
+[Types]
+int {0[1]} 42
+float {0[0]} 0.44
+boolean {0[0]} NO
 """.format(self.delimiters, self.comment_prefixes)
         if self.allow_no_value:
             config_string += (
@@ -166,17 +253,17 @@ another with spaces {0[0]} splat!
     def test_basic_from_dict(self):
         config = {
             "Foo Bar": {
-                "foo": "bar",
+                "foo": "bar1",
             },
             "Spacey Bar": {
-                "foo": "bar",
+                "foo": "bar2",
             },
             "Spacey Bar From The Beginning": {
-                "foo": "bar",
+                "foo": "bar3",
                 "baz": "qwe",
             },
             "Commented Bar": {
-                "foo": "bar",
+                "foo": "bar4",
                 "baz": "qwe",
             },
             "Long Line": {
@@ -194,7 +281,12 @@ another with spaces {0[0]} splat!
             "Spaces": {
                 "key with spaces": "value",
                 "another with spaces": "splat!",
-            }
+            },
+            "Types": {
+                "int": 42,
+                "float": 0.44,
+                "boolean": False,
+            },
         }
         if self.allow_no_value:
             config.update({
@@ -226,14 +318,18 @@ another with spaces {0[0]} splat!
         cf = self.newconfig()
         cf.add_section("A")
         cf.add_section("a")
+        cf.add_section("B")
         L = cf.sections()
         L.sort()
         eq = self.assertEqual
-        eq(L, ["A", "a"])
+        eq(L, ["A", "B", "a"])
         cf.set("a", "B", "value")
         eq(cf.options("a"), ["b"])
         eq(cf.get("a", "b"), "value",
            "could not locate option, expecting case-insensitive option names")
+        with self.assertRaises(configparser.NoSectionError):
+            # section names are case-sensitive
+            cf.set("b", "A", "value")
         self.assertTrue(cf.has_option("a", "b"))
         cf.set("A", "A-B", "A-B value")
         for opt in ("a-b", "A-b", "a-B", "A-B"):
@@ -247,7 +343,7 @@ another with spaces {0[0]} splat!
 
         # SF bug #432369:
         cf = self.fromstring(
-            "[MySection]\nOption{} first line\n\tsecond line\n".format(
+            "[MySection]\nOption{} first line   \n\tsecond line   \n".format(
                 self.delimiters[0]))
         eq(cf.options("MySection"), ["option"])
         eq(cf.get("MySection", "Option"), "first line\nsecond line")
@@ -259,14 +355,54 @@ another with spaces {0[0]} splat!
         self.assertTrue(cf.has_option("section", "Key"))
 
 
+    def test_case_sensitivity_mapping_access(self):
+        cf = self.newconfig()
+        cf["A"] = {}
+        cf["a"] = {"B": "value"}
+        cf["B"] = {}
+        L = [section for section in cf]
+        L.sort()
+        eq = self.assertEqual
+        elem_eq = self.assertCountEqual
+        eq(L, sorted(["A", "B", self.default_section, "a"]))
+        eq(cf["a"].keys(), {"b"})
+        eq(cf["a"]["b"], "value",
+           "could not locate option, expecting case-insensitive option names")
+        with self.assertRaises(KeyError):
+            # section names are case-sensitive
+            cf["b"]["A"] = "value"
+        self.assertTrue("b" in cf["a"])
+        cf["A"]["A-B"] = "A-B value"
+        for opt in ("a-b", "A-b", "a-B", "A-B"):
+            self.assertTrue(
+                opt in cf["A"],
+                "has_option() returned false for option which should exist")
+        eq(cf["A"].keys(), {"a-b"})
+        eq(cf["a"].keys(), {"b"})
+        del cf["a"]["B"]
+        elem_eq(cf["a"].keys(), {})
+
+        # SF bug #432369:
+        cf = self.fromstring(
+            "[MySection]\nOption{} first line   \n\tsecond line   \n".format(
+                self.delimiters[0]))
+        eq(cf["MySection"].keys(), {"option"})
+        eq(cf["MySection"]["Option"], "first line\nsecond line")
+
+        # SF bug #561822:
+        cf = self.fromstring("[section]\n"
+                             "nekey{}nevalue\n".format(self.delimiters[0]),
+                             defaults={"key":"value"})
+        self.assertTrue("Key" in cf["section"])
+
     def test_default_case_sensitivity(self):
         cf = self.newconfig({"foo": "Bar"})
         self.assertEqual(
-            cf.get("DEFAULT", "Foo"), "Bar",
+            cf.get(self.default_section, "Foo"), "Bar",
             "could not locate option, expecting case-insensitive option names")
         cf = self.newconfig({"Foo": "Bar"})
         self.assertEqual(
-            cf.get("DEFAULT", "Foo"), "Bar",
+            cf.get(self.default_section, "Foo"), "Bar",
             "could not locate option, expecting case-insensitive defaults")
 
     def test_parse_errors(self):
@@ -284,9 +420,24 @@ another with spaces {0[0]} splat!
             e = self.parse_error(cf, configparser.ParsingError,
                                 "[Foo]\n  wrong-indent\n")
             self.assertEqual(e.args, ('<???>',))
+            # read_file on a real file
+            tricky = support.findfile("cfgparser.3")
+            if self.delimiters[0] == '=':
+                error = configparser.ParsingError
+                expected = (tricky,)
+            else:
+                error = configparser.MissingSectionHeaderError
+                expected = (tricky, 1,
+                            '  # INI with as many tricky parts as possible\n')
+            with open(tricky, encoding='utf-8') as f:
+                e = self.parse_error(cf, error, f)
+            self.assertEqual(e.args, expected)
 
     def parse_error(self, cf, exc, src):
-        sio = io.StringIO(src)
+        if hasattr(src, 'readline'):
+            sio = src
+        else:
+            sio = io.StringIO(src)
         with self.assertRaises(exc) as cm:
             cf.read_file(sio)
         return cm.exception
@@ -378,7 +529,7 @@ another with spaces {0[0]} splat!
             "[Long Line]\n"
             "foo{0[0]} this line is much, much longer than my editor\n"
             "   likes it.\n"
-            "[DEFAULT]\n"
+            "[{default_section}]\n"
             "foo{0[1]} another very\n"
             " long line\n"
             "[Long Line - With Comments!]\n"
@@ -386,7 +537,8 @@ another with spaces {0[0]} splat!
             "            also      {comment} place\n"
             "            comments  {comment} in\n"
             "            multiline {comment} values"
-            "\n".format(self.delimiters, comment=self.comment_prefixes[0])
+            "\n".format(self.delimiters, comment=self.comment_prefixes[0],
+                        default_section=self.default_section)
             )
         if self.allow_no_value:
             config_string += (
@@ -398,7 +550,7 @@ another with spaces {0[0]} splat!
         output = io.StringIO()
         cf.write(output)
         expect_string = (
-            "[DEFAULT]\n"
+            "[{default_section}]\n"
             "foo {equals} another very\n"
             "\tlong line\n"
             "\n"
@@ -411,7 +563,8 @@ another with spaces {0[0]} splat!
             "\talso\n"
             "\tcomments\n"
             "\tmultiline\n"
-            "\n".format(equals=self.delimiters[0])
+            "\n".format(equals=self.delimiters[0],
+                        default_section=self.default_section)
             )
         if self.allow_no_value:
             expect_string += (
@@ -484,17 +637,15 @@ another with spaces {0[0]} splat!
             "bar{equals}%(foo)s\n"
             "\n"
             "[Interpolation Error]\n"
-            "name{equals}%(reference)s\n".format(equals=self.delimiters[0]),
             # no definition for 'reference'
-            defaults={"getname": "%(__name__)s"})
+            "name{equals}%(reference)s\n".format(equals=self.delimiters[0]))
 
     def check_items_config(self, expected):
         cf = self.fromstring(
             "[section]\n"
             "name {0[0]} value\n"
             "key{0[1]} |%(name)s| \n"
-            "getdefault{0[1]} |%(default)s|\n"
-            "getname{0[1]} |%(__name__)s|".format(self.delimiters),
+            "getdefault{0[1]} |%(default)s|\n".format(self.delimiters),
             defaults={"default": "<default>"})
         L = list(cf.items("section"))
         L.sort()
@@ -517,7 +668,6 @@ class ConfigParserTestCase(BasicTestCase):
         }
         cf = self.get_interpolation_config()
         eq = self.assertEqual
-        eq(cf.get("Foo", "getname"), "Foo")
         eq(cf.get("Foo", "bar"), "something with interpolation (1 step)")
         eq(cf.get("Foo", "bar9"),
            "something with lots of interpolation (9 steps)")
@@ -543,7 +693,6 @@ class ConfigParserTestCase(BasicTestCase):
     def test_items(self):
         self.check_items_config([('default', '<default>'),
                                  ('getdefault', '|<default>|'),
-                                 ('getname', '|section|'),
                                  ('key', '|value|'),
                                  ('name', 'value')])
 
@@ -571,6 +720,9 @@ class ConfigParserTestCase(BasicTestCase):
 class ConfigParserTestCaseNonStandardDelimiters(ConfigParserTestCase):
     delimiters = (':=', '$')
     comment_prefixes = ('//', '"')
+
+class ConfigParserTestCaseNonStandardDefaultSection(ConfigParserTestCase):
+    default_section = 'general'
 
 class MultilineValuesTestCase(BasicTestCase):
     config_class = configparser.ConfigParser
@@ -606,7 +758,6 @@ class RawConfigParserTestCase(BasicTestCase):
     def test_interpolation(self):
         cf = self.get_interpolation_config()
         eq = self.assertEqual
-        eq(cf.get("Foo", "getname"), "%(__name__)s")
         eq(cf.get("Foo", "bar"),
            "something %(with1)s interpolation (1 step)")
         eq(cf.get("Foo", "bar9"),
@@ -619,7 +770,6 @@ class RawConfigParserTestCase(BasicTestCase):
     def test_items(self):
         self.check_items_config([('default', '<default>'),
                                  ('getdefault', '|%(default)s|'),
-                                 ('getname', '|%(__name__)s|'),
                                  ('key', '|%(name)s|'),
                                  ('name', 'value')])
 
@@ -699,13 +849,73 @@ class SafeConfigParserTestCase(ConfigParserTestCase):
         self.assertRaises(TypeError, cf.set, "sect", "option2", 1.0)
         self.assertRaises(TypeError, cf.set, "sect", "option2", object())
 
-    def test_add_section_default_1(self):
+    def test_add_section_default(self):
         cf = self.newconfig()
-        self.assertRaises(ValueError, cf.add_section, "default")
+        self.assertRaises(ValueError, cf.add_section, self.default_section)
 
-    def test_add_section_default_2(self):
-        cf = self.newconfig()
-        self.assertRaises(ValueError, cf.add_section, "DEFAULT")
+class SafeConfigParserTestCaseExtendedInterpolation(BasicTestCase):
+    config_class = configparser.SafeConfigParser
+    interpolation = configparser.ExtendedInterpolation()
+    default_section = 'common'
+
+    def test_extended_interpolation(self):
+        cf = self.fromstring(textwrap.dedent("""
+            [common]
+            favourite Beatle = Paul
+            favourite color = green
+
+            [tom]
+            favourite band = ${favourite color} day
+            favourite pope = John ${favourite Beatle} II
+            sequel = ${favourite pope}I
+
+            [ambv]
+            favourite Beatle = George
+            son of Edward VII = ${favourite Beatle} V
+            son of George V = ${son of Edward VII}I
+
+            [stanley]
+            favourite Beatle = ${ambv:favourite Beatle}
+            favourite pope = ${tom:favourite pope}
+            favourite color = black
+            favourite state of mind = paranoid
+            favourite movie = soylent ${common:favourite color}
+            favourite song = ${favourite color} sabbath - ${favourite state of mind}
+        """).strip())
+
+        eq = self.assertEqual
+        eq(cf['common']['favourite Beatle'], 'Paul')
+        eq(cf['common']['favourite color'], 'green')
+        eq(cf['tom']['favourite Beatle'], 'Paul')
+        eq(cf['tom']['favourite color'], 'green')
+        eq(cf['tom']['favourite band'], 'green day')
+        eq(cf['tom']['favourite pope'], 'John Paul II')
+        eq(cf['tom']['sequel'], 'John Paul III')
+        eq(cf['ambv']['favourite Beatle'], 'George')
+        eq(cf['ambv']['favourite color'], 'green')
+        eq(cf['ambv']['son of Edward VII'], 'George V')
+        eq(cf['ambv']['son of George V'], 'George VI')
+        eq(cf['stanley']['favourite Beatle'], 'George')
+        eq(cf['stanley']['favourite color'], 'black')
+        eq(cf['stanley']['favourite state of mind'], 'paranoid')
+        eq(cf['stanley']['favourite movie'], 'soylent green')
+        eq(cf['stanley']['favourite pope'], 'John Paul II')
+        eq(cf['stanley']['favourite song'],
+           'black sabbath - paranoid')
+
+    def test_endless_loop(self):
+        cf = self.fromstring(textwrap.dedent("""
+            [one for you]
+            ping = ${one for me:pong}
+
+            [one for me]
+            pong = ${one for you:ping}
+        """).strip())
+
+        with self.assertRaises(configparser.InterpolationDepthError):
+            cf['one for you']['ping']
+
+
 
 class SafeConfigParserTestCaseNonStandardDelimiters(SafeConfigParserTestCase):
     delimiters = (':=', '$')
@@ -732,14 +942,17 @@ class SafeConfigParserTestCaseTrickyFile(CfgParserTestCaseClass):
                                          'no values here',
                                          'tricky interpolation',
                                          'more interpolation'])
-        #self.assertEqual(cf.getint('DEFAULT', 'go', vars={'interpolate': '-1'}),
-        #                 -1)
+        self.assertEqual(cf.getint(self.default_section, 'go',
+                                   vars={'interpolate': '-1'}), -1)
+        with self.assertRaises(ValueError):
+            # no interpolation will happen
+            cf.getint(self.default_section, 'go', raw=True,
+                      vars={'interpolate': '-1'})
         self.assertEqual(len(cf.get('strange', 'other').split('\n')), 4)
         self.assertEqual(len(cf.get('corruption', 'value').split('\n')), 10)
         longname = 'yeah, sections can be indented as well'
         self.assertFalse(cf.getboolean(longname, 'are they subsections'))
-        self.assertEquals(cf.get(longname, 'lets use some Unicode'),
-                                           '片仮名')
+        self.assertEqual(cf.get(longname, 'lets use some Unicode'), '片仮名')
         self.assertEqual(len(cf.items('another one!')), 5) # 4 in section and
                                                            # `go` from DEFAULT
         with self.assertRaises(configparser.InterpolationMissingOptionError):
@@ -755,6 +968,36 @@ class SafeConfigParserTestCaseTrickyFile(CfgParserTestCaseClass):
         with self.assertRaises(UnicodeDecodeError):
             cf.read(tricky, encoding='ascii')
 
+
+class Issue7005TestCase(unittest.TestCase):
+    """Test output when None is set() as a value and allow_no_value == False.
+
+    http://bugs.python.org/issue7005
+
+    """
+
+    expected_output = "[section]\noption = None\n\n"
+
+    def prepare(self, config_class):
+        # This is the default, but that's the point.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=DeprecationWarning)
+            cp = config_class(allow_no_value=False)
+        cp.add_section("section")
+        cp.set("section", "option", None)
+        sio = io.StringIO()
+        cp.write(sio)
+        return sio.getvalue()
+
+    def test_none_as_value_stringified(self):
+        output = self.prepare(configparser.ConfigParser)
+        self.assertEqual(output, self.expected_output)
+
+    def test_none_as_value_stringified_raw(self):
+        output = self.prepare(configparser.RawConfigParser)
+        self.assertEqual(output, self.expected_output)
+
+
 class SortedTestCase(RawConfigParserTestCase):
     dict_type = SortedDict
 
@@ -768,19 +1011,19 @@ class SortedTestCase(RawConfigParserTestCase):
                              "k=v\n")
         output = io.StringIO()
         cf.write(output)
-        self.assertEquals(output.getvalue(),
-                          "[a]\n"
-                          "k = v\n\n"
-                          "[b]\n"
-                          "o1 = 4\n"
-                          "o2 = 3\n"
-                          "o3 = 2\n"
-                          "o4 = 1\n\n")
+        self.assertEqual(output.getvalue(),
+                         "[a]\n"
+                         "k = v\n\n"
+                         "[b]\n"
+                         "o1 = 4\n"
+                         "o2 = 3\n"
+                         "o3 = 2\n"
+                         "o4 = 1\n\n")
 
 
 class CompatibleTestCase(CfgParserTestCaseClass):
     config_class = configparser.RawConfigParser
-    comment_prefixes = configparser.RawConfigParser._COMPATIBLE
+    comment_prefixes = configparser._COMPATIBLE
 
     def test_comment_handling(self):
         config_string = textwrap.dedent("""\
@@ -807,12 +1050,15 @@ def test_main():
         RawConfigParserTestCaseNonStandardDelimiters,
         RawConfigParserTestSambaConf,
         SafeConfigParserTestCase,
+        SafeConfigParserTestCaseExtendedInterpolation,
         SafeConfigParserTestCaseNonStandardDelimiters,
         SafeConfigParserTestCaseNoValue,
         SafeConfigParserTestCaseTrickyFile,
         SortedTestCase,
+        Issue7005TestCase,
         StrictTestCase,
         CompatibleTestCase,
+        ConfigParserTestCaseNonStandardDefaultSection,
         )
 
 

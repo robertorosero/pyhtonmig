@@ -66,7 +66,6 @@ PyAPI_FUNC(PyObject *) PyMemoryView_FromBuffer(Py_buffer *info);
 #ifndef Py_LIMITED_API
 typedef struct {
     PyObject_HEAD
-    PyObject *base;
     Py_buffer view;
 } PyMemoryViewObject;
 #endif

@@ -658,6 +658,7 @@ typedef struct
     char writetranslate;
     char seekable;
     char telling;
+    char deallocating;
     /* Specialized encoding func (see below) */
     encodefunc_t encodefunc;
     /* Whether or not it's the start of the stream */
@@ -1094,6 +1095,7 @@ _textiowrapper_clear(textio *self)
 static void
 textiowrapper_dealloc(textio *self)
 {
+    self->deallocating = 1;
     if (_textiowrapper_clear(self) < 0)
         return;
     _PyObject_GC_UNTRACK(self);
@@ -1259,10 +1261,8 @@ textiowrapper_write(textio *self, PyObject *args)
 
     CHECK_CLOSED(self);
 
-    if (self->encoder == NULL) {
-        PyErr_SetString(PyExc_IOError, "not writable");
-        return NULL;
-    }
+    if (self->encoder == NULL)
+        return _unsupported("not writable");
 
     Py_INCREF(text);
 
@@ -1399,7 +1399,7 @@ textiowrapper_read_chunk(textio *self)
      */
 
     if (self->decoder == NULL) {
-        PyErr_SetString(PyExc_IOError, "not readable");
+        _unsupported("not readable");
         return -1;
     }
 
@@ -1489,10 +1489,8 @@ textiowrapper_read(textio *self, PyObject *args)
 
     CHECK_CLOSED(self);
 
-    if (self->decoder == NULL) {
-        PyErr_SetString(PyExc_IOError, "not readable");
-        return NULL;
-    }
+    if (self->decoder == NULL)
+        return _unsupported("not readable");
 
     if (_textiowrapper_writeflush(self) < 0)
         return NULL;
@@ -1983,8 +1981,7 @@ textiowrapper_seek(textio *self, PyObject *args)
     Py_INCREF(cookieObj);
 
     if (!self->seekable) {
-        PyErr_SetString(PyExc_IOError,
-                        "underlying stream is not seekable");
+        _unsupported("underlying stream is not seekable");
         goto fail;
     }
 
@@ -1995,8 +1992,7 @@ textiowrapper_seek(textio *self, PyObject *args)
             goto fail;
 
         if (cmp == 0) {
-            PyErr_SetString(PyExc_IOError,
-                            "can't do nonzero cur-relative seeks");
+            _unsupported("can't do nonzero cur-relative seeks");
             goto fail;
         }
 
@@ -2016,8 +2012,7 @@ textiowrapper_seek(textio *self, PyObject *args)
             goto fail;
 
         if (cmp == 0) {
-            PyErr_SetString(PyExc_IOError,
-                            "can't do nonzero end-relative seeks");
+            _unsupported("can't do nonzero end-relative seeks");
             goto fail;
         }
 
@@ -2151,8 +2146,7 @@ textiowrapper_tell(textio *self, PyObject *args)
     CHECK_CLOSED(self);
 
     if (!self->seekable) {
-        PyErr_SetString(PyExc_IOError,
-                        "underlying stream is not seekable");
+        _unsupported("underlying stream is not seekable");
         goto fail;
     }
     if (!self->telling) {
@@ -2389,6 +2383,14 @@ textiowrapper_isatty(textio *self, PyObject *args)
 }
 
 static PyObject *
+textiowrapper_getstate(textio *self, PyObject *args)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "cannot serialize '%s' object", Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
+static PyObject *
 textiowrapper_flush(textio *self, PyObject *args)
 {
     CHECK_INITIALIZED(self);
@@ -2418,6 +2420,13 @@ textiowrapper_close(textio *self, PyObject *args)
         Py_RETURN_NONE; /* stream already closed */
     }
     else {
+        if (self->deallocating) {
+            res = PyObject_CallMethod(self->buffer, "_dealloc_warn", "O", self);
+            if (res)
+                Py_DECREF(res);
+            else
+                PyErr_Clear();
+        }
         res = PyObject_CallMethod((PyObject *)self, "flush", NULL);
         if (res == NULL) {
             return NULL;
@@ -2545,6 +2554,7 @@ static PyMethodDef textiowrapper_methods[] = {
     {"readable", (PyCFunction)textiowrapper_readable, METH_NOARGS},
     {"writable", (PyCFunction)textiowrapper_writable, METH_NOARGS},
     {"isatty", (PyCFunction)textiowrapper_isatty, METH_NOARGS},
+    {"__getstate__", (PyCFunction)textiowrapper_getstate, METH_NOARGS},
 
     {"seek", (PyCFunction)textiowrapper_seek, METH_VARARGS},
     {"tell", (PyCFunction)textiowrapper_tell, METH_NOARGS},

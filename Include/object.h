@@ -193,7 +193,6 @@ typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
 
 #define PyBUF_READ  0x100
 #define PyBUF_WRITE 0x200
-#define PyBUF_SHADOW 0x400
 
 /* End buffer interface */
 
@@ -287,7 +286,7 @@ typedef PyObject *(*getattrofunc)(PyObject *, PyObject *);
 typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
 typedef int (*setattrofunc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*reprfunc)(PyObject *);
-typedef long (*hashfunc)(PyObject *);
+typedef Py_hash_t (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc) (PyObject *, PyObject *, int);
 typedef PyObject *(*getiterfunc) (PyObject *);
 typedef PyObject *(*iternextfunc) (PyObject *);
@@ -480,13 +479,21 @@ PyAPI_FUNC(PyObject *) _PyObject_NextNotImplemented(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_GenericGetAttr(PyObject *, PyObject *);
 PyAPI_FUNC(int) PyObject_GenericSetAttr(PyObject *,
                                               PyObject *, PyObject *);
-PyAPI_FUNC(long) PyObject_Hash(PyObject *);
-PyAPI_FUNC(long) PyObject_HashNotImplemented(PyObject *);
+PyAPI_FUNC(Py_hash_t) PyObject_Hash(PyObject *);
+PyAPI_FUNC(Py_hash_t) PyObject_HashNotImplemented(PyObject *);
 PyAPI_FUNC(int) PyObject_IsTrue(PyObject *);
 PyAPI_FUNC(int) PyObject_Not(PyObject *);
 PyAPI_FUNC(int) PyCallable_Check(PyObject *);
 
 PyAPI_FUNC(void) PyObject_ClearWeakRefs(PyObject *);
+
+/* Same as PyObject_Generic{Get,Set}Attr, but passing the attributes
+   dict as the last parameter. */
+PyAPI_FUNC(PyObject *)
+_PyObject_GenericGetAttrWithDict(PyObject *, PyObject *, PyObject *);
+PyAPI_FUNC(int)
+_PyObject_GenericSetAttrWithDict(PyObject *, PyObject *,
+                                 PyObject *, PyObject *);
 
 
 /* PyObject_Dir(obj) acts like Python builtins.dir(obj), returning a
@@ -503,8 +510,8 @@ PyAPI_FUNC(void) Py_ReprLeave(PyObject *);
 
 /* Helpers for hash functions */
 #ifndef Py_LIMITED_API
-PyAPI_FUNC(long) _Py_HashDouble(double);
-PyAPI_FUNC(long) _Py_HashPointer(void*);
+PyAPI_FUNC(Py_hash_t) _Py_HashDouble(double);
+PyAPI_FUNC(Py_hash_t) _Py_HashPointer(void*);
 #endif
 
 /* Helper for passing objects to printf and the like */

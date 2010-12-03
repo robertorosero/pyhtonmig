@@ -482,25 +482,36 @@ class GCTests(unittest.TestCase):
             x.x = x
             x.y = X('second')
             del x
-            if %d:
-                gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
+            gc.set_debug(%s)
         """
         def run_command(code):
-            p = subprocess.Popen([sys.executable, "-c", code],
+            p = subprocess.Popen([sys.executable, "-Wd", "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
             stdout, stderr = p.communicate()
+            p.stdout.close()
+            p.stderr.close()
             self.assertEqual(p.returncode, 0)
             self.assertEqual(stdout.strip(), b"")
             return strip_python_stderr(stderr)
 
-        stderr = run_command(code % 0)
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
-        self.assertNotIn(b"[<X 'first'>, <X 'second'>]", stderr)
+        stderr = run_command(code % "0")
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown; use", stderr)
+        self.assertNotIn(b"<X 'first'>", stderr)
         # With DEBUG_UNCOLLECTABLE, the garbage list gets printed
-        stderr = run_command(code % 1)
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
-        self.assertIn(b"[<X 'first'>, <X 'second'>]", stderr)
+        stderr = run_command(code % "gc.DEBUG_UNCOLLECTABLE")
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown", stderr)
+        self.assertTrue(
+            (b"[<X 'first'>, <X 'second'>]" in stderr) or
+            (b"[<X 'second'>, <X 'first'>]" in stderr), stderr)
+        # With DEBUG_SAVEALL, no additional message should get printed
+        # (because gc.garbage also contains normally reclaimable cyclic
+        # references, and its elements get printed at runtime anyway).
+        stderr = run_command(code % "gc.DEBUG_SAVEALL")
+        self.assertNotIn(b"uncollectable objects at shutdown", stderr)
+
 
 class GCTogglingTests(unittest.TestCase):
     def setUp(self):

@@ -30,7 +30,7 @@ functions should be applied to nil objects.
 #ifndef Py_LIMITED_API
 typedef struct {
     PyObject_VAR_HEAD
-    long ob_shash;
+    Py_hash_t ob_shash;
     char ob_sval[1];
 
     /* Invariants:

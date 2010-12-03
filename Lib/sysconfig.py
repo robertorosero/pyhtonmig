@@ -5,9 +5,19 @@ import sys
 import os
 from os.path import pardir, realpath
 
-__all__ = ['parse_config_h', 'get_config_h_filename', 'get_scheme_names',
-           'get_path_names', 'get_paths', 'get_path', 'get_config_vars',
-           'get_config_var', 'get_platform', 'get_python_version']
+__all__ = [
+    'get_config_h_filename',
+    'get_config_var',
+    'get_config_vars',
+    'get_makefile_filename',
+    'get_path',
+    'get_path_names',
+    'get_paths',
+    'get_platform',
+    'get_python_version',
+    'get_scheme_names',
+    'parse_config_h',
+    ]
 
 _INSTALL_SCHEMES = {
     'posix_prefix': {
@@ -15,8 +25,10 @@ _INSTALL_SCHEMES = {
         'platstdlib': '{platbase}/lib/python{py_version_short}',
         'purelib': '{base}/lib/python{py_version_short}/site-packages',
         'platlib': '{platbase}/lib/python{py_version_short}/site-packages',
-        'include': '{base}/include/python{py_version_short}',
-        'platinclude': '{platbase}/include/python{py_version_short}',
+        'include':
+            '{base}/include/python{py_version_short}{abiflags}',
+        'platinclude':
+            '{platbase}/include/python{py_version_short}{abiflags}',
         'scripts': '{base}/bin',
         'data': '{base}',
         },
@@ -97,21 +109,28 @@ _PREFIX = os.path.normpath(sys.prefix)
 _EXEC_PREFIX = os.path.normpath(sys.exec_prefix)
 _CONFIG_VARS = None
 _USER_BASE = None
+
+def _safe_realpath(path):
+    try:
+        return realpath(path)
+    except OSError:
+        return path
+
 if sys.executable:
-    _PROJECT_BASE = os.path.dirname(realpath(sys.executable))
+    _PROJECT_BASE = os.path.dirname(_safe_realpath(sys.executable))
 else:
     # sys.executable can be empty if argv[0] has been changed and Python is
     # unable to retrieve the real program name
-    _PROJECT_BASE = realpath(os.getcwd())
+    _PROJECT_BASE = _safe_realpath(os.getcwd())
 
 if os.name == "nt" and "pcbuild" in _PROJECT_BASE[-8:].lower():
-    _PROJECT_BASE = realpath(os.path.join(_PROJECT_BASE, pardir))
+    _PROJECT_BASE = _safe_realpath(os.path.join(_PROJECT_BASE, pardir))
 # PC/VS7.1
 if os.name == "nt" and "\\pc\\v" in _PROJECT_BASE[-10:].lower():
-    _PROJECT_BASE = realpath(os.path.join(_PROJECT_BASE, pardir, pardir))
+    _PROJECT_BASE = _safe_realpath(os.path.join(_PROJECT_BASE, pardir, pardir))
 # PC/AMD64
 if os.name == "nt" and "\\pcbuild\\amd64" in _PROJECT_BASE[-14:].lower():
-    _PROJECT_BASE = realpath(os.path.join(_PROJECT_BASE, pardir, pardir))
+    _PROJECT_BASE = _safe_realpath(os.path.join(_PROJECT_BASE, pardir, pardir))
 
 def is_python_build():
     for fn in ("Setup.dist", "Setup.local"):
@@ -198,7 +217,7 @@ def _parse_makefile(filename, vars=None):
     done = {}
     notdone = {}
 
-    with open(filename) as f:
+    with open(filename, errors="surrogateescape") as f:
         lines = f.readlines()
 
     for line in lines:
@@ -286,21 +305,29 @@ def _parse_makefile(filename, vars=None):
                 # bogus variable reference; just drop it since we can't deal
                 variables.remove(name)
 
+    # strip spurious spaces
+    for k, v in done.items():
+        if isinstance(v, str):
+            done[k] = v.strip()
+
     # save the results in the global dictionary
     vars.update(done)
     return vars
 
 
-def _get_makefile_filename():
+def get_makefile_filename():
+    """Return the path of the Makefile."""
     if _PYTHON_BUILD:
         return os.path.join(_PROJECT_BASE, "Makefile")
-    return os.path.join(get_path('stdlib'), "config", "Makefile")
+    return os.path.join(get_path('stdlib'),
+                        'config-{}{}'.format(_PY_VERSION_SHORT, sys.abiflags),
+                        'Makefile')
 
 
 def _init_posix(vars):
     """Initialize the module as appropriate for POSIX systems."""
     # load the installed Makefile:
-    makefile = _get_makefile_filename()
+    makefile = get_makefile_filename()
     try:
         _parse_makefile(makefile, vars)
     except IOError as e:
@@ -311,7 +338,8 @@ def _init_posix(vars):
     # load the installed pyconfig.h:
     config_h = get_config_h_filename()
     try:
-        parse_config_h(open(config_h), vars)
+        with open(config_h) as f:
+            parse_config_h(f, vars)
     except IOError as e:
         msg = "invalid Python installation: unable to open %s" % config_h
         if hasattr(e, "strerror"):
@@ -347,7 +375,7 @@ def _init_non_posix(vars):
     vars['SO'] = '.pyd'
     vars['EXE'] = '.exe'
     vars['VERSION'] = _PY_VERSION_SHORT_NO_DOT
-    vars['BINDIR'] = os.path.dirname(realpath(sys.executable))
+    vars['BINDIR'] = os.path.dirname(_safe_realpath(sys.executable))
 
 #
 # public APIs
@@ -384,7 +412,7 @@ def parse_config_h(fp, vars=None):
     return vars
 
 def get_config_h_filename():
-    """Returns the path of pyconfig.h."""
+    """Return the path of pyconfig.h."""
     if _PYTHON_BUILD:
         if os.name == "nt":
             inc_dir = os.path.join(_PROJECT_BASE, "PC")
@@ -395,17 +423,17 @@ def get_config_h_filename():
     return os.path.join(inc_dir, 'pyconfig.h')
 
 def get_scheme_names():
-    """Returns a tuple containing the schemes names."""
+    """Return a tuple containing the schemes names."""
     schemes = list(_INSTALL_SCHEMES.keys())
     schemes.sort()
     return tuple(schemes)
 
 def get_path_names():
-    """Returns a tuple containing the paths names."""
+    """Return a tuple containing the paths names."""
     return _SCHEME_KEYS
 
 def get_paths(scheme=_get_default_scheme(), vars=None, expand=True):
-    """Returns a mapping containing an install scheme.
+    """Return a mapping containing an install scheme.
 
     ``scheme`` is the install scheme name. If not provided, it will
     return the default scheme for the current platform.
@@ -416,7 +444,7 @@ def get_paths(scheme=_get_default_scheme(), vars=None, expand=True):
         return _INSTALL_SCHEMES[scheme]
 
 def get_path(name, scheme=_get_default_scheme(), vars=None, expand=True):
-    """Returns a path corresponding to the scheme.
+    """Return a path corresponding to the scheme.
 
     ``scheme`` is the install scheme name.
     """
@@ -447,6 +475,11 @@ def get_config_vars(*args):
         _CONFIG_VARS['base'] = _PREFIX
         _CONFIG_VARS['platbase'] = _EXEC_PREFIX
         _CONFIG_VARS['projectbase'] = _PROJECT_BASE
+        try:
+            _CONFIG_VARS['abiflags'] = sys.abiflags
+        except AttributeError:
+            # sys.abiflags may not be defined on all platforms.
+            _CONFIG_VARS['abiflags'] = ''
 
         if os.name in ('nt', 'os2'):
             _init_non_posix(_CONFIG_VARS)
@@ -460,7 +493,7 @@ def get_config_vars(*args):
         if 'srcdir' not in _CONFIG_VARS:
             _CONFIG_VARS['srcdir'] = _PROJECT_BASE
         else:
-            _CONFIG_VARS['srcdir'] = realpath(_CONFIG_VARS['srcdir'])
+            _CONFIG_VARS['srcdir'] = _safe_realpath(_CONFIG_VARS['srcdir'])
 
 
         # Convert srcdir into an absolute path if it appears necessary.
@@ -469,8 +502,12 @@ def get_config_vars(*args):
         # from a different directory.
         if _PYTHON_BUILD and os.name == "posix":
             base = _PROJECT_BASE
+            try:
+                cwd = os.getcwd()
+            except OSError:
+                cwd = None
             if (not os.path.isabs(_CONFIG_VARS['srcdir']) and
-                base != os.getcwd()):
+                base != cwd):
                 # srcdir is relative and we are not in the same directory
                 # as the executable. Assume executable is in the build
                 # directory and make srcdir absolute.
@@ -653,13 +690,16 @@ def get_platform():
                 # behaviour.
                 pass
             else:
-                m = re.search(
-                        r'<key>ProductUserVisibleVersion</key>\s*' +
-                        r'<string>(.*?)</string>', f.read())
-                f.close()
-                if m is not None:
-                    macrelease = '.'.join(m.group(1).split('.')[:2])
-                # else: fall back to the default behaviour
+                try:
+                    m = re.search(
+                            r'<key>ProductUserVisibleVersion</key>\s*' +
+                            r'<string>(.*?)</string>', f.read())
+                    f.close()
+                    if m is not None:
+                        macrelease = '.'.join(m.group(1).split('.')[:2])
+                    # else: fall back to the default behaviour
+                finally:
+                    f.close()
 
         if not macver:
             macver = macrelease
@@ -726,7 +766,7 @@ def _print_dict(title, data):
         print('\t{0} = "{1}"'.format(key, value))
 
 def _main():
-    """Displays all information sysconfig detains."""
+    """Display all information sysconfig detains."""
     print('Platform: "{0}"'.format(get_platform()))
     print('Python version: "{0}"'.format(get_python_version()))
     print('Current installation scheme: "{0}"'.format(_get_default_scheme()))

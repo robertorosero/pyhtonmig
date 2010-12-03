@@ -336,6 +336,8 @@ expect a function argument.
    b.date)``.  Equivalent to::
 
       def attrgetter(*items):
+          if any(not isinstance(item, str) for item in items):
+              raise TypeError('attribute name must be a string')
           if len(items) == 1:
               attr = items[0]
               def g(obj):
@@ -387,7 +389,7 @@ expect a function argument.
 
       >>> inventory = [('apple', 3), ('banana', 2), ('pear', 5), ('orange', 1)]
       >>> getcount = itemgetter(1)
-      >>> map(getcount, inventory)
+      >>> list(map(getcount, inventory))
       [3, 2, 5, 1]
       >>> sorted(inventory, key=getcount)
       [('orange', 1), ('banana', 2), ('apple', 3), ('pear', 5)]

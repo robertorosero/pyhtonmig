@@ -45,6 +45,62 @@ def open(filename, mode="rb", compresslevel=9):
     """
     return GzipFile(filename, mode, compresslevel)
 
+class _PaddedFile:
+    """Minimal read-only file object that prepends a string to the contents
+    of an actual file. Shouldn't be used outside of gzip.py, as it lacks
+    essential functionality."""
+
+    def __init__(self, f, prepend=b''):
+        self._buffer = prepend
+        self._length = len(prepend)
+        self.file = f
+        self._read = 0
+
+    def read(self, size):
+        if self._read is None:
+            return self.file.read(size)
+        if self._read + size <= self._length:
+            read = self._read
+            self._read += size
+            return self._buffer[read:self._read]
+        else:
+            read = self._read
+            self._read = None
+            return self._buffer[read:] + \
+                   self.file.read(size-self._length+read)
+
+    def prepend(self, prepend=b'', readprevious=False):
+        if self._read is None:
+            self._buffer = prepend
+        elif readprevious and len(prepend) <= self._read:
+            self._read -= len(prepend)
+            return
+        else:
+            self._buffer = self._buffer[read:] + prepend
+        self._length = len(self._buffer)
+        self._read = 0
+
+    def unused(self):
+        if self._read is None:
+            return b''
+        return self._buffer[self._read:]
+
+    def seek(self, offset, whence=0):
+        # This is only ever called with offset=whence=0
+        if whence == 1 and self._read is not None:
+            if 0 <= offset + self._read <= self._length:
+                self._read += offset
+                return
+            else:
+                offset += self._length - self._read
+        self._read = None
+        self._buffer = None
+        return self.file.seek(offset, whence)
+
+    def __getattr__(self, name):
+        return getattr(self.file, name)
+
+
 class GzipFile(io.BufferedIOBase):
     """The GzipFile class simulates most of the methods of a file object with
     the exception of the readinto() and truncate() methods.
@@ -119,6 +175,7 @@ class GzipFile(io.BufferedIOBase):
             self.name = filename
             # Starts small, scales exponentially
             self.min_readsize = 100
+            fileobj = _PaddedFile(fileobj)
 
         elif mode[0:1] == 'w' or mode[0:1] == 'a':
             self.mode = WRITE
@@ -147,8 +204,18 @@ class GzipFile(io.BufferedIOBase):
         return self.name
 
     def __repr__(self):
-        s = repr(self.fileobj)
+        fileobj = self.fileobj
+        if isinstance(fileobj, _PaddedFile):
+            fileobj = fileobj.file
+        s = repr(fileobj)
         return '<gzip ' + s[1:-1] + ' ' + hex(id(self)) + '>'
+
+    def _check_closed(self):
+        """Raises a ValueError if the underlying file object has been closed.
+
+        """
+        if self.closed:
+            raise ValueError('I/O operation on closed file.')
 
     def _init_write(self, filename):
         self.name = filename
@@ -188,6 +255,9 @@ class GzipFile(io.BufferedIOBase):
 
     def _read_gzip_header(self):
         magic = self.fileobj.read(2)
+        if magic == b'':
+            raise EOFError("Reached EOF")
+
         if magic != b'\037\213':
             raise IOError('Not a gzipped file')
         method = ord( self.fileobj.read(1) )
@@ -219,7 +289,13 @@ class GzipFile(io.BufferedIOBase):
         if flag & FHCRC:
             self.fileobj.read(2)     # Read & discard the 16-bit header CRC
 
+        unused = self.fileobj.unused()
+        if unused:
+            uncompress = self.decompress.decompress(unused)
+            self._add_read_data(uncompress)
+
     def write(self,data):
+        self._check_closed()
         if self.mode != WRITE:
             import errno
             raise IOError(errno.EBADF, "write() on read-only GzipFile object")
@@ -240,6 +316,7 @@ class GzipFile(io.BufferedIOBase):
         return len(data)
 
     def read(self, size=-1):
+        self._check_closed()
         if self.mode != READ:
             import errno
             raise IOError(errno.EBADF, "read() on write-only GzipFile object")
@@ -271,6 +348,28 @@ class GzipFile(io.BufferedIOBase):
         self.offset += size
         return chunk
 
+    def peek(self, n):
+        if self.mode != READ:
+            import errno
+            raise IOError(errno.EBADF, "peek() on write-only GzipFile object")
+
+        # Do not return ridiculously small buffers, for one common idiom
+        # is to call peek(1) and expect more bytes in return.
+        if n < 100:
+            n = 100
+        if self.extrasize == 0:
+            if self.fileobj is None:
+                return b''
+            try:
+                # 1024 is the same buffering heuristic used in read()
+                self._read(max(n, 1024))
+            except EOFError:
+                pass
+        offset = self.offset - self.extrastart
+        remaining = self.extrasize
+        assert remaining == len(self.extrabuf) - offset
+        return self.extrabuf[offset:offset + n]
+
     def _unread(self, buf):
         self.extrasize = len(buf) + self.extrasize
         self.offset -= len(buf)
@@ -282,16 +381,6 @@ class GzipFile(io.BufferedIOBase):
         if self._new_member:
             # If the _new_member flag is set, we have to
             # jump to the next member, if there is one.
-            #
-            # First, check if we're at the end of the file;
-            # if so, it's time to stop; no more members to read.
-            pos = self.fileobj.tell()   # Save current position
-            self.fileobj.seek(0, 2)     # Seek to end of file
-            if pos == self.fileobj.tell():
-                raise EOFError("Reached EOF")
-            else:
-                self.fileobj.seek( pos ) # Return to original position
-
             self._init_read()
             self._read_gzip_header()
             self.decompress = zlib.decompressobj(-zlib.MAX_WBITS)
@@ -305,6 +394,9 @@ class GzipFile(io.BufferedIOBase):
 
         if buf == b"":
             uncompress = self.decompress.flush()
+            # Prepend the already read bytes to the fileobj to they can be
+            # seen by _read_eof()
+            self.fileobj.prepend(self.decompress.unused_data, True)
             self._read_eof()
             self._add_read_data( uncompress )
             raise EOFError('Reached EOF')
@@ -316,10 +408,9 @@ class GzipFile(io.BufferedIOBase):
             # Ending case: we've come to the end of a member in the file,
             # so seek back to the start of the unused data, finish up
             # this member, and read a new gzip header.
-            # (The number of bytes to seek back is the length of the unused
-            # data, minus 8 because _read_eof() will rewind a further 8 bytes)
-            self.fileobj.seek( -len(self.decompress.unused_data)+8, 1)
-
+            # Prepend the already read bytes to the fileobj to they can be
+            # seen by _read_eof() and _read_gzip_header()
+            self.fileobj.prepend(self.decompress.unused_data, True)
             # Check the CRC and file size, and set the flag so we read
             # a new member on the next call
             self._read_eof()
@@ -334,12 +425,10 @@ class GzipFile(io.BufferedIOBase):
         self.size = self.size + len(data)
 
     def _read_eof(self):
-        # We've read to the end of the file, so we have to rewind in order
-        # to reread the 8 bytes containing the CRC and the file size.
+        # We've read to the end of the file
         # We check the that the computed CRC and size of the
         # uncompressed data matches the stored values.  Note that the size
         # stored is the true file size mod 2**32.
-        self.fileobj.seek(-8, 1)
         crc32 = read32(self.fileobj)
         isize = read32(self.fileobj)  # may exceed 2GB
         if crc32 != self.crc:
@@ -355,7 +444,7 @@ class GzipFile(io.BufferedIOBase):
         while c == b"\x00":
             c = self.fileobj.read(1)
         if c:
-            self.fileobj.seek(-1, 1)
+            self.fileobj.prepend(c, True)
 
     @property
     def closed(self):
@@ -377,6 +466,7 @@ class GzipFile(io.BufferedIOBase):
             self.myfileobj = None
 
     def flush(self,zlib_mode=zlib.Z_SYNC_FLUSH):
+        self._check_closed()
         if self.mode == WRITE:
             # Ensure the compressor's buffer is flushed
             self.fileobj.write(self.compress.flush(zlib_mode))

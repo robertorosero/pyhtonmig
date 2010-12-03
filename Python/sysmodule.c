@@ -15,10 +15,8 @@ Data members:
 */
 
 #include "Python.h"
-#include "structseq.h"
 #include "code.h"
 #include "frameobject.h"
-#include "eval.h"
 
 #include "osdefs.h"
 
@@ -183,24 +181,6 @@ implementation."
 );
 
 static PyObject *
-sys_setdefaultencoding(PyObject *self, PyObject *args)
-{
-    char *encoding;
-    if (!PyArg_ParseTuple(args, "s:setdefaultencoding", &encoding))
-        return NULL;
-    if (PyUnicode_SetDefaultEncoding(encoding))
-        return NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-PyDoc_STRVAR(setdefaultencoding_doc,
-"setdefaultencoding(encoding)\n\
-\n\
-Set the current default string encoding used by the Unicode implementation."
-);
-
-static PyObject *
 sys_getfilesystemencoding(PyObject *self)
 {
     if (Py_FileSystemDefaultEncoding)
@@ -213,25 +193,6 @@ PyDoc_STRVAR(getfilesystemencoding_doc,
 "getfilesystemencoding() -> string\n\
 \n\
 Return the encoding used to convert Unicode filenames in\n\
-operating system filenames."
-);
-
-static PyObject *
-sys_setfilesystemencoding(PyObject *self, PyObject *args)
-{
-    PyObject *new_encoding;
-    if (!PyArg_ParseTuple(args, "U:setfilesystemencoding", &new_encoding))
-        return NULL;
-    if (_Py_SetFileSystemEncoding(new_encoding))
-        return NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-PyDoc_STRVAR(setfilesystemencoding_doc,
-"setfilesystemencoding(string) -> None\n\
-\n\
-Set the encoding used to convert Unicode filenames in\n\
 operating system filenames."
 );
 
@@ -604,9 +565,9 @@ get_hash_info(void)
     if (hash_info == NULL)
         return NULL;
     PyStructSequence_SET_ITEM(hash_info, field++,
-                              PyLong_FromLong(8*sizeof(long)));
+                              PyLong_FromLong(8*sizeof(Py_hash_t)));
     PyStructSequence_SET_ITEM(hash_info, field++,
-                              PyLong_FromLong(_PyHASH_MODULUS));
+                              PyLong_FromSsize_t(_PyHASH_MODULUS));
     PyStructSequence_SET_ITEM(hash_info, field++,
                               PyLong_FromLong(_PyHASH_INF));
     PyStructSequence_SET_ITEM(hash_info, field++,
@@ -1030,10 +991,6 @@ static PyMethodDef sys_methods[] = {
 #ifdef USE_MALLOPT
     {"mdebug",          sys_mdebug, METH_VARARGS},
 #endif
-    {"setdefaultencoding", sys_setdefaultencoding, METH_VARARGS,
-     setdefaultencoding_doc},
-    {"setfilesystemencoding", sys_setfilesystemencoding, METH_VARARGS,
-     setfilesystemencoding_doc},
     {"setcheckinterval",        sys_setcheckinterval, METH_VARARGS,
      setcheckinterval_doc},
     {"getcheckinterval",        sys_getcheckinterval, METH_NOARGS,
@@ -1125,6 +1082,61 @@ int
 PySys_HasWarnOptions(void)
 {
     return (warnoptions != NULL && (PyList_Size(warnoptions) > 0)) ? 1 : 0;
+}
+
+static PyObject *xoptions = NULL;
+
+static PyObject *
+get_xoptions(void)
+{
+    if (xoptions == NULL || !PyDict_Check(xoptions)) {
+        Py_XDECREF(xoptions);
+        xoptions = PyDict_New();
+    }
+    return xoptions;
+}
+
+void
+PySys_AddXOption(const wchar_t *s)
+{
+    PyObject *opts;
+    PyObject *name = NULL, *value = NULL;
+    const wchar_t *name_end;
+    int r;
+
+    opts = get_xoptions();
+    if (opts == NULL)
+        goto error;
+
+    name_end = wcschr(s, L'=');
+    if (!name_end) {
+        name = PyUnicode_FromWideChar(s, -1);
+        value = Py_True;
+        Py_INCREF(value);
+    }
+    else {
+        name = PyUnicode_FromWideChar(s, name_end - s);
+        value = PyUnicode_FromWideChar(name_end + 1, -1);
+    }
+    if (name == NULL || value == NULL)
+        goto error;
+    r = PyDict_SetItem(opts, name, value);
+    Py_DECREF(name);
+    Py_DECREF(value);
+    return;
+
+error:
+    Py_XDECREF(name);
+    Py_XDECREF(value);
+    /* No return value, therefore clear error state if possible */
+    if (_Py_atomic_load_relaxed(&_PyThreadState_Current))
+        PyErr_Clear();
+}
+
+PyObject *
+PySys_GetXOptions(void)
+{
+    return get_xoptions();
 }
 
 /* XXX This doc string is too long to be a single string literal in VC++ 5.0.
@@ -1562,6 +1574,10 @@ _PySys_Init(void)
     SET_SYS_FROM_STRING("winver",
                         PyUnicode_FromString(PyWin_DLLVersionString));
 #endif
+#ifdef ABIFLAGS
+    SET_SYS_FROM_STRING("abiflags",
+                        PyUnicode_FromString(ABIFLAGS));
+#endif
     if (warnoptions == NULL) {
         warnoptions = PyList_New(0);
     }
@@ -1570,6 +1586,11 @@ _PySys_Init(void)
     }
     if (warnoptions != NULL) {
         PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
+    }
+
+    v = get_xoptions();
+    if (v != NULL) {
+        PyDict_SetItemString(sysdict, "_xoptions", v);
     }
 
     /* version_info */
@@ -1698,134 +1719,122 @@ makeargvobject(int argc, wchar_t **argv)
     return av;
 }
 
-#ifdef HAVE_REALPATH
-static wchar_t*
-_wrealpath(const wchar_t *path, wchar_t *resolved_path)
-{
-    char cpath[PATH_MAX];
-    char cresolved_path[PATH_MAX];
-    char *res;
-    size_t r;
-    r = wcstombs(cpath, path, PATH_MAX);
-    if (r == (size_t)-1 || r >= PATH_MAX) {
-        errno = EINVAL;
-        return NULL;
-    }
-    res = realpath(cpath, cresolved_path);
-    if (res == NULL)
-        return NULL;
-    r = mbstowcs(resolved_path, cresolved_path, PATH_MAX);
-    if (r == (size_t)-1 || r >= PATH_MAX) {
-        errno = EINVAL;
-        return NULL;
-    }
-    return resolved_path;
-}
-#endif
-
 #define _HAVE_SCRIPT_ARGUMENT(argc, argv) \
   (argc > 0 && argv0 != NULL && \
    wcscmp(argv0, L"-c") != 0 && wcscmp(argv0, L"-m") != 0)
-  
-void
-PySys_SetArgvEx(int argc, wchar_t **argv, int updatepath)
+
+static void
+sys_update_path(int argc, wchar_t **argv)
 {
+    wchar_t *argv0;
+    wchar_t *p = NULL;
+    Py_ssize_t n = 0;
+    PyObject *a;
+    PyObject *path;
+#ifdef HAVE_READLINK
+    wchar_t link[MAXPATHLEN+1];
+    wchar_t argv0copy[2*MAXPATHLEN+1];
+    int nr = 0;
+#endif
 #if defined(HAVE_REALPATH)
     wchar_t fullpath[MAXPATHLEN];
 #elif defined(MS_WINDOWS) && !defined(MS_WINCE)
     wchar_t fullpath[MAX_PATH];
 #endif
+
+    path = PySys_GetObject("path");
+    if (path == NULL)
+        return;
+
+    argv0 = argv[0];
+
+#ifdef HAVE_READLINK
+    if (_HAVE_SCRIPT_ARGUMENT(argc, argv))
+        nr = _Py_wreadlink(argv0, link, MAXPATHLEN);
+    if (nr > 0) {
+        /* It's a symlink */
+        link[nr] = '\0';
+        if (link[0] == SEP)
+            argv0 = link; /* Link to absolute path */
+        else if (wcschr(link, SEP) == NULL)
+            ; /* Link without path */
+        else {
+            /* Must join(dirname(argv0), link) */
+            wchar_t *q = wcsrchr(argv0, SEP);
+            if (q == NULL)
+                argv0 = link; /* argv0 without path */
+            else {
+                /* Must make a copy */
+                wcscpy(argv0copy, argv0);
+                q = wcsrchr(argv0copy, SEP);
+                wcscpy(q+1, link);
+                argv0 = argv0copy;
+            }
+        }
+    }
+#endif /* HAVE_READLINK */
+#if SEP == '\\' /* Special case for MS filename syntax */
+    if (_HAVE_SCRIPT_ARGUMENT(argc, argv)) {
+        wchar_t *q;
+#if defined(MS_WINDOWS) && !defined(MS_WINCE)
+        /* This code here replaces the first element in argv with the full
+        path that it represents. Under CE, there are no relative paths so
+        the argument must be the full path anyway. */
+        wchar_t *ptemp;
+        if (GetFullPathNameW(argv0,
+                           sizeof(fullpath)/sizeof(fullpath[0]),
+                           fullpath,
+                           &ptemp)) {
+            argv0 = fullpath;
+        }
+#endif
+        p = wcsrchr(argv0, SEP);
+        /* Test for alternate separator */
+        q = wcsrchr(p ? p : argv0, '/');
+        if (q != NULL)
+            p = q;
+        if (p != NULL) {
+            n = p + 1 - argv0;
+            if (n > 1 && p[-1] != ':')
+                n--; /* Drop trailing separator */
+        }
+    }
+#else /* All other filename syntaxes */
+    if (_HAVE_SCRIPT_ARGUMENT(argc, argv)) {
+#if defined(HAVE_REALPATH)
+        if (_Py_wrealpath(argv0, fullpath, PATH_MAX)) {
+            argv0 = fullpath;
+        }
+#endif
+        p = wcsrchr(argv0, SEP);
+    }
+    if (p != NULL) {
+        n = p + 1 - argv0;
+#if SEP == '/' /* Special case for Unix filename syntax */
+        if (n > 1)
+            n--; /* Drop trailing separator */
+#endif /* Unix */
+    }
+#endif /* All others */
+    a = PyUnicode_FromWideChar(argv0, n);
+    if (a == NULL)
+        Py_FatalError("no mem for sys.path insertion");
+    if (PyList_Insert(path, 0, a) < 0)
+        Py_FatalError("sys.path.insert(0) failed");
+    Py_DECREF(a);
+}
+
+void
+PySys_SetArgvEx(int argc, wchar_t **argv, int updatepath)
+{
     PyObject *av = makeargvobject(argc, argv);
-    PyObject *path = PySys_GetObject("path");
     if (av == NULL)
         Py_FatalError("no mem for sys.argv");
     if (PySys_SetObject("argv", av) != 0)
         Py_FatalError("can't assign sys.argv");
-    if (updatepath && path != NULL) {
-        wchar_t *argv0 = argv[0];
-        wchar_t *p = NULL;
-        Py_ssize_t n = 0;
-        PyObject *a;
-        extern int _Py_wreadlink(const wchar_t *, wchar_t *, size_t);
-#ifdef HAVE_READLINK
-        wchar_t link[MAXPATHLEN+1];
-        wchar_t argv0copy[2*MAXPATHLEN+1];
-        int nr = 0;
-        if (_HAVE_SCRIPT_ARGUMENT(argc, argv))
-            nr = _Py_wreadlink(argv0, link, MAXPATHLEN);
-        if (nr > 0) {
-            /* It's a symlink */
-            link[nr] = '\0';
-            if (link[0] == SEP)
-                argv0 = link; /* Link to absolute path */
-            else if (wcschr(link, SEP) == NULL)
-                ; /* Link without path */
-            else {
-                /* Must join(dirname(argv0), link) */
-                wchar_t *q = wcsrchr(argv0, SEP);
-                if (q == NULL)
-                    argv0 = link; /* argv0 without path */
-                else {
-                    /* Must make a copy */
-                    wcscpy(argv0copy, argv0);
-                    q = wcsrchr(argv0copy, SEP);
-                    wcscpy(q+1, link);
-                    argv0 = argv0copy;
-                }
-            }
-        }
-#endif /* HAVE_READLINK */
-#if SEP == '\\' /* Special case for MS filename syntax */
-        if (_HAVE_SCRIPT_ARGUMENT(argc, argv)) {
-            wchar_t *q;
-#if defined(MS_WINDOWS) && !defined(MS_WINCE)
-            /* This code here replaces the first element in argv with the full
-            path that it represents. Under CE, there are no relative paths so
-            the argument must be the full path anyway. */
-            wchar_t *ptemp;
-            if (GetFullPathNameW(argv0,
-                               sizeof(fullpath)/sizeof(fullpath[0]),
-                               fullpath,
-                               &ptemp)) {
-                argv0 = fullpath;
-            }
-#endif
-            p = wcsrchr(argv0, SEP);
-            /* Test for alternate separator */
-            q = wcsrchr(p ? p : argv0, '/');
-            if (q != NULL)
-                p = q;
-            if (p != NULL) {
-                n = p + 1 - argv0;
-                if (n > 1 && p[-1] != ':')
-                    n--; /* Drop trailing separator */
-            }
-        }
-#else /* All other filename syntaxes */
-        if (_HAVE_SCRIPT_ARGUMENT(argc, argv)) {
-#if defined(HAVE_REALPATH)
-            if (_wrealpath(argv0, fullpath)) {
-                argv0 = fullpath;
-            }
-#endif
-            p = wcsrchr(argv0, SEP);
-        }
-        if (p != NULL) {
-            n = p + 1 - argv0;
-#if SEP == '/' /* Special case for Unix filename syntax */
-            if (n > 1)
-                n--; /* Drop trailing separator */
-#endif /* Unix */
-        }
-#endif /* All others */
-        a = PyUnicode_FromWideChar(argv0, n);
-        if (a == NULL)
-            Py_FatalError("no mem for sys.path insertion");
-        if (PyList_Insert(path, 0, a) < 0)
-            Py_FatalError("sys.path.insert(0) failed");
-        Py_DECREF(a);
-    }
     Py_DECREF(av);
+    if (updatepath)
+        sys_update_path(argc, argv);
 }
 
 void

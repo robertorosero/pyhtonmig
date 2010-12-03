@@ -356,8 +356,14 @@ class TestOneTrickPonyABCs(ABCTestCase):
         for x in samples:
             self.assertIsInstance(x, Iterator)
             self.assertTrue(issubclass(type(x), Iterator), repr(type(x)))
-        self.validate_abstract_methods(Iterator, '__next__')
-        self.validate_isinstance(Iterator, '__next__')
+        self.validate_abstract_methods(Iterator, '__next__', '__iter__')
+
+        # Issue 10565
+        class NextOnly:
+            def __next__(self):
+                yield 1
+                raise StopIteration
+        self.assertNotIsInstance(NextOnly(), Iterator)
 
     def test_Sized(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -701,9 +707,9 @@ class TestCounter(unittest.TestCase):
                     ]):
             msg = (i, dup, words)
             self.assertTrue(dup is not words)
-            self.assertEquals(dup, words)
-            self.assertEquals(len(dup), len(words))
-            self.assertEquals(type(dup), type(words))
+            self.assertEqual(dup, words)
+            self.assertEqual(len(dup), len(words))
+            self.assertEqual(type(dup), type(words))
 
     def test_conversions(self):
         # Convert to: set, list, dict
@@ -922,10 +928,10 @@ class TestOrderedDict(unittest.TestCase):
                     OrderedDict(od),
                     ]):
             self.assertTrue(dup is not od)
-            self.assertEquals(dup, od)
-            self.assertEquals(list(dup.items()), list(od.items()))
-            self.assertEquals(len(dup), len(od))
-            self.assertEquals(type(dup), type(od))
+            self.assertEqual(dup, od)
+            self.assertEqual(list(dup.items()), list(od.items()))
+            self.assertEqual(len(dup), len(od))
+            self.assertEqual(type(dup), type(od))
 
     def test_yaml_linkage(self):
         # Verify that __reduce__ is setup in a way that supports PyYAML's dump() feature.
@@ -951,6 +957,13 @@ class TestOrderedDict(unittest.TestCase):
         self.assertEqual(eval(repr(od)), od)
         self.assertEqual(repr(OrderedDict()), "OrderedDict()")
 
+    def test_repr_recursive(self):
+        # See issue #9826
+        od = OrderedDict.fromkeys('abc')
+        od['x'] = od
+        self.assertEqual(repr(od),
+            "OrderedDict([('a', None), ('b', None), ('c', None), ('x', ...)])")
+
     def test_setdefault(self):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]
         shuffle(pairs)
@@ -973,7 +986,25 @@ class TestOrderedDict(unittest.TestCase):
         od['a'] = 1
         self.assertEqual(list(od.items()), [('b', 2), ('a', 1)])
 
+    def test_move_to_end(self):
+        od = OrderedDict.fromkeys('abcde')
+        self.assertEqual(list(od), list('abcde'))
+        od.move_to_end('c')
+        self.assertEqual(list(od), list('abdec'))
+        od.move_to_end('c', 0)
+        self.assertEqual(list(od), list('cabde'))
+        od.move_to_end('c', 0)
+        self.assertEqual(list(od), list('cabde'))
+        od.move_to_end('e')
+        self.assertEqual(list(od), list('cabde'))
+        with self.assertRaises(KeyError):
+            od.move_to_end('x')
 
+    def test_sizeof(self):
+        # Wimpy test: Just verify the reported size is larger than a regular dict
+        d = dict(a=1)
+        od = OrderedDict(**d)
+        self.assertGreater(sys.getsizeof(od), sys.getsizeof(d))
 
 class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = OrderedDict

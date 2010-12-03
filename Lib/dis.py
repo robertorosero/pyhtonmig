@@ -6,8 +6,8 @@ import types
 from opcode import *
 from opcode import __all__ as _opcodes_all
 
-__all__ = ["dis", "disassemble", "distb", "disco",
-           "findlinestarts", "findlabels"] + _opcodes_all
+__all__ = ["code_info", "dis", "disassemble", "distb", "disco",
+           "findlinestarts", "findlabels", "show_code"] + _opcodes_all
 del _opcodes_all
 
 _have_code = (types.MethodType, types.FunctionType, types.CodeType, type)
@@ -141,7 +141,7 @@ def _format_code_info(co):
     return "\n".join(lines)
 
 def show_code(co):
-    """Show details about a code object."""
+    """Print details of methods, functions, or code to stdout."""
     print(code_info(co))
 
 def disassemble(co, lasti=-1):

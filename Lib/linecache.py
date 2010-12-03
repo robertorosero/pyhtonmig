@@ -123,12 +123,10 @@ def updatecache(filename, module_globals=None):
         else:
             return []
     try:
-        with open(fullname, 'rb') as fp:
-            coding, line = tokenize.detect_encoding(fp.readline)
-        with open(fullname, 'r', encoding=coding) as fp:
+        with tokenize.open(fullname) as fp:
             lines = fp.readlines()
     except IOError:
-        pass
+        return []
     if lines and not lines[-1].endswith('\n'):
         lines[-1] += '\n'
     size, mtime = stat.st_size, stat.st_mtime

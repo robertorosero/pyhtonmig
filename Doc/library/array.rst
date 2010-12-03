@@ -60,7 +60,7 @@ The module defines the following type:
    appropriate type.
 
    If given a list or string, the initializer is passed to the new array's
-   :meth:`fromlist`, :meth:`fromstring`, or :meth:`fromunicode` method (see below)
+   :meth:`fromlist`, :meth:`frombytes`, or :meth:`fromunicode` method (see below)
    to add initial items to the array.  Otherwise, the iterable initializer is
    passed to the :meth:`extend` method.
 
@@ -103,7 +103,7 @@ The following data items and methods are also supported:
    memory buffer in bytes can be computed as ``array.buffer_info()[1] *
    array.itemsize``.  This is occasionally useful when working with low-level (and
    inherently unsafe) I/O interfaces that require memory addresses, such as certain
-   :cfunc:`ioctl` operations.  The returned numbers are valid as long as the array
+   :c:func:`ioctl` operations.  The returned numbers are valid as long as the array
    exists and no length-changing operations are applied to it.
 
    .. note::
@@ -136,13 +136,22 @@ The following data items and methods are also supported:
    must be the right type to be appended to the array.
 
 
+.. method:: array.frombytes(s)
+
+   Appends items from the string, interpreting the string as an array of machine
+   values (as if it had been read from a file using the :meth:`fromfile` method).
+
+   .. versionadded:: 3.2
+      :meth:`fromstring` is renamed to :meth:`frombytes` for clarity.
+
+
 .. method:: array.fromfile(f, n)
 
-   Read *n* items (as machine values) from the file object *f* and append them to
-   the end of the array.  If less than *n* items are available, :exc:`EOFError` is
-   raised, but the items that were available are still inserted into the array.
-   *f* must be a real built-in file object; something else with a :meth:`read`
-   method won't do.
+   Read *n* items (as machine values) from the :term:`file object` *f* and append
+   them to the end of the array.  If less than *n* items are available,
+   :exc:`EOFError` is raised, but the items that were available are still
+   inserted into the array. *f* must be a real built-in file object; something
+   else with a :meth:`read` method won't do.
 
 
 .. method:: array.fromlist(list)
@@ -151,17 +160,16 @@ The following data items and methods are also supported:
    a.append(x)`` except that if there is a type error, the array is unchanged.
 
 
-.. method:: array.fromstring(s)
+.. method:: array.fromstring()
 
-   Appends items from the string, interpreting the string as an array of machine
-   values (as if it had been read from a file using the :meth:`fromfile` method).
+   Deprecated alias for :meth:`frombytes`.
 
 
 .. method:: array.fromunicode(s)
 
    Extends this array with data from the given unicode string.  The array must
    be a type ``'u'`` array; otherwise a :exc:`ValueError` is raised.  Use
-   ``array.fromstring(unicodestring.encode(enc))`` to append Unicode data to an
+   ``array.frombytes(unicodestring.encode(enc))`` to append Unicode data to an
    array of some other type.
 
 
@@ -194,9 +202,19 @@ The following data items and methods are also supported:
    Reverse the order of the items in the array.
 
 
+.. method:: array.tobytes()
+
+   Convert the array to an array of machine values and return the bytes
+   representation (the same sequence of bytes that would be written to a file by
+   the :meth:`tofile` method.)
+
+   .. versionadded:: 3.2
+      :meth:`tostring` is renamed to :meth:`tobytes` for clarity.
+
+
 .. method:: array.tofile(f)
 
-   Write all items (as machine values) to the file object *f*.
+   Write all items (as machine values) to the :term:`file object` *f*.
 
 
 .. method:: array.tolist()
@@ -206,15 +224,13 @@ The following data items and methods are also supported:
 
 .. method:: array.tostring()
 
-   Convert the array to an array of machine values and return the string
-   representation (the same sequence of bytes that would be written to a file by
-   the :meth:`tofile` method.)
+   Deprecated alias for :meth:`tobytes`.
 
 
 .. method:: array.tounicode()
 
    Convert the array to a unicode string.  The array must be a type ``'u'`` array;
-   otherwise a :exc:`ValueError` is raised. Use ``array.tostring().decode(enc)`` to
+   otherwise a :exc:`ValueError` is raised. Use ``array.tobytes().decode(enc)`` to
    obtain a unicode string from an array of some other type.
 
 

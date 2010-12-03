@@ -99,6 +99,7 @@
 #include "descrobject.h"
 #include "warnings.h"
 #include "weakrefobject.h"
+#include "structseq.h"
 
 
 #include "codecs.h"
@@ -124,6 +125,7 @@
 #include "pystrtod.h"
 #include "pystrcmp.h"
 #include "dtoa.h"
+#include "fileutils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,21 +134,6 @@ extern "C" {
 /* _Py_Mangle is defined in compile.c */
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
-#endif
-
-/* These functions live in main.c */
-#ifndef Py_LIMITED_API
-PyAPI_FUNC(wchar_t *) _Py_char2wchar(char *);
-PyAPI_FUNC(char*) _Py_wchar2char(const wchar_t *text);
-PyAPI_FUNC(FILE *) _Py_wfopen(const wchar_t *path, const wchar_t *mode);
-#endif
-
-/* These functions live in import.c */
-#ifndef Py_LIMITED_API
-PyAPI_FUNC(FILE*) _Py_fopen(PyObject *unicode, const char *mode);
-#ifdef HAVE_STAT
-int _Py_stat(PyObject *unicode, struct stat *statbuf);
-#endif
 #endif
 
 #ifdef __cplusplus

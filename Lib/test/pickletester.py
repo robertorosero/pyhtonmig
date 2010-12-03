@@ -30,6 +30,21 @@ def count_opcode(code, pickle):
             n += 1
     return n
 
+
+class UnseekableIO(io.BytesIO):
+    def peek(self, *args):
+        raise NotImplementedError
+
+    def seekable(self):
+        return False
+
+    def seek(self, *args):
+        raise io.UnsupportedOperation
+
+    def tell(self):
+        raise io.UnsupportedOperation
+
+
 # We can't very well test the extension registry without putting known stuff
 # in it, but we have to be careful to restore its original state.  Code
 # should do this:
@@ -564,7 +579,7 @@ class AbstractPickleTests(unittest.TestCase):
 
     def test_get(self):
         self.assertRaises(KeyError, self.loads, b'g0\np0')
-        self.assertEquals(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
+        self.assertEqual(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
 
     def test_insecure_strings(self):
         # XXX Some of these tests are temporarily disabled
@@ -1068,6 +1083,16 @@ class AbstractPickleTests(unittest.TestCase):
         dumped = self.dumps(set([3]), 2)
         self.assertEqual(dumped, DATA6)
 
+    def test_large_pickles(self):
+        # Test the correctness of internal buffering routines when handling
+        # large data.
+        for proto in protocols:
+            data = (1, min, b'xy' * (30 * 1024), len)
+            dumped = self.dumps(data, proto)
+            loaded = self.loads(dumped)
+            self.assertEqual(len(loaded), len(data))
+            self.assertEqual(loaded, data)
+
 
 # Test classes for reduce_ex
 
@@ -1363,6 +1388,31 @@ class AbstractPicklerUnpicklerObjectTests(unittest.TestCase):
         f.write(pickled2)
         f.seek(0)
         self.assertEqual(unpickler.load(), data2)
+
+    def _check_multiple_unpicklings(self, ioclass):
+        for proto in protocols:
+            data1 = [(x, str(x)) for x in range(2000)] + [b"abcde", len]
+            f = ioclass()
+            pickler = self.pickler_class(f, protocol=proto)
+            pickler.dump(data1)
+            pickled = f.getvalue()
+
+            N = 5
+            f = ioclass(pickled * N)
+            unpickler = self.unpickler_class(f)
+            for i in range(N):
+                if f.seekable():
+                    pos = f.tell()
+                self.assertEqual(unpickler.load(), data1)
+                if f.seekable():
+                    self.assertEqual(f.tell(), pos + len(pickled))
+            self.assertRaises(EOFError, unpickler.load)
+
+    def test_multiple_unpicklings_seekable(self):
+        self._check_multiple_unpicklings(io.BytesIO)
+
+    def test_multiple_unpicklings_unseekable(self):
+        self._check_multiple_unpicklings(UnseekableIO)
 
 
 if __name__ == "__main__":

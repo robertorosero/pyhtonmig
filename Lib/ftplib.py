@@ -171,7 +171,7 @@ class FTP:
     def sanitize(self, s):
         if s[:5] == 'pass ' or s[:5] == 'PASS ':
             i = len(s)
-            while i > 5 and s[i-1] in '\r\n':
+            while i > 5 and s[i-1] in {'\r', '\n'}:
                 i = i-1
             s = s[:5] + '*'*(i-5) + s[i:]
         return repr(s)
@@ -221,7 +221,7 @@ class FTP:
         if self.debugging: print('*resp*', self.sanitize(resp))
         self.lastresp = resp[:3]
         c = resp[:1]
-        if c in ('1', '2', '3'):
+        if c in {'1', '2', '3'}:
             return resp
         if c == '4':
             raise error_temp(resp)
@@ -245,7 +245,7 @@ class FTP:
         if self.debugging > 1: print('*put urgent*', self.sanitize(line))
         self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
-        if resp[:3] not in ('426', '225', '226'):
+        if resp[:3] not in {'426', '225', '226'}:
             raise error_proto(resp)
 
     def sendcmd(self, cmd):
@@ -361,6 +361,7 @@ class FTP:
             conn, sockaddr = sock.accept()
             if self.timeout is not _GLOBAL_DEFAULT_TIMEOUT:
                 conn.settimeout(self.timeout)
+            sock.close()
         if resp[:3] == '150':
             # this is conditional in case we received a 125
             size = parse150(resp)
@@ -375,7 +376,7 @@ class FTP:
         if not user: user = 'anonymous'
         if not passwd: passwd = ''
         if not acct: acct = ''
-        if user == 'anonymous' and passwd in ('', '-'):
+        if user == 'anonymous' and passwd in {'', '-'}:
             # If there is no anonymous ftp password specified
             # then we'll just use anonymous@
             # We don't send any other thing because:
@@ -406,13 +407,12 @@ class FTP:
           The response code.
         """
         self.voidcmd('TYPE I')
-        conn = self.transfercmd(cmd, rest)
-        while 1:
-            data = conn.recv(blocksize)
-            if not data:
-                break
-            callback(data)
-        conn.close()
+        with self.transfercmd(cmd, rest) as conn:
+            while 1:
+                data = conn.recv(blocksize)
+                if not data:
+                    break
+                callback(data)
         return self.voidresp()
 
     def retrlines(self, cmd, callback = None):
@@ -429,20 +429,18 @@ class FTP:
         """
         if callback is None: callback = print_line
         resp = self.sendcmd('TYPE A')
-        conn = self.transfercmd(cmd)
-        fp = conn.makefile('r', encoding=self.encoding)
-        while 1:
-            line = fp.readline()
-            if self.debugging > 2: print('*retr*', repr(line))
-            if not line:
-                break
-            if line[-2:] == CRLF:
-                line = line[:-2]
-            elif line[-1:] == '\n':
-                line = line[:-1]
-            callback(line)
-        fp.close()
-        conn.close()
+        with self.transfercmd(cmd) as conn, \
+                 conn.makefile('r', encoding=self.encoding) as fp:
+            while 1:
+                line = fp.readline()
+                if self.debugging > 2: print('*retr*', repr(line))
+                if not line:
+                    break
+                if line[-2:] == CRLF:
+                    line = line[:-2]
+                elif line[-1:] == '\n':
+                    line = line[:-1]
+                callback(line)
         return self.voidresp()
 
     def storbinary(self, cmd, fp, blocksize=8192, callback=None, rest=None):
@@ -461,13 +459,12 @@ class FTP:
           The response code.
         """
         self.voidcmd('TYPE I')
-        conn = self.transfercmd(cmd, rest)
-        while 1:
-            buf = fp.read(blocksize)
-            if not buf: break
-            conn.sendall(buf)
-            if callback: callback(buf)
-        conn.close()
+        with self.transfercmd(cmd, rest) as conn:
+            while 1:
+                buf = fp.read(blocksize)
+                if not buf: break
+                conn.sendall(buf)
+                if callback: callback(buf)
         return self.voidresp()
 
     def storlines(self, cmd, fp, callback=None):
@@ -483,16 +480,15 @@ class FTP:
           The response code.
         """
         self.voidcmd('TYPE A')
-        conn = self.transfercmd(cmd)
-        while 1:
-            buf = fp.readline()
-            if not buf: break
-            if buf[-2:] != B_CRLF:
-                if buf[-1] in B_CRLF: buf = buf[:-1]
-                buf = buf + B_CRLF
-            conn.sendall(buf)
-            if callback: callback(buf)
-        conn.close()
+        with self.transfercmd(cmd) as conn:
+            while 1:
+                buf = fp.readline()
+                if not buf: break
+                if buf[-2:] != B_CRLF:
+                    if buf[-1] in B_CRLF: buf = buf[:-1]
+                    buf = buf + B_CRLF
+                conn.sendall(buf)
+                if callback: callback(buf)
         return self.voidresp()
 
     def acct(self, password):
@@ -534,7 +530,7 @@ class FTP:
     def delete(self, filename):
         '''Delete a file.'''
         resp = self.sendcmd('DELE ' + filename)
-        if resp[:3] in ('250', '200'):
+        if resp[:3] in {'250', '200'}:
             return resp
         else:
             raise error_reply(resp)
@@ -897,9 +893,9 @@ def ftpcp(source, sourcename, target, targetname = '', type = 'I'):
     # transfer request.
     # So: STOR before RETR, because here the target is a "user".
     treply = target.sendcmd('STOR ' + targetname)
-    if treply[:3] not in ('125', '150'): raise error_proto  # RFC 959
+    if treply[:3] not in {'125', '150'}: raise error_proto  # RFC 959
     sreply = source.sendcmd('RETR ' + sourcename)
-    if sreply[:3] not in ('125', '150'): raise error_proto  # RFC 959
+    if sreply[:3] not in {'125', '150'}: raise error_proto  # RFC 959
     source.voidresp()
     target.voidresp()
 

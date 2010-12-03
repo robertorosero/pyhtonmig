@@ -13,6 +13,8 @@ import time
 import shutil
 from test import support
 import contextlib
+import mmap
+import uuid
 
 # Detect whether we're on a Linux system that uses the (now outdated
 # and unmaintained) linuxthreads threading library.  There's an issue
@@ -219,16 +221,16 @@ class StatAttributeTests(unittest.TestCase):
         os.unlink(self.fname)
         os.rmdir(support.TESTFN)
 
-    def test_stat_attributes(self):
+    def check_stat_attributes(self, fname):
         if not hasattr(os, "stat"):
             return
 
         import stat
-        result = os.stat(self.fname)
+        result = os.stat(fname)
 
         # Make sure direct access works
-        self.assertEquals(result[stat.ST_SIZE], 3)
-        self.assertEquals(result.st_size, 3)
+        self.assertEqual(result[stat.ST_SIZE], 3)
+        self.assertEqual(result.st_size, 3)
 
         # Make sure all the attributes are there
         members = dir(result)
@@ -239,7 +241,7 @@ class StatAttributeTests(unittest.TestCase):
                     def trunc(x): return int(x)
                 else:
                     def trunc(x): return x
-                self.assertEquals(trunc(getattr(result, attr)),
+                self.assertEqual(trunc(getattr(result, attr)),
                                   result[getattr(stat, name)])
                 self.assertIn(attr, members)
 
@@ -281,6 +283,15 @@ class StatAttributeTests(unittest.TestCase):
         except TypeError:
             pass
 
+    def test_stat_attributes(self):
+        self.check_stat_attributes(self.fname)
+
+    def test_stat_attributes_bytes(self):
+        try:
+            fname = self.fname.encode(sys.getfilesystemencoding())
+        except UnicodeEncodeError:
+            self.skipTest("cannot encode %a for the filesystem" % self.fname)
+        self.check_stat_attributes(fname)
 
     def test_statvfs_attributes(self):
         if not hasattr(os, "statvfs"):
@@ -294,13 +305,13 @@ class StatAttributeTests(unittest.TestCase):
                 return
 
         # Make sure direct access works
-        self.assertEquals(result.f_bfree, result[3])
+        self.assertEqual(result.f_bfree, result[3])
 
         # Make sure all the attributes are there.
         members = ('bsize', 'frsize', 'blocks', 'bfree', 'bavail', 'files',
                     'ffree', 'favail', 'flag', 'namemax')
         for value, member in enumerate(members):
-            self.assertEquals(getattr(result, 'f_' + member), result[value])
+            self.assertEqual(getattr(result, 'f_' + member), result[value])
 
         # Make sure that assignment really fails
         try:
@@ -335,7 +346,7 @@ class StatAttributeTests(unittest.TestCase):
         # time stamps in stat, but not in utime.
         os.utime(support.TESTFN, (st.st_atime, int(st.st_mtime-delta)))
         st2 = os.stat(support.TESTFN)
-        self.assertEquals(st2.st_mtime, int(st.st_mtime-delta))
+        self.assertEqual(st2.st_mtime, int(st.st_mtime-delta))
 
     # Restrict test to Win32, since there is no guarantee other
     # systems support centiseconds
@@ -352,7 +363,7 @@ class StatAttributeTests(unittest.TestCase):
             def test_1565150(self):
                 t1 = 1159195039.25
                 os.utime(self.fname, (t1, t1))
-                self.assertEquals(os.stat(self.fname).st_mtime, t1)
+                self.assertEqual(os.stat(self.fname).st_mtime, t1)
 
         def test_1686475(self):
             # Verify that an open file can be stat'ed
@@ -395,24 +406,26 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         os.environ.clear()
         if os.path.exists("/bin/sh"):
             os.environ.update(HELLO="World")
-            value = os.popen("/bin/sh -c 'echo $HELLO'").read().strip()
-            self.assertEquals(value, "World")
+            with os.popen("/bin/sh -c 'echo $HELLO'") as popen:
+                value = popen.read().strip()
+                self.assertEqual(value, "World")
 
     def test_os_popen_iter(self):
         if os.path.exists("/bin/sh"):
-            popen = os.popen("/bin/sh -c 'echo \"line1\nline2\nline3\"'")
-            it = iter(popen)
-            self.assertEquals(next(it), "line1\n")
-            self.assertEquals(next(it), "line2\n")
-            self.assertEquals(next(it), "line3\n")
-            self.assertRaises(StopIteration, next, it)
+            with os.popen(
+                "/bin/sh -c 'echo \"line1\nline2\nline3\"'") as popen:
+                it = iter(popen)
+                self.assertEqual(next(it), "line1\n")
+                self.assertEqual(next(it), "line2\n")
+                self.assertEqual(next(it), "line3\n")
+                self.assertRaises(StopIteration, next, it)
 
     # Verify environ keys and values from the OS are of the
     # correct str type.
     def test_keyvalue_types(self):
         for key, val in os.environ.items():
-            self.assertEquals(type(key), str)
-            self.assertEquals(type(val), str)
+            self.assertEqual(type(key), str)
+            self.assertEqual(type(val), str)
 
     def test_items(self):
         for key, value in self._reference().items():
@@ -422,7 +435,6 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
     def test___repr__(self):
         """Check that the repr() of os.environ looks like environ({...})."""
         env = os.environ
-        self.assertTrue(isinstance(env.data, dict))
         self.assertEqual(repr(env), 'environ({{{}}})'.format(', '.join(
             '{!r}: {!r}'.format(key, value)
             for key, value in env.items())))
@@ -451,8 +463,11 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         if os.supports_bytes_environ:
             # env cannot contain 'PATH' and b'PATH' keys
             try:
-                mixed_env = {'PATH': '1', b'PATH': b'2'}
+                # ignore BytesWarning warning
+                with warnings.catch_warnings(record=True):
+                    mixed_env = {'PATH': '1', b'PATH': b'2'}
             except BytesWarning:
+                # mixed_env cannot be created with python -bb
                 pass
             else:
                 self.assertRaises(ValueError, os.get_exec_path, mixed_env)
@@ -478,15 +493,15 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
                 sys.getfilesystemencoding(),)
             self.skipTest(msg)
         os.environ['unicode'] = value
-        self.assertEquals(os.environ['unicode'], value)
-        self.assertEquals(os.environb[b'unicode'], value_bytes)
+        self.assertEqual(os.environ['unicode'], value)
+        self.assertEqual(os.environb[b'unicode'], value_bytes)
 
         # os.environb -> os.environ
         value = b'\xff'
         os.environb[b'bytes'] = value
-        self.assertEquals(os.environb[b'bytes'], value)
+        self.assertEqual(os.environb[b'bytes'], value)
         value_str = value.decode(sys.getfilesystemencoding(), 'surrogateescape')
-        self.assertEquals(os.environ['bytes'], value_str)
+        self.assertEqual(os.environ['bytes'], value_str)
 
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
@@ -526,7 +541,7 @@ class WalkTests(unittest.TestCase):
             f = open(path, "w")
             f.write("I'm " + path + " and proud of it.  Blame test_os.\n")
             f.close()
-        if support.can_symlink():
+        if hasattr(os, "symlink"):
             os.symlink(os.path.abspath(t2_path), link_path)
             sub2_tree = (sub2_path, ["link"], ["tmp3"])
         else:
@@ -570,7 +585,7 @@ class WalkTests(unittest.TestCase):
         self.assertEqual(all[flipped + 1], (sub1_path, ["SUB11"], ["tmp2"]))
         self.assertEqual(all[2 - 2 * flipped], sub2_tree)
 
-        if support.can_symlink():
+        if hasattr(os, "symlink"):
             # Walk, following symlinks.
             for root, dirs, files in os.walk(walk_path, followlinks=True):
                 if root == link_path:
@@ -614,6 +629,28 @@ class MakedirTests(unittest.TestCase):
         path = os.path.join(base, 'dir1', os.curdir, 'dir2', 'dir3', 'dir4',
                             'dir5', 'dir6')
         os.makedirs(path)
+
+    def test_exist_ok_existing_directory(self):
+        path = os.path.join(support.TESTFN, 'dir1')
+        mode = 0o777
+        old_mask = os.umask(0o022)
+        os.makedirs(path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, 0o776, exist_ok=True)
+        os.makedirs(path, mode=mode, exist_ok=True)
+        os.umask(old_mask)
+
+    def test_exist_ok_existing_regular_file(self):
+        base = support.TESTFN
+        path = os.path.join(support.TESTFN, 'dir1')
+        f = open(path, 'w')
+        f.write('abc')
+        f.close()
+        self.assertRaises(OSError, os.makedirs, path)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=True)
+        os.remove(path)
 
     def tearDown(self):
         path = os.path.join(support.TESTFN, 'dir1', 'dir2', 'dir3',
@@ -845,6 +882,42 @@ class TestInvalidFD(unittest.TestCase):
         if hasattr(os, "write"):
             self.check(os.write, b" ")
 
+
+class LinkTests(unittest.TestCase):
+    def setUp(self):
+        self.file1 = support.TESTFN
+        self.file2 = os.path.join(support.TESTFN + "2")
+
+    def tearDown(self):
+        for file in (self.file1, self.file2):
+            if os.path.exists(file):
+                os.unlink(file)
+
+    def _test_link(self, file1, file2):
+        with open(file1, "w") as f1:
+            f1.write("test")
+
+        os.link(file1, file2)
+        with open(file1, "r") as f1, open(file2, "r") as f2:
+            self.assertTrue(os.path.sameopenfile(f1.fileno(), f2.fileno()))
+
+    def test_link(self):
+        self._test_link(self.file1, self.file2)
+
+    def test_link_bytes(self):
+        self._test_link(bytes(self.file1, sys.getfilesystemencoding()),
+                        bytes(self.file2, sys.getfilesystemencoding()))
+
+    def test_unicode_name(self):
+        try:
+            os.fsencode("\xf1")
+        except UnicodeError:
+            raise unittest.SkipTest("Unable to encode for this platform.")
+
+        self.file1 += "\xf1"
+        self.file2 = self.file1 + "2"
+        self._test_link(self.file1, self.file2)
+
 if sys.platform != 'win32':
     class Win32ErrorTests(unittest.TestCase):
         pass
@@ -943,7 +1016,7 @@ if sys.platform != 'win32':
         def test_listdir(self):
             expected = self.unicodefn
             found = set(os.listdir(self.dir))
-            self.assertEquals(found, expected)
+            self.assertEqual(found, expected)
 
         def test_open(self):
             for fn in self.unicodefn:
@@ -991,6 +1064,9 @@ class Win32KillTests(unittest.TestCase):
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 stdin=subprocess.PIPE)
+        self.addCleanup(proc.stdout.close)
+        self.addCleanup(proc.stderr.close)
+        self.addCleanup(proc.stdin.close)
 
         count, max = 0, 100
         while count < max and proc.poll() is None:
@@ -1021,13 +1097,23 @@ class Win32KillTests(unittest.TestCase):
         self._kill(100)
 
     def _kill_with_event(self, event, name):
+        tagname = "test_os_%s" % uuid.uuid1()
+        m = mmap.mmap(-1, 1, tagname)
+        m[0] = 0
         # Run a script which has console control handling enabled.
         proc = subprocess.Popen([sys.executable,
                    os.path.join(os.path.dirname(__file__),
-                                "win_console_handler.py")],
+                                "win_console_handler.py"), tagname],
                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         # Let the interpreter startup before we send signals. See #3137.
-        time.sleep(0.5)
+        count, max = 0, 20
+        while count < max and proc.poll() is None:
+            if m[0] == 1:
+                break
+            time.sleep(0.5)
+            count += 1
+        else:
+            self.fail("Subprocess didn't finish initialization")
         os.kill(proc.pid, event)
         # proc.send_signal(event) could also be done here.
         # Allow time for the signal to be passed and the process to exit.
@@ -1060,14 +1146,8 @@ class Win32KillTests(unittest.TestCase):
         self._kill_with_event(signal.CTRL_BREAK_EVENT, "CTRL_BREAK_EVENT")
 
 
-def skipUnlessWindows6(test):
-    if (hasattr(sys, 'getwindowsversion')
-        and sys.getwindowsversion().major >= 6):
-        return test
-    return unittest.skip("Requires Windows Vista or later")(test)
-
 @unittest.skipUnless(sys.platform == "win32", "Win32 specific tests")
-@support.skip_unless_symlink
+@unittest.skipUnless(hasattr(os, "symlink"), "Requires symlink implementation")
 class Win32SymlinkTests(unittest.TestCase):
     filelink = 'filelinktest'
     filelink_target = os.path.abspath(__file__)
@@ -1140,8 +1220,8 @@ class Win32SymlinkTests(unittest.TestCase):
 
 class FSEncodingTests(unittest.TestCase):
     def test_nop(self):
-        self.assertEquals(os.fsencode(b'abc\xff'), b'abc\xff')
-        self.assertEquals(os.fsdecode('abc\u0141'), 'abc\u0141')
+        self.assertEqual(os.fsencode(b'abc\xff'), b'abc\xff')
+        self.assertEqual(os.fsdecode('abc\u0141'), 'abc\u0141')
 
     def test_identity(self):
         # assert fsdecode(fsencode(x)) == x
@@ -1150,37 +1230,28 @@ class FSEncodingTests(unittest.TestCase):
                 bytesfn = os.fsencode(fn)
             except UnicodeEncodeError:
                 continue
-            self.assertEquals(os.fsdecode(bytesfn), fn)
+            self.assertEqual(os.fsdecode(bytesfn), fn)
 
-    def get_output(self, fs_encoding, func):
-        env = os.environ.copy()
-        env['PYTHONIOENCODING'] = 'utf-8'
-        env['PYTHONFSENCODING'] = fs_encoding
-        code = 'import os; print(%s, end="")' % func
-        process = subprocess.Popen(
-            [sys.executable, "-c", code],
-            stdout=subprocess.PIPE, env=env)
-        stdout, stderr = process.communicate()
-        self.assertEqual(process.returncode, 0)
-        return stdout.decode('utf-8')
 
-    @unittest.skipIf(sys.platform in ('win32', 'darwin'),
-                     'PYTHONFSENCODING is ignored on Windows and Mac OS X')
-    def test_encodings(self):
-        def check(encoding, bytesfn, unicodefn):
-            encoded = self.get_output(encoding, 'repr(os.fsencode(%a))' % unicodefn)
-            self.assertEqual(encoded, repr(bytesfn))
+class PidTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, 'getppid'), "test needs os.getppid")
+    def test_getppid(self):
+        p = subprocess.Popen([sys.executable, '-c',
+                              'import os; print(os.getppid())'],
+                             stdout=subprocess.PIPE)
+        stdout, _ = p.communicate()
+        # We are the parent of our subprocess
+        self.assertEqual(int(stdout), os.getpid())
 
-            decoded = self.get_output(encoding, 'repr(os.fsdecode(%a))' % bytesfn)
-            self.assertEqual(decoded, repr(unicodefn))
 
-        check('utf-8', b'\xc3\xa9\x80', '\xe9\udc80')
-
-        # Raise SkipTest() if sys.executable is not encodable to ascii
-        support.workaroundIssue8611()
-
-        check('ascii', b'abc\xff', 'abc\udcff')
-        check('iso-8859-15', b'\xef\xa4', '\xef\u20ac')
+# The introduction of this TestCase caused at least two different errors on
+# *nix buildbots. Temporarily skip this to let the buildbots move along.
+@unittest.skip("Skip due to platform/environment differences on *NIX buildbots")
+@unittest.skipUnless(hasattr(os, 'getlogin'), "test needs os.getlogin")
+class LoginTests(unittest.TestCase):
+    def test_getlogin(self):
+        user_name = os.getlogin()
+        self.assertNotEqual(len(user_name), 0)
 
 
 def test_main():
@@ -1200,6 +1271,9 @@ def test_main():
         Win32KillTests,
         Win32SymlinkTests,
         FSEncodingTests,
+        PidTests,
+        LoginTests,
+        LinkTests,
     )
 
 if __name__ == "__main__":

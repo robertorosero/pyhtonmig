@@ -9,9 +9,8 @@ import subprocess
 import traceback
 import sys, os, time, errno
 
-if sys.platform == 'os2' or sys.platform == 'riscos':
-    raise unittest.SkipTest("Can't test signal on %s" % \
-                                   sys.platform)
+if sys.platform in ('os2', 'riscos'):
+    raise unittest.SkipTest("Can't test signal on %s" % sys.platform)
 
 
 class HandlerBCalled(Exception):
@@ -204,22 +203,22 @@ class BasicSignalTests(unittest.TestCase):
 
     def test_getsignal(self):
         hup = signal.signal(signal.SIGHUP, self.trivial_signal_handler)
-        self.assertEquals(signal.getsignal(signal.SIGHUP),
-                          self.trivial_signal_handler)
+        self.assertEqual(signal.getsignal(signal.SIGHUP),
+                         self.trivial_signal_handler)
         signal.signal(signal.SIGHUP, hup)
-        self.assertEquals(signal.getsignal(signal.SIGHUP), hup)
+        self.assertEqual(signal.getsignal(signal.SIGHUP), hup)
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows specific")
 class WindowsSignalTests(unittest.TestCase):
     def test_issue9324(self):
+        # Updated for issue #10003, adding SIGBREAK
         handler = lambda x, y: None
-        signal.signal(signal.SIGABRT, handler)
-        signal.signal(signal.SIGFPE, handler)
-        signal.signal(signal.SIGILL, handler)
-        signal.signal(signal.SIGINT, handler)
-        signal.signal(signal.SIGSEGV, handler)
-        signal.signal(signal.SIGTERM, handler)
+        for sig in (signal.SIGABRT, signal.SIGBREAK, signal.SIGFPE,
+                    signal.SIGILL, signal.SIGINT, signal.SIGSEGV,
+                    signal.SIGTERM):
+            # Set and then reset a handler for signals that work on windows
+            signal.signal(sig, signal.signal(sig, handler))
 
         with self.assertRaises(ValueError):
             signal.signal(-1, handler)
@@ -439,8 +438,8 @@ class ItimerTest(unittest.TestCase):
         self.assertEqual(self.hndl_called, True)
 
     # Issue 3864, unknown if this affects earlier versions of freebsd also
-    @unittest.skipIf(sys.platform=='freebsd6',
-        'itimer not reliable (does not mix well with threading) on freebsd6')
+    @unittest.skipIf(sys.platform in ('freebsd6', 'netbsd5'),
+        'itimer not reliable (does not mix well with threading) on some BSDs.')
     def test_itimer_virtual(self):
         self.itimer = signal.ITIMER_VIRTUAL
         signal.signal(signal.SIGVTALRM, self.sig_vtalrm)
@@ -457,9 +456,9 @@ class ItimerTest(unittest.TestCase):
                           "high")
 
         # virtual itimer should be (0.0, 0.0) now
-        self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))
+        self.assertEqual(signal.getitimer(self.itimer), (0.0, 0.0))
         # and the handler should have been called
-        self.assertEquals(self.hndl_called, True)
+        self.assertEqual(self.hndl_called, True)
 
     # Issue 3864, unknown if this affects earlier versions of freebsd also
     @unittest.skipIf(sys.platform=='freebsd6',
@@ -480,7 +479,7 @@ class ItimerTest(unittest.TestCase):
                           "high")
 
         # profiling itimer should be (0.0, 0.0) now
-        self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))
+        self.assertEqual(signal.getitimer(self.itimer), (0.0, 0.0))
         # and the handler should have been called
         self.assertEqual(self.hndl_called, True)
 

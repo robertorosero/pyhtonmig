@@ -131,7 +131,7 @@ class CgiTests(unittest.TestCase):
             if isinstance(expect, dict):
                 # test dict interface
                 self.assertEqual(len(expect), len(fs))
-                self.assertItemsEqual(expect.keys(), fs.keys())
+                self.assertCountEqual(expect.keys(), fs.keys())
                 ##self.assertEqual(norm(expect.values()), norm(fs.values()))
                 ##self.assertEqual(norm(expect.items()), norm(fs.items()))
                 self.assertEqual(fs.getvalue("nonexistent field", "default"), "default")
@@ -182,10 +182,12 @@ class CgiTests(unittest.TestCase):
                 return a
 
         f = TestReadlineFile(tempfile.TemporaryFile("w+"))
+        self.addCleanup(f.close)
         f.write('x' * 256 * 1024)
         f.seek(0)
         env = {'REQUEST_METHOD':'PUT'}
         fs = cgi.FieldStorage(fp=f, environ=env)
+        self.addCleanup(fs.file.close)
         # if we're not chunking properly, readline is only called twice
         # (by read_binary); if we are chunking properly, it will be called 5 times
         # as long as the chunksize is 1 << 16.
@@ -215,7 +217,7 @@ Content-Disposition: form-data; name="submit"
 -----------------------------721837373350705526688164684--
 """
         fs = cgi.FieldStorage(fp=StringIO(postdata), environ=env)
-        self.assertEquals(len(fs.list), 4)
+        self.assertEqual(len(fs.list), 4)
         expect = [{'name':'id', 'filename':None, 'value':'1234'},
                   {'name':'title', 'filename':None, 'value':''},
                   {'name':'file', 'filename':'test.txt', 'value':'Testing 123.'},
@@ -223,7 +225,7 @@ Content-Disposition: form-data; name="submit"
         for x in range(len(fs.list)):
             for k, exp in expect[x].items():
                 got = getattr(fs.list[x], k)
-                self.assertEquals(got, exp)
+                self.assertEqual(got, exp)
 
     _qs_result = {
         'key1': 'value1',

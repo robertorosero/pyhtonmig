@@ -24,6 +24,7 @@ To use, simply 'import logging' and log away!
 """
 
 import sys, os, time, io, traceback, warnings, weakref
+from string import Template
 
 __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'FATAL', 'FileHandler', 'Filter', 'Formatter', 'Handler', 'INFO',
@@ -31,7 +32,8 @@ __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'StreamHandler', 'WARN', 'WARNING', 'addLevelName', 'basicConfig',
            'captureWarnings', 'critical', 'debug', 'disable', 'error',
            'exception', 'fatal', 'getLevelName', 'getLogger', 'getLoggerClass',
-           'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning']
+           'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning',
+           'getLogRecordFactory', 'setLogRecordFactory']
 
 try:
     import codecs
@@ -52,8 +54,6 @@ __date__    = "07 February 2010"
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
 #---------------------------------------------------------------------------
-
-_unicode = 'unicode' in dir(__builtins__)
 
 #
 # _srcfile is used when walking the stack to check when we've got the first
@@ -238,7 +238,7 @@ class LogRecord(object):
     information to be logged.
     """
     def __init__(self, name, level, pathname, lineno,
-                 msg, args, exc_info, func=None):
+                 msg, args, exc_info, func=None, sinfo=None, **kwargs):
         """
         Initialize a logging record with interesting information.
         """
@@ -272,6 +272,7 @@ class LogRecord(object):
             self.module = "Unknown module"
         self.exc_info = exc_info
         self.exc_text = None      # used to cache the traceback text
+        self.stack_info = sinfo
         self.lineno = lineno
         self.funcName = func
         self.created = ct
@@ -313,18 +314,32 @@ class LogRecord(object):
         Return the message for this LogRecord after merging any user-supplied
         arguments with the message.
         """
-        if not _unicode: #if no unicode support...
-            msg = str(self.msg)
-        else:
-            msg = self.msg
-            if not isinstance(msg, str):
-                try:
-                    msg = str(self.msg)
-                except UnicodeError:
-                    msg = self.msg      #Defer encoding till later
+        msg = str(self.msg)
         if self.args:
             msg = msg % self.args
         return msg
+
+#
+#   Determine which class to use when instantiating log records.
+#
+_logRecordFactory = LogRecord
+
+def setLogRecordFactory(factory):
+    """
+    Set the factory to be used when instantiating a log record.
+
+    :param factory: A callable which will be called to instantiate
+    a log record.
+    """
+    global _logRecordFactory
+    _logRecordFactory = factory
+
+def getLogRecordFactory():
+    """
+    Return the factory to be used when instantiating a log record.
+    """
+
+    return _logRecordFactory
 
 def makeLogRecord(dict):
     """
@@ -333,13 +348,56 @@ def makeLogRecord(dict):
     a socket connection (which is sent as a dictionary) into a LogRecord
     instance.
     """
-    rv = LogRecord(None, None, "", 0, "", (), None, None)
+    rv = _logRecordFactory(None, None, "", 0, "", (), None, None)
     rv.__dict__.update(dict)
     return rv
 
 #---------------------------------------------------------------------------
 #   Formatter classes and functions
 #---------------------------------------------------------------------------
+
+class PercentStyle(object):
+
+    default_format = '%(message)s'
+    asctime_format = '%(asctime)s'
+
+    def __init__(self, fmt):
+        self._fmt = fmt or self.default_format
+
+    def usesTime(self):
+        return self._fmt.find(self.asctime_format) >= 0
+
+    def format(self, record):
+        return self._fmt % record.__dict__
+
+class StrFormatStyle(PercentStyle):
+    default_format = '{message}'
+    asctime_format = '{asctime}'
+
+    def format(self, record):
+        return self._fmt.format(**record.__dict__)
+
+
+class StringTemplateStyle(PercentStyle):
+    default_format = '${message}'
+    asctime_format = '${asctime}'
+
+    def __init__(self, fmt):
+        self._fmt = fmt or self.default_format
+        self._tpl = Template(self._fmt)
+
+    def usesTime(self):
+        fmt = self._fmt
+        return fmt.find('$asctime') >= 0 or fmt.find(self.asctime_format) >= 0
+
+    def format(self, record):
+        return self._tpl.substitute(**record.__dict__)
+
+_STYLES = {
+    '%': PercentStyle,
+    '{': StrFormatStyle,
+    '$': StringTemplateStyle
+}
 
 class Formatter(object):
     """
@@ -349,7 +407,7 @@ class Formatter(object):
     responsible for converting a LogRecord to (usually) a string which can
     be interpreted by either a human or an external system. The base Formatter
     allows a formatting string to be specified. If none is supplied, the
-    default value of "%s(message)\\n" is used.
+    default value of "%s(message)" is used.
 
     The Formatter can be initialized with a format string which makes use of
     knowledge of the LogRecord attributes - e.g. the default value mentioned
@@ -385,18 +443,26 @@ class Formatter(object):
 
     converter = time.localtime
 
-    def __init__(self, fmt=None, datefmt=None):
+    def __init__(self, fmt=None, datefmt=None, style='%'):
         """
         Initialize the formatter with specified format strings.
 
         Initialize the formatter either with the specified format string, or a
         default as described above. Allow for specialized date formatting with
         the optional datefmt argument (if omitted, you get the ISO8601 format).
+
+        Use a style parameter of '%', '{' or '$' to specify that you want to
+        use one of %-formatting, :meth:`str.format` (``{}``) formatting or
+        :class:`string.Template` formatting in your format string.
+
+        .. versionchanged: 3.2
+           Added the ``style`` parameter.
         """
-        if fmt:
-            self._fmt = fmt
-        else:
-            self._fmt = "%(message)s"
+        if style not in _STYLES:
+            raise ValueError('Style must be one of: %s' % ','.join(
+                             _STYLES.keys()))
+        self._style = _STYLES[style](fmt)
+        self._fmt = self._style._fmt
         self.datefmt = datefmt
 
     def formatTime(self, record, datefmt=None):
@@ -422,7 +488,7 @@ class Formatter(object):
             s = time.strftime(datefmt, ct)
         else:
             t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-            s = "%s,%03d" % (t, record.msecs)
+            s = "%s,%03d" % (t, record.msecs) # the use of % here is internal
         return s
 
     def formatException(self, ei):
@@ -433,7 +499,11 @@ class Formatter(object):
         traceback.print_exception()
         """
         sio = io.StringIO()
-        traceback.print_exception(ei[0], ei[1], ei[2], None, sio)
+        tb = ei[2]
+        # See issues #9427, #1553375. Commented out for now.
+        #if getattr(self, 'fullstack', False):
+        #    traceback.print_stack(tb.tb_frame.f_back, file=sio)
+        traceback.print_exception(ei[0], ei[1], tb, None, sio)
         s = sio.getvalue()
         sio.close()
         if s[-1:] == "\n":
@@ -444,7 +514,23 @@ class Formatter(object):
         """
         Check if the format uses the creation time of the record.
         """
-        return self._fmt.find("%(asctime)") >= 0
+        return self._style.usesTime()
+
+    def formatMessage(self, record):
+        return self._style.format(record)
+
+    def formatStack(self, stack_info):
+        """
+        This method is provided as an extension point for specialized
+        formatting of stack information.
+
+        The input data is a string as returned from a call to
+        :func:`traceback.print_stack`, but with the last trailing newline
+        removed.
+
+        The base implementation just returns the value passed in.
+        """
+        return stack_info
 
     def format(self, record):
         """
@@ -462,7 +548,7 @@ class Formatter(object):
         record.message = record.getMessage()
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
-        s = self._fmt % record.__dict__
+        s = self.formatMessage(record)
         if record.exc_info:
             # Cache the traceback text to avoid converting it multiple times
             # (it's constant anyway)
@@ -472,6 +558,10 @@ class Formatter(object):
             if s[-1:] != "\n":
                 s = s + "\n"
             s = s + record.exc_text
+        if record.stack_info:
+            if s[-1:] != "\n":
+                s = s + "\n"
+            s = s + self.formatStack(record.stack_info)
         return s
 
 #
@@ -590,10 +680,18 @@ class Filterer(object):
         The default is to allow the record to be logged; any filter can veto
         this and the record is then dropped. Returns a zero value if a record
         is to be dropped, else non-zero.
+
+        .. versionchanged: 3.2
+
+           Allow filters to be just callables.
         """
         rv = 1
         for f in self.filters:
-            if not f.filter(record):
+            if hasattr(f, 'filter'):
+                result = f.filter(record)
+            else:
+                result = f(record) # assume callable - will raise if not
+            if not result:
                 rv = 0
                 break
         return rv
@@ -801,6 +899,8 @@ class StreamHandler(Handler):
     sys.stdout or sys.stderr may be used.
     """
 
+    terminator = '\n'
+
     def __init__(self, stream=None):
         """
         Initialize the handler.
@@ -833,28 +933,8 @@ class StreamHandler(Handler):
         try:
             msg = self.format(record)
             stream = self.stream
-            fs = "%s\n"
-            if not _unicode: #if no unicode support...
-                stream.write(fs % msg)
-            else:
-                try:
-                    if (isinstance(msg, unicode) and
-                        getattr(stream, 'encoding', None)):
-                        fs = fs.decode(stream.encoding)
-                        try:
-                            stream.write(fs % msg)
-                        except UnicodeEncodeError:
-                            #Printing to terminals sometimes fails. For example,
-                            #with an encoding of 'cp1251', the above write will
-                            #work if written to a stream opened or wrapped by
-                            #the codecs module, but fail when writing to a
-                            #terminal even when the codepage is set to cp1251.
-                            #An extra encoding step seems to be needed.
-                            stream.write((fs % msg).encode(stream.encoding))
-                    else:
-                        stream.write(fs % msg)
-                except UnicodeError:
-                    stream.write(fs % msg.encode("UTF-8"))
+            stream.write(msg)
+            stream.write(self.terminator)
             self.flush()
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -931,16 +1011,13 @@ class PlaceHolder(object):
         """
         Initialize with the specified logger being a child of this placeholder.
         """
-        #self.loggers = [alogger]
         self.loggerMap = { alogger : None }
 
     def append(self, alogger):
         """
         Add the specified logger as a child of this placeholder.
         """
-        #if alogger not in self.loggers:
         if alogger not in self.loggerMap:
-            #self.loggers.append(alogger)
             self.loggerMap[alogger] = None
 
 #
@@ -982,6 +1059,7 @@ class Manager(object):
         self.emittedNoHandlerWarning = 0
         self.loggerDict = {}
         self.loggerClass = None
+        self.logRecordFactory = None
 
     def getLogger(self, name):
         """
@@ -1024,6 +1102,13 @@ class Manager(object):
                 raise TypeError("logger not derived from logging.Logger: "
                                 + klass.__name__)
         self.loggerClass = klass
+
+    def setLogRecordFactory(self, factory):
+        """
+        Set the factory to be used when instantiating a log record with this
+        Manager.
+        """
+        self.logRecordFactory = factory
 
     def _fixupParents(self, alogger):
         """
@@ -1149,11 +1234,12 @@ class Logger(Filterer):
         if self.isEnabledFor(ERROR):
             self._log(ERROR, msg, args, **kwargs)
 
-    def exception(self, msg, *args):
+    def exception(self, msg, *args, **kwargs):
         """
         Convenience method for logging an ERROR with exception information.
         """
-        self.error(msg, exc_info=1, *args)
+        kwargs['exc_info'] = True
+        self.error(msg, *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
         """
@@ -1186,7 +1272,7 @@ class Logger(Filterer):
         if self.isEnabledFor(level):
             self._log(level, msg, args, **kwargs)
 
-    def findCaller(self):
+    def findCaller(self, stack_info=False):
         """
         Find the stack frame of the caller so that we can note the source
         file name, line number and function name.
@@ -1196,23 +1282,34 @@ class Logger(Filterer):
         #IronPython isn't run with -X:Frames.
         if f is not None:
             f = f.f_back
-        rv = "(unknown file)", 0, "(unknown function)"
+        rv = "(unknown file)", 0, "(unknown function)", None
         while hasattr(f, "f_code"):
             co = f.f_code
             filename = os.path.normcase(co.co_filename)
             if filename == _srcfile:
                 f = f.f_back
                 continue
-            rv = (filename, f.f_lineno, co.co_name)
+            sinfo = None
+            if stack_info:
+                sio = io.StringIO()
+                sio.write('Stack (most recent call last):\n')
+                traceback.print_stack(f, file=sio)
+                sinfo = sio.getvalue()
+                if sinfo[-1] == '\n':
+                    sinfo = sinfo[:-1]
+                sio.close()
+            rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
             break
         return rv
 
-    def makeRecord(self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None):
+    def makeRecord(self, name, level, fn, lno, msg, args, exc_info,
+                   func=None, extra=None, sinfo=None):
         """
         A factory method which can be overridden in subclasses to create
         specialized LogRecords.
         """
-        rv = LogRecord(name, level, fn, lno, msg, args, exc_info, func)
+        rv = _logRecordFactory(name, level, fn, lno, msg, args, exc_info, func,
+                             sinfo)
         if extra is not None:
             for key in extra:
                 if (key in ["message", "asctime"]) or (key in rv.__dict__):
@@ -1220,17 +1317,18 @@ class Logger(Filterer):
                 rv.__dict__[key] = extra[key]
         return rv
 
-    def _log(self, level, msg, args, exc_info=None, extra=None):
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False):
         """
         Low-level logging routine which creates a LogRecord and then calls
         all the handlers of this logger to handle the record.
         """
+        sinfo = None
         if _srcfile:
             #IronPython doesn't track Python frames, so findCaller throws an
             #exception on some versions of IronPython. We trap it here so that
             #IronPython can use logging.
             try:
-                fn, lno, func = self.findCaller()
+                fn, lno, func, sinfo = self.findCaller(stack_info)
             except ValueError:
                 fn, lno, func = "(unknown file)", 0, "(unknown function)"
         else:
@@ -1238,7 +1336,8 @@ class Logger(Filterer):
         if exc_info:
             if not isinstance(exc_info, tuple):
                 exc_info = sys.exc_info()
-        record = self.makeRecord(self.name, level, fn, lno, msg, args, exc_info, func, extra)
+        record = self.makeRecord(self.name, level, fn, lno, msg, args,
+                                 exc_info, func, extra, sinfo)
         self.handle(record)
 
     def handle(self, record):
@@ -1255,20 +1354,45 @@ class Logger(Filterer):
         """
         Add the specified handler to this logger.
         """
-        if not (hdlr in self.handlers):
-            self.handlers.append(hdlr)
+        _acquireLock()
+        try:
+            if not (hdlr in self.handlers):
+                self.handlers.append(hdlr)
+        finally:
+            _releaseLock()
 
     def removeHandler(self, hdlr):
         """
         Remove the specified handler from this logger.
         """
-        if hdlr in self.handlers:
-            #hdlr.close()
-            hdlr.acquire()
-            try:
+        _acquireLock()
+        try:
+            if hdlr in self.handlers:
                 self.handlers.remove(hdlr)
-            finally:
-                hdlr.release()
+        finally:
+            _releaseLock()
+
+    def hasHandlers(self):
+        """
+        See if this logger has any handlers configured.
+
+        Loop through all handlers for this logger and its parents in the
+        logger hierarchy. Return True if a handler was found, else False.
+        Stop searching up the hierarchy whenever a logger with the "propagate"
+        attribute set to zero is found - that will be the last logger which
+        is checked for the existence of handlers.
+        """
+        c = self
+        rv = False
+        while c:
+            if c.handlers:
+                rv = True
+                break
+            if not c.propagate:
+                break
+            else:
+                c = c.parent
+        return rv
 
     def callHandlers(self, record):
         """
@@ -1384,68 +1508,82 @@ class LoggerAdapter(object):
         kwargs["extra"] = self.extra
         return msg, kwargs
 
+    #
+    # Boilerplate convenience methods
+    #
     def debug(self, msg, *args, **kwargs):
         """
-        Delegate a debug call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate a debug call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.debug(msg, *args, **kwargs)
+        self.log(DEBUG, msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
         """
-        Delegate an info call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate an info call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.info(msg, *args, **kwargs)
+        self.log(INFO, msg, *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
         """
-        Delegate a warning call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate a warning call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.warning(msg, *args, **kwargs)
+        self.log(WARNING, msg, *args, **kwargs)
+
+    warn = warning
 
     def error(self, msg, *args, **kwargs):
         """
-        Delegate an error call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate an error call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.error(msg, *args, **kwargs)
+        self.log(ERROR, msg, *args, **kwargs)
 
     def exception(self, msg, *args, **kwargs):
         """
-        Delegate an exception call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate an exception call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
         kwargs["exc_info"] = 1
-        self.logger.error(msg, *args, **kwargs)
+        self.log(ERROR, msg, *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
         """
-        Delegate a critical call to the underlying logger, after adding
-        contextual information from this adapter instance.
+        Delegate a critical call to the underlying logger.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.critical(msg, *args, **kwargs)
+        self.log(CRITICAL, msg, *args, **kwargs)
 
     def log(self, level, msg, *args, **kwargs):
         """
         Delegate a log call to the underlying logger, after adding
         contextual information from this adapter instance.
         """
-        msg, kwargs = self.process(msg, kwargs)
-        self.logger.log(level, msg, *args, **kwargs)
+        if self.isEnabledFor(level):
+            msg, kwargs = self.process(msg, kwargs)
+            self.logger._log(level, msg, args, **kwargs)
 
     def isEnabledFor(self, level):
         """
-        See if the underlying logger is enabled for the specified level.
+        Is this logger enabled for level 'level'?
         """
-        return self.logger.isEnabledFor(level)
+        if self.logger.manager.disable >= level:
+            return False
+        return level >= self.getEffectiveLevel()
+
+    def setLevel(self, level):
+        """
+        Set the specified level on the underlying logger.
+        """
+        self.logger.setLevel(level)
+
+    def getEffectiveLevel(self):
+        """
+        Get the effective level for the underlying logger.
+        """
+        return self.logger.getEffectiveLevel()
+
+    def hasHandlers(self):
+        """
+        See if the underlying logger has any handlers.
+        """
+        return self.logger.hasHandlers()
 
 root = RootLogger(WARNING)
 Logger.root = root
@@ -1478,6 +1616,10 @@ def basicConfig(**kwargs):
               (if filemode is unspecified, it defaults to 'a').
     format    Use the specified format string for the handler.
     datefmt   Use the specified date/time format.
+    style     If a format string is specified, use this to specify the
+              type of format string (possible values '%', '{', '$', for
+              %-formatting, :meth:`str.format` and :class:`string.Template`
+              - defaults to '%').
     level     Set the root logger level to the specified level.
     stream    Use the specified stream to initialize the StreamHandler. Note
               that this argument is incompatible with 'filename' - if both
@@ -1488,23 +1630,33 @@ def basicConfig(**kwargs):
     remembered that StreamHandler does not close its stream (since it may be
     using sys.stdout or sys.stderr), whereas FileHandler closes its stream
     when the handler is closed.
+
+    .. versionchanged: 3.2
+       Added the ``style`` parameter.
     """
-    if len(root.handlers) == 0:
-        filename = kwargs.get("filename")
-        if filename:
-            mode = kwargs.get("filemode", 'a')
-            hdlr = FileHandler(filename, mode)
-        else:
-            stream = kwargs.get("stream")
-            hdlr = StreamHandler(stream)
-        fs = kwargs.get("format", BASIC_FORMAT)
-        dfs = kwargs.get("datefmt", None)
-        fmt = Formatter(fs, dfs)
-        hdlr.setFormatter(fmt)
-        root.addHandler(hdlr)
-        level = kwargs.get("level")
-        if level is not None:
-            root.setLevel(level)
+    # Add thread safety in case someone mistakenly calls
+    # basicConfig() from multiple threads
+    _acquireLock()
+    try:
+        if len(root.handlers) == 0:
+            filename = kwargs.get("filename")
+            if filename:
+                mode = kwargs.get("filemode", 'a')
+                hdlr = FileHandler(filename, mode)
+            else:
+                stream = kwargs.get("stream")
+                hdlr = StreamHandler(stream)
+            fs = kwargs.get("format", BASIC_FORMAT)
+            dfs = kwargs.get("datefmt", None)
+            style = kwargs.get("style", '%')
+            fmt = Formatter(fs, dfs, style)
+            hdlr.setFormatter(fmt)
+            root.addHandler(hdlr)
+            level = kwargs.get("level")
+            if level is not None:
+                root.setLevel(level)
+    finally:
+        _releaseLock()
 
 #---------------------------------------------------------------------------
 # Utility functions at module level.
@@ -1521,15 +1673,6 @@ def getLogger(name=None):
         return Logger.manager.getLogger(name)
     else:
         return root
-
-#def getRootLogger():
-#    """
-#    Return the root logger.
-#
-#    Note that getLogger('') now does the same thing, so this function is
-#    deprecated and may disappear in the future.
-#    """
-#    return root
 
 def critical(msg, *args, **kwargs):
     """
@@ -1549,12 +1692,13 @@ def error(msg, *args, **kwargs):
         basicConfig()
     root.error(msg, *args, **kwargs)
 
-def exception(msg, *args):
+def exception(msg, *args, **kwargs):
     """
     Log a message with severity 'ERROR' on the root logger,
     with exception information.
     """
-    error(msg, exc_info=1, *args)
+    kwargs['exc_info'] = True
+    error(msg, *args, **kwargs)
 
 def warning(msg, *args, **kwargs):
     """
@@ -1639,8 +1783,14 @@ class NullHandler(Handler):
     a NullHandler and add it to the top-level logger of the library module or
     package.
     """
+    def handle(self, record):
+        pass
+
     def emit(self, record):
         pass
+
+    def createLock(self):
+        self.lock = None
 
 # Warnings integration
 

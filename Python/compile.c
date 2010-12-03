@@ -25,10 +25,8 @@
 
 #include "Python-ast.h"
 #include "node.h"
-#include "pyarena.h"
 #include "ast.h"
 #include "code.h"
-#include "compile.h"
 #include "symtable.h"
 #include "opcode.h"
 
@@ -123,6 +121,7 @@ struct compiler_unit {
 
     int u_firstlineno; /* the first lineno of the block */
     int u_lineno;          /* the lineno for the current stmt */
+    int u_col_offset;      /* the offset of the current stmt */
     int u_lineno_set;  /* boolean to indicate whether instr
                           has been generated with current lineno */
 };
@@ -486,6 +485,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
     u->u_nfblocks = 0;
     u->u_firstlineno = lineno;
     u->u_lineno = 0;
+    u->u_col_offset = 0;
     u->u_lineno_set = 0;
     u->u_consts = PyDict_New();
     if (!u->u_consts) {
@@ -680,8 +680,8 @@ opcode_stack_effect(int opcode, int oparg)
             return 0;
         case DUP_TOP:
             return 1;
-        case ROT_FOUR:
-            return 0;
+        case DUP_TOP_TWO:
+            return 2;
 
         case UNARY_POSITIVE:
         case UNARY_NEGATIVE:
@@ -782,8 +782,6 @@ opcode_stack_effect(int opcode, int oparg)
             return -1;
         case DELETE_GLOBAL:
             return 0;
-        case DUP_TOPX:
-            return oparg;
         case LOAD_CONST:
             return 1;
         case LOAD_NAME:
@@ -859,6 +857,8 @@ opcode_stack_effect(int opcode, int oparg)
             return 1;
         case STORE_DEREF:
             return -1;
+        case DELETE_DEREF:
+            return 0;
         default:
             fprintf(stderr, "opcode = %d\n", opcode);
             Py_FatalError("opcode_stack_effect()");
@@ -1965,6 +1965,7 @@ compiler_try_except(struct compiler *c, stmt_ty s)
             return compiler_error(c, "default 'except:' must be last");
         c->u->u_lineno_set = 0;
         c->u->u_lineno = handler->lineno;
+        c->u->u_col_offset = handler->col_offset;
         except = compiler_new_block(c);
         if (except == NULL)
             return 0;
@@ -2247,6 +2248,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 
     /* Always assign a lineno to the next instruction for a stmt. */
     c->u->u_lineno = s->lineno;
+    c->u->u_col_offset = s->col_offset;
     c->u->u_lineno_set = 0;
 
     switch (s->kind) {
@@ -2508,13 +2510,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
         case AugLoad:
         case AugStore:
             break;
-        case Del:
-            PyErr_Format(PyExc_SyntaxError,
-                         "can not delete variable '%S' referenced "
-                         "in nested scope",
-                         name);
-            Py_DECREF(mangled);
-            return 0;
+        case Del: op = DELETE_DEREF; break;
         case Param:
         default:
             PyErr_SetString(PyExc_SystemError,
@@ -3128,6 +3124,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         c->u->u_lineno = e->lineno;
         c->u->u_lineno_set = 0;
     }
+    /* Updating the column offset is always harmless. */
+    c->u->u_col_offset = e->col_offset;
     switch (e->kind) {
     case BoolOp_kind:
         return compiler_boolop(c, e);
@@ -3361,7 +3359,7 @@ compiler_in_loop(struct compiler *c) {
 static int
 compiler_error(struct compiler *c, const char *errstr)
 {
-    PyObject *loc;
+    PyObject *loc, *filename;
     PyObject *u = NULL, *v = NULL;
 
     loc = PyErr_ProgramText(c->c_filename, c->u->u_lineno);
@@ -3369,8 +3367,17 @@ compiler_error(struct compiler *c, const char *errstr)
         Py_INCREF(Py_None);
         loc = Py_None;
     }
-    u = Py_BuildValue("(ziOO)", c->c_filename, c->u->u_lineno,
-                      Py_None, loc);
+    if (c->c_filename != NULL) {
+        filename = PyUnicode_DecodeFSDefault(c->c_filename);
+        if (!filename)
+            goto exit;
+    }
+    else {
+        Py_INCREF(Py_None);
+        filename = Py_None;
+    }
+    u = Py_BuildValue("(NiiO)", filename, c->u->u_lineno,
+                      c->u->u_col_offset, loc);
     if (!u)
         goto exit;
     v = Py_BuildValue("(zO)", errstr, u);
@@ -3404,7 +3411,7 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
             return 0;
     }
     if (ctx == AugLoad) {
-        ADDOP_I(c, DUP_TOPX, 2);
+        ADDOP(c, DUP_TOP_TWO);
     }
     else if (ctx == AugStore) {
         ADDOP(c, ROT_THREE);
@@ -3942,7 +3949,7 @@ makecode(struct compiler *c, struct assembler *a)
     freevars = dict_keys_inorder(c->u->u_freevars, PyTuple_Size(cellvars));
     if (!freevars)
         goto error;
-    filename = PyUnicode_FromString(c->c_filename);
+    filename = PyUnicode_DecodeFSDefault(c->c_filename);
     if (!filename)
         goto error;
 

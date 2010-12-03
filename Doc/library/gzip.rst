@@ -9,10 +9,9 @@ like the GNU programs :program:`gzip` and :program:`gunzip` would.
 
 The data compression is provided by the :mod:`zlib` module.
 
-The :mod:`gzip` module provides the :class:`GzipFile` class which is modeled
-after Python's File Object. The :class:`GzipFile` class reads and writes
-:program:`gzip`\ -format files, automatically compressing or decompressing the
-data so that it looks like an ordinary file object.
+The :mod:`gzip` module provides the :class:`GzipFile` class. The :class:`GzipFile`
+class reads and writes :program:`gzip`\ -format files, automatically compressing
+or decompressing the data so that it looks like an ordinary :term:`file object`.
 
 Note that additional file formats which can be decompressed by the
 :program:`gzip` and :program:`gunzip` programs, such  as those produced by
@@ -26,10 +25,10 @@ The module defines the following items:
 
 .. class:: GzipFile(filename=None, mode=None, compresslevel=9, fileobj=None, mtime=None)
 
-   Constructor for the :class:`GzipFile` class, which simulates most of the methods
-   of a file object, with the exception of the :meth:`readinto` and
-   :meth:`truncate` methods.  At least one of *fileobj* and *filename* must be
-   given a non-trivial value.
+   Constructor for the :class:`GzipFile` class, which simulates most of the
+   methods of a :term:`file object`, with the exception of the :meth:`truncate`
+   method.  At least one of *fileobj* and *filename* must be given a non-trivial
+   value.
 
    The new class instance is based on *fileobj*, which can be a regular file, a
    :class:`StringIO` object, or any other object which simulates a file.  It
@@ -63,17 +62,33 @@ The module defines the following items:
 
    Calling a :class:`GzipFile` object's :meth:`close` method does not close
    *fileobj*, since you might wish to append more material after the compressed
-   data.  This also allows you to pass a :class:`StringIO` object opened for
+   data.  This also allows you to pass a :class:`io.BytesIO` object opened for
    writing as *fileobj*, and retrieve the resulting memory buffer using the
-   :class:`StringIO` object's :meth:`getvalue` method.
+   :class:`io.BytesIO` object's :meth:`~io.BytesIO.getvalue` method.
 
-   :class:`GzipFile` supports iteration and the :keyword:`with` statement.
+   :class:`GzipFile` supports the :class:`io.BufferedIOBase` interface,
+   including iteration and the :keyword:`with` statement.  Only the
+   :meth:`truncate` method isn't implemented.
+
+   :class:`GzipFile` also provides the following method:
+
+   .. method:: peek([n])
+
+      Read *n* uncompressed bytes without advancing the file position.
+      At most one single read on the compressed stream is done to satisfy
+      the call.  The number of bytes returned may be more or less than
+      requested.
+
+      .. versionadded:: 3.2
 
    .. versionchanged:: 3.1
       Support for the :keyword:`with` statement was added.
 
    .. versionchanged:: 3.2
       Support for zero-padded files was added.
+
+   .. versionchanged:: 3.2
+      Support for unseekable files was added.
 
 
 .. function:: open(filename, mode='rb', compresslevel=9)

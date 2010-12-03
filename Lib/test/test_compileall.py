@@ -7,6 +7,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
 import unittest
 import io
 
@@ -112,7 +113,7 @@ class EncodingTest(unittest.TestCase):
 
 
 class CommandLineTests(unittest.TestCase):
-    """Test some aspects of compileall's CLI."""
+    """Test compileall's CLI."""
 
     def setUp(self):
         self.addCleanup(self._cleanup)
@@ -131,22 +132,28 @@ class CommandLineTests(unittest.TestCase):
         assert sys.path[0] == self.directory, 'Missing path'
         del sys.path[0]
 
-    def test_pep3147_paths(self):
-        # Ensure that the default behavior of compileall's CLI is to create
-        # PEP 3147 pyc/pyo files.
-        retcode = subprocess.call(
-            (sys.executable, '-m', 'compileall', '-q', self.pkgdir))
-        self.assertEqual(retcode, 0)
-        # Verify the __pycache__ directory contents.
-        cachedir = os.path.join(self.pkgdir, '__pycache__')
-        self.assertTrue(os.path.exists(cachedir))
-        ext = ('pyc' if __debug__ else 'pyo')
-        expected = sorted(base.format(imp.get_tag(), ext) for base in
-                          ('__init__.{}.{}', 'bar.{}.{}'))
-        self.assertEqual(sorted(os.listdir(cachedir)), expected)
-        # Make sure there are no .pyc files in the source directory.
-        self.assertFalse([pyc_file for pyc_file in os.listdir(self.pkgdir)
-                          if pyc_file.endswith(ext)])
+    # Ensure that the default behavior of compileall's CLI is to create
+    # PEP 3147 pyc/pyo files.
+    for name, ext, switch in [
+        ('normal', 'pyc', []),
+        ('optimize', 'pyo', ['-O']),
+        ('doubleoptimize', 'pyo', ['-OO']),
+    ]:
+        def f(self, ext=ext, switch=switch):
+            retcode = subprocess.call(
+                [sys.executable] + switch +
+                ['-m', 'compileall', '-q', self.pkgdir])
+            self.assertEqual(retcode, 0)
+            # Verify the __pycache__ directory contents.
+            cachedir = os.path.join(self.pkgdir, '__pycache__')
+            self.assertTrue(os.path.exists(cachedir))
+            expected = sorted(base.format(imp.get_tag(), ext) for base in
+                              ('__init__.{}.{}', 'bar.{}.{}'))
+            self.assertEqual(sorted(os.listdir(cachedir)), expected)
+            # Make sure there are no .pyc files in the source directory.
+            self.assertFalse([pyc_file for pyc_file in os.listdir(self.pkgdir)
+                              if pyc_file.endswith(ext)])
+        locals()['test_pep3147_paths_' + name] = f
 
     def test_legacy_paths(self):
         # Ensure that with the proper switch, compileall leaves legacy
@@ -157,10 +164,7 @@ class CommandLineTests(unittest.TestCase):
         # Verify the __pycache__ directory contents.
         cachedir = os.path.join(self.pkgdir, '__pycache__')
         self.assertFalse(os.path.exists(cachedir))
-        ext = ('pyc' if __debug__ else 'pyo')
-        expected = [base.format(ext) for base in ('__init__.{}', 'bar.{}')]
-        expected.extend(['__init__.py', 'bar.py'])
-        expected.sort()
+        expected = sorted(['__init__.py', '__init__.pyc', 'bar.py', 'bar.pyc'])
         self.assertEqual(sorted(os.listdir(self.pkgdir)), expected)
 
     def test_multiple_runs(self):
@@ -180,6 +184,59 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(retcode, 0)
         self.assertTrue(os.path.exists(cachedir))
         self.assertFalse(os.path.exists(cachecachedir))
+
+    def test_force(self):
+        retcode = subprocess.call(
+            (sys.executable, '-m', 'compileall', '-q', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        pycpath = imp.cache_from_source(os.path.join(self.pkgdir, 'bar.py'))
+        # set atime/mtime backward to avoid file timestamp resolution issues
+        os.utime(pycpath, (time.time()-60,)*2)
+        access = os.stat(pycpath).st_mtime
+        retcode = subprocess.call(
+            (sys.executable, '-m', 'compileall', '-q', '-f', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        access2 = os.stat(pycpath).st_mtime
+        self.assertNotEqual(access, access2)
+
+    def test_legacy(self):
+        # create a new module  XXX could rewrite using self.pkgdir
+        newpackage = os.path.join(self.pkgdir, 'spam')
+        os.mkdir(newpackage)
+        with open(os.path.join(newpackage, '__init__.py'), 'w'):
+            pass
+        with open(os.path.join(newpackage, 'ham.py'), 'w'):
+            pass
+        sourcefile = os.path.join(newpackage, 'ham.py')
+
+        retcode = subprocess.call(
+                (sys.executable, '-m', 'compileall',  '-q', '-l', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        self.assertFalse(os.path.exists(imp.cache_from_source(sourcefile)))
+
+        retcode = subprocess.call(
+                (sys.executable, '-m', 'compileall', '-q', self.pkgdir))
+        self.assertEqual(retcode, 0)
+        self.assertTrue(os.path.exists(imp.cache_from_source(sourcefile)))
+
+    def test_quiet(self):
+        noise = subprocess.check_output(
+             [sys.executable, '-m', 'compileall', self.pkgdir],
+             stderr=subprocess.STDOUT)
+        quiet = subprocess.check_output(
+            [sys.executable, '-m', 'compileall', '-f', '-q', self.pkgdir],
+            stderr=subprocess.STDOUT)
+        self.assertGreater(len(noise), len(quiet))
+
+    def test_regexp(self):
+        retcode = subprocess.call(
+            (sys.executable, '-m', 'compileall', '-q', '-x', 'bar.*', self.pkgdir))
+        self.assertEqual(retcode, 0)
+
+        sourcefile = os.path.join(self.pkgdir, 'bar.py')
+        self.assertFalse(os.path.exists(imp.cache_from_source(sourcefile)))
+        sourcefile = os.path.join(self.pkgdir, '__init__.py')
+        self.assertTrue(os.path.exists(imp.cache_from_source(sourcefile)))
 
 
 def test_main():

@@ -49,11 +49,8 @@ meaning otherwise.
 #define PyDict_MINSIZE 8
 
 typedef struct {
-    /* Cached hash code of me_key.  Note that hash codes are C longs.
-     * We have to use Py_ssize_t instead because dict_popitem() abuses
-     * me_hash to hold a search finger.
-     */
-    Py_ssize_t me_hash;
+    /* Cached hash code of me_key. */
+    Py_hash_t me_hash;
     PyObject *me_key;
     PyObject *me_value;
 } PyDictEntry;
@@ -85,7 +82,7 @@ struct _dictobject {
      * setitem calls.
      */
     PyDictEntry *ma_table;
-    PyDictEntry *(*ma_lookup)(PyDictObject *mp, PyObject *key, long hash);
+    PyDictEntry *(*ma_lookup)(PyDictObject *mp, PyObject *key, Py_hash_t hash);
     PyDictEntry ma_smalltable[PyDict_MINSIZE];
 };
 #endif /* Py_LIMITED_API */
@@ -119,7 +116,7 @@ PyAPI_FUNC(int) PyDict_Next(
     PyObject *mp, Py_ssize_t *pos, PyObject **key, PyObject **value);
 #ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _PyDict_Next(
-    PyObject *mp, Py_ssize_t *pos, PyObject **key, PyObject **value, long *hash);
+    PyObject *mp, Py_ssize_t *pos, PyObject **key, PyObject **value, Py_hash_t *hash);
 #endif
 PyAPI_FUNC(PyObject *) PyDict_Keys(PyObject *mp);
 PyAPI_FUNC(PyObject *) PyDict_Values(PyObject *mp);
@@ -128,7 +125,7 @@ PyAPI_FUNC(Py_ssize_t) PyDict_Size(PyObject *mp);
 PyAPI_FUNC(PyObject *) PyDict_Copy(PyObject *mp);
 PyAPI_FUNC(int) PyDict_Contains(PyObject *mp, PyObject *key);
 #ifndef Py_LIMITED_API
-PyAPI_FUNC(int) _PyDict_Contains(PyObject *mp, PyObject *key, long hash);
+PyAPI_FUNC(int) _PyDict_Contains(PyObject *mp, PyObject *key, Py_hash_t hash);
 PyAPI_FUNC(PyObject *) _PyDict_NewPresized(Py_ssize_t minused);
 PyAPI_FUNC(void) _PyDict_MaybeUntrack(PyObject *mp);
 PyAPI_FUNC(int) _PyDict_HasOnlyStringKeys(PyObject *mp);

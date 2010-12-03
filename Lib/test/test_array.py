@@ -11,6 +11,7 @@ import operator
 import io
 import math
 import struct
+import warnings
 
 import array
 from array import _array_reconstructor as array_reconstructor
@@ -237,9 +238,9 @@ class BaseTest(unittest.TestCase):
     def test_reduce_ex(self):
         a = array.array(self.typecode, self.example)
         for protocol in range(3):
-            self.assert_(a.__reduce_ex__(protocol)[0] is array.array)
+            self.assertIs(a.__reduce_ex__(protocol)[0], array.array)
         for protocol in range(3, pickle.HIGHEST_PROTOCOL):
-            self.assert_(a.__reduce_ex__(protocol)[0] is array_reconstructor)
+            self.assertIs(a.__reduce_ex__(protocol)[0], array_reconstructor)
 
     def test_pickle(self):
         for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -367,15 +368,35 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(a, b)
 
     def test_tofromstring(self):
+        nb_warnings = 4
+        with warnings.catch_warnings(record=True) as r:
+            warnings.filterwarnings("always",
+                                    message=r"(to|from)string\(\) is deprecated",
+                                    category=DeprecationWarning)
+            a = array.array(self.typecode, 2*self.example)
+            b = array.array(self.typecode)
+            self.assertRaises(TypeError, a.tostring, 42)
+            self.assertRaises(TypeError, b.fromstring)
+            self.assertRaises(TypeError, b.fromstring, 42)
+            b.fromstring(a.tostring())
+            self.assertEqual(a, b)
+            if a.itemsize>1:
+                self.assertRaises(ValueError, b.fromstring, "x")
+                nb_warnings += 1
+        self.assertEqual(len(r), nb_warnings)
+
+    def test_tofrombytes(self):
         a = array.array(self.typecode, 2*self.example)
         b = array.array(self.typecode)
-        self.assertRaises(TypeError, a.tostring, 42)
-        self.assertRaises(TypeError, b.fromstring)
-        self.assertRaises(TypeError, b.fromstring, 42)
-        b.fromstring(a.tostring())
+        self.assertRaises(TypeError, a.tobytes, 42)
+        self.assertRaises(TypeError, b.frombytes)
+        self.assertRaises(TypeError, b.frombytes, 42)
+        b.frombytes(a.tobytes())
+        c = array.array(self.typecode, bytearray(a.tobytes()))
         self.assertEqual(a, b)
+        self.assertEqual(a, c)
         if a.itemsize>1:
-            self.assertRaises(ValueError, b.fromstring, "x")
+            self.assertRaises(ValueError, b.frombytes, b"x")
 
     def test_repr(self):
         a = array.array(self.typecode, 2*self.example)
@@ -764,11 +785,11 @@ class BaseTest(unittest.TestCase):
                     data.reverse()
                     L[start:stop:step] = data
                     a[start:stop:step] = array.array(self.typecode, data)
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
                     del L[start:stop:step]
                     del a[start:stop:step]
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
     def test_index(self):
         example = 2*self.example
@@ -898,8 +919,8 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example)
         m = memoryview(a)
         expected = m.tobytes()
-        self.assertEqual(a.tostring(), expected)
-        self.assertEqual(a.tostring()[0], expected[0])
+        self.assertEqual(a.tobytes(), expected)
+        self.assertEqual(a.tobytes()[0], expected[0])
         # Resizing is forbidden when there are buffer exports.
         # For issue 4509, we also check after each error that
         # the array was not modified.
@@ -913,7 +934,7 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.fromlist, a.tolist())
         self.assertEqual(m.tobytes(), expected)
-        self.assertRaises(BufferError, a.fromstring, a.tostring())
+        self.assertRaises(BufferError, a.frombytes, a.tobytes())
         self.assertEqual(m.tobytes(), expected)
         if self.typecode == 'u':
             self.assertRaises(BufferError, a.fromunicode, a.tounicode())
@@ -932,7 +953,7 @@ class BaseTest(unittest.TestCase):
     def test_weakref(self):
         s = array.array(self.typecode, self.example)
         p = weakref.proxy(s)
-        self.assertEqual(p.tostring(), s.tostring())
+        self.assertEqual(p.tobytes(), s.tobytes())
         s = None
         self.assertRaises(ReferenceError, len, p)
 
@@ -1110,6 +1131,23 @@ class UnsignedNumberTest(NumberTest):
         upper = int(pow(2, a.itemsize * 8)) - 1
         self.check_overflow(lower, upper)
 
+    def test_bytes_extend(self):
+        s = bytes(self.example)
+
+        a = array.array(self.typecode, self.example)
+        a.extend(s)
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example)
+        )
+
+        a = array.array(self.typecode, self.example)
+        a.extend(bytearray(reversed(s)))
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example[::-1])
+        )
+
 
 class ByteTest(SignedNumberTest):
     typecode = 'b'
@@ -1172,7 +1210,7 @@ class FPTest(NumberTest):
                 # On alphas treating the byte swapped bit patters as
                 # floats/doubles results in floating point exceptions
                 # => compare the 8bit string values instead
-                self.assertNotEqual(a.tostring(), b.tostring())
+                self.assertNotEqual(a.tobytes(), b.tobytes())
             b.byteswap()
             self.assertEqual(a, b)
 

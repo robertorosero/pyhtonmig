@@ -243,8 +243,13 @@ class OpenWrapper:
         return open(*args, **kwargs)
 
 
-class UnsupportedOperation(ValueError, IOError):
-    pass
+# In normal operation, both `UnsupportedOperation`s should be bound to the
+# same object.
+try:
+    UnsupportedOperation = io.UnsupportedOperation
+except AttributeError:
+    class UnsupportedOperation(ValueError, IOError):
+        pass
 
 
 class IOBase(metaclass=abc.ABCMeta):
@@ -259,7 +264,8 @@ class IOBase(metaclass=abc.ABCMeta):
     Even though IOBase does not declare read, readinto, or write because
     their signatures will vary, implementations and clients should
     consider those methods part of the interface. Also, implementations
-    may raise a IOError when operations they do not support are called.
+    may raise UnsupportedOperation when operations they do not support are
+    called.
 
     The basic type used for binary data read from or written to a file is
     bytes. bytearrays are accepted too, and in some cases (such as
@@ -353,46 +359,45 @@ class IOBase(metaclass=abc.ABCMeta):
     def seekable(self) -> bool:
         """Return whether object supports random access.
 
-        If False, seek(), tell() and truncate() will raise IOError.
+        If False, seek(), tell() and truncate() will raise UnsupportedOperation.
         This method may need to do a test seek().
         """
         return False
 
     def _checkSeekable(self, msg=None):
-        """Internal: raise an IOError if file is not seekable
+        """Internal: raise UnsupportedOperation if file is not seekable
         """
         if not self.seekable():
-            raise IOError("File or stream is not seekable."
-                          if msg is None else msg)
-
+            raise UnsupportedOperation("File or stream is not seekable."
+                                       if msg is None else msg)
 
     def readable(self) -> bool:
         """Return whether object was opened for reading.
 
-        If False, read() will raise IOError.
+        If False, read() will raise UnsupportedOperation.
         """
         return False
 
     def _checkReadable(self, msg=None):
-        """Internal: raise an IOError if file is not readable
+        """Internal: raise UnsupportedOperation if file is not readable
         """
         if not self.readable():
-            raise IOError("File or stream is not readable."
-                          if msg is None else msg)
+            raise UnsupportedOperation("File or stream is not readable."
+                                       if msg is None else msg)
 
     def writable(self) -> bool:
         """Return whether object was opened for writing.
 
-        If False, write() and truncate() will raise IOError.
+        If False, write() and truncate() will raise UnsupportedOperation.
         """
         return False
 
     def _checkWritable(self, msg=None):
-        """Internal: raise an IOError if file is not writable
+        """Internal: raise UnsupportedOperation if file is not writable
         """
         if not self.writable():
-            raise IOError("File or stream is not writable."
-                          if msg is None else msg)
+            raise UnsupportedOperation("File or stream is not writable."
+                                       if msg is None else msg)
 
     @property
     def closed(self):
@@ -539,6 +544,8 @@ class RawIOBase(IOBase):
             return self.readall()
         b = bytearray(n.__index__())
         n = self.readinto(b)
+        if n is None:
+            return None
         del b[n:]
         return bytes(b)
 
@@ -556,7 +563,7 @@ class RawIOBase(IOBase):
         """Read up to len(b) bytes into b.
 
         Returns number of bytes read (0 for EOF), or None if the object
-        is set not to block as has no data to read.
+        is set not to block and has no data to read.
         """
         self._unsupported("readinto")
 
@@ -740,6 +747,10 @@ class _BufferedIOMixin(BufferedIOBase):
     def mode(self):
         return self.raw.mode
 
+    def __getstate__(self):
+        raise TypeError("can not serialize a '{0}' object"
+                        .format(self.__class__.__name__))
+
     def __repr__(self):
         clsname = self.__class__.__name__
         try:
@@ -780,6 +791,11 @@ class BytesIO(BufferedIOBase):
         if self.closed:
             raise ValueError("getvalue on closed file")
         return bytes(self._buffer)
+
+    def getbuffer(self):
+        """Return a readable and writable view of the buffer.
+        """
+        return memoryview(self._buffer)
 
     def read(self, n=None):
         if self.closed:
@@ -1647,7 +1663,7 @@ class TextIOWrapper(TextIOBase):
 
     def tell(self):
         if not self._seekable:
-            raise IOError("underlying stream is not seekable")
+            raise UnsupportedOperation("underlying stream is not seekable")
         if not self._telling:
             raise IOError("telling position disabled by next() call")
         self.flush()
@@ -1726,17 +1742,17 @@ class TextIOWrapper(TextIOBase):
         if self.closed:
             raise ValueError("tell on closed file")
         if not self._seekable:
-            raise IOError("underlying stream is not seekable")
+            raise UnsupportedOperation("underlying stream is not seekable")
         if whence == 1: # seek relative to current position
             if cookie != 0:
-                raise IOError("can't do nonzero cur-relative seeks")
+                raise UnsupportedOperation("can't do nonzero cur-relative seeks")
             # Seeking to the current position should attempt to
             # sync the underlying buffer with the current position.
             whence = 0
             cookie = self.tell()
         if whence == 2: # seek relative to end of file
             if cookie != 0:
-                raise IOError("can't do nonzero end-relative seeks")
+                raise UnsupportedOperation("can't do nonzero end-relative seeks")
             self.flush()
             position = self.buffer.seek(0, 2)
             self._set_decoded_chars('')

@@ -1,6 +1,7 @@
 # Author: Steven J. Bethard <steven.bethard@gmail.com>.
 
 import codecs
+import inspect
 import os
 import shutil
 import sys
@@ -26,6 +27,13 @@ class TestCase(unittest.TestCase):
             print(obj2)
         super(TestCase, self).assertEqual(obj1, obj2)
 
+    def setUp(self):
+        # The tests assume that line wrapping occurs at 80 columns, but this
+        # behaviour can be overridden by setting the COLUMNS environment
+        # variable.  To ensure that this assumption is true, unset COLUMNS.
+        env = support.EnvironmentVarGuard()
+        env.unset("COLUMNS")
+        self.addCleanup(env.__exit__)
 
 
 class TempDirMixin(object):
@@ -456,6 +464,30 @@ class TestOptionalsAlternatePrefixCharsAddedHelp(ParserTestCase):
         ('+f /b', NS(f=True, bar=None, baz=42)),
         ('/ba +f', NS(f=True, bar=None, baz=42))
     ]
+
+
+class TestOptionalsAlternatePrefixCharsMultipleShortArgs(ParserTestCase):
+    """Verify that Optionals must be called with their defined prefixes"""
+
+    parser_signature = Sig(prefix_chars='+-', add_help=False)
+    argument_signatures = [
+        Sig('-x', action='store_true'),
+        Sig('+y', action='store_true'),
+        Sig('+z', action='store_true'),
+    ]
+    failures = ['-w',
+                '-xyz',
+                '+x',
+                '-y',
+                '+xyz',
+    ]
+    successes = [
+        ('', NS(x=False, y=False, z=False)),
+        ('-x', NS(x=True, y=False, z=False)),
+        ('+y -x', NS(x=True, y=True, z=False)),
+        ('+yz -x', NS(x=True, y=True, z=True)),
+    ]
+
 
 class TestOptionalsShortLong(ParserTestCase):
     """Test a combination of single- and double-dash option strings"""
@@ -1715,6 +1747,7 @@ class TestAddSubparsers(TestCase):
         return parser
 
     def setUp(self):
+        super().setUp()
         self.parser = self._get_parser()
         self.command_help_parser = self._get_parser(subparser_help=True)
 
@@ -1738,6 +1771,28 @@ class TestAddSubparsers(TestCase):
         self.assertEqual(
             self.parser.parse_args('--foo 0.125 1 c'.split()),
             NS(foo=True, bar=0.125, w=None, x='c'),
+        )
+
+    def test_parse_known_args(self):
+        self.assertEqual(
+            self.parser.parse_known_args('0.5 1 b -w 7'.split()),
+            (NS(foo=False, bar=0.5, w=7, x='b'), []),
+        )
+        self.assertEqual(
+            self.parser.parse_known_args('0.5 -p 1 b -w 7'.split()),
+            (NS(foo=False, bar=0.5, w=7, x='b'), ['-p']),
+        )
+        self.assertEqual(
+            self.parser.parse_known_args('0.5 1 b -w 7 -p'.split()),
+            (NS(foo=False, bar=0.5, w=7, x='b'), ['-p']),
+        )
+        self.assertEqual(
+            self.parser.parse_known_args('0.5 1 b -q -rs -w 7'.split()),
+            (NS(foo=False, bar=0.5, w=7, x='b'), ['-q', '-rs']),
+        )
+        self.assertEqual(
+            self.parser.parse_known_args('0.5 -W 1 b -X Y -w 7 Z'.split()),
+            (NS(foo=False, bar=0.5, w=7, x='b'), ['-W', '-X', 'Y', 'Z']),
         )
 
     def test_dest(self):
@@ -1942,6 +1997,7 @@ class TestParentParsers(TestCase):
         self.assertRaises(ArgumentParserError, *args, **kwargs)
 
     def setUp(self):
+        super().setUp()
         self.wxyz_parent = ErrorRaisingArgumentParser(add_help=False)
         self.wxyz_parent.add_argument('--w')
         x_group = self.wxyz_parent.add_argument_group('x')
@@ -2129,6 +2185,25 @@ class TestMutuallyExclusiveGroupErrors(TestCase):
         raises(ValueError, add_argument, 'bar', nargs=1)
         raises(ValueError, add_argument, 'bar', nargs=argparse.PARSER)
 
+    def test_help(self):
+        parser = ErrorRaisingArgumentParser(prog='PROG')
+        group1 = parser.add_mutually_exclusive_group()
+        group1.add_argument('--foo', action='store_true')
+        group1.add_argument('--bar', action='store_false')
+        group2 = parser.add_mutually_exclusive_group()
+        group2.add_argument('--soup', action='store_true')
+        group2.add_argument('--nuts', action='store_false')
+        expected = '''\
+            usage: PROG [-h] [--foo | --bar] [--soup | --nuts]
+
+            optional arguments:
+              -h, --help  show this help message and exit
+              --foo
+              --bar
+              --soup
+              --nuts
+              '''
+        self.assertEqual(parser.format_help(), textwrap.dedent(expected))
 
 class MEMixin(object):
 
@@ -2623,18 +2698,18 @@ class TestNamespaceContainsSimple(TestCase):
 
     def test_empty(self):
         ns = argparse.Namespace()
-        self.assertEquals('' in ns, False)
-        self.assertEquals('' not in ns, True)
-        self.assertEquals('x' in ns, False)
+        self.assertEqual('' in ns, False)
+        self.assertEqual('' not in ns, True)
+        self.assertEqual('x' in ns, False)
 
     def test_non_empty(self):
         ns = argparse.Namespace(x=1, y=2)
-        self.assertEquals('x' in ns, True)
-        self.assertEquals('x' not in ns, False)
-        self.assertEquals('y' in ns, True)
-        self.assertEquals('' in ns, False)
-        self.assertEquals('xx' in ns, False)
-        self.assertEquals('z' in ns, False)
+        self.assertEqual('x' in ns, True)
+        self.assertEqual('x' not in ns, False)
+        self.assertEqual('y' in ns, True)
+        self.assertEqual('' in ns, False)
+        self.assertEqual('xx' in ns, False)
+        self.assertEqual('z' in ns, False)
 
 # =====================
 # Help formatting tests
@@ -4160,7 +4235,8 @@ class TestEncoding(TestCase):
     def _test_module_encoding(self, path):
         path, _ = os.path.splitext(path)
         path += ".py"
-        codecs.open(path, 'r', 'utf8').read()
+        with codecs.open(path, 'r', 'utf8') as f:
+            f.read()
 
     def test_argparse_module_encoding(self):
         self._test_module_encoding(argparse.__file__)
@@ -4183,7 +4259,7 @@ class TestArgumentError(TestCase):
 # ArgumentTypeError tests
 # =======================
 
-class TestArgumentError(TestCase):
+class TestArgumentTypeError(TestCase):
 
     def test_argument_type_error(self):
 
@@ -4234,6 +4310,15 @@ class TestImportStar(TestCase):
     def test(self):
         for name in argparse.__all__:
             self.assertTrue(hasattr(argparse, name))
+
+    def test_all_exports_everything_but_modules(self):
+        items = [
+            name
+            for name, value in vars(argparse).items()
+            if not name.startswith("_")
+            if not inspect.ismodule(value)
+        ]
+        self.assertEqual(sorted(items), sorted(argparse.__all__))
 
 def test_main():
     # silence warnings about version argument - these are expected

@@ -82,12 +82,12 @@ Extending :class:`JSONEncoder`::
     ...             return [obj.real, obj.imag]
     ...         return json.JSONEncoder.default(self, obj)
     ...
-    >>> dumps(2 + 1j, cls=ComplexEncoder)
+    >>> json.dumps(2 + 1j, cls=ComplexEncoder)
     '[2.0, 1.0]'
     >>> ComplexEncoder().encode(2 + 1j)
     '[2.0, 1.0]'
     >>> list(ComplexEncoder().iterencode(2 + 1j))
-    ['[', '2.0', ', ', '1.0', ']']
+    ['[2.0', ', 1.0', ']']
 
 
 .. highlight:: none
@@ -135,10 +135,12 @@ Basic Usage
    ``inf``, ``-inf``) in strict compliance of the JSON specification, instead of
    using the JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
 
-   If *indent* is a non-negative integer, then JSON array elements and object
-   members will be pretty-printed with that indent level.  An indent level of 0
-   will only insert newlines.  ``None`` (the default) selects the most compact
-   representation.
+   If *indent* is a non-negative integer or string, then JSON array elements and
+   object members will be pretty-printed with that indent level.  An indent level
+   of 0 or ``""`` will only insert newlines.  ``None`` (the default) selects the
+   most compact representation. Using an integer indent indents that many spaces
+   per level.  If *indent* is a string (such at '\t'), that string is used to indent
+   each level.
 
    If *separators* is an ``(item_separator, dict_separator)`` tuple, then it
    will be used instead of the default ``(', ', ': ')`` separators.  ``(',',
@@ -149,7 +151,7 @@ Basic Usage
 
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
-   *cls* kwarg.
+   *cls* kwarg; otherwise :class:`JSONEncoder` is used.
 
 
 .. function:: dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, **kw)
@@ -195,8 +197,8 @@ Basic Usage
    are encountered.
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
-   kwarg.  Additional keyword arguments will be passed to the constructor of the
-   class.
+   kwarg; otherwise :class:`JSONDecoder` is used.  Additional keyword arguments
+   will be passed to the constructor of the class.
 
 
 .. function:: loads(s, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
@@ -274,6 +276,11 @@ Encoders and decoders
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``, ``'null'``, ``'true'``,
    ``'false'``.  This can be used to raise an exception if invalid JSON numbers
    are encountered.
+
+   If *strict* is ``False`` (``True`` is the default), then control characters
+   will be allowed inside strings.  Control characters in this context are
+   those with character codes in the 0-31 range, including ``'\t'`` (tab),
+   ``'\n'``, ``'\r'`` and ``'\0'``.
 
 
    .. method:: decode(s)
@@ -373,7 +380,7 @@ Encoders and decoders
                 pass
             else:
                 return list(iterable)
-            return JSONEncoder.default(self, o)
+            return json.JSONEncoder.default(self, o)
 
 
    .. method:: encode(o)
@@ -381,7 +388,7 @@ Encoders and decoders
       Return a JSON string representation of a Python data structure, *o*.  For
       example::
 
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+        >>> json.JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
 
 
@@ -390,5 +397,5 @@ Encoders and decoders
       Encode the given object, *o*, and yield each string representation as
       available.  For example::
 
-            for chunk in JSONEncoder().iterencode(bigobject):
+            for chunk in json.JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)

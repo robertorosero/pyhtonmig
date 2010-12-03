@@ -748,12 +748,15 @@ class build_ext(Command):
         elif sys.platform == 'darwin':
             # Don't use the default code below
             return ext.libraries
+        elif sys.platform[:3] == 'aix':
+            # Don't use the default code below
+            return ext.libraries
         else:
             from distutils import sysconfig
             if sysconfig.get_config_var('Py_ENABLE_SHARED'):
-                template = "python%d.%d"
-                pythonlib = (template %
-                             (sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff))
+                pythonlib = 'python{}.{}{}'.format(
+                    sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff,
+                    sys.abiflags)
                 return ext.libraries + [pythonlib]
             else:
                 return ext.libraries

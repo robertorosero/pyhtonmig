@@ -176,7 +176,9 @@ class TestTimeZone(unittest.TestCase):
 
 
     def test_constructor(self):
-        self.assertEqual(timezone.utc, timezone(timedelta(0)))
+        self.assertIs(timezone.utc, timezone(timedelta(0)))
+        self.assertIsNot(timezone.utc, timezone(timedelta(0), 'UTC'))
+        self.assertEqual(timezone.utc, timezone(timedelta(0), 'UTC'))
         # invalid offsets
         for invalid in [timedelta(microseconds=1), timedelta(1, 1),
                         timedelta(seconds=1), timedelta(1), -timedelta(1)]:
@@ -1729,10 +1731,10 @@ class TestDateTime(TestDate):
     def test_microsecond_rounding(self):
         # Test whether fromtimestamp "rounds up" floats that are less
         # than 1/2 microsecond smaller than an integer.
-        self.assertEqual(self.theclass.fromtimestamp(0.9999999),
-                         self.theclass.fromtimestamp(1))
-        self.assertEqual(self.theclass.fromtimestamp(0.99999949).microsecond,
-                         999999)
+        for fts in [self.theclass.fromtimestamp,
+                    self.theclass.utcfromtimestamp]:
+            self.assertEqual(fts(0.9999999), fts(1))
+            self.assertEqual(fts(0.99999949).microsecond, 999999)
 
     def test_insane_fromtimestamp(self):
         # It's possible that some platform maps time_t to double,

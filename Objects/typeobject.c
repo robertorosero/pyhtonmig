@@ -320,8 +320,11 @@ type_set_module(PyTypeObject *type, PyObject *value, void *context)
 static PyObject *
 type_abstractmethods(PyTypeObject *type, void *context)
 {
-    PyObject *mod = PyDict_GetItemString(type->tp_dict,
-                                         "__abstractmethods__");
+    PyObject *mod = NULL;
+    /* type itself has an __abstractmethods__ descriptor (this). Don't return
+       that. */
+    if (type != &PyType_Type)
+        mod = PyDict_GetItemString(type->tp_dict, "__abstractmethods__");
     if (!mod) {
         PyErr_Format(PyExc_AttributeError, "__abstractmethods__");
         return NULL;
@@ -3353,9 +3356,26 @@ object_format(PyObject *self, PyObject *args)
         return NULL;
 
     self_as_str = PyObject_Str(self);
-    if (self_as_str != NULL)
-        result = PyObject_Format(self_as_str, format_spec);
+    if (self_as_str != NULL) {
+        /* Issue 7994: If we're converting to a string, we
+	   should reject format specifications */
+        if (PyUnicode_GET_SIZE(format_spec) > 0) {
+	    if (PyErr_WarnEx(PyExc_PendingDeprecationWarning,
+			     "object.__format__ with a non-empty format "
+			     "string is deprecated", 1) < 0) {
+	      goto done;
+	    }
+	    /* Eventually this will become an error:
+	       PyErr_Format(PyExc_TypeError,
+	       "non-empty format string passed to object.__format__");
+	       goto done;
+	    */
+	}
 
+	result = PyObject_Format(self_as_str, format_spec);
+    }
+
+done:
     Py_XDECREF(self_as_str);
 
     return result;
@@ -4084,10 +4104,6 @@ wrap_binaryfunc_r(PyObject *self, PyObject *args, void *wrapped)
     if (!check_num_args(args, 1))
         return NULL;
     other = PyTuple_GET_ITEM(args, 0);
-    if (!PyType_IsSubtype(Py_TYPE(other), Py_TYPE(self))) {
-        Py_INCREF(Py_NotImplemented);
-        return Py_NotImplemented;
-    }
     return (*func)(other, self);
 }
 
@@ -4336,14 +4352,14 @@ static PyObject *
 wrap_hashfunc(PyObject *self, PyObject *args, void *wrapped)
 {
     hashfunc func = (hashfunc)wrapped;
-    long res;
+    Py_hash_t res;
 
     if (!check_num_args(args, 0))
         return NULL;
     res = (*func)(self);
     if (res == -1 && PyErr_Occurred())
         return NULL;
-    return PyLong_FromLong(res);
+    return PyLong_FromSsize_t(res);
 }
 
 static PyObject *
@@ -4940,13 +4956,12 @@ slot_tp_str(PyObject *self)
     }
 }
 
-static long
+static Py_hash_t
 slot_tp_hash(PyObject *self)
 {
     PyObject *func, *res;
     static PyObject *hash_str;
-    long h;
-    int overflow;
+    Py_ssize_t h;
 
     func = lookup_method(self, "__hash__", &hash_str);
 
@@ -4969,20 +4984,23 @@ slot_tp_hash(PyObject *self)
                         "__hash__ method should return an integer");
         return -1;
     }
-    /* Transform the PyLong `res` to a C long `h`.  For an existing
-       hashable Python object x, hash(x) will always lie within the range
-       of a C long.  Therefore our transformation must preserve values
-       that already lie within this range, to ensure that if x.__hash__()
-       returns hash(y) then hash(x) == hash(y). */
-    h = PyLong_AsLongAndOverflow(res, &overflow);
-    if (overflow)
-        /* res was not within the range of a C long, so we're free to
+    /* Transform the PyLong `res` to a Py_hash_t `h`.  For an existing
+       hashable Python object x, hash(x) will always lie within the range of
+       Py_hash_t.  Therefore our transformation must preserve values that
+       already lie within this range, to ensure that if x.__hash__() returns
+       hash(y) then hash(x) == hash(y). */
+    h = PyLong_AsSsize_t(res);
+    if (h == -1 && PyErr_Occurred()) {
+        /* res was not within the range of a Py_hash_t, so we're free to
            use any sufficiently bit-mixing transformation;
            long.__hash__ will do nicely. */
+        PyErr_Clear();
         h = PyLong_Type.tp_hash(res);
-    Py_DECREF(res);
-    if (h == -1 && !PyErr_Occurred())
+    }
+    /* -1 is reserved for errors. */
+    if (h == -1)
         h = -2;
+    Py_DECREF(res);
     return h;
 }
 

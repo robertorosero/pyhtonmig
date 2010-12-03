@@ -217,7 +217,7 @@ Numeric Types --- :class:`int`, :class:`float`, :class:`complex`
 There are three distinct numeric types: :dfn:`integers`, :dfn:`floating
 point numbers`, and :dfn:`complex numbers`.  In addition, Booleans are a
 subtype of integers.  Integers have unlimited precision.  Floating point
-numbers are usually implemented using :ctype:`double` in C; information
+numbers are usually implemented using :c:type:`double` in C; information
 about the precision and internal representation of floating point
 numbers for the machine on which your program is running is available
 in :data:`sys.float_info`.  Complex numbers have a real and imaginary
@@ -530,10 +530,20 @@ The float type has some additional methods.
 
 .. method:: float.as_integer_ratio()
 
-    Return a pair of integers whose ratio is exactly equal to the
-    original float and with a positive denominator.  Raises
-    :exc:`OverflowError` on infinities and a :exc:`ValueError` on
-    NaNs.
+   Return a pair of integers whose ratio is exactly equal to the
+   original float and with a positive denominator.  Raises
+   :exc:`OverflowError` on infinities and a :exc:`ValueError` on
+   NaNs.
+
+.. method:: float.is_integer()
+
+   Return ``True`` if the float instance is finite with integral
+   value, and ``False`` otherwise::
+
+      >>> (-2.0).is_integer()
+      True
+      >>> (3.2).is_integer()
+      False
 
 Two methods support conversion to
 and from hexadecimal strings.  Since Python's floats are stored
@@ -804,22 +814,20 @@ constructor, :func:`bytes`, and from literals; use a ``b`` prefix with normal
 string syntax: ``b'xyzzy'``.  To construct byte arrays, use the
 :func:`bytearray` function.
 
-.. warning::
+While string objects are sequences of characters (represented by strings of
+length 1), bytes and bytearray objects are sequences of *integers* (between 0
+and 255), representing the ASCII value of single bytes.  That means that for
+a bytes or bytearray object *b*, ``b[0]`` will be an integer, while
+``b[0:1]`` will be a bytes or bytearray object of length 1.  The
+representation of bytes objects uses the literal format (``b'...'``) since it
+is generally more useful than e.g. ``bytes([50, 19, 100])``.  You can always
+convert a bytes object into a list of integers using ``list(b)``.
 
-   While string objects are sequences of characters (represented by strings of
-   length 1), bytes and bytearray objects are sequences of *integers* (between 0
-   and 255), representing the ASCII value of single bytes.  That means that for
-   a bytes or bytearray object *b*, ``b[0]`` will be an integer, while
-   ``b[0:1]`` will be a bytes or bytearray object of length 1.  The
-   representation of bytes objects uses the literal format (``b'...'``) since it
-   is generally more useful than e.g. ``bytes([50, 19, 100])``.  You can always
-   convert a bytes object into a list of integers using ``list(b)``.
-
-   Also, while in previous Python versions, byte strings and Unicode strings
-   could be exchanged for each other rather freely (barring encoding issues),
-   strings and bytes are now completely separate concepts.  There's no implicit
-   en-/decoding if you pass an object of the wrong type.  A string always
-   compares unequal to a bytes or bytearray object.
+Also, while in previous Python versions, byte strings and Unicode strings
+could be exchanged for each other rather freely (barring encoding issues),
+strings and bytes are now completely separate concepts.  There's no implicit
+en-/decoding if you pass an object of the wrong type.  A string always
+compares unequal to a bytes or bytearray object.
 
 Lists are constructed with square brackets, separating items with commas: ``[a,
 b, c]``.  Tuples are constructed by the comma operator (not within square
@@ -838,7 +846,7 @@ operations have the same priorities as the comparison operations.  The ``+`` and
 
 This table lists the sequence operations sorted in ascending priority
 (operations in the same box have the same priority).  In the table, *s* and *t*
-are sequences of the same type; *n*, *i* and *j* are integers:
+are sequences of the same type; *n*, *i*, *j* and *k* are integers.
 
 +------------------+--------------------------------+----------+
 | Operation        | Result                         | Notes    |
@@ -867,6 +875,12 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 | ``min(s)``       | smallest item of *s*           |          |
 +------------------+--------------------------------+----------+
 | ``max(s)``       | largest item of *s*            |          |
++------------------+--------------------------------+----------+
+| ``s.index(i)``   | index of the first occurence   |          |
+|                  | of *i* in *s*                  |          |
++------------------+--------------------------------+----------+
+| ``s.count(i)``   | total number of occurences of  |          |
+|                  | *i* in *s*                     |          |
 +------------------+--------------------------------+----------+
 
 Sequence types also support comparisons.  In particular, tuples and lists are
@@ -984,12 +998,12 @@ functions based on regular expressions.
    interpreted as in slice notation.
 
 
-.. method:: str.encode(encoding=sys.getdefaultencoding(), errors="strict")
+.. method:: str.encode(encoding="utf-8", errors="strict")
 
-   Return an encoded version of the string as a bytes object.  Default encoding
-   is the current default string encoding.  *errors* may be given to set a
-   different error handling scheme.  The default for *errors* is ``'strict'``,
-   meaning that encoding errors raise a :exc:`UnicodeError`.  Other possible
+   Return an encoded version of the string as a bytes object. Default encoding
+   is ``'utf-8'``. *errors* may be given to set a different error handling scheme.
+   The default for *errors* is ``'strict'``, meaning that encoding errors raise
+   a :exc:`UnicodeError`. Other possible
    values are ``'ignore'``, ``'replace'``, ``'xmlcharrefreplace'``,
    ``'backslashreplace'`` and any other name registered via
    :func:`codecs.register_error`, see section :ref:`codec-base-classes`. For a
@@ -1038,6 +1052,22 @@ functions based on regular expressions.
 
    See :ref:`formatstrings` for a description of the various formatting options
    that can be specified in format strings.
+
+
+.. method:: str.format_map(mapping)
+
+   Similar to ``str.format(**mapping)``, except that ``mapping`` is
+   used directly and not copied to a :class:`dict` .  This is useful
+   if for example ``mapping`` is a dict subclass:
+
+   >>> class Default(dict):
+   ...     def __missing__(self, key):
+   ...         return key
+   ...
+   >>> '{name} was born in {country}'.format_map(Default(name='Guido'))
+   'Guido was born in country'
+
+   .. versionadded:: 3.2
 
 
 .. method:: str.index(sub[, start[, end]])
@@ -1322,6 +1352,19 @@ functions based on regular expressions.
         "They're Bill's Friends."
 
 
+.. method:: str.transform(encoding, errors='strict')
+
+   Return an encoded version of the string.  In contrast to :meth:`encode`, this
+   method works with codecs that provide string-to-string mappings, and not
+   string-to-bytes mappings.  :meth:`transform` therefore returns a string
+   object.
+
+   The codecs that can be used with this method are listed in
+   :ref:`standard-encodings`.
+
+   .. versionadded:: 3.2
+
+
 .. method:: str.translate(map)
 
    Return a copy of the *s* where all characters have been mapped through the
@@ -1337,6 +1380,14 @@ functions based on regular expressions.
       An even more flexible approach is to create a custom character mapping
       codec using the :mod:`codecs` module (see :mod:`encodings.cp1251` for an
       example).
+
+
+.. method:: str.untransform(encoding, errors='strict')
+
+   Return a decoded version of the string.  This provides the reverse operation
+   of :meth:`transform`.
+
+   .. versionadded:: 3.2
 
 
 .. method:: str.upper()
@@ -1378,7 +1429,7 @@ String objects have one unique built-in operation: the ``%`` operator (modulo).
 This is also known as the string *formatting* or *interpolation* operator.
 Given ``format % values`` (where *format* is a string), ``%`` conversion
 specifications in *format* are replaced with zero or more elements of *values*.
-The effect is similar to the using :cfunc:`sprintf` in the C language.
+The effect is similar to the using :c:func:`sprintf` in the C language.
 
 If *format* requires a single argument, *values* may be a single non-tuple
 object. [#]_  Otherwise, *values* must be a tuple with exactly the number of
@@ -1414,9 +1465,8 @@ formats in the string *must* include a parenthesised mapping key into that
 dictionary inserted immediately after the ``'%'`` character. The mapping key
 selects the value to be formatted from the mapping.  For example:
 
-
-   >>> print('%(language)s has %(#)03d quote types.' % \
-   ...       {'language': "Python", "#": 2})
+   >>> print('%(language)s has %(number)03d quote types.' %
+   ...       {'language': "Python", "number": 2})
    Python has 002 quote types.
 
 In this case no ``*`` specifiers may occur in a format (since they require a
@@ -1552,11 +1602,23 @@ Range Type
 The :class:`range` type is an immutable sequence which is commonly used for
 looping.  The advantage of the :class:`range` type is that an :class:`range`
 object will always take the same amount of memory, no matter the size of the
-range it represents.  There are no consistent performance advantages.
+range it represents.
 
-Range objects have very little behavior: they only support indexing, iteration,
-and the :func:`len` function.
+Range objects have relatively little behavior: they support indexing, contains,
+iteration, the :func:`len` function, and the following methods:
 
+.. method:: range.count(x)
+
+   Return the number of *i*'s for which ``s[i] == x``.
+
+    .. versionadded:: 3.2
+
+.. method:: range.index(x)
+
+   Return the smallest *i* such that ``s[i] == x``.  Raises
+   :exc:`ValueError` when *x* is not in the range.
+
+    .. versionadded:: 3.2
 
 .. _typesseq-mutable:
 
@@ -1577,6 +1639,22 @@ arbitrary object).
 
 Note that while lists allow their items to be of any type, bytearray object
 "items" are all integers in the range 0 <= x < 256.
+
+.. index::
+   triple: operations on; sequence; types
+   triple: operations on; list; type
+   pair: subscript; assignment
+   pair: slice; assignment
+   statement: del
+   single: append() (sequence method)
+   single: extend() (sequence method)
+   single: count() (sequence method)
+   single: index() (sequence method)
+   single: insert() (sequence method)
+   single: pop() (sequence method)
+   single: remove() (sequence method)
+   single: reverse() (sequence method)
+   single: sort() (sequence method)
 
 +------------------------------+--------------------------------+---------------------+
 | Operation                    | Result                         | Notes               |
@@ -1622,21 +1700,6 @@ Note that while lists allow their items to be of any type, bytearray object
 | ``s.sort([key[, reverse]])`` | sort the items of *s* in place | (6), (7), (8)       |
 +------------------------------+--------------------------------+---------------------+
 
-.. index::
-   triple: operations on; sequence; types
-   triple: operations on; list; type
-   pair: subscript; assignment
-   pair: slice; assignment
-   statement: del
-   single: append() (sequence method)
-   single: extend() (sequence method)
-   single: count() (sequence method)
-   single: index() (sequence method)
-   single: insert() (sequence method)
-   single: pop() (sequence method)
-   single: remove() (sequence method)
-   single: reverse() (sequence method)
-   single: sort() (sequence method)
 
 Notes:
 
@@ -1727,11 +1790,11 @@ Wherever one of these methods needs to interpret the bytes as characters
       b = a.replace(b"a", b"f")
 
 
-.. method:: bytes.decode(encoding=sys.getdefaultencoding(), errors="strict")
-            bytearray.decode(encoding=sys.getdefaultencoding(), errors="strict")
+.. method:: bytes.decode(encoding="utf-8", errors="strict")
+            bytearray.decode(encoding="utf-8", errors="strict")
 
-   Return a string decoded from the given bytes.  Default encoding is the
-   current default string encoding.  *errors* may be given to set a different
+   Return a string decoded from the given bytes.  Default encoding is
+   ``'utf-8'``. *errors* may be given to set a different
    error handling scheme.  The default for *errors* is ``'strict'``, meaning
    that encoding errors raise a :exc:`UnicodeError`.  Other possible values are
    ``'ignore'``, ``'replace'`` and any other name registered via
@@ -1758,6 +1821,20 @@ The bytes and bytearray types have an additional class method:
 The maketrans and translate methods differ in semantics from the versions
 available on strings:
 
+.. method:: bytes.transform(encoding, errors='strict')
+            bytearray.transform(encoding, errors='strict')
+
+   Return an encoded version of the bytes object.  In contrast to
+   :meth:`encode`, this method works with codecs that provide bytes-to-bytes
+   mappings, and not string-to-bytes mappings.  :meth:`transform` therefore
+   returns a bytes or bytearray object.
+
+   The codecs that can be used with this method are listed in
+   :ref:`standard-encodings`.
+
+   .. versionadded:: 3.2
+
+
 .. method:: bytes.translate(table[, delete])
             bytearray.translate(table[, delete])
 
@@ -1773,6 +1850,15 @@ available on strings:
 
       >>> b'read this short text'.translate(None, b'aeiou')
       b'rd ths shrt txt'
+
+
+.. method:: bytes.untransform(encoding, errors='strict')
+            bytearray.untransform(encoding, errors='strict')
+
+   Return an decoded version of the bytes object.  This provides the reverse
+   operation of :meth:`transform`.
+
+   .. versionadded:: 3.2
 
 
 .. staticmethod:: bytes.maketrans(from, to)
@@ -2032,12 +2118,12 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
    values are added as items to the dictionary.  If a key is specified both in
    the positional argument and as a keyword argument, the value associated with
    the keyword is retained in the dictionary.  For example, these all return a
-   dictionary equal to ``{"one": 2, "two": 3}``:
+   dictionary equal to ``{"one": 1, "two": 2}``:
 
-   * ``dict(one=2, two=3)``
-   * ``dict({'one': 2, 'two': 3})``
-   * ``dict(zip(('one', 'two'), (2, 3)))``
-   * ``dict([['two', 3], ['one', 2]])``
+   * ``dict(one=1, two=2)``
+   * ``dict({'one': 1, 'two': 2})``
+   * ``dict(zip(('one', 'two'), (1, 2)))``
+   * ``dict([['two', 2], ['one', 1]])``
 
    The first example only works for keys that are valid Python identifiers; the
    others work with any valid keys.
@@ -2143,7 +2229,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       existing keys.  Return ``None``.
 
       :meth:`update` accepts either another dictionary object or an iterable of
-      key/value pairs (as a tuple or other iterable of length two).  If keyword
+      key/value pairs (as tuples or other iterables of length two).  If keyword
       arguments are specified, the dictionary is then updated with those
       key/value pairs: ``d.update(red=1, blue=2)``.
 
@@ -2193,29 +2279,11 @@ support membership tests:
 
 
 Keys views are set-like since their entries are unique and hashable.  If all
-values are hashable, so that (key, value) pairs are unique and hashable, then
-the items view is also set-like.  (Values views are not treated as set-like
-since the entries are generally not unique.)  Then these set operations are
-available ("other" refers either to another view or a set):
-
-.. describe:: dictview & other
-
-   Return the intersection of the dictview and the other object as a new set.
-
-.. describe:: dictview | other
-
-   Return the union of the dictview and the other object as a new set.
-
-.. describe:: dictview - other
-
-   Return the difference between the dictview and the other object (all elements
-   in *dictview* that aren't in *other*) as a new set.
-
-.. describe:: dictview ^ other
-
-   Return the symmetric difference (all elements either in *dictview* or
-   *other*, but not in both) of the dictview and the other object as a new set.
-
+values are hashable, so that ``(key, value)`` pairs are unique and hashable,
+then the items view is also set-like.  (Values views are not treated as set-like
+since the entries are generally not unique.)  For set-like views, all of the
+operations defined for the abstract base class :class:`collections.Set` are
+available (for example, ``==``, ``<``, or ``^``).
 
 An example of dictionary view usage::
 
@@ -2245,6 +2313,8 @@ An example of dictionary view usage::
    >>> # set operations
    >>> keys & {'eggs', 'bacon', 'salad'}
    {'bacon'}
+   >>> keys ^ {'sausage', 'juice'}
+   {'juice', 'eggs', 'bacon', 'spam'}
 
 
 .. _typememoryview:
@@ -2306,7 +2376,7 @@ is generally interpreted as simple bytes.
 
    Notice how the size of the memoryview object cannot be changed.
 
-   :class:`memoryview` has two methods:
+   :class:`memoryview` has several methods:
 
    .. method:: tobytes()
 
@@ -2325,6 +2395,39 @@ is generally interpreted as simple bytes.
 
          >>> memoryview(b'abc').tolist()
          [97, 98, 99]
+
+   .. method:: release()
+
+      Release the underlying buffer exposed by the memoryview object.  Many
+      objects take special actions when a view is held on them (for example,
+      a :class:`bytearray` would temporarily forbid resizing); therefore,
+      calling release() is handy to remove these restrictions (and free any
+      dangling resources) as soon as possible.
+
+      After this method has been called, any further operation on the view
+      raises a :class:`ValueError` (except :meth:`release()` itself which can
+      be called multiple times)::
+
+         >>> m = memoryview(b'abc')
+         >>> m.release()
+         >>> m[0]
+         Traceback (most recent call last):
+           File "<stdin>", line 1, in <module>
+         ValueError: operation forbidden on released memoryview object
+
+      The context management protocol can be used for a similar effect,
+      using the ``with`` statement::
+
+         >>> with memoryview(b'abc') as m:
+         ...     m[0]
+         ...
+         b'a'
+         >>> m[0]
+         Traceback (most recent call last):
+           File "<stdin>", line 1, in <module>
+         ValueError: operation forbidden on released memoryview object
+
+      .. versionadded:: 3.2
 
    There are also several readonly attributes available:
 
@@ -2389,9 +2492,9 @@ to be provided for a context manager object to define a runtime context:
    the identifier in the :keyword:`as` clause of :keyword:`with` statements using
    this context manager.
 
-   An example of a context manager that returns itself is a file object. File
-   objects return themselves from __enter__() to allow :func:`open` to be used as
-   the context expression in a :keyword:`with` statement.
+   An example of a context manager that returns itself is a :term:`file object`.
+   File objects return themselves from __enter__() to allow :func:`open` to be
+   used as the context expression in a :keyword:`with` statement.
 
    An example of a context manager that returns a related object is the one
    returned by :func:`decimal.localcontext`. These managers set the active

@@ -20,6 +20,9 @@ import re
 import subprocess
 import imp
 import time
+import sysconfig
+
+
 try:
     import _thread
 except ImportError:
@@ -35,11 +38,11 @@ __all__ = [
     "check_warnings", "CleanImport", "EnvironmentVarGuard",
     "TransientResource", "captured_output", "captured_stdout",
     "time_out", "socket_peer_reset", "ioerror_peer_reset",
-    "run_with_locale", 'temp_umask',
+    "run_with_locale", 'temp_umask', "transient_internet",
     "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
     "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
     "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
-    "swap_item", "swap_attr", "can_symlink", "skip_unless_symlink"]
+    "swap_item", "swap_attr"]
 
 
 class Error(Exception):
@@ -394,8 +397,9 @@ TESTFN_UNENCODABLE = None
 if os.name in ('nt', 'ce'):
     # skip win32s (0) or Windows 9x/ME (1)
     if sys.getwindowsversion().platform >= 2:
-        # Japanese characters (I think - from bug 846133)
-        TESTFN_UNENCODABLE = TESTFN + "-\u5171\u6709\u3055\u308c\u308b"
+        # Different kinds of characters from various languages to minimize the
+        # probability that the whole name is encodable to MBCS (issue #9819)
+        TESTFN_UNENCODABLE = TESTFN + "-\u5171\u0141\u2661\u0363\uDC80"
         try:
             TESTFN_UNENCODABLE.encode(TESTFN_ENCODING)
         except UnicodeEncodeError:
@@ -595,22 +599,22 @@ def _filterwarnings(filters, quiet=False):
         sys.modules['warnings'].simplefilter("always")
         yield WarningsRecorder(w)
     # Filter the recorded warnings
-    reraise = [warning.message for warning in w]
+    reraise = list(w)
     missing = []
     for msg, cat in filters:
         seen = False
-        for exc in reraise[:]:
-            message = str(exc)
+        for w in reraise[:]:
+            warning = w.message
             # Filter out the matching messages
-            if (re.match(msg, message, re.I) and
-                issubclass(exc.__class__, cat)):
+            if (re.match(msg, str(warning), re.I) and
+                issubclass(warning.__class__, cat)):
                 seen = True
-                reraise.remove(exc)
+                reraise.remove(w)
         if not seen and not quiet:
             # This filter caught nothing
             missing.append((msg, cat.__name__))
     if reraise:
-        raise AssertionError("unhandled warning %r" % reraise[0])
+        raise AssertionError("unhandled warning %s" % reraise[0])
     if missing:
         raise AssertionError("filter (%r, %s) did not catch any warning" %
                              missing[0])
@@ -775,23 +779,72 @@ class TransientResource(object):
             else:
                 raise ResourceDenied("an optional resource is not available")
 
-
 # Context managers that raise ResourceDenied when various issues
 # with the Internet connection manifest themselves as exceptions.
+# XXX deprecate these and use transient_internet() instead
 time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
 socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
 ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
 
 
 @contextlib.contextmanager
-def transient_internet():
+def transient_internet(resource_name, *, timeout=30.0, errnos=()):
     """Return a context manager that raises ResourceDenied when various issues
     with the Internet connection manifest themselves as exceptions."""
-    time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
-    socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
-    ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
-    with time_out, socket_peer_reset, ioerror_peer_reset:
+    default_errnos = [
+        ('ECONNREFUSED', 111),
+        ('ECONNRESET', 104),
+        ('ENETUNREACH', 101),
+        ('ETIMEDOUT', 110),
+    ]
+    default_gai_errnos = [
+        ('EAI_NONAME', -2),
+        ('EAI_NODATA', -5),
+    ]
+
+    denied = ResourceDenied("Resource '%s' is not available" % resource_name)
+    captured_errnos = errnos
+    gai_errnos = []
+    if not captured_errnos:
+        captured_errnos = [getattr(errno, name, num)
+                           for (name, num) in default_errnos]
+        gai_errnos = [getattr(socket, name, num)
+                      for (name, num) in default_gai_errnos]
+
+    def filter_error(err):
+        n = getattr(err, 'errno', None)
+        if (isinstance(err, socket.timeout) or
+            (isinstance(err, socket.gaierror) and n in gai_errnos) or
+            n in captured_errnos):
+            if not verbose:
+                sys.stderr.write(denied.args[0] + "\n")
+            raise denied from err
+
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        if timeout is not None:
+            socket.setdefaulttimeout(timeout)
         yield
+    except IOError as err:
+        # urllib can wrap original socket errors multiple times (!), we must
+        # unwrap to get at the original error.
+        while True:
+            a = err.args
+            if len(a) >= 1 and isinstance(a[0], IOError):
+                err = a[0]
+            # The error can also be wrapped as args[1]:
+            #    except socket.error as msg:
+            #        raise IOError('socket error', msg).with_traceback(sys.exc_info()[2])
+            elif len(a) >= 2 and isinstance(a[1], IOError):
+                err = a[1]
+            else:
+                break
+        filter_error(err)
+        raise
+    # XXX should we catch generic exceptions and look for their
+    # __cause__ or __context__?
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 @contextlib.contextmanager
@@ -833,6 +886,16 @@ def gc_collect():
         time.sleep(0.1)
     gc.collect()
     gc.collect()
+
+
+def python_is_optimized():
+    """Find if Python was built with optimizations."""
+    cflags = sysconfig.get_config_var('PY_CFLAGS') or ''
+    final_opt = ""
+    for opt in cflags.split():
+        if opt.startswith('-O'):
+            final_opt = opt
+    return final_opt and final_opt != '-O0'
 
 
 #=======================================================================
@@ -996,7 +1059,7 @@ def _id(obj):
     return obj
 
 def requires_resource(resource):
-    if resource_is_enabled(resource):
+    if is_resource_enabled(resource):
         return _id
     else:
         return unittest.skip("resource {0!r} is not enabled".format(resource))
@@ -1193,27 +1256,6 @@ def reap_children():
             except:
                 break
 
-try:
-    from .symlink_support import enable_symlink_privilege
-except:
-    enable_symlink_privilege = lambda: True
-
-def can_symlink():
-    """It's no longer sufficient to test for the presence of symlink in the
-    os module - on Windows XP and earlier, os.symlink exists but a
-    NotImplementedError is thrown.
-    """
-    has_symlink = hasattr(os, 'symlink')
-    is_old_windows = sys.platform == "win32" and sys.getwindowsversion().major < 6
-    has_privilege = False if is_old_windows else enable_symlink_privilege()
-    return has_symlink and (not is_old_windows) and has_privilege
-
-def skip_unless_symlink(test):
-    """Skip decorator for tests that require functional symlink"""
-    selector = can_symlink()
-    msg = "Requires functional symlink implementation"
-    return [unittest.skip(msg)(test), test][selector]
-
 @contextlib.contextmanager
 def swap_attr(obj, attr, new_val):
     """Temporary swap out an attribute with a new object.
@@ -1278,10 +1320,21 @@ def strip_python_stderr(stderr):
     stderr = re.sub(br"\[\d+ refs\]\r?\n?$", b"", stderr).strip()
     return stderr
 
-def workaroundIssue8611():
-    try:
-        sys.executable.encode('ascii')
-    except UnicodeEncodeError:
-        raise unittest.SkipTest(
-            "Issue #8611: Python doesn't support ascii locale encoding "
-            "with an non-ascii path")
+def args_from_interpreter_flags():
+    """Return a list of command-line arguments reproducing the current
+    settings in sys.flags."""
+    flag_opt_map = {
+        'bytes_warning': 'b',
+        'dont_write_bytecode': 'B',
+        'ignore_environment': 'E',
+        'no_user_site': 's',
+        'no_site': 'S',
+        'optimize': 'O',
+        'verbose': 'v',
+    }
+    args = []
+    for flag, opt in flag_opt_map.items():
+        v = getattr(sys.flags, flag)
+        if v > 0:
+            args.append('-' + opt * v)
+    return args

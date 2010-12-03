@@ -155,7 +155,7 @@ class PosixPathTest(unittest.TestCase):
             f.write(b"foo")
             f.close()
             self.assertIs(posixpath.islink(support.TESTFN + "1"), False)
-            if support.can_symlink():
+            if hasattr(os, "symlink"):
                 os.symlink(support.TESTFN + "1", support.TESTFN + "2")
                 self.assertIs(posixpath.islink(support.TESTFN + "2"), True)
                 os.remove(support.TESTFN + "1")
@@ -180,7 +180,8 @@ class PosixPathTest(unittest.TestCase):
     @unittest.skipIf(
         sys.platform.startswith('win'),
         "posixpath.samefile does not work on links in Windows")
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     def test_samefile_on_links(self):
         test_fn1 = support.TESTFN + "1"
         test_fn2 = support.TESTFN + "2"
@@ -204,7 +205,8 @@ class PosixPathTest(unittest.TestCase):
     @unittest.skipIf(
         sys.platform.startswith('win'),
         "posixpath.samestat does not work on links in Windows")
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     def test_samestat_on_links(self):
         test_fn1 = support.TESTFN + "1"
         test_fn2 = support.TESTFN + "2"
@@ -273,7 +275,8 @@ class PosixPathTest(unittest.TestCase):
         self.assertEqual(posixpath.normpath(b"///..//./foo/.//bar"),
                          b"/foo/bar")
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     @skip_if_ABSTFN_contains_backslash
     def test_realpath_basic(self):
         # Basic operation.
@@ -283,7 +286,8 @@ class PosixPathTest(unittest.TestCase):
         finally:
             support.unlink(ABSTFN)
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     @skip_if_ABSTFN_contains_backslash
     def test_realpath_symlink_loops(self):
         # Bug #930024, return the path unchanged if we get into an infinite
@@ -307,7 +311,8 @@ class PosixPathTest(unittest.TestCase):
             support.unlink(ABSTFN+"1")
             support.unlink(ABSTFN+"2")
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     @skip_if_ABSTFN_contains_backslash
     def test_realpath_resolve_parents(self):
         # We also need to resolve any symlinks in the parents of a relative
@@ -328,7 +333,8 @@ class PosixPathTest(unittest.TestCase):
             safe_rmdir(ABSTFN + "/y")
             safe_rmdir(ABSTFN)
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     @skip_if_ABSTFN_contains_backslash
     def test_realpath_resolve_before_normalizing(self):
         # Bug #990669: Symbolic links should be resolved before we
@@ -358,7 +364,8 @@ class PosixPathTest(unittest.TestCase):
             safe_rmdir(ABSTFN + "/k")
             safe_rmdir(ABSTFN)
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, "symlink"),
+                         "Missing symlink implementation")
     @skip_if_ABSTFN_contains_backslash
     def test_realpath_resolve_first(self):
         # Bug #1213894: The first component of the path, if not absolute,
@@ -394,6 +401,15 @@ class PosixPathTest(unittest.TestCase):
                              "../"+curdir+"/a/b")
             self.assertEqual(posixpath.relpath("a", "b/c"), "../../a")
             self.assertEqual(posixpath.relpath("a", "a"), ".")
+            self.assertEqual(posixpath.relpath("/foo/bar/bat", "/x/y/z"), '../../../foo/bar/bat')
+            self.assertEqual(posixpath.relpath("/foo/bar/bat", "/foo/bar"), 'bat')
+            self.assertEqual(posixpath.relpath("/foo/bar/bat", "/"), 'foo/bar/bat')
+            self.assertEqual(posixpath.relpath("/", "/foo/bar/bat"), '../../..')
+            self.assertEqual(posixpath.relpath("/foo/bar/bat", "/x"), '../foo/bar/bat')
+            self.assertEqual(posixpath.relpath("/x", "/foo/bar/bat"), '../../../x')
+            self.assertEqual(posixpath.relpath("/", "/"), '.')
+            self.assertEqual(posixpath.relpath("/a", "/a"), '.')
+            self.assertEqual(posixpath.relpath("/a/b", "/a/b"), '.')
         finally:
             os.getcwd = real_getcwd
 
@@ -412,6 +428,15 @@ class PosixPathTest(unittest.TestCase):
                              b"../"+curdir+b"/a/b")
             self.assertEqual(posixpath.relpath(b"a", b"b/c"), b"../../a")
             self.assertEqual(posixpath.relpath(b"a", b"a"), b".")
+            self.assertEqual(posixpath.relpath(b"/foo/bar/bat", b"/x/y/z"), b'../../../foo/bar/bat')
+            self.assertEqual(posixpath.relpath(b"/foo/bar/bat", b"/foo/bar"), b'bat')
+            self.assertEqual(posixpath.relpath(b"/foo/bar/bat", b"/"), b'foo/bar/bat')
+            self.assertEqual(posixpath.relpath(b"/", b"/foo/bar/bat"), b'../../..')
+            self.assertEqual(posixpath.relpath(b"/foo/bar/bat", b"/x"), b'../foo/bar/bat')
+            self.assertEqual(posixpath.relpath(b"/x", b"/foo/bar/bat"), b'../../../x')
+            self.assertEqual(posixpath.relpath(b"/", b"/"), b'.')
+            self.assertEqual(posixpath.relpath(b"/a", b"/a"), b'.')
+            self.assertEqual(posixpath.relpath(b"/a/b", b"/a/b"), b'.')
 
             self.assertRaises(TypeError, posixpath.relpath, b"bytes", "str")
             self.assertRaises(TypeError, posixpath.relpath, "str", b"bytes")

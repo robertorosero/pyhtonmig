@@ -787,9 +787,9 @@ Encodings and Unicode
 ---------------------
 
 Strings are stored internally as sequences of codepoints (to be precise
-as :ctype:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
-via :option:`--without-wide-unicode` or :option:`--with-wide-unicode`, with the
-former being the default) :ctype:`Py_UNICODE` is either a 16-bit or 32-bit data
+as :c:type:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
+via ``--without-wide-unicode`` or ``--with-wide-unicode``, with the
+former being the default) :c:type:`Py_UNICODE` is either a 16-bit or 32-bit data
 type. Once a string object is used outside of CPU and memory, CPU endianness
 and how these arrays are stored as bytes become an issue.  Transforming a
 string object into a sequence of bytes is called encoding and recreating the
@@ -1164,6 +1164,46 @@ particular, the following variants typically exist:
 |                    |         | representation of the     |
 |                    |         | operand                   |
 +--------------------+---------+---------------------------+
+
+The following codecs provide bytes-to-bytes mappings.  They can be used with
+:meth:`bytes.transform` and :meth:`bytes.untransform`.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| base64_codec       | base64, base-64           | Convert operand to MIME   |
+|                    |                           | base64                    |
++--------------------+---------------------------+---------------------------+
+| bz2_codec          | bz2                       | Compress the operand      |
+|                    |                           | using bz2                 |
++--------------------+---------------------------+---------------------------+
+| hex_codec          | hex                       | Convert operand to        |
+|                    |                           | hexadecimal               |
+|                    |                           | representation, with two  |
+|                    |                           | digits per byte           |
++--------------------+---------------------------+---------------------------+
+| quopri_codec       | quopri, quoted-printable, | Convert operand to MIME   |
+|                    | quotedprintable           | quoted printable          |
++--------------------+---------------------------+---------------------------+
+| uu_codec           | uu                        | Convert the operand using |
+|                    |                           | uuencode                  |
++--------------------+---------------------------+---------------------------+
+| zlib_codec         | zip, zlib                 | Compress the operand      |
+|                    |                           | using gzip                |
++--------------------+---------------------------+---------------------------+
+
+The following codecs provide string-to-string mappings.  They can be used with
+:meth:`str.transform` and :meth:`str.untransform`.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| rot_13             | rot13                     | Returns the Caesar-cypher |
+|                    |                           | encryption of the operand |
++--------------------+---------------------------+---------------------------+
+
+.. versionadded:: 3.2
+   bytes-to-bytes and string-to-string codecs.
 
 
 :mod:`encodings.idna` --- Internationalized Domain Names in Applications

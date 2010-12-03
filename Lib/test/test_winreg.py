@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Test the windows specific win32reg module.
 # Only win32reg functions not hit here: FlushKey, LoadKey and SaveKey
 
@@ -83,12 +82,12 @@ class BaseWinregTests(unittest.TestCase):
 
         # Check we wrote as many items as we thought.
         nkeys, nvalues, since_mod = QueryInfoKey(key)
-        self.assertEquals(nkeys, 1, "Not the correct number of sub keys")
-        self.assertEquals(nvalues, 1, "Not the correct number of values")
+        self.assertEqual(nkeys, 1, "Not the correct number of sub keys")
+        self.assertEqual(nvalues, 1, "Not the correct number of values")
         nkeys, nvalues, since_mod = QueryInfoKey(sub_key)
-        self.assertEquals(nkeys, 0, "Not the correct number of sub keys")
-        self.assertEquals(nvalues, len(test_data),
-                          "Not the correct number of values")
+        self.assertEqual(nkeys, 0, "Not the correct number of sub keys")
+        self.assertEqual(nvalues, len(test_data),
+                         "Not the correct number of values")
         # Close this key this way...
         # (but before we do, copy the key as an integer - this allows
         # us to test that the key really gets closed).
@@ -113,8 +112,8 @@ class BaseWinregTests(unittest.TestCase):
     def _read_test_data(self, root_key, subkeystr="sub_key", OpenKey=OpenKey):
         # Check we can get default value for this key.
         val = QueryValue(root_key, test_key_name)
-        self.assertEquals(val, "Default value",
-                          "Registry didn't give back the correct value")
+        self.assertEqual(val, "Default value",
+                         "Registry didn't give back the correct value")
 
         key = OpenKey(root_key, test_key_name)
         # Read the sub-keys
@@ -126,22 +125,22 @@ class BaseWinregTests(unittest.TestCase):
                     data = EnumValue(sub_key, index)
                 except EnvironmentError:
                     break
-                self.assertEquals(data in test_data, True,
-                                  "Didn't read back the correct test data")
+                self.assertEqual(data in test_data, True,
+                                 "Didn't read back the correct test data")
                 index = index + 1
-            self.assertEquals(index, len(test_data),
-                              "Didn't read the correct number of items")
+            self.assertEqual(index, len(test_data),
+                             "Didn't read the correct number of items")
             # Check I can directly access each item
             for value_name, value_data, value_type in test_data:
                 read_val, read_typ = QueryValueEx(sub_key, value_name)
-                self.assertEquals(read_val, value_data,
-                                  "Could not directly read the value")
-                self.assertEquals(read_typ, value_type,
-                                  "Could not directly read the value")
+                self.assertEqual(read_val, value_data,
+                                 "Could not directly read the value")
+                self.assertEqual(read_typ, value_type,
+                                 "Could not directly read the value")
         sub_key.Close()
         # Enumerate our main key.
         read_val = EnumKey(key, 0)
-        self.assertEquals(read_val, subkeystr, "Read subkey value wrong")
+        self.assertEqual(read_val, subkeystr, "Read subkey value wrong")
         try:
             EnumKey(key, 1)
             self.fail("Was able to get a second key when I only have one!")
@@ -160,8 +159,8 @@ class BaseWinregTests(unittest.TestCase):
             DeleteValue(sub_key, value_name)
 
         nkeys, nvalues, since_mod = QueryInfoKey(sub_key)
-        self.assertEquals(nkeys, 0, "subkey not empty before delete")
-        self.assertEquals(nvalues, 0, "subkey not empty before delete")
+        self.assertEqual(nkeys, 0, "subkey not empty before delete")
+        self.assertEqual(nvalues, 0, "subkey not empty before delete")
         sub_key.Close()
         DeleteKey(key, subkeystr)
 
@@ -185,6 +184,16 @@ class BaseWinregTests(unittest.TestCase):
         self._read_test_data(root_key, subkeystr)
         self._delete_test_data(root_key, subkeystr)
 
+    def _test_named_args(self, key, sub_key):
+        with CreateKeyEx(key=key, sub_key=sub_key, reserved=0,
+                         access=KEY_ALL_ACCESS) as ckey:
+            self.assertTrue(ckey.handle != 0)
+
+        with OpenKeyEx(key=key, sub_key=sub_key, reserved=0,
+                       access=KEY_ALL_ACCESS) as okey:
+            self.assertTrue(okey.handle != 0)
+
+
 class LocalWinregTests(BaseWinregTests):
 
     def test_registry_works(self):
@@ -202,6 +211,12 @@ class LocalWinregTests(BaseWinregTests):
         self._read_test_data(HKEY_CURRENT_USER, OpenKey=oke)
 
         self._delete_test_data(HKEY_CURRENT_USER)
+
+    def test_named_arguments(self):
+        self._test_named_args(HKEY_CURRENT_USER, test_key_name)
+        # Use the regular DeleteKey to clean up
+        # DeleteKeyEx takes named args and is tested separately
+        DeleteKey(HKEY_CURRENT_USER, test_key_name)
 
     def test_connect_registry_to_local_machine_works(self):
         # perform minimal ConnectRegistry test which just invokes it
@@ -314,14 +329,20 @@ class RemoteWinregTests(BaseWinregTests):
 @unittest.skipUnless(WIN64_MACHINE, "x64 specific registry tests")
 class Win64WinregTests(BaseWinregTests):
 
+    def test_named_arguments(self):
+        self._test_named_args(HKEY_CURRENT_USER, test_key_name)
+        # Clean up and also exercise the named arguments
+        DeleteKeyEx(key=HKEY_CURRENT_USER, sub_key=test_key_name,
+                    access=KEY_ALL_ACCESS, reserved=0)
+
     def test_reflection_functions(self):
         # Test that we can call the query, enable, and disable functions
         # on a key which isn't on the reflection list with no consequences.
         with OpenKey(HKEY_LOCAL_MACHINE, "Software") as key:
             # HKLM\Software is redirected but not reflected in all OSes
             self.assertTrue(QueryReflectionKey(key))
-            self.assertEquals(None, EnableReflectionKey(key))
-            self.assertEquals(None, DisableReflectionKey(key))
+            self.assertEqual(None, EnableReflectionKey(key))
+            self.assertEqual(None, DisableReflectionKey(key))
             self.assertTrue(QueryReflectionKey(key))
 
     @unittest.skipUnless(HAS_REFLECTION, "OS doesn't support reflection")

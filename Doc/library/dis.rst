@@ -10,6 +10,10 @@ disassembling it. The CPython bytecode which this module takes as an
 input is defined in the file :file:`Include/opcode.h` and used by the compiler
 and the interpreter.
 
+.. seealso::
+
+   Latest version of the :source:`dis module Python source code <Lib/dis.py>`
+
 .. impl-detail::
 
    Bytecode is an implementation detail of the CPython interpreter!  No
@@ -36,7 +40,7 @@ the following command can be used to get the disassembly of :func:`myfunc`::
 The :mod:`dis` module defines the following functions and constants:
 
 
-.. function:: code_info(x=None)
+.. function:: code_info(x)
 
    Return a formatted multi-line string with detailed code object information
    for the supplied function, method, source code string or code object.
@@ -47,6 +51,16 @@ The :mod:`dis` module defines the following functions and constants:
 
    .. versionadded:: 3.2
 
+
+.. function:: show_code(x)
+
+   Print detailed code object information for the supplied function, method,
+   source code string or code object to stdout.
+
+   This is a convenient shorthand for ``print(code_info(x))``, intended for
+   interactive exploration at the interpreter prompt.
+
+   .. versionadded:: 3.2
 
 .. function:: dis(x=None)
 
@@ -105,7 +119,7 @@ The :mod:`dis` module defines the following functions and constants:
 
 .. data:: opmap
 
-   Dictionary mapping bytecodes to operation names.
+   Dictionary mapping operation names to bytecodes.
 
 
 .. data:: cmp_op
@@ -184,15 +198,15 @@ The Python compiler currently generates the following bytecode instructions.
    three.
 
 
-.. opcode:: ROT_FOUR
-
-   Lifts second, third and forth stack item one position up, moves top down to
-   position four.
-
-
 .. opcode:: DUP_TOP
 
    Duplicates the reference on top of the stack.
+
+
+.. opcode:: DUP_TOP_TWO
+
+   Duplicates the two references on top of the stack, leaving them in the
+   same order.
 
 
 **Unary operations**
@@ -531,12 +545,6 @@ the more significant byte last.
    are put onto the stack right-to-left.
 
 
-.. opcode:: DUP_TOPX (count)
-
-   Duplicate *count* items, keeping them in the same order. Due to implementation
-   limits, *count* should be between 1 and 5 inclusive.
-
-
 .. opcode:: STORE_ATTR (namei)
 
    Implements ``TOS.name = TOS1``, where *namei* is the index of name in
@@ -717,6 +725,12 @@ the more significant byte last.
 
    Stores TOS into the cell contained in slot *i* of the cell and free variable
    storage.
+
+
+.. opcode:: DELETE_DEREF (i)
+
+   Empties the cell contained in slot *i* of the cell and free variable storage.
+   Used by the :keyword:`del` statement.
 
 
 .. opcode:: SET_LINENO (lineno)

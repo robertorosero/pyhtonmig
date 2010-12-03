@@ -2,8 +2,7 @@ Building Python using VC++ 6.0 or 5.0
 -------------------------------------
 This directory is used to build Python for Win32 platforms, e.g. Windows
 2000 and XP.  It requires Microsoft Visual C++ 6.x or 5.x and Platform
-SDK February 2003 Edition (Core SDK). You can download this SDK from
-http://www.microsoft.com/msdownload/platformsdk/sdkupdate/psdk-full.htm.
+SDK February 2003 Edition (Core SDK).
 (For other Windows platforms and compilers, see ../readme.txt.)
 
 All you need to do is open the workspace "pcbuild.dsw" in MSVC++, select
@@ -149,20 +148,18 @@ _ssl
     Get the latest source code for OpenSSL from
         http://www.openssl.org
 
-    You (probably) don't want the "engine" code.  For example, get
-        openssl-0.9.8g.tar.gz
-    not
-        openssl-engine-0.9.8g.tar.gz
+    You (probably) don't want the "engine" code.  For example, don't get
+        openssl-engine-0.9.6g.tar.gz
 
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
-        dist/openssl-0.9.8g
+        dist/openssl-1.0.0a
 
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.
 
     You must also install ActivePerl from
-        http://www.activestate.com/Products/ActivePerl/
+        http://www.activestate.com/activeperl/
     as this is used by the OpenSSL build process.  Complain to them <wink>.
 
     The MSVC project simply invokes PC/VC6/build_ssl.py to perform

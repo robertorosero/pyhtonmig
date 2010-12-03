@@ -13,7 +13,6 @@
 
 #include "code.h"
 #include "frameobject.h"
-#include "eval.h"
 #include "opcode.h"
 #include "structmember.h"
 
@@ -135,6 +134,7 @@ static PyObject * cmp_outcome(int, PyObject *, PyObject *);
 static PyObject * import_from(PyObject *, PyObject *);
 static int import_all_from(PyObject *, PyObject *);
 static void format_exc_check_arg(PyObject *, const char *, PyObject *);
+static void format_exc_unbound(PyCodeObject *co, int oparg);
 static PyObject * unicode_concatenate(PyObject *, PyObject *,
                                       PyFrameObject *, unsigned char *);
 static PyObject * special_lookup(PyObject *, char *, PyObject **);
@@ -216,15 +216,23 @@ PyEval_GetCallStats(PyObject *self)
 #endif
 
 
+#ifdef WITH_THREAD
+#define GIL_REQUEST _Py_atomic_load_relaxed(&gil_drop_request)
+#else
+#define GIL_REQUEST 0
+#endif
+
 /* This can set eval_breaker to 0 even though gil_drop_request became
    1.  We believe this is all right because the eval loop will release
    the GIL eventually anyway. */
 #define COMPUTE_EVAL_BREAKER() \
     _Py_atomic_store_relaxed( \
         &eval_breaker, \
-        _Py_atomic_load_relaxed(&gil_drop_request) | \
+        GIL_REQUEST | \
         _Py_atomic_load_relaxed(&pendingcalls_to_do) | \
         pending_async_exc)
+
+#ifdef WITH_THREAD
 
 #define SET_GIL_DROP_REQUEST() \
     do { \
@@ -237,6 +245,8 @@ PyEval_GetCallStats(PyObject *self)
         _Py_atomic_store_relaxed(&gil_drop_request, 0); \
         COMPUTE_EVAL_BREAKER(); \
     } while (0)
+
+#endif
 
 /* Pending calls are only modified under pending_lock */
 #define SIGNAL_PENDING_CALLS() \
@@ -302,6 +312,15 @@ PyEval_InitThreads(void)
 }
 
 void
+_PyEval_FiniThreads(void)
+{
+    if (!gil_created())
+        return;
+    destroy_gil();
+    assert(!gil_created());
+}
+
+void
 PyEval_AcquireLock(void)
 {
     PyThreadState *tstate = PyThreadState_GET();
@@ -357,10 +376,6 @@ PyEval_ReInitThreads(void)
 
     if (!gil_created())
         return;
-    /*XXX Can't use PyThread_free_lock here because it does too
-      much error-checking.  Doing this cleanly would require
-      adding a new function to each thread_*.h.  Instead, just
-      create a new lock and waste a little bit of memory */
     recreate_gil();
     pending_lock = PyThread_allocate_lock();
     take_gil(tstate);
@@ -386,7 +401,6 @@ PyEval_ReInitThreads(void)
 
 #else
 static _Py_atomic_int eval_breaker = {0};
-static _Py_atomic_int gil_drop_request = {0};
 static int pending_async_exc = 0;
 #endif /* WITH_THREAD */
 
@@ -1217,6 +1231,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         PyObject *error_type, *error_value, *error_traceback;
         PyErr_Fetch(&error_type, &error_value, &error_traceback);
         filename = _PyUnicode_AsString(co->co_filename);
+        if (filename == NULL && tstate->overflowed) {
+            /* maximum recursion depth exceeded */
+            goto exit_eval_frame;
+        }
         PyErr_Restore(error_type, error_value, error_traceback);
     }
 #endif
@@ -1276,8 +1294,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                     goto on_error;
                 }
             }
-            if (_Py_atomic_load_relaxed(&gil_drop_request)) {
 #ifdef WITH_THREAD
+            if (_Py_atomic_load_relaxed(&gil_drop_request)) {
                 /* Give another thread a chance */
                 if (PyThreadState_Swap(NULL) != tstate)
                     Py_FatalError("ceval: tstate mix-up");
@@ -1288,8 +1306,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 take_gil(tstate);
                 if (PyThreadState_Swap(tstate) != NULL)
                     Py_FatalError("ceval: orphan tstate");
-#endif
             }
+#endif
             /* Check for asynchronous exceptions. */
             if (tstate->async_exc != NULL) {
                 x = tstate->async_exc;
@@ -1420,50 +1438,21 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             SET_THIRD(v);
             FAST_DISPATCH();
 
-        TARGET(ROT_FOUR)
-            u = TOP();
-            v = SECOND();
-            w = THIRD();
-            x = FOURTH();
-            SET_TOP(v);
-            SET_SECOND(w);
-            SET_THIRD(x);
-            SET_FOURTH(u);
-            FAST_DISPATCH();
-
         TARGET(DUP_TOP)
             v = TOP();
             Py_INCREF(v);
             PUSH(v);
             FAST_DISPATCH();
 
-        TARGET(DUP_TOPX)
-            if (oparg == 2) {
-                x = TOP();
-                Py_INCREF(x);
-                w = SECOND();
-                Py_INCREF(w);
-                STACKADJ(2);
-                SET_TOP(x);
-                SET_SECOND(w);
-                FAST_DISPATCH();
-            } else if (oparg == 3) {
-                x = TOP();
-                Py_INCREF(x);
-                w = SECOND();
-                Py_INCREF(w);
-                v = THIRD();
-                Py_INCREF(v);
-                STACKADJ(3);
-                SET_TOP(x);
-                SET_SECOND(w);
-                SET_THIRD(v);
-                FAST_DISPATCH();
-            }
-            Py_FatalError("invalid argument to DUP_TOPX"
-                          " (bytecode corruption?)");
-            /* Never returns, so don't bother to set why. */
-            break;
+        TARGET(DUP_TOP_TWO)
+            x = TOP();
+            Py_INCREF(x);
+            w = SECOND();
+            Py_INCREF(w);
+            STACKADJ(2);
+            SET_TOP(x);
+            SET_SECOND(w);
+            FAST_DISPATCH();
 
         TARGET(UNARY_POSITIVE)
             v = TOP();
@@ -2112,7 +2101,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* Inline the PyDict_GetItem() calls.
                    WARNING: this is an extreme speed hack.
                    Do not try this at home. */
-                long hash = ((PyUnicodeObject *)w)->hash;
+                Py_hash_t hash = ((PyUnicodeObject *)w)->hash;
                 if (hash != -1) {
                     PyDictObject *d;
                     PyDictEntry *e;
@@ -2172,6 +2161,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 );
             break;
 
+        TARGET(DELETE_DEREF)
+            x = freevars[oparg];
+            if (PyCell_GET(x) != NULL) {
+                PyCell_Set(x, NULL);
+                DISPATCH();
+            }
+            err = -1;
+            format_exc_unbound(co, oparg);
+            break;
+
         TARGET(LOAD_CLOSURE)
             x = freevars[oparg];
             Py_INCREF(x);
@@ -2187,22 +2186,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 DISPATCH();
             }
             err = -1;
-            /* Don't stomp existing exception */
-            if (PyErr_Occurred())
-                break;
-            if (oparg < PyTuple_GET_SIZE(co->co_cellvars)) {
-                v = PyTuple_GET_ITEM(co->co_cellvars,
-                                     oparg);
-                format_exc_check_arg(
-                       PyExc_UnboundLocalError,
-                       UNBOUNDLOCAL_ERROR_MSG,
-                       v);
-            } else {
-                v = PyTuple_GET_ITEM(co->co_freevars, oparg -
-                    PyTuple_GET_SIZE(co->co_cellvars));
-                format_exc_check_arg(PyExc_NameError,
-                                     UNBOUNDFREE_ERROR_MSG, v);
-            }
+            format_exc_unbound(co, oparg);
             break;
 
         TARGET(STORE_DEREF)
@@ -4382,6 +4366,28 @@ format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
     PyErr_Format(exc, format_str, obj_str);
 }
 
+static void
+format_exc_unbound(PyCodeObject *co, int oparg)
+{
+    PyObject *name;
+    /* Don't stomp existing exception */
+    if (PyErr_Occurred())
+        return;
+    if (oparg < PyTuple_GET_SIZE(co->co_cellvars)) {
+        name = PyTuple_GET_ITEM(co->co_cellvars,
+                                oparg);
+        format_exc_check_arg(
+            PyExc_UnboundLocalError,
+            UNBOUNDLOCAL_ERROR_MSG,
+            name);
+    } else {
+        name = PyTuple_GET_ITEM(co->co_freevars, oparg -
+                                PyTuple_GET_SIZE(co->co_cellvars));
+        format_exc_check_arg(PyExc_NameError,
+                             UNBOUNDFREE_ERROR_MSG, name);
+    }
+}
+
 static PyObject *
 unicode_concatenate(PyObject *v, PyObject *w,
                    PyFrameObject *f, unsigned char *next_instr)
@@ -4397,7 +4403,7 @@ unicode_concatenate(PyObject *v, PyObject *w,
         return NULL;
     }
 
-    if (v->ob_refcnt == 2) {
+    if (Py_REFCNT(v) == 2) {
         /* In the common case, there are 2 references to the value
          * stored in 'variable' when the += is performed: one on the
          * value stack (in 'v') and one still stored in the
@@ -4438,7 +4444,7 @@ unicode_concatenate(PyObject *v, PyObject *w,
         }
     }
 
-    if (v->ob_refcnt == 1 && !PyUnicode_CHECK_INTERNED(v)) {
+    if (Py_REFCNT(v) == 1 && !PyUnicode_CHECK_INTERNED(v)) {
         /* Now we own the last reference to 'v', so we can resize it
          * in-place.
          */

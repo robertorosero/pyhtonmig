@@ -25,7 +25,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="TRUE"
@@ -87,7 +87,7 @@
 				AdditionalOptions="/Zm200 "
 				Optimization="0"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="_DEBUG;USE_DL_EXPORT;WIN32;_WINDOWS"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;_DEBUG;USE_DL_EXPORT;WIN32;_WINDOWS"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
@@ -148,7 +148,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="2"
@@ -215,7 +215,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\..\Include,..\..\PC"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
+				PreprocessorDefinitions="Py_BUILD_CORE_MODULE;NDEBUG;WIN32;_WINDOWS;USE_DL_EXPORT"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="2"
@@ -391,7 +391,13 @@
 			RelativePath="..\..\Modules\_codecsmodule.c">
 		</File>
 		<File
+			RelativePath="..\..\Modules\_collectionsmodule.c">
+		</File>
+		<File
 			RelativePath="..\..\Modules\_csv.c">
+		</File>
+		<File
+			RelativePath="..\..\Modules\_datetimemodule.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\_functoolsmodule.c">
@@ -427,10 +433,13 @@
 			RelativePath="..\..\Pc\_subprocess.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_weakref.c">
+			RelativePath="..\..\Modules\_time.c">
 		</File>
 		<File
-			RelativePath="..\..\Pc\winreg.c">
+			RelativePath="..\..\Python\_warnings.c">
+		</File>
+		<File
+			RelativePath="..\..\Modules\_weakref.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\abstract.c">
@@ -440,9 +449,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Modules\arraymodule.c">
-		</File>
-		<File
-			RelativePath="..\..\Python\_warnings.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\asdl.c">
@@ -472,6 +478,9 @@
 			RelativePath="..\..\Objects\bytes_methods.c">
 		</File>
 		<File
+			RelativePath="..\..\Objects\bytearrayobject.c">
+		</File>
+		<File
 			RelativePath="..\..\Objects\bytesobject.c">
 		</File>
 		<File
@@ -496,9 +505,6 @@
 			RelativePath="..\..\Objects\codeobject.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_collectionsmodule.c">
-		</File>
-		<File
 			RelativePath="..\..\Python\compile.c">
 		</File>
 		<File
@@ -509,9 +515,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Python\dynamic_annotations.c">
-		</File>
-		<File
-			RelativePath="..\..\Modules\datetimemodule.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\descrobject.c">
@@ -542,6 +545,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\fileobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\fileutils.c">
 		</File>
 		<File
 			RelativePath="..\..\Parser\firstsets.c">
@@ -746,6 +752,9 @@
 			RelativePath="..\..\Python\pystrtod.c">
 		</File>
 		<File
+			RelativePath="..\..\Python\pytime.c">
+		</File>
+		<File
 			RelativePath="..\..\Python\Python-ast.c">
 		</File>
 		<File
@@ -777,9 +786,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\sliceobject.c">
-		</File>
-		<File
-			RelativePath="..\..\Objects\stringobject.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\structmember.c">
@@ -822,6 +828,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\unicodeobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Pc\winreg.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\weakrefobject.c">

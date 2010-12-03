@@ -697,6 +697,16 @@ class Popen(object):
         data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
         return data.decode(encoding)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.stdout:
+            self.stdout.close()
+        if self.stderr:
+            self.stderr.close()
+        if self.stdin:
+            self.stdin.close()
 
     def __del__(self, _maxsize=sys.maxsize, _active=_active):
         if not self._child_created:
@@ -983,7 +993,7 @@ class Popen(object):
             elif sig == signal.CTRL_BREAK_EVENT:
                 os.kill(self.pid, signal.CTRL_BREAK_EVENT)
             else:
-                raise ValueError("Only SIGTERM is supported on Windows")
+                raise ValueError("Unsupported signal: {}".format(sig))
 
         def terminate(self):
             """Terminates the process
@@ -1193,11 +1203,11 @@ class Popen(object):
                                 try:
                                     exc_type, exc_value = sys.exc_info()[:2]
                                     if isinstance(exc_value, OSError):
-                                        errno = exc_value.errno
+                                        errno_num = exc_value.errno
                                     else:
-                                        errno = 0
+                                        errno_num = 0
                                     message = '%s:%x:%s' % (exc_type.__name__,
-                                                            errno, exc_value)
+                                                            errno_num, exc_value)
                                     message = message.encode(errors="surrogatepass")
                                     os.write(errpipe_write, message)
                                 except Exception:
@@ -1252,10 +1262,12 @@ class Popen(object):
                         os.close(fd)
                 err_msg = err_msg.decode(errors="surrogatepass")
                 if issubclass(child_exception_type, OSError) and hex_errno:
-                    errno = int(hex_errno, 16)
-                    if errno != 0:
-                        err_msg = os.strerror(errno)
-                    raise child_exception_type(errno, err_msg)
+                    errno_num = int(hex_errno, 16)
+                    if errno_num != 0:
+                        err_msg = os.strerror(errno_num)
+                        if errno_num == errno.ENOENT:
+                            err_msg += ': ' + repr(args[0])
+                    raise child_exception_type(errno_num, err_msg)
                 raise child_exception_type(err_msg)
 
 

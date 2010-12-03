@@ -11,9 +11,14 @@ The :mod:`atexit` module defines functions to register and unregister cleanup
 functions.  Functions thus registered are automatically executed upon normal
 interpreter termination.
 
+.. seealso::
+
+   Latest version of the :source:`atexit Python source code
+   <Lib/atexit.py>`
+
 Note: the functions registered via this module are not called when the program
-is killed by a signal, when a Python fatal internal error is detected, or when
-:func:`os._exit` is called.
+is killed by a signal not handled by Python, when a Python fatal internal error
+is detected, or when :func:`os._exit` is called.
 
 
 .. function:: register(func, *args, **kargs)

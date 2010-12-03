@@ -9,14 +9,27 @@ import os
 import re
 import sys
 import copy
-import operator
+import functools
 import pickle
 import tempfile
 import unittest
-import warnings
 import test.support
 import test.string_tests
 import test.buffer_tests
+
+
+if sys.flags.bytes_warning:
+    def check_bytes_warnings(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kw):
+            with test.support.check_warnings(('', BytesWarning)):
+                return func(*args, **kw)
+        return wrapper
+else:
+    # no-op
+    def check_bytes_warnings(func):
+        return func
+
 
 class Indexable:
     def __init__(self, value=0):
@@ -121,20 +134,19 @@ class BaseBytesTest(unittest.TestCase):
         self.assertFalse(b3 <  b2)
         self.assertFalse(b3 <= b2)
 
+    @check_bytes_warnings
     def test_compare_to_str(self):
-        with test.support.check_warnings():
-            warnings.simplefilter('ignore', BytesWarning)
-            # Byte comparisons with unicode should always fail!
-            # Test this for all expected byte orders and Unicode character
-            # sizes.
-            self.assertEqual(self.type2test(b"\0a\0b\0c") == "abc", False)
-            self.assertEqual(self.type2test(b"\0\0\0a\0\0\0b\0\0\0c") == "abc",
-                                False)
-            self.assertEqual(self.type2test(b"a\0b\0c\0") == "abc", False)
-            self.assertEqual(self.type2test(b"a\0\0\0b\0\0\0c\0\0\0") == "abc",
-                                False)
-            self.assertEqual(self.type2test() == str(), False)
-            self.assertEqual(self.type2test() != str(), True)
+        # Byte comparisons with unicode should always fail!
+        # Test this for all expected byte orders and Unicode character
+        # sizes.
+        self.assertEqual(self.type2test(b"\0a\0b\0c") == "abc", False)
+        self.assertEqual(self.type2test(b"\0\0\0a\0\0\0b\0\0\0c") == "abc",
+                            False)
+        self.assertEqual(self.type2test(b"a\0b\0c\0") == "abc", False)
+        self.assertEqual(self.type2test(b"a\0\0\0b\0\0\0c\0\0\0") == "abc",
+                            False)
+        self.assertEqual(self.type2test() == str(), False)
+        self.assertEqual(self.type2test() != str(), True)
 
     def test_reversed(self):
         input = list(map(ord, "Hello"))
@@ -195,6 +207,11 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b.decode(errors="ignore", encoding="utf8"),
                          "Hello world\n")
 
+    def test_transform(self):
+        b1 = self.type2test(range(256))
+        b2 = b1.transform("base64").untransform("base64")
+        self.assertEqual(b2, b1)
+
     def test_from_int(self):
         b = self.type2test(0)
         self.assertEqual(b, self.type2test())
@@ -254,11 +271,11 @@ class BaseBytesTest(unittest.TestCase):
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
-        self.assertEquals(self.type2test.fromhex(''), self.type2test())
+        self.assertEqual(self.type2test.fromhex(''), self.type2test())
         b = bytearray([0x1a, 0x2b, 0x30])
-        self.assertEquals(self.type2test.fromhex('1a2B30'), b)
-        self.assertEquals(self.type2test.fromhex('  1A 2B  30   '), b)
-        self.assertEquals(self.type2test.fromhex('0000'), b'\0\0')
+        self.assertEqual(self.type2test.fromhex('1a2B30'), b)
+        self.assertEqual(self.type2test.fromhex('  1A 2B  30   '), b)
+        self.assertEqual(self.type2test.fromhex('0000'), b'\0\0')
         self.assertRaises(TypeError, self.type2test.fromhex, b'1B')
         self.assertRaises(ValueError, self.type2test.fromhex, 'a')
         self.assertRaises(ValueError, self.type2test.fromhex, 'rt')
@@ -614,11 +631,11 @@ class ByteArrayTest(BaseBytesTest):
                     data.reverse()
                     L[start:stop:step] = data
                     b[start:stop:step] = data
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
                     del L[start:stop:step]
                     del b[start:stop:step]
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self
@@ -797,25 +814,25 @@ class ByteArrayTest(BaseBytesTest):
         resize(10)
         orig = b[:]
         self.assertRaises(BufferError, resize, 11)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 9)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # Other operations implying resize
         self.assertRaises(BufferError, b.pop, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, b.remove, b[1])
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         def delitem():
             del b[1]
         self.assertRaises(BufferError, delitem)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # deleting a non-contiguous slice
         def delslice():
             b[1:-1:2] = b""
         self.assertRaises(BufferError, delslice)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
 
 
 class AssortedBytesTest(unittest.TestCase):
@@ -823,17 +840,16 @@ class AssortedBytesTest(unittest.TestCase):
     # Test various combinations of bytes and bytearray
     #
 
+    @check_bytes_warnings
     def test_repr_str(self):
-        with test.support.check_warnings():
-            warnings.simplefilter('ignore', BytesWarning)
-            for f in str, repr:
-                self.assertEqual(f(bytearray()), "bytearray(b'')")
-                self.assertEqual(f(bytearray([0])), "bytearray(b'\\x00')")
-                self.assertEqual(f(bytearray([0, 1, 254, 255])),
-                                 "bytearray(b'\\x00\\x01\\xfe\\xff')")
-                self.assertEqual(f(b"abc"), "b'abc'")
-                self.assertEqual(f(b"'"), '''b"'"''') # '''
-                self.assertEqual(f(b"'\""), r"""b'\'"'""") # '
+        for f in str, repr:
+            self.assertEqual(f(bytearray()), "bytearray(b'')")
+            self.assertEqual(f(bytearray([0])), "bytearray(b'\\x00')")
+            self.assertEqual(f(bytearray([0, 1, 254, 255])),
+                             "bytearray(b'\\x00\\x01\\xfe\\xff')")
+            self.assertEqual(f(b"abc"), "b'abc'")
+            self.assertEqual(f(b"'"), '''b"'"''') # '''
+            self.assertEqual(f(b"'\""), r"""b'\'"'""") # '
 
     def test_compare_bytes_to_bytearray(self):
         self.assertEqual(b"abc" == bytes(b"abc"), True)
@@ -876,15 +892,14 @@ class AssortedBytesTest(unittest.TestCase):
         b = bytearray(buf)
         self.assertEqual(b, bytearray(sample))
 
+    @check_bytes_warnings
     def test_to_str(self):
-        with test.support.check_warnings():
-            warnings.simplefilter('ignore', BytesWarning)
-            self.assertEqual(str(b''), "b''")
-            self.assertEqual(str(b'x'), "b'x'")
-            self.assertEqual(str(b'\x80'), "b'\\x80'")
-            self.assertEqual(str(bytearray(b'')), "bytearray(b'')")
-            self.assertEqual(str(bytearray(b'x')), "bytearray(b'x')")
-            self.assertEqual(str(bytearray(b'\x80')), "bytearray(b'\\x80')")
+        self.assertEqual(str(b''), "b''")
+        self.assertEqual(str(b'x'), "b'x'")
+        self.assertEqual(str(b'\x80'), "b'\\x80'")
+        self.assertEqual(str(bytearray(b'')), "bytearray(b'')")
+        self.assertEqual(str(bytearray(b'x')), "bytearray(b'x')")
+        self.assertEqual(str(bytearray(b'\x80')), "bytearray(b'\\x80')")
 
     def test_literal(self):
         tests =  [
@@ -930,19 +945,18 @@ class AssortedBytesTest(unittest.TestCase):
 
     def test_compare(self):
         if sys.flags.bytes_warning:
-            with test.support.check_warnings():
-                warnings.simplefilter('error', BytesWarning)
-                with self.assertRaises(BytesWarning):
-                    b'' == ''
-                with self.assertRaises(BytesWarning):
-                    b'' != ''
-                with self.assertRaises(BytesWarning):
-                    bytearray(b'') == ''
-                with self.assertRaises(BytesWarning):
-                    bytearray(b'') != ''
+            def bytes_warning():
+                return test.support.check_warnings(('', BytesWarning))
+            with bytes_warning():
+                b'' == ''
+            with bytes_warning():
+                b'' != ''
+            with bytes_warning():
+                bytearray(b'') == ''
+            with bytes_warning():
+                bytearray(b'') != ''
         else:
-            # self.skipTest("BytesWarning is needed for this test: use -bb option")
-            pass
+            self.skipTest("BytesWarning is needed for this test: use -bb option")
 
     # Optimizations:
     # __iter__? (optimization)

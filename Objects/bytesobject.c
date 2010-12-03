@@ -178,7 +178,7 @@ PyBytes_FromFormatV(const char *format, va_list vargs)
     for (f = format; *f; f++) {
         if (*f == '%') {
             const char* p = f;
-            while (*++f && *f != '%' && !ISALPHA(*f))
+            while (*++f && *f != '%' && !Py_ISALPHA(*f))
                 ;
 
             /* skip the 'l' or 'z' in {%ld, %zd, %lu, %zu} since
@@ -247,15 +247,15 @@ PyBytes_FromFormatV(const char *format, va_list vargs)
             /* parse the width.precision part (we're only
                interested in the precision value, if any) */
             n = 0;
-            while (ISDIGIT(*f))
+            while (Py_ISDIGIT(*f))
                 n = (n*10) + *f++ - '0';
             if (*f == '.') {
                 f++;
                 n = 0;
-                while (ISDIGIT(*f))
+                while (Py_ISDIGIT(*f))
                     n = (n*10) + *f++ - '0';
             }
-            while (*f && *f != '%' && !ISALPHA(*f))
+            while (*f && *f != '%' && !Py_ISALPHA(*f))
                 f++;
             /* handle the long flag, but only for %ld and %lu.
                others can be added when necessary. */
@@ -446,22 +446,22 @@ PyObject *PyBytes_DecodeEscape(const char *s,
             *p++ = c;
             break;
         case 'x':
-            if (s+1 < end && ISXDIGIT(s[0]) && ISXDIGIT(s[1])) {
+            if (s+1 < end && Py_ISXDIGIT(s[0]) && Py_ISXDIGIT(s[1])) {
                 unsigned int x = 0;
                 c = Py_CHARMASK(*s);
                 s++;
-                if (ISDIGIT(c))
+                if (Py_ISDIGIT(c))
                     x = c - '0';
-                else if (ISLOWER(c))
+                else if (Py_ISLOWER(c))
                     x = 10 + c - 'a';
                 else
                     x = 10 + c - 'A';
                 x = x << 4;
                 c = Py_CHARMASK(*s);
                 s++;
-                if (ISDIGIT(c))
+                if (Py_ISDIGIT(c))
                     x += c - '0';
-                else if (ISLOWER(c))
+                else if (Py_ISLOWER(c))
                     x += 10 + c - 'a';
                 else
                     x += 10 + c - 'A';
@@ -868,12 +868,12 @@ bytes_richcompare(PyBytesObject *a, PyBytesObject *b, int op)
     return result;
 }
 
-static long
+static Py_hash_t
 bytes_hash(PyBytesObject *a)
 {
     register Py_ssize_t len;
     register unsigned char *p;
-    register long x;
+    register Py_hash_t x;
 
     if (a->ob_shash != -1)
         return a->ob_shash;
@@ -1406,7 +1406,7 @@ do_strip(PyBytesObject *self, int striptype)
 
     i = 0;
     if (striptype != RIGHTSTRIP) {
-        while (i < len && ISSPACE(s[i])) {
+        while (i < len && Py_ISSPACE(s[i])) {
             i++;
         }
     }
@@ -1415,7 +1415,7 @@ do_strip(PyBytesObject *self, int striptype)
     if (striptype != LEFTSTRIP) {
         do {
             j--;
-        } while (j >= i && ISSPACE(s[j]));
+        } while (j >= i && Py_ISSPACE(s[j]));
         j++;
     }
 
@@ -2131,8 +2131,7 @@ PyDoc_STRVAR(replace__doc__,
 \n\
 Return a copy of B with all occurrences of subsection\n\
 old replaced by new.  If the optional argument count is\n\
-positive, only the first count occurrences are replaced. A\n\
-negative value of count replaces all occurrences");
+given, only first count occurances are replaced.");
 
 static PyObject *
 bytes_replace(PyBytesObject *self, PyObject *args)
@@ -2290,10 +2289,10 @@ bytes_endswith(PyBytesObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(decode__doc__,
-"B.decode([encoding[, errors]]) -> str\n\
+"B.decode(encoding='utf-8', errors='strict') -> str\n\
 \n\
-Decode B using the codec registered for encoding. encoding defaults\n\
-to the default encoding. errors may be given to set a different error\n\
+Decode B using the codec registered for encoding. Default encoding\n\
+is 'utf-8'. errors may be given to set a different error\n\
 handling scheme.  Default is 'strict' meaning that encoding errors raise\n\
 a UnicodeDecodeError.  Other possible values are 'ignore' and 'replace'\n\
 as well as any other name registerd with codecs.register_error that is\n\
@@ -2313,6 +2312,68 @@ bytes_decode(PyObject *self, PyObject *args, PyObject *kwargs)
     return PyUnicode_FromEncodedObject(self, encoding, errors);
 }
 
+PyDoc_STRVAR(transform__doc__,
+"B.transform(encoding, errors='strict') -> bytes\n\
+\n\
+Transform B using the codec registered for encoding. errors may be given\n\
+to set a different error handling scheme.");
+
+static PyObject *
+bytes_transform(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    static char *kwlist[] = {"encoding", "errors", 0};
+    PyObject *v;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|s:transform",
+                                     kwlist, &encoding, &errors))
+        return NULL;
+
+    v = PyCodec_Encode(self, encoding, errors);
+    if (v == NULL)
+        return NULL;
+    if (!PyBytes_Check(v)) {
+        PyErr_Format(PyExc_TypeError,
+                     "encoder did not return a bytes object (type=%.400s)",
+                     Py_TYPE(v)->tp_name);
+        Py_DECREF(v);
+        return NULL;
+    }
+    return v;
+}
+
+
+PyDoc_STRVAR(untransform__doc__,
+"B.untransform(encoding, errors='strict') -> bytes\n\
+\n\
+Reverse-transform B using the codec registered for encoding. errors may\n\
+be given to set a different error handling scheme.");
+
+static PyObject *
+bytes_untransform(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    static char *kwlist[] = {"encoding", "errors", 0};
+    PyObject *v;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|s:untransform",
+                                     kwlist, &encoding, &errors))
+        return NULL;
+
+    v = PyCodec_Decode(self, encoding, errors);
+    if (v == NULL)
+        return NULL;
+    if (!PyBytes_Check(v)) {
+        PyErr_Format(PyExc_TypeError,
+                     "decoder did not return a bytes object (type=%.400s)",
+                     Py_TYPE(v)->tp_name);
+        Py_DECREF(v);
+        return NULL;
+    }
+    return v;
+}
 
 PyDoc_STRVAR(splitlines__doc__,
 "B.splitlines([keepends]) -> list of lines\n\
@@ -2348,11 +2409,11 @@ hex_digit_to_int(Py_UNICODE c)
 {
     if (c >= 128)
         return -1;
-    if (ISDIGIT(c))
+    if (Py_ISDIGIT(c))
         return c - '0';
     else {
-        if (ISUPPER(c))
-            c = TOLOWER(c);
+        if (Py_ISUPPER(c))
+            c = Py_TOLOWER(c);
         if (c >= 'a' && c <= 'f')
             return c - 'a' + 10;
     }
@@ -2476,8 +2537,10 @@ bytes_methods[] = {
     {"swapcase", (PyCFunction)stringlib_swapcase, METH_NOARGS,
      _Py_swapcase__doc__},
     {"title", (PyCFunction)stringlib_title, METH_NOARGS, _Py_title__doc__},
+    {"transform", (PyCFunction)bytes_transform, METH_VARARGS | METH_KEYWORDS, transform__doc__},
     {"translate", (PyCFunction)bytes_translate, METH_VARARGS,
      translate__doc__},
+    {"untransform", (PyCFunction)bytes_untransform, METH_VARARGS | METH_KEYWORDS, untransform__doc__},
     {"upper", (PyCFunction)stringlib_upper, METH_NOARGS, _Py_upper__doc__},
     {"zfill", (PyCFunction)stringlib_zfill, METH_VARARGS, zfill__doc__},
     {"__sizeof__", (PyCFunction)bytes_sizeof, METH_NOARGS,

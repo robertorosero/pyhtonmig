@@ -3,6 +3,7 @@
 import sys
 import unittest
 from tempfile import NamedTemporaryFile
+from test.support import run_unittest
 
 from distutils import log
 
@@ -22,9 +23,9 @@ class TestLog(unittest.TestCase):
                 log.debug("debug:\xe9")
                 log.fatal("fatal:\xe9")
                 stdout.seek(0)
-                self.assertEquals(stdout.read().rstrip(), "debug:\\xe9")
+                self.assertEqual(stdout.read().rstrip(), "debug:\\xe9")
                 stderr.seek(0)
-                self.assertEquals(stderr.read().rstrip(), "fatal:\\xe9")
+                self.assertEqual(stderr.read().rstrip(), "fatal:\\xe9")
         finally:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
@@ -33,4 +34,4 @@ def test_suite():
     return unittest.makeSuite(TestLog)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

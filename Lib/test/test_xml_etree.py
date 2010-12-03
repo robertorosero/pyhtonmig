@@ -12,7 +12,7 @@
 # except if the test is specific to the Python implementation.
 
 import sys
-import cgi
+import html
 import unittest
 
 from test import support
@@ -602,10 +602,13 @@ def parsefile():
        <ns0:empty-element />
     </ns0:root>
 
+    >>> with open(SIMPLE_XMLFILE) as f:
+    ...     data = f.read()
+
     >>> parser = ET.XMLParser()
     >>> parser.version  # doctest: +ELLIPSIS
     'Expat ...'
-    >>> parser.feed(open(SIMPLE_XMLFILE).read())
+    >>> parser.feed(data)
     >>> print(serialize(parser.close()))
     <root>
        <element key="value">text</element>
@@ -614,7 +617,7 @@ def parsefile():
     </root>
 
     >>> parser = ET.XMLTreeBuilder() # 1.2 compatibility
-    >>> parser.feed(open(SIMPLE_XMLFILE).read())
+    >>> parser.feed(data)
     >>> print(serialize(parser.close()))
     <root>
        <element key="value">text</element>
@@ -624,7 +627,7 @@ def parsefile():
 
     >>> target = ET.TreeBuilder()
     >>> parser = ET.XMLParser(target=target)
-    >>> parser.feed(open(SIMPLE_XMLFILE).read())
+    >>> parser.feed(data)
     >>> print(serialize(parser.close()))
     <root>
        <element key="value">text</element>
@@ -727,7 +730,8 @@ def iterparse():
     end-ns None
 
     >>> events = ("start", "end", "bogus")
-    >>> context = iterparse(SIMPLE_XMLFILE, events)
+    >>> with open(SIMPLE_XMLFILE, "rb") as f:
+    ...     iterparse(f, events)
     Traceback (most recent call last):
     ValueError: unknown event 'bogus'
 
@@ -779,6 +783,8 @@ def custom_builder():
     """
     Test parser w. custom builder.
 
+    >>> with open(SIMPLE_XMLFILE) as f:
+    ...     data = f.read()
     >>> class Builder:
     ...     def start(self, tag, attrib):
     ...         print("start", tag)
@@ -788,7 +794,7 @@ def custom_builder():
     ...         pass
     >>> builder = Builder()
     >>> parser = ET.XMLParser(target=builder)
-    >>> parser.feed(open(SIMPLE_XMLFILE, "r").read())
+    >>> parser.feed(data)
     start root
     start element
     end element
@@ -798,6 +804,8 @@ def custom_builder():
     end empty-element
     end root
 
+    >>> with open(SIMPLE_NS_XMLFILE) as f:
+    ...     data = f.read()
     >>> class Builder:
     ...     def start(self, tag, attrib):
     ...         print("start", tag)
@@ -811,7 +819,7 @@ def custom_builder():
     ...         print("comment", repr(data))
     >>> builder = Builder()
     >>> parser = ET.XMLParser(target=builder)
-    >>> parser.feed(open(SIMPLE_NS_XMLFILE, "r").read())
+    >>> parser.feed(data)
     pi pi 'data'
     comment ' comment '
     start {namespace}root
@@ -829,7 +837,8 @@ def getchildren():
     """
     Test Element.getchildren()
 
-    >>> tree = ET.parse(open(SIMPLE_XMLFILE, "rb"))
+    >>> with open(SIMPLE_XMLFILE, "rb") as f:
+    ...     tree = ET.parse(f)
     >>> for elem in tree.getroot().iter():
     ...     summarize_list(elem.getchildren())
     ['element', 'element', 'empty-element']
@@ -1110,6 +1119,11 @@ def qname():
     >>> elem = ET.Element(ET.QName("uri", "tag"))
     >>> serialize(elem) # 1.3
     '<ns0:tag xmlns:ns0="uri" />'
+    >>> elem = ET.Element(ET.QName("uri", "tag"))
+    >>> subelem = ET.SubElement(elem, ET.QName("uri", "tag1"))
+    >>> subelem = ET.SubElement(elem, ET.QName("uri", "tag2"))
+    >>> serialize(elem) # 1.4
+    '<ns0:tag xmlns:ns0="uri"><ns0:tag1 /><ns0:tag2 /></ns0:tag>'
 
     2) decorated attributes
 
@@ -1319,7 +1333,7 @@ XINCLUDE["default.xml"] = """\
   <p>Example.</p>
   <xi:include href="{}"/>
 </document>
-""".format(cgi.escape(SIMPLE_XMLFILE, True))
+""".format(html.escape(SIMPLE_XMLFILE, True))
 
 def xinclude_loader(href, parse="xml", encoding=None):
     try:
@@ -1835,6 +1849,10 @@ class CleanContext(object):
     checkwarnings = None
 
     def __init__(self, quiet=False):
+        if sys.flags.optimize >= 2:
+            # under -OO, doctests cannot be run and therefore not all warnings
+            # will be emitted
+            quiet = True
         deprecations = (
             # Search behaviour is broken if search path starts with "/".
             ("This search is broken in 1.3 and earlier, and will be fixed "

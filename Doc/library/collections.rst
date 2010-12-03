@@ -28,8 +28,13 @@ Python's general purpose built-in containers, :class:`dict`, :class:`list`,
 =====================   ====================================================================
 
 In addition to the concrete container classes, the collections module provides
-ABCs (abstract base classes) that can be used to test whether a class provides a
+:ref:`abstract-base-classes` that can be used to test whether a class provides a
 particular interface, for example, whether it is hashable or a mapping.
+
+.. seealso::
+
+   Latest version of the :source:`collections module Python source code
+   <Lib/collections.py>`
 
 
 :class:`Counter` objects
@@ -581,11 +586,15 @@ they add the ability to access fields by name instead of position index.
    .. versionchanged:: 3.1
       Added support for *rename*.
 
-Example:
 
 .. doctest::
    :options: +NORMALIZE_WHITESPACE
 
+   >>> # Basic example
+   >>> Point = namedtuple('Point', 'x y')
+   >>> p = Point(x=10, y=11)
+
+   >>> # Example using the verbose option to print the class definition
    >>> Point = namedtuple('Point', 'x y', verbose=True)
    class Point(tuple):
            'Point(x, y)'
@@ -793,6 +802,23 @@ the items are returned in the order their keys were first added.
       (key, value) pair.  The pairs are returned in LIFO order if *last* is true
       or FIFO order if false.
 
+   .. method:: move_to_end(key, last=True)
+
+      Move an existing *key* to either end of an ordered dictionary.  The item
+      is moved to the right end if *last* is true (the default) or to the
+      beginning if *last* is false.  Raises :exc:`KeyError` if the *key* does
+      not exist::
+
+          >>> d = OrderedDict.fromkeys('abcde')
+          >>> d.move_to_end('b')
+          >>> ''.join(d.keys)
+          'acdeb'
+          >>> d.move_to_end('b', last=False)
+          >>> ''.join(d.keys)
+          'bacde'
+
+      .. versionadded:: 3.2
+
 In addition to the usual mapping methods, ordered dictionaries also support
 reverse iteration using :func:`reversed`.
 
@@ -933,6 +959,7 @@ attribute.
    subclass) or an arbitrary sequence which can be converted into a string using
    the built-in :func:`str` function.
 
+.. _abstract-base-classes:
 
 ABCs - abstract base classes
 ----------------------------
@@ -1041,6 +1068,9 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
    ``__hash__ = Set._hash``.
 
 .. seealso::
+
+   * Latest version of the :source:`Python source code for the collections
+     abstract base classes <Lib/_abcoll.py>`
 
    * `OrderedSet recipe <http://code.activestate.com/recipes/576694/>`_ for an
      example built on :class:`MutableSet`.

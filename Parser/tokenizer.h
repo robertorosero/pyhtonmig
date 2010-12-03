@@ -15,7 +15,7 @@ extern "C" {
 enum decoding_state {
     STATE_INIT,
     STATE_RAW,
-    STATE_NORMAL, /* have a codec associated with input */
+    STATE_NORMAL        /* have a codec associated with input */
 };
 
 /* Tokenizer state */
@@ -40,7 +40,7 @@ struct tok_state {
     int level;          /* () [] {} Parentheses nesting level */
             /* Used to allow free continuations inside them */
     /* Stuff for checking on different tab sizes */
-    const char *filename;       /* For error messages */
+    const char *filename;   /* encoded to the filesystem encoding */
     int altwarning;     /* Issue warning if alternate tabs don't match */
     int alterror;       /* Issue error if alternate tabs don't match */
     int alttabsize;     /* Alternate tab spacing */
@@ -53,7 +53,7 @@ struct tok_state {
     int cont_line;          /* whether we are in a continuation line. */
     const char* line_start;     /* pointer to start of current line */
 #ifndef PGEN
-    PyObject *decoding_readline; /* codecs.open(...).readline */
+    PyObject *decoding_readline; /* open(...).readline */
     PyObject *decoding_buffer;
 #endif
     const char* enc;        /* Encoding for the current str. */

@@ -451,7 +451,7 @@ io_open(PyObject *self, PyObject *args, PyObject *kwds)
             if (fileno == -1 && PyErr_Occurred())
                 goto error;
 
-            if (fstat(fileno, &st) >= 0)
+            if (fstat(fileno, &st) >= 0 && st.st_blksize > 1)
                 buffering = st.st_blksize;
         }
 #endif
@@ -710,6 +710,8 @@ PyInit__io(void)
     /* BytesIO */
     PyBytesIO_Type.tp_base = &PyBufferedIOBase_Type;
     ADD_TYPE(&PyBytesIO_Type, "BytesIO");
+    if (PyType_Ready(&_PyBytesIOBuffer_Type) < 0)
+        goto fail;
 
     /* StringIO */
     PyStringIO_Type.tp_base = &PyTextIOBase_Type;

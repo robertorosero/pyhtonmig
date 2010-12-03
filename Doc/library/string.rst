@@ -15,6 +15,11 @@ section, and also the string-specific methods described in the
 :ref:`string-formatting` section.  Also, see the :mod:`re` module for
 string functions based on regular expressions.
 
+.. seealso::
+
+   Latest version of the :source:`string module Python source code
+   <Lib/string.py>`
+
 
 String constants
 ----------------
@@ -114,7 +119,7 @@ implementation as the built-in :meth:`format` method.
 
       Loop over the format_string and return an iterable of tuples
       (*literal_text*, *field_name*, *format_spec*, *conversion*).  This is used
-      by :meth:`vformat` to break the string in to either literal text, or
+      by :meth:`vformat` to break the string into either literal text, or
       replacement fields.
 
       The values in the tuple conceptually represent a span of literal text
@@ -299,11 +304,11 @@ The general form of a *standard format specifier* is:
    precision: `integer`
    type: "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" | "s" | "x" | "X" | "%"
 
-The *fill* character can be any character other than '}' (which signifies the
-end of the field).  The presence of a fill character is signaled by the *next*
-character, which must be one of the alignment options. If the second character
-of *format_spec* is not a valid alignment option, then it is assumed that both
-the fill character and the alignment option are absent.
+The *fill* character can be any character other than '{' or '}'.  The presence
+of a fill character is signaled by the character following it, which must be
+one of the alignment options.  If the second character of *format_spec* is not
+a valid alignment option, then it is assumed that both the fill character and
+the alignment option are absent.
 
 The meaning of the various alignment options is as follows:
 
@@ -345,9 +350,18 @@ following:
    |         | positive numbers, and a minus sign on negative numbers.  |
    +---------+----------------------------------------------------------+
 
-The ``'#'`` option is only valid for integers, and only for binary, octal, or
-hexadecimal output.  If present, it specifies that the output will be prefixed
-by ``'0b'``, ``'0o'``, or ``'0x'``, respectively.
+
+The ``'#'`` option causes the "alternate form" to be used for the
+conversion.  The alternate form is defined differently for different
+types.  This option is only valid for integer, float, complex and
+Decimal types. For integers, when binary, octal, or hexadecimal output
+is used, this option adds the prefix respective ``'0b'``, ``'0o'``, or
+``'0x'`` to the output value. For floats, complex and Decimal the
+alternate form causes the result of the conversion to always contain a
+decimal-point character, even if no digits follow it. Normally, a
+decimal-point character appears in the result of these conversions
+only if a digit follows it. In addition, for ``'g'`` and ``'G'``
+conversions, trailing zeros are not removed from the result.
 
 The ``','`` option signals the use of a comma for a thousands separator.
 For a locale aware separator, use the ``'n'`` integer presentation type
@@ -448,7 +462,7 @@ The available presentation types for floating point and decimal values are:
    |         | from the significand, and the decimal point is also      |
    |         | removed if there are no remaining digits following it.   |
    |         |                                                          |
-   |         | Postive and negative infinity, positive and negative     |
+   |         | Positive and negative infinity, positive and negative    |
    |         | zero, and nans, are formatted as ``inf``, ``-inf``,      |
    |         | ``0``, ``-0`` and ``nan`` respectively, regardless of    |
    |         | the precision.                                           |
