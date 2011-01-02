@@ -47,6 +47,7 @@ from randdec import *
 from randfloat import *
 
 
+EXIT_STATUS = 0
 py_minor = sys.version_info[1]
 py_micro = sys.version_info[2]
 
@@ -410,7 +411,6 @@ class dHandlerCdec:
         return self.un_resolve_ulp(result, "ln", operands)
 
     def __pow__(self, result, operands):
-        """See DIFFERENCES.txt"""
         if operands[2] is not None: # three argument __pow__
             # issue7049: third arg must fit into precision
             if (operands[0].mpd.is_zero() != operands[1].mpd.is_zero()):
@@ -428,6 +428,7 @@ class dHandlerCdec:
              context.f.flags[cdecimal.Inexact] and \
              context.d.flags[decimal.Rounded] and \
              context.d.flags[decimal.Inexact]:
+            # decimal.py: correctly-rounded pow()
             return self.bin_resolve_ulp(result, "__pow__", operands)
         else:
             return False
@@ -509,9 +510,11 @@ def verify(result, funcname, operands):
     """Verifies that after operation 'funcname' with operand(s) 'operands'
        result[0] and result[1] as well as the context flags have the same
        values."""
+    global EXIT_STATUS
     if result[0] != result[1] or not context.assert_eq_status():
         if obj_known_disagreement(result, funcname, operands):
             return # skip known disagreements
+        EXIT_STATUS = 1
         raise CdecException(result, funcname, operands,
                             str(context.f), str(context.d))
 
@@ -541,6 +544,7 @@ class cdec(object):
         """Verifies that after operation 'funcname' with operand(s) 'operands'
            self.mpd and self.dec as well as the context flags have the same
            values."""
+        global EXIT_STATUS
         mpdstr = str(self.mpd)
         decstr = str(self.dec)
         mpdstr_eng = self.mpd.to_eng_string()
@@ -555,6 +559,7 @@ class cdec(object):
            or not context.assert_eq_status():
             if cdec_known_disagreement(self, funcname, operands):
                 return # skip known disagreements
+            EXIT_STATUS = 1
             raise CdecException(self, funcname, operands,
                                 str(context.f), str(context.d))
 
@@ -1021,8 +1026,6 @@ class cdec(object):
 
     def to_sci_string(self):
         context.clear_status()
-        # cdecimal's Decimal has a 'to_sci_string' method
-        # that honours the default context.
         r_mpd = self.mpd.to_sci_string()
         r_dec = context.d.to_sci_string(self.dec)
         verify((r_mpd, r_dec), 'to_sci_string', (self,))
@@ -1338,6 +1341,75 @@ def test_from_float(method, prec, exprange, restr_range, iter):
             except CdecException as err:
                 log(err)
 
+def assert_eq_status(c, d):
+    """assert equality of cdecimal and decimal status"""
+    for signal in c.flags:
+        if signal == cdecimal.FloatOperation:
+            continue
+        if c.flags[signal] == (not d.flags[deccond[signal]]):
+            return False
+    return True
+
+def test_quantize_api(method, prec, exprange, restr_range, iter):
+    for a in un_incr_digits(prec, restr_range, 1):
+        emax = random.randrange(exprange)
+        emin = random.randrange(-exprange, 0)
+        clamp = random.randrange(2)
+        exp = randdec(2*prec, exprange)
+        for rounding in sorted(decround):
+            try:
+                c = cdecimal.Context(prec=prec, Emax=emax, Emin=emin, clamp=clamp, traps=[])
+                d = decimal.Context(prec=prec, Emax=emax, Emin=emin, traps=[])
+                attr = 'clamp' if py_minor >= 2 else "_clamp"
+                setattr(d, attr, clamp)
+
+                x = cdecimal.Decimal(a)
+                y = cdecimal.Decimal(exp)
+                cresult = x.quantize(y, rounding, c)
+
+                u = decimal.Decimal(a)
+                v = decimal.Decimal(exp)
+                dresult = u.quantize(v, decround[rounding], d)
+            except Exception as err:
+                print(err)
+                continue
+            if str(cresult) != str(dresult) or \
+               not assert_eq_status(c, d):
+                print("%s\n%s\n" % (c, d))
+                print("x: %s\ny: %s\nu: %s\nv: %s\n" % (x, y, u, v))
+                print("a: %s  exp: %s\n" % (a, exp))
+                print("cresult: %s\ndresult: %s\n" % (cresult, dresult))
+    for i in range(1000):
+        a = randdec(prec, 9999)
+        prec = random.randrange(1, 50)
+        emax = random.randrange(exprange)
+        emin = random.randrange(-exprange, 0)
+        clamp = random.randrange(2)
+        exp = randdec(2*prec, exprange)
+        for rounding in sorted(decround):
+            try:
+                c = cdecimal.Context(prec=prec, Emax=emax, Emin=emin, clamp=clamp, traps=[])
+                d = decimal.Context(prec=prec, Emax=emax, Emin=emin, traps=[])
+                attr = 'clamp' if py_minor >= 2 else "_clamp"
+                setattr(d, attr, clamp)
+
+                x = cdecimal.Decimal(a)
+                y = cdecimal.Decimal(exp)
+                cresult = x.quantize(context=c, exp=y, rounding=rounding)
+
+                u = decimal.Decimal(a)
+                v = decimal.Decimal(exp)
+                dresult = u.quantize(context=d, exp=v, rounding=decround[rounding])
+            except Exception as err:
+                print(err)
+                continue
+            if str(cresult) != str(dresult) or \
+               not assert_eq_status(c, d):
+                print("%s\n%s\n" % (c, d))
+                print("x: %s\ny: %s\nu: %s\nv: %s\n" % (x, y, u, v))
+                print("a: %s  exp: %s\n" % (a, exp))
+                print("cresult: %s\ndresult: %s\n" % (cresult, dresult))
+
 
 if __name__ == '__main__':
 
@@ -1449,6 +1521,8 @@ if __name__ == '__main__':
     for method in ['logical_and', 'logical_or', 'logical_xor']:
         test_method(method, testspecs, test_bin_logical)
 
+    test_method('quantize_api', testspecs, test_quantize_api)
+
 
     if py_minor >= 2:
         # Some tests will fail with 3.1, since alignment has been changed
@@ -1458,3 +1532,6 @@ if __name__ == '__main__':
         test_method('locale', testspecs, test_locale)
         test_method('round', testspecs, test_round)
         test_method('from_float', testspecs, test_from_float)
+
+
+    sys.exit(EXIT_STATUS)
