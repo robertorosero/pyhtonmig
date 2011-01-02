@@ -329,8 +329,8 @@ The returned value is one of the following ten strings:\n\
 \n");
 
 PyDoc_STRVAR(doc_quantize,"\n\
-quantize(exp[, context]) - Return a value equal to the first operand after\n\
-rounding and having the exponent of the second operand.\n\
+quantize(exp[, rounding[, context]]) - Return a value equal to the first\n\
+operand after rounding and having the exponent of the second operand.\n\
 \n\
     >>> Decimal('1.41421356').quantize(Decimal('1.000'))\n\
     Decimal('1.414')\n\
@@ -345,8 +345,8 @@ result is subnormal and inexact.\n\
 \n\
 If the exponent of the second operand is larger than that of the first, then\n\
 rounding may be necessary. In this case, the rounding mode is determined by the\n\
-given context argument; if no argument is given, the rounding mode of the\n\
-current default context is used.\n\
+rounding argument if given, else by the given context argument; if neither\n\
+argument is given, the rounding mode of the current thread’s context is used.\n\
 \n");
 
 PyDoc_STRVAR(doc_radix,"\n\
