@@ -308,3 +308,13 @@ trunc10048 trunc -9.333e+80 -> -9.333E+80
 trunc10049 trunc 100.0 -> 100
 trunc10050 trunc -100.0 -> -100
 
+
+-- negative etop: trigger allocation failure in mpd_qshiftl.
+maxexponent: 50
+minexponent: -50
+precision: 100
+clamp: 1
+etop10051 apply 1e+50 -> 100000000000000000000000000000000000000000000000000.0000000000000000000000000000000000000000000000000 Clamped
+
+
+
