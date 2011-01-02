@@ -134,9 +134,9 @@ mpd_bsf(mpd_size_t a)
 
 	__asm__ (
 #ifdef CONFIG_64
-		"bsfq %1, %0"
+		"bsfq %1, %0\n\t"
 #else
-		"bsf %1, %0"
+		"bsf %1, %0\n\t"
 #endif
 		:"=r" (retval)
 		:"r" (a)
