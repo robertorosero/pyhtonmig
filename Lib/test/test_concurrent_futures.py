@@ -11,15 +11,10 @@ test.support.import_module('threading')
 
 import io
 import logging
-import multiprocessing
 import sys
 import threading
 import time
 import unittest
-
-if sys.platform.startswith('win'):
-    import ctypes
-    import ctypes.wintypes
 
 from concurrent import futures
 from concurrent.futures._base import (
