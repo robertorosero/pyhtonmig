@@ -5,6 +5,7 @@
 
 include vars.mk
 
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
 LIBSTATIC = libmpdec.a
 LIBSONAME = @LIBSHARED@
 LIBSHARED = @LIBSHARED@
@@ -13,8 +14,13 @@ CC = @CC@
 LD = @CC@
 AR = @AR@
 GCOV ?= gcov
-PREFIX = @prefix@
 INC= -I../../../ -I../../../Include
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = @includedir@
+libdir = @libdir@
+datarootdir = @datarootdir@
+docdir = @docdir@
 
 MPD_HEADER = @MPD_HEADER@
 MPD_WARN = @MPD_WARN@
@@ -235,9 +241,9 @@ profile:
 	$(MAKE) profile_use
 
 install: FORCE
-	cp $(LIBSTATIC) $(PREFIX)/lib
-	cp $(LIBSHARED) $(PREFIX)/lib
-	cp mpdecimal.h $(PREFIX)/include
+	mkdir -p $(DESTDIR)$(includedir) && cp mpdecimal.h $(DESTDIR)$(includedir)
+	mkdir -p $(DESTDIR)$(libdir) && cp $(LIBSTATIC) $(LIBSHARED) $(DESTDIR)$(libdir)
+	mkdir -p $(DESTDIR)$(docdir) && cp -Rp doc/* $(DESTDIR)$(docdir)
 
 clean: FORCE
 	rm -f *.o *.so *.gch *.gcda *.gcno *.gcov *.dyn *.dpi *.lock \
