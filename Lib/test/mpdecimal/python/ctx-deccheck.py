@@ -36,6 +36,7 @@ from copy import copy
 from randdec import *
 
 
+EXIT_STATUS = 0
 py_minor = sys.version_info[1]
 py_micro = sys.version_info[2]
 
@@ -377,7 +378,6 @@ class dHandlerCdec:
         return self.un_resolve_ulp(result, "ln", operands)
 
     def __pow__(self, result, operands):
-        """See DIFFERENCES.txt"""
         if operands[2] is not None: # three argument __pow__
             # issue7049: third arg must fit into precision
             if (operands[0].mpd.is_zero() != operands[1].mpd.is_zero()):
@@ -395,6 +395,7 @@ class dHandlerCdec:
              context.f.flags[cdecimal.Inexact] and \
              context.d.flags[decimal.Rounded] and \
              context.d.flags[decimal.Inexact]:
+            # decimal.py: correctly-rounded pow()
             return self.bin_resolve_ulp(result, "__pow__", operands)
         else:
             return False
@@ -460,9 +461,11 @@ def verify(result, funcname, operands):
     """Verifies that after operation 'funcname' with operand(s) 'operands'
        result[0] and result[1] as well as the context flags have the same
        values."""
+    global EXIT_STATUS
     if result[0] != result[1] or not context.assert_eq_status():
         if obj_known_disagreement(result, funcname, operands):
             return # skip known disagreements
+        EXIT_STATUS = 1
         raise CdecException(result, funcname, operands,
                             str(context.f), str(context.d))
 
@@ -494,6 +497,7 @@ class cdec(object):
         """Verifies that after operation 'funcname' with operand(s) 'operands'
            self.mpd and self.dec as well as the context flags have the same
            values."""
+        global EXIT_STATUS
         mpdstr = str(self.mpd)
         decstr = str(self.dec)
         mpdstr_eng = self.mpd.to_eng_string()
@@ -502,6 +506,7 @@ class cdec(object):
            not context.assert_eq_status():
             if cdec_known_disagreement(self, funcname, operands):
                 return # skip known disagreements
+            EXIT_STATUS = 1
             raise CdecException(self, funcname, operands,
                                 str(context.f), str(context.d))
 
@@ -1065,3 +1070,6 @@ if __name__ == '__main__':
 
     prec_lst = sorted(random.sample(range(1, 101), samples))
     test_from_float(prec_lst)
+
+
+    sys.exit(EXIT_STATUS)
