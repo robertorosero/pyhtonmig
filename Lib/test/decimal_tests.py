@@ -2128,6 +2128,38 @@ class DecimalPythonAPItests(unittest.TestCase):
         self.assertEqual(repr(context.create_decimal_from_float(10)),
                          "Decimal('10')")
 
+    def test_quantize(self):
+        c = Context(Emax=99999, Emin=-99999)
+        self.assertEqual(
+            Decimal('7.335').quantize(Decimal('.01')),
+            Decimal('7.34')
+        )
+        self.assertEqual(
+            Decimal('7.335').quantize(Decimal('.01'), rounding=ROUND_DOWN),
+            Decimal('7.33')
+        )
+        self.assertRaises(
+            InvalidOperation,
+            Decimal("10e99999").quantize, Decimal('1e100000'), context=c
+        )
+        if HAVE_CDECIMAL:
+            self.assertRaises(
+                TypeError,
+                Decimal("1.23456789").quantize, Decimal('1e-100000'), []
+            )
+            self.assertRaises(
+                TypeError,
+                Decimal("1.23456789").quantize, Decimal('1e-100000'), c
+            )
+            self.assertRaises(
+                ValueError,
+                Decimal("1.23456789").quantize, Decimal('1e-100000'), 10
+            )
+            self.assertRaises(
+                TypeError,
+                Decimal("1.23456789").quantize, Decimal('1e-100000'), ROUND_UP, 1000
+            )
+
 class ContextAPItests(unittest.TestCase):
 
     def test_pickle(self):
@@ -2892,10 +2924,10 @@ class Coverage(unittest.TestCase):
         for attr in ['capitals', 'clamp', '_allcr']:
             self.assertRaises(ValueError, setattr, c, attr, -1)
             self.assertRaises(ValueError, setattr, c, attr, 2)
+            self.assertRaises(TypeError, setattr, c, attr, [1,2,3])
             if HAVE_CONFIG_64:
                 self.assertRaises(ValueError, setattr, c, attr, 2**32)
                 self.assertRaises(ValueError, setattr, c, attr, 2**32+1)
-                self.assertRaises(TypeError, setattr, c, attr, [1,2,3])
 
         # Specific: _flags, _traps
         for attr in ['_flags', '_traps']:
@@ -3051,14 +3083,17 @@ class Coverage(unittest.TestCase):
             self.assertEqual(x.to_integral(), 10)
             self.assertRaises(TypeError, x.to_integral, '10')
             self.assertRaises(TypeError, x.to_integral, 10, 'x')
+            self.assertRaises(ValueError, x.to_integral, 10)
 
             self.assertEqual(x.to_integral_value(), 10)
             self.assertRaises(TypeError, x.to_integral_value, '10')
             self.assertRaises(TypeError, x.to_integral_value, 10, 'x')
+            self.assertRaises(ValueError, x.to_integral_value, 10)
 
             self.assertEqual(x.to_integral_exact(), 10)
             self.assertRaises(TypeError, x.to_integral_exact, '10')
             self.assertRaises(TypeError, x.to_integral_exact, 10, 'x')
+            self.assertRaises(ValueError, x.to_integral_exact, 10)
 
         with localcontext() as c:
             x = Decimal("99999999999999999999999999.9").to_integral_value(ROUND_UP)
@@ -3293,6 +3328,18 @@ class Coverage(unittest.TestCase):
             c._traps = cond
             self.assertTrue(c._traps&DecIEEEInvalidOperation)
             assertIsExclusivelySet(InvalidOperation, c.traps)
+
+    def test_bignum(self):
+        b1 = 10**35
+        b2 = 10**36
+        with localcontext() as c:
+            c.prec = 1000000
+            for i in range(5):
+                a = random.randrange(b1, b2)
+                b = random.randrange(1000, 1200)
+                x = a ** b
+                y = Decimal(a) ** Decimal(b)
+                self.assertEqual(x, y)
 
 def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
     """ Execute the tests.
