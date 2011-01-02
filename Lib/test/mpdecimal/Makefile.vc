@@ -5,9 +5,9 @@
 
 
 INSTALLDIR = .
-LIBSTATIC = libmpdec-2.0.lib
-LIBIMPORT = libmpdec-2.0.dll.lib
-LIBSHARED = libmpdec-2.0.dll
+LIBSTATIC = libmpdec-@RELEASE_VERSION@.lib
+LIBIMPORT = libmpdec-@RELEASE_VERSION@.dll.lib
+LIBSHARED = libmpdec-@RELEASE_VERSION@.dll
 
 
 OBJS = basearith.obj context.obj constants.obj convolute.obj crt.obj \
