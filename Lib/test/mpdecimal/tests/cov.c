@@ -12,6 +12,7 @@
 #ifndef _MSC_VER
   #include <inttypes.h>
   #define ASSERT(p) if (!(p)) {abort();}
+  mpd_uint_t mpd_qsshiftr(mpd_t *result, const mpd_t *a, mpd_ssize_t n);
 #else
   #define ASSERT(p) if (!(p)) {mpd_err_fatal("assertion failed");}
 #endif
@@ -21,8 +22,6 @@
   #error "insufficient buffer length"
 #endif
 
-
-mpd_uint_t mpd_qsshiftr(mpd_t *result, const mpd_t *a, mpd_ssize_t n);
 
 static void mpd_testcontext(mpd_context_t *ctx)
 {
@@ -1164,8 +1163,9 @@ test_output(void)
 		mpd_set_string(&a, "1.23456789e441", &ctx);
 		mpd_fprint(fp, &a);
 		rewind(fp);
-		fgets(buf, BUFSIZE, fp);
-		ASSERT(strcmp(buf, "1.23456789e441\n"))
+		if (fgets(buf, BUFSIZE, fp) != NULL) {
+			ASSERT(strcmp(buf, "1.23456789e441\n"))
+		}
 		fclose(fp);
 	}
 
