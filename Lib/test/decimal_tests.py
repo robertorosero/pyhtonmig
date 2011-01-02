@@ -488,7 +488,7 @@ class DecimalTest(unittest.TestCase):
 
         if id in cdecimal_result_diff: # XXX
             t = cdecimal_result_diff[id]
-            self.assert_(result == t[0] and ans == t[1])
+            self.assertTrue(result == t[0] and ans == t[1])
         else:
             self.assertEqual(result, ans,
                              'Incorrect answer for ' + s + ' -- got ' + result)
