@@ -1615,11 +1615,12 @@ _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
 	} /* fold down */
 	else if (ctx->clamp && dec->exp > mpd_etop(ctx)) {
 		shift = dec->exp - mpd_etop(ctx);
-		/* if shiftl fails, dec is NaN */
-		(void)mpd_qshiftl(dec, dec, shift, status);
+		if (!mpd_qshiftl(dec, dec, shift, status)) {
+			return;
+		}
 		dec->exp -= shift;
 		*status |= MPD_Clamped;
-		if (adjexp < ctx->emin) {
+		if (!mpd_iszerocoeff(dec) && adjexp < ctx->emin) {
 			*status |= MPD_Subnormal;
 		}
 	}
@@ -6932,7 +6933,7 @@ mpd_qinvroot(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 		return;
 	}
 
-        _mpd_qinvroot(result, a, ctx, status);
+	_mpd_qinvroot(result, a, ctx, status);
 }
 
 /*
