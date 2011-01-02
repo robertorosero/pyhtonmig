@@ -1,17 +1,10 @@
 dnl Some parts taken from Python's configure.in.
 
-dnl Only use correct autoconf version:
-m4_define([version_required],
-[m4_if(m4_version_compare(m4_defn([m4_PACKAGE_VERSION]), [$1]), 0,
-       [],
-       [m4_fatal([Autoconf version $1 is required for mpdecimal], 63)])
-])
-version_required(2.67)
-
-AC_INIT(mpdecimal, 2.0, mpdecimal-bugs@bytereef.org, mpdecimal-2.0.tar.gz, http://www.bytereef.org/libmpdec.html)
+AC_PREREQ([2.67])
+AC_INIT(mpdecimal, @RELEASE_VERSION@, mpdecimal-bugs@bytereef.org, mpdecimal, http://www.bytereef.org/mpdecimal/index.html)
 AC_CONFIG_HEADER(config.h)
 AC_CONFIG_FILES([Makefile tests/Makefile])
-AC_ARG_VAR(MACHINE, [force configuration: x64, uint128, ansi64, ppro, ansi32, ansi-legacy, universal])
+AC_ARG_VAR(MACHINE, [force configuration: x64, uint128, ansi64, ppro, ansi32, ansi-legacy])
 
 LIBSHARED=libmpdec.so.$PACKAGE_VERSION
 AC_SUBST(LIBSHARED)
@@ -42,7 +35,7 @@ AC_TYPE_INT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_CHECK_TYPE(__uint128_t, AC_DEFINE(HAVE_UINT128_T, 1,
-              [Define if your compiler provides __uint128_t]),,)
+              [Define if your compiler provides __uint128_t.]),,)
 
 # Sizes of various types:
 AC_CHECK_SIZEOF(size_t, 4)
@@ -56,7 +49,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
 AC_MSG_RESULT($have_gcc_asm_for_x64)
 if test "$have_gcc_asm_for_x64" = yes; then
     AC_DEFINE(HAVE_GCC_ASM_FOR_X64, 1,
-    [Define if we can use x64 gcc inline assembler])
+    [Define if we can use x64 gcc inline assembler.])
 fi
 
 # x87 with gcc asm:
@@ -69,7 +62,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
 AC_MSG_RESULT($have_gcc_asm_for_x87)
 if test "$have_gcc_asm_for_x87" = yes; then
     AC_DEFINE(HAVE_GCC_ASM_FOR_X87, 1,
-    [Define if we can use x87 gcc inline assembler])
+    [Define if we can use x87 gcc inline assembler.])
 fi
 
 # gmp for extended tests:
@@ -108,11 +101,43 @@ fi
 AC_SUBST(GMPDEPS)
 AC_SUBST(GMPPATH)
 
+# _FORTIFY_SOURCE wrappers for memmove and bcopy are incorrect:
+# http://sourceware.org/ml/libc-alpha/2010-12/msg00009.html
+AC_MSG_CHECKING(for glibc _FORTIFY_SOURCE/memmove bug)
+saved_cflags="$CFLAGS"
+CFLAGS="-O2 -D_FORTIFY_SOURCE=2"
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+void foo(void *p, void *q) { memmove(p, q, 19); }
+int main() {
+  char a[32] = "123456789000000000";
+  foo(&a[9], a);
+  if (strcmp(a, "123456789123456789000000000") != 0)
+    return 1;
+  foo(a, &a[9]);
+  if (strcmp(a, "123456789000000000") != 0)
+    return 1;
+  return 0;
+}
+]])],
+[have_glibc_memmove_bug=no],
+[have_glibc_memmove_bug=yes],
+[have_glibc_memmove_bug=undefined])
+CFLAGS="$saved_cflags"
+AC_MSG_RESULT($have_glibc_memmove_bug)
+if test "$have_glibc_memmove_bug" = yes; then
+    AC_DEFINE(HAVE_GLIBC_MEMMOVE_BUG, 1,
+    [Define if glibc has incorrect _FORTIFY_SOURCE wrappers
+     for memmove and bcopy.])
+fi
+
 # suncc is dectected as cc:
 case $ac_sys_system in
 sun*|Sun*)
     case $CC in
-        cc|suncc)
+        cc)
             CC=suncc
             ;;
     esac
@@ -127,34 +152,36 @@ MPD_PUSE=
 MPD_CCOV=
 MPD_LDCOV=
 case $CC in
-    gcc)
+    *gcc*)
         MPD_WARN="-Wall -W -Wno-unknown-pragmas"
         MPD_OPT="-O2 -fpic -s"
         MPD_PGEN="-fprofile-generate -fprofile-values"
         MPD_PUSE="-fprofile-use -freorder-blocks"
-	MPD_CCOV="-DTEST_COVERAGE -O0 -g -fno-inline -fprofile-arcs -ftest-coverage -fpic"
-	MPD_LDCOV="-fprofile-arcs"
+        MPD_CCOV="-DTEST_COVERAGE -O0 -g -fno-inline -fprofile-arcs -ftest-coverage -fpic"
+        MPD_LDCOV="-fprofile-arcs"
         ;;
-    icc)
+    *icc*)
         AR=xiar
         MPD_WARN="-Wall -Wno-unknown-pragmas"
         MPD_OPT="-O2 -fpic -s"
         MPD_PGEN="-wd11505 -prof-gen"
         MPD_PUSE="-wd11505 -prof-use"
         ;;
-    clang)
+    *clang*)
         MPD_WARN="-Wall -W -Wno-unknown-pragmas"
         MPD_OPT="-O2 -fpic"
         ;;
-    suncc)
+    *suncc*)
         MPD_WARN=
         MPD_OPT="-O2 -fpic -s"
         ;;
 esac
 
 # Auto-detect machine dependent settings:
+M64=
 M32=
 if test -n "$MACHINE"; then
+    M64="-m64 "
     M32="-m32 "
     case "$MACHINE" in
         x64|uint128|ansi64|full_coverage|ppro|ansi32|ansi-legacy|universal)
@@ -175,9 +202,9 @@ else
     MACHINE="ansi32"
     if test $have_gcc_asm_for_x87 = yes; then
         case $CC in
-            gcc|clang) # icc >= 11.0 works as well
+            *gcc*|*clang*) # icc >= 11.0 works as well
                 case $ac_sys_system in
-                    darwin|Darwin)
+                    darwin*|Darwin*)
                     ;;
                 *)
                     MACHINE="ppro"
@@ -194,27 +221,50 @@ MPD_DPREC=18
 CONFIGURE_LDFLAGS=
 case "$MACHINE" in
     x64)
-        MPD_CONFIG="-DCONFIG_64 -DASM"
+        MPD_CONFIG=$M64"-DCONFIG_64 -DASM"
+        CONFIGURE_LDFLAGS=$M64
         MPD_PREC=19
         MPD_DPREC=38
         ;;
     uint128)
-        MPD_CONFIG="-DCONFIG_64 -DANSI -DHAVE_UINT128_T"
+        MPD_CONFIG=$M64"-DCONFIG_64 -DANSI -DHAVE_UINT128_T"
+        CONFIGURE_LDFLAGS=$M64
         MPD_PREC=19
         MPD_DPREC=38
         ;;
     ansi64)
-        MPD_CONFIG="-DCONFIG_64 -DANSI"
+        MPD_CONFIG=$M64"-DCONFIG_64 -DANSI"
+        CONFIGURE_LDFLAGS=$M64
         MPD_PREC=19
         MPD_DPREC=38
         ;;
     full_coverage)
         # Formerly ansi64c32, for testing only!
-        MPD_CONFIG="-DCONFIG_32 -DANSI"
+        MPD_CONFIG=$M64"-DCONFIG_32 -DANSI"
+        CONFIGURE_LDFLAGS=$M64
         ;;
     ppro)
         MPD_CONFIG=$M32"-DCONFIG_32 -DPPRO -DASM"
         CONFIGURE_LDFLAGS=$M32
+        # gcc-4.5 miscompiles inline asm:
+        # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=46491
+        # http://gcc.gnu.org/ml/gcc/2010-11/msg00366.html
+        case $CC in
+            *gcc*)
+                AC_MSG_CHECKING(for gcc-4.5)
+                gcc_version=`$CC -dumpversion`
+                have_gcc_4_5=no
+                case $gcc_version in
+                    4.5*)
+                        have_gcc_4_5=yes
+                        MPD_CONFIG="$MPD_CONFIG -fno-ipa-pure-const"
+                        AC_DEFINE(HAVE_GCC_4_5, 1,
+                        [Define if the gcc version is 4.5.x.])
+                    ;;
+                esac
+                AC_MSG_RESULT($have_gcc_4_5)
+            ;;
+        esac
         ;;
     ansi32)
         MPD_CONFIG=$M32"-DCONFIG_32 -DANSI"
@@ -246,7 +296,10 @@ AC_SUBST(MPD_DPREC)
 if test -z "$CFLAGS"; then
     CONFIGURE_CFLAGS="$MPD_WARN $MPD_CONFIG $MPD_OPT"
 else
-    CONFIGURE_CFLAGS="$CFLAGS"
+    CONFIGURE_CFLAGS="$MPD_CONFIG -fpic $CFLAGS"
+fi
+if test "$have_glibc_memmove_bug" = yes; then
+    CONFIGURE_CFLAGS="$CONFIGURE_CFLAGS -U_FORTIFY_SOURCE"
 fi
 
 if test -n "$LDFLAGS"; then
@@ -258,5 +311,25 @@ AC_SUBST(CONFIGURE_LDFLAGS)
 
 AC_OUTPUT
 
+GLIBC_MEMMOVE_BUG_WARN="
+***************************** WARNING *********************************
 
+Detected glibc _FORTIFY_SOURCE/memmove bug. See:
+
+    http://sourceware.org/ml/libc-alpha/2010-12/msg00009.html
+
+Enabling -U_FORTIFY_SOURCE workaround. If -D_FORTIFY_SOURCE is also
+present in the command line, make sure that the order of the two
+options is:
+
+   ... -D_FORTIFY_SOURCE=2 ... -U_FORTIFY_SOURCE ...
+
+A better solution is to upgrade glibc or to report the bug to your
+OS vendor.
+
+***************************** WARNING *********************************
+"
+if test "$have_glibc_memmove_bug" = yes; then
+    echo "$GLIBC_MEMMOVE_BUG_WARN"
+fi
 
