@@ -55,10 +55,8 @@ main(int argc UNUSED, char **argv)
 	mpd_uint_t a, b, c, d;
 	mpd_uint_t a1, a2, b1, b2;
 	long i;
-	int cw;
 
-	cw = mpd_set_fenv();
-
+	(void)mpd_set_fenv();
 
 	fprintf(stderr, "%s:\n", argv[0]);
 	fprintf(stderr, "testing MULMOD ... ");
