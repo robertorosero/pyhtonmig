@@ -526,7 +526,7 @@ signaldict_get(PyObject *self, PyObject *args)
 		                           "OOO", self, key, failobj);
 	}
 	return PyObject_CallMethod((PyObject *)&PyDict_Type, "get",
-		                   "OO", self, key);
+	                           "OO", self, key);
 }
 
 static PyObject *
@@ -1348,8 +1348,8 @@ init_extended_context(PyObject *v)
 	ctx.prec = 9;
 	ctx.traps = 0;
 
-       *CtxAddr(v) = ctx;
-       CtxCaps(v) = 1;
+	*CtxAddr(v) = ctx;
+	CtxCaps(v) = 1;
 }
 
 /* Factory function for creating IEEE interchange format contexts */
@@ -1382,8 +1382,8 @@ ieee_context(PyObject *dummy UNUSED, PyObject *v)
 error:
 	PyErr_Format(PyExc_ValueError,
 	    "argument must be a multiple of 32, with a maximum of %d.",
-	    MPD_IEEE_CONTEXT_MAX_BITS
-	);
+	    MPD_IEEE_CONTEXT_MAX_BITS);
+
 	return NULL;
 }
 
@@ -2764,30 +2764,29 @@ PyDec_ToIntegralValue(PyObject *self, PyObject *args, PyObject *kwds)
 	static char *kwlist[] = {"rounding", "context", NULL};
 	PyDecObject *result;
 	PyObject *ctxobj;
-	int round = -1;
-	mpd_context_t *ctx, workctx;
 	uint32_t status = 0;
-
-	assert(PyTuple_Check(args));
+	mpd_context_t *ctx;
+	mpd_context_t workctx;
+	int round = -1;
 
 	CURRENT_CONTEXT(ctxobj);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO",
-	                                 kwlist, &round, &ctxobj)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO", kwlist,
+	                                 &round, &ctxobj)) {
 		return NULL;
-	}
-	if (!PyDecContext_Check(ctxobj)) {
-		PyErr_SetString(PyExc_TypeError,
-		    "optional second arg must be a context.");
-		return NULL;
-	}
-	if ((result = dec_alloc()) == NULL) {
-		return NULL; /* GCOV_UNLIKELY */
 	}
 
+	CONTEXT_CHECK_VA(ctxobj);
 	ctx = CtxAddr(ctxobj);
+
 	workctx = *ctx;
 	if (round >= 0) {
-		workctx.round = round;
+		if (!mpd_qsetround(&workctx, round)) {
+			return value_error_ptr(invalid_rounding_err);
+		}
+	}
+
+	if ((result = dec_alloc()) == NULL) {
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qround_to_int(result->dec, DecAddr(self), &workctx, &status);
@@ -2796,7 +2795,7 @@ PyDec_ToIntegralValue(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL; /* GCOV_UNLIKELY */
 	}
 
-	return (PyObject *)result;
+	return (PyObject *) result;
 }
 
 static PyObject *
@@ -2805,30 +2804,29 @@ PyDec_ToIntegralExact(PyObject *self, PyObject *args, PyObject *kwds)
 	static char *kwlist[] = {"rounding", "context", NULL};
 	PyDecObject *result;
 	PyObject *ctxobj;
-	int round = -1;
-	mpd_context_t *ctx, workctx;
 	uint32_t status = 0;
-
-	assert(PyTuple_Check(args));
+	mpd_context_t *ctx;
+	mpd_context_t workctx;
+	int round = -1;
 
 	CURRENT_CONTEXT(ctxobj);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO",
-	                                 kwlist, &round, &ctxobj)) {
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iO", kwlist,
+	                                 &round, &ctxobj)) {
 		return NULL;
-	}
-	if (!PyDecContext_Check(ctxobj)) {
-		PyErr_SetString(PyExc_TypeError,
-		    "optional second arg must be a context.");
-		return NULL;
-	}
-	if ((result = dec_alloc()) == NULL) {
-		return NULL; /* GCOV_UNLIKELY */
 	}
 
+	CONTEXT_CHECK_VA(ctxobj);
 	ctx = CtxAddr(ctxobj);
+
 	workctx = *ctx;
 	if (round >= 0) {
-		workctx.round = round;
+		if (!mpd_qsetround(&workctx, round)) {
+			return value_error_ptr(invalid_rounding_err);
+		}
+	}
+
+	if ((result = dec_alloc()) == NULL) {
+		return NULL; /* GCOV_UNLIKELY */
 	}
 
 	mpd_qround_to_intx(result->dec, DecAddr(self), &workctx, &status);
@@ -2837,7 +2835,7 @@ PyDec_ToIntegralExact(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	return (PyObject *)result;
+	return (PyObject *) result;
 }
 
 /* Caller guarantees type */
@@ -3049,7 +3047,7 @@ PyDec_Round(PyObject *self, PyObject *args)
 			return NULL;
 		}
 
-		return (PyObject *)result;
+		return (PyObject *) result;
 	}
 	else {
 		return _PyInt_FromDec(a, ctx, MPD_ROUND_HALF_EVEN);
@@ -3491,7 +3489,7 @@ _Dec_BinaryFunc(mpd_qdivint)
 static int
 _Dec_nonzero(PyDecObject *v)
 {
-    return !mpd_iszero(v->dec);
+	return !mpd_iszero(v->dec);
 }
 
 static PyObject *
@@ -3600,7 +3598,6 @@ _DecOpt_BinaryFunc(mpd_qmin_mag)
 _DecOpt_BinaryFunc(mpd_qmul)
 _DecOpt_BinaryFunc(mpd_qnext_toward)
 _DecOpt_BinaryFunc(mpd_qpow)
-_DecOpt_BinaryFunc(mpd_qquantize)
 _DecOpt_BinaryFunc(mpd_qrem)
 _DecOpt_BinaryFunc(mpd_qrem_near)
 _DecOpt_BinaryFunc(mpd_qsub)
@@ -3784,6 +3781,53 @@ _DecOpt_mpd_qdivmod(PyObject *v, PyObject *args)
 	}
 
 	return Py_BuildValue("(NN)", q, r);
+}
+
+static PyObject *
+_Dec_mpd_qquantize(PyObject *v, PyObject *args, PyObject *kwds)
+{
+	static char *kwlist[] = {"exp", "rounding", "context", NULL};
+	PyObject *w, *ctxobj;
+	PyDecObject *a, *b;
+	PyDecObject *result;
+	uint32_t status = 0;
+	mpd_context_t *ctx;
+	mpd_context_t workctx;
+	int round = -1;
+
+	CURRENT_CONTEXT(ctxobj);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|iO", kwlist,
+	                                 &w, &round, &ctxobj)) {
+		return NULL;
+	}
+
+	CONTEXT_CHECK_VA(ctxobj);
+	ctx = CtxAddr(ctxobj);
+
+	workctx = *ctx;
+	if (round >= 0) {
+		if (!mpd_qsetround(&workctx, round)) {
+			return value_error_ptr(invalid_rounding_err);
+		}
+	}
+
+	CONVERT_BINOP_SET(v, w, &a, &b, ctx);
+
+	if ((result = dec_alloc()) == NULL) {
+		Py_DECREF(a); /* GCOV_UNLIKELY */
+		Py_DECREF(b); /* GCOV_UNLIKELY */
+		return NULL; /* GCOV_UNLIKELY */
+	}
+
+	mpd_qquantize(result->dec, a->dec, b->dec, &workctx, &status);
+	Py_DECREF(a);
+	Py_DECREF(b);
+	if (dec_addstatus(ctx, status)) {
+		Py_DECREF(result);
+		return NULL;
+	}
+
+	return (PyObject *) result;
 }
 
 static PyObject *
@@ -4255,7 +4299,7 @@ static PyMethodDef dec_methods [] =
   { "next_toward", _DecOpt_mpd_qnext_toward, METH_VARARGS, doc_next_toward },
   { "pow", _DecOpt_mpd_qpow, METH_VARARGS, doc_pow }, /* alias for power */
   { "power", _DecOpt_mpd_qpow, METH_VARARGS, doc_power },
-  { "quantize", _DecOpt_mpd_qquantize, METH_VARARGS, doc_quantize },
+  { "quantize", (PyCFunction)_Dec_mpd_qquantize, METH_VARARGS|METH_KEYWORDS, doc_quantize },
   { "rem", _DecOpt_mpd_qrem, METH_VARARGS, doc_rem }, /* alias for remainder */
   { "remainder", _DecOpt_mpd_qrem, METH_VARARGS, doc_remainder },
   { "remainder_near", _DecOpt_mpd_qrem_near, METH_VARARGS, doc_remainder_near },
@@ -4568,7 +4612,7 @@ _DecCtx_copy_decimal(PyObject *self UNUSED, PyObject *v)
 	ctx = CtxAddr(self);
 	CONVERT_OP_SET(v, &result, ctx);
 
-	return (PyObject *)result;
+	return (PyObject *) result;
 }
 
 /* Arithmetic operations */
