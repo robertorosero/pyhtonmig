@@ -22,7 +22,7 @@ class ArraySubclass(array.array):
 
 class ArraySubclassWithKwargs(array.array):
     def __init__(self, typecode, newarg=None):
-        array.array.__init__(typecode)
+        array.array.__init__(self, typecode)
 
 tests = [] # list to accumulate all tests
 typecodes = "ubBhHiIlLfd"
@@ -502,6 +502,12 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(
             a,
             array.array(self.typecode)
+        )
+
+        a = 5 * array.array(self.typecode, self.example[:1])
+        self.assertEqual(
+            a,
+            array.array(self.typecode, [a[0]] * 5)
         )
 
         self.assertRaises(TypeError, a.__mul__, "bad")

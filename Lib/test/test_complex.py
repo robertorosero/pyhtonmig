@@ -220,6 +220,7 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(complex(NS(1+10j)), 1+10j)
         self.assertRaises(TypeError, complex, OS(None))
         self.assertRaises(TypeError, complex, NS(None))
+        self.assertRaises(TypeError, complex, {})
 
         self.assertAlmostEqual(complex("1+10j"), 1+10j)
         self.assertAlmostEqual(complex(10), 10+0j)
@@ -325,6 +326,8 @@ class ComplexTest(unittest.TestCase):
 
         # check that complex accepts long unicode strings
         self.assertEqual(type(complex("1"*500)), complex)
+        # check whitespace processing
+        self.assertEqual(complex('\N{EM SPACE}(\N{EN SPACE}1+1j ) '), 1+1j)
 
         class EvilExc(Exception):
             pass
@@ -378,28 +381,48 @@ class ComplexTest(unittest.TestCase):
         for num in nums:
             self.assertAlmostEqual((num.real**2 + num.imag**2)  ** 0.5, abs(num))
 
-    def test_repr(self):
-        self.assertEqual(repr(1+6j), '(1+6j)')
-        self.assertEqual(repr(1-6j), '(1-6j)')
+    def test_repr_str(self):
+        def test(v, expected, test_fn=self.assertEqual):
+            test_fn(repr(v), expected)
+            test_fn(str(v), expected)
 
-        self.assertNotEqual(repr(-(1+0j)), '(-1+-0j)')
+        test(1+6j, '(1+6j)')
+        test(1-6j, '(1-6j)')
+
+        test(-(1+0j), '(-1+-0j)', test_fn=self.assertNotEqual)
+
+        test(complex(1., INF), "(1+infj)")
+        test(complex(1., -INF), "(1-infj)")
+        test(complex(INF, 1), "(inf+1j)")
+        test(complex(-INF, INF), "(-inf+infj)")
+        test(complex(NAN, 1), "(nan+1j)")
+        test(complex(1, NAN), "(1+nanj)")
+        test(complex(NAN, NAN), "(nan+nanj)")
+
+        test(complex(0, INF), "infj")
+        test(complex(0, -INF), "-infj")
+        test(complex(0, NAN), "nanj")
 
         self.assertEqual(1-6j,complex(repr(1-6j)))
         self.assertEqual(1+6j,complex(repr(1+6j)))
         self.assertEqual(-6j,complex(repr(-6j)))
         self.assertEqual(6j,complex(repr(6j)))
 
-        self.assertEqual(repr(complex(1., INF)), "(1+infj)")
-        self.assertEqual(repr(complex(1., -INF)), "(1-infj)")
-        self.assertEqual(repr(complex(INF, 1)), "(inf+1j)")
-        self.assertEqual(repr(complex(-INF, INF)), "(-inf+infj)")
-        self.assertEqual(repr(complex(NAN, 1)), "(nan+1j)")
-        self.assertEqual(repr(complex(1, NAN)), "(1+nanj)")
-        self.assertEqual(repr(complex(NAN, NAN)), "(nan+nanj)")
+    @support.requires_IEEE_754
+    def test_negative_zero_repr_str(self):
+        def test(v, expected, test_fn=self.assertEqual):
+            test_fn(repr(v), expected)
+            test_fn(str(v), expected)
 
-        self.assertEqual(repr(complex(0, INF)), "infj")
-        self.assertEqual(repr(complex(0, -INF)), "-infj")
-        self.assertEqual(repr(complex(0, NAN)), "nanj")
+        test(complex(0., 1.),   "1j")
+        test(complex(-0., 1.),  "(-0+1j)")
+        test(complex(0., -1.),  "-1j")
+        test(complex(-0., -1.), "(-0-1j)")
+
+        test(complex(0., 0.),   "0j")
+        test(complex(0., -0.),  "-0j")
+        test(complex(-0., 0.),  "(-0+0j)")
+        test(complex(-0., -0.), "(-0-0j)")
 
     def test_neg(self):
         self.assertEqual(-(1+6j), -1-6j)
@@ -428,15 +451,14 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(complex(0, INF).__getnewargs__(), (0.0, INF))
         self.assertEqual(complex(INF, 0).__getnewargs__(), (INF, 0.0))
 
-    if float.__getformat__("double").startswith("IEEE"):
-        def test_plus_minus_0j(self):
-            # test that -0j and 0j literals are not identified
-            z1, z2 = 0j, -0j
-            self.assertEqual(atan2(z1.imag, -1.), atan2(0., -1.))
-            self.assertEqual(atan2(z2.imag, -1.), atan2(-0., -1.))
+    @support.requires_IEEE_754
+    def test_plus_minus_0j(self):
+        # test that -0j and 0j literals are not identified
+        z1, z2 = 0j, -0j
+        self.assertEqual(atan2(z1.imag, -1.), atan2(0., -1.))
+        self.assertEqual(atan2(z2.imag, -1.), atan2(-0., -1.))
 
-    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
-                         "test requires IEEE 754 doubles")
+    @support.requires_IEEE_754
     def test_negated_imaginary_literal(self):
         z0 = -0j
         z1 = -7j
@@ -452,15 +474,13 @@ class ComplexTest(unittest.TestCase):
         self.assertFloatsAreIdentical(z2.real, -0.0)
         self.assertFloatsAreIdentical(z2.imag, -INF)
 
-    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
-                         "test requires IEEE 754 doubles")
+    @support.requires_IEEE_754
     def test_overflow(self):
         self.assertEqual(complex("1e500"), complex(INF, 0.0))
         self.assertEqual(complex("-1e500j"), complex(0.0, -INF))
         self.assertEqual(complex("-1e500+1.8e308j"), complex(-INF, INF))
 
-    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
-                         "test requires IEEE 754 doubles")
+    @support.requires_IEEE_754
     def test_repr_roundtrip(self):
         vals = [0.0, 1e-500, 1e-315, 1e-200, 0.0123, 3.1415, 1e50, INF, NAN]
         vals += [-v for v in vals]
@@ -555,8 +575,28 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(format(1.5e21+3j, '^40,.2f'), ' 1,500,000,000,000,000,000,000.00+3.00j ')
         self.assertEqual(format(1.5e21+3000j, ',.2f'), '1,500,000,000,000,000,000,000.00+3,000.00j')
 
-        # alternate is invalid
-        self.assertRaises(ValueError, (1.5+0.5j).__format__, '#f')
+        # Issue 7094: Alternate formatting (specified by #)
+        self.assertEqual(format(1+1j, '.0e'), '1e+00+1e+00j')
+        self.assertEqual(format(1+1j, '#.0e'), '1.e+00+1.e+00j')
+        self.assertEqual(format(1+1j, '.0f'), '1+1j')
+        self.assertEqual(format(1+1j, '#.0f'), '1.+1.j')
+        self.assertEqual(format(1.1+1.1j, 'g'), '1.1+1.1j')
+        self.assertEqual(format(1.1+1.1j, '#g'), '1.10000+1.10000j')
+
+        # Alternate doesn't make a difference for these, they format the same with or without it
+        self.assertEqual(format(1+1j, '.1e'),  '1.0e+00+1.0e+00j')
+        self.assertEqual(format(1+1j, '#.1e'), '1.0e+00+1.0e+00j')
+        self.assertEqual(format(1+1j, '.1f'),  '1.0+1.0j')
+        self.assertEqual(format(1+1j, '#.1f'), '1.0+1.0j')
+
+        # Misc. other alternate tests
+        self.assertEqual(format((-1.5+0.5j), '#f'), '-1.500000+0.500000j')
+        self.assertEqual(format((-1.5+0.5j), '#.0f'), '-2.+0.j')
+        self.assertEqual(format((-1.5+0.5j), '#e'), '-1.500000e+00+5.000000e-01j')
+        self.assertEqual(format((-1.5+0.5j), '#.0e'), '-2.e+00+5.e-01j')
+        self.assertEqual(format((-1.5+0.5j), '#g'), '-1.50000+0.500000j')
+        self.assertEqual(format((-1.5+0.5j), '.0g'), '-2+0.5j')
+        self.assertEqual(format((-1.5+0.5j), '#.0g'), '-2.+0.5j')
 
         # zero padding is invalid
         self.assertRaises(ValueError, (1.5+0.5j).__format__, '010f')

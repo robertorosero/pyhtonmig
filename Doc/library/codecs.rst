@@ -1114,9 +1114,9 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | utf_16          | U16, utf16                     | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_be       | UTF-16BE                       | all languages (BMP only)       |
+| utf_16_be       | UTF-16BE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_le       | UTF-16LE                       | all languages (BMP only)       |
+| utf_16_le       | UTF-16LE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
 | utf_7           | U7, unicode-1-1-utf-7          | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
@@ -1164,6 +1164,44 @@ particular, the following variants typically exist:
 |                    |         | representation of the     |
 |                    |         | operand                   |
 +--------------------+---------+---------------------------+
+
+The following codecs provide bytes-to-bytes mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| base64_codec       | base64, base-64           | Convert operand to MIME   |
+|                    |                           | base64                    |
++--------------------+---------------------------+---------------------------+
+| bz2_codec          | bz2                       | Compress the operand      |
+|                    |                           | using bz2                 |
++--------------------+---------------------------+---------------------------+
+| hex_codec          | hex                       | Convert operand to        |
+|                    |                           | hexadecimal               |
+|                    |                           | representation, with two  |
+|                    |                           | digits per byte           |
++--------------------+---------------------------+---------------------------+
+| quopri_codec       | quopri, quoted-printable, | Convert operand to MIME   |
+|                    | quotedprintable           | quoted printable          |
++--------------------+---------------------------+---------------------------+
+| uu_codec           | uu                        | Convert the operand using |
+|                    |                           | uuencode                  |
++--------------------+---------------------------+---------------------------+
+| zlib_codec         | zip, zlib                 | Compress the operand      |
+|                    |                           | using gzip                |
++--------------------+---------------------------+---------------------------+
+
+The following codecs provide string-to-string mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| rot_13             | rot13                     | Returns the Caesar-cypher |
+|                    |                           | encryption of the operand |
++--------------------+---------------------------+---------------------------+
+
+.. versionadded:: 3.2
+   bytes-to-bytes and string-to-string codecs.
 
 
 :mod:`encodings.idna` --- Internationalized Domain Names in Applications

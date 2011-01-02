@@ -231,6 +231,19 @@ class TestDiscovery(unittest.TestCase):
         program.parseArgs(['something'])
         self.assertTrue(self.called)
 
+    def test_command_line_handling_discover_by_default_with_options(self):
+        program = TestableTestProgram()
+        program.module = None
+
+        args = ['something', '-v', '-b', '-v', '-c', '-f']
+        self.called = False
+        def do_discovery(argv):
+            self.called = True
+            self.assertEqual(argv, args[1:])
+        program._do_discovery = do_discovery
+        program.parseArgs(args)
+        self.assertTrue(self.called)
+
 
     def test_command_line_handling_do_discovery_too_many_arguments(self):
         class Stop(Exception):
@@ -354,7 +367,7 @@ class TestDiscovery(unittest.TestCase):
         expected_dir = os.path.abspath('foo')
         msg = re.escape(r"'foo' module incorrectly imported from %r. Expected %r. "
                 "Is this module globally installed?" % (mod_dir, expected_dir))
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             ImportError, '^%s$' % msg, loader.discover,
             start_dir='foo', pattern='foo.py'
         )

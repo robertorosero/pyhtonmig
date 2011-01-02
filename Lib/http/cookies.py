@@ -173,6 +173,11 @@ _Translator       = {
     '\033' : '\\033',  '\034' : '\\034',  '\035' : '\\035',
     '\036' : '\\036',  '\037' : '\\037',
 
+    # Because of the way browsers really handle cookies (as opposed
+    # to what the RFC says) we also encode , and ;
+
+    ',' : '\\054', ';' : '\\073',
+
     '"' : '\\"',       '\\' : '\\\\',
 
     '\177' : '\\177',  '\200' : '\\200',  '\201' : '\\201',
@@ -230,7 +235,7 @@ def _quote(str, LegalChars=_LegalChars):
     if all(c in LegalChars for c in str):
         return str
     else:
-        return '"' + _nulljoin(map(_Translator.get, str, str)) + '"'
+        return '"' + _nulljoin(_Translator.get(s, s) for s in str) + '"'
 
 
 _OctalPatt = re.compile(r"\\[0-3][0-7][0-7]")

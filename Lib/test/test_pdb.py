@@ -29,7 +29,7 @@ def test_pdb_displayhook():
     """This tests the custom displayhook for pdb.
 
     >>> def test_function(foo, bar):
-    ...     import pdb; pdb.Pdb().set_trace()
+    ...     import pdb; pdb.Pdb(nosigint=True).set_trace()
     ...     pass
 
     >>> with PdbTestInput([
@@ -69,7 +69,7 @@ def test_pdb_basic_commands():
     ...     return foo.upper()
 
     >>> def test_function():
-    ...     import pdb; pdb.Pdb().set_trace()
+    ...     import pdb; pdb.Pdb(nosigint=True).set_trace()
     ...     ret = test_function_2('baz')
     ...     print(ret)
 
@@ -168,7 +168,7 @@ def test_pdb_breakpoint_commands():
     """Test basic commands related to breakpoints.
 
     >>> def test_function():
-    ...     import pdb; pdb.Pdb().set_trace()
+    ...     import pdb; pdb.Pdb(nosigint=True).set_trace()
     ...     print(1)
     ...     print(2)
     ...     print(3)
@@ -192,6 +192,9 @@ def test_pdb_breakpoint_commands():
     ...     'ignore 1 10',
     ...     'condition 1 1 < 2',
     ...     'break 4',
+    ...     'break 4',
+    ...     'break',
+    ...     'clear 3',
     ...     'break',
     ...     'condition 1',
     ...     'enable 1',
@@ -220,6 +223,17 @@ def test_pdb_breakpoint_commands():
     New condition set for breakpoint 1.
     (Pdb) break 4
     Breakpoint 2 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
+    (Pdb) break 4
+    Breakpoint 3 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
+    (Pdb) break
+    Num Type         Disp Enb   Where
+    1   breakpoint   keep no    at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:3
+            stop only if 1 < 2
+            ignore next 10 hits
+    2   breakpoint   keep yes   at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
+    3   breakpoint   keep yes   at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
+    (Pdb) clear 3
+    Deleted breakpoint 3 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
     (Pdb) break
     Num Type         Disp Enb   Where
     1   breakpoint   keep no    at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:3
@@ -244,10 +258,10 @@ def test_pdb_breakpoint_commands():
     Clear all breaks? y
     Deleted breakpoint 2 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:4
     (Pdb) tbreak 5
-    Breakpoint 3 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:5
+    Breakpoint 4 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:5
     (Pdb) continue
     2
-    Deleted breakpoint 3 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:5
+    Deleted breakpoint 4 at <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>:5
     > <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>(5)test_function()
     -> print(3)
     (Pdb) break
@@ -283,7 +297,7 @@ def test_list_commands():
     ...     return foo
 
     >>> def test_function():
-    ...     import pdb; pdb.Pdb().set_trace()
+    ...     import pdb; pdb.Pdb(nosigint=True).set_trace()
     ...     ret = test_function_2('baz')
 
     >>> with PdbTestInput([  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
@@ -306,7 +320,7 @@ def test_list_commands():
     -> ret = test_function_2('baz')
     (Pdb) list
       1         def test_function():
-      2             import pdb; pdb.Pdb().set_trace()
+      2             import pdb; pdb.Pdb(nosigint=True).set_trace()
       3  ->         ret = test_function_2('baz')
     [EOF]
     (Pdb) step
@@ -369,7 +383,7 @@ def test_post_mortem():
     ...         print('Exception!')
 
     >>> def test_function():
-    ...     import pdb; pdb.Pdb().set_trace()
+    ...     import pdb; pdb.Pdb(nosigint=True).set_trace()
     ...     test_function_2()
     ...     print('Not reached.')
 
@@ -402,7 +416,7 @@ def test_post_mortem():
     -> 1/0
     (Pdb) list
       1         def test_function():
-      2             import pdb; pdb.Pdb().set_trace()
+      2             import pdb; pdb.Pdb(nosigint=True).set_trace()
       3  ->         test_function_2()
       4             print('Not reached.')
     [EOF]
@@ -426,7 +440,7 @@ def test_pdb_skip_modules():
 
     >>> def skip_module():
     ...     import string
-    ...     import pdb; pdb.Pdb(skip=['stri*']).set_trace()
+    ...     import pdb; pdb.Pdb(skip=['stri*'], nosigint=True).set_trace()
     ...     string.capwords('FOO')
 
     >>> with PdbTestInput([
@@ -455,7 +469,7 @@ def test_pdb_skip_modules_with_callback():
     >>> def skip_module():
     ...     def callback():
     ...         return None
-    ...     import pdb; pdb.Pdb(skip=['module_to_skip*']).set_trace()
+    ...     import pdb; pdb.Pdb(skip=['module_to_skip*'], nosigint=True).set_trace()
     ...     mod.foo_pony(callback)
 
     >>> with PdbTestInput([
@@ -496,7 +510,7 @@ def test_pdb_continue_in_bottomframe():
     """Test that "continue" and "next" work properly in bottom frame (issue #5294).
 
     >>> def test_function():
-    ...     import pdb, sys; inst = pdb.Pdb()
+    ...     import pdb, sys; inst = pdb.Pdb(nosigint=True)
     ...     inst.set_trace()
     ...     inst.botframe = sys._getframe()  # hackery to get the right botframe
     ...     print(1)
@@ -536,7 +550,8 @@ def test_pdb_continue_in_bottomframe():
 
 def pdb_invoke(method, arg):
     """Run pdb.method(arg)."""
-    import pdb; getattr(pdb, method)(arg)
+    import pdb
+    getattr(pdb.Pdb(nosigint=True), method)(arg)
 
 
 def test_pdb_run_with_incorrect_argument():

@@ -836,8 +836,8 @@ the enclosing parentheses, such as ``a, b, c`` or ``()``.  A single item tuple
 must have a trailing comma, such as ``(d,)``.
 
 Objects of type range are created using the :func:`range` function.  They don't
-support slicing, concatenation or repetition, and using ``in``, ``not in``,
-:func:`min` or :func:`max` on them is inefficient.
+support concatenation or repetition, and using :func:`min` or :func:`max` on
+them is inefficient.
 
 Most sequence types support the following operations.  The ``in`` and ``not in``
 operations have the same priorities as the comparison operations.  The ``+`` and
@@ -1078,20 +1078,26 @@ functions based on regular expressions.
 .. method:: str.isalnum()
 
    Return true if all characters in the string are alphanumeric and there is at
-   least one character, false otherwise.
+   least one character, false otherwise.  A character ``c`` is alphanumeric if one
+   of the following returns ``True``: ``c.isalpha()``, ``c.isdecimal()``,
+   ``c.isdigit()``, or ``c.isnumeric()``.
 
 
 .. method:: str.isalpha()
 
    Return true if all characters in the string are alphabetic and there is at least
-   one character, false otherwise.
+   one character, false otherwise.  Alphabetic characters are those characters defined
+   in the Unicode character database as "Letter", i.e., those with general category
+   property being one of "Lm", "Lt", "Lu", "Ll", or "Lo".  Note that this is different
+   from the "Alphabetic" property defined in the Unicode Standard.
 
 
 .. method:: str.isdecimal()
 
    Return true if all characters in the string are decimal
    characters and there is at least one character, false
-   otherwise. Decimal characters include digit characters, and all characters
+   otherwise. Decimal characters are those from general category "Nd". This category
+   includes digit characters, and all characters
    that that can be used to form decimal-radix numbers, e.g. U+0660,
    ARABIC-INDIC DIGIT ZERO.
 
@@ -1099,7 +1105,9 @@ functions based on regular expressions.
 .. method:: str.isdigit()
 
    Return true if all characters in the string are digits and there is at least one
-   character, false otherwise.
+   character, false otherwise.  Digits include decimal characters and digits that need
+   special handling, such as the compatibility superscript digits.  Formally, a digit
+   is a character that has the property value Numeric_Type=Digit or Numeric_Type=Decimal.
 
 
 .. method:: str.isidentifier()
@@ -1111,7 +1119,9 @@ functions based on regular expressions.
 .. method:: str.islower()
 
    Return true if all cased characters in the string are lowercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise.  Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and lowercase characters
+   are those with general category property "Ll".
 
 
 .. method:: str.isnumeric()
@@ -1120,7 +1130,8 @@ functions based on regular expressions.
    characters, and there is at least one character, false
    otherwise. Numeric characters include digit characters, and all characters
    that have the Unicode numeric value property, e.g. U+2155,
-   VULGAR FRACTION ONE FIFTH.
+   VULGAR FRACTION ONE FIFTH.  Formally, numeric characters are those with the property
+   value Numeric_Type=Digit, Numeric_Type=Decimal or Numeric_Type=Numeric.
 
 
 .. method:: str.isprintable()
@@ -1137,8 +1148,9 @@ functions based on regular expressions.
 .. method:: str.isspace()
 
    Return true if there are only whitespace characters in the string and there is
-   at least one character, false otherwise.
-
+   at least one character, false otherwise.  Whitespace characters  are those
+   characters defined in the Unicode character database as "Other" or "Separator"
+   and those with bidirectional property being one of "WS", "B", or "S".
 
 .. method:: str.istitle()
 
@@ -1150,7 +1162,9 @@ functions based on regular expressions.
 .. method:: str.isupper()
 
    Return true if all cased characters in the string are uppercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise. Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and uppercase characters
+   are those with general category property "Lu".
 
 
 .. method:: str.join(iterable)
@@ -2279,8 +2293,8 @@ memoryview type
 ===============
 
 :class:`memoryview` objects allow Python code to access the internal data
-of an object that supports the buffer protocol without copying.  Memory
-is generally interpreted as simple bytes.
+of an object that supports the :ref:`buffer protocol <bufferobjects>` without
+copying.  Memory is generally interpreted as simple bytes.
 
 .. class:: memoryview(obj)
 
@@ -2419,6 +2433,10 @@ is generally interpreted as simple bytes.
       A tuple of integers the length of :attr:`ndim` giving the size in bytes to
       access each element for each dimension of the array.
 
+   .. attribute:: readonly
+
+      A bool indicating whether the memory is read only.
+
    .. memoryview.suboffsets isn't documented because it only seems useful for C
 
 
@@ -2433,12 +2451,9 @@ Context Manager Types
    single: protocol; context management
 
 Python's :keyword:`with` statement supports the concept of a runtime context
-defined by a context manager.  This is implemented using two separate methods
+defined by a context manager.  This is implemented using a pair of methods
 that allow user-defined classes to define a runtime context that is entered
-before the statement body is executed and exited when the statement ends.
-
-The :dfn:`context management protocol` consists of a pair of methods that need
-to be provided for a context manager object to define a runtime context:
+before the statement body is executed and exited when the statement ends:
 
 
 .. method:: contextmanager.__enter__()
@@ -2486,9 +2501,9 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's :term:`generator`\s and the ``contextlib.contextmanager`` :term:`decorator`
+Python's :term:`generator`\s and the :class:`contextlib.contextmanager` decorator
 provide a convenient way to implement these protocols.  If a generator function is
-decorated with the ``contextlib.contextmanager`` decorator, it will return a
+decorated with the :class:`contextlib.contextmanager` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
 generator function.

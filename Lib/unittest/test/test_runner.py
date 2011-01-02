@@ -1,5 +1,8 @@
 import io
+import os
+import sys
 import pickle
+import subprocess
 
 import unittest
 
@@ -31,9 +34,7 @@ class TestCleanUp(unittest.TestCase):
                          [(cleanup1, (1, 2, 3), dict(four='hello', five='goodbye')),
                           (cleanup2, (), {})])
 
-        result = test.doCleanups()
-        self.assertTrue(result)
-
+        self.assertTrue(test.doCleanups())
         self.assertEqual(cleanups, [(2, (), {}), (1, (1, 2, 3), dict(four='hello', five='goodbye'))])
 
     def testCleanUpWithErrors(self):
@@ -41,14 +42,12 @@ class TestCleanUp(unittest.TestCase):
             def testNothing(self):
                 pass
 
-        class MockResult(object):
+        class MockOutcome(object):
+            success = True
             errors = []
-            def addError(self, test, exc_info):
-                self.errors.append((test, exc_info))
 
-        result = MockResult()
         test = TestableTest('testNothing')
-        test._resultForDoCleanups = result
+        test._outcomeForDoCleanups = MockOutcome
 
         exc1 = Exception('foo')
         exc2 = Exception('bar')
@@ -62,10 +61,11 @@ class TestCleanUp(unittest.TestCase):
         test.addCleanup(cleanup2)
 
         self.assertFalse(test.doCleanups())
+        self.assertFalse(MockOutcome.success)
 
-        (test1, (Type1, instance1, _)), (test2, (Type2, instance2, _)) = reversed(MockResult.errors)
-        self.assertEqual((test1, Type1, instance1), (test, Exception, exc1))
-        self.assertEqual((test2, Type2, instance2), (test, Exception, exc2))
+        (Type1, instance1, _), (Type2, instance2, _) = reversed(MockOutcome.errors)
+        self.assertEqual((Type1, instance1), (Exception, exc1))
+        self.assertEqual((Type2, instance2), (Exception, exc2))
 
     def testCleanupInRun(self):
         blowUp = False
@@ -144,6 +144,7 @@ class Test_TextTestRunner(unittest.TestCase):
         self.assertFalse(runner.failfast)
         self.assertFalse(runner.buffer)
         self.assertEqual(runner.verbosity, 1)
+        self.assertEqual(runner.warnings, None)
         self.assertTrue(runner.descriptions)
         self.assertEqual(runner.resultclass, unittest.TextTestResult)
 
@@ -244,3 +245,74 @@ class Test_TextTestRunner(unittest.TestCase):
 
         expectedresult = (runner.stream, DESCRIPTIONS, VERBOSITY)
         self.assertEqual(runner._makeResult(), expectedresult)
+
+    def test_warnings(self):
+        """
+        Check that warnings argument of TextTestRunner correctly affects the
+        behavior of the warnings.
+        """
+        # see #10535 and the _test_warnings file for more information
+
+        def get_parse_out_err(p):
+            return [b.splitlines() for b in p.communicate()]
+        opts = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    cwd=os.path.dirname(__file__))
+        ae_msg = b'Please use assertEqual instead.'
+        at_msg = b'Please use assertTrue instead.'
+
+        # no args -> all the warnings are printed, unittest warnings only once
+        p = subprocess.Popen([sys.executable, '_test_warnings.py'], **opts)
+        out, err = get_parse_out_err(p)
+        self.assertIn(b'OK', err)
+        # check that the total number of warnings in the output is correct
+        self.assertEqual(len(out), 12)
+        # check that the numbers of the different kind of warnings is correct
+        for msg in [b'dw', b'iw', b'uw']:
+            self.assertEqual(out.count(msg), 3)
+        for msg in [ae_msg, at_msg, b'rw']:
+            self.assertEqual(out.count(msg), 1)
+
+        args_list = (
+            # passing 'ignore' as warnings arg -> no warnings
+            [sys.executable, '_test_warnings.py', 'ignore'],
+            # -W doesn't affect the result if the arg is passed
+            [sys.executable, '-Wa', '_test_warnings.py', 'ignore'],
+            # -W affects the result if the arg is not passed
+            [sys.executable, '-Wi', '_test_warnings.py']
+        )
+        # in all these cases no warnings are printed
+        for args in args_list:
+            p = subprocess.Popen(args, **opts)
+            out, err = get_parse_out_err(p)
+            self.assertIn(b'OK', err)
+            self.assertEqual(len(out), 0)
+
+
+        # passing 'always' as warnings arg -> all the warnings printed,
+        #                                     unittest warnings only once
+        p = subprocess.Popen([sys.executable, '_test_warnings.py', 'always'],
+                             **opts)
+        out, err = get_parse_out_err(p)
+        self.assertIn(b'OK', err)
+        self.assertEqual(len(out), 14)
+        for msg in [b'dw', b'iw', b'uw', b'rw']:
+            self.assertEqual(out.count(msg), 3)
+        for msg in [ae_msg, at_msg]:
+            self.assertEqual(out.count(msg), 1)
+
+    def testStdErrLookedUpAtInstantiationTime(self):
+        # see issue 10786
+        old_stderr = sys.stderr
+        f = io.StringIO()
+        sys.stderr = f
+        try:
+            runner = unittest.TextTestRunner()
+            self.assertTrue(runner.stream.stream is f)
+        finally:
+            sys.stderr = old_stderr
+
+    def testSpecifiedStreamUsed(self):
+        # see issue 10786
+        f = io.StringIO()
+        runner = unittest.TextTestRunner(f)
+        self.assertTrue(runner.stream.stream is f)

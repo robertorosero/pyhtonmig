@@ -710,19 +710,19 @@ proxy_get(proxyobject *pp, PyObject *args)
 static PyObject *
 proxy_keys(proxyobject *pp)
 {
-    return PyMapping_Keys(pp->dict);
+    return PyObject_CallMethod(pp->dict, "keys", NULL);
 }
 
 static PyObject *
 proxy_values(proxyobject *pp)
 {
-    return PyMapping_Values(pp->dict);
+    return PyObject_CallMethod(pp->dict, "values", NULL);
 }
 
 static PyObject *
 proxy_items(proxyobject *pp)
 {
-    return PyMapping_Items(pp->dict);
+    return PyObject_CallMethod(pp->dict, "items", NULL);
 }
 
 static PyObject *
@@ -766,6 +766,12 @@ proxy_str(proxyobject *pp)
     return PyObject_Str(pp->dict);
 }
 
+static PyObject *
+proxy_repr(proxyobject *pp)
+{
+    return PyUnicode_FromFormat("dict_proxy(%R)", pp->dict);
+}
+
 static int
 proxy_traverse(PyObject *self, visitproc visit, void *arg)
 {
@@ -791,7 +797,7 @@ PyTypeObject PyDictProxy_Type = {
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
     0,                                          /* tp_reserved */
-    0,                                          /* tp_repr */
+    (reprfunc)proxy_repr,                       /* tp_repr */
     0,                                          /* tp_as_number */
     &proxy_as_sequence,                         /* tp_as_sequence */
     &proxy_as_mapping,                          /* tp_as_mapping */
@@ -1190,7 +1196,7 @@ property_descr_get(PyObject *self, PyObject *obj, PyObject *type)
         PyErr_SetString(PyExc_AttributeError, "unreadable attribute");
         return NULL;
     }
-    return PyObject_CallFunction(gs->prop_get, "(O)", obj);
+    return PyObject_CallFunctionObjArgs(gs->prop_get, obj, NULL);
 }
 
 static int
@@ -1211,9 +1217,9 @@ property_descr_set(PyObject *self, PyObject *obj, PyObject *value)
         return -1;
     }
     if (value == NULL)
-        res = PyObject_CallFunction(func, "(O)", obj);
+        res = PyObject_CallFunctionObjArgs(func, obj, NULL);
     else
-        res = PyObject_CallFunction(func, "(OO)", obj, value);
+        res = PyObject_CallFunctionObjArgs(func, obj, value, NULL);
     if (res == NULL)
         return -1;
     Py_DECREF(res);

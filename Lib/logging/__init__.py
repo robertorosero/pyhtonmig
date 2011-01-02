@@ -33,7 +33,7 @@ __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'captureWarnings', 'critical', 'debug', 'disable', 'error',
            'exception', 'fatal', 'getLevelName', 'getLogger', 'getLoggerClass',
            'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning',
-           'getLogRecordClass', 'setLogRecordClass']
+           'getLogRecordFactory', 'setLogRecordFactory', 'lastResort']
 
 try:
     import codecs
@@ -238,7 +238,7 @@ class LogRecord(object):
     information to be logged.
     """
     def __init__(self, name, level, pathname, lineno,
-                 msg, args, exc_info, func=None, sinfo=None):
+                 msg, args, exc_info, func=None, sinfo=None, **kwargs):
         """
         Initialize a logging record with interesting information.
         """
@@ -322,21 +322,24 @@ class LogRecord(object):
 #
 #   Determine which class to use when instantiating log records.
 #
-_logRecordClass = LogRecord
+_logRecordFactory = LogRecord
 
-def setLogRecordClass(cls):
+def setLogRecordFactory(factory):
     """
-    Set the class to be used when instantiating a log record.
-    """
-    global _logRecordClass
-    _logRecordClass = cls
+    Set the factory to be used when instantiating a log record.
 
-def getLogRecordClass():
+    :param factory: A callable which will be called to instantiate
+    a log record.
     """
-    Return the class to be used when instantiating a log record.
+    global _logRecordFactory
+    _logRecordFactory = factory
+
+def getLogRecordFactory():
+    """
+    Return the factory to be used when instantiating a log record.
     """
 
-    return _logRecordClass
+    return _logRecordFactory
 
 def makeLogRecord(dict):
     """
@@ -345,7 +348,7 @@ def makeLogRecord(dict):
     a socket connection (which is sent as a dictionary) into a LogRecord
     instance.
     """
-    rv = _logRecordClass(None, None, "", 0, "", (), None, None)
+    rv = _logRecordFactory(None, None, "", 0, "", (), None, None)
     rv.__dict__.update(dict)
     return rv
 
@@ -994,6 +997,26 @@ class FileHandler(StreamHandler):
             self.stream = self._open()
         StreamHandler.emit(self, record)
 
+class _StderrHandler(StreamHandler):
+    """
+    This class is like a StreamHandler using sys.stderr, but always uses
+    whatever sys.stderr is currently set to rather than the value of
+    sys.stderr at handler construction time.
+    """
+    def __init__(self, level=NOTSET):
+        """
+        Initialize the handler.
+        """
+        Handler.__init__(self, level)
+
+    @property
+    def stream(self):
+        return sys.stderr
+
+
+_defaultLastResort = _StderrHandler(WARNING)
+lastResort = _defaultLastResort
+
 #---------------------------------------------------------------------------
 #   Manager classes and functions
 #---------------------------------------------------------------------------
@@ -1053,10 +1076,10 @@ class Manager(object):
         """
         self.root = rootnode
         self.disable = 0
-        self.emittedNoHandlerWarning = 0
+        self.emittedNoHandlerWarning = False
         self.loggerDict = {}
         self.loggerClass = None
-        self.logRecordClass = None
+        self.logRecordFactory = None
 
     def getLogger(self, name):
         """
@@ -1100,12 +1123,12 @@ class Manager(object):
                                 + klass.__name__)
         self.loggerClass = klass
 
-    def setLogRecordClass(self, cls):
+    def setLogRecordFactory(self, factory):
         """
-        Set the class to be used when instantiating a log record with this
+        Set the factory to be used when instantiating a log record with this
         Manager.
         """
-        self.logRecordClass = cls
+        self.logRecordFactory = factory
 
     def _fixupParents(self, alogger):
         """
@@ -1305,7 +1328,7 @@ class Logger(Filterer):
         A factory method which can be overridden in subclasses to create
         specialized LogRecords.
         """
-        rv = _logRecordClass(name, level, fn, lno, msg, args, exc_info, func,
+        rv = _logRecordFactory(name, level, fn, lno, msg, args, exc_info, func,
                              sinfo)
         if extra is not None:
             for key in extra:
@@ -1412,10 +1435,13 @@ class Logger(Filterer):
                 c = None    #break out
             else:
                 c = c.parent
-        if (found == 0) and raiseExceptions and not self.manager.emittedNoHandlerWarning:
-            sys.stderr.write("No handlers could be found for logger"
-                             " \"%s\"\n" % self.name)
-            self.manager.emittedNoHandlerWarning = 1
+        if (found == 0):
+            if lastResort:
+                lastResort.handle(record)
+            elif raiseExceptions and not self.manager.emittedNoHandlerWarning:
+                sys.stderr.write("No handlers could be found for logger"
+                                 " \"%s\"\n" % self.name)
+                self.manager.emittedNoHandlerWarning = True
 
     def getEffectiveLevel(self):
         """
@@ -1673,7 +1699,9 @@ def getLogger(name=None):
 
 def critical(msg, *args, **kwargs):
     """
-    Log a message with severity 'CRITICAL' on the root logger.
+    Log a message with severity 'CRITICAL' on the root logger. If the logger
+    has no handlers, call basicConfig() to add a console handler with a
+    pre-defined format.
     """
     if len(root.handlers) == 0:
         basicConfig()
@@ -1683,7 +1711,9 @@ fatal = critical
 
 def error(msg, *args, **kwargs):
     """
-    Log a message with severity 'ERROR' on the root logger.
+    Log a message with severity 'ERROR' on the root logger. If the logger has
+    no handlers, call basicConfig() to add a console handler with a pre-defined
+    format.
     """
     if len(root.handlers) == 0:
         basicConfig()
@@ -1691,15 +1721,18 @@ def error(msg, *args, **kwargs):
 
 def exception(msg, *args, **kwargs):
     """
-    Log a message with severity 'ERROR' on the root logger,
-    with exception information.
+    Log a message with severity 'ERROR' on the root logger, with exception
+    information. If the logger has no handlers, basicConfig() is called to add
+    a console handler with a pre-defined format.
     """
     kwargs['exc_info'] = True
     error(msg, *args, **kwargs)
 
 def warning(msg, *args, **kwargs):
     """
-    Log a message with severity 'WARNING' on the root logger.
+    Log a message with severity 'WARNING' on the root logger. If the logger has
+    no handlers, call basicConfig() to add a console handler with a pre-defined
+    format.
     """
     if len(root.handlers) == 0:
         basicConfig()
@@ -1709,7 +1742,9 @@ warn = warning
 
 def info(msg, *args, **kwargs):
     """
-    Log a message with severity 'INFO' on the root logger.
+    Log a message with severity 'INFO' on the root logger. If the logger has
+    no handlers, call basicConfig() to add a console handler with a pre-defined
+    format.
     """
     if len(root.handlers) == 0:
         basicConfig()
@@ -1717,7 +1752,9 @@ def info(msg, *args, **kwargs):
 
 def debug(msg, *args, **kwargs):
     """
-    Log a message with severity 'DEBUG' on the root logger.
+    Log a message with severity 'DEBUG' on the root logger. If the logger has
+    no handlers, call basicConfig() to add a console handler with a pre-defined
+    format.
     """
     if len(root.handlers) == 0:
         basicConfig()
@@ -1725,7 +1762,9 @@ def debug(msg, *args, **kwargs):
 
 def log(level, msg, *args, **kwargs):
     """
-    Log 'msg % args' with the integer severity 'level' on the root logger.
+    Log 'msg % args' with the integer severity 'level' on the root logger. If
+    the logger has no handlers, call basicConfig() to add a console handler
+    with a pre-defined format.
     """
     if len(root.handlers) == 0:
         basicConfig()

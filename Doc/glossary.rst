@@ -27,7 +27,7 @@ Glossary
       :ref:`2to3-reference`.
 
    abstract base class
-      Abstract Base Classes (abbreviated ABCs) complement :term:`duck-typing` by
+      :ref:`abstract-base-classes` complement :term:`duck-typing` by
       providing a way to define interfaces when other techniques like
       :func:`hasattr` would be clumsy. Python comes with many built-in ABCs for
       data structures (in the :mod:`collections` module), numbers (in the
@@ -181,22 +181,22 @@ Glossary
       not expressions.
 
    extension module
-      A module written in C or C++, using Python's C API to interact with the core and
-      with user code.
+      A module written in C or C++, using Python's C API to interact with the
+      core and with user code.
 
    file object
       An object exposing a file-oriented API (with methods such as
-      :meth:`read()` or :meth:`write()`) to an underlying resource.
-      Depending on the way it was created, a file object can mediate access
-      to a real on-disk file or to another other type of storage or
-      communication device (for example standard input/output, in-memory
-      buffers, sockets, pipes, etc.).  File objects are also called
-      :dfn:`file-like objects` or :dfn:`streams`.
+      :meth:`read()` or :meth:`write()`) to an underlying resource.  Depending
+      on the way it was created, a file object can mediate access to a real
+      on-disk file or to another other type of storage or communication device
+      (for example standard input/output, in-memory buffers, sockets, pipes,
+      etc.).  File objects are also called :dfn:`file-like objects` or
+      :dfn:`streams`.
 
-      There are actually three categories of file objects: raw binary
-      files, buffered binary files and text files.  Their interfaces are
-      defined in the :mod:`io` module.  The canonical way to create a
-      file object is by using the :func:`open` function.
+      There are actually three categories of file objects: raw binary files,
+      buffered binary files and text files.  Their interfaces are defined in the
+      :mod:`io` module.  The canonical way to create a file object is by using
+      the :func:`open` function.
 
    file-like object
       A synonym for :term:`file object`.
@@ -391,6 +391,12 @@ Glossary
       pre-conditions before making calls or lookups.  This style contrasts with
       the :term:`EAFP` approach and is characterized by the presence of many
       :keyword:`if` statements.
+
+      In a multi-threaded environment, the LBYL approach can risk introducing a
+      race condition between "the looking" and "the leaping".  For example, the
+      code, ``if key in mapping: return mapping[key]`` can fail if another
+      thread removes *key* from *mapping* after the test, but before the lookup.
+      This issue can be solved with locks or by using the EAFP approach.
 
    list
       A built-in Python :term:`sequence`.  Despite its name it is more akin

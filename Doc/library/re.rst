@@ -991,8 +991,10 @@ support the following methods and attributes:
    The string passed to :meth:`~regex.match` or :meth:`~regex.search`.
 
 
-Examples
---------
+.. _re-examples:
+
+Regular Expression Examples
+---------------------------
 
 
 Checking For a Pair
@@ -1298,6 +1300,7 @@ successive matches::
     Token = collections.namedtuple('Token', 'typ value line column')
 
     def tokenize(s):
+        keywords = {'IF', 'THEN', 'FOR', 'NEXT', 'GOSUB', 'RETURN'}
         tok_spec = [
             ('NUMBER', r'\d+(\.\d*)?'), # Integer or decimal number
             ('ASSIGN', r':='),          # Assignment operator
@@ -1318,6 +1321,8 @@ successive matches::
                 line_start = pos
                 line += 1
             elif typ != 'SKIP':
+                if typ == 'ID' and val in keywords:
+                    typ = val
                 yield Token(typ, mo.group(typ), line, mo.start()-line_start)
             pos = mo.end()
             mo = gettok(s, pos)

@@ -45,6 +45,7 @@ class NormalizationTest(unittest.TestCase):
                                         check=check_version)
         except (IOError, HTTPException):
             self.skipTest("Could not retrieve " + TESTDATAURL)
+        self.addCleanup(testdata.close)
         for line in testdata:
             if '#' in line:
                 line = line.split('#')[0]
@@ -53,9 +54,6 @@ class NormalizationTest(unittest.TestCase):
                 continue
             if line.startswith("@Part"):
                 part = line.split()[0]
-                continue
-            if part == "@Part3":
-                # XXX we don't support PRI #29 yet, so skip these tests for now
                 continue
             try:
                 c1,c2,c3,c4,c5 = [unistr(x) for x in line.split(';')[:-1]]

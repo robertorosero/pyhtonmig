@@ -925,6 +925,15 @@ class test_TemporaryDirectory(TC):
             f.write(b"Hello world!")
         return tmp
 
+    def test_mkdtemp_failure(self):
+        # Check no additional exception if mkdtemp fails
+        # Previously would raise AttributeError instead
+        # (noted as part of Issue #10188)
+        with tempfile.TemporaryDirectory() as nonexistent:
+            pass
+        with self.assertRaises(os.error):
+            tempfile.TemporaryDirectory(dir=nonexistent)
+
     def test_explicit_cleanup(self):
         # A TemporaryDirectory is deleted when cleaned up
         dir = tempfile.mkdtemp()
@@ -955,20 +964,56 @@ class test_TemporaryDirectory(TC):
     def test_del_on_shutdown(self):
         # A TemporaryDirectory may be cleaned up during shutdown
         # Make sure it works with the relevant modules nulled out
-        dir = tempfile.mkdtemp()
-        try:
+        with self.do_create() as dir:
             d = self.do_create(dir=dir)
             # Mimic the nulling out of modules that
             # occurs during system shutdown
             modules = [os, os.path]
             if has_stat:
                 modules.append(stat)
-            with NulledModules(*modules):
-                d.cleanup()
+            # Currently broken, so suppress the warning
+            # that is otherwise emitted on stdout
+            with support.captured_stderr() as err:
+                with NulledModules(*modules):
+                    d.cleanup()
+            # Currently broken, so stop spurious exception by
+            # indicating the object has already been closed
+            d._closed = True
+            # And this assert will fail, as expected by the
+            # unittest decorator...
             self.assertFalse(os.path.exists(d.name),
                         "TemporaryDirectory %s exists after cleanup" % d.name)
-        finally:
-            os.rmdir(dir)
+
+    def test_warnings_on_cleanup(self):
+        # Two kinds of warning on shutdown
+        #   Issue 10888: may write to stderr if modules are nulled out
+        #   ResourceWarning will be triggered by __del__
+        with self.do_create() as dir:
+            if os.sep != '\\':
+                # Embed a backslash in order to make sure string escaping
+                # in the displayed error message is dealt with correctly
+                suffix = '\\check_backslash_handling'
+            else:
+                suffix = ''
+            d = self.do_create(dir=dir, suf=suffix)
+
+            #Check for the Issue 10888 message
+            modules = [os, os.path]
+            if has_stat:
+                modules.append(stat)
+            with support.captured_stderr() as err:
+                with NulledModules(*modules):
+                    d.cleanup()
+            message = err.getvalue().replace('\\\\', '\\')
+            self.assertIn("while cleaning up",  message)
+            self.assertIn(d.name,  message)
+
+            # Check for the resource warning
+            with support.check_warnings(('Implicitly', ResourceWarning), quiet=False):
+                warnings.filterwarnings("always", category=ResourceWarning)
+                d.__del__()
+            self.assertFalse(os.path.exists(d.name),
+                        "TemporaryDirectory %s exists after __del__" % d.name)
 
     def test_multiple_close(self):
         # Can be cleaned-up many times without error

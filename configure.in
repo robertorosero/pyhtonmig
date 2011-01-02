@@ -608,6 +608,7 @@ AC_MSG_RESULT($LIBRARY)
 AC_SUBST(LDLIBRARY)
 AC_SUBST(DLLLIBRARY)
 AC_SUBST(BLDLIBRARY)
+AC_SUBST(PY3LIBRARY)
 AC_SUBST(LDLIBRARYDIR)
 AC_SUBST(INSTSONAME)
 AC_SUBST(RUNSHARED)
@@ -618,7 +619,7 @@ INSTSONAME='$(LDLIBRARY)'
 DLLLIBRARY=''
 LDLIBRARYDIR=''
 RUNSHARED=''
-LDVERSION="$(VERSION)"
+LDVERSION="$VERSION"
 
 # LINKCC is the command that links the python executable -- default is $(CC).
 # If CXX is set, and if it is needed to link a main function that was
@@ -737,6 +738,10 @@ if test $enable_shared = "yes"; then
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  if test $with_pydebug == no
+	  then
+	      PY3LIBRARY=libpython3.so
+	  fi
           ;;
     Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*)
 	  LDLIBRARY='libpython$(LDVERSION).so'
@@ -748,6 +753,11 @@ if test $enable_shared = "yes"; then
 		;;
 	  esac
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  PY3LIBRARY=libpython3.so
+	  if test $with_pydebug == no
+          then
+	      PY3LIBRARY=libpython3.so
+	  fi
 	  ;;
     hp*|HP*)
 	  case `uname -m` in
@@ -4252,7 +4262,7 @@ case $ac_sys_system in
   OSF*) AC_MSG_ERROR(OSF* systems are deprecated unless somebody volunteers. Check http://bugs.python.org/issue8606) ;;
 esac
 
-
+AC_CHECK_FUNC(pipe2, AC_DEFINE(HAVE_PIPE2, 1, [Define if the OS supports pipe2()]), )
 
 AC_SUBST(THREADHEADERS)
 

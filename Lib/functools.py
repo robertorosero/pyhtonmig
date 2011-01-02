@@ -12,7 +12,7 @@ __all__ = ['update_wrapper', 'wraps', 'WRAPPER_ASSIGNMENTS', 'WRAPPER_UPDATES',
            'total_ordering', 'cmp_to_key', 'lru_cache', 'reduce', 'partial']
 
 from _functools import partial, reduce
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 try:
     from _thread import allocate_lock as Lock
 except:
@@ -114,49 +114,91 @@ def cmp_to_key(mycmp):
             raise TypeError('hash not implemented')
     return K
 
+_CacheInfo = namedtuple("CacheInfo", "hits misses maxsize currsize")
+
 def lru_cache(maxsize=100):
     """Least-recently-used cache decorator.
 
+    If *maxsize* is set to None, the LRU features are disabled and the cache
+    can grow without bound.
+
     Arguments to the cached function must be hashable.
-    Cache performance statistics stored in f.hits and f.misses.
-    Clear the cache using f.clear().
-    http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used
+
+    View the cache statistics named tuple (hits, misses, maxsize, currsize) with
+    f.cache_info().  Clear the cache and statistics with f.cache_clear().
+    Access the underlying function with f.__wrapped__.
+
+    See:  http://en.wikipedia.org/wiki/Cache_algorithms#Least_Recently_Used
 
     """
-    def decorating_function(user_function, tuple=tuple, sorted=sorted,
-                            len=len, KeyError=KeyError):
-        cache = OrderedDict()           # ordered least recent to most recent
-        cache_popitem = cache.popitem
-        cache_renew = cache.move_to_end
-        kwd_mark = object()             # separate positional and keyword args
+    # Users should only access the lru_cache through its public API:
+    #       cache_info, cache_clear, and f.__wrapped__
+    # The internals of the lru_cache are encapsulated for thread safety and
+    # to allow the implementation to change (including a possible C version).
+
+    def decorating_function(user_function,
+                tuple=tuple, sorted=sorted, len=len, KeyError=KeyError):
+
+        hits = misses = 0
+        kwd_mark = object()             # separates positional and keyword args
         lock = Lock()
 
-        @wraps(user_function)
-        def wrapper(*args, **kwds):
-            key = args
-            if kwds:
-                key += (kwd_mark,) + tuple(sorted(kwds.items()))
-            try:
-                with lock:
+        if maxsize is None:
+            cache = dict()              # simple cache without ordering or size limit
+
+            @wraps(user_function)
+            def wrapper(*args, **kwds):
+                nonlocal hits, misses
+                key = args
+                if kwds:
+                    key += (kwd_mark,) + tuple(sorted(kwds.items()))
+                try:
                     result = cache[key]
-                    cache_renew(key)            # record recent use of this key
-                    wrapper.cache_hits += 1
-            except KeyError:
-                result = user_function(*args, **kwds)
-                with lock:
-                    cache[key] = result         # record recent use of this key
-                    wrapper.cache_misses += 1
-                    if len(cache) > maxsize:
-                        cache_popitem(0)        # purge least recently used cache entry
-            return result
+                    hits += 1
+                except KeyError:
+                    result = user_function(*args, **kwds)
+                    cache[key] = result
+                    misses += 1
+                return result
+        else:
+            cache = OrderedDict()       # ordered least recent to most recent
+            cache_popitem = cache.popitem
+            cache_renew = cache.move_to_end
+
+            @wraps(user_function)
+            def wrapper(*args, **kwds):
+                nonlocal hits, misses
+                key = args
+                if kwds:
+                    key += (kwd_mark,) + tuple(sorted(kwds.items()))
+                try:
+                    with lock:
+                        result = cache[key]
+                        cache_renew(key)        # record recent use of this key
+                        hits += 1
+                except KeyError:
+                    result = user_function(*args, **kwds)
+                    with lock:
+                        cache[key] = result     # record recent use of this key
+                        misses += 1
+                        if len(cache) > maxsize:
+                            cache_popitem(0)    # purge least recently used cache entry
+                return result
+
+        def cache_info():
+            """Report cache statistics"""
+            with lock:
+                return _CacheInfo(hits, misses, maxsize, len(cache))
 
         def cache_clear():
             """Clear the cache and cache statistics"""
+            nonlocal hits, misses
             with lock:
                 cache.clear()
-                wrapper.cache_hits = wrapper.cache_misses = 0
+                hits = misses = 0
 
-        wrapper.cache_hits = wrapper.cache_misses = 0
+        wrapper.cache_info = cache_info
         wrapper.cache_clear = cache_clear
         return wrapper
+
     return decorating_function

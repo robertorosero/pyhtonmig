@@ -24,7 +24,7 @@ if sys.platform.startswith('win'):
 from concurrent import futures
 from concurrent.futures._base import (
     PENDING, RUNNING, CANCELLED, CANCELLED_AND_NOTIFIED, FINISHED, Future,
-    LOGGER, STDERR_HANDLER, wait)
+    LOGGER, wait)
 import concurrent.futures.process
 
 def create_future(state=PENDING, exception=None, result=None):
@@ -75,15 +75,27 @@ class Call(object):
 
     def _wait_on_event(self, handle):
         if sys.platform.startswith('win'):
+            # WaitForSingleObject returns 0 if handle is signaled.
             r = ctypes.windll.kernel32.WaitForSingleObject(handle, 60 * 1000)
-            assert r == 0
+            if r != 0:
+                message = (
+                    'WaitForSingleObject({}, ...) failed with {}, '
+                    'GetLastError() = {}'.format(
+                            handle, r, ctypes.GetLastError()))
+                logging.critical(message)
+                assert False, message
         else:
             self.CALL_LOCKS[handle].wait()
 
     def _signal_event(self, handle):
         if sys.platform.startswith('win'):
-            r = ctypes.windll.kernel32.SetEvent(handle)
-            assert r != 0
+            r = ctypes.windll.kernel32.SetEvent(handle)  # Returns 0 on failure.
+            if r == 0:
+                message = (
+                    'SetEvent({}) failed with {}, GetLastError() = {}'.format(
+                            handle, r, ctypes.GetLastError()))
+                logging.critical(message)
+                assert False, message
         else:
             self.CALL_LOCKS[handle].set()
 
@@ -113,6 +125,8 @@ class Call(object):
         if sys.platform.startswith('win'):
             ctypes.windll.kernel32.CloseHandle(self._called_event)
             ctypes.windll.kernel32.CloseHandle(self._can_finish)
+            self._called_event = None
+            self._can_finish = None
         else:
             del self.CALL_LOCKS[self._called_event]
             del self.CALL_LOCKS[self._can_finish]
@@ -363,8 +377,6 @@ class WaitTests(unittest.TestCase):
 
             self.assertEqual(set([future1, future2]), finished)
             self.assertEqual(set(), pending)
-
-
         finally:
             call1.close()
             call2.close()
@@ -620,11 +632,7 @@ class FutureTests(unittest.TestCase):
         self.assertTrue(was_cancelled)
 
     def test_done_callback_raises(self):
-        LOGGER.removeHandler(STDERR_HANDLER)
-        logging_stream = io.StringIO()
-        handler = logging.StreamHandler(logging_stream)
-        LOGGER.addHandler(handler)
-        try:
+        with test.support.captured_stderr() as stderr:
             raising_was_called = False
             fn_was_called = False
 
@@ -643,10 +651,7 @@ class FutureTests(unittest.TestCase):
             f.set_result(5)
             self.assertTrue(raising_was_called)
             self.assertTrue(fn_was_called)
-            self.assertIn('Exception: doh!', logging_stream.getvalue())
-        finally:
-            LOGGER.removeHandler(handler)
-            LOGGER.addHandler(STDERR_HANDLER)
+            self.assertIn('Exception: doh!', stderr.getvalue())
 
     def test_done_callback_already_successful(self):
         callback_result = None
@@ -682,18 +687,18 @@ class FutureTests(unittest.TestCase):
         self.assertTrue(was_cancelled)
 
     def test_repr(self):
-        self.assertRegexpMatches(repr(PENDING_FUTURE),
-                                 '<Future at 0x[0-9a-f]+ state=pending>')
-        self.assertRegexpMatches(repr(RUNNING_FUTURE),
-                                 '<Future at 0x[0-9a-f]+ state=running>')
-        self.assertRegexpMatches(repr(CANCELLED_FUTURE),
-                                 '<Future at 0x[0-9a-f]+ state=cancelled>')
-        self.assertRegexpMatches(repr(CANCELLED_AND_NOTIFIED_FUTURE),
-                                 '<Future at 0x[0-9a-f]+ state=cancelled>')
-        self.assertRegexpMatches(
+        self.assertRegex(repr(PENDING_FUTURE),
+                         '<Future at 0x[0-9a-f]+ state=pending>')
+        self.assertRegex(repr(RUNNING_FUTURE),
+                         '<Future at 0x[0-9a-f]+ state=running>')
+        self.assertRegex(repr(CANCELLED_FUTURE),
+                         '<Future at 0x[0-9a-f]+ state=cancelled>')
+        self.assertRegex(repr(CANCELLED_AND_NOTIFIED_FUTURE),
+                         '<Future at 0x[0-9a-f]+ state=cancelled>')
+        self.assertRegex(
                 repr(EXCEPTION_FUTURE),
                 '<Future at 0x[0-9a-f]+ state=finished raised IOError>')
-        self.assertRegexpMatches(
+        self.assertRegex(
                 repr(SUCCESSFUL_FUTURE),
                 '<Future at 0x[0-9a-f]+ state=finished returned int>')
 

@@ -180,6 +180,17 @@ class TestMessageAPI(TestEmailBase):
         self.assertRaises(errors.HeaderParseError,
                           msg.set_boundary, 'BOUNDARY')
 
+    def test_make_boundary(self):
+        msg = MIMEMultipart('form-data')
+        # Note that when the boundary gets created is an implementation
+        # detail and might change.
+        self.assertEqual(msg.items()[0][1], 'multipart/form-data')
+        # Trigger creation of boundary
+        msg.as_string()
+        self.assertEqual(msg.items()[0][1][:33],
+                        'multipart/form-data; boundary="==')
+        # XXX: there ought to be tests of the uniqueness of the boundary, too.
+
     def test_message_rfc822_only(self):
         # Issue 7970: message/rfc822 not in multipart parsed by
         # HeaderParser caused an exception when flattened.
@@ -510,6 +521,45 @@ class TestMessageAPI(TestEmailBase):
         self.assertEqual(msg.get_payload(decode=True),
                          bytes(x, 'raw-unicode-escape'))
 
+    # Issue 1078919
+    def test_ascii_add_header(self):
+        msg = Message()
+        msg.add_header('Content-Disposition', 'attachment',
+                       filename='bud.gif')
+        self.assertEqual('attachment; filename="bud.gif"',
+            msg['Content-Disposition'])
+
+    def test_noascii_add_header(self):
+        msg = Message()
+        msg.add_header('Content-Disposition', 'attachment',
+            filename="Fußballer.ppt")
+        self.assertEqual(
+            'attachment; filename*=utf-8\'\'Fu%C3%9Fballer.ppt',
+            msg['Content-Disposition'])
+
+    def test_nonascii_add_header_via_triple(self):
+        msg = Message()
+        msg.add_header('Content-Disposition', 'attachment',
+            filename=('iso-8859-1', '', 'Fußballer.ppt'))
+        self.assertEqual(
+            'attachment; filename*=iso-8859-1\'\'Fu%DFballer.ppt',
+            msg['Content-Disposition'])
+
+    def test_ascii_add_header_with_tspecial(self):
+        msg = Message()
+        msg.add_header('Content-Disposition', 'attachment',
+            filename="windows [filename].ppt")
+        self.assertEqual(
+            'attachment; filename="windows [filename].ppt"',
+            msg['Content-Disposition'])
+
+    def test_nonascii_add_header_with_tspecial(self):
+        msg = Message()
+        msg.add_header('Content-Disposition', 'attachment',
+            filename="Fußballer [filename].ppt")
+        self.assertEqual(
+            "attachment; filename*=utf-8''Fu%C3%9Fballer%20%5Bfilename%5D.ppt",
+            msg['Content-Disposition'])
 
 
 # Test the email.encoders module
@@ -2243,6 +2293,16 @@ class TestMiscellaneous(TestEmailBase):
         eq(utils.parsedate_tz('5 Feb 2003 13:47:26 -0800'),
            (2003, 2, 5, 13, 47, 26, 0, 1, -1, -28800))
 
+    def test_parsedate_no_space_before_positive_offset(self):
+        self.assertEqual(utils.parsedate_tz('Wed, 3 Apr 2002 14:58:26+0800'),
+           (2002, 4, 3, 14, 58, 26, 0, 1, -1, 28800))
+
+    def test_parsedate_no_space_before_negative_offset(self):
+        # Issue 1155362: we already handled '+' for this case.
+        self.assertEqual(utils.parsedate_tz('Wed, 3 Apr 2002 14:58:26-0800'),
+           (2002, 4, 3, 14, 58, 26, 0, 1, -1, -28800))
+
+
     def test_parsedate_acceptable_to_time_functions(self):
         eq = self.assertEqual
         timetup = utils.parsedate('5 Feb 2003 13:47:26 -0800')
@@ -2318,6 +2378,24 @@ class TestMiscellaneous(TestEmailBase):
           ('', '"\\"example\\" example"@example.com'))
         eq(utils.parseaddr('"\\\\"example\\\\" example"@example.com'),
           ('', '"\\\\"example\\\\" example"@example.com'))
+
+    def test_parseaddr_preserves_spaces_in_local_part(self):
+        # issue 9286.  A normal RFC5322 local part should not contain any
+        # folding white space, but legacy local parts can (they are a sequence
+        # of atoms, not dotatoms).  On the other hand we strip whitespace from
+        # before the @ and around dots, on the assumption that the whitespace
+        # around the punctuation is a mistake in what would otherwise be
+        # an RFC5322 local part.  Leading whitespace is, usual, stripped as well.
+        self.assertEqual(('', "merwok wok@xample.com"),
+            utils.parseaddr("merwok wok@xample.com"))
+        self.assertEqual(('', "merwok  wok@xample.com"),
+            utils.parseaddr("merwok  wok@xample.com"))
+        self.assertEqual(('', "merwok  wok@xample.com"),
+            utils.parseaddr(" merwok  wok  @xample.com"))
+        self.assertEqual(('', 'merwok"wok"  wok@xample.com'),
+            utils.parseaddr('merwok"wok"  wok@xample.com'))
+        self.assertEqual(('', 'merwok.wok.wok@xample.com'),
+            utils.parseaddr('merwok. wok .  wok@xample.com'))
 
     def test_multiline_from_comment(self):
         x = """\
@@ -2457,6 +2535,10 @@ multipart/report
     text/rfc822-headers
 """)
 
+    def test_make_msgid_domain(self):
+        self.assertEqual(
+            email.utils.make_msgid(domain='testdomain-string')[-19:],
+            '@testdomain-string>')
 
 
 # Test the iterator/generators
@@ -3577,7 +3659,7 @@ To: bbb@zzz.org
 Subject: This is a test message
 Date: Fri, 4 May 2001 14:05:44 -0400
 Content-Type: text/plain; charset=us-ascii;
- title*="us-ascii'en'This%20is%20even%20more%20%2A%2A%2Afun%2A%2A%2A%20isn%27t%20it%21"
+ title*=us-ascii'en'This%20is%20even%20more%20%2A%2A%2Afun%2A%2A%2A%20isn%27t%20it%21
 
 
 Hi,
@@ -3607,7 +3689,7 @@ To: bbb@zzz.org
 Subject: This is a test message
 Date: Fri, 4 May 2001 14:05:44 -0400
 Content-Type: text/plain; charset="us-ascii";
- title*="us-ascii'en'This%20is%20even%20more%20%2A%2A%2Afun%2A%2A%2A%20isn%27t%20it%21"
+ title*=us-ascii'en'This%20is%20even%20more%20%2A%2A%2Afun%2A%2A%2A%20isn%27t%20it%21
 
 
 Hi,
@@ -3621,6 +3703,32 @@ Do you like this message?
         eq = self.assertEqual
         msg = self._msgobj('msg_32.txt')
         eq(msg.get_content_charset(), 'us-ascii')
+
+    def test_rfc2231_parse_rfc_quoting(self):
+        m = textwrap.dedent('''\
+            Content-Disposition: inline;
+            \tfilename*0*=''This%20is%20even%20more%20;
+            \tfilename*1*=%2A%2A%2Afun%2A%2A%2A%20;
+            \tfilename*2="is it not.pdf"
+
+            ''')
+        msg = email.message_from_string(m)
+        self.assertEqual(msg.get_filename(),
+                         'This is even more ***fun*** is it not.pdf')
+        self.assertEqual(m, msg.as_string())
+
+    def test_rfc2231_parse_extra_quoting(self):
+        m = textwrap.dedent('''\
+            Content-Disposition: inline;
+            \tfilename*0*="''This%20is%20even%20more%20";
+            \tfilename*1*="%2A%2A%2Afun%2A%2A%2A%20";
+            \tfilename*2="is it not.pdf"
+
+            ''')
+        msg = email.message_from_string(m)
+        self.assertEqual(msg.get_filename(),
+                         'This is even more ***fun*** is it not.pdf')
+        self.assertEqual(m, msg.as_string())
 
     def test_rfc2231_no_language_or_charset(self):
         m = '''\

@@ -63,8 +63,9 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
     PyMethodDef *ml;
     const char* name;
     PyModuleObject *m;
-    if (!Py_IsInitialized())
-        Py_FatalError("Interpreter not initialized (version mismatch?)");
+    PyInterpreterState *interp = PyThreadState_Get()->interp;
+    if (interp->modules == NULL)
+        Py_FatalError("Python import machinery not initialized");
     if (PyType_Ready(&moduledef_type) < 0)
         return NULL;
     if (module->m_base.m_index == 0) {
@@ -74,7 +75,7 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
         module->m_base.m_index = max_module_number;
     }
     name = module->m_name;
-    if (module_api_version != PYTHON_API_VERSION) {
+    if (module_api_version != PYTHON_API_VERSION && module_api_version != PYTHON_ABI_VERSION) {
         int err;
         err = PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
             "Python C API version mismatch for module %.100s: "

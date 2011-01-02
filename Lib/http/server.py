@@ -314,8 +314,12 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.command, self.path, self.request_version = command, path, version
 
         # Examine the headers and look for a Connection directive.
-        self.headers = http.client.parse_headers(self.rfile,
-                                                 _class=self.MessageClass)
+        try:
+            self.headers = http.client.parse_headers(self.rfile,
+                                                     _class=self.MessageClass)
+        except http.client.LineTooLong:
+            self.send_error(400, "Line too long")
+            return False
 
         conntype = self.headers.get('Connection', "")
         if conntype.lower() == 'close':
@@ -358,7 +362,13 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         """
         try:
-            self.raw_requestline = self.rfile.readline()
+            self.raw_requestline = self.rfile.readline(65537)
+            if len(self.raw_requestline) > 65536:
+                self.requestline = ''
+                self.request_version = ''
+                self.command = ''
+                self.send_error(414)
+                return
             if not self.raw_requestline:
                 self.close_connection = 1
                 return
@@ -868,7 +878,7 @@ def nobody_uid():
     try:
         nobody = pwd.getpwnam('nobody')[2]
     except KeyError:
-        nobody = 1 + max(map(lambda x: x[2], pwd.getpwall()))
+        nobody = 1 + max(x[2] for x in pwd.getpwall())
     return nobody
 
 

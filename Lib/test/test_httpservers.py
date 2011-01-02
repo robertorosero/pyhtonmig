@@ -566,6 +566,19 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
         self.assertEqual(sum(r == b'Connection: close\r\n' for r in result[1:-1]), 1)
         self.handler = usual_handler        # Restore to avoid breaking any subsequent tests.
 
+    def test_request_length(self):
+        # Issue #10714: huge request lines are discarded, to avoid Denial
+        # of Service attacks.
+        result = self.send_typical_request(b'GET ' + b'x' * 65537)
+        self.assertEqual(result[0], b'HTTP/1.1 414 Request-URI Too Long\r\n')
+        self.assertFalse(self.handler.get_called)
+
+    def test_header_length(self):
+        # Issue #6791: same for headers
+        result = self.send_typical_request(
+            b'GET / HTTP/1.1\r\nX-Foo: bar' + b'r' * 65537 + b'\r\n\r\n')
+        self.assertEqual(result[0], b'HTTP/1.1 400 Line too long\r\n')
+        self.assertFalse(self.handler.get_called)
 
 class SimpleHTTPRequestHandlerTestCase(unittest.TestCase):
     """ Test url parsing """

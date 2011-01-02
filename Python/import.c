@@ -5,13 +5,9 @@
 
 #include "Python-ast.h"
 #undef Yield /* undefine macro conflicting with winbase.h */
-#include "pyarena.h"
-#include "pythonrun.h"
 #include "errcode.h"
 #include "marshal.h"
 #include "code.h"
-#include "compile.h"
-#include "eval.h"
 #include "osdefs.h"
 #include "importdl.h"
 
@@ -329,8 +325,17 @@ _PyImport_ReInitLock(void)
 {
     if (import_lock != NULL)
         import_lock = PyThread_allocate_lock();
-    import_lock_thread = -1;
-    import_lock_level = 0;
+    if (import_lock_level > 1) {
+        /* Forked as a side effect of import */
+        long me = PyThread_get_thread_ident();
+        PyThread_acquire_lock(import_lock, 0);
+	/* XXX: can the previous line fail? */
+        import_lock_thread = me;
+        import_lock_level--;
+    } else {
+        import_lock_thread = -1;
+        import_lock_level = 0;
+    }
 }
 
 #endif
@@ -801,7 +806,7 @@ PyImport_ExecCodeModuleWithPathnames(char *name, PyObject *co, char *pathname,
         PyErr_Clear(); /* Not important enough to report */
     Py_DECREF(v);
 
-    v = PyEval_EvalCode((PyCodeObject *)co, d, d);
+    v = PyEval_EvalCode(co, d, d);
     if (v == NULL)
         goto error;
     Py_DECREF(v);
@@ -3201,14 +3206,14 @@ call_find_module(char *name, PyObject *path)
 static PyObject *
 imp_find_module(PyObject *self, PyObject *args)
 {
-    char *name;
+    PyObject *name;
     PyObject *ret, *path = NULL;
-    if (!PyArg_ParseTuple(args, "es|O:find_module",
-                          Py_FileSystemDefaultEncoding, &name,
+    if (!PyArg_ParseTuple(args, "O&|O:find_module",
+                          PyUnicode_FSConverter, &name,
                           &path))
         return NULL;
-    ret = call_find_module(name, path);
-    PyMem_Free(name);
+    ret = call_find_module(PyBytes_AS_STRING(name), path);
+    Py_DECREF(name);
     return ret;
 }
 
@@ -3326,23 +3331,23 @@ static PyObject *
 imp_load_compiled(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject *fob = NULL;
     PyObject *m;
     FILE *fp;
-    if (!PyArg_ParseTuple(args, "ses|O:load_compiled",
+    if (!PyArg_ParseTuple(args, "sO&|O:load_compiled",
                           &name,
-                          Py_FileSystemDefaultEncoding, &pathname,
+                          PyUnicode_FSConverter, &pathname,
                           &fob))
         return NULL;
-    fp = get_file(pathname, fob, "rb");
+    fp = get_file(PyBytes_AS_STRING(pathname), fob, "rb");
     if (fp == NULL) {
-        PyMem_Free(pathname);
+        Py_DECREF(pathname);
         return NULL;
     }
-    m = load_compiled_module(name, pathname, fp);
+    m = load_compiled_module(name, PyBytes_AS_STRING(pathname), fp);
     fclose(fp);
-    PyMem_Free(pathname);
+    Py_DECREF(pathname);
     return m;
 }
 
@@ -3381,22 +3386,22 @@ static PyObject *
 imp_load_source(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject *fob = NULL;
     PyObject *m;
     FILE *fp;
-    if (!PyArg_ParseTuple(args, "ses|O:load_source",
+    if (!PyArg_ParseTuple(args, "sO&|O:load_source",
                           &name,
-                          Py_FileSystemDefaultEncoding, &pathname,
+                          PyUnicode_FSConverter, &pathname,
                           &fob))
         return NULL;
-    fp = get_file(pathname, fob, "r");
+    fp = get_file(PyBytes_AS_STRING(pathname), fob, "r");
     if (fp == NULL) {
-        PyMem_Free(pathname);
+        Py_DECREF(pathname);
         return NULL;
     }
-    m = load_source_module(name, pathname, fp);
-    PyMem_Free(pathname);
+    m = load_source_module(name, PyBytes_AS_STRING(pathname), fp);
+    Py_DECREF(pathname);
     fclose(fp);
     return m;
 }
@@ -3450,13 +3455,13 @@ static PyObject *
 imp_load_package(PyObject *self, PyObject *args)
 {
     char *name;
-    char *pathname;
+    PyObject *pathname;
     PyObject * ret;
-    if (!PyArg_ParseTuple(args, "ses:load_package",
-                          &name, Py_FileSystemDefaultEncoding, &pathname))
+    if (!PyArg_ParseTuple(args, "sO&:load_package",
+                          &name, PyUnicode_FSConverter, &pathname))
         return NULL;
-    ret = load_package(name, pathname);
-    PyMem_Free(pathname);
+    ret = load_package(name, PyBytes_AS_STRING(pathname));
+    Py_DECREF(pathname);
     return ret;
 }
 
@@ -3529,21 +3534,23 @@ imp_source_from_cache(PyObject *self, PyObject *args, PyObject *kws)
 {
     static char *kwlist[] = {"path", NULL};
 
+    PyObject *pathname_obj;
     char *pathname;
     char buf[MAXPATHLEN+1];
 
     if (!PyArg_ParseTupleAndKeywords(
-                args, kws, "es", kwlist,
-                Py_FileSystemDefaultEncoding, &pathname))
+                args, kws, "O&", kwlist,
+                PyUnicode_FSConverter, &pathname_obj))
         return NULL;
 
+    pathname = PyBytes_AS_STRING(pathname_obj);
     if (make_source_pathname(pathname, buf) == NULL) {
         PyErr_Format(PyExc_ValueError, "Not a PEP 3147 pyc path: %s",
                      pathname);
-        PyMem_Free(pathname);
+        Py_DECREF(pathname_obj);
         return NULL;
     }
-    PyMem_Free(pathname);
+    Py_DECREF(pathname_obj);
     return PyUnicode_FromString(buf);
 }
 

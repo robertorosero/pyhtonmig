@@ -38,11 +38,6 @@ OTHERSTUFF = (10, 34.5, "abc", {}, [], ())
 INF = float("inf")
 NAN = float("nan")
 
-# decorator for skipping tests on non-IEEE 754 platforms
-requires_IEEE_754 = unittest.skipUnless(
-    float.__getformat__("double").startswith("IEEE"),
-    "test requires IEEE 754 doubles")
-
 
 #############################################################################
 # module tests
@@ -407,7 +402,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         self.assertRaises(ZeroDivisionError, lambda: a / 0.0)
         self.assertRaises(TypeError, lambda: a / '')
 
-    @requires_IEEE_754
+    @support.requires_IEEE_754
     def test_disallowed_special(self):
         a = timedelta(42)
         self.assertRaises(ValueError, a.__mul__, NAN)
@@ -589,7 +584,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         self.assertRaises(OverflowError, day.__truediv__, 1e-10)
         self.assertRaises(OverflowError, day.__truediv__, 9e-10)
 
-    @requires_IEEE_754
+    @support.requires_IEEE_754
     def _test_overflow_special(self):
         day = timedelta(1)
         self.assertRaises(OverflowError, day.__mul__, INF)
@@ -2513,10 +2508,16 @@ class TestTimeTZ(TestTime, TZInfoBase, unittest.TestCase):
 
         # Check that an invalid tzname result raises an exception.
         class Badtzname(tzinfo):
-            def tzname(self, dt): return 42
+            tz = 42
+            def tzname(self, dt): return self.tz
         t = time(2, 3, 4, tzinfo=Badtzname())
         self.assertEqual(t.strftime("%H:%M:%S"), "02:03:04")
         self.assertRaises(TypeError, t.strftime, "%Z")
+
+        # Issue #6697:
+        if '_Fast' in str(type(self)):
+            Badtzname.tz = '\ud800'
+            self.assertRaises(ValueError, t.strftime, "%Z")
 
     def test_hash_edge_cases(self):
         # Offsets that overflow a basic time.

@@ -14,6 +14,7 @@ from distutils.core import Extension, setup
 from distutils.command.build_ext import build_ext
 from distutils.command.install import install
 from distutils.command.install_lib import install_lib
+from distutils.command.build_scripts import build_scripts
 from distutils.spawn import find_executable
 
 # Were we compiled --with-pydebug or with #define Py_DEBUG?
@@ -27,11 +28,19 @@ disabled_module_list = []
 _BUILDDIR_COOKIE = "pybuilddir.txt"
 
 def add_dir_to_list(dirlist, dir):
-    """Add the directory 'dir' to the list 'dirlist' (at the front) if
+    """Add the directory 'dir' to the list 'dirlist' (after any relative
+    directories) if:
+
     1) 'dir' is not already in 'dirlist'
-    2) 'dir' actually exists, and is a directory."""
-    if dir is not None and os.path.isdir(dir) and dir not in dirlist:
-        dirlist.insert(0, dir)
+    2) 'dir' actually exists, and is a directory.
+    """
+    if dir is None or not os.path.isdir(dir) or dir in dirlist:
+        return
+    for i, path in enumerate(dirlist):
+        if not os.path.isabs(path):
+            dirlist.insert(i + 1, dir)
+            return
+    dirlist.insert(0, dir)
 
 def macosx_sdk_root():
     """
@@ -362,7 +371,9 @@ class PyBuildExt(build_ext):
         return sys.platform
 
     def detect_modules(self):
-        # Ensure that /usr/local is always used
+        # Ensure that /usr/local is always used, but the local build
+        # directories (i.e. '.' and 'Include') must be first.  See issue
+        # 10520.
         add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
         add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
 
@@ -437,9 +448,10 @@ class PyBuildExt(build_ext):
             # This should work on any unixy platform ;-)
             # If the user has bothered specifying additional -I and -L flags
             # in OPT and LDFLAGS we might as well use them here.
-            #   NOTE: using shlex.split would technically be more correct, but
-            # also gives a bootstrap problem. Let's hope nobody uses directories
-            # with whitespace in the name to store libraries.
+            #
+            # NOTE: using shlex.split would technically be more correct, but
+            # also gives a bootstrap problem. Let's hope nobody uses
+            # directories with whitespace in the name to store libraries.
             cflags, ldflags = sysconfig.get_config_vars(
                     'CFLAGS', 'LDFLAGS')
             for item in cflags.split():
@@ -1571,6 +1583,10 @@ class PyBuildExt(build_ext):
 ##         # Uncomment these lines if you want to play with xxmodule.c
 ##         ext = Extension('xx', ['xxmodule.c'])
 ##         self.extensions.append(ext)
+        if 'd' not in sys.abiflags:
+            ext = Extension('xxlimited', ['xxlimited.c'],
+                            define_macros=[('Py_LIMITED_API', 1)])
+            self.extensions.append(ext)
 
         # XXX handle these, but how to detect?
         # *** Uncomment and edit for PIL (TkImaging) extension only:
@@ -1858,6 +1874,25 @@ class PyBuildInstallLib(install_lib):
     def is_chmod_supported(self):
         return hasattr(os, 'chmod')
 
+class PyBuildScripts(build_scripts):
+    def copy_scripts(self):
+        outfiles, updated_files = build_scripts.copy_scripts(self)
+        fullversion = '-{0[0]}.{0[1]}'.format(sys.version_info)
+        minoronly = '.{0[1]}'.format(sys.version_info)
+        newoutfiles = []
+        newupdated_files = []
+        for filename in outfiles:
+            if filename.endswith('2to3'):
+                newfilename = filename + fullversion
+            else:
+                newfilename = filename + minoronly
+            log.info('renaming {} to {}'.format(filename, newfilename))
+            os.rename(filename, newfilename)
+            newoutfiles.append(newfilename)
+            if filename in updated_files:
+                newupdated_files.append(newfilename)
+        return newoutfiles, newupdated_files
+
 SUMMARY = """
 Python is an interpreted, interactive, object-oriented programming
 language. It is often compared to Tcl, Perl, Scheme or Java.
@@ -1903,12 +1938,17 @@ def main():
           platforms = ["Many"],
 
           # Build info
-          cmdclass = {'build_ext':PyBuildExt, 'install':PyBuildInstall,
-                      'install_lib':PyBuildInstallLib},
+          cmdclass = {'build_ext': PyBuildExt,
+                      'build_scripts': PyBuildScripts,
+                      'install': PyBuildInstall,
+                      'install_lib': PyBuildInstallLib},
           # The struct module is defined here, because build_ext won't be
           # called unless there's at least one extension module defined.
           ext_modules=[Extension('_struct', ['_struct.c'])],
 
+          # If you change the scripts installed here, you also need to
+          # check the PyBuildScripts command above, and change the links
+          # created by the bininstall target in Makefile.pre.in
           scripts = ["Tools/scripts/pydoc3", "Tools/scripts/idle3",
                      "Tools/scripts/2to3"]
         )

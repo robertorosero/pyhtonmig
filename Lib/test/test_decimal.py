@@ -32,7 +32,8 @@ import pickle, copy
 import unittest
 from decimal import *
 import numbers
-from test.support import run_unittest, run_doctest, is_resource_enabled
+from test.support import (run_unittest, run_doctest, is_resource_enabled,
+                          requires_IEEE_754)
 from test.support import check_warnings
 import random
 try:
@@ -60,11 +61,6 @@ def init():
         traps = dict.fromkeys(Signals, 0)
         )
     setcontext(DefaultTestContext)
-
-# decorator for skipping tests on non-IEEE 754 platforms
-requires_IEEE_754 = unittest.skipUnless(
-    float.__getformat__("double").startswith("IEEE"),
-    "test requires IEEE 754 doubles")
 
 TESTDATADIR = 'decimaltestdata'
 if __name__ == '__main__':
@@ -818,6 +814,18 @@ class DecimalFormatTest(unittest.TestCase):
 
             # issue 6850
             ('a=-7.0', '0.12345', 'aaaa0.1'),
+
+            # Issue 7094: Alternate formatting (specified by #)
+            ('.0e', '1.0', '1e+0'),
+            ('#.0e', '1.0', '1.e+0'),
+            ('.0f', '1.0', '1'),
+            ('#.0f', '1.0', '1.'),
+            ('g', '1.1', '1.1'),
+            ('#g', '1.1', '1.1'),
+            ('.0g', '1', '1'),
+            ('#.0g', '1', '1.'),
+            ('.0%', '1.0', '100%'),
+            ('#.0%', '1.0', '100.%'),
             ]
         for fmt, d, result in test_values:
             self.assertEqual(format(Decimal(d), fmt), result)

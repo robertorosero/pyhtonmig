@@ -584,6 +584,8 @@ class QName:
         self.text = text_or_uri
     def __str__(self):
         return self.text
+    def __repr__(self):
+        return '<QName %r>' % (self.text,)
     def __hash__(self):
         return hash(self.text)
     def __le__(self, other):
@@ -1066,7 +1068,7 @@ _serialize = {
 def register_namespace(prefix, uri):
     if re.match("ns\d+$", prefix):
         raise ValueError("Prefix format reserved for internal use")
-    for k, v in _namespace_map.items():
+    for k, v in list(_namespace_map.items()):
         if k == uri or v == prefix:
             del _namespace_map[k]
     _namespace_map[uri] = prefix

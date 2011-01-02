@@ -324,10 +324,11 @@ complex_dealloc(PyObject *op)
     op->ob_type->tp_free(op);
 }
 
-
 static PyObject *
-complex_format(PyComplexObject *v, int precision, char format_code)
+complex_repr(PyComplexObject *v)
 {
+    int precision = 0;
+    char format_code = 'r';
     PyObject *result = NULL;
     Py_ssize_t len;
 
@@ -344,6 +345,8 @@ complex_format(PyComplexObject *v, int precision, char format_code)
     char *tail = "";
 
     if (v->cval.real == 0. && copysign(1.0, v->cval.real)==1.0) {
+        /* Real part is +0: just output the imaginary part and do not
+           include parens. */
         re = "";
         im = PyOS_double_to_string(v->cval.imag, format_code,
                                    precision, 0, NULL);
@@ -352,7 +355,8 @@ complex_format(PyComplexObject *v, int precision, char format_code)
             goto done;
         }
     } else {
-        /* Format imaginary part with sign, real part without */
+        /* Format imaginary part with sign, real part without. Include
+           parens in the result. */
         pre = PyOS_double_to_string(v->cval.real, format_code,
                                     precision, 0, NULL);
         if (!pre) {
@@ -371,7 +375,7 @@ complex_format(PyComplexObject *v, int precision, char format_code)
         tail = ")";
     }
     /* Alloc the final buffer. Add one for the "j" in the format string,
-       and one for the trailing zero. */
+       and one for the trailing zero byte. */
     len = strlen(lead) + strlen(re) + strlen(im) + strlen(tail) + 2;
     buf = PyMem_Malloc(len);
     if (!buf) {
@@ -386,12 +390,6 @@ complex_format(PyComplexObject *v, int precision, char format_code)
     PyMem_Free(buf);
 
     return result;
-}
-
-static PyObject *
-complex_repr(PyComplexObject *v)
-{
-    return complex_format(v, 0, 'r');
 }
 
 static Py_hash_t
@@ -766,24 +764,30 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
     char *end;
     double x=0.0, y=0.0, z;
     int got_bracket=0;
-    char *s_buffer = NULL;
+    PyObject *s_buffer = NULL;
     Py_ssize_t len;
 
     if (PyUnicode_Check(v)) {
-        s_buffer = (char *)PyMem_MALLOC(PyUnicode_GET_SIZE(v) + 1);
+        Py_ssize_t i, buflen = PyUnicode_GET_SIZE(v);
+        Py_UNICODE *bufptr;
+        s_buffer = PyUnicode_TransformDecimalToASCII(
+            PyUnicode_AS_UNICODE(v), buflen);
         if (s_buffer == NULL)
-            return PyErr_NoMemory();
-        if (PyUnicode_EncodeDecimal(PyUnicode_AS_UNICODE(v),
-                                    PyUnicode_GET_SIZE(v),
-                                    s_buffer,
-                                    NULL))
+            return NULL;
+        /* Replace non-ASCII whitespace with ' ' */
+        bufptr = PyUnicode_AS_UNICODE(s_buffer);
+        for (i = 0; i < buflen; i++) {
+            Py_UNICODE ch = bufptr[i];
+            if (ch > 127 && Py_UNICODE_ISSPACE(ch))
+                bufptr[i] = ' ';
+        }
+        s = _PyUnicode_AsStringAndSize(s_buffer, &len);
+        if (s == NULL)
             goto error;
-        s = s_buffer;
-        len = strlen(s);
     }
     else if (PyObject_AsCharBuffer(v, &s, &len)) {
         PyErr_SetString(PyExc_TypeError,
-                        "complex() arg is not a string");
+                        "complex() argument must be a string or a number");
         return NULL;
     }
 
@@ -894,16 +898,14 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
     if (s-start != len)
         goto parse_error;
 
-    if (s_buffer)
-        PyMem_FREE(s_buffer);
+    Py_XDECREF(s_buffer);
     return complex_subtype_from_doubles(type, x, y);
 
   parse_error:
     PyErr_SetString(PyExc_ValueError,
                     "complex() arg is a malformed string");
   error:
-    if (s_buffer)
-        PyMem_FREE(s_buffer);
+    Py_XDECREF(s_buffer);
     return NULL;
 }
 

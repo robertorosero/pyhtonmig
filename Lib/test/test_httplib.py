@@ -230,6 +230,22 @@ class BasicTest(TestCase):
         conn.send(io.BytesIO(expected))
         self.assertEqual(expected, sock.data)
 
+    def test_send_iter(self):
+        expected = b'GET /foo HTTP/1.1\r\nHost: example.com\r\n' \
+                   b'Accept-Encoding: identity\r\nContent-Length: 11\r\n' \
+                   b'\r\nonetwothree'
+
+        def body():
+            yield b"one"
+            yield b"two"
+            yield b"three"
+
+        conn = client.HTTPConnection('example.com')
+        sock = FakeSocket("")
+        conn.sock = sock
+        conn.request('GET', '/foo', body(), {'Content-Length': '11'})
+        self.assertEquals(sock.data, expected)
+
     def test_chunked(self):
         chunked_start = (
             'HTTP/1.1 200 OK\r\n'
@@ -316,6 +332,33 @@ class BasicTest(TestCase):
         self.assertEqual(401, resp.status)
         self.assertEqual("Basic realm=\"example\"",
                          resp.getheader("www-authenticate"))
+
+    # Test lines overflowing the max line size (_MAXLINE in http.client)
+
+    def test_overflowing_status_line(self):
+        body = "HTTP/1.1 200 Ok" + "k" * 65536 + "\r\n"
+        resp = client.HTTPResponse(FakeSocket(body))
+        self.assertRaises((client.LineTooLong, client.BadStatusLine), resp.begin)
+
+    def test_overflowing_header_line(self):
+        body = (
+            'HTTP/1.1 200 OK\r\n'
+            'X-Foo: bar' + 'r' * 65536 + '\r\n\r\n'
+        )
+        resp = client.HTTPResponse(FakeSocket(body))
+        self.assertRaises(client.LineTooLong, resp.begin)
+
+    def test_overflowing_chunked_line(self):
+        body = (
+            'HTTP/1.1 200 OK\r\n'
+            'Transfer-Encoding: chunked\r\n\r\n'
+            + '0' * 65536 + 'a\r\n'
+            'hello world\r\n'
+            '0\r\n'
+        )
+        resp = client.HTTPResponse(FakeSocket(body))
+        resp.begin()
+        self.assertRaises(client.LineTooLong, resp.read)
 
 class OfflineTest(TestCase):
     def test_responses(self):

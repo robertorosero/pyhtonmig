@@ -2,7 +2,6 @@
 /* Time module */
 
 #include "Python.h"
-#include "structseq.h"
 #include "_time.h"
 
 #define TZNAME_ENCODING "utf-8"
@@ -716,7 +715,7 @@ time_tzset(PyObject *self, PyObject *unused)
 }
 
 PyDoc_STRVAR(tzset_doc,
-"tzset(zone)\n\
+"tzset()\n\
 \n\
 Initialize, or reinitialize, the local timezone to the value stored in\n\
 os.environ['TZ']. The TZ environment variable should be specified in\n\

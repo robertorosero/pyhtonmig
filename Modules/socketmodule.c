@@ -1406,9 +1406,9 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
         {
             struct sockaddr_hci *addr = (struct sockaddr_hci *)addr_ret;
 #if defined(__NetBSD__) || defined(__DragonFly__)
-			char *straddr = PyBytes_AS_STRING(args);
+                        char *straddr = PyBytes_AS_STRING(args);
 
-			_BT_HCI_MEMB(addr, family) = AF_BLUETOOTH;
+                        _BT_HCI_MEMB(addr, family) = AF_BLUETOOTH;
             if (straddr == NULL) {
                 PyErr_SetString(socket_error, "getsockaddrarg: "
                     "wrong format");
@@ -4022,8 +4022,10 @@ socket_getaddrinfo(PyObject *self, PyObject *args, PyObject* kwargs)
         pptr = pbuf;
     } else if (PyUnicode_Check(pobj)) {
         pptr = _PyUnicode_AsString(pobj);
+        if (pptr == NULL)
+            goto err;
     } else if (PyBytes_Check(pobj)) {
-        pptr = PyBytes_AsString(pobj);
+        pptr = PyBytes_AS_STRING(pobj);
     } else if (pobj == Py_None) {
         pptr = (char *)NULL;
     } else {
@@ -4358,6 +4360,7 @@ static
 PySocketModule_APIObject PySocketModuleAPI =
 {
     &sock_type,
+    NULL,
     NULL
 };
 
@@ -4425,6 +4428,7 @@ PyInit__socket(void)
                                         socket_error, NULL);
     if (socket_timeout == NULL)
         return NULL;
+    PySocketModuleAPI.timeout_error = socket_timeout;
     Py_INCREF(socket_timeout);
     PyModule_AddObject(m, "timeout", socket_timeout);
     Py_INCREF((PyObject *)&sock_type);

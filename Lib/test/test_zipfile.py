@@ -6,6 +6,7 @@ except ImportError:
 
 import io
 import os
+import sys
 import imp
 import time
 import shutil
@@ -23,6 +24,7 @@ from test.support import TESTFN, run_unittest, findfile, unlink
 TESTFN2 = TESTFN + "2"
 TESTFNDIR = TESTFN + "d"
 FIXEDTEST_SIZE = 1000
+DATAFILES_DIR = 'zipfile_datafiles'
 
 SMALL_TEST_DATA = [('_ziptest1', '1q2w3e4r5t'),
                    ('ziptest2dir/_ziptest2', 'qawsedrftg'),
@@ -487,6 +489,13 @@ class TestsWithSourceFile(unittest.TestCase):
         except zipfile.BadZipFile:
             self.assertTrue(zipfp2.fp is None, 'zipfp is not closed')
 
+    def test_unicode_filenames(self):
+        # bug #10801
+        fname = findfile('zip_cp437_header.zip')
+        with zipfile.ZipFile(fname) as zipfp:
+            for name in zipfp.namelist():
+                zipfp.open(name).close()
+
     def tearDown(self):
         unlink(TESTFN)
         unlink(TESTFN2)
@@ -609,7 +618,7 @@ class TestZip64InSmallFiles(unittest.TestCase):
 
 class PyZipFileTests(unittest.TestCase):
     def test_write_pyfile(self):
-        with zipfile.PyZipFile(TemporaryFile(), "w") as zipfp:
+        with TemporaryFile() as t, zipfile.PyZipFile(t, "w") as zipfp:
             fn = __file__
             if fn.endswith('.pyc') or fn.endswith('.pyo'):
                 path_split = fn.split(os.sep)
@@ -627,7 +636,7 @@ class PyZipFileTests(unittest.TestCase):
             self.assertTrue(bn + 'o' in zipfp.namelist() or
                             bn + 'c' in zipfp.namelist())
 
-        with zipfile.PyZipFile(TemporaryFile(), "w") as zipfp:
+        with TemporaryFile() as t, zipfile.PyZipFile(t, "w") as zipfp:
             fn = __file__
             if fn.endswith(('.pyc', '.pyo')):
                 fn = fn[:-1]
@@ -643,7 +652,7 @@ class PyZipFileTests(unittest.TestCase):
         import email
         packagedir = os.path.dirname(email.__file__)
 
-        with zipfile.PyZipFile(TemporaryFile(), "w") as zipfp:
+        with TemporaryFile() as t, zipfile.PyZipFile(t, "w") as zipfp:
             zipfp.writepy(packagedir)
 
             # Check for a couple of modules at different levels of the
@@ -653,6 +662,22 @@ class PyZipFileTests(unittest.TestCase):
                             'email/__init__.pyc' in names)
             self.assertTrue('email/mime/text.pyo' in names or
                             'email/mime/text.pyc' in names)
+
+    def test_write_with_optimization(self):
+        import email
+        packagedir = os.path.dirname(email.__file__)
+        # use .pyc if running test in optimization mode,
+        # use .pyo if running test in debug mode
+        optlevel = 1 if __debug__ else 0
+        ext = '.pyo' if optlevel == 1 else '.pyc'
+
+        with TemporaryFile() as t, \
+                 zipfile.PyZipFile(t, "w", optimize=optlevel) as zipfp:
+            zipfp.writepy(packagedir)
+
+            names = zipfp.namelist()
+            self.assertIn('email/__init__' + ext, names)
+            self.assertIn('email/mime/text' + ext, names)
 
     def test_write_python_directory(self):
         os.mkdir(TESTFN2)
@@ -666,24 +691,23 @@ class PyZipFileTests(unittest.TestCase):
             with open(os.path.join(TESTFN2, "mod2.txt"), "w") as fp:
                 fp.write("bla bla bla\n")
 
-            zipfp  = zipfile.PyZipFile(TemporaryFile(), "w")
-            zipfp.writepy(TESTFN2)
+            with TemporaryFile() as t, zipfile.PyZipFile(t, "w") as zipfp:
+                zipfp.writepy(TESTFN2)
 
-            names = zipfp.namelist()
-            self.assertTrue('mod1.pyc' in names or 'mod1.pyo' in names)
-            self.assertTrue('mod2.pyc' in names or 'mod2.pyo' in names)
-            self.assertNotIn('mod2.txt', names)
+                names = zipfp.namelist()
+                self.assertTrue('mod1.pyc' in names or 'mod1.pyo' in names)
+                self.assertTrue('mod2.pyc' in names or 'mod2.pyo' in names)
+                self.assertNotIn('mod2.txt', names)
 
         finally:
             shutil.rmtree(TESTFN2)
 
     def test_write_non_pyfile(self):
-        with zipfile.PyZipFile(TemporaryFile(), "w") as zipfp:
+        with TemporaryFile() as t, zipfile.PyZipFile(t, "w") as zipfp:
             with open(TESTFN, 'w') as f:
                 f.write('most definitely not a python file')
             self.assertRaises(RuntimeError, zipfp.writepy, TESTFN)
             os.remove(TESTFN)
-
 
 
 class OtherTests(unittest.TestCase):
@@ -1073,6 +1097,12 @@ class DecryptionTests(unittest.TestCase):
         self.assertEqual(self.zip.read("test.txt"), self.plain)
         self.zip2.setpassword(b"12345")
         self.assertEqual(self.zip2.read("zero"), self.plain2)
+
+    def test_unicode_password(self):
+        self.assertRaises(TypeError, self.zip.setpassword, "unicode")
+        self.assertRaises(TypeError, self.zip.read, "test.txt", "python")
+        self.assertRaises(TypeError, self.zip.open, "test.txt", pwd="python")
+        self.assertRaises(TypeError, self.zip.extract, "test.txt", pwd="python")
 
 
 class TestsWithRandomBinaryFiles(unittest.TestCase):

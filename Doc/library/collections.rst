@@ -28,7 +28,7 @@ Python's general purpose built-in containers, :class:`dict`, :class:`list`,
 =====================   ====================================================================
 
 In addition to the concrete container classes, the collections module provides
-ABCs (abstract base classes) that can be used to test whether a class provides a
+:ref:`abstract-base-classes` that can be used to test whether a class provides a
 particular interface, for example, whether it is hashable or a mapping.
 
 .. seealso::
@@ -866,7 +866,7 @@ If a new entry overwrites an existing entry, the
 original insertion position is changed and moved to the end::
 
     class LastUpdatedOrderedDict(OrderedDict):
-        'Store items is the order the keys were last added'
+        'Store items in the order the keys were last added'
         def __setitem__(self, key, value):
             if key in self:
                 del self[key]
@@ -959,6 +959,7 @@ attribute.
    subclass) or an arbitrary sequence which can be converted into a string using
    the built-in :func:`str` function.
 
+.. _abstract-base-classes:
 
 ABCs - abstract base classes
 ----------------------------

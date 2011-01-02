@@ -21,7 +21,7 @@ import subprocess
 import imp
 import time
 import sysconfig
-
+import logging.handlers
 
 try:
     import _thread
@@ -42,7 +42,8 @@ __all__ = [
     "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
     "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
     "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
-    "swap_item", "swap_attr", "can_symlink", "skip_unless_symlink"]
+    "swap_item", "swap_attr", "requires_IEEE_754",
+    "TestHandler", "Matcher", "can_symlink", "skip_unless_symlink"]
 
 
 class Error(Exception):
@@ -365,6 +366,11 @@ def fcmp(x, y): # fuzzy comparison function
                 return outcome
         return (len(x) > len(y)) - (len(x) < len(y))
     return (x > y) - (x < y)
+
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
 
 is_jython = sys.platform.startswith('java')
 
@@ -868,6 +874,9 @@ def captured_output(stream_name):
 def captured_stdout():
     return captured_output("stdout")
 
+def captured_stderr():
+    return captured_output("stderr")
+
 def captured_stdin():
     return captured_output("stdin")
 
@@ -1256,27 +1265,6 @@ def reap_children():
             except:
                 break
 
-try:
-    from .symlink_support import enable_symlink_privilege
-except:
-    enable_symlink_privilege = lambda: True
-
-def can_symlink():
-    """It's no longer sufficient to test for the presence of symlink in the
-    os module - on Windows XP and earlier, os.symlink exists but a
-    NotImplementedError is thrown.
-    """
-    has_symlink = hasattr(os, 'symlink')
-    is_old_windows = sys.platform == "win32" and sys.getwindowsversion().major < 6
-    has_privilege = False if is_old_windows else enable_symlink_privilege()
-    return has_symlink and (not is_old_windows) and has_privilege
-
-def skip_unless_symlink(test):
-    """Skip decorator for tests that require functional symlink"""
-    selector = can_symlink()
-    msg = "Requires functional symlink implementation"
-    return [unittest.skip(msg)(test), test][selector]
-
 @contextlib.contextmanager
 def swap_attr(obj, attr, new_val):
     """Temporary swap out an attribute with a new object.
@@ -1359,3 +1347,88 @@ def args_from_interpreter_flags():
         if v > 0:
             args.append('-' + opt * v)
     return args
+
+#============================================================
+# Support for assertions about logging.
+#============================================================
+
+class TestHandler(logging.handlers.BufferingHandler):
+    def __init__(self, matcher):
+        # BufferingHandler takes a "capacity" argument
+        # so as to know when to flush. As we're overriding
+        # shouldFlush anyway, we can set a capacity of zero.
+        # You can call flush() manually to clear out the
+        # buffer.
+        logging.handlers.BufferingHandler.__init__(self, 0)
+        self.matcher = matcher
+
+    def shouldFlush(self):
+        return False
+
+    def emit(self, record):
+        self.format(record)
+        self.buffer.append(record.__dict__)
+
+    def matches(self, **kwargs):
+        """
+        Look for a saved dict whose keys/values match the supplied arguments.
+        """
+        result = False
+        for d in self.buffer:
+            if self.matcher.matches(d, **kwargs):
+                result = True
+                break
+        return result
+
+class Matcher(object):
+
+    _partial_matches = ('msg', 'message')
+
+    def matches(self, d, **kwargs):
+        """
+        Try to match a single dict with the supplied arguments.
+
+        Keys whose values are strings and which are in self._partial_matches
+        will be checked for partial (i.e. substring) matches. You can extend
+        this scheme to (for example) do regular expression matching, etc.
+        """
+        result = True
+        for k in kwargs:
+            v = kwargs[k]
+            dv = d.get(k)
+            if not self.match_value(k, dv, v):
+                result = False
+                break
+        return result
+
+    def match_value(self, k, dv, v):
+        """
+        Try to match a single stored value (dv) with a supplied value (v).
+        """
+        if type(v) != type(dv):
+            result = False
+        elif type(dv) is not str or k not in self._partial_matches:
+            result = (v == dv)
+        else:
+            result = dv.find(v) >= 0
+        return result
+
+
+_can_symlink = None
+def can_symlink():
+    global _can_symlink
+    if _can_symlink is not None:
+        return _can_symlink
+    try:
+        os.symlink(TESTFN, TESTFN + "can_symlink")
+        can = True
+    except (OSError, NotImplementedError):
+        can = False
+    _can_symlink = can
+    return can
+
+def skip_unless_symlink(test):
+    """Skip decorator for tests that require functional symlink"""
+    ok = can_symlink()
+    msg = "Requires functional symlink implementation"
+    return test if ok else unittest.skip(msg)(test)

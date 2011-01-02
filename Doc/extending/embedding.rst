@@ -35,9 +35,6 @@ stdio file pointer and a file name (for identification in error messages only)
 to :c:func:`PyRun_SimpleFile`.  You can also call the lower-level operations
 described in the previous chapters to construct and use Python objects.
 
-A simple demo of embedding Python can be found in the directory
-:file:`Demo/embed/` of the source distribution.
-
 
 .. seealso::
 
@@ -209,7 +206,7 @@ Python extension.  For example::
    {
        if(!PyArg_ParseTuple(args, ":numargs"))
            return NULL;
-       return Py_BuildValue("i", numargs);
+       return PyLong_FromLong(numargs);
    }
 
    static PyMethodDef EmbMethods[] = {

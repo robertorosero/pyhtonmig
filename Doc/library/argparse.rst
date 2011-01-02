@@ -1428,6 +1428,16 @@ Sub-commands
 
        {foo,bar}   additional help
 
+   Furthermore, ``add_parser`` supports an additional ``aliases`` argument,
+   which allows multiple strings to refer to the same subparser. This example,
+   like ``svn``, aliases ``co`` as a shorthand for ``checkout``::
+
+     >>> parser = argparse.ArgumentParser()
+     >>> subparsers = parser.add_subparsers()
+     >>> checkout = subparsers.add_parser('checkout', aliases=['co'])
+     >>> checkout.add_argument('foo')
+     >>> parser.parse_args(['co', 'bar'])
+     Namespace(foo='bar')
 
    One particularly effective way of handling sub-commands is to combine the use
    of the :meth:`add_subparsers` method with calls to :meth:`set_defaults` so
@@ -1466,7 +1476,7 @@ Sub-commands
      >>> args.func(args)
      ((XYZYX))
 
-   This way, you can let :meth:`parse_args` does the job of calling the
+   This way, you can let :meth:`parse_args` do the job of calling the
    appropriate function after argument parsing is complete.  Associating
    functions with actions like this is typically the easiest way to handle the
    different actions for each of your subparsers.  However, if it is necessary
@@ -1648,14 +1658,14 @@ are available:
 .. method:: ArgumentParser.print_usage(file=None)
 
    Print a brief description of how the :class:`ArgumentParser` should be
-   invoked on the command line.  If *file* is ``None``, :data:`sys.stderr` is
+   invoked on the command line.  If *file* is ``None``, :data:`sys.stdout` is
    assumed.
 
 .. method:: ArgumentParser.print_help(file=None)
 
    Print a help message, including the program usage and information about the
    arguments registered with the :class:`ArgumentParser`.  If *file* is
-   ``None``, :data:`sys.stderr` is assumed.
+   ``None``, :data:`sys.stdout` is assumed.
 
 There are also variants of these methods that simply return a string instead of
 printing it:
@@ -1729,6 +1739,7 @@ Exiting methods
    This method prints a usage message including the *message* to the
    standard output and terminates the program with a status code of 2.
 
+.. _upgrading-optparse-code:
 
 Upgrading optparse code
 -----------------------

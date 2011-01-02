@@ -1168,8 +1168,13 @@ class UnicodeTest(string_tests.CommonTest,
         # Error handling (wrong arguments)
         self.assertRaises(TypeError, "hello".encode, 42, 42, 42)
 
-        # Error handling (PyUnicode_EncodeDecimal())
-        self.assertRaises(UnicodeError, int, "\u0200")
+        # Error handling (lone surrogate in PyUnicode_TransformDecimalToASCII())
+        self.assertRaises(UnicodeError, int, "\ud800")
+        self.assertRaises(UnicodeError, int, "\udf00")
+        self.assertRaises(UnicodeError, float, "\ud800")
+        self.assertRaises(UnicodeError, float, "\udf00")
+        self.assertRaises(UnicodeError, complex, "\ud800")
+        self.assertRaises(UnicodeError, complex, "\udf00")
 
     def test_codecs(self):
         # Encoding
@@ -1427,7 +1432,7 @@ class UnicodeTest(string_tests.CommonTest,
 
         # non-ascii format, ascii argument: ensure that PyUnicode_FromFormat()
         # raises an error for a non-ascii format string.
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
             '^PyUnicode_FromFormatV\(\) expects an ASCII-encoded format '
             'string, got a non-ASCII byte: 0xe9$',
             format_unicode, b'unicode\xe9=%s', 'ascii')
@@ -1439,6 +1444,7 @@ class UnicodeTest(string_tests.CommonTest,
     # Test PyUnicode_AsWideChar()
     def test_aswidechar(self):
         from _testcapi import unicode_aswidechar
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidechar('abcdef', 2)
@@ -1475,6 +1481,7 @@ class UnicodeTest(string_tests.CommonTest,
     # Test PyUnicode_AsWideCharString()
     def test_aswidecharstring(self):
         from _testcapi import unicode_aswidecharstring
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidecharstring('abc')

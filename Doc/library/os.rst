@@ -1058,7 +1058,10 @@ Files and Directories
 
    Create a hard link pointing to *source* named *link_name*.
 
-   Availability: Unix.
+   Availability: Unix, Windows.
+
+   .. versionchanged:: 3.2
+      Added Windows support.
 
 
 .. function:: listdir(path='.')
@@ -1140,24 +1143,30 @@ Files and Directories
    Availability: Unix, Windows.
 
 
-.. function:: makedirs(path[, mode])
+.. function:: makedirs(path, mode=0o777, exist_ok=False)
 
    .. index::
       single: directory; creating
       single: UNC paths; and os.makedirs()
 
    Recursive directory creation function.  Like :func:`mkdir`, but makes all
-   intermediate-level directories needed to contain the leaf directory.  Throws
-   an :exc:`error` exception if the leaf directory already exists or cannot be
-   created.  The default *mode* is ``0o777`` (octal).  On some systems, *mode*
-   is ignored. Where it is used, the current umask value is first masked out.
+   intermediate-level directories needed to contain the leaf directory.  If
+   the target directory with the same mode as specified already exists,
+   raises an :exc:`OSError` exception if *exist_ok* is False, otherwise no
+   exception is raised.  If the directory cannot be created in other cases,
+   raises an :exc:`OSError` exception.  The default *mode* is ``0o777`` (octal).
+   On some systems, *mode* is ignored.  Where it is used, the current umask
+   value is first masked out.
 
    .. note::
 
-      :func:`makedirs` will become confused if the path elements to create include
-      :data:`os.pardir`.
+      :func:`makedirs` will become confused if the path elements to create
+      include :data:`pardir`.
 
    This function handles UNC paths correctly.
+
+   .. versionadded:: 3.2
+      The *exist_ok* parameter.
 
 
 .. function:: pathconf(path, name)
@@ -1383,7 +1392,18 @@ Files and Directories
 
    Symbolic link support was introduced in Windows 6.0 (Vista).  :func:`symlink`
    will raise a :exc:`NotImplementedError` on Windows versions earlier than 6.0.
-   The *SeCreateSymbolicLinkPrivilege* is required in order to create symlinks.
+
+   .. note::
+
+      The *SeCreateSymbolicLinkPrivilege* is required in order to successfully
+      create symlinks. This privilege is not typically granted to regular
+      users but is available to accounts which can escalate privileges to the
+      administrator level. Either obtaining the privilege or running your
+      application as an administrator are ways to successfully create symlinks.
+
+
+      :exc:`OSError` is raised when the function is called by an unprivileged
+      user.
 
    Availability: Unix, Windows.
 

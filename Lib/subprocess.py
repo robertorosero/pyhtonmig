@@ -27,10 +27,10 @@ This module defines one class called Popen:
 
 class Popen(args, bufsize=0, executable=None,
             stdin=None, stdout=None, stderr=None,
-            preexec_fn=None, close_fds=False, shell=False,
+            preexec_fn=None, close_fds=True, shell=False,
             cwd=None, env=None, universal_newlines=False,
             startupinfo=None, creationflags=0,
-            restore_signals=True, start_new_session=False):
+            restore_signals=True, start_new_session=False, pass_fds=()):
 
 
 Arguments are:
@@ -39,12 +39,12 @@ args should be a string, or a sequence of program arguments.  The
 program to execute is normally the first item in the args sequence or
 string, but can be explicitly set by using the executable argument.
 
-On UNIX, with shell=False (default): In this case, the Popen class
+On POSIX, with shell=False (default): In this case, the Popen class
 uses os.execvp() to execute the child program.  args should normally
 be a sequence.  A string will be treated as a sequence with the string
 as the only item (the program to execute).
 
-On UNIX, with shell=True: If args is a string, it specifies the
+On POSIX, with shell=True: If args is a string, it specifies the
 command string to execute through the shell.  If args is a sequence,
 the first item specifies the command string, and any additional items
 will be treated as additional shell arguments.
@@ -73,14 +73,19 @@ parent.  Additionally, stderr can be STDOUT, which indicates that the
 stderr data from the applications should be captured into the same
 file handle as for stdout.
 
-On UNIX, if preexec_fn is set to a callable object, this object will be
+On POSIX, if preexec_fn is set to a callable object, this object will be
 called in the child process just before the child is executed.  The use
 of preexec_fn is not thread safe, using it in the presence of threads
 could lead to a deadlock in the child process before the new executable
 is executed.
 
 If close_fds is true, all file descriptors except 0, 1 and 2 will be
-closed before the child process is executed.
+closed before the child process is executed.  The default for close_fds
+varies by platform:  Always true on POSIX.  True when stdin/stdout/stderr
+are None on Windows, false otherwise.
+
+pass_fds is an optional sequence of file descriptors to keep open between the
+parent and child.  Providing any pass_fds implicitly sets close_fds to true.
 
 if shell is true, the specified command will be executed through the
 shell.
@@ -88,12 +93,12 @@ shell.
 If cwd is not None, the current directory will be changed to cwd
 before the child is executed.
 
-On UNIX, if restore_signals is True all signals that Python sets to
+On POSIX, if restore_signals is True all signals that Python sets to
 SIG_IGN are restored to SIG_DFL in the child process before the exec.
 Currently this includes the SIGPIPE, SIGXFZ and SIGXFSZ signals.  This
 parameter does nothing on Windows.
 
-On UNIX, if start_new_session is True, the setsid() system call will be made
+On POSIX, if start_new_session is True, the setsid() system call will be made
 in the child process prior to executing the command.
 
 If env is not None, it defines the environment variables for the new
@@ -101,7 +106,7 @@ process.
 
 If universal_newlines is true, the file objects stdout and stderr are
 opened as a text files, but lines may be terminated by any of '\n',
-the Unix end-of-line convention, '\r', the Macintosh convention or
+the Unix end-of-line convention, '\r', the old Macintosh convention or
 '\r\n', the Windows convention.  All of these external representations
 are seen as '\n' by the Python program.  Note: This feature is only
 available if Python is built with universal newline support (the
@@ -242,7 +247,7 @@ pid
 returncode
     The child return code.  A None value indicates that the process
     hasn't terminated yet.  A negative value -N indicates that the
-    child was terminated by signal N (UNIX only).
+    child was terminated by signal N (POSIX only).
 
 
 Replacing older functions with the subprocess module
@@ -339,6 +344,7 @@ import traceback
 import gc
 import signal
 import builtins
+import warnings
 
 # Exception classes used by this module.
 class CalledProcessError(Exception):
@@ -378,7 +384,6 @@ else:
         import _posixsubprocess
     except ImportError:
         _posixsubprocess = None
-        import warnings
         warnings.warn("The _posixsubprocess module is not being used. "
                       "Child process reliability may suffer if your "
                       "program uses threads.", RuntimeWarning)
@@ -388,6 +393,23 @@ else:
     # POSIX defines PIPE_BUF as >= 512.
     _PIPE_BUF = getattr(select, 'PIPE_BUF', 512)
 
+    if _posixsubprocess:
+        _create_pipe = _posixsubprocess.cloexec_pipe
+    else:
+        def _create_pipe():
+            try:
+                cloexec_flag = fcntl.FD_CLOEXEC
+            except AttributeError:
+                cloexec_flag = 1
+
+            fds = os.pipe()
+
+            old = fcntl.fcntl(fds[0], fcntl.F_GETFD)
+            fcntl.fcntl(fds[0], fcntl.F_SETFD, old | cloexec_flag)
+            old = fcntl.fcntl(fds[1], fcntl.F_GETFD)
+            fcntl.fcntl(fds[1], fcntl.F_SETFD, old | cloexec_flag)
+
+            return fds
 
 __all__ = ["Popen", "PIPE", "STDOUT", "call", "check_call", "getstatusoutput",
            "getoutput", "check_output", "CalledProcessError"]
@@ -562,7 +584,7 @@ def list2cmdline(seq):
 
 # Various tools for executing commands and looking at their output and status.
 #
-# NB This only works (and is only relevant) for UNIX.
+# NB This only works (and is only relevant) for POSIX.
 
 def getstatusoutput(cmd):
     """Return (status, output) of executing cmd in a shell.
@@ -602,13 +624,17 @@ def getoutput(cmd):
     return getstatusoutput(cmd)[1]
 
 
+_PLATFORM_DEFAULT_CLOSE_FDS = object()
+
+
 class Popen(object):
     def __init__(self, args, bufsize=0, executable=None,
                  stdin=None, stdout=None, stderr=None,
-                 preexec_fn=None, close_fds=False, shell=False,
-                 cwd=None, env=None, universal_newlines=False,
+                 preexec_fn=None, close_fds=_PLATFORM_DEFAULT_CLOSE_FDS,
+                 shell=False, cwd=None, env=None, universal_newlines=False,
                  startupinfo=None, creationflags=0,
-                 restore_signals=True, start_new_session=False):
+                 restore_signals=True, start_new_session=False,
+                 pass_fds=()):
         """Create new Popen instance."""
         _cleanup()
 
@@ -622,12 +648,24 @@ class Popen(object):
             if preexec_fn is not None:
                 raise ValueError("preexec_fn is not supported on Windows "
                                  "platforms")
-            if close_fds and (stdin is not None or stdout is not None or
-                              stderr is not None):
-                raise ValueError("close_fds is not supported on Windows "
-                                 "platforms if you redirect stdin/stdout/stderr")
+            any_stdio_set = (stdin is not None or stdout is not None or
+                             stderr is not None)
+            if close_fds is _PLATFORM_DEFAULT_CLOSE_FDS:
+                if any_stdio_set:
+                    close_fds = False
+                else:
+                    close_fds = True
+            elif close_fds and any_stdio_set:
+                raise ValueError(
+                        "close_fds is not supported on Windows platforms"
+                        " if you redirect stdin/stdout/stderr")
         else:
             # POSIX
+            if close_fds is _PLATFORM_DEFAULT_CLOSE_FDS:
+                close_fds = True
+            if pass_fds and not close_fds:
+                warnings.warn("pass_fds overriding close_fds.", RuntimeWarning)
+                close_fds = True
             if startupinfo is not None:
                 raise ValueError("startupinfo is only supported on Windows "
                                  "platforms")
@@ -662,7 +700,7 @@ class Popen(object):
          errread, errwrite) = self._get_handles(stdin, stdout, stderr)
 
         self._execute_child(args, executable, preexec_fn, close_fds,
-                            cwd, env, universal_newlines,
+                            pass_fds, cwd, env, universal_newlines,
                             startupinfo, creationflags, shell,
                             p2cread, p2cwrite,
                             c2pread, c2pwrite,
@@ -697,6 +735,16 @@ class Popen(object):
         data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
         return data.decode(encoding)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.stdout:
+            self.stdout.close()
+        if self.stderr:
+            self.stderr.close()
+        if self.stdin:
+            self.stdin.close()
 
     def __del__(self, _maxsize=sys.maxsize, _active=_active):
         if not self._child_created:
@@ -829,13 +877,15 @@ class Popen(object):
 
 
         def _execute_child(self, args, executable, preexec_fn, close_fds,
-                           cwd, env, universal_newlines,
+                           pass_fds, cwd, env, universal_newlines,
                            startupinfo, creationflags, shell,
                            p2cread, p2cwrite,
                            c2pread, c2pwrite,
                            errread, errwrite,
                            unused_restore_signals, unused_start_new_session):
             """Execute program (MS Windows version)"""
+
+            assert not pass_fds, "pass_fds not supported on Windows."
 
             if not isinstance(args, str):
                 args = list2cmdline(args)
@@ -935,6 +985,7 @@ class Popen(object):
 
         def _readerthread(self, fh, buffer):
             buffer.append(fh.read())
+            fh.close()
 
 
         def _communicate(self, input):
@@ -1007,7 +1058,7 @@ class Popen(object):
             if stdin is None:
                 pass
             elif stdin == PIPE:
-                p2cread, p2cwrite = os.pipe()
+                p2cread, p2cwrite = _create_pipe()
             elif isinstance(stdin, int):
                 p2cread = stdin
             else:
@@ -1017,7 +1068,7 @@ class Popen(object):
             if stdout is None:
                 pass
             elif stdout == PIPE:
-                c2pread, c2pwrite = os.pipe()
+                c2pread, c2pwrite = _create_pipe()
             elif isinstance(stdout, int):
                 c2pwrite = stdout
             else:
@@ -1027,7 +1078,7 @@ class Popen(object):
             if stderr is None:
                 pass
             elif stderr == PIPE:
-                errread, errwrite = os.pipe()
+                errread, errwrite = _create_pipe()
             elif stderr == STDOUT:
                 errwrite = c2pwrite
             elif isinstance(stderr, int):
@@ -1041,23 +1092,24 @@ class Popen(object):
                     errread, errwrite)
 
 
-        def _set_cloexec_flag(self, fd):
-            try:
-                cloexec_flag = fcntl.FD_CLOEXEC
-            except AttributeError:
-                cloexec_flag = 1
-
-            old = fcntl.fcntl(fd, fcntl.F_GETFD)
-            fcntl.fcntl(fd, fcntl.F_SETFD, old | cloexec_flag)
-
-
         def _close_fds(self, but):
             os.closerange(3, but)
             os.closerange(but + 1, MAXFD)
 
 
+        def _close_all_but_a_sorted_few_fds(self, fds_to_keep):
+            # precondition: fds_to_keep must be sorted and unique
+            start_fd = 3
+            for fd in fds_to_keep:
+                if fd >= start_fd:
+                    os.closerange(start_fd, fd)
+                    start_fd = fd + 1
+            if start_fd <= MAXFD:
+                os.closerange(start_fd, MAXFD)
+
+
         def _execute_child(self, args, executable, preexec_fn, close_fds,
-                           cwd, env, universal_newlines,
+                           pass_fds, cwd, env, universal_newlines,
                            startupinfo, creationflags, shell,
                            p2cread, p2cwrite,
                            c2pread, c2pwrite,
@@ -1081,10 +1133,9 @@ class Popen(object):
             # For transferring possible exec failure from child to parent.
             # Data format: "exception name:hex errno:description"
             # Pickle is not used; it is complex and involves memory allocation.
-            errpipe_read, errpipe_write = os.pipe()
+            errpipe_read, errpipe_write = _create_pipe()
             try:
                 try:
-                    self._set_cloexec_flag(errpipe_write)
 
                     if _posixsubprocess:
                         # We must avoid complex work that could involve
@@ -1105,9 +1156,11 @@ class Popen(object):
                             executable_list = tuple(
                                 os.path.join(os.fsencode(dir), executable)
                                 for dir in os.get_exec_path(env))
+                        fds_to_keep = set(pass_fds)
+                        fds_to_keep.add(errpipe_write)
                         self.pid = _posixsubprocess.fork_exec(
                                 args, executable_list,
-                                close_fds, cwd, env_list,
+                                close_fds, sorted(fds_to_keep), cwd, env_list,
                                 p2cread, p2cwrite, c2pread, c2pwrite,
                                 errread, errwrite,
                                 errpipe_read, errpipe_write,
@@ -1161,7 +1214,14 @@ class Popen(object):
 
                                 # Close all other fds, if asked for
                                 if close_fds:
-                                    self._close_fds(but=errpipe_write)
+                                    if pass_fds:
+                                        fds_to_keep = set(pass_fds)
+                                        fds_to_keep.add(errpipe_write)
+                                        self._close_all_but_a_sorted_few_fds(
+                                                sorted(fds_to_keep))
+                                    else:
+                                        self._close_fds(but=errpipe_write)
+
 
                                 if cwd is not None:
                                     os.chdir(cwd)
@@ -1236,7 +1296,11 @@ class Popen(object):
                 os.close(errpipe_read)
 
             if data:
-                _eintr_retry_call(os.waitpid, self.pid, 0)
+                try:
+                    _eintr_retry_call(os.waitpid, self.pid, 0)
+                except OSError as e:
+                    if e.errno != errno.ECHILD:
+                        raise
                 try:
                     exception_name, hex_errno, err_msg = data.split(b':', 2)
                 except ValueError:
@@ -1299,7 +1363,15 @@ class Popen(object):
             """Wait for child process to terminate.  Returns returncode
             attribute."""
             if self.returncode is None:
-                pid, sts = _eintr_retry_call(os.waitpid, self.pid, 0)
+                try:
+                    pid, sts = _eintr_retry_call(os.waitpid, self.pid, 0)
+                except OSError as e:
+                    if e.errno != errno.ECHILD:
+                        raise
+                    # This happens if SIGCLD is set to be ignored or waiting
+                    # for child processes has otherwise been disabled for our
+                    # process.  This child is dead, we can't get the status.
+                    sts = 0
                 self._handle_exitstatus(sts)
             return self.returncode
 

@@ -630,6 +630,28 @@ class MakedirTests(unittest.TestCase):
                             'dir5', 'dir6')
         os.makedirs(path)
 
+    def test_exist_ok_existing_directory(self):
+        path = os.path.join(support.TESTFN, 'dir1')
+        mode = 0o777
+        old_mask = os.umask(0o022)
+        os.makedirs(path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, 0o776, exist_ok=True)
+        os.makedirs(path, mode=mode, exist_ok=True)
+        os.umask(old_mask)
+
+    def test_exist_ok_existing_regular_file(self):
+        base = support.TESTFN
+        path = os.path.join(support.TESTFN, 'dir1')
+        f = open(path, 'w')
+        f.write('abc')
+        f.close()
+        self.assertRaises(OSError, os.makedirs, path)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=True)
+        os.remove(path)
+
     def tearDown(self):
         path = os.path.join(support.TESTFN, 'dir1', 'dir2', 'dir3',
                             'dir4', 'dir5', 'dir6')
@@ -860,6 +882,42 @@ class TestInvalidFD(unittest.TestCase):
         if hasattr(os, "write"):
             self.check(os.write, b" ")
 
+
+class LinkTests(unittest.TestCase):
+    def setUp(self):
+        self.file1 = support.TESTFN
+        self.file2 = os.path.join(support.TESTFN + "2")
+
+    def tearDown(self):
+        for file in (self.file1, self.file2):
+            if os.path.exists(file):
+                os.unlink(file)
+
+    def _test_link(self, file1, file2):
+        with open(file1, "w") as f1:
+            f1.write("test")
+
+        os.link(file1, file2)
+        with open(file1, "r") as f1, open(file2, "r") as f2:
+            self.assertTrue(os.path.sameopenfile(f1.fileno(), f2.fileno()))
+
+    def test_link(self):
+        self._test_link(self.file1, self.file2)
+
+    def test_link_bytes(self):
+        self._test_link(bytes(self.file1, sys.getfilesystemencoding()),
+                        bytes(self.file2, sys.getfilesystemencoding()))
+
+    def test_unicode_name(self):
+        try:
+            os.fsencode("\xf1")
+        except UnicodeError:
+            raise unittest.SkipTest("Unable to encode for this platform.")
+
+        self.file1 += "\xf1"
+        self.file2 = self.file1 + "2"
+        self._test_link(self.file1, self.file2)
+
 if sys.platform != 'win32':
     class Win32ErrorTests(unittest.TestCase):
         pass
@@ -1048,13 +1106,15 @@ class Win32KillTests(unittest.TestCase):
                                 "win_console_handler.py"), tagname],
                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         # Let the interpreter startup before we send signals. See #3137.
-        count, max = 0, 20
+        count, max = 0, 100
         while count < max and proc.poll() is None:
             if m[0] == 1:
                 break
-            time.sleep(0.5)
+            time.sleep(0.1)
             count += 1
         else:
+            # Forcefully kill the process if we weren't able to signal it.
+            os.kill(proc.pid, signal.SIGINT)
             self.fail("Subprocess didn't finish initialization")
         os.kill(proc.pid, event)
         # proc.send_signal(event) could also be done here.
@@ -1087,12 +1147,6 @@ class Win32KillTests(unittest.TestCase):
     def test_CTRL_BREAK_EVENT(self):
         self._kill_with_event(signal.CTRL_BREAK_EVENT, "CTRL_BREAK_EVENT")
 
-
-def skipUnlessWindows6(test):
-    if (hasattr(sys, 'getwindowsversion')
-        and sys.getwindowsversion().major >= 6):
-        return test
-    return unittest.skip("Requires Windows Vista or later")(test)
 
 @unittest.skipUnless(sys.platform == "win32", "Win32 specific tests")
 @support.skip_unless_symlink
@@ -1221,6 +1275,7 @@ def test_main():
         FSEncodingTests,
         PidTests,
         LoginTests,
+        LinkTests,
     )
 
 if __name__ == "__main__":

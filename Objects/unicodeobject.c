@@ -41,9 +41,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
-#include "bytes_methods.h"
-
-#include "unicodeobject.h"
 #include "ucnhash.h"
 
 #ifdef MS_WINDOWS
@@ -1264,7 +1261,7 @@ unicode_aswidechar(PyUnicodeObject *unicode,
 }
 
 Py_ssize_t
-PyUnicode_AsWideChar(PyUnicodeObject *unicode,
+PyUnicode_AsWideChar(PyObject *unicode,
                      wchar_t *w,
                      Py_ssize_t size)
 {
@@ -1272,7 +1269,7 @@ PyUnicode_AsWideChar(PyUnicodeObject *unicode,
         PyErr_BadInternalCall();
         return -1;
     }
-    return unicode_aswidechar(unicode, w, size);
+    return unicode_aswidechar((PyUnicodeObject*)unicode, w, size);
 }
 
 wchar_t*
@@ -6207,6 +6204,30 @@ PyObject *PyUnicode_Translate(PyObject *str,
     return NULL;
 }
 
+PyObject *
+PyUnicode_TransformDecimalToASCII(Py_UNICODE *s,
+                                  Py_ssize_t length)
+{
+    PyObject *result;
+    Py_UNICODE *p; /* write pointer into result */
+    Py_ssize_t i;
+    /* Copy to a new string */
+    result = (PyObject *)_PyUnicode_New(length);
+    Py_UNICODE_COPY(PyUnicode_AS_UNICODE(result), s, length);
+    if (result == NULL)
+        return result;
+    p = PyUnicode_AS_UNICODE(result);
+    /* Iterate over code points */
+    for (i = 0; i < length; i++) {
+        Py_UNICODE ch =s[i];
+        if (ch > 127) {
+            int decimal = Py_UNICODE_TODECIMAL(ch);
+            if (decimal >= 0)
+                p[i] = '0' + decimal;
+        }
+    }
+    return result;
+}
 /* --- Decimal Encoder ---------------------------------------------------- */
 
 int PyUnicode_EncodeDecimal(Py_UNICODE *s,
@@ -7425,26 +7446,11 @@ unicode_encode(PyUnicodeObject *self, PyObject *args, PyObject *kwargs)
     static char *kwlist[] = {"encoding", "errors", 0};
     char *encoding = NULL;
     char *errors = NULL;
-    PyObject *v;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ss:encode",
                                      kwlist, &encoding, &errors))
         return NULL;
-    v = PyUnicode_AsEncodedString((PyObject *)self, encoding, errors);
-    if (v == NULL)
-        goto onError;
-    if (!PyBytes_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "encoder did not return a bytes object "
-                     "(type=%.400s)",
-                     Py_TYPE(v)->tp_name);
-        Py_DECREF(v);
-        return NULL;
-    }
-    return v;
-
-  onError:
-    return NULL;
+    return PyUnicode_AsEncodedString((PyObject *)self, encoding, errors);
 }
 
 PyDoc_STRVAR(expandtabs__doc__,
@@ -8945,6 +8951,13 @@ unicode_freelistsize(PyUnicodeObject *self)
 {
     return PyLong_FromLong(numfree);
 }
+
+static PyObject *
+unicode__decimal2ascii(PyObject *self)
+{
+    return PyUnicode_TransformDecimalToASCII(PyUnicode_AS_UNICODE(self),
+                                             PyUnicode_GET_SIZE(self));
+}
 #endif
 
 PyDoc_STRVAR(startswith__doc__,
@@ -9086,7 +9099,6 @@ unicode_getnewargs(PyUnicodeObject *v)
     return Py_BuildValue("(u#)", v->str, v->length);
 }
 
-
 static PyMethodDef unicode_methods[] = {
 
     /* Order is according to common usage: often used methods should
@@ -9143,8 +9155,9 @@ static PyMethodDef unicode_methods[] = {
 #endif
 
 #if 0
-    /* This one is just used for debugging the implementation. */
+    /* These methods are just used for debugging the implementation. */
     {"freelistsize", (PyCFunction) unicode_freelistsize, METH_NOARGS},
+    {"_decimal2ascii", (PyCFunction) unicode__decimal2ascii, METH_NOARGS},
 #endif
 
     {"__getnewargs__",  (PyCFunction)unicode_getnewargs, METH_NOARGS},
@@ -9195,7 +9208,7 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
         Py_UNICODE* result_buf;
         PyObject* result;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, PyUnicode_GET_SIZE(self),
+        if (PySlice_GetIndicesEx(item, PyUnicode_GET_SIZE(self),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }

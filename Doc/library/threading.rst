@@ -1,8 +1,8 @@
-:mod:`threading` --- Higher-level threading interface
-=====================================================
+:mod:`threading` --- Thread-based parallelism
+=============================================
 
 .. module:: threading
-   :synopsis: Higher-level threading interface.
+   :synopsis: Thread-based parallelism.
 
 
 This module constructs higher-level threading interfaces on top of the lower
@@ -407,6 +407,9 @@ All methods are executed atomically.
 
    .. versionchanged:: 3.2
       The *timeout* parameter is new.
+
+   .. versionchanged:: 3.2
+      Lock acquires can now be interrupted by signals on POSIX.
 
 
 .. method:: Lock.release()

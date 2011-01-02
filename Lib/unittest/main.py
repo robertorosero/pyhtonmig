@@ -58,7 +58,24 @@ Examples:
                                                in MyTestCase
 """
 
+def _convert_name(name):
+    # on Linux / Mac OS X 'foo.PY' is not importable, but on
+    # Windows it is. Simpler to do a case insensitive match
+    # a better check would be to check that the name is a
+    # valid Python module name.
+    if os.path.isfile(name) and name.lower().endswith('.py'):
+        if os.path.isabs(name):
+            rel_path = os.path.relpath(name, os.getcwd())
+            if os.path.isabs(rel_path) or rel_path.startswith(os.pardir):
+                return name
+            name = rel_path
+        # on Windows both '\' and '/' are used as path
+        # separators. Better to replace both than rely on os.path.sep
+        return name[:-3].replace('\\', '.').replace('/', '.')
+    return name
 
+def _convert_names(names):
+    return [_convert_name(name) for name in names]
 
 class TestProgram(object):
     """A command-line program that runs a set of tests; this is primarily
@@ -67,12 +84,12 @@ class TestProgram(object):
     USAGE = USAGE_FROM_MODULE
 
     # defaults for testing
-    failfast = catchbreak = buffer = progName = None
+    failfast = catchbreak = buffer = progName = warnings = None
 
     def __init__(self, module='__main__', defaultTest=None, argv=None,
                     testRunner=None, testLoader=loader.defaultTestLoader,
                     exit=True, verbosity=1, failfast=None, catchbreak=None,
-                    buffer=None):
+                    buffer=None, warnings=None):
         if isinstance(module, str):
             self.module = __import__(module)
             for part in module.split('.')[1:]:
@@ -87,6 +104,18 @@ class TestProgram(object):
         self.catchbreak = catchbreak
         self.verbosity = verbosity
         self.buffer = buffer
+        if warnings is None and not sys.warnoptions:
+            # even if DreprecationWarnings are ignored by default
+            # print them anyway unless other warnings settings are
+            # specified by the warnings arg or the -W python flag
+            self.warnings = 'default'
+        else:
+            # here self.warnings is set either to the value passed
+            # to the warnings args or to None.
+            # If the user didn't pass a value self.warnings will
+            # be None. This means that the behavior is unchanged
+            # and depends on the values passed to -W.
+            self.warnings = warnings
         self.defaultTest = defaultTest
         self.testRunner = testRunner
         self.testLoader = testLoader
@@ -118,38 +147,48 @@ class TestProgram(object):
         long_opts = ['help', 'verbose', 'quiet', 'failfast', 'catch', 'buffer']
         try:
             options, args = getopt.getopt(argv[1:], 'hHvqfcb', long_opts)
-            for opt, value in options:
-                if opt in ('-h','-H','--help'):
-                    self.usageExit()
-                if opt in ('-q','--quiet'):
-                    self.verbosity = 0
-                if opt in ('-v','--verbose'):
-                    self.verbosity = 2
-                if opt in ('-f','--failfast'):
-                    if self.failfast is None:
-                        self.failfast = True
-                    # Should this raise an exception if -f is not valid?
-                if opt in ('-c','--catch'):
-                    if self.catchbreak is None:
-                        self.catchbreak = True
-                    # Should this raise an exception if -c is not valid?
-                if opt in ('-b','--buffer'):
-                    if self.buffer is None:
-                        self.buffer = True
-                    # Should this raise an exception if -b is not valid?
-            if len(args) == 0 and self.defaultTest is None:
-                # createTests will load tests from self.module
-                self.testNames = None
-            elif len(args) > 0:
-                self.testNames = args
-                if __name__ == '__main__':
-                    # to support python -m unittest ...
-                    self.module = None
-            else:
-                self.testNames = (self.defaultTest,)
-            self.createTests()
         except getopt.error as msg:
             self.usageExit(msg)
+            return
+
+        for opt, value in options:
+            if opt in ('-h','-H','--help'):
+                self.usageExit()
+            if opt in ('-q','--quiet'):
+                self.verbosity = 0
+            if opt in ('-v','--verbose'):
+                self.verbosity = 2
+            if opt in ('-f','--failfast'):
+                if self.failfast is None:
+                    self.failfast = True
+                # Should this raise an exception if -f is not valid?
+            if opt in ('-c','--catch'):
+                if self.catchbreak is None:
+                    self.catchbreak = True
+                # Should this raise an exception if -c is not valid?
+            if opt in ('-b','--buffer'):
+                if self.buffer is None:
+                    self.buffer = True
+                # Should this raise an exception if -b is not valid?
+
+        if len(args) == 0 and self.module is None:
+            # this allows "python -m unittest -v" to still work for
+            # test discovery. This means -c / -b / -v / -f options will
+            # be handled twice, which is harmless but not ideal.
+            self._do_discovery(argv[1:])
+            return
+
+        if len(args) == 0 and self.defaultTest is None:
+            # createTests will load tests from self.module
+            self.testNames = None
+        elif len(args) > 0:
+            self.testNames = _convert_names(args)
+            if __name__ == '__main__':
+                # to support python -m unittest ...
+                self.module = None
+        else:
+            self.testNames = (self.defaultTest,)
+        self.createTests()
 
     def createTests(self):
         if self.testNames is None:
@@ -220,7 +259,8 @@ class TestProgram(object):
             try:
                 testRunner = self.testRunner(verbosity=self.verbosity,
                                              failfast=self.failfast,
-                                             buffer=self.buffer)
+                                             buffer=self.buffer,
+                                             warnings=self.warnings)
             except TypeError:
                 # didn't accept the verbosity, buffer or failfast arguments
                 testRunner = self.testRunner()

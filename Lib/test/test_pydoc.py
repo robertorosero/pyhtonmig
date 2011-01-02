@@ -1,17 +1,20 @@
-import sys
 import os
-import os.path
+import sys
 import difflib
-import subprocess
-import re
-import pydoc
 import inspect
-import unittest
+import pydoc
+import re
+import string
+import subprocess
 import test.support
+import time
+import unittest
 import xml.etree
+import textwrap
+from io import StringIO
 from contextlib import contextmanager
-from test.support import (
-    TESTFN, forget, rmtree, EnvironmentVarGuard, reap_children)
+from test.support import TESTFN, forget, rmtree, EnvironmentVarGuard, \
+     reap_children, captured_output
 
 from test import pydoc_mod
 
@@ -219,18 +222,26 @@ def get_pydoc_text(module):
 
     output = doc.docmodule(module)
 
-    # cleanup the extra text formatting that pydoc preforms
+    # clean up the extra text formatting that pydoc performs
     patt = re.compile('\b.')
     output = patt.sub('', output)
     return output.strip(), loc
 
 def print_diffs(text1, text2):
     "Prints unified diffs for two texts"
+    # XXX now obsolete, use unittest built-in support
     lines1 = text1.splitlines(True)
     lines2 = text2.splitlines(True)
     diffs = difflib.unified_diff(lines1, lines2, n=0, fromfile='expected',
                                  tofile='got')
     print('\n' + ''.join(diffs))
+
+def get_html_title(text):
+    # Bit of hack, but good enough for test purposes
+    header, _, _ = text.partition("</head>")
+    _, _, title = header.partition("<title>")
+    title, _, _ = title.partition("</title>")
+    return title
 
 
 class PyDocDocTest(unittest.TestCase):
@@ -327,6 +338,41 @@ class PyDocDocTest(unittest.TestCase):
         self.assertEqual(stripid("<type 'exceptions.Exception'>"),
                          "<type 'exceptions.Exception'>")
 
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     'Docstrings are omitted with -O2 and above')
+    def test_help_output_redirect(self):
+        # issue 940286, if output is set in Helper, then all output from
+        # Helper.help should be redirected
+        old_pattern = expected_text_pattern
+        getpager_old = pydoc.getpager
+        getpager_new = lambda: (lambda x: x)
+        self.maxDiff = None
+
+        buf = StringIO()
+        helper = pydoc.Helper(output=buf)
+        unused, doc_loc = get_pydoc_text(pydoc_mod)
+        module = "test.pydoc_mod"
+        help_header = """
+        Help on module test.pydoc_mod in test:
+
+        """.lstrip()
+        help_header = textwrap.dedent(help_header)
+        expected_help_pattern = help_header + expected_text_pattern
+
+        pydoc.getpager = getpager_new
+        try:
+            with captured_output('stdout') as output, \
+                 captured_output('stderr') as err:
+                helper.help(module)
+                result = buf.getvalue().strip()
+                expected_text = expected_help_pattern % \
+                                (doc_loc, inspect.getabsfile(pydoc_mod))
+                self.assertEqual('', output.getvalue())
+                self.assertEqual('', err.getvalue())
+                self.assertEqual(expected_text, result)
+        finally:
+            pydoc.getpager = getpager_old
+
 
 class TestDescriptions(unittest.TestCase):
 
@@ -336,16 +382,8 @@ class TestDescriptions(unittest.TestCase):
         doc = pydoc.render_doc(pydocfodder)
         self.assertIn("pydocfodder", doc)
 
-    def test_classic_class(self):
-        class C: "Classic class"
-        c = C()
-        self.assertEqual(pydoc.describe(C), 'class C')
-        self.assertEqual(pydoc.describe(c), 'C')
-        expected = 'C in module %s' % __name__
-        self.assertIn(expected, pydoc.render_doc(c))
-
     def test_class(self):
-        class C(object): "New-style class"
+        class C: "New-style class"
         c = C()
 
         self.assertEqual(pydoc.describe(C), 'class C')
@@ -354,8 +392,78 @@ class TestDescriptions(unittest.TestCase):
         self.assertIn(expected, pydoc.render_doc(c))
 
 
+class PyDocServerTest(unittest.TestCase):
+    """Tests for pydoc._start_server"""
+
+    def test_server(self):
+
+        # Minimal test that starts the server, then stops it.
+        def my_url_handler(url, content_type):
+            text = 'the URL sent was: (%s, %s)' % (url, content_type)
+            return text
+
+        serverthread = pydoc._start_server(my_url_handler, port=0)
+        starttime = time.time()
+        timeout = 1  #seconds
+
+        while serverthread.serving:
+            time.sleep(.01)
+            if serverthread.serving and time.time() - starttime > timeout:
+                serverthread.stop()
+                break
+
+        self.assertEqual(serverthread.error, None)
+
+
+class PyDocUrlHandlerTest(unittest.TestCase):
+    """Tests for pydoc._url_handler"""
+
+    def test_content_type_err(self):
+        err = 'Error: unknown content type '
+        f = pydoc._url_handler
+        result = f("", "")
+        self.assertEqual(result, err + "''")
+        result = f("", "foobar")
+        self.assertEqual(result, err + "'foobar'")
+
+    def test_url_requests(self):
+        # Test for the correct title in the html pages returned.
+        # This tests the different parts of the URL handler without
+        # getting too picky about the exact html.
+        requests = [
+            ("", "Python: Index of Modules"),
+            ("get?key=", "Python: Index of Modules"),
+            ("index", "Python: Index of Modules"),
+            ("topics", "Python: Topics"),
+            ("keywords", "Python: Keywords"),
+            ("pydoc", "Python: module pydoc"),
+            ("get?key=pydoc", "Python: module pydoc"),
+            ("search?key=pydoc", "Python: Search Results"),
+            ("def", "Python: KEYWORD def"),
+            ("STRINGS", "Python: TOPIC STRINGS"),
+            ("foobar", "Python: Error"),
+            ("getfile?key=foobar", "Python: Read Error"),
+            ]
+
+        for url, title in requests:
+            text = pydoc._url_handler(url, "text/html")
+            result = get_html_title(text)
+            self.assertEqual(result, title)
+
+        path = string.__file__
+        title = "Python: getfile " + path
+        url = "getfile?key=" + path
+        text = pydoc._url_handler(url, "text/html")
+        result = get_html_title(text)
+        self.assertEqual(result, title)
+
+
 def test_main():
-    test.support.run_unittest(PyDocDocTest, TestDescriptions)
+    test.support.run_unittest(PyDocDocTest,
+                              TestDescriptions,
+                              PyDocServerTest,
+                              PyDocUrlHandlerTest,
+                              )
 
 if __name__ == "__main__":
     test_main()

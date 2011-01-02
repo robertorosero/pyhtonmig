@@ -7,6 +7,24 @@ Built-in Functions
 The Python interpreter has a number of functions and types built into it that
 are always available.  They are listed here in alphabetical order.
 
+===================  =================  ==================  ================  ====================
+..                   ..                 Built-in Functions  ..                ..
+===================  =================  ==================  ================  ====================
+:func:`abs`          :func:`dict`       :func:`help`        :func:`min`       :func:`setattr`
+:func:`all`          :func:`dir`        :func:`hex`         :func:`next`      :func:`slice`
+:func:`any`          :func:`divmod`     :func:`id`          :func:`object`    :func:`sorted`
+:func:`ascii`        :func:`enumerate`  :func:`input`       :func:`oct`       :func:`staticmethod`
+:func:`bin`          :func:`eval`       :func:`int`         :func:`open`      :func:`str`
+:func:`bool`         :func:`exec`       :func:`isinstance`  :func:`ord`       :func:`sum`
+:func:`bytearray`    :func:`filter`     :func:`issubclass`  :func:`pow`       :func:`super`
+:func:`bytes`        :func:`float`      :func:`iter`        :func:`print`     :func:`tuple`
+:func:`callable`     :func:`format`     :func:`len`         :func:`property`  :func:`type`
+:func:`chr`          :func:`frozenset`  :func:`list`        :func:`range`     :func:`vars`
+:func:`classmethod`  :func:`getattr`    :func:`locals`      :func:`repr`      :func:`zip`
+:func:`compile`      :func:`globals`    :func:`map`         :func:`reversed`  :func:`__import__`
+:func:`complex`      :func:`hasattr`    :func:`max`         :func:`round`
+:func:`delattr`      :func:`hash`       :func:`memoryview`  :func:`set`
+===================  =================  ==================  ================  ====================
 
 .. function:: abs(x)
 
@@ -103,6 +121,19 @@ are always available.  They are listed here in alphabetical order.
    Bytes objects can also be created with literals, see :ref:`strings`.
 
 
+.. function:: callable(object)
+
+   Return :const:`True` if the *object* argument appears callable,
+   :const:`False` if not.  If this returns true, it is still possible that a
+   call fails, but if it is false, calling *object* will never succeed.
+   Note that classes are callable (calling a class returns a new instance);
+   instances are callable if their class has a :meth:`__call__` method.
+
+   .. versionadded:: 3.2
+      This function was first removed in Python 3.0 and then brought back
+      in Python 3.2.
+
+
 .. function:: chr(i)
 
    Return the string representing a character whose Unicode codepoint is the integer
@@ -143,7 +174,7 @@ are always available.  They are listed here in alphabetical order.
    type hierarchy in :ref:`types`.
 
 
-.. function:: compile(source, filename, mode, flags=0, dont_inherit=False)
+.. function:: compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
 
    Compile the *source* into a code or AST object.  Code objects can be executed
    by :func:`exec` or :func:`eval`.  *source* can either be a string or an AST
@@ -175,6 +206,12 @@ are always available.  They are listed here in alphabetical order.
    can be found as the :attr:`compiler_flag` attribute on the :class:`_Feature`
    instance in the :mod:`__future__` module.
 
+   The argument *optimize* specifies the optimization level of the compiler; the
+   default value of ``-1`` selects the optimization level of the interpreter as
+   given by :option:`-O` options.  Explicit levels are ``0`` (no optimization;
+   ``__debug__`` is true), ``1`` (asserts are removed, ``__debug__`` is false)
+   or ``2`` (docstrings are removed too).
+
    This function raises :exc:`SyntaxError` if the compiled source is invalid,
    and :exc:`TypeError` if the source contains null bytes.
 
@@ -187,7 +224,7 @@ are always available.  They are listed here in alphabetical order.
 
    .. versionchanged:: 3.2
       Allowed use of Windows and Mac newlines.  Also input in ``'exec'`` mode
-      does not have to end in a newline anymore.
+      does not have to end in a newline anymore.  Added the *optimize* parameter.
 
 
 .. function:: complex([real[, imag]])
@@ -417,8 +454,8 @@ are always available.  They are listed here in alphabetical order.
       sign: "+" | "-"
       infinity: "Infinity" | "inf"
       nan: "nan"
-      numeric-value: `floatnumber` | `infinity` | `nan`
-      numeric-string: [`sign`] `numeric-value`
+      numeric_value: `floatnumber` | `infinity` | `nan`
+      numeric_string: [`sign`] `numeric_value`
 
    Here ``floatnumber`` is the form of a Python floating-point literal,
    described in :ref:`floating`.  Case is not significant, so, for example,
@@ -992,8 +1029,33 @@ are always available.  They are listed here in alphabetical order.
       >>> list(range(1, 0))
       []
 
+   Range objects implement the :class:`collections.Sequence` ABC, and provide
+   features such as containment tests, element index lookup, slicing and
+   support for negative indices:
+
+      >>> r = range(0, 20, 2)
+      >>> r
+      range(0, 20, 2)
+      >>> 11 in r
+      False
+      >>> 10 in r
+      True
+      >>> r.index(10)
+      5
+      >>> r[5]
+      10
+      >>> r[:5]
+      range(0, 10, 2)
+      >>> r[-1]
+      18
+
+   Ranges containing absolute values larger than :data:`sys.maxsize` are permitted
+   but some features (such as :func:`len`) will raise :exc:`OverflowError`.
+
    .. versionchanged:: 3.2
-      Testing integers for membership takes constant time instead of iterating
+      Implement the Sequence ABC.
+      Support slicing and negative indices.
+      Test integers for membership in constant time instead of iterating
       through all items.
 
 

@@ -67,8 +67,12 @@ class BaseTest(unittest.TestCase):
         try:
             self.saved_handlers = logging._handlers.copy()
             self.saved_handler_list = logging._handlerList[:]
-            self.saved_loggers = logger_dict.copy()
+            self.saved_loggers = saved_loggers = logger_dict.copy()
             self.saved_level_names = logging._levelNames.copy()
+            self.logger_states = logger_states = {}
+            for name in saved_loggers:
+                logger_states[name] = getattr(saved_loggers[name],
+                                              'disabled', None)
         finally:
             logging._releaseLock()
 
@@ -86,8 +90,12 @@ class BaseTest(unittest.TestCase):
         self.root_hdlr = logging.StreamHandler(self.stream)
         self.root_formatter = logging.Formatter(self.log_format)
         self.root_hdlr.setFormatter(self.root_formatter)
-        self.assertFalse(self.logger1.hasHandlers())
-        self.assertFalse(self.logger2.hasHandlers())
+        if self.logger1.hasHandlers():
+            hlist = self.logger1.handlers + self.root_logger.handlers
+            raise AssertionError('Unexpected handlers: %s' % hlist)
+        if self.logger2.hasHandlers():
+            hlist = self.logger2.handlers + self.root_logger.handlers
+            raise AssertionError('Unexpected handlers: %s' % hlist)
         self.root_logger.addHandler(self.root_hdlr)
         self.assertTrue(self.logger1.hasHandlers())
         self.assertTrue(self.logger2.hasHandlers())
@@ -112,6 +120,10 @@ class BaseTest(unittest.TestCase):
             loggerDict = logging.getLogger().manager.loggerDict
             loggerDict.clear()
             loggerDict.update(self.saved_loggers)
+            logger_states = self.logger_states
+            for name in self.logger_states:
+                if logger_states[name] is not None:
+                    self.saved_loggers[name].disabled = logger_states[name]
         finally:
             logging._releaseLock()
 
@@ -907,7 +919,8 @@ class EncodingTest(BaseTest):
     def test_encoding_plain_file(self):
         # In Python 2.x, a plain file object is treated as having no encoding.
         log = logging.getLogger("test")
-        fn = tempfile.mktemp(".log", "test_logging-1-")
+        fd, fn = tempfile.mkstemp(".log", "test_logging-1-")
+        os.close(fd)
         # the non-ascii data we write to the log.
         data = "foo\x80"
         try:
@@ -1799,7 +1812,7 @@ class ChildLoggerTest(BaseTest):
 class DerivedLogRecord(logging.LogRecord):
     pass
 
-class LogRecordClassTest(BaseTest):
+class LogRecordFactoryTest(BaseTest):
 
     def setUp(self):
         class CheckingFilter(logging.Filter):
@@ -1817,17 +1830,17 @@ class LogRecordClassTest(BaseTest):
         BaseTest.setUp(self)
         self.filter = CheckingFilter(DerivedLogRecord)
         self.root_logger.addFilter(self.filter)
-        self.orig_cls = logging.getLogRecordClass()
+        self.orig_factory = logging.getLogRecordFactory()
 
     def tearDown(self):
         self.root_logger.removeFilter(self.filter)
         BaseTest.tearDown(self)
-        logging.setLogRecordClass(self.orig_cls)
+        logging.setLogRecordFactory(self.orig_factory)
 
     def test_logrecord_class(self):
         self.assertRaises(TypeError, self.root_logger.warning,
                           self.next_message())
-        logging.setLogRecordClass(DerivedLogRecord)
+        logging.setLogRecordFactory(DerivedLogRecord)
         self.root_logger.error(self.next_message())
         self.assert_log_lines([
            ('root', 'ERROR', '2'),
@@ -1885,7 +1898,7 @@ class FormatterTest(unittest.TestCase):
         return logging.makeLogRecord(result)
 
     def test_percent(self):
-        "Test %-formatting"
+        # Test %-formatting
         r = self.get_record()
         f = logging.Formatter('${%(message)s}')
         self.assertEqual(f.format(r), '${Message with 2 placeholders}')
@@ -1898,7 +1911,7 @@ class FormatterTest(unittest.TestCase):
         self.assertFalse(f.usesTime())
 
     def test_braces(self):
-        "Test {}-formatting"
+        # Test {}-formatting
         r = self.get_record()
         f = logging.Formatter('$%{message}%$', style='{')
         self.assertEqual(f.format(r), '$%Message with 2 placeholders%$')
@@ -1911,7 +1924,7 @@ class FormatterTest(unittest.TestCase):
         self.assertFalse(f.usesTime())
 
     def test_dollars(self):
-        "Test $-formatting"
+        # Test $-formatting
         r = self.get_record()
         f = logging.Formatter('$message', style='$')
         self.assertEqual(f.format(r), 'Message with 2 placeholders')
@@ -1927,17 +1940,54 @@ class FormatterTest(unittest.TestCase):
         f = logging.Formatter('asctime', style='$')
         self.assertFalse(f.usesTime())
 
+class LastResortTest(BaseTest):
+    def test_last_resort(self):
+        # Test the last resort handler
+        root = self.root_logger
+        root.removeHandler(self.root_hdlr)
+        old_stderr = sys.stderr
+        old_lastresort = logging.lastResort
+        old_raise_exceptions = logging.raiseExceptions
+        try:
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), 'This is your final chance!\n')
+            #No handlers and no last resort, so 'No handlers' message
+            logging.lastResort = None
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), 'No handlers could be found for logger "root"\n')
+            # 'No handlers' message only printed once
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), '')
+            root.manager.emittedNoHandlerWarning = False
+            #If raiseExceptions is False, no message is printed
+            logging.raiseExceptions = False
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), '')
+        finally:
+            sys.stderr = old_stderr
+            root.addHandler(self.root_hdlr)
+            logging.lastResort = old_lastresort
+            logging.raiseExceptions = old_raise_exceptions
+
+
 class BaseFileTest(BaseTest):
     "Base class for handler tests that write log files"
 
     def setUp(self):
         BaseTest.setUp(self)
-        self.fn = tempfile.mktemp(".log", "test_logging-2-")
+        fd, self.fn = tempfile.mkstemp(".log", "test_logging-2-")
+        os.close(fd)
         self.rmfiles = []
 
     def tearDown(self):
         for fn in self.rmfiles:
             os.unlink(fn)
+        if os.path.exists(self.fn):
+            os.unlink(self.fn)
         BaseTest.tearDown(self)
 
     def assertLogFile(self, filename):
@@ -1966,7 +2016,6 @@ class RotatingFileHandlerTest(BaseFileTest):
     def test_file_created(self):
         # checks that the file is created and assumes it was created
         # by us
-        self.assertFalse(os.path.exists(self.fn))
         rh = logging.handlers.RotatingFileHandler(self.fn)
         rh.emit(self.next_rec())
         self.assertLogFile(self.fn)
@@ -2015,8 +2064,9 @@ def test_main():
                  ConfigFileTest, SocketHandlerTest, MemoryTest,
                  EncodingTest, WarningsTest, ConfigDictTest, ManagerTest,
                  FormatterTest,
-                 LogRecordClassTest, ChildLoggerTest, QueueHandlerTest,
+                 LogRecordFactoryTest, ChildLoggerTest, QueueHandlerTest,
                  RotatingFileHandlerTest,
+                 LastResortTest,
                  #TimedRotatingFileHandlerTest
                 )
 

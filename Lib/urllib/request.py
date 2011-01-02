@@ -94,6 +94,7 @@ import re
 import socket
 import sys
 import time
+import collections
 
 from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
@@ -274,8 +275,9 @@ class OpenerDirector:
     def __init__(self):
         client_version = "Python-urllib/%s" % __version__
         self.addheaders = [('User-agent', client_version)]
-        # manage the individual handlers
+        # self.handlers is retained only for backward compatibility
         self.handlers = []
+        # manage the individual handlers
         self.handle_open = {}
         self.handle_error = {}
         self.process_response = {}
@@ -325,8 +327,6 @@ class OpenerDirector:
             added = True
 
         if added:
-            # the handlers must work in an specific order, the order
-            # is specified in a Handler attribute
             bisect.insort(self.handlers, handler)
             handler.add_parent(self)
 
@@ -1053,8 +1053,16 @@ class AbstractHTTPHandler(BaseHandler):
                     'Content-type',
                     'application/x-www-form-urlencoded')
             if not request.has_header('Content-length'):
-                request.add_unredirected_header(
-                    'Content-length', '%d' % len(data))
+                try:
+                    mv = memoryview(data)
+                except TypeError:
+                    if isinstance(data, collections.Iterable):
+                        raise ValueError("Content-Length should be specified \
+                                for iterable data of type %r %r" % (type(data),
+                                data))
+                else:
+                    request.add_unredirected_header(
+                            'Content-length', '%d' % (len(mv) * mv.itemsize))
 
         sel_host = host
         if request.has_proxy():

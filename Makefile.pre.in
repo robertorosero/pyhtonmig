@@ -108,9 +108,8 @@ ABIFLAGS=	@ABIFLAGS@
 # Detailed destination directories
 BINLIBDEST=	$(LIBDIR)/python$(VERSION)
 LIBDEST=	$(SCRIPTDIR)/python$(VERSION)
-INCLUDEPY=	$(INCLUDEDIR)/python$(VERSION)
-CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(VERSION)
-LIBP=		$(LIBDIR)/python$(VERSION)
+INCLUDEPY=	$(INCLUDEDIR)/python$(LDVERSION)
+CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(LDVERSION)
 
 # Symbols used for using shared libraries
 SO=		@SO@
@@ -155,7 +154,7 @@ CONFIG_ARGS=	@CONFIG_ARGS@
 SRCDIRS= 	@SRCDIRS@
 
 # Other subdirectories
-SUBDIRSTOO=	Include Lib Misc Demo
+SUBDIRSTOO=	Include Lib Misc
 
 # Files and directories to be distributed
 CONFIGFILES=	configure configure.in acconfig.h pyconfig.h.in Makefile.pre.in
@@ -167,6 +166,7 @@ DIST=		$(DISTFILES) $(DISTDIRS)
 LIBRARY=	@LIBRARY@
 LDLIBRARY=      @LDLIBRARY@
 BLDLIBRARY=     @BLDLIBRARY@
+PY3LIBRARY=     @PY3LIBRARY@
 DLLLIBRARY=	@DLLLIBRARY@
 LDLIBRARYDIR=   @LDLIBRARYDIR@
 INSTSONAME=	@INSTSONAME@
@@ -421,7 +421,7 @@ coverage:
 
 
 # Build the interpreter
-$(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY)
+$(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY) $(PY3LIBRARY)
 	$(LINKCC) $(PY_LDFLAGS) $(LINKFORSHARED) -o $@ Modules/python.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
 
 platform: $(BUILDPYTHON)
@@ -454,6 +454,9 @@ libpython$(LDVERSION).so: $(LIBRARY_OBJS)
 	else \
 		$(BLDSHARED) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 	fi
+
+libpython3.so:	libpython$(LDVERSION).so
+	$(BLDSHARED) -o $@ -Wl,-hl$@ $^
 
 libpython$(VERSION).dylib: $(LIBRARY_OBJS)
 	 $(CC) -dynamiclib -Wl,-single_module $(PY_LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
@@ -499,7 +502,6 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 		$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/Resources/Info.plist
 	$(LN) -fsn $(VERSION) $(PYTHONFRAMEWORKDIR)/Versions/Current
 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(PYTHONFRAMEWORKDIR)/$(PYTHONFRAMEWORK)
-	$(LN) -fsn Versions/Current/Headers $(PYTHONFRAMEWORKDIR)/Headers
 	$(LN) -fsn Versions/Current/Resources $(PYTHONFRAMEWORKDIR)/Resources
 
 # This rule builds the Cygwin Python DLL and import library if configured
@@ -579,7 +581,7 @@ $(IO_OBJS): $(IO_H)
 $(GRAMMAR_H) $(GRAMMAR_C): Parser/pgen.stamp
 Parser/pgen.stamp: $(PGEN) $(GRAMMAR_INPUT)
 		-@$(INSTALL) -d Include
-		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+		$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
 		-touch Parser/pgen.stamp
 
 $(PGEN):	$(PGENOBJS)
@@ -642,6 +644,9 @@ Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
 				$(BYTESTR_DEPS) \
 				$(srcdir)/Objects/stringlib/formatter.h
 
+Objects/typeobject.o: $(srcdir)/Objects/typeslots.inc
+$(srcdir)/Objects/typeslots.inc: $(srcdir)/Include/typeslots.h $(srcdir)/Objects/typeslots.py
+	$(PYTHON) $(srcdir)/Objects/typeslots.py < $(srcdir)/Include/typeslots.h > $(srcdir)/Objects/typeslots.inc
 
 ############################################################################
 # Header files
@@ -834,7 +839,13 @@ altbininstall: $(BUILDPYTHON)
 		else	true; \
 		fi; \
 	done
-	$(INSTALL_PROGRAM) $(BUILDPYTHON) $(DESTDIR)$(BINDIR)/python$(VERSION)$(EXE)
+	$(INSTALL_PROGRAM) $(BUILDPYTHON) $(DESTDIR)$(BINDIR)/python$(LDVERSION)$(EXE)
+	-if test "$(VERSION)" != "$(LDVERSION)"; then \
+		if test -f $(DESTDIR)$(BINDIR)/$(PYTHON)$(VERSION)$(EXE) -o -h $(DESTDIR)$(BINDIR)/$(PYTHON)$(VERSION)$(EXE); \
+		then rm -f $(DESTDIR)$(BINDIR)/python$(VERSION)$(EXE); \
+		fi; \
+		(cd $(DESTDIR)$(BINDIR); $(LN) python$(LDVERSION)$(EXE) python$(VERSION)$(EXE)); \
+	fi
 	if test -f $(LDLIBRARY); then \
 		if test -n "$(DLLLIBRARY)" ; then \
 			$(INSTALL_SHARED) $(DLLLIBRARY) $(DESTDIR)$(BINDIR); \
@@ -843,6 +854,9 @@ altbininstall: $(BUILDPYTHON)
 			if test $(LDLIBRARY) != $(INSTSONAME); then \
 				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) $(LDLIBRARY)) \
 			fi \
+		fi; \
+		if test -n "$(PY3LIBRARY)"; then \
+			$(INSTALL_SHARED) $(PY3LIBRARY) $(DESTDIR)$(LIBDIR)/$(PY3LIBRARY); \
 		fi; \
 	else	true; \
 	fi
@@ -853,10 +867,22 @@ bininstall: altbininstall
 	else true; \
 	fi
 	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON)3$(EXE))
+	-if test "$(VERSION)" != "$(LDVERSION)"; then \
+		rm -f $(DESTDIR)$(BINDIR)/python$(VERSION)-config; \
+		(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(LDVERSION)-config python$(VERSION)-config); \
+		rm -f $(DESTDIR)$(LIBPC)/python-$(LDVERSION).pc; \
+		(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python-$(LDVERSION).pc); \
+	fi
 	-rm -f $(DESTDIR)$(BINDIR)/python3-config
 	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)-config python3-config)
 	-rm -f $(DESTDIR)$(LIBPC)/python3.pc
 	(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python3.pc)
+	-rm -f $(DESTDIR)$(BINDIR)/idle3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s idle$(VERSION) idle3)
+	-rm -f $(DESTDIR)$(BINDIR)/pydoc3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s pydoc$(VERSION) pydoc3)
+	-rm -f $(DESTDIR)$(BINDIR)/2to3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s 2to3-$(VERSION) 2to3)
 
 # Install the manual page
 maninstall:
@@ -879,11 +905,11 @@ XMLLIBSUBDIRS=  xml xml/dom xml/etree xml/parsers xml/sax
 LIBSUBDIRS=	tkinter tkinter/test tkinter/test/test_tkinter \
                 tkinter/test/test_ttk site-packages test \
 		test/mpdecimal \
-		test/decimaltestdata test/xmltestdata \
+		test/decimaltestdata test/xmltestdata test/subprocessdata \
 		test/tracedmodules test/encoded_modules \
 		concurrent concurrent/futures encodings \
 		email email/mime email/test email/test/data \
-		html json json/tests http dbm xmlrpc \
+		html json test/json_tests http dbm xmlrpc \
 		sqlite3 sqlite3/test \
 		logging csv wsgiref urllib \
 		lib2to3 lib2to3/fixes lib2to3/pgen2 lib2to3/tests \
@@ -987,7 +1013,7 @@ $(srcdir)/Lib/$(PLATDIR):
 python-config: $(srcdir)/Misc/python-config.in
 	# Substitution happens here, as the completely-expanded BINDIR
 	# is not available in configure
-	sed -e "s,@EXENAME@,$(BINDIR)/python$(VERSION)$(EXE)," < $(srcdir)/Misc/python-config.in >python-config
+	sed -e "s,@EXENAME@,$(BINDIR)/python$(LDVERSION)$(EXE)," < $(srcdir)/Misc/python-config.in >python-config
 
 # Install the include files
 INCLDIRSTOMAKE=$(INCLUDEDIR) $(CONFINCLUDEDIR) $(INCLUDEPY) $(CONFINCLUDEPY)
@@ -1009,13 +1035,13 @@ inclinstall:
 
 # Install the library and miscellaneous stuff needed for extending/embedding
 # This goes into $(exec_prefix)
-LIBPL=		$(LIBP)/config
+LIBPL=		$(LIBDEST)/config-$(LDVERSION)
 
 # pkgconfig directory
 LIBPC=		$(LIBDIR)/pkgconfig
 
 libainstall:	all python-config
-	@for i in $(LIBDIR) $(LIBP) $(LIBPL) $(LIBPC); \
+	@for i in $(LIBDIR) $(LIBPL) $(LIBPC); \
 	do \
 		if test ! -d $(DESTDIR)$$i; then \
 			echo "Creating directory $$i"; \
@@ -1045,7 +1071,7 @@ libainstall:	all python-config
 	$(INSTALL_DATA) Misc/python.pc $(DESTDIR)$(LIBPC)/python-$(VERSION).pc
 	$(INSTALL_SCRIPT) $(srcdir)/Modules/makesetup $(DESTDIR)$(LIBPL)/makesetup
 	$(INSTALL_SCRIPT) $(srcdir)/install-sh $(DESTDIR)$(LIBPL)/install-sh
-	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(VERSION)-config
+	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(LDVERSION)-config
 	rm python-config
 	@if [ -s Modules/python.exp -a \
 		"`echo $(MACHDEP) | sed 's/^\(...\).*/\1/'`" = "aix" ]; then \
@@ -1103,7 +1129,7 @@ frameworkinstallstructure:	$(LDLIBRARY)
 		else	true; \
 		fi; \
 	done
-	$(LN) -fsn include/python$(VERSION) $(DESTDIR)$(prefix)/Headers
+	$(LN) -fsn include/python$(LDVERSION) $(DESTDIR)$(prefix)/Headers
 	sed 's/%VERSION%/'"`$(RUNSHARED) ./$(BUILDPYTHON) -c 'import platform; print(platform.python_version())'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
 	$(LN) -fsn $(VERSION) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Versions/Current
 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/$(PYTHONFRAMEWORK)
@@ -1115,8 +1141,8 @@ frameworkinstallstructure:	$(LDLIBRARY)
 # Install a number of symlinks to keep software that expects a normal unix
 # install (which includes python-config) happy.
 frameworkinstallmaclib:
-	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config/libpython$(VERSION).a"
-	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config/libpython$(VERSION).dylib"
+	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).a"
+	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).dylib"
 	ln -fs "../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/libpython$(VERSION).dylib"
 
 # This installs the IDE, the Launcher and other apps into /Applications
@@ -1130,7 +1156,7 @@ frameworkinstallunixtools:
 frameworkaltinstallunixtools:
 	cd Mac && $(MAKE) altinstallunixtools DESTDIR="$(DESTDIR)"
 
-# This installs the Demos and Tools into the applications directory.
+# This installs the Tools into the applications directory.
 # It is not part of a normal frameworkinstall
 frameworkinstallextras:
 	cd Mac && $(MAKE) installextras DESTDIR="$(DESTDIR)"
@@ -1298,3 +1324,6 @@ Python/thread.o: @THREADHEADERS@
 .PHONY: gdbhooks
 
 # IF YOU PUT ANYTHING HERE IT WILL GO AWAY
+# Local Variables:
+# mode: makefile
+# End:

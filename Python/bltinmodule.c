@@ -5,7 +5,6 @@
 
 #include "node.h"
 #include "code.h"
-#include "eval.h"
 
 #include <ctype.h>
 
@@ -311,6 +310,20 @@ PyDoc_STRVAR(bin_doc,
 Return the binary representation of an integer or long integer.");
 
 
+static PyObject *
+builtin_callable(PyObject *self, PyObject *v)
+{
+    return PyBool_FromLong((long)PyCallable_Check(v));
+}
+
+PyDoc_STRVAR(callable_doc,
+"callable(object) -> bool\n\
+\n\
+Return whether the object is callable (i.e., some kind of function).\n\
+Note that classes are callable, as are instances of classes with a\n\
+__call__() method.");
+
+
 typedef struct {
     PyObject_HEAD
     PyObject *func;
@@ -530,19 +543,20 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     int mode = -1;
     int dont_inherit = 0;
     int supplied_flags = 0;
+    int optimize = -1;
     int is_ast;
     PyCompilerFlags cf;
     PyObject *cmd;
     static char *kwlist[] = {"source", "filename", "mode", "flags",
-                             "dont_inherit", NULL};
+                             "dont_inherit", "optimize", NULL};
     int start[] = {Py_file_input, Py_eval_input, Py_single_input};
     PyObject *result;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&s|ii:compile",  kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&s|iii:compile",  kwlist,
                                      &cmd,
                                      PyUnicode_FSConverter, &filename_obj,
                                      &startstr, &supplied_flags,
-                                     &dont_inherit))
+                                     &dont_inherit, &optimize))
         return NULL;
 
     filename = PyBytes_AS_STRING(filename_obj);
@@ -556,6 +570,12 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
         goto error;
     }
     /* XXX Warn if (supplied_flags & PyCF_MASK_OBSOLETE) != 0? */
+
+    if (optimize < -1 || optimize > 2) {
+        PyErr_SetString(PyExc_ValueError,
+                        "compile(): invalid optimize value");
+        goto error;
+    }
 
     if (!dont_inherit) {
         PyEval_MergeCompilerFlags(&cf);
@@ -591,8 +611,8 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
                 PyArena_Free(arena);
                 goto error;
             }
-            result = (PyObject*)PyAST_Compile(mod, filename,
-                                              &cf, arena);
+            result = (PyObject*)PyAST_CompileEx(mod, filename,
+                                                &cf, optimize, arena);
             PyArena_Free(arena);
         }
         goto finally;
@@ -602,7 +622,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     if (str == NULL)
         goto error;
 
-    result = Py_CompileStringFlags(str, filename, start[mode], &cf);
+    result = Py_CompileStringExFlags(str, filename, start[mode], &cf, optimize);
     goto finally;
 
 error:
@@ -714,7 +734,7 @@ builtin_eval(PyObject *self, PyObject *args)
         "code object passed to eval() may not contain free variables");
             return NULL;
         }
-        return PyEval_EvalCode((PyCodeObject *) cmd, globals, locals);
+        return PyEval_EvalCode(cmd, globals, locals);
     }
 
     cf.cf_flags = PyCF_SOURCE_IS_UTF8;
@@ -790,7 +810,7 @@ builtin_exec(PyObject *self, PyObject *args)
                 "contain free variables");
             return NULL;
         }
-        v = PyEval_EvalCode((PyCodeObject *) prog, globals, locals);
+        v = PyEval_EvalCode(prog, globals, locals);
     }
     else {
         char *str;
@@ -2242,6 +2262,7 @@ static PyMethodDef builtin_methods[] = {
     {"any",             builtin_any,        METH_O, any_doc},
     {"ascii",           builtin_ascii,      METH_O, ascii_doc},
     {"bin",             builtin_bin,        METH_O, bin_doc},
+    {"callable",        builtin_callable,   METH_O, callable_doc},
     {"chr",             builtin_chr,        METH_VARARGS, chr_doc},
     {"compile",         (PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
     {"delattr",         builtin_delattr,    METH_VARARGS, delattr_doc},

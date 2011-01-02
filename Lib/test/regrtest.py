@@ -167,6 +167,7 @@ from inspect import isabstract
 import tempfile
 import platform
 import sysconfig
+import logging
 
 
 # Some times __path__ and __file__ are not absolute (e.g. while running from
@@ -526,7 +527,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         def tests_and_args():
             for test in tests:
                 args_tuple = (
-                    (test, verbose, quiet, testdir),
+                    (test, verbose, quiet),
                     dict(huntrleaks=huntrleaks, use_resources=use_resources,
                         debug=debug)
                 )
@@ -598,16 +599,15 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             if trace:
                 # If we're tracing code coverage, then we don't exit with status
                 # if on a false return value from main.
-                tracer.runctx('runtest(test, verbose, quiet, testdir)',
+                tracer.runctx('runtest(test, verbose, quiet)',
                               globals=globals(), locals=vars())
             else:
                 try:
-                    result = runtest(test, verbose, quiet,
-                                     testdir, huntrleaks, debug)
+                    result = runtest(test, verbose, quiet, huntrleaks, debug)
                     accumulate_result(test, result)
                     if verbose3 and result[0] == FAILED:
                         print("Re-running test {} in verbose mode".format(test))
-                        runtest(test, True, quiet, testdir, huntrleaks, debug)
+                        runtest(test, True, quiet, huntrleaks, debug)
                 except KeyboardInterrupt:
                     interrupted = True
                     break
@@ -677,8 +677,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             sys.stdout.flush()
             try:
                 verbose = True
-                ok = runtest(test, True, quiet, testdir,
-                             huntrleaks, debug)
+                ok = runtest(test, True, quiet, huntrleaks, debug)
             except KeyboardInterrupt:
                 # print a newline separate from the ^C
                 print()
@@ -744,14 +743,13 @@ def replace_stdout():
         errors="backslashreplace")
 
 def runtest(test, verbose, quiet,
-            testdir=None, huntrleaks=False, debug=False, use_resources=None):
+            huntrleaks=False, debug=False, use_resources=None):
     """Run a single test.
 
     test -- the name of the test
     verbose -- if true, print more messages
     quiet -- if true, don't print 'skipped' messages (probably redundant)
     test_times -- a list of (time, test_name) pairs
-    testdir -- test directory
     huntrleaks -- run multiple times to test for leaks; requires a debug
                   build; a triple corresponding to -R's three arguments
 
@@ -768,8 +766,7 @@ def runtest(test, verbose, quiet,
     if use_resources is not None:
         support.use_resources = use_resources
     try:
-        return runtest_inner(test, verbose, quiet,
-                             testdir, huntrleaks, debug)
+        return runtest_inner(test, verbose, quiet, huntrleaks, debug)
     finally:
         cleanup_test_droppings(test, verbose)
 
@@ -814,7 +811,8 @@ class saved_test_environment:
 
     resources = ('sys.argv', 'cwd', 'sys.stdin', 'sys.stdout', 'sys.stderr',
                  'os.environ', 'sys.path', 'sys.path_hooks', '__import__',
-                 'warnings.filters', 'asyncore.socket_map')
+                 'warnings.filters', 'asyncore.socket_map',
+                 'logging._handlers', 'logging._handlerList')
 
     def get_sys_argv(self):
         return id(sys.argv), sys.argv, sys.argv[:]
@@ -882,6 +880,20 @@ class saved_test_environment:
             asyncore.close_all(ignore_all=True)
             asyncore.socket_map.update(saved_map)
 
+    def get_logging__handlers(self):
+        # _handlers is a WeakValueDictionary
+        return id(logging._handlers), logging._handlers, logging._handlers.copy()
+    def restore_logging__handlers(self, saved_handlers):
+        # Can't easily revert the logging state
+        pass
+
+    def get_logging__handlerList(self):
+        # _handlerList is a list of weakrefs to handlers
+        return id(logging._handlerList), logging._handlerList, logging._handlerList[:]
+    def restore_logging__handlerList(self, saved_handlerList):
+        # Can't easily revert the logging state
+        pass
+
     def resource_info(self):
         for name in self.resources:
             method_suffix = name.replace('.', '_')
@@ -915,10 +927,8 @@ class saved_test_environment:
         return False
 
 
-def runtest_inner(test, verbose, quiet,
-                  testdir=None, huntrleaks=False, debug=False):
+def runtest_inner(test, verbose, quiet, huntrleaks=False, debug=False):
     support.unload(test)
-    testdir = findtestdir(testdir)
     if verbose:
         capture_stdout = None
     else:
@@ -1468,16 +1478,7 @@ class _ExpectedSkips:
         assert self.isvalid()
         return self.expected
 
-if __name__ == '__main__':
-    # findtestdir() gets the dirname out of __file__, so we have to make it
-    # absolute before changing the working directory.
-    # For example __file__ may be relative when running trace or profile.
-    # See issue #9323.
-    __file__ = os.path.abspath(__file__)
-
-    # sanity check
-    assert __file__ == os.path.abspath(sys.argv[0])
-
+def _make_temp_dir_for_build(TEMPDIR):
     # When tests are run from the Python build directory, it is best practice
     # to keep the test files in a subfolder.  It eases the cleanup of leftover
     # files using command "make distclean".
@@ -1493,6 +1494,31 @@ if __name__ == '__main__':
     TESTCWD = 'test_python_{}'.format(os.getpid())
 
     TESTCWD = os.path.join(TEMPDIR, TESTCWD)
+    return TEMPDIR, TESTCWD
+
+if __name__ == '__main__':
+    # Remove regrtest.py's own directory from the module search path. Despite
+    # the elimination of implicit relative imports, this is still needed to
+    # ensure that submodules of the test package do not inappropriately appear
+    # as top-level modules even when people (or buildbots!) invoke regrtest.py
+    # directly instead of using the -m switch
+    mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
+    i = len(sys.path)
+    while i >= 0:
+        i -= 1
+        if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
+            del sys.path[i]
+
+    # findtestdir() gets the dirname out of __file__, so we have to make it
+    # absolute before changing the working directory.
+    # For example __file__ may be relative when running trace or profile.
+    # See issue #9323.
+    __file__ = os.path.abspath(__file__)
+
+    # sanity check
+    assert __file__ == os.path.abspath(sys.argv[0])
+
+    TEMPDIR, TESTCWD = _make_temp_dir_for_build(TEMPDIR)
 
     # Run the tests in a context manager that temporary changes the CWD to a
     # temporary and writable directory. If it's not possible to create or

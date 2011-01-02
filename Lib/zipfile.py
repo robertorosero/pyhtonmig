@@ -473,9 +473,11 @@ class ZipExtFile(io.BufferedIOBase):
     # Search for universal newlines or line chunks.
     PATTERN = re.compile(br'^(?P<chunk>[^\r\n]+)|(?P<newline>\n|\r\n?)')
 
-    def __init__(self, fileobj, mode, zipinfo, decrypter=None):
+    def __init__(self, fileobj, mode, zipinfo, decrypter=None,
+                 close_fileobj=False):
         self._fileobj = fileobj
         self._decrypter = decrypter
+        self._close_fileobj = close_fileobj
 
         self._compress_type = zipinfo.compress_type
         self._compress_size = zipinfo.compress_size
@@ -647,6 +649,12 @@ class ZipExtFile(io.BufferedIOBase):
         self._offset += len(data)
         return data
 
+    def close(self):
+        try:
+            if self._close_fileobj:
+                self._fileobj.close()
+        finally:
+            super().close()
 
 
 class ZipFile:
@@ -869,8 +877,12 @@ class ZipFile:
 
     def setpassword(self, pwd):
         """Set default password for encrypted files."""
-        assert isinstance(pwd, bytes)
-        self.pwd = pwd
+        if pwd and not isinstance(pwd, bytes):
+            raise TypeError("pwd: expected bytes, got %s" % type(pwd))
+        if pwd:
+            self.pwd = pwd
+        else:
+            self.pwd = None
 
     def read(self, name, pwd=None):
         """Return file bytes (as a string) for name."""
@@ -881,6 +893,8 @@ class ZipFile:
         """Return file-like object for 'name'."""
         if mode not in ("r", "U", "rU"):
             raise RuntimeError('open() requires mode "r", "U", or "rU"')
+        if pwd and not isinstance(pwd, bytes):
+            raise TypeError("pwd: expected bytes, got %s" % type(pwd))
         if not self.fp:
             raise RuntimeError(
                   "Attempt to read ZIP archive that was already closed")
@@ -898,8 +912,12 @@ class ZipFile:
             zinfo = name
         else:
             # Get info object for name
-            zinfo = self.getinfo(name)
-
+            try:
+                zinfo = self.getinfo(name)
+            except KeyError:
+                if not self._filePassed:
+                    zef_file.close()
+                raise
         zef_file.seek(zinfo.header_offset, 0)
 
         # Skip the file header:
@@ -912,7 +930,15 @@ class ZipFile:
         if fheader[_FH_EXTRA_FIELD_LENGTH]:
             zef_file.read(fheader[_FH_EXTRA_FIELD_LENGTH])
 
-        if fname != zinfo.orig_filename.encode("utf-8"):
+        if zinfo.flag_bits & 0x800:
+            # UTF-8 filename
+            fname_str = fname.decode("utf-8")
+        else:
+            fname_str = fname.decode("cp437")
+
+        if fname_str != zinfo.orig_filename:
+            if not self._filePassed:
+                zef_file.close()
             raise BadZipFile(
                   'File name in directory %r and header %r differ.'
                   % (zinfo.orig_filename, fname))
@@ -924,6 +950,8 @@ class ZipFile:
             if not pwd:
                 pwd = self.pwd
             if not pwd:
+                if not self._filePassed:
+                    zef_file.close()
                 raise RuntimeError("File %s is encrypted, "
                                    "password required for extraction" % name)
 
@@ -933,8 +961,8 @@ class ZipFile:
             #  completely random, while the 12th contains the MSB of the CRC,
             #  or the MSB of the file time depending on the header type
             #  and is used to check the correctness of the password.
-            bytes = zef_file.read(12)
-            h = list(map(zd, bytes[0:12]))
+            header = zef_file.read(12)
+            h = list(map(zd, header[0:12]))
             if zinfo.flag_bits & 0x8:
                 # compare against the file type from extended local headers
                 check_byte = (zinfo._raw_time >> 8) & 0xff
@@ -942,9 +970,12 @@ class ZipFile:
                 # compare against the CRC otherwise
                 check_byte = (zinfo.CRC >> 24) & 0xff
             if h[11] != check_byte:
+                if not self._filePassed:
+                    zef_file.close()
                 raise RuntimeError("Bad password for file", name)
 
-        return  ZipExtFile(zef_file, mode, zinfo, zd)
+        return ZipExtFile(zef_file, mode, zinfo, zd,
+                          close_fileobj=not self._filePassed)
 
     def extract(self, member, path=None, pwd=None):
         """Extract a member from the archive to the current working directory,
@@ -1276,6 +1307,12 @@ class ZipFile:
 class PyZipFile(ZipFile):
     """Class to create ZIP archives with Python library files and packages."""
 
+    def __init__(self, file, mode="r", compression=ZIP_STORED,
+                 allowZip64=False, optimize=-1):
+        ZipFile.__init__(self, file, mode=mode, compression=compression,
+                         allowZip64=allowZip64)
+        self._optimize = optimize
+
     def writepy(self, pathname, basename=""):
         """Add all files from "pathname" to the ZIP archive.
 
@@ -1348,44 +1385,63 @@ class PyZipFile(ZipFile):
         archive name, compiling if necessary.  For example, given
         /python/lib/string, return (/python/lib/string.pyc, string).
         """
+        def _compile(file, optimize=-1):
+            import py_compile
+            if self.debug:
+                print("Compiling", file)
+            try:
+                py_compile.compile(file, doraise=True, optimize=optimize)
+            except py_compile.PyCompileError as error:
+                print(err.msg)
+                return False
+            return True
+
         file_py  = pathname + ".py"
         file_pyc = pathname + ".pyc"
         file_pyo = pathname + ".pyo"
         pycache_pyc = imp.cache_from_source(file_py, True)
         pycache_pyo = imp.cache_from_source(file_py, False)
-        if (os.path.isfile(file_pyo) and
-            os.stat(file_pyo).st_mtime >= os.stat(file_py).st_mtime):
-            # Use .pyo file.
-            arcname = fname = file_pyo
-        elif (os.path.isfile(file_pyc) and
-              os.stat(file_pyc).st_mtime >= os.stat(file_py).st_mtime):
-            # Use .pyc file.
-            arcname = fname = file_pyc
-        elif (os.path.isfile(pycache_pyc) and
-              os.stat(pycache_pyc).st_mtime >= os.stat(file_py).st_mtime):
-            # Use the __pycache__/*.pyc file, but write it to the legacy pyc
-            # file name in the archive.
-            fname = pycache_pyc
-            arcname = file_pyc
-        elif (os.path.isfile(pycache_pyo) and
-              os.stat(pycache_pyo).st_mtime >= os.stat(file_py).st_mtime):
-            # Use the __pycache__/*.pyo file, but write it to the legacy pyo
-            # file name in the archive.
-            fname = pycache_pyo
-            arcname = file_pyo
-        else:
-            # Compile py into PEP 3147 pyc file.
-            import py_compile
-            if self.debug:
-                print("Compiling", file_py)
-            try:
-                py_compile.compile(file_py, doraise=True)
-            except py_compile.PyCompileError as error:
-                print(err.msg)
-                fname = file_py
+        if self._optimize == -1:
+            # legacy mode: use whatever file is present
+            if (os.path.isfile(file_pyo) and
+                os.stat(file_pyo).st_mtime >= os.stat(file_py).st_mtime):
+                # Use .pyo file.
+                arcname = fname = file_pyo
+            elif (os.path.isfile(file_pyc) and
+                  os.stat(file_pyc).st_mtime >= os.stat(file_py).st_mtime):
+                # Use .pyc file.
+                arcname = fname = file_pyc
+            elif (os.path.isfile(pycache_pyc) and
+                  os.stat(pycache_pyc).st_mtime >= os.stat(file_py).st_mtime):
+                # Use the __pycache__/*.pyc file, but write it to the legacy pyc
+                # file name in the archive.
+                fname = pycache_pyc
+                arcname = file_pyc
+            elif (os.path.isfile(pycache_pyo) and
+                  os.stat(pycache_pyo).st_mtime >= os.stat(file_py).st_mtime):
+                # Use the __pycache__/*.pyo file, but write it to the legacy pyo
+                # file name in the archive.
+                fname = pycache_pyo
+                arcname = file_pyo
             else:
-                fname = (pycache_pyc if __debug__ else pycache_pyo)
-                arcname = (file_pyc if __debug__ else file_pyo)
+                # Compile py into PEP 3147 pyc file.
+                if _compile(file_py):
+                    fname = (pycache_pyc if __debug__ else pycache_pyo)
+                    arcname = (file_pyc if __debug__ else file_pyo)
+                else:
+                    fname = arcname = file_py
+        else:
+            # new mode: use given optimization level
+            if self._optimize == 0:
+                fname = pycache_pyc
+                arcname = file_pyc
+            else:
+                fname = pycache_pyo
+                arcname = file_pyo
+            if not (os.path.isfile(fname) and
+                    os.stat(fname).st_mtime >= os.stat(file_py).st_mtime):
+                if not _compile(file_py, optimize=self._optimize):
+                    fname = arcname = file_py
         archivename = os.path.split(arcname)[1]
         if basename:
             archivename = "%s/%s" % (basename, archivename)

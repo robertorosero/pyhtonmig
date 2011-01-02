@@ -19,19 +19,20 @@ import struct
 
 __all__ = ["compile_dir","compile_file","compile_path"]
 
-def compile_dir(dir, maxlevels=10, ddir=None,
-                force=False, rx=None, quiet=False, legacy=False):
+def compile_dir(dir, maxlevels=10, ddir=None, force=False, rx=None,
+                quiet=False, legacy=False, optimize=-1):
     """Byte-compile all modules in the given directory tree.
 
     Arguments (only dir is required):
 
     dir:       the directory to byte-compile
     maxlevels: maximum recursion level (default 10)
-    ddir:      if given, purported directory name (this is the
-               directory name that will show up in error messages)
+    ddir:      the directory that will be prepended to the path to the
+               file as it is compiled into each byte-code file.
     force:     if True, force compilation, even if timestamps are up-to-date
     quiet:     if True, be quiet during compilation
     legacy:    if True, produce legacy pyc paths instead of PEP 3147 paths
+    optimize:  optimization level or -1 for level of the interpreter
     """
     if not quiet:
         print('Listing', dir, '...')
@@ -51,7 +52,8 @@ def compile_dir(dir, maxlevels=10, ddir=None,
         else:
             dfile = None
         if not os.path.isdir(fullname):
-            if not compile_file(fullname, ddir, force, rx, quiet, legacy):
+            if not compile_file(fullname, ddir, force, rx, quiet,
+                                legacy, optimize):
                 success = 0
         elif (maxlevels > 0 and name != os.curdir and name != os.pardir and
               os.path.isdir(fullname) and not os.path.islink(fullname)):
@@ -60,15 +62,19 @@ def compile_dir(dir, maxlevels=10, ddir=None,
                 success = 0
     return success
 
-def compile_file(fullname, ddir=None, force=0, rx=None, quiet=False,
-                 legacy=False):
-    """Byte-compile file.
+def compile_file(fullname, ddir=None, force=False, rx=None, quiet=False,
+                 legacy=False, optimize=-1):
+    """Byte-compile one file.
+
+    Arguments (only fullname is required):
+
     fullname:  the file to byte-compile
-    ddir:      if given, purported directory name (this is the
-               directory name that will show up in error messages)
+    ddir:      if given, the directory name compiled in to the
+               byte-code file.
     force:     if True, force compilation, even if timestamps are up-to-date
     quiet:     if True, be quiet during compilation
     legacy:    if True, produce legacy pyc paths instead of PEP 3147 paths
+    optimize:  optimization level or -1 for level of the interpreter
     """
     success = 1
     name = os.path.basename(fullname)
@@ -84,7 +90,11 @@ def compile_file(fullname, ddir=None, force=0, rx=None, quiet=False,
         if legacy:
             cfile = fullname + ('c' if __debug__ else 'o')
         else:
-            cfile = imp.cache_from_source(fullname)
+            if optimize >= 0:
+                cfile = imp.cache_from_source(fullname,
+                                              debug_override=not optimize)
+            else:
+                cfile = imp.cache_from_source(fullname)
             cache_dir = os.path.dirname(cfile)
         head, tail = name[:-3], name[-3:]
         if tail == '.py':
@@ -101,7 +111,8 @@ def compile_file(fullname, ddir=None, force=0, rx=None, quiet=False,
             if not quiet:
                 print('Compiling', fullname, '...')
             try:
-                ok = py_compile.compile(fullname, cfile, dfile, True)
+                ok = py_compile.compile(fullname, cfile, dfile, True,
+                                        optimize=optimize)
             except py_compile.PyCompileError as err:
                 if quiet:
                     print('*** Error compiling', fullname, '...')
@@ -126,7 +137,7 @@ def compile_file(fullname, ddir=None, force=0, rx=None, quiet=False,
     return success
 
 def compile_path(skip_curdir=1, maxlevels=0, force=False, quiet=False,
-                 legacy=False):
+                 legacy=False, optimize=-1):
     """Byte-compile all module on sys.path.
 
     Arguments (all optional):
@@ -136,6 +147,7 @@ def compile_path(skip_curdir=1, maxlevels=0, force=False, quiet=False,
     force: as for compile_dir() (default False)
     quiet: as for compile_dir() (default False)
     legacy: as for compile_dir() (default False)
+    optimize: as for compile_dir() (default -1)
     """
     success = 1
     for dir in sys.path:
@@ -144,7 +156,7 @@ def compile_path(skip_curdir=1, maxlevels=0, force=False, quiet=False,
         else:
             success = success and compile_dir(dir, maxlevels, None,
                                               force, quiet=quiet,
-                                              legacy=legacy)
+                                              legacy=legacy, optimize=optimize)
     return success
 
 
@@ -154,60 +166,73 @@ def main():
 
     parser = argparse.ArgumentParser(
         description='Utilities to support installing Python libraries.')
-    parser.add_argument('-l', action='store_const', default=10, const=0,
-                        dest='maxlevels', help="don't recurse down")
+    parser.add_argument('-l', action='store_const', const=0,
+                        default=10, dest='maxlevels',
+                        help="don't recurse into subdirectories")
     parser.add_argument('-f', action='store_true', dest='force',
                         help='force rebuild even if timestamps are up to date')
     parser.add_argument('-q', action='store_true', dest='quiet',
-                        help='reduce output')
+                        help='output only error messages')
     parser.add_argument('-b', action='store_true', dest='legacy',
-                        help='produce legacy byte-compiled file paths')
+                        help='use legacy (pre-PEP3147) compiled file locations')
     parser.add_argument('-d', metavar='DESTDIR',  dest='ddir', default=None,
-                        help=('purported directory name for error messages; '
-                              'if no directory arguments, -l sys.path '
-                              'is assumed.'))
+                        help=('directory to prepend to file paths for use in '
+                              'compile time tracebacks and in runtime '
+                              'tracebacks in cases where the source file is '
+                              'unavailable'))
     parser.add_argument('-x', metavar='REGEXP', dest='rx', default=None,
-                        help=('skip files matching the regular expression.\n\t'
+                        help=('skip files matching the regular expression. '
                               'The regexp is searched for in the full path '
-                              'of the file'))
+                              'to each file considered for compilation.'))
     parser.add_argument('-i', metavar='FILE', dest='flist',
-                        help='expand the list with the content of FILE.')
-    parser.add_argument('compile_dest', metavar='FILE|DIR', nargs='?')
+                        help=('add all the files and directories listed in '
+                              'FILE to the list considered for compilation. '
+                              'If "-", names are read from stdin.'))
+    parser.add_argument('compile_dest', metavar='FILE|DIR', nargs='*',
+                        help=('zero or more file and directory names '
+                              'to compile; if no arguments given, defaults '
+                              'to the equivalent of -l sys.path'))
     args = parser.parse_args()
 
-    if (args.ddir and args.compile_dest != 1 and
-        not os.path.isdir(args.compile_dest)):
-        raise argparse.ArgumentError(
-            "-d destdir requires exactly one directory argument")
+    compile_dests = args.compile_dest
+
+    if (args.ddir and (len(compile_dests) != 1
+            or not os.path.isdir(compile_dests[0]))):
+        parser.exit('-d destdir requires exactly one directory argument')
     if args.rx:
         import re
         args.rx = re.compile(args.rx)
 
     # if flist is provided then load it
-    compile_dests = [args.compile_dest]
     if args.flist:
-        with open(args.flist) as f:
-            files = f.read().split()
-            compile_dests.extend(files)
+        try:
+            with (sys.stdin if args.flist=='-' else open(args.flist)) as f:
+                for line in f:
+                    compile_dests.append(line.strip())
+        except EnvironmentError:
+            print("Error reading file list {}".format(args.flist))
+            return False
 
+    success = True
     try:
         if compile_dests:
             for dest in compile_dests:
-                if os.path.isdir(dest):
+                if os.path.isfile(dest):
+                    if not compile_file(dest, args.ddir, args.force, args.rx,
+                                        args.quiet, args.legacy):
+                        success = False
+                else:
                     if not compile_dir(dest, args.maxlevels, args.ddir,
                                        args.force, args.rx, args.quiet,
                                        args.legacy):
-                        return 0
-                else:
-                    if not compile_file(dest, args.ddir, args.force, args.rx,
-                                        args.quiet, args.legacy):
-                        return 0
+                        success = False
+            return success
         else:
             return compile_path(legacy=args.legacy)
     except KeyboardInterrupt:
         print("\n[interrupted]")
-        return 0
-    return 1
+        return False
+    return True
 
 
 if __name__ == '__main__':

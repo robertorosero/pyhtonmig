@@ -569,7 +569,7 @@ class SizeofTest(unittest.TestCase):
     TPFLAGS_HEAPTYPE = 1<<9
 
     def setUp(self):
-        self.c = len(struct.pack('c', ' '))
+        self.c = len(struct.pack('c', b' '))
         self.H = len(struct.pack('H', 0))
         self.i = len(struct.pack('i', 0))
         self.l = len(struct.pack('l', 0))
@@ -782,8 +782,8 @@ class SizeofTest(unittest.TestCase):
         # reverse
         check(reversed(''), size(h + 'PP'))
         # range
-        check(range(1), size(h + '3P'))
-        check(range(66000), size(h + '3P'))
+        check(range(1), size(h + '4P'))
+        check(range(66000), size(h + '4P'))
         # set
         # frozenset
         PySet_MINSIZE = 8
