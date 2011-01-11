@@ -3917,14 +3917,6 @@ _ssize_MpdCtx(char **token, mpd_ssize_t (*func)(const mpd_t *, mpd_context_t *),
 	check_equalmem(tmp, op, token[0]);
 }
 
-/* unused for now */
-static inline void
-add_clarification(char *filename)
-{
-	filename = NULL;
-	return;
-}
-
 
 /* process a file */
 static void
@@ -3935,7 +3927,7 @@ doit(char *filename)
 	char *line;
 	char *tmpline;
 	char *token[MAXTOKEN+1];
-	uint32_t testno = 0;
+	uint32_t testno;
 	mpd_ssize_t l;
 
 
@@ -3958,8 +3950,6 @@ doit(char *filename)
 	if ((tmpline = mpd_alloc(MAXLINE+1, sizeof *line)) == NULL) {
 		mpd_err_fatal("out of memory");
 	}
-
-	add_clarification(filename);
 
 
 	while (fgets(line, MAXLINE+1, file) != NULL) {
@@ -4095,6 +4085,7 @@ doit(char *filename)
 		 *   - testno can be used for setting a watchpoint in the debugger
 		 */
 		testno = get_testno(token[0]);
+		(void)testno;
 
 		/* The id is in the skip list */
 		if (check_skip(token[0])) {
