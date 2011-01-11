@@ -135,7 +135,7 @@ main(int argc, char **argv)
                     fprintf(stderr, " FAIL: seed = %"PRI_time_t"\n", seed);
                     exit(1);
                 }
-    
+
                 mpd_free(q_mpd);
                 mpd_free(r_mpd);
                 mpd_free(q_mpz);

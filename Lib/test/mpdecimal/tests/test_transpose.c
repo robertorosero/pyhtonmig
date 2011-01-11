@@ -145,7 +145,7 @@ swap_halfrows_pow2_c(uint8_t *matrix, mpd_size_t rows, mpd_size_t cols, int dir)
 				next = mulmod_size_t(next, r, m);
 			        hp = matrix + next*cols/2;
 
-			} 
+			}
 
 			memcpy(hp+offset, writebuf, stride*(sizeof *writebuf));
 
@@ -245,7 +245,7 @@ squaretrans_pow2_c(uint8_t *matrix, mpd_size_t size)
 					to += size;
 				}
 			}
-	  	}
+		}
 	}
 
 }

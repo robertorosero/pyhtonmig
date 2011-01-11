@@ -91,7 +91,7 @@ main(int argc, char **argv)
 					exit(1);
 				}
 			}
-	
+
 			mpd_free(fntresult);
 			mpd_free(kresult);
 		}
@@ -129,7 +129,7 @@ main(int argc, char **argv)
 					exit(1);
 				}
 			}
-	
+
 			mpd_free(fntresult);
 			mpd_free(kresult);
 		}

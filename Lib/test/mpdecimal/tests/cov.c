@@ -198,13 +198,13 @@ test_int_conversions(void)
 	mpd_set_string(a, "nan", &ctx);
 	ASSERT(mpd_qget_uint(a, &status) == MPD_UINT_MAX)
 	ASSERT(status&MPD_Invalid_operation)
- 
+
 	/* non-integer */
 	status = 0;
 	mpd_set_string(a, "2345e-1", &ctx);
 	ASSERT(mpd_qget_uint(a, &status) == MPD_UINT_MAX)
 	ASSERT(status&MPD_Invalid_operation)
-  
+
 	/* too large */
 	status = 0;
 	mpd_set_uint(a, 8, &ctx);
@@ -217,7 +217,7 @@ test_int_conversions(void)
 	mpd_set_uint(a, ((uint64_t)MPD_SSIZE_MAX)+1, &ctx);
 	ASSERT(mpd_qget_ssize(a, &status) == MPD_SSIZE_MAX)
 	ASSERT(status&MPD_Invalid_operation)
- 
+
 	mpd_del(a);
 }
 

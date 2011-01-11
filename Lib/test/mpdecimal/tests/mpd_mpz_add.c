@@ -119,7 +119,7 @@ main(int argc, char **argv)
                     fprintf(stderr, " FAIL: seed = %"PRI_time_t"\n", seed);
                     exit(1);
                 }
-    
+
                 mpd_free(mpdresult);
                 mpd_free(mpzresult);
             }

@@ -152,7 +152,7 @@ main(void)
                 exit(1);
             }
         }
-    
+
         mpd_free(fntresult);
         mpd_free(kresult);
         mpd_free(kfntresult);
@@ -173,7 +173,7 @@ main(void)
                     exit(1);
                 }
             }
-    
+
             mpd_free(fntresult);
             mpd_free(kresult);
             mpd_free(kfntresult);
@@ -317,7 +317,7 @@ main(void)
             goto malloc_error;
         }
 
-        ASSERT(z->data[0] == 1) 
+        ASSERT(z->data[0] == 1)
         for (k = 1; k < ylen; k++) {
             ASSERT(z->data[k] == 0)
         }

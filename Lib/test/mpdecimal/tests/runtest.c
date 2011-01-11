@@ -632,7 +632,7 @@ get_testno(char *token)
 static int
 scan_1op_result(mpd_t *op1, char **result, char *token[], mpd_context_t *ctx)
 {
-	/* operand 1 */ 
+	/* operand 1 */
 	if (token[2] == NULL) {
 		mpd_err_fatal("parse error at id %s", token[0]);
 	}
@@ -656,7 +656,7 @@ scan_1op_result(mpd_t *op1, char **result, char *token[], mpd_context_t *ctx)
 static int
 scan_1op_2results(mpd_t *op1, char **result1, char **result2, char *token[], mpd_context_t *ctx)
 {
-	/* operand 1 */ 
+	/* operand 1 */
 	if (token[2] == NULL) {
 		mpd_err_fatal("parse error at id %s", token[0]);
 	}
@@ -994,7 +994,7 @@ _cp_MpdFmtCtx(char **token, char *(*func)(const mpd_t *, const char *, mpd_conte
 	free(expected);
 }
 
-/* 
+/*
  * Test a function returning pointer to const char, accepting:
  *     op1, context
  */
