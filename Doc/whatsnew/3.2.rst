@@ -205,8 +205,8 @@ dictionary::
     "root": {"level": "DEBUG", "handlers": ["console", "console_priority"]}}
 
 
-If that dictionary is stored in a file called :file:`conf.json`, it can loaded
-and called with code like this::
+If that dictionary is stored in a file called :file:`conf.json`, it can be
+loaded and called with code like this::
 
    >>> import logging.config
    >>> logging.config.dictConfig(json.load(open('conf.json', 'rb')))
@@ -281,7 +281,7 @@ PEP 3147:  PYC Repository Directories
 =====================================
 
 Python's scheme for caching bytecode in *.pyc* files did not work well in
-environments with multiple python interpreters.  If one interpreter encountered
+environments with multiple Python interpreters.  If one interpreter encountered
 a cached file created by another interpreter, it would recompile the source and
 overwrite the cached file, thus losing the benefits of caching.
 
@@ -362,6 +362,51 @@ module::
    :pep:`3149` - ABI Version Tagged .so Files
       PEP written by Barry Warsaw.
 
+PEP 3333: Python Web Server Gateway Interface v1.0.1
+=====================================================
+
+This informational PEP clarifies how bytes/text issues are to be handled by the
+WGSI protocol.  The challenge is that string handling in Python 3 is most
+conveniently handled with the :class:`str` type even though the HTTP protocol
+is itself bytes oriented.
+
+The PEP differentiates so-called *native strings* that are used for
+request/response headers and metadata versus *byte strings* which are used for
+the bodies of requests and responses.
+
+The *native strings* are always of type :class:`str` but are restricted to code
+points between *u0000* through *u00FF* which are translatable to bytes using
+*Latin-1* encoding.  These strings are used for the keys and values in the
+environ dictionary and for response headers and statuses in the
+:func:`start_response` function.  They must follow :rfc:`2616` with respect to
+encoding. That is, they must either be *ISO-8859-1* characters or use
+:rfc:`2047` MIME encoding.
+
+For developers porting WSGI applications from Python 2, here are the salient
+points:
+
+* If the app already used strings for headers in Python 2, no change is needed.
+
+* If instead, the app encoded output headers or decoded input headers, then the
+  headers will need to be re-encoded to Latin-1.  For example, an output header
+  encoded in utf-8 was using ``h.encode('utf-8')`` now needs to convert from
+  bytes to native strings using ``h.encode('utf-8').decode('latin-1')``.
+
+* Values yielded by an application or sent using the :meth:`write` method
+  must be byte strings.  The :func:`start_response` function and environ
+  must use native strings.  The two cannot be mixed.
+
+For server implementers writing CGI-to-WSGI pathways or other CGI-style
+protocols, the users must to be able access the environment using native strings
+eventhough the underlying platform may have a different convention.  To bridge
+this gap, the :mod:`wsgiref` module has a new function,
+:func:`wsgiref.handlers.read_environ` for transcoding CGI variables from
+:attr:`os.environ` into native strings and returning a new dictionary.
+
+.. seealso::
+
+   :pep:`3333` - Python Web Server Gateway Interface v1.0.1
+      PEP written by Phillip Eby.
 
 Other Language Changes
 ======================
@@ -383,17 +428,24 @@ Some smaller changes made to the core Python language are:
   (Suggested by Mark Dickinson and implemented by Eric Smith in :issue:`7094`.)
 
 * The interpreter can now be started with a quiet option, ``-q``, to suppress
-  the copyright and version information in an interactive mode.
+  the copyright and version information from being displayed in the interactive
+  mode.  The option can be introspected using the :attr:`sys.flags` attribute::
 
-  (Contributed by Marcin Wojdyr in issue:`1772833`).
+    $ python -q
+    >>> sys.flags
+    sys.flags(debug=0, division_warning=0, inspect=0, interactive=0,
+    optimize=0, dont_write_bytecode=0, no_user_site=0, no_site=0,
+    ignore_environment=0, verbose=0, bytes_warning=0, quiet=1)
 
-* The :func:`hasattr` function used to catch and suppress any Exception.  Now,
-  it only catches :exc:`AttributeError`.  Under the hood, :func:`hasattr` works
-  by calling :func:`getattr` and throwing away the results.  This is necessary
-  because dynamic attribute creation is possible using :meth:`__getattribute__`
-  or :meth:`__getattr__`.  If :func:`hasattr` were to just scan instance and class
-  dictionaries it would miss the dynamic methods and make it difficult to
-  implement proxy objects.
+  (Contributed by Marcin Wojdyr in :issue:`1772833`).
+
+* The :func:`hasattr` function works by calling :func:`getattr` and detecting
+  whether an exception is raised.  This technique allows it to detect methods
+  created dynamically by :meth:`__getattr__` or :meth:`__getattribute__` which
+  would otherwise be absent from the class dictionary.  Formerly, *hasattr*
+  would catch any exception, possibly masking genuine errors.  Now, *hasattr*
+  has been tightened to only catch :exc:`AttributeError` and let other
+  exceptions pass through.
 
   (Discovered by Yury Selivanov and fixed by Benjamin Peterson; :issue:`9666`.)
 
@@ -421,7 +473,6 @@ Some smaller changes made to the core Python language are:
 
   (Added by Antoine Pitrou; :issue:`9757`.)
 
-
 * Previously it was illegal to delete a name from the local namespace if it
   occurs as a free variable in a nested block::
 
@@ -447,9 +498,9 @@ Some smaller changes made to the core Python language are:
   (See :issue:`4617`.)
 
 * The internal :c:type:`structsequence` tool now creates subclasses of tuple.
-  This means that C generated structures like those returned by :func:`os.stat`,
+  This means that C structures like those returned by :func:`os.stat`,
   :func:`time.gmtime`, and :func:`sys.version_info` now work like a
-  :term:`named tuple` and are more interoperable with functions and methods that
+  :term:`named tuple` and now work with functions and methods that
   expect a tuple as an argument.  The is a big step forward in making the C
   structures as flexible as their pure Python counterparts.
 
@@ -479,7 +530,7 @@ Some smaller changes made to the core Python language are:
   produce various issues, especially under Windows.  Here is an example
   of enabling the warning from the command line::
 
-      $ ./python -q -Wdefault
+      $ python -q -Wdefault
       >>> f = open("foo", "wb")
       >>> del f
       __main__:1: ResourceWarning: unclosed file <_io.BufferedWriter name='foo'>
@@ -502,7 +553,7 @@ Some smaller changes made to the core Python language are:
       >>> range(0, 100, 2)[0:5]
       range(0, 10, 2)
 
-  (Contributed by Daniel Stuzback in :issue:`9213` and by Alexander Belopolsky
+  (Contributed by Daniel Stutzbach in :issue:`9213` and by Alexander Belopolsky
   in :issue:`2690`.)
 
 * The :func:`callable` builtin function from Py2.x was resurrected.  It provides
@@ -535,14 +586,13 @@ For the first time, there is correct handling of inputs with mixed encodings.
 Throughout the standard library, there has been more careful attention to
 encodings and text versus bytes issues.  In particular, interactions with the
 operating system are now better able to pass non-ASCII data using the Windows
-mcbs encoding, locale aware encodings, or UTF-8.
+mcbs encoding, locale-aware encodings, or UTF-8.
 
 Another significant win is the addition of substantially better support for
 *SSL* connections and security certificates.
 
-In addition, more functions and classes now have a :term:`context manager` to
-support convenient and reliable resource clean-up using the
-:keyword:`with`-statement.
+In addition, more classes now implement a :term:`context manager` to support
+convenient and reliable resource clean-up using the :keyword:`with`-statement.
 
 email
 -----
@@ -567,6 +617,8 @@ format.
 * Given bytes input to the model, :class:`~email.generator.Generator` will
   convert message bodies that have a :mailheader:`Content-Transfer-Encoding` of
   *8bit* to instead have a *7bit* :mailheader:`Content-Transfer-Encoding`.
+
+..  XXX: Headers with Un-encoded non-ASCII bytes will be :rfc:`2047`\ -encoded using the charset `unknown-8bit`.
 
 * A new class :class:`~email.generator.BytesGenerator` produces bytes as output,
   preserving any unchanged non-ASCII data that was present in the input used to
@@ -602,7 +654,7 @@ Several new and useful functions and methods have been added:
 * :meth:`xml.etree.ElementTree.Element.iterfind` searches an element and
   subelements
 * :meth:`xml.etree.ElementTree.Element.itertext` creates a text iterator over
-  an element and its sub-elements
+  an element and its subelements
 * :meth:`xml.etree.ElementTree.TreeBuilder.end` closes the current element
 * :meth:`xml.etree.ElementTree.TreeBuilder.doctype` handles a doctype
   declaration
@@ -661,7 +713,7 @@ functools
 
 * To help write classes with rich comparison methods, a new decorator
   :func:`functools.total_ordering` will use a existing equality and inequality
-  methods to fill-in the remaining methods.
+  methods to fill in the remaining methods.
 
   For example, supplying *__eq__* and *__lt__* will enable
   :func:`~functools.total_ordering` to fill-in *__le__*, *__gt__* and *__ge__*::
@@ -675,9 +727,10 @@ functools
             return ((self.lastname.lower(), self.firstname.lower()) <
                     (other.lastname.lower(), other.firstname.lower()))
 
-  (Contributed by Raymond Hettinger.)
+  With the *total_ordering* decorator, the remaining comparison methods
+  are filled in automatically.
 
-.. XXX clarify what the example does
+  (Contributed by Raymond Hettinger.)
 
 * To aid in porting programs from Python 2, the :func:`~functools.cmp_to_key`
   function converts an old-style comparison function to
@@ -764,12 +817,14 @@ collections
 
   (Contributed by Raymond Hettinger.)
 
+.. XXX threading.py and Barrier objects
+
 datetime
 --------
 
 * The :mod:`datetime` module has a new type :class:`~datetime.timezone` that
   implements the :class:`~datetime.tzinfo` interface by returning a fixed UTC
-  offset and timezone name. This makes it easier to create timezone aware
+  offset and timezone name. This makes it easier to create timezone-aware
   datetime objects:
 
   >>> datetime.now(timezone.utc)
@@ -780,12 +835,33 @@ datetime
 
 * Also, :class:`~datetime.timedelta` objects can now be multiplied by
   :class:`float` and divided by :class:`float` and :class:`int` objects.
+  And :class:`~datetime.timedelta` objects can now divide one another.
 
-.. XXX Describe added support for dividing a timedelta by another timedelta.
-       See revision 80290 and issue #2706.
+  (Contributed by Alexander Belopolsky in :issue:`1289118`, :issue:`5094`,
+  :issue:`6641`, and :issue:`2706`.)
 
-  (Contributed by Alexander Belopolsky in :issue:`1289118`, :issue:`5094` and
-  :issue:`6641`.)
+.. XXX
+
+   * The ``strftime()`` method of :class:`~datetime.date` and
+     :class:`~datetime.datetime` are no longer restricted to years >=
+     1900.  The new supported year range is [1000, 9999]. (Contributed
+     by Alexander Belopolsky and Victor Stinner in :issue:`1777412`)
+
+.. XXX Add a section on time module.
+
+   * The :func:`time.asctime` and :func:`time.ctime` functions no
+     longer call C library asctime. (Contributed by Alexander
+     Belopolsky in :issue:`8013`.)
+
+   * Changed the rules for using 2-digit years in time tuples. The
+     :func:`time.asctime` and
+     :func:`time.strftime` functions will now format any year when
+     ``time.accept2dyear`` is false and will accept years >= 1000
+     otherwise. :func:`time.mktime` and :func:`time.strftime` now
+     accepts full range supported by the OS.  Conversion of 2-digit
+     years to 4-digit is deprecated.  (Contributed by Alexander
+     Belopolsky and Victor Stinner in :issue:`10827`.)
+
 
 abc
 ---
@@ -804,7 +880,7 @@ contextlib
 
 There is a new and slightly mind-blowing tool
 :class:`~contextlib.ContextDecorator` that is helpful for creating a
-:term:`context manager` that does double-duty as a function decorator.
+:term:`context manager` that does double duty as a function decorator.
 
 As a convenience, this new functionality is used by
 :func:`~contextlib.contextmanager` so that no extra effort is needed to support
@@ -814,7 +890,7 @@ The basic idea is that both context managers and function decorators can be used
 for pre-action and post-action wrappers.  Context managers wrap a group of
 statements using the :keyword:`with`-statement, and function decorators wrap a
 group of statements enclosed in a function.  So, occasionally there is a need to
-write a pre/post action wrapper that can be used in either role.
+write a pre-action or post-action wrapper that can be used in either role.
 
 For example, it is sometimes useful to wrap functions or groups of statements
 with a logger that can track the time of entry and time of exit.  Rather than
@@ -848,8 +924,8 @@ Context managers normally have the flexibility to return an argument usable by
 the :keyword:`with`-statement, but there is no parallel for function decorators.
 
 In the above example, there is not a clean way for the *track_entry_and_exit*
-context manager does not have a way to return a logging instance for use in the
-body of enclosed statements.
+context manager to return a logging instance for use in the body of enclosed
+statements.
 
 (Contributed by Michael Foord in :issue:`9110`.)
 
@@ -923,7 +999,11 @@ also grew auto-closing context managers::
 (Contributed by Tarek Ziadé and Giampaolo Rodolà in :issue:`4972`, and
 by Georg Brandl in :issue:`8046` and :issue:`1286`.)
 
-.. XXX mention os.popen and subprocess.Popen auto-closing of fds
+popen
+-----
+
+The :func:`os.popen` and :func:`subprocess.Popen` functions now support
+the :keyword:`with`-statement` for auto-closing of the file descriptors.
 
 gzip and zipfile
 ----------------
@@ -935,7 +1015,7 @@ zero-padded file objects.
 
 The :mod:`gzip` module also gains the :func:`~gzip.compress` and
 :func:`~gzip.decompress` functions for easier in-memory compression and
-decompression.  Keep in mind that text needs to be encoded in to :class:`bytes`
+decompression.  Keep in mind that text needs to be encoded as :class:`bytes`
 before compressing and decompressing:
 
 >>> s = 'Three shall be the number thou shalt count, '
@@ -1051,7 +1131,7 @@ nntp
 ----
 
 The :mod:`nntplib` module has a revamped implementation with better bytes and
-unicode semantics as well as more practical APIs.  These improvements break
+text semantics as well as more practical APIs.  These improvements break
 compatibility with the nntplib version in Python 3.1, which was partly
 dysfunctional in itself.
 
@@ -1070,24 +1150,39 @@ as recommended in public uses of HTTPS.
 unittest
 --------
 
-* The command-line call, ``python -m unittest`` can now accept file paths
+The unittest module has a number of improvements supporting test discovery for
+packages, easier experimentation at the interactive prompt, new testcase
+methods, improved diagnostic messages for test failures, and better method
+names.
+
+* The command-line call ``python -m unittest`` can now accept file paths
   instead of module names for running specific tests (:issue:`10620`).  The new
   test discovery can find tests within packages, locating any test importable
   from the top level directory.  The top level directory can be specified with
   the `-t` option, a pattern for matching files with ``-p``, and a directory to
   start discovery with ``-s``::
 
-    $ python -m unittest discover -s my_proj_dir -p '_test.py'
+    $ python -m unittest discover -s my_proj_dir -p _test.py
+
+  (Contributed by Michael Foord.)
+
+* Experimentation at the interactive prompt is now easier because the
+  :class:`unittest.case.TestCase` class can now be instantiated without
+  arguments:
+
+  >>> TestCase().assertEqual(pow(2, 3), 8)
 
   (Contributed by Michael Foord.)
 
 * The :mod:`unittest` module has two new methods,
   :meth:`~unittest.TestCase.assertWarns` and
-  :meth:`~unittest.TestCase.assertWarnsRegex` to check that a given warning type
+  :meth:`~unittest.TestCase.assertWarnsRegex` to verify that a given warning type
   is triggered by the code under test:
 
   >>> with self.assertWarns(DeprecationWarning):
   ...     legacy_function('XYZ')
+
+  (Contributed by Michael Foord and Ezio Melotti.)
 
   Another new method, :meth:`~unittest.TestCase.assertCountEqual` is used to
   compare two iterables to determine if their element counts are equal (whether
@@ -1097,23 +1192,28 @@ unittest
      def test_anagram(self):
          self.assertCountEqual('algorithm', 'logarithm')
 
-  A principal feature of the unittest module is an effort to produce meaningful
-  diagnostics when a test fails.  When possible the failure is recorded along
+  (Contributed by Raymond Hettinger.)
+
+* A principal feature of the unittest module is an effort to produce meaningful
+  diagnostics when a test fails.  When possible, the failure is recorded along
   with a diff of the output.  This is especially helpful for analyzing log files
   of failed test runs. However, since diffs can sometime be voluminous, there is
   a new :attr:`~unittest.TestCase.maxDiff` attribute which sets maximum length of
   diffs.
 
-  In addition the naming in the module has undergone a number of clean-ups.  For
-  example, :meth:`~unittest.TestCase.assertRegex` is the new name for
+* In addition, the method names in the module have undergone a number of clean-ups.
+
+  For example, :meth:`~unittest.TestCase.assertRegex` is the new name for
   :meth:`~unittest.TestCase.assertRegexpMatches` which was misnamed because the
   test uses :func:`re.search`, not :func:`re.match`.  Other methods using
-  regular expressions are now named using short form "Regex" in preference
-  to "Regexp" -- this matches the names used in other unittest implementations,
+  regular expressions are now named using short form "Regex" in preference to
+  "Regexp" -- this matches the names used in other unittest implementations,
   matches Python's old name for the :mod:`re` module, and it has unambiguous
   camel-casing.
 
-  To improve consistency, some of long-standing method aliases are being
+  (Contributed by Raymond Hettinger and implemented by Ezio Melotti.)
+
+* To improve consistency, some long-standing method aliases are being
   deprecated in favor of the preferred names:
 
    - replace :meth:`assert_` with :meth:`.assertTrue`
@@ -1127,6 +1227,13 @@ unittest
   the :mod:`unittest` documentation.
 
   (Contributed by Ezio Melotti; :issue:`9424`.)
+
+* The :meth:`~unittest.TestCase.assertDictContainsSubset` method was deprecated
+  because it was mis-implemented with the arguments in the wrong order.  This
+  created hard-to-debug optical illusions where tests like
+  ``TestCase().assertDictContainsSubset({'a':1, 'b':2}, {'a':1})`` would fail.
+
+  (Contributed by Raymond Hettinger.)
 
 random
 ------
@@ -1169,7 +1276,7 @@ The :mod:`tempfile` module has a new context manager,
 cleanup of temporary directories:
 
 >>> with tempfile.TemporaryDirectory() as tmpdirname:
-...     print 'created temporary directory', tmpdirname
+...     print('created temporary dir:', tmpdirname)
 
 (Contributed by Neil Schemenauer and Nick Coghlan; :issue:`5178`.)
 
@@ -1199,7 +1306,7 @@ window to display that server.
 sysconfig
 ---------
 
-The new :mod:`sysconfig` module makes it straight-forward to discover
+The new :mod:`sysconfig` module makes it straightforward to discover
 installation paths and configuration variables which vary across platforms and
 installations.
 
@@ -1208,8 +1315,8 @@ information:
 
 * :func:`~sysconfig.get_platform` returning values like *linux-i586* or
   *macosx-10.6-ppc*.
-* :func:`~sysconfig.get_python_version` returns a Python version string in
-  the form, "3.2".
+* :func:`~sysconfig.get_python_version` returns a Python version string
+  such as "3.2".
 
 It also provides access to the paths and variables corresponding to one of
 seven named schemes used by :mod:`distutils`.  Those include *posix_prefix*,
@@ -1267,13 +1374,13 @@ The :mod:`pdb` debugger module gained a number of usability improvements:
 * A :file:`.pdbrc` script file can contain ``continue`` and ``next`` commands
   that continue debugging.
 * The :class:`Pdb` class constructor now accepts a *nosigint* argument.
-* new commands: ``l(list)``, ``ll(long list`` and ``source`` for
+* New commands: ``l(list)``, ``ll(long list)`` and ``source`` for
   listing source code.
-* new commands: ``display`` and ``undisplay`` for showing or hiding
+* New commands: ``display`` and ``undisplay`` for showing or hiding
   the value of an expression if it has changed.
-* new command: ``interact`` for starting an interactive interpreter containing
+* New command: ``interact`` for starting an interactive interpreter containing
   the global and local  names found in the current scope.
-* breakpoints can be cleared by breakpoint number
+* Breakpoints can be cleared by breakpoint number.
 
 (Contributed by Georg Brandl, Antonio Cuni and Ilya Sandler.)
 
@@ -1362,7 +1469,7 @@ reading directly from dictionaries and strings.
             - bytes input support
             - non-UTF8 percent encoding of non-ASCII characters
           Issue 2987 for IPv6 (RFC2732) support in urlparse
-.. XXX: Any updates to the WSGI bytes versus text problem?
+
 
 Multi-threading
 ===============
@@ -1426,12 +1533,12 @@ A number of small performance enhancements have been added:
   :meth:`list.sort` and :func:`sorted` now runs faster and uses less memory
   when called with a :term:`key function`.  Previously, every element of
   a list was wrapped with a temporary object that remembered the key value
-  associated with each element.  Now, an array of keys and values are
+  associated with each element.  Now, two arrays of keys and values are
   sorted in parallel.  This save the memory consumed by the sort wrappers,
   and it saves time lost during comparisons which were delegated by the
   sort wrappers.
 
-  (Patch by Daniel Stuzback in :issue:`9915`.)
+  (Patch by Daniel Stutzbach in :issue:`9915`.)
 
 * JSON decoding performance is improved and memory consumption is reduced
   whenever the same string is repeated for multiple keys.  Also, JSON encoding
@@ -1461,11 +1568,11 @@ A number of small performance enhancements have been added:
   (:issue:`6713` by Gawain Bolton, Mark Dickinson, and Victor Stinner.)
 
 There were several other minor optimizations. Set differencing now runs faster
-when one operand is much larger than the other (Patch by Andress Bennetts in
+when one operand is much larger than the other (patch by Andress Bennetts in
 :issue:`8685`).  The :meth:`array.repeat` method has a faster implementation
 (:issue:`1569291` by Alexander Belopolsky). The :class:`BaseHTTPRequestHandler`
 has more efficient buffering (:issue:`3709` by Andrew Schaaf).  The
-multi-argument form of :func:`operator.attrgetter` now function runs slightly
+multi-argument form of :func:`operator.attrgetter` function now runs slightly
 faster (:issue:`10160` by Christos Georgiou).  And :class:`ConfigParser` loads
 multi-line arguments a bit faster (:issue:`7113` by Łukasz Langa).
 
@@ -1515,7 +1622,7 @@ By default, tarfile uses ``'utf-8'`` encoding on Windows (instead of
 ``'mbcs'``), and the ``'surrogateescape'`` error handler on all operating
 systems.
 
-* Added the *cp720* Arabic DOS encoding (:issue:`1616979`).
+Also, support was added for *cp720* Arabic DOS encoding (:issue:`1616979`).
 
 
 Documentation
@@ -1528,10 +1635,10 @@ A table of quick links has been added to the top of lengthy sections such as
 accompanied by tables of cheatsheet-style summaries to provide an overview and
 memory jog without having to read all of the docs.
 
-In some cases, the pure python source code can be helpful adjunct to the docs,
-so now some modules feature quick links to the latest version of the source
-code.  For example, the :mod:`functools` module documentation has a quick link
-at the top labeled :source:`functools Python source code <Lib/functools.py>`.
+In some cases, the pure Python source code can be a helpful adjunct to the
+documentation, so now many modules now feature quick links to the latest version
+of the source code.  For example, the :mod:`functools` module documentation has
+a quick link at the top labeled: **Source code** :source:`Lib/functools.py`.
 
 The docs now contain more examples and recipes.  In particular, :mod:`re` module
 has an extensive section, :ref:`re-examples`.  Likewise, the :mod:`itertools`
@@ -1541,18 +1648,31 @@ The :mod:`datetime` module now has an auxiliary implementation in pure Python.
 No functionality was changed.  This just provides an easier-to-read
 alternate implementation.  (Contributed by Alexander Belopolsky.)
 
+The unmaintained :file:`Demo` directory has been removed.  Some demos were
+integrated into the documentation, some were moved to the :file:`Tools/demo`
+directory, and others were removed altogether.  (Contributed by Georg Brandl.)
+
 
 IDLE
 ====
 
-* The format menu now has an option to clean-up source files by stripping
-  trailing whitespace (:issue:`5150`).
+* The format menu now has an option to clean source files by stripping
+  trailing whitespace.
+
+  (Contributed by Raymond Hettinger; :issue:`5150`.)
+
+* IDLE on Mac OS X now works with both Carbon AquaTk and Cocoa AquaTk.
+
+  (Contributed by Kevin Walzer, Ned Deily, and Ronald Oussoren; :issue:`6075`.)
 
 
 Build and C API Changes
 =======================
 
 Changes to Python's build process and to the C API include:
+
+* The *idle*, *pydoc* and *2to3* scripts are now installed with a
+  version-specific suffix on ``make altinstall`` (:issue:`10679`).
 
 * The C functions that access the Unicode Database now accept and return
   characters from the full Unicode range, even on narrow unicode builds
@@ -1585,19 +1705,19 @@ Changes to Python's build process and to the C API include:
   :issue:`9778`.)
 
 * A new macro :c:macro:`Py_VA_COPY` copies the state of the variable argument
-  list.  It is equivalent to C99 *va_copy* but available on all python platforms
+  list.  It is equivalent to C99 *va_copy* but available on all Python platforms
   (:issue:`2443`).
 
-* A new C API function :c:func:`PySys_SetArgvEx` allows an embedded
-  interpreter to set sys.argv without also modifying :attr:`sys.path`
+* A new C API function :c:func:`PySys_SetArgvEx` allows an embedded interpreter
+  to set :attr:`sys.argv` without also modifying :attr:`sys.path`
   (:issue:`5753`).
 
 * :c:macro:`PyEval_CallObject` is now only available in macro form.  The
   function declaration, which was kept for backwards compatibility reasons, is
-  now removed -- the macro was introduced in 1997  (:issue:`8276`).
+  now removed -- the macro was introduced in 1997 (:issue:`8276`).
 
 * The is a new function :c:func:`PyLong_AsLongLongAndOverflow` which
-  is analogous to :c:func:`PyLong_AsLongAndOverflow`.  The both serve to
+  is analogous to :c:func:`PyLong_AsLongAndOverflow`.  They both serve to
   convert Python :class:`int` into a native fixed-width type while providing
   detection of cases where the conversion won't fit (:issue:`7767`).
 
@@ -1614,7 +1734,7 @@ Changes to Python's build process and to the C API include:
   gives improved memory leak detection when running under Valgrind, while taking
   advantage of pymalloc at other times (:issue:`2422`).
 
-* Removed the "O?" format from the *PyArg_Parse* functions.  The format is no
+* Removed the ``O?`` format from the *PyArg_Parse* functions.  The format is no
   longer used and it had never been documented (:issue:`8837`).
 
 There were a number of other small changes to the C-API.  See the
@@ -1664,7 +1784,7 @@ require changes to your code:
 * :class:`bytearray` objects can no longer be used as filenames; instead,
   they should be converted to :class:`bytes`.
 
-* PyArg_Parse*() functions:
+* ``PyArg_Parse*()`` functions:
 
   * "t#" format has been removed: use "s#" or "s*" instead
   * "w" and "w#" formats has been removed: use "w*" instead
@@ -1683,7 +1803,7 @@ require changes to your code:
   ``random.seed(s, version=1)``.
 
 * The previously deprecated :func:`string.maketrans` function has been removed
-  in favor of the static methods, :meth:`bytes.maketrans` and
+  in favor of the static methods :meth:`bytes.maketrans` and
   :meth:`bytearray.maketrans`.  This change solves the confusion around which
   types were supported by the :mod:`string` module.  Now, :class:`str`,
   :class:`bytes`, and :class:`bytearray` each have their own **maketrans** and
@@ -1706,6 +1826,20 @@ require changes to your code:
   (Contributed by Georg Brandl and Mattias Brändström;
   `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
 
-* :func:`struct.pack` no longer implicitly encodes unicode to UTF-8: use
-  explicit conversion instead and replace unicode literals by bytes literals.
+* :func:`struct.pack` now only allows bytes for the ``s`` string pack code.
+  Formerly, it would accept text arguments and implicitly encode them to bytes
+  using UTF-8.  This was problematic because it made assumptions about the
+  correct encoding and because a variable-length encoding can fail when writing
+  to fixed length segment of a structure.
 
+  Code such as ``struct.pack('<6sHHBBB', 'GIF87a', x, y)`` should be rewritten
+  with to use bytes instead of text, ``struct.pack('<6sHHBBB', b'GIF87a', x, y)``.
+
+  (Discovered by David Beazley and fixed by Victor Stinner; :issue:`10783`.)
+
+* The :class:`xml.etree.ElementTree` class now raises an
+  :exc:`xml.etree.ElementTree.ParseError` when a parse fails. Previously it
+  raised a :exc:`xml.parsers.expat.ExpatError`.
+
+* The new, longer :func:`str` value on floats may break doctests which rely on
+  the old output format.

@@ -7,6 +7,10 @@
 
 .. index:: single: filenames; pathname expansion
 
+**Source code:** :source:`Lib/glob.py`
+
+--------------
+
 The :mod:`glob` module finds all the pathnames matching a specified pattern
 according to the rules used by the Unix shell.  No tilde expansion is done, but
 ``*``, ``?``, and character ranges expressed with ``[]`` will be correctly
@@ -15,9 +19,6 @@ matched.  This is done by using the :func:`os.listdir` and
 subshell.  (For tilde and shell variable expansion, use
 :func:`os.path.expanduser` and :func:`os.path.expandvars`.)
 
-.. seealso::
-
-   Latest version of the :source:`glob module Python source code <Lib/glob.py>`
 
 .. function:: glob(pathname)
 

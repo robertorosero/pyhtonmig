@@ -1752,8 +1752,8 @@ then
 				esac
 		fi;;
 	NetBSD*|DragonFly*)
-		LDSHARED="cc -shared"
-		LDCXXSHARED="c++ -shared";;
+		LDSHARED='$(CC) -shared'
+		LDCXXSHARED='$(CXX) -shared';;
 	OpenUNIX*|UnixWare*)
 		if test "$GCC" = "yes" ; then
 			LDSHARED='$(CC) -shared'
@@ -2352,7 +2352,7 @@ yes
 			;;
 		solaris)
 			if test -f /etc/netconfig; then
-                          if /usr/xpg4/bin/grep -q tcp6 /etc/netconfig; then
+                          if $GREP -q tcp6 /etc/netconfig; then
 				ipv6type=$i
 				ipv6trylibc=yes
                           fi

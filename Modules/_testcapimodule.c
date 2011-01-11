@@ -2188,7 +2188,7 @@ argparsing(PyObject *o, PyObject *args)
             /* argument converter not called? */
             return NULL;
         /* Should be 1 */
-        res = PyLong_FromLong(Py_REFCNT(str2));
+        res = PyLong_FromSsize_t(Py_REFCNT(str2));
         Py_DECREF(str2);
         PyErr_Clear();
         return res;
@@ -2244,17 +2244,6 @@ crash_no_current_thread(PyObject *self)
     PyThreadState_Get();
     Py_END_ALLOW_THREADS
     return NULL;
-}
-
-static PyObject *
-format_unicode(PyObject *self, PyObject *args)
-{
-    const char *format;
-    PyObject *arg;
-    if (!PyArg_ParseTuple(args, "yU", &format, &arg))
-        return NULL;
-    return PyUnicode_FromFormat(format, arg);
-
 }
 
 static PyMethodDef TestMethods[] = {
@@ -2338,7 +2327,6 @@ static PyMethodDef TestMethods[] = {
     {"make_exception_with_doc", (PyCFunction)make_exception_with_doc,
      METH_VARARGS | METH_KEYWORDS},
     {"crash_no_current_thread", (PyCFunction)crash_no_current_thread, METH_NOARGS},
-    {"format_unicode",          format_unicode,                 METH_VARARGS},
     {NULL, NULL} /* sentinel */
 };
 

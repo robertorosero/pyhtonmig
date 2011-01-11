@@ -24,6 +24,3 @@ The following modules are documented in this chapter:
    decimal.rst
    fractions.rst
    random.rst
-   itertools.rst
-   functools.rst
-   operator.rst

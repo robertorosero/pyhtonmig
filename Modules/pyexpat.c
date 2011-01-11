@@ -797,25 +797,13 @@ xmlparse_Parse(xmlparseobject *self, PyObject *args)
 static int
 readinst(char *buf, int buf_size, PyObject *meth)
 {
-    PyObject *arg = NULL;
-    PyObject *bytes = NULL;
-    PyObject *str = NULL;
-    int len = -1;
+    PyObject *str;
+    Py_ssize_t len;
     char *ptr;
 
-    if ((bytes = PyLong_FromLong(buf_size)) == NULL)
-        goto finally;
-
-    if ((arg = PyTuple_New(1)) == NULL) {
-        Py_DECREF(bytes);
-        goto finally;
-    }
-
-    PyTuple_SET_ITEM(arg, 0, bytes);
-
-    str = PyObject_Call(meth, arg, NULL);
+    str = PyObject_CallFunction(meth, "n", buf_size);
     if (str == NULL)
-        goto finally;
+        goto error;
 
     if (PyBytes_Check(str))
         ptr = PyBytes_AS_STRING(str);
@@ -825,21 +813,24 @@ readinst(char *buf, int buf_size, PyObject *meth)
         PyErr_Format(PyExc_TypeError,
                      "read() did not return a bytes object (type=%.400s)",
                      Py_TYPE(str)->tp_name);
-        goto finally;
+        goto error;
     }
     len = Py_SIZE(str);
     if (len > buf_size) {
         PyErr_Format(PyExc_ValueError,
                      "read() returned too much data: "
-                     "%i bytes requested, %i returned",
+                     "%i bytes requested, %zd returned",
                      buf_size, len);
-        goto finally;
+        goto error;
     }
     memcpy(buf, ptr, len);
-finally:
-    Py_XDECREF(arg);
+    Py_DECREF(str);
+    /* len <= buf_size <= INT_MAX */
+    return (int)len;
+
+error:
     Py_XDECREF(str);
-    return len;
+    return -1;
 }
 
 PyDoc_STRVAR(xmlparse_ParseFile__doc__,
@@ -1522,7 +1513,7 @@ PyDoc_STRVAR(Xmlparsetype__doc__, "XML parser");
 static PyTypeObject Xmlparsetype = {
         PyVarObject_HEAD_INIT(NULL, 0)
         "pyexpat.xmlparser",            /*tp_name*/
-        sizeof(xmlparseobject) + PyGC_HEAD_SIZE,/*tp_basicsize*/
+        sizeof(xmlparseobject),         /*tp_basicsize*/
         0,                              /*tp_itemsize*/
         /* methods */
         (destructor)xmlparse_dealloc,   /*tp_dealloc*/
@@ -1807,7 +1798,7 @@ MODULE_INITFUNC(void)
         Py_XDECREF(rev_codes_dict);
         return NULL;
     }
-    
+
 #define MYCONST(name) \
     if (PyModule_AddStringConstant(errors_module, #name,               \
                                    (char *)XML_ErrorString(name)) < 0) \
@@ -1873,7 +1864,7 @@ MODULE_INITFUNC(void)
         return NULL;
     if (PyModule_AddObject(errors_module, "messages", rev_codes_dict) < 0)
         return NULL;
-    
+
 #undef MYCONST
 
 #define MYCONST(c) PyModule_AddIntConstant(m, #c, c)

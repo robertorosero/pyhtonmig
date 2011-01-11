@@ -4,6 +4,9 @@
 .. module:: queue
    :synopsis: A synchronized queue class.
 
+**Source code:** :source:`Lib/queue.py`
+
+--------------
 
 The :mod:`queue` module implements multi-producer, multi-consumer queues.
 It is especially useful in threaded programming when information must be
@@ -19,10 +22,6 @@ the first retrieved (operating like a stack).  With a priority queue,
 the entries are kept sorted (using the :mod:`heapq` module) and the
 lowest valued entry is retrieved first.
 
-.. seealso::
-
-   Latest version of the :source:`queue module Python source code
-   <Lib/queue.py>`
 
 The :mod:`queue` module defines the following classes and exceptions:
 
@@ -63,12 +62,6 @@ The :mod:`queue` module defines the following classes and exceptions:
 
    Exception raised when non-blocking :meth:`put` (or :meth:`put_nowait`) is called
    on a :class:`Queue` object which is full.
-
-.. seealso::
-
-   :class:`collections.deque` is an alternative implementation of unbounded
-   queues with fast atomic :func:`append` and :func:`popleft` operations that
-   do not require locking.
 
 
 .. _queueobjects:
@@ -179,4 +172,15 @@ Example of how to wait for enqueued tasks to be completed::
        q.put(item)
 
    q.join()       # block until all tasks are done
+
+
+.. seealso::
+
+   Class :class:`multiprocessing.Queue`
+      A queue class for use in a multi-processing (rather than multi-threading)
+      context.
+
+   :class:`collections.deque` is an alternative implementation of unbounded
+   queues with fast atomic :func:`append` and :func:`popleft` operations that
+   do not require locking.
 

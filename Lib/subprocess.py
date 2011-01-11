@@ -393,22 +393,22 @@ else:
     # POSIX defines PIPE_BUF as >= 512.
     _PIPE_BUF = getattr(select, 'PIPE_BUF', 512)
 
+    _FD_CLOEXEC = getattr(fcntl, 'FD_CLOEXEC', 1)
+
+    def _set_cloexec(fd, cloexec):
+        old = fcntl.fcntl(fd, fcntl.F_GETFD)
+        if cloexec:
+            fcntl.fcntl(fd, fcntl.F_SETFD, old | _FD_CLOEXEC)
+        else:
+            fcntl.fcntl(fd, fcntl.F_SETFD, old & ~_FD_CLOEXEC)
+
     if _posixsubprocess:
         _create_pipe = _posixsubprocess.cloexec_pipe
     else:
         def _create_pipe():
-            try:
-                cloexec_flag = fcntl.FD_CLOEXEC
-            except AttributeError:
-                cloexec_flag = 1
-
             fds = os.pipe()
-
-            old = fcntl.fcntl(fds[0], fcntl.F_GETFD)
-            fcntl.fcntl(fds[0], fcntl.F_SETFD, old | cloexec_flag)
-            old = fcntl.fcntl(fds[1], fcntl.F_GETFD)
-            fcntl.fcntl(fds[1], fcntl.F_SETFD, old | cloexec_flag)
-
+            _set_cloexec(fds[0], True)
+            _set_cloexec(fds[1], True)
             return fds
 
 __all__ = ["Popen", "PIPE", "STDOUT", "call", "check_call", "getstatusoutput",
@@ -699,13 +699,9 @@ class Popen(object):
          c2pread, c2pwrite,
          errread, errwrite) = self._get_handles(stdin, stdout, stderr)
 
-        self._execute_child(args, executable, preexec_fn, close_fds,
-                            pass_fds, cwd, env, universal_newlines,
-                            startupinfo, creationflags, shell,
-                            p2cread, p2cwrite,
-                            c2pread, c2pwrite,
-                            errread, errwrite,
-                            restore_signals, start_new_session)
+        # We wrap OS handles *before* launching the child, otherwise a
+        # quickly terminating child could make our fds unwrappable
+        # (see #8458).
 
         if mswindows:
             if p2cwrite != -1:
@@ -729,6 +725,24 @@ class Popen(object):
             self.stderr = io.open(errread, 'rb', bufsize)
             if universal_newlines:
                 self.stderr = io.TextIOWrapper(self.stderr)
+
+        try:
+            self._execute_child(args, executable, preexec_fn, close_fds,
+                                pass_fds, cwd, env, universal_newlines,
+                                startupinfo, creationflags, shell,
+                                p2cread, p2cwrite,
+                                c2pread, c2pwrite,
+                                errread, errwrite,
+                                restore_signals, start_new_session)
+        except:
+            # Cleanup if the child failed starting
+            for f in filter(None, [self.stdin, self.stdout, self.stderr]):
+                try:
+                    f.close()
+                except EnvironmentError:
+                    # Ignore EBADF or other errors
+                    pass
+            raise
 
 
     def _translate_newlines(self, data, encoding):
@@ -1092,15 +1106,9 @@ class Popen(object):
                     errread, errwrite)
 
 
-        def _close_fds(self, but):
-            os.closerange(3, but)
-            os.closerange(but + 1, MAXFD)
-
-
-        def _close_all_but_a_sorted_few_fds(self, fds_to_keep):
-            # precondition: fds_to_keep must be sorted and unique
+        def _close_fds(self, fds_to_keep):
             start_fd = 3
-            for fd in fds_to_keep:
+            for fd in sorted(fds_to_keep):
                 if fd >= start_fd:
                     os.closerange(start_fd, fd)
                     start_fd = fd + 1
@@ -1194,33 +1202,31 @@ class Popen(object):
                                 os.close(errpipe_read)
 
                                 # Dup fds for child
-                                if p2cread != -1:
-                                    os.dup2(p2cread, 0)
-                                if c2pwrite != -1:
-                                    os.dup2(c2pwrite, 1)
-                                if errwrite != -1:
-                                    os.dup2(errwrite, 2)
+                                def _dup2(a, b):
+                                    # dup2() removes the CLOEXEC flag but
+                                    # we must do it ourselves if dup2()
+                                    # would be a no-op (issue #10806).
+                                    if a == b:
+                                        _set_cloexec(a, False)
+                                    elif a != -1:
+                                        os.dup2(a, b)
+                                _dup2(p2cread, 0)
+                                _dup2(c2pwrite, 1)
+                                _dup2(errwrite, 2)
 
                                 # Close pipe fds.  Make sure we don't close the
                                 # same fd more than once, or standard fds.
-                                if p2cread != -1 and p2cread not in (0,):
-                                    os.close(p2cread)
-                                if (c2pwrite != -1 and
-                                    c2pwrite not in (p2cread, 1)):
-                                    os.close(c2pwrite)
-                                if (errwrite != -1 and
-                                    errwrite not in (p2cread, c2pwrite, 2)):
-                                    os.close(errwrite)
+                                closed = set()
+                                for fd in [p2cread, c2pwrite, errwrite]:
+                                    if fd > 2 and fd not in closed:
+                                        os.close(fd)
+                                        closed.add(fd)
 
                                 # Close all other fds, if asked for
                                 if close_fds:
-                                    if pass_fds:
-                                        fds_to_keep = set(pass_fds)
-                                        fds_to_keep.add(errpipe_write)
-                                        self._close_all_but_a_sorted_few_fds(
-                                                sorted(fds_to_keep))
-                                    else:
-                                        self._close_fds(but=errpipe_write)
+                                    fds_to_keep = set(pass_fds)
+                                    fds_to_keep.add(errpipe_write)
+                                    self._close_fds(fds_to_keep)
 
 
                                 if cwd is not None:

@@ -4,6 +4,9 @@
 .. module:: threading
    :synopsis: Thread-based parallelism.
 
+**Source code:** :source:`Lib/threading.py`
+
+--------------
 
 This module constructs higher-level threading interfaces on top of the lower
 level :mod:`_thread` module.  See also the :mod:`queue` module.
@@ -17,10 +20,17 @@ The :mod:`dummy_threading` module is provided for situations where
    methods and functions in this module in the Python 2.x series are still
    supported by this module.
 
-.. seealso::
+.. impl-detail::
 
-   Latest version of the :source:`threading module Python source code
-   <Lib/threading.py>`
+   Due to the :term:`Global Interpreter Lock`, in CPython only one thread
+   can execute Python code at once (even though certain performance-oriented
+   libraries might overcome this limitation).
+   If you want your application to make better of use of the computational
+   resources of multi-core machines, you are advised to use
+   :mod:`multiprocessing` or :class:`concurrent.futures.ProcessPoolExecutor`.
+   However, threading is still an appropriate model if you want to run
+   multiple I/O-bound tasks simultaneously.
+
 
 This module defines the following functions and objects:
 
@@ -707,9 +717,9 @@ waiting until some other thread calls :meth:`release`.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Semaphores are often used to guard resources with limited capacity, for example,
-a database server.  In any situation where the size of the resource size is
-fixed, you should use a bounded semaphore.  Before spawning any worker threads,
-your main thread would initialize the semaphore::
+a database server.  In any situation where the size of the resource is fixed,
+you should use a bounded semaphore.  Before spawning any worker threads, your
+main thread would initialize the semaphore::
 
    maxconnections = 5
    ...

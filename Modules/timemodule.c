@@ -1,4 +1,3 @@
-
 /* Time module */
 
 #include "Python.h"
@@ -218,29 +217,6 @@ tmtotuple(struct tm *p)
 }
 
 static PyObject *
-structtime_totuple(PyObject *t)
-{
-    PyObject *x = NULL;
-    unsigned int i;
-    PyObject *v = PyTuple_New(9);
-    if (v == NULL)
-        return NULL;
-
-    for (i=0; i<9; i++) {
-        x = PyStructSequence_GET_ITEM(t, i);
-        Py_INCREF(x);
-        PyTuple_SET_ITEM(v, i, x);
-    }
-
-    if (PyErr_Occurred()) {
-        Py_XDECREF(v);
-        return NULL;
-    }
-
-    return v;
-}
-
-static PyObject *
 time_convert(double when, struct tm * (*function)(const time_t *))
 {
     struct tm *p;
@@ -321,56 +297,62 @@ static int
 gettmarg(PyObject *args, struct tm *p)
 {
     int y;
-    PyObject *t = NULL;
 
     memset((void *) p, '\0', sizeof(struct tm));
 
-    if (PyTuple_Check(args)) {
-        t = args;
-        Py_INCREF(t);
-    }
-    else if (Py_TYPE(args) == &StructTimeType) {
-        t = structtime_totuple(args);
-    }
-    else {
+    if (!PyTuple_Check(args)) {
         PyErr_SetString(PyExc_TypeError,
                         "Tuple or struct_time argument required");
         return 0;
     }
 
-    if (t == NULL || !PyArg_ParseTuple(t, "iiiiiiiii",
-                                       &y,
-                                       &p->tm_mon,
-                                       &p->tm_mday,
-                                       &p->tm_hour,
-                                       &p->tm_min,
-                                       &p->tm_sec,
-                                       &p->tm_wday,
-                                       &p->tm_yday,
-                                       &p->tm_isdst)) {
-        Py_XDECREF(t);
+    if (!PyArg_ParseTuple(args, "iiiiiiiii",
+                          &y, &p->tm_mon, &p->tm_mday,
+                          &p->tm_hour, &p->tm_min, &p->tm_sec,
+                          &p->tm_wday, &p->tm_yday, &p->tm_isdst))
         return 0;
-    }
-    Py_DECREF(t);
 
-    if (y < 1900) {
+    /* If year is specified with less than 4 digits, its interpretation
+     * depends on the accept2dyear value.
+     *
+     * If accept2dyear is true (default), a backward compatibility behavior is
+     * invoked as follows:
+     *
+     *   - for 2-digit year, century is guessed according to POSIX rules for
+     *      %y strptime format: 21st century for y < 69, 20th century
+     *      otherwise.  A deprecation warning is issued when century
+     *      information is guessed in this way.
+     *
+     *   - for 3-digit or negative year, a ValueError exception is raised.
+     *
+     * If accept2dyear is false (set by the program or as a result of a
+     * non-empty value assigned to PYTHONY2K environment variable) all year
+     * values are interpreted as given.
+     */
+    if (y < 1000) {
         PyObject *accept = PyDict_GetItemString(moddict,
                                                 "accept2dyear");
-        if (accept == NULL || !PyLong_CheckExact(accept) ||
-            !PyObject_IsTrue(accept)) {
-            PyErr_SetString(PyExc_ValueError,
-                            "year >= 1900 required");
-            return 0;
+        if (accept != NULL) {
+            int acceptval =  PyObject_IsTrue(accept);
+            if (acceptval == -1)
+                return 0;
+            if (acceptval) {
+                if (0 <= y && y < 69)
+                    y += 2000;
+                else if (69 <= y && y < 100)
+                    y += 1900;
+                else {
+                    PyErr_SetString(PyExc_ValueError,
+                                    "year out of range");
+                    return 0;
+                }
+                if (PyErr_WarnEx(PyExc_DeprecationWarning,
+                           "Century info guessed for a 2-digit year.", 1) != 0)
+                    return 0;
+            }
         }
-        if (69 <= y && y <= 99)
-            y += 1900;
-        else if (0 <= y && y <= 68)
-            y += 2000;
-        else {
-            PyErr_SetString(PyExc_ValueError,
-                            "year out of range");
+        else
             return 0;
-        }
     }
     p->tm_year = y - 1900;
     p->tm_mon--;
@@ -492,6 +474,15 @@ time_strftime(PyObject *self, PyObject *args)
     else if (!gettmarg(tup, &buf) || !checktm(&buf))
         return NULL;
 
+#if defined(_MSC_VER) || defined(sun)
+    if (buf.tm_year + 1900 < 1 || 9999 < buf.tm_year + 1900) {
+        PyErr_Format(PyExc_ValueError,
+                     "strftime() requires year in [1; 9999]",
+                     buf.tm_year + 1900);
+        return NULL;
+    }
+#endif
+
     /* Normalize tm_isdst just in case someone foolishly implements %Z
        based on the assumption that tm_isdst falls within the range of
        [-1, 1] */
@@ -599,19 +590,51 @@ time_strptime(PyObject *self, PyObject *args)
     return strptime_result;
 }
 
+
 PyDoc_STRVAR(strptime_doc,
 "strptime(string, format) -> struct_time\n\
 \n\
 Parse a string to a time tuple according to a format specification.\n\
 See the library reference manual for formatting codes (same as strftime()).");
 
+static PyObject *
+_asctime(struct tm *timeptr)
+{
+    /* Inspired by Open Group reference implementation available at
+     * http://pubs.opengroup.org/onlinepubs/009695399/functions/asctime.html */
+    static char wday_name[7][3] = {
+        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+    };
+    static char mon_name[12][3] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    char buf[20]; /* 'Sun Sep 16 01:03:52\0' */
+    int n;
+
+    n = PyOS_snprintf(buf, sizeof(buf), "%.3s %.3s%3d %.2d:%.2d:%.2d",
+                      wday_name[timeptr->tm_wday],
+                      mon_name[timeptr->tm_mon],
+                      timeptr->tm_mday, timeptr->tm_hour,
+                      timeptr->tm_min, timeptr->tm_sec);
+    /* XXX: since the fields used by snprintf above are validated in checktm,
+     * the following condition should never trigger. We keep the check because
+     * historically fixed size buffer used in asctime was the source of
+     * crashes. */
+    if (n + 1 != sizeof(buf)) {
+        PyErr_SetString(PyExc_ValueError, "unconvertible time");
+        return NULL;
+    }
+
+    return PyUnicode_FromFormat("%s %d", buf, 1900 + timeptr->tm_year);
+}
 
 static PyObject *
 time_asctime(PyObject *self, PyObject *args)
 {
     PyObject *tup = NULL;
     struct tm buf;
-    char *p;
+
     if (!PyArg_UnpackTuple(args, "asctime", 0, 1, &tup))
         return NULL;
     if (tup == NULL) {
@@ -619,10 +642,7 @@ time_asctime(PyObject *self, PyObject *args)
         buf = *localtime(&tt);
     } else if (!gettmarg(tup, &buf) || !checktm(&buf))
         return NULL;
-    p = asctime(&buf);
-    if (p[24] == '\n')
-        p[24] = '\0';
-    return PyUnicode_FromString(p);
+    return _asctime(&buf);
 }
 
 PyDoc_STRVAR(asctime_doc,
@@ -637,7 +657,7 @@ time_ctime(PyObject *self, PyObject *args)
 {
     PyObject *ot = NULL;
     time_t tt;
-    char *p;
+    struct tm *timeptr;
 
     if (!PyArg_UnpackTuple(args, "ctime", 0, 1, &ot))
         return NULL;
@@ -651,14 +671,12 @@ time_ctime(PyObject *self, PyObject *args)
         if (tt == (time_t)-1 && PyErr_Occurred())
             return NULL;
     }
-    p = ctime(&tt);
-    if (p == NULL) {
+    timeptr = localtime(&tt);
+    if (timeptr == NULL) {
         PyErr_SetString(PyExc_ValueError, "unconvertible time");
         return NULL;
     }
-    if (p[24] == '\n')
-        p[24] = '\0';
-    return PyUnicode_FromString(p);
+    return _asctime(timeptr);
 }
 
 PyDoc_STRVAR(ctime_doc,
@@ -676,8 +694,11 @@ time_mktime(PyObject *self, PyObject *tup)
     time_t tt;
     if (!gettmarg(tup, &buf))
         return NULL;
+    buf.tm_wday = -1;  /* sentinel; original value ignored */
     tt = mktime(&buf);
-    if (tt == (time_t)(-1)) {
+    /* Return value of -1 does not necessarily mean an error, but tm_wday
+     * cannot remain set to -1 if mktime succedded. */
+    if (tt == (time_t)(-1) && buf.tm_wday == -1) {
         PyErr_SetString(PyExc_OverflowError,
                         "mktime argument out of range");
         return NULL;

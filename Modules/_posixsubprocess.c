@@ -69,27 +69,40 @@ static void child_exec(char *const exec_array[],
     }
     POSIX_CALL(close(errpipe_read));
 
-    /* Dup fds for child. */
-    if (p2cread != -1) {
+    /* Dup fds for child.
+       dup2() removes the CLOEXEC flag but we must do it ourselves if dup2()
+       would be a no-op (issue #10806). */
+    if (p2cread == 0) {
+        int old = fcntl(p2cread, F_GETFD);
+        if (old != -1)
+            fcntl(p2cread, F_SETFD, old & ~FD_CLOEXEC);
+    } else if (p2cread != -1) {
         POSIX_CALL(dup2(p2cread, 0));  /* stdin */
     }
-    if (c2pwrite != -1) {
+    if (c2pwrite == 1) {
+        int old = fcntl(c2pwrite, F_GETFD);
+        if (old != -1)
+            fcntl(c2pwrite, F_SETFD, old & ~FD_CLOEXEC);
+    } else if (c2pwrite != -1) {
         POSIX_CALL(dup2(c2pwrite, 1));  /* stdout */
     }
-    if (errwrite != -1) {
+    if (errwrite == 2) {
+        int old = fcntl(errwrite, F_GETFD);
+        if (old != -1)
+            fcntl(errwrite, F_SETFD, old & ~FD_CLOEXEC);
+    } else if (errwrite != -1) {
         POSIX_CALL(dup2(errwrite, 2));  /* stderr */
     }
 
     /* Close pipe fds.  Make sure we don't close the same fd more than */
     /* once, or standard fds. */
-    if (p2cread != -1 && p2cread != 0) {
+    if (p2cread > 2) {
         POSIX_CALL(close(p2cread));
     }
-    if (c2pwrite != -1 && c2pwrite != p2cread && c2pwrite != 1) {
+    if (c2pwrite > 2) {
         POSIX_CALL(close(c2pwrite));
     }
-    if (errwrite != -1 && errwrite != p2cread &&
-        errwrite != c2pwrite && errwrite != 2) {
+    if (errwrite != c2pwrite && errwrite > 2) {
         POSIX_CALL(close(errwrite));
     }
 
@@ -415,27 +428,39 @@ subprocess_cloexec_pipe(PyObject *self, PyObject *noargs)
     Py_BEGIN_ALLOW_THREADS
     res = pipe2(fds, O_CLOEXEC);
     Py_END_ALLOW_THREADS
-#else
-    /* We hold the GIL which offers some protection from other code calling
-     * fork() before the CLOEXEC flags have been set but we can't guarantee
-     * anything without pipe2(). */
-    long oldflags;
+    if (res != 0 && errno == ENOSYS)
+    {
+        if (PyErr_WarnEx(
+                PyExc_RuntimeWarning,
+                "pipe2 set errno ENOSYS; falling "
+                "back to non-atomic pipe+fcntl.", 1) != 0) {
+            return NULL;
+        }
+        {
+#endif
+        /* We hold the GIL which offers some protection from other code calling
+         * fork() before the CLOEXEC flags have been set but we can't guarantee
+         * anything without pipe2(). */
+        long oldflags;
 
-    res = pipe(fds);
+        res = pipe(fds);
 
-    if (res == 0) {
-        oldflags = fcntl(fds[0], F_GETFD, 0);
-        if (oldflags < 0) res = oldflags;
+        if (res == 0) {
+            oldflags = fcntl(fds[0], F_GETFD, 0);
+            if (oldflags < 0) res = oldflags;
+        }
+        if (res == 0)
+            res = fcntl(fds[0], F_SETFD, oldflags | FD_CLOEXEC);
+
+        if (res == 0) {
+            oldflags = fcntl(fds[1], F_GETFD, 0);
+            if (oldflags < 0) res = oldflags;
+        }
+        if (res == 0)
+            res = fcntl(fds[1], F_SETFD, oldflags | FD_CLOEXEC);
+#ifdef HAVE_PIPE2
+        }
     }
-    if (res == 0)
-        res = fcntl(fds[0], F_SETFD, oldflags | FD_CLOEXEC);
-
-    if (res == 0) {
-        oldflags = fcntl(fds[1], F_GETFD, 0);
-        if (oldflags < 0) res = oldflags;
-    }
-    if (res == 0)
-        res = fcntl(fds[1], F_SETFD, oldflags | FD_CLOEXEC);
 #endif
     if (res != 0)
         return PyErr_SetFromErrno(PyExc_OSError);

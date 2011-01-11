@@ -976,18 +976,18 @@ struct win32_stat{
     int st_gid;
     int st_rdev;
     __int64 st_size;
-    int st_atime;
+    time_t st_atime;
     int st_atime_nsec;
-    int st_mtime;
+    time_t st_mtime;
     int st_mtime_nsec;
-    int st_ctime;
+    time_t st_ctime;
     int st_ctime_nsec;
 };
 
 static __int64 secs_between_epochs = 11644473600; /* Seconds between 1.1.1601 and 1.1.1970 */
 
 static void
-FILE_TIME_to_time_t_nsec(FILETIME *in_ptr, int *time_out, int* nsec_out)
+FILE_TIME_to_time_t_nsec(FILETIME *in_ptr, time_t *time_out, int* nsec_out)
 {
     /* XXX endianness. Shouldn't matter, as all Windows implementations are little-endian */
     /* Cannot simply cast and dereference in_ptr,
@@ -995,12 +995,11 @@ FILE_TIME_to_time_t_nsec(FILETIME *in_ptr, int *time_out, int* nsec_out)
     __int64 in;
     memcpy(&in, in_ptr, sizeof(in));
     *nsec_out = (int)(in % 10000000) * 100; /* FILETIME is in units of 100 nsec. */
-    /* XXX Win32 supports time stamps past 2038; we currently don't */
-    *time_out = Py_SAFE_DOWNCAST((in / 10000000) - secs_between_epochs, __int64, int);
+    *time_out = Py_SAFE_DOWNCAST((in / 10000000) - secs_between_epochs, __int64, time_t);
 }
 
 static void
-time_t_to_FILE_TIME(int time_in, int nsec_in, FILETIME *out_ptr)
+time_t_to_FILE_TIME(time_t time_in, int nsec_in, FILETIME *out_ptr)
 {
     /* XXX endianness */
     __int64 out;
@@ -3138,15 +3137,19 @@ posix_uname(PyObject *self, PyObject *noargs)
 #endif /* HAVE_UNAME */
 
 static int
-extract_time(PyObject *t, long* sec, long* usec)
+extract_time(PyObject *t, time_t* sec, long* usec)
 {
-    long intval;
+    time_t intval;
     if (PyFloat_Check(t)) {
         double tval = PyFloat_AsDouble(t);
-        PyObject *intobj = Py_TYPE(t)->tp_as_number->nb_int(t);
+        PyObject *intobj = PyNumber_Long(t);
         if (!intobj)
             return -1;
+#if SIZEOF_TIME_T > SIZEOF_LONG
+        intval = PyLong_AsUnsignedLongLongMask(intobj);
+#else
         intval = PyLong_AsLong(intobj);
+#endif
         Py_DECREF(intobj);
         if (intval == -1 && PyErr_Occurred())
             return -1;
@@ -3158,7 +3161,11 @@ extract_time(PyObject *t, long* sec, long* usec)
             *usec = 0;
         return 0;
     }
+#if SIZEOF_TIME_T > SIZEOF_LONG
+    intval = PyLong_AsUnsignedLongLongMask(t);
+#else
     intval = PyLong_AsLong(t);
+#endif
     if (intval == -1 && PyErr_Occurred())
         return -1;
     *sec = intval;
@@ -3182,7 +3189,8 @@ posix_utime(PyObject *self, PyObject *args)
     PyObject *oapath;
     char *apath;
     HANDLE hFile;
-    long atimesec, mtimesec, ausec, musec;
+    time_t atimesec, mtimesec;
+    long ausec, musec;
     FILETIME atime, mtime;
     PyObject *result = NULL;
 
@@ -3248,6 +3256,7 @@ posix_utime(PyObject *self, PyObject *args)
            something is wrong with the file, when it also
            could be the time stamp that gives a problem. */
         win32_error("utime", NULL);
+        goto done;
     }
     Py_INCREF(Py_None);
     result = Py_None;
@@ -3258,7 +3267,8 @@ done:
 
     PyObject *opath;
     char *path;
-    long atime, mtime, ausec, musec;
+    time_t atime, mtime;
+    long ausec, musec;
     int res;
     PyObject* arg;
 
@@ -5687,7 +5697,7 @@ posix_write(PyObject *self, PyObject *args)
 {
     Py_buffer pbuf;
     int fd;
-    Py_ssize_t size;
+    Py_ssize_t size, len;
 
     if (!PyArg_ParseTuple(args, "iy*:write", &fd, &pbuf))
         return NULL;
@@ -5695,8 +5705,15 @@ posix_write(PyObject *self, PyObject *args)
         PyBuffer_Release(&pbuf);
         return posix_error();
     }
+    len = pbuf.len;
     Py_BEGIN_ALLOW_THREADS
-    size = write(fd, pbuf.buf, (size_t)pbuf.len);
+#if defined(MS_WIN64) || defined(MS_WINDOWS)
+    if (len > INT_MAX)
+        len = INT_MAX;
+    size = write(fd, pbuf.buf, (int)len);
+#else
+    size = write(fd, pbuf.buf, len);
+#endif
     Py_END_ALLOW_THREADS
     PyBuffer_Release(&pbuf);
     if (size < 0)

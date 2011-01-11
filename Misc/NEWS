@@ -8,6 +8,26 @@ What's New in Python 3.2 Release Candidate 1
 Core and Builtins
 -----------------
 
+- Issue #8020: Avoid a crash where the small objects allocator would read
+  non-Python managed memory while it is being modified by another thread.
+  Patch by Matt Bandy.
+
+- Issue #10841: On Windows, set the binary mode on stdin, stdout, stderr and
+  all io.FileIO objects (to not translate newlines, \r\n <=> \n). The Python
+  parser translates newlines (\r\n => \n).
+
+- Remove buffer API from stable ABI for now, see #10181.
+
+- Issue #8651: PyArg_Parse*() functions raise an OverflowError if the file
+  doesn't have PY_SSIZE_T_CLEAN define and the size doesn't fit in an int
+  (length bigger than 2^31-1 bytes).
+
+- Issue #9015, #9611: FileIO.readinto(), FileIO.write(), os.write() and
+  stdprinter.write() clamp the length to 2^31-1 on Windows.
+
+- Issue #8278: On Windows and with a NTFS filesystem, os.stat() and os.utime()
+  can now handle dates after 2038.
+
 - Issue #10780: PyErr_SetFromWindowsErrWithFilename() and
   PyErr_SetExcFromWindowsErrWithFilename() decode the filename from the
   filesystem encoding instead of UTF-8.
@@ -19,6 +39,84 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #10875: Update Regular Expression HOWTO; patch by 'SilentGhost'.
+
+- Issue #10872: The repr() of TextIOWrapper objects now includes the mode
+  if available.
+
+- Issue #10869: Fixed bug where ast.increment_lineno modified the root
+  node twice.
+
+- Issue #5871: email.header.Header.encode now raises an error if any
+  continuation line in the formatted value has no leading white space
+  and looks like a header.  Since Generator uses Header to format all
+  headers, this check is made for all headers in any serialized message
+  at serialization time.  This provides protection against header
+  injection attacks.
+
+- Issue #10859: Make ``contextlib.GeneratorContextManager`` officially
+  private by renaming it to ``_GeneratorContextManager``.
+
+- Issue #10042: Fixed the total_ordering decorator to handle cross-type
+  comparisons that could lead to infinite recursion.
+
+- Issue #10686: the email package now :rfc:`2047`\ -encodes headers with
+  non-ASCII bytes (parsed by a Bytes Parser) when doing conversion to
+  7bit-clean presentation, instead of replacing them with ?s.
+
+- email.header.Header was incorrectly encoding folding white space when
+  rfc2047-encoding header values with embedded newlines, leaving them
+  without folding whitespace.  It now uses the continuation_ws, as it
+  does for continuation lines that it creates itself.
+
+- Issue #1777412, #10827: Changed the rules for 2-digit years. The
+  time.asctime(), time.ctime() and time.strftime() functions will now format
+  any year when ``time.accept2dyear`` is False and will accept years >= 1000
+  otherwise. ``time.mktime`` and ``time.strftime`` now accept full range
+  supported by the OS. With Visual Studio or on Solaris, the year is limited to
+  the range [1; 9999]. Conversion of 2-digit years to 4-digit is deprecated.
+
+- Issue #7858: Raise an error properly when os.utime() fails under Windows
+  on an existing file.
+
+- Issue #3839: wsgiref should not override a Content-Length header set by
+  the application.  Initial patch by Clovis Fabricio.
+
+- Issue #10492: bdb.Bdb.run() only traces the execution of the code, not the
+  compilation (if the input is a string).
+
+- Issue #7995: When calling accept() on a socket with a timeout, the returned
+  socket is now always blocking, regardless of the operating system.
+
+- Issue #10756: atexit normalizes the exception before displaying it. Patch by
+  Andreas Stührk.
+
+- Issue #10790: email.header.Header.append's charset logic now works correctly
+  for charsets whose output codec is different from its input codec.
+
+- Issue #10819: SocketIO.name property returns -1 when its closed, instead of
+  raising a ValueError, to fix repr().
+
+- Issue #8650: zlib.compress() and zlib.decompress() raise an OverflowError if
+  the input buffer length doesn't fit into an unsigned int (length bigger than
+  2^32-1 bytes).
+
+- Issue #6643: Reinitialize locks held within the threading module after fork
+  to avoid a potential rare deadlock or crash on some platforms.
+
+- Issue #10806, issue #9905: Fix subprocess pipes when some of the standard
+  file descriptors (0, 1, 2) are closed in the parent process.  Initial
+  patch by Ross Lagerwall.
+
+- `unittest.TestCase` can be instantiated without a method name; for simpler
+  exploration from the interactive interpreter.
+
+- Issue #10798: Reject supporting concurrent.futures if the system has too
+  few POSIX semaphores.
+
+- Issue #10807: Remove base64, bz2, hex, quopri, rot13, uu and zlib codecs from
+  the codec aliases. They are still accessible via codecs.lookup().
 
 - Issue #10801: In zipfile, support different encodings for the header and
   the filenames.
@@ -82,11 +180,31 @@ Library
 
 - Deprecated assertDictContainsSubset() in the unittest module.
 
+C-API
+-----
+
+- Issue #10333: Remove ancient GC API, which has been deprecated since
+  Python 2.2.
+
 Build
 -----
 
+- Issue #10820: Fix OS X framework installs to support version-specific
+  scripts (#10679).
+
+- Issue #7716: Under Solaris, don't assume existence of /usr/xpg4/bin/grep in
+  the configure script but use $GREP instead.  Patch by Fabian Groffen.
+
+- Issue #10475: Don't hardcode compilers for LDSHARED/LDCXXSHARED on NetBSD
+  and DragonFly BSD.  Patch by Nicolas Joly.
+
 - Issue #10679: The "idle", "pydoc" and "2to3" scripts are now installed with
   a version-specific suffix on "make altinstall".
+
+- Issue #10655: Fix the build on PowerPC on Linux with GCC when building with
+  timestamp profiling (--with-tsc): the preprocessor test for the PowerPC
+  support now looks for "__powerpc__" as well as "__ppc__": the latter seems to
+  only be present on OS X; the former is the correct one for Linux with GCC.
 
 Tools/Demos
 -----------
@@ -94,6 +212,25 @@ Tools/Demos
 - Issue #7962: The Demo directory is gone.  Most of the old and unmaintained
   demos have been removed, others integrated in documentation or a new
   Tools/demo subdirectory.
+
+- Issue #10502: Addition of the unittestgui tool. Originally by Steve Purcell.
+  Updated for test discovery by Mark Roddy and Python 3 compatibility by
+  Brian Curtin.
+
+Tests
+-----
+
+- Make the --coverage flag work for test.regrtest.
+
+- Issue #1677694: Refactor and improve test_timeout.  Original patch by
+  Björn Lindqvist.
+
+- Issue #5485: Add tests for the UseForeignDTD method of expat parser objects.
+  Patch by Jean-Paul Calderone and Sandro Tosi.
+
+- Issue #6293: Have regrtest.py echo back sys.flags.  This is done by default
+  in whole runs and enabled selectively using ``--header`` when running an
+  explicit list of tests.  Original patch by Collin Winter.
 
 
 What's New in Python 3.2 Beta 2?
@@ -1365,6 +1502,12 @@ Core and Builtins
 
 Extension Modules
 -----------------
+
+- Issue #8013: time.asctime and time.ctime no longer call system
+  asctime and ctime functions.  The year range for time.asctime is now
+  1900 through maxint.  The range for time.ctime is the same as for
+  time.localtime.  The string produced by these functions is longer
+  than 24 characters when year is greater than 9999.
 
 - Issue #6608: time.asctime is now checking struct tm fields its input
   before passing it to the system asctime.  Patch by MunSic Jeong.

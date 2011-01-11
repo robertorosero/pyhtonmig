@@ -17,7 +17,8 @@ import email.quoprimime
 import email.base64mime
 
 from email.errors import HeaderParseError
-from email.charset import Charset
+from email import charset as _charset
+Charset = _charset.Charset
 
 NL = '\n'
 SPACE = ' '
@@ -45,6 +46,10 @@ ecre = re.compile(r'''
 # according to RFC 2822.  Character range is from tilde to exclamation mark.
 # For use with .match()
 fcre = re.compile(r'[\041-\176]+:$')
+
+# Find a header embeded in a putative header value.  Used to check for
+# header injection attack.
+_embeded_header = re.compile(r'\n[^ \t]+:')
 
 
 
@@ -210,6 +215,9 @@ class Header:
             # from a charset to None/us-ascii, or from None/us-ascii to a
             # charset.  Only do this for the second and subsequent chunks.
             nextcs = charset
+            if nextcs == _charset.UNKNOWN8BIT:
+                original_bytes = string.encode('ascii', 'surrogateescape')
+                string = original_bytes.decode('ascii', 'replace')
             if uchunks:
                 if lastcs not in (None, 'us-ascii'):
                     if nextcs in (None, 'us-ascii'):
@@ -245,32 +253,27 @@ class Header:
         that byte string, and a UnicodeError will be raised if the string
         cannot be decoded with that charset.  If s is a Unicode string, then
         charset is a hint specifying the character set of the characters in
-        the string.  In this case, when producing an RFC 2822 compliant header
-        using RFC 2047 rules, the Unicode string will be encoded using the
-        following charsets in order: us-ascii, the charset hint, utf-8.  The
-        first character set not to provoke a UnicodeError is used.
+        the string.  In either case, when producing an RFC 2822 compliant
+        header using RFC 2047 rules, the string will be encoded using the
+        output codec of the charset.  If the string cannot be encoded to the
+        output codec, a UnicodeError will be raised.
 
-        Optional `errors' is passed as the third argument to any unicode() or
-        ustr.encode() call.
+        Optional `errors' is passed as the errors argument to the decode
+        call if s is a byte string.
         """
         if charset is None:
             charset = self._charset
         elif not isinstance(charset, Charset):
             charset = Charset(charset)
-        if isinstance(s, str):
-            # Convert the string from the input character set to the output
-            # character set and store the resulting bytes and the charset for
-            # composition later.
+        if not isinstance(s, str):
             input_charset = charset.input_codec or 'us-ascii'
-            input_bytes = s.encode(input_charset, errors)
-        else:
-            # We already have the bytes we will store internally.
-            input_bytes = s
+            s = s.decode(input_charset, errors)
         # Ensure that the bytes we're storing can be decoded to the output
         # character set, otherwise an early error is thrown.
         output_charset = charset.output_codec or 'us-ascii'
-        output_string = input_bytes.decode(output_charset, errors)
-        self._chunks.append((output_string, charset))
+        if output_charset != _charset.UNKNOWN8BIT:
+            s.encode(output_charset, errors)
+        self._chunks.append((s, charset))
 
     def encode(self, splitchars=';, \t', maxlinelen=None, linesep='\n'):
         """Encode a message header into an RFC-compliant format.
@@ -311,12 +314,21 @@ class Header:
                                     self._continuation_ws, splitchars)
         for string, charset in self._chunks:
             lines = string.splitlines()
-            for line in lines:
+            formatter.feed(lines[0], charset)
+            for line in lines[1:]:
+                formatter.newline()
+                if charset.header_encoding is not None:
+                    formatter.feed(self._continuation_ws, USASCII)
+                    line = ' ' + line.lstrip()
                 formatter.feed(line, charset)
-                if len(lines) > 1:
-                    formatter.newline()
+            if len(lines) > 1:
+                formatter.newline()
             formatter.add_transition()
-        return formatter._str(linesep)
+        value = formatter._str(linesep)
+        if _embeded_header.search(value):
+            raise HeaderParseError("header value appears to contain "
+                "an embedded header: {!r}".format(value))
+        return value
 
     def _normalize(self):
         # Step 1: Normalize the chunks so that all runs of identical charsets

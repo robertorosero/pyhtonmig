@@ -94,14 +94,15 @@ Here is the :class:`Header` class description:
       decoded with that character set.
 
       If *s* is an instance of :class:`str`, then *charset* is a hint specifying
-      the character set of the characters in the string.  In this case, when
-      producing an :rfc:`2822`\ -compliant header using :rfc:`2047` rules, the
-      Unicode string will be encoded using the following charsets in order:
-      ``us-ascii``, the *charset* hint, ``utf-8``.  The first character set to
-      not provoke a :exc:`UnicodeError` is used.
+      the character set of the characters in the string.
 
-      Optional *errors* is passed through to any :func:`encode` or
-      :func:`ustr.encode` call, and defaults to "strict".
+      In either case, when producing an :rfc:`2822`\ -compliant header using
+      :rfc:`2047` rules, the string will be encoded using the output codec of
+      the charset.  If the string cannot be encoded using the output codec, a
+      UnicodeError will be raised.
+
+      Optional *errors* is passed as the errors argument to the decode call
+      if *s* is a byte string.
 
 
    .. method:: encode(splitchars=';, \\t', maxlinelen=None, linesep='\\n')
@@ -129,13 +130,15 @@ Here is the :class:`Header` class description:
 
    .. method:: __str__()
 
-      A synonym for :meth:`Header.encode`.  Useful for ``str(aHeader)``.
+      Returns an approximation of the :class:`Header` as a string, using an
+      unlimited line length.  All pieces are converted to unicode using the
+      specified encoding and joined together appropriately.  Any pieces with a
+      charset of `unknown-8bit` are decoded as `ASCII` using the `replace`
+      error handler.
 
+      .. versionchanged:: 3.2
+         Added handling for the `unknown-8bit` charset.
 
-   .. method:: __unicode__()
-
-      A helper for :class:`str`'s :func:`encode` method.  Returns the header as
-      a Unicode string.
 
    .. method:: __eq__(other)
 

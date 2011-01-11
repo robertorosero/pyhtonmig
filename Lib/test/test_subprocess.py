@@ -903,6 +903,106 @@ class POSIXProcessTestCase(BaseTestCase):
         self.assertStderrEqual(stderr, b'')
         self.assertEqual(p.wait(), -signal.SIGTERM)
 
+    def check_close_std_fds(self, fds):
+        # Issue #9905: test that subprocess pipes still work properly with
+        # some standard fds closed
+        stdin = 0
+        newfds = []
+        for a in fds:
+            b = os.dup(a)
+            newfds.append(b)
+            if a == 0:
+                stdin = b
+        try:
+            for fd in fds:
+                os.close(fd)
+            out, err = subprocess.Popen([sys.executable, "-c",
+                              'import sys;'
+                              'sys.stdout.write("apple");'
+                              'sys.stdout.flush();'
+                              'sys.stderr.write("orange")'],
+                       stdin=stdin,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE).communicate()
+            err = support.strip_python_stderr(err)
+            self.assertEqual((out, err), (b'apple', b'orange'))
+        finally:
+            for b, a in zip(newfds, fds):
+                os.dup2(b, a)
+            for b in newfds:
+                os.close(b)
+
+    def test_close_fd_0(self):
+        self.check_close_std_fds([0])
+
+    def test_close_fd_1(self):
+        self.check_close_std_fds([1])
+
+    def test_close_fd_2(self):
+        self.check_close_std_fds([2])
+
+    def test_close_fds_0_1(self):
+        self.check_close_std_fds([0, 1])
+
+    def test_close_fds_0_2(self):
+        self.check_close_std_fds([0, 2])
+
+    def test_close_fds_1_2(self):
+        self.check_close_std_fds([1, 2])
+
+    def test_close_fds_0_1_2(self):
+        # Issue #10806: test that subprocess pipes still work properly with
+        # all standard fds closed.
+        self.check_close_std_fds([0, 1, 2])
+
+    def test_remapping_std_fds(self):
+        # open up some temporary files
+        temps = [mkstemp() for i in range(3)]
+        try:
+            temp_fds = [fd for fd, fname in temps]
+
+            # unlink the files -- we won't need to reopen them
+            for fd, fname in temps:
+                os.unlink(fname)
+
+            # write some data to what will become stdin, and rewind
+            os.write(temp_fds[1], b"STDIN")
+            os.lseek(temp_fds[1], 0, 0)
+
+            # move the standard file descriptors out of the way
+            saved_fds = [os.dup(fd) for fd in range(3)]
+            try:
+                # duplicate the file objects over the standard fd's
+                for fd, temp_fd in enumerate(temp_fds):
+                    os.dup2(temp_fd, fd)
+
+                # now use those files in the "wrong" order, so that subprocess
+                # has to rearrange them in the child
+                p = subprocess.Popen([sys.executable, "-c",
+                    'import sys; got = sys.stdin.read();'
+                    'sys.stdout.write("got %s"%got); sys.stderr.write("err")'],
+                    stdin=temp_fds[1],
+                    stdout=temp_fds[2],
+                    stderr=temp_fds[0])
+                p.wait()
+            finally:
+                # restore the original fd's underneath sys.stdin, etc.
+                for std, saved in enumerate(saved_fds):
+                    os.dup2(saved, std)
+                    os.close(saved)
+
+            for fd in temp_fds:
+                os.lseek(fd, 0, 0)
+
+            out = os.read(temp_fds[2], 1024)
+            err = support.strip_python_stderr(os.read(temp_fds[0], 1024))
+            self.assertEqual(out, b"got STDIN")
+            self.assertEqual(err, b"err")
+
+        finally:
+            for fd in temp_fds:
+                os.close(fd)
+
     def test_surrogates_error_message(self):
         def prepare():
             raise ValueError("surrogate:\uDCff")
@@ -1022,6 +1122,9 @@ class POSIXProcessTestCase(BaseTestCase):
         self.assertTrue(readfiles, "The child hung")
         self.assertEqual(p2.stdout.read(), data)
 
+        p1.stdout.close()
+        p2.stdout.close()
+
     def test_close_fds(self):
         fd_status = support.findfile("fd_status.py", subdir="subprocessdata")
 
@@ -1053,6 +1156,9 @@ class POSIXProcessTestCase(BaseTestCase):
 
         open_fds = set()
 
+        if support.verbose:
+            print(" -- maxfd =", subprocess.MAXFD)
+
         for x in range(5):
             fds = os.pipe()
             self.addCleanup(os.close, fds[0])
@@ -1067,6 +1173,10 @@ class POSIXProcessTestCase(BaseTestCase):
 
             remaining_fds = set(map(int, output.split(b',')))
             to_be_closed = open_fds - {fd}
+            # Temporary debug output for intermittent failures
+            if support.verbose:
+                print(" -- fds that should have been closed:", to_be_closed)
+                print(" -- fds that remained open:", remaining_fds)
 
             self.assertIn(fd, remaining_fds, "fd to be passed not passed")
             self.assertFalse(remaining_fds & to_be_closed,

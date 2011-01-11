@@ -561,6 +561,18 @@ class TestMessageAPI(TestEmailBase):
             "attachment; filename*=utf-8''Fu%C3%9Fballer%20%5Bfilename%5D.ppt",
             msg['Content-Disposition'])
 
+    # Issue 5871: reject an attempt to embed a header inside a header value
+    # (header injection attack).
+    def test_embeded_header_via_Header_rejected(self):
+        msg = Message()
+        msg['Dummy'] = Header('dummy\nX-Injected-Header: test')
+        self.assertRaises(errors.HeaderParseError, msg.as_string)
+
+    def test_embeded_header_via_string_rejected(self):
+        msg = Message()
+        msg['Dummy'] = 'dummy\nX-Injected-Header: test'
+        self.assertRaises(errors.HeaderParseError, msg.as_string)
+
 
 # Test the email.encoders module
 class TestEncoders(unittest.TestCase):
@@ -967,6 +979,19 @@ List: List-Unsubscribe: <http://lists.sourceforge.net/lists/listinfo/spamassassi
         <mailto:spamassassin-talk-request@lists.sourceforge.net?subject=unsubscribe>
 
 """)
+
+    def test_long_rfc2047_header_with_embedded_fws(self):
+        h = Header(textwrap.dedent("""\
+            We're going to pretend this header is in a non-ascii character set
+            \tto see if line wrapping with encoded words and embedded
+               folding white space works"""),
+                   charset='utf-8',
+                   header_name='Test')
+        self.assertEqual(h.encode()+'\n', textwrap.dedent("""\
+            =?utf-8?q?We=27re_going_to_pretend_this_header_is_in_a_non-ascii_chara?=
+             =?utf-8?q?cter_set?=
+             =?utf-8?q?_to_see_if_line_wrapping_with_encoded_words_and_embedded?=
+             =?utf-8?q?_folding_white_space_works?=""")+'\n')
 
 
 
@@ -2828,7 +2853,7 @@ class Test8BitBytesHandling(unittest.TestCase):
                                      cte='8bit',
                                      bodyline='pöstal').encode('utf-8')
         msg = email.message_from_bytes(m)
-        self.assertEqual(msg.get_payload(), "p��stal\n")
+        self.assertEqual(msg.get_payload(), "p\uFFFD\uFFFDstal\n")
         self.assertEqual(msg.get_payload(decode=True),
                          "pöstal\n".encode('utf-8'))
 
@@ -2861,7 +2886,7 @@ class Test8BitBytesHandling(unittest.TestCase):
                                      cte='quoted-printable',
                                      bodyline='p=C3=B6stál').encode('utf-8')
         msg = email.message_from_bytes(m)
-        self.assertEqual(msg.get_payload(), 'p=C3=B6st��l\n')
+        self.assertEqual(msg.get_payload(), 'p=C3=B6st\uFFFD\uFFFDl\n')
         self.assertEqual(msg.get_payload(decode=True),
                         'pöstál\n'.encode('utf-8'))
 
@@ -2886,52 +2911,65 @@ class Test8BitBytesHandling(unittest.TestCase):
                          '<,.V<W1A; á \n'.encode('utf-8'))
 
 
-    headertest_msg = textwrap.dedent("""\
-        From: foo@bar.com
-        To: báz
-        Subject: Maintenant je vous présente mon collègue, le pouf célèbre
-        \tJean de Baddie
-        From: göst
-
-        Yes, they are flying.
-        """).encode('utf-8')
+    headertest_headers = (
+        ('From: foo@bar.com', ('From', 'foo@bar.com')),
+        ('To: báz', ('To', '=?unknown-8bit?q?b=C3=A1z?=')),
+        ('Subject: Maintenant je vous présente mon collègue, le pouf célèbre\n'
+            '\tJean de Baddie',
+            ('Subject', '=?unknown-8bit?q?Maintenant_je_vous_pr=C3=A9sente_mon_'
+                'coll=C3=A8gue=2C_le_pouf_c=C3=A9l=C3=A8bre?=\n'
+                ' =?unknown-8bit?q?_Jean_de_Baddie?=')),
+        ('From: göst', ('From', '=?unknown-8bit?b?Z8O2c3Q=?=')),
+        )
+    headertest_msg = ('\n'.join([src for (src, _) in headertest_headers]) +
+        '\nYes, they are flying.\n').encode('utf-8')
 
     def test_get_8bit_header(self):
         msg = email.message_from_bytes(self.headertest_msg)
-        self.assertEqual(msg.get('to'), 'b??z')
-        self.assertEqual(msg['to'], 'b??z')
+        self.assertEqual(str(msg.get('to')), 'b\uFFFD\uFFFDz')
+        self.assertEqual(str(msg['to']), 'b\uFFFD\uFFFDz')
 
     def test_print_8bit_headers(self):
         msg = email.message_from_bytes(self.headertest_msg)
         self.assertEqual(str(msg),
-                         self.headertest_msg.decode(
-                            'ascii', 'replace').replace('�', '?'))
+                         textwrap.dedent("""\
+                            From: {}
+                            To: {}
+                            Subject: {}
+                            From: {}
+
+                            Yes, they are flying.
+                            """).format(*[expected[1] for (_, expected) in
+                                        self.headertest_headers]))
 
     def test_values_with_8bit_headers(self):
         msg = email.message_from_bytes(self.headertest_msg)
-        self.assertListEqual(msg.values(),
+        self.assertListEqual([str(x) for x in msg.values()],
                               ['foo@bar.com',
-                               'b??z',
-                               'Maintenant je vous pr??sente mon '
-                                   'coll??gue, le pouf c??l??bre\n'
+                               'b\uFFFD\uFFFDz',
+                               'Maintenant je vous pr\uFFFD\uFFFDsente mon '
+                                   'coll\uFFFD\uFFFDgue, le pouf '
+                                   'c\uFFFD\uFFFDl\uFFFD\uFFFDbre\n'
                                    '\tJean de Baddie',
-                               "g??st"])
+                               "g\uFFFD\uFFFDst"])
 
     def test_items_with_8bit_headers(self):
         msg = email.message_from_bytes(self.headertest_msg)
-        self.assertListEqual(msg.items(),
+        self.assertListEqual([(str(x), str(y)) for (x, y) in msg.items()],
                               [('From', 'foo@bar.com'),
-                               ('To', 'b??z'),
-                               ('Subject', 'Maintenant je vous pr??sente mon '
-                                              'coll??gue, le pouf c??l??bre\n'
-                                              '\tJean de Baddie'),
-                               ('From', 'g??st')])
+                               ('To', 'b\uFFFD\uFFFDz'),
+                               ('Subject', 'Maintenant je vous '
+                                  'pr\uFFFD\uFFFDsente '
+                                  'mon coll\uFFFD\uFFFDgue, le pouf '
+                                  'c\uFFFD\uFFFDl\uFFFD\uFFFDbre\n'
+                                  '\tJean de Baddie'),
+                               ('From', 'g\uFFFD\uFFFDst')])
 
     def test_get_all_with_8bit_headers(self):
         msg = email.message_from_bytes(self.headertest_msg)
-        self.assertListEqual(msg.get_all('from'),
+        self.assertListEqual([str(x) for x in msg.get_all('from')],
                               ['foo@bar.com',
-                               'g??st'])
+                               'g\uFFFD\uFFFDst'])
 
     non_latin_bin_msg = textwrap.dedent("""\
         From: foo@bar.com
@@ -2951,13 +2989,12 @@ class Test8BitBytesHandling(unittest.TestCase):
         email.generator.BytesGenerator(out).flatten(msg)
         self.assertEqual(out.getvalue(), self.non_latin_bin_msg)
 
-    # XXX: ultimately the '?' should turn into CTE encoded bytes
-    # using 'unknown-8bit' charset.
-    non_latin_bin_msg_as7bit = textwrap.dedent("""\
+    non_latin_bin_msg_as7bit_wrapped = textwrap.dedent("""\
         From: foo@bar.com
-        To: b??z
-        Subject: Maintenant je vous pr??sente mon coll??gue, le pouf c??l??bre
-        \tJean de Baddie
+        To: =?unknown-8bit?q?b=C3=A1z?=
+        Subject: =?unknown-8bit?q?Maintenant_je_vous_pr=C3=A9sente_mon_coll=C3=A8gue?=
+         =?unknown-8bit?q?=2C_le_pouf_c=C3=A9l=C3=A8bre?=
+         =?unknown-8bit?q?_Jean_de_Baddie?=
         Mime-Version: 1.0
         Content-Type: text/plain; charset="utf-8"
         Content-Transfer-Encoding: base64
@@ -2969,7 +3006,7 @@ class Test8BitBytesHandling(unittest.TestCase):
         msg = email.message_from_bytes(self.non_latin_bin_msg)
         out = StringIO()
         email.generator.Generator(out).flatten(msg)
-        self.assertEqual(out.getvalue(), self.non_latin_bin_msg_as7bit)
+        self.assertEqual(out.getvalue(), self.non_latin_bin_msg_as7bit_wrapped)
 
     def test_bytes_generator_with_unix_from(self):
         # The unixfrom contains a current date, so we can't check it
@@ -2981,6 +3018,12 @@ class Test8BitBytesHandling(unittest.TestCase):
         lines = out.getvalue().split(b'\n')
         self.assertEqual(lines[0].split()[0], b'From')
         self.assertEqual(b'\n'.join(lines[1:]), self.non_latin_bin_msg)
+
+    non_latin_bin_msg_as7bit = non_latin_bin_msg_as7bit_wrapped.split('\n')
+    non_latin_bin_msg_as7bit[2:4] = [
+        'Subject: =?unknown-8bit?q?Maintenant_je_vous_pr=C3=A9sente_mon_'
+         'coll=C3=A8gue=2C_le_pouf_c=C3=A9l=C3=A8bre?=']
+    non_latin_bin_msg_as7bit = '\n'.join(non_latin_bin_msg_as7bit)
 
     def test_message_from_binary_file(self):
         fn = 'test.msg'
@@ -3619,6 +3662,10 @@ A very long line that must get split to something other than at the
         raises = self.assertRaises
         s = 'Subject: =?EUC-KR?B?CSixpLDtKSC/7Liuvsax4iC6uLmwMcijIKHaILzSwd/H0SC8+LCjwLsgv7W/+Mj3I ?='
         raises(errors.HeaderParseError, decode_header, s)
+
+    def test_shift_jis_charset(self):
+        h = Header('文', charset='shift_jis')
+        self.assertEqual(h.encode(), '=?iso-2022-jp?b?GyRCSjgbKEI=?=')
 
 
 
