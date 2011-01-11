@@ -201,7 +201,7 @@ Makefile vars.mk cdecimal.o $(LIBSTATIC)
 
 check: $(LIBSTATIC) FORCE
 	cd tests && $(MAKE) "CFLAGS=$(CFLAGS)" "LDFLAGS=$(LDFLAGS)" && ./runshort.sh
- 
+
 extended:\
 Makefile $(LIBSTATIC)
 	cd tests && $(MAKE) extended
@@ -243,7 +243,7 @@ profile:
 install: FORCE
 	mkdir -p $(DESTDIR)$(includedir) && cp mpdecimal.h $(DESTDIR)$(includedir)
 	mkdir -p $(DESTDIR)$(libdir) && cp $(LIBSTATIC) $(LIBSHARED) $(DESTDIR)$(libdir)
-	mkdir -p $(DESTDIR)$(docdir) && cp -Rp doc/* $(DESTDIR)$(docdir)
+	mkdir -p $(DESTDIR)$(docdir) && cp -R doc/* $(DESTDIR)$(docdir)
 
 clean: FORCE
 	rm -f *.o *.so *.gch *.gcda *.gcno *.gcov *.dyn *.dpi *.lock \
