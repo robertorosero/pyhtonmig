@@ -799,7 +799,7 @@ context_setprec(PyObject *self, PyObject *value, void *closure UNUSED)
 	ctx = CtxAddr(self);
 	if (!mpd_qsetprec(ctx, x)) {
 		return value_error_int(
-		    "valid range for prec is [0, MAX_PREC].");
+		    "valid range for prec is [1, MAX_PREC].");
 	}
 
 	return 0;
