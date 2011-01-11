@@ -246,23 +246,41 @@ case "$MACHINE" in
     ppro)
         MPD_CONFIG=$M32"-DCONFIG_32 -DPPRO -DASM"
         CONFIGURE_LDFLAGS=$M32
-        # gcc-4.5 miscompiles inline asm:
+        # Some versions of gcc miscompile inline asm:
         # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=46491
         # http://gcc.gnu.org/ml/gcc/2010-11/msg00366.html
         case $CC in
             *gcc*)
-                AC_MSG_CHECKING(for gcc-4.5)
-                gcc_version=`$CC -dumpversion`
-                have_gcc_4_5=no
-                case $gcc_version in
-                    4.5*)
-                        have_gcc_4_5=yes
-                        MPD_CONFIG="$MPD_CONFIG -fno-ipa-pure-const"
-                        AC_DEFINE(HAVE_GCC_4_5, 1,
-                        [Define if the gcc version is 4.5.x.])
-                    ;;
-                esac
-                AC_MSG_RESULT($have_gcc_4_5)
+                AC_MSG_CHECKING(for gcc ipa-pure-const bug)
+                saved_cflags="$CFLAGS"
+                CFLAGS="-O2"
+                AC_RUN_IFELSE([AC_LANG_SOURCE([[
+                __attribute__((noinline)) int
+                foo(int *p) {
+                  int r;
+                  asm ( "movl \$6, (%1)\n\t"
+                        "xorl %0, %0\n\t"
+                        : "=r" (r) : "r" (p) : "memory"
+                  );
+                  return r;
+                }
+                int main() {
+                  int p = 8;
+                  if ((foo(&p) ? : p) != 6)
+                    return 1;
+                  return 0;
+                }
+                ]])],
+                [have_ipa_pure_const_bug=no],
+                [have_ipa_pure_const_bug=yes],
+                [have_ipa_pure_const_bug=undefined])
+                CFLAGS="$saved_cflags"
+                AC_MSG_RESULT($have_ipa_pure_const_bug)
+                if test "$have_ipa_pure_const_bug" = yes; then
+                    MPD_CONFIG="$MPD_CONFIG -fno-ipa-pure-const"
+                    AC_DEFINE(HAVE_IPA_PURE_CONST_BUG, 1,
+                [Define if gcc has the ipa-pure-const bug.])
+                fi
             ;;
         esac
         ;;
