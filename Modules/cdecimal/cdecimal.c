@@ -391,7 +391,7 @@ dec_addstatus(mpd_context_t *ctx, uint32_t status)
 	if (ctx->traps&status) {
 		PyObject *ex, *siglist;
 
- 		ex = flags_as_exception(ctx->traps&status);
+		ex = flags_as_exception(ctx->traps&status);
 		if (ex == NULL) {
 			return 1; /* GCOV_NOT_REACHED */
 		}
@@ -498,7 +498,7 @@ signaldict_richcompare(PyObject *a, PyObject *b, int op)
 	}
 	return PyDict_Type.tp_richcompare(a, b, op);
 }
- 
+
 static int
 signaldict_contains(PyObject *self, PyObject *key)
 {
@@ -2234,11 +2234,11 @@ _PyDec_FromFloat_Max(PyObject *self, PyObject *v)
 	}
 	k--;
 
-	if ((d1 = mpd_qnew()) == NULL) { 
+	if ((d1 = mpd_qnew()) == NULL) {
 		Py_DECREF(n_d); /* GCOV_UNLIKELY */
 		return NULL; /* GCOV_UNLIKELY */
 	}
-	if ((d2 = mpd_qnew()) == NULL) { 
+	if ((d2 = mpd_qnew()) == NULL) {
 		mpd_del(d1); /* GCOV_UNLIKELY */
 		Py_DECREF(n_d); /* GCOV_UNLIKELY */
 		return NULL; /* GCOV_UNLIKELY */
@@ -3539,7 +3539,7 @@ _Dec_mpd_qpow(PyObject *base, PyObject *exp, PyObject *mod)
 	CONVERT_BINOP(base, exp, &a, &b, ctx);
 
 	if (mod != Py_None) {
- 		if (!convert_op(mod, &c, ctx)) {
+		if (!convert_op(mod, &c, ctx)) {
 			Py_DECREF(a);
 			Py_DECREF(b);
 			return (PyObject *) c;
@@ -3549,7 +3549,7 @@ _Dec_mpd_qpow(PyObject *base, PyObject *exp, PyObject *mod)
 	if ((result = dec_alloc()) == NULL) {
 		return NULL; /* GCOV_UNLIKELY */
 	}
- 
+
 	if (c == NULL) {
 		mpd_qpow(result->dec, a->dec, b->dec, ctx, &status);
 	}

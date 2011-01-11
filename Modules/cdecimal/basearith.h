@@ -96,7 +96,7 @@ _mpd_div_words_r(mpd_uint_t *q, mpd_uint_t *r, mpd_uint_t hi, mpd_uint_t lo)
 	h += hi;
 	h -= MPD_RADIX;
 
-	*q = (h - t); 
+	*q = (h - t);
 	*r = l + (MPD_RADIX & h);
 }
 #else

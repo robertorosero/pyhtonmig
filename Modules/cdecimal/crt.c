@@ -177,7 +177,7 @@ crt3(mpd_uint_t *x1, mpd_uint_t *x2, mpd_uint_t *x3, mpd_size_t rsize)
 
 		_crt_mulP1P2_3(t, s);
 		_crt_add3(z, t);
-	 	_crt_add3(carry, z);
+		_crt_add3(carry, z);
 
 		x1[i] = _crt_div3(carry, carry, MPD_RADIX);
 	}

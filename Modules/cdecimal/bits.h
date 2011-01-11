@@ -105,7 +105,7 @@ mpd_bsf(mpd_size_t n)
  * Caller has to make sure that a is not 0.
  */
 static inline int
-mpd_bsr(mpd_size_t a) 
+mpd_bsr(mpd_size_t a)
 {
 	mpd_size_t retval;
 
@@ -128,7 +128,7 @@ mpd_bsr(mpd_size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int
-mpd_bsf(mpd_size_t a) 
+mpd_bsf(mpd_size_t a)
 {
 	mpd_size_t retval;
 
@@ -154,7 +154,7 @@ mpd_bsf(mpd_size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-mpd_bsr(mpd_size_t a) 
+mpd_bsr(mpd_size_t a)
 {
 	unsigned long retval;
 
@@ -172,7 +172,7 @@ mpd_bsr(mpd_size_t a)
  * Caller has to make sure that a is not 0.
  */
 static inline int __cdecl
-mpd_bsf(mpd_size_t a) 
+mpd_bsf(mpd_size_t a)
 {
 	unsigned long retval;
 

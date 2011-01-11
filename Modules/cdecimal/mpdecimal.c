@@ -1364,7 +1364,7 @@ mpd_qget_i32(const mpd_t *a, uint32_t *status)
  * Check if the operand is NaN, copy to result and return 1 if this is
  * the case. Copying can fail since NaNs are allowed to have a payload that
  * does not fit in MPD_MINALLOC.
- */ 
+ */
 int
 mpd_qcheck_nan(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
                uint32_t *status)
@@ -1383,7 +1383,7 @@ mpd_qcheck_nan(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
  * Check if either operand is NaN, copy to result and return 1 if this
  * is the case. Copying can fail since NaNs are allowed to have a payload
  * that does not fit in MPD_MINALLOC.
- */ 
+ */
 int
 mpd_qcheck_nans(mpd_t *result, const mpd_t *a, const mpd_t *b,
                 const mpd_context_t *ctx, uint32_t *status)
@@ -1412,7 +1412,7 @@ mpd_qcheck_nans(mpd_t *result, const mpd_t *a, const mpd_t *b,
  * Check if one of the operands is NaN, copy to result and return 1 if this
  * is the case. Copying can fail since NaNs are allowed to have a payload
  * that does not fit in MPD_MINALLOC.
- */ 
+ */
 static int
 mpd_qcheck_3nans(mpd_t *result, const mpd_t *a, const mpd_t *b, const mpd_t *c,
                  const mpd_context_t *ctx, uint32_t *status)
@@ -1513,7 +1513,7 @@ _mpd_apply_round(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx,
 
 /*
  * Apply rounding to a decimal. Allow overflow of the precision.
- */ 
+ */
 static inline void
 _mpd_apply_round_excess(mpd_t *dec, mpd_uint_t rnd, const mpd_context_t *ctx,
                         uint32_t *status)
@@ -1631,7 +1631,7 @@ _mpd_check_exp(mpd_t *dec, const mpd_context_t *ctx, uint32_t *status)
 		if (mpd_iszerocoeff(dec)) {
 			if (dec->exp < etiny) {
 				dec->exp = etiny;
-				mpd_zerocoeff(dec); 
+				mpd_zerocoeff(dec);
 				*status |= MPD_Clamped;
 			}
 			return;
@@ -1865,7 +1865,7 @@ mpd_qcopy_sign(mpd_t *result, const mpd_t *a, const mpd_t *b, uint32_t *status)
  * Compare the data of big and small. This function does the equivalent
  * of first shifting small to the left and then comparing the data of
  * big and small, except that no allocation for the left shift is needed.
- */ 
+ */
 static int
 _mpd_basecmp(mpd_uint_t *big, mpd_uint_t *small, mpd_size_t n, mpd_size_t m,
              mpd_size_t shift)
@@ -2269,7 +2269,7 @@ _mpd_get_rnd(const mpd_uint_t *data, mpd_ssize_t len, int use_msd)
  * Same as mpd_qshiftr(), but 'result' is a static array. It is the
  * caller's responsibility to make sure that the array is big enough.
  * The function cannot fail.
- */ 
+ */
 mpd_uint_t
 mpd_qsshiftr(mpd_t *result, const mpd_t *a, mpd_ssize_t n)
 {
@@ -3821,7 +3821,7 @@ _mpd_get_exp_iterations(const mpd_t *a, mpd_ssize_t prec)
  * ACM Transactions on Mathematical Software, Vol. 12, No. 2, June 1986.
  *
  * Main differences:
- * 
+ *
  *  - The number of iterations for the Horner scheme is calculated using the
  *    C log10() function.
  *
@@ -3854,7 +3854,7 @@ _mpd_qexp(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	 *       this will also happen for t > 10 (32 bit) or (t > 19) (64 bit).
 	 */
 #if defined(CONFIG_64)
- 	#define MPD_EXP_MAX_T 19
+	#define MPD_EXP_MAX_T 19
 #elif defined(CONFIG_32)
 	#define MPD_EXP_MAX_T 10
 #endif
@@ -4362,7 +4362,7 @@ mpd_qln(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	 *
 	 * 2) |log10(a)| >= adjexp(a), if adjexp(a) >= 0
 	 *    |log10(a)| > -adjexp(a)-1, if adjexp(a) < 0
-	 * 
+	 *
 	 * 3) |log(a)| > 2*|log10(a)|
 	 */
 	adjexp = mpd_adjexp(a);
@@ -5460,7 +5460,7 @@ mpd_qnext_plus(mpd_t *result, const mpd_t *a, const mpd_context_t *ctx,
 	*status |= (workctx.status&MPD_Errors);
 }
 
-/* 
+/*
  * The number closest to the first operand that is in the direction towards
  * the second operand.
  */
@@ -5530,7 +5530,7 @@ _mpd_qpow_uint(mpd_t *result, mpd_t *base, mpd_uint_t exp, uint8_t resultsign,
 		}
 	}
 
-	*status |= workstatus; 
+	*status |= workstatus;
 	mpd_set_sign(result, resultsign);
 }
 
@@ -5756,7 +5756,7 @@ _qcheck_pow_one(mpd_t *result, const mpd_t *base, const mpd_t *exp,
  *
  *   Let (0 < x < 1 and y > 0) or (x > 1 and y < 0).                  (H3)
  *   Let ub_omega(exp_clamp) < lb_zeta(x) + lb_theta(y)               (H4)
- *                 
+ *
  *   Then:
  *     log10(abs(exp_clamp)) < log10(abs(log10(x))) + log10(abs(y)).   (4)
  *              log10(x) * y < exp_clamp                               (5)
@@ -5856,7 +5856,7 @@ _mpd_qpow_exact(mpd_t *result, const mpd_t *base, const mpd_t *exp,
 }
 */
 
-/* The power function for real exponents */ 
+/* The power function for real exponents */
 static void
 _mpd_qpow_real(mpd_t *result, const mpd_t *base, const mpd_t *exp,
                const mpd_context_t *ctx, uint32_t *status)
@@ -6113,7 +6113,7 @@ mpd_qpowmod(mpd_t *result, const mpd_t *base, const mpd_t *exp,
 		mpd_qrem(&tbase, &tbase, &tmod, &maxcontext, status);
 		mpd_qdivint(&texp, &texp, &two, &maxcontext, status);
 	}
-	if (mpd_isspecial(&texp) || mpd_isspecial(&tbase) || 
+	if (mpd_isspecial(&texp) || mpd_isspecial(&tbase) ||
             mpd_isspecial(&tmod) || mpd_isspecial(result)) {
 		/* MPD_Malloc_error */
 		goto mpd_errors;

@@ -79,7 +79,7 @@ static inline mpd_uint_t
 ext_submod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 {
 	mpd_uint_t d;
- 
+
 	a = (a >= m) ? a - m : a;
 	b = (b >= m) ? b - m : b;
 
@@ -146,7 +146,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 32;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		/* second reduction */
 		x = y = hi;
@@ -157,7 +157,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 32;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		return (hi || lo >= m ? lo - m : lo);
 	}
@@ -172,7 +172,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 34;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		/* second reduction */
 		x = y = hi;
@@ -183,7 +183,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 34;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		/* third reduction */
 		x = y = hi;
@@ -194,7 +194,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 34;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		return (hi || lo >= m ? lo - m : lo);
 	}
@@ -209,7 +209,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 40;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		/* second reduction */
 		x = y = hi;
@@ -220,7 +220,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 40;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		/* third reduction */
 		x = y = hi;
@@ -231,7 +231,7 @@ x64_mulmod(mpd_uint_t a, mpd_uint_t b, mpd_uint_t m)
 
 		y <<= 40;
 		lo = y + x;
- 		if (lo < y) hi++;
+		if (lo < y) hi++;
 
 		return (hi || lo >= m ? lo - m : lo);
 	}

@@ -468,7 +468,7 @@ _mpd_baseshiftr(mpd_uint_t *dest, mpd_uint_t *src, mpd_size_t slen,
 
 		_mpd_divmod_pow10(&hprev, &rest, src[q], r);
 		_mpd_divmod_pow10(&rnd, &rest, rest, r-1);
-	
+
 		if (rest == 0 && q > 0) {
 			rest = !_mpd_isallzero(src, q);
 		}

@@ -153,7 +153,7 @@ scan_dpoint_exp(const char *s, const char **dpoint, const char **exp,
 				}
 			}
 			break;
-					
+
 		}
 	}
 
@@ -269,7 +269,7 @@ mpd_qset_string(mpd_t *dec, const char *s, const mpd_context_t *ctx,
 			if (fracdigits > MPD_MAX_PREC) {
 				goto conversion_error;
 			}
- 			if (dec->exp < (MPD_SSIZE_MIN+1)+(mpd_ssize_t)fracdigits) {
+			if (dec->exp < (MPD_SSIZE_MIN+1)+(mpd_ssize_t)fracdigits) {
 				dec->exp = MPD_SSIZE_MIN+1;
 			}
 			else {
@@ -485,7 +485,7 @@ _mpd_to_string(const mpd_t *dec, int flags, mpd_ssize_t zeroexp)
 		 *
 		 * dplace: Position of the decimal point relative to the first
 		 *         member of the coefficient.
-		 * 
+		 *
 		 * 0.00000_.____._____000000.
 		 *  ^      ^    ^           ^
 		 *  |      |    |           |
@@ -744,7 +744,7 @@ mpd_parse_fmt_str(mpd_spec_t *spec, const char *fmt, int caps)
 
 	/* zero padding */
 	if (*cp == '0') {
-		/* zero padding implies alignment, which should not be 
+		/* zero padding implies alignment, which should not be
 		 * specified twice. */
 		if (have_align) {
 			return 0;
@@ -884,7 +884,7 @@ _mbstr_copy_pad(mpd_mbstr_t *dest, mpd_ssize_t n)
 static void
 _mpd_add_sep_dot(mpd_mbstr_t *dest,
                  const char *src, mpd_ssize_t n_src, /* integer part and length */
-                 const char *sign, const char *dot, const char *rest, 
+                 const char *sign, const char *dot, const char *rest,
                  mpd_spec_t *spec)
 {
 	mpd_ssize_t n_sep, n_sign, consume;
@@ -899,7 +899,7 @@ _mpd_add_sep_dot(mpd_mbstr_t *dest,
 
 	/* rest <= MPD_MAX_PREC */
 	_mbstr_copy_ascii(dest, rest, (mpd_ssize_t)strlen(rest));
-	
+
 	if (dot) {
 		_mbstr_copy_char(dest, dot, (mpd_ssize_t)strlen(dot));
 	}
