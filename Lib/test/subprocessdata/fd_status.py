@@ -4,6 +4,7 @@ file descriptors on stdout."""
 import errno
 import os
 import fcntl
+import subprocess
 import sys
 
 try:
@@ -27,3 +28,7 @@ if __name__ == "__main__":
     if '--debug' in sys.argv[1:]:
         for fd in fds:
             print(fd, fcntl.fcntl(fd, fcntl.F_GETFL), os.fstat(fd))
+        sys.stdout.flush()
+        subprocess.call("ls -la /proc/{}/fd/".format(os.getpid()), shell=True)
+        if 5 in fds:
+            subprocess.call("stat /proc/{}/fd/{}".format(os.getpid(), 5), shell=True)
