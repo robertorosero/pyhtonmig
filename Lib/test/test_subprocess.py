@@ -1075,13 +1075,13 @@ class POSIXProcessTestCase(BaseTestCase):
         sleeper = support.findfile("input_reader.py", subdir="subprocessdata")
         fd_status = support.findfile("fd_status.py", subdir="subprocessdata")
 
-        p1 = subprocess.Popen([sys.executable, sleeper],
+        p1 = subprocess.Popen([sys.executable, '-E', sleeper],
                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, close_fds=False)
 
         self.addCleanup(p1.communicate, b'')
 
-        p2 = subprocess.Popen([sys.executable, fd_status],
+        p2 = subprocess.Popen([sys.executable, '-E', fd_status],
                               stdout=subprocess.PIPE, close_fds=False)
 
         output, error = p2.communicate()
@@ -1134,7 +1134,7 @@ class POSIXProcessTestCase(BaseTestCase):
 
         open_fds = set(fds)
 
-        p = subprocess.Popen([sys.executable, fd_status],
+        p = subprocess.Popen([sys.executable, '-E', fd_status],
                              stdout=subprocess.PIPE, close_fds=False)
         output, ignored = p.communicate()
         remaining_fds = set(map(int, output.split(b',')))
@@ -1142,7 +1142,7 @@ class POSIXProcessTestCase(BaseTestCase):
         self.assertEqual(remaining_fds & open_fds, open_fds,
                          "Some fds were closed")
 
-        p = subprocess.Popen([sys.executable, fd_status],
+        p = subprocess.Popen([sys.executable, '-E', fd_status],
                              stdout=subprocess.PIPE, close_fds=True)
         output, ignored = p.communicate()
         remaining_fds = set(map(int, output.split(b',')))
@@ -1166,17 +1166,22 @@ class POSIXProcessTestCase(BaseTestCase):
             open_fds.update(fds)
 
         for fd in open_fds:
-            p = subprocess.Popen([sys.executable, fd_status],
+            p = subprocess.Popen([sys.executable, '-E', fd_status, '--debug'],
                                  stdout=subprocess.PIPE, close_fds=True,
                                  pass_fds=(fd, ))
             output, ignored = p.communicate()
 
-            remaining_fds = set(map(int, output.split(b',')))
+            # First line is the list of open fds, the rest is human-readable
+            # debug output.
+            remaining_fds, *debug = output.splitlines()
+            remaining_fds = set(map(int, remaining_fds.split(b',')))
             to_be_closed = open_fds - {fd}
             # Temporary debug output for intermittent failures
             if support.verbose:
                 print(" -- fds that should have been closed:", to_be_closed)
                 print(" -- fds that remained open:", remaining_fds)
+                print(" -- debug info:")
+                print("\n".join(s.decode('latin1') for s in debug))
 
             self.assertIn(fd, remaining_fds, "fd to be passed not passed")
             self.assertFalse(remaining_fds & to_be_closed,

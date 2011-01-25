@@ -4,6 +4,7 @@ file descriptors on stdout."""
 import errno
 import os
 import fcntl
+import sys
 
 try:
     _MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -21,4 +22,8 @@ def isopen(fd):
     return True
 
 if __name__ == "__main__":
-    print(','.join(str(fd) for fd in range(0, _MAXFD) if isopen(fd)))
+    fds = [fd for fd in range(0, _MAXFD) if isopen(fd)]
+    print(','.join(map(str, fds)))
+    if '--debug' in sys.argv[1:]:
+        for fd in fds:
+            print(fd, fcntl.fcntl(fd, fcntl.F_GETFL), os.fstat(fd))
