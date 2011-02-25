@@ -1466,9 +1466,11 @@ PyObject *PyUnicode_Decode(const char *s,
 
     /* Shortcuts for common default encodings */
     if (normalize_encoding(encoding, lower, sizeof(lower))) {
-        if (strcmp(lower, "utf-8") == 0)
+        if ((strcmp(lower, "utf-8") == 0) ||
+            (strcmp(lower, "utf8") == 0))
             return PyUnicode_DecodeUTF8(s, size, errors);
         else if ((strcmp(lower, "latin-1") == 0) ||
+                 (strcmp(lower, "latin1") == 0) ||
                  (strcmp(lower, "iso-8859-1") == 0))
             return PyUnicode_DecodeLatin1(s, size, errors);
 #if defined(MS_WINDOWS) && defined(HAVE_USABLE_WCHAR_T)
@@ -1676,11 +1678,13 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
 
     /* Shortcuts for common default encodings */
     if (normalize_encoding(encoding, lower, sizeof(lower))) {
-        if (strcmp(lower, "utf-8") == 0)
+        if ((strcmp(lower, "utf-8") == 0) ||
+            (strcmp(lower, "utf8") == 0))
             return PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
                                         PyUnicode_GET_SIZE(unicode),
                                         errors);
         else if ((strcmp(lower, "latin-1") == 0) ||
+                 (strcmp(lower, "latin1") == 0) ||
                  (strcmp(lower, "iso-8859-1") == 0))
             return PyUnicode_EncodeLatin1(PyUnicode_AS_UNICODE(unicode),
                                           PyUnicode_GET_SIZE(unicode),
