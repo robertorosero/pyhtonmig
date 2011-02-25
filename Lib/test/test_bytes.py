@@ -206,6 +206,8 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b.decode("utf8", "ignore"), "Hello world\n")
         self.assertEqual(b.decode(errors="ignore", encoding="utf8"),
                          "Hello world\n")
+        # Default encoding is utf-8
+        self.assertEqual(self.type2test(b'\xe2\x98\x83').decode(), '\u2603')
 
     def test_from_int(self):
         b = self.type2test(0)

@@ -1462,7 +1462,7 @@ PyObject *PyUnicode_Decode(const char *s,
     char lower[11];  /* Enough for any encoding shortcut */
 
     if (encoding == NULL)
-        encoding = PyUnicode_GetDefaultEncoding();
+        return PyUnicode_DecodeUTF8(s, size, errors);
 
     /* Shortcuts for common default encodings */
     if (normalize_encoding(encoding, lower, sizeof(lower))) {
@@ -1670,7 +1670,9 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
     }
 
     if (encoding == NULL)
-        encoding = PyUnicode_GetDefaultEncoding();
+        return PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(unicode),
+                                    PyUnicode_GET_SIZE(unicode),
+                                    errors);
 
     /* Shortcuts for common default encodings */
     if (normalize_encoding(encoding, lower, sizeof(lower))) {
