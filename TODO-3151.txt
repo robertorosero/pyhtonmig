@@ -1,0 +1,6 @@
+
+- rename all PyExc_WindowsError to PyExc_IOError
+- rename all PyExc_OSError to PyExc_IOError
+- rename all WindowsError to IOError
+- rename all OSError to IOError
+- LOAD_OLD_GLOBAL
