@@ -93,7 +93,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit(0)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 0)
+            self.assertEqual(exc.code, 0)
         except:
             self.fail("wrong exception")
         else:
@@ -104,7 +104,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit(42)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -114,7 +114,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((42,))
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -124,7 +124,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit("exit")
         except SystemExit as exc:
-            self.assertEquals(exc.code, "exit")
+            self.assertEqual(exc.code, "exit")
         except:
             self.fail("wrong exception")
         else:
@@ -134,7 +134,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((17, 23))
         except SystemExit as exc:
-            self.assertEquals(exc.code, (17, 23))
+            self.assertEqual(exc.code, (17, 23))
         except:
             self.fail("wrong exception")
         else:
@@ -188,7 +188,7 @@ class SysModuleTest(unittest.TestCase):
             orig = sys.getcheckinterval()
             for n in 0, 100, 120, orig: # orig last to restore starting state
                 sys.setcheckinterval(n)
-                self.assertEquals(sys.getcheckinterval(), n)
+                self.assertEqual(sys.getcheckinterval(), n)
 
     @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_switchinterval(self):
@@ -202,7 +202,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             for n in 0.00001, 0.05, 3.0, orig:
                 sys.setswitchinterval(n)
-                self.assertAlmostEquals(sys.getswitchinterval(), n)
+                self.assertAlmostEqual(sys.getswitchinterval(), n)
         finally:
             sys.setswitchinterval(orig)
 
@@ -215,6 +215,8 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(sys.getrecursionlimit(), 10000)
         sys.setrecursionlimit(oldlimit)
 
+    @unittest.skipIf(hasattr(sys, 'gettrace') and sys.gettrace(),
+                     'fatal error if run with a trace function')
     def test_recursionlimit_recovery(self):
         # NOTE: this test is slightly fragile in that it depends on the current
         # recursion count when executing the test being low enough so as to
@@ -301,6 +303,7 @@ class SysModuleTest(unittest.TestCase):
             self.assertEqual(sys.getdlopenflags(), oldflags+1)
             sys.setdlopenflags(oldflags)
 
+    @test.support.refcount_test
     def test_refcount(self):
         # n here must be a global in order for this test to pass while
         # tracing with a python function.  Tracing calls PyFrame_FastToLocals
@@ -501,7 +504,7 @@ class SysModuleTest(unittest.TestCase):
         attrs = ("debug", "division_warning",
                  "inspect", "interactive", "optimize", "dont_write_bytecode",
                  "no_user_site", "no_site", "ignore_environment", "verbose",
-                 "bytes_warning")
+                 "bytes_warning", "quiet")
         for attr in attrs:
             self.assertTrue(hasattr(sys.flags, attr), attr)
             self.assertEqual(type(getattr(sys.flags, attr)), int, attr)
@@ -569,7 +572,7 @@ class SizeofTest(unittest.TestCase):
     TPFLAGS_HEAPTYPE = 1<<9
 
     def setUp(self):
-        self.c = len(struct.pack('c', ' '))
+        self.c = len(struct.pack('c', b' '))
         self.H = len(struct.pack('H', 0))
         self.i = len(struct.pack('i', 0))
         self.l = len(struct.pack('l', 0))
@@ -782,8 +785,8 @@ class SizeofTest(unittest.TestCase):
         # reverse
         check(reversed(''), size(h + 'PP'))
         # range
-        check(range(1), size(h + '3P'))
-        check(range(66000), size(h + '3P'))
+        check(range(1), size(h + '4P'))
+        check(range(66000), size(h + '4P'))
         # set
         # frozenset
         PySet_MINSIZE = 8

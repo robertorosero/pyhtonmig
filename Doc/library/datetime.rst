@@ -1661,9 +1661,6 @@ version) requires, and these work on all platforms with a standard C
 implementation.  Note that the 1999 version of the C standard added additional
 format codes.
 
-The exact range of years for which :meth:`strftime` works also varies across
-platforms.  Regardless of platform, years before 1900 cannot be used.
-
 +-----------+--------------------------------+-------+
 | Directive | Meaning                        | Notes |
 +===========+================================+=======+
@@ -1706,7 +1703,7 @@ platforms.  Regardless of platform, years before 1900 cannot be used.
 |           | AM or PM.                      |       |
 +-----------+--------------------------------+-------+
 | ``%S``    | Second as a decimal number     | \(3)  |
-|           | [00,61].                       |       |
+|           | [00,59].                       |       |
 +-----------+--------------------------------+-------+
 | ``%U``    | Week number of the year        | \(4)  |
 |           | (Sunday as the first day of    |       |
@@ -1736,10 +1733,11 @@ platforms.  Regardless of platform, years before 1900 cannot be used.
 | ``%y``    | Year without century as a      |       |
 |           | decimal number [00,99].        |       |
 +-----------+--------------------------------+-------+
-| ``%Y``    | Year with century as a decimal |       |
-|           | number.                        |       |
+| ``%Y``    | Year with century as a decimal | \(5)  |
+|           | number [0001,9999] (strptime), |       |
+|           | [1000,9999] (strftime).        |       |
 +-----------+--------------------------------+-------+
-| ``%z``    | UTC offset in the form +HHMM   | \(5)  |
+| ``%z``    | UTC offset in the form +HHMM   | \(6)  |
 |           | or -HHMM (empty string if the  |       |
 |           | the object is naive).          |       |
 +-----------+--------------------------------+-------+
@@ -1763,18 +1761,26 @@ Notes:
    the output hour field if the ``%I`` directive is used to parse the hour.
 
 (3)
-   The range really is ``0`` to ``61``; according to the Posix standard this
-   accounts for leap seconds and the (very rare) double leap seconds.
-   The :mod:`time` module may produce and does accept leap seconds since
-   it is based on the Posix standard, but the :mod:`datetime` module
-   does not accept leap seconds in :meth:`strptime` input nor will it
-   produce them in :func:`strftime` output.
+   Unlike :mod:`time` module, :mod:`datetime` module does not support
+   leap seconds.
 
 (4)
    When used with the :meth:`strptime` method, ``%U`` and ``%W`` are only used in
    calculations when the day of the week and the year are specified.
 
 (5)
+   For technical reasons, :meth:`strftime` method does not support
+   dates before year 1000: ``t.strftime(format)`` will raise a
+   :exc:`ValueError` when ``t.year < 1000`` even if ``format`` does
+   not contain ``%Y`` directive.  The :meth:`strptime` method can
+   parse years in the full [1, 9999] range, but years < 1000 must be
+   zero-filled to 4-digit width.
+
+   .. versionchanged:: 3.2
+      In previous versions, :meth:`strftime` method was restricted to
+      years >= 1900.
+
+(6)
    For example, if :meth:`utcoffset` returns ``timedelta(hours=-3, minutes=-30)``,
    ``%z`` is replaced with the string ``'-0330'``.
 

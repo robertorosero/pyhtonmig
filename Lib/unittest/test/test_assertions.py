@@ -1,5 +1,5 @@
 import datetime
-
+import warnings
 import unittest
 
 
@@ -92,15 +92,15 @@ class Test_Assertions(unittest.TestCase):
         else:
             self.fail("assertRaises() didn't let exception pass through")
 
-    def testAssertNotRegexpMatches(self):
-        self.assertNotRegexpMatches('Ala ma kota', r'r+')
+    def testAssertNotRegex(self):
+        self.assertNotRegex('Ala ma kota', r'r+')
         try:
-            self.assertNotRegexpMatches('Ala ma kota', r'k.t', 'Message')
+            self.assertNotRegex('Ala ma kota', r'k.t', 'Message')
         except self.failureException as e:
             self.assertIn("'kot'", e.args[0])
             self.assertIn('Message', e.args[0])
         else:
-            self.fail('assertNotRegexpMatches should have failed.')
+            self.fail('assertNotRegex should have failed.')
 
 
 class TestLongMessage(unittest.TestCase):
@@ -127,14 +127,14 @@ class TestLongMessage(unittest.TestCase):
         self.testableFalse = TestableTestFalse('testTest')
 
     def testDefault(self):
-        self.assertFalse(unittest.TestCase.longMessage)
+        self.assertTrue(unittest.TestCase.longMessage)
 
     def test_formatMsg(self):
-        self.assertEquals(self.testableFalse._formatMessage(None, "foo"), "foo")
-        self.assertEquals(self.testableFalse._formatMessage("foo", "bar"), "foo")
+        self.assertEqual(self.testableFalse._formatMessage(None, "foo"), "foo")
+        self.assertEqual(self.testableFalse._formatMessage("foo", "bar"), "foo")
 
-        self.assertEquals(self.testableTrue._formatMessage(None, "foo"), "foo")
-        self.assertEquals(self.testableTrue._formatMessage("foo", "bar"), "bar : foo")
+        self.assertEqual(self.testableTrue._formatMessage(None, "foo"), "foo")
+        self.assertEqual(self.testableTrue._formatMessage("foo", "bar"), "bar : foo")
 
         # This blows up if _formatMessage uses string concatenation
         self.testableTrue._formatMessage(object(), 'foo')
@@ -153,26 +153,26 @@ class TestLongMessage(unittest.TestCase):
                 test = self.testableTrue
             return getattr(test, methodName)
 
-        for i, expected_regexp in enumerate(errors):
+        for i, expected_regex in enumerate(errors):
             testMethod = getMethod(i)
             kwargs = {}
             withMsg = i % 2
             if withMsg:
                 kwargs = {"msg": "oops"}
 
-            with self.assertRaisesRegexp(self.failureException,
-                                         expected_regexp=expected_regexp):
+            with self.assertRaisesRegex(self.failureException,
+                                        expected_regex=expected_regex):
                 testMethod(*args, **kwargs)
 
     def testAssertTrue(self):
         self.assertMessages('assertTrue', (False,),
-                            ["^False is not True$", "^oops$", "^False is not True$",
-                             "^False is not True : oops$"])
+                            ["^False is not true$", "^oops$", "^False is not true$",
+                             "^False is not true : oops$"])
 
     def testAssertFalse(self):
         self.assertMessages('assertFalse', (True,),
-                            ["^True is not False$", "^oops$", "^True is not False$",
-                             "^True is not False : oops$"])
+                            ["^True is not false$", "^oops$", "^True is not false$",
+                             "^True is not false : oops$"])
 
     def testNotEqual(self):
         self.assertMessages('assertNotEqual', (1, 1),
@@ -222,18 +222,6 @@ class TestLongMessage(unittest.TestCase):
                             [r"\+ \{'key': 'value'\}$", "^oops$",
                              "\+ \{'key': 'value'\}$",
                              "\+ \{'key': 'value'\} : oops$"])
-
-    def testAssertDictContainsSubset(self):
-        self.assertMessages('assertDictContainsSubset', ({'key': 'value'}, {}),
-                            ["^Missing: 'key'$", "^oops$",
-                             "^Missing: 'key'$",
-                             "^Missing: 'key' : oops$"])
-
-    def testAssertItemsEqual(self):
-        self.assertMessages('assertItemsEqual', ([], [None]),
-                            [r"\[None\]$", "^oops$",
-                             r"\[None\]$",
-                             r"\[None\] : oops$"])
 
     def testAssertMultiLineEqual(self):
         self.assertMessages('assertMultiLineEqual', ("", "foo"),

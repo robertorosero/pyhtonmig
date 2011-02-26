@@ -53,6 +53,8 @@ const struct filedescr _PyImport_DynLoadFiletab[] = {
 #else  /* !__VMS */
     {"." SOABI ".so", "rb", C_EXTENSION},
     {"module." SOABI ".so", "rb", C_EXTENSION},
+    {".abi" PYTHON_ABI_STRING ".so", "rb", C_EXTENSION},
+    {"module.abi" PYTHON_ABI_STRING ".so", "rb", C_EXTENSION},
     {".so", "rb", C_EXTENSION},
     {"module.so", "rb", C_EXTENSION},
 #endif  /* __VMS */
@@ -73,7 +75,7 @@ static struct {
 static int nhandles = 0;
 
 
-dl_funcptr _PyImport_GetDynLoadFunc(const char *fqname, const char *shortname,
+dl_funcptr _PyImport_GetDynLoadFunc(const char *shortname,
                                     const char *pathname, FILE *fp)
 {
     dl_funcptr p;

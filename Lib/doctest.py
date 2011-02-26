@@ -318,7 +318,8 @@ class _OutputRedirectingPdb(pdb.Pdb):
     def __init__(self, out):
         self.__out = out
         self.__debugger_used = False
-        pdb.Pdb.__init__(self, stdout=out)
+        # do not play signal games in the pdb
+        pdb.Pdb.__init__(self, stdout=out, nosigint=True)
         # still use input() to get user input
         self.use_rawinput = 1
 
@@ -1372,6 +1373,7 @@ class DocTestRunner:
         # Note that the interactive output will go to *our*
         # save_stdout, even if that's not the real sys.stdout; this
         # allows us to write test cases for the set_trace behavior.
+        save_trace = sys.gettrace()
         save_set_trace = pdb.set_trace
         self.debugger = _OutputRedirectingPdb(save_stdout)
         self.debugger.reset()
@@ -1391,6 +1393,7 @@ class DocTestRunner:
         finally:
             sys.stdout = save_stdout
             pdb.set_trace = save_set_trace
+            sys.settrace(save_trace)
             linecache.getlines = self.save_linecache_getlines
             sys.displayhook = save_displayhook
             if clear_globs:
@@ -2528,14 +2531,16 @@ def debug_script(src, pm=False, globs=None):
                     exec(f.read(), globs, globs)
             except:
                 print(sys.exc_info()[1])
-                pdb.post_mortem(sys.exc_info()[2])
+                p = pdb.Pdb(nosigint=True)
+                p.reset()
+                p.interaction(None, sys.exc_info()[2])
         else:
             fp = open(srcfilename)
             try:
                 script = fp.read()
             finally:
                 fp.close()
-            pdb.run("exec(%r)" % script, globs, globs)
+            pdb.Pdb(nosigint=True).run("exec(%r)" % script, globs, globs)
 
     finally:
         os.remove(srcfilename)

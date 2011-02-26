@@ -86,7 +86,7 @@ PyTuple_New(register Py_ssize_t size)
         {
             return PyErr_NoMemory();
         }
-        nbytes += sizeof(PyTupleObject) - sizeof(PyObject *);
+        /* nbytes += sizeof(PyTupleObject) - sizeof(PyObject *); */
 
         op = PyObject_GC_NewVar(PyTupleObject, &PyTuple_Type, size);
         if (op == NULL)
@@ -689,7 +689,7 @@ tuplesubscript(PyTupleObject* self, PyObject* item)
         PyObject* it;
         PyObject **src, **dest;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item,
+        if (PySlice_GetIndicesEx(item,
                          PyTuple_GET_SIZE(self),
                          &start, &stop, &step, &slicelength) < 0) {
             return NULL;

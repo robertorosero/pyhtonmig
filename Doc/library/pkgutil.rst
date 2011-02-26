@@ -4,6 +4,10 @@
 .. module:: pkgutil
    :synopsis: Utilities for the import system.
 
+**Source code:** :source:`Lib/pkgutil.py`
+
+--------------
+
 This module provides utilities for the import system, in particular package
 support.
 
@@ -77,8 +81,8 @@ support.
    newly created by a path hook.
 
    If there is no importer, a wrapper around the basic import machinery is
-   returned.  This wrapper is never inserted into the importer cache (None is
-   inserted instead).
+   returned.  This wrapper is never inserted into the importer cache (``None``
+   is inserted instead).
 
    The cache (or part of it) can be cleared manually if a rescan of
    :data:`sys.path_hooks` is necessary.

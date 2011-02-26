@@ -100,7 +100,7 @@ class FTP:
     file = None
     welcome = None
     passiveserver = 1
-    encoding = "latin1"
+    encoding = "latin-1"
 
     # Initialization method (called by class instantiation).
     # Initialize host to localhost, port to standard ftp port
@@ -589,11 +589,11 @@ class FTP:
 
     def close(self):
         '''Close the connection without assuming anything about it.'''
-        if self.file:
+        if self.file is not None:
             self.file.close()
+        if self.sock is not None:
             self.sock.close()
-            self.file = self.sock = None
-
+        self.file = self.sock = None
 
 try:
     import ssl

@@ -710,7 +710,7 @@ Letting your object adapt itself
 This is a good approach if you write the class yourself. Let's suppose you have
 a class like this::
 
-   class Point(object):
+   class Point:
        def __init__(self, x, y):
            self.x, self.y = x, y
 
@@ -888,4 +888,4 @@ only makes sense to call from a different thread.
 .. [#f1] The sqlite3 module is not built with loadable extension support by
   default, because some platforms (notably Mac OS X) have SQLite libraries which
   are compiled without this feature. To get loadable extension support, you must
-  modify setup.py and and remove the line that sets SQLITE_OMIT_LOAD_EXTENSION.
+  pass --enable-loadable-sqlite-extensions to configure.

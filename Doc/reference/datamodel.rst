@@ -618,7 +618,7 @@ Callable types
       an object passed to the C function as an implicit extra argument.  An example of
       a built-in method is ``alist.append()``, assuming *alist* is a list object. In
       this case, the special read-only attribute :attr:`__self__` is set to the object
-      denoted by *list*.
+      denoted by *alist*.
 
    Classes
       Classes are callable.  These objects normally act as factories for new
@@ -1591,7 +1591,7 @@ attributes of *A* as they are defined within the body of the class statement.
 Once those definitions are executed, the ordered dictionary is fully populated
 and the metaclass's :meth:`__new__` method gets invoked.  That method builds
 the new type and it saves the ordered dictionary keys in an attribute
-called *members*.
+called ``members``.
 
 
 Customizing instance and subclass checks
@@ -1987,7 +1987,7 @@ to work correctly if defined on an object's type, not in the object's instance
 dictionary.  That behaviour is the reason why the following code raises an
 exception::
 
-   >>> class C(object):
+   >>> class C:
    ...     pass
    ...
    >>> c = C()

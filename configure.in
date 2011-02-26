@@ -3,15 +3,8 @@ dnl * Please run autoreconf to test your changes! *
 dnl ***********************************************
 
 # Set VERSION so we only need to edit in one place (i.e., here)
-m4_define(PYTHON_VERSION, 3.2)
+m4_define(PYTHON_VERSION, 3.3)
 
-dnl Some m4 magic to ensure that the configure script is generated
-dnl by the correct autoconf version.
-m4_define([version_required],
-[m4_if(m4_version_compare(m4_defn([m4_PACKAGE_VERSION]), [$1]), 0,
-       [],
-       [m4_fatal([Autoconf version $1 is required for Python], 63)])
-])
 AC_PREREQ(2.65)
 
 AC_REVISION($Revision$)
@@ -608,6 +601,7 @@ AC_MSG_RESULT($LIBRARY)
 AC_SUBST(LDLIBRARY)
 AC_SUBST(DLLLIBRARY)
 AC_SUBST(BLDLIBRARY)
+AC_SUBST(PY3LIBRARY)
 AC_SUBST(LDLIBRARYDIR)
 AC_SUBST(INSTSONAME)
 AC_SUBST(RUNSHARED)
@@ -618,7 +612,7 @@ INSTSONAME='$(LDLIBRARY)'
 DLLLIBRARY=''
 LDLIBRARYDIR=''
 RUNSHARED=''
-LDVERSION="$(VERSION)"
+LDVERSION="$VERSION"
 
 # LINKCC is the command that links the python executable -- default is $(CC).
 # If CXX is set, and if it is needed to link a main function that was
@@ -737,6 +731,10 @@ if test $enable_shared = "yes"; then
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  if test "$with_pydebug" != yes
+	  then
+	      PY3LIBRARY=libpython3.so
+	  fi
           ;;
     Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*)
 	  LDLIBRARY='libpython$(LDVERSION).so'
@@ -748,6 +746,10 @@ if test $enable_shared = "yes"; then
 		;;
 	  esac
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  if test "$with_pydebug" != yes
+          then
+	      PY3LIBRARY=libpython3.so
+	  fi
 	  ;;
     hp*|HP*)
 	  case `uname -m` in
@@ -1281,10 +1283,10 @@ shadow.h signal.h stdint.h stropts.h termios.h thread.h \
 unistd.h utime.h \
 sys/audioio.h sys/bsdtty.h sys/epoll.h sys/event.h sys/file.h sys/loadavg.h \
 sys/lock.h sys/mkdev.h sys/modem.h \
-sys/param.h sys/poll.h sys/select.h sys/socket.h sys/statvfs.h sys/stat.h \
-sys/termio.h sys/time.h \
-sys/times.h sys/types.h sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
-sys/resource.h netpacket/packet.h sysexits.h bluetooth.h \
+sys/param.h sys/poll.h sys/select.h sys/sendfile.h sys/socket.h sys/statvfs.h \
+sys/stat.h sys/termio.h sys/time.h \
+sys/times.h sys/types.h sys/uio.h sys/un.h sys/utsname.h sys/wait.h pty.h \
+libutil.h sys/resource.h netpacket/packet.h sysexits.h bluetooth.h \
 bluetooth/bluetooth.h linux/tipc.h spawn.h util.h)
 AC_HEADER_DIRENT
 AC_HEADER_MAJOR
@@ -1367,6 +1369,12 @@ fi
 if test "$use_lfs" = "yes"; then
 # Two defines needed to enable largefile support on various platforms
 # These may affect some typedefs
+case $ac_sys_system/$ac_sys_release in
+AIX*)
+    AC_DEFINE(_LARGE_FILES, 1, 
+    [This must be defined on AIX systems to enable large file support.])
+    ;;
+esac
 AC_DEFINE(_LARGEFILE_SOURCE, 1, 
 [This must be defined on some systems to enable large file support.])
 AC_DEFINE(_FILE_OFFSET_BITS, 64,
@@ -1633,7 +1641,7 @@ if test -z "$LDSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	AIX*)
-		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:Modules/python.exp -L\$(srcdir)"
+		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:\$(srcdir)/Modules/python.exp"
 		LDSHARED="\$(BINLIBDEST)/config/ld_so_aix \$(CC) -bI:\$(BINLIBDEST)/config/python.exp"
 		;;
 	IRIX/5*) LDSHARED="ld -shared";;
@@ -1740,8 +1748,8 @@ then
 				esac
 		fi;;
 	NetBSD*|DragonFly*)
-		LDSHARED="cc -shared"
-		LDCXXSHARED="c++ -shared";;
+		LDSHARED='$(CC) -shared'
+		LDCXXSHARED='$(CXX) -shared';;
 	OpenUNIX*|UnixWare*)
 		if test "$GCC" = "yes" ; then
 			LDSHARED='$(CC) -shared'
@@ -1883,6 +1891,7 @@ AC_MSG_RESULT($SHLIBS)
 
 
 # checks for libraries
+AC_CHECK_LIB(sendfile, sendfile)
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
 
@@ -1903,7 +1912,7 @@ AC_CHECK_LIB(intl, textdomain,
 case "$ac_sys_system" in
 	AIX*)	AC_MSG_CHECKING(for genuine AIX C++ extensions support)
 		AC_LINK_IFELSE([
-		  AC_LANG_PROGRAM([[#include "/usr/lpp/xlC/include/load.h"]],
+		  AC_LANG_PROGRAM([[#include <load.h>]],
 				  [[loadAndInit("", 0, "")]])
 		],[
 		  AC_DEFINE(AIX_GENUINE_CPLUSPLUS, 1,
@@ -2340,7 +2349,7 @@ yes
 			;;
 		solaris)
 			if test -f /etc/netconfig; then
-                          if /usr/xpg4/bin/grep -q tcp6 /etc/netconfig; then
+                          if $GREP -q tcp6 /etc/netconfig; then
 				ipv6type=$i
 				ipv6trylibc=yes
                           fi
@@ -2525,18 +2534,19 @@ AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
 AC_CHECK_FUNCS(alarm accept4 setitimer getitimer bind_textdomain_codeset chown \
- clock confstr ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
+ clock confstr ctermid execv faccessat fchmod fchmodat fchown fchownat \
+ fdopendir fork fpathconf fstatat ftime ftruncate futimesat \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getresuid getresgid getpwent getspnam getspent getsid getwd \
- initgroups kill killpg lchmod lchown lstat mbrtowc mkfifo mknod mktime \
- mremap nice pathconf pause plock poll pthread_init \
- putenv readlink realpath \
- select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
+ initgroups kill killpg lchmod lchown linkat lstat mbrtowc mkdirat mkfifo \
+ mkfifoat mknod mknodat mktime mremap nice openat pathconf pause plock poll \
+ pthread_init putenv readlink readlinkat realpath renameat \
+ select sem_open sem_timedwait sem_getvalue sem_unlink sendfile setegid seteuid \
  setgid \
- setlocale setregid setreuid setresuid setresgid setsid setpgid setpgrp setuid setvbuf \
- sigaction siginterrupt sigrelse snprintf strftime strlcpy \
+ setlocale setregid setreuid setresuid setresgid setsid setpgid setpgrp setpriority setuid setvbuf \
+ sigaction siginterrupt sigrelse snprintf strftime strlcpy symlinkat \
  sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname unsetenv utimes waitpid wait3 wait4 \
+ truncate uname unlinkat unsetenv utimensat utimes waitpid wait3 wait4 \
  wcscoll wcsftime wcsxfrm _getpty)
 
 # For some functions, having a definition is not sufficient, since
@@ -3372,6 +3382,10 @@ fi
 LIBS_SAVE=$LIBS
 LIBS="$LIBS $LIBM"
 
+AC_CHECK_FUNCS([acosh asinh atanh copysign erf erfc expm1 finite gamma])
+AC_CHECK_FUNCS([hypot lgamma log1p round tgamma])
+AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
+
 # On FreeBSD 6.2, it appears that tanh(-0.) returns 0. instead of
 # -0. on some architectures.
 AC_MSG_CHECKING(whether tanh preserves the sign of zero)
@@ -3398,9 +3412,34 @@ then
   [Define if tanh(-0.) is -0., or if platform doesn't have signed zeros])
 fi
 
-AC_CHECK_FUNCS([acosh asinh atanh copysign erf erfc expm1 finite gamma])
-AC_CHECK_FUNCS([hypot lgamma log1p round tgamma])
-AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
+if test "$ac_cv_func_log1p" = yes
+then
+    # On some versions of AIX, log1p(-0.) returns 0. instead of
+    # -0.  See issue #9920.
+    AC_MSG_CHECKING(whether log1p drops the sign of negative zero)
+    AC_CACHE_VAL(ac_cv_log1p_drops_zero_sign, [
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+    #include <math.h>
+    #include <stdlib.h>
+    int main() {
+        /* Fail if the signs of log1p(-0.) and -0. can be
+	   distinguished. */
+        if (atan2(log1p(-0.), -1.) == atan2(-0., -1.))
+            return 0;
+        else
+            return 1;
+    }
+    ]])],
+    [ac_cv_log1p_drops_zero_sign=no],
+    [ac_cv_log1p_drops_zero_sign=yes],
+    [ac_cv_log1p_drops_zero_sign=no])])
+    AC_MSG_RESULT($ac_cv_log1p_drops_zero_sign)
+fi
+if test "$ac_cv_log1p_drops_zero_sign" = yes
+then
+  AC_DEFINE(LOG1P_DROPS_ZERO_SIGN, 1,
+  [Define if log1p(-0.) is 0. rather than -0.])
+fi
 
 LIBS=$LIBS_SAVE
 
@@ -4206,7 +4245,7 @@ case $ac_sys_system in
   OSF*) AC_MSG_ERROR(OSF* systems are deprecated unless somebody volunteers. Check http://bugs.python.org/issue8606) ;;
 esac
 
-
+AC_CHECK_FUNC(pipe2, AC_DEFINE(HAVE_PIPE2, 1, [Define if the OS supports pipe2()]), )
 
 AC_SUBST(THREADHEADERS)
 

@@ -6,6 +6,7 @@ import test.support, unittest
 import os
 import sys
 import subprocess
+import tempfile
 from test.script_helper import spawn_python, kill_python, assert_python_ok, assert_python_failure
 
 
@@ -150,7 +151,7 @@ class CmdLineTest(unittest.TestCase):
     @unittest.skipUnless(sys.platform == 'darwin', 'test specific to Mac OS X')
     def test_osx_utf8(self):
         def check_output(text):
-            decoded = text.decode('utf8', 'surrogateescape')
+            decoded = text.decode('utf-8', 'surrogateescape')
             expected = ascii(decoded).encode('ascii') + b'\n'
 
             env = os.environ.copy()
@@ -220,6 +221,49 @@ class CmdLineTest(unittest.TestCase):
                                         PYTHONPATH=path)
         self.assertIn(path1.encode('ascii'), out)
         self.assertIn(path2.encode('ascii'), out)
+
+    def test_displayhook_unencodable(self):
+        for encoding in ('ascii', 'latin-1', 'utf-8'):
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = encoding
+            p = subprocess.Popen(
+                [sys.executable, '-i'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env)
+            # non-ascii, surrogate, non-BMP printable, non-BMP unprintable
+            text = "a=\xe9 b=\uDC80 c=\U00010000 d=\U0010FFFF"
+            p.stdin.write(ascii(text).encode('ascii') + b"\n")
+            p.stdin.write(b'exit()\n')
+            data = kill_python(p)
+            escaped = repr(text).encode(encoding, 'backslashreplace')
+            self.assertIn(escaped, data)
+
+    def check_input(self, code, expected):
+        with tempfile.NamedTemporaryFile("wb+") as stdin:
+            sep = os.linesep.encode('ASCII')
+            stdin.write(sep.join((b'abc', b'def')))
+            stdin.flush()
+            stdin.seek(0)
+            with subprocess.Popen(
+                (sys.executable, "-c", code),
+                stdin=stdin, stdout=subprocess.PIPE) as proc:
+                stdout, stderr = proc.communicate()
+        self.assertEqual(stdout.rstrip(), expected)
+
+    def test_stdin_readline(self):
+        # Issue #11272: check that sys.stdin.readline() replaces '\r\n' by '\n'
+        # on Windows (sys.stdin is opened in binary mode)
+        self.check_input(
+            "import sys; print(repr(sys.stdin.readline()))",
+            b"'abc\\n'")
+
+    def test_builtin_input(self):
+        # Issue #11272: check that input() strips newlines ('\n' or '\r\n')
+        self.check_input(
+            "print(repr(input()))",
+            b"'abc'")
 
 
 def test_main():

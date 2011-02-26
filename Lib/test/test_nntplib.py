@@ -2,7 +2,9 @@ import io
 import datetime
 import textwrap
 import unittest
+import functools
 import contextlib
+import collections.abc
 from test import support
 from nntplib import NNTP, GroupInfo, _have_ssl
 import nntplib
@@ -112,9 +114,13 @@ class NetworkedNNTPTestsMixin:
 
     def test_xover(self):
         resp, count, first, last, name = self.server.group(self.GROUP_NAME)
-        resp, lines = self.server.xover(last, last)
+        resp, lines = self.server.xover(last - 5, last)
+        if len(lines) == 0:
+            self.skipTest("no articles retrieved")
+        # The 'last' article is not necessarily part of the output (cancelled?)
         art_num, art_dict = lines[0]
-        self.assertEqual(art_num, last)
+        self.assertGreaterEqual(art_num, last - 5)
+        self.assertLessEqual(art_num, last)
         self._check_art_dict(art_dict)
 
     def test_over(self):
@@ -127,7 +133,9 @@ class NetworkedNNTPTestsMixin:
         # The "start-end" article range form
         resp, lines = self.server.over((start, last))
         art_num, art_dict = lines[-1]
-        self.assertEqual(art_num, last)
+        # The 'last' article is not necessarily part of the output (cancelled?)
+        self.assertGreaterEqual(art_num, start)
+        self.assertLessEqual(art_num, last)
         self._check_art_dict(art_dict)
         # XXX The "message_id" form is unsupported by gmane
         # 503 Overview by message-ID unsupported
@@ -149,31 +157,27 @@ class NetworkedNNTPTestsMixin:
 
     def test_article_head_body(self):
         resp, count, first, last, name = self.server.group(self.GROUP_NAME)
-        resp, head = self.server.head(last)
+        # Try to find an available article
+        for art_num in (last, first, last - 1):
+            try:
+                resp, head = self.server.head(art_num)
+            except nntplib.NNTPTemporaryError as e:
+                if not e.response.startswith("423 "):
+                    raise
+                # "423 No such article" => choose another one
+                continue
+            break
+        else:
+            self.skipTest("could not find a suitable article number")
         self.assertTrue(resp.startswith("221 "), resp)
-        self.check_article_resp(resp, head, last)
-        resp, body = self.server.body(last)
+        self.check_article_resp(resp, head, art_num)
+        resp, body = self.server.body(art_num)
         self.assertTrue(resp.startswith("222 "), resp)
-        self.check_article_resp(resp, body, last)
-        resp, article = self.server.article(last)
+        self.check_article_resp(resp, body, art_num)
+        resp, article = self.server.article(art_num)
         self.assertTrue(resp.startswith("220 "), resp)
-        self.check_article_resp(resp, article, last)
+        self.check_article_resp(resp, article, art_num)
         self.assertEqual(article.lines, head.lines + [b''] + body.lines)
-
-    def test_quit(self):
-        self.server.quit()
-        self.server = None
-
-    def test_login(self):
-        baduser = "notarealuser"
-        badpw = "notarealpassword"
-        # Check that bogus credentials cause failure
-        self.assertRaises(nntplib.NNTPError, self.server.login,
-                     user=baduser, password=badpw, usenetrc=False)
-        # FIXME: We should check that correct credentials succeed, but that
-        # would require valid details for some server somewhere to be in the
-        # test suite, I think. Gmane is anonymous, at least as used for the
-        # other tests.
 
     def test_capabilities(self):
         # The server under test implements NNTP version 2 and has a
@@ -207,6 +211,49 @@ class NetworkedNNTPTestsMixin:
                 # Check that trying starttls when it's already active fails.
                 self.assertRaises(ValueError, self.server.starttls)
 
+    def test_zlogin(self):
+        # This test must be the penultimate because further commands will be
+        # refused.
+        baduser = "notarealuser"
+        badpw = "notarealpassword"
+        # Check that bogus credentials cause failure
+        self.assertRaises(nntplib.NNTPError, self.server.login,
+                          user=baduser, password=badpw, usenetrc=False)
+        # FIXME: We should check that correct credentials succeed, but that
+        # would require valid details for some server somewhere to be in the
+        # test suite, I think. Gmane is anonymous, at least as used for the
+        # other tests.
+
+    def test_zzquit(self):
+        # This test must be called last, hence the name
+        cls = type(self)
+        try:
+            self.server.quit()
+        finally:
+            cls.server = None
+
+    @classmethod
+    def wrap_methods(cls):
+        # Wrap all methods in a transient_internet() exception catcher
+        # XXX put a generic version in test.support?
+        def wrap_meth(meth):
+            @functools.wraps(meth)
+            def wrapped(self):
+                with support.transient_internet(self.NNTP_HOST):
+                    meth(self)
+            return wrapped
+        for name in dir(cls):
+            if not name.startswith('test_'):
+                continue
+            meth = getattr(cls, name)
+            if not isinstance(meth, collections.abc.Callable):
+                continue
+            # Need to use a closure so that meth remains bound to its current
+            # value
+            setattr(cls, name, wrap_meth(meth))
+
+NetworkedNNTPTestsMixin.wrap_methods()
+
 
 class NetworkedNNTPTests(NetworkedNNTPTestsMixin, unittest.TestCase):
     # This server supports STARTTLS (gmane doesn't)
@@ -214,33 +261,34 @@ class NetworkedNNTPTests(NetworkedNNTPTestsMixin, unittest.TestCase):
     GROUP_NAME = 'fr.comp.lang.python'
     GROUP_PAT = 'fr.comp.lang.*'
 
-    def setUp(self):
-        support.requires("network")
-        with support.transient_internet(self.NNTP_HOST):
-            self.server = NNTP(self.NNTP_HOST, timeout=TIMEOUT, usenetrc=False)
+    NNTP_CLASS = NNTP
 
-    def tearDown(self):
-        if self.server is not None:
-            self.server.quit()
+    @classmethod
+    def setUpClass(cls):
+        support.requires("network")
+        with support.transient_internet(cls.NNTP_HOST):
+            cls.server = cls.NNTP_CLASS(cls.NNTP_HOST, timeout=TIMEOUT, usenetrc=False)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.server is not None:
+            cls.server.quit()
 
 
 if _have_ssl:
-    class NetworkedNNTP_SSLTests(NetworkedNNTPTestsMixin, unittest.TestCase):
-        NNTP_HOST = 'snews.gmane.org'
-        GROUP_NAME = 'gmane.comp.python.devel'
-        GROUP_PAT = 'gmane.comp.python.d*'
+    class NetworkedNNTP_SSLTests(NetworkedNNTPTests):
 
-        def setUp(self):
-            support.requires("network")
-            with support.transient_internet(self.NNTP_HOST):
-                self.server = nntplib.NNTP_SSL(self.NNTP_HOST, timeout=TIMEOUT,
-                                               usenetrc=False)
+        # Technical limits for this public NNTP server (see http://www.aioe.org):
+        # "Only two concurrent connections per IP address are allowed and
+        # 400 connections per day are accepted from each IP address."
 
-        def tearDown(self):
-            if self.server is not None:
-                self.server.quit()
+        NNTP_HOST = 'nntp.aioe.org'
+        GROUP_NAME = 'comp.lang.python'
+        GROUP_PAT = 'comp.lang.*'
 
-        # Disabled with gmane as it produces too much data
+        NNTP_CLASS = nntplib.NNTP_SSL
+
+        # Disabled as it produces too much data
         test_list = None
 
         # Disabled as the connection will already be encrypted.
@@ -765,7 +813,7 @@ class NNTPv1v2TestsMixin:
 
     def _check_article_body(self, lines):
         self.assertEqual(len(lines), 4)
-        self.assertEqual(lines[-1].decode('utf8'), "-- Signed by André.")
+        self.assertEqual(lines[-1].decode('utf-8'), "-- Signed by André.")
         self.assertEqual(lines[-2], b"")
         self.assertEqual(lines[-3], b".Here is a dot-starting line.")
         self.assertEqual(lines[-4], b"This is just a test article.")

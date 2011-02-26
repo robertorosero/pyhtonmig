@@ -103,7 +103,7 @@ class HashLibTestCase(unittest.TestCase):
 
     def test_algorithms_guaranteed(self):
         self.assertEqual(hashlib.algorithms_guaranteed,
-            tuple(_algo for _algo in self.supported_hash_names
+            set(_algo for _algo in self.supported_hash_names
                   if _algo.islower()))
 
     def test_algorithms_available(self):
@@ -310,10 +310,10 @@ class HashLibTestCase(unittest.TestCase):
         m.update(b'1')
         m.update(b'#' * gil_minsize)
         m.update(b'1')
-        self.assertEquals(m.hexdigest(), 'cb1e1a2cbc80be75e19935d621fb9b21')
+        self.assertEqual(m.hexdigest(), 'cb1e1a2cbc80be75e19935d621fb9b21')
 
         m = hashlib.md5(b'x' * gil_minsize)
-        self.assertEquals(m.hexdigest(), 'cfb767f225d58469c5de3632a8803958')
+        self.assertEqual(m.hexdigest(), 'cfb767f225d58469c5de3632a8803958')
 
     @unittest.skipUnless(threading, 'Threading required for this test.')
     @support.reap_threads

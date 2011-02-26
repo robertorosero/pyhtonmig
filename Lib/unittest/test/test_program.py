@@ -99,6 +99,7 @@ class InitialisableProgram(unittest.TestProgram):
     defaultTest = None
     testRunner = None
     testLoader = unittest.defaultTestLoader
+    module = '__main__'
     progName = 'test'
     test = 'test'
     def __init__(self, *args):
@@ -182,6 +183,27 @@ class TestCommandLineArgs(unittest.TestCase):
                 program.parseArgs([None, opt])
                 self.assertEqual(getattr(program, attr), not_none)
 
+    def testWarning(self):
+        """Test the warnings argument"""
+        # see #10535
+        class FakeTP(unittest.TestProgram):
+            def parseArgs(self, *args, **kw): pass
+            def runTests(self, *args, **kw): pass
+        warnoptions = sys.warnoptions
+        try:
+            sys.warnoptions[:] = []
+            # no warn options, no arg -> default
+            self.assertEqual(FakeTP().warnings, 'default')
+            # no warn options, w/ arg -> arg value
+            self.assertEqual(FakeTP(warnings='ignore').warnings, 'ignore')
+            sys.warnoptions[:] = ['somevalue']
+            # warn options, no arg -> None
+            # warn options, w/ arg -> arg value
+            self.assertEqual(FakeTP().warnings, None)
+            self.assertEqual(FakeTP(warnings='ignore').warnings, 'ignore')
+        finally:
+            sys.warnoptions[:] = warnoptions
+
     def testRunTestsRunnerClass(self):
         program = self.program
 
@@ -189,12 +211,14 @@ class TestCommandLineArgs(unittest.TestCase):
         program.verbosity = 'verbosity'
         program.failfast = 'failfast'
         program.buffer = 'buffer'
+        program.warnings = 'warnings'
 
         program.runTests()
 
         self.assertEqual(FakeRunner.initArgs, {'verbosity': 'verbosity',
                                                 'failfast': 'failfast',
-                                                'buffer': 'buffer'})
+                                                'buffer': 'buffer',
+                                                'warnings': 'warnings'})
         self.assertEqual(FakeRunner.test, 'test')
         self.assertIs(program.result, RESULT)
 
@@ -249,6 +273,85 @@ class TestCommandLineArgs(unittest.TestCase):
 
         program.runTests()
         self.assertTrue(self.installed)
+
+    def _patch_isfile(self, names, exists=True):
+        def isfile(path):
+            return path in names
+        original = os.path.isfile
+        os.path.isfile = isfile
+        def restore():
+            os.path.isfile = original
+        self.addCleanup(restore)
+
+
+    def testParseArgsFileNames(self):
+        # running tests with filenames instead of module names
+        program = self.program
+        argv = ['progname', 'foo.py', 'bar.Py', 'baz.PY', 'wing.txt']
+        self._patch_isfile(argv)
+
+        program.createTests = lambda: None
+        program.parseArgs(argv)
+
+        # note that 'wing.txt' is not a Python file so the name should
+        # *not* be converted to a module name
+        expected = ['foo', 'bar', 'baz', 'wing.txt']
+        self.assertEqual(program.testNames, expected)
+
+
+    def testParseArgsFilePaths(self):
+        program = self.program
+        argv = ['progname', 'foo/bar/baz.py', 'green\\red.py']
+        self._patch_isfile(argv)
+
+        program.createTests = lambda: None
+        program.parseArgs(argv)
+
+        expected = ['foo.bar.baz', 'green.red']
+        self.assertEqual(program.testNames, expected)
+
+
+    def testParseArgsNonExistentFiles(self):
+        program = self.program
+        argv = ['progname', 'foo/bar/baz.py', 'green\\red.py']
+        self._patch_isfile([])
+
+        program.createTests = lambda: None
+        program.parseArgs(argv)
+
+        self.assertEqual(program.testNames, argv[1:])
+
+    def testParseArgsAbsolutePathsThatCanBeConverted(self):
+        cur_dir = os.getcwd()
+        program = self.program
+        def _join(name):
+            return os.path.join(cur_dir, name)
+        argv = ['progname', _join('foo/bar/baz.py'), _join('green\\red.py')]
+        self._patch_isfile(argv)
+
+        program.createTests = lambda: None
+        program.parseArgs(argv)
+
+        expected = ['foo.bar.baz', 'green.red']
+        self.assertEqual(program.testNames, expected)
+
+    def testParseArgsAbsolutePathsThatCannotBeConverted(self):
+        program = self.program
+        # even on Windows '/...' is considered absolute by os.path.abspath
+        argv = ['progname', '/foo/bar/baz.py', '/green/red.py']
+        self._patch_isfile(argv)
+
+        program.createTests = lambda: None
+        program.parseArgs(argv)
+
+        self.assertEqual(program.testNames, argv[1:])
+
+        # it may be better to use platform specific functions to normalise paths
+        # rather than accepting '.PY' and '\' as file seprator on Linux / Mac
+        # it would also be better to check that a filename is a valid module
+        # identifier (we have a regex for this in loader.py)
+        # for invalid filenames should we raise a useful error rather than
+        # leaving the current error message (import of filename fails) in place?
 
 
 if __name__ == '__main__':

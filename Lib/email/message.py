@@ -16,7 +16,9 @@ from io import BytesIO, StringIO
 # Intrapackage imports
 from email import utils
 from email import errors
-from email.charset import Charset
+from email import header
+from email import charset as _charset
+Charset = _charset.Charset
 
 SEMISPACE = '; '
 
@@ -31,16 +33,15 @@ _has_surrogates = re.compile(
 
 
 # Helper functions
-def _sanitize_surrogates(value):
-    # If the value contains surrogates, re-decode and replace the original
-    # non-ascii bytes with '?'s.  Used to sanitize header values before letting
-    # them escape as strings.
+def _sanitize_header(name, value):
+    # If the header value contains surrogates, return a Header using
+    # the unknown-8bit charset to encode the bytes as encoded words.
     if not isinstance(value, str):
-        # Header object
+        # Assume it is already a header object
         return value
     if _has_surrogates(value):
-        original_bytes = value.encode('ascii', 'surrogateescape')
-        return original_bytes.decode('ascii', 'replace').replace('\ufffd', '?')
+        return header.Header(value, charset=_charset.UNKNOWN8BIT,
+                             header_name=name)
     else:
         return value
 
@@ -57,16 +58,28 @@ def _splitparam(param):
 def _formatparam(param, value=None, quote=True):
     """Convenience function to format and return a key=value pair.
 
-    This will quote the value if needed or if quote is true.
+    This will quote the value if needed or if quote is true.  If value is a
+    three tuple (charset, language, value), it will be encoded according
+    to RFC2231 rules.  If it contains non-ascii characters it will likewise
+    be encoded according to RFC2231 rules, using the utf-8 charset and
+    a null language.
     """
     if value is not None and len(value) > 0:
         # A tuple is used for RFC 2231 encoded parameter values where items
         # are (charset, language, value).  charset is a string, not a Charset
-        # instance.
+        # instance.  RFC 2231 encoded values are never quoted, per RFC.
         if isinstance(value, tuple):
             # Encode as per RFC 2231
             param += '*'
             value = utils.encode_rfc2231(value[2], value[0], value[1])
+            return '%s=%s' % (param, value)
+        else:
+            try:
+                value.encode('ascii')
+            except UnicodeEncodeError:
+                param += '*'
+                value = utils.encode_rfc2231(value, 'utf-8', '')
+                return '%s=%s' % (param, value)
         # BAW: Please check this.  I think that if quote is set it should
         # force quoting even if not necessary.
         if quote or tspecials.search(value):
@@ -386,7 +399,7 @@ class Message:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
-        return [_sanitize_surrogates(v) for k, v in self._headers]
+        return [_sanitize_header(k, v) for k, v in self._headers]
 
     def items(self):
         """Get all the message's header fields and values.
@@ -396,7 +409,7 @@ class Message:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
-        return [(k, _sanitize_surrogates(v)) for k, v in self._headers]
+        return [(k, _sanitize_header(k, v)) for k, v in self._headers]
 
     def get(self, name, failobj=None):
         """Get a header value.
@@ -407,7 +420,7 @@ class Message:
         name = name.lower()
         for k, v in self._headers:
             if k.lower() == name:
-                return _sanitize_surrogates(v)
+                return _sanitize_header(k, v)
         return failobj
 
     #
@@ -427,7 +440,7 @@ class Message:
         name = name.lower()
         for k, v in self._headers:
             if k.lower() == name:
-                values.append(_sanitize_surrogates(v))
+                values.append(_sanitize_header(k, v))
         if not values:
             return failobj
         return values
@@ -438,11 +451,19 @@ class Message:
         name is the header field to add.  keyword arguments can be used to set
         additional parameters for the header field, with underscores converted
         to dashes.  Normally the parameter will be added as key="value" unless
-        value is None, in which case only the key will be added.
+        value is None, in which case only the key will be added.  If a
+        parameter value contains non-ASCII characters it can be specified as a
+        three-tuple of (charset, language, value), in which case it will be
+        encoded according to RFC2231 rules.  Otherwise it will be encoded using
+        the utf-8 charset and a language of ''.
 
-        Example:
+        Examples:
 
         msg.add_header('content-disposition', 'attachment', filename='bud.gif')
+        msg.add_header('content-disposition', 'attachment',
+                       filename=('utf-8', '', Fußballer.ppt'))
+        msg.add_header('content-disposition', 'attachment',
+                       filename='Fußballer.ppt'))
         """
         parts = []
         for k, v in _params.items():

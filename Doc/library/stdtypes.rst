@@ -197,8 +197,8 @@ exception.
    operator: in
    operator: not in
 
-Two more operations with the same syntactic priority, ``in`` and ``not in``, are
-supported only by sequence types (below).
+Two more operations with the same syntactic priority, :keyword:`in` and
+:keyword:`not in`, are supported only by sequence types (below).
 
 
 .. _typesnumeric:
@@ -836,8 +836,8 @@ the enclosing parentheses, such as ``a, b, c`` or ``()``.  A single item tuple
 must have a trailing comma, such as ``(d,)``.
 
 Objects of type range are created using the :func:`range` function.  They don't
-support slicing, concatenation or repetition, and using ``in``, ``not in``,
-:func:`min` or :func:`max` on them is inefficient.
+support concatenation or repetition, and using :func:`min` or :func:`max` on
+them is inefficient.
 
 Most sequence types support the following operations.  The ``in`` and ``not in``
 operations have the same priorities as the comparison operations.  The ``+`` and
@@ -846,7 +846,7 @@ operations have the same priorities as the comparison operations.  The ``+`` and
 
 This table lists the sequence operations sorted in ascending priority
 (operations in the same box have the same priority).  In the table, *s* and *t*
-are sequences of the same type; *n*, *i* and *j* are integers:
+are sequences of the same type; *n*, *i*, *j* and *k* are integers.
 
 +------------------+--------------------------------+----------+
 | Operation        | Result                         | Notes    |
@@ -875,6 +875,12 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 | ``min(s)``       | smallest item of *s*           |          |
 +------------------+--------------------------------+----------+
 | ``max(s)``       | largest item of *s*            |          |
++------------------+--------------------------------+----------+
+| ``s.index(i)``   | index of the first occurence   |          |
+|                  | of *i* in *s*                  |          |
++------------------+--------------------------------+----------+
+| ``s.count(i)``   | total number of occurences of  |          |
+|                  | *i* in *s*                     |          |
 +------------------+--------------------------------+----------+
 
 Sequence types also support comparisons.  In particular, tuples and lists are
@@ -1072,20 +1078,26 @@ functions based on regular expressions.
 .. method:: str.isalnum()
 
    Return true if all characters in the string are alphanumeric and there is at
-   least one character, false otherwise.
+   least one character, false otherwise.  A character ``c`` is alphanumeric if one
+   of the following returns ``True``: ``c.isalpha()``, ``c.isdecimal()``,
+   ``c.isdigit()``, or ``c.isnumeric()``.
 
 
 .. method:: str.isalpha()
 
    Return true if all characters in the string are alphabetic and there is at least
-   one character, false otherwise.
+   one character, false otherwise.  Alphabetic characters are those characters defined
+   in the Unicode character database as "Letter", i.e., those with general category
+   property being one of "Lm", "Lt", "Lu", "Ll", or "Lo".  Note that this is different
+   from the "Alphabetic" property defined in the Unicode Standard.
 
 
 .. method:: str.isdecimal()
 
    Return true if all characters in the string are decimal
    characters and there is at least one character, false
-   otherwise. Decimal characters include digit characters, and all characters
+   otherwise. Decimal characters are those from general category "Nd". This category
+   includes digit characters, and all characters
    that that can be used to form decimal-radix numbers, e.g. U+0660,
    ARABIC-INDIC DIGIT ZERO.
 
@@ -1093,7 +1105,9 @@ functions based on regular expressions.
 .. method:: str.isdigit()
 
    Return true if all characters in the string are digits and there is at least one
-   character, false otherwise.
+   character, false otherwise.  Digits include decimal characters and digits that need
+   special handling, such as the compatibility superscript digits.  Formally, a digit
+   is a character that has the property value Numeric_Type=Digit or Numeric_Type=Decimal.
 
 
 .. method:: str.isidentifier()
@@ -1105,7 +1119,9 @@ functions based on regular expressions.
 .. method:: str.islower()
 
    Return true if all cased characters in the string are lowercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise.  Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and lowercase characters
+   are those with general category property "Ll".
 
 
 .. method:: str.isnumeric()
@@ -1114,7 +1130,8 @@ functions based on regular expressions.
    characters, and there is at least one character, false
    otherwise. Numeric characters include digit characters, and all characters
    that have the Unicode numeric value property, e.g. U+2155,
-   VULGAR FRACTION ONE FIFTH.
+   VULGAR FRACTION ONE FIFTH.  Formally, numeric characters are those with the property
+   value Numeric_Type=Digit, Numeric_Type=Decimal or Numeric_Type=Numeric.
 
 
 .. method:: str.isprintable()
@@ -1131,8 +1148,9 @@ functions based on regular expressions.
 .. method:: str.isspace()
 
    Return true if there are only whitespace characters in the string and there is
-   at least one character, false otherwise.
-
+   at least one character, false otherwise.  Whitespace characters  are those
+   characters defined in the Unicode character database as "Other" or "Separator"
+   and those with bidirectional property being one of "WS", "B", or "S".
 
 .. method:: str.istitle()
 
@@ -1144,7 +1162,9 @@ functions based on regular expressions.
 .. method:: str.isupper()
 
    Return true if all cased characters in the string are uppercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise. Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and uppercase characters
+   are those with general category property "Lu".
 
 
 .. method:: str.join(iterable)
@@ -1575,16 +1595,14 @@ Range Type
 The :class:`range` type is an immutable sequence which is commonly used for
 looping.  The advantage of the :class:`range` type is that an :class:`range`
 object will always take the same amount of memory, no matter the size of the
-range it represents.  There are no consistent performance advantages.
+range it represents.
 
-Range objects have relatively little behavior: they support indexing,
-iteration, the :func:`len` function, and the following methods.
+Range objects have relatively little behavior: they support indexing, contains,
+iteration, the :func:`len` function, and the following methods:
 
 .. method:: range.count(x)
 
-   Return the number of *i*'s for which ``s[i] == x``.  Normally the
-   result will be 0 or 1, but it could be greater if *x* defines an
-   unusual equality function.
+   Return the number of *i*'s for which ``s[i] == x``.
 
     .. versionadded:: 3.2
 
@@ -1624,6 +1642,8 @@ Note that while lists allow their items to be of any type, bytearray object
    single: append() (sequence method)
    single: extend() (sequence method)
    single: count() (sequence method)
+   single: clear() (sequence method)
+   single: copy() (sequence method)
    single: index() (sequence method)
    single: insert() (sequence method)
    single: pop() (sequence method)
@@ -1654,6 +1674,12 @@ Note that while lists allow their items to be of any type, bytearray object
 +------------------------------+--------------------------------+---------------------+
 | ``s.extend(x)``              | same as ``s[len(s):len(s)] =   | \(2)                |
 |                              | x``                            |                     |
++------------------------------+--------------------------------+---------------------+
+| ``s.clear()``                | remove all items from ``s``    | \(8)                |
+|                              |                                |                     |
++------------------------------+--------------------------------+---------------------+
+| ``s.copy()``                 | return a shallow copy of ``s`` | \(8)                |
+|                              |                                |                     |
 +------------------------------+--------------------------------+---------------------+
 | ``s.count(x)``               | return number of *i*'s for     |                     |
 |                              | which ``s[i] == x``            |                     |
@@ -1731,7 +1757,11 @@ Notes:
       detect that the list has been mutated during a sort.
 
 (8)
-   :meth:`sort` is not supported by :class:`bytearray` objects.
+   :meth:`clear`, :meth:`!copy` and :meth:`sort` are not supported by
+   :class:`bytearray` objects.
+
+    .. versionadded:: 3.3
+       :meth:`clear` and :meth:`!copy` methods.
 
 
 .. _bytes-methods:
@@ -2099,8 +2129,20 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       returned or raised by the ``__missing__(key)`` call if the key is not
       present. No other operations or methods invoke :meth:`__missing__`. If
       :meth:`__missing__` is not defined, :exc:`KeyError` is raised.
-      :meth:`__missing__` must be a method; it cannot be an instance variable. For
-      an example, see :class:`collections.defaultdict`.
+      :meth:`__missing__` must be a method; it cannot be an instance variable::
+
+          >>> class Counter(dict):
+          ...     def __missing__(self, key):
+          ...         return 0
+          >>> c = Counter()
+          >>> c['red']
+          0
+          >>> c['red'] += 1
+          >>> c['red']
+          1
+
+      See :class:`collections.Counter` for a complete implementation including
+      other methods helpful for accumulating and managing tallies.
 
    .. describe:: d[key] = value
 
@@ -2275,8 +2317,8 @@ memoryview type
 ===============
 
 :class:`memoryview` objects allow Python code to access the internal data
-of an object that supports the buffer protocol without copying.  Memory
-is generally interpreted as simple bytes.
+of an object that supports the :ref:`buffer protocol <bufferobjects>` without
+copying.  Memory is generally interpreted as simple bytes.
 
 .. class:: memoryview(obj)
 
@@ -2415,6 +2457,10 @@ is generally interpreted as simple bytes.
       A tuple of integers the length of :attr:`ndim` giving the size in bytes to
       access each element for each dimension of the array.
 
+   .. attribute:: readonly
+
+      A bool indicating whether the memory is read only.
+
    .. memoryview.suboffsets isn't documented because it only seems useful for C
 
 
@@ -2429,12 +2475,9 @@ Context Manager Types
    single: protocol; context management
 
 Python's :keyword:`with` statement supports the concept of a runtime context
-defined by a context manager.  This is implemented using two separate methods
+defined by a context manager.  This is implemented using a pair of methods
 that allow user-defined classes to define a runtime context that is entered
-before the statement body is executed and exited when the statement ends.
-
-The :dfn:`context management protocol` consists of a pair of methods that need
-to be provided for a context manager object to define a runtime context:
+before the statement body is executed and exited when the statement ends:
 
 
 .. method:: contextmanager.__enter__()
@@ -2482,9 +2525,9 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's :term:`generator`\s and the ``contextlib.contextmanager`` :term:`decorator`
+Python's :term:`generator`\s and the :class:`contextlib.contextmanager` decorator
 provide a convenient way to implement these protocols.  If a generator function is
-decorated with the ``contextlib.contextmanager`` decorator, it will return a
+decorated with the :class:`contextlib.contextmanager` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
 generator function.

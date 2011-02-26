@@ -45,10 +45,11 @@ time-critical functions in your code, and gain a significant improvement with
 very little effort, as long as you're running on a machine with an
 x86-compatible processor.
 
-`Pyrex <http://www.cosc.canterbury.ac.nz/~greg/python/Pyrex/>`_ is a compiler
-that accepts a slightly modified form of Python and generates the corresponding
-C code.  Pyrex makes it possible to write an extension without having to learn
-Python's C API.
+`Cython <http://cython.org>`_ and its relative `Pyrex
+<http://www.cosc.canterbury.ac.nz/~greg/python/Pyrex/>`_ are compilers
+that accept a slightly modified form of Python and generate the corresponding
+C code.  Cython and Pyrex make it possible to write an extension without having
+to learn Python's C API.
 
 If you need to interface to some C or C++ library for which no Python extension
 currently exists, you can try wrapping the library's data types and functions
@@ -379,7 +380,7 @@ complete example using the GNU readline library (you may want to ignore
            if (ps1  == prompt ||                  /* ">>> " or */
                '\n' == code[i + j - 1])           /* "... " and double '\n' */
            {                                               /* so execute it */
-             dum = PyEval_EvalCode ((PyCodeObject *)src, glb, loc);
+             dum = PyEval_EvalCode (src, glb, loc);
              Py_XDECREF (dum);
              Py_XDECREF (src);
              free (code);

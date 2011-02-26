@@ -11,6 +11,10 @@
    single: message digest, MD5
    single: secure hash algorithm, SHA1, SHA224, SHA256, SHA384, SHA512
 
+**Source code:** :source:`Lib/hashlib.py`
+
+--------------
+
 This module implements a common interface to many different secure hash and
 message digest algorithms.  Included are the FIPS secure hash algorithms SHA1,
 SHA224, SHA256, SHA384, and SHA512 (defined in FIPS 180-2) as well as RSA's MD5
@@ -135,7 +139,7 @@ A hash object has the following methods:
 .. method:: hash.digest()
 
    Return the digest of the data passed to the :meth:`update` method so far.
-   This is a bytes array of size :attr:`digest_size` which may contain bytes in
+   This is a bytes object of size :attr:`digest_size` which may contain bytes in
    the whole range from 0 to 255.
 
 

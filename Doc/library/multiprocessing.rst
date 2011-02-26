@@ -1,8 +1,8 @@
-:mod:`multiprocessing` --- Process-based "threading" interface
-==============================================================
+:mod:`multiprocessing` --- Process-based parallelism
+====================================================
 
 .. module:: multiprocessing
-   :synopsis: Process-based "threading" interface.
+   :synopsis: Process-based parallelism.
 
 
 Introduction
@@ -297,7 +297,7 @@ The :mod:`multiprocessing` package mostly replicates the API of the
 :class:`Process` and exceptions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. class:: Process([group[, target[, name[, args[, kwargs]]]]])
+.. class:: Process([group[, target[, name[, args[, kwargs]]]]], *, daemon=None)
 
    Process objects represent activity that is run in a separate process. The
    :class:`Process` class has equivalents of all the methods of
@@ -312,12 +312,18 @@ The :mod:`multiprocessing` package mostly replicates the API of the
    :sub:`1`,N\ :sub:`2`,...,N\ :sub:`k` is a sequence of integers whose length
    is determined by the *generation* of the process.  *args* is the argument
    tuple for the target invocation.  *kwargs* is a dictionary of keyword
-   arguments for the target invocation.  By default, no arguments are passed to
-   *target*.
+   arguments for the target invocation.  If provided, the keyword-only *daemon* argument
+   sets the process :attr:`daemon` flag to ``True`` or ``False``.  If ``None``
+   (the default), this flag will be inherited from the creating process.
+
+   By default, no arguments are passed to *target*.
 
    If a subclass overrides the constructor, it must make sure it invokes the
    base class constructor (:meth:`Process.__init__`) before doing anything else
    to the process.
+
+   .. versionchanged:: 3.3
+      Added the *daemon* argument.
 
    .. method:: run()
 
@@ -1334,7 +1340,7 @@ callables with the manager class.  For example::
 
    from multiprocessing.managers import BaseManager
 
-   class MathsClass(object):
+   class MathsClass:
        def add(self, x, y):
            return x + y
        def mul(self, x, y):

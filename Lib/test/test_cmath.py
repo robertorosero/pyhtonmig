@@ -1,5 +1,5 @@
-from test.support import run_unittest
-from test.test_math import parse_testfile, test_file, requires_IEEE_754
+from test.support import run_unittest, requires_IEEE_754
+from test.test_math import parse_testfile, test_file
 import unittest
 import cmath, math
 from cmath import phase, polar, rect, pi
@@ -312,10 +312,8 @@ class CMathTests(unittest.TestCase):
                 self.rAssertAlmostEqual(math.log(v, base), z.real)
                 self.assertEqual(0., z.imag)
 
+    @requires_IEEE_754
     def test_specific_values(self):
-        if not float.__getformat__("double").startswith("IEEE"):
-            return
-
         def rect_complex(z):
             """Wrapped version of rect that accepts a complex number instead of
             two float arguments."""
@@ -460,9 +458,11 @@ class CMathTests(unittest.TestCase):
         self.assertEqual(abs(complex(INF, NAN)), INF)
         self.assertTrue(math.isnan(abs(complex(NAN, NAN))))
 
+
+    @requires_IEEE_754
+    def test_abs_overflows(self):
         # result overflows
-        if float.__getformat__("double").startswith("IEEE"):
-            self.assertRaises(OverflowError, abs, complex(1.4e308, 1.4e308))
+        self.assertRaises(OverflowError, abs, complex(1.4e308, 1.4e308))
 
     def assertCEqual(self, a, b):
         eps = 1E-7
@@ -511,10 +511,26 @@ class CMathTests(unittest.TestCase):
     @unittest.skipIf(sysconfig.get_config_var('TANH_PRESERVES_ZERO_SIGN') == 0,
                      "system tanh() function doesn't copy the sign")
     def testTanhSign(self):
-        self.assertComplexIdentical(cmath.tanh(complex(0., .0j)), complex(0., .0j))
-        self.assertComplexIdentical(cmath.tanh(complex(0., -.0j)), complex(0., -.0j))
-        self.assertComplexIdentical(cmath.tanh(complex(-0., .0j)), complex(-0., .0j))
-        self.assertComplexIdentical(cmath.tanh(complex(-0., -.0j)), complex(-0., -.0j))
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.tanh(z), z)
+
+    # The algorithm used for atan and atanh makes use of the system
+    # log1p function; If that system function doesn't respect the sign
+    # of zero, then atan and atanh will also have difficulties with
+    # the sign of complex zeros.
+    @requires_IEEE_754
+    @unittest.skipIf(sysconfig.get_config_var('LOG1P_DROPS_ZERO_SIGN'),
+                     "system log1p() function doesn't preserve the sign")
+    def testAtanSign(self):
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.atan(z), z)
+
+    @requires_IEEE_754
+    @unittest.skipIf(sysconfig.get_config_var('LOG1P_DROPS_ZERO_SIGN'),
+                     "system log1p() function doesn't preserve the sign")
+    def testAtanhSign(self):
+        for z in complex_zeros:
+            self.assertComplexIdentical(cmath.atanh(z), z)
 
 
 def test_main():

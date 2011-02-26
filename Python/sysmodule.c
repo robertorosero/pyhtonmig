@@ -15,10 +15,8 @@ Data members:
 */
 
 #include "Python.h"
-#include "structseq.h"
 #include "code.h"
 #include "frameobject.h"
-#include "eval.h"
 
 #include "osdefs.h"
 
@@ -67,6 +65,68 @@ PySys_SetObject(const char *name, PyObject *v)
         return PyDict_SetItemString(sd, name, v);
 }
 
+/* Write repr(o) to sys.stdout using sys.stdout.encoding and 'backslashreplace'
+   error handler. If sys.stdout has a buffer attribute, use
+   sys.stdout.buffer.write(encoded), otherwise redecode the string and use
+   sys.stdout.write(redecoded).
+
+   Helper function for sys_displayhook(). */
+static int
+sys_displayhook_unencodable(PyObject *outf, PyObject *o)
+{
+    PyObject *stdout_encoding = NULL;
+    PyObject *encoded, *escaped_str, *repr_str, *buffer, *result;
+    char *stdout_encoding_str;
+    int ret;
+
+    stdout_encoding = PyObject_GetAttrString(outf, "encoding");
+    if (stdout_encoding == NULL)
+        goto error;
+    stdout_encoding_str = _PyUnicode_AsString(stdout_encoding);
+    if (stdout_encoding_str == NULL)
+        goto error;
+
+    repr_str = PyObject_Repr(o);
+    if (repr_str == NULL)
+        goto error;
+    encoded = PyUnicode_AsEncodedString(repr_str,
+                                        stdout_encoding_str,
+                                        "backslashreplace");
+    Py_DECREF(repr_str);
+    if (encoded == NULL)
+        goto error;
+
+    buffer = PyObject_GetAttrString(outf, "buffer");
+    if (buffer) {
+        result = PyObject_CallMethod(buffer, "write", "(O)", encoded);
+        Py_DECREF(buffer);
+        Py_DECREF(encoded);
+        if (result == NULL)
+            goto error;
+        Py_DECREF(result);
+    }
+    else {
+        PyErr_Clear();
+        escaped_str = PyUnicode_FromEncodedObject(encoded,
+                                                  stdout_encoding_str,
+                                                  "strict");
+        Py_DECREF(encoded);
+        if (PyFile_WriteObject(escaped_str, outf, Py_PRINT_RAW) != 0) {
+            Py_DECREF(escaped_str);
+            goto error;
+        }
+        Py_DECREF(escaped_str);
+    }
+    ret = 0;
+    goto finally;
+
+error:
+    ret = -1;
+finally:
+    Py_XDECREF(stdout_encoding);
+    return ret;
+}
+
 static PyObject *
 sys_displayhook(PyObject *self, PyObject *o)
 {
@@ -74,6 +134,7 @@ sys_displayhook(PyObject *self, PyObject *o)
     PyInterpreterState *interp = PyThreadState_GET()->interp;
     PyObject *modules = interp->modules;
     PyObject *builtins = PyDict_GetItemString(modules, "builtins");
+    int err;
 
     if (builtins == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "lost builtins module");
@@ -94,8 +155,19 @@ sys_displayhook(PyObject *self, PyObject *o)
         PyErr_SetString(PyExc_RuntimeError, "lost sys.stdout");
         return NULL;
     }
-    if (PyFile_WriteObject(o, outf, 0) != 0)
-        return NULL;
+    if (PyFile_WriteObject(o, outf, 0) != 0) {
+        if (PyErr_ExceptionMatches(PyExc_UnicodeEncodeError)) {
+            /* repr(o) is not encodable to sys.stdout.encoding with
+             * sys.stdout.errors error handler (which is probably 'strict') */
+            PyErr_Clear();
+            err = sys_displayhook_unencodable(outf, o);
+            if (err)
+                return NULL;
+        }
+        else {
+            return NULL;
+        }
+    }
     if (PyFile_WriteString("\n", outf) != 0)
         return NULL;
     if (PyObject_SetAttrString(builtins, "_", o) != 0)
@@ -1104,7 +1176,6 @@ PySys_AddXOption(const wchar_t *s)
     PyObject *opts;
     PyObject *name = NULL, *value = NULL;
     const wchar_t *name_end;
-    int r;
 
     opts = get_xoptions();
     if (opts == NULL)
@@ -1122,7 +1193,7 @@ PySys_AddXOption(const wchar_t *s)
     }
     if (name == NULL || value == NULL)
         goto error;
-    r = PyDict_SetItem(opts, name, value);
+    PyDict_SetItem(opts, name, value);
     Py_DECREF(name);
     Py_DECREF(value);
     return;
@@ -1345,7 +1416,8 @@ static PyStructSequence_Field flags_fields[] = {
 #endif
     /* {"unbuffered",                   "-u"}, */
     /* {"skip_first",                   "-x"}, */
-    {"bytes_warning", "-b"},
+    {"bytes_warning",           "-b"},
+    {"quiet",                   "-q"},
     {0}
 };
 
@@ -1354,9 +1426,9 @@ static PyStructSequence_Desc flags_desc = {
     flags__doc__,       /* doc */
     flags_fields,       /* fields */
 #ifdef RISCOS
-    12
+    13
 #else
-    11
+    12
 #endif
 };
 
@@ -1389,6 +1461,7 @@ make_flags(void)
     /* SetFlag(saw_unbuffered_flag); */
     /* SetFlag(skipfirstline); */
     SetFlag(Py_BytesWarningFlag);
+    SetFlag(Py_QuietFlag);
 #undef SetFlag
 
     if (PyErr_Occurred()) {

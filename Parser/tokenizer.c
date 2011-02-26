@@ -545,6 +545,7 @@ decoding_fgets(char *s, int size, struct tok_state *tok)
 {
     char *line = NULL;
     int badchar = 0;
+    PyObject *filename;
     for (;;) {
         if (tok->decoding_state == STATE_NORMAL) {
             /* We already have a codec associated with
@@ -585,12 +586,16 @@ decoding_fgets(char *s, int size, struct tok_state *tok)
     if (badchar) {
         /* Need to add 1 to the line number, since this line
            has not been counted, yet.  */
-        PyErr_Format(PyExc_SyntaxError,
-            "Non-UTF-8 code starting with '\\x%.2x' "
-            "in file %.200s on line %i, "
-            "but no encoding declared; "
-            "see http://python.org/dev/peps/pep-0263/ for details",
-            badchar, tok->filename, tok->lineno + 1);
+        filename = PyUnicode_DecodeFSDefault(tok->filename);
+        if (filename != NULL) {
+            PyErr_Format(PyExc_SyntaxError,
+                    "Non-UTF-8 code starting with '\\x%.2x' "
+                    "in file %U on line %i, "
+                    "but no encoding declared; "
+                    "see http://python.org/dev/peps/pep-0263/ for details",
+                    badchar, filename, tok->lineno + 1);
+            Py_DECREF(filename);
+        }
         return error_ret(tok);
     }
 #endif
@@ -888,6 +893,13 @@ tok_nextc(register struct tok_state *tok)
         if (tok->prompt != NULL) {
             char *newtok = PyOS_Readline(stdin, stdout, tok->prompt);
 #ifndef PGEN
+            if (newtok != NULL) {
+                char *translated = translate_newlines(newtok, 0, tok);
+                PyMem_FREE(newtok);
+                if (translated == NULL)
+                    return EOF;
+                newtok = translated;
+            }
             if (tok->encoding && newtok && *newtok) {
                 /* Recode to UTF-8 */
                 Py_ssize_t buflen;

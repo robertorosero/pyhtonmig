@@ -271,24 +271,35 @@ class TestShutil(unittest.TestCase):
             shutil.rmtree(src_dir)
             shutil.rmtree(os.path.dirname(dst_dir))
 
-    @support.skip_unless_symlink
+    @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
     def test_dont_copy_file_onto_link_to_itself(self):
+        # Temporarily disable test on Windows.
+        if os.name == 'nt':
+            return
         # bug 851123.
         os.mkdir(TESTFN)
         src = os.path.join(TESTFN, 'cheese')
         dst = os.path.join(TESTFN, 'shop')
         try:
-            f = open(src, 'w')
-            f.write('cheddar')
-            f.close()
+            with open(src, 'w') as f:
+                f.write('cheddar')
+            os.link(src, dst)
+            self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
+            with open(src, 'r') as f:
+                self.assertEqual(f.read(), 'cheddar')
+            os.remove(dst)
+        finally:
+            shutil.rmtree(TESTFN, ignore_errors=True)
 
-            if hasattr(os, "link"):
-                os.link(src, dst)
-                self.assertRaises(shutil.Error, shutil.copyfile, src, dst)
-                with open(src, 'r') as f:
-                    self.assertEqual(f.read(), 'cheddar')
-                os.remove(dst)
-
+    @support.skip_unless_symlink
+    def test_dont_copy_file_onto_symlink_to_itself(self):
+        # bug 851123.
+        os.mkdir(TESTFN)
+        src = os.path.join(TESTFN, 'cheese')
+        dst = os.path.join(TESTFN, 'shop')
+        try:
+            with open(src, 'w') as f:
+                f.write('cheddar')
             # Using `src` here would mean we end up with a symlink pointing
             # to TESTFN/TESTFN/cheese, while it should point at
             # TESTFN/cheese.
@@ -298,10 +309,7 @@ class TestShutil(unittest.TestCase):
                 self.assertEqual(f.read(), 'cheddar')
             os.remove(dst)
         finally:
-            try:
-                shutil.rmtree(TESTFN)
-            except OSError:
-                pass
+            shutil.rmtree(TESTFN, ignore_errors=True)
 
     @support.skip_unless_symlink
     def test_rmtree_on_symlink(self):
@@ -328,26 +336,26 @@ class TestShutil(unittest.TestCase):
             finally:
                 os.remove(TESTFN)
 
-    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'requires os.mkfifo')
-    def test_copytree_named_pipe(self):
-        os.mkdir(TESTFN)
-        try:
-            subdir = os.path.join(TESTFN, "subdir")
-            os.mkdir(subdir)
-            pipe = os.path.join(subdir, "mypipe")
-            os.mkfifo(pipe)
+        @support.skip_unless_symlink
+        def test_copytree_named_pipe(self):
+            os.mkdir(TESTFN)
             try:
-                shutil.copytree(TESTFN, TESTFN2)
-            except shutil.Error as e:
-                errors = e.args[0]
-                self.assertEqual(len(errors), 1)
-                src, dst, error_msg = errors[0]
-                self.assertEqual("`%s` is a named pipe" % pipe, error_msg)
-            else:
-                self.fail("shutil.Error should have been raised")
-        finally:
-            shutil.rmtree(TESTFN, ignore_errors=True)
-            shutil.rmtree(TESTFN2, ignore_errors=True)
+                subdir = os.path.join(TESTFN, "subdir")
+                os.mkdir(subdir)
+                pipe = os.path.join(subdir, "mypipe")
+                os.mkfifo(pipe)
+                try:
+                    shutil.copytree(TESTFN, TESTFN2)
+                except shutil.Error as e:
+                    errors = e.args[0]
+                    self.assertEqual(len(errors), 1)
+                    src, dst, error_msg = errors[0]
+                    self.assertEqual("`%s` is a named pipe" % pipe, error_msg)
+                else:
+                    self.fail("shutil.Error should have been raised")
+            finally:
+                shutil.rmtree(TESTFN, ignore_errors=True)
+                shutil.rmtree(TESTFN2, ignore_errors=True)
 
     def test_copytree_special_func(self):
 
@@ -362,7 +370,7 @@ class TestShutil(unittest.TestCase):
             copied.append((src, dst))
 
         shutil.copytree(src_dir, dst_dir, copy_function=_copy)
-        self.assertEquals(len(copied), 2)
+        self.assertEqual(len(copied), 2)
 
     @support.skip_unless_symlink
     def test_copytree_dangling_symlinks(self):
@@ -477,7 +485,7 @@ class TestShutil(unittest.TestCase):
 
         self.assertTrue(os.path.exists(tarball2))
         # let's compare both tarballs
-        self.assertEquals(self._tarinfo(tarball), self._tarinfo(tarball2))
+        self.assertEqual(self._tarinfo(tarball), self._tarinfo(tarball2))
 
         # trying an uncompressed one
         base_name = os.path.join(tmpdir2, 'archive')
@@ -572,8 +580,8 @@ class TestShutil(unittest.TestCase):
         archive = tarfile.open(archive_name)
         try:
             for member in archive.getmembers():
-                self.assertEquals(member.uid, 0)
-                self.assertEquals(member.gid, 0)
+                self.assertEqual(member.uid, 0)
+                self.assertEqual(member.gid, 0)
         finally:
             archive.close()
 
@@ -588,7 +596,7 @@ class TestShutil(unittest.TestCase):
                 make_archive('xxx', 'xxx', root_dir=self.mkdtemp())
             except Exception:
                 pass
-            self.assertEquals(os.getcwd(), current_dir)
+            self.assertEqual(os.getcwd(), current_dir)
         finally:
             unregister_archive_format('xxx')
 
@@ -635,16 +643,16 @@ class TestShutil(unittest.TestCase):
             # let's try to unpack it now
             unpack_archive(filename, tmpdir2)
             diff = self._compare_dirs(tmpdir, tmpdir2)
-            self.assertEquals(diff, [])
+            self.assertEqual(diff, [])
 
     def test_unpack_registery(self):
 
         formats = get_unpack_formats()
 
         def _boo(filename, extract_dir, extra):
-            self.assertEquals(extra, 1)
-            self.assertEquals(filename, 'stuff.boo')
-            self.assertEquals(extract_dir, 'xx')
+            self.assertEqual(extra, 1)
+            self.assertEqual(filename, 'stuff.boo')
+            self.assertEqual(extract_dir, 'xx')
 
         register_unpack_format('Boo', ['.boo', '.b2'], _boo, [('extra', 1)])
         unpack_archive('stuff.boo', 'xx')
@@ -661,7 +669,7 @@ class TestShutil(unittest.TestCase):
 
         # let's leave a clean state
         unregister_unpack_format('Boo2')
-        self.assertEquals(get_unpack_formats(), formats)
+        self.assertEqual(get_unpack_formats(), formats)
 
 
 class TestMove(unittest.TestCase):

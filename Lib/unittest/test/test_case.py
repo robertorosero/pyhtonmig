@@ -1,5 +1,6 @@
 import difflib
 import pprint
+import pickle
 import re
 import sys
 import warnings
@@ -75,6 +76,16 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
             def test(self): pass
 
         self.assertEqual(Test().id()[-13:], '.Test.runTest')
+
+        # test that TestCase can be instantiated with no args
+        # primarily for use at the interactive interpreter
+        test = unittest.TestCase()
+        test.assertEqual(3, 3)
+        with test.assertRaises(test.failureException):
+            test.assertEqual(3, 2)
+
+        with self.assertRaises(AttributeError):
+            test.run()
 
     # "class TestCase([methodName])"
     # ...
@@ -176,8 +187,8 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
                 super(Foo, self).test()
                 raise RuntimeError('raised by Foo.test')
 
-        expected = ['startTest', 'setUp', 'test', 'addError', 'tearDown',
-                    'stopTest']
+        expected = ['startTest', 'setUp', 'test', 'tearDown',
+                    'addError', 'stopTest']
         Foo(events).run(result)
         self.assertEqual(events, expected)
 
@@ -194,8 +205,8 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
                 super(Foo, self).test()
                 raise RuntimeError('raised by Foo.test')
 
-        expected = ['startTestRun', 'startTest', 'setUp', 'test', 'addError',
-                    'tearDown', 'stopTest', 'stopTestRun']
+        expected = ['startTestRun', 'startTest', 'setUp', 'test',
+                    'tearDown', 'addError', 'stopTest', 'stopTestRun']
         Foo(events).run()
         self.assertEqual(events, expected)
 
@@ -215,8 +226,8 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
                 super(Foo, self).test()
                 self.fail('raised by Foo.test')
 
-        expected = ['startTest', 'setUp', 'test', 'addFailure', 'tearDown',
-                    'stopTest']
+        expected = ['startTest', 'setUp', 'test', 'tearDown',
+                    'addFailure', 'stopTest']
         Foo(events).run(result)
         self.assertEqual(events, expected)
 
@@ -230,8 +241,8 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
                 super(Foo, self).test()
                 self.fail('raised by Foo.test')
 
-        expected = ['startTestRun', 'startTest', 'setUp', 'test', 'addFailure',
-                    'tearDown', 'stopTest', 'stopTestRun']
+        expected = ['startTestRun', 'startTest', 'setUp', 'test',
+                    'tearDown', 'addFailure', 'stopTest', 'stopTestRun']
         events = []
         Foo(events).run()
         self.assertEqual(events, expected)
@@ -477,33 +488,6 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
         self.assertRaises(self.failureException, self.assertNotIn, 'cow',
                           animals)
 
-    def testAssertDictContainsSubset(self):
-        self.assertDictContainsSubset({}, {})
-        self.assertDictContainsSubset({}, {'a': 1})
-        self.assertDictContainsSubset({'a': 1}, {'a': 1})
-        self.assertDictContainsSubset({'a': 1}, {'a': 1, 'b': 2})
-        self.assertDictContainsSubset({'a': 1, 'b': 2}, {'a': 1, 'b': 2})
-
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({1: "one"}, {})
-
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({'a': 2}, {'a': 1})
-
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({'c': 1}, {'a': 1})
-
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({'a': 1, 'c': 1}, {'a': 1})
-
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({'a': 1, 'c': 1}, {'a': 1})
-
-        one = ''.join(chr(i) for i in range(255))
-        # this used to cause a UnicodeDecodeError constructing the failure msg
-        with self.assertRaises(self.failureException):
-            self.assertDictContainsSubset({'foo': one}, {'foo': '\uFFFD'})
-
     def testAssertEqual(self):
         equal_pairs = [
                 ((), ()),
@@ -671,45 +655,67 @@ class Test_TestCase(unittest.TestCase, TestEquality, TestHashing):
         else:
             self.fail('assertMultiLineEqual did not fail')
 
-    def testAssertItemsEqual(self):
+    def testAssertCountEqual(self):
         a = object()
-        self.assertItemsEqual([1, 2, 3], [3, 2, 1])
-        self.assertItemsEqual(['foo', 'bar', 'baz'], ['bar', 'baz', 'foo'])
-        self.assertItemsEqual([a, a, 2, 2, 3], (a, 2, 3, a, 2))
-        self.assertItemsEqual([1, "2", "a", "a"], ["a", "2", True, "a"])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertCountEqual([1, 2, 3], [3, 2, 1])
+        self.assertCountEqual(['foo', 'bar', 'baz'], ['bar', 'baz', 'foo'])
+        self.assertCountEqual([a, a, 2, 2, 3], (a, 2, 3, a, 2))
+        self.assertCountEqual([1, "2", "a", "a"], ["a", "2", True, "a"])
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [1, 2] + [3] * 100, [1] * 100 + [2, 3])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [1, "2", "a", "a"], ["a", "2", True, 1])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [10], [10, 11])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [10, 11], [10])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [10, 11, 10], [10, 11])
 
         # Test that sequences of unhashable objects can be tested for sameness:
-        self.assertItemsEqual([[1, 2], [3, 4], 0], [False, [3, 4], [1, 2]])
+        self.assertCountEqual([[1, 2], [3, 4], 0], [False, [3, 4], [1, 2]])
+        # Test that iterator of unhashable objects can be tested for sameness:
+        self.assertCountEqual(iter([1, 2, [], 3, 4]),
+                              iter([1, 2, [], 3, 4]))
 
         # hashable types, but not orderable
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [], [divmod, 'x', 1, 5j, 2j, frozenset()])
         # comparing dicts
-        self.assertItemsEqual([{'a': 1}, {'b': 2}], [{'b': 2}, {'a': 1}])
+        self.assertCountEqual([{'a': 1}, {'b': 2}], [{'b': 2}, {'a': 1}])
         # comparing heterogenous non-hashable sequences
-        self.assertItemsEqual([1, 'x', divmod, []], [divmod, [], 'x', 1])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertCountEqual([1, 'x', divmod, []], [divmod, [], 'x', 1])
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [], [divmod, [], 'x', 1, 5j, 2j, set()])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [[1]], [[2]])
 
         # Same elements, but not same sequence length
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [1, 1, 2], [2, 1])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [1, 1, "2", "a", "a"], ["2", "2", True, "a"])
-        self.assertRaises(self.failureException, self.assertItemsEqual,
+        self.assertRaises(self.failureException, self.assertCountEqual,
                           [1, {'b': 2}, None, True], [{'b': 2}, True, None])
+
+        # Same elements which don't reliably compare, in
+        # different order, see issue 10242
+        a = [{2,4}, {1,2}]
+        b = a[::-1]
+        self.assertCountEqual(a, b)
+
+        # test utility functions supporting assertCountEqual()
+
+        diffs = set(unittest.util._count_diff_all_purpose('aaabccd', 'abbbcce'))
+        expected = {(3,1,'a'), (1,3,'b'), (1,0,'d'), (0,1,'e')}
+        self.assertEqual(diffs, expected)
+
+        diffs = unittest.util._count_diff_all_purpose([[]], [])
+        self.assertEqual(diffs, [(1, 0, [])])
+
+        diffs = set(unittest.util._count_diff_hashable('aaabccd', 'abbbcce'))
+        expected = {(3,1,'a'), (1,3,'b'), (1,0,'d'), (0,1,'e')}
+        self.assertEqual(diffs, expected)
 
     def testAssertSetEqual(self):
         set1 = set()
@@ -864,44 +870,44 @@ test case
         self.assertIsNotNone('DjZoPloGears on Rails')
         self.assertRaises(self.failureException, self.assertIsNotNone, None)
 
-    def testAssertRegexpMatches(self):
-        self.assertRegexpMatches('asdfabasdf', r'ab+')
-        self.assertRaises(self.failureException, self.assertRegexpMatches,
+    def testAssertRegex(self):
+        self.assertRegex('asdfabasdf', r'ab+')
+        self.assertRaises(self.failureException, self.assertRegex,
                           'saaas', r'aaaa')
 
-    def testAssertRaisesRegexp(self):
+    def testAssertRaisesRegex(self):
         class ExceptionMock(Exception):
             pass
 
         def Stub():
             raise ExceptionMock('We expect')
 
-        self.assertRaisesRegexp(ExceptionMock, re.compile('expect$'), Stub)
-        self.assertRaisesRegexp(ExceptionMock, 'expect$', Stub)
+        self.assertRaisesRegex(ExceptionMock, re.compile('expect$'), Stub)
+        self.assertRaisesRegex(ExceptionMock, 'expect$', Stub)
 
-    def testAssertNotRaisesRegexp(self):
-        self.assertRaisesRegexp(
+    def testAssertNotRaisesRegex(self):
+        self.assertRaisesRegex(
                 self.failureException, '^Exception not raised by <lambda>$',
-                self.assertRaisesRegexp, Exception, re.compile('x'),
+                self.assertRaisesRegex, Exception, re.compile('x'),
                 lambda: None)
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
                 self.failureException, '^Exception not raised by <lambda>$',
-                self.assertRaisesRegexp, Exception, 'x',
+                self.assertRaisesRegex, Exception, 'x',
                 lambda: None)
 
-    def testAssertRaisesRegexpMismatch(self):
+    def testAssertRaisesRegexMismatch(self):
         def Stub():
             raise Exception('Unexpected')
 
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
                 self.failureException,
                 r'"\^Expected\$" does not match "Unexpected"',
-                self.assertRaisesRegexp, Exception, '^Expected$',
+                self.assertRaisesRegex, Exception, '^Expected$',
                 Stub)
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
                 self.failureException,
                 r'"\^Expected\$" does not match "Unexpected"',
-                self.assertRaisesRegexp, Exception,
+                self.assertRaisesRegex, Exception,
                 re.compile('^Expected$'), Stub)
 
     def testAssertRaisesExcValue(self):
@@ -985,26 +991,26 @@ test case
                 with self.assertWarns(DeprecationWarning):
                     _runtime_warn()
 
-    def testAssertWarnsRegexpCallable(self):
+    def testAssertWarnsRegexCallable(self):
         def _runtime_warn(msg):
             warnings.warn(msg, RuntimeWarning)
-        self.assertWarnsRegexp(RuntimeWarning, "o+",
-                               _runtime_warn, "foox")
+        self.assertWarnsRegex(RuntimeWarning, "o+",
+                              _runtime_warn, "foox")
         # Failure when no warning is triggered
         with self.assertRaises(self.failureException):
-            self.assertWarnsRegexp(RuntimeWarning, "o+",
-                                   lambda: 0)
+            self.assertWarnsRegex(RuntimeWarning, "o+",
+                                  lambda: 0)
         # Failure when another warning is triggered
         with warnings.catch_warnings():
             # Force default filter (in case tests are run with -We)
             warnings.simplefilter("default", RuntimeWarning)
             with self.assertRaises(self.failureException):
-                self.assertWarnsRegexp(DeprecationWarning, "o+",
-                                       _runtime_warn, "foox")
+                self.assertWarnsRegex(DeprecationWarning, "o+",
+                                      _runtime_warn, "foox")
         # Failure when message doesn't match
         with self.assertRaises(self.failureException):
-            self.assertWarnsRegexp(RuntimeWarning, "o+",
-                                   _runtime_warn, "barz")
+            self.assertWarnsRegex(RuntimeWarning, "o+",
+                                  _runtime_warn, "barz")
         # A little trickier: we ask RuntimeWarnings to be raised, and then
         # check for some of them.  It is implementation-defined whether
         # non-matching RuntimeWarnings are simply re-raised, or produce a
@@ -1012,15 +1018,15 @@ test case
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
             with self.assertRaises((RuntimeWarning, self.failureException)):
-                self.assertWarnsRegexp(RuntimeWarning, "o+",
-                                       _runtime_warn, "barz")
+                self.assertWarnsRegex(RuntimeWarning, "o+",
+                                      _runtime_warn, "barz")
 
-    def testAssertWarnsRegexpContext(self):
-        # Same as above, but with assertWarnsRegexp as a context manager
+    def testAssertWarnsRegexContext(self):
+        # Same as above, but with assertWarnsRegex as a context manager
         def _runtime_warn(msg):
             warnings.warn(msg, RuntimeWarning)
         _runtime_warn_lineno = inspect.getsourcelines(_runtime_warn)[1]
-        with self.assertWarnsRegexp(RuntimeWarning, "o+") as cm:
+        with self.assertWarnsRegex(RuntimeWarning, "o+") as cm:
             _runtime_warn("foox")
         self.assertIsInstance(cm.warning, RuntimeWarning)
         self.assertEqual(cm.warning.args[0], "foox")
@@ -1028,18 +1034,18 @@ test case
         self.assertEqual(cm.lineno, _runtime_warn_lineno + 1)
         # Failure when no warning is triggered
         with self.assertRaises(self.failureException):
-            with self.assertWarnsRegexp(RuntimeWarning, "o+"):
+            with self.assertWarnsRegex(RuntimeWarning, "o+"):
                 pass
         # Failure when another warning is triggered
         with warnings.catch_warnings():
             # Force default filter (in case tests are run with -We)
             warnings.simplefilter("default", RuntimeWarning)
             with self.assertRaises(self.failureException):
-                with self.assertWarnsRegexp(DeprecationWarning, "o+"):
+                with self.assertWarnsRegex(DeprecationWarning, "o+"):
                     _runtime_warn("foox")
         # Failure when message doesn't match
         with self.assertRaises(self.failureException):
-            with self.assertWarnsRegexp(RuntimeWarning, "o+"):
+            with self.assertWarnsRegex(RuntimeWarning, "o+"):
                 _runtime_warn("barz")
         # A little trickier: we ask RuntimeWarnings to be raised, and then
         # check for some of them.  It is implementation-defined whether
@@ -1048,42 +1054,27 @@ test case
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
             with self.assertRaises((RuntimeWarning, self.failureException)):
-                with self.assertWarnsRegexp(RuntimeWarning, "o+"):
+                with self.assertWarnsRegex(RuntimeWarning, "o+"):
                     _runtime_warn("barz")
 
-    def testSynonymAssertMethodNames(self):
-        """Test undocumented method name synonyms.
+    def testDeprecatedMethodNames(self):
+        """Test that the deprecated methods raise a DeprecationWarning.
 
-        Please do not use these methods names in your own code.
-
-        This test confirms their continued existence and functionality
-        in order to avoid breaking existing code.
-        """
-        self.assertNotEquals(3, 5)
-        self.assertEquals(3, 3)
-        self.assertAlmostEquals(2.0, 2.0)
-        self.assertNotAlmostEquals(3.0, 5.0)
-        self.assert_(True)
-
-    def testPendingDeprecationMethodNames(self):
-        """Test fail* methods pending deprecation, they will warn in 3.2.
-
-        Do not use these methods.  They will go away in 3.3.
+        The fail* methods will be removed in 3.3. The assert* methods will
+        have to stay around for a few more versions.  See #9424.
         """
         old = (
-            (self.failIfEqual, (3, 5)),
-            (self.failUnlessEqual, (3, 3)),
-            (self.failUnlessAlmostEqual, (2.0, 2.0)),
-            (self.failIfAlmostEqual, (3.0, 5.0)),
-            (self.failUnless, (True,)),
-            (self.failUnlessRaises, (TypeError, lambda _: 3.14 + 'spam')),
-            (self.failIf, (False,)),
-            (self.assertSameElements, ([1, 1, 2, 3], [1, 2, 3]))
+            (self.assertNotEquals, (3, 5)),
+            (self.assertEquals, (3, 3)),
+            (self.assertAlmostEquals, (2.0, 2.0)),
+            (self.assertNotAlmostEquals, (3.0, 5.0)),
+            (self.assert_, (True,)),
+            (self.assertRaisesRegexp, (KeyError, 'foo', lambda: {}['foo'])),
+            (self.assertRegexpMatches, ('bar', 'bar')),
         )
         for meth, args in old:
-            with support.check_warnings(('', DeprecationWarning)) as w:
+            with self.assertWarns(DeprecationWarning):
                 meth(*args)
-            self.assertEqual(len(w.warnings), 1)
 
     def testDeepcopy(self):
         # Issue: 5660
@@ -1095,3 +1086,99 @@ test case
 
         # This shouldn't blow up
         deepcopy(test)
+
+    def testPickle(self):
+        # Issue 10326
+
+        # Can't use TestCase classes defined in Test class as
+        # pickle does not work with inner classes
+        test = unittest.TestCase('run')
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+
+            # blew up prior to fix
+            pickled_test = pickle.dumps(test, protocol=protocol)
+            unpickled_test = pickle.loads(pickled_test)
+            self.assertEqual(test, unpickled_test)
+
+            # exercise the TestCase instance in a way that will invoke
+            # the type equality lookup mechanism
+            unpickled_test.assertEqual(set(), set())
+
+    def testKeyboardInterrupt(self):
+        def _raise(self=None):
+            raise KeyboardInterrupt
+        def nothing(self):
+            pass
+
+        class Test1(unittest.TestCase):
+            test_something = _raise
+
+        class Test2(unittest.TestCase):
+            setUp = _raise
+            test_something = nothing
+
+        class Test3(unittest.TestCase):
+            test_something = nothing
+            tearDown = _raise
+
+        class Test4(unittest.TestCase):
+            def test_something(self):
+                self.addCleanup(_raise)
+
+        for klass in (Test1, Test2, Test3, Test4):
+            with self.assertRaises(KeyboardInterrupt):
+                klass('test_something').run()
+
+    def testSkippingEverywhere(self):
+        def _skip(self=None):
+            raise unittest.SkipTest('some reason')
+        def nothing(self):
+            pass
+
+        class Test1(unittest.TestCase):
+            test_something = _skip
+
+        class Test2(unittest.TestCase):
+            setUp = _skip
+            test_something = nothing
+
+        class Test3(unittest.TestCase):
+            test_something = nothing
+            tearDown = _skip
+
+        class Test4(unittest.TestCase):
+            def test_something(self):
+                self.addCleanup(_skip)
+
+        for klass in (Test1, Test2, Test3, Test4):
+            result = unittest.TestResult()
+            klass('test_something').run(result)
+            self.assertEqual(len(result.skipped), 1)
+            self.assertEqual(result.testsRun, 1)
+
+    def testSystemExit(self):
+        def _raise(self=None):
+            raise SystemExit
+        def nothing(self):
+            pass
+
+        class Test1(unittest.TestCase):
+            test_something = _raise
+
+        class Test2(unittest.TestCase):
+            setUp = _raise
+            test_something = nothing
+
+        class Test3(unittest.TestCase):
+            test_something = nothing
+            tearDown = _raise
+
+        class Test4(unittest.TestCase):
+            def test_something(self):
+                self.addCleanup(_raise)
+
+        for klass in (Test1, Test2, Test3, Test4):
+            result = unittest.TestResult()
+            klass('test_something').run(result)
+            self.assertEqual(len(result.errors), 1)
+            self.assertEqual(result.testsRun, 1)

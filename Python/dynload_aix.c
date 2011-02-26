@@ -12,7 +12,7 @@
 
 
 #ifdef AIX_GENUINE_CPLUSPLUS
-#include "/usr/lpp/xlC/include/load.h"
+#include <load.h>
 #define aix_load loadAndInit
 #else
 #define aix_load load
@@ -154,7 +154,7 @@ aix_loaderror(const char *pathname)
 }
 
 
-dl_funcptr _PyImport_GetDynLoadFunc(const char *fqname, const char *shortname,
+dl_funcptr _PyImport_GetDynLoadFunc(const char *shortname,
                                     const char *pathname, FILE *fp)
 {
     dl_funcptr p;

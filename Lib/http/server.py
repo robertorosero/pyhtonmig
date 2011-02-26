@@ -314,8 +314,12 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.command, self.path, self.request_version = command, path, version
 
         # Examine the headers and look for a Connection directive.
-        self.headers = http.client.parse_headers(self.rfile,
-                                                 _class=self.MessageClass)
+        try:
+            self.headers = http.client.parse_headers(self.rfile,
+                                                     _class=self.MessageClass)
+        except http.client.LineTooLong:
+            self.send_error(400, "Line too long")
+            return False
 
         conntype = self.headers.get('Connection', "")
         if conntype.lower() == 'close':
@@ -358,7 +362,13 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         """
         try:
-            self.raw_requestline = self.rfile.readline()
+            self.raw_requestline = self.rfile.readline(65537)
+            if len(self.raw_requestline) > 65536:
+                self.requestline = ''
+                self.request_version = ''
+                self.command = ''
+                self.send_error(414)
+                return
             if not self.raw_requestline:
                 self.close_connection = 1
                 return
@@ -438,12 +448,15 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                 message = ''
         if self.request_version != 'HTTP/0.9':
             self.wfile.write(("%s %d %s\r\n" %
-                              (self.protocol_version, code, message)).encode('ASCII', 'strict'))
+                              (self.protocol_version, code, message)).encode('latin-1', 'strict'))
 
     def send_header(self, keyword, value):
         """Send a MIME header."""
         if self.request_version != 'HTTP/0.9':
-            self.wfile.write(("%s: %s\r\n" % (keyword, value)).encode('ASCII', 'strict'))
+            if not hasattr(self, '_headers_buffer'):
+                self._headers_buffer = []
+            self._headers_buffer.append(
+                ("%s: %s\r\n" % (keyword, value)).encode('latin-1', 'strict'))
 
         if keyword.lower() == 'connection':
             if value.lower() == 'close':
@@ -454,7 +467,9 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
     def end_headers(self):
         """Send the blank line ending the MIME headers."""
         if self.request_version != 'HTTP/0.9':
-            self.wfile.write(b"\r\n")
+            self._headers_buffer.append(b"\r\n")
+            self.wfile.write(b"".join(self._headers_buffer))
+            self._headers_buffer = []
 
     def log_request(self, code='-', size='-'):
         """Log an accepted request.
@@ -863,7 +878,7 @@ def nobody_uid():
     try:
         nobody = pwd.getpwnam('nobody')[2]
     except KeyError:
-        nobody = 1 + max(map(lambda x: x[2], pwd.getpwall()))
+        nobody = 1 + max(x[2] for x in pwd.getpwall())
     return nobody
 
 

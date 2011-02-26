@@ -15,13 +15,13 @@ import shutil
 import warnings
 import unittest
 import importlib
-import collections
+import collections.abc
 import re
 import subprocess
 import imp
 import time
 import sysconfig
-
+import logging.handlers
 
 try:
     import _thread
@@ -33,7 +33,7 @@ __all__ = [
     "verbose", "use_resources", "max_memuse", "record_original_stdout",
     "get_original_stdout", "unload", "unlink", "rmtree", "forget",
     "is_resource_enabled", "requires", "find_unused_port", "bind_port",
-    "fcmp", "is_jython", "TESTFN", "HOST", "FUZZ", "SAVEDCWD", "temp_cwd",
+    "is_jython", "TESTFN", "HOST", "SAVEDCWD", "temp_cwd",
     "findfile", "sortdict", "check_syntax_error", "open_urlresource",
     "check_warnings", "CleanImport", "EnvironmentVarGuard",
     "TransientResource", "captured_output", "captured_stdout",
@@ -42,7 +42,8 @@ __all__ = [
     "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
     "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
     "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
-    "swap_item", "swap_attr", "can_symlink", "skip_unless_symlink"]
+    "swap_item", "swap_attr", "requires_IEEE_754",
+    "TestHandler", "Matcher", "can_symlink", "skip_unless_symlink"]
 
 
 class Error(Exception):
@@ -348,23 +349,10 @@ def bind_port(sock, host=HOST):
     port = sock.getsockname()[1]
     return port
 
-FUZZ = 1e-6
-
-def fcmp(x, y): # fuzzy comparison function
-    if isinstance(x, float) or isinstance(y, float):
-        try:
-            fuzz = (abs(x) + abs(y)) * FUZZ
-            if abs(x-y) <= fuzz:
-                return 0
-        except:
-            pass
-    elif type(x) == type(y) and isinstance(x, (tuple, list)):
-        for i in range(min(len(x), len(y))):
-            outcome = fcmp(x[i], y[i])
-            if outcome != 0:
-                return outcome
-        return (len(x) > len(y)) - (len(x) < len(y))
-    return (x > y) - (x < y)
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
 
 is_jython = sys.platform.startswith('java')
 
@@ -676,7 +664,7 @@ class CleanImport(object):
         sys.modules.update(self.original_modules)
 
 
-class EnvironmentVarGuard(collections.MutableMapping):
+class EnvironmentVarGuard(collections.abc.MutableMapping):
 
     """Class to help protect the environment variable properly.  Can be used as
     a context manager."""
@@ -794,6 +782,7 @@ def transient_internet(resource_name, *, timeout=30.0, errnos=()):
     default_errnos = [
         ('ECONNREFUSED', 111),
         ('ECONNRESET', 104),
+        ('EHOSTUNREACH', 113),
         ('ENETUNREACH', 101),
         ('ETIMEDOUT', 110),
     ]
@@ -867,6 +856,9 @@ def captured_output(stream_name):
 
 def captured_stdout():
     return captured_output("stdout")
+
+def captured_stderr():
+    return captured_output("stderr")
 
 def captured_stdin():
     return captured_output("stdin")
@@ -968,13 +960,12 @@ def set_memlimit(limit):
         raise ValueError('Memory limit %r too low to be useful' % (limit,))
     max_memuse = memlimit
 
-def bigmemtest(minsize, memuse, overhead=5*_1M):
+def bigmemtest(minsize, memuse):
     """Decorator for bigmem tests.
 
     'minsize' is the minimum useful size for the test (in arbitrary,
     test-interpreted units.) 'memuse' is the number of 'bytes per size' for
-    the test, or a good estimate of it. 'overhead' specifies fixed overhead,
-    independent of the testsize, and defaults to 5Mb.
+    the test, or a good estimate of it.
 
     The decorator tries to guess a good value for 'size' and passes it to
     the decorated test function. If minsize * memuse is more than the
@@ -986,52 +977,43 @@ def bigmemtest(minsize, memuse, overhead=5*_1M):
             # Retrieve values in case someone decided to adjust them
             minsize = wrapper.minsize
             memuse = wrapper.memuse
-            overhead = wrapper.overhead
             if not max_memuse:
                 # If max_memuse is 0 (the default),
                 # we still want to run the tests with size set to a few kb,
                 # to make sure they work. We still want to avoid using
                 # too much memory, though, but we do that noisily.
                 maxsize = 5147
-                self.assertFalse(maxsize * memuse + overhead > 20 * _1M)
+                self.assertFalse(maxsize * memuse > 20 * _1M)
             else:
-                maxsize = int((max_memuse - overhead) / memuse)
+                maxsize = int(max_memuse / memuse)
                 if maxsize < minsize:
-                    # Really ought to print 'test skipped' or something
-                    if verbose:
-                        sys.stderr.write("Skipping %s because of memory "
-                                         "constraint\n" % (f.__name__,))
-                    return
-                # Try to keep some breathing room in memory use
-                maxsize = max(maxsize - 50 * _1M, minsize)
+                    raise unittest.SkipTest(
+                        "not enough memory: %.1fG minimum needed"
+                        % (minsize * memuse / (1024 ** 3)))
             return f(self, maxsize)
         wrapper.minsize = minsize
         wrapper.memuse = memuse
-        wrapper.overhead = overhead
         return wrapper
     return decorator
 
-def precisionbigmemtest(size, memuse, overhead=5*_1M):
+def precisionbigmemtest(size, memuse):
     def decorator(f):
         def wrapper(self):
             size = wrapper.size
             memuse = wrapper.memuse
-            overhead = wrapper.overhead
             if not real_max_memuse:
                 maxsize = 5147
             else:
                 maxsize = size
 
                 if real_max_memuse and real_max_memuse < maxsize * memuse:
-                    if verbose:
-                        sys.stderr.write("Skipping %s because of memory "
-                                         "constraint\n" % (f.__name__,))
-                    return
+                    raise unittest.SkipTest(
+                        "not enough memory: %.1fG minimum needed"
+                        % (size * memuse / (1024 ** 3)))
 
             return f(self, maxsize)
         wrapper.size = size
         wrapper.memuse = memuse
-        wrapper.overhead = overhead
         return wrapper
     return decorator
 
@@ -1039,9 +1021,13 @@ def bigaddrspacetest(f):
     """Decorator for tests that fill the address space."""
     def wrapper(self):
         if max_memuse < MAX_Py_ssize_t:
-            if verbose:
-                sys.stderr.write("Skipping %s because of memory "
-                                 "constraint\n" % (f.__name__,))
+            if MAX_Py_ssize_t >= 2**63 - 1 and max_memuse >= 2**31:
+                raise unittest.SkipTest(
+                    "not enough memory: try a 32-bit build instead")
+            else:
+                raise unittest.SkipTest(
+                    "not enough memory: %.1fG minimum needed"
+                    % (MAX_Py_ssize_t / (1024 ** 3)))
         else:
             return f(self)
     return wrapper
@@ -1103,6 +1089,32 @@ def check_impl_detail(**guards):
     guards, default = _parse_guards(guards)
     return guards.get(platform.python_implementation().lower(), default)
 
+
+def no_tracing(func):
+    """Decorator to temporarily turn off tracing for the duration of a test."""
+    if not hasattr(sys, 'gettrace'):
+        return func
+    else:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            original_trace = sys.gettrace()
+            try:
+                sys.settrace(None)
+                return func(*args, **kwargs)
+            finally:
+                sys.settrace(original_trace)
+        return wrapper
+
+
+def refcount_test(test):
+    """Decorator for tests which involve reference counting.
+
+    To start, the decorator does not run the test if is not run by CPython.
+    After that, any trace function is unset during the test to prevent
+    unexpected refcounts caused by the trace function.
+
+    """
+    return no_tracing(cpython_only(test))
 
 
 def _run_suite(suite):
@@ -1189,6 +1201,12 @@ def modules_cleanup(oldmodules):
                  if k.startswith('encodings.')]
     sys.modules.clear()
     sys.modules.update(encodings)
+    # XXX: This kind of problem can affect more than just encodings. In particular
+    # extension modules (such as _ssl) don't cope with reloading properly.
+    # Really, test modules should be cleaning out the test specific modules they
+    # know they added (ala test_runpy) rather than relying on this function (as
+    # test_importhooks and test_pkg do currently).
+    # Implicitly imported *real* modules should be left alone (see issue 10556).
     sys.modules.update(oldmodules)
 
 #=======================================================================
@@ -1255,27 +1273,6 @@ def reap_children():
                     break
             except:
                 break
-
-try:
-    from .symlink_support import enable_symlink_privilege
-except:
-    enable_symlink_privilege = lambda: True
-
-def can_symlink():
-    """It's no longer sufficient to test for the presence of symlink in the
-    os module - on Windows XP and earlier, os.symlink exists but a
-    NotImplementedError is thrown.
-    """
-    has_symlink = hasattr(os, 'symlink')
-    is_old_windows = sys.platform == "win32" and sys.getwindowsversion().major < 6
-    has_privilege = False if is_old_windows else enable_symlink_privilege()
-    return has_symlink and (not is_old_windows) and has_privilege
-
-def skip_unless_symlink(test):
-    """Skip decorator for tests that require functional symlink"""
-    selector = can_symlink()
-    msg = "Requires functional symlink implementation"
-    return [unittest.skip(msg)(test), test][selector]
 
 @contextlib.contextmanager
 def swap_attr(obj, attr, new_val):
@@ -1359,3 +1356,88 @@ def args_from_interpreter_flags():
         if v > 0:
             args.append('-' + opt * v)
     return args
+
+#============================================================
+# Support for assertions about logging.
+#============================================================
+
+class TestHandler(logging.handlers.BufferingHandler):
+    def __init__(self, matcher):
+        # BufferingHandler takes a "capacity" argument
+        # so as to know when to flush. As we're overriding
+        # shouldFlush anyway, we can set a capacity of zero.
+        # You can call flush() manually to clear out the
+        # buffer.
+        logging.handlers.BufferingHandler.__init__(self, 0)
+        self.matcher = matcher
+
+    def shouldFlush(self):
+        return False
+
+    def emit(self, record):
+        self.format(record)
+        self.buffer.append(record.__dict__)
+
+    def matches(self, **kwargs):
+        """
+        Look for a saved dict whose keys/values match the supplied arguments.
+        """
+        result = False
+        for d in self.buffer:
+            if self.matcher.matches(d, **kwargs):
+                result = True
+                break
+        return result
+
+class Matcher(object):
+
+    _partial_matches = ('msg', 'message')
+
+    def matches(self, d, **kwargs):
+        """
+        Try to match a single dict with the supplied arguments.
+
+        Keys whose values are strings and which are in self._partial_matches
+        will be checked for partial (i.e. substring) matches. You can extend
+        this scheme to (for example) do regular expression matching, etc.
+        """
+        result = True
+        for k in kwargs:
+            v = kwargs[k]
+            dv = d.get(k)
+            if not self.match_value(k, dv, v):
+                result = False
+                break
+        return result
+
+    def match_value(self, k, dv, v):
+        """
+        Try to match a single stored value (dv) with a supplied value (v).
+        """
+        if type(v) != type(dv):
+            result = False
+        elif type(dv) is not str or k not in self._partial_matches:
+            result = (v == dv)
+        else:
+            result = dv.find(v) >= 0
+        return result
+
+
+_can_symlink = None
+def can_symlink():
+    global _can_symlink
+    if _can_symlink is not None:
+        return _can_symlink
+    try:
+        os.symlink(TESTFN, TESTFN + "can_symlink")
+        can = True
+    except (OSError, NotImplementedError):
+        can = False
+    _can_symlink = can
+    return can
+
+def skip_unless_symlink(test):
+    """Skip decorator for tests that require functional symlink"""
+    ok = can_symlink()
+    msg = "Requires functional symlink implementation"
+    return test if ok else unittest.skip(msg)(test)

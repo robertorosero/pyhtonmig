@@ -403,7 +403,8 @@ unicodedata_decomposition(PyObject *self, PyObject *args)
 {
     PyUnicodeObject *v;
     char decomp[256];
-    int code, index, count, i;
+    int code, index, count;
+    size_t i;
     unsigned int prefix_index;
     Py_UCS4 c;
 
@@ -450,15 +451,12 @@ unicodedata_decomposition(PyObject *self, PyObject *args)
     while (count-- > 0) {
         if (i)
             decomp[i++] = ' ';
-        assert((size_t)i < sizeof(decomp));
+        assert(i < sizeof(decomp));
         PyOS_snprintf(decomp + i, sizeof(decomp) - i, "%04X",
                       decomp_data[++index]);
         i += strlen(decomp + i);
     }
-
-    decomp[i] = '\0';
-
-    return PyUnicode_FromString(decomp);
+    return PyUnicode_FromStringAndSize(decomp, i);
 }
 
 static void
@@ -684,10 +682,14 @@ nfc_nfkc(PyObject *self, PyObject *input, int k)
       comb = 0;
       while (i1 < end) {
           int comb1 = _getrecord_ex(*i1)->combining;
-          if (comb && (comb1 == 0 || comb == comb1)) {
-              /* Character is blocked. */
-              i1++;
-              continue;
+          if (comb) {
+              if (comb1 == 0)
+                  break;
+              if (comb >= comb1) {
+                  /* Character is blocked. */
+                  i1++;
+                  continue;
+              }
           }
           l = find_nfc_index(self, nfc_last, *i1);
           /* *i1 cannot be combined with *i. If *i1
@@ -711,6 +713,7 @@ nfc_nfkc(PyObject *self, PyObject *input, int k)
           /* Replace the original character. */
           *i = code;
           /* Mark the second character unused. */
+          assert(cskipped < 20);
           skipped[cskipped++] = i1;
           i1++;
           f = find_nfc_index(self, nfc_first, *i);
@@ -866,13 +869,16 @@ static char *hangul_syllables[][3] = {
     { 0,    0,     "H"  }
 };
 
+/* These ranges need to match makeunicodedata.py:cjk_ranges. */
 static int
 is_unified_ideograph(Py_UCS4 code)
 {
-    return (
-        (0x3400 <= code && code <= 0x4DB5) || /* CJK Ideograph Extension A */
-        (0x4E00 <= code && code <= 0x9FBB) || /* CJK Ideograph */
-        (0x20000 <= code && code <= 0x2A6D6));/* CJK Ideograph Extension B */
+    return
+        (0x3400 <= code && code <= 0x4DB5)   || /* CJK Ideograph Extension A */
+        (0x4E00 <= code && code <= 0x9FCB)   || /* CJK Ideograph */
+        (0x20000 <= code && code <= 0x2A6D6) || /* CJK Ideograph Extension B */
+        (0x2A700 <= code && code <= 0x2B734) || /* CJK Ideograph Extension C */
+        (0x2B740 <= code && code <= 0x2B81D);   /* CJK Ideograph Extension D */
 }
 
 static int

@@ -337,7 +337,7 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(BadExc, d.remove, 'c')
         for x, y in zip(d, e):
             # verify that original order and values are retained.
-            self.assert_(x is y)
+            self.assertIs(x, y)
 
     def test_count(self):
         a = self.type2test([0, 1, 2])*3
@@ -425,6 +425,47 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertRaises(TypeError, u.reverse, 42)
 
+    def test_clear(self):
+        u = self.type2test([2, 3, 4])
+        u.clear()
+        self.assertEqual(u, [])
+
+        u = self.type2test([])
+        u.clear()
+        self.assertEqual(u, [])
+
+        u = self.type2test([])
+        u.append(1)
+        u.clear()
+        u.append(2)
+        self.assertEqual(u, [2])
+
+        self.assertRaises(TypeError, u.clear, None)
+
+    def test_copy(self):
+        u = self.type2test([1, 2, 3])
+        v = u.copy()
+        self.assertEqual(v, [1, 2, 3])
+
+        u = self.type2test([])
+        v = u.copy()
+        self.assertEqual(v, [])
+
+        # test that it's indeed a copy and not a reference
+        u = self.type2test(['a', 'b'])
+        v = u.copy()
+        v.append('i')
+        self.assertEqual(u, ['a', 'b'])
+        self.assertEqual(v, u + ['i'])
+
+        # test that it's a shallow, not a deep copy
+        u = self.type2test([1, 2, [3, 4], 5])
+        v = u.copy()
+        self.assertEqual(u, v)
+        self.assertIs(v[3], u[3])
+
+        self.assertRaises(TypeError, u.copy, None)
+
     def test_sort(self):
         u = self.type2test([1, 0])
         u.sort()
@@ -482,7 +523,7 @@ class CommonTest(seq_tests.CommonTest):
         u = self.type2test([0, 1])
         u2 = u
         u += [2, 3]
-        self.assert_(u is u2)
+        self.assertIs(u, u2)
 
         u = self.type2test("spam")
         u += "eggs"

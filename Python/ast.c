@@ -7,7 +7,6 @@
 #include "Python-ast.h"
 #include "grammar.h"
 #include "node.h"
-#include "pyarena.h"
 #include "ast.h"
 #include "token.h"
 #include "parsetok.h"
@@ -3232,7 +3231,6 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
     const char *end;
 
     if (encoding == NULL) {
-        buf = (char *)s;
         u = NULL;
     } else {
         /* check for integer overflow */

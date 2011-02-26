@@ -6,9 +6,11 @@ executing have not been removed.
 """
 import unittest
 from test.support import run_unittest, TESTFN, EnvironmentVarGuard
+from test.support import captured_stderr
 import builtins
 import os
 import sys
+import re
 import encodings
 import subprocess
 import sysconfig
@@ -90,6 +92,58 @@ class HelperFunctionsTests(unittest.TestCase):
         finally:
             pth_file.cleanup()
 
+    def make_pth(self, contents, pth_dir='.', pth_name=TESTFN):
+        # Create a .pth file and return its (abspath, basename).
+        pth_dir = os.path.abspath(pth_dir)
+        pth_basename = pth_name + '.pth'
+        pth_fn = os.path.join(pth_dir, pth_basename)
+        pth_file = open(pth_fn, 'w', encoding='utf-8')
+        self.addCleanup(lambda: os.remove(pth_fn))
+        pth_file.write(contents)
+        pth_file.close()
+        return pth_dir, pth_basename
+
+    def test_addpackage_import_bad_syntax(self):
+        # Issue 10642
+        pth_dir, pth_fn = self.make_pth("import bad)syntax\n")
+        with captured_stderr() as err_out:
+            site.addpackage(pth_dir, pth_fn, set())
+        self.assertRegex(err_out.getvalue(), "line 1")
+        self.assertRegex(err_out.getvalue(),
+            re.escape(os.path.join(pth_dir, pth_fn)))
+        # XXX: the previous two should be independent checks so that the
+        # order doesn't matter.  The next three could be a single check
+        # but my regex foo isn't good enough to write it.
+        self.assertRegex(err_out.getvalue(), 'Traceback')
+        self.assertRegex(err_out.getvalue(), r'import bad\)syntax')
+        self.assertRegex(err_out.getvalue(), 'SyntaxError')
+
+    def test_addpackage_import_bad_exec(self):
+        # Issue 10642
+        pth_dir, pth_fn = self.make_pth("randompath\nimport nosuchmodule\n")
+        with captured_stderr() as err_out:
+            site.addpackage(pth_dir, pth_fn, set())
+        self.assertRegex(err_out.getvalue(), "line 2")
+        self.assertRegex(err_out.getvalue(),
+            re.escape(os.path.join(pth_dir, pth_fn)))
+        # XXX: ditto previous XXX comment.
+        self.assertRegex(err_out.getvalue(), 'Traceback')
+        self.assertRegex(err_out.getvalue(), 'ImportError')
+
+    @unittest.skipIf(sys.platform == "win32", "Windows does not raise an "
+                      "error for file paths containing null characters")
+    def test_addpackage_import_bad_pth_file(self):
+        # Issue 5258
+        pth_dir, pth_fn = self.make_pth("abc\x00def\n")
+        with captured_stderr() as err_out:
+            site.addpackage(pth_dir, pth_fn, set())
+        self.assertRegex(err_out.getvalue(), "line 1")
+        self.assertRegex(err_out.getvalue(),
+            re.escape(os.path.join(pth_dir, pth_fn)))
+        # XXX: ditto previous XXX comment.
+        self.assertRegex(err_out.getvalue(), 'Traceback')
+        self.assertRegex(err_out.getvalue(), 'TypeError')
+
     def test_addsitedir(self):
         # Same tests for test_addpackage since addsitedir() essentially just
         # calls addpackage() for every .pth file in the directory
@@ -107,12 +161,16 @@ class HelperFunctionsTests(unittest.TestCase):
         usersite = site.USER_SITE
         self.assertIn(usersite, sys.path)
 
+        env = os.environ.copy()
         rc = subprocess.call([sys.executable, '-c',
-            'import sys; sys.exit(%r in sys.path)' % usersite])
+            'import sys; sys.exit(%r in sys.path)' % usersite],
+            env=env)
         self.assertEqual(rc, 1)
 
+        env = os.environ.copy()
         rc = subprocess.call([sys.executable, '-s', '-c',
-            'import sys; sys.exit(%r in sys.path)' % usersite])
+            'import sys; sys.exit(%r in sys.path)' % usersite],
+            env=env)
         self.assertEqual(rc, 0)
 
         env = os.environ.copy()
@@ -134,7 +192,7 @@ class HelperFunctionsTests(unittest.TestCase):
         user_base = site.getuserbase()
 
         # the call sets site.USER_BASE
-        self.assertEquals(site.USER_BASE, user_base)
+        self.assertEqual(site.USER_BASE, user_base)
 
         # let's set PYTHONUSERBASE and see if it uses it
         site.USER_BASE = None
@@ -152,7 +210,7 @@ class HelperFunctionsTests(unittest.TestCase):
         user_site = site.getusersitepackages()
 
         # the call sets USER_BASE *and* USER_SITE
-        self.assertEquals(site.USER_SITE, user_site)
+        self.assertEqual(site.USER_SITE, user_site)
         self.assertTrue(user_site.startswith(site.USER_BASE), user_site)
 
     def test_getsitepackages(self):
@@ -162,19 +220,19 @@ class HelperFunctionsTests(unittest.TestCase):
         if sys.platform in ('os2emx', 'riscos'):
             self.assertEqual(len(dirs), 1)
             wanted = os.path.join('xoxo', 'Lib', 'site-packages')
-            self.assertEquals(dirs[0], wanted)
+            self.assertEqual(dirs[0], wanted)
         elif os.sep == '/':
             self.assertEqual(len(dirs), 2)
             wanted = os.path.join('xoxo', 'lib', 'python' + sys.version[:3],
                                   'site-packages')
-            self.assertEquals(dirs[0], wanted)
+            self.assertEqual(dirs[0], wanted)
             wanted = os.path.join('xoxo', 'lib', 'site-python')
-            self.assertEquals(dirs[1], wanted)
+            self.assertEqual(dirs[1], wanted)
         else:
             self.assertEqual(len(dirs), 2)
-            self.assertEquals(dirs[0], 'xoxo')
+            self.assertEqual(dirs[0], 'xoxo')
             wanted = os.path.join('xoxo', 'lib', 'site-packages')
-            self.assertEquals(dirs[1], wanted)
+            self.assertEqual(dirs[1], wanted)
 
         # let's try the specific Apple location
         if (sys.platform == "darwin" and
@@ -184,7 +242,7 @@ class HelperFunctionsTests(unittest.TestCase):
             self.assertEqual(len(dirs), 3)
             wanted = os.path.join('/Library', 'Python', sys.version[:3],
                                   'site-packages')
-            self.assertEquals(dirs[2], wanted)
+            self.assertEqual(dirs[2], wanted)
 
 class PthFile(object):
     """Helper class for handling testing of .pth files"""

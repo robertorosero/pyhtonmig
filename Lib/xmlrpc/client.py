@@ -1297,8 +1297,12 @@ class Transport:
 
     def parse_response(self, response):
         # read response data from httpresponse, and parse it
-        if response.getheader("Content-Encoding", "") == "gzip":
-            stream = GzipDecodedResponse(response)
+        # Check for new http response object, otherwise it is a file object.
+        if hasattr(response, 'getheader'):
+            if response.getheader("Content-Encoding", "") == "gzip":
+                stream = GzipDecodedResponse(response)
+            else:
+                stream = response
         else:
             stream = response
 
@@ -1330,7 +1334,7 @@ class SafeTransport(Transport):
         if self._connection and host == self._connection[0]:
             return self._connection[1]
 
-        if not hasattr(socket, "ssl"):
+        if not hasattr(http.client, "HTTPSConnection"):
             raise NotImplementedError(
             "your version of http.client doesn't support HTTPS")
         # create a HTTPS connection object from a host descriptor

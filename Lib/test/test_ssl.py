@@ -185,17 +185,17 @@ class BasicSocketTests(unittest.TestCase):
 
     def test_errors(self):
         sock = socket.socket()
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                         "certfile must be specified",
                         ssl.wrap_socket, sock, keyfile=CERTFILE)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                         "certfile must be specified for server-side operations",
                         ssl.wrap_socket, sock, server_side=True)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                         "certfile must be specified for server-side operations",
                         ssl.wrap_socket, sock, server_side=True, certfile="")
         s = ssl.wrap_socket(sock, server_side=True, certfile=CERTFILE)
-        self.assertRaisesRegexp(ValueError, "can't connect in server-side mode",
+        self.assertRaisesRegex(ValueError, "can't connect in server-side mode",
                                 s.connect, (HOST, 8080))
         with self.assertRaises(IOError) as cm:
             with socket.socket() as sock:
@@ -310,7 +310,7 @@ class ContextTests(unittest.TestCase):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         ctx.set_ciphers("ALL")
         ctx.set_ciphers("DEFAULT")
-        with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
+        with self.assertRaisesRegex(ssl.SSLError, "No cipher can be selected"):
             ctx.set_ciphers("^$:,;?*'dorothyx")
 
     @skip_if_broken_ubuntu_ssl
@@ -358,24 +358,24 @@ class ContextTests(unittest.TestCase):
         with self.assertRaises(IOError) as cm:
             ctx.load_cert_chain(WRONGCERT)
         self.assertEqual(cm.exception.errno, errno.ENOENT)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_cert_chain(BADCERT)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_cert_chain(EMPTYCERT)
         # Separate key and cert
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         ctx.load_cert_chain(ONLYCERT, ONLYKEY)
         ctx.load_cert_chain(certfile=ONLYCERT, keyfile=ONLYKEY)
         ctx.load_cert_chain(certfile=BYTES_ONLYCERT, keyfile=BYTES_ONLYKEY)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_cert_chain(ONLYCERT)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_cert_chain(ONLYKEY)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_cert_chain(certfile=ONLYKEY, keyfile=ONLYCERT)
         # Mismatching key and cert
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-        with self.assertRaisesRegexp(ssl.SSLError, "key values mismatch"):
+        with self.assertRaisesRegex(ssl.SSLError, "key values mismatch"):
             ctx.load_cert_chain(SVN_PYTHON_ORG_ROOT_CERT, ONLYKEY)
 
     def test_load_verify_locations(self):
@@ -389,10 +389,13 @@ class ContextTests(unittest.TestCase):
         with self.assertRaises(IOError) as cm:
             ctx.load_verify_locations(WRONGCERT)
         self.assertEqual(cm.exception.errno, errno.ENOENT)
-        with self.assertRaisesRegexp(ssl.SSLError, "PEM lib"):
+        with self.assertRaisesRegex(ssl.SSLError, "PEM lib"):
             ctx.load_verify_locations(BADCERT)
         ctx.load_verify_locations(CERTFILE, CAPATH)
         ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
+
+        # Issue #10989: crash if the second argument type is invalid
+        self.assertRaises(TypeError, ctx.load_verify_locations, None, True)
 
     @skip_if_broken_ubuntu_ssl
     def test_session_stats(self):
@@ -412,6 +415,12 @@ class ContextTests(unittest.TestCase):
                 'cache_full': 0,
             })
 
+    def test_set_default_verify_paths(self):
+        # There's not much we can do to test that it acts as expected,
+        # so just check it doesn't crash or raise an exception.
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+        ctx.set_default_verify_paths()
+
 
 class NetworkedTests(unittest.TestCase):
 
@@ -428,8 +437,8 @@ class NetworkedTests(unittest.TestCase):
             # this should fail because we have no verification certs
             s = ssl.wrap_socket(socket.socket(socket.AF_INET),
                                 cert_reqs=ssl.CERT_REQUIRED)
-            self.assertRaisesRegexp(ssl.SSLError, "certificate verify failed",
-                                    s.connect, ("svn.python.org", 443))
+            self.assertRaisesRegex(ssl.SSLError, "certificate verify failed",
+                                   s.connect, ("svn.python.org", 443))
             s.close()
 
             # this should succeed because we specify the root cert
@@ -463,7 +472,7 @@ class NetworkedTests(unittest.TestCase):
             # This should fail because we have no verification certs
             ctx.verify_mode = ssl.CERT_REQUIRED
             s = ctx.wrap_socket(socket.socket(socket.AF_INET))
-            self.assertRaisesRegexp(ssl.SSLError, "certificate verify failed",
+            self.assertRaisesRegex(ssl.SSLError, "certificate verify failed",
                                     s.connect, ("svn.python.org", 443))
             s.close()
             # This should succeed because we specify the root cert
@@ -581,7 +590,7 @@ class NetworkedTests(unittest.TestCase):
                                 cert_reqs=ssl.CERT_NONE, ciphers="DEFAULT")
             s.connect(remote)
             # Error checking can happen at instantiation or when connecting
-            with self.assertRaisesRegexp(ssl.SSLError, "No cipher can be selected"):
+            with self.assertRaisesRegex(ssl.SSLError, "No cipher can be selected"):
                 with socket.socket(socket.AF_INET) as sock:
                     s = ssl.wrap_socket(sock,
                                         cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
@@ -593,10 +602,10 @@ class NetworkedTests(unittest.TestCase):
         # SHA256 was added in OpenSSL 0.9.8
         if ssl.OPENSSL_VERSION_INFO < (0, 9, 8, 0, 15):
             self.skipTest("SHA256 not available on %r" % ssl.OPENSSL_VERSION)
-        # NOTE: https://sha256.tbs-internet.com is another possible test host
-        remote = ("sha2.hboeck.de", 443)
+        # https://sha2.hboeck.de/ was used until 2011-01-08 (no route to host)
+        remote = ("sha256.tbs-internet.com", 443)
         sha256_cert = os.path.join(os.path.dirname(__file__), "sha256.pem")
-        with support.transient_internet("sha2.hboeck.de"):
+        with support.transient_internet("sha256.tbs-internet.com"):
             s = ssl.wrap_socket(socket.socket(socket.AF_INET),
                                 cert_reqs=ssl.CERT_REQUIRED,
                                 ca_certs=sha256_cert,)
@@ -1493,8 +1502,8 @@ else:
                     c.settimeout(0.2)
                     c.connect((host, port))
                     # Will attempt handshake and time out
-                    self.assertRaisesRegexp(ssl.SSLError, "timed out",
-                                            ssl.wrap_socket, c)
+                    self.assertRaisesRegex(socket.timeout, "timed out",
+                                           ssl.wrap_socket, c)
                 finally:
                     c.close()
                 try:
@@ -1502,8 +1511,8 @@ else:
                     c = ssl.wrap_socket(c)
                     c.settimeout(0.2)
                     # Will attempt handshake and time out
-                    self.assertRaisesRegexp(ssl.SSLError, "timed out",
-                                            c.connect, (host, port))
+                    self.assertRaisesRegex(socket.timeout, "timed out",
+                                           c.connect, (host, port))
                 finally:
                     c.close()
             finally:

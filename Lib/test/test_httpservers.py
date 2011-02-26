@@ -97,6 +97,14 @@ class BaseHTTPServerTestCase(BaseTestCase):
             self.send_header('Connection', 'close')
             self.end_headers()
 
+        def do_LATINONEHEADER(self):
+            self.send_response(999)
+            self.send_header('X-Special', 'Dängerous Mind')
+            self.send_header('Connection', 'close')
+            self.end_headers()
+            body = self.headers['x-special-incoming'].encode('utf-8')
+            self.wfile.write(body)
+
     def setUp(self):
         BaseTestCase.setUp(self)
         self.con = http.client.HTTPConnection('localhost', self.PORT)
@@ -193,6 +201,14 @@ class BaseHTTPServerTestCase(BaseTestCase):
         self.con.request('CUSTOM', '/')
         res = self.con.getresponse()
         self.assertEqual(res.status, 999)
+
+    def test_latin1_header(self):
+        self.con.request('LATINONEHEADER', '/', headers={
+            'X-Special-Incoming':       'Ärger mit Unicode'
+        })
+        res = self.con.getresponse()
+        self.assertEqual(res.getheader('X-Special'), 'Dängerous Mind')
+        self.assertEqual(res.read(), 'Ärger mit Unicode'.encode('utf-8'))
 
 
 class SimpleHTTPServerTestCase(BaseTestCase):
@@ -511,6 +527,49 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
         self.verify_get_called()
         self.assertEqual(result[-1], b'<html><body>Data</body></html>\r\n')
 
+    def test_header_buffering(self):
+
+        def _readAndReseek(f):
+            pos = f.tell()
+            f.seek(0)
+            data = f.read()
+            f.seek(pos)
+            return data
+
+        input = BytesIO(b'GET / HTTP/1.1\r\n\r\n')
+        output = BytesIO()
+        self.handler.rfile = input
+        self.handler.wfile = output
+        self.handler.request_version = 'HTTP/1.1'
+
+        self.handler.send_header('Foo', 'foo')
+        self.handler.send_header('bar', 'bar')
+        self.assertEqual(_readAndReseek(output), b'')
+        self.handler.end_headers()
+        self.assertEqual(_readAndReseek(output),
+                         b'Foo: foo\r\nbar: bar\r\n\r\n')
+
+    def test_header_unbuffered_when_continue(self):
+
+        def _readAndReseek(f):
+            pos = f.tell()
+            f.seek(0)
+            data = f.read()
+            f.seek(pos)
+            return data
+
+        input = BytesIO(b'GET / HTTP/1.1\r\nExpect: 100-continue\r\n\r\n')
+        output = BytesIO()
+        self.handler.rfile = input
+        self.handler.wfile = output
+        self.handler.request_version = 'HTTP/1.1'
+
+        self.handler.handle_one_request()
+        self.assertNotEqual(_readAndReseek(output), b'')
+        result = _readAndReseek(output).split(b'\r\n')
+        self.assertEqual(result[0], b'HTTP/1.1 100 Continue')
+        self.assertEqual(result[1], b'HTTP/1.1 200 OK')
+
     def test_with_continue_rejected(self):
         usual_handler = self.handler        # Save to avoid breaking any subsequent tests.
         self.handler = RejectingSocketlessRequestHandler()
@@ -523,6 +582,19 @@ class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
         self.assertEqual(sum(r == b'Connection: close\r\n' for r in result[1:-1]), 1)
         self.handler = usual_handler        # Restore to avoid breaking any subsequent tests.
 
+    def test_request_length(self):
+        # Issue #10714: huge request lines are discarded, to avoid Denial
+        # of Service attacks.
+        result = self.send_typical_request(b'GET ' + b'x' * 65537)
+        self.assertEqual(result[0], b'HTTP/1.1 414 Request-URI Too Long\r\n')
+        self.assertFalse(self.handler.get_called)
+
+    def test_header_length(self):
+        # Issue #6791: same for headers
+        result = self.send_typical_request(
+            b'GET / HTTP/1.1\r\nX-Foo: bar' + b'r' * 65537 + b'\r\n\r\n')
+        self.assertEqual(result[0], b'HTTP/1.1 400 Line too long\r\n')
+        self.assertFalse(self.handler.get_called)
 
 class SimpleHTTPRequestHandlerTestCase(unittest.TestCase):
     """ Test url parsing """

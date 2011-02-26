@@ -130,7 +130,13 @@ class socket(_socket.socket):
         For IP sockets, the address info is a pair (hostaddr, port).
         """
         fd, addr = self._accept()
-        return socket(self.family, self.type, self.proto, fileno=fd), addr
+        sock = socket(self.family, self.type, self.proto, fileno=fd)
+        # Issue #7995: if no default timeout is set and the listening
+        # socket had a (non-zero) timeout, force the new socket in blocking
+        # mode to override platform-specific socket flags inheritance.
+        if getdefaulttimeout() is None and self.gettimeout():
+            sock.setblocking(True)
+        return sock, addr
 
     def makefile(self, mode="r", buffering=None, *,
                  encoding=None, errors=None, newline=None):
@@ -251,6 +257,7 @@ class SocketIO(io.RawIOBase):
         self._mode = mode
         self._reading = "r" in mode
         self._writing = "w" in mode
+        self._timeout_occurred = False
 
     def readinto(self, b):
         """Read up to len(b) bytes into the writable buffer *b* and return
@@ -262,9 +269,14 @@ class SocketIO(io.RawIOBase):
         """
         self._checkClosed()
         self._checkReadable()
+        if self._timeout_occurred:
+            raise IOError("cannot read from timed out object")
         while True:
             try:
                 return self._sock.recv_into(b)
+            except timeout:
+                self._timeout_occurred = True
+                raise
             except error as e:
                 n = e.args[0]
                 if n == EINTR:
@@ -307,7 +319,10 @@ class SocketIO(io.RawIOBase):
 
     @property
     def name(self):
-        return self.fileno()
+        if not self.closed:
+            return self.fileno()
+        else:
+            return -1
 
     @property
     def mode(self):

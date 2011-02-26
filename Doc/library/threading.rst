@@ -1,9 +1,12 @@
-:mod:`threading` --- Higher-level threading interface
-=====================================================
+:mod:`threading` --- Thread-based parallelism
+=============================================
 
 .. module:: threading
-   :synopsis: Higher-level threading interface.
+   :synopsis: Thread-based parallelism.
 
+**Source code:** :source:`Lib/threading.py`
+
+--------------
 
 This module constructs higher-level threading interfaces on top of the lower
 level :mod:`_thread` module.  See also the :mod:`queue` module.
@@ -16,6 +19,18 @@ The :mod:`dummy_threading` module is provided for situations where
    While they are not listed below, the ``camelCase`` names used for some
    methods and functions in this module in the Python 2.x series are still
    supported by this module.
+
+.. impl-detail::
+
+   Due to the :term:`Global Interpreter Lock`, in CPython only one thread
+   can execute Python code at once (even though certain performance-oriented
+   libraries might overcome this limitation).
+   If you want your application to make better of use of the computational
+   resources of multi-core machines, you are advised to use
+   :mod:`multiprocessing` or :class:`concurrent.futures.ProcessPoolExecutor`.
+   However, threading is still an appropriate model if you want to run
+   multiple I/O-bound tasks simultaneously.
+
 
 This module defines the following functions and objects:
 
@@ -226,7 +241,7 @@ changed through the :attr:`name` attribute.
 A thread can be flagged as a "daemon thread".  The significance of this flag is
 that the entire Python program exits when only daemon threads are left.  The
 initial value is inherited from the creating thread.  The flag can be set
-through the :attr:`daemon` property.
+through the :attr:`daemon` property or the *daemon* constructor argument.
 
 There is a "main thread" object; this corresponds to the initial thread of
 control in the Python program.  It is not a daemon thread.
@@ -239,7 +254,8 @@ daemonic, and cannot be :meth:`join`\ ed.  They are never deleted, since it is
 impossible to detect the termination of alien threads.
 
 
-.. class:: Thread(group=None, target=None, name=None, args=(), kwargs={})
+.. class:: Thread(group=None, target=None, name=None, args=(), kwargs={},
+                  verbose=None, *, daemon=None)
 
    This constructor should always be called with keyword arguments.  Arguments
    are:
@@ -258,9 +274,18 @@ impossible to detect the termination of alien threads.
    *kwargs* is a dictionary of keyword arguments for the target invocation.
    Defaults to ``{}``.
 
+   *verbose* is a flag used for debugging messages.
+
+   If not ``None``, *daemon* explicitly sets whether the thread is daemonic.
+   If ``None`` (the default), the daemonic property is inherited from the
+   current thread.
+
    If the subclass overrides the constructor, it must make sure to invoke the
    base class constructor (``Thread.__init__()``) before doing anything else to
    the thread.
+
+   .. versionchanged:: 3.3
+      Added the *daemon* argument.
 
    .. method:: start()
 
@@ -269,7 +294,7 @@ impossible to detect the termination of alien threads.
       It must be called at most once per thread object.  It arranges for the
       object's :meth:`run` method to be invoked in a separate thread of control.
 
-      This method will raise a :exc:`RuntimeException` if called more than once
+      This method will raise a :exc:`RuntimeError` if called more than once
       on the same thread object.
 
    .. method:: run()
@@ -403,6 +428,9 @@ All methods are executed atomically.
    .. versionchanged:: 3.2
       The *timeout* parameter is new.
 
+   .. versionchanged:: 3.2
+      Lock acquires can now be interrupted by signals on POSIX.
+
 
 .. method:: Lock.release()
 
@@ -534,6 +562,13 @@ state change can be interesting for only one or several waiting threads.  E.g.
 in a typical producer-consumer situation, adding one item to the buffer only
 needs to wake up one consumer thread.
 
+Note:  Condition variables can be, depending on the implementation, subject
+to both spurious wakeups (when :meth:`wait` returns without a :meth:`notify`
+call) and stolen wakeups (when another thread acquires the lock before the
+awoken thread.)  For this reason, it is always necessary to verify the state
+the thread is waiting for when :meth:`wait` returns and optionally repeat
+the call as often as necessary.
+
 
 .. class:: Condition(lock=None)
 
@@ -579,6 +614,35 @@ needs to wake up one consumer thread.
 
       .. versionchanged:: 3.2
          Previously, the method always returned ``None``.
+
+   .. method:: wait_for(predicate, timeout=None)
+
+      Wait until a condition evaluates to True.  *predicate* should be a
+      callable which result will be interpreted as a boolean value.
+      A *timeout* may be provided giving the maximum time to wait.
+
+      This utility method may call :meth:`wait` repeatedly until the predicate
+      is satisfied, or until a timeout occurs. The return value is
+      the last return value of the predicate and will evaluate to
+      ``False`` if the method timed out.
+
+      Ignoring the timeout feature, calling this method is roughly equivalent to
+      writing::
+
+        while not predicate():
+            cv.wait()
+
+      Therefore, the same rules apply as with :meth:`wait`: The lock must be
+      held when called and is re-aquired on return.  The predicate is evaluated
+      with the lock held.
+
+      Using this method, the consumer example above can be written thus::
+
+         with cv:
+             cv.wait_for(an_item_is_available)
+             get_an_available_item()
+
+      .. versionadded:: 3.2
 
    .. method:: notify()
 
@@ -663,9 +727,9 @@ waiting until some other thread calls :meth:`release`.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Semaphores are often used to guard resources with limited capacity, for example,
-a database server.  In any situation where the size of the resource size is
-fixed, you should use a bounded semaphore.  Before spawning any worker threads,
-your main thread would initialize the semaphore::
+a database server.  In any situation where the size of the resource is fixed,
+you should use a bounded semaphore.  Before spawning any worker threads, your
+main thread would initialize the semaphore::
 
    maxconnections = 5
    ...
@@ -814,7 +878,7 @@ As an example, here is a simple way to synchronize a client and server thread::
       constructor.
 
       The return value is an integer in the range 0 to *parties* -- 1, different
-      for each thrad.  This can be used to select a thread to do some special
+      for each thread.  This can be used to select a thread to do some special
       housekeeping, e.g.::
 
          i = barrier.wait()

@@ -216,6 +216,8 @@ Fundamental data types
 +----------------------+------------------------------------------+----------------------------+
 | ctypes type          | C type                                   | Python type                |
 +======================+==========================================+============================+
+| :class:`c_bool`      | :c:type:`_Bool`                          | bool (1)                   |
++----------------------+------------------------------------------+----------------------------+
 | :class:`c_char`      | :c:type:`char`                           | 1-character bytes object   |
 +----------------------+------------------------------------------+----------------------------+
 | :class:`c_wchar`     | :c:type:`wchar_t`                        | 1-character string         |
@@ -253,6 +255,9 @@ Fundamental data types
 +----------------------+------------------------------------------+----------------------------+
 | :class:`c_void_p`    | :c:type:`void *`                         | int or ``None``            |
 +----------------------+------------------------------------------+----------------------------+
+
+(1)
+   The constructor accepts any object with a truth value.
 
 All these types can be created by calling them with an optional initializer of
 the correct type and value::
@@ -369,7 +374,7 @@ your own classes be used as function arguments.  :mod:`ctypes` looks for an
 :attr:`_as_parameter_` attribute and uses this as the function argument.  Of
 course, it must be one of integer, string, or bytes::
 
-   >>> class Bottles(object):
+   >>> class Bottles:
    ...     def __init__(self, number):
    ...         self._as_parameter_ = number
    ...
@@ -1928,22 +1933,6 @@ Utility functions
    instance of a ctypes type.  It is not possible to make the buffer smaller
    than the native size of the objects type, as given by ``sizeof(type(obj))``,
    but it is possible to enlarge the buffer.
-
-
-.. function:: set_conversion_mode(encoding, errors)
-
-   This function sets the rules that ctypes objects use when converting between
-   bytes objects and (unicode) strings. *encoding* must be a string specifying an
-   encoding, like ``'utf-8'`` or ``'mbcs'``, *errors* must be a string specifying
-   the error handling on encoding/decoding errors. Examples of possible values are
-   ``'strict'``, ``'replace'``, or ``'ignore'``.
-
-   :func:`set_conversion_mode` returns a 2-tuple containing the previous
-   conversion rules. On windows, the initial conversion rules are ``('mbcs',
-   'ignore')``, on other systems ``('ascii', 'strict')``.
-
-   You can set the *encoding* to ``'undefined'`` to completely disable automatic
-   conversions.
 
 
 .. function:: set_errno(value)

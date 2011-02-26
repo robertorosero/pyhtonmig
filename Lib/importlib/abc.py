@@ -18,8 +18,9 @@ class Loader(metaclass=abc.ABCMeta):
     """Abstract base class for import loaders."""
 
     @abc.abstractmethod
-    def load_module(self, fullname:str) -> types.ModuleType:
-        """Abstract method which when implemented should load a module."""
+    def load_module(self, fullname):
+        """Abstract method which when implemented should load a module.
+        The fullname is a str."""
         raise NotImplementedError
 
 
@@ -28,8 +29,11 @@ class Finder(metaclass=abc.ABCMeta):
     """Abstract base class for import finders."""
 
     @abc.abstractmethod
-    def find_module(self, fullname:str, path:[str]=None) -> Loader:
-        """Abstract method which when implemented should find a module."""
+    def find_module(self, fullname, path=None):
+        """Abstract method which when implemented should find a module.
+        The fullname is a str and the optional path is a str or None.
+        Returns a Loader object.
+        """
         raise NotImplementedError
 
 Finder.register(machinery.BuiltinImporter)
@@ -47,9 +51,9 @@ class ResourceLoader(Loader):
     """
 
     @abc.abstractmethod
-    def get_data(self, path:str) -> bytes:
+    def get_data(self, path):
         """Abstract method which when implemented should return the bytes for
-        the specified path."""
+        the specified path.  The path must be a str."""
         raise NotImplementedError
 
 
@@ -63,21 +67,21 @@ class InspectLoader(Loader):
     """
 
     @abc.abstractmethod
-    def is_package(self, fullname:str) -> bool:
+    def is_package(self, fullname):
         """Abstract method which when implemented should return whether the
-        module is a package."""
+        module is a package.  The fullname is a str.  Returns a bool."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_code(self, fullname:str) -> types.CodeType:
+    def get_code(self, fullname):
         """Abstract method which when implemented should return the code object
-        for the module"""
+        for the module.  The fullname is a str.  Returns a types.CodeType."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_source(self, fullname:str) -> str:
+    def get_source(self, fullname):
         """Abstract method which should return the source code for the
-        module."""
+        module.  The fullname is a str.  Returns a str."""
         raise NotImplementedError
 
 InspectLoader.register(machinery.BuiltinImporter)
@@ -94,7 +98,7 @@ class ExecutionLoader(InspectLoader):
     """
 
     @abc.abstractmethod
-    def get_filename(self, fullname:str) -> str:
+    def get_filename(self, fullname):
         """Abstract method which should return the value that __file__ is to be
         set to."""
         raise NotImplementedError
@@ -117,12 +121,14 @@ class SourceLoader(_bootstrap.SourceLoader, ResourceLoader, ExecutionLoader):
 
     """
 
-    def path_mtime(self, path:str) -> int:
-        """Return the modification time for the path."""
+    def path_mtime(self, path):
+        """Return the (int) modification time for the path (str)."""
         raise NotImplementedError
 
-    def set_data(self, path:str, data:bytes) -> None:
+    def set_data(self, path, data):
         """Write the bytes to the path (if possible).
+
+        Accepts a str path and data as bytes.
 
         Any needed intermediary directories are to be created. If for some
         reason the file cannot be written because of permissions, fail
@@ -170,9 +176,9 @@ class PyLoader(SourceLoader):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def source_path(self, fullname:str) -> object:
-        """Abstract method which when implemented should return the path to the
-        source code for the module."""
+    def source_path(self, fullname):
+        """Abstract method.  Accepts a str module name and returns the path to
+        the source code for the module."""
         raise NotImplementedError
 
     def get_filename(self, fullname):
@@ -279,20 +285,20 @@ class PyPycLoader(PyLoader):
         return code_object
 
     @abc.abstractmethod
-    def source_mtime(self, fullname:str) -> int:
-        """Abstract method which when implemented should return the
+    def source_mtime(self, fullname):
+        """Abstract method. Accepts a str filename and returns an int
         modification time for the source of the module."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def bytecode_path(self, fullname:str) -> object:
-        """Abstract method which when implemented should return the path to the
-        bytecode for the module."""
+    def bytecode_path(self, fullname):
+        """Abstract method. Accepts a str filename and returns the str pathname
+        to the bytecode for the module."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def write_bytecode(self, fullname:str, bytecode:bytes) -> bool:
-        """Abstract method which when implemented should attempt to write the
-        bytecode for the module, returning a boolean representing whether the
-        bytecode was written or not."""
+    def write_bytecode(self, fullname, bytecode):
+        """Abstract method.  Accepts a str filename and bytes object
+        representing the bytecode for the module.  Returns a boolean
+        representing whether the bytecode was written or not."""
         raise NotImplementedError

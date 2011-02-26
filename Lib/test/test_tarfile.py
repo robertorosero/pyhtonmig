@@ -419,6 +419,22 @@ class StreamReadTest(CommonReadTest):
 
     mode="r|"
 
+    def test_read_through(self):
+        # Issue #11224: A poorly designed _FileInFile.read() method
+        # caused seeking errors with stream tar files.
+        for tarinfo in self.tar:
+            if not tarinfo.isreg():
+                continue
+            fobj = self.tar.extractfile(tarinfo)
+            while True:
+                try:
+                    buf = fobj.read(512)
+                except tarfile.StreamError:
+                    self.fail("simple read-through using TarFile.extractfile() failed")
+                if not buf:
+                    break
+            fobj.close()
+
     def test_fileobj_regular_file(self):
         tarinfo = self.tar.next() # get "regtype" (can't use getmember)
         fobj = self.tar.extractfile(tarinfo)
@@ -919,6 +935,10 @@ class WriteTest(WriteTestBase):
             finally:
                 tar.close()
 
+            # Verify that filter is a keyword-only argument
+            with self.assertRaises(TypeError):
+                tar.add(tempdir, "empty_dir", True, None, filter)
+
             tar = tarfile.open(tmpname, "r")
             try:
                 for tarinfo in tar:
@@ -1000,7 +1020,7 @@ class WriteTest(WriteTestBase):
             tar = tarfile.open(tmpname, "r")
             try:
                 for t in tar:
-                    self.assert_(t.name == "." or t.name.startswith("./"))
+                    self.assertTrue(t.name == "." or t.name.startswith("./"))
             finally:
                 tar.close()
         finally:
@@ -1269,7 +1289,7 @@ class UstarUnicodeTest(unittest.TestCase):
         self._test_unicode_filename("utf7")
 
     def test_utf8_filename(self):
-        self._test_unicode_filename("utf8")
+        self._test_unicode_filename("utf-8")
 
     def _test_unicode_filename(self, encoding):
         tar = tarfile.open(tmpname, "w", format=self.format, encoding=encoding, errors="strict")
@@ -1348,7 +1368,7 @@ class GNUUnicodeTest(UstarUnicodeTest):
     def test_bad_pax_header(self):
         # Test for issue #8633. GNU tar <= 1.23 creates raw binary fields
         # without a hdrcharset=BINARY header.
-        for encoding, name in (("utf8", "pax/bad-pax-\udce4\udcf6\udcfc"),
+        for encoding, name in (("utf-8", "pax/bad-pax-\udce4\udcf6\udcfc"),
                 ("iso8859-1", "pax/bad-pax-\xe4\xf6\xfc"),):
             with tarfile.open(tarname, encoding=encoding, errors="surrogateescape") as tar:
                 try:
@@ -1363,7 +1383,7 @@ class PAXUnicodeTest(UstarUnicodeTest):
 
     def test_binary_header(self):
         # Test a POSIX.1-2008 compatible header with a hdrcharset=BINARY field.
-        for encoding, name in (("utf8", "pax/hdrcharset-\udce4\udcf6\udcfc"),
+        for encoding, name in (("utf-8", "pax/hdrcharset-\udce4\udcf6\udcfc"),
                 ("iso8859-1", "pax/hdrcharset-\xe4\xf6\xfc"),):
             with tarfile.open(tarname, encoding=encoding, errors="surrogateescape") as tar:
                 try:

@@ -66,16 +66,18 @@ Debugger commands
 # NOTE: the actual command documentation is collected from docstrings of the
 # commands and is appended to __doc__ after the class has been defined.
 
+import os
+import re
 import sys
-import linecache
 import cmd
 import bdb
 import dis
-import os
-import re
+import code
 import pprint
-import traceback
+import signal
 import inspect
+import traceback
+import linecache
 
 
 class Restart(Exception):
@@ -94,14 +96,14 @@ def find_function(funcname, filename):
     # consumer of this info expects the first line to be 1
     lineno = 1
     answer = None
-    while 1:
+    while True:
         line = fp.readline()
         if line == '':
             break
         if cre.match(line):
             answer = funcname, filename, lineno
             break
-        lineno = lineno + 1
+        lineno += 1
     fp.close()
     return answer
 
@@ -123,6 +125,12 @@ def lasti2lineno(code, lasti):
     return 0
 
 
+class _rstr(str):
+    """String that doesn't quote its repr."""
+    def __repr__(self):
+        return self
+
+
 # Interaction prompt line will separate file and call info from code
 # text using value of line_prefix string.  A newline and arrow may
 # be to your liking.  You can set it once pdb is imported using the
@@ -132,21 +140,25 @@ line_prefix = '\n-> '   # Probably a better default
 
 class Pdb(bdb.Bdb, cmd.Cmd):
 
-    def __init__(self, completekey='tab', stdin=None, stdout=None, skip=None):
+    def __init__(self, completekey='tab', stdin=None, stdout=None, skip=None,
+                 nosigint=False):
         bdb.Bdb.__init__(self, skip=skip)
         cmd.Cmd.__init__(self, completekey, stdin, stdout)
         if stdout:
             self.use_rawinput = 0
         self.prompt = '(Pdb) '
         self.aliases = {}
+        self.displaying = {}
         self.mainpyfile = ''
-        self._wait_for_mainpyfile = 0
+        self._wait_for_mainpyfile = False
         self.tb_lineno = {}
         # Try to load readline if it exists
         try:
             import readline
         except ImportError:
             pass
+        self.allow_kbdint = False
+        self.nosigint = nosigint
 
         # Read $HOME/.pdbrc and ./.pdbrc
         self.rcLines = []
@@ -172,6 +184,15 @@ class Pdb(bdb.Bdb, cmd.Cmd):
                                        # a command list
         self.commands_bnum = None # The breakpoint number for which we are
                                   # defining a list
+
+    def sigint_handler(self, signum, frame):
+        if self.allow_kbdint:
+            raise KeyboardInterrupt
+        self.message("\nProgram interrupted. (Use 'cont' to resume).")
+        self.set_step()
+        self.set_trace(frame)
+        # restore previous signal handler
+        signal.signal(signal.SIGINT, self._previous_sigint_handler)
 
     def reset(self):
         bdb.Bdb.reset(self)
@@ -235,9 +256,9 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         """This function is called when we stop or break at this line."""
         if self._wait_for_mainpyfile:
             if (self.mainpyfile != self.canonic(frame.f_code.co_filename)
-                or frame.f_lineno<= 0):
+                or frame.f_lineno <= 0):
                 return
-            self._wait_for_mainpyfile = 0
+            self._wait_for_mainpyfile = False
         if self.bp_commands(frame):
             self.interaction(frame, None)
 
@@ -260,7 +281,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             if not self.commands_silent[currentbp]:
                 self.print_stack_entry(self.stack[self.curindex])
             if self.commands_doprompt[currentbp]:
-                self.cmdloop()
+                self._cmdloop()
             self.forget()
             return
         return 1
@@ -285,6 +306,31 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         self.interaction(frame, exc_traceback)
 
     # General interaction function
+    def _cmdloop(self):
+        while True:
+            try:
+                # keyboard interrupts allow for an easy way to cancel
+                # the current command, so allow them during interactive input
+                self.allow_kbdint = True
+                self.cmdloop()
+                self.allow_kbdint = False
+                break
+            except KeyboardInterrupt:
+                self.message('--KeyboardInterrupt--')
+
+    # Called before loop, handles display expressions
+    def preloop(self):
+        displaying = self.displaying.get(self.curframe)
+        if displaying:
+            for expr, oldvalue in displaying.items():
+                newvalue = self._getval_except(expr)
+                # check for identity first; this prevents custom __eq__ to
+                # be called at every loop, and also prevents instances whose
+                # fields are changed to be displayed
+                if newvalue is not oldvalue and newvalue != oldvalue:
+                    displaying[expr] = newvalue
+                    self.message('display %s: %r  [old: %r]' %
+                                 (expr, newvalue, oldvalue))
 
     def interaction(self, frame, traceback):
         if self.setup(frame, traceback):
@@ -293,7 +339,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             self.forget()
             return
         self.print_stack_entry(self.stack[self.curindex])
-        self.cmdloop()
+        self._cmdloop()
         self.forget()
 
     def displayhook(self, obj):
@@ -337,7 +383,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             for tmpArg in args[1:]:
                 line = line.replace("%" + str(ii),
                                       tmpArg)
-                ii = ii + 1
+                ii += 1
             line = line.replace("%*", ' '.join(args[1:]))
             args = line.split()
         # split into ';;' separated commands
@@ -774,7 +820,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             except ValueError as err:
                 self.error(err)
             else:
-                self.clear_break(bp.file, bp.line)
+                self.clear_bpbynumber(i)
                 self.message('Deleted %s' % bp)
     do_cl = do_clear # 'c' is already an abbreviation for 'continue'
 
@@ -908,6 +954,9 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         """c(ont(inue))
         Continue execution, only stop when a breakpoint is encountered.
         """
+        if not self.nosigint:
+            self._previous_sigint_handler = \
+                signal.signal(signal.SIGINT, self.sigint_handler)
         self.set_continue()
         return 1
     do_c = do_cont = do_continue
@@ -962,7 +1011,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         """q(uit)\nexit
         Quit from the debugger. The program being executed is aborted.
         """
-        self._user_requested_quit = 1
+        self._user_requested_quit = True
         self.set_quit()
         return 1
 
@@ -974,7 +1023,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         Handles the receipt of EOF as a command.
         """
         self.message('')
-        self._user_requested_quit = 1
+        self._user_requested_quit = True
         self.set_quit()
         return 1
 
@@ -1012,6 +1061,17 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             exc_info = sys.exc_info()[:2]
             self.error(traceback.format_exception_only(*exc_info)[-1].strip())
             raise
+
+    def _getval_except(self, arg, frame=None):
+        try:
+            if frame is None:
+                return eval(arg, self.curframe.f_globals, self.curframe_locals)
+            else:
+                return eval(arg, frame.f_globals, frame.f_locals)
+        except:
+            exc_info = sys.exc_info()[:2]
+            err = traceback.format_exception_only(*exc_info)[-1].strip()
+            return _rstr('** raised %s **' % err)
 
     def do_p(self, arg):
         """p(rint) expression
@@ -1166,6 +1226,48 @@ class Pdb(bdb.Bdb, cmd.Cmd):
             return
         # None of the above...
         self.message(type(value))
+
+    def do_display(self, arg):
+        """display [expression]
+
+        Display the value of the expression if it changed, each time execution
+        stops in the current frame.
+
+        Without expression, list all display expressions for the current frame.
+        """
+        if not arg:
+            self.message('Currently displaying:')
+            for item in self.displaying.get(self.curframe, {}).items():
+                self.message('%s: %r' % item)
+        else:
+            val = self._getval_except(arg)
+            self.displaying.setdefault(self.curframe, {})[arg] = val
+            self.message('display %s: %r' % (arg, val))
+
+    def do_undisplay(self, arg):
+        """undisplay [expression]
+
+        Do not display the expression any more in the current frame.
+
+        Without expression, clear all display expressions for the current frame.
+        """
+        if arg:
+            try:
+                del self.displaying.get(self.curframe, {})[arg]
+            except KeyError:
+                self.error('not displaying %s' % arg)
+        else:
+            self.displaying.pop(self.curframe, None)
+
+    def do_interact(self, arg):
+        """interact
+
+        Start an interative interpreter whose global namespace
+        contains all the (global and local) names found in the current scope.
+        """
+        ns = self.curframe.f_globals.copy()
+        ns.update(self.curframe_locals)
+        code.interact("*interactive*", local=ns)
 
     def do_alias(self, arg):
         """alias [name [command [parameter parameter ...] ]]
@@ -1326,9 +1428,9 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         # events depends on python version). So we take special measures to
         # avoid stopping before we reach the main script (see user_line and
         # user_call for details).
-        self._wait_for_mainpyfile = 1
+        self._wait_for_mainpyfile = True
         self.mainpyfile = self.canonic(filename)
-        self._user_requested_quit = 0
+        self._user_requested_quit = False
         with open(filename, "rb") as fp:
             statement = "exec(compile(%r, %r, 'exec'))" % \
                         (fp.read(), self.mainpyfile)
@@ -1342,8 +1444,8 @@ if __doc__ is not None:
         'help', 'where', 'down', 'up', 'break', 'tbreak', 'clear', 'disable',
         'enable', 'ignore', 'condition', 'commands', 'step', 'next', 'until',
         'jump', 'return', 'retval', 'run', 'continue', 'list', 'longlist',
-        'args', 'print', 'pp', 'whatis', 'source', 'alias', 'unalias',
-        'debug', 'quit',
+        'args', 'print', 'pp', 'whatis', 'source', 'display', 'undisplay',
+        'interact', 'alias', 'unalias', 'debug', 'quit',
     ]
 
     for _command in _help_order:

@@ -565,10 +565,6 @@ in a different style:
    If you don't need the "variable part" indication, use the standard
    ````code```` instead.
 
-.. describe:: var
-
-   A Python or C variable or parameter name.
-
 
 The following roles generate external links:
 
@@ -614,6 +610,8 @@ Example::
 
 The ``:ref:`` invocation is replaced with the section title.
 
+Alternatively, you can reference any label (not just section titles)
+if you provide the link text ``:ref:`link text <reference-label>```.
 
 Paragraph-level markup
 ----------------------

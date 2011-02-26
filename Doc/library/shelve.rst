@@ -7,6 +7,10 @@
 
 .. index:: module: pickle
 
+**Source code:** :source:`Lib/shelve.py`
+
+--------------
+
 A "shelf" is a persistent, dictionary-like object.  The difference with "dbm"
 databases is that the values (not the keys!) in a shelf can be essentially
 arbitrary Python objects --- anything that the :mod:`pickle` module can handle.
@@ -97,7 +101,7 @@ Restrictions
   implementation used.
 
 
-.. class:: Shelf(dict, protocol=None, writeback=False)
+.. class:: Shelf(dict, protocol=None, writeback=False, keyencoding='utf-8')
 
    A subclass of :class:`collections.MutableMapping` which stores pickled values
    in the *dict* object.
@@ -111,8 +115,15 @@ Restrictions
    This allows natural operations on mutable entries, but can consume much more
    memory and make sync and close take a long time.
 
+   The *keyencoding* parameter is the encoding used to encode keys before they
+   are used with the underlying dict.
 
-.. class:: BsdDbShelf(dict, protocol=None, writeback=False)
+   .. versionadded:: 3.2
+      The *keyencoding* parameter; previously, keys were always encoded in
+      UTF-8.
+
+
+.. class:: BsdDbShelf(dict, protocol=None, writeback=False, keyencoding='utf-8')
 
    A subclass of :class:`Shelf` which exposes :meth:`first`, :meth:`!next`,
    :meth:`previous`, :meth:`last` and :meth:`set_location` which are available
@@ -121,8 +132,8 @@ Restrictions
    modules.  The *dict* object passed to the constructor must support those
    methods.  This is generally accomplished by calling one of
    :func:`bsddb.hashopen`, :func:`bsddb.btopen` or :func:`bsddb.rnopen`.  The
-   optional *protocol* and *writeback* parameters have the same interpretation
-   as for the :class:`Shelf` class.
+   optional *protocol*, *writeback*, and *keyencoding* parameters have the same
+   interpretation as for the :class:`Shelf` class.
 
 
 .. class:: DbfilenameShelf(filename, flag='c', protocol=None, writeback=False)
@@ -158,8 +169,8 @@ object)::
    klist = list(d.keys()) # a list of all existing keys (slow!)
 
    # as d was opened WITHOUT writeback=True, beware:
-   d['xx'] = range(4)  # this works as expected, but...
-   d['xx'].append(5)   # *this doesn't!* -- d['xx'] is STILL range(4)!
+   d['xx'] = [0, 1, 2]    # this works as expected, but...
+   d['xx'].append(3)      # *this doesn't!* -- d['xx'] is STILL [0, 1, 2]!
 
    # having opened d without writeback=True, you need to code carefully:
    temp = d['xx']      # extracts the copy

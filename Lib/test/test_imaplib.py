@@ -9,6 +9,7 @@ import imaplib
 import os.path
 import socketserver
 import time
+import calendar
 
 from test.support import reap_threads, verbose, transient_internet
 import unittest
@@ -22,6 +23,18 @@ CERTFILE = None
 
 
 class TestImaplib(unittest.TestCase):
+
+    def test_Internaldate2tuple(self):
+        t0 = calendar.timegm((2000, 1, 1, 0, 0, 0, -1, -1, -1))
+        tt = imaplib.Internaldate2tuple(
+            b'25 (INTERNALDATE "01-Jan-2000 00:00:00 +0000")')
+        self.assertEqual(time.mktime(tt), t0)
+        tt = imaplib.Internaldate2tuple(
+            b'25 (INTERNALDATE "01-Jan-2000 11:30:00 +1130")')
+        self.assertEqual(time.mktime(tt), t0)
+        tt = imaplib.Internaldate2tuple(
+            b'25 (INTERNALDATE "31-Dec-1999 12:30:00 -1130")')
+        self.assertEqual(time.mktime(tt), t0)
 
     def test_that_Time2Internaldate_returns_a_result(self):
         # We can check only that it successfully produces a result,
@@ -60,7 +73,7 @@ class SimpleIMAPHandler(socketserver.StreamRequestHandler):
     timeout = 1
 
     def _send(self, message):
-        if verbose: print("SENT:", message.strip())
+        if verbose: print("SENT: %r" % message.strip())
         self.wfile.write(message)
 
     def handle(self):
@@ -84,7 +97,7 @@ class SimpleIMAPHandler(socketserver.StreamRequestHandler):
                 if line.endswith(b'\r\n'):
                     break
 
-            if verbose: print('GOT:', line.strip())
+            if verbose: print('GOT: %r' % line.strip())
             splitline = line.split()
             tag = splitline[0].decode('ASCII')
             cmd = splitline[1].decode('ASCII')
@@ -112,7 +125,7 @@ class BaseThreadedNetworkedTests(unittest.TestCase):
 
         if verbose: print("creating server")
         server = MyServer(addr, hdlr)
-        self.assertEquals(server.server_address, server.socket.getsockname())
+        self.assertEqual(server.server_address, server.socket.getsockname())
 
         if verbose:
             print("server created")
@@ -135,6 +148,7 @@ class BaseThreadedNetworkedTests(unittest.TestCase):
     def reap_server(self, server, thread):
         if verbose: print("waiting for server")
         server.shutdown()
+        server.server_close()
         thread.join()
         if verbose: print("done")
 
@@ -208,9 +222,9 @@ class RemoteIMAPTest(unittest.TestCase):
             self.server.logout()
 
     def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
         self.assertTrue('LOGINDISABLED' in self.server.capabilities)
-
-    def test_anonlogin(self):
         self.assertTrue('AUTH=ANONYMOUS' in self.server.capabilities)
         rs = self.server.login(self.username, self.password)
         self.assertEqual(rs[0], 'OK')
@@ -222,11 +236,27 @@ class RemoteIMAPTest(unittest.TestCase):
 
 
 @unittest.skipUnless(ssl, "SSL not available")
+class RemoteIMAP_STARTTLSTest(RemoteIMAPTest):
+
+    def setUp(self):
+        super().setUp()
+        rs = self.server.starttls()
+        self.assertEqual(rs[0], 'OK')
+
+    def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
+        self.assertFalse('LOGINDISABLED' in self.server.capabilities)
+
+
+@unittest.skipUnless(ssl, "SSL not available")
 class RemoteIMAP_SSLTest(RemoteIMAPTest):
     port = 993
     imap_class = IMAP4_SSL
 
     def test_logincapa(self):
+        for cap in self.server.capabilities:
+            self.assertIsInstance(cap, str)
         self.assertFalse('LOGINDISABLED' in self.server.capabilities)
         self.assertTrue('AUTH=PLAIN' in self.server.capabilities)
 
@@ -243,7 +273,7 @@ def test_main():
                 raise support.TestFailed("Can't read certificate files!")
         tests.extend([
             ThreadedNetworkedTests, ThreadedNetworkedTestsSSL,
-            RemoteIMAPTest, RemoteIMAP_SSLTest,
+            RemoteIMAPTest, RemoteIMAP_SSLTest, RemoteIMAP_STARTTLSTest,
         ])
 
     support.run_unittest(*tests)

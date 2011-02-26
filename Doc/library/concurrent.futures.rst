@@ -1,16 +1,21 @@
-:mod:`concurrent.futures` --- Concurrent computation
-====================================================
+:mod:`concurrent.futures` --- Launching parallel tasks
+======================================================
 
 .. module:: concurrent.futures
    :synopsis: Execute computations concurrently using threads or processes.
 
+**Source code:** :source:`Lib/concurrent/futures/thread.py`
+and :source:`Lib/concurrent/futures/process.py`
+
 .. versionadded:: 3.2
+
+--------------
 
 The :mod:`concurrent.futures` module provides a high-level interface for
 asynchronously executing callables.
 
 The asynchronous execution can be be performed with threads, using
-:class:`ThreadPoolExecutor`, or seperate processes, using
+:class:`ThreadPoolExecutor`, or separate processes, using
 :class:`ProcessPoolExecutor`.  Both implement the same interface, which is
 defined by the abstract :class:`Executor` class.
 
@@ -216,7 +221,7 @@ The :class:`Future` class encapsulates the asynchronous execution of a callable.
     .. method:: cancel()
 
        Attempt to cancel the call.  If the call is currently being executed and
-       cannot be cancelled and the method will return ``False``, otherwise the
+       cannot be cancelled then the method will return ``False``, otherwise the
        call will be cancelled and the method will return ``True``.
 
     .. method:: cancelled()

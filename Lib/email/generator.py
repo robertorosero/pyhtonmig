@@ -220,18 +220,13 @@ class Generator:
             g = self.clone(s)
             g.flatten(part, unixfrom=False, linesep=self._NL)
             msgtexts.append(s.getvalue())
-        # Now make sure the boundary we've selected doesn't appear in any of
-        # the message texts.
-        alltext = self._encoded_NL.join(msgtexts)
         # BAW: What about boundaries that are wrapped in double-quotes?
-        boundary = msg.get_boundary(failobj=self._make_boundary(alltext))
-        # If we had to calculate a new boundary because the body text
-        # contained that string, set the new boundary.  We don't do it
-        # unconditionally because, while set_boundary() preserves order, it
-        # doesn't preserve newlines/continuations in headers.  This is no big
-        # deal in practice, but turns out to be inconvenient for the unittest
-        # suite.
-        if msg.get_boundary() != boundary:
+        boundary = msg.get_boundary()
+        if not boundary:
+            # Create a boundary that doesn't appear in any of the
+            # message texts.
+            alltext = self._encoded_NL.join(msgtexts)
+            boundary = self._make_boundary(alltext)
             msg.set_boundary(boundary)
         # If there's a preamble, write it out, with a trailing CRLF
         if msg.preamble is not None:
@@ -274,7 +269,7 @@ class Generator:
         for part in msg.get_payload():
             s = self._new_buffer()
             g = self.clone(s)
-            g.flatten(part, unixfrom=False)
+            g.flatten(part, unixfrom=False, linesep=self._NL)
             text = s.getvalue()
             lines = text.split(self._encoded_NL)
             # Strip off the unnecessary trailing empty line
@@ -301,7 +296,7 @@ class Generator:
         # in that case we just emit the string body.
         payload = msg.get_payload()
         if isinstance(payload, list):
-            g.flatten(msg.get_payload(0), unixfrom=False)
+            g.flatten(msg.get_payload(0), unixfrom=False, linesep=self._NL)
             payload = s.getvalue()
         self._fp.write(payload)
 
@@ -382,6 +377,8 @@ class BytesGenerator(Generator):
     def _handle_text(self, msg):
         # If the string has surrogates the original source was bytes, so
         # just write it back out.
+        if msg._payload is None:
+            return
         if _has_surrogates(msg._payload):
             self.write(msg._payload)
         else:

@@ -1,4 +1,4 @@
-from test.support import TESTFN, run_unittest, import_module
+from test.support import TESTFN, run_unittest, import_module, unlink, requires
 import unittest
 import os
 import re
@@ -320,6 +320,33 @@ class MmapTests(unittest.TestCase):
             mf.close()
             f.close()
 
+    def test_length_0_offset(self):
+        # Issue #10916: test mapping of remainder of file by passing 0 for
+        # map length with an offset doesn't cause a segfault.
+        if not hasattr(os, "stat"):
+            self.skipTest("needs os.stat")
+        # NOTE: allocation granularity is currently 65536 under Win64,
+        # and therefore the minimum offset alignment.
+        with open(TESTFN, "wb") as f:
+            f.write((65536 * 2) * b'm') # Arbitrary character
+
+        with open(TESTFN, "rb") as f:
+            with mmap.mmap(f.fileno(), 0, offset=65536, access=mmap.ACCESS_READ) as mf:
+                self.assertRaises(IndexError, mf.__getitem__, 80000)
+
+    def test_length_0_large_offset(self):
+        # Issue #10959: test mapping of a file by passing 0 for
+        # map length with a large offset doesn't cause a segfault.
+        if not hasattr(os, "stat"):
+            self.skipTest("needs os.stat")
+
+        with open(TESTFN, "wb") as f:
+            f.write(115699 * b'm') # Arbitrary character
+
+        with open(TESTFN, "w+b") as f:
+            self.assertRaises(ValueError, mmap.mmap, f.fileno(), 0,
+                              offset=2147418112)
+
     def test_move(self):
         # make move works everywhere (64-bit format problem earlier)
         f = open(TESTFN, 'wb+')
@@ -413,7 +440,7 @@ class MmapTests(unittest.TestCase):
                     data = bytes(reversed(data))
                     L[start:stop:step] = data
                     m[start:stop:step] = data
-                    self.assertEquals(m[:], bytes(L))
+                    self.assertEqual(m[:], bytes(L))
 
     def make_mmap_file (self, f, halfsize):
         # Write 2 pages worth of data to the file
@@ -509,27 +536,27 @@ class MmapTests(unittest.TestCase):
         f.close()
         # Test write_byte()
         for i in range(len(data)):
-            self.assertEquals(m.tell(), i)
+            self.assertEqual(m.tell(), i)
             m.write_byte(data[i])
-            self.assertEquals(m.tell(), i+1)
+            self.assertEqual(m.tell(), i+1)
         self.assertRaises(ValueError, m.write_byte, b"x"[0])
-        self.assertEquals(m[:], data)
+        self.assertEqual(m[:], data)
         # Test read_byte()
         m.seek(0)
         for i in range(len(data)):
-            self.assertEquals(m.tell(), i)
-            self.assertEquals(m.read_byte(), data[i])
-            self.assertEquals(m.tell(), i+1)
+            self.assertEqual(m.tell(), i)
+            self.assertEqual(m.read_byte(), data[i])
+            self.assertEqual(m.tell(), i+1)
         self.assertRaises(ValueError, m.read_byte)
         # Test read()
         m.seek(3)
-        self.assertEquals(m.read(3), b"345")
-        self.assertEquals(m.tell(), 6)
+        self.assertEqual(m.read(3), b"345")
+        self.assertEqual(m.tell(), 6)
         # Test write()
         m.seek(3)
         m.write(b"bar")
-        self.assertEquals(m.tell(), 6)
-        self.assertEquals(m[:], b"012bar6789")
+        self.assertEqual(m.tell(), 6)
+        self.assertEqual(m[:], b"012bar6789")
         m.seek(8)
         self.assertRaises(ValueError, m.write, b"bar")
 
@@ -537,9 +564,9 @@ class MmapTests(unittest.TestCase):
         for b in (129, 200, 255): # > 128
             m = mmap.mmap(-1, 1)
             m.write_byte(b)
-            self.assertEquals(m[0], b)
+            self.assertEqual(m[0], b)
             m.seek(0)
-            self.assertEquals(m.read_byte(), b)
+            self.assertEqual(m.read_byte(), b)
             m.close()
 
     if os.name == 'nt':
@@ -553,8 +580,8 @@ class MmapTests(unittest.TestCase):
             m1[:] = data1
             m2 = mmap.mmap(-1, len(data2), tagname="foo")
             m2[:] = data2
-            self.assertEquals(m1[:], data2)
-            self.assertEquals(m2[:], data2)
+            self.assertEqual(m1[:], data2)
+            self.assertEqual(m2[:], data2)
             m2.close()
             m1.close()
 
@@ -563,8 +590,8 @@ class MmapTests(unittest.TestCase):
             m1[:] = data1
             m2 = mmap.mmap(-1, len(data2), tagname="boo")
             m2[:] = data2
-            self.assertEquals(m1[:], data1)
-            self.assertEquals(m2[:], data2)
+            self.assertEqual(m1[:], data1)
+            self.assertEqual(m2[:], data2)
             m2.close()
             m1.close()
 
@@ -618,9 +645,56 @@ class MmapTests(unittest.TestCase):
                               "wrong exception raised in context manager")
         self.assertTrue(m.closed, "context manager failed")
 
+class LargeMmapTests(unittest.TestCase):
+
+    def setUp(self):
+        unlink(TESTFN)
+
+    def tearDown(self):
+        unlink(TESTFN)
+
+    def _working_largefile(self):
+        # Only run if the current filesystem supports large files.
+        f = open(TESTFN, 'wb', buffering=0)
+        try:
+            f.seek(0x80000001)
+            f.write(b'x')
+            f.flush()
+        except (IOError, OverflowError):
+            raise unittest.SkipTest("filesystem does not have largefile support")
+        finally:
+            f.close()
+            unlink(TESTFN)
+
+    def test_large_offset(self):
+        if sys.platform[:3] == 'win' or sys.platform == 'darwin':
+            requires('largefile',
+                'test requires %s bytes and a long time to run' % str(0x180000000))
+        self._working_largefile()
+        with open(TESTFN, 'wb') as f:
+            f.seek(0x14FFFFFFF)
+            f.write(b" ")
+
+        with open(TESTFN, 'rb') as f:
+            with mmap.mmap(f.fileno(), 0, offset=0x140000000, access=mmap.ACCESS_READ) as m:
+                self.assertEqual(m[0xFFFFFFF], 32)
+
+    def test_large_filesize(self):
+        if sys.platform[:3] == 'win' or sys.platform == 'darwin':
+            requires('largefile',
+                'test requires %s bytes and a long time to run' % str(0x180000000))
+        self._working_largefile()
+        with open(TESTFN, 'wb') as f:
+            f.seek(0x17FFFFFFF)
+            f.write(b" ")
+
+        with open(TESTFN, 'rb') as f:
+            with mmap.mmap(f.fileno(), 0x10000, access=mmap.ACCESS_READ) as m:
+                self.assertEqual(m.size(), 0x180000000)
+
 
 def test_main():
-    run_unittest(MmapTests)
+    run_unittest(MmapTests, LargeMmapTests)
 
 if __name__ == '__main__':
     test_main()

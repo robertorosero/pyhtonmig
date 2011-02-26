@@ -145,79 +145,11 @@ in various ways.  There is a separate error indicator for each thread.
 
 .. c:function:: PyObject* PyErr_Format(PyObject *exception, const char *format, ...)
 
-   This function sets the error indicator and returns *NULL*. *exception* should be
-   a Python exception (class, not an instance). *format* should be an ASCII-encoded string,
-   containing format codes, similar to :c:func:`printf`. The ``width.precision``
-   before a format code is parsed, but the width part is ignored.
-
-   .. % This should be exactly the same as the table in PyString_FromFormat.
-   .. % One should just refer to the other.
-   .. % The descriptions for %zd and %zu are wrong, but the truth is complicated
-   .. % because not all compilers support the %z width modifier -- we fake it
-   .. % when necessary via interpolating PY_FORMAT_SIZE_T.
-   .. % Similar comments apply to the %ll width modifier and
-   .. % PY_FORMAT_LONG_LONG.
-
-   +-------------------+---------------+--------------------------------+
-   | Format Characters | Type          | Comment                        |
-   +===================+===============+================================+
-   | :attr:`%%`        | *n/a*         | The literal % character.       |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%c`        | int           | A single character,            |
-   |                   |               | represented as an C int.       |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%d`        | int           | Exactly equivalent to          |
-   |                   |               | ``printf("%d")``.              |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%u`        | unsigned int  | Exactly equivalent to          |
-   |                   |               | ``printf("%u")``.              |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%ld`       | long          | Exactly equivalent to          |
-   |                   |               | ``printf("%ld")``.             |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%lu`       | unsigned long | Exactly equivalent to          |
-   |                   |               | ``printf("%lu")``.             |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%lld`      | long long     | Exactly equivalent to          |
-   |                   |               | ``printf("%lld")``.            |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%llu`      | unsigned      | Exactly equivalent to          |
-   |                   | long long     | ``printf("%llu")``.            |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%zd`       | Py_ssize_t    | Exactly equivalent to          |
-   |                   |               | ``printf("%zd")``.             |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%zu`       | size_t        | Exactly equivalent to          |
-   |                   |               | ``printf("%zu")``.             |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%i`        | int           | Exactly equivalent to          |
-   |                   |               | ``printf("%i")``.              |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%x`        | int           | Exactly equivalent to          |
-   |                   |               | ``printf("%x")``.              |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%s`        | char\*        | A null-terminated C character  |
-   |                   |               | array.                         |
-   +-------------------+---------------+--------------------------------+
-   | :attr:`%p`        | void\*        | The hex representation of a C  |
-   |                   |               | pointer. Mostly equivalent to  |
-   |                   |               | ``printf("%p")`` except that   |
-   |                   |               | it is guaranteed to start with |
-   |                   |               | the literal ``0x`` regardless  |
-   |                   |               | of what the platform's         |
-   |                   |               | ``printf`` yields.             |
-   +-------------------+---------------+--------------------------------+
-
-   An unrecognized format character causes all the rest of the format string to be
-   copied as-is to the result string, and any extra arguments discarded.
-
-   .. note::
-
-      The `"%lld"` and `"%llu"` format specifiers are only available
-      when :const:`HAVE_LONG_LONG` is defined.
-
-   .. versionchanged:: 3.2
-      Support for `"%lld"` and `"%llu"` added.
+   This function sets the error indicator and returns *NULL*.  *exception*
+   should be a Python exception class.  The *format* and subsequent
+   parameters help format the error message; they have the same meaning and
+   values as in :c:func:`PyUnicode_FromFormat`. *format* is an ASCII-encoded
+   string.
 
 
 .. c:function:: void PyErr_SetNone(PyObject *type)
@@ -287,7 +219,9 @@ in various ways.  There is a separate error indicator for each thread.
 
    Similar to :c:func:`PyErr_SetFromWindowsErr`, with the additional behavior that
    if *filename* is not *NULL*, it is passed to the constructor of
-   :exc:`WindowsError` as a third parameter. Availability: Windows.
+   :exc:`WindowsError` as a third parameter.  *filename* is decoded from the
+   filesystem encoding (:func:`sys.getfilesystemencoding`).  Availability:
+   Windows.
 
 
 .. c:function:: PyObject* PyErr_SetExcFromWindowsErrWithFilename(PyObject *type, int ierr, char *filename)
@@ -301,7 +235,8 @@ in various ways.  There is a separate error indicator for each thread.
    Set file, line, and offset information for the current exception.  If the
    current exception is not a :exc:`SyntaxError`, then it sets additional
    attributes, which make the exception printing subsystem think the exception
-   is a :exc:`SyntaxError`.
+   is a :exc:`SyntaxError`. *filename* is decoded from the filesystem encoding
+   (:func:`sys.getfilesystemencoding`).
 
 .. versionadded:: 3.2
 
@@ -323,7 +258,7 @@ in various ways.  There is a separate error indicator for each thread.
 .. c:function:: int PyErr_WarnEx(PyObject *category, char *message, int stack_level)
 
    Issue a warning message.  The *category* argument is a warning category (see
-   below) or *NULL*; the *message* argument is a message string.  *stack_level* is a
+   below) or *NULL*; the *message* argument is an UTF-8 encoded string.  *stack_level* is a
    positive number giving a number of stack frames; the warning will be issued from
    the  currently executing line of code in that stack frame.  A *stack_level* of 1
    is the function calling :c:func:`PyErr_WarnEx`, 2 is  the function above that,
@@ -363,13 +298,16 @@ in various ways.  There is a separate error indicator for each thread.
    is a straightforward wrapper around the Python function
    :func:`warnings.warn_explicit`, see there for more information.  The *module*
    and *registry* arguments may be set to *NULL* to get the default effect
-   described there.
+   described there. *message* and *module* are UTF-8 encoded strings,
+   *filename* is decoded from the filesystem encoding
+   (:func:`sys.getfilesystemencoding`).
 
 
 .. c:function:: int PyErr_WarnFormat(PyObject *category, Py_ssize_t stack_level, const char *format, ...)
 
    Function similar to :c:func:`PyErr_WarnEx`, but use
-   :c:func:`PyUnicode_FromFormatV` to format the warning message.
+   :c:func:`PyUnicode_FromFormat` to format the warning message.  *format* is
+   an ASCII-encoded string.
 
    .. versionadded:: 3.2
 
@@ -496,6 +434,85 @@ Exception Objects
    This steals a reference to *ctx*.
 
 
+.. _unicodeexceptions:
+
+Unicode Exception Objects
+=========================
+
+The following functions are used to create and modify Unicode exceptions from C.
+
+.. c:function:: PyObject* PyUnicodeDecodeError_Create(const char *encoding, const char *object, Py_ssize_t length, Py_ssize_t start, Py_ssize_t end, const char *reason)
+
+   Create a :class:`UnicodeDecodeError` object with the attributes *encoding*,
+   *object*, *length*, *start*, *end* and *reason*. *encoding* and *reason* are
+   UTF-8 encoded strings.
+
+.. c:function:: PyObject* PyUnicodeEncodeError_Create(const char *encoding, const Py_UNICODE *object, Py_ssize_t length, Py_ssize_t start, Py_ssize_t end, const char *reason)
+
+   Create a :class:`UnicodeEncodeError` object with the attributes *encoding*,
+   *object*, *length*, *start*, *end* and *reason*. *encoding* and *reason* are
+   UTF-8 encoded strings.
+
+.. c:function:: PyObject* PyUnicodeTranslateError_Create(const Py_UNICODE *object, Py_ssize_t length, Py_ssize_t start, Py_ssize_t end, const char *reason)
+
+   Create a :class:`UnicodeTranslateError` object with the attributes *object*,
+   *length*, *start*, *end* and *reason*. *reason* is an UTF-8 encoded string.
+
+.. c:function:: PyObject* PyUnicodeDecodeError_GetEncoding(PyObject *exc)
+                PyObject* PyUnicodeEncodeError_GetEncoding(PyObject *exc)
+
+   Return the *encoding* attribute of the given exception object.
+
+.. c:function:: PyObject* PyUnicodeDecodeError_GetObject(PyObject *exc)
+                PyObject* PyUnicodeEncodeError_GetObject(PyObject *exc)
+                PyObject* PyUnicodeTranslateError_GetObject(PyObject *exc)
+
+   Return the *object* attribute of the given exception object.
+
+.. c:function:: int PyUnicodeDecodeError_GetStart(PyObject *exc, Py_ssize_t *start)
+                int PyUnicodeEncodeError_GetStart(PyObject *exc, Py_ssize_t *start)
+                int PyUnicodeTranslateError_GetStart(PyObject *exc, Py_ssize_t *start)
+
+   Get the *start* attribute of the given exception object and place it into
+   *\*start*.  *start* must not be *NULL*.  Return ``0`` on success, ``-1`` on
+   failure.
+
+.. c:function:: int PyUnicodeDecodeError_SetStart(PyObject *exc, Py_ssize_t start)
+                int PyUnicodeEncodeError_SetStart(PyObject *exc, Py_ssize_t start)
+                int PyUnicodeTranslateError_SetStart(PyObject *exc, Py_ssize_t start)
+
+   Set the *start* attribute of the given exception object to *start*.  Return
+   ``0`` on success, ``-1`` on failure.
+
+.. c:function:: int PyUnicodeDecodeError_GetEnd(PyObject *exc, Py_ssize_t *end)
+                int PyUnicodeEncodeError_GetEnd(PyObject *exc, Py_ssize_t *end)
+                int PyUnicodeTranslateError_GetEnd(PyObject *exc, Py_ssize_t *end)
+
+   Get the *end* attribute of the given exception object and place it into
+   *\*end*.  *end* must not be *NULL*.  Return ``0`` on success, ``-1`` on
+   failure.
+
+.. c:function:: int PyUnicodeDecodeError_SetEnd(PyObject *exc, Py_ssize_t end)
+                int PyUnicodeEncodeError_SetEnd(PyObject *exc, Py_ssize_t end)
+                int PyUnicodeTranslateError_SetEnd(PyObject *exc, Py_ssize_t end)
+
+   Set the *end* attribute of the given exception object to *end*.  Return ``0``
+   on success, ``-1`` on failure.
+
+.. c:function:: PyObject* PyUnicodeDecodeError_GetReason(PyObject *exc)
+                PyObject* PyUnicodeEncodeError_GetReason(PyObject *exc)
+                PyObject* PyUnicodeTranslateError_GetReason(PyObject *exc)
+
+   Return the *reason* attribute of the given exception object.
+
+.. c:function:: int PyUnicodeDecodeError_SetReason(PyObject *exc, const char *reason)
+                int PyUnicodeEncodeError_SetReason(PyObject *exc, const char *reason)
+                int PyUnicodeTranslateError_SetReason(PyObject *exc, const char *reason)
+
+   Set the *reason* attribute of the given exception object to *reason*.  Return
+   ``0`` on success, ``-1`` on failure.
+
+
 Recursion Control
 =================
 
@@ -524,6 +541,35 @@ recursion depth automatically).
 
    Ends a :c:func:`Py_EnterRecursiveCall`.  Must be called once for each
    *successful* invocation of :c:func:`Py_EnterRecursiveCall`.
+
+Properly implementing :attr:`tp_repr` for container types requires
+special recursion handling.  In addition to protecting the stack,
+:attr:`tp_repr` also needs to track objects to prevent cycles.  The
+following two functions facilitate this functionality.  Effectively,
+these are the C equivalent to :func:`reprlib.recursive_repr`.
+
+.. c:function:: int Py_ReprEnter(PyObject *object)
+
+   Called at the beginning of the :attr:`tp_repr` implementation to
+   detect cycles.
+
+   If the object has already been processed, the function returns a
+   positive integer.  In that case the :attr:`tp_repr` implementation
+   should return a string object indicating a cycle.  As examples,
+   :class:`dict` objects return ``{...}`` and :class:`list` objects
+   return ``[...]``.
+
+   The function will return a negative integer if the recursion limit
+   is reached.  In that case the :attr:`tp_repr` implementation should
+   typically return ``NULL``.
+
+   Otherwise, the function returns zero and the :attr:`tp_repr`
+   implementation can continue normally.
+
+.. c:function:: void Py_ReprLeave(PyObject *object)
+
+   Ends a :c:func:`Py_ReprEnter`.  Must be called once for each
+   invocation of :c:func:`Py_ReprEnter` that returns zero.
 
 
 .. _standardexceptions:

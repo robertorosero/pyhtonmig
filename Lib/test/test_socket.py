@@ -44,7 +44,7 @@ def linux_version():
         return 0, 0, 0
 
 HOST = support.HOST
-MSG = 'Michael Gilfix was here\u1234\r\n'.encode('utf8') ## test unicode string and carriage return
+MSG = 'Michael Gilfix was here\u1234\r\n'.encode('utf-8') ## test unicode string and carriage return
 SUPPORTS_IPV6 = socket.has_ipv6 and try_address('::1', family=socket.AF_INET6)
 
 try:
@@ -446,8 +446,8 @@ class GeneralModuleTests(unittest.TestCase):
             return  # No inet_aton, nothing to check
         # Test that issue1008086 and issue767150 are fixed.
         # It must return 4 bytes.
-        self.assertEquals(b'\x00'*4, socket.inet_aton('0.0.0.0'))
-        self.assertEquals(b'\xff'*4, socket.inet_aton('255.255.255.255'))
+        self.assertEqual(b'\x00'*4, socket.inet_aton('0.0.0.0'))
+        self.assertEqual(b'\xff'*4, socket.inet_aton('255.255.255.255'))
 
     def testIPv4toString(self):
         if not hasattr(socket, 'inet_pton'):
@@ -455,16 +455,16 @@ class GeneralModuleTests(unittest.TestCase):
         from socket import inet_aton as f, inet_pton, AF_INET
         g = lambda a: inet_pton(AF_INET, a)
 
-        self.assertEquals(b'\x00\x00\x00\x00', f('0.0.0.0'))
-        self.assertEquals(b'\xff\x00\xff\x00', f('255.0.255.0'))
-        self.assertEquals(b'\xaa\xaa\xaa\xaa', f('170.170.170.170'))
-        self.assertEquals(b'\x01\x02\x03\x04', f('1.2.3.4'))
-        self.assertEquals(b'\xff\xff\xff\xff', f('255.255.255.255'))
+        self.assertEqual(b'\x00\x00\x00\x00', f('0.0.0.0'))
+        self.assertEqual(b'\xff\x00\xff\x00', f('255.0.255.0'))
+        self.assertEqual(b'\xaa\xaa\xaa\xaa', f('170.170.170.170'))
+        self.assertEqual(b'\x01\x02\x03\x04', f('1.2.3.4'))
+        self.assertEqual(b'\xff\xff\xff\xff', f('255.255.255.255'))
 
-        self.assertEquals(b'\x00\x00\x00\x00', g('0.0.0.0'))
-        self.assertEquals(b'\xff\x00\xff\x00', g('255.0.255.0'))
-        self.assertEquals(b'\xaa\xaa\xaa\xaa', g('170.170.170.170'))
-        self.assertEquals(b'\xff\xff\xff\xff', g('255.255.255.255'))
+        self.assertEqual(b'\x00\x00\x00\x00', g('0.0.0.0'))
+        self.assertEqual(b'\xff\x00\xff\x00', g('255.0.255.0'))
+        self.assertEqual(b'\xaa\xaa\xaa\xaa', g('170.170.170.170'))
+        self.assertEqual(b'\xff\xff\xff\xff', g('255.255.255.255'))
 
     def testIPv6toString(self):
         if not hasattr(socket, 'inet_pton'):
@@ -477,10 +477,10 @@ class GeneralModuleTests(unittest.TestCase):
             return
         f = lambda a: inet_pton(AF_INET6, a)
 
-        self.assertEquals(b'\x00' * 16, f('::'))
-        self.assertEquals(b'\x00' * 16, f('0::0'))
-        self.assertEquals(b'\x00\x01' + b'\x00' * 14, f('1::'))
-        self.assertEquals(
+        self.assertEqual(b'\x00' * 16, f('::'))
+        self.assertEqual(b'\x00' * 16, f('0::0'))
+        self.assertEqual(b'\x00\x01' + b'\x00' * 14, f('1::'))
+        self.assertEqual(
             b'\x45\xef\x76\xcb\x00\x1a\x56\xef\xaf\xeb\x0b\xac\x19\x24\xae\xae',
             f('45ef:76cb:1a:56ef:afeb:bac:1924:aeae')
         )
@@ -491,14 +491,14 @@ class GeneralModuleTests(unittest.TestCase):
         from socket import inet_ntoa as f, inet_ntop, AF_INET
         g = lambda a: inet_ntop(AF_INET, a)
 
-        self.assertEquals('1.0.1.0', f(b'\x01\x00\x01\x00'))
-        self.assertEquals('170.85.170.85', f(b'\xaa\x55\xaa\x55'))
-        self.assertEquals('255.255.255.255', f(b'\xff\xff\xff\xff'))
-        self.assertEquals('1.2.3.4', f(b'\x01\x02\x03\x04'))
+        self.assertEqual('1.0.1.0', f(b'\x01\x00\x01\x00'))
+        self.assertEqual('170.85.170.85', f(b'\xaa\x55\xaa\x55'))
+        self.assertEqual('255.255.255.255', f(b'\xff\xff\xff\xff'))
+        self.assertEqual('1.2.3.4', f(b'\x01\x02\x03\x04'))
 
-        self.assertEquals('1.0.1.0', g(b'\x01\x00\x01\x00'))
-        self.assertEquals('170.85.170.85', g(b'\xaa\x55\xaa\x55'))
-        self.assertEquals('255.255.255.255', g(b'\xff\xff\xff\xff'))
+        self.assertEqual('1.0.1.0', g(b'\x01\x00\x01\x00'))
+        self.assertEqual('170.85.170.85', g(b'\xaa\x55\xaa\x55'))
+        self.assertEqual('255.255.255.255', g(b'\xff\xff\xff\xff'))
 
     def testStringToIPv6(self):
         if not hasattr(socket, 'inet_ntop'):
@@ -511,9 +511,9 @@ class GeneralModuleTests(unittest.TestCase):
             return
         f = lambda a: inet_ntop(AF_INET6, a)
 
-        self.assertEquals('::', f(b'\x00' * 16))
-        self.assertEquals('::1', f(b'\x00' * 15 + b'\x01'))
-        self.assertEquals(
+        self.assertEqual('::', f(b'\x00' * 16))
+        self.assertEqual('::1', f(b'\x00' * 15 + b'\x01'))
+        self.assertEqual(
             'aef:b01:506:1001:ffff:9997:55:170',
             f(b'\x0a\xef\x0b\x01\x05\x06\x10\x01\xff\xff\x99\x97\x00\x55\x01\x70')
         )
@@ -544,7 +544,11 @@ class GeneralModuleTests(unittest.TestCase):
         # XXX(nnorwitz): http://tinyurl.com/os5jz seems to indicate
         # it reasonable to get the host's addr in addition to 0.0.0.0.
         # At least for eCos.  This is required for the S/390 to pass.
-        my_ip_addr = socket.gethostbyname(socket.gethostname())
+        try:
+            my_ip_addr = socket.gethostbyname(socket.gethostname())
+        except socket.error:
+            # Probably name lookup wasn't set up right; skip this test
+            return
         self.assertIn(name[0], ("0.0.0.0", my_ip_addr), '%s invalid' % name[0])
         self.assertEqual(name[1], port)
 
@@ -663,6 +667,8 @@ class GeneralModuleTests(unittest.TestCase):
                                type=socket.SOCK_STREAM, proto=0,
                                flags=socket.AI_PASSIVE)
         self.assertEqual(a, b)
+        # Issue #6697.
+        self.assertRaises(UnicodeEncodeError, socket.getaddrinfo, 'localhost', '\uD800')
 
     def test_getnameinfo(self):
         # only IP addresses are allowed
@@ -731,6 +737,12 @@ class GeneralModuleTests(unittest.TestCase):
         with self.assertWarns(ResourceWarning):
             f = None
             support.gc_collect()
+
+    def test_name_closed_socketio(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            fp = sock.makefile("rb")
+            fp.close()
+            self.assertEqual(repr(fp), "<_io.BufferedReader name=-1>")
 
 
 @unittest.skipUnless(thread, 'Threading required for this test.')
@@ -970,6 +982,23 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
         def _testInitNonBlocking(self):
             pass
 
+    def testInheritFlags(self):
+        # Issue #7995: when calling accept() on a listening socket with a
+        # timeout, the resulting socket should not be non-blocking.
+        self.serv.settimeout(10)
+        try:
+            conn, addr = self.serv.accept()
+            message = conn.recv(len(MSG))
+        finally:
+            conn.close()
+            self.serv.settimeout(None)
+
+    def _testInheritFlags(self):
+        time.sleep(0.1)
+        self.cli.connect((HOST, self.port))
+        time.sleep(0.5)
+        self.cli.send(MSG)
+
     def testAccept(self):
         # Testing non-blocking accept
         self.serv.setblocking(0)
@@ -1036,7 +1065,7 @@ class FileObjectClassTestCase(SocketConnectedTest):
     """
 
     bufsize = -1 # Use default buffer size
-    encoding = 'utf8'
+    encoding = 'utf-8'
     errors = 'strict'
     newline = None
 
@@ -1079,6 +1108,23 @@ class FileObjectClassTestCase(SocketConnectedTest):
         self.assertTrue(self.write_file.closed)
         self.write_file = None
         SocketConnectedTest.clientTearDown(self)
+
+    def testReadAfterTimeout(self):
+        # Issue #7322: A file object must disallow further reads
+        # after a timeout has occurred.
+        self.cli_conn.settimeout(1)
+        self.read_file.read(3)
+        # First read raises a timeout
+        self.assertRaises(socket.timeout, self.read_file.read, 1)
+        # Second read is disallowed
+        with self.assertRaises(IOError) as ctx:
+            self.read_file.read(1)
+        self.assertIn("cannot read from timed out object", str(ctx.exception))
+
+    def _testReadAfterTimeout(self):
+        self.write_file.write(self.write_msg[0:3])
+        self.write_file.flush()
+        self.serv_finished.wait()
 
     def testSmallRead(self):
         # Performing small file read test
@@ -1222,8 +1268,8 @@ class FileObjectInterruptedTestCase(unittest.TestCase):
                 lambda : b"",  # XXX(gps): io library does an extra EOF read
             ])
         fo = mock_sock._textiowrap_for_test(buffering=buffering)
-        self.assertEquals(fo.readline(size), "This is the first line\n")
-        self.assertEquals(fo.readline(size), "And the second line is here\n")
+        self.assertEqual(fo.readline(size), "This is the first line\n")
+        self.assertEqual(fo.readline(size), "And the second line is here\n")
 
     def _test_read(self, size=-1, buffering=-1):
         mock_sock = self.MockSocket(recv_funcs=[
@@ -1240,13 +1286,13 @@ class FileObjectInterruptedTestCase(unittest.TestCase):
             data = b''
         else:
             data = ''
-            expecting = expecting.decode('utf8')
+            expecting = expecting.decode('utf-8')
         while len(data) != len(expecting):
             part = fo.read(size)
             if not part:
                 break
             data += part
-        self.assertEquals(data, expecting)
+        self.assertEqual(data, expecting)
 
     def test_default(self):
         self._test_readline()
@@ -1270,8 +1316,8 @@ class FileObjectInterruptedTestCase(unittest.TestCase):
                 lambda : b"",
             ])
         fo = mock_sock._textiowrap_for_test(buffering=0)
-        self.assertEquals(fo.readline(size), b"a\n")
-        self.assertEquals(fo.readline(size), b"Bb")
+        self.assertEqual(fo.readline(size), b"a\n")
+        self.assertEqual(fo.readline(size), b"Bb")
 
     def test_no_buffer(self):
         self._test_readline_no_buffer()
@@ -1398,7 +1444,7 @@ class UnicodeReadFileObjectClassTestCase(FileObjectClassTestCase):
     """Tests for socket.makefile() in text mode (rather than binary)"""
 
     read_mode = 'r'
-    read_msg = MSG.decode('utf8')
+    read_msg = MSG.decode('utf-8')
     write_mode = 'wb'
     write_msg = MSG
     newline = ''
@@ -1410,7 +1456,7 @@ class UnicodeWriteFileObjectClassTestCase(FileObjectClassTestCase):
     read_mode = 'rb'
     read_msg = MSG
     write_mode = 'w'
-    write_msg = MSG.decode('utf8')
+    write_msg = MSG.decode('utf-8')
     newline = ''
 
 
@@ -1418,9 +1464,9 @@ class UnicodeReadWriteFileObjectClassTestCase(FileObjectClassTestCase):
     """Tests for socket.makefile() in text mode (rather than binary)"""
 
     read_mode = 'r'
-    read_msg = MSG.decode('utf8')
+    read_msg = MSG.decode('utf-8')
     write_mode = 'w'
-    write_msg = MSG.decode('utf8')
+    write_msg = MSG.decode('utf-8')
     newline = ''
 
 
@@ -1521,7 +1567,7 @@ class NetworkConnectionAttributesTest(SocketTCPTest, ThreadableTest):
             self.addCleanup(self.cli.close)
         finally:
             socket.setdefaulttimeout(None)
-        self.assertEquals(self.cli.gettimeout(), 42)
+        self.assertEqual(self.cli.gettimeout(), 42)
 
     testTimeoutNone = _justAccept
     def _testTimeoutNone(self):
@@ -1672,25 +1718,25 @@ class TestLinuxAbstractNamespace(unittest.TestCase):
 
     def testLinuxAbstractNamespace(self):
         address = b"\x00python-test-hello\x00\xff"
-        s1 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s1.bind(address)
-        s1.listen(1)
-        s2 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s2.connect(s1.getsockname())
-        s1.accept()
-        self.assertEqual(s1.getsockname(), address)
-        self.assertEqual(s2.getpeername(), address)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s1:
+            s1.bind(address)
+            s1.listen(1)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s2:
+                s2.connect(s1.getsockname())
+                with s1.accept()[0] as s3:
+                    self.assertEqual(s1.getsockname(), address)
+                    self.assertEqual(s2.getpeername(), address)
 
     def testMaxName(self):
         address = b"\x00" + b"h" * (self.UNIX_PATH_MAX - 1)
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.bind(address)
-        self.assertEqual(s.getsockname(), address)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.bind(address)
+            self.assertEqual(s.getsockname(), address)
 
     def testNameOverflow(self):
         address = "\x00" + "h" * self.UNIX_PATH_MAX
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.assertRaises(socket.error, s.bind, address)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            self.assertRaises(socket.error, s.bind, address)
 
 
 @unittest.skipUnless(thread, 'Threading required for this test.')
@@ -1892,10 +1938,10 @@ class CloexecConstantTest(unittest.TestCase):
         if v < (2, 6, 28):
             self.skipTest("Linux kernel 2.6.28 or higher required, not %s"
                           % ".".join(map(str, v)))
-        s = socket.socket(socket.AF_INET,
-                          socket.SOCK_STREAM | socket.SOCK_CLOEXEC)
-        self.assertTrue(s.type & socket.SOCK_CLOEXEC)
-        self.assertTrue(fcntl.fcntl(s, fcntl.F_GETFD) & fcntl.FD_CLOEXEC)
+        with socket.socket(socket.AF_INET,
+                           socket.SOCK_STREAM | socket.SOCK_CLOEXEC) as s:
+            self.assertTrue(s.type & socket.SOCK_CLOEXEC)
+            self.assertTrue(fcntl.fcntl(s, fcntl.F_GETFD) & fcntl.FD_CLOEXEC)
 
 
 @unittest.skipUnless(hasattr(socket, "SOCK_NONBLOCK"),
@@ -1916,29 +1962,33 @@ class NonblockConstantTest(unittest.TestCase):
                           % ".".join(map(str, v)))
         # a lot of it seems silly and redundant, but I wanted to test that
         # changing back and forth worked ok
-        s = socket.socket(socket.AF_INET,
-                          socket.SOCK_STREAM | socket.SOCK_NONBLOCK)
-        self.checkNonblock(s)
-        s.setblocking(1)
-        self.checkNonblock(s, False)
-        s.setblocking(0)
-        self.checkNonblock(s)
-        s.settimeout(None)
-        self.checkNonblock(s, False)
-        s.settimeout(2.0)
-        self.checkNonblock(s, timeout=2.0)
-        s.setblocking(1)
-        self.checkNonblock(s, False)
+        with socket.socket(socket.AF_INET,
+                           socket.SOCK_STREAM | socket.SOCK_NONBLOCK) as s:
+            self.checkNonblock(s)
+            s.setblocking(1)
+            self.checkNonblock(s, False)
+            s.setblocking(0)
+            self.checkNonblock(s)
+            s.settimeout(None)
+            self.checkNonblock(s, False)
+            s.settimeout(2.0)
+            self.checkNonblock(s, timeout=2.0)
+            s.setblocking(1)
+            self.checkNonblock(s, False)
         # defaulttimeout
         t = socket.getdefaulttimeout()
         socket.setdefaulttimeout(0.0)
-        self.checkNonblock(socket.socket())
+        with socket.socket() as s:
+            self.checkNonblock(s)
         socket.setdefaulttimeout(None)
-        self.checkNonblock(socket.socket(), False)
+        with socket.socket() as s:
+            self.checkNonblock(s, False)
         socket.setdefaulttimeout(2.0)
-        self.checkNonblock(socket.socket(), timeout=2.0)
+        with socket.socket() as s:
+            self.checkNonblock(s, timeout=2.0)
         socket.setdefaulttimeout(None)
-        self.checkNonblock(socket.socket(), False)
+        with socket.socket() as s:
+            self.checkNonblock(s, False)
         socket.setdefaulttimeout(t)
 
 

@@ -345,17 +345,17 @@ class _LoaderBasics:
 
 class SourceLoader(_LoaderBasics):
 
-    def path_mtime(self, path:str) -> int:
-        """Optional method that returns the modification time for the specified
-        path.
+    def path_mtime(self, path):
+        """Optional method that returns the modification time (an int) for the
+        specified path, where path is a str.
 
         Implementing this method allows the loader to read bytecode files.
 
         """
         raise NotImplementedError
 
-    def set_data(self, path:str, data:bytes) -> None:
-        """Optional method which writes data to a file path.
+    def set_data(self, path, data):
+        """Optional method which writes data (bytes) to a file path (a str).
 
         Implementing this method allows for the writing of bytecode files.
 
@@ -758,6 +758,8 @@ class _ImportLockContext:
 
 _IMPLICIT_META_PATH = [BuiltinImporter, FrozenImporter, _DefaultPathFinder]
 
+_ERR_MSG = 'No module named {}'
+
 def _gcd_import(name, package=None, level=0):
     """Import and return the module based on its name, the package the call is
     being made from, and the level adjustment.
@@ -808,8 +810,8 @@ def _gcd_import(name, package=None, level=0):
             try:
                 path = parent_module.__path__
             except AttributeError:
-                raise ImportError("no module named {}; "
-                                    "{} is not a package".format(name, parent))
+                msg = (_ERR_MSG + '; {} is not a package').format(name, parent)
+                raise ImportError(msg)
         meta_path = sys.meta_path + _IMPLICIT_META_PATH
         for finder in meta_path:
             loader = finder.find_module(name, path)
@@ -817,7 +819,7 @@ def _gcd_import(name, package=None, level=0):
                 loader.load_module(name)
                 break
         else:
-            raise ImportError("No module named {0}".format(name))
+            raise ImportError(_ERR_MSG.format(name))
         # Backwards-compatibility; be nicer to skip the dict lookup.
         module = sys.modules[name]
         if parent:

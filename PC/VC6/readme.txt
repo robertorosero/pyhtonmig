@@ -12,7 +12,7 @@ and build the projects.
 The proper order to build subprojects:
 
 1) pythoncore (this builds the main Python DLL and library files,
-               python32.{dll, lib} in Release mode)
+               python33.{dll, lib} in Release mode)
 
 2) python (this builds the main Python executable,
            python.exe in Release mode)
@@ -23,7 +23,7 @@ The proper order to build subprojects:
    to the subsystems they implement; see SUBPROJECTS below)
 
 When using the Debug setting, the output files have a _d added to
-their name:  python32_d.dll, python_d.exe, pyexpat_d.pyd, and so on.
+their name:  python33_d.dll, python_d.exe, pyexpat_d.pyd, and so on.
 
 SUBPROJECTS
 -----------
@@ -158,9 +158,17 @@ _ssl
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.
 
-    You must also install ActivePerl from
+    You can install the NASM assembler from
+        http://www.nasm.us/
+    for x86 builds.  Put nasmw.exe anywhere in your PATH.
+    Note: recent releases of nasm only have nasm.exe. Just rename it to 
+    nasmw.exe.
+
+    You can also install ActivePerl from
         http://www.activestate.com/activeperl/
-    as this is used by the OpenSSL build process.  Complain to them <wink>.
+    if you like to use the official sources instead of the files from 
+    python's subversion repository. The svn version contains pre-build
+    makefiles and assembly files.
 
     The MSVC project simply invokes PC/VC6/build_ssl.py to perform
     the build.  This Python script locates and builds your OpenSSL

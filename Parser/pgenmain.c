@@ -13,6 +13,8 @@
    - check for duplicate definitions of names (instead of fatal err)
 */
 
+#define PGEN
+
 #include "Python.h"
 #include "pgenheaders.h"
 #include "grammar.h"
@@ -26,6 +28,8 @@ int Py_IgnoreEnvironmentFlag;
 
 /* Forward */
 grammar *getgrammar(char *filename);
+
+void Py_Exit(int) _Py_NO_RETURN;
 
 void
 Py_Exit(int sts)

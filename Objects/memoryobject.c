@@ -52,9 +52,6 @@ memory_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
 {
     int res = 0;
     CHECK_RELEASED_INT(self);
-    /* XXX for whatever reason fixing the flags seems necessary */
-    if (self->view.readonly)
-        flags &= ~PyBUF_WRITABLE;
     if (self->view.obj != NULL)
         res = PyObject_GetBuffer(self->view.obj, view, flags);
     if (view)
@@ -78,6 +75,11 @@ PyMemoryView_FromBuffer(Py_buffer *info)
 {
     PyMemoryViewObject *mview;
 
+    if (info->buf == NULL) {
+        PyErr_SetString(PyExc_ValueError,
+            "cannot make memory view from a buffer with a NULL data pointer");
+        return NULL;
+    }
     mview = (PyMemoryViewObject *)
         PyObject_GC_New(PyMemoryViewObject, &PyMemoryView_Type);
     if (mview == NULL)
@@ -599,7 +601,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
     else if (PySlice_Check(key)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -678,7 +680,7 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     else if (PySlice_Check(key)) {
         Py_ssize_t stop, step;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                          &start, &stop, &step, &len) < 0) {
             return -1;
         }

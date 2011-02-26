@@ -63,8 +63,9 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
     PyMethodDef *ml;
     const char* name;
     PyModuleObject *m;
-    if (!Py_IsInitialized())
-        Py_FatalError("Interpreter not initialized (version mismatch?)");
+    PyInterpreterState *interp = PyThreadState_Get()->interp;
+    if (interp->modules == NULL)
+        Py_FatalError("Python import machinery not initialized");
     if (PyType_Ready(&moduledef_type) < 0)
         return NULL;
     if (module->m_base.m_index == 0) {
@@ -74,7 +75,7 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
         module->m_base.m_index = max_module_number;
     }
     name = module->m_name;
-    if (module_api_version != PYTHON_API_VERSION) {
+    if (module_api_version != PYTHON_API_VERSION && module_api_version != PYTHON_ABI_VERSION) {
         int err;
         err = PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
             "Python C API version mismatch for module %.100s: "
@@ -168,24 +169,35 @@ PyModule_GetDict(PyObject *m)
     return d;
 }
 
-const char *
-PyModule_GetName(PyObject *m)
+PyObject*
+PyModule_GetNameObject(PyObject *m)
 {
     PyObject *d;
-    PyObject *nameobj;
+    PyObject *name;
     if (!PyModule_Check(m)) {
         PyErr_BadArgument();
         return NULL;
     }
     d = ((PyModuleObject *)m)->md_dict;
     if (d == NULL ||
-        (nameobj = PyDict_GetItemString(d, "__name__")) == NULL ||
-        !PyUnicode_Check(nameobj))
+        (name = PyDict_GetItemString(d, "__name__")) == NULL ||
+        !PyUnicode_Check(name))
     {
         PyErr_SetString(PyExc_SystemError, "nameless module");
         return NULL;
     }
-    return _PyUnicode_AsString(nameobj);
+    Py_INCREF(name);
+    return name;
+}
+
+const char *
+PyModule_GetName(PyObject *m)
+{
+    PyObject *name = PyModule_GetNameObject(m);
+    if (name == NULL)
+        return NULL;
+    Py_DECREF(name);   /* module dict has still a reference */
+    return _PyUnicode_AsString(name);
 }
 
 PyObject*
@@ -218,7 +230,7 @@ PyModule_GetFilename(PyObject *m)
     if (fileobj == NULL)
         return NULL;
     utf8 = _PyUnicode_AsString(fileobj);
-    Py_DECREF(fileobj);
+    Py_DECREF(fileobj);   /* module dict has still a reference */
     return utf8;
 }
 
@@ -346,21 +358,25 @@ module_dealloc(PyModuleObject *m)
 static PyObject *
 module_repr(PyModuleObject *m)
 {
-    const char *name;
-    PyObject *filename, *repr;
+    PyObject *name, *filename, *repr;
 
-    name = PyModule_GetName((PyObject *)m);
+    name = PyModule_GetNameObject((PyObject *)m);
     if (name == NULL) {
         PyErr_Clear();
-        name = "?";
+        name = PyUnicode_FromStringAndSize("?", 1);
+        if (name == NULL)
+            return NULL;
     }
     filename = PyModule_GetFilenameObject((PyObject *)m);
     if (filename == NULL) {
         PyErr_Clear();
-        return PyUnicode_FromFormat("<module '%s' (built-in)>", name);
+        repr = PyUnicode_FromFormat("<module %R (built-in)>", name);
     }
-    repr = PyUnicode_FromFormat("<module '%s' from '%U'>", name, filename);
-    Py_DECREF(filename);
+    else {
+        repr = PyUnicode_FromFormat("<module %R from %R>", name, filename);
+        Py_DECREF(filename);
+    }
+    Py_DECREF(name);
     return repr;
 }
 

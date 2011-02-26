@@ -674,11 +674,9 @@ array_concat(arrayobject *a, PyObject *bb)
 static PyObject *
 array_repeat(arrayobject *a, Py_ssize_t n)
 {
-    Py_ssize_t i;
     Py_ssize_t size;
     arrayobject *np;
-    char *p;
-    Py_ssize_t nbytes;
+    Py_ssize_t oldbytes, newbytes;
     if (n < 0)
         n = 0;
     if ((Py_SIZE(a) != 0) && (n > PY_SSIZE_T_MAX / Py_SIZE(a))) {
@@ -688,13 +686,23 @@ array_repeat(arrayobject *a, Py_ssize_t n)
     np = (arrayobject *) newarrayobject(&Arraytype, size, a->ob_descr);
     if (np == NULL)
         return NULL;
-    p = np->ob_item;
-    nbytes = Py_SIZE(a) * a->ob_descr->itemsize;
-    for (i = 0; i < n; i++) {
-        memcpy(p, a->ob_item, nbytes);
-        p += nbytes;
+    if (n == 0)
+        return (PyObject *)np;
+    oldbytes = Py_SIZE(a) * a->ob_descr->itemsize;
+    newbytes = oldbytes * n;
+    /* this follows the code in unicode_repeat */
+    if (oldbytes == 1) {
+        memset(np->ob_item, a->ob_item[0], newbytes);
+    } else {
+        Py_ssize_t done = oldbytes;
+        Py_MEMCPY(np->ob_item, a->ob_item, oldbytes);
+        while (done < newbytes) {
+            Py_ssize_t ncopy = (done <= newbytes-done) ? done : newbytes-done;
+            Py_MEMCPY(np->ob_item+done, np->ob_item, ncopy);
+            done += ncopy;
+        }
     }
-    return (PyObject *) np;
+    return (PyObject *)np;
 }
 
 static int
@@ -868,7 +876,6 @@ array_inplace_repeat(arrayobject *self, Py_ssize_t n)
     if (Py_SIZE(self) > 0) {
         if (n < 0)
             n = 0;
-        items = self->ob_item;
         if ((self->ob_descr->itemsize != 0) &&
             (Py_SIZE(self) > PY_SSIZE_T_MAX / self->ob_descr->itemsize)) {
             return PyErr_NoMemory();
@@ -1448,7 +1455,7 @@ array_fromunicode(arrayobject *self, PyObject *args)
 {
     Py_UNICODE *ustr;
     Py_ssize_t n;
-    char typecode;
+    Py_UNICODE typecode;
 
     if (!PyArg_ParseTuple(args, "u#:fromunicode", &ustr, &n))
         return NULL;
@@ -1483,7 +1490,7 @@ append Unicode data to an array of some other type.");
 static PyObject *
 array_tounicode(arrayobject *self, PyObject *unused)
 {
-    char typecode;
+    Py_UNICODE typecode;
     typecode = self->ob_descr->typecode;
     if ((typecode != 'u')) {
         PyErr_SetString(PyExc_ValueError,
@@ -2002,8 +2009,8 @@ PyDoc_STRVAR(reduce_doc, "Return state information for pickling.");
 static PyObject *
 array_get_typecode(arrayobject *a, void *closure)
 {
-    char tc = a->ob_descr->typecode;
-    return PyUnicode_FromStringAndSize(&tc, 1);
+    Py_UNICODE tc = a->ob_descr->typecode;
+    return PyUnicode_FromUnicode(&tc, 1);
 }
 
 static PyObject *
@@ -2075,21 +2082,21 @@ static PyMethodDef array_methods[] = {
 static PyObject *
 array_repr(arrayobject *a)
 {
-    char typecode;
+    Py_UNICODE typecode;
     PyObject *s, *v = NULL;
     Py_ssize_t len;
 
     len = Py_SIZE(a);
     typecode = a->ob_descr->typecode;
     if (len == 0) {
-        return PyUnicode_FromFormat("array('%c')", typecode);
+        return PyUnicode_FromFormat("array('%c')", (int)typecode);
     }
     if ((typecode == 'u'))
         v = array_tounicode(a, NULL);
     else
         v = array_tolist(a, NULL);
 
-    s = PyUnicode_FromFormat("array('%c', %R)", typecode, v);
+    s = PyUnicode_FromFormat("array('%c', %R)", (int)typecode, v);
     Py_DECREF(v);
     return s;
 }
@@ -2112,7 +2119,7 @@ array_subscr(arrayobject* self, PyObject* item)
         arrayobject* ar;
         int itemsize = self->ob_descr->itemsize;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self),
+        if (PySlice_GetIndicesEx(item, Py_SIZE(self),
                          &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -2183,7 +2190,7 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
             return (*self->ob_descr->setitem)(self, i, value);
     }
     else if (PySlice_Check(item)) {
-        if (PySlice_GetIndicesEx((PySliceObject *)item,
+        if (PySlice_GetIndicesEx(item,
                                  Py_SIZE(self), &start, &stop,
                                  &step, &slicelength) < 0) {
             return -1;
@@ -2397,7 +2404,9 @@ array_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
           || PyByteArray_Check(initial)
           || PyBytes_Check(initial)
           || PyTuple_Check(initial)
-          || ((c=='u') && PyUnicode_Check(initial)))) {
+          || ((c=='u') && PyUnicode_Check(initial))
+          || (array_Check(initial)
+              && c == ((arrayobject*)initial)->ob_descr->typecode))) {
         it = PyObject_GetIter(initial);
         if (it == NULL)
             return NULL;
@@ -2413,17 +2422,20 @@ array_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             PyObject *a;
             Py_ssize_t len;
 
-            if (initial == NULL || !(PyList_Check(initial)
-                || PyTuple_Check(initial)))
+            if (initial == NULL)
                 len = 0;
+            else if (PyList_Check(initial))
+                len = PyList_GET_SIZE(initial);
+            else if (PyTuple_Check(initial) || array_Check(initial))
+                len = Py_SIZE(initial);
             else
-                len = PySequence_Size(initial);
+                len = 0;
 
             a = newarrayobject(type, len, descr);
             if (a == NULL)
                 return NULL;
 
-            if (len > 0) {
+            if (len > 0 && !array_Check(initial)) {
                 Py_ssize_t i;
                 for (i = 0; i < len; i++) {
                     PyObject *v =
@@ -2473,6 +2485,11 @@ array_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
                     memcpy(item, PyUnicode_AS_DATA(initial), n);
                     self->allocated = Py_SIZE(self);
                 }
+            }
+            else if (initial != NULL && array_Check(initial)) {
+                arrayobject *self = (arrayobject *)a;
+                arrayobject *other = (arrayobject *)initial;
+                memcpy(self->ob_item, other->ob_item, len * other->ob_descr->itemsize);
             }
             if (it != NULL) {
                 if (array_iter_extend((arrayobject *)a, it) == -1) {

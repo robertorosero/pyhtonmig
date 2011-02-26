@@ -188,24 +188,26 @@ class BaseBytesTest(unittest.TestCase):
 
     def test_encoding(self):
         sample = "Hello world\n\u1234\u5678\u9abc"
-        for enc in ("utf8", "utf16"):
+        for enc in ("utf-8", "utf-16"):
             b = self.type2test(sample, enc)
             self.assertEqual(b, self.type2test(sample.encode(enc)))
-        self.assertRaises(UnicodeEncodeError, self.type2test, sample, "latin1")
-        b = self.type2test(sample, "latin1", "ignore")
+        self.assertRaises(UnicodeEncodeError, self.type2test, sample, "latin-1")
+        b = self.type2test(sample, "latin-1", "ignore")
         self.assertEqual(b, self.type2test(sample[:-3], "utf-8"))
 
     def test_decode(self):
         sample = "Hello world\n\u1234\u5678\u9abc\def0\def0"
-        for enc in ("utf8", "utf16"):
+        for enc in ("utf-8", "utf-16"):
             b = self.type2test(sample, enc)
             self.assertEqual(b.decode(enc), sample)
         sample = "Hello world\n\x80\x81\xfe\xff"
-        b = self.type2test(sample, "latin1")
-        self.assertRaises(UnicodeDecodeError, b.decode, "utf8")
-        self.assertEqual(b.decode("utf8", "ignore"), "Hello world\n")
-        self.assertEqual(b.decode(errors="ignore", encoding="utf8"),
+        b = self.type2test(sample, "latin-1")
+        self.assertRaises(UnicodeDecodeError, b.decode, "utf-8")
+        self.assertEqual(b.decode("utf-8", "ignore"), "Hello world\n")
+        self.assertEqual(b.decode(errors="ignore", encoding="utf-8"),
                          "Hello world\n")
+        # Default encoding is utf-8
+        self.assertEqual(self.type2test(b'\xe2\x98\x83').decode(), '\u2603')
 
     def test_from_int(self):
         b = self.type2test(0)
@@ -266,11 +268,11 @@ class BaseBytesTest(unittest.TestCase):
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
-        self.assertEquals(self.type2test.fromhex(''), self.type2test())
+        self.assertEqual(self.type2test.fromhex(''), self.type2test())
         b = bytearray([0x1a, 0x2b, 0x30])
-        self.assertEquals(self.type2test.fromhex('1a2B30'), b)
-        self.assertEquals(self.type2test.fromhex('  1A 2B  30   '), b)
-        self.assertEquals(self.type2test.fromhex('0000'), b'\0\0')
+        self.assertEqual(self.type2test.fromhex('1a2B30'), b)
+        self.assertEqual(self.type2test.fromhex('  1A 2B  30   '), b)
+        self.assertEqual(self.type2test.fromhex('0000'), b'\0\0')
         self.assertRaises(TypeError, self.type2test.fromhex, b'1B')
         self.assertRaises(ValueError, self.type2test.fromhex, 'a')
         self.assertRaises(ValueError, self.type2test.fromhex, 'rt')
@@ -497,6 +499,27 @@ class BytesTest(BaseBytesTest):
                 return None
         self.assertRaises(TypeError, bytes, A())
 
+    # Test PyBytes_FromFormat()
+    def test_from_format(self):
+        test.support.import_module('ctypes')
+        from ctypes import pythonapi, py_object, c_int, c_char_p
+        PyBytes_FromFormat = pythonapi.PyBytes_FromFormat
+        PyBytes_FromFormat.restype = py_object
+
+        self.assertEqual(PyBytes_FromFormat(b'format'),
+                         b'format')
+
+        self.assertEqual(PyBytes_FromFormat(b'%'), b'%')
+        self.assertEqual(PyBytes_FromFormat(b'%%'), b'%')
+        self.assertEqual(PyBytes_FromFormat(b'%%s'), b'%s')
+        self.assertEqual(PyBytes_FromFormat(b'[%%]'), b'[%]')
+        self.assertEqual(PyBytes_FromFormat(b'%%%c', c_int(ord('_'))), b'%_')
+
+        self.assertEqual(PyBytes_FromFormat(b'c:%c', c_int(255)),
+                         b'c:\xff')
+        self.assertEqual(PyBytes_FromFormat(b's:%s', c_char_p(b'cstr')),
+                         b's:cstr')
+
 
 class ByteArrayTest(BaseBytesTest):
     type2test = bytearray
@@ -626,11 +649,11 @@ class ByteArrayTest(BaseBytesTest):
                     data.reverse()
                     L[start:stop:step] = data
                     b[start:stop:step] = data
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
                     del L[start:stop:step]
                     del b[start:stop:step]
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self
@@ -809,25 +832,25 @@ class ByteArrayTest(BaseBytesTest):
         resize(10)
         orig = b[:]
         self.assertRaises(BufferError, resize, 11)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 9)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # Other operations implying resize
         self.assertRaises(BufferError, b.pop, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, b.remove, b[1])
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         def delitem():
             del b[1]
         self.assertRaises(BufferError, delitem)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # deleting a non-contiguous slice
         def delslice():
             b[1:-1:2] = b""
         self.assertRaises(BufferError, delslice)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
 
 
 class AssortedBytesTest(unittest.TestCase):

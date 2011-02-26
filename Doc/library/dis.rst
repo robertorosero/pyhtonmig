@@ -4,6 +4,9 @@
 .. module:: dis
    :synopsis: Disassembler for Python bytecode.
 
+**Source code:** :source:`Lib/dis.py`
+
+--------------
 
 The :mod:`dis` module supports the analysis of CPython :term:`bytecode` by
 disassembling it. The CPython bytecode which this module takes as an
@@ -12,7 +15,7 @@ and the interpreter.
 
 .. impl-detail::
 
-   Bytecode is an implementation detail of the CPython interpreter!  No
+   Bytecode is an implementation detail of the CPython interpreter.  No
    guarantees are made that bytecode will not be added, removed, or changed
    between versions of Python.  Use of this module should not be considered to
    work across Python VMs or Python releases.
@@ -727,11 +730,6 @@ the more significant byte last.
 
    Empties the cell contained in slot *i* of the cell and free variable storage.
    Used by the :keyword:`del` statement.
-
-
-.. opcode:: SET_LINENO (lineno)
-
-   This opcode is obsolete.
 
 
 .. opcode:: RAISE_VARARGS (argc)

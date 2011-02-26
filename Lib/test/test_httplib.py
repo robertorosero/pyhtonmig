@@ -106,6 +106,25 @@ class HeaderTests(TestCase):
         conn.putheader('Content-length', 42)
         self.assertTrue(b'Content-length: 42' in conn._buffer)
 
+    def test_ipv6host_header(self):
+        # Default host header on IPv6 transaction should wrapped by [] if
+        # its actual IPv6 address
+        expected = b'GET /foo HTTP/1.1\r\nHost: [2001::]:81\r\n' \
+                   b'Accept-Encoding: identity\r\n\r\n'
+        conn = client.HTTPConnection('[2001::]:81')
+        sock = FakeSocket('')
+        conn.sock = sock
+        conn.request('GET', '/foo')
+        self.assertTrue(sock.data.startswith(expected))
+
+        expected = b'GET /foo HTTP/1.1\r\nHost: [2001:102A::]\r\n' \
+                   b'Accept-Encoding: identity\r\n\r\n'
+        conn = client.HTTPConnection('[2001:102A::]')
+        sock = FakeSocket('')
+        conn.sock = sock
+        conn.request('GET', '/foo')
+        self.assertTrue(sock.data.startswith(expected))
+
 
 class BasicTest(TestCase):
     def test_status_lines(self):
@@ -125,7 +144,7 @@ class BasicTest(TestCase):
 
     def test_bad_status_repr(self):
         exc = client.BadStatusLine('')
-        self.assertEquals(repr(exc), '''BadStatusLine("\'\'",)''')
+        self.assertEqual(repr(exc), '''BadStatusLine("\'\'",)''')
 
     def test_partial_reads(self):
         # if we have a lenght, the system knows when to close itself
@@ -203,13 +222,29 @@ class BasicTest(TestCase):
         sock = FakeSocket(None)
         conn.sock = sock
         conn.send(expected)
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
         sock.data = b''
         conn.send(array.array('b', expected))
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
         sock.data = b''
         conn.send(io.BytesIO(expected))
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
+
+    def test_send_iter(self):
+        expected = b'GET /foo HTTP/1.1\r\nHost: example.com\r\n' \
+                   b'Accept-Encoding: identity\r\nContent-Length: 11\r\n' \
+                   b'\r\nonetwothree'
+
+        def body():
+            yield b"one"
+            yield b"two"
+            yield b"three"
+
+        conn = client.HTTPConnection('example.com')
+        sock = FakeSocket("")
+        conn.sock = sock
+        conn.request('GET', '/foo', body(), {'Content-Length': '11'})
+        self.assertEqual(sock.data, expected)
 
     def test_chunked(self):
         chunked_start = (
@@ -223,7 +258,7 @@ class BasicTest(TestCase):
         sock = FakeSocket(chunked_start + '0\r\n')
         resp = client.HTTPResponse(sock, method="GET")
         resp.begin()
-        self.assertEquals(resp.read(), b'hello world')
+        self.assertEqual(resp.read(), b'hello world')
         resp.close()
 
         for x in ('', 'foo\r\n'):
@@ -233,7 +268,7 @@ class BasicTest(TestCase):
             try:
                 resp.read()
             except client.IncompleteRead as i:
-                self.assertEquals(i.partial, b'hello world')
+                self.assertEqual(i.partial, b'hello world')
                 self.assertEqual(repr(i),'IncompleteRead(11 bytes read)')
                 self.assertEqual(str(i),'IncompleteRead(11 bytes read)')
             else:
@@ -253,9 +288,9 @@ class BasicTest(TestCase):
         sock = FakeSocket(chunked_start + '0\r\n')
         resp = client.HTTPResponse(sock, method="HEAD")
         resp.begin()
-        self.assertEquals(resp.read(), b'')
-        self.assertEquals(resp.status, 200)
-        self.assertEquals(resp.reason, 'OK')
+        self.assertEqual(resp.read(), b'')
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(resp.reason, 'OK')
         self.assertTrue(resp.isclosed())
 
     def test_negative_content_length(self):
@@ -263,7 +298,7 @@ class BasicTest(TestCase):
             'HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nHello\r\n')
         resp = client.HTTPResponse(sock, method="GET")
         resp.begin()
-        self.assertEquals(resp.read(), b'Hello\r\n')
+        self.assertEqual(resp.read(), b'Hello\r\n')
         resp.close()
 
     def test_incomplete_read(self):
@@ -273,7 +308,7 @@ class BasicTest(TestCase):
         try:
             resp.read()
         except client.IncompleteRead as i:
-            self.assertEquals(i.partial, b'Hello\r\n')
+            self.assertEqual(i.partial, b'Hello\r\n')
             self.assertEqual(repr(i),
                              "IncompleteRead(7 bytes read, 3 more expected)")
             self.assertEqual(str(i),
@@ -298,9 +333,36 @@ class BasicTest(TestCase):
         self.assertEqual("Basic realm=\"example\"",
                          resp.getheader("www-authenticate"))
 
+    # Test lines overflowing the max line size (_MAXLINE in http.client)
+
+    def test_overflowing_status_line(self):
+        body = "HTTP/1.1 200 Ok" + "k" * 65536 + "\r\n"
+        resp = client.HTTPResponse(FakeSocket(body))
+        self.assertRaises((client.LineTooLong, client.BadStatusLine), resp.begin)
+
+    def test_overflowing_header_line(self):
+        body = (
+            'HTTP/1.1 200 OK\r\n'
+            'X-Foo: bar' + 'r' * 65536 + '\r\n\r\n'
+        )
+        resp = client.HTTPResponse(FakeSocket(body))
+        self.assertRaises(client.LineTooLong, resp.begin)
+
+    def test_overflowing_chunked_line(self):
+        body = (
+            'HTTP/1.1 200 OK\r\n'
+            'Transfer-Encoding: chunked\r\n\r\n'
+            + '0' * 65536 + 'a\r\n'
+            'hello world\r\n'
+            '0\r\n'
+        )
+        resp = client.HTTPResponse(FakeSocket(body))
+        resp.begin()
+        self.assertRaises(client.LineTooLong, resp.read)
+
 class OfflineTest(TestCase):
     def test_responses(self):
-        self.assertEquals(client.responses[client.NOT_FOUND], "Not Found")
+        self.assertEqual(client.responses[client.NOT_FOUND], "Not Found")
 
 
 class SourceAddressTest(TestCase):
@@ -498,7 +560,7 @@ class RequestBodyTest(TestCase):
         self.conn.request("PUT", "/url", "body")
         message, f = self.get_headers_and_fp()
         self.assertEqual("text/plain", message.get_content_type())
-        self.assertEqual(None, message.get_charset())
+        self.assertIsNone(message.get_charset())
         self.assertEqual("4", message.get("content-length"))
         self.assertEqual(b'body', f.read())
 
@@ -506,7 +568,7 @@ class RequestBodyTest(TestCase):
         self.conn.request("PUT", "/url", "body\xc1")
         message, f = self.get_headers_and_fp()
         self.assertEqual("text/plain", message.get_content_type())
-        self.assertEqual(None, message.get_charset())
+        self.assertIsNone(message.get_charset())
         self.assertEqual("5", message.get("content-length"))
         self.assertEqual(b'body\xc1', f.read())
 
@@ -514,7 +576,7 @@ class RequestBodyTest(TestCase):
         self.conn.request("PUT", "/url", b"body\xc1")
         message, f = self.get_headers_and_fp()
         self.assertEqual("text/plain", message.get_content_type())
-        self.assertEqual(None, message.get_charset())
+        self.assertIsNone(message.get_charset())
         self.assertEqual("5", message.get("content-length"))
         self.assertEqual(b'body\xc1', f.read())
 
@@ -525,7 +587,7 @@ class RequestBodyTest(TestCase):
             self.conn.request("PUT", "/url", f)
             message, f = self.get_headers_and_fp()
             self.assertEqual("text/plain", message.get_content_type())
-            self.assertEqual(None, message.get_charset())
+            self.assertIsNone(message.get_charset())
             self.assertEqual("4", message.get("content-length"))
             self.assertEqual(b'body', f.read())
 
@@ -536,7 +598,7 @@ class RequestBodyTest(TestCase):
             self.conn.request("PUT", "/url", f)
             message, f = self.get_headers_and_fp()
             self.assertEqual("text/plain", message.get_content_type())
-            self.assertEqual(None, message.get_charset())
+            self.assertIsNone(message.get_charset())
             self.assertEqual("5", message.get("content-length"))
             self.assertEqual(b'body\xc1', f.read())
 

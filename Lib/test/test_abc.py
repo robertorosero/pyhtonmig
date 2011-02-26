@@ -98,13 +98,6 @@ class TestABC(unittest.TestCase):
             self.assertRaises(TypeError, F)  # because bar is abstract now
             self.assertTrue(isabstract(F))
 
-    def test_type_has_no_abstractmethods(self):
-        # type pretends not to have __abstractmethods__.
-        self.assertRaises(AttributeError, getattr, type, "__abstractmethods__")
-        class meta(type):
-            pass
-        self.assertRaises(AttributeError, getattr, meta, "__abstractmethods__")
-
     def test_metaclass_abc(self):
         # Metaclasses can be ABCs, too.
         class A(metaclass=abc.ABCMeta):
@@ -128,11 +121,12 @@ class TestABC(unittest.TestCase):
         self.assertFalse(issubclass(B, (A,)))
         self.assertNotIsInstance(b, A)
         self.assertNotIsInstance(b, (A,))
-        A.register(B)
+        B1 = A.register(B)
         self.assertTrue(issubclass(B, A))
         self.assertTrue(issubclass(B, (A,)))
         self.assertIsInstance(b, A)
         self.assertIsInstance(b, (A,))
+        self.assertIs(B1, B)
         class C(B):
             pass
         c = C()
@@ -140,6 +134,27 @@ class TestABC(unittest.TestCase):
         self.assertTrue(issubclass(C, (A,)))
         self.assertIsInstance(c, A)
         self.assertIsInstance(c, (A,))
+
+    def test_register_as_class_deco(self):
+        class A(metaclass=abc.ABCMeta):
+            pass
+        @A.register
+        class B(object):
+            pass
+        b = B()
+        self.assertTrue(issubclass(B, A))
+        self.assertTrue(issubclass(B, (A,)))
+        self.assertIsInstance(b, A)
+        self.assertIsInstance(b, (A,))
+        @A.register
+        class C(B):
+            pass
+        c = C()
+        self.assertTrue(issubclass(C, A))
+        self.assertTrue(issubclass(C, (A,)))
+        self.assertIsInstance(c, A)
+        self.assertIsInstance(c, (A,))
+        self.assertIs(C, A.register(C))
 
     def test_isinstance_invalidation(self):
         class A(metaclass=abc.ABCMeta):
@@ -192,8 +207,8 @@ class TestABC(unittest.TestCase):
     def test_register_non_class(self):
         class A(metaclass=abc.ABCMeta):
             pass
-        self.assertRaisesRegexp(TypeError, "Can only register classes",
-                                A.register, 4)
+        self.assertRaisesRegex(TypeError, "Can only register classes",
+                               A.register, 4)
 
     def test_registration_transitiveness(self):
         class A(metaclass=abc.ABCMeta):

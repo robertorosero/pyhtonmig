@@ -4,9 +4,13 @@
 .. module:: argparse
    :synopsis: Command-line option and argument parsing library.
 .. moduleauthor:: Steven Bethard <steven.bethard@gmail.com>
-.. versionadded:: 3.2
 .. sectionauthor:: Steven Bethard <steven.bethard@gmail.com>
 
+**Source code:** :source:`Lib/argparse.py`
+
+.. versionadded:: 3.2
+
+--------------
 
 The :mod:`argparse` module makes it easy to write user friendly command line
 interfaces. The program defines what arguments it requires, and :mod:`argparse`
@@ -120,7 +124,9 @@ command-line args from :data:`sys.argv`.
 ArgumentParser objects
 ----------------------
 
-.. class:: ArgumentParser([description], [epilog], [prog], [usage], [add_help], [argument_default], [parents], [prefix_chars], [conflict_handler], [formatter_class])
+.. class:: ArgumentParser([description], [epilog], [prog], [usage], [add_help], \
+                          [argument_default], [parents], [prefix_chars], \
+                          [conflict_handler], [formatter_class])
 
    Create a new :class:`ArgumentParser` object.  Each parameter has its own more
    detailed description below, but in short they are:
@@ -563,7 +569,9 @@ your usage messages.
 The add_argument() method
 -------------------------
 
-.. method:: ArgumentParser.add_argument(name or flags..., [action], [nargs], [const], [default], [type], [choices], [required], [help], [metavar], [dest])
+.. method:: ArgumentParser.add_argument(name or flags..., [action], [nargs], \
+                           [const], [default], [type], [choices], [required], \
+                           [help], [metavar], [dest])
 
    Define how a single command line argument should be parsed.  Each parameter
    has its own more detailed description below, but in short they are:
@@ -777,9 +785,11 @@ values are:
      >>> parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'),
      ...                     default=sys.stdout)
      >>> parser.parse_args(['input.txt', 'output.txt'])
-     Namespace(infile=<open file 'input.txt', mode 'r' at 0x...>, outfile=<open file 'output.txt', mode 'w' at 0x...>)
+     Namespace(infile=<_io.TextIOWrapper name='input.txt' encoding='UTF-8'>,
+               outfile=<_io.TextIOWrapper name='output.txt' encoding='UTF-8'>)
      >>> parser.parse_args([])
-     Namespace(infile=<open file '<stdin>', mode 'r' at 0x...>, outfile=<open file '<stdout>', mode 'w' at 0x...>)
+     Namespace(infile=<_io.TextIOWrapper name='<stdin>' encoding='UTF-8'>,
+               outfile=<_io.TextIOWrapper name='<stdout>' encoding='UTF-8'>)
 
 * ``'*'``.  All command-line args present are gathered into a list.  Note that
   it generally doesn't make much sense to have more than one positional argument
@@ -875,26 +885,26 @@ type
 
 By default, ArgumentParser objects read command-line args in as simple strings.
 However, quite often the command-line string should instead be interpreted as
-another type, like a :class:`float`, :class:`int` or :class:`file`.  The
-``type`` keyword argument of :meth:`add_argument` allows any necessary
-type-checking and type-conversions to be performed.  Many common built-in types
-can be used directly as the value of the ``type`` argument::
+another type, like a :class:`float` or :class:`int`.  The ``type`` keyword
+argument of :meth:`add_argument` allows any necessary type-checking and
+type-conversions to be performed.  Common built-in types and functions can be
+used directly as the value of the ``type`` argument::
 
    >>> parser = argparse.ArgumentParser()
    >>> parser.add_argument('foo', type=int)
-   >>> parser.add_argument('bar', type=file)
+   >>> parser.add_argument('bar', type=open)
    >>> parser.parse_args('2 temp.txt'.split())
-   Namespace(bar=<open file 'temp.txt', mode 'r' at 0x...>, foo=2)
+   Namespace(bar=<_io.TextIOWrapper name='temp.txt' encoding='UTF-8'>, foo=2)
 
 To ease the use of various types of files, the argparse module provides the
 factory FileType which takes the ``mode=`` and ``bufsize=`` arguments of the
-``file`` object.  For example, ``FileType('w')`` can be used to create a
+:func:`open` function.  For example, ``FileType('w')`` can be used to create a
 writable file::
 
    >>> parser = argparse.ArgumentParser()
    >>> parser.add_argument('bar', type=argparse.FileType('w'))
    >>> parser.parse_args(['out.txt'])
-   Namespace(bar=<open file 'out.txt', mode 'w' at 0x...>)
+   Namespace(bar=<_io.TextIOWrapper name='out.txt' encoding='UTF-8'>)
 
 ``type=`` can take any callable that takes a single string argument and returns
 the type-converted value::
@@ -1312,7 +1322,7 @@ already existing object, rather than the newly-created :class:`Namespace` object
 that is normally used.  This can be achieved by specifying the ``namespace=``
 keyword argument::
 
-   >>> class C(object):
+   >>> class C:
    ...     pass
    ...
    >>> c = C()
@@ -1428,6 +1438,16 @@ Sub-commands
 
        {foo,bar}   additional help
 
+   Furthermore, ``add_parser`` supports an additional ``aliases`` argument,
+   which allows multiple strings to refer to the same subparser. This example,
+   like ``svn``, aliases ``co`` as a shorthand for ``checkout``::
+
+     >>> parser = argparse.ArgumentParser()
+     >>> subparsers = parser.add_subparsers()
+     >>> checkout = subparsers.add_parser('checkout', aliases=['co'])
+     >>> checkout.add_argument('foo')
+     >>> parser.parse_args(['co', 'bar'])
+     Namespace(foo='bar')
 
    One particularly effective way of handling sub-commands is to combine the use
    of the :meth:`add_subparsers` method with calls to :meth:`set_defaults` so
@@ -1466,7 +1486,7 @@ Sub-commands
      >>> args.func(args)
      ((XYZYX))
 
-   This way, you can let :meth:`parse_args` does the job of calling the
+   This way, you can let :meth:`parse_args` do the job of calling the
    appropriate function after argument parsing is complete.  Associating
    functions with actions like this is typically the easiest way to handle the
    different actions for each of your subparsers.  However, if it is necessary
@@ -1496,7 +1516,7 @@ FileType objects
    >>> parser = argparse.ArgumentParser()
    >>> parser.add_argument('--output', type=argparse.FileType('wb', 0))
    >>> parser.parse_args(['--output', 'out'])
-   Namespace(output=<open file 'out', mode 'wb' at 0x...>)
+   Namespace(output=<_io.BufferedWriter name='out'>)
 
    FileType objects understand the pseudo-argument ``'-'`` and automatically
    convert this into ``sys.stdin`` for readable :class:`FileType` objects and
@@ -1505,7 +1525,7 @@ FileType objects
    >>> parser = argparse.ArgumentParser()
    >>> parser.add_argument('infile', type=argparse.FileType('r'))
    >>> parser.parse_args(['-'])
-   Namespace(infile=<open file '<stdin>', mode 'r' at 0x...>)
+   Namespace(infile=<_io.TextIOWrapper name='<stdin>' encoding='UTF-8'>)
 
 
 Argument groups
@@ -1648,14 +1668,14 @@ are available:
 .. method:: ArgumentParser.print_usage(file=None)
 
    Print a brief description of how the :class:`ArgumentParser` should be
-   invoked on the command line.  If *file* is ``None``, :data:`sys.stderr` is
+   invoked on the command line.  If *file* is ``None``, :data:`sys.stdout` is
    assumed.
 
 .. method:: ArgumentParser.print_help(file=None)
 
    Print a help message, including the program usage and information about the
    arguments registered with the :class:`ArgumentParser`.  If *file* is
-   ``None``, :data:`sys.stderr` is assumed.
+   ``None``, :data:`sys.stdout` is assumed.
 
 There are also variants of these methods that simply return a string instead of
 printing it:
@@ -1729,6 +1749,7 @@ Exiting methods
    This method prints a usage message including the *message* to the
    standard output and terminates the program with a status code of 2.
 
+.. _upgrading-optparse-code:
 
 Upgrading optparse code
 -----------------------
@@ -1742,11 +1763,12 @@ backwards compatibility.
 
 A partial upgrade path from optparse to argparse:
 
-* Replace all ``add_option()`` calls with :meth:`ArgumentParser.add_argument` calls.
+* Replace all ``add_option()`` calls with :meth:`ArgumentParser.add_argument`
+  calls.
 
 * Replace ``options, args = parser.parse_args()`` with ``args =
-  parser.parse_args()`` and add additional :meth:`ArgumentParser.add_argument` calls for the
-  positional arguments.
+  parser.parse_args()`` and add additional :meth:`ArgumentParser.add_argument`
+  calls for the positional arguments.
 
 * Replace callback actions and the ``callback_*`` keyword arguments with
   ``type`` or ``action`` arguments.
