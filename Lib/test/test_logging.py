@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2001-2010 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2011 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -18,7 +18,7 @@
 
 """Test harness for the logging module. Run all tests.
 
-Copyright (C) 2001-2010 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2011 Vinay Sajip. All Rights Reserved.
 """
 
 import logging
@@ -1907,6 +1907,8 @@ class FormatterTest(unittest.TestCase):
         self.assertFalse(f.usesTime())
         f = logging.Formatter('%(asctime)s')
         self.assertTrue(f.usesTime())
+        f = logging.Formatter('%(asctime)-15s')
+        self.assertTrue(f.usesTime())
         f = logging.Formatter('asctime')
         self.assertFalse(f.usesTime())
 
@@ -1919,6 +1921,10 @@ class FormatterTest(unittest.TestCase):
         self.assertRaises(KeyError, f.format, r)
         self.assertFalse(f.usesTime())
         f = logging.Formatter('{asctime}', style='{')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('{asctime!s:15}', style='{')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('{asctime:15}', style='{')
         self.assertTrue(f.usesTime())
         f = logging.Formatter('asctime', style='{')
         self.assertFalse(f.usesTime())
@@ -1935,6 +1941,8 @@ class FormatterTest(unittest.TestCase):
         self.assertFalse(f.usesTime())
         f = logging.Formatter('${asctime}', style='$')
         self.assertTrue(f.usesTime())
+        f = logging.Formatter('${asctime', style='$')
+        self.assertFalse(f.usesTime())
         f = logging.Formatter('$asctime', style='$')
         self.assertTrue(f.usesTime())
         f = logging.Formatter('asctime', style='$')
@@ -2044,13 +2052,13 @@ for when, exp in (('S', 1),
                   ('M', 60),
                   ('H', 60 * 60),
                   ('D', 60 * 60 * 24),
-                  ('MIDNIGHT', 60 * 60 * 23),
+                  ('MIDNIGHT', 60 * 60 * 24),
                   # current time (epoch start) is a Thursday, W0 means Monday
-                  ('W0', secs(days=4, hours=23)),
+                  ('W0', secs(days=4, hours=24)),
                  ):
     def test_compute_rollover(self, when=when, exp=exp):
         rh = logging.handlers.TimedRotatingFileHandler(
-            self.fn, when=when, interval=1, backupCount=0)
+            self.fn, when=when, interval=1, backupCount=0, utc=True)
         currentTime = 0.0
         actual = rh.computeRollover(currentTime)
         if exp != actual:

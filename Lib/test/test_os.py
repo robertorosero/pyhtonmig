@@ -1340,7 +1340,7 @@ class SendfileTestServer(asyncore.dispatcher, threading.Thread):
 
     def wait(self):
         # wait for handler connection to be closed, then stop the server
-        while not getattr(self.handler_instance, "closed", True):
+        while not getattr(self.handler_instance, "closed", False):
             time.sleep(0.001)
         self.stop()
 
@@ -1374,7 +1374,7 @@ class SendfileTestServer(asyncore.dispatcher, threading.Thread):
 @unittest.skipUnless(hasattr(os, 'sendfile'), "test needs os.sendfile()")
 class TestSendfile(unittest.TestCase):
 
-    DATA = b"12345abcde" * 1024 * 1024  # 10 Mb
+    DATA = b"12345abcde" * 16 * 1024  # 160 KB
     SUPPORT_HEADERS_TRAILERS = not sys.platform.startswith("linux") and \
                                not sys.platform.startswith("solaris") and \
                                not sys.platform.startswith("sunos")
@@ -1432,7 +1432,7 @@ class TestSendfile(unittest.TestCase):
         total_sent = 0
         offset = 0
         nbytes = 4096
-        while 1:
+        while total_sent < len(self.DATA):
             sent = self.sendfile_wrapper(self.sockno, self.fileno, offset, nbytes)
             if sent == 0:
                 break
@@ -1442,17 +1442,20 @@ class TestSendfile(unittest.TestCase):
             self.assertEqual(offset, total_sent)
 
         self.assertEqual(total_sent, len(self.DATA))
+        self.client.shutdown(socket.SHUT_RDWR)
         self.client.close()
         self.server.wait()
         data = self.server.handler_instance.get_data()
-        self.assertEqual(hash(data), hash(self.DATA))
+        self.assertEqual(len(data), len(self.DATA))
+        self.assertEqual(data, self.DATA)
 
     def test_send_at_certain_offset(self):
         # start sending a file at a certain offset
         total_sent = 0
-        offset = len(self.DATA) / 2
+        offset = len(self.DATA) // 2
+        must_send = len(self.DATA) - offset
         nbytes = 4096
-        while 1:
+        while total_sent < must_send:
             sent = self.sendfile_wrapper(self.sockno, self.fileno, offset, nbytes)
             if sent == 0:
                 break
@@ -1460,18 +1463,27 @@ class TestSendfile(unittest.TestCase):
             total_sent += sent
             self.assertTrue(sent <= nbytes)
 
+        self.client.shutdown(socket.SHUT_RDWR)
         self.client.close()
         self.server.wait()
         data = self.server.handler_instance.get_data()
-        expected = self.DATA[int(len(self.DATA) / 2):]
+        expected = self.DATA[len(self.DATA) // 2:]
         self.assertEqual(total_sent, len(expected))
-        self.assertEqual(hash(data), hash(expected))
+        self.assertEqual(len(data), len(expected))
+        self.assertEqual(data, expected)
 
     def test_offset_overflow(self):
         # specify an offset > file size
         offset = len(self.DATA) + 4096
-        sent = os.sendfile(self.sockno, self.fileno, offset, 4096)
-        self.assertEqual(sent, 0)
+        try:
+            sent = os.sendfile(self.sockno, self.fileno, offset, 4096)
+        except OSError as e:
+            # Solaris can raise EINVAL if offset >= file length, ignore.
+            if e.errno != errno.EINVAL:
+                raise
+        else:
+            self.assertEqual(sent, 0)
+        self.client.shutdown(socket.SHUT_RDWR)
         self.client.close()
         self.server.wait()
         data = self.server.handler_instance.get_data()
