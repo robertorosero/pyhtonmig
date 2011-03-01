@@ -39,7 +39,7 @@ class XMLRPCTestCase(unittest.TestCase):
     def test_dump_load(self):
         dump = xmlrpclib.dumps((alist,))
         load = xmlrpclib.loads(dump)
-        self.assertEquals(alist, load[0][0])
+        self.assertEqual(alist, load[0][0])
 
     def test_dump_bare_datetime(self):
         # This checks that an unwrapped datetime.date object can be handled
@@ -49,22 +49,22 @@ class XMLRPCTestCase(unittest.TestCase):
         dt = datetime.datetime(2005, 2, 10, 11, 41, 23)
         s = xmlrpclib.dumps((dt,))
         (newdt,), m = xmlrpclib.loads(s, use_datetime=1)
-        self.assertEquals(newdt, dt)
-        self.assertEquals(m, None)
+        self.assertEqual(newdt, dt)
+        self.assertEqual(m, None)
 
         (newdt,), m = xmlrpclib.loads(s, use_datetime=0)
-        self.assertEquals(newdt, xmlrpclib.DateTime('20050210T11:41:23'))
+        self.assertEqual(newdt, xmlrpclib.DateTime('20050210T11:41:23'))
 
     def test_datetime_before_1900(self):
         # same as before but with a date before 1900
         dt = datetime.datetime(1,  2, 10, 11, 41, 23)
         s = xmlrpclib.dumps((dt,))
         (newdt,), m = xmlrpclib.loads(s, use_datetime=1)
-        self.assertEquals(newdt, dt)
-        self.assertEquals(m, None)
+        self.assertEqual(newdt, dt)
+        self.assertEqual(m, None)
 
         (newdt,), m = xmlrpclib.loads(s, use_datetime=0)
-        self.assertEquals(newdt, xmlrpclib.DateTime('00010210T11:41:23'))
+        self.assertEqual(newdt, xmlrpclib.DateTime('00010210T11:41:23'))
 
     def test_cmp_datetime_DateTime(self):
         now = datetime.datetime.now()
@@ -92,7 +92,7 @@ class XMLRPCTestCase(unittest.TestCase):
         t.x = 100
         t.y = "Hello"
         ((t2,), dummy) = xmlrpclib.loads(xmlrpclib.dumps((t,)))
-        self.assertEquals(t2, t.__dict__)
+        self.assertEqual(t2, t.__dict__)
 
     def test_dump_big_long(self):
         self.assertRaises(OverflowError, xmlrpclib.dumps, (2**99,))
@@ -138,18 +138,30 @@ class XMLRPCTestCase(unittest.TestCase):
         value = alist + [None]
         arg1 = (alist + [None],)
         strg = xmlrpclib.dumps(arg1, allow_none=True)
-        self.assertEquals(value,
+        self.assertEqual(value,
                           xmlrpclib.loads(strg)[0][0])
         self.assertRaises(TypeError, xmlrpclib.dumps, (arg1,))
 
     def test_get_host_info(self):
         # see bug #3613, this raised a TypeError
         transp = xmlrpc.client.Transport()
-        self.assertEquals(transp.get_host_info("user@host.tld"),
+        self.assertEqual(transp.get_host_info("user@host.tld"),
                           ('host.tld',
                            [('Authorization', 'Basic dXNlcg==')], {}))
 
-
+    def test_ssl_presence(self):
+        try:
+            import ssl
+        except ImportError:
+            has_ssl = False
+        else:
+            has_ssl = True
+        try:
+            xmlrpc.client.ServerProxy('https://localhost:9999').bad_function()
+        except NotImplementedError:
+            self.assertFalse(has_ssl, "xmlrpc client's error with SSL support")
+        except socket.error:
+            self.assertTrue(has_ssl)
 
 class HelperTestCase(unittest.TestCase):
     def test_escape(self):
@@ -167,8 +179,8 @@ class FaultTestCase(unittest.TestCase):
         f = xmlrpclib.Fault(42, 'Test Fault')
         s = xmlrpclib.dumps((f,))
         (newf,), m = xmlrpclib.loads(s)
-        self.assertEquals(newf, {'faultCode': 42, 'faultString': 'Test Fault'})
-        self.assertEquals(m, None)
+        self.assertEqual(newf, {'faultCode': 42, 'faultString': 'Test Fault'})
+        self.assertEqual(m, None)
 
         s = xmlrpclib.Marshaller().dumps(f)
         self.assertRaises(xmlrpclib.Fault, xmlrpclib.loads, s)
@@ -617,6 +629,7 @@ class KeepaliveServerTestCase1(BaseKeepaliveServerTestCase):
         self.assertEqual(p.pow(6,8), 6**8)
         self.assertEqual(p.pow(6,8), 6**8)
         self.assertEqual(p.pow(6,8), 6**8)
+        p("close")()
 
         #they should have all been handled by a single request handler
         self.assertEqual(len(self.RequestHandler.myRequests), 1)
@@ -624,6 +637,7 @@ class KeepaliveServerTestCase1(BaseKeepaliveServerTestCase):
         #check that we did at least two (the third may be pending append
         #due to thread scheduling)
         self.assertGreaterEqual(len(self.RequestHandler.myRequests[-1]), 2)
+
 
 #test special attribute access on the serverproxy, through the __call__
 #function.
@@ -641,6 +655,7 @@ class KeepaliveServerTestCase2(BaseKeepaliveServerTestCase):
         self.assertEqual(p.pow(6,8), 6**8)
         self.assertEqual(p.pow(6,8), 6**8)
         self.assertEqual(p.pow(6,8), 6**8)
+        p("close")()
 
         #they should have all been two request handlers, each having logged at least
         #two complete requests
@@ -648,12 +663,14 @@ class KeepaliveServerTestCase2(BaseKeepaliveServerTestCase):
         self.assertGreaterEqual(len(self.RequestHandler.myRequests[-1]), 2)
         self.assertGreaterEqual(len(self.RequestHandler.myRequests[-2]), 2)
 
+
     def test_transport(self):
         p = xmlrpclib.ServerProxy(URL)
         #do some requests with close.
         self.assertEqual(p.pow(6,8), 6**8)
         p("transport").close() #same as above, really.
         self.assertEqual(p.pow(6,8), 6**8)
+        p("close")()
         self.assertEqual(len(self.RequestHandler.myRequests), 2)
 
 #A test case that verifies that gzip encoding works in both directions
@@ -697,16 +714,18 @@ class GzipServerTestCase(BaseServerTestCase):
         self.assertEqual(p.pow(6,8), 6**8)
         b = self.RequestHandler.content_length
         self.assertTrue(a>b)
+        p("close")()
 
     def test_bad_gzip_request(self):
         t = self.Transport()
         t.encode_threshold = None
         t.fake_gzip = True
         p = xmlrpclib.ServerProxy(URL, transport=t)
-        cm = self.assertRaisesRegexp(xmlrpclib.ProtocolError,
-                                     re.compile(r"\b400\b"))
+        cm = self.assertRaisesRegex(xmlrpclib.ProtocolError,
+                                    re.compile(r"\b400\b"))
         with cm:
             p.pow(6, 8)
+        p("close")()
 
     def test_gsip_response(self):
         t = self.Transport()
@@ -717,6 +736,7 @@ class GzipServerTestCase(BaseServerTestCase):
         a = t.response_length
         self.requestHandler.encode_threshold = 0 #always encode
         self.assertEqual(p.pow(6,8), 6**8)
+        p("close")()
         b = t.response_length
         self.requestHandler.encode_threshold = old
         self.assertTrue(a>b)
@@ -906,7 +926,7 @@ class CGIHandlerTestCase(unittest.TestCase):
 
         content = handle[handle.find("<?xml"):]
 
-        self.assertEquals(
+        self.assertEqual(
             int(re.search('Content-Length: (\d+)', handle).group(1)),
             len(content))
 

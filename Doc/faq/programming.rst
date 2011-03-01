@@ -127,9 +127,9 @@ increased speed.
 
 .. XXX seems to have overlap with other questions!
 
-`Pyrex <http://www.cosc.canterbury.ac.nz/~greg/python/Pyrex/>`_ can compile a
-slightly modified version of Python code into a C extension, and can be used on
-many different platforms.
+`Cython <http://cython.org>`_ and `Pyrex <http://www.cosc.canterbury.ac.nz/~greg/python/Pyrex/>`_
+can compile a slightly modified version of Python code into a C extension, and
+can be used on many different platforms.
 
 `Psyco <http://psyco.sourceforge.net>`_ is a just-in-time compiler that
 translates Python code into x86 assembly language.  If you can use it, Psyco can
@@ -989,7 +989,7 @@ and then convert decimal strings to numeric values using :func:`int` or
 if the line uses something other than whitespace as a separator.
 
 For more complicated input parsing, regular expressions are more powerful
-than C's :cfunc:`sscanf` and better suited for the task.
+than C's :c:func:`sscanf` and better suited for the task.
 
 
 What does 'UnicodeDecodeError' or 'UnicodeEncodeError' error  mean?

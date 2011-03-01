@@ -9,6 +9,9 @@
 .. sectionauthor:: Steve Holden <sholden@holdenweb.com>
 .. heavily adapted from original documentation by Sam Rushing
 
+**Source code:** :source:`Lib/asyncore.py`
+
+--------------
 
 This module provides the basic infrastructure for writing asynchronous  socket
 service clients and servers.
@@ -22,7 +25,7 @@ bound.  If your program is processor bound, then pre-emptive scheduled threads
 are probably what you really need.  Network servers are rarely processor
 bound, however.
 
-If your operating system supports the :cfunc:`select` system call in its I/O
+If your operating system supports the :c:func:`select` system call in its I/O
 library (and nearly all do), then you can use it to juggle multiple
 communication channels at once; doing other work while your I/O is taking
 place in the "background."  Although this strategy can seem strange and
@@ -86,14 +89,14 @@ any that have been added to the map during asynchronous service) is closed.
    | ``handle_close()``   | Implied by a read event with no data   |
    |                      | available                              |
    +----------------------+----------------------------------------+
-   | ``handle_accept()``  | Implied by a read event on a listening |
+   | ``handle_accepted()``| Implied by a read event on a listening |
    |                      | socket                                 |
    +----------------------+----------------------------------------+
 
    During asynchronous processing, each mapped channel's :meth:`readable` and
    :meth:`writable` methods are used to determine whether the channel's socket
-   should be added to the list of channels :cfunc:`select`\ ed or
-   :cfunc:`poll`\ ed for read and write events.
+   should be added to the list of channels :c:func:`select`\ ed or
+   :c:func:`poll`\ ed for read and write events.
 
    Thus, the set of channel events is larger than the basic socket events.  The
    full set of methods that can be overridden in your subclass follows:
@@ -144,7 +147,21 @@ any that have been added to the map during asynchronous service) is closed.
 
       Called on listening channels (passive openers) when a connection can be
       established with a new remote endpoint that has issued a :meth:`connect`
-      call for the local endpoint.
+      call for the local endpoint. Deprecated in version 3.2; use
+      :meth:`handle_accepted` instead.
+
+      .. deprecated:: 3.2
+
+
+   .. method:: handle_accepted(sock, addr)
+
+      Called on listening channels (passive openers) when a connection has been
+      established with a new remote endpoint that has issued a :meth:`connect`
+      call for the local endpoint.  *conn* is a *new* socket object usable to
+      send and receive data on the connection, and *address* is the address
+      bound to the socket on the other end of the connection.
+
+      .. versionadded:: 3.2
 
 
    .. method:: readable()
@@ -167,11 +184,13 @@ any that have been added to the map during asynchronous service) is closed.
    Most of these are nearly identical to their socket partners.
 
 
-   .. method:: create_socket(family, type)
+   .. method:: create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
 
       This is identical to the creation of a normal socket, and will use the
       same options for creation.  Refer to the :mod:`socket` documentation for
       information on creating sockets.
+
+  .. versionchanged:: 3.3 family and type arguments can be omitted.
 
 
    .. method:: connect(address)
@@ -210,10 +229,13 @@ any that have been added to the map during asynchronous service) is closed.
    .. method:: accept()
 
       Accept a connection.  The socket must be bound to an address and listening
-      for connections.  The return value is a pair ``(conn, address)`` where
-      *conn* is a *new* socket object usable to send and receive data on the
-      connection, and *address* is the address bound to the socket on the other
-      end of the connection.
+      for connections.  The return value can be either ``None`` or a pair
+      ``(conn, address)`` where *conn* is a *new* socket object usable to send
+      and receive data on the connection, and *address* is the address bound to
+      the socket on the other end of the connection.
+      When ``None`` is returned it means the connection didn't take place, in
+      which case the server should just ignore this event and keep listening
+      for further incoming connections.
 
 
    .. method:: close()
@@ -223,12 +245,19 @@ any that have been added to the map during asynchronous service) is closed.
       flushed).  Sockets are automatically closed when they are
       garbage-collected.
 
+
+.. class:: dispatcher_with_send()
+
+   A :class:`dispatcher` subclass which adds simple buffered output capability,
+   useful for simple clients. For more sophisticated usage use
+   :class:`asynchat.async_chat`.
+
 .. class:: file_dispatcher()
 
    A file_dispatcher takes a file descriptor or :term:`file object` along
-   with an optional map argument and wraps it for use with the :cfunc:`poll`
-   or :cfunc:`loop` functions.  If provided a file object or anything with a
-   :cfunc:`fileno` method, that method will be called and passed to the
+   with an optional map argument and wraps it for use with the :c:func:`poll`
+   or :c:func:`loop` functions.  If provided a file object or anything with a
+   :c:func:`fileno` method, that method will be called and passed to the
    :class:`file_wrapper` constructor.  Availability: UNIX.
 
 .. class:: file_wrapper()
@@ -239,7 +268,7 @@ any that have been added to the map during asynchronous service) is closed.
    socket for use by the :class:`file_dispatcher` class.  Availability: UNIX.
 
 
-.. _asyncore-example:
+.. _asyncore-example-1:
 
 asyncore Example basic HTTP client
 ----------------------------------
@@ -249,11 +278,11 @@ implement its socket handling::
 
    import asyncore, socket
 
-   class http_client(asyncore.dispatcher):
+   class HTTPClient(asyncore.dispatcher):
 
        def __init__(self, host, path):
            asyncore.dispatcher.__init__(self)
-           self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+           self.create_socket()
            self.connect( (host, 80) )
            self.buffer = bytes('GET %s HTTP/1.0\r\n\r\n' % path, 'ascii')
 
@@ -273,6 +302,41 @@ implement its socket handling::
            sent = self.send(self.buffer)
            self.buffer = self.buffer[sent:]
 
-   c = http_client('www.python.org', '/')
 
-   asyncore.loop()
+    client = HTTPClient('www.python.org', '/')
+    asyncore.loop()
+
+.. _asyncore-example-2:
+
+asyncore Example basic echo server
+----------------------------------
+
+Here is a basic echo server that uses the :class:`dispatcher` class to accept
+connections and dispatches the incoming connections to a handler::
+
+    import asyncore
+    import socket
+
+    class EchoHandler(asyncore.dispatcher_with_send):
+
+        def handle_read(self):
+            data = self.recv(8192)
+            if data:
+                self.send(data)
+
+    class EchoServer(asyncore.dispatcher):
+
+        def __init__(self, host, port):
+            asyncore.dispatcher.__init__(self)
+            self.create_socket()
+            self.set_reuse_addr()
+            self.bind((host, port))
+            self.listen(5)
+
+        def handle_accepted(self, sock, addr):
+            print('Incoming connection from %s' % repr(addr))
+            handler = EchoHandler(sock)
+
+    server = EchoServer('localhost', 8080)
+    asyncore.loop()
+

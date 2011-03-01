@@ -333,29 +333,7 @@ PyErr_BadArgument(void)
 PyObject *
 PyErr_NoMemory(void)
 {
-    if (PyErr_ExceptionMatches(PyExc_MemoryError))
-        /* already current */
-        return NULL;
-
-    /* raise the pre-allocated instance if it still exists */
-    if (PyExc_MemoryErrorInst)
-    {
-        /* Clear the previous traceback, otherwise it will be appended
-         * to the current one.
-         *
-         * The following statement is not likely to raise any error;
-         * if it does, we simply discard it.
-         */
-        PyException_SetTraceback(PyExc_MemoryErrorInst, Py_None);
-
-        PyErr_SetObject(PyExc_MemoryError, PyExc_MemoryErrorInst);
-    }
-    else
-        /* this will probably fail since there's no memory and hee,
-           hee, we have to instantiate this class
-        */
-        PyErr_SetNone(PyExc_MemoryError);
-
+    PyErr_SetNone(PyExc_MemoryError);
     return NULL;
 }
 
@@ -537,7 +515,7 @@ PyObject *PyErr_SetExcFromWindowsErrWithFilename(
     int ierr,
     const char *filename)
 {
-    PyObject *name = filename ? PyUnicode_FromString(filename) : NULL;
+    PyObject *name = filename ? PyUnicode_DecodeFSDefault(filename) : NULL;
     PyObject *ret = PyErr_SetExcFromWindowsErrWithFilenameObject(exc,
                                                                  ierr,
                                                                  name);
@@ -574,7 +552,7 @@ PyObject *PyErr_SetFromWindowsErrWithFilename(
     int ierr,
     const char *filename)
 {
-    PyObject *name = filename ? PyUnicode_FromString(filename) : NULL;
+    PyObject *name = filename ? PyUnicode_DecodeFSDefault(filename) : NULL;
     PyObject *result = PyErr_SetExcFromWindowsErrWithFilenameObject(
                                                   PyExc_WindowsError,
                                                   ierr, name);
@@ -767,8 +745,10 @@ PyErr_WriteUnraisable(PyObject *obj)
             }
             Py_XDECREF(moduleName);
         }
-        PyFile_WriteString(" in ", f);
-        PyFile_WriteObject(obj, f, 0);
+        if (obj) {
+            PyFile_WriteString(" in ", f);
+            PyFile_WriteObject(obj, f, 0);
+        }
         PyFile_WriteString(" ignored\n", f);
         PyErr_Clear(); /* Just in case */
     }
@@ -819,7 +799,7 @@ PyErr_SyntaxLocationEx(const char *filename, int lineno, int col_offset)
         }
     }
     if (filename != NULL) {
-        tmp = PyUnicode_FromString(filename);
+        tmp = PyUnicode_DecodeFSDefault(filename);
         if (tmp == NULL)
             PyErr_Clear();
         else {

@@ -1,5 +1,6 @@
 /* Definitions for bytecode */
 
+#ifndef Py_LIMITED_API
 #ifndef Py_CODE_H
 #define Py_CODE_H
 #ifdef __cplusplus
@@ -72,7 +73,7 @@ PyAPI_DATA(PyTypeObject) PyCode_Type;
 PyAPI_FUNC(PyCodeObject *) PyCode_New(
 	int, int, int, int, int, PyObject *, PyObject *,
 	PyObject *, PyObject *, PyObject *, PyObject *,
-	PyObject *, PyObject *, int, PyObject *); 
+	PyObject *, PyObject *, int, PyObject *);
         /* same as struct above */
 
 /* Creates a new empty code object with the specified source location. */
@@ -93,20 +94,16 @@ typedef struct _addr_pair {
 /* Update *bounds to describe the first and one-past-the-last instructions in the
    same line as lasti.  Return the number of that line.
 */
+#ifndef Py_LIMITED_API
 PyAPI_FUNC(int) _PyCode_CheckLineNumber(PyCodeObject* co,
                                         int lasti, PyAddrPair *bounds);
+#endif
 
 PyAPI_FUNC(PyObject*) PyCode_Optimize(PyObject *code, PyObject* consts,
                                       PyObject *names, PyObject *lineno_obj);
-
-/* List of weak references to all code objects. The list is used by
-   initfsencoding() to redecode code filenames at startup if the filesystem
-   encoding changes. At initfsencoding() exit, the list is set to NULL and it
-   is no more used. */
-
-extern PyObject *_Py_code_object_list;
 
 #ifdef __cplusplus
 }
 #endif
 #endif /* !Py_CODE_H */
+#endif /* Py_LIMITED_API */

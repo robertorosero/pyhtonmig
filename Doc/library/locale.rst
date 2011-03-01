@@ -39,7 +39,7 @@ The :mod:`locale` module defines the following exception and functions:
    If *locale* is omitted or ``None``, the current setting for *category* is
    returned.
 
-   :func:`setlocale` is not thread safe on most systems. Applications typically
+   :func:`setlocale` is not thread-safe on most systems. Applications typically
    start with a call of ::
 
       import locale
@@ -215,7 +215,7 @@ The :mod:`locale` module defines the following exception and functions:
 
       .. note::
 
-         The expression is in the syntax suitable for the :cfunc:`regex` function
+         The expression is in the syntax suitable for the :c:func:`regex` function
          from the C library, which might differ from the syntax used in :mod:`re`.
 
    .. data:: NOEXPR
@@ -529,8 +529,8 @@ catalogs, and the C library's search algorithms for locating message catalogs.
 
 Python applications should normally find no need to invoke these functions, and
 should use :mod:`gettext` instead.  A known exception to this rule are
-applications that link use additional C libraries which internally invoke
-:cfunc:`gettext` or :func:`dcgettext`.  For these applications, it may be
+applications that link with additional C libraries which internally invoke
+:c:func:`gettext` or :func:`dcgettext`.  For these applications, it may be
 necessary to bind the text domain, so that the libraries can properly locate
 their message catalogs.
 

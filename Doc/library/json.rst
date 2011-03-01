@@ -6,7 +6,7 @@
 .. moduleauthor:: Bob Ippolito <bob@redivi.com>
 .. sectionauthor:: Bob Ippolito <bob@redivi.com>
 
-JSON (JavaScript Object Notation) <http://json.org> is a subset of JavaScript
+`JSON (JavaScript Object Notation) <http://json.org>`_ is a subset of JavaScript
 syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 
 :mod:`json` exposes an API familiar to users of the standard library
@@ -118,9 +118,8 @@ Basic Usage
    file-like object).
 
    If *skipkeys* is ``True`` (default: ``False``), then dict keys that are not
-   of a basic type (:class:`bytes`, :class:`str`, :class:`int`,
-   :class:`float`, :class:`bool`, ``None``) will be skipped instead of raising a
-   :exc:`TypeError`.
+   of a basic type (:class:`str`, :class:`int`, :class:`float`, :class:`bool`,
+   ``None``) will be skipped instead of raising a :exc:`TypeError`.
 
    The :mod:`json` module always produces :class:`str` objects, not
    :class:`bytes` objects. Therefore, ``fp.write()`` must support :class:`str`
@@ -135,10 +134,12 @@ Basic Usage
    ``inf``, ``-inf``) in strict compliance of the JSON specification, instead of
    using the JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
 
-   If *indent* is a non-negative integer, then JSON array elements and object
-   members will be pretty-printed with that indent level.  An indent level of 0
-   will only insert newlines.  ``None`` (the default) selects the most compact
-   representation.
+   If *indent* is a non-negative integer or string, then JSON array elements and
+   object members will be pretty-printed with that indent level.  An indent level
+   of 0 or ``""`` will only insert newlines.  ``None`` (the default) selects the
+   most compact representation. Using an integer indent indents that many spaces
+   per level.  If *indent* is a string (such at '\t'), that string is used to indent
+   each level.
 
    If *separators* is an ``(item_separator, dict_separator)`` tuple, then it
    will be used instead of the default ``(', ', ': ')`` separators.  ``(',',
@@ -149,7 +150,7 @@ Basic Usage
 
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
-   *cls* kwarg.
+   *cls* kwarg; otherwise :class:`JSONEncoder` is used.
 
 
 .. function:: dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, **kw)
@@ -195,21 +196,17 @@ Basic Usage
    are encountered.
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
-   kwarg.  Additional keyword arguments will be passed to the constructor of the
-   class.
+   kwarg; otherwise :class:`JSONDecoder` is used.  Additional keyword arguments
+   will be passed to the constructor of the class.
 
 
 .. function:: loads(s, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
 
-   Deserialize *s* (a :class:`bytes` or :class:`str` instance containing a JSON
-   document) to a Python object.
+   Deserialize *s* (a :class:`str` instance containing a JSON document) to a
+   Python object.
 
-   If *s* is a :class:`bytes` instance and is encoded with an ASCII based encoding
-   other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
-   specified.  Encodings that are not ASCII based (such as UCS-2) are not
-   allowed and should be decoded to :class:`str` first.
-
-   The other arguments have the same meaning as in :func:`load`.
+   The other arguments have the same meaning as in :func:`load`, except
+   *encoding* which is ignored and deprecated.
 
 
 Encoders and decoders
@@ -274,6 +271,11 @@ Encoders and decoders
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``, ``'null'``, ``'true'``,
    ``'false'``.  This can be used to raise an exception if invalid JSON numbers
    are encountered.
+
+   If *strict* is ``False`` (``True`` is the default), then control characters
+   will be allowed inside strings.  Control characters in this context are
+   those with character codes in the 0-31 range, including ``'\t'`` (tab),
+   ``'\n'``, ``'\r'`` and ``'\0'``.
 
 
    .. method:: decode(s)

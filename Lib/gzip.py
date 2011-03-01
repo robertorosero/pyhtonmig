@@ -98,7 +98,7 @@ class _PaddedFile:
         return self.file.seek(offset, whence)
 
     def __getattr__(self, name):
-        return getattr(name, self.file)
+        return getattr(self.file, name)
 
 
 class GzipFile(io.BufferedIOBase):
@@ -210,6 +210,13 @@ class GzipFile(io.BufferedIOBase):
         s = repr(fileobj)
         return '<gzip ' + s[1:-1] + ' ' + hex(id(self)) + '>'
 
+    def _check_closed(self):
+        """Raises a ValueError if the underlying file object has been closed.
+
+        """
+        if self.closed:
+            raise ValueError('I/O operation on closed file.')
+
     def _init_write(self, filename):
         self.name = filename
         self.crc = zlib.crc32(b"") & 0xffffffff
@@ -288,6 +295,7 @@ class GzipFile(io.BufferedIOBase):
             self._add_read_data(uncompress)
 
     def write(self,data):
+        self._check_closed()
         if self.mode != WRITE:
             import errno
             raise IOError(errno.EBADF, "write() on read-only GzipFile object")
@@ -308,6 +316,7 @@ class GzipFile(io.BufferedIOBase):
         return len(data)
 
     def read(self, size=-1):
+        self._check_closed()
         if self.mode != READ:
             import errno
             raise IOError(errno.EBADF, "read() on write-only GzipFile object")
@@ -342,16 +351,18 @@ class GzipFile(io.BufferedIOBase):
     def peek(self, n):
         if self.mode != READ:
             import errno
-            raise IOError(errno.EBADF, "read() on write-only GzipFile object")
+            raise IOError(errno.EBADF, "peek() on write-only GzipFile object")
 
-        # Do not return ridiculously small buffers
+        # Do not return ridiculously small buffers, for one common idiom
+        # is to call peek(1) and expect more bytes in return.
         if n < 100:
             n = 100
         if self.extrasize == 0:
             if self.fileobj is None:
                 return b''
             try:
-                self._read(max(self.max_read_chunk, n))
+                # 1024 is the same buffering heuristic used in read()
+                self._read(max(n, 1024))
             except EOFError:
                 pass
         offset = self.offset - self.extrastart
@@ -455,6 +466,7 @@ class GzipFile(io.BufferedIOBase):
             self.myfileobj = None
 
     def flush(self,zlib_mode=zlib.Z_SYNC_FLUSH):
+        self._check_closed()
         if self.mode == WRITE:
             # Ensure the compressor's buffer is flushed
             self.fileobj.write(self.compress.flush(zlib_mode))

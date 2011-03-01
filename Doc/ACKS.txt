@@ -47,6 +47,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * L. Peter Deutsch
    * Robert Donohue
    * Fred L. Drake, Jr.
+   * Jacques Ducasse
    * Josip Dzolonga
    * Jeff Epler
    * Michael Ernst
@@ -111,6 +112,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Andrew M. Kuchling
    * Dave Kuhlman
    * Erno Kuusela
+   * Ross Lagerwall
    * Thomas Lamb
    * Detlef Lannert
    * Piers Lauder
@@ -128,6 +130,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Andrew MacIntyre
    * Vladimir Marangozov
    * Vincent Marchetti
+   * Westley Martínez
    * Laura Matson
    * Daniel May
    * Rebecca McCreary
@@ -138,6 +141,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Ross Moore
    * Sjoerd Mullender
    * Dale Nagata
+   * Michal Nowikowski 
    * Ng Pheng Siong
    * Koray Oner
    * Tomas Oppelstrup
@@ -178,6 +182,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Joakim Sernbrant
    * Justin Sheehy
    * Charlie Shepherd
+   * SilentGhost
    * Michael Simcich
    * Ionel Simionescu
    * Michael Sloan

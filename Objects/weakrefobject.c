@@ -139,7 +139,7 @@ weakref_call(PyWeakReference *self, PyObject *args, PyObject *kw)
 }
 
 
-static long
+static Py_hash_t
 weakref_hash(PyWeakReference *self)
 {
     if (self->hash != -1)
@@ -168,13 +168,20 @@ weakref_repr(PyWeakReference *self)
                 PyErr_Clear();
         else if (PyUnicode_Check(nameobj))
                 name = _PyUnicode_AsString(nameobj);
-        PyOS_snprintf(buffer, sizeof(buffer),
-                      name ? "<weakref at %p; to '%.50s' at %p (%s)>"
-                           : "<weakref at %p; to '%.50s' at %p>",
-                      self,
-                      Py_TYPE(PyWeakref_GET_OBJECT(self))->tp_name,
-                      PyWeakref_GET_OBJECT(self),
-                      name);
+        if (name)
+            PyOS_snprintf(buffer, sizeof(buffer),
+                          "<weakref at %p; to '%.50s' at %p (%s)>",
+                          self,
+                          Py_TYPE(PyWeakref_GET_OBJECT(self))->tp_name,
+                          PyWeakref_GET_OBJECT(self),
+                          name);
+        else
+            PyOS_snprintf(buffer, sizeof(buffer),
+                          "<weakref at %p; to '%.50s' at %p>",
+                          self,
+                          Py_TYPE(PyWeakref_GET_OBJECT(self))->tp_name,
+                          PyWeakref_GET_OBJECT(self));
+
         Py_XDECREF(nameobj);
     }
     return PyUnicode_FromString(buffer);
@@ -583,7 +590,7 @@ proxy_iternext(PyWeakReference *proxy)
 }
 
 
-WRAP_METHOD(proxy_bytes, "__bytes__");
+WRAP_METHOD(proxy_bytes, "__bytes__")
 
 
 static PyMethodDef proxy_methods[] = {

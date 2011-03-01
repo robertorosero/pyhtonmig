@@ -3,7 +3,6 @@
  */
 
 #include "Python.h"
-#include "modsupport.h"
 #include "structmember.h"
 
 #include <time.h>
@@ -241,16 +240,10 @@ days_before_year(int year)
     int y = year - 1;
     /* This is incorrect if year <= 0; we really want the floor
      * here.  But so long as MINYEAR is 1, the smallest year this
-     * can see is 0 (this can happen in some normalization endcases),
-     * so we'll just special-case that.
+     * can see is 1.
      */
-    assert (year >= 0);
-    if (y >= 0)
-        return y*365 + y/4 - y/100 + y/400;
-    else {
-        assert(y == -1);
-        return -366;
-    }
+    assert (year >= 1);
+    return y*365 + y/4 - y/100 + y/400;
 }
 
 /* Number of days in 4, 100, and 400 year cycles.  That these have
@@ -509,20 +502,10 @@ normalize_y_m_d(int *y, int *m, int *d)
 {
     int dim;            /* # of days in month */
 
-    /* This gets muddy:  the proper range for day can't be determined
-     * without knowing the correct month and year, but if day is, e.g.,
-     * plus or minus a million, the current month and year values make
-     * no sense (and may also be out of bounds themselves).
-     * Saying 12 months == 1 year should be non-controversial.
+    /* In actual use, m is always the month component extracted from a
+     * date/datetime object.  Therefore it is always in [1, 12] range.
      */
-    if (*m < 1 || *m > 12) {
-        --*m;
-        normalize_pair(y, m, 12);
-        ++*m;
-        /* |y| can't be bigger than about
-         * |original y| + |original m|/12 now.
-         */
-    }
+
     assert(1 <= *m && *m <= 12);
 
     /* Now only day can be out of bounds (year may also be out of bounds
@@ -783,14 +766,15 @@ typedef struct
     PyObject *name;
 } PyDateTime_TimeZone;
 
-PyObject *PyDateTime_TimeZone_UTC;
+/* The interned UTC timezone instance */ 
+static PyObject *PyDateTime_TimeZone_UTC;
 
 /* Create new timezone instance checking offset range.  This
    function does not check the name argument.  Caller must assure
    that offset is a timedelta instance and name is either NULL
    or a unicode object. */
 static PyObject *
-new_timezone(PyObject *offset, PyObject *name)
+create_timezone(PyObject *offset, PyObject *name)
 {
     PyDateTime_TimeZone *self;
     PyTypeObject *type = &PyDateTime_TimeZoneType;
@@ -799,6 +783,30 @@ new_timezone(PyObject *offset, PyObject *name)
     assert(PyDelta_Check(offset));
     assert(name == NULL || PyUnicode_Check(name));
 
+    self = (PyDateTime_TimeZone *)(type->tp_alloc(type, 0));
+    if (self == NULL) {
+        return NULL;
+    }
+    Py_INCREF(offset);
+    self->offset = offset;
+    Py_XINCREF(name);
+    self->name = name;
+    return (PyObject *)self;
+}
+
+static int delta_bool(PyDateTime_Delta *self);
+
+static PyObject *
+new_timezone(PyObject *offset, PyObject *name)
+{
+    assert(offset != NULL);
+    assert(PyDelta_Check(offset));
+    assert(name == NULL || PyUnicode_Check(name));
+
+    if (name == NULL && delta_bool((PyDateTime_Delta *)offset) == 0) {
+        Py_INCREF(PyDateTime_TimeZone_UTC);
+        return PyDateTime_TimeZone_UTC;
+    }
     if (GET_TD_MICROSECONDS(offset) != 0 || GET_TD_SECONDS(offset) % 60 != 0) {
         PyErr_Format(PyExc_ValueError, "offset must be a timedelta"
                      " representing a whole number of minutes");
@@ -812,15 +820,7 @@ new_timezone(PyObject *offset, PyObject *name)
         return NULL;
     }
 
-    self = (PyDateTime_TimeZone *)(type->tp_alloc(type, 0));
-    if (self == NULL) {
-        return NULL;
-    }
-    Py_INCREF(offset);
-    self->offset = offset;
-    Py_XINCREF(name);
-    self->name = name;
-    return (PyObject *)self;
+    return create_timezone(offset, name);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1166,10 +1166,10 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
     if (!pin)
         return NULL;
 
-    /* Give up if the year is before 1900.
+    /* Give up if the year is before 1000.
      * Python strftime() plays games with the year, and different
      * games depending on whether envar PYTHON2K is set.  This makes
-     * years before 1900 a nightmare, even if the platform strftime
+     * years before 1000 a nightmare, even if the platform strftime
      * supports them (and not all do).
      * We could get a lot farther here by avoiding Python's strftime
      * wrapper and calling the C strftime() directly, but that isn't
@@ -1182,10 +1182,10 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
         assert(PyLong_Check(pyyear));
         year = PyLong_AsLong(pyyear);
         Py_DECREF(pyyear);
-        if (year < 1900) {
+        if (year < 1000) {
             PyErr_Format(PyExc_ValueError, "year=%ld is before "
-                         "1900; the datetime strftime() "
-                         "methods require year >= 1900",
+                         "1000; the datetime strftime() "
+                         "methods require year >= 1000",
                          year);
             return NULL;
         }
@@ -1257,7 +1257,8 @@ wrap_strftime(PyObject *object, PyObject *format, PyObject *timetuple,
             assert(PyUnicode_Check(Zreplacement));
             ptoappend = _PyUnicode_AsStringAndSize(Zreplacement,
                                                   &ntoappend);
-            ntoappend = Py_SIZE(Zreplacement);
+            if (ptoappend == NULL)
+                goto Done;
         }
         else if (ch == 'f') {
             /* format microseconds */
@@ -1460,7 +1461,7 @@ delta_to_microseconds(PyDateTime_Delta *self)
         goto Done;
     Py_DECREF(x1);
     Py_DECREF(x2);
-    x1 = x2 = NULL;
+    /* x1 = */ x2 = NULL;
 
     /* x3 has days+seconds in seconds */
     x1 = PyNumber_Multiply(x3, us_per_second);          /* us */
@@ -1842,7 +1843,7 @@ delta_richcompare(PyObject *self, PyObject *other, int op)
 
 static PyObject *delta_getstate(PyDateTime_Delta *self);
 
-static long
+static Py_hash_t
 delta_hash(PyDateTime_Delta *self)
 {
     if (self->hashcode == -1) {
@@ -2776,11 +2777,11 @@ date_replace(PyDateTime_Date *self, PyObject *args, PyObject *kw)
 /*
     Borrowed from stringobject.c, originally it was string_hash()
 */
-static long
+static Py_hash_t
 generic_hash(unsigned char *data, int len)
 {
     register unsigned char *p;
-    register long x;
+    register Py_hash_t x;
 
     p = (unsigned char *) data;
     x = *p << 7;
@@ -2796,7 +2797,7 @@ generic_hash(unsigned char *data, int len)
 
 static PyObject *date_getstate(PyDateTime_Date *self);
 
-static long
+static Py_hash_t
 date_hash(PyDateTime_Date *self)
 {
     if (self->hashcode == -1)
@@ -3245,7 +3246,7 @@ timezone_richcompare(PyDateTime_TimeZone *self,
     return delta_richcompare(self->offset, other->offset, op);
 }
 
-static long
+static Py_hash_t
 timezone_hash(PyDateTime_TimeZone *self)
 {
     return delta_hash((PyDateTime_Delta *)self->offset);
@@ -3662,7 +3663,7 @@ time_strftime(PyDateTime_Time *self, PyObject *args, PyObject *kw)
 
     /* Python's strftime does insane things with the year part of the
      * timetuple.  The year is forced to (the otherwise nonsensical)
-     * 1900 to worm around that.
+     * 1900 to work around that.
      */
     tuple = Py_BuildValue("iiiiiiiii",
                           1900, 1, 1, /* year, month, day */
@@ -3750,7 +3751,7 @@ time_richcompare(PyObject *self, PyObject *other, int op)
     return result;
 }
 
-static long
+static Py_hash_t
 time_hash(PyDateTime_Time *self)
 {
     if (self->hashcode == -1) {
@@ -4639,7 +4640,7 @@ datetime_richcompare(PyObject *self, PyObject *other, int op)
     return result;
 }
 
-static long
+static Py_hash_t
 datetime_hash(PyDateTime_DateTime *self)
 {
     if (self->hashcode == -1) {
@@ -5172,7 +5173,7 @@ PyInit__datetime(void)
     delta = new_delta(0, 0, 0, 0);
     if (delta == NULL)
         return NULL;
-    x = new_timezone(delta, NULL);
+    x = create_timezone(delta, NULL);
     Py_DECREF(delta);
     if (x == NULL || PyDict_SetItemString(d, "utc", x) < 0)
         return NULL;
@@ -5181,7 +5182,7 @@ PyInit__datetime(void)
     delta = new_delta(-1, 60, 0, 1); /* -23:59 */
     if (delta == NULL)
         return NULL;
-    x = new_timezone(delta, NULL);
+    x = create_timezone(delta, NULL);
     Py_DECREF(delta);
     if (x == NULL || PyDict_SetItemString(d, "min", x) < 0)
         return NULL;
@@ -5190,7 +5191,7 @@ PyInit__datetime(void)
     delta = new_delta(0, (23 * 60 + 59) * 60, 0, 0); /* +23:59 */
     if (delta == NULL)
         return NULL;
-    x = new_timezone(delta, NULL);
+    x = create_timezone(delta, NULL);
     Py_DECREF(delta);
     if (x == NULL || PyDict_SetItemString(d, "max", x) < 0)
         return NULL;

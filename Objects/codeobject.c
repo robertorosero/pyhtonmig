@@ -5,8 +5,6 @@
 #define NAME_CHARS \
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
-PyObject *_Py_code_object_list = NULL;
-
 /* all_name_chars(s): true iff all chars in s are valid NAME_CHARS */
 
 static int
@@ -111,23 +109,8 @@ PyCode_New(int argcount, int kwonlyargcount,
         co->co_lnotab = lnotab;
         co->co_zombieframe = NULL;
         co->co_weakreflist = NULL;
-
-        if (_Py_code_object_list != NULL) {
-            int err;
-            PyObject *ref = PyWeakref_NewRef((PyObject*)co, NULL);
-            if (ref == NULL)
-                goto error;
-            err = PyList_Append(_Py_code_object_list, ref);
-            Py_DECREF(ref);
-            if (err)
-                goto error;
-        }
     }
     return co;
-
-error:
-    Py_DECREF(co);
-    return NULL;
 }
 
 PyCodeObject *
@@ -364,11 +347,11 @@ code_repr(PyCodeObject *co)
         lineno = -1;
     if (co->co_filename && PyUnicode_Check(co->co_filename)) {
         return PyUnicode_FromFormat(
-            "<code object %.100U at %p, file \"%.300U\", line %d>",
+            "<code object %U at %p, file \"%U\", line %d>",
             co->co_name, co, co->co_filename, lineno);
     } else {
         return PyUnicode_FromFormat(
-            "<code object %.100U at %p, file ???, line %d>",
+            "<code object %U at %p, file ???, line %d>",
             co->co_name, co, lineno);
     }
 }
@@ -434,10 +417,10 @@ code_richcompare(PyObject *self, PyObject *other, int op)
     return res;
 }
 
-static long
+static Py_hash_t
 code_hash(PyCodeObject *co)
 {
-    long h, h0, h1, h2, h3, h4, h5, h6;
+    Py_hash_t h, h0, h1, h2, h3, h4, h5, h6;
     h0 = PyObject_Hash(co->co_name);
     if (h0 == -1) return -1;
     h1 = PyObject_Hash(co->co_code);
@@ -509,7 +492,7 @@ PyTypeObject PyCode_Type = {
 int
 PyCode_Addr2Line(PyCodeObject *co, int addrq)
 {
-    int size = PyBytes_Size(co->co_lnotab) / 2;
+    Py_ssize_t size = PyBytes_Size(co->co_lnotab) / 2;
     unsigned char *p = (unsigned char*)PyBytes_AsString(co->co_lnotab);
     int line = co->co_firstlineno;
     int addr = 0;
@@ -527,7 +510,8 @@ PyCode_Addr2Line(PyCodeObject *co, int addrq)
 int
 _PyCode_CheckLineNumber(PyCodeObject* co, int lasti, PyAddrPair *bounds)
 {
-    int size, addr, line;
+    Py_ssize_t size;
+    int addr, line;
     unsigned char* p;
 
     p = (unsigned char*)PyBytes_AS_STRING(co->co_lnotab);

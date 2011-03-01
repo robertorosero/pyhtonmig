@@ -87,16 +87,14 @@ The following constructs bind names: formal parameters to functions,
 :keyword:`import` statements, class and function definitions (these bind the
 class or function name in the defining block), and targets that are identifiers
 if occurring in an assignment, :keyword:`for` loop header, or after
-:keyword:`as` in a :keyword:`with` statement or :keyword.`except` clause.
+:keyword:`as` in a :keyword:`with` statement or :keyword:`except` clause.
 The :keyword:`import` statement
 of the form ``from ... import *`` binds all names defined in the imported
 module, except those beginning with an underscore.  This form may only be used
 at the module level.
 
 A target occurring in a :keyword:`del` statement is also considered bound for
-this purpose (though the actual semantics are to unbind the name).  It is
-illegal to unbind a name that is referenced by an enclosing scope; the compiler
-will report a :exc:`SyntaxError`.
+this purpose (though the actual semantics are to unbind the name).
 
 Each assignment or import statement occurs within a block defined by a class or
 function definition or at the module level (the top-level code block).
@@ -141,9 +139,9 @@ weak form of restricted execution.
 The namespace for a module is automatically created the first time a module is
 imported.  The main module for a script is always called :mod:`__main__`.
 
-The global statement has the same scope as a name binding operation in the same
-block.  If the nearest enclosing scope for a free variable contains a global
-statement, the free variable is treated as a global.
+The :keyword:`global` statement has the same scope as a name binding operation
+in the same block.  If the nearest enclosing scope for a free variable contains
+a global statement, the free variable is treated as a global.
 
 A class definition is an executable statement that may use and define names.
 These references follow the normal rules for name resolution.  The namespace of

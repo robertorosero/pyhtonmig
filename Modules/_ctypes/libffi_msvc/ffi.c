@@ -110,7 +110,7 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
       argp += z;
     }
 
-  if (argp - stack > ecif->cif->bytes) 
+  if (argp >= stack && (unsigned)(argp - stack) > ecif->cif->bytes) 
     {
       Py_FatalError("FFI BUG: not enough stack space for arguments");
     }
@@ -380,7 +380,7 @@ ffi_prep_closure_loc (ffi_closure* closure,
   short bytes;
   char *tramp;
 #ifdef _WIN64
-  int mask;
+  int mask = 0;
 #endif
   FFI_ASSERT (cif->abi == FFI_SYSV);
   

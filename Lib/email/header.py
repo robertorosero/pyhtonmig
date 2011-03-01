@@ -17,7 +17,8 @@ import email.quoprimime
 import email.base64mime
 
 from email.errors import HeaderParseError
-from email.charset import Charset
+from email import charset as _charset
+Charset = _charset.Charset
 
 NL = '\n'
 SPACE = ' '
@@ -45,6 +46,10 @@ ecre = re.compile(r'''
 # according to RFC 2822.  Character range is from tilde to exclamation mark.
 # For use with .match()
 fcre = re.compile(r'[\041-\176]+:$')
+
+# Find a header embeded in a putative header value.  Used to check for
+# header injection attack.
+_embeded_header = re.compile(r'\n[^ \t]+:')
 
 
 
@@ -169,7 +174,7 @@ class Header:
         charset is used both as s's initial charset and as the default for
         subsequent .append() calls.
 
-        The maximum line length can be specified explicit via maxlinelen.  For
+        The maximum line length can be specified explicitly via maxlinelen. For
         splitting the first line to a shorter value (to account for the field
         header which isn't included in s, e.g. `Subject') pass in the name of
         the field in header_name.  The default maxlinelen is 78 as recommended
@@ -210,6 +215,9 @@ class Header:
             # from a charset to None/us-ascii, or from None/us-ascii to a
             # charset.  Only do this for the second and subsequent chunks.
             nextcs = charset
+            if nextcs == _charset.UNKNOWN8BIT:
+                original_bytes = string.encode('ascii', 'surrogateescape')
+                string = original_bytes.decode('ascii', 'replace')
             if uchunks:
                 if lastcs not in (None, 'us-ascii'):
                     if nextcs in (None, 'us-ascii'):
@@ -241,38 +249,33 @@ class Header:
         constructor is used.
 
         s may be a byte string or a Unicode string.  If it is a byte string
-        (i.e. isinstance(s, str) is true), then charset is the encoding of
+        (i.e. isinstance(s, str) is false), then charset is the encoding of
         that byte string, and a UnicodeError will be raised if the string
         cannot be decoded with that charset.  If s is a Unicode string, then
         charset is a hint specifying the character set of the characters in
-        the string.  In this case, when producing an RFC 2822 compliant header
-        using RFC 2047 rules, the Unicode string will be encoded using the
-        following charsets in order: us-ascii, the charset hint, utf-8.  The
-        first character set not to provoke a UnicodeError is used.
+        the string.  In either case, when producing an RFC 2822 compliant
+        header using RFC 2047 rules, the string will be encoded using the
+        output codec of the charset.  If the string cannot be encoded to the
+        output codec, a UnicodeError will be raised.
 
-        Optional `errors' is passed as the third argument to any unicode() or
-        ustr.encode() call.
+        Optional `errors' is passed as the errors argument to the decode
+        call if s is a byte string.
         """
         if charset is None:
             charset = self._charset
         elif not isinstance(charset, Charset):
             charset = Charset(charset)
-        if isinstance(s, str):
-            # Convert the string from the input character set to the output
-            # character set and store the resulting bytes and the charset for
-            # composition later.
+        if not isinstance(s, str):
             input_charset = charset.input_codec or 'us-ascii'
-            input_bytes = s.encode(input_charset, errors)
-        else:
-            # We already have the bytes we will store internally.
-            input_bytes = s
+            s = s.decode(input_charset, errors)
         # Ensure that the bytes we're storing can be decoded to the output
         # character set, otherwise an early error is thrown.
         output_charset = charset.output_codec or 'us-ascii'
-        output_string = input_bytes.decode(output_charset, errors)
-        self._chunks.append((output_string, charset))
+        if output_charset != _charset.UNKNOWN8BIT:
+            s.encode(output_charset, errors)
+        self._chunks.append((s, charset))
 
-    def encode(self, splitchars=';, \t', maxlinelen=None):
+    def encode(self, splitchars=';, \t', maxlinelen=None, linesep='\n'):
         """Encode a message header into an RFC-compliant format.
 
         There are many issues involved in converting a given string for use in
@@ -293,6 +296,11 @@ class Header:
         Optional splitchars is a string containing characters to split long
         ASCII lines on, in rough support of RFC 2822's `highest level
         syntactic breaks'.  This doesn't affect RFC 2047 encoded lines.
+
+        Optional linesep is a string to be used to separate the lines of
+        the value.  The default value is the most useful for typical
+        Python applications, but it can be set to \r\n to produce RFC-compliant
+        line separators when needed.
         """
         self._normalize()
         if maxlinelen is None:
@@ -306,12 +314,21 @@ class Header:
                                     self._continuation_ws, splitchars)
         for string, charset in self._chunks:
             lines = string.splitlines()
-            for line in lines:
+            formatter.feed(lines[0], charset)
+            for line in lines[1:]:
+                formatter.newline()
+                if charset.header_encoding is not None:
+                    formatter.feed(self._continuation_ws, USASCII)
+                    line = ' ' + line.lstrip()
                 formatter.feed(line, charset)
-                if len(lines) > 1:
-                    formatter.newline()
+            if len(lines) > 1:
+                formatter.newline()
             formatter.add_transition()
-        return str(formatter)
+        value = formatter._str(linesep)
+        if _embeded_header.search(value):
+            raise HeaderParseError("header value appears to contain "
+                "an embedded header: {!r}".format(value))
+        return value
 
     def _normalize(self):
         # Step 1: Normalize the chunks so that all runs of identical charsets
@@ -342,9 +359,12 @@ class _ValueFormatter:
         self._lines = []
         self._current_line = _Accumulator(headerlen)
 
-    def __str__(self):
+    def _str(self, linesep):
         self.newline()
-        return NL.join(self._lines)
+        return linesep.join(self._lines)
+
+    def __str__(self):
+        return self._str(NL)
 
     def newline(self):
         end_of_line = self._current_line.pop()

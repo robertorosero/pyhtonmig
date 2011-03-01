@@ -65,10 +65,6 @@ The module defines the following type:
    passed to the :meth:`extend` method.
 
 
-.. data:: ArrayType
-
-   Obsolete alias for :class:`array`.
-
 .. data:: typecodes
 
    A string with all available type codes.
@@ -103,7 +99,7 @@ The following data items and methods are also supported:
    memory buffer in bytes can be computed as ``array.buffer_info()[1] *
    array.itemsize``.  This is occasionally useful when working with low-level (and
    inherently unsafe) I/O interfaces that require memory addresses, such as certain
-   :cfunc:`ioctl` operations.  The returned numbers are valid as long as the array
+   :c:func:`ioctl` operations.  The returned numbers are valid as long as the array
    exists and no length-changing operations are applied to it.
 
    .. note::

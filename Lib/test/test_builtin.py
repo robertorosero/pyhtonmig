@@ -6,10 +6,11 @@ import sys
 import warnings
 import collections
 import io
+import ast
 import types
 import builtins
 import random
-from test.support import fcmp, TESTFN, unlink,  run_unittest, check_warnings
+from test.support import TESTFN, unlink,  run_unittest, check_warnings
 from operator import neg
 
 
@@ -207,22 +208,39 @@ class BuiltinTest(unittest.TestCase):
         self.assertTrue(isinstance(x, int))
         self.assertEqual(-x, sys.maxsize+1)
 
-    # XXX(nnorwitz): This test case for callable should probably be removed.
     def test_callable(self):
-        self.assertTrue(hasattr(len, '__call__'))
+        self.assertTrue(callable(len))
+        self.assertFalse(callable("a"))
+        self.assertTrue(callable(callable))
+        self.assertTrue(callable(lambda x, y: x + y))
+        self.assertFalse(callable(__builtins__))
         def f(): pass
-        self.assertTrue(hasattr(f, '__call__'))
-        class C:
+        self.assertTrue(callable(f))
+
+        class C1:
             def meth(self): pass
-        self.assertTrue(hasattr(C, '__call__'))
-        x = C()
-        self.assertTrue(hasattr(x.meth, '__call__'))
-        self.assertTrue(not hasattr(x, '__call__'))
-        class D(C):
+        self.assertTrue(callable(C1))
+        c = C1()
+        self.assertTrue(callable(c.meth))
+        self.assertFalse(callable(c))
+
+        # __call__ is looked up on the class, not the instance
+        c.__call__ = None
+        self.assertFalse(callable(c))
+        c.__call__ = lambda self: 0
+        self.assertFalse(callable(c))
+        del c.__call__
+        self.assertFalse(callable(c))
+
+        class C2(object):
             def __call__(self): pass
-        y = D()
-        self.assertTrue(hasattr(y, '__call__'))
-        y()
+        c2 = C2()
+        self.assertTrue(callable(c2))
+        c2.__call__ = None
+        self.assertTrue(callable(c2))
+        class C3(C2): pass
+        c3 = C3()
+        self.assertTrue(callable(c3))
 
     def test_chr(self):
         self.assertEqual(chr(32), ' ')
@@ -267,6 +285,34 @@ class BuiltinTest(unittest.TestCase):
         compile('print("\xe5")\n', '', 'exec')
         self.assertRaises(TypeError, compile, chr(0), 'f', 'exec')
         self.assertRaises(ValueError, compile, str('a = 1'), 'f', 'bad')
+
+        # test the optimize argument
+
+        codestr = '''def f():
+        """doc"""
+        try:
+            assert False
+        except AssertionError:
+            return (True, f.__doc__)
+        else:
+            return (False, f.__doc__)
+        '''
+        def f(): """doc"""
+        values = [(-1, __debug__, f.__doc__),
+                  (0, True, 'doc'),
+                  (1, False, 'doc'),
+                  (2, False, None)]
+        for optval, debugval, docstring in values:
+            # test both direct compilation and compilation via AST
+            codeobjs = []
+            codeobjs.append(compile(codestr, "<test>", "exec", optimize=optval))
+            tree = ast.parse(codestr)
+            codeobjs.append(compile(tree, "<test>", "exec", optimize=optval))
+            for code in codeobjs:
+                ns = {}
+                exec(code, ns)
+                rv = ns['f']()
+                self.assertEqual(rv, (debugval, docstring))
 
     def test_delattr(self):
         sys.spam = 1
@@ -348,10 +394,13 @@ class BuiltinTest(unittest.TestCase):
 
         self.assertEqual(divmod(-sys.maxsize-1, -1), (sys.maxsize+1, 0))
 
-        self.assertTrue(not fcmp(divmod(3.25, 1.0), (3.0, 0.25)))
-        self.assertTrue(not fcmp(divmod(-3.25, 1.0), (-4.0, 0.75)))
-        self.assertTrue(not fcmp(divmod(3.25, -1.0), (-4.0, -0.75)))
-        self.assertTrue(not fcmp(divmod(-3.25, -1.0), (3.0, -0.25)))
+        for num, denom, exp_result in [ (3.25, 1.0, (3.0, 0.25)),
+                                        (-3.25, 1.0, (-4.0, 0.75)),
+                                        (3.25, -1.0, (-4.0, -0.75)),
+                                        (-3.25, -1.0, (3.0, -0.25))]:
+            result = divmod(num, denom)
+            self.assertAlmostEqual(result[0], exp_result[0])
+            self.assertAlmostEqual(result[1], exp_result[1])
 
         self.assertRaises(TypeError, divmod)
 
@@ -542,11 +591,11 @@ class BuiltinTest(unittest.TestCase):
         class X:
             def __hash__(self):
                 return 2**100
-        self.assertEquals(type(hash(X())), int)
+        self.assertEqual(type(hash(X())), int)
         class Z(int):
             def __hash__(self):
                 return self
-        self.assertEquals(hash(Z(42)), hash(42))
+        self.assertEqual(hash(Z(42)), hash(42))
 
     def test_hex(self):
         self.assertEqual(hex(16), '0x10')
@@ -777,7 +826,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
         class Iter(object):
             def __iter__(self):
@@ -786,7 +835,7 @@ class BuiltinTest(unittest.TestCase):
                 raise StopIteration
 
         it = iter(Iter())
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
         self.assertRaises(StopIteration, next, it)
 
         def gen():
@@ -794,9 +843,9 @@ class BuiltinTest(unittest.TestCase):
             return
 
         it = gen()
-        self.assertEquals(next(it), 1)
+        self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
     def test_oct(self):
         self.assertEqual(oct(100), '0o144')
@@ -905,182 +954,6 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, pow, 1, 2, 0)
 
         self.assertRaises(TypeError, pow)
-
-    def test_range(self):
-        self.assertEqual(list(range(3)), [0, 1, 2])
-        self.assertEqual(list(range(1, 5)), [1, 2, 3, 4])
-        self.assertEqual(list(range(0)), [])
-        self.assertEqual(list(range(-3)), [])
-        self.assertEqual(list(range(1, 10, 3)), [1, 4, 7])
-        #self.assertEqual(list(range(5, -5, -3)), [5, 2, -1, -4])
-
-        #issue 6334: the internal stored range length was being
-        #computed incorrectly in some cases involving large arguments.
-        x = range(10**20, 10**20+10, 3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
-
-        x = range(10**20+10, 10**20, 3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
-
-        x = range(10**20, 10**20+10, -3)
-        self.assertEqual(len(x), 0)
-        self.assertEqual(len(list(x)), 0)
-
-        x = range(10**20+10, 10**20, -3)
-        self.assertEqual(len(x), 4)
-        self.assertEqual(len(list(x)), 4)
-
-        # Now test range() with longs
-        self.assertEqual(list(range(-2**100)), [])
-        self.assertEqual(list(range(0, -2**100)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
-        self.assertEqual(list(range(0, 2**100, -1)), [])
-
-        a = int(10 * sys.maxsize)
-        b = int(100 * sys.maxsize)
-        c = int(50 * sys.maxsize)
-
-        self.assertEqual(list(range(a, a+2)), [a, a+1])
-        self.assertEqual(list(range(a+2, a, -1)), [a+2, a+1])
-        self.assertEqual(list(range(a+4, a, -2)), [a+4, a+2])
-
-        seq = list(range(a, b, c))
-        self.assertIn(a, seq)
-        self.assertNotIn(b, seq)
-        self.assertEqual(len(seq), 2)
-
-        seq = list(range(b, a, -c))
-        self.assertIn(b, seq)
-        self.assertNotIn(a, seq)
-        self.assertEqual(len(seq), 2)
-
-        seq = list(range(-a, -b, -c))
-        self.assertIn(-a, seq)
-        self.assertNotIn(-b, seq)
-        self.assertEqual(len(seq), 2)
-
-        self.assertRaises(TypeError, range)
-        self.assertRaises(TypeError, range, 1, 2, 3, 4)
-        self.assertRaises(ValueError, range, 1, 2, 0)
-        self.assertRaises(ValueError, range, a, a + 1, int(0))
-
-        """ XXX(nnorwitz):
-        class badzero(int):
-            def __eq__(self, other):
-                raise RuntimeError
-            __ne__ = __lt__ = __gt__ = __le__ = __ge__ = __eq__
-
-        # XXX This won't (but should!) raise RuntimeError if a is an int...
-        self.assertRaises(RuntimeError, range, a, a + 1, badzero(1))
-        """
-
-        # Reject floats.
-        self.assertRaises(TypeError, range, 1., 1., 1.)
-        self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
-
-        self.assertRaises(TypeError, range, 0, "spam")
-        self.assertRaises(TypeError, range, 0, 42, "spam")
-
-        #NEAL self.assertRaises(OverflowError, range, -sys.maxsize, sys.maxsize)
-        #NEAL self.assertRaises(OverflowError, range, 0, 2*sys.maxsize)
-
-        self.assertRaises(OverflowError, len, range(0, sys.maxsize**10))
-
-        bignum = 2*sys.maxsize
-        smallnum = 42
-
-        # User-defined class with an __index__ method
-        class I:
-            def __init__(self, n):
-                self.n = int(n)
-            def __index__(self):
-                return self.n
-        self.assertEqual(list(range(I(bignum), I(bignum + 1))), [bignum])
-        self.assertEqual(list(range(I(smallnum), I(smallnum + 1))), [smallnum])
-
-        # User-defined class with a failing __index__ method
-        class IX:
-            def __index__(self):
-                raise RuntimeError
-        self.assertRaises(RuntimeError, range, IX())
-
-        # User-defined class with an invalid __index__ method
-        class IN:
-            def __index__(self):
-                return "not a number"
-
-        self.assertRaises(TypeError, range, IN())
-        # Exercise various combinations of bad arguments, to check
-        # refcounting logic
-        self.assertRaises(TypeError, range, 0.0)
-
-        self.assertRaises(TypeError, range, 0, 0.0)
-        self.assertRaises(TypeError, range, 0.0, 0)
-        self.assertRaises(TypeError, range, 0.0, 0.0)
-
-        self.assertRaises(TypeError, range, 0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0, 0.0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0, 1.0)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1)
-        self.assertRaises(TypeError, range, 0.0, 0.0, 1.0)
-
-        self.assertEqual(range(3).count(-1), 0)
-        self.assertEqual(range(3).count(0), 1)
-        self.assertEqual(range(3).count(1), 1)
-        self.assertEqual(range(3).count(2), 1)
-        self.assertEqual(range(3).count(3), 0)
-
-        self.assertEqual(range(10**20).count(1), 1)
-        self.assertEqual(range(10**20).count(10**20), 0)
-        self.assertEqual(range(3).index(1), 1)
-        self.assertEqual(range(1, 2**100, 2).count(2**87), 0)
-        self.assertEqual(range(1, 2**100, 2).count(2**87+1), 1)
-
-        self.assertEqual(range(1, 10, 3).index(4), 1)
-        self.assertEqual(range(1, -10, -3).index(-5), 2)
-
-        self.assertEqual(range(10**20).index(1), 1)
-        self.assertEqual(range(10**20).index(10**20 - 1), 10**20 - 1)
-
-        self.assertRaises(ValueError, range(1, 2**100, 2).index, 2**87)
-        self.assertEqual(range(1, 2**100, 2).index(2**87+1), 2**86)
-
-        class AlwaysEqual(object):
-            def __eq__(self, other):
-                return True
-        always_equal = AlwaysEqual()
-        self.assertEqual(range(10).count(always_equal), 10)
-        self.assertEqual(range(10).index(always_equal), 0)
-
-    def test_range_index(self):
-        u = range(2)
-        self.assertEqual(u.index(0), 0)
-        self.assertEqual(u.index(1), 1)
-        self.assertRaises(ValueError, u.index, 2)
-
-        u = range(-2, 3)
-        self.assertEqual(u.count(0), 1)
-        self.assertEqual(u.index(0), 2)
-        self.assertRaises(TypeError, u.index)
-
-        class BadExc(Exception):
-            pass
-
-        class BadCmp:
-            def __eq__(self, other):
-                if other == 2:
-                    raise BadExc()
-                return False
-
-        a = range(4)
-        self.assertRaises(BadExc, a.index, BadCmp())
-
-        a = range(-2, 3)
-        self.assertEqual(a.index(0), 2)
 
     def test_input(self):
         self.write_testfile()

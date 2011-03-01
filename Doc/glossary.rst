@@ -27,7 +27,7 @@ Glossary
       :ref:`2to3-reference`.
 
    abstract base class
-      Abstract Base Classes (abbreviated ABCs) complement :term:`duck-typing` by
+      :ref:`abstract-base-classes` complement :term:`duck-typing` by
       providing a way to define interfaces when other techniques like
       :func:`hasattr` would be clumsy. Python comes with many built-in ABCs for
       data structures (in the :mod:`collections` module), numbers (in the
@@ -102,9 +102,10 @@ Glossary
       See :pep:`343`.
 
    CPython
-      The canonical implementation of the Python programming language.  The
-      term "CPython" is used in contexts when necessary to distinguish this
-      implementation from others such as Jython or IronPython.
+      The canonical implementation of the Python programming language, as
+      distributed on `python.org <http://python.org>`_.  The term "CPython"
+      is used when necessary to distinguish this implementation from others
+      such as Jython or IronPython.
 
    decorator
       A function returning another function, usually applied as a function
@@ -181,22 +182,22 @@ Glossary
       not expressions.
 
    extension module
-      A module written in C or C++, using Python's C API to interact with the core and
-      with user code.
+      A module written in C or C++, using Python's C API to interact with the
+      core and with user code.
 
    file object
       An object exposing a file-oriented API (with methods such as
-      :meth:`read()` or :meth:`write()`) to an underlying resource.
-      Depending on the way it was created, a file object can mediate access
-      to a real on-disk file or to another other type of storage or
-      communication device (for example standard input/output, in-memory
-      buffers, sockets, pipes, etc.).  File objects are also called
-      :dfn:`file-like objects` or :dfn:`streams`.
+      :meth:`read()` or :meth:`write()`) to an underlying resource.  Depending
+      on the way it was created, a file object can mediate access to a real
+      on-disk file or to another other type of storage or communication device
+      (for example standard input/output, in-memory buffers, sockets, pipes,
+      etc.).  File objects are also called :dfn:`file-like objects` or
+      :dfn:`streams`.
 
-      There are actually three categories of file objects: raw binary
-      files, buffered binary files and text files.  Their interfaces are
-      defined in the :mod:`io` module.  The canonical way to create a
-      file object is by using the :func:`open` function.
+      There are actually three categories of file objects: raw binary files,
+      buffered binary files and text files.  Their interfaces are defined in the
+      :mod:`io` module.  The canonical way to create a file object is by using
+      the :func:`open` function.
 
    file-like object
       A synonym for :term:`file object`.
@@ -263,16 +264,25 @@ Glossary
       See :term:`global interpreter lock`.
 
    global interpreter lock
-      The lock used by Python threads to assure that only one thread
-      executes in the :term:`CPython` :term:`virtual machine` at a time.
-      This simplifies the CPython implementation by assuring that no two
-      processes can access the same memory at the same time.  Locking the
-      entire interpreter makes it easier for the interpreter to be
-      multi-threaded, at the expense of much of the parallelism afforded by
-      multi-processor machines.  Efforts have been made in the past to
-      create a "free-threaded" interpreter (one which locks shared data at a
-      much finer granularity), but so far none have been successful because
-      performance suffered in the common single-processor case.
+      The mechanism used by the :term:`CPython` interpreter to assure that
+      only one thread executes Python :term:`bytecode` at a time.
+      This simplifies the CPython implementation by making the object model
+      (including critical built-in types such as :class:`dict`) implicitly
+      safe against concurrent access.  Locking the entire interpreter
+      makes it easier for the interpreter to be multi-threaded, at the
+      expense of much of the parallelism afforded by multi-processor
+      machines.
+
+      However, some extension modules, either standard or third-party,
+      are designed so as to release the GIL when doing computationally-intensive
+      tasks such as compression or hashing.  Also, the GIL is always released
+      when doing I/O.
+
+      Past efforts to create a "free-threaded" interpreter (one which locks
+      shared data at a much finer granularity) have not been successful
+      because performance suffered in the common single-processor case. It
+      is believed that overcoming this performance issue would make the
+      implementation much more complicated and therefore costlier to maintain.
 
    hashable
       An object is *hashable* if it has a hash value which never changes during
@@ -322,7 +332,7 @@ Glossary
       slowly.  See also :term:`interactive`.
 
    iterable
-      A container object capable of returning its members one at a
+      An object capable of returning its members one at a
       time. Examples of iterables include all sequence types (such as
       :class:`list`, :class:`str`, and :class:`tuple`) and some non-sequence
       types like :class:`dict` and :class:`file` and objects of any classes you
@@ -339,12 +349,12 @@ Glossary
 
    iterator
       An object representing a stream of data.  Repeated calls to the iterator's
-      :meth:`__next__` (or passing it to the built-in function :func:`next`)
-      method return successive items in the stream.  When no more data are
-      available a :exc:`StopIteration` exception is raised instead.  At this
+      :meth:`__next__` method (or passing it to the built-in function
+      :func:`next`) return successive items in the stream.  When no more data
+      are available a :exc:`StopIteration` exception is raised instead.  At this
       point, the iterator object is exhausted and any further calls to its
-      :meth:`next` method just raise :exc:`StopIteration` again.  Iterators are
-      required to have an :meth:`__iter__` method that returns the iterator
+      :meth:`__next__` method just raise :exc:`StopIteration` again.  Iterators
+      are required to have an :meth:`__iter__` method that returns the iterator
       object itself so every iterator is also iterable and may be used in most
       places where other iterables are accepted.  One notable exception is code
       which attempts multiple iteration passes.  A container object (such as a
@@ -354,6 +364,26 @@ Glossary
       in the previous iteration pass, making it appear like an empty container.
 
       More information can be found in :ref:`typeiter`.
+
+   key function
+      A key function or collation function is a callable that returns a value
+      used for sorting or ordering.  For example, :func:`locale.strxfrm` is
+      used to produce a sort key that is aware of locale specific sort
+      conventions.
+
+      A number of tools in Python accept key functions to control how elements
+      are ordered or grouped.  They include :func:`min`, :func:`max`,
+      :func:`sorted`, :meth:`list.sort`, :func:`heapq.nsmallest`,
+      :func:`heapq.nlargest`, and :func:`itertools.groupby`.
+
+      There are several ways to create a key function.  For example. the
+      :meth:`str.lower` method can serve as a key function for case insensitive
+      sorts.  Alternatively, an ad-hoc key function can be built from a
+      :keyword:`lambda` expression such as ``lambda r: (r[0], r[2])``.  Also,
+      the :mod:`operator` module provides three key function constuctors:
+      :func:`~operator.attrgetter`, :func:`~operator.itemgetter`, and
+      :func:`~operator.methodcaller`.  See the :ref:`Sorting HOW TO
+      <sortinghowto>` for examples of how to create and use key functions.
 
    keyword argument
       Arguments which are preceded with a ``variable_name=`` in the call.
@@ -371,6 +401,12 @@ Glossary
       pre-conditions before making calls or lookups.  This style contrasts with
       the :term:`EAFP` approach and is characterized by the presence of many
       :keyword:`if` statements.
+
+      In a multi-threaded environment, the LBYL approach can risk introducing a
+      race condition between "the looking" and "the leaping".  For example, the
+      code, ``if key in mapping: return mapping[key]`` can fail if another
+      thread removes *key* from *mapping* after the test, but before the lookup.
+      This issue can be solved with locks or by using the EAFP approach.
 
    list
       A built-in Python :term:`sequence`.  Despite its name it is more akin
@@ -392,9 +428,11 @@ Glossary
       :class:`importlib.abc.Loader` for an :term:`abstract base class`.
 
    mapping
-      A container object (such as :class:`dict`) which supports arbitrary key
-      lookups using the special method :meth:`__getitem__`.  Mappings also
-      support :meth:`__len__`, :meth:`__iter__`, and :meth:`__contains__`.
+      A container object that supports arbitrary key lookups and implements the
+      methods specified in the :class:`Mapping` or :class:`MutableMapping`
+      :ref:`abstract base classes <abstract-base-classes>`. Examples include
+      :class:`dict`, :class:`collections.defaultdict`,
+      :class:`collections.OrderedDict` and :class:`collections.Counter`.
 
    metaclass
       The class of a class.  Class definitions create a class name, a class
@@ -414,6 +452,14 @@ Glossary
       of an instance of that class, the method will get the instance object as
       its first :term:`argument` (which is usually called ``self``).
       See :term:`function` and :term:`nested scope`.
+
+   method resolution order
+      Method Resolution Order is the order in which base classes are searched
+      for a member during lookup. See `The Python 2.3 Method Resolution Order
+      <http://www.python.org/download/releases/2.3/mro/>`_.
+
+   MRO
+      See :term:`method resolution order`.
 
    mutable
       Mutable objects can change their value but keep their :func:`id`.  See

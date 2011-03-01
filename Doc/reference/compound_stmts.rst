@@ -285,12 +285,11 @@ keeping all locals in that frame alive until the next garbage collection occurs.
 
 Before an except clause's suite is executed, details about the exception are
 stored in the :mod:`sys` module and can be access via :func:`sys.exc_info`.
-:func:`sys.exc_info` returns a 3-tuple consisting of: ``exc_type``, the
-exception class; ``exc_value``, the exception instance; ``exc_traceback``, a
-traceback object (see section :ref:`types`) identifying the point in the program
-where the exception occurred. :func:`sys.exc_info` values are restored to their
-previous values (before the call) when returning from a function that handled an
-exception.
+:func:`sys.exc_info` returns a 3-tuple consisting of the exception class, the
+exception instance and a traceback object (see section :ref:`types`) identifying
+the point in the program where the exception occurred.  :func:`sys.exc_info`
+values are restored to their previous values (before the call) when returning
+from a function that handled an exception.
 
 .. index::
    keyword: else
@@ -555,14 +554,22 @@ A class definition defines a class object (see section :ref:`types`):
 
 .. productionlist::
    classdef: [`decorators`] "class" `classname` [`inheritance`] ":" `suite`
-   inheritance: "(" [`argument_list` [","] ] ")"
+   inheritance: "(" [`argument_list` [","] | `comprehension`] ")"
    classname: `identifier`
-
 
 A class definition is an executable statement.  The inheritance list usually
 gives a list of base classes (see :ref:`metaclasses` for more advanced uses), so
 each item in the list should evaluate to a class object which allows
-subclassing.
+subclassing.  Classes without an inheritance list inherit, by default, from the
+base class :class:`object`; hence, ::
+
+   class Foo:
+       pass
+
+is equivalent to ::
+
+   class Foo(object):
+       pass
 
 The class's suite is then executed in a new execution frame (see :ref:`naming`),
 using a newly created local namespace and the original global namespace.
@@ -575,7 +582,7 @@ namespace.
 
 Class creation can be customized heavily using :ref:`metaclasses <metaclasses>`.
 
-Classes can also be decorated; as with functions, ::
+Classes can also be decorated: just like when decorating functions, ::
 
    @f1(arg)
    @f2
@@ -585,6 +592,10 @@ is equivalent to ::
 
    class Foo: pass
    Foo = f1(arg)(f2(Foo))
+
+The evaluation rules for the decorator expressions are the same as for function
+decorators.  The result must be a class object, which is then bound to the class
+name.
 
 **Programmer's note:** Variables defined in the class definition are class
 attributes; they are shared by instances.  Instance attributes can be set in a

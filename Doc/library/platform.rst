@@ -6,6 +6,9 @@
 .. moduleauthor:: Marc-Andre Lemburg <mal@egenix.com>
 .. sectionauthor:: Bjorn Pettersen <bpettersen@corp.fairisaac.com>
 
+**Source code:** :source:`Lib/platform.py`
+
+--------------
 
 .. note::
 
@@ -27,14 +30,24 @@ Cross Platform
    returned as strings.
 
    Values that cannot be determined are returned as given by the parameter presets.
-   If bits is given as ``''``, the :cfunc:`sizeof(pointer)` (or
-   :cfunc:`sizeof(long)` on Python version < 1.5.2) is used as indicator for the
+   If bits is given as ``''``, the :c:func:`sizeof(pointer)` (or
+   :c:func:`sizeof(long)` on Python version < 1.5.2) is used as indicator for the
    supported pointer size.
 
    The function relies on the system's :file:`file` command to do the actual work.
    This is available on most if not all Unix  platforms and some non-Unix platforms
    and then only if the executable points to the Python interpreter.  Reasonable
    defaults are used when the above needs are not met.
+
+   .. note::
+
+      On Mac OS X (and perhaps other platforms), executable files may be
+      universal files containing multiple architectures.
+
+      To get at the "64-bitness" of the current interpreter, it is more
+      reliable to query the :attr:`sys.maxsize` attribute::
+
+         is_64bits = sys.maxsize > 2**32
 
 
 .. function:: machine()
@@ -186,7 +199,7 @@ Windows Platform
 
    .. note::
 
-      Note: this function works best with Mark Hammond's
+      This function works best with Mark Hammond's
       :mod:`win32all` package installed, but also on Python 2.3 and
       later (support for this was added in Python 2.6). It obviously
       only runs on Win32 compatible platforms.
@@ -215,7 +228,7 @@ Mac OS Platform
    Entries which cannot be determined are set to ``''``.  All tuple entries are
    strings.
 
-   Documentation for the underlying :cfunc:`gestalt` API is available online at
+   Documentation for the underlying :c:func:`gestalt` API is available online at
    http://www.rgaros.nl/gestalt/.
 
 

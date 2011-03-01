@@ -5,7 +5,6 @@
 
 #include "node.h"
 #include "code.h"
-#include "eval.h"
 
 #include <ctype.h>
 
@@ -38,7 +37,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *func, *name, *bases, *mkw, *meta, *prep, *ns, *cell;
     PyObject *cls = NULL;
-    Py_ssize_t nargs, nbases;
+    Py_ssize_t nargs;
 
     assert(args != NULL);
     if (!PyTuple_Check(args)) {
@@ -62,7 +61,6 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
     bases = PyTuple_GetSlice(args, 2, nargs);
     if (bases == NULL)
         return NULL;
-    nbases = nargs - 2;
 
     if (kwds == NULL) {
         meta = NULL;
@@ -311,6 +309,20 @@ PyDoc_STRVAR(bin_doc,
 Return the binary representation of an integer or long integer.");
 
 
+static PyObject *
+builtin_callable(PyObject *self, PyObject *v)
+{
+    return PyBool_FromLong((long)PyCallable_Check(v));
+}
+
+PyDoc_STRVAR(callable_doc,
+"callable(object) -> bool\n\
+\n\
+Return whether the object is callable (i.e., some kind of function).\n\
+Note that classes are callable, as are instances of classes with a\n\
+__call__() method.");
+
+
 typedef struct {
     PyObject_HEAD
     PyObject *func;
@@ -524,23 +536,29 @@ static PyObject *
 builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 {
     char *str;
+    PyObject *filename_obj;
     char *filename;
     char *startstr;
     int mode = -1;
     int dont_inherit = 0;
     int supplied_flags = 0;
+    int optimize = -1;
     int is_ast;
     PyCompilerFlags cf;
     PyObject *cmd;
     static char *kwlist[] = {"source", "filename", "mode", "flags",
-                             "dont_inherit", NULL};
+                             "dont_inherit", "optimize", NULL};
     int start[] = {Py_file_input, Py_eval_input, Py_single_input};
+    PyObject *result;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oss|ii:compile",
-                                     kwlist, &cmd, &filename, &startstr,
-                                     &supplied_flags, &dont_inherit))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&s|iii:compile",  kwlist,
+                                     &cmd,
+                                     PyUnicode_FSConverter, &filename_obj,
+                                     &startstr, &supplied_flags,
+                                     &dont_inherit, &optimize))
         return NULL;
 
+    filename = PyBytes_AS_STRING(filename_obj);
     cf.cf_flags = supplied_flags | PyCF_SOURCE_IS_UTF8;
 
     if (supplied_flags &
@@ -548,9 +566,15 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     {
         PyErr_SetString(PyExc_ValueError,
                         "compile(): unrecognised flags");
-        return NULL;
+        goto error;
     }
     /* XXX Warn if (supplied_flags & PyCF_MASK_OBSOLETE) != 0? */
+
+    if (optimize < -1 || optimize > 2) {
+        PyErr_SetString(PyExc_ValueError,
+                        "compile(): invalid optimize value");
+        goto error;
+    }
 
     if (!dont_inherit) {
         PyEval_MergeCompilerFlags(&cf);
@@ -565,14 +589,13 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     else {
         PyErr_SetString(PyExc_ValueError,
                         "compile() arg 3 must be 'exec', 'eval' or 'single'");
-        return NULL;
+        goto error;
     }
 
     is_ast = PyAST_Check(cmd);
     if (is_ast == -1)
-        return NULL;
+        goto error;
     if (is_ast) {
-        PyObject *result;
         if (supplied_flags & PyCF_ONLY_AST) {
             Py_INCREF(cmd);
             result = cmd;
@@ -585,20 +608,27 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
             mod = PyAST_obj2mod(cmd, arena, mode);
             if (mod == NULL) {
                 PyArena_Free(arena);
-                return NULL;
+                goto error;
             }
-            result = (PyObject*)PyAST_Compile(mod, filename,
-                                              &cf, arena);
+            result = (PyObject*)PyAST_CompileEx(mod, filename,
+                                                &cf, optimize, arena);
             PyArena_Free(arena);
         }
-        return result;
+        goto finally;
     }
 
     str = source_as_string(cmd, "compile", "string, bytes, AST or code", &cf);
     if (str == NULL)
-        return NULL;
+        goto error;
 
-    return Py_CompileStringFlags(str, filename, start[mode], &cf);
+    result = Py_CompileStringExFlags(str, filename, start[mode], &cf, optimize);
+    goto finally;
+
+error:
+    result = NULL;
+finally:
+    Py_DECREF(filename_obj);
+    return result;
 }
 
 PyDoc_STRVAR(compile_doc,
@@ -703,7 +733,7 @@ builtin_eval(PyObject *self, PyObject *args)
         "code object passed to eval() may not contain free variables");
             return NULL;
         }
-        return PyEval_EvalCode((PyCodeObject *) cmd, globals, locals);
+        return PyEval_EvalCode(cmd, globals, locals);
     }
 
     cf.cf_flags = PyCF_SOURCE_IS_UTF8;
@@ -735,7 +765,6 @@ builtin_exec(PyObject *self, PyObject *args)
 {
     PyObject *v;
     PyObject *prog, *globals = Py_None, *locals = Py_None;
-    int plain = 0;
 
     if (!PyArg_UnpackTuple(args, "exec", 1, 3, &prog, &globals, &locals))
         return NULL;
@@ -744,7 +773,6 @@ builtin_exec(PyObject *self, PyObject *args)
         globals = PyEval_GetGlobals();
         if (locals == Py_None) {
             locals = PyEval_GetLocals();
-            plain = 1;
         }
         if (!globals || !locals) {
             PyErr_SetString(PyExc_SystemError,
@@ -779,7 +807,7 @@ builtin_exec(PyObject *self, PyObject *args)
                 "contain free variables");
             return NULL;
         }
-        v = PyEval_EvalCode((PyCodeObject *) prog, globals, locals);
+        v = PyEval_EvalCode(prog, globals, locals);
     }
     else {
         char *str;
@@ -1137,12 +1165,12 @@ Delete a named attribute on an object; delattr(x, 'y') is equivalent to\n\
 static PyObject *
 builtin_hash(PyObject *self, PyObject *v)
 {
-    long x;
+    Py_hash_t x;
 
     x = PyObject_Hash(v);
     if (x == -1)
         return NULL;
-    return PyLong_FromLong(x);
+    return PyLong_FromSsize_t(x);
 }
 
 PyDoc_STRVAR(hash_doc,
@@ -1590,6 +1618,7 @@ builtin_input(PyObject *self, PyObject *args)
         PyObject *stdin_encoding;
         char *stdin_encoding_str;
         PyObject *result;
+        size_t len;
 
         stdin_encoding = PyObject_GetAttrString(fin, "encoding");
         if (!stdin_encoding)
@@ -1654,19 +1683,23 @@ builtin_input(PyObject *self, PyObject *args)
             Py_DECREF(stdin_encoding);
             return NULL;
         }
-        if (*s == '\0') {
+
+        len = strlen(s);
+        if (len == 0) {
             PyErr_SetNone(PyExc_EOFError);
             result = NULL;
         }
-        else { /* strip trailing '\n' */
-            size_t len = strlen(s);
+        else {
             if (len > PY_SSIZE_T_MAX) {
                 PyErr_SetString(PyExc_OverflowError,
                                 "input: input too long");
                 result = NULL;
             }
             else {
-                result = PyUnicode_Decode(s, len-1, stdin_encoding_str, NULL);
+                len--;   /* strip trailing '\n' */
+                if (len != 0 && s[len-1] == '\r')
+                    len--;   /* strip trailing '\r' */
+                result = PyUnicode_Decode(s, len, stdin_encoding_str, NULL);
             }
         }
         Py_DECREF(stdin_encoding);
@@ -2231,6 +2264,7 @@ static PyMethodDef builtin_methods[] = {
     {"any",             builtin_any,        METH_O, any_doc},
     {"ascii",           builtin_ascii,      METH_O, ascii_doc},
     {"bin",             builtin_bin,        METH_O, bin_doc},
+    {"callable",        builtin_callable,   METH_O, callable_doc},
     {"chr",             builtin_chr,        METH_VARARGS, chr_doc},
     {"compile",         (PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
     {"delattr",         builtin_delattr,    METH_VARARGS, delattr_doc},

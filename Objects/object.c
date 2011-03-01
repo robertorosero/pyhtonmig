@@ -2,7 +2,6 @@
 /* Generic object operations; and implementation of None (NoObject) */
 
 #include "Python.h"
-#include "sliceobject.h" /* For PyEllipsis_Type */
 #include "frameobject.h"
 
 #ifdef __cplusplus
@@ -687,12 +686,12 @@ PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 
    */
 
-long
+Py_hash_t
 _Py_HashDouble(double v)
 {
     int e, sign;
     double m;
-    unsigned long x, y;
+    Py_uhash_t x, y;
 
     if (!Py_IS_FINITE(v)) {
         if (Py_IS_INFINITY(v))
@@ -716,7 +715,7 @@ _Py_HashDouble(double v)
         x = ((x << 28) & _PyHASH_MODULUS) | x >> (_PyHASH_BITS - 28);
         m *= 268435456.0;  /* 2**28 */
         e -= 28;
-        y = (unsigned long)m;  /* pull out integer part */
+        y = (Py_uhash_t)m;  /* pull out integer part */
         m -= y;
         x += y;
         if (x >= _PyHASH_MODULUS)
@@ -728,26 +727,26 @@ _Py_HashDouble(double v)
     x = ((x << e) & _PyHASH_MODULUS) | x >> (_PyHASH_BITS - e);
 
     x = x * sign;
-    if (x == (unsigned long)-1)
-        x = (unsigned long)-2;
-    return (long)x;
+    if (x == (Py_uhash_t)-1)
+        x = (Py_uhash_t)-2;
+    return (Py_hash_t)x;
 }
 
-long
+Py_hash_t
 _Py_HashPointer(void *p)
 {
-    long x;
+    Py_hash_t x;
     size_t y = (size_t)p;
     /* bottom 3 or 4 bits are likely to be 0; rotate y by 4 to avoid
        excessive hash collisions for dicts and sets */
     y = (y >> 4) | (y << (8 * SIZEOF_VOID_P - 4));
-    x = (long)y;
+    x = (Py_hash_t)y;
     if (x == -1)
         x = -2;
     return x;
 }
 
-long
+Py_hash_t
 PyObject_HashNotImplemented(PyObject *v)
 {
     PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
@@ -755,7 +754,7 @@ PyObject_HashNotImplemented(PyObject *v)
     return -1;
 }
 
-long
+Py_hash_t
 PyObject_Hash(PyObject *v)
 {
     PyTypeObject *tp = Py_TYPE(v);
@@ -1604,10 +1603,6 @@ _Py_ReadyTypes(void)
     if (PyType_Ready(&PyCode_Type) < 0)
         Py_FatalError("Can't initialize code type");
 
-    _Py_code_object_list = PyList_New(0);
-    if (_Py_code_object_list == NULL)
-        Py_FatalError("Can't initialize code type");
-
     if (PyType_Ready(&PyFrame_Type) < 0)
         Py_FatalError("Can't initialize frame type");
 
@@ -1760,7 +1755,6 @@ _Py_GetObjects(PyObject *self, PyObject *args)
 
 #endif
 
-
 /* Hack to force loading of pycapsule.o */
 PyTypeObject *_PyCapsule_hack = &PyCapsule_Type;
 
@@ -1904,6 +1898,19 @@ _PyTrash_destroy_chain(void)
         --_PyTrash_delete_nesting;
     }
 }
+
+#ifndef Py_TRACE_REFS
+/* For Py_LIMITED_API, we need an out-of-line version of _Py_Dealloc.
+   Define this here, so we can undefine the macro. */
+#undef _Py_Dealloc
+PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
+void
+_Py_Dealloc(PyObject *op)
+{
+    _Py_INC_TPFREES(op) _Py_COUNT_ALLOCS_COMMA
+    (*Py_TYPE(op)->tp_dealloc)(op);
+}
+#endif
 
 #ifdef __cplusplus
 }

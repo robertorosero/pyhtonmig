@@ -9,11 +9,13 @@ import random
 import stat
 import sys
 import unittest
+import textwrap
 
 from test.support import (
     EnvironmentVarGuard, TESTFN, check_warnings, forget, is_jython,
     make_legacy_pyc, rmtree, run_unittest, swap_attr, swap_item, temp_umask,
     unlink, unload)
+from test import script_helper
 
 
 def remove_files(name):
@@ -36,12 +38,8 @@ class ImportTests(unittest.TestCase):
     def test_case_sensitivity(self):
         # Brief digression to test that import is case-sensitive:  if we got
         # this far, we know for sure that "random" exists.
-        try:
+        with self.assertRaises(ImportError):
             import RAnDoM
-        except ImportError:
-            pass
-        else:
-            self.fail("import of RAnDoM should have failed (case mismatch)")
 
     def test_double_const(self):
         # Another brief digression to test the accuracy of manifest float
@@ -102,7 +100,7 @@ class ImportTests(unittest.TestCase):
             sys.path.insert(0, os.curdir)
             try:
                 fname = TESTFN + os.extsep + "py"
-                f = open(fname, 'w').close()
+                open(fname, 'w').close()
                 os.chmod(fname, (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH |
                                  stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
                 __import__(TESTFN)
@@ -121,7 +119,6 @@ class ImportTests(unittest.TestCase):
 
     def test_imp_module(self):
         # Verify that the imp module can correctly load and find .py files
-        import imp, os
         # XXX (ncoghlan): It would be nice to use support.CleanImport
         # here, but that breaks because the os module registers some
         # handlers in copy_reg on import. Since CleanImport doesn't
@@ -133,6 +130,7 @@ class ImportTests(unittest.TestCase):
         orig_getenv = os.getenv
         with EnvironmentVarGuard():
             x = imp.find_module("os")
+            self.addCleanup(x[0].close)
             new_os = imp.load_module("os", *x)
             self.assertIs(os, new_os)
             self.assertIs(orig_path, new_os.path)
@@ -287,6 +285,17 @@ class ImportTests(unittest.TestCase):
             __import__(path)
         self.assertEqual("Import by filename is not supported.",
                          c.exception.args[0])
+
+    def test_import_in_del_does_not_crash(self):
+        # Issue 4236
+        testfn = script_helper.make_script('', TESTFN, textwrap.dedent("""\
+            import sys
+            class C:
+               def __del__(self):
+                  import imp
+            sys.argv.insert(0, C())
+            """))
+        script_helper.assert_python_ok(testfn)
 
 
 class PycRewritingTests(unittest.TestCase):
@@ -520,7 +529,8 @@ class PycacheTests(unittest.TestCase):
         __import__(TESTFN)
         self.assertTrue(os.path.exists('__pycache__'))
         self.assertTrue(os.path.exists(os.path.join(
-            '__pycache__', '{}.{}.pyc'.format(TESTFN, self.tag))))
+            '__pycache__', '{}.{}.py{}'.format(
+            TESTFN, self.tag, __debug__ and 'c' or 'o'))))
 
     @unittest.skipUnless(os.name == 'posix',
                          "test meaningful only on posix systems")

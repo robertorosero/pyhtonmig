@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) 2001,2002 Python Software Foundation
 # csv package unit tests
 
@@ -314,22 +313,17 @@ class TestDialectRegistry(unittest.TestCase):
         expected_dialects = csv.list_dialects() + [name]
         expected_dialects.sort()
         csv.register_dialect(name, myexceltsv)
-        try:
-            self.assertTrue(csv.get_dialect(name).delimiter, '\t')
-            got_dialects = csv.list_dialects()
-            got_dialects.sort()
-            self.assertEqual(expected_dialects, got_dialects)
-        finally:
-            csv.unregister_dialect(name)
+        self.addCleanup(csv.unregister_dialect, name)
+        self.assertEqual(csv.get_dialect(name).delimiter, '\t')
+        got_dialects = sorted(csv.list_dialects())
+        self.assertEqual(expected_dialects, got_dialects)
 
     def test_register_kwargs(self):
         name = 'fedcba'
         csv.register_dialect(name, delimiter=';')
-        try:
-            self.assertTrue(csv.get_dialect(name).delimiter, '\t')
-            self.assertTrue(list(csv.reader('X;Y;Z', name)), ['X', 'Y', 'Z'])
-        finally:
-            csv.unregister_dialect(name)
+        self.addCleanup(csv.unregister_dialect, name)
+        self.assertEqual(csv.get_dialect(name).delimiter, ';')
+        self.assertEqual([['X', 'Y', 'Z']], list(csv.reader(['X;Y;Z'], name)))
 
     def test_incomplete_dialect(self):
         class myexceltsv(csv.Dialect):
@@ -515,6 +509,15 @@ class TestEscapedExcel(TestCsvBase):
 
     def test_read_escape_fieldsep(self):
         self.readerAssertEqual('abc\\,def\r\n', [['abc,def']])
+
+class TestDialectUnix(TestCsvBase):
+    dialect = 'unix'
+
+    def test_simple_writer(self):
+        self.writerAssertEqual([[1, 'abc def', 'abc']], '"1","abc def","abc"\n')
+
+    def test_simple_reader(self):
+        self.readerAssertEqual('"1","abc def","abc"\n', [['1', 'abc def', 'abc']])
 
 class QuotedEscapedExcel(csv.excel):
     quoting = csv.QUOTE_NONNUMERIC

@@ -52,9 +52,6 @@ memory_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
 {
     int res = 0;
     CHECK_RELEASED_INT(self);
-    /* XXX for whatever reason fixing the flags seems necessary */
-    if (self->view.readonly)
-        flags &= ~PyBUF_WRITABLE;
     if (self->view.obj != NULL)
         res = PyObject_GetBuffer(self->view.obj, view, flags);
     if (view)
@@ -78,11 +75,15 @@ PyMemoryView_FromBuffer(Py_buffer *info)
 {
     PyMemoryViewObject *mview;
 
+    if (info->buf == NULL) {
+        PyErr_SetString(PyExc_ValueError,
+            "cannot make memory view from a buffer with a NULL data pointer");
+        return NULL;
+    }
     mview = (PyMemoryViewObject *)
         PyObject_GC_New(PyMemoryViewObject, &PyMemoryView_Type);
     if (mview == NULL)
         return NULL;
-    mview->base = NULL;
     dup_buffer(&mview->view, info);
     /* NOTE: mview->view.obj should already have been incref'ed as
        part of PyBuffer_FillInfo(). */
@@ -112,8 +113,6 @@ PyMemoryView_FromObject(PyObject *base)
         return NULL;
     }
 
-    mview->base = base;
-    Py_INCREF(base);
     return (PyObject *)mview;
 }
 
@@ -291,8 +290,6 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
 
     if (PyBuffer_IsContiguous(view, fort)) {
         /* no copy needed */
-        Py_INCREF(obj);
-        mem->base = obj;
         _PyObject_GC_TRACK(mem);
         return (PyObject *)mem;
     }
@@ -324,21 +321,7 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
             Py_DECREF(mem);
             return NULL;
         }
-    }
-    if (buffertype == PyBUF_SHADOW) {
-        /* return a shadowed memory-view object */
-        view->buf = dest;
-        mem->base = PyTuple_Pack(2, obj, bytes);
-        Py_DECREF(bytes);
-        if (mem->base == NULL) {
-            Py_DECREF(mem);
-            return NULL;
-        }
-    }
-    else {
         PyBuffer_Release(view);  /* XXX ? */
-        /* steal the reference */
-        mem->base = bytes;
     }
     _PyObject_GC_TRACK(mem);
     return (PyObject *)mem;
@@ -371,8 +354,9 @@ _IntTupleFromSsizet(int len, Py_ssize_t *vals)
         return Py_None;
     }
     intTuple = PyTuple_New(len);
-    if (!intTuple) return NULL;
-    for(i=0; i<len; i++) {
+    if (!intTuple)
+        return NULL;
+    for (i=0; i<len; i++) {
         o = PyLong_FromSsize_t(vals[i]);
         if (!o) {
             Py_DECREF(intTuple);
@@ -480,28 +464,7 @@ static void
 do_release(PyMemoryViewObject *self)
 {
     if (self->view.obj != NULL) {
-        if (self->base && PyTuple_Check(self->base)) {
-            /* Special case when first element is generic object
-               with buffer interface and the second element is a
-               contiguous "shadow" that must be copied back into
-               the data areay of the first tuple element before
-               releasing the buffer on the first element.
-            */
-
-            PyObject_CopyData(PyTuple_GET_ITEM(self->base,0),
-                              PyTuple_GET_ITEM(self->base,1));
-
-            /* The view member should have readonly == -1 in
-               this instance indicating that the memory can
-               be "locked" and was locked and will be unlocked
-               again after this call.
-            */
-            PyBuffer_Release(&(self->view));
-        }
-        else {
-            PyBuffer_Release(&(self->view));
-        }
-        Py_CLEAR(self->base);
+        PyBuffer_Release(&(self->view));
     }
     self->view.obj = NULL;
     self->view.buf = NULL;
@@ -638,7 +601,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
     else if (PySlice_Check(key)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -717,7 +680,7 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     else if (PySlice_Check(key)) {
         Py_ssize_t stop, step;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                          &start, &stop, &step, &len) < 0) {
             return -1;
         }
@@ -818,8 +781,6 @@ _notimpl:
 static int
 memory_traverse(PyMemoryViewObject *self, visitproc visit, void *arg)
 {
-    if (self->base != NULL)
-        Py_VISIT(self->base);
     if (self->view.obj != NULL)
         Py_VISIT(self->view.obj);
     return 0;
@@ -828,7 +789,6 @@ memory_traverse(PyMemoryViewObject *self, visitproc visit, void *arg)
 static int
 memory_clear(PyMemoryViewObject *self)
 {
-    Py_CLEAR(self->base);
     PyBuffer_Release(&self->view);
     return 0;
 }

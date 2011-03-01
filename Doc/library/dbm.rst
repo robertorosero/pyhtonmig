@@ -20,7 +20,7 @@ the Oracle Berkeley DB.
 
 .. function:: whichdb(filename)
 
-   This functionattempts to guess which of the several simple database modules
+   This function attempts to guess which of the several simple database modules
    available --- :mod:`dbm.gnu`, :mod:`dbm.ndbm` or :mod:`dbm.dumb` --- should
    be used to open a given file.
 
@@ -61,10 +61,15 @@ the Oracle Berkeley DB.
    modified by the prevailing umask).
 
 
-The object returned by :func:`.open` supports most of the same functionality as
+The object returned by :func:`.open` supports the same basic functionality as
 dictionaries; keys and their corresponding values can be stored, retrieved, and
 deleted, and the :keyword:`in` operator and the :meth:`keys` method are
-available. Key and values are always stored as bytes. This means that when
+available, as well as :meth:`get` and :meth:`setdefault`.
+
+.. versionchanged:: 3.2
+   :meth:`get` and :meth:`setdefault` are now available in all database modules.
+
+Key and values are always stored as bytes. This means that when
 strings are used they are implicitly converted to the default encoding before
 being stored.
 
@@ -86,10 +91,8 @@ then prints out the contents of the database::
    # Notice how the value is now in bytes.
    assert db['www.cnn.com'] == b'Cable News Network'
 
-   # Loop through contents.  Other dictionary methods
-   # such as .keys(), .values() also work.
-   for k, v in db.iteritems():
-       print(k, '\t', v)
+   # Often-used methods of the dict interface work too.
+   print(db.get('python.org', b'not present'))
 
    # Storing a non-string key or value will raise an exception (most
    # likely a TypeError).

@@ -37,7 +37,7 @@ NOTE:
    running a Python core buildbot test slave; see SUBPROJECTS below)
 
 When using the Debug setting, the output files have a _d added to
-their name:  python32_d.dll, python_d.exe, parser_d.pyd, and so on. Both
+their name:  python33_d.dll, python_d.exe, parser_d.pyd, and so on. Both
 the build and rt batch files accept a -d option for debug builds.
 
 The 32bit builds end up in the solution folder PCbuild while the x64 builds
@@ -104,7 +104,7 @@ winsound
 
 Python-controlled subprojects that wrap external projects:
 _sqlite3
-    Wraps SQLite 3.6.21, which is currently built by sqlite3.vcproj (see below).
+    Wraps SQLite 3.7.4, which is currently built by sqlite3.vcproj (see below).
 _tkinter
     Wraps the Tk windowing system.  Unlike _sqlite3, there's no
     corresponding tcltk.vcproj-type project that builds Tcl/Tk from vcproj's
@@ -156,7 +156,7 @@ _ssl
     nasmw.exe.
 
     You can also install ActivePerl from
-        http://www.activestate.com/Products/ActivePerl/
+        http://www.activestate.com/activeperl/
     if you like to use the official sources instead of the files from 
     python's subversion repository. The svn version contains pre-build
     makefiles and assembly files.

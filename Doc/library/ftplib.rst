@@ -9,6 +9,10 @@
    pair: FTP; protocol
    single: FTP; ftplib (standard module)
 
+**Source code:** :source:`Lib/ftplib.py`
+
+--------------
+
 This module defines the class :class:`FTP` and a few related items. The
 :class:`FTP` class implements the client side of the FTP protocol.  You can use
 this to write Python programs that perform a variety of automated FTP jobs, such
@@ -36,7 +40,7 @@ Here's a sample session using the :mod:`ftplib` module::
 
 The module defines the following items:
 
-.. class:: FTP(host='', user='', passwd='', acct=''[, timeout])
+.. class:: FTP(host='', user='', passwd='', acct='', timeout=None, source_address=None)
 
    Return a new instance of the :class:`FTP` class.  When *host* is given, the
    method call ``connect(host)`` is made.  When *user* is given, additionally
@@ -44,7 +48,8 @@ The module defines the following items:
    *acct* default to the empty string when not given).  The optional *timeout*
    parameter specifies a timeout in seconds for blocking operations like the
    connection attempt (if is not specified, the global default timeout setting
-   will be used).
+   will be used). *source_address* is a 2-tuple ``(host, port)`` for the socket
+   to bind to as its source address before connecting.
 
    :class:`FTP` class supports the :keyword:`with` statement. Here is a sample
    on how using it:
@@ -64,8 +69,11 @@ The module defines the following items:
    .. versionchanged:: 3.2
       Support for the :keyword:`with` statement was added.
 
+   .. versionchanged:: 3.3
+      *source_address* parameter was added.
 
-.. class:: FTP_TLS(host='', user='', passwd='', acct='', [keyfile[, certfile[, context[, timeout]]]])
+
+.. class:: FTP_TLS(host='', user='', passwd='', acct='', keyfile=None, certfile=None, context=None, timeout=None, source_address=None)
 
    A :class:`FTP` subclass which adds TLS support to FTP as described in
    :rfc:`4217`.
@@ -76,9 +84,14 @@ The module defines the following items:
    private key and certificate chain file name for the SSL connection.
    *context* parameter is a :class:`ssl.SSLContext` object which allows
    bundling SSL configuration options, certificates and private keys into a
-   single (potentially long-lived) structure.
+   single (potentially long-lived) structure. *source_address* is a 2-tuple
+   ``(host, port)`` for the socket to bind to as its source address before
+   connecting.
 
    .. versionadded:: 3.2
+
+   .. versionchanged:: 3.3
+      *source_address* parameter was added.
 
    Here's a sample session using the :class:`FTP_TLS` class:
 
@@ -109,16 +122,22 @@ The module defines the following items:
 
 .. exception:: error_temp
 
-   Exception raised when an unexpected reply is received from the server.
+   Exception raised when an error code signifying a temporary error (response
+   codes in the range 400--499) is received.
+
 
 .. exception:: error_perm
 
-   Exception raised when an error code in the range 500--599 is received.
+   Exception raised when an error code signifying a permanent error (response
+   codes in the range 500--599) is received.
+
 
 .. exception:: error_proto
 
-   Exception raised when a reply is received from the server that does not
-   begin with a digit in the range 1--5.
+   Exception raised when a reply is received from the server that does not fit
+   the response specifications of the File Transfer Protocol, i.e. begin with a
+   digit in the range 1--5.
+
 
 .. data:: all_errors
 
@@ -127,6 +146,7 @@ The module defines the following items:
    opposed to programming errors made by the caller).  This set includes the
    four exceptions listed above as well as :exc:`socket.error` and
    :exc:`IOError`.
+
 
 .. seealso::
 
@@ -163,7 +183,7 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
    debugging output, logging each line sent and received on the control connection.
 
 
-.. method:: FTP.connect(host='', port=0[, timeout])
+.. method:: FTP.connect(host='', port=0, timeout=None, source_address=None)
 
    Connect to the given host and port.  The default port number is ``21``, as
    specified by the FTP protocol specification.  It is rarely needed to specify a
@@ -171,10 +191,14 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
    instance; it should not be called at all if a host was given when the instance
    was created.  All other methods can only be used after a connection has been
    made.
-
    The optional *timeout* parameter specifies a timeout in seconds for the
    connection attempt. If no *timeout* is passed, the global default timeout
    setting will be used.
+   *source_address* is a 2-tuple ``(host, port)`` for the socket to bind to as
+   its source address before connecting.
+
+   .. versionchanged:: 3.3
+      *source_address* parameter was added.
 
 
 .. method:: FTP.getwelcome()
@@ -209,9 +233,9 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
 
 .. method:: FTP.voidcmd(cmd)
 
-   Send a simple command string to the server and handle the response. Return
-   nothing if a response code in the range 200--299 is received. Raise an exception
-   otherwise.
+   Send a simple command string to the server and handle the response.  Return
+   nothing if a response code corresponding to success (codes in the range
+   200--299) is received.  Raise :exc:`error_reply` otherwise.
 
 
 .. method:: FTP.retrbinary(cmd, callback, blocksize=8192, rest=None)
@@ -228,12 +252,15 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
 
 .. method:: FTP.retrlines(cmd, callback=None)
 
-   Retrieve a file or directory listing in ASCII transfer mode.  *cmd*
-   should be an appropriate ``RETR`` command (see :meth:`retrbinary`) or a
-   command such as ``LIST``, ``NLST`` or ``MLSD`` (usually just the string
-   ``'LIST'``).  The *callback* function is called for each line with a
-   string argument containing the line with the trailing CRLF stripped.
-   The default *callback* prints the line to ``sys.stdout``.
+   Retrieve a file or directory listing in ASCII transfer mode.  *cmd* should be
+   an appropriate ``RETR`` command (see :meth:`retrbinary`) or a command such as
+   ``LIST``, ``NLST`` or ``MLSD`` (usually just the string ``'LIST'``).
+   ``LIST`` retrieves a list of files and information about those files.
+   ``NLST`` retrieves a list of file names.  On some servers, ``MLSD`` retrieves
+   a machine readable list of files and information about those files.  The
+   *callback* function is called for each line with a string argument containing
+   the line with the trailing CRLF stripped.  The default *callback* prints the
+   line to ``sys.stdout``.
 
 
 .. method:: FTP.set_pasv(boolean)
@@ -295,10 +322,10 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
 
 .. method:: FTP.nlst(argument[, ...])
 
-   Return a list of files as returned by the ``NLST`` command.  The optional
-   *argument* is a directory to list (default is the current server directory).
-   Multiple arguments can be used to pass non-standard options to the ``NLST``
-   command.
+   Return a list of file names as returned by the ``NLST`` command.  The
+   optional *argument* is a directory to list (default is the current server
+   directory).  Multiple arguments can be used to pass non-standard options to
+   the ``NLST`` command.
 
 
 .. method:: FTP.dir(argument[, ...])

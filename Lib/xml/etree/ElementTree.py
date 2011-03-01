@@ -584,6 +584,8 @@ class QName:
         self.text = text_or_uri
     def __str__(self):
         return self.text
+    def __repr__(self):
+        return '<QName %r>' % (self.text,)
     def __hash__(self):
         return hash(self.text)
     def __le__(self, other):
@@ -662,17 +664,23 @@ class ElementTree:
     # @exception ParseError If the parser fails to parse the document.
 
     def parse(self, source, parser=None):
+        close_source = False
         if not hasattr(source, "read"):
             source = open(source, "rb")
-        if not parser:
-            parser = XMLParser(target=TreeBuilder())
-        while 1:
-            data = source.read(65536)
-            if not data:
-                break
-            parser.feed(data)
-        self._root = parser.close()
-        return self._root
+            close_source = True
+        try:
+            if not parser:
+                parser = XMLParser(target=TreeBuilder())
+            while 1:
+                data = source.read(65536)
+                if not data:
+                    break
+                parser.feed(data)
+            self._root = parser.close()
+            return self._root
+        finally:
+            if close_source:
+                source.close()
 
     ##
     # Creates a tree iterator for the root element.  The iterator loops
@@ -907,8 +915,9 @@ def _namespaces(elem, default_namespace=None):
         iterate = elem.getiterator # cET compatibility
     for elem in iterate():
         tag = elem.tag
-        if isinstance(tag, QName) and tag.text not in qnames:
-            add_qname(tag.text)
+        if isinstance(tag, QName):
+            if tag.text not in qnames:
+                add_qname(tag.text)
         elif isinstance(tag, str):
             if tag not in qnames:
                 add_qname(tag)
@@ -1059,7 +1068,7 @@ _serialize = {
 def register_namespace(prefix, uri):
     if re.match("ns\d+$", prefix):
         raise ValueError("Prefix format reserved for internal use")
-    for k, v in _namespace_map.items():
+    for k, v in list(_namespace_map.items()):
         if k == uri or v == prefix:
             del _namespace_map[k]
     _namespace_map[uri] = prefix
@@ -1226,16 +1235,19 @@ def parse(source, parser=None):
 # @return A (event, elem) iterator.
 
 def iterparse(source, events=None, parser=None):
+    close_source = False
     if not hasattr(source, "read"):
         source = open(source, "rb")
+        close_source = True
     if not parser:
         parser = XMLParser(target=TreeBuilder())
-    return _IterParseIterator(source, events, parser)
+    return _IterParseIterator(source, events, parser, close_source)
 
 class _IterParseIterator:
 
-    def __init__(self, source, events, parser):
+    def __init__(self, source, events, parser, close_source=False):
         self._file = source
+        self._close_file = close_source
         self._events = []
         self._index = 0
         self.root = self._root = None
@@ -1282,6 +1294,8 @@ class _IterParseIterator:
             except IndexError:
                 if self._parser is None:
                     self.root = self._root
+                    if self._close_file:
+                        self._file.close()
                     raise StopIteration
                 # load event buffer
                 del self._events[:]

@@ -11,6 +11,7 @@ The compiler compiles a pattern to a pytree.*Pattern instance.
 __author__ = "Guido van Rossum <guido@python.org>"
 
 # Python imports
+import io
 import os
 
 # Fairly local imports
@@ -32,7 +33,7 @@ class PatternSyntaxError(Exception):
 def tokenize_wrapper(input):
     """Tokenizes a string suppressing significant whitespace."""
     skip = set((token.NEWLINE, token.INDENT, token.DEDENT))
-    tokens = tokenize.generate_tokens(driver.generate_lines(input).__next__)
+    tokens = tokenize.generate_tokens(io.StringIO(input).readline)
     for quintuple in tokens:
         type, value, start, end, line_text = quintuple
         if type not in skip:
@@ -52,14 +53,17 @@ class PatternCompiler(object):
         self.pysyms = pygram.python_symbols
         self.driver = driver.Driver(self.grammar, convert=pattern_convert)
 
-    def compile_pattern(self, input, debug=False):
+    def compile_pattern(self, input, debug=False, with_tree=False):
         """Compiles a pattern string to a nested pytree.*Pattern object."""
         tokens = tokenize_wrapper(input)
         try:
             root = self.driver.parse_tokens(tokens, debug=debug)
         except parse.ParseError as e:
             raise PatternSyntaxError(str(e))
-        return self.compile_node(root)
+        if with_tree:
+            return self.compile_node(root), root
+        else:
+            return self.compile_node(root)
 
     def compile_node(self, node):
         """Compiles a node, recursively.

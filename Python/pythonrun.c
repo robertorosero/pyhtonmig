@@ -11,14 +11,10 @@
 #include "parsetok.h"
 #include "errcode.h"
 #include "code.h"
-#include "compile.h"
 #include "symtable.h"
-#include "pyarena.h"
 #include "ast.h"
-#include "eval.h"
 #include "marshal.h"
 #include "osdefs.h"
-#include "abstract.h"
 
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
@@ -82,6 +78,7 @@ extern void _PyGILState_Fini(void);
 
 int Py_DebugFlag; /* Needed by parser.c */
 int Py_VerboseFlag; /* Needed by import.c */
+int Py_QuietFlag; /* Needed by sysmodule.c */
 int Py_InteractiveFlag; /* Needed by Py_FdIsInteractive() below */
 int Py_InspectFlag; /* Needed to determine whether to exit at SystemError */
 int Py_NoSiteFlag; /* Suppress 'import site' */
@@ -255,7 +252,7 @@ Py_InitializeEx(int install_sigs)
     bimod = _PyBuiltin_Init();
     if (bimod == NULL)
         Py_FatalError("Py_Initialize: can't initialize builtins modules");
-    _PyImport_FixupExtension(bimod, "builtins", "builtins");
+    _PyImport_FixupBuiltin(bimod, "builtins");
     interp->builtins = PyModule_GetDict(bimod);
     if (interp->builtins == NULL)
         Py_FatalError("Py_Initialize: can't initialize builtins dict");
@@ -271,7 +268,7 @@ Py_InitializeEx(int install_sigs)
     if (interp->sysdict == NULL)
         Py_FatalError("Py_Initialize: can't initialize sys dict");
     Py_INCREF(interp->sysdict);
-    _PyImport_FixupExtension(sysmod, "sys", "sys");
+    _PyImport_FixupBuiltin(sysmod, "sys");
     PySys_SetPath(Py_GetPath());
     PyDict_SetItemString(interp->sysdict, "modules",
                          interp->modules);
@@ -283,6 +280,7 @@ Py_InitializeEx(int install_sigs)
         Py_FatalError("Py_Initialize: can't set preliminary stderr");
     PySys_SetObject("stderr", pstderr);
     PySys_SetObject("__stderr__", pstderr);
+    Py_DECREF(pstderr);
 
     _PyImport_Init();
 
@@ -298,18 +296,20 @@ Py_InitializeEx(int install_sigs)
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
-    /* Initialize warnings. */
-    if (PySys_HasWarnOptions()) {
-        PyObject *warnings_module = PyImport_ImportModule("warnings");
-        if (!warnings_module)
-            PyErr_Clear();
-        Py_XDECREF(warnings_module);
-    }
-
     initmain(); /* Module __main__ */
     if (initstdio() < 0)
         Py_FatalError(
             "Py_Initialize: can't initialize sys standard streams");
+
+    /* Initialize warnings. */
+    if (PySys_HasWarnOptions()) {
+        PyObject *warnings_module = PyImport_ImportModule("warnings");
+        if (warnings_module == NULL) {
+            fprintf(stderr, "'import warnings' failed; traceback:\n");
+            PyErr_Print();
+        }
+        Py_XDECREF(warnings_module);
+    }
 
     if (!Py_NoSiteFlag)
         initsite(); /* Module site */
@@ -577,7 +577,7 @@ Py_NewInterpreter(void)
     interp->modules = PyDict_New();
     interp->modules_reloading = PyDict_New();
 
-    bimod = _PyImport_FindExtension("builtins", "builtins");
+    bimod = _PyImport_FindBuiltin("builtins");
     if (bimod != NULL) {
         interp->builtins = PyModule_GetDict(bimod);
         if (interp->builtins == NULL)
@@ -588,7 +588,7 @@ Py_NewInterpreter(void)
     /* initialize builtin exceptions */
     _PyExc_Init();
 
-    sysmod = _PyImport_FindExtension("sys", "sys");
+    sysmod = _PyImport_FindBuiltin("sys");
     if (bimod != NULL && sysmod != NULL) {
         PyObject *pstderr;
         interp->sysdict = PyModule_GetDict(sysmod);
@@ -605,6 +605,7 @@ Py_NewInterpreter(void)
             Py_FatalError("Py_Initialize: can't set preliminary stderr");
         PySys_SetObject("stderr", pstderr);
         PySys_SetObject("__stderr__", pstderr);
+        Py_DECREF(pstderr);
 
         _PyImportHooks_Init();
         if (initstdio() < 0)
@@ -719,259 +720,6 @@ initmain(void)
     }
 }
 
-/* Redecode a filename from the default filesystem encoding (utf-8) to
-   'new_encoding' encoding with 'errors' error handler */
-static PyObject*
-redecode_filename(PyObject *file, const char *new_encoding,
-                  const char *errors)
-{
-    PyObject *file_bytes = NULL, *new_file = NULL;
-
-    file_bytes = PyUnicode_EncodeFSDefault(file);
-    if (file_bytes == NULL)
-        return NULL;
-    new_file = PyUnicode_Decode(
-        PyBytes_AsString(file_bytes),
-        PyBytes_GET_SIZE(file_bytes),
-        new_encoding,
-        errors);
-    Py_DECREF(file_bytes);
-    return new_file;
-}
-
-/* Redecode a path list */
-static int
-redecode_path_list(PyObject *paths,
-                   const char *new_encoding, const char *errors)
-{
-    PyObject *filename, *new_filename;
-    Py_ssize_t i, size;
-
-    size = PyList_Size(paths);
-    for (i=0; i < size; i++) {
-        filename = PyList_GetItem(paths, i);
-        if (filename == NULL)
-            return -1;
-
-        new_filename = redecode_filename(filename, new_encoding, errors);
-        if (new_filename == NULL)
-            return -1;
-        if (PyList_SetItem(paths, i, new_filename)) {
-            Py_DECREF(new_filename);
-            return -1;
-        }
-    }
-    return 0;
-}
-
-/* Redecode __file__ and __path__ attributes of sys.modules */
-static int
-redecode_sys_modules(const char *new_encoding, const char *errors)
-{
-    PyInterpreterState *interp;
-    PyObject *modules, *values, *file, *new_file, *paths;
-    PyObject *iter = NULL, *module = NULL;
-
-    interp = PyThreadState_GET()->interp;
-    modules = interp->modules;
-
-    values = PyObject_CallMethod(modules, "values", "");
-    if (values == NULL)
-        goto error;
-
-    iter = PyObject_GetIter(values);
-    Py_DECREF(values);
-    if (iter == NULL)
-        goto error;
-
-    while (1)
-    {
-        module = PyIter_Next(iter);
-        if (module == NULL) {
-            if (PyErr_Occurred())
-                goto error;
-            else
-                break;
-        }
-
-        file = PyModule_GetFilenameObject(module);
-        if (file != NULL) {
-            new_file = redecode_filename(file, new_encoding, errors);
-            Py_DECREF(file);
-            if (new_file == NULL)
-                goto error;
-            if (PyObject_SetAttrString(module, "__file__", new_file)) {
-                Py_DECREF(new_file);
-                goto error;
-            }
-            Py_DECREF(new_file);
-        }
-        else
-            PyErr_Clear();
-
-        paths = PyObject_GetAttrString(module, "__path__");
-        if (paths != NULL) {
-            if (redecode_path_list(paths, new_encoding, errors))
-                goto error;
-        }
-        else
-            PyErr_Clear();
-
-        Py_CLEAR(module);
-    }
-    Py_CLEAR(iter);
-    return 0;
-
-error:
-    Py_XDECREF(iter);
-    Py_XDECREF(module);
-    return -1;
-}
-
-/* Redecode sys.path_importer_cache keys */
-static int
-redecode_sys_path_importer_cache(const char *new_encoding, const char *errors)
-{
-    PyObject *path_importer_cache, *items, *item, *path, *importer, *new_path;
-    PyObject *new_cache = NULL, *iter = NULL;
-
-    path_importer_cache = PySys_GetObject("path_importer_cache");
-    if (path_importer_cache == NULL)
-        goto error;
-
-    items = PyObject_CallMethod(path_importer_cache, "items", "");
-    if (items == NULL)
-        goto error;
-
-    iter = PyObject_GetIter(items);
-    Py_DECREF(items);
-    if (iter == NULL)
-        goto error;
-
-    new_cache = PyDict_New();
-    if (new_cache == NULL)
-        goto error;
-
-    while (1)
-    {
-        item = PyIter_Next(iter);
-        if (item == NULL) {
-            if (PyErr_Occurred())
-                goto error;
-            else
-                break;
-        }
-        path = PyTuple_GET_ITEM(item, 0);
-        importer = PyTuple_GET_ITEM(item, 1);
-
-        new_path = redecode_filename(path, new_encoding, errors);
-        if (new_path == NULL)
-            goto error;
-        if (PyDict_SetItem(new_cache, new_path, importer)) {
-            Py_DECREF(new_path);
-            goto error;
-        }
-        Py_DECREF(new_path);
-    }
-    Py_CLEAR(iter);
-    if (PySys_SetObject("path_importer_cache", new_cache))
-        goto error;
-    Py_CLEAR(new_cache);
-    return 0;
-
-error:
-    Py_XDECREF(iter);
-    Py_XDECREF(new_cache);
-    return -1;
-}
-
-/* Redecode co_filename attribute of all code objects */
-static int
-redecode_code_objects(const char *new_encoding, const char *errors)
-{
-    Py_ssize_t i, len;
-    PyCodeObject *co;
-    PyObject *ref, *new_file;
-
-    len = Py_SIZE(_Py_code_object_list);
-    for (i=0; i < len; i++) {
-        ref = PyList_GET_ITEM(_Py_code_object_list, i);
-        co = (PyCodeObject *)PyWeakref_GetObject(ref);
-        if ((PyObject*)co == Py_None)
-            continue;
-        if (co == NULL)
-            return -1;
-
-        new_file = redecode_filename(co->co_filename, new_encoding, errors);
-        if (new_file == NULL)
-            return -1;
-        Py_DECREF(co->co_filename);
-        co->co_filename = new_file;
-    }
-    Py_CLEAR(_Py_code_object_list);
-    return 0;
-}
-
-/* Redecode the filenames of all modules (__file__ and __path__ attributes),
-   all code objects (co_filename attribute), sys.path, sys.meta_path,
-   sys.executable and sys.path_importer_cache (keys) when the filesystem
-   encoding changes from the default encoding (utf-8) to new_encoding */
-static int
-redecode_filenames(const char *new_encoding)
-{
-    char *errors;
-    PyObject *paths, *executable, *new_executable;
-
-    /* PyUnicode_DecodeFSDefault() and PyUnicode_EncodeFSDefault() do already
-       use utf-8 if Py_FileSystemDefaultEncoding is NULL */
-    if (strcmp(new_encoding, "utf-8") == 0)
-        return 0;
-
-    if (strcmp(new_encoding, "mbcs") != 0)
-        errors = "surrogateescape";
-    else
-        errors = NULL;
-
-    /* sys.modules */
-    if (redecode_sys_modules(new_encoding, errors))
-        return -1;
-
-    /* sys.path and sys.meta_path */
-    paths = PySys_GetObject("path");
-    if (paths != NULL) {
-        if (redecode_path_list(paths, new_encoding, errors))
-            return -1;
-    }
-    paths = PySys_GetObject("meta_path");
-    if (paths != NULL) {
-        if (redecode_path_list(paths, new_encoding, errors))
-            return -1;
-    }
-
-    /* sys.executable */
-    executable = PySys_GetObject("executable");
-    if (executable == NULL)
-        return -1;
-    new_executable = redecode_filename(executable, new_encoding, errors);
-    if (new_executable == NULL)
-        return -1;
-    if (PySys_SetObject("executable", new_executable)) {
-        Py_DECREF(new_executable);
-        return -1;
-    }
-    Py_DECREF(new_executable);
-
-    /* sys.path_importer_cache */
-    if (redecode_sys_path_importer_cache(new_encoding, errors))
-        return -1;
-
-    /* code objects */
-    if (redecode_code_objects(new_encoding, errors))
-        return -1;
-
-    return 0;
-}
-
 static void
 initfsencoding(void)
 {
@@ -980,41 +728,19 @@ initfsencoding(void)
     char *codeset = NULL;
 
     if (Py_FileSystemDefaultEncoding == NULL) {
-        const char *env_encoding = Py_GETENV("PYTHONFSENCODING");
-        if (env_encoding != NULL) {
-            codeset = get_codec_name(env_encoding);
-            if (!codeset) {
-                fprintf(stderr, "PYTHONFSENCODING is not a valid encoding:\n");
-                PyErr_Print();
-            }
-        }
-        if (!codeset) {
-            /* On Unix, set the file system encoding according to the
-               user's preference, if the CODESET names a well-known
-               Python codec, and Py_FileSystemDefaultEncoding isn't
-               initialized by other means. Also set the encoding of
-               stdin and stdout if these are terminals.  */
-            codeset = get_codeset();
-        }
-        if (codeset != NULL) {
-            if (redecode_filenames(codeset))
-                Py_FatalError("Py_Initialize: can't redecode filenames");
-            Py_FileSystemDefaultEncoding = codeset;
-            Py_HasFileSystemDefaultEncoding = 0;
-            Py_CLEAR(_Py_code_object_list);
-            return;
-        } else {
-            fprintf(stderr, "Unable to get the locale encoding:\n");
-            PyErr_Print();
-        }
+        /* On Unix, set the file system encoding according to the
+           user's preference, if the CODESET names a well-known
+           Python codec, and Py_FileSystemDefaultEncoding isn't
+           initialized by other means. */
+        codeset = get_codeset();
+        if (codeset == NULL)
+            Py_FatalError("Py_Initialize: Unable to get the locale encoding");
 
-        fprintf(stderr, "Unable to get the filesystem encoding: fallback to utf-8\n");
-        Py_FileSystemDefaultEncoding = "utf-8";
-        Py_HasFileSystemDefaultEncoding = 1;
+        Py_FileSystemDefaultEncoding = codeset;
+        Py_HasFileSystemDefaultEncoding = 0;
+        return;
     }
 #endif
-
-    Py_CLEAR(_Py_code_object_list);
 
     /* the encoding is mbcs, utf-8 or ascii */
     codec = _PyCodec_Lookup(Py_FileSystemDefaultEncoding);
@@ -1052,6 +778,7 @@ create_stdio(PyObject* io,
 {
     PyObject *buf = NULL, *stream = NULL, *text = NULL, *raw = NULL, *res;
     const char* mode;
+    const char* newline;
     PyObject *line_buffering;
     int buffering, isatty;
 
@@ -1102,9 +829,17 @@ create_stdio(PyObject* io,
     Py_CLEAR(raw);
     Py_CLEAR(text);
 
+    newline = "\n";
+#ifdef MS_WINDOWS
+    if (!write_mode) {
+        /* translate \r\n to \n for sys.stdin on Windows */
+        newline = NULL;
+    }
+#endif
+
     stream = PyObject_CallMethod(io, "TextIOWrapper", "OsssO",
                                  buf, encoding, errors,
-                                 "\n", line_buffering);
+                                 newline, line_buffering);
     Py_CLEAR(buf);
     if (stream == NULL)
         goto error;
@@ -1164,8 +899,10 @@ initstdio(void)
 
     /* Set builtins.open */
     if (PyObject_SetAttrString(bimod, "open", wrapper) == -1) {
+        Py_DECREF(wrapper);
         goto error;
     }
+    Py_DECREF(wrapper);
 
     encoding = Py_GETENV("PYTHONIOENCODING");
     errors = NULL;
@@ -1246,6 +983,7 @@ initstdio(void)
         if (encoding != NULL) {
             _PyCodec_Lookup(encoding);
         }
+        Py_DECREF(encoding_attr);
     }
     PyErr_Clear();  /* Not a fatal error if codec isn't available */
 
@@ -1473,7 +1211,8 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 {
     PyObject *m, *d, *v;
     const char *ext;
-    int set_file_name = 0, ret, len;
+    int set_file_name = 0, ret;
+    size_t len;
 
     m = PyImport_AddModule("__main__");
     if (m == NULL)
@@ -1481,7 +1220,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
     d = PyModule_GetDict(m);
     if (PyDict_GetItemString(d, "__file__") == NULL) {
         PyObject *f;
-        f = PyUnicode_FromString(filename);
+        f = PyUnicode_DecodeFSDefault(filename);
         if (f == NULL)
             return -1;
         if (PyDict_SetItemString(d, "__file__", f) < 0) {
@@ -1619,7 +1358,7 @@ print_error_text(PyObject *f, int offset, const char *text)
 {
     char *nl;
     if (offset >= 0) {
-        if (offset > 0 && offset == (int)strlen(text))
+        if (offset > 0 && offset == strlen(text) && text[offset - 1] == '\n')
             offset--;
         for (;;) {
             nl = strchr(text, '\n');
@@ -1640,11 +1379,8 @@ print_error_text(PyObject *f, int offset, const char *text)
     if (offset == -1)
         return;
     PyFile_WriteString("    ", f);
-    offset--;
-    while (offset > 0) {
+    while (--offset > 0)
         PyFile_WriteString(" ", f);
-        offset--;
-    }
     PyFile_WriteString("^\n", f);
 }
 
@@ -2030,7 +1766,7 @@ run_mod(mod_ty mod, const char *filename, PyObject *globals, PyObject *locals,
     co = PyAST_Compile(mod, filename, flags, arena);
     if (co == NULL)
         return NULL;
-    v = PyEval_EvalCode(co, globals, locals);
+    v = PyEval_EvalCode((PyObject*)co, globals, locals);
     Py_DECREF(co);
     return v;
 }
@@ -2060,7 +1796,7 @@ run_pyc_file(FILE *fp, const char *filename, PyObject *globals,
         return NULL;
     }
     co = (PyCodeObject *)v;
-    v = PyEval_EvalCode(co, globals, locals);
+    v = PyEval_EvalCode((PyObject*)co, globals, locals);
     if (v && flags)
         flags->cf_flags |= (co->co_flags & PyCF_MASK);
     Py_DECREF(co);
@@ -2068,8 +1804,8 @@ run_pyc_file(FILE *fp, const char *filename, PyObject *globals,
 }
 
 PyObject *
-Py_CompileStringFlags(const char *str, const char *filename, int start,
-                      PyCompilerFlags *flags)
+Py_CompileStringExFlags(const char *str, const char *filename, int start,
+                        PyCompilerFlags *flags, int optimize)
 {
     PyCodeObject *co;
     mod_ty mod;
@@ -2087,9 +1823,17 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
         PyArena_Free(arena);
         return result;
     }
-    co = PyAST_Compile(mod, filename, flags, arena);
+    co = PyAST_CompileEx(mod, filename, flags, optimize, arena);
     PyArena_Free(arena);
     return (PyObject *)co;
+}
+
+/* For use in Py_LIMITED_API */
+#undef Py_CompileString
+PyObject *
+PyCompileString(const char *str, const char *filename, int start)
+{
+    return Py_CompileStringFlags(str, filename, start, NULL);
 }
 
 struct symtable *
@@ -2236,7 +1980,9 @@ err_input(perrdetail *err)
 {
     PyObject *v, *w, *errtype, *errtext;
     PyObject *msg_obj = NULL;
+    PyObject *filename;
     char *msg = NULL;
+
     errtype = PyExc_SyntaxError;
     switch (err->error) {
     case E_ERROR:
@@ -2320,8 +2066,17 @@ err_input(perrdetail *err)
         errtext = PyUnicode_DecodeUTF8(err->text, strlen(err->text),
                                        "replace");
     }
-    v = Py_BuildValue("(ziiN)", err->filename,
-                      err->lineno, err->offset, errtext);
+    if (err->filename != NULL)
+        filename = PyUnicode_DecodeFSDefault(err->filename);
+    else {
+        Py_INCREF(Py_None);
+        filename = Py_None;
+    }
+    if (filename != NULL)
+        v = Py_BuildValue("(NiiN)", filename,
+                          err->lineno, err->offset, errtext);
+    else
+        v = NULL;
     if (v != NULL) {
         if (msg_obj)
             w = Py_BuildValue("(OO)", msg_obj, v);
@@ -2706,7 +2461,15 @@ PyRun_SimpleString(const char *s)
 PyAPI_FUNC(PyObject *)
 Py_CompileString(const char *str, const char *p, int s)
 {
-    return Py_CompileStringFlags(str, p, s, NULL);
+    return Py_CompileStringExFlags(str, p, s, NULL, -1);
+}
+
+#undef Py_CompileStringFlags
+PyAPI_FUNC(PyObject *)
+Py_CompileStringFlags(const char *str, const char *p, int s,
+                      PyCompilerFlags *flags)
+{
+    return Py_CompileStringExFlags(str, p, s, flags, -1);
 }
 
 #undef PyRun_InteractiveOne

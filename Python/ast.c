@@ -7,7 +7,6 @@
 #include "Python-ast.h"
 #include "grammar.h"
 #include "node.h"
-#include "pyarena.h"
 #include "ast.h"
 #include "token.h"
 #include "parsetok.h"
@@ -102,6 +101,7 @@ static void
 ast_error_finish(const char *filename)
 {
     PyObject *type, *value, *tback, *errstr, *offset, *loc, *tmp;
+    PyObject *filename_obj;
     long lineno;
 
     assert(PyErr_Occurred());
@@ -130,7 +130,16 @@ ast_error_finish(const char *filename)
         Py_INCREF(Py_None);
         loc = Py_None;
     }
-    tmp = Py_BuildValue("(zlOO)", filename, lineno, offset, loc);
+    if (filename != NULL)
+        filename_obj = PyUnicode_DecodeFSDefault(filename);
+    else {
+        Py_INCREF(Py_None);
+        filename_obj = Py_None;
+    }
+    if (filename_obj != NULL)
+        tmp = Py_BuildValue("(NlOO)", filename_obj, lineno, offset, loc);
+    else
+        tmp = NULL;
     Py_DECREF(loc);
     if (!tmp) {
         Py_DECREF(errstr);
@@ -3222,7 +3231,6 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
     const char *end;
 
     if (encoding == NULL) {
-        buf = (char *)s;
         u = NULL;
     } else {
         /* check for integer overflow */

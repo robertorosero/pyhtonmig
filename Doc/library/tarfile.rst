@@ -8,6 +8,9 @@
 .. moduleauthor:: Lars Gustäbel <lars@gustaebel.de>
 .. sectionauthor:: Lars Gustäbel <lars@gustaebel.de>
 
+**Source code:** :source:`Lib/tarfile.py`
+
+--------------
 
 The :mod:`tarfile` module makes it possible to read and write tar
 archives, including those using gzip or bz2 compression.
@@ -20,7 +23,8 @@ Some facts and figures:
 * read/write support for the POSIX.1-1988 (ustar) format.
 
 * read/write support for the GNU tar format including *longname* and *longlink*
-  extensions, read-only support for the *sparse* extension.
+  extensions, read-only support for all variants of the *sparse* extension
+  including restoration of sparse files.
 
 * read/write support for the POSIX.1-2001 (pax) format.
 
@@ -335,12 +339,13 @@ be finalized; only the internally used file object will be closed. See the
       dots ``".."``.
 
 
-.. method:: TarFile.extract(member, path="")
+.. method:: TarFile.extract(member, path="", set_attrs=True)
 
    Extract a member from the archive to the current working directory, using its
    full name. Its file information is extracted as accurately as possible. *member*
    may be a filename or a :class:`TarInfo` object. You can specify a different
-   directory using *path*.
+   directory using *path*. File attributes (owner, mtime, mode) are set unless
+   *set_attrs* is False.
 
    .. note::
 
@@ -351,6 +356,8 @@ be finalized; only the internally used file object will be closed. See the
 
       See the warning for :meth:`extractall`.
 
+   .. versionchanged:: 3.2
+      Added the *set_attrs* parameter.
 
 .. method:: TarFile.extractfile(member)
 
@@ -366,19 +373,20 @@ be finalized; only the internally used file object will be closed. See the
       and :meth:`close`, and also supports iteration over its lines.
 
 
-.. method:: TarFile.add(name, arcname=None, recursive=True, exclude=None, filter=None)
+.. method:: TarFile.add(name, arcname=None, recursive=True, exclude=None, *, filter=None)
 
-   Add the file *name* to the archive. *name* may be any type of file (directory,
-   fifo, symbolic link, etc.). If given, *arcname* specifies an alternative name
-   for the file in the archive. Directories are added recursively by default. This
-   can be avoided by setting *recursive* to :const:`False`. If *exclude* is given,
-   it must be a function that takes one filename argument and returns a boolean
-   value. Depending on this value the respective file is either excluded
-   (:const:`True`) or added (:const:`False`). If *filter* is specified it must
-   be a function that takes a :class:`TarInfo` object argument and returns the
-   changed :class:`TarInfo` object. If it instead returns :const:`None` the :class:`TarInfo`
-   object will be excluded from the archive. See :ref:`tar-examples` for an
-   example.
+   Add the file *name* to the archive. *name* may be any type of file
+   (directory, fifo, symbolic link, etc.). If given, *arcname* specifies an
+   alternative name for the file in the archive. Directories are added
+   recursively by default. This can be avoided by setting *recursive* to
+   :const:`False`. If *exclude* is given, it must be a function that takes one
+   filename argument and returns a boolean value. Depending on this value the
+   respective file is either excluded (:const:`True`) or added
+   (:const:`False`). If *filter* is specified it must be a keyword argument.  It
+   should be a function that takes a :class:`TarInfo` object argument and
+   returns the changed :class:`TarInfo` object. If it instead returns
+   :const:`None` the :class:`TarInfo` object will be excluded from the
+   archive. See :ref:`tar-examples` for an example.
 
    .. versionchanged:: 3.2
       Added the *filter* parameter.

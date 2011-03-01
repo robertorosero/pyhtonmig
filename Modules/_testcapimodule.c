@@ -225,7 +225,7 @@ test_lazy_hash_inheritance(PyObject* self)
 {
     PyTypeObject *type;
     PyObject *obj;
-    long hash;
+    Py_hash_t hash;
 
     type = &_HashInheritanceTester_Type;
 
@@ -1398,7 +1398,7 @@ unicode_aswidechar(PyObject *self, PyObject *args)
     if (buffer == NULL)
         return PyErr_NoMemory();
 
-    size = PyUnicode_AsWideChar((PyUnicodeObject*)unicode, buffer, buflen);
+    size = PyUnicode_AsWideChar(unicode, buffer, buflen);
     if (size == -1) {
         PyMem_Free(buffer);
         return NULL;
@@ -1426,7 +1426,7 @@ unicode_aswidecharstring(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "U", &unicode))
         return NULL;
 
-    buffer = PyUnicode_AsWideCharString((PyUnicodeObject*)unicode, &size);
+    buffer = PyUnicode_AsWideCharString(unicode, &size);
     if (buffer == NULL)
         return NULL;
 
@@ -1741,15 +1741,16 @@ test_string_from_format(PyObject *self, PyObject *args)
 {
     PyObject *result;
     char *msg;
+    static const Py_UNICODE one[] = {'1', 0};
 
-#define CHECK_1_FORMAT(FORMAT, TYPE)                    \
-    result = PyUnicode_FromFormat(FORMAT, (TYPE)1);     \
-    if (result == NULL)                                 \
-        return NULL;                                    \
-    if (strcmp(_PyUnicode_AsString(result), "1")) {     \
-        msg = FORMAT " failed at 1";                    \
-        goto Fail;                                      \
-    }                                                   \
+#define CHECK_1_FORMAT(FORMAT, TYPE)                                \
+    result = PyUnicode_FromFormat(FORMAT, (TYPE)1);                 \
+    if (result == NULL)                                             \
+        return NULL;                                                \
+    if (Py_UNICODE_strcmp(PyUnicode_AS_UNICODE(result), one)) {     \
+        msg = FORMAT " failed at 1";                                \
+        goto Fail;                                                  \
+    }                                                               \
     Py_DECREF(result)
 
     CHECK_1_FORMAT("%d", int);
@@ -1792,7 +1793,7 @@ test_unicode_compare_with_ascii(PyObject *self) {
         return NULL;
     }
     Py_RETURN_NONE;
-};
+}
 
 /* This is here to provide a docstring for test_descr. */
 static PyObject *
@@ -2187,7 +2188,7 @@ argparsing(PyObject *o, PyObject *args)
             /* argument converter not called? */
             return NULL;
         /* Should be 1 */
-        res = PyLong_FromLong(Py_REFCNT(str2));
+        res = PyLong_FromSsize_t(Py_REFCNT(str2));
         Py_DECREF(str2);
         PyErr_Clear();
         return res;
@@ -2230,6 +2231,15 @@ make_exception_with_doc(PyObject *self, PyObject *args, PyObject *kwargs)
     return PyErr_NewExceptionWithDoc(name, doc, base, dict);
 }
 
+static PyObject *
+make_memoryview_from_NULL_pointer(PyObject *self)
+{
+    Py_buffer info;
+    if (PyBuffer_FillInfo(&info, NULL, NULL, 1, 1, PyBUF_FULL_RO) < 0)
+        return NULL;
+    return PyMemoryView_FromBuffer(&info);
+}
+
 /* Test that the fatal error from not having a current thread doesn't
    cause an infinite loop.  Run via Lib/test/test_capi.py */
 static PyObject *
@@ -2243,17 +2253,6 @@ crash_no_current_thread(PyObject *self)
     PyThreadState_Get();
     Py_END_ALLOW_THREADS
     return NULL;
-}
-
-static PyObject *
-format_unicode(PyObject *self, PyObject *args)
-{
-    const char *format;
-    PyObject *arg;
-    if (!PyArg_ParseTuple(args, "yU", &format, &arg))
-        return NULL;
-    return PyUnicode_FromFormat(format, arg);
-
 }
 
 static PyMethodDef TestMethods[] = {
@@ -2336,8 +2335,9 @@ static PyMethodDef TestMethods[] = {
     {"code_newempty",           code_newempty,                   METH_VARARGS},
     {"make_exception_with_doc", (PyCFunction)make_exception_with_doc,
      METH_VARARGS | METH_KEYWORDS},
+    {"make_memoryview_from_NULL_pointer", (PyCFunction)make_memoryview_from_NULL_pointer,
+     METH_NOARGS},
     {"crash_no_current_thread", (PyCFunction)crash_no_current_thread, METH_NOARGS},
-    {"format_unicode",          format_unicode,                 METH_VARARGS},
     {NULL, NULL} /* sentinel */
 };
 

@@ -22,7 +22,7 @@ class ArraySubclass(array.array):
 
 class ArraySubclassWithKwargs(array.array):
     def __init__(self, typecode, newarg=None):
-        array.array.__init__(typecode)
+        array.array.__init__(self)
 
 tests = [] # list to accumulate all tests
 typecodes = "ubBhHiIlLfd"
@@ -238,9 +238,9 @@ class BaseTest(unittest.TestCase):
     def test_reduce_ex(self):
         a = array.array(self.typecode, self.example)
         for protocol in range(3):
-            self.assert_(a.__reduce_ex__(protocol)[0] is array.array)
+            self.assertIs(a.__reduce_ex__(protocol)[0], array.array)
         for protocol in range(3, pickle.HIGHEST_PROTOCOL):
-            self.assert_(a.__reduce_ex__(protocol)[0] is array_reconstructor)
+            self.assertIs(a.__reduce_ex__(protocol)[0], array_reconstructor)
 
     def test_pickle(self):
         for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
@@ -398,6 +398,11 @@ class BaseTest(unittest.TestCase):
         if a.itemsize>1:
             self.assertRaises(ValueError, b.frombytes, b"x")
 
+    def test_fromarray(self):
+        a = array.array(self.typecode, self.example)
+        b = array.array(self.typecode, a)
+        self.assertEqual(a, b)
+
     def test_repr(self):
         a = array.array(self.typecode, 2*self.example)
         self.assertEqual(a, eval(repr(a), {"array": array.array}))
@@ -502,6 +507,12 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(
             a,
             array.array(self.typecode)
+        )
+
+        a = 5 * array.array(self.typecode, self.example[:1])
+        self.assertEqual(
+            a,
+            array.array(self.typecode, [a[0]] * 5)
         )
 
         self.assertRaises(TypeError, a.__mul__, "bad")
@@ -785,11 +796,11 @@ class BaseTest(unittest.TestCase):
                     data.reverse()
                     L[start:stop:step] = data
                     a[start:stop:step] = array.array(self.typecode, data)
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
                     del L[start:stop:step]
                     del a[start:stop:step]
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
     def test_index(self):
         example = 2*self.example
@@ -1106,6 +1117,11 @@ class NumberTest(BaseTest):
         self.assertEntryEqual(a[0], 7)
 
         self.assertRaises(AttributeError, setattr, a, "color", "blue")
+
+    def test_frombytearray(self):
+        a = array.array('b', range(10))
+        b = array.array(self.typecode, a)
+        self.assertEqual(a, b)
 
 class SignedNumberTest(NumberTest):
     example = [-1, 0, 1, 42, 0x7f]

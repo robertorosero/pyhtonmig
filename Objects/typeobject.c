@@ -326,7 +326,7 @@ type_abstractmethods(PyTypeObject *type, void *context)
     if (type != &PyType_Type)
         mod = PyDict_GetItemString(type->tp_dict, "__abstractmethods__");
     if (!mod) {
-        PyErr_Format(PyExc_AttributeError, "__abstractmethods__");
+        PyErr_SetString(PyExc_AttributeError, "__abstractmethods__");
         return NULL;
     }
     Py_XINCREF(mod);
@@ -340,8 +340,17 @@ type_set_abstractmethods(PyTypeObject *type, PyObject *value, void *context)
        abc.ABCMeta.__new__, so this function doesn't do anything
        special to update subclasses.
     */
-    int res = PyDict_SetItemString(type->tp_dict,
-                                   "__abstractmethods__", value);
+    int res;
+    if (value != NULL) {
+        res = PyDict_SetItemString(type->tp_dict, "__abstractmethods__", value);
+    }
+    else {
+        res = PyDict_DelItemString(type->tp_dict, "__abstractmethods__");
+        if (res && PyErr_ExceptionMatches(PyExc_KeyError)) {
+            PyErr_SetString(PyExc_AttributeError, "__abstractmethods__");
+            return -1;
+        }
+    }
     if (res == 0) {
         PyType_Modified(type);
         if (value && PyObject_IsTrue(value)) {
@@ -893,7 +902,7 @@ subtype_dealloc(PyObject *self)
 
     /* Find the nearest base with a different tp_dealloc */
     base = type;
-    while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
+    while ((/*basedealloc =*/ base->tp_dealloc) == subtype_dealloc) {
         base = base->tp_base;
         assert(base);
     }
@@ -1895,6 +1904,12 @@ type_init(PyObject *cls, PyObject *args, PyObject *kwds)
     return res;
 }
 
+long
+PyType_GetFlags(PyTypeObject *type)
+{
+    return type->tp_flags;
+}
+
 static PyObject *
 type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
@@ -2303,6 +2318,57 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
     return (PyObject *)type;
 }
+
+static short slotoffsets[] = {
+    -1, /* invalid slot */
+#include "typeslots.inc"
+};
+
+PyObject* PyType_FromSpec(PyType_Spec *spec)
+{
+    PyHeapTypeObject *res = (PyHeapTypeObject*)PyType_GenericAlloc(&PyType_Type, 0);
+    char *res_start = (char*)res;
+    PyType_Slot *slot;
+
+    if (res == NULL)
+      return NULL;
+    res->ht_name = PyUnicode_FromString(spec->name);
+    if (!res->ht_name)
+	goto fail;
+    res->ht_type.tp_name = _PyUnicode_AsString(res->ht_name);
+    if (!res->ht_type.tp_name)
+	goto fail;
+
+    res->ht_type.tp_basicsize = spec->basicsize;
+    res->ht_type.tp_itemsize = spec->itemsize;
+    res->ht_type.tp_flags = spec->flags | Py_TPFLAGS_HEAPTYPE;
+
+    for (slot = spec->slots; slot->slot; slot++) {
+	if (slot->slot >= sizeof(slotoffsets)/sizeof(slotoffsets[0])) {
+	    PyErr_SetString(PyExc_RuntimeError, "invalid slot offset");
+	    goto fail;
+	}
+	*(void**)(res_start + slotoffsets[slot->slot]) = slot->pfunc;
+
+        /* need to make a copy of the docstring slot, which usually
+           points to a static string literal */
+        if (slot->slot == Py_tp_doc) {
+            ssize_t len = strlen(slot->pfunc)+1;
+            char *tp_doc = PyObject_MALLOC(len);
+            if (tp_doc == NULL)
+	    	goto fail;
+            memcpy(tp_doc, slot->pfunc, len);
+            res->ht_type.tp_doc = tp_doc;
+        }
+    }
+
+    return (PyObject*)res;
+
+ fail:
+    Py_DECREF(res);
+    return NULL;
+}
+
 
 /* Internal API to look for a name through the MRO.
    This returns a borrowed reference, and doesn't set an exception! */
@@ -2898,10 +2964,7 @@ same_slots_added(PyTypeObject *a, PyTypeObject *b)
     Py_ssize_t size;
     PyObject *slots_a, *slots_b;
 
-    if (base != b->tp_base)
-        return 0;
-    if (equiv_structs(a, base) && equiv_structs(b, base))
-        return 1;
+    assert(base == b->tp_base);
     size = base->tp_basicsize;
     if (a->tp_dictoffset == size && b->tp_dictoffset == size)
         size += sizeof(PyObject *);
@@ -4314,14 +4377,14 @@ static PyObject *
 wrap_hashfunc(PyObject *self, PyObject *args, void *wrapped)
 {
     hashfunc func = (hashfunc)wrapped;
-    long res;
+    Py_hash_t res;
 
     if (!check_num_args(args, 0))
         return NULL;
     res = (*func)(self);
     if (res == -1 && PyErr_Occurred())
         return NULL;
-    return PyLong_FromLong(res);
+    return PyLong_FromSsize_t(res);
 }
 
 static PyObject *
@@ -4918,13 +4981,12 @@ slot_tp_str(PyObject *self)
     }
 }
 
-static long
+static Py_hash_t
 slot_tp_hash(PyObject *self)
 {
     PyObject *func, *res;
     static PyObject *hash_str;
-    long h;
-    int overflow;
+    Py_ssize_t h;
 
     func = lookup_method(self, "__hash__", &hash_str);
 
@@ -4947,20 +5009,23 @@ slot_tp_hash(PyObject *self)
                         "__hash__ method should return an integer");
         return -1;
     }
-    /* Transform the PyLong `res` to a C long `h`.  For an existing
-       hashable Python object x, hash(x) will always lie within the range
-       of a C long.  Therefore our transformation must preserve values
-       that already lie within this range, to ensure that if x.__hash__()
-       returns hash(y) then hash(x) == hash(y). */
-    h = PyLong_AsLongAndOverflow(res, &overflow);
-    if (overflow)
-        /* res was not within the range of a C long, so we're free to
+    /* Transform the PyLong `res` to a Py_hash_t `h`.  For an existing
+       hashable Python object x, hash(x) will always lie within the range of
+       Py_hash_t.  Therefore our transformation must preserve values that
+       already lie within this range, to ensure that if x.__hash__() returns
+       hash(y) then hash(x) == hash(y). */
+    h = PyLong_AsSsize_t(res);
+    if (h == -1 && PyErr_Occurred()) {
+        /* res was not within the range of a Py_hash_t, so we're free to
            use any sufficiently bit-mixing transformation;
            long.__hash__ will do nicely. */
+        PyErr_Clear();
         h = PyLong_Type.tp_hash(res);
-    Py_DECREF(res);
-    if (h == -1 && !PyErr_Occurred())
+    }
+    /* -1 is reserved for errors. */
+    if (h == -1)
         h = -2;
+    Py_DECREF(res);
     return h;
 }
 
@@ -6162,7 +6227,7 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
            and first local variable on the stack. */
         PyFrameObject *f = PyThreadState_GET()->frame;
         PyCodeObject *co = f->f_code;
-        int i, n;
+        Py_ssize_t i, n;
         if (co == NULL) {
             PyErr_SetString(PyExc_SystemError,
                             "super(): no code object");

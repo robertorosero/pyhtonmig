@@ -787,9 +787,9 @@ Encodings and Unicode
 ---------------------
 
 Strings are stored internally as sequences of codepoints (to be precise
-as :ctype:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
-via :option:`--without-wide-unicode` or :option:`--with-wide-unicode`, with the
-former being the default) :ctype:`Py_UNICODE` is either a 16-bit or 32-bit data
+as :c:type:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
+via ``--without-wide-unicode`` or ``--with-wide-unicode``, with the
+former being the default) :c:type:`Py_UNICODE` is either a 16-bit or 32-bit data
 type. Once a string object is used outside of CPU and memory, CPU endianness
 and how these arrays are stored as bytes become an issue.  Transforming a
 string object into a sequence of bytes is called encoding and recreating the
@@ -903,6 +903,15 @@ encoding is likely used. Neither the list of aliases nor the list of languages
 is meant to be exhaustive. Notice that spelling alternatives that only differ in
 case or use a hyphen instead of an underscore are also valid aliases; therefore,
 e.g. ``'utf-8'`` is a valid alias for the ``'utf_8'`` codec.
+
+.. impl-detail::
+
+   Some common encodings can bypass the codecs lookup machinery to
+   improve performance.  These optimization opportunities are only
+   recognized by CPython for a limited set of aliases: utf-8, utf8,
+   latin-1, latin1, iso-8859-1, mbcs (Windows only), ascii, utf-16,
+   and utf-32.  Using alternative spellings for these encodings may
+   result in slower execution.
 
 Many of the character sets support the same languages. They vary in individual
 characters (e.g. whether the EURO SIGN is supported or not), and in the
@@ -1114,9 +1123,9 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | utf_16          | U16, utf16                     | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_be       | UTF-16BE                       | all languages (BMP only)       |
+| utf_16_be       | UTF-16BE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_le       | UTF-16LE                       | all languages (BMP only)       |
+| utf_16_le       | UTF-16LE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
 | utf_7           | U7, unicode-1-1-utf-7          | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
@@ -1164,6 +1173,44 @@ particular, the following variants typically exist:
 |                    |         | representation of the     |
 |                    |         | operand                   |
 +--------------------+---------+---------------------------+
+
+The following codecs provide bytes-to-bytes mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| base64_codec       | base64, base-64           | Convert operand to MIME   |
+|                    |                           | base64                    |
++--------------------+---------------------------+---------------------------+
+| bz2_codec          | bz2                       | Compress the operand      |
+|                    |                           | using bz2                 |
++--------------------+---------------------------+---------------------------+
+| hex_codec          | hex                       | Convert operand to        |
+|                    |                           | hexadecimal               |
+|                    |                           | representation, with two  |
+|                    |                           | digits per byte           |
++--------------------+---------------------------+---------------------------+
+| quopri_codec       | quopri, quoted-printable, | Convert operand to MIME   |
+|                    | quotedprintable           | quoted printable          |
++--------------------+---------------------------+---------------------------+
+| uu_codec           | uu                        | Convert the operand using |
+|                    |                           | uuencode                  |
++--------------------+---------------------------+---------------------------+
+| zlib_codec         | zip, zlib                 | Compress the operand      |
+|                    |                           | using gzip                |
++--------------------+---------------------------+---------------------------+
+
+The following codecs provide string-to-string mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| rot_13             | rot13                     | Returns the Caesar-cypher |
+|                    |                           | encryption of the operand |
++--------------------+---------------------------+---------------------------+
+
+.. versionadded:: 3.2
+   bytes-to-bytes and string-to-string codecs.
 
 
 :mod:`encodings.idna` --- Internationalized Domain Names in Applications

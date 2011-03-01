@@ -35,6 +35,9 @@ It defines the following constants and functions:
 
    Raised on thread-specific errors.
 
+   .. versionchanged:: 3.3
+      This is now a synonym of the built-in :exc:`RuntimeError`.
+
 
 .. data:: LockType
 
@@ -136,6 +139,10 @@ Lock objects have the following methods:
 
    .. versionchanged:: 3.2
       The *timeout* parameter is new.
+
+   .. versionchanged:: 3.2
+      Lock acquires can now be interrupted by signals on POSIX.
+
 
 .. method:: lock.release()
 

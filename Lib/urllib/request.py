@@ -94,6 +94,7 @@ import re
 import socket
 import sys
 import time
+import collections
 
 from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
@@ -105,7 +106,7 @@ from urllib.response import addinfourl, addclosehook
 # check for SSL
 try:
     import ssl
-except:
+except ImportError:
     _have_ssl = False
 else:
     _have_ssl = True
@@ -114,11 +115,27 @@ else:
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+            *, cafile=None, capath=None):
     global _opener
-    if _opener is None:
-        _opener = build_opener()
-    return _opener.open(url, data, timeout)
+    if cafile or capath:
+        if not _have_ssl:
+            raise ValueError('SSL support not available')
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.options |= ssl.OP_NO_SSLv2
+        if cafile or capath:
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile, capath)
+            check_hostname = True
+        else:
+            check_hostname = False
+        https_handler = HTTPSHandler(context=context, check_hostname=check_hostname)
+        opener = build_opener(https_handler)
+    elif _opener is None:
+        _opener = opener = build_opener()
+    else:
+        opener = _opener
+    return opener.open(url, data, timeout)
 
 def install_opener(opener):
     global _opener
@@ -258,8 +275,9 @@ class OpenerDirector:
     def __init__(self):
         client_version = "Python-urllib/%s" % __version__
         self.addheaders = [('User-agent', client_version)]
-        # manage the individual handlers
+        # self.handlers is retained only for backward compatibility
         self.handlers = []
+        # manage the individual handlers
         self.handle_open = {}
         self.handle_error = {}
         self.process_response = {}
@@ -309,8 +327,6 @@ class OpenerDirector:
             added = True
 
         if added:
-            # the handlers must work in an specific order, the order
-            # is specified in a Handler attribute
             bisect.insort(self.handlers, handler)
             handler.add_parent(self)
 
@@ -1032,13 +1048,24 @@ class AbstractHTTPHandler(BaseHandler):
 
         if request.data is not None:  # POST
             data = request.data
+            if isinstance(data, str):
+                raise TypeError("POST data should be bytes"
+                        " or an iterable of bytes. It cannot be str.")
             if not request.has_header('Content-type'):
                 request.add_unredirected_header(
                     'Content-type',
                     'application/x-www-form-urlencoded')
             if not request.has_header('Content-length'):
-                request.add_unredirected_header(
-                    'Content-length', '%d' % len(data))
+                try:
+                    mv = memoryview(data)
+                except TypeError:
+                    if isinstance(data, collections.Iterable):
+                        raise ValueError("Content-Length should be specified "
+                                "for iterable data of type %r %r" % (type(data),
+                                data))
+                else:
+                    request.add_unredirected_header(
+                            'Content-length', '%d' % (len(mv) * mv.itemsize))
 
         sel_host = host
         if request.has_proxy():
@@ -1053,7 +1080,7 @@ class AbstractHTTPHandler(BaseHandler):
 
         return request
 
-    def do_open(self, http_class, req):
+    def do_open(self, http_class, req, **http_conn_args):
         """Return an HTTPResponse object for the request, using http_class.
 
         http_class must implement the HTTPConnection API from http.client.
@@ -1062,7 +1089,8 @@ class AbstractHTTPHandler(BaseHandler):
         if not host:
             raise URLError('no host given')
 
-        h = http_class(host, timeout=req.timeout) # will parse host:port
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
 
         headers = dict(req.unredirected_hdrs)
         headers.update(dict((k, v) for k, v in req.headers.items()
@@ -1114,10 +1142,18 @@ class HTTPHandler(AbstractHTTPHandler):
     http_request = AbstractHTTPHandler.do_request_
 
 if hasattr(http.client, 'HTTPSConnection'):
+    import ssl
+
     class HTTPSHandler(AbstractHTTPHandler):
 
+        def __init__(self, debuglevel=0, context=None, check_hostname=None):
+            AbstractHTTPHandler.__init__(self, debuglevel)
+            self._context = context
+            self._check_hostname = check_hostname
+
         def https_open(self, req):
-            return self.do_open(http.client.HTTPSConnection, req)
+            return self.do_open(http.client.HTTPSConnection, req,
+                context=self._context, check_hostname=self._check_hostname)
 
         https_request = AbstractHTTPHandler.do_request_
 
@@ -1203,8 +1239,8 @@ class FileHandler(BaseHandler):
         url = req.selector
         if url[:2] == '//' and url[2:3] != '/' and (req.host and
                 req.host != 'localhost'):
-            req.type = 'ftp'
-            return self.parent.open(req)
+            if not req.host is self.get_names():
+                raise URLError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(req)
 
@@ -1275,8 +1311,8 @@ class FTPHandler(BaseHandler):
         else:
             passwd = None
         host = unquote(host)
-        user = unquote(user or '')
-        passwd = unquote(passwd or '')
+        user = user or ''
+        passwd = passwd or ''
 
         try:
             host = socket.gethostbyname(host)
@@ -1687,7 +1723,7 @@ class URLopener:
         if not isinstance(url, str):
             raise URLError('file error', 'proxy support for file protocol currently not implemented')
         if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
-            return self.open_ftp(url)
+            raise ValueError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(url)
 
@@ -1810,7 +1846,7 @@ class URLopener:
         if encoding == 'base64':
             import base64
             # XXX is this encoding/decoding ok?
-            data = base64.decodebytes(data.encode('ascii')).decode('latin1')
+            data = base64.decodebytes(data.encode('ascii')).decode('latin-1')
         else:
             data = unquote(data)
         msg.append('Content-Length: %d' % len(data))

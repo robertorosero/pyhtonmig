@@ -6,7 +6,7 @@ import builtins
 from itertools import islice
 try:
     from _thread import get_ident
-except AttributeError:
+except ImportError:
     from _dummy_thread import get_ident
 
 def recursive_repr(fillvalue='...'):
@@ -30,6 +30,7 @@ def recursive_repr(fillvalue='...'):
         wrapper.__module__ = getattr(user_function, '__module__')
         wrapper.__doc__ = getattr(user_function, '__doc__')
         wrapper.__name__ = getattr(user_function, '__name__')
+        wrapper.__annotations__ = getattr(user_function, '__annotations__', {})
         return wrapper
 
     return decorating_function

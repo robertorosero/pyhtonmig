@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-1 -*-
 """ Test script for the Unicode implementation.
 
 Written by Marc-Andre Lemburg (mal@lemburg.com).
@@ -12,6 +11,7 @@ import sys
 import unittest
 import warnings
 from test import support, string_tests
+import _string
 
 # Error handling (bad decoder return)
 def search_function(encoding):
@@ -403,11 +403,11 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertTrue("b0".isidentifier())
         self.assertTrue("bc".isidentifier())
         self.assertTrue("b_".isidentifier())
-        self.assertTrue("µ".isidentifier())
+        self.assertTrue("Âµ".isidentifier())
 
         self.assertFalse(" ".isidentifier())
         self.assertFalse("[".isidentifier())
-        self.assertFalse("©".isidentifier())
+        self.assertFalse("Â©".isidentifier())
         self.assertFalse("0".isidentifier())
 
     def test_isprintable(self):
@@ -695,6 +695,46 @@ class UnicodeTest(string_tests.CommonTest,
         # Alternate formatting is not supported
         self.assertRaises(ValueError, format, '', '#')
         self.assertRaises(ValueError, format, '', '#20')
+
+    def test_format_map(self):
+        self.assertEqual(''.format_map({}), '')
+        self.assertEqual('a'.format_map({}), 'a')
+        self.assertEqual('ab'.format_map({}), 'ab')
+        self.assertEqual('a{{'.format_map({}), 'a{')
+        self.assertEqual('a}}'.format_map({}), 'a}')
+        self.assertEqual('{{b'.format_map({}), '{b')
+        self.assertEqual('}}b'.format_map({}), '}b')
+        self.assertEqual('a{{b'.format_map({}), 'a{b')
+
+        # using mappings
+        class Mapping(dict):
+            def __missing__(self, key):
+                return key
+        self.assertEqual('{hello}'.format_map(Mapping()), 'hello')
+        self.assertEqual('{a} {world}'.format_map(Mapping(a='hello')), 'hello world')
+
+        class InternalMapping:
+            def __init__(self):
+                self.mapping = {'a': 'hello'}
+            def __getitem__(self, key):
+                return self.mapping[key]
+        self.assertEqual('{a}'.format_map(InternalMapping()), 'hello')
+
+
+        class C:
+            def __init__(self, x=100):
+                self._x = x
+            def __format__(self, spec):
+                return spec
+        self.assertEqual('{foo._x}'.format_map({'foo': C(20)}), '20')
+
+        # test various errors
+        self.assertRaises(TypeError, '{'.format_map)
+        self.assertRaises(TypeError, '}'.format_map)
+        self.assertRaises(TypeError, 'a{'.format_map)
+        self.assertRaises(TypeError, 'a}'.format_map)
+        self.assertRaises(TypeError, '{a'.format_map)
+        self.assertRaises(TypeError, '}a'.format_map)
 
     def test_format_auto_numbering(self):
         class C:
@@ -1129,18 +1169,26 @@ class UnicodeTest(string_tests.CommonTest,
         # Error handling (wrong arguments)
         self.assertRaises(TypeError, "hello".encode, 42, 42, 42)
 
-        # Error handling (PyUnicode_EncodeDecimal())
-        self.assertRaises(UnicodeError, int, "\u0200")
+        # Error handling (lone surrogate in PyUnicode_TransformDecimalToASCII())
+        self.assertRaises(UnicodeError, int, "\ud800")
+        self.assertRaises(UnicodeError, int, "\udf00")
+        self.assertRaises(UnicodeError, float, "\ud800")
+        self.assertRaises(UnicodeError, float, "\udf00")
+        self.assertRaises(UnicodeError, complex, "\ud800")
+        self.assertRaises(UnicodeError, complex, "\udf00")
 
     def test_codecs(self):
         # Encoding
         self.assertEqual('hello'.encode('ascii'), b'hello')
         self.assertEqual('hello'.encode('utf-7'), b'hello')
         self.assertEqual('hello'.encode('utf-8'), b'hello')
-        self.assertEqual('hello'.encode('utf8'), b'hello')
+        self.assertEqual('hello'.encode('utf-8'), b'hello')
         self.assertEqual('hello'.encode('utf-16-le'), b'h\000e\000l\000l\000o\000')
         self.assertEqual('hello'.encode('utf-16-be'), b'\000h\000e\000l\000l\000o')
         self.assertEqual('hello'.encode('latin-1'), b'hello')
+
+        # Default encoding is utf-8
+        self.assertEqual('\u2603'.encode(), b'\xe2\x98\x83')
 
         # Roundtrip safety for BMP (just the first 1024 chars)
         for c in range(1024):
@@ -1349,7 +1397,7 @@ class UnicodeTest(string_tests.CommonTest,
 
     def test_printable_repr(self):
         self.assertEqual(repr('\U00010000'), "'%c'" % (0x10000,)) # printable
-        self.assertEqual(repr('\U00011000'), "'\\U00011000'")     # nonprintable
+        self.assertEqual(repr('\U00014000'), "'\\U00014000'")     # nonprintable
 
     def test_expandtabs_overflows_gracefully(self):
         # This test only affects 32-bit platforms because expandtabs can only take
@@ -1379,45 +1427,66 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual("%s" % s, '__str__ overridden')
         self.assertEqual("{}".format(s), '__str__ overridden')
 
+    # Test PyUnicode_FromFormat()
     def test_from_format(self):
-        # Ensure that PyUnicode_FromFormat() raises an error for a non-ascii
-        # format string.
-        from _testcapi import format_unicode
+        support.import_module('ctypes')
+        from ctypes import pythonapi, py_object, c_int
+        if sys.maxunicode == 65535:
+            name = "PyUnicodeUCS2_FromFormat"
+        else:
+            name = "PyUnicodeUCS4_FromFormat"
+        _PyUnicode_FromFormat = getattr(pythonapi, name)
+        _PyUnicode_FromFormat.restype = py_object
+
+        def PyUnicode_FromFormat(format, *args):
+            cargs = tuple(
+                py_object(arg) if isinstance(arg, str) else arg
+                for arg in args)
+            return _PyUnicode_FromFormat(format, *cargs)
 
         # ascii format, non-ascii argument
-        text = format_unicode(b'ascii\x7f=%U', 'unicode\xe9')
+        text = PyUnicode_FromFormat(b'ascii\x7f=%U', 'unicode\xe9')
         self.assertEqual(text, 'ascii\x7f=unicode\xe9')
 
-        # non-ascii format, ascii argument
-        self.assertRaisesRegexp(ValueError,
+        # non-ascii format, ascii argument: ensure that PyUnicode_FromFormatV()
+        # raises an error
+        self.assertRaisesRegex(ValueError,
             '^PyUnicode_FromFormatV\(\) expects an ASCII-encoded format '
             'string, got a non-ASCII byte: 0xe9$',
-            format_unicode, b'unicode\xe9=%s', 'ascii')
+            PyUnicode_FromFormat, b'unicode\xe9=%s', 'ascii')
+
+        self.assertEqual(PyUnicode_FromFormat(b'%c', c_int(0xabcd)), '\uabcd')
+        self.assertEqual(PyUnicode_FromFormat(b'%c', c_int(0x10ffff)), '\U0010ffff')
+
+        # other tests
+        text = PyUnicode_FromFormat(b'%%A:%A', 'abc\xe9\uabcd\U0010ffff')
+        self.assertEqual(text, r"%A:'abc\xe9\uabcd\U0010ffff'")
 
     # Test PyUnicode_AsWideChar()
     def test_aswidechar(self):
         from _testcapi import unicode_aswidechar
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidechar('abcdef', 2)
-        self.assertEquals(size, 2)
-        self.assertEquals(wchar, 'ab')
+        self.assertEqual(size, 2)
+        self.assertEqual(wchar, 'ab')
 
         wchar, size = unicode_aswidechar('abc', 3)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc')
 
         wchar, size = unicode_aswidechar('abc', 4)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidechar('abc', 10)
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidechar('abc\0def', 20)
-        self.assertEquals(size, 7)
-        self.assertEquals(wchar, 'abc\0def\0')
+        self.assertEqual(size, 7)
+        self.assertEqual(wchar, 'abc\0def\0')
 
         nonbmp = chr(0x10ffff)
         if sizeof(c_wchar) == 2:
@@ -1427,21 +1496,22 @@ class UnicodeTest(string_tests.CommonTest,
             buflen = 2
             nchar = 1
         wchar, size = unicode_aswidechar(nonbmp, buflen)
-        self.assertEquals(size, nchar)
-        self.assertEquals(wchar, nonbmp + '\0')
+        self.assertEqual(size, nchar)
+        self.assertEqual(wchar, nonbmp + '\0')
 
     # Test PyUnicode_AsWideCharString()
     def test_aswidecharstring(self):
         from _testcapi import unicode_aswidecharstring
+        support.import_module('ctypes')
         from ctypes import c_wchar, sizeof
 
         wchar, size = unicode_aswidecharstring('abc')
-        self.assertEquals(size, 3)
-        self.assertEquals(wchar, 'abc\0')
+        self.assertEqual(size, 3)
+        self.assertEqual(wchar, 'abc\0')
 
         wchar, size = unicode_aswidecharstring('abc\0def')
-        self.assertEquals(size, 7)
-        self.assertEquals(wchar, 'abc\0def\0')
+        self.assertEqual(size, 7)
+        self.assertEqual(wchar, 'abc\0def\0')
 
         nonbmp = chr(0x10ffff)
         if sizeof(c_wchar) == 2:
@@ -1449,8 +1519,59 @@ class UnicodeTest(string_tests.CommonTest,
         else: # sizeof(c_wchar) == 4
             nchar = 1
         wchar, size = unicode_aswidecharstring(nonbmp)
-        self.assertEquals(size, nchar)
-        self.assertEquals(wchar, nonbmp + '\0')
+        self.assertEqual(size, nchar)
+        self.assertEqual(wchar, nonbmp + '\0')
+
+
+class StringModuleTest(unittest.TestCase):
+    def test_formatter_parser(self):
+        def parse(format):
+            return list(_string.formatter_parser(format))
+
+        formatter = parse("prefix {2!s}xxx{0:^+10.3f}{obj.attr!s} {z[0]!s:10}")
+        self.assertEqual(formatter, [
+            ('prefix ', '2', '', 's'),
+            ('xxx', '0', '^+10.3f', None),
+            ('', 'obj.attr', '', 's'),
+            (' ', 'z[0]', '10', 's'),
+        ])
+
+        formatter = parse("prefix {} suffix")
+        self.assertEqual(formatter, [
+            ('prefix ', '', '', None),
+            (' suffix', None, None, None),
+        ])
+
+        formatter = parse("str")
+        self.assertEqual(formatter, [
+            ('str', None, None, None),
+        ])
+
+        formatter = parse("")
+        self.assertEqual(formatter, [])
+
+        formatter = parse("{0}")
+        self.assertEqual(formatter, [
+            ('', '0', '', None),
+        ])
+
+        self.assertRaises(TypeError, _string.formatter_parser, 1)
+
+    def test_formatter_field_name_split(self):
+        def split(name):
+            items = list(_string.formatter_field_name_split(name))
+            items[1] = list(items[1])
+            return items
+        self.assertEqual(split("obj"), ["obj", []])
+        self.assertEqual(split("obj.arg"), ["obj", [(True, 'arg')]])
+        self.assertEqual(split("obj[key]"), ["obj", [(False, 'key')]])
+        self.assertEqual(split("obj.arg[key1][key2]"), [
+            "obj",
+            [(True, 'arg'),
+             (False, 'key1'),
+             (False, 'key2'),
+            ]])
+        self.assertRaises(TypeError, _string.formatter_field_name_split, 1)
 
 
 def test_main():

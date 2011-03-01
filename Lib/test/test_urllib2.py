@@ -4,6 +4,7 @@ from test import support
 import os
 import io
 import socket
+import array
 
 import urllib.request
 from urllib.request import Request, OpenerDirector
@@ -598,7 +599,7 @@ class OpenerDirectorTests(unittest.TestCase):
 
 def sanepathname2url(path):
     try:
-        path.encode("utf8")
+        path.encode("utf-8")
     except UnicodeEncodeError:
         raise unittest.SkipTest("path is not encodable to utf8")
     urlpath = urllib.request.pathname2url(path)
@@ -631,22 +632,32 @@ class HandlerTests(unittest.TestCase):
         h = NullFTPHandler(data)
         o = h.parent = MockOpener()
 
-        for url, host, port, type_, dirs, filename, mimetype in [
+        for url, host, port, user, passwd, type_, dirs, filename, mimetype in [
             ("ftp://localhost/foo/bar/baz.html",
-             "localhost", ftplib.FTP_PORT, "I",
+             "localhost", ftplib.FTP_PORT, "", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "parrot", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://%25parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "%parrot", "", "I",
+             ["foo", "bar"], "baz.html", "text/html"),
+            ("ftp://%2542parrot@localhost/foo/bar/baz.html",
+             "localhost", ftplib.FTP_PORT, "%42parrot", "", "I",
              ["foo", "bar"], "baz.html", "text/html"),
             ("ftp://localhost:80/foo/bar/",
-             "localhost", 80, "D",
+             "localhost", 80, "", "", "D",
              ["foo", "bar"], "", None),
             ("ftp://localhost/baz.gif;type=a",
-             "localhost", ftplib.FTP_PORT, "A",
+             "localhost", ftplib.FTP_PORT, "", "", "A",
              [], "baz.gif", None),  # XXX really this should guess image/gif
             ]:
             req = Request(url)
             req.timeout = None
             r = h.ftp_open(req)
             # ftp authentication not yet implemented by FTPHandler
-            self.assertTrue(h.user == h.passwd == "")
+            self.assertEqual(h.user, user)
+            self.assertEqual(h.passwd, passwd)
             self.assertEqual(h.host, socket.gethostbyname(host))
             self.assertEqual(h.port, port)
             self.assertEqual(h.dirs, dirs)
@@ -731,11 +742,11 @@ class HandlerTests(unittest.TestCase):
         # file:///blah.txt (a file)
         # file://ftp.example.com/blah.txt (an ftp URL)
         for url, ftp in [
-            ("file://ftp.example.com//foo.txt", True),
+            ("file://ftp.example.com//foo.txt", False),
             ("file://ftp.example.com///foo.txt", False),
 # XXXX bug: fails with OSError, should be URLError
             ("file://ftp.example.com/foo.txt", False),
-            ("file://somehost//foo/something.txt", True),
+            ("file://somehost//foo/something.txt", False),
             ("file://localhost//foo/something.txt", False),
             ]:
             req = Request(url)
@@ -747,7 +758,7 @@ class HandlerTests(unittest.TestCase):
             else:
                 self.assertIs(o.req, req)
                 self.assertEqual(req.type, "ftp")
-            self.assertEqual(req.type is "ftp", ftp)
+            self.assertEqual(req.type == "ftp", ftp)
 
     def test_http(self):
 
@@ -755,7 +766,7 @@ class HandlerTests(unittest.TestCase):
         o = h.parent = MockOpener()
 
         url = "http://example.com/"
-        for method, data in [("GET", None), ("POST", "blah")]:
+        for method, data in [("GET", None), ("POST", b"blah")]:
             req = Request(url, data, {"Foo": "bar"})
             req.timeout = None
             req.add_unredirected_header("Spam", "eggs")
@@ -783,9 +794,13 @@ class HandlerTests(unittest.TestCase):
         http.raise_on_endheaders = True
         self.assertRaises(urllib.error.URLError, h.do_open, http, req)
 
+        # Check for TypeError on POST data which is str.
+        req = Request("http://example.com/","badpost")
+        self.assertRaises(TypeError, h.do_request_, req)
+
         # check adding of standard headers
         o.addheaders = [("Spam", "eggs")]
-        for data in "", None:  # POST, GET
+        for data in b"", None:  # POST, GET
             req = Request("http://example.com/", data)
             r = MockResponse(200, "OK", {}, "")
             newreq = h.do_request_(req)
@@ -811,6 +826,48 @@ class HandlerTests(unittest.TestCase):
             self.assertEqual(req.unredirected_hdrs["Host"], "baz")
             self.assertEqual(req.unredirected_hdrs["Spam"], "foo")
 
+        # Check iterable body support
+        def iterable_body():
+            yield b"one"
+            yield b"two"
+            yield b"three"
+
+        for headers in {}, {"Content-Length": 11}:
+            req = Request("http://example.com/", iterable_body(), headers)
+            if not headers:
+                # Having an iterable body without a Content-Length should
+                # raise an exception
+                self.assertRaises(ValueError, h.do_request_, req)
+            else:
+                newreq = h.do_request_(req)
+
+        # A file object.
+        # Test only Content-Length attribute of request.
+
+        file_obj = io.BytesIO()
+        file_obj.write(b"Something\nSomething\nSomething\n")
+
+        for headers in {}, {"Content-Length": 30}:
+            req = Request("http://example.com/", file_obj, headers)
+            if not headers:
+                # Having an iterable body without a Content-Length should
+                # raise an exception
+                self.assertRaises(ValueError, h.do_request_, req)
+            else:
+                newreq = h.do_request_(req)
+                self.assertEqual(int(newreq.get_header('Content-length')),30)
+
+        file_obj.close()
+
+        # array.array Iterable - Content Length is calculated
+
+        iterable_array = array.array("I",[1,2,3,4])
+
+        for headers in {}, {"Content-Length": 16}:
+            req = Request("http://example.com/", iterable_array, headers)
+            newreq = h.do_request_(req)
+            self.assertEqual(int(newreq.get_header('Content-length')),16)
+
     def test_http_doubleslash(self):
         # Checks the presence of any unnecessary double slash in url does not
         # break anything. Previously, a double slash directly after the host
@@ -818,7 +875,7 @@ class HandlerTests(unittest.TestCase):
         h = urllib.request.AbstractHTTPHandler()
         o = h.parent = MockOpener()
 
-        data = ""
+        data = b""
         ds_urls = [
             "http://example.com/foo/bar/baz.html",
             "http://example.com//foo/bar/baz.html",
@@ -837,6 +894,25 @@ class HandlerTests(unittest.TestCase):
             ds_req.set_proxy("someproxy:3128",None)
             p_ds_req = h.do_request_(ds_req)
             self.assertEqual(p_ds_req.unredirected_hdrs["Host"],"example.com")
+
+    def test_fixpath_in_weirdurls(self):
+        # Issue4493: urllib2 to supply '/' when to urls where path does not
+        # start with'/'
+
+        h = urllib.request.AbstractHTTPHandler()
+        o = h.parent = MockOpener()
+
+        weird_url = 'http://www.python.org?getspam'
+        req = Request(weird_url)
+        newreq = h.do_request_(req)
+        self.assertEqual(newreq.host,'www.python.org')
+        self.assertEqual(newreq.selector,'/?getspam')
+
+        url_without_path = 'http://www.python.org'
+        req = Request(url_without_path)
+        newreq = h.do_request_(req)
+        self.assertEqual(newreq.host,'www.python.org')
+        self.assertEqual(newreq.selector,'')
 
 
     def test_errors(self):

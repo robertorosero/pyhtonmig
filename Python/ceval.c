@@ -13,7 +13,6 @@
 
 #include "code.h"
 #include "frameobject.h"
-#include "eval.h"
 #include "opcode.h"
 #include "structmember.h"
 
@@ -27,10 +26,11 @@
 
 typedef unsigned long long uint64;
 
-#if defined(__ppc__) /* <- Don't know if this is the correct symbol; this
-                           section should work for GCC on any PowerPC
-                           platform, irrespective of OS.
-                           POWER?  Who knows :-) */
+/* PowerPC suppport.
+   "__ppc__" appears to be the preprocessor definition to detect on OS X, whereas
+   "__powerpc__" appears to be the correct one for Linux with GCC
+*/
+#if defined(__ppc__) || defined (__powerpc__)
 
 #define READ_TIMESTAMP(var) ppc_getcounter(&var)
 
@@ -756,7 +756,7 @@ static int _Py_TracingPossible = 0;
 
 
 PyObject *
-PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
 {
     return PyEval_EvalCodeEx(co,
                       globals, locals,
@@ -811,10 +811,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     unsigned char *first_instr;
     PyObject *names;
     PyObject *consts;
-#if defined(Py_DEBUG) || defined(LLTRACE)
-    /* Make it easier to find out where we are with a debugger */
-    char *filename;
-#endif
 
 /* Computed GOTOs, or
        the-optimization-commonly-but-improperly-known-as-"threaded code"
@@ -1226,14 +1222,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 #ifdef LLTRACE
     lltrace = PyDict_GetItemString(f->f_globals, "__lltrace__") != NULL;
-#endif
-#if defined(Py_DEBUG) || defined(LLTRACE)
-    {
-        PyObject *error_type, *error_value, *error_traceback;
-        PyErr_Fetch(&error_type, &error_value, &error_traceback);
-        filename = _PyUnicode_AsString(co->co_filename);
-        PyErr_Restore(error_type, error_value, error_traceback);
-    }
 #endif
 
     why = WHY_NOT;
@@ -2098,7 +2086,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 /* Inline the PyDict_GetItem() calls.
                    WARNING: this is an extreme speed hack.
                    Do not try this at home. */
-                long hash = ((PyUnicodeObject *)w)->hash;
+                Py_hash_t hash = ((PyUnicodeObject *)w)->hash;
                 if (hash != -1) {
                     PyDictObject *d;
                     PyDictEntry *e;
@@ -2702,7 +2690,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
                 Py_DECREF(*pfunc);
                 *pfunc = self;
                 na++;
-                n++;
+                /* n++; */
             } else
                 Py_INCREF(func);
             sp = stack_pointer;
@@ -3038,7 +3026,7 @@ fast_yield:
                                 PyTrace_RETURN, retval)) {
                 Py_XDECREF(retval);
                 retval = NULL;
-                why = WHY_EXCEPTION;
+                /* why = WHY_EXCEPTION; */
             }
         }
     }
@@ -3056,10 +3044,11 @@ exit_eval_frame:
    the test in the if statements in Misc/gdbinit (pystack and pystackv). */
 
 PyObject *
-PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
+PyEval_EvalCodeEx(PyObject *_co, PyObject *globals, PyObject *locals,
            PyObject **args, int argcount, PyObject **kws, int kwcount,
            PyObject **defs, int defcount, PyObject *kwdefs, PyObject *closure)
 {
+    PyCodeObject* co = (PyCodeObject*)_co;
     register PyFrameObject *f;
     register PyObject *retval = NULL;
     register PyObject **fastlocals, **freevars;
@@ -3965,7 +3954,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
         d = &PyTuple_GET_ITEM(argdefs, 0);
         nd = Py_SIZE(argdefs);
     }
-    return PyEval_EvalCodeEx(co, globals,
+    return PyEval_EvalCodeEx((PyObject*)co, globals,
                              (PyObject *)NULL, (*pp_stack)-n, na,
                              (*pp_stack)-2*nk, nk, d, nd, kwdefs,
                              PyFunction_GET_CLOSURE(func));

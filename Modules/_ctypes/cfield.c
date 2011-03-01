@@ -9,6 +9,7 @@
 
 #define CTYPES_CFIELD_CAPSULE_NAME_PYMEM "_ctypes/cfield.c pymem"
 
+#if Py_UNICODE_SIZE != SIZEOF_WCHAR_T
 static void pymem_destructor(PyObject *ptr)
 {
     void *p = PyCapsule_GetPointer(ptr, CTYPES_CFIELD_CAPSULE_NAME_PYMEM);
@@ -16,6 +17,7 @@ static void pymem_destructor(PyObject *ptr)
         PyMem_Free(p);
     }
 }
+#endif
 
 
 /******************************************************************/
@@ -50,7 +52,7 @@ PyCField_FromDesc(PyObject *desc, Py_ssize_t index,
 {
     CFieldObject *self;
     PyObject *proto;
-    Py_ssize_t size, align, length;
+    Py_ssize_t size, align;
     SETFUNC setfunc = NULL;
     GETFUNC getfunc = NULL;
     StgDictObject *dict;
@@ -104,7 +106,6 @@ PyCField_FromDesc(PyObject *desc, Py_ssize_t index,
     }
 
     size = dict->size;
-    length = dict->length;
     proto = desc;
 
     /*  Field descriptors for 'c_char * n' are be scpecial cased to
@@ -1212,7 +1213,7 @@ u_set(void *ptr, PyObject *value, Py_ssize_t size)
     } else
         Py_INCREF(value);
 
-    len = PyUnicode_AsWideChar((PyUnicodeObject *)value, chars, 2);
+    len = PyUnicode_AsWideChar(value, chars, 2);
     if (len != 1) {
         Py_DECREF(value);
         PyErr_SetString(PyExc_TypeError,
@@ -1290,7 +1291,7 @@ U_set(void *ptr, PyObject *value, Py_ssize_t length)
     } else if (size < length-1)
         /* copy terminating NUL character if there is space */
         size += 1;
-    PyUnicode_AsWideChar((PyUnicodeObject *)value, (wchar_t *)ptr, size);
+    PyUnicode_AsWideChar(value, (wchar_t *)ptr, size);
     return value;
 }
 
@@ -1434,7 +1435,7 @@ Z_set(void *ptr, PyObject *value, Py_ssize_t size)
         PyObject *keep;
         wchar_t *buffer;
 
-        buffer = PyUnicode_AsWideCharString((PyUnicodeObject *)value, NULL);
+        buffer = PyUnicode_AsWideCharString(value, NULL);
         if (!buffer) {
             Py_DECREF(value);
             return NULL;

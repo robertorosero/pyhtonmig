@@ -1,14 +1,15 @@
 # tests command line execution of scripts
 
 import unittest
+import sys
 import os
 import os.path
 import py_compile
 
 from test import support
 from test.script_helper import (
-    make_pkg, make_script, make_zip_pkg, make_zip_script, run_python,
-    temp_dir)
+    make_pkg, make_script, make_zip_pkg, make_zip_script,
+    assert_python_ok, assert_python_failure, temp_dir)
 
 verbose = support.verbose
 
@@ -29,17 +30,17 @@ f()
 assertEqual(result, ['Top level assignment', 'Lower level reference'])
 # Check population of magic variables
 assertEqual(__name__, '__main__')
-print('__file__==%r' % __file__)
+print('__file__==%a' % __file__)
 assertEqual(__cached__, None)
 print('__package__==%r' % __package__)
 # Check the sys module
 import sys
 assertIdentical(globals(), sys.modules[__name__].__dict__)
-print('sys.argv[0]==%r' % sys.argv[0])
-print('sys.path[0]==%r' % sys.path[0])
+print('sys.argv[0]==%a' % sys.argv[0])
+print('sys.path[0]==%a' % sys.path[0])
 # Check the working directory
 import os
-print('cwd==%r' % os.getcwd())
+print('cwd==%a' % os.getcwd())
 """
 
 def _make_test_script(script_dir, script_basename, source=test_source):
@@ -76,11 +77,11 @@ class CmdLineTest(unittest.TestCase):
             print("Output from test script %r:" % script_name)
             print(data)
         self.assertEqual(exit_code, 0)
-        printed_file = '__file__==%r' % expected_file
+        printed_file = '__file__==%a' % expected_file
         printed_package = '__package__==%r' % expected_package
-        printed_argv0 = 'sys.argv[0]==%r' % expected_argv0
-        printed_path0 = 'sys.path[0]==%r' % expected_path0
-        printed_cwd = 'cwd==%r' % os.getcwd()
+        printed_argv0 = 'sys.argv[0]==%a' % expected_argv0
+        printed_path0 = 'sys.path[0]==%a' % expected_path0
+        printed_cwd = 'cwd==%a' % os.getcwd()
         if verbose > 1:
             print('Expected output:')
             print(printed_file)
@@ -97,20 +98,22 @@ class CmdLineTest(unittest.TestCase):
                             expected_argv0, expected_path0,
                             expected_package,
                             *cmd_line_switches):
+        if not __debug__:
+            cmd_line_switches += ('-' + 'O' * sys.flags.optimize,)
         run_args = cmd_line_switches + (script_name,)
-        exit_code, data = run_python(*run_args)
-        self._check_output(script_name, exit_code, data, expected_file,
+        rc, out, err = assert_python_ok(*run_args)
+        self._check_output(script_name, rc, out + err, expected_file,
                            expected_argv0, expected_path0, expected_package)
 
     def _check_import_error(self, script_name, expected_msg,
                             *cmd_line_switches):
         run_args = cmd_line_switches + (script_name,)
-        exit_code, data = run_python(*run_args)
+        rc, out, err = assert_python_failure(*run_args)
         if verbose > 1:
             print('Output from test script %r:' % script_name)
-            print(data)
+            print(err)
             print('Expected output: %r' % expected_msg)
-        self.assertIn(expected_msg.encode('utf-8'), data)
+        self.assertIn(expected_msg.encode('utf-8'), err)
 
     def test_basic_script(self):
         with temp_dir() as script_dir:
@@ -237,13 +240,12 @@ class CmdLineTest(unittest.TestCase):
                 pkg_dir = os.path.join(script_dir, 'test_pkg')
                 make_pkg(pkg_dir, "import sys; print('init_argv0==%r' % sys.argv[0])")
                 script_name = _make_test_script(pkg_dir, 'script')
-                exit_code, data = run_python('-m', 'test_pkg.script')
+                rc, out, err = assert_python_ok('-m', 'test_pkg.script')
                 if verbose > 1:
                     print(data)
-                self.assertEqual(exit_code, 0)
                 expected = "init_argv0==%r" % '-m'
-                self.assertIn(expected.encode('utf-8'), data)
-                self._check_output(script_name, exit_code, data,
+                self.assertIn(expected.encode('utf-8'), out)
+                self._check_output(script_name, rc, out,
                                    script_name, script_name, '', 'test_pkg')
 
     def test_issue8202_dash_c_file_ignored(self):
@@ -253,13 +255,12 @@ class CmdLineTest(unittest.TestCase):
             with support.temp_cwd(path=script_dir):
                 with open("-c", "w") as f:
                     f.write("data")
-                    exit_code, data = run_python('-c',
+                    rc, out, err = assert_python_ok('-c',
                         'import sys; print("sys.path[0]==%r" % sys.path[0])')
                     if verbose > 1:
-                        print(data)
-                    self.assertEqual(exit_code, 0)
+                        print(out)
                     expected = "sys.path[0]==%r" % ''
-                    self.assertIn(expected.encode('utf-8'), data)
+                    self.assertIn(expected.encode('utf-8'), out)
 
     def test_issue8202_dash_m_file_ignored(self):
         # Make sure a "-m" file in the current directory
@@ -269,8 +270,8 @@ class CmdLineTest(unittest.TestCase):
             with support.temp_cwd(path=script_dir):
                 with open("-m", "w") as f:
                     f.write("data")
-                    exit_code, data = run_python('-m', 'other')
-                    self._check_output(script_name, exit_code, data,
+                    rc, out, err = assert_python_ok('-m', 'other')
+                    self._check_output(script_name, rc, out,
                                       script_name, script_name, '', '')
 
 def test_main():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2001-2010 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2011 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -18,7 +18,7 @@
 
 """Test harness for the logging module. Run all tests.
 
-Copyright (C) 2001-2010 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2011 Vinay Sajip. All Rights Reserved.
 """
 
 import logging
@@ -67,8 +67,12 @@ class BaseTest(unittest.TestCase):
         try:
             self.saved_handlers = logging._handlers.copy()
             self.saved_handler_list = logging._handlerList[:]
-            self.saved_loggers = logger_dict.copy()
+            self.saved_loggers = saved_loggers = logger_dict.copy()
             self.saved_level_names = logging._levelNames.copy()
+            self.logger_states = logger_states = {}
+            for name in saved_loggers:
+                logger_states[name] = getattr(saved_loggers[name],
+                                              'disabled', None)
         finally:
             logging._releaseLock()
 
@@ -86,8 +90,12 @@ class BaseTest(unittest.TestCase):
         self.root_hdlr = logging.StreamHandler(self.stream)
         self.root_formatter = logging.Formatter(self.log_format)
         self.root_hdlr.setFormatter(self.root_formatter)
-        self.assertFalse(self.logger1.hasHandlers())
-        self.assertFalse(self.logger2.hasHandlers())
+        if self.logger1.hasHandlers():
+            hlist = self.logger1.handlers + self.root_logger.handlers
+            raise AssertionError('Unexpected handlers: %s' % hlist)
+        if self.logger2.hasHandlers():
+            hlist = self.logger2.handlers + self.root_logger.handlers
+            raise AssertionError('Unexpected handlers: %s' % hlist)
         self.root_logger.addHandler(self.root_hdlr)
         self.assertTrue(self.logger1.hasHandlers())
         self.assertTrue(self.logger2.hasHandlers())
@@ -112,6 +120,10 @@ class BaseTest(unittest.TestCase):
             loggerDict = logging.getLogger().manager.loggerDict
             loggerDict.clear()
             loggerDict.update(self.saved_loggers)
+            logger_states = self.logger_states
+            for name in self.logger_states:
+                if logger_states[name] is not None:
+                    self.saved_loggers[name].disabled = logger_states[name]
         finally:
             logging._releaseLock()
 
@@ -127,13 +139,14 @@ class BaseTest(unittest.TestCase):
         except AttributeError:
             # StringIO.StringIO lacks a reset() method.
             actual_lines = stream.getvalue().splitlines()
-        self.assertEquals(len(actual_lines), len(expected_values))
+        self.assertEqual(len(actual_lines), len(expected_values),
+                          '%s vs. %s' % (actual_lines, expected_values))
         for actual, expected in zip(actual_lines, expected_values):
             match = pat.search(actual)
             if not match:
                 self.fail("Log line does not match expected pattern:\n" +
                             actual)
-            self.assertEquals(tuple(match.groups()), expected)
+            self.assertEqual(tuple(match.groups()), expected)
         s = stream.read()
         if s:
             self.fail("Remaining output at end of log stream:\n" + s)
@@ -307,6 +320,35 @@ class BasicFilterTest(BaseTest):
             ])
         finally:
             handler.removeFilter(filter_)
+
+    def test_callable_filter(self):
+        # Only messages satisfying the specified criteria pass through the
+        #  filter.
+
+        def filterfunc(record):
+            parts = record.name.split('.')
+            prefix = '.'.join(parts[:2])
+            return prefix == 'spam.eggs'
+
+        handler = self.root_logger.handlers[0]
+        try:
+            handler.addFilter(filterfunc)
+            spam = logging.getLogger("spam")
+            spam_eggs = logging.getLogger("spam.eggs")
+            spam_eggs_fish = logging.getLogger("spam.eggs.fish")
+            spam_bakedbeans = logging.getLogger("spam.bakedbeans")
+
+            spam.info(self.next_message())
+            spam_eggs.info(self.next_message())  # Good.
+            spam_eggs_fish.info(self.next_message())  # Good.
+            spam_bakedbeans.info(self.next_message())
+
+            self.assert_log_lines([
+                ('spam.eggs', 'INFO', '2'),
+                ('spam.eggs.fish', 'INFO', '3'),
+            ])
+        finally:
+            handler.removeFilter(filterfunc)
 
 
 #
@@ -699,7 +741,7 @@ class ConfigFileTest(BaseTest):
             except RuntimeError:
                 logging.exception("just testing")
             sys.stdout.seek(0)
-            self.assertEquals(output.getvalue(),
+            self.assertEqual(output.getvalue(),
                 "ERROR:root:just testing\nGot a [RuntimeError]\n")
             # Original logger output is empty
             self.assert_log_lines([])
@@ -818,7 +860,7 @@ class SocketHandlerTest(BaseTest):
         logger = logging.getLogger("tcp")
         logger.error("spam")
         logger.debug("eggs")
-        self.assertEquals(self.get_output(), "spam\neggs\n")
+        self.assertEqual(self.get_output(), "spam\neggs\n")
 
 
 class MemoryTest(BaseTest):
@@ -877,7 +919,8 @@ class EncodingTest(BaseTest):
     def test_encoding_plain_file(self):
         # In Python 2.x, a plain file object is treated as having no encoding.
         log = logging.getLogger("test")
-        fn = tempfile.mktemp(".log")
+        fd, fn = tempfile.mkstemp(".log", "test_logging-1-")
+        os.close(fd)
         # the non-ascii data we write to the log.
         data = "foo\x80"
         try:
@@ -1534,7 +1577,7 @@ class ConfigDictTest(BaseTest):
             except RuntimeError:
                 logging.exception("just testing")
             sys.stdout.seek(0)
-            self.assertEquals(output.getvalue(),
+            self.assertEqual(output.getvalue(),
                 "ERROR:root:just testing\nGot a [RuntimeError]\n")
             # Original logger output is empty
             self.assert_log_lines([])
@@ -1549,7 +1592,7 @@ class ConfigDictTest(BaseTest):
             except RuntimeError:
                 logging.exception("just testing")
             sys.stdout.seek(0)
-            self.assertEquals(output.getvalue(),
+            self.assertEqual(output.getvalue(),
                 "ERROR:root:just testing\nGot a [RuntimeError]\n")
             # Original logger output is empty
             self.assert_log_lines([])
@@ -1766,6 +1809,44 @@ class ChildLoggerTest(BaseTest):
         self.assertTrue(c2 is c3)
 
 
+class DerivedLogRecord(logging.LogRecord):
+    pass
+
+class LogRecordFactoryTest(BaseTest):
+
+    def setUp(self):
+        class CheckingFilter(logging.Filter):
+            def __init__(self, cls):
+                self.cls = cls
+
+            def filter(self, record):
+                t = type(record)
+                if t is not self.cls:
+                    msg = 'Unexpected LogRecord type %s, expected %s' % (t,
+                            self.cls)
+                    raise TypeError(msg)
+                return True
+
+        BaseTest.setUp(self)
+        self.filter = CheckingFilter(DerivedLogRecord)
+        self.root_logger.addFilter(self.filter)
+        self.orig_factory = logging.getLogRecordFactory()
+
+    def tearDown(self):
+        self.root_logger.removeFilter(self.filter)
+        BaseTest.tearDown(self)
+        logging.setLogRecordFactory(self.orig_factory)
+
+    def test_logrecord_class(self):
+        self.assertRaises(TypeError, self.root_logger.warning,
+                          self.next_message())
+        logging.setLogRecordFactory(DerivedLogRecord)
+        self.root_logger.error(self.next_message())
+        self.assert_log_lines([
+           ('root', 'ERROR', '2'),
+        ])
+
+
 class QueueHandlerTest(BaseTest):
     # Do not bother with a logger name group.
     expected_log_pat = r"^[\w.]+ -> ([\w]+): ([\d]+)$"
@@ -1795,17 +1876,126 @@ class QueueHandlerTest(BaseTest):
         self.assertEqual(data.name, self.que_logger.name)
         self.assertEqual((data.msg, data.args), (msg, None))
 
+class FormatterTest(unittest.TestCase):
+    def setUp(self):
+        self.common = {
+            'name': 'formatter.test',
+            'level': logging.DEBUG,
+            'pathname': os.path.join('path', 'to', 'dummy.ext'),
+            'lineno': 42,
+            'exc_info': None,
+            'func': None,
+            'msg': 'Message with %d %s',
+            'args': (2, 'placeholders'),
+        }
+        self.variants = {
+        }
+
+    def get_record(self, name=None):
+        result = dict(self.common)
+        if name is not None:
+            result.update(self.variants[name])
+        return logging.makeLogRecord(result)
+
+    def test_percent(self):
+        # Test %-formatting
+        r = self.get_record()
+        f = logging.Formatter('${%(message)s}')
+        self.assertEqual(f.format(r), '${Message with 2 placeholders}')
+        f = logging.Formatter('%(random)s')
+        self.assertRaises(KeyError, f.format, r)
+        self.assertFalse(f.usesTime())
+        f = logging.Formatter('%(asctime)s')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('%(asctime)-15s')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('asctime')
+        self.assertFalse(f.usesTime())
+
+    def test_braces(self):
+        # Test {}-formatting
+        r = self.get_record()
+        f = logging.Formatter('$%{message}%$', style='{')
+        self.assertEqual(f.format(r), '$%Message with 2 placeholders%$')
+        f = logging.Formatter('{random}', style='{')
+        self.assertRaises(KeyError, f.format, r)
+        self.assertFalse(f.usesTime())
+        f = logging.Formatter('{asctime}', style='{')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('{asctime!s:15}', style='{')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('{asctime:15}', style='{')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('asctime', style='{')
+        self.assertFalse(f.usesTime())
+
+    def test_dollars(self):
+        # Test $-formatting
+        r = self.get_record()
+        f = logging.Formatter('$message', style='$')
+        self.assertEqual(f.format(r), 'Message with 2 placeholders')
+        f = logging.Formatter('$$%${message}%$$', style='$')
+        self.assertEqual(f.format(r), '$%Message with 2 placeholders%$')
+        f = logging.Formatter('${random}', style='$')
+        self.assertRaises(KeyError, f.format, r)
+        self.assertFalse(f.usesTime())
+        f = logging.Formatter('${asctime}', style='$')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('${asctime', style='$')
+        self.assertFalse(f.usesTime())
+        f = logging.Formatter('$asctime', style='$')
+        self.assertTrue(f.usesTime())
+        f = logging.Formatter('asctime', style='$')
+        self.assertFalse(f.usesTime())
+
+class LastResortTest(BaseTest):
+    def test_last_resort(self):
+        # Test the last resort handler
+        root = self.root_logger
+        root.removeHandler(self.root_hdlr)
+        old_stderr = sys.stderr
+        old_lastresort = logging.lastResort
+        old_raise_exceptions = logging.raiseExceptions
+        try:
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), 'This is your final chance!\n')
+            #No handlers and no last resort, so 'No handlers' message
+            logging.lastResort = None
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), 'No handlers could be found for logger "root"\n')
+            # 'No handlers' message only printed once
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), '')
+            root.manager.emittedNoHandlerWarning = False
+            #If raiseExceptions is False, no message is printed
+            logging.raiseExceptions = False
+            sys.stderr = sio = io.StringIO()
+            root.warning('This is your final chance!')
+            self.assertEqual(sio.getvalue(), '')
+        finally:
+            sys.stderr = old_stderr
+            root.addHandler(self.root_hdlr)
+            logging.lastResort = old_lastresort
+            logging.raiseExceptions = old_raise_exceptions
+
+
 class BaseFileTest(BaseTest):
     "Base class for handler tests that write log files"
 
     def setUp(self):
         BaseTest.setUp(self)
-        self.fn = tempfile.mktemp(".log")
+        fd, self.fn = tempfile.mkstemp(".log", "test_logging-2-")
+        os.close(fd)
         self.rmfiles = []
 
     def tearDown(self):
         for fn in self.rmfiles:
             os.unlink(fn)
+        if os.path.exists(self.fn):
+            os.unlink(self.fn)
         BaseTest.tearDown(self)
 
     def assertLogFile(self, filename):
@@ -1824,18 +2014,20 @@ class RotatingFileHandlerTest(BaseFileTest):
         # If maxbytes is zero rollover never occurs
         rh = logging.handlers.RotatingFileHandler(self.fn, maxBytes=0)
         self.assertFalse(rh.shouldRollover(None))
+        rh.close()
 
     def test_should_rollover(self):
         rh = logging.handlers.RotatingFileHandler(self.fn, maxBytes=1)
         self.assertTrue(rh.shouldRollover(self.next_rec()))
+        rh.close()
 
     def test_file_created(self):
         # checks that the file is created and assumes it was created
         # by us
-        self.assertFalse(os.path.exists(self.fn))
         rh = logging.handlers.RotatingFileHandler(self.fn)
         rh.emit(self.next_rec())
         self.assertLogFile(self.fn)
+        rh.close()
 
     def test_rollover_filenames(self):
         rh = logging.handlers.RotatingFileHandler(
@@ -1847,6 +2039,7 @@ class RotatingFileHandlerTest(BaseFileTest):
         rh.emit(self.next_rec())
         self.assertLogFile(self.fn + ".2")
         self.assertFalse(os.path.exists(self.fn + ".3"))
+        rh.close()
 
 class TimedRotatingFileHandlerTest(BaseFileTest):
     # test methods added below
@@ -1859,13 +2052,44 @@ for when, exp in (('S', 1),
                   ('M', 60),
                   ('H', 60 * 60),
                   ('D', 60 * 60 * 24),
-                  ('MIDNIGHT', 60 * 60 * 23),
+                  ('MIDNIGHT', 60 * 60 * 24),
                   # current time (epoch start) is a Thursday, W0 means Monday
-                  ('W0', secs(days=4, hours=23)),):
+                  ('W0', secs(days=4, hours=24)),
+                 ):
     def test_compute_rollover(self, when=when, exp=exp):
         rh = logging.handlers.TimedRotatingFileHandler(
-            self.fn, when=when, interval=1, backupCount=0)
-        self.assertEquals(exp, rh.computeRollover(0.0))
+            self.fn, when=when, interval=1, backupCount=0, utc=True)
+        currentTime = 0.0
+        actual = rh.computeRollover(currentTime)
+        if exp != actual:
+            # Failures occur on some systems for MIDNIGHT and W0.
+            # Print detailed calculation for MIDNIGHT so we can try to see
+            # what's going on
+            import time
+            if when == 'MIDNIGHT':
+                try:
+                    if rh.utc:
+                        t = time.gmtime(currentTime)
+                    else:
+                        t = time.localtime(currentTime)
+                    currentHour = t[3]
+                    currentMinute = t[4]
+                    currentSecond = t[5]
+                    # r is the number of seconds left between now and midnight
+                    r = logging.handlers._MIDNIGHT - ((currentHour * 60 +
+                                                       currentMinute) * 60 +
+                            currentSecond)
+                    result = currentTime + r
+                    print('t: %s (%s)' % (t, rh.utc), file=sys.stderr)
+                    print('currentHour: %s' % currentHour, file=sys.stderr)
+                    print('currentMinute: %s' % currentMinute, file=sys.stderr)
+                    print('currentSecond: %s' % currentSecond, file=sys.stderr)
+                    print('r: %s' % r, file=sys.stderr)
+                    print('result: %s' % result, file=sys.stderr)
+                except Exception:
+                    print('exception in diagnostic code: %s' % sys.exc_info()[1], file=sys.stderr)
+        self.assertEqual(exp, actual)
+        rh.close()
     setattr(TimedRotatingFileHandlerTest, "test_compute_rollover_%s" % when, test_compute_rollover)
 
 # Set the locale to the platform-dependent default.  I have no idea
@@ -1877,9 +2101,11 @@ def test_main():
                  CustomLevelsAndFiltersTest, MemoryHandlerTest,
                  ConfigFileTest, SocketHandlerTest, MemoryTest,
                  EncodingTest, WarningsTest, ConfigDictTest, ManagerTest,
-                 ChildLoggerTest, QueueHandlerTest,
+                 FormatterTest,
+                 LogRecordFactoryTest, ChildLoggerTest, QueueHandlerTest,
                  RotatingFileHandlerTest,
-                 #TimedRotatingFileHandlerTest
+                 LastResortTest,
+                 TimedRotatingFileHandlerTest
                 )
 
 if __name__ == "__main__":

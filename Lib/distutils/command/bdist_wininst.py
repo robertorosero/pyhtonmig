@@ -263,11 +263,11 @@ class bdist_wininst(Command):
         cfgdata = cfgdata + b"\0"
         if self.pre_install_script:
             # We need to normalize newlines, so we open in text mode and
-            # convert back to bytes. "latin1" simply avoids any possible
+            # convert back to bytes. "latin-1" simply avoids any possible
             # failures.
             with open(self.pre_install_script, "r",
-                encoding="latin1") as script:
-                script_data = script.read().encode("latin1")
+                encoding="latin-1") as script:
+                script_data = script.read().encode("latin-1")
             cfgdata = cfgdata + script_data + b"\n\0"
         else:
             # empty pre-install script
@@ -340,4 +340,8 @@ class bdist_wininst(Command):
             sfix = ''
 
         filename = os.path.join(directory, "wininst-%.1f%s.exe" % (bv, sfix))
-        return open(filename, "rb").read()
+        f = open(filename, "rb")
+        try:
+            return f.read()
+        finally:
+            f.close()

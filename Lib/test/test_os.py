@@ -13,6 +13,15 @@ import time
 import shutil
 from test import support
 import contextlib
+import mmap
+import uuid
+import asyncore
+import asynchat
+import socket
+try:
+    import threading
+except ImportError:
+    threading = None
 
 # Detect whether we're on a Linux system that uses the (now outdated
 # and unmaintained) linuxthreads threading library.  There's an issue
@@ -227,8 +236,8 @@ class StatAttributeTests(unittest.TestCase):
         result = os.stat(fname)
 
         # Make sure direct access works
-        self.assertEquals(result[stat.ST_SIZE], 3)
-        self.assertEquals(result.st_size, 3)
+        self.assertEqual(result[stat.ST_SIZE], 3)
+        self.assertEqual(result.st_size, 3)
 
         # Make sure all the attributes are there
         members = dir(result)
@@ -239,7 +248,7 @@ class StatAttributeTests(unittest.TestCase):
                     def trunc(x): return int(x)
                 else:
                     def trunc(x): return x
-                self.assertEquals(trunc(getattr(result, attr)),
+                self.assertEqual(trunc(getattr(result, attr)),
                                   result[getattr(stat, name)])
                 self.assertIn(attr, members)
 
@@ -303,13 +312,13 @@ class StatAttributeTests(unittest.TestCase):
                 return
 
         # Make sure direct access works
-        self.assertEquals(result.f_bfree, result[3])
+        self.assertEqual(result.f_bfree, result[3])
 
         # Make sure all the attributes are there.
         members = ('bsize', 'frsize', 'blocks', 'bfree', 'bavail', 'files',
                     'ffree', 'favail', 'flag', 'namemax')
         for value, member in enumerate(members):
-            self.assertEquals(getattr(result, 'f_' + member), result[value])
+            self.assertEqual(getattr(result, 'f_' + member), result[value])
 
         # Make sure that assignment really fails
         try:
@@ -344,7 +353,7 @@ class StatAttributeTests(unittest.TestCase):
         # time stamps in stat, but not in utime.
         os.utime(support.TESTFN, (st.st_atime, int(st.st_mtime-delta)))
         st2 = os.stat(support.TESTFN)
-        self.assertEquals(st2.st_mtime, int(st.st_mtime-delta))
+        self.assertEqual(st2.st_mtime, int(st.st_mtime-delta))
 
     # Restrict test to Win32, since there is no guarantee other
     # systems support centiseconds
@@ -361,7 +370,12 @@ class StatAttributeTests(unittest.TestCase):
             def test_1565150(self):
                 t1 = 1159195039.25
                 os.utime(self.fname, (t1, t1))
-                self.assertEquals(os.stat(self.fname).st_mtime, t1)
+                self.assertEqual(os.stat(self.fname).st_mtime, t1)
+
+            def test_large_time(self):
+                t1 = 5000000000 # some day in 2128
+                os.utime(self.fname, (t1, t1))
+                self.assertEqual(os.stat(self.fname).st_mtime, t1)
 
         def test_1686475(self):
             # Verify that an open file can be stat'ed
@@ -404,24 +418,26 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         os.environ.clear()
         if os.path.exists("/bin/sh"):
             os.environ.update(HELLO="World")
-            value = os.popen("/bin/sh -c 'echo $HELLO'").read().strip()
-            self.assertEquals(value, "World")
+            with os.popen("/bin/sh -c 'echo $HELLO'") as popen:
+                value = popen.read().strip()
+                self.assertEqual(value, "World")
 
     def test_os_popen_iter(self):
         if os.path.exists("/bin/sh"):
-            popen = os.popen("/bin/sh -c 'echo \"line1\nline2\nline3\"'")
-            it = iter(popen)
-            self.assertEquals(next(it), "line1\n")
-            self.assertEquals(next(it), "line2\n")
-            self.assertEquals(next(it), "line3\n")
-            self.assertRaises(StopIteration, next, it)
+            with os.popen(
+                "/bin/sh -c 'echo \"line1\nline2\nline3\"'") as popen:
+                it = iter(popen)
+                self.assertEqual(next(it), "line1\n")
+                self.assertEqual(next(it), "line2\n")
+                self.assertEqual(next(it), "line3\n")
+                self.assertRaises(StopIteration, next, it)
 
     # Verify environ keys and values from the OS are of the
     # correct str type.
     def test_keyvalue_types(self):
         for key, val in os.environ.items():
-            self.assertEquals(type(key), str)
-            self.assertEquals(type(val), str)
+            self.assertEqual(type(key), str)
+            self.assertEqual(type(val), str)
 
     def test_items(self):
         for key, value in self._reference().items():
@@ -459,8 +475,11 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         if os.supports_bytes_environ:
             # env cannot contain 'PATH' and b'PATH' keys
             try:
-                mixed_env = {'PATH': '1', b'PATH': b'2'}
+                # ignore BytesWarning warning
+                with warnings.catch_warnings(record=True):
+                    mixed_env = {'PATH': '1', b'PATH': b'2'}
             except BytesWarning:
+                # mixed_env cannot be created with python -bb
                 pass
             else:
                 self.assertRaises(ValueError, os.get_exec_path, mixed_env)
@@ -486,15 +505,15 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
                 sys.getfilesystemencoding(),)
             self.skipTest(msg)
         os.environ['unicode'] = value
-        self.assertEquals(os.environ['unicode'], value)
-        self.assertEquals(os.environb[b'unicode'], value_bytes)
+        self.assertEqual(os.environ['unicode'], value)
+        self.assertEqual(os.environb[b'unicode'], value_bytes)
 
         # os.environb -> os.environ
         value = b'\xff'
         os.environb[b'bytes'] = value
-        self.assertEquals(os.environb[b'bytes'], value)
+        self.assertEqual(os.environb[b'bytes'], value)
         value_str = value.decode(sys.getfilesystemencoding(), 'surrogateescape')
-        self.assertEquals(os.environ['bytes'], value_str)
+        self.assertEqual(os.environ['bytes'], value_str)
 
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
@@ -622,6 +641,28 @@ class MakedirTests(unittest.TestCase):
         path = os.path.join(base, 'dir1', os.curdir, 'dir2', 'dir3', 'dir4',
                             'dir5', 'dir6')
         os.makedirs(path)
+
+    def test_exist_ok_existing_directory(self):
+        path = os.path.join(support.TESTFN, 'dir1')
+        mode = 0o777
+        old_mask = os.umask(0o022)
+        os.makedirs(path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode)
+        self.assertRaises(OSError, os.makedirs, path, mode, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, 0o776, exist_ok=True)
+        os.makedirs(path, mode=mode, exist_ok=True)
+        os.umask(old_mask)
+
+    def test_exist_ok_existing_regular_file(self):
+        base = support.TESTFN
+        path = os.path.join(support.TESTFN, 'dir1')
+        f = open(path, 'w')
+        f.write('abc')
+        f.close()
+        self.assertRaises(OSError, os.makedirs, path)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=False)
+        self.assertRaises(OSError, os.makedirs, path, exist_ok=True)
+        os.remove(path)
 
     def tearDown(self):
         path = os.path.join(support.TESTFN, 'dir1', 'dir2', 'dir3',
@@ -853,6 +894,42 @@ class TestInvalidFD(unittest.TestCase):
         if hasattr(os, "write"):
             self.check(os.write, b" ")
 
+
+class LinkTests(unittest.TestCase):
+    def setUp(self):
+        self.file1 = support.TESTFN
+        self.file2 = os.path.join(support.TESTFN + "2")
+
+    def tearDown(self):
+        for file in (self.file1, self.file2):
+            if os.path.exists(file):
+                os.unlink(file)
+
+    def _test_link(self, file1, file2):
+        with open(file1, "w") as f1:
+            f1.write("test")
+
+        os.link(file1, file2)
+        with open(file1, "r") as f1, open(file2, "r") as f2:
+            self.assertTrue(os.path.sameopenfile(f1.fileno(), f2.fileno()))
+
+    def test_link(self):
+        self._test_link(self.file1, self.file2)
+
+    def test_link_bytes(self):
+        self._test_link(bytes(self.file1, sys.getfilesystemencoding()),
+                        bytes(self.file2, sys.getfilesystemencoding()))
+
+    def test_unicode_name(self):
+        try:
+            os.fsencode("\xf1")
+        except UnicodeError:
+            raise unittest.SkipTest("Unable to encode for this platform.")
+
+        self.file1 += "\xf1"
+        self.file2 = self.file1 + "2"
+        self._test_link(self.file1, self.file2)
+
 if sys.platform != 'win32':
     class Win32ErrorTests(unittest.TestCase):
         pass
@@ -951,7 +1028,7 @@ if sys.platform != 'win32':
         def test_listdir(self):
             expected = self.unicodefn
             found = set(os.listdir(self.dir))
-            self.assertEquals(found, expected)
+            self.assertEqual(found, expected)
 
         def test_open(self):
             for fn in self.unicodefn:
@@ -999,6 +1076,9 @@ class Win32KillTests(unittest.TestCase):
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 stdin=subprocess.PIPE)
+        self.addCleanup(proc.stdout.close)
+        self.addCleanup(proc.stderr.close)
+        self.addCleanup(proc.stdin.close)
 
         count, max = 0, 100
         while count < max and proc.poll() is None:
@@ -1029,13 +1109,25 @@ class Win32KillTests(unittest.TestCase):
         self._kill(100)
 
     def _kill_with_event(self, event, name):
+        tagname = "test_os_%s" % uuid.uuid1()
+        m = mmap.mmap(-1, 1, tagname)
+        m[0] = 0
         # Run a script which has console control handling enabled.
         proc = subprocess.Popen([sys.executable,
                    os.path.join(os.path.dirname(__file__),
-                                "win_console_handler.py")],
+                                "win_console_handler.py"), tagname],
                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         # Let the interpreter startup before we send signals. See #3137.
-        time.sleep(0.5)
+        count, max = 0, 100
+        while count < max and proc.poll() is None:
+            if m[0] == 1:
+                break
+            time.sleep(0.1)
+            count += 1
+        else:
+            # Forcefully kill the process if we weren't able to signal it.
+            os.kill(proc.pid, signal.SIGINT)
+            self.fail("Subprocess didn't finish initialization")
         os.kill(proc.pid, event)
         # proc.send_signal(event) could also be done here.
         # Allow time for the signal to be passed and the process to exit.
@@ -1067,12 +1159,6 @@ class Win32KillTests(unittest.TestCase):
     def test_CTRL_BREAK_EVENT(self):
         self._kill_with_event(signal.CTRL_BREAK_EVENT, "CTRL_BREAK_EVENT")
 
-
-def skipUnlessWindows6(test):
-    if (hasattr(sys, 'getwindowsversion')
-        and sys.getwindowsversion().major >= 6):
-        return test
-    return unittest.skip("Requires Windows Vista or later")(test)
 
 @unittest.skipUnless(sys.platform == "win32", "Win32 specific tests")
 @support.skip_unless_symlink
@@ -1148,8 +1234,8 @@ class Win32SymlinkTests(unittest.TestCase):
 
 class FSEncodingTests(unittest.TestCase):
     def test_nop(self):
-        self.assertEquals(os.fsencode(b'abc\xff'), b'abc\xff')
-        self.assertEquals(os.fsdecode('abc\u0141'), 'abc\u0141')
+        self.assertEqual(os.fsencode(b'abc\xff'), b'abc\xff')
+        self.assertEqual(os.fsdecode('abc\u0141'), 'abc\u0141')
 
     def test_identity(self):
         # assert fsdecode(fsencode(x)) == x
@@ -1158,37 +1244,7 @@ class FSEncodingTests(unittest.TestCase):
                 bytesfn = os.fsencode(fn)
             except UnicodeEncodeError:
                 continue
-            self.assertEquals(os.fsdecode(bytesfn), fn)
-
-    def get_output(self, fs_encoding, func):
-        env = os.environ.copy()
-        env['PYTHONIOENCODING'] = 'utf-8'
-        env['PYTHONFSENCODING'] = fs_encoding
-        code = 'import os; print(%s, end="")' % func
-        process = subprocess.Popen(
-            [sys.executable, "-c", code],
-            stdout=subprocess.PIPE, env=env)
-        stdout, stderr = process.communicate()
-        self.assertEqual(process.returncode, 0)
-        return stdout.decode('utf-8')
-
-    @unittest.skipIf(sys.platform in ('win32', 'darwin'),
-                     'PYTHONFSENCODING is ignored on Windows and Mac OS X')
-    def test_encodings(self):
-        def check(encoding, bytesfn, unicodefn):
-            encoded = self.get_output(encoding, 'repr(os.fsencode(%a))' % unicodefn)
-            self.assertEqual(encoded, repr(bytesfn))
-
-            decoded = self.get_output(encoding, 'repr(os.fsdecode(%a))' % bytesfn)
-            self.assertEqual(decoded, repr(unicodefn))
-
-        check('utf-8', b'\xc3\xa9\x80', '\xe9\udc80')
-
-        # Raise SkipTest() if sys.executable is not encodable to ascii
-        support.workaroundIssue8611()
-
-        check('ascii', b'abc\xff', 'abc\udcff')
-        check('iso-8859-15', b'\xef\xa4', '\xef\u20ac')
+            self.assertEqual(os.fsdecode(bytesfn), fn)
 
 
 class PidTests(unittest.TestCase):
@@ -1212,6 +1268,289 @@ class LoginTests(unittest.TestCase):
         self.assertNotEqual(len(user_name), 0)
 
 
+@unittest.skipUnless(hasattr(os, 'getpriority') and hasattr(os, 'setpriority'),
+                     "needs os.getpriority and os.setpriority")
+class ProgramPriorityTests(unittest.TestCase):
+    """Tests for os.getpriority() and os.setpriority()."""
+
+    def test_set_get_priority(self):
+
+        base = os.getpriority(os.PRIO_PROCESS, os.getpid())
+        os.setpriority(os.PRIO_PROCESS, os.getpid(), base + 1)
+        try:
+            new_prio = os.getpriority(os.PRIO_PROCESS, os.getpid())
+            if base >= 19 and new_prio <= 19:
+                raise unittest.SkipTest(
+      "unable to reliably test setpriority at current nice level of %s" % base)
+            else:
+                self.assertEqual(new_prio, base + 1)
+        finally:
+            try:
+                os.setpriority(os.PRIO_PROCESS, os.getpid(), base)
+            except OSError as err:
+                if err.errno != errno.EACCES:
+                    raise
+
+
+class SendfileTestServer(asyncore.dispatcher, threading.Thread):
+
+    class Handler(asynchat.async_chat):
+
+        def __init__(self, conn):
+            asynchat.async_chat.__init__(self, conn)
+            self.in_buffer = []
+            self.closed = False
+            self.push(b"220 ready\r\n")
+
+        def handle_read(self):
+            data = self.recv(4096)
+            self.in_buffer.append(data)
+
+        def get_data(self):
+            return b''.join(self.in_buffer)
+
+        def handle_close(self):
+            self.close()
+            self.closed = True
+
+        def handle_error(self):
+            raise
+
+    def __init__(self, address):
+        threading.Thread.__init__(self)
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.bind(address)
+        self.listen(5)
+        self.host, self.port = self.socket.getsockname()[:2]
+        self.handler_instance = None
+        self._active = False
+        self._active_lock = threading.Lock()
+
+    # --- public API
+
+    @property
+    def running(self):
+        return self._active
+
+    def start(self):
+        assert not self.running
+        self.__flag = threading.Event()
+        threading.Thread.start(self)
+        self.__flag.wait()
+
+    def stop(self):
+        assert self.running
+        self._active = False
+        self.join()
+
+    def wait(self):
+        # wait for handler connection to be closed, then stop the server
+        while not getattr(self.handler_instance, "closed", False):
+            time.sleep(0.001)
+        self.stop()
+
+    # --- internals
+
+    def run(self):
+        self._active = True
+        self.__flag.set()
+        while self._active and asyncore.socket_map:
+            self._active_lock.acquire()
+            asyncore.loop(timeout=0.001, count=1)
+            self._active_lock.release()
+        asyncore.close_all()
+
+    def handle_accept(self):
+        conn, addr = self.accept()
+        self.handler_instance = self.Handler(conn)
+
+    def handle_connect(self):
+        self.close()
+    handle_read = handle_connect
+
+    def writable(self):
+        return 0
+
+    def handle_error(self):
+        raise
+
+
+@unittest.skipUnless(threading is not None, "test needs threading module")
+@unittest.skipUnless(hasattr(os, 'sendfile'), "test needs os.sendfile()")
+class TestSendfile(unittest.TestCase):
+
+    DATA = b"12345abcde" * 16 * 1024  # 160 KB
+    SUPPORT_HEADERS_TRAILERS = not sys.platform.startswith("linux") and \
+                               not sys.platform.startswith("solaris") and \
+                               not sys.platform.startswith("sunos")
+
+    @classmethod
+    def setUpClass(cls):
+        with open(support.TESTFN, "wb") as f:
+            f.write(cls.DATA)
+
+    @classmethod
+    def tearDownClass(cls):
+        support.unlink(support.TESTFN)
+
+    def setUp(self):
+        self.server = SendfileTestServer((support.HOST, 0))
+        self.server.start()
+        self.client = socket.socket()
+        self.client.connect((self.server.host, self.server.port))
+        self.client.settimeout(1)
+        # synchronize by waiting for "220 ready" response
+        self.client.recv(1024)
+        self.sockno = self.client.fileno()
+        self.file = open(support.TESTFN, 'rb')
+        self.fileno = self.file.fileno()
+
+    def tearDown(self):
+        self.file.close()
+        self.client.close()
+        if self.server.running:
+            self.server.stop()
+
+    def sendfile_wrapper(self, sock, file, offset, nbytes, headers=[], trailers=[]):
+        """A higher level wrapper representing how an application is
+        supposed to use sendfile().
+        """
+        while 1:
+            try:
+                if self.SUPPORT_HEADERS_TRAILERS:
+                    return os.sendfile(sock, file, offset, nbytes, headers,
+                                       trailers)
+                else:
+                    return os.sendfile(sock, file, offset, nbytes)
+            except OSError as err:
+                if err.errno == errno.ECONNRESET:
+                    # disconnected
+                    raise
+                elif err.errno in (errno.EAGAIN, errno.EBUSY):
+                    # we have to retry send data
+                    continue
+                else:
+                    raise
+
+    def test_send_whole_file(self):
+        # normal send
+        total_sent = 0
+        offset = 0
+        nbytes = 4096
+        while total_sent < len(self.DATA):
+            sent = self.sendfile_wrapper(self.sockno, self.fileno, offset, nbytes)
+            if sent == 0:
+                break
+            offset += sent
+            total_sent += sent
+            self.assertTrue(sent <= nbytes)
+            self.assertEqual(offset, total_sent)
+
+        self.assertEqual(total_sent, len(self.DATA))
+        self.client.shutdown(socket.SHUT_RDWR)
+        self.client.close()
+        self.server.wait()
+        data = self.server.handler_instance.get_data()
+        self.assertEqual(len(data), len(self.DATA))
+        self.assertEqual(data, self.DATA)
+
+    def test_send_at_certain_offset(self):
+        # start sending a file at a certain offset
+        total_sent = 0
+        offset = len(self.DATA) // 2
+        must_send = len(self.DATA) - offset
+        nbytes = 4096
+        while total_sent < must_send:
+            sent = self.sendfile_wrapper(self.sockno, self.fileno, offset, nbytes)
+            if sent == 0:
+                break
+            offset += sent
+            total_sent += sent
+            self.assertTrue(sent <= nbytes)
+
+        self.client.shutdown(socket.SHUT_RDWR)
+        self.client.close()
+        self.server.wait()
+        data = self.server.handler_instance.get_data()
+        expected = self.DATA[len(self.DATA) // 2:]
+        self.assertEqual(total_sent, len(expected))
+        self.assertEqual(len(data), len(expected))
+        self.assertEqual(data, expected)
+
+    def test_offset_overflow(self):
+        # specify an offset > file size
+        offset = len(self.DATA) + 4096
+        try:
+            sent = os.sendfile(self.sockno, self.fileno, offset, 4096)
+        except OSError as e:
+            # Solaris can raise EINVAL if offset >= file length, ignore.
+            if e.errno != errno.EINVAL:
+                raise
+        else:
+            self.assertEqual(sent, 0)
+        self.client.shutdown(socket.SHUT_RDWR)
+        self.client.close()
+        self.server.wait()
+        data = self.server.handler_instance.get_data()
+        self.assertEqual(data, b'')
+
+    def test_invalid_offset(self):
+        with self.assertRaises(OSError) as cm:
+            os.sendfile(self.sockno, self.fileno, -1, 4096)
+        self.assertEqual(cm.exception.errno, errno.EINVAL)
+
+    # --- headers / trailers tests
+
+    if SUPPORT_HEADERS_TRAILERS:
+
+        def test_headers(self):
+            total_sent = 0
+            sent = os.sendfile(self.sockno, self.fileno, 0, 4096,
+                               headers=[b"x" * 512])
+            total_sent += sent
+            offset = 4096
+            nbytes = 4096
+            while 1:
+                sent = self.sendfile_wrapper(self.sockno, self.fileno,
+                                                     offset, nbytes)
+                if sent == 0:
+                    break
+                total_sent += sent
+                offset += sent
+
+            expected_data = b"x" * 512 + self.DATA
+            self.assertEqual(total_sent, len(expected_data))
+            self.client.close()
+            self.server.wait()
+            data = self.server.handler_instance.get_data()
+            self.assertEqual(hash(data), hash(expected_data))
+
+        def test_trailers(self):
+            TESTFN2 = support.TESTFN + "2"
+            f = open(TESTFN2, 'wb')
+            f.write(b"abcde")
+            f.close()
+            f = open(TESTFN2, 'rb')
+            try:
+                os.sendfile(self.sockno, f.fileno(), 0, 4096, trailers=[b"12345"])
+                self.client.close()
+                self.server.wait()
+                data = self.server.handler_instance.get_data()
+                self.assertEqual(data, b"abcde12345")
+            finally:
+                os.remove(TESTFN2)
+
+        if hasattr(os, "SF_NODISKIO"):
+            def test_flags(self):
+                try:
+                    os.sendfile(self.sockno, self.fileno, 0, 4096,
+                                flags=os.SF_NODISKIO)
+                except OSError as err:
+                    if err.errno not in (errno.EBUSY, errno.EAGAIN):
+                        raise
+
+
 def test_main():
     support.run_unittest(
         FileTests,
@@ -1231,6 +1570,9 @@ def test_main():
         FSEncodingTests,
         PidTests,
         LoginTests,
+        LinkTests,
+        TestSendfile,
+        ProgramPriorityTests,
     )
 
 if __name__ == "__main__":

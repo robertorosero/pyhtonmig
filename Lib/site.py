@@ -55,6 +55,7 @@ ImportError exception, it is silently ignored.
 import sys
 import os
 import builtins
+import traceback
 
 # Prefixes for site-packages; add additional prefixes like /usr/local here
 PREFIXES = [sys.prefix, sys.exec_prefix]
@@ -70,7 +71,11 @@ USER_BASE = None
 
 
 def makepath(*paths):
-    dir = os.path.abspath(os.path.join(*paths))
+    dir = os.path.join(*paths)
+    try:
+        dir = os.path.abspath(dir)
+    except OSError:
+        pass
     return dir, os.path.normcase(dir)
 
 
@@ -81,11 +86,11 @@ def abs_paths():
             continue   # don't mess with a PEP 302-supplied __file__
         try:
             m.__file__ = os.path.abspath(m.__file__)
-        except AttributeError:
+        except (AttributeError, OSError):
             pass
         try:
             m.__cached__ = os.path.abspath(m.__cached__)
-        except AttributeError:
+        except (AttributeError, OSError):
             pass
 
 
@@ -137,17 +142,26 @@ def addpackage(sitedir, name, known_paths):
     except IOError:
         return
     with f:
-        for line in f:
+        for n, line in enumerate(f):
             if line.startswith("#"):
                 continue
-            if line.startswith(("import ", "import\t")):
-                exec(line)
-                continue
-            line = line.rstrip()
-            dir, dircase = makepath(sitedir, line)
-            if not dircase in known_paths and os.path.exists(dir):
-                sys.path.append(dir)
-                known_paths.add(dircase)
+            try:
+                if line.startswith(("import ", "import\t")):
+                    exec(line)
+                    continue
+                line = line.rstrip()
+                dir, dircase = makepath(sitedir, line)
+                if not dircase in known_paths and os.path.exists(dir):
+                    sys.path.append(dir)
+                    known_paths.add(dircase)
+            except Exception as err:
+                print("Error processing line {:d} of {}:\n".format(n+1, fullname),
+                      file=sys.stderr)
+                for record in traceback.format_exception(*sys.exc_info()):
+                    for line in record.splitlines():
+                        print('  '+line, file=sys.stderr)
+                print("\nRemainder of file ignored", file=sys.stderr)
+                break
     if reset:
         known_paths = None
     return known_paths

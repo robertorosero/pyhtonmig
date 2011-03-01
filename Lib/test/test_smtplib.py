@@ -1,9 +1,11 @@
 import asyncore
+import email.mime.text
 import email.utils
 import socket
 import smtpd
 import smtplib
 import io
+import re
 import sys
 import time
 import select
@@ -56,6 +58,13 @@ class GeneralTests(unittest.TestCase):
 
     def tearDown(self):
         smtplib.socket = socket
+
+    # This method is no longer used but is retained for backward compatibility,
+    # so test to make sure it still works.
+    def testQuoteData(self):
+        teststr  = "abc\n.jkl\rfoo\r\n..blue"
+        expected = "abc\r\n..jkl\r\nfoo\r\n...blue"
+        self.assertEqual(expected, smtplib.quotedata(teststr))
 
     def testBasic1(self):
         mock_socket.reply_with(b"220 Hola mundo")
@@ -150,6 +159,8 @@ MSG_END = '------------ END MESSAGE ------------\n'
 @unittest.skipUnless(threading, 'Threading required for this test.')
 class DebuggingServerTests(unittest.TestCase):
 
+    maxDiff = None
+
     def setUp(self):
         self.real_getfqdn = socket.getfqdn
         socket.getfqdn = mock_socket.getfqdn
@@ -161,6 +172,9 @@ class DebuggingServerTests(unittest.TestCase):
         self._threads = support.threading_setup()
         self.serv_evt = threading.Event()
         self.client_evt = threading.Event()
+        # Capture SMTPChannel debug output
+        self.old_DEBUGSTREAM = smtpd.DEBUGSTREAM
+        smtpd.DEBUGSTREAM = io.StringIO()
         # Pick a random unused port by passing 0 for the port number
         self.serv = smtpd.DebuggingServer((HOST, 0), ('nowhere', -1))
         # Keep a note of what port was assigned
@@ -183,6 +197,9 @@ class DebuggingServerTests(unittest.TestCase):
         support.threading_cleanup(*self._threads)
         # restore sys.stdout
         sys.stdout = self.old_stdout
+        # restore DEBUGSTREAM
+        smtpd.DEBUGSTREAM.close()
+        smtpd.DEBUGSTREAM = self.old_DEBUGSTREAM
 
     def testBasic(self):
         # connect
@@ -246,6 +263,95 @@ class DebuggingServerTests(unittest.TestCase):
         self.output.flush()
         mexpect = '%s%s\n%s' % (MSG_BEGIN, m, MSG_END)
         self.assertEqual(self.output.getvalue(), mexpect)
+
+    def testSendBinary(self):
+        m = b'A test message'
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
+        smtp.sendmail('John', 'Sally', m)
+        # XXX (see comment in testSend)
+        time.sleep(0.01)
+        smtp.quit()
+
+        self.client_evt.set()
+        self.serv_evt.wait()
+        self.output.flush()
+        mexpect = '%s%s\n%s' % (MSG_BEGIN, m.decode('ascii'), MSG_END)
+        self.assertEqual(self.output.getvalue(), mexpect)
+
+    def testSendMessage(self):
+        m = email.mime.text.MIMEText('A test message')
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
+        smtp.send_message(m, from_addr='John', to_addrs='Sally')
+        # XXX (see comment in testSend)
+        time.sleep(0.01)
+        smtp.quit()
+
+        self.client_evt.set()
+        self.serv_evt.wait()
+        self.output.flush()
+        # Add the X-Peer header that DebuggingServer adds
+        # XXX: I'm not sure hardcoding this IP will work on linux-vserver.
+        m['X-Peer'] = '127.0.0.1'
+        mexpect = '%s%s\n%s' % (MSG_BEGIN, m.as_string(), MSG_END)
+        self.assertEqual(self.output.getvalue(), mexpect)
+
+    def testSendMessageWithAddresses(self):
+        m = email.mime.text.MIMEText('A test message')
+        m['From'] = 'foo@bar.com'
+        m['To'] = 'John'
+        m['CC'] = 'Sally, Fred'
+        m['Bcc'] = 'John Root <root@localhost>, "Dinsdale" <warped@silly.walks.com>'
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
+        smtp.send_message(m)
+        # XXX (see comment in testSend)
+        time.sleep(0.01)
+        smtp.quit()
+
+        self.client_evt.set()
+        self.serv_evt.wait()
+        self.output.flush()
+        # Add the X-Peer header that DebuggingServer adds
+        # XXX: I'm not sure hardcoding this IP will work on linux-vserver.
+        m['X-Peer'] = '127.0.0.1'
+        # The Bcc header is deleted before serialization.
+        del m['Bcc']
+        mexpect = '%s%s\n%s' % (MSG_BEGIN, m.as_string(), MSG_END)
+        self.assertEqual(self.output.getvalue(), mexpect)
+        debugout = smtpd.DEBUGSTREAM.getvalue()
+        sender = re.compile("^sender: foo@bar.com$", re.MULTILINE)
+        self.assertRegex(debugout, sender)
+        for addr in ('John', 'Sally', 'Fred', 'root@localhost',
+                     'warped@silly.walks.com'):
+            to_addr = re.compile(r"^recips: .*'{}'.*$".format(addr),
+                                 re.MULTILINE)
+            self.assertRegex(debugout, to_addr)
+
+    def testSendMessageWithSomeAddresses(self):
+        # Make sure nothing breaks if not all of the three 'to' headers exist
+        m = email.mime.text.MIMEText('A test message')
+        m['From'] = 'foo@bar.com'
+        m['To'] = 'John, Dinsdale'
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
+        smtp.send_message(m)
+        # XXX (see comment in testSend)
+        time.sleep(0.01)
+        smtp.quit()
+
+        self.client_evt.set()
+        self.serv_evt.wait()
+        self.output.flush()
+        # Add the X-Peer header that DebuggingServer adds
+        # XXX: I'm not sure hardcoding this IP will work on linux-vserver.
+        m['X-Peer'] = '127.0.0.1'
+        mexpect = '%s%s\n%s' % (MSG_BEGIN, m.as_string(), MSG_END)
+        self.assertEqual(self.output.getvalue(), mexpect)
+        debugout = smtpd.DEBUGSTREAM.getvalue()
+        sender = re.compile("^sender: foo@bar.com$", re.MULTILINE)
+        self.assertRegex(debugout, sender)
+        for addr in ('John', 'Dinsdale'):
+            to_addr = re.compile(r"^recips: .*'{}'.*$".format(addr),
+                                 re.MULTILINE)
+            self.assertRegex(debugout, to_addr)
 
 
 class NonConnectingTests(unittest.TestCase):
@@ -379,8 +485,7 @@ class SimSMTPServer(smtpd.SMTPServer):
         self._extra_features = []
         smtpd.SMTPServer.__init__(self, *args, **kw)
 
-    def handle_accept(self):
-        conn, addr = self.accept()
+    def handle_accepted(self, conn, addr):
         self._SMTPchannel = SimSMTPChannel(self._extra_features,
                                            self, conn, addr)
 
@@ -488,6 +593,7 @@ class SMTPSimTests(unittest.TestCase):
 
         expected_auth_ok = (235, b'plain auth ok')
         self.assertEqual(smtp.login(sim_auth[0], sim_auth[1]), expected_auth_ok)
+        smtp.close()
 
     # SimSMTPChannel doesn't fully support LOGIN or CRAM-MD5 auth because they
     # require a synchronous read to obtain the credentials...so instead smtpd
@@ -502,8 +608,8 @@ class SMTPSimTests(unittest.TestCase):
         smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=15)
         try: smtp.login(sim_auth[0], sim_auth[1])
         except smtplib.SMTPAuthenticationError as err:
-            if sim_auth_login_password not in str(err):
-                raise "expected encoded password not found in error message"
+            self.assertIn(sim_auth_login_password, str(err))
+        smtp.close()
 
     def testAUTH_CRAM_MD5(self):
         self.serv.add_feature("AUTH CRAM-MD5")
@@ -511,8 +617,8 @@ class SMTPSimTests(unittest.TestCase):
 
         try: smtp.login(sim_auth[0], sim_auth[1])
         except smtplib.SMTPAuthenticationError as err:
-            if sim_auth_credentials['cram-md5'] not in str(err):
-                raise "expected encoded credentials not found in error message"
+            self.assertIn(sim_auth_credentials['cram-md5'], str(err))
+        smtp.close()
 
     #TODO: add tests for correct AUTH method fallback now that the
     #test infrastructure can support it.

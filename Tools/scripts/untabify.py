@@ -5,7 +5,7 @@
 import os
 import sys
 import getopt
-
+import tokenize
 
 def main():
     tabsize = 8
@@ -25,10 +25,11 @@ def main():
         process(filename, tabsize)
 
 
-def process(filename, tabsize):
+def process(filename, tabsize, verbose=True):
     try:
-        with open(filename) as f:
+        with tokenize.open(filename) as f:
             text = f.read()
+            encoding = f.encoding
     except IOError as msg:
         print("%r: I/O error: %s" % (filename, msg))
         return
@@ -44,9 +45,10 @@ def process(filename, tabsize):
         os.rename(filename, backup)
     except os.error:
         pass
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding=encoding) as f:
         f.write(newtext)
-    print(filename)
+    if verbose:
+        print(filename)
 
 
 if __name__ == '__main__':

@@ -389,7 +389,7 @@ bytearray_subscript(PyByteArrayObject *self, PyObject *index)
     }
     else if (PySlice_Check(index)) {
         Py_ssize_t start, stop, step, slicelength, cur, i;
-        if (PySlice_GetIndicesEx((PySliceObject *)index,
+        if (PySlice_GetIndicesEx(index,
                                  PyByteArray_GET_SIZE(self),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
@@ -573,7 +573,7 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
         }
     }
     else if (PySlice_Check(index)) {
-        if (PySlice_GetIndicesEx((PySliceObject *)index,
+        if (PySlice_GetIndicesEx(index,
                                  PyByteArray_GET_SIZE(self),
                                  &start, &stop, &step, &slicelen) < 0) {
             return -1;
@@ -589,7 +589,7 @@ bytearray_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *valu
         needed = 0;
     }
     else if (values == (PyObject *)self || !PyByteArray_Check(values)) {
-        /* Make a copy an call this function recursively */
+        /* Make a copy and call this function recursively */
         int err;
         values = PyByteArray_FromObject(values);
         if (values == NULL)
@@ -2439,7 +2439,7 @@ If the argument is omitted, strip trailing ASCII whitespace.");
 static PyObject *
 bytearray_rstrip(PyByteArrayObject *self, PyObject *args)
 {
-    Py_ssize_t left, right, mysize, argsize;
+    Py_ssize_t right, mysize, argsize;
     void *myptr, *argptr;
     PyObject *arg = Py_None;
     Py_buffer varg;
@@ -2457,18 +2457,17 @@ bytearray_rstrip(PyByteArrayObject *self, PyObject *args)
     }
     myptr = self->ob_bytes;
     mysize = Py_SIZE(self);
-    left = 0;
     right = rstrip_helper(myptr, mysize, argptr, argsize);
     if (arg != Py_None)
         PyBuffer_Release(&varg);
-    return PyByteArray_FromStringAndSize(self->ob_bytes + left, right - left);
+    return PyByteArray_FromStringAndSize(self->ob_bytes, right);
 }
 
 PyDoc_STRVAR(decode_doc,
-"B.decode([encoding[, errors]]) -> str\n\
+"B.decode(encoding='utf-8', errors='strict') -> str\n\
 \n\
-Decode B using the codec registered for encoding. encoding defaults\n\
-to the default encoding. errors may be given to set a different error\n\
+Decode B using the codec registered for encoding. Default encoding\n\
+is 'utf-8'. errors may be given to set a different error\n\
 handling scheme.  Default is 'strict' meaning that encoding errors raise\n\
 a UnicodeDecodeError.  Other possible values are 'ignore' and 'replace'\n\
 as well as any other name registered with codecs.register_error that is\n\

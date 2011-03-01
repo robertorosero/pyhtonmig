@@ -6,6 +6,9 @@
               of the Unix cal program.
 .. sectionauthor:: Drew Csillag <drew_csillag@geocities.com>
 
+**Source code:** :source:`Lib/calendar.py`
+
+--------------
 
 This module allows you to output calendars like the Unix :program:`cal` program,
 and provides additional useful functions related to the calendar. By default,
@@ -16,7 +19,7 @@ are given as integers. For related
 functionality, see also the :mod:`datetime` and :mod:`time` modules.
 
 Most of these functions and classes rely on the :mod:`datetime` module which
-uses an idealized calendar, the current Gregorian calendar indefinitely extended
+uses an idealized calendar, the current Gregorian calendar extended
 in both directions.  This matches the definition of the "proleptic Gregorian"
 calendar in Dershowitz and Reingold's book "Calendrical Calculations", where
 it's the base calendar for all computations.
@@ -170,9 +173,9 @@ it's the base calendar for all computations.
 .. class:: LocaleTextCalendar(firstweekday=0, locale=None)
 
    This subclass of :class:`TextCalendar` can be passed a locale name in the
-   constructor and will return month and weekday names in the specified
-   locale. If this locale includes an encoding all strings containing month and
-   weekday names will be returned as unicode.
+   constructor and will return month and weekday names in the specified locale.
+   If this locale includes an encoding all strings containing month and weekday
+   names will be returned as unicode.
 
 
 .. class:: LocaleHTMLCalendar(firstweekday=0, locale=None)
@@ -181,6 +184,12 @@ it's the base calendar for all computations.
    constructor and will return month and weekday names in the specified
    locale. If this locale includes an encoding all strings containing month and
    weekday names will be returned as unicode.
+
+.. note::
+
+   The :meth:`formatweekday` and :meth:`formatmonthname` methods of these two
+   classes temporarily change the current locale to the given *locale*.  Because
+   the current locale is a process-wide setting, they are not thread-safe.
 
 
 For simple text calendars this module provides the following functions.
@@ -303,4 +312,3 @@ The :mod:`calendar` module exports the following data attributes:
 
    Module :mod:`time`
       Low-level time related functions.
-

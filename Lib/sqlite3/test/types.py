@@ -85,7 +85,7 @@ class DeclTypesTests(unittest.TestCase):
             if isinstance(_val, bytes):
                 # sqlite3 always calls __init__ with a bytes created from a
                 # UTF-8 string when __conform__ was used to store the object.
-                _val = _val.decode('utf8')
+                _val = _val.decode('utf-8')
             self.val = _val
 
         def __cmp__(self, other):
@@ -291,7 +291,7 @@ class ColNamesTests(unittest.TestCase):
         no row returned.
         """
         self.cur.execute("select * from test where 0 = 1")
-        self.assert_(self.cur.description[0][0] == "x")
+        self.assertEqual(self.cur.description[0][0], "x")
 
 class ObjectAdaptationTests(unittest.TestCase):
     def cast(obj):

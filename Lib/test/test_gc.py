@@ -1,5 +1,6 @@
 import unittest
-from test.support import verbose, run_unittest, strip_python_stderr
+from test.support import (verbose, refcount_test, run_unittest,
+                            strip_python_stderr)
 import sys
 import gc
 import weakref
@@ -175,6 +176,7 @@ class GCTests(unittest.TestCase):
         del d
         self.assertEqual(gc.collect(), 2)
 
+    @refcount_test
     def test_frame(self):
         def f():
             frame = sys._getframe()
@@ -242,6 +244,7 @@ class GCTests(unittest.TestCase):
     # For example:
     # - disposed tuples are not freed, but reused
     # - the call to assertEqual somehow avoids building its args tuple
+    @refcount_test
     def test_get_count(self):
         # Avoid future allocation of method object
         assertEqual = self._baseAssertEqual
@@ -252,6 +255,7 @@ class GCTests(unittest.TestCase):
         # the dict, and the tuple returned by get_count()
         assertEqual(gc.get_count(), (2, 0, 0))
 
+    @refcount_test
     def test_collect_generations(self):
         # Avoid future allocation of method object
         assertEqual = self.assertEqual
@@ -485,20 +489,24 @@ class GCTests(unittest.TestCase):
             gc.set_debug(%s)
         """
         def run_command(code):
-            p = subprocess.Popen([sys.executable, "-c", code],
+            p = subprocess.Popen([sys.executable, "-Wd", "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE)
             stdout, stderr = p.communicate()
+            p.stdout.close()
+            p.stderr.close()
             self.assertEqual(p.returncode, 0)
             self.assertEqual(stdout.strip(), b"")
             return strip_python_stderr(stderr)
 
         stderr = run_command(code % "0")
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown; use", stderr)
         self.assertNotIn(b"<X 'first'>", stderr)
         # With DEBUG_UNCOLLECTABLE, the garbage list gets printed
         stderr = run_command(code % "gc.DEBUG_UNCOLLECTABLE")
-        self.assertIn(b"gc: 2 uncollectable objects at shutdown", stderr)
+        self.assertIn(b"ResourceWarning: gc: 2 uncollectable objects at "
+                      b"shutdown", stderr)
         self.assertTrue(
             (b"[<X 'first'>, <X 'second'>]" in stderr) or
             (b"[<X 'second'>, <X 'first'>]" in stderr), stderr)

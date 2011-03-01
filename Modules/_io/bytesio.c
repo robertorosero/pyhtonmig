@@ -430,15 +430,20 @@ static PyObject *
 bytesio_readinto(bytesio *self, PyObject *buffer)
 {
     void *raw_buffer;
-    Py_ssize_t len;
+    Py_ssize_t len, n;
 
     CHECK_CLOSED(self);
 
     if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
         return NULL;
 
-    if (self->pos + len > self->string_size)
-        len = self->string_size - self->pos;
+    /* adjust invalid sizes */
+    n = self->string_size - self->pos;
+    if (len > n) {
+        len = n;
+        if (len < 0)
+            len = 0;
+    }
 
     memcpy(raw_buffer, self->buf + self->pos, len);
     assert(self->pos + len < PY_SSIZE_T_MAX);
@@ -933,13 +938,11 @@ static int
 bytesiobuf_getbuffer(bytesiobuf *obj, Py_buffer *view, int flags)
 {
     int ret;
-    void *ptr;
     bytesio *b = (bytesio *) obj->source;
     if (view == NULL) {
         b->exports++;
         return 0;
     }
-    ptr = (void *) obj;
     ret = PyBuffer_FillInfo(view, (PyObject*)obj, b->buf, b->string_size,
                             0, flags);
     if (ret >= 0) {

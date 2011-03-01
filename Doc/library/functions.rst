@@ -7,6 +7,24 @@ Built-in Functions
 The Python interpreter has a number of functions and types built into it that
 are always available.  They are listed here in alphabetical order.
 
+===================  =================  ==================  ================  ====================
+..                   ..                 Built-in Functions  ..                ..
+===================  =================  ==================  ================  ====================
+:func:`abs`          :func:`dict`       :func:`help`        :func:`min`       :func:`setattr`
+:func:`all`          :func:`dir`        :func:`hex`         :func:`next`      :func:`slice`
+:func:`any`          :func:`divmod`     :func:`id`          :func:`object`    :func:`sorted`
+:func:`ascii`        :func:`enumerate`  :func:`input`       :func:`oct`       :func:`staticmethod`
+:func:`bin`          :func:`eval`       :func:`int`         :func:`open`      :func:`str`
+:func:`bool`         :func:`exec`       :func:`isinstance`  :func:`ord`       :func:`sum`
+:func:`bytearray`    :func:`filter`     :func:`issubclass`  :func:`pow`       :func:`super`
+:func:`bytes`        :func:`float`      :func:`iter`        :func:`print`     :func:`tuple`
+:func:`callable`     :func:`format`     :func:`len`         :func:`property`  :func:`type`
+:func:`chr`          :func:`frozenset`  :func:`list`        :func:`range`     :func:`vars`
+:func:`classmethod`  :func:`getattr`    :func:`locals`      :func:`repr`      :func:`zip`
+:func:`compile`      :func:`globals`    :func:`map`         :func:`reversed`  :func:`__import__`
+:func:`complex`      :func:`hasattr`    :func:`max`         :func:`round`
+:func:`delattr`      :func:`hash`       :func:`memoryview`  :func:`set`
+===================  =================  ==================  ================  ====================
 
 .. function:: abs(x)
 
@@ -70,7 +88,7 @@ are always available.  They are listed here in alphabetical order.
    Return a new array of bytes.  The :class:`bytearray` type is a mutable
    sequence of integers in the range 0 <= x < 256.  It has most of the usual
    methods of mutable sequences, described in :ref:`typesseq-mutable`, as well
-   as most methods that the :class:`str` type has, see :ref:`bytes-methods`.
+   as most methods that the :class:`bytes` type has, see :ref:`bytes-methods`.
 
    The optional *source* parameter can be used to initialize the array in a few
    different ways:
@@ -103,13 +121,30 @@ are always available.  They are listed here in alphabetical order.
    Bytes objects can also be created with literals, see :ref:`strings`.
 
 
+.. function:: callable(object)
+
+   Return :const:`True` if the *object* argument appears callable,
+   :const:`False` if not.  If this returns true, it is still possible that a
+   call fails, but if it is false, calling *object* will never succeed.
+   Note that classes are callable (calling a class returns a new instance);
+   instances are callable if their class has a :meth:`__call__` method.
+
+   .. versionadded:: 3.2
+      This function was first removed in Python 3.0 and then brought back
+      in Python 3.2.
+
+
 .. function:: chr(i)
 
-   Return the string of one character whose Unicode codepoint is the integer
+   Return the string representing a character whose Unicode codepoint is the integer
    *i*.  For example, ``chr(97)`` returns the string ``'a'``. This is the
-   inverse of :func:`ord`.  The valid range for the argument depends how Python
-   was configured -- it may be either UCS2 [0..0xFFFF] or UCS4 [0..0x10FFFF].
-   :exc:`ValueError` will be raised if *i* is outside that range.
+   inverse of :func:`ord`.  The valid range for the argument is from 0 through
+   1,114,111 (0x10FFFF in base 16).  :exc:`ValueError` will be raised if *i* is
+   outside that range.
+
+   Note that on narrow Unicode builds, the result is a string of
+   length two for *i* greater than 65,535 (0xFFFF in hexadecimal).
+
 
 
 .. function:: classmethod(function)
@@ -139,7 +174,7 @@ are always available.  They are listed here in alphabetical order.
    type hierarchy in :ref:`types`.
 
 
-.. function:: compile(source, filename, mode, flags=0, dont_inherit=False)
+.. function:: compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
 
    Compile the *source* into a code or AST object.  Code objects can be executed
    by :func:`exec` or :func:`eval`.  *source* can either be a string or an AST
@@ -171,6 +206,12 @@ are always available.  They are listed here in alphabetical order.
    can be found as the :attr:`compiler_flag` attribute on the :class:`_Feature`
    instance in the :mod:`__future__` module.
 
+   The argument *optimize* specifies the optimization level of the compiler; the
+   default value of ``-1`` selects the optimization level of the interpreter as
+   given by :option:`-O` options.  Explicit levels are ``0`` (no optimization;
+   ``__debug__`` is true), ``1`` (asserts are removed, ``__debug__`` is false)
+   or ``2`` (docstrings are removed too).
+
    This function raises :exc:`SyntaxError` if the compiled source is invalid,
    and :exc:`TypeError` if the source contains null bytes.
 
@@ -183,7 +224,7 @@ are always available.  They are listed here in alphabetical order.
 
    .. versionchanged:: 3.2
       Allowed use of Windows and Mac newlines.  Also input in ``'exec'`` mode
-      does not have to end in a newline anymore.
+      does not have to end in a newline anymore.  Added the *optimize* parameter.
 
 
 .. function:: complex([real[, imag]])
@@ -255,7 +296,7 @@ are always available.  They are listed here in alphabetical order.
       ['Struct', '__builtins__', '__doc__', '__file__', '__name__',
        '__package__', '_clearcache', 'calcsize', 'error', 'pack', 'pack_into',
        'unpack', 'unpack_from']
-      >>> class Foo(object):
+      >>> class Foo:
       ...     def __dir__(self):
       ...         return ["kan", "ga", "roo"]
       ...
@@ -395,26 +436,54 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: float([x])
 
-   Convert a string or a number to floating point.  If the argument is a string,
-   it must contain a possibly signed decimal or floating point number, possibly
-   embedded in whitespace. The argument may also be ``'[+|-]nan'`` or
-   ``'[+|-]inf'``.  Otherwise, the argument may be an integer or a floating
-   point number, and a floating point number with the same value (within
-   Python's floating point precision) is returned.  If no argument is given,
-   ``0.0`` is returned.
+   .. index::
+      single: NaN
+      single: Infinity
 
-   .. note::
+   Convert a string or a number to floating point.
 
-      .. index::
-         single: NaN
-         single: Infinity
+   If the argument is a string, it should contain a decimal number, optionally
+   preceded by a sign, and optionally embedded in whitespace.  The optional
+   sign may be ``'+'`` or ``'-'``; a ``'+'`` sign has no effect on the value
+   produced.  The argument may also be a string representing a NaN
+   (not-a-number), or a positive or negative infinity.  More precisely, the
+   input must conform to the following grammar after leading and trailing
+   whitespace characters are removed:
 
-      When passing in a string, values for NaN and Infinity may be returned,
-      depending on the underlying C library.  Float accepts the strings
-      ``'nan'``, ``'inf'`` and ``'-inf'`` for NaN and positive or negative
-      infinity.  The case and a leading + are ignored as well as a leading - is
-      ignored for NaN.  Float always represents NaN and infinity as ``nan``,
-      ``inf`` or ``-inf``.
+   .. productionlist::
+      sign: "+" | "-"
+      infinity: "Infinity" | "inf"
+      nan: "nan"
+      numeric_value: `floatnumber` | `infinity` | `nan`
+      numeric_string: [`sign`] `numeric_value`
+
+   Here ``floatnumber`` is the form of a Python floating-point literal,
+   described in :ref:`floating`.  Case is not significant, so, for example,
+   "inf", "Inf", "INFINITY" and "iNfINity" are all acceptable spellings for
+   positive infinity.
+
+   Otherwise, if the argument is an integer or a floating point number, a
+   floating point number with the same value (within Python's floating point
+   precision) is returned.  If the argument is outside the range of a Python
+   float, an :exc:`OverflowError` will be raised.
+
+   For a general Python object ``x``, ``float(x)`` delegates to
+   ``x.__float__()``.
+
+   If no argument is given, ``0.0`` is returned.
+
+   Examples::
+
+      >>> float('+1.23')
+      1.23
+      >>> float('   -12345\n')
+      -12345.0
+      >>> float('1e-003')
+      0.001
+      >>> float('+1E6')
+      1000000.0
+      >>> float('-Infinity')
+      -inf
 
    The float type is described in :ref:`typesnumeric`.
 
@@ -447,7 +516,7 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: getattr(object, name[, default])
 
-   Return the value of the named attributed of *object*.  *name* must be a string.
+   Return the value of the named attribute of *object*.  *name* must be a string.
    If the string is the name of one of the object's attributes, the result is the
    value of that attribute.  For example, ``getattr(x, 'foobar')`` is equivalent to
    ``x.foobar``.  If the named attribute does not exist, *default* is returned if
@@ -634,9 +703,9 @@ are always available.  They are listed here in alphabetical order.
    The optional keyword-only *key* argument specifies a one-argument ordering
    function like that used for :meth:`list.sort`.
 
-   If multiple items are maximal, the function returns the first one encountered.
-   This is consistent with other sort-stability preserving tools such as
-   ``sorted(iterable, key=keyfunc, reverse=True)[0]` and
+   If multiple items are maximal, the function returns the first one
+   encountered.  This is consistent with other sort-stability preserving tools
+   such as ``sorted(iterable, key=keyfunc, reverse=True)[0]`` and
    ``heapq.nlargest(1, iterable, key=keyfunc)``.
 
 .. function:: memoryview(obj)
@@ -655,10 +724,10 @@ are always available.  They are listed here in alphabetical order.
    The optional keyword-only *key* argument specifies a one-argument ordering
    function like that used for :meth:`list.sort`.
 
-   If multiple items are minimal, the function returns the first one encountered.
-   This is consistent with other sort-stability preserving tools such as
-   ``sorted(iterable, key=keyfunc)[0]` and
-   ``heapq.nsmallest(1, iterable, key=keyfunc)``.
+   If multiple items are minimal, the function returns the first one
+   encountered.  This is consistent with other sort-stability preserving tools
+   such as ``sorted(iterable, key=keyfunc)[0]`` and ``heapq.nsmallest(1,
+   iterable, key=keyfunc)``.
 
 .. function:: next(iterator[, default])
 
@@ -822,14 +891,14 @@ are always available.  They are listed here in alphabetical order.
 .. XXX works for bytes too, but should it?
 .. function:: ord(c)
 
-   Given a string of length one, return an integer representing the Unicode code
-   point of the character.  For example, ``ord('a')`` returns the integer ``97``
+   Given a string representing one Uncicode character, return an integer
+   representing the Unicode code
+   point of that character.  For example, ``ord('a')`` returns the integer ``97``
    and ``ord('\u2020')`` returns ``8224``.  This is the inverse of :func:`chr`.
 
-   If the argument length is not one, a :exc:`TypeError` will be raised.  (If
-   Python was built with UCS2 Unicode, then the character's code point must be
-   in the range [0..65535] inclusive; otherwise the string length is two!)
-
+   On wide Unicode builds, if the argument length is not one, a
+   :exc:`TypeError` will be raised.  On narrow Unicode builds, strings
+   of length two are accepted when they form a UTF-16 surrogate pair.
 
 .. function:: pow(x, y[, z])
 
@@ -871,7 +940,7 @@ are always available.  They are listed here in alphabetical order.
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
    use is to define a managed attribute ``x``::
 
-      class C(object):
+      class C:
           def __init__(self):
               self._x = None
 
@@ -890,7 +959,7 @@ are always available.  They are listed here in alphabetical order.
    property will copy *fget*'s docstring (if it exists).  This makes it possible to
    create read-only properties easily using :func:`property` as a :term:`decorator`::
 
-      class Parrot(object):
+      class Parrot:
           def __init__(self):
               self._voltage = 100000
 
@@ -907,7 +976,7 @@ are always available.  They are listed here in alphabetical order.
    corresponding accessor function set to the decorated function.  This is
    best explained with an example::
 
-      class C(object):
+      class C:
           def __init__(self):
               self._x = None
 
@@ -960,8 +1029,33 @@ are always available.  They are listed here in alphabetical order.
       >>> list(range(1, 0))
       []
 
+   Range objects implement the :class:`collections.Sequence` ABC, and provide
+   features such as containment tests, element index lookup, slicing and
+   support for negative indices:
+
+      >>> r = range(0, 20, 2)
+      >>> r
+      range(0, 20, 2)
+      >>> 11 in r
+      False
+      >>> 10 in r
+      True
+      >>> r.index(10)
+      5
+      >>> r[5]
+      10
+      >>> r[:5]
+      range(0, 10, 2)
+      >>> r[-1]
+      18
+
+   Ranges containing absolute values larger than :data:`sys.maxsize` are permitted
+   but some features (such as :func:`len`) will raise :exc:`OverflowError`.
+
    .. versionchanged:: 3.2
-      Testing integers for membership takes constant time instead of iterating
+      Implement the Sequence ABC.
+      Support slicing and negative indices.
+      Test integers for membership in constant time instead of iterating
       through all items.
 
 
@@ -1115,10 +1209,13 @@ are always available.  They are listed here in alphabetical order.
 
    Sums *start* and the items of an *iterable* from left to right and returns the
    total.  *start* defaults to ``0``. The *iterable*'s items are normally numbers,
-   and are not allowed to be strings.  The fast, correct way to concatenate a
-   sequence of strings is by calling ``''.join(sequence)``.  To add floating
-   point values with extended precision, see :func:`math.fsum`\.
+   and the start value is not allowed to be a string.
 
+   For some use cases, there are good alternatives to :func:`sum`.
+   The preferred, fast way to concatenate a sequence of strings is by calling
+   ``''.join(sequence)``.  To add floating point values with extended precision,
+   see :func:`math.fsum`\.  To concatenate a series of iterables, consider using
+   :func:`itertools.chain`.
 
 .. function:: super([type[, object-or-type]])
 
@@ -1208,7 +1305,7 @@ are always available.  They are listed here in alphabetical order.
    attribute.  For example, the following two statements create identical
    :class:`type` objects:
 
-      >>> class X(object):
+      >>> class X:
       ...     a = 1
       ...
       >>> X = type('X', (object,), dict(a=1))
@@ -1235,11 +1332,18 @@ are always available.  They are listed here in alphabetical order.
    iterable argument, it returns an iterator of 1-tuples.  With no arguments,
    it returns an empty iterator.  Equivalent to::
 
-      def zip(*iterables):
-          # zip('ABCD', 'xy') --> Ax By
-          iterables = map(iter, iterables)
-          while iterables:
-              yield tuple(map(next, iterables))
+        def zip(*iterables):
+            # zip('ABCD', 'xy') --> Ax By
+            sentinel = object()
+            iterables = [iter(it) for it in iterables]
+            while iterables:
+                result = []
+                for it in iterables:
+                    elem = next(it, sentinel)
+                    if elem is sentinel:
+                        return
+                    result.append(elem)
+                yield tuple(result)
 
    The left-to-right evaluation order of the iterables is guaranteed. This
    makes possible an idiom for clustering a data series into n-length groups

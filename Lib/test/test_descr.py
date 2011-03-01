@@ -4205,11 +4205,11 @@ order (MRO) for bases """
             __getattr__ = descr
 
         self.assertRaises(AttributeError, getattr, A(), "attr")
-        self.assertEquals(descr.counter, 1)
+        self.assertEqual(descr.counter, 1)
         self.assertRaises(AttributeError, getattr, B(), "attr")
-        self.assertEquals(descr.counter, 2)
+        self.assertEqual(descr.counter, 2)
         self.assertRaises(AttributeError, getattr, C(), "attr")
-        self.assertEquals(descr.counter, 4)
+        self.assertEqual(descr.counter, 4)
 
         import gc
         class EvilGetattribute(object):
@@ -4224,6 +4224,17 @@ order (MRO) for bases """
 
         self.assertRaises(AttributeError, getattr, EvilGetattribute(), "attr")
 
+    def test_abstractmethods(self):
+        # type pretends not to have __abstractmethods__.
+        self.assertRaises(AttributeError, getattr, type, "__abstractmethods__")
+        class meta(type):
+            pass
+        self.assertRaises(AttributeError, getattr, meta, "__abstractmethods__")
+        class X(object):
+            pass
+        with self.assertRaises(AttributeError):
+            del X.__abstractmethods__
+
 
 class DictProxyTests(unittest.TestCase):
     def setUp(self):
@@ -4232,21 +4243,33 @@ class DictProxyTests(unittest.TestCase):
                 pass
         self.C = C
 
+    @unittest.skipIf(hasattr(sys, 'gettrace') and sys.gettrace(),
+                        'trace function introduces __local__')
     def test_iter_keys(self):
-        # Testing dict-proxy iterkeys...
-        keys = [ key for key in self.C.__dict__.keys() ]
+        # Testing dict-proxy keys...
+        it = self.C.__dict__.keys()
+        self.assertNotIsInstance(it, list)
+        keys = list(it)
         keys.sort()
-        self.assertEquals(keys, ['__dict__', '__doc__', '__module__',
+        self.assertEqual(keys, ['__dict__', '__doc__', '__module__',
             '__weakref__', 'meth'])
 
+    @unittest.skipIf(hasattr(sys, 'gettrace') and sys.gettrace(),
+                        'trace function introduces __local__')
     def test_iter_values(self):
-        # Testing dict-proxy itervalues...
-        values = [ values for values in self.C.__dict__.values() ]
+        # Testing dict-proxy values...
+        it = self.C.__dict__.values()
+        self.assertNotIsInstance(it, list)
+        values = list(it)
         self.assertEqual(len(values), 5)
 
+    @unittest.skipIf(hasattr(sys, 'gettrace') and sys.gettrace(),
+                        'trace function introduces __local__')
     def test_iter_items(self):
         # Testing dict-proxy iteritems...
-        keys = [ key for (key, value) in self.C.__dict__.items() ]
+        it = self.C.__dict__.items()
+        self.assertNotIsInstance(it, list)
+        keys = [item[0] for item in it]
         keys.sort()
         self.assertEqual(keys, ['__dict__', '__doc__', '__module__',
             '__weakref__', 'meth'])
@@ -4261,6 +4284,11 @@ class DictProxyTests(unittest.TestCase):
             # In 2.3a1, C.__dict__ was a real dict rather than a dict proxy
             pass
         self.assertEqual(type(C.__dict__), type(B.__dict__))
+
+    def test_repr(self):
+        # Testing dict_proxy.__repr__
+        dict_ = {k: v for k, v in self.C.__dict__.items()}
+        self.assertEqual(repr(self.C.__dict__), 'dict_proxy({!r})'.format(dict_))
 
 
 class PTypesLongInitTest(unittest.TestCase):

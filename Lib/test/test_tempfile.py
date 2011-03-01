@@ -85,7 +85,8 @@ class test_exports(TC):
             "gettempdir" : 1,
             "tempdir" : 1,
             "template" : 1,
-            "SpooledTemporaryFile" : 1
+            "SpooledTemporaryFile" : 1,
+            "TemporaryDirectory" : 1,
         }
 
         unexp = []
@@ -318,7 +319,7 @@ class test__mkstemp_inner(TC):
         f.write(b"blat\x1a")
         f.write(b"extra\n")
         os.lseek(f.fd, 0, os.SEEK_SET)
-        self.assertEquals(os.read(f.fd, 20), b"blat")
+        self.assertEqual(os.read(f.fd, 20), b"blat")
 
 test_classes.append(test__mkstemp_inner)
 
@@ -878,7 +879,7 @@ class test_TemporaryFile(TC):
             with tempfile.TemporaryFile(*args, **kwargs) as fileobj:
                 fileobj.write(input)
                 fileobj.seek(0)
-                self.assertEquals(input, fileobj.read())
+                self.assertEqual(input, fileobj.read())
 
         roundtrip(b"1234", "w+b")
         roundtrip("abdc\n", "w+")
@@ -888,6 +889,152 @@ class test_TemporaryFile(TC):
 
 if tempfile.NamedTemporaryFile is not tempfile.TemporaryFile:
     test_classes.append(test_TemporaryFile)
+
+
+# Helper for test_del_on_shutdown
+class NulledModules:
+    def __init__(self, *modules):
+        self.refs = [mod.__dict__ for mod in modules]
+        self.contents = [ref.copy() for ref in self.refs]
+
+    def __enter__(self):
+        for d in self.refs:
+            for key in d:
+                d[key] = None
+
+    def __exit__(self, *exc_info):
+        for d, c in zip(self.refs, self.contents):
+            d.clear()
+            d.update(c)
+
+class test_TemporaryDirectory(TC):
+    """Test TemporaryDirectory()."""
+
+    def do_create(self, dir=None, pre="", suf="", recurse=1):
+        if dir is None:
+            dir = tempfile.gettempdir()
+        try:
+            tmp = tempfile.TemporaryDirectory(dir=dir, prefix=pre, suffix=suf)
+        except:
+            self.failOnException("TemporaryDirectory")
+        self.nameCheck(tmp.name, dir, pre, suf)
+        # Create a subdirectory and some files
+        if recurse:
+            self.do_create(tmp.name, pre, suf, recurse-1)
+        with open(os.path.join(tmp.name, "test.txt"), "wb") as f:
+            f.write(b"Hello world!")
+        return tmp
+
+    def test_mkdtemp_failure(self):
+        # Check no additional exception if mkdtemp fails
+        # Previously would raise AttributeError instead
+        # (noted as part of Issue #10188)
+        with tempfile.TemporaryDirectory() as nonexistent:
+            pass
+        with self.assertRaises(os.error):
+            tempfile.TemporaryDirectory(dir=nonexistent)
+
+    def test_explicit_cleanup(self):
+        # A TemporaryDirectory is deleted when cleaned up
+        dir = tempfile.mkdtemp()
+        try:
+            d = self.do_create(dir=dir)
+            self.assertTrue(os.path.exists(d.name),
+                            "TemporaryDirectory %s does not exist" % d.name)
+            d.cleanup()
+            self.assertFalse(os.path.exists(d.name),
+                        "TemporaryDirectory %s exists after cleanup" % d.name)
+        finally:
+            os.rmdir(dir)
+
+    @support.cpython_only
+    def test_del_on_collection(self):
+        # A TemporaryDirectory is deleted when garbage collected
+        dir = tempfile.mkdtemp()
+        try:
+            d = self.do_create(dir=dir)
+            name = d.name
+            del d # Rely on refcounting to invoke __del__
+            self.assertFalse(os.path.exists(name),
+                        "TemporaryDirectory %s exists after __del__" % name)
+        finally:
+            os.rmdir(dir)
+
+    @unittest.expectedFailure # See issue #10188
+    def test_del_on_shutdown(self):
+        # A TemporaryDirectory may be cleaned up during shutdown
+        # Make sure it works with the relevant modules nulled out
+        with self.do_create() as dir:
+            d = self.do_create(dir=dir)
+            # Mimic the nulling out of modules that
+            # occurs during system shutdown
+            modules = [os, os.path]
+            if has_stat:
+                modules.append(stat)
+            # Currently broken, so suppress the warning
+            # that is otherwise emitted on stdout
+            with support.captured_stderr() as err:
+                with NulledModules(*modules):
+                    d.cleanup()
+            # Currently broken, so stop spurious exception by
+            # indicating the object has already been closed
+            d._closed = True
+            # And this assert will fail, as expected by the
+            # unittest decorator...
+            self.assertFalse(os.path.exists(d.name),
+                        "TemporaryDirectory %s exists after cleanup" % d.name)
+
+    def test_warnings_on_cleanup(self):
+        # Two kinds of warning on shutdown
+        #   Issue 10888: may write to stderr if modules are nulled out
+        #   ResourceWarning will be triggered by __del__
+        with self.do_create() as dir:
+            if os.sep != '\\':
+                # Embed a backslash in order to make sure string escaping
+                # in the displayed error message is dealt with correctly
+                suffix = '\\check_backslash_handling'
+            else:
+                suffix = ''
+            d = self.do_create(dir=dir, suf=suffix)
+
+            #Check for the Issue 10888 message
+            modules = [os, os.path]
+            if has_stat:
+                modules.append(stat)
+            with support.captured_stderr() as err:
+                with NulledModules(*modules):
+                    d.cleanup()
+            message = err.getvalue().replace('\\\\', '\\')
+            self.assertIn("while cleaning up",  message)
+            self.assertIn(d.name,  message)
+
+            # Check for the resource warning
+            with support.check_warnings(('Implicitly', ResourceWarning), quiet=False):
+                warnings.filterwarnings("always", category=ResourceWarning)
+                d.__del__()
+            self.assertFalse(os.path.exists(d.name),
+                        "TemporaryDirectory %s exists after __del__" % d.name)
+
+    def test_multiple_close(self):
+        # Can be cleaned-up many times without error
+        d = self.do_create()
+        d.cleanup()
+        try:
+            d.cleanup()
+            d.cleanup()
+        except:
+            self.failOnException("cleanup")
+
+    def test_context_manager(self):
+        # Can be used as a context manager
+        d = self.do_create()
+        with d as name:
+            self.assertTrue(os.path.exists(name))
+            self.assertEqual(name, d.name)
+        self.assertFalse(os.path.exists(name))
+
+
+test_classes.append(test_TemporaryDirectory)
 
 def test_main():
     support.run_unittest(*test_classes)

@@ -1272,7 +1272,7 @@ element_subscr(PyObject* self_, PyObject* item)
         if (!self->extra)
             return PyList_New(0);
 
-        if (PySlice_GetIndicesEx((PySliceObject *)item,
+        if (PySlice_GetIndicesEx(item,
                 self->extra->length,
                 &start, &stop, &step, &slicelen) < 0) {
             return NULL;
@@ -1331,7 +1331,7 @@ element_ass_subscr(PyObject* self_, PyObject* item, PyObject* value)
         if (!self->extra)
             element_new_extra(self, NULL);
 
-        if (PySlice_GetIndicesEx((PySliceObject *)item,
+        if (PySlice_GetIndicesEx(item,
                 self->extra->length,
                 &start, &stop, &step, &slicelen) < 0) {
             return -1;
@@ -1483,6 +1483,9 @@ element_getattro(ElementObject* self, PyObject* nameobj)
 
     if (PyUnicode_Check(nameobj))
         name = _PyUnicode_AsString(nameobj);
+    
+    if (name == NULL)
+        return NULL;
 
     /* handle common attributes first */
     if (strcmp(name, "tag") == 0) {
@@ -2139,7 +2142,7 @@ expat_set_error(const char* message, int line, int column)
     PyObject *position;
     char buffer[256];
 
-    sprintf(buffer, "%s: line %d, column %d", message, line, column);
+    sprintf(buffer, "%.100s: line %d, column %d", message, line, column);
 
     error = PyObject_CallFunction(elementtree_parseerror_obj, "s", buffer);
     if (!error)
@@ -2194,8 +2197,8 @@ expat_default_handler(XMLParserObject* self, const XML_Char* data_in,
         Py_XDECREF(res);
     } else if (!PyErr_Occurred()) {
         /* Report the first error, not the last */
-        char message[128];
-        sprintf(message, "undefined entity &%.100s;", _PyUnicode_AsString(key));
+        char message[128] = "undefined entity ";
+        strncat(message, data_in, data_len < 100?data_len:100);
         expat_set_error(
             message,
             EXPAT(GetErrorLineNumber)(self->parser),
@@ -2796,29 +2799,25 @@ static PyMethodDef xmlparser_methods[] = {
 static PyObject*  
 xmlparser_getattro(XMLParserObject* self, PyObject* nameobj)
 {
-    PyObject* res;
-    char *name = "";
-
-    if (PyUnicode_Check(nameobj))
-        name = _PyUnicode_AsString(nameobj);
-
-    PyErr_Clear();
-
-    if (strcmp(name, "entity") == 0)
-        res = self->entity;
-    else if (strcmp(name, "target") == 0)
-        res = self->target;
-    else if (strcmp(name, "version") == 0) {
-        char buffer[100];
-        sprintf(buffer, "Expat %d.%d.%d", XML_MAJOR_VERSION,
+    if (PyUnicode_Check(nameobj)) {
+        PyObject* res;
+        if (PyUnicode_CompareWithASCIIString(nameobj, "entity") == 0)
+            res = self->entity;
+        else if (PyUnicode_CompareWithASCIIString(nameobj, "target") == 0)
+            res = self->target;
+        else if (PyUnicode_CompareWithASCIIString(nameobj, "version") == 0) {
+            return PyUnicode_FromFormat(
+                "Expat %d.%d.%d", XML_MAJOR_VERSION,
                 XML_MINOR_VERSION, XML_MICRO_VERSION);
-        return PyUnicode_DecodeUTF8(buffer, strlen(buffer), "strict");
-    } else {
-        return PyObject_GenericGetAttr((PyObject*) self, nameobj);
-    }
+        }
+        else
+            goto generic;
 
-    Py_INCREF(res);
-    return res;
+        Py_INCREF(res);
+        return res;
+    }
+  generic:
+    return PyObject_GenericGetAttr((PyObject*) self, nameobj);
 }
 
 static PyTypeObject XMLParser_Type = {
@@ -2946,19 +2945,25 @@ PyInit__elementtree(void)
 
         "class ElementTree(ET.ElementTree):\n" /* public */
         "  def parse(self, source, parser=None):\n"
+        "    close_source = False\n"
         "    if not hasattr(source, 'read'):\n"
         "      source = open(source, 'rb')\n"
-        "    if parser is not None:\n"
-        "      while 1:\n"
-        "        data = source.read(65536)\n"
-        "        if not data:\n"
-        "          break\n"
-        "        parser.feed(data)\n"
-        "      self._root = parser.close()\n"
-        "    else:\n" 
-        "      parser = cElementTree.XMLParser()\n"
-        "      self._root = parser._parse(source)\n"
-        "    return self._root\n"
+        "      close_source = True\n"
+        "    try:\n"
+        "      if parser is not None:\n"
+        "        while 1:\n"
+        "          data = source.read(65536)\n"
+        "          if not data:\n"
+        "            break\n"
+        "          parser.feed(data)\n"
+        "        self._root = parser.close()\n"
+        "      else:\n" 
+        "        parser = cElementTree.XMLParser()\n"
+        "        self._root = parser._parse(source)\n"
+        "      return self._root\n"
+        "    finally:\n"
+        "      if close_source:\n"
+        "        source.close()\n"
         "cElementTree.ElementTree = ElementTree\n"
 
         "def iter(node, tag=None):\n" /* helper */
@@ -2988,8 +2993,10 @@ PyInit__elementtree(void)
         "class iterparse:\n"
         " root = None\n"
         " def __init__(self, file, events=None):\n"
+        "  self._close_file = False\n"
         "  if not hasattr(file, 'read'):\n"
         "    file = open(file, 'rb')\n"
+        "    self._close_file = True\n"
         "  self._file = file\n"
         "  self._events = []\n"
         "  self._index = 0\n"
@@ -3004,6 +3011,8 @@ PyInit__elementtree(void)
         "    except IndexError:\n"
         "      if self._parser is None:\n"
         "        self.root = self._root\n"
+        "        if self._close_file:\n"
+        "          self._file.close()\n"
         "        raise StopIteration\n"
         "      # load event buffer\n"
         "      del self._events[:]\n"

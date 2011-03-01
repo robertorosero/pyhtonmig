@@ -10,6 +10,13 @@ interpreter and to functions that interact strongly with the interpreter. It is
 always available.
 
 
+.. data:: abiflags
+
+   On POSIX systems where Python is build with the standard ``configure``
+   script, this contains the ABI flags as specified by :pep:`3149`.
+
+   .. versionadded:: 3.2
+
 .. data:: argv
 
    The list of command line arguments passed to a Python script. ``argv[0]`` is the
@@ -46,6 +53,13 @@ always available.
    A tuple of strings giving the names of all modules that are compiled into this
    Python interpreter.  (This information is not available in any other way ---
    ``modules.keys()`` only lists the imported modules.)
+
+
+.. function:: call_tracing(func, args)
+
+   Call ``func(*args)``, while tracing is enabled.  The tracing state is saved,
+   and restored afterwards.  This is intended to be called from a debugger from
+   a checkpoint, to recursively debug some other code.
 
 
 .. data:: copyright
@@ -85,12 +99,38 @@ always available.
 
 .. function:: displayhook(value)
 
-   If *value* is not ``None``, this function prints it to ``sys.stdout``, and saves
-   it in ``builtins._``.
+   If *value* is not ``None``, this function prints ``repr(value)`` to
+   ``sys.stdout``, and saves *value* in ``builtins._``. If ``repr(value)`` is
+   not encodable to ``sys.stdout.encoding`` with ``sys.stdout.errors`` error
+   handler (which is probably ``'strict'``), encode it to
+   ``sys.stdout.encoding`` with ``'backslashreplace'`` error handler.
 
    ``sys.displayhook`` is called on the result of evaluating an :term:`expression`
    entered in an interactive Python session.  The display of these values can be
    customized by assigning another one-argument function to ``sys.displayhook``.
+
+   Pseudo-code::
+
+       def displayhook(value):
+           if value is None:
+               return
+           # Set '_' to None to avoid recursion
+           builtins._ = None
+           text = repr(value)
+           try:
+               sys.stdout.write(text)
+           except UnicodeEncodeError:
+               bytes = text.encode(sys.stdout.encoding, 'backslashreplace')
+               if hasattr(sys.stdout, 'buffer'):
+                   sys.stdout.buffer.write(bytes)
+               else:
+                   text = bytes.decode(sys.stdout.encoding, 'strict')
+                   sys.stdout.write(text)
+           sys.stdout.write("\n")
+           builtins._ = value
+
+   .. versionchanged:: 3.2
+      Use ``'backslashreplace'`` error handler on :exc:`UnicodeEncodeError`.
 
 
 .. function:: excepthook(type, value, traceback)
@@ -155,7 +195,7 @@ always available.
 
    A string giving the site-specific directory prefix where the platform-dependent
    Python files are installed; by default, this is also ``'/usr/local'``.  This can
-   be set at build time with the :option:`--exec-prefix` argument to the
+   be set at build time with the ``--exec-prefix`` argument to the
    :program:`configure` script.  Specifically, all configuration files (e.g. the
    :file:`pyconfig.h` header file) are installed in the directory ``exec_prefix +
    '/lib/pythonversion/config'``, and shared library modules are installed in
@@ -173,19 +213,25 @@ always available.
 
    Exit from Python.  This is implemented by raising the :exc:`SystemExit`
    exception, so cleanup actions specified by finally clauses of :keyword:`try`
-   statements are honored, and it is possible to intercept the exit attempt at an
-   outer level.  The optional argument *arg* can be an integer giving the exit
-   status (defaulting to zero), or another type of object.  If it is an integer,
-   zero is considered "successful termination" and any nonzero value is considered
-   "abnormal termination" by shells and the like.  Most systems require it to be in
-   the range 0-127, and produce undefined results otherwise.  Some systems have a
-   convention for assigning specific meanings to specific exit codes, but these are
-   generally underdeveloped; Unix programs generally use 2 for command line syntax
-   errors and 1 for all other kind of errors.  If another type of object is passed,
-   ``None`` is equivalent to passing zero, and any other object is printed to
-   ``sys.stderr`` and results in an exit code of 1.  In particular,
-   ``sys.exit("some error message")`` is a quick way to exit a program when an
-   error occurs.
+   statements are honored, and it is possible to intercept the exit attempt at
+   an outer level.
+
+   The optional argument *arg* can be an integer giving the exit status
+   (defaulting to zero), or another type of object.  If it is an integer, zero
+   is considered "successful termination" and any nonzero value is considered
+   "abnormal termination" by shells and the like.  Most systems require it to be
+   in the range 0-127, and produce undefined results otherwise.  Some systems
+   have a convention for assigning specific meanings to specific exit codes, but
+   these are generally underdeveloped; Unix programs generally use 2 for command
+   line syntax errors and 1 for all other kind of errors.  If another type of
+   object is passed, ``None`` is equivalent to passing zero, and any other
+   object is printed to :data:`stderr` and results in an exit code of 1.  In
+   particular, ``sys.exit("some error message")`` is a quick way to exit a
+   program when an error occurs.
+
+   Since :func:`exit` ultimately "only" raises an exception, it will only exit
+   the process when called from the main thread, and the exception is not
+   intercepted.
 
 
 .. data:: flags
@@ -218,6 +264,11 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
+   | :const:`quiet`               | -q                                       |
+   +------------------------------+------------------------------------------+
+
+   .. versionchanged:: 3.2
+      Added ``quiet`` attribute for the new :option:`-q` flag.
 
 
 .. data:: float_info
@@ -312,7 +363,7 @@ always available.
 
 .. function:: getdlopenflags()
 
-   Return the current value of the flags that are used for :cfunc:`dlopen` calls.
+   Return the current value of the flags that are used for :c:func:`dlopen` calls.
    The flag constants are defined in the :mod:`ctypes` and :mod:`DLFCN` modules.
    Availability: Unix.
 
@@ -369,6 +420,9 @@ always available.
    additional garbage collector overhead if the object is managed by the garbage
    collector.
 
+   See `recursive sizeof recipe <http://code.activestate.com/recipes/577504>`_
+   for an example of using :func:`getsizeof` recursively to find the size of
+   containers and all their contents.
 
 .. function:: getswitchinterval()
 
@@ -457,8 +511,8 @@ always available.
    +---------------------------------------+---------------------------------+
 
 
-   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the
-   Microsoft documentation on :cfunc:`OSVERSIONINFOEX` for more information
+   This function wraps the Win32 :c:func:`GetVersionEx` function; see the
+   Microsoft documentation on :c:func:`OSVERSIONINFOEX` for more information
    about these fields.
 
    Availability: Windows.
@@ -552,7 +606,7 @@ always available.
    Their intended use is to allow an interactive user to import a debugger module
    and engage in post-mortem debugging without having to re-execute the command
    that caused the error.  (Typical use is ``import pdb; pdb.pm()`` to enter the
-   post-mortem debugger; see chapter :ref:`debugger` for
+   post-mortem debugger; see :mod:`pdb` module for
    more information.)
 
    The meaning of the variables is the same as that of the return values from
@@ -561,7 +615,7 @@ always available.
 
 .. data:: maxsize
 
-   An integer giving the maximum value a variable of type :ctype:`Py_ssize_t` can
+   An integer giving the maximum value a variable of type :c:type:`Py_ssize_t` can
    take.  It's usually ``2**31 - 1`` on a 32-bit platform and ``2**63 - 1`` on a
    64-bit platform.
 
@@ -580,7 +634,7 @@ always available.
     imported. The :meth:`find_module` method is called at least with the
     absolute name of the module being imported. If the module to be imported is
     contained in package then the parent package's :attr:`__path__` attribute
-    is passed in as a second argument. The method returns :keyword:`None` if
+    is passed in as a second argument. The method returns ``None`` if
     the module cannot be found, else returns a :term:`loader`.
 
     :data:`sys.meta_path` is searched before any implicit default finders or
@@ -633,7 +687,7 @@ always available.
     A dictionary acting as a cache for :term:`finder` objects. The keys are
     paths that have been passed to :data:`sys.path_hooks` and the values are
     the finders that are found. If a path is a valid file system path but no
-    explicit finder is found on :data:`sys.path_hooks` then :keyword:`None` is
+    explicit finder is found on :data:`sys.path_hooks` then ``None`` is
     stored to represent the implicit default finder should be used. If the path
     is not an existing path then :class:`imp.NullImporter` is set.
 
@@ -665,7 +719,7 @@ always available.
 
    A string giving the site-specific directory prefix where the platform
    independent Python files are installed; by default, this is the string
-   ``'/usr/local'``.  This can be set at build time with the :option:`--prefix`
+   ``'/usr/local'``.  This can be set at build time with the ``--prefix``
    argument to the :program:`configure` script.  The main collection of Python
    library modules is installed in the directory ``prefix + '/lib/pythonversion'``
    while the platform independent header files (all except :file:`pyconfig.h`) are
@@ -714,7 +768,7 @@ always available.
 
 .. function:: setdlopenflags(n)
 
-   Set the flags used by the interpreter for :cfunc:`dlopen` calls, such as when
+   Set the flags used by the interpreter for :c:func:`dlopen` calls, such as when
    the interpreter loads extension modules.  Among other things, this will enable a
    lazy resolving of symbols when importing a module, if called as
    ``sys.setdlopenflags(0)``.  To share symbols across extension modules, call as
@@ -806,8 +860,9 @@ always available.
 
    ``'return'``
       A function (or other code block) is about to return.  The local trace
-      function is called; *arg* is the value that will be returned.  The trace
-      function's return value is ignored.
+      function is called; *arg* is the value that will be returned, or ``None``
+      if the event is caused by an exception being raised.  The trace function's
+      return value is ignored.
 
    ``'exception'``
       An exception has occurred.  The local trace function is called; *arg* is a
@@ -819,10 +874,10 @@ always available.
       a built-in.  *arg* is the C function object.
 
    ``'c_return'``
-      A C function has returned. *arg* is ``None``.
+      A C function has returned. *arg* is the C function object.
 
    ``'c_exception'``
-      A C function has raised an exception.  *arg* is ``None``.
+      A C function has raised an exception.  *arg* is the C function object.
 
    Note that as an exception is propagated down the chain of callers, an
    ``'exception'`` event is generated at each level.
@@ -841,7 +896,7 @@ always available.
 
    Activate dumping of VM measurements using the Pentium timestamp counter, if
    *on_flag* is true. Deactivate these dumps if *on_flag* is off. The function is
-   available only if Python was compiled with :option:`--with-tsc`. To understand
+   available only if Python was compiled with ``--with-tsc``. To understand
    the output of this dump, read :file:`Python/ceval.c` in the Python sources.
 
    .. impl-detail::
@@ -953,6 +1008,30 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
+
+
+.. data:: _xoptions
+
+   A dictionary of the various implementation-specific flags passed through
+   the :option:`-X` command-line option.  Option names are either mapped to
+   their values, if given explicitly, or to :const:`True`.  Example::
+
+      $ ./python -Xa=b -Xc
+      Python 3.2a3+ (py3k, Oct 16 2010, 20:14:50)
+      [GCC 4.4.3] on linux2
+      Type "help", "copyright", "credits" or "license" for more information.
+      >>> import sys
+      >>> sys._xoptions
+      {'a': 'b', 'c': True}
+
+   .. impl-detail::
+
+      This is a CPython-specific way of accessing options passed through
+      :option:`-X`.  Other implementations may export them through other
+      means, or not at all.
+
+   .. versionadded:: 3.2
+
 
 .. rubric:: Citations
 

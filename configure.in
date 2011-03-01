@@ -3,15 +3,8 @@ dnl * Please run autoreconf to test your changes! *
 dnl ***********************************************
 
 # Set VERSION so we only need to edit in one place (i.e., here)
-m4_define(PYTHON_VERSION, 3.2)
+m4_define(PYTHON_VERSION, 3.3)
 
-dnl Some m4 magic to ensure that the configure script is generated
-dnl by the correct autoconf version.
-m4_define([version_required],
-[m4_if(m4_version_compare(m4_defn([m4_PACKAGE_VERSION]), [$1]), 0,
-       [],
-       [m4_fatal([Autoconf version $1 is required for Python], 63)])
-])
 AC_PREREQ(2.65)
 
 AC_REVISION($Revision$)
@@ -585,7 +578,7 @@ AC_SUBST(LIBRARY)
 AC_MSG_CHECKING(LIBRARY)
 if test -z "$LIBRARY"
 then
-	LIBRARY='libpython$(VERSION).a'
+	LIBRARY='libpython$(VERSION)$(ABIFLAGS).a'
 fi
 AC_MSG_RESULT($LIBRARY)
 
@@ -602,18 +595,24 @@ AC_MSG_RESULT($LIBRARY)
 #
 # INSTSONAME is the name of the shared library that will be use to install
 # on the system - some systems like version suffix, others don't
+#
+# LDVERSION is the shared library version number, normally the Python version
+# with the ABI build flags appended.
 AC_SUBST(LDLIBRARY)
 AC_SUBST(DLLLIBRARY)
 AC_SUBST(BLDLIBRARY)
+AC_SUBST(PY3LIBRARY)
 AC_SUBST(LDLIBRARYDIR)
 AC_SUBST(INSTSONAME)
 AC_SUBST(RUNSHARED)
+AC_SUBST(LDVERSION)
 LDLIBRARY="$LIBRARY"
 BLDLIBRARY='$(LDLIBRARY)'
 INSTSONAME='$(LDLIBRARY)'
 DLLLIBRARY=''
 LDLIBRARYDIR=''
 RUNSHARED=''
+LDVERSION="$VERSION"
 
 # LINKCC is the command that links the python executable -- default is $(CC).
 # If CXX is set, and if it is needed to link a main function that was
@@ -724,18 +723,22 @@ if test $enable_shared = "yes"; then
   AC_DEFINE(Py_ENABLE_SHARED, 1, [Defined if Python is built as a shared library.])
   case $ac_sys_system in
     CYGWIN*)
-          LDLIBRARY='libpython$(VERSION).dll.a'
-          DLLLIBRARY='libpython$(VERSION).dll'
+          LDLIBRARY='libpython$(LDVERSION).dll.a'
+          DLLLIBRARY='libpython$(LDVERSION).dll'
           ;;
     SunOS*)
-	  LDLIBRARY='libpython$(VERSION).so'
-	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
+	  LDLIBRARY='libpython$(LDVERSION).so'
+	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  if test "$with_pydebug" != yes
+	  then
+	      PY3LIBRARY=libpython3.so
+	  fi
           ;;
     Linux*|GNU*|NetBSD*|FreeBSD*|DragonFly*)
-	  LDLIBRARY='libpython$(VERSION).so'
-	  BLDLIBRARY='-L. -lpython$(VERSION)'
+	  LDLIBRARY='libpython$(LDVERSION).so'
+	  BLDLIBRARY='-L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  case $ac_sys_system in
 	      FreeBSD*)
@@ -743,31 +746,35 @@ if test $enable_shared = "yes"; then
 		;;
 	  esac
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
+	  if test "$with_pydebug" != yes
+          then
+	      PY3LIBRARY=libpython3.so
+	  fi
 	  ;;
     hp*|HP*)
 	  case `uname -m` in
 		ia64)
-			LDLIBRARY='libpython$(VERSION).so'
+			LDLIBRARY='libpython$(LDVERSION).so'
 			;;
 		*)
-			LDLIBRARY='libpython$(VERSION).sl'
+			LDLIBRARY='libpython$(LDVERSION).sl'
 			;;
 	  esac
-	  BLDLIBRARY='-Wl,+b,$(LIBDIR) -L. -lpython$(VERSION)'
+	  BLDLIBRARY='-Wl,+b,$(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=SHLIB_PATH=`pwd`:${SHLIB_PATH}
 	  ;;
     OSF*)
-	  LDLIBRARY='libpython$(VERSION).so'
-	  BLDLIBRARY='-rpath $(LIBDIR) -L. -lpython$(VERSION)'
+	  LDLIBRARY='libpython$(LDVERSION).so'
+	  BLDLIBRARY='-rpath $(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  ;;
     Darwin*)
-    	LDLIBRARY='libpython$(VERSION).dylib'
-	BLDLIBRARY='-L. -lpython$(VERSION)'
+    	LDLIBRARY='libpython$(LDVERSION).dylib'
+	BLDLIBRARY='-L. -lpython$(LDVERSION)'
 	RUNSHARED='DYLD_LIBRARY_PATH=`pwd`:${DYLD_LIBRARY_PATH}'
 	;;
     AIX*)
-	LDLIBRARY='libpython$(VERSION).so'
+	LDLIBRARY='libpython$(LDVERSION).so'
 	RUNSHARED=LIBPATH=`pwd`:${LIBPATH}
 	;;
 
@@ -776,7 +783,7 @@ else # shared is disabled
   case $ac_sys_system in
     CYGWIN*)
           BLDLIBRARY='$(LIBRARY)'
-          LDLIBRARY='libpython$(VERSION).dll.a'
+          LDLIBRARY='libpython$(LDVERSION).dll.a'
           ;;
   esac
 fi
@@ -823,7 +830,8 @@ if test -z "$LN" ; then
 fi
 
 # For calculating the .so ABI tag.
-SOABI_QUALIFIERS=""
+AC_SUBST(ABIFLAGS)
+ABIFLAGS=""
 
 # Check for --with-pydebug
 AC_MSG_CHECKING(for --with-pydebug)
@@ -836,7 +844,7 @@ then
   [Define if you want to build an interpreter with many run-time checks.]) 
   AC_MSG_RESULT(yes); 
   Py_DEBUG='true'
-  SOABI_QUALIFIERS="${SOABI_QUALIFIERS}d"
+  ABIFLAGS="${ABIFLAGS}d"
 else AC_MSG_RESULT(no); Py_DEBUG='false'
 fi],
 [AC_MSG_RESULT(no)])
@@ -1086,51 +1094,6 @@ then
 	BASECFLAGS="$BASECFLAGS $ac_arch_flags"
 fi
 
-# disable check for icc since it seems to pass, but generates a warning
-if test "$CC" = icc
-then
-  ac_cv_opt_olimit_ok=no
-fi
-
-AC_MSG_CHECKING(whether $CC accepts -OPT:Olimit=0)
-AC_CACHE_VAL(ac_cv_opt_olimit_ok,
-[ac_save_cc="$CC"
-CC="$CC -OPT:Olimit=0"
-AC_COMPILE_IFELSE(
-  [AC_LANG_PROGRAM([[]], [[]])],
-  [ac_cv_opt_olimit_ok=yes],
-  [ac_cv_opt_olimit_ok=no]
-  )
-CC="$ac_save_cc"])
-AC_MSG_RESULT($ac_cv_opt_olimit_ok)
-if test $ac_cv_opt_olimit_ok = yes; then
-    case $ac_sys_system in
-	# XXX is this branch needed? On MacOSX 10.2.2 the result of the
-	# olimit_ok test is "no".  Is it "yes" in some other Darwin-esque
-	# environment?
-        Darwin*)
-	    ;;
-        *)
-	    BASECFLAGS="$BASECFLAGS -OPT:Olimit=0"
-	    ;;
-    esac
-else
-  AC_MSG_CHECKING(whether $CC accepts -Olimit 1500)
-  AC_CACHE_VAL(ac_cv_olimit_ok,
-  [ac_save_cc="$CC"
-  CC="$CC -Olimit 1500"
-  AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM([[]], [[]])],
-    [ac_cv_olimit_ok=yes],
-    [ac_cv_olimit_ok=no]
-    )
-  CC="$ac_save_cc"])
-  AC_MSG_RESULT($ac_cv_olimit_ok)
-  if test $ac_cv_olimit_ok = yes; then
-    BASECFLAGS="$BASECFLAGS -Olimit 1500"
-  fi
-fi
-
 # Check whether GCC supports PyArg_ParseTuple format
 if test "$GCC" = "yes"
 then
@@ -1320,10 +1283,10 @@ shadow.h signal.h stdint.h stropts.h termios.h thread.h \
 unistd.h utime.h \
 sys/audioio.h sys/bsdtty.h sys/epoll.h sys/event.h sys/file.h sys/loadavg.h \
 sys/lock.h sys/mkdev.h sys/modem.h \
-sys/param.h sys/poll.h sys/select.h sys/socket.h sys/statvfs.h sys/stat.h \
-sys/termio.h sys/time.h \
-sys/times.h sys/types.h sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
-sys/resource.h netpacket/packet.h sysexits.h bluetooth.h \
+sys/param.h sys/poll.h sys/select.h sys/sendfile.h sys/socket.h sys/statvfs.h \
+sys/stat.h sys/termio.h sys/time.h \
+sys/times.h sys/types.h sys/uio.h sys/un.h sys/utsname.h sys/wait.h pty.h \
+libutil.h sys/resource.h netpacket/packet.h sysexits.h bluetooth.h \
 bluetooth/bluetooth.h linux/tipc.h spawn.h util.h)
 AC_HEADER_DIRENT
 AC_HEADER_MAJOR
@@ -1406,6 +1369,12 @@ fi
 if test "$use_lfs" = "yes"; then
 # Two defines needed to enable largefile support on various platforms
 # These may affect some typedefs
+case $ac_sys_system/$ac_sys_release in
+AIX*)
+    AC_DEFINE(_LARGE_FILES, 1, 
+    [This must be defined on AIX systems to enable large file support.])
+    ;;
+esac
 AC_DEFINE(_LARGEFILE_SOURCE, 1, 
 [This must be defined on some systems to enable large file support.])
 AC_DEFINE(_FILE_OFFSET_BITS, 64,
@@ -1483,6 +1452,9 @@ AC_CHECK_TYPES(uintptr_t,
    [AC_CHECK_SIZEOF(uintptr_t, 4)], 
    [], [#ifdef HAVE_STDINT_H
         #include <stdint.h>
+        #endif
+        #ifdef HAVE_INTTYPES_H
+        #include <inttypes.h>
         #endif])
 
 AC_CHECK_SIZEOF(off_t, [], [
@@ -1669,7 +1641,7 @@ if test -z "$LDSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	AIX*)
-		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:Modules/python.exp -L\$(srcdir)"
+		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:\$(srcdir)/Modules/python.exp"
 		LDSHARED="\$(BINLIBDEST)/config/ld_so_aix \$(CC) -bI:\$(BINLIBDEST)/config/python.exp"
 		;;
 	IRIX/5*) LDSHARED="ld -shared";;
@@ -1691,8 +1663,8 @@ then
 		fi ;;
 	OSF*) LDSHARED="ld -shared -expect_unresolved \"*\"";;
 	Darwin/1.3*)
-		LDSHARED='$(CC) $(LDFLAGS) -bundle'
-		LDCXXSHARED='$(CXX) $(LDFLAGS) -bundle'
+		LDSHARED='$(CC) -bundle'
+		LDCXXSHARED='$(CXX) -bundle'
 		if test "$enable_framework" ; then
 			# Link against the framework. All externals should be defined.
 			BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
@@ -1704,8 +1676,8 @@ then
 			LDCXXSHARED="$LDCXXSHARED -undefined suppress"
 		fi ;;
 	Darwin/1.4*|Darwin/5.*|Darwin/6.*)
-		LDSHARED='$(CC) $(LDFLAGS) -bundle'
-		LDCXXSHARED='$(CXX) $(LDFLAGS) -bundle'
+		LDSHARED='$(CC) -bundle'
+		LDCXXSHARED='$(CXX) -bundle'
 		if test "$enable_framework" ; then
 			# Link against the framework. All externals should be defined.
 			BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
@@ -1726,12 +1698,12 @@ then
 			if test "${enable_universalsdk}"; then
 				LDFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${LDFLAGS}"
 			fi
-			LDSHARED='$(CC) $(LDFLAGS) -bundle -undefined dynamic_lookup'
-			LDCXXSHARED='$(CXX) $(LDFLAGS) -bundle -undefined dynamic_lookup'
+			LDSHARED='$(CC) -bundle -undefined dynamic_lookup'
+			LDCXXSHARED='$(CXX) -bundle -undefined dynamic_lookup'
 			BLDSHARED="$LDSHARED"
 		else
-			LDSHARED='$(CC) $(LDFLAGS) -bundle'
-			LDCXXSHARED='$(CXX) $(LDFLAGS) -bundle'
+			LDSHARED='$(CC) -bundle'
+			LDCXXSHARED='$(CXX) -bundle'
 			if test "$enable_framework" ; then
 				# Link against the framework. All externals should be defined.
 				BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
@@ -1754,30 +1726,30 @@ then
 	FreeBSD*)
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
 		then
-			LDSHARED='$(CC) -shared ${LDFLAGS}'
-			LDCXXSHARED='$(CXX) -shared ${LDFLAGS}'
+			LDSHARED='$(CC) -shared'
+			LDCXXSHARED='$(CXX) -shared'
 		else
-			LDSHARED="ld -Bshareable ${LDFLAGS}"
+			LDSHARED="ld -Bshareable"
 		fi;;
 	OpenBSD*)
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
 		then
-				LDSHARED='$(CC) -shared $(CCSHARED) ${LDFLAGS}'
-				LDCXXSHARED='$(CXX) -shared $(CCSHARED) ${LDFLAGS}'
+				LDSHARED='$(CC) -shared $(CCSHARED)'
+				LDCXXSHARED='$(CXX) -shared $(CCSHARED)'
 		else
 				case `uname -r` in
 				[[01]].* | 2.[[0-7]] | 2.[[0-7]].*)
 				   LDSHARED="ld -Bshareable ${LDFLAGS}"
 				   ;;
 				*)
-				   LDSHARED='$(CC) -shared $(CCSHARED) ${LDFLAGS}'
-				   LDCXXSHARED='$(CXX) -shared $(CCSHARED) ${LDFLAGS}'
+				   LDSHARED='$(CC) -shared $(CCSHARED)'
+				   LDCXXSHARED='$(CXX) -shared $(CCSHARED)'
 				   ;;
 				esac
 		fi;;
 	NetBSD*|DragonFly*)
-		LDSHARED="cc -shared ${LDFLAGS}"
-		LDCXXSHARED="c++ -shared ${LDFLAGS}";;
+		LDSHARED='$(CC) -shared'
+		LDCXXSHARED='$(CXX) -shared';;
 	OpenUNIX*|UnixWare*)
 		if test "$GCC" = "yes" ; then
 			LDSHARED='$(CC) -shared'
@@ -1919,6 +1891,7 @@ AC_MSG_RESULT($SHLIBS)
 
 
 # checks for libraries
+AC_CHECK_LIB(sendfile, sendfile)
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
 
@@ -1939,7 +1912,7 @@ AC_CHECK_LIB(intl, textdomain,
 case "$ac_sys_system" in
 	AIX*)	AC_MSG_CHECKING(for genuine AIX C++ extensions support)
 		AC_LINK_IFELSE([
-		  AC_LANG_PROGRAM([[#include "/usr/lpp/xlC/include/load.h"]],
+		  AC_LANG_PROGRAM([[#include <load.h>]],
 				  [[loadAndInit("", 0, "")]])
 		],[
 		  AC_DEFINE(AIX_GENUINE_CPLUSPLUS, 1,
@@ -1970,14 +1943,18 @@ AC_PATH_TOOL([PKG_CONFIG], [pkg-config])
 # Check for use of the system expat library
 AC_MSG_CHECKING(for --with-system-expat)
 AC_ARG_WITH(system_expat,
-            AS_HELP_STRING([--with-system-expat], [build pyexpat module using an installed expat library]))
+            AS_HELP_STRING([--with-system-expat], [build pyexpat module using an installed expat library]),
+            [],
+            [with_system_expat="no"])
 
 AC_MSG_RESULT($with_system_expat)
 
 # Check for use of the system libffi library
 AC_MSG_CHECKING(for --with-system-ffi)
 AC_ARG_WITH(system_ffi,
-            AS_HELP_STRING([--with-system-ffi], [build _ctypes module using an installed ffi library]))
+            AS_HELP_STRING([--with-system-ffi], [build _ctypes module using an installed ffi library]),
+            [],
+            [with_system_ffi="no"])
 
 if test "$with_system_ffi" = "yes" && test -n "$PKG_CONFIG"; then
     LIBFFI_INCLUDEDIR="`"$PKG_CONFIG" libffi --cflags-only-I 2>/dev/null | sed -e 's/^-I//;s/ *$//'`"
@@ -1987,6 +1964,15 @@ fi
 AC_SUBST(LIBFFI_INCLUDEDIR)
 
 AC_MSG_RESULT($with_system_ffi)
+
+# Check for support for loadable sqlite extensions
+AC_MSG_CHECKING(for --enable-loadable-sqlite-extensions)
+AC_ARG_ENABLE(loadable-sqlite-extensions,
+              AS_HELP_STRING([--enable-loadable-sqlite-extensions], [support loadable extensions in _sqlite module]),
+              [],
+              [enable_loadable_sqlite_extensions="no"])
+
+AC_MSG_RESULT($enable_loadable_sqlite_extensions)
 
 # Check for --with-dbmliborder
 AC_MSG_CHECKING(for --with-dbmliborder)
@@ -2363,7 +2349,7 @@ yes
 			;;
 		solaris)
 			if test -f /etc/netconfig; then
-                          if /usr/xpg4/bin/grep -q tcp6 /etc/netconfig; then
+                          if $GREP -q tcp6 /etc/netconfig; then
 				ipv6type=$i
 				ipv6trylibc=yes
                           fi
@@ -2470,7 +2456,7 @@ AC_ARG_WITH(pymalloc,
 if test -z "$with_pymalloc"
 then
     with_pymalloc="yes"
-    SOABI_QUALIFIERS="${SOABI_QUALIFIERS}m"
+    ABIFLAGS="${ABIFLAGS}m"
 fi
 if test "$with_pymalloc" != "no"
 then
@@ -2547,19 +2533,20 @@ fi
 AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
-AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
- clock confstr ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
+AC_CHECK_FUNCS(alarm accept4 setitimer getitimer bind_textdomain_codeset chown \
+ clock confstr ctermid execv faccessat fchmod fchmodat fchown fchownat \
+ fdopendir fork fpathconf fstatat ftime ftruncate futimesat \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getresuid getresgid getpwent getspnam getspent getsid getwd \
- initgroups kill killpg lchmod lchown lstat mbrtowc mkfifo mknod mktime \
- mremap nice pathconf pause plock poll pthread_init \
- putenv readlink realpath \
- select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
- setgid \
- setlocale setregid setreuid setresuid setresgid setsid setpgid setpgrp setuid setvbuf \
- sigaction siginterrupt sigrelse snprintf strftime strlcpy \
+ initgroups kill killpg lchmod lchown linkat lstat mbrtowc mkdirat mkfifo \
+ mkfifoat mknod mknodat mktime mremap nice openat pathconf pause plock poll \
+ pthread_init putenv readlink readlinkat realpath renameat \
+ select sem_open sem_timedwait sem_getvalue sem_unlink sendfile setegid seteuid \
+ setgid sethostname \
+ setlocale setregid setreuid setresuid setresgid setsid setpgid setpgrp setpriority setuid setvbuf \
+ sigaction siginterrupt sigrelse snprintf strftime strlcpy symlinkat \
  sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname unsetenv utimes waitpid wait3 wait4 \
+ truncate uname unlinkat unsetenv utimensat utimes waitpid wait3 wait4 \
  wcscoll wcsftime wcsxfrm _getpty)
 
 # For some functions, having a definition is not sufficient, since
@@ -2954,6 +2941,8 @@ int main()
 [ac_cv_buggy_getaddrinfo=yes]))
 fi
 
+AC_MSG_RESULT($ac_cv_buggy_getaddrinfo)
+
 if test $have_getaddrinfo = no -o "$ac_cv_buggy_getaddrinfo" = yes
 then
 	if test $ipv6 = yes
@@ -2965,6 +2954,7 @@ then
 else
 	AC_DEFINE(HAVE_GETADDRINFO, 1, [Define if you have the getaddrinfo function.])
 fi
+
 AC_CHECK_FUNCS(getnameinfo)
 
 # checks for structures
@@ -3392,6 +3382,10 @@ fi
 LIBS_SAVE=$LIBS
 LIBS="$LIBS $LIBM"
 
+AC_CHECK_FUNCS([acosh asinh atanh copysign erf erfc expm1 finite gamma])
+AC_CHECK_FUNCS([hypot lgamma log1p round tgamma])
+AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
+
 # On FreeBSD 6.2, it appears that tanh(-0.) returns 0. instead of
 # -0. on some architectures.
 AC_MSG_CHECKING(whether tanh preserves the sign of zero)
@@ -3418,9 +3412,34 @@ then
   [Define if tanh(-0.) is -0., or if platform doesn't have signed zeros])
 fi
 
-AC_CHECK_FUNCS([acosh asinh atanh copysign erf erfc expm1 finite gamma])
-AC_CHECK_FUNCS([hypot lgamma log1p round tgamma])
-AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
+if test "$ac_cv_func_log1p" = yes
+then
+    # On some versions of AIX, log1p(-0.) returns 0. instead of
+    # -0.  See issue #9920.
+    AC_MSG_CHECKING(whether log1p drops the sign of negative zero)
+    AC_CACHE_VAL(ac_cv_log1p_drops_zero_sign, [
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+    #include <math.h>
+    #include <stdlib.h>
+    int main() {
+        /* Fail if the signs of log1p(-0.) and -0. can be
+	   distinguished. */
+        if (atan2(log1p(-0.), -1.) == atan2(-0., -1.))
+            return 0;
+        else
+            return 1;
+    }
+    ]])],
+    [ac_cv_log1p_drops_zero_sign=no],
+    [ac_cv_log1p_drops_zero_sign=yes],
+    [ac_cv_log1p_drops_zero_sign=no])])
+    AC_MSG_RESULT($ac_cv_log1p_drops_zero_sign)
+fi
+if test "$ac_cv_log1p_drops_zero_sign" = yes
+then
+  AC_DEFINE(LOG1P_DROPS_ZERO_SIGN, 1,
+  [Define if log1p(-0.) is 0. rather than -0.])
+fi
 
 LIBS=$LIBS_SAVE
 
@@ -3583,7 +3602,7 @@ AH_TEMPLATE(Py_UNICODE_SIZE,
 case "$unicode_size" in
   4)
      AC_DEFINE(Py_UNICODE_SIZE, 4)
-     SOABI_QUALIFIERS="${SOABI_QUALIFIERS}u"
+     ABIFLAGS="${ABIFLAGS}u"
      ;;
   *) AC_DEFINE(Py_UNICODE_SIZE, 2) ;;
 esac
@@ -3632,9 +3651,15 @@ AC_C_BIGENDIAN
 # would get a shared library ABI version tag of 'cpython-32dmu' and shared
 # libraries would be named 'foo.cpython-32dmu.so'.
 AC_SUBST(SOABI)
+AC_MSG_CHECKING(ABIFLAGS)
+AC_MSG_RESULT($ABIFLAGS)
 AC_MSG_CHECKING(SOABI)
-SOABI='cpython-'`echo $VERSION | tr -d .`${SOABI_QUALIFIERS}
+SOABI='cpython-'`echo $VERSION | tr -d .`${ABIFLAGS}
 AC_MSG_RESULT($SOABI)
+
+AC_MSG_CHECKING(LDVERSION)
+LDVERSION='$(VERSION)$(ABIFLAGS)'
+AC_MSG_RESULT($LDVERSION)
 
 # SO is the extension of shared libraries `(including the dot!)
 # -- usually .so, .sl on HP-UX, .dll on Cygwin
@@ -3649,7 +3674,8 @@ then
 		esac
 		;;
 	CYGWIN*)   SO=.dll;;
-	Linux*)    SO=.${SOABI}.so;;
+	Linux*|GNU*)
+		   SO=.${SOABI}.so;;
 	*)	   SO=.so;;
 	esac
 else
@@ -4209,13 +4235,17 @@ fi
 ],
 [AC_MSG_RESULT(no value specified)])
 
+case $ac_sys_system in
+AIX*)   
+  AC_DEFINE(HAVE_BROKEN_PIPE_BUF, 1, [Define if the system reports an invalid PIPE_BUF value.]) ;;
+esac
 
 
 case $ac_sys_system in
   OSF*) AC_MSG_ERROR(OSF* systems are deprecated unless somebody volunteers. Check http://bugs.python.org/issue8606) ;;
 esac
 
-
+AC_CHECK_FUNC(pipe2, AC_DEFINE(HAVE_PIPE2, 1, [Define if the OS supports pipe2()]), )
 
 AC_SUBST(THREADHEADERS)
 

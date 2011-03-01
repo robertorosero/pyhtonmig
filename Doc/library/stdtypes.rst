@@ -197,8 +197,8 @@ exception.
    operator: in
    operator: not in
 
-Two more operations with the same syntactic priority, ``in`` and ``not in``, are
-supported only by sequence types (below).
+Two more operations with the same syntactic priority, :keyword:`in` and
+:keyword:`not in`, are supported only by sequence types (below).
 
 
 .. _typesnumeric:
@@ -217,7 +217,7 @@ Numeric Types --- :class:`int`, :class:`float`, :class:`complex`
 There are three distinct numeric types: :dfn:`integers`, :dfn:`floating
 point numbers`, and :dfn:`complex numbers`.  In addition, Booleans are a
 subtype of integers.  Integers have unlimited precision.  Floating point
-numbers are usually implemented using :ctype:`double` in C; information
+numbers are usually implemented using :c:type:`double` in C; information
 about the precision and internal representation of floating point
 numbers for the machine on which your program is running is available
 in :data:`sys.float_info`.  Complex numbers have a real and imaginary
@@ -530,10 +530,20 @@ The float type has some additional methods.
 
 .. method:: float.as_integer_ratio()
 
-    Return a pair of integers whose ratio is exactly equal to the
-    original float and with a positive denominator.  Raises
-    :exc:`OverflowError` on infinities and a :exc:`ValueError` on
-    NaNs.
+   Return a pair of integers whose ratio is exactly equal to the
+   original float and with a positive denominator.  Raises
+   :exc:`OverflowError` on infinities and a :exc:`ValueError` on
+   NaNs.
+
+.. method:: float.is_integer()
+
+   Return ``True`` if the float instance is finite with integral
+   value, and ``False`` otherwise::
+
+      >>> (-2.0).is_integer()
+      True
+      >>> (3.2).is_integer()
+      False
 
 Two methods support conversion to
 and from hexadecimal strings.  Since Python's floats are stored
@@ -804,22 +814,20 @@ constructor, :func:`bytes`, and from literals; use a ``b`` prefix with normal
 string syntax: ``b'xyzzy'``.  To construct byte arrays, use the
 :func:`bytearray` function.
 
-.. warning::
+While string objects are sequences of characters (represented by strings of
+length 1), bytes and bytearray objects are sequences of *integers* (between 0
+and 255), representing the ASCII value of single bytes.  That means that for
+a bytes or bytearray object *b*, ``b[0]`` will be an integer, while
+``b[0:1]`` will be a bytes or bytearray object of length 1.  The
+representation of bytes objects uses the literal format (``b'...'``) since it
+is generally more useful than e.g. ``bytes([50, 19, 100])``.  You can always
+convert a bytes object into a list of integers using ``list(b)``.
 
-   While string objects are sequences of characters (represented by strings of
-   length 1), bytes and bytearray objects are sequences of *integers* (between 0
-   and 255), representing the ASCII value of single bytes.  That means that for
-   a bytes or bytearray object *b*, ``b[0]`` will be an integer, while
-   ``b[0:1]`` will be a bytes or bytearray object of length 1.  The
-   representation of bytes objects uses the literal format (``b'...'``) since it
-   is generally more useful than e.g. ``bytes([50, 19, 100])``.  You can always
-   convert a bytes object into a list of integers using ``list(b)``.
-
-   Also, while in previous Python versions, byte strings and Unicode strings
-   could be exchanged for each other rather freely (barring encoding issues),
-   strings and bytes are now completely separate concepts.  There's no implicit
-   en-/decoding if you pass an object of the wrong type.  A string always
-   compares unequal to a bytes or bytearray object.
+Also, while in previous Python versions, byte strings and Unicode strings
+could be exchanged for each other rather freely (barring encoding issues),
+strings and bytes are now completely separate concepts.  There's no implicit
+en-/decoding if you pass an object of the wrong type.  A string always
+compares unequal to a bytes or bytearray object.
 
 Lists are constructed with square brackets, separating items with commas: ``[a,
 b, c]``.  Tuples are constructed by the comma operator (not within square
@@ -828,8 +836,8 @@ the enclosing parentheses, such as ``a, b, c`` or ``()``.  A single item tuple
 must have a trailing comma, such as ``(d,)``.
 
 Objects of type range are created using the :func:`range` function.  They don't
-support slicing, concatenation or repetition, and using ``in``, ``not in``,
-:func:`min` or :func:`max` on them is inefficient.
+support concatenation or repetition, and using :func:`min` or :func:`max` on
+them is inefficient.
 
 Most sequence types support the following operations.  The ``in`` and ``not in``
 operations have the same priorities as the comparison operations.  The ``+`` and
@@ -838,7 +846,7 @@ operations have the same priorities as the comparison operations.  The ``+`` and
 
 This table lists the sequence operations sorted in ascending priority
 (operations in the same box have the same priority).  In the table, *s* and *t*
-are sequences of the same type; *n*, *i* and *j* are integers:
+are sequences of the same type; *n*, *i*, *j* and *k* are integers.
 
 +------------------+--------------------------------+----------+
 | Operation        | Result                         | Notes    |
@@ -867,6 +875,12 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 | ``min(s)``       | smallest item of *s*           |          |
 +------------------+--------------------------------+----------+
 | ``max(s)``       | largest item of *s*            |          |
++------------------+--------------------------------+----------+
+| ``s.index(i)``   | index of the first occurence   |          |
+|                  | of *i* in *s*                  |          |
++------------------+--------------------------------+----------+
+| ``s.count(i)``   | total number of occurences of  |          |
+|                  | *i* in *s*                     |          |
 +------------------+--------------------------------+----------+
 
 Sequence types also support comparisons.  In particular, tuples and lists are
@@ -984,12 +998,12 @@ functions based on regular expressions.
    interpreted as in slice notation.
 
 
-.. method:: str.encode(encoding=sys.getdefaultencoding(), errors="strict")
+.. method:: str.encode(encoding="utf-8", errors="strict")
 
-   Return an encoded version of the string as a bytes object.  Default encoding
-   is the current default string encoding.  *errors* may be given to set a
-   different error handling scheme.  The default for *errors* is ``'strict'``,
-   meaning that encoding errors raise a :exc:`UnicodeError`.  Other possible
+   Return an encoded version of the string as a bytes object. Default encoding
+   is ``'utf-8'``. *errors* may be given to set a different error handling scheme.
+   The default for *errors* is ``'strict'``, meaning that encoding errors raise
+   a :exc:`UnicodeError`. Other possible
    values are ``'ignore'``, ``'replace'``, ``'xmlcharrefreplace'``,
    ``'backslashreplace'`` and any other name registered via
    :func:`codecs.register_error`, see section :ref:`codec-base-classes`. For a
@@ -1040,6 +1054,22 @@ functions based on regular expressions.
    that can be specified in format strings.
 
 
+.. method:: str.format_map(mapping)
+
+   Similar to ``str.format(**mapping)``, except that ``mapping`` is
+   used directly and not copied to a :class:`dict` .  This is useful
+   if for example ``mapping`` is a dict subclass:
+
+   >>> class Default(dict):
+   ...     def __missing__(self, key):
+   ...         return key
+   ...
+   >>> '{name} was born in {country}'.format_map(Default(name='Guido'))
+   'Guido was born in country'
+
+   .. versionadded:: 3.2
+
+
 .. method:: str.index(sub[, start[, end]])
 
    Like :meth:`find`, but raise :exc:`ValueError` when the substring is not found.
@@ -1048,20 +1078,26 @@ functions based on regular expressions.
 .. method:: str.isalnum()
 
    Return true if all characters in the string are alphanumeric and there is at
-   least one character, false otherwise.
+   least one character, false otherwise.  A character ``c`` is alphanumeric if one
+   of the following returns ``True``: ``c.isalpha()``, ``c.isdecimal()``,
+   ``c.isdigit()``, or ``c.isnumeric()``.
 
 
 .. method:: str.isalpha()
 
    Return true if all characters in the string are alphabetic and there is at least
-   one character, false otherwise.
+   one character, false otherwise.  Alphabetic characters are those characters defined
+   in the Unicode character database as "Letter", i.e., those with general category
+   property being one of "Lm", "Lt", "Lu", "Ll", or "Lo".  Note that this is different
+   from the "Alphabetic" property defined in the Unicode Standard.
 
 
 .. method:: str.isdecimal()
 
    Return true if all characters in the string are decimal
    characters and there is at least one character, false
-   otherwise. Decimal characters include digit characters, and all characters
+   otherwise. Decimal characters are those from general category "Nd". This category
+   includes digit characters, and all characters
    that that can be used to form decimal-radix numbers, e.g. U+0660,
    ARABIC-INDIC DIGIT ZERO.
 
@@ -1069,7 +1105,9 @@ functions based on regular expressions.
 .. method:: str.isdigit()
 
    Return true if all characters in the string are digits and there is at least one
-   character, false otherwise.
+   character, false otherwise.  Digits include decimal characters and digits that need
+   special handling, such as the compatibility superscript digits.  Formally, a digit
+   is a character that has the property value Numeric_Type=Digit or Numeric_Type=Decimal.
 
 
 .. method:: str.isidentifier()
@@ -1081,7 +1119,9 @@ functions based on regular expressions.
 .. method:: str.islower()
 
    Return true if all cased characters in the string are lowercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise.  Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and lowercase characters
+   are those with general category property "Ll".
 
 
 .. method:: str.isnumeric()
@@ -1090,7 +1130,8 @@ functions based on regular expressions.
    characters, and there is at least one character, false
    otherwise. Numeric characters include digit characters, and all characters
    that have the Unicode numeric value property, e.g. U+2155,
-   VULGAR FRACTION ONE FIFTH.
+   VULGAR FRACTION ONE FIFTH.  Formally, numeric characters are those with the property
+   value Numeric_Type=Digit, Numeric_Type=Decimal or Numeric_Type=Numeric.
 
 
 .. method:: str.isprintable()
@@ -1107,8 +1148,9 @@ functions based on regular expressions.
 .. method:: str.isspace()
 
    Return true if there are only whitespace characters in the string and there is
-   at least one character, false otherwise.
-
+   at least one character, false otherwise.  Whitespace characters  are those
+   characters defined in the Unicode character database as "Other" or "Separator"
+   and those with bidirectional property being one of "WS", "B", or "S".
 
 .. method:: str.istitle()
 
@@ -1120,7 +1162,9 @@ functions based on regular expressions.
 .. method:: str.isupper()
 
    Return true if all cased characters in the string are uppercase and there is at
-   least one cased character, false otherwise.
+   least one cased character, false otherwise. Cased characters are those with
+   general category property being one of "Lu", "Ll", or "Lt" and uppercase characters
+   are those with general category property "Lu".
 
 
 .. method:: str.join(iterable)
@@ -1378,7 +1422,7 @@ String objects have one unique built-in operation: the ``%`` operator (modulo).
 This is also known as the string *formatting* or *interpolation* operator.
 Given ``format % values`` (where *format* is a string), ``%`` conversion
 specifications in *format* are replaced with zero or more elements of *values*.
-The effect is similar to the using :cfunc:`sprintf` in the C language.
+The effect is similar to the using :c:func:`sprintf` in the C language.
 
 If *format* requires a single argument, *values* may be a single non-tuple
 object. [#]_  Otherwise, *values* must be a tuple with exactly the number of
@@ -1414,9 +1458,8 @@ formats in the string *must* include a parenthesised mapping key into that
 dictionary inserted immediately after the ``'%'`` character. The mapping key
 selects the value to be formatted from the mapping.  For example:
 
-
-   >>> print('%(language)s has %(#)03d quote types.' % \
-   ...       {'language': "Python", "#": 2})
+   >>> print('%(language)s has %(number)03d quote types.' %
+   ...       {'language': "Python", "number": 2})
    Python has 002 quote types.
 
 In this case no ``*`` specifiers may occur in a format (since they require a
@@ -1552,16 +1595,14 @@ Range Type
 The :class:`range` type is an immutable sequence which is commonly used for
 looping.  The advantage of the :class:`range` type is that an :class:`range`
 object will always take the same amount of memory, no matter the size of the
-range it represents.  There are no consistent performance advantages.
+range it represents.
 
-Range objects have relatively little behavior: they support indexing,
-iteration, the :func:`len` function, and the following methods.
+Range objects have relatively little behavior: they support indexing, contains,
+iteration, the :func:`len` function, and the following methods:
 
 .. method:: range.count(x)
 
-   Return the number of *i*'s for which ``s[i] == x``.  Normally the
-   result will be 0 or 1, but it could be greater if *x* defines an
-   unusual equality function.
+   Return the number of *i*'s for which ``s[i] == x``.
 
     .. versionadded:: 3.2
 
@@ -1601,6 +1642,8 @@ Note that while lists allow their items to be of any type, bytearray object
    single: append() (sequence method)
    single: extend() (sequence method)
    single: count() (sequence method)
+   single: clear() (sequence method)
+   single: copy() (sequence method)
    single: index() (sequence method)
    single: insert() (sequence method)
    single: pop() (sequence method)
@@ -1631,6 +1674,12 @@ Note that while lists allow their items to be of any type, bytearray object
 +------------------------------+--------------------------------+---------------------+
 | ``s.extend(x)``              | same as ``s[len(s):len(s)] =   | \(2)                |
 |                              | x``                            |                     |
++------------------------------+--------------------------------+---------------------+
+| ``s.clear()``                | remove all items from ``s``    | \(8)                |
+|                              |                                |                     |
++------------------------------+--------------------------------+---------------------+
+| ``s.copy()``                 | return a shallow copy of ``s`` | \(8)                |
+|                              |                                |                     |
 +------------------------------+--------------------------------+---------------------+
 | ``s.count(x)``               | return number of *i*'s for     |                     |
 |                              | which ``s[i] == x``            |                     |
@@ -1708,7 +1757,11 @@ Notes:
       detect that the list has been mutated during a sort.
 
 (8)
-   :meth:`sort` is not supported by :class:`bytearray` objects.
+   :meth:`clear`, :meth:`!copy` and :meth:`sort` are not supported by
+   :class:`bytearray` objects.
+
+    .. versionadded:: 3.3
+       :meth:`clear` and :meth:`!copy` methods.
 
 
 .. _bytes-methods:
@@ -1742,11 +1795,11 @@ Wherever one of these methods needs to interpret the bytes as characters
       b = a.replace(b"a", b"f")
 
 
-.. method:: bytes.decode(encoding=sys.getdefaultencoding(), errors="strict")
-            bytearray.decode(encoding=sys.getdefaultencoding(), errors="strict")
+.. method:: bytes.decode(encoding="utf-8", errors="strict")
+            bytearray.decode(encoding="utf-8", errors="strict")
 
-   Return a string decoded from the given bytes.  Default encoding is the
-   current default string encoding.  *errors* may be given to set a different
+   Return a string decoded from the given bytes.  Default encoding is
+   ``'utf-8'``. *errors* may be given to set a different
    error handling scheme.  The default for *errors* is ``'strict'``, meaning
    that encoding errors raise a :exc:`UnicodeError`.  Other possible values are
    ``'ignore'``, ``'replace'`` and any other name registered via
@@ -2047,12 +2100,12 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
    values are added as items to the dictionary.  If a key is specified both in
    the positional argument and as a keyword argument, the value associated with
    the keyword is retained in the dictionary.  For example, these all return a
-   dictionary equal to ``{"one": 2, "two": 3}``:
+   dictionary equal to ``{"one": 1, "two": 2}``:
 
-   * ``dict(one=2, two=3)``
-   * ``dict({'one': 2, 'two': 3})``
-   * ``dict(zip(('one', 'two'), (2, 3)))``
-   * ``dict([['two', 3], ['one', 2]])``
+   * ``dict(one=1, two=2)``
+   * ``dict({'one': 1, 'two': 2})``
+   * ``dict(zip(('one', 'two'), (1, 2)))``
+   * ``dict([['two', 2], ['one', 1]])``
 
    The first example only works for keys that are valid Python identifiers; the
    others work with any valid keys.
@@ -2076,8 +2129,20 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       returned or raised by the ``__missing__(key)`` call if the key is not
       present. No other operations or methods invoke :meth:`__missing__`. If
       :meth:`__missing__` is not defined, :exc:`KeyError` is raised.
-      :meth:`__missing__` must be a method; it cannot be an instance variable. For
-      an example, see :class:`collections.defaultdict`.
+      :meth:`__missing__` must be a method; it cannot be an instance variable::
+
+          >>> class Counter(dict):
+          ...     def __missing__(self, key):
+          ...         return 0
+          >>> c = Counter()
+          >>> c['red']
+          0
+          >>> c['red'] += 1
+          >>> c['red']
+          1
+
+      See :class:`collections.Counter` for a complete implementation including
+      other methods helpful for accumulating and managing tallies.
 
    .. describe:: d[key] = value
 
@@ -2208,34 +2273,11 @@ support membership tests:
 
 
 Keys views are set-like since their entries are unique and hashable.  If all
-values are hashable, so that (key, value) pairs are unique and hashable, then
-the items view is also set-like.  (Values views are not treated as set-like
-since the entries are generally not unique.)  Then these set operations are
-available ("other" refers either to another view or a set):
-
-.. describe:: dictview & other
-
-   Return the intersection of the dictview and the other object as a new set.
-
-.. describe:: dictview | other
-
-   Return the union of the dictview and the other object as a new set.
-
-.. describe:: dictview - other
-
-   Return the difference between the dictview and the other object (all elements
-   in *dictview* that aren't in *other*) as a new set.
-
-.. describe:: dictview ^ other
-
-   Return the symmetric difference (all elements either in *dictview* or
-   *other*, but not in both) of the dictview and the other object as a new set.
-
-.. method:: dictview.isdisjoint(other)
-
-   Return True if the view has no elements in common with *other*.  Sets are
-   disjoint if and only if their intersection is the empty set.
-
+values are hashable, so that ``(key, value)`` pairs are unique and hashable,
+then the items view is also set-like.  (Values views are not treated as set-like
+since the entries are generally not unique.)  For set-like views, all of the
+operations defined for the abstract base class :class:`collections.Set` are
+available (for example, ``==``, ``<``, or ``^``).
 
 An example of dictionary view usage::
 
@@ -2265,6 +2307,8 @@ An example of dictionary view usage::
    >>> # set operations
    >>> keys & {'eggs', 'bacon', 'salad'}
    {'bacon'}
+   >>> keys ^ {'sausage', 'juice'}
+   {'juice', 'eggs', 'bacon', 'spam'}
 
 
 .. _typememoryview:
@@ -2273,8 +2317,8 @@ memoryview type
 ===============
 
 :class:`memoryview` objects allow Python code to access the internal data
-of an object that supports the buffer protocol without copying.  Memory
-is generally interpreted as simple bytes.
+of an object that supports the :ref:`buffer protocol <bufferobjects>` without
+copying.  Memory is generally interpreted as simple bytes.
 
 .. class:: memoryview(obj)
 
@@ -2413,6 +2457,10 @@ is generally interpreted as simple bytes.
       A tuple of integers the length of :attr:`ndim` giving the size in bytes to
       access each element for each dimension of the array.
 
+   .. attribute:: readonly
+
+      A bool indicating whether the memory is read only.
+
    .. memoryview.suboffsets isn't documented because it only seems useful for C
 
 
@@ -2427,12 +2475,9 @@ Context Manager Types
    single: protocol; context management
 
 Python's :keyword:`with` statement supports the concept of a runtime context
-defined by a context manager.  This is implemented using two separate methods
+defined by a context manager.  This is implemented using a pair of methods
 that allow user-defined classes to define a runtime context that is entered
-before the statement body is executed and exited when the statement ends.
-
-The :dfn:`context management protocol` consists of a pair of methods that need
-to be provided for a context manager object to define a runtime context:
+before the statement body is executed and exited when the statement ends:
 
 
 .. method:: contextmanager.__enter__()
@@ -2480,9 +2525,9 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's :term:`generator`\s and the ``contextlib.contextmanager`` :term:`decorator`
+Python's :term:`generator`\s and the :class:`contextlib.contextmanager` decorator
 provide a convenient way to implement these protocols.  If a generator function is
-decorated with the ``contextlib.contextmanager`` decorator, it will return a
+decorated with the :class:`contextlib.contextmanager` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
 generator function.

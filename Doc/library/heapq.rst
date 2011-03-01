@@ -8,14 +8,19 @@
 .. sectionauthor:: François Pinard
 .. sectionauthor:: Raymond Hettinger
 
+**Source code:** :source:`Lib/heapq.py`
+
+--------------
+
 This module provides an implementation of the heap queue algorithm, also known
 as the priority queue algorithm.
 
-Heaps are arrays for which ``heap[k] <= heap[2*k+1]`` and ``heap[k] <=
-heap[2*k+2]`` for all *k*, counting elements from zero.  For the sake of
-comparison, non-existing elements are considered to be infinite.  The
-interesting property of a heap is that ``heap[0]`` is always its smallest
-element.
+Heaps are binary trees for which every parent node has a value less than or
+equal to any of its children.  This implementation uses arrays for which
+``heap[k] <= heap[2*k+1]`` and ``heap[k] <= heap[2*k+2]`` for all *k*, counting
+elements from zero.  For the sake of comparison, non-existing elements are
+considered to be infinite.  The interesting property of a heap is that its
+smallest element is always the root, ``heap[0]``.
 
 The API below differs from textbook heap algorithms in two aspects: (a) We use
 zero-based indexing.  This makes the relationship between the index for a node
@@ -202,9 +207,6 @@ entry as invalid and optionally add a new entry with the revised priority::
 
 Theory
 ------
-
-(This explanation is due to François Pinard.  The Python code for this module
-was contributed by Kevin O'Connor.)
 
 Heaps are arrays for which ``a[k] <= a[2*k+1]`` and ``a[k] <= a[2*k+2]`` for all
 *k*, counting elements from 0.  For the sake of comparison, non-existing

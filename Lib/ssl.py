@@ -55,6 +55,7 @@ PROTOCOL_TLSv1
 """
 
 import textwrap
+import re
 
 import _ssl             # if we can't import it, let the error propagate
 
@@ -76,6 +77,7 @@ from _ssl import (
     SSL_ERROR_EOF,
     SSL_ERROR_INVALID_ERROR_CODE,
     )
+from _ssl import HAS_SNI
 
 from socket import getnameinfo as _getnameinfo
 from socket import error as socket_error
@@ -83,6 +85,64 @@ from socket import socket, AF_INET, SOCK_STREAM
 import base64        # for DER-to-PEM translation
 import traceback
 import errno
+
+
+class CertificateError(ValueError):
+    pass
+
+
+def _dnsname_to_pat(dn):
+    pats = []
+    for frag in dn.split(r'.'):
+        if frag == '*':
+            # When '*' is a fragment by itself, it matches a non-empty dotless
+            # fragment.
+            pats.append('[^.]+')
+        else:
+            # Otherwise, '*' matches any dotless fragment.
+            frag = re.escape(frag)
+            pats.append(frag.replace(r'\*', '[^.]*'))
+    return re.compile(r'\A' + r'\.'.join(pats) + r'\Z', re.IGNORECASE)
+
+
+def match_hostname(cert, hostname):
+    """Verify that *cert* (in decoded format as returned by
+    SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 rules
+    are mostly followed, but IP addresses are not accepted for *hostname*.
+
+    CertificateError is raised on failure. On success, the function
+    returns nothing.
+    """
+    if not cert:
+        raise ValueError("empty or no certificate")
+    dnsnames = []
+    san = cert.get('subjectAltName', ())
+    for key, value in san:
+        if key == 'DNS':
+            if _dnsname_to_pat(value).match(hostname):
+                return
+            dnsnames.append(value)
+    if not san:
+        # The subject is only checked when subjectAltName is empty
+        for sub in cert.get('subject', ()):
+            for key, value in sub:
+                # XXX according to RFC 2818, the most specific Common Name
+                # must be used.
+                if key == 'commonName':
+                    if _dnsname_to_pat(value).match(hostname):
+                        return
+                    dnsnames.append(value)
+    if len(dnsnames) > 1:
+        raise CertificateError("hostname %r "
+            "doesn't match either of %s"
+            % (hostname, ', '.join(map(repr, dnsnames))))
+    elif len(dnsnames) == 1:
+        raise CertificateError("hostname %r "
+            "doesn't match %r"
+            % (hostname, dnsnames[0]))
+    else:
+        raise CertificateError("no appropriate commonName or "
+            "subjectAltName fields were found")
 
 
 class SSLContext(_SSLContext):
@@ -99,10 +159,12 @@ class SSLContext(_SSLContext):
 
     def wrap_socket(self, sock, server_side=False,
                     do_handshake_on_connect=True,
-                    suppress_ragged_eofs=True):
+                    suppress_ragged_eofs=True,
+                    server_hostname=None):
         return SSLSocket(sock=sock, server_side=server_side,
                          do_handshake_on_connect=do_handshake_on_connect,
                          suppress_ragged_eofs=suppress_ragged_eofs,
+                         server_hostname=server_hostname,
                          _context=self)
 
 
@@ -117,6 +179,7 @@ class SSLSocket(socket):
                  do_handshake_on_connect=True,
                  family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None,
                  suppress_ragged_eofs=True, ciphers=None,
+                 server_hostname=None,
                  _context=None):
 
         if _context:
@@ -143,7 +206,11 @@ class SSLSocket(socket):
             self.ssl_version = ssl_version
             self.ca_certs = ca_certs
             self.ciphers = ciphers
+        if server_side and server_hostname:
+            raise ValueError("server_hostname can only be specified "
+                             "in client mode")
         self.server_side = server_side
+        self.server_hostname = server_hostname
         self.do_handshake_on_connect = do_handshake_on_connect
         self.suppress_ragged_eofs = suppress_ragged_eofs
         connected = False
@@ -170,10 +237,12 @@ class SSLSocket(socket):
 
         self._closed = False
         self._sslobj = None
+        self._connected = connected
         if connected:
             # create the SSL object
             try:
-                self._sslobj = self.context._wrap_socket(self, server_side)
+                self._sslobj = self.context._wrap_socket(self, server_side,
+                                                         server_hostname)
                 if do_handshake_on_connect:
                     timeout = self.gettimeout()
                     if timeout == 0.0:
@@ -362,23 +431,36 @@ class SSLSocket(socket):
         finally:
             self.settimeout(timeout)
 
-    def connect(self, addr):
-        """Connects to remote ADDR, and then wraps the connection in
-        an SSL channel."""
+    def _real_connect(self, addr, return_errno):
         if self.server_side:
             raise ValueError("can't connect in server-side mode")
         # Here we assume that the socket is client-side, and not
         # connected at the time of the call.  We connect it, then wrap it.
-        if self._sslobj:
+        if self._connected:
             raise ValueError("attempt to connect already-connected SSLSocket!")
-        socket.connect(self, addr)
-        self._sslobj = self.context._wrap_socket(self, False)
+        self._sslobj = self.context._wrap_socket(self, False, self.server_hostname)
         try:
+            socket.connect(self, addr)
             if self.do_handshake_on_connect:
                 self.do_handshake()
-        except:
-            self._sslobj = None
-            raise
+        except socket_error as e:
+            if return_errno:
+                return e.errno
+            else:
+                self._sslobj = None
+                raise e
+        self._connected = True
+        return 0
+
+    def connect(self, addr):
+        """Connects to remote ADDR, and then wraps the connection in
+        an SSL channel."""
+        self._real_connect(addr, False)
+
+    def connect_ex(self, addr):
+        """Connects to remote ADDR, and then wraps the connection in
+        an SSL channel."""
+        return self._real_connect(addr, True)
 
     def accept(self):
         """Accepts a new connection from a remote client, and returns

@@ -3,7 +3,7 @@
 """
 Usage:
 
-python -m test.regrtest [options] [test_name1 [test_name2 ...]]
+python -m test [options] [test_name1 [test_name2 ...]]
 python path/to/Lib/test/regrtest.py [options] [test_name1 [test_name2 ...]]
 
 
@@ -14,7 +14,7 @@ them in alphabetical order (but see -M and -u, below, for exceptions).
 For more rigorous testing, it is useful to use the following
 command line:
 
-python -E -tt -Wd -3 -m test.regrtest [options] [test_name1 ...]
+python -E -Wd -m test [options] [test_name1 ...]
 
 
 Options:
@@ -29,10 +29,12 @@ Verbosity
 -d/--debug      -- print traceback for failed tests
 -q/--quiet      -- no output unless one or more tests fail
 -S/--slow       -- print the slowest 10 tests
+   --header     -- print header with interpreter info
 
 Selecting tests
 
 -r/--random     -- randomize test execution order (see below)
+   --randseed   -- pass a random seed to reproduce a previous random run
 -f/--fromfile   -- read names of tests to run from a file (see below)
 -x/--exclude    -- arguments are tests to *exclude*
 -s/--single     -- single step through a set of tests (see below)
@@ -138,8 +140,7 @@ resources to test.  Currently only the following are defined:
     decimal -   Test the decimal module against a large suite that
                 verifies compliance with standards.
 
-    compiler -  Allow test_tokenize to verify round-trip lexing on
-                every file in the test library.
+    cpu -       Used for certain CPU-heavy tests.
 
     subprocess  Run all tests for the subprocess module.
 
@@ -168,6 +169,7 @@ from inspect import isabstract
 import tempfile
 import platform
 import sysconfig
+import logging
 
 
 # Some times __path__ and __file__ are not absolute (e.g. while running from
@@ -214,7 +216,7 @@ INTERRUPTED = -4
 from test import support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
-                  'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
+                  'decimal', 'cpu', 'subprocess', 'urlfetch', 'gui')
 
 TEMPDIR = os.path.abspath(tempfile.gettempdir())
 
@@ -228,7 +230,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
          runleaks=False, huntrleaks=False, verbose2=False, print_slow=False,
-         random_seed=None, use_mp=None, verbose3=False, forever=False):
+         random_seed=None, use_mp=None, verbose3=False, forever=False,
+         header=False):
     """Execute a test suite.
 
     This also parses command-line options and modifies its behavior
@@ -261,8 +264,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
              'exclude', 'single', 'slow', 'random', 'fromfile', 'findleaks',
              'use=', 'threshold=', 'trace', 'coverdir=', 'nocoverdir',
              'runleaks', 'huntrleaks=', 'memlimit=', 'randseed=',
-             'multiprocess=', 'slaveargs=', 'forever', 'debug', 'start=',
-             'nowindows'])
+             'multiprocess=', 'coverage', 'slaveargs=', 'forever', 'debug',
+             'start=', 'nowindows', 'header'])
     except getopt.error as msg:
         usage(msg)
 
@@ -371,6 +374,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             forever = True
         elif o in ('-j', '--multiprocess'):
             use_mp = int(a)
+        elif o == '--header':
+            header = True
         elif o == '--slaveargs':
             args, kwargs = json.loads(a)
             try:
@@ -391,9 +396,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         usage("-T and -j don't go together!")
     if use_mp and findleaks:
         usage("-l and -j don't go together!")
-    if use_mp and max(sys.flags):
-        # TODO: inherit the environment and the flags
-        print("Warning: flags and environment variables are ignored with -j option")
 
     good = []
     bad = []
@@ -428,7 +430,9 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
     if fromfile:
         tests = []
         fp = open(os.path.join(support.SAVEDCWD, fromfile))
+        count_pat = re.compile(r'\[\s*\d+/\s*\d+\]')
         for line in fp:
+            line = count_pat.sub('', line)
             guts = line.split() # assuming no test has whitespace in its name
             if guts and not guts[0].startswith('#'):
                 tests.extend(guts)
@@ -448,12 +452,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         args = []
 
     # For a partial run, we do not need to clutter the output.
-    if verbose or not (quiet or single or tests or args):
+    if verbose or header or not (quiet or single or tests or args):
         # Print basic platform information
         print("==", platform.python_implementation(), *sys.version.split())
         print("==  ", platform.platform(aliased=True),
                       "%s-endian" % sys.byteorder)
         print("==  ", os.getcwd())
+        print("Testing with flags:", sys.flags)
 
     alltests = findtests(testdir, stdtests, nottests)
     selected = tests or args or alltests
@@ -528,12 +533,14 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
         def tests_and_args():
             for test in tests:
                 args_tuple = (
-                    (test, verbose, quiet, testdir),
+                    (test, verbose, quiet),
                     dict(huntrleaks=huntrleaks, use_resources=use_resources,
                         debug=debug)
                 )
                 yield (test, args_tuple)
         pending = tests_and_args()
+        opt_args = support.args_from_interpreter_flags()
+        base_cmd = [sys.executable] + opt_args + ['-m', 'test.regrtest']
         def work():
             # A worker thread.
             try:
@@ -544,8 +551,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         output.put((None, None, None, None))
                         return
                     # -E is needed by some tests, e.g. test_import
-                    popen = Popen([sys.executable, '-E', '-m', 'test.regrtest',
-                                   '--slaveargs', json.dumps(args_tuple)],
+                    popen = Popen(base_cmd + ['--slaveargs', json.dumps(args_tuple)],
                                    stdout=PIPE, stderr=PIPE,
                                    universal_newlines=True,
                                    close_fds=(os.name != 'nt'))
@@ -599,16 +605,15 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             if trace:
                 # If we're tracing code coverage, then we don't exit with status
                 # if on a false return value from main.
-                tracer.runctx('runtest(test, verbose, quiet, testdir)',
+                tracer.runctx('runtest(test, verbose, quiet)',
                               globals=globals(), locals=vars())
             else:
                 try:
-                    result = runtest(test, verbose, quiet,
-                                     testdir, huntrleaks, debug)
+                    result = runtest(test, verbose, quiet, huntrleaks, debug)
                     accumulate_result(test, result)
                     if verbose3 and result[0] == FAILED:
                         print("Re-running test {} in verbose mode".format(test))
-                        runtest(test, True, quiet, testdir, huntrleaks, debug)
+                        runtest(test, True, quiet, huntrleaks, debug)
                 except KeyboardInterrupt:
                     interrupted = True
                     break
@@ -678,8 +683,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             sys.stdout.flush()
             try:
                 verbose = True
-                ok = runtest(test, True, quiet, testdir,
-                             huntrleaks, debug)
+                ok = runtest(test, True, quiet, huntrleaks, debug)
             except KeyboardInterrupt:
                 # print a newline separate from the ^C
                 print()
@@ -739,20 +743,28 @@ def replace_stdout():
     if os.name == "nt":
         # Replace sys.stdout breaks the stdout newlines on Windows: issue #8533
         return
+
+    import atexit
+
     stdout = sys.stdout
     sys.stdout = open(stdout.fileno(), 'w',
         encoding=stdout.encoding,
-        errors="backslashreplace")
+        errors="backslashreplace",
+        closefd=False)
+
+    def restore_stdout():
+        sys.stdout.close()
+        sys.stdout = stdout
+    atexit.register(restore_stdout)
 
 def runtest(test, verbose, quiet,
-            testdir=None, huntrleaks=False, debug=False, use_resources=None):
+            huntrleaks=False, debug=False, use_resources=None):
     """Run a single test.
 
     test -- the name of the test
     verbose -- if true, print more messages
     quiet -- if true, don't print 'skipped' messages (probably redundant)
     test_times -- a list of (time, test_name) pairs
-    testdir -- test directory
     huntrleaks -- run multiple times to test for leaks; requires a debug
                   build; a triple corresponding to -R's three arguments
 
@@ -769,8 +781,7 @@ def runtest(test, verbose, quiet,
     if use_resources is not None:
         support.use_resources = use_resources
     try:
-        return runtest_inner(test, verbose, quiet,
-                             testdir, huntrleaks, debug)
+        return runtest_inner(test, verbose, quiet, huntrleaks, debug)
     finally:
         cleanup_test_droppings(test, verbose)
 
@@ -815,7 +826,8 @@ class saved_test_environment:
 
     resources = ('sys.argv', 'cwd', 'sys.stdin', 'sys.stdout', 'sys.stderr',
                  'os.environ', 'sys.path', 'sys.path_hooks', '__import__',
-                 'warnings.filters', 'asyncore.socket_map')
+                 'warnings.filters', 'asyncore.socket_map',
+                 'logging._handlers', 'logging._handlerList', 'sys.gettrace')
 
     def get_sys_argv(self):
         return id(sys.argv), sys.argv, sys.argv[:]
@@ -862,6 +874,11 @@ class saved_test_environment:
         sys.path_hooks = saved_hooks[1]
         sys.path_hooks[:] = saved_hooks[2]
 
+    def get_sys_gettrace(self):
+        return sys.gettrace()
+    def restore_sys_gettrace(self, trace_fxn):
+        sys.settrace(trace_fxn)
+
     def get___import__(self):
         return builtins.__import__
     def restore___import__(self, import_):
@@ -875,12 +892,27 @@ class saved_test_environment:
 
     def get_asyncore_socket_map(self):
         asyncore = sys.modules.get('asyncore')
-        return asyncore and asyncore.socket_map or {}
+        # XXX Making a copy keeps objects alive until __exit__ gets called.
+        return asyncore and asyncore.socket_map.copy() or {}
     def restore_asyncore_socket_map(self, saved_map):
         asyncore = sys.modules.get('asyncore')
         if asyncore is not None:
-            asyncore.socket_map.clear()
+            asyncore.close_all(ignore_all=True)
             asyncore.socket_map.update(saved_map)
+
+    def get_logging__handlers(self):
+        # _handlers is a WeakValueDictionary
+        return id(logging._handlers), logging._handlers, logging._handlers.copy()
+    def restore_logging__handlers(self, saved_handlers):
+        # Can't easily revert the logging state
+        pass
+
+    def get_logging__handlerList(self):
+        # _handlerList is a list of weakrefs to handlers
+        return id(logging._handlerList), logging._handlerList, logging._handlerList[:]
+    def restore_logging__handlerList(self, saved_handlerList):
+        # Can't easily revert the logging state
+        pass
 
     def resource_info(self):
         for name in self.resources:
@@ -895,9 +927,11 @@ class saved_test_environment:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        saved_values = self.saved_values
+        del self.saved_values
         for name, get, restore in self.resource_info():
             current = get()
-            original = self.saved_values[name]
+            original = saved_values.pop(name)
             # Check for changes to the resource's value
             if current != original:
                 self.changed = True
@@ -913,10 +947,8 @@ class saved_test_environment:
         return False
 
 
-def runtest_inner(test, verbose, quiet,
-                  testdir=None, huntrleaks=False, debug=False):
+def runtest_inner(test, verbose, quiet, huntrleaks=False, debug=False):
     support.unload(test)
-    testdir = findtestdir(testdir)
     if verbose:
         capture_stdout = None
     else:
@@ -978,6 +1010,12 @@ def runtest_inner(test, verbose, quiet,
 def cleanup_test_droppings(testname, verbose):
     import shutil
     import stat
+    import gc
+
+    # First kill any dangling references to open files etc.
+    # This can also issue some ResourceWarnings which would otherwise get
+    # triggered during the following test run, and possibly produce failures.
+    gc.collect()
 
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
@@ -1018,7 +1056,8 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
         False if the test didn't leak references; True if we detected refleaks.
     """
     # This code is hackish and inelegant, but it seems to do the job.
-    import copyreg, _abcoll
+    import copyreg
+    import collections.abc
 
     if not hasattr(sys, 'gettotalrefcount'):
         raise Exception("Tracking reference leaks requires a debug build "
@@ -1035,7 +1074,7 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
     else:
         zdc = zipimport._zip_directory_cache.copy()
     abcs = {}
-    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+    for abc in [getattr(collections.abc, a) for a in collections.abc.__all__]:
         if not isabstract(abc):
             continue
         for obj in abc.__subclasses__() + [abc]:
@@ -1081,7 +1120,7 @@ def dash_R_cleanup(fs, ps, pic, zdc, abcs):
     import gc, copyreg
     import _strptime, linecache
     import urllib.parse, urllib.request, mimetypes, doctest
-    import struct, filecmp, _abcoll
+    import struct, filecmp, collections.abc
     from distutils.dir_util import _path_created
     from weakref import WeakSet
 
@@ -1108,7 +1147,7 @@ def dash_R_cleanup(fs, ps, pic, zdc, abcs):
     sys._clear_type_cache()
 
     # Clear ABC registries, restoring previously saved ABC registries.
-    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+    for abc in [getattr(collections.abc, a) for a in collections.abc.__all__]:
         if not isabstract(abc):
             continue
         for obj in abc.__subclasses__() + [abc]:
@@ -1272,6 +1311,7 @@ _expectations = {
         test_curses
         test_epoll
         test_dbm_gnu
+        test_gdb
         test_largefile
         test_locale
         test_minidom
@@ -1433,14 +1473,16 @@ class _ExpectedSkips:
             if sys.platform != "win32":
                 # test_sqlite is only reliable on Windows where the library
                 # is distributed with Python
-                WIN_ONLY = ["test_unicode_file", "test_winreg",
+                WIN_ONLY = {"test_unicode_file", "test_winreg",
                             "test_winsound", "test_startfile",
-                            "test_sqlite"]
-                for skip in WIN_ONLY:
-                    self.expected.add(skip)
+                            "test_sqlite"}
+                self.expected |= WIN_ONLY
 
             if sys.platform != 'sunos5':
                 self.expected.add('test_nis')
+
+            if support.python_is_optimized():
+                self.expected.add("test_gdb")
 
             self.valid = True
 
@@ -1457,16 +1499,7 @@ class _ExpectedSkips:
         assert self.isvalid()
         return self.expected
 
-if __name__ == '__main__':
-    # findtestdir() gets the dirname out of __file__, so we have to make it
-    # absolute before changing the working directory.
-    # For example __file__ may be relative when running trace or profile.
-    # See issue #9323.
-    __file__ = os.path.abspath(__file__)
-
-    # sanity check
-    assert __file__ == os.path.abspath(sys.argv[0])
-
+def _make_temp_dir_for_build(TEMPDIR):
     # When tests are run from the Python build directory, it is best practice
     # to keep the test files in a subfolder.  It eases the cleanup of leftover
     # files using command "make distclean".
@@ -1482,6 +1515,31 @@ if __name__ == '__main__':
     TESTCWD = 'test_python_{}'.format(os.getpid())
 
     TESTCWD = os.path.join(TEMPDIR, TESTCWD)
+    return TEMPDIR, TESTCWD
+
+if __name__ == '__main__':
+    # Remove regrtest.py's own directory from the module search path. Despite
+    # the elimination of implicit relative imports, this is still needed to
+    # ensure that submodules of the test package do not inappropriately appear
+    # as top-level modules even when people (or buildbots!) invoke regrtest.py
+    # directly instead of using the -m switch
+    mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
+    i = len(sys.path)
+    while i >= 0:
+        i -= 1
+        if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
+            del sys.path[i]
+
+    # findtestdir() gets the dirname out of __file__, so we have to make it
+    # absolute before changing the working directory.
+    # For example __file__ may be relative when running trace or profile.
+    # See issue #9323.
+    __file__ = os.path.abspath(__file__)
+
+    # sanity check
+    assert __file__ == os.path.abspath(sys.argv[0])
+
+    TEMPDIR, TESTCWD = _make_temp_dir_for_build(TEMPDIR)
 
     # Run the tests in a context manager that temporary changes the CWD to a
     # temporary and writable directory. If it's not possible to create or

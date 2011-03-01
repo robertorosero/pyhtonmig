@@ -229,7 +229,7 @@ The special characters are:
    undefined.
 
 ``(?:...)``
-   A non-grouping version of regular parentheses. Matches whatever regular
+   A non-capturing version of regular parentheses.  Matches whatever regular
    expression is inside the parentheses, but the substring matched by the group
    *cannot* be retrieved after performing a match or referenced later in the
    pattern.
@@ -991,8 +991,10 @@ support the following methods and attributes:
    The string passed to :meth:`~regex.match` or :meth:`~regex.search`.
 
 
-Examples
---------
+.. _re-examples:
+
+Regular Expression Examples
+---------------------------
 
 
 Checking For a Pair
@@ -1057,14 +1059,14 @@ Simulating scanf()
 
 .. index:: single: scanf()
 
-Python does not currently have an equivalent to :cfunc:`scanf`.  Regular
+Python does not currently have an equivalent to :c:func:`scanf`.  Regular
 expressions are generally more powerful, though also more verbose, than
-:cfunc:`scanf` format strings.  The table below offers some more-or-less
-equivalent mappings between :cfunc:`scanf` format tokens and regular
+:c:func:`scanf` format strings.  The table below offers some more-or-less
+equivalent mappings between :c:func:`scanf` format tokens and regular
 expressions.
 
 +--------------------------------+---------------------------------------------+
-| :cfunc:`scanf` Token           | Regular Expression                          |
+| :c:func:`scanf` Token          | Regular Expression                          |
 +================================+=============================================+
 | ``%c``                         | ``.``                                       |
 +--------------------------------+---------------------------------------------+
@@ -1089,7 +1091,7 @@ To extract the filename and numbers from a string like ::
 
    /usr/sbin/sendmail - 0 errors, 4 warnings
 
-you would use a :cfunc:`scanf` format like ::
+you would use a :c:func:`scanf` format like ::
 
    %s - %d errors, %d warnings
 
@@ -1298,6 +1300,7 @@ successive matches::
     Token = collections.namedtuple('Token', 'typ value line column')
 
     def tokenize(s):
+        keywords = {'IF', 'THEN', 'FOR', 'NEXT', 'GOSUB', 'RETURN'}
         tok_spec = [
             ('NUMBER', r'\d+(\.\d*)?'), # Integer or decimal number
             ('ASSIGN', r':='),          # Assignment operator
@@ -1318,6 +1321,8 @@ successive matches::
                 line_start = pos
                 line += 1
             elif typ != 'SKIP':
+                if typ == 'ID' and val in keywords:
+                    typ = val
                 yield Token(typ, mo.group(typ), line, mo.start()-line_start)
             pos = mo.end()
             mo = gettok(s, pos)

@@ -293,7 +293,7 @@ following WSGI-application::
     # -*- coding: UTF-8 -*-
 
     import sys, os
-    from cgi import escape
+    from html import escape
     from flup.server.fcgi import WSGIServer
 
     def app(environ, start_response):
@@ -526,7 +526,7 @@ Popular template engines include:
 
 .. seealso::
 
-   There are many template engines competing for attention, becuase it is
+   There are many template engines competing for attention, because it is
    pretty easy to create them in Python.  The page `Templating
    <http://wiki.python.org/moin/Templating>`_ in the wiki lists a big,
    ever-growing number of these.  The three listed above are considered "second

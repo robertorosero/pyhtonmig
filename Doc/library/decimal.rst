@@ -51,6 +51,7 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   alterable precision (defaulting to 28 places) which can be as large as needed for
   a given problem:
 
+     >>> from decimal import *
      >>> getcontext().prec = 6
      >>> Decimal(1) / Decimal(7)
      Decimal('0.142857')
@@ -143,7 +144,7 @@ value of that integer or float.  Decimal numbers include special values such as
    >>> Decimal((0, (3, 1, 4), -2))
    Decimal('3.14')
    >>> Decimal(str(2.0 ** 0.5))
-   Decimal('1.41421356237')
+   Decimal('1.4142135623730951')
    >>> Decimal(2) ** Decimal('0.5')
    Decimal('1.414213562373095048801688724')
    >>> Decimal('NaN')
@@ -1656,7 +1657,8 @@ to work with the :class:`Decimal` class::
            build(trailneg)
        for i in range(places):
            build(next() if digits else '0')
-       build(dp)
+       if places:
+           build(dp)
        if not digits:
            build('0')
        i = 0
@@ -1716,6 +1718,9 @@ to work with the :class:`Decimal` class::
    def cos(x):
        """Return the cosine of x as measured in radians.
 
+       The Taylor series approximation works best for a small value of x.
+       For larger values, first compute x = x % (2 * pi).
+
        >>> print(cos(Decimal('0.5')))
        0.8775825618903727161162815826
        >>> print(cos(0.5))
@@ -1738,6 +1743,9 @@ to work with the :class:`Decimal` class::
 
    def sin(x):
        """Return the sine of x as measured in radians.
+
+       The Taylor series approximation works best for a small value of x.
+       For larger values, first compute x = x % (2 * pi).
 
        >>> print(sin(Decimal('0.5')))
        0.4794255386042030002732879352

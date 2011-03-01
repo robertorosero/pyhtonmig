@@ -5,7 +5,7 @@ import pickletools
 import copyreg
 from http.cookies import SimpleCookie
 
-from test.support import TestFailed, TESTFN, run_with_locale
+from test.support import TestFailed, TESTFN, run_with_locale, no_tracing
 
 from pickle import bytes_types
 
@@ -29,6 +29,21 @@ def count_opcode(code, pickle):
         if op.code == code.decode("latin-1"):
             n += 1
     return n
+
+
+class UnseekableIO(io.BytesIO):
+    def peek(self, *args):
+        raise NotImplementedError
+
+    def seekable(self):
+        return False
+
+    def seek(self, *args):
+        raise io.UnsupportedOperation
+
+    def tell(self):
+        raise io.UnsupportedOperation
+
 
 # We can't very well test the extension registry without putting known stuff
 # in it, but we have to be careful to restore its original state.  Code
@@ -564,7 +579,7 @@ class AbstractPickleTests(unittest.TestCase):
 
     def test_get(self):
         self.assertRaises(KeyError, self.loads, b'g0\np0')
-        self.assertEquals(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
+        self.assertEqual(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
 
     def test_insecure_strings(self):
         # XXX Some of these tests are temporarily disabled
@@ -987,6 +1002,7 @@ class AbstractPickleTests(unittest.TestCase):
             y = self.loads(s)
             self.assertEqual(y._reduce_called, 1)
 
+    @no_tracing
     def test_bad_getattr(self):
         x = BadGetattr()
         for proto in 0, 1:
@@ -1072,11 +1088,16 @@ class AbstractPickleTests(unittest.TestCase):
         # Test the correctness of internal buffering routines when handling
         # large data.
         for proto in protocols:
-            data = (1, b'x' * (256 * 1024))
+            data = (1, min, b'xy' * (30 * 1024), len)
             dumped = self.dumps(data, proto)
             loaded = self.loads(dumped)
+            self.assertEqual(len(loaded), len(data))
             self.assertEqual(loaded, data)
 
+    def test_empty_bytestring(self):
+        # issue 11286
+        empty = self.loads(b'\x80\x03U\x00q\x00.', encoding='koi8-r')
+        self.assertEqual(empty, '')
 
 # Test classes for reduce_ex
 
@@ -1372,6 +1393,31 @@ class AbstractPicklerUnpicklerObjectTests(unittest.TestCase):
         f.write(pickled2)
         f.seek(0)
         self.assertEqual(unpickler.load(), data2)
+
+    def _check_multiple_unpicklings(self, ioclass):
+        for proto in protocols:
+            data1 = [(x, str(x)) for x in range(2000)] + [b"abcde", len]
+            f = ioclass()
+            pickler = self.pickler_class(f, protocol=proto)
+            pickler.dump(data1)
+            pickled = f.getvalue()
+
+            N = 5
+            f = ioclass(pickled * N)
+            unpickler = self.unpickler_class(f)
+            for i in range(N):
+                if f.seekable():
+                    pos = f.tell()
+                self.assertEqual(unpickler.load(), data1)
+                if f.seekable():
+                    self.assertEqual(f.tell(), pos + len(pickled))
+            self.assertRaises(EOFError, unpickler.load)
+
+    def test_multiple_unpicklings_seekable(self):
+        self._check_multiple_unpicklings(io.BytesIO)
+
+    def test_multiple_unpicklings_unseekable(self):
+        self._check_multiple_unpicklings(UnseekableIO)
 
 
 if __name__ == "__main__":

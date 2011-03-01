@@ -28,7 +28,7 @@ Using the subprocess Module
 This module defines one class called :class:`Popen`:
 
 
-.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=False, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0, restore_signals=True, start_new_session=False)
+.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=True, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0, restore_signals=True, start_new_session=False, pass_fds=())
 
    Arguments are:
 
@@ -75,6 +75,24 @@ This module defines one class called :class:`Popen`:
    itself.  That is to say, *Popen* does the equivalent of::
 
       Popen(['/bin/sh', '-c', args[0], args[1], ...])
+
+   .. warning::
+
+      Executing shell commands that incorporate unsanitized input from an
+      untrusted source makes a program vulnerable to `shell injection
+      <http://en.wikipedia.org/wiki/Shell_injection#Shell_injection>`_,
+      a serious security flaw which can result in arbitrary command execution.
+      For this reason, the use of *shell=True* is **strongly discouraged** in cases
+      where the command string is constructed from external input::
+
+         >>> from subprocess import call
+         >>> filename = input("What file would you like to display?\n")
+         What file would you like to display?
+         non_existent; rm -rf / #
+         >>> call("cat " + filename, shell=True) # Uh-oh. This will end badly...
+
+      *shell=False* does not suffer from this vulnerability; the above Note may be
+      helpful in getting code using *shell=False* to work.
 
    On Windows: the :class:`Popen` class uses CreateProcess() to execute the child
    program, which operates on strings.  If *args* is a sequence, it will be
@@ -135,12 +153,22 @@ This module defines one class called :class:`Popen`:
 
    If *close_fds* is true, all file descriptors except :const:`0`, :const:`1` and
    :const:`2` will be closed before the child process is executed. (Unix only).
-   Or, on Windows, if *close_fds* is true then no handles will be inherited by the
+   The default varies by platform:  Always true on Unix.  On Windows it is
+   true when *stdin*/*stdout*/*stderr* are :const:`None`, false otherwise.
+   On Windows, if *close_fds* is true then no handles will be inherited by the
    child process.  Note that on Windows, you cannot set *close_fds* to true and
    also redirect the standard handles by setting *stdin*, *stdout* or *stderr*.
 
-   If *shell* is :const:`True`, the specified command will be executed through the
-   shell.
+   .. versionchanged:: 3.2
+      The default for *close_fds* was changed from :const:`False` to
+      what is described above.
+
+   *pass_fds* is an optional sequence of file descriptors to keep open
+   between the parent and child.  Providing any *pass_fds* forces
+   *close_fds* to be :const:`True`.  (Unix only)
+
+   .. versionadded:: 3.2
+      The *pass_fds* parameter was added.
 
    If *cwd* is not ``None``, the child's current directory will be changed to *cwd*
    before it is executed.  Note that this directory is not considered when
@@ -189,6 +217,16 @@ This module defines one class called :class:`Popen`:
    The *startupinfo* and *creationflags*, if given, will be passed to the
    underlying CreateProcess() function.  They can specify things such as appearance
    of the main window and priority for the new process.  (Windows only)
+
+   Popen objects are supported as context managers via the :keyword:`with` statement,
+   closing any open file descriptors on exit.
+   ::
+
+      with Popen(["ifconfig"], stdout=PIPE) as proc:
+          log.write(proc.stdout.read())
+
+   .. versionchanged:: 3.2
+      Added context manager support.
 
 
 .. data:: PIPE
@@ -271,13 +309,14 @@ This module also defines four shortcut functions:
 
 
 .. function:: getstatusoutput(cmd)
+
    Return ``(status, output)`` of executing *cmd* in a shell.
 
    Execute the string *cmd* in a shell with :func:`os.popen` and return a 2-tuple
    ``(status, output)``.  *cmd* is actually run as ``{ cmd ; } 2>&1``, so that the
    returned output will contain output or error messages.  A trailing newline is
    stripped from the output.  The exit status for the command can be interpreted
-   according to the rules for the C function :cfunc:`wait`.  Example::
+   according to the rules for the C function :c:func:`wait`.  Example::
 
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
@@ -290,6 +329,7 @@ This module also defines four shortcut functions:
 
 
 .. function:: getoutput(cmd)
+
    Return output (stdout and stderr) of executing *cmd* in a shell.
 
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
@@ -380,14 +420,14 @@ Instances of the :class:`Popen` class have the following methods:
    .. note::
 
       On Windows, SIGTERM is an alias for :meth:`terminate`. CTRL_C_EVENT and
-      CTRL_BREAK_EVENT can be sent to processes started with a `creationflags`
+      CTRL_BREAK_EVENT can be sent to processes started with a *creationflags*
       parameter which includes `CREATE_NEW_PROCESS_GROUP`.
 
 
 .. method:: Popen.terminate()
 
    Stop the child. On Posix OSs the method sends SIGTERM to the
-   child. On Windows the Win32 API function :cfunc:`TerminateProcess` is called
+   child. On Windows the Win32 API function :c:func:`TerminateProcess` is called
    to stop the child.
 
 
@@ -479,8 +519,11 @@ Replacing shell pipeline
    ==>
    p1 = Popen(["dmesg"], stdout=PIPE)
    p2 = Popen(["grep", "hda"], stdin=p1.stdout, stdout=PIPE)
+   p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
    output = p2.communicate()[0]
 
+The p1.stdout.close() call after starting the p2 is important in order for p1
+to receive a SIGPIPE if p2 exits before p1.
 
 Replacing :func:`os.system`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -619,4 +662,5 @@ Replacing functions from the :mod:`popen2` module
 * ``stdin=PIPE`` and ``stdout=PIPE`` must be specified.
 
 * popen2 closes all file descriptors by default, but you have to specify
-  ``close_fds=True`` with :class:`Popen`.
+  ``close_fds=True`` with :class:`Popen` to guarantee this behavior on
+  all platforms or past Python versions.
