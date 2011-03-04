@@ -37,7 +37,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *func, *name, *bases, *mkw, *meta, *prep, *ns, *cell;
     PyObject *cls = NULL;
-    Py_ssize_t nargs, nbases;
+    Py_ssize_t nargs;
 
     assert(args != NULL);
     if (!PyTuple_Check(args)) {
@@ -61,7 +61,6 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
     bases = PyTuple_GetSlice(args, 2, nargs);
     if (bases == NULL)
         return NULL;
-    nbases = nargs - 2;
 
     if (kwds == NULL) {
         meta = NULL;
@@ -512,7 +511,7 @@ source_as_string(PyObject *cmd, char *funcname, char *what, PyCompilerFlags *cf)
 
     if (PyUnicode_Check(cmd)) {
         cf->cf_flags |= PyCF_IGNORE_COOKIE;
-        cmd = _PyUnicode_AsDefaultEncodedString(cmd, NULL);
+        cmd = _PyUnicode_AsDefaultEncodedString(cmd);
         if (cmd == NULL)
             return NULL;
     }
@@ -766,7 +765,6 @@ builtin_exec(PyObject *self, PyObject *args)
 {
     PyObject *v;
     PyObject *prog, *globals = Py_None, *locals = Py_None;
-    int plain = 0;
 
     if (!PyArg_UnpackTuple(args, "exec", 1, 3, &prog, &globals, &locals))
         return NULL;
@@ -775,7 +773,6 @@ builtin_exec(PyObject *self, PyObject *args)
         globals = PyEval_GetGlobals();
         if (locals == Py_None) {
             locals = PyEval_GetLocals();
-            plain = 1;
         }
         if (!globals || !locals) {
             PyErr_SetString(PyExc_SystemError,
@@ -1621,6 +1618,7 @@ builtin_input(PyObject *self, PyObject *args)
         PyObject *stdin_encoding;
         char *stdin_encoding_str;
         PyObject *result;
+        size_t len;
 
         stdin_encoding = PyObject_GetAttrString(fin, "encoding");
         if (!stdin_encoding)
@@ -1685,19 +1683,23 @@ builtin_input(PyObject *self, PyObject *args)
             Py_DECREF(stdin_encoding);
             return NULL;
         }
-        if (*s == '\0') {
+
+        len = strlen(s);
+        if (len == 0) {
             PyErr_SetNone(PyExc_EOFError);
             result = NULL;
         }
-        else { /* strip trailing '\n' */
-            size_t len = strlen(s);
+        else {
             if (len > PY_SSIZE_T_MAX) {
                 PyErr_SetString(PyExc_OverflowError,
                                 "input: input too long");
                 result = NULL;
             }
             else {
-                result = PyUnicode_Decode(s, len-1, stdin_encoding_str, NULL);
+                len--;   /* strip trailing '\n' */
+                if (len != 0 && s[len-1] == '\r')
+                    len--;   /* strip trailing '\r' */
+                result = PyUnicode_Decode(s, len, stdin_encoding_str, NULL);
             }
         }
         Py_DECREF(stdin_encoding);

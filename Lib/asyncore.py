@@ -54,9 +54,11 @@ import warnings
 
 import os
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, EINVAL, \
-     ENOTCONN, ESHUTDOWN, EINTR, EISCONN, EBADF, ECONNABORTED, errorcode
+     ENOTCONN, ESHUTDOWN, EINTR, EISCONN, EBADF, ECONNABORTED, EPIPE, EAGAIN, \
+     errorcode
 
-_DISCONNECTED = frozenset((ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED))
+_DISCONNECTED = frozenset((ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED, EPIPE,
+                           EBADF))
 
 try:
     socket_map
@@ -111,7 +113,7 @@ def readwrite(obj, flags):
         if flags & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
             obj.handle_close()
     except socket.error as e:
-        if e.args[0] not in (EBADF, ECONNRESET, ENOTCONN, ESHUTDOWN, ECONNABORTED):
+        if e.args[0] not in _DISCONNECTED:
             obj.handle_error()
         else:
             obj.handle_close()
@@ -287,7 +289,7 @@ class dispatcher:
             del map[fd]
         self._fileno = None
 
-    def create_socket(self, family, type):
+    def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM):
         self.family_and_type = family, type
         sock = socket.socket(family, type)
         sock.setblocking(0)
@@ -355,7 +357,7 @@ class dispatcher:
         except TypeError:
             return None
         except socket.error as why:
-            if why.args[0] in (EWOULDBLOCK, ECONNABORTED):
+            if why.args[0] in (EWOULDBLOCK, ECONNABORTED, EAGAIN):
                 return None
             else:
                 raise

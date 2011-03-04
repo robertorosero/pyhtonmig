@@ -977,11 +977,6 @@ _Unpickler_Read(UnpicklerObject *self, char **s, Py_ssize_t n)
 {
     Py_ssize_t num_read;
 
-    if (n == 0) {
-        *s = NULL;
-        return 0;
-    }
-
     if (self->next_read_idx + n <= self->input_len) {
         *s = self->input_buffer + self->next_read_idx;
         self->next_read_idx += n;
@@ -2244,19 +2239,21 @@ save_list(PicklerObject *self, PyObject *obj)
     if (len != 0) {
         /* Materialize the list elements. */
         if (PyList_CheckExact(obj) && self->proto > 0) {
-            if (Py_EnterRecursiveCall(" while pickling an object") == 0) {
-                status = batch_list_exact(self, obj);
-                Py_LeaveRecursiveCall();
-            }
+            if (Py_EnterRecursiveCall(" while pickling an object"))
+                goto error;
+            status = batch_list_exact(self, obj);
+            Py_LeaveRecursiveCall();
         } else {
             PyObject *iter = PyObject_GetIter(obj);
             if (iter == NULL)
                 goto error;
 
-            if (Py_EnterRecursiveCall(" while pickling an object") == 0) {
-                status = batch_list(self, iter);
-                Py_LeaveRecursiveCall();
+            if (Py_EnterRecursiveCall(" while pickling an object")) {
+                Py_DECREF(iter);
+                goto error;
             }
+            status = batch_list(self, iter);
+            Py_LeaveRecursiveCall();
             Py_DECREF(iter);
         }
     }
@@ -2504,10 +2501,10 @@ save_dict(PicklerObject *self, PyObject *obj)
         if (PyDict_CheckExact(obj) && self->proto > 0) {
             /* We can take certain shortcuts if we know this is a dict and
                not a dict subclass. */
-            if (Py_EnterRecursiveCall(" while pickling an object") == 0) {
-                status = batch_dict_exact(self, obj);
-                Py_LeaveRecursiveCall();
-            }
+            if (Py_EnterRecursiveCall(" while pickling an object"))
+                goto error;
+            status = batch_dict_exact(self, obj);
+            Py_LeaveRecursiveCall();
         } else {
             items = PyObject_CallMethod(obj, "items", "()");
             if (items == NULL)
@@ -2516,7 +2513,12 @@ save_dict(PicklerObject *self, PyObject *obj)
             Py_DECREF(items);
             if (iter == NULL)
                 goto error;
+            if (Py_EnterRecursiveCall(" while pickling an object")) {
+                Py_DECREF(iter);
+                goto error;
+            }
             status = batch_dict(self, iter);
+            Py_LeaveRecursiveCall();
             Py_DECREF(iter);
         }
     }
@@ -3044,7 +3046,7 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
     PyObject *reduce_value = NULL;
     int status = 0;
 
-    if (Py_EnterRecursiveCall(" while pickling an object") < 0)
+    if (Py_EnterRecursiveCall(" while pickling an object"))
         return -1;
 
     /* The extra pers_save argument is necessary to avoid calling save_pers()

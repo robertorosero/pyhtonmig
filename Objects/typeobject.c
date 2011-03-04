@@ -326,7 +326,7 @@ type_abstractmethods(PyTypeObject *type, void *context)
     if (type != &PyType_Type)
         mod = PyDict_GetItemString(type->tp_dict, "__abstractmethods__");
     if (!mod) {
-        PyErr_Format(PyExc_AttributeError, "__abstractmethods__");
+        PyErr_SetString(PyExc_AttributeError, "__abstractmethods__");
         return NULL;
     }
     Py_XINCREF(mod);
@@ -340,8 +340,17 @@ type_set_abstractmethods(PyTypeObject *type, PyObject *value, void *context)
        abc.ABCMeta.__new__, so this function doesn't do anything
        special to update subclasses.
     */
-    int res = PyDict_SetItemString(type->tp_dict,
-                                   "__abstractmethods__", value);
+    int res;
+    if (value != NULL) {
+        res = PyDict_SetItemString(type->tp_dict, "__abstractmethods__", value);
+    }
+    else {
+        res = PyDict_DelItemString(type->tp_dict, "__abstractmethods__");
+        if (res && PyErr_ExceptionMatches(PyExc_KeyError)) {
+            PyErr_SetString(PyExc_AttributeError, "__abstractmethods__");
+            return -1;
+        }
+    }
     if (res == 0) {
         PyType_Modified(type);
         if (value && PyObject_IsTrue(value)) {
@@ -893,7 +902,7 @@ subtype_dealloc(PyObject *self)
 
     /* Find the nearest base with a different tp_dealloc */
     base = type;
-    while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
+    while ((/*basedealloc =*/ base->tp_dealloc) == subtype_dealloc) {
         base = base->tp_base;
         assert(base);
     }
@@ -1895,6 +1904,12 @@ type_init(PyObject *cls, PyObject *args, PyObject *kwds)
     return res;
 }
 
+long
+PyType_GetFlags(PyTypeObject *type)
+{
+    return type->tp_flags;
+}
+
 static PyObject *
 type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
@@ -2315,6 +2330,8 @@ PyObject* PyType_FromSpec(PyType_Spec *spec)
     char *res_start = (char*)res;
     PyType_Slot *slot;
 
+    if (res == NULL)
+      return NULL;
     res->ht_name = PyUnicode_FromString(spec->name);
     if (!res->ht_name)
 	goto fail;
@@ -2332,6 +2349,17 @@ PyObject* PyType_FromSpec(PyType_Spec *spec)
 	    goto fail;
 	}
 	*(void**)(res_start + slotoffsets[slot->slot]) = slot->pfunc;
+
+        /* need to make a copy of the docstring slot, which usually
+           points to a static string literal */
+        if (slot->slot == Py_tp_doc) {
+            ssize_t len = strlen(slot->pfunc)+1;
+            char *tp_doc = PyObject_MALLOC(len);
+            if (tp_doc == NULL)
+	    	goto fail;
+            memcpy(tp_doc, slot->pfunc, len);
+            res->ht_type.tp_doc = tp_doc;
+        }
     }
 
     return (PyObject*)res;
@@ -2936,10 +2964,7 @@ same_slots_added(PyTypeObject *a, PyTypeObject *b)
     Py_ssize_t size;
     PyObject *slots_a, *slots_b;
 
-    if (base != b->tp_base)
-        return 0;
-    if (equiv_structs(a, base) && equiv_structs(b, base))
-        return 1;
+    assert(base == b->tp_base);
     size = base->tp_basicsize;
     if (a->tp_dictoffset == size && b->tp_dictoffset == size)
         size += sizeof(PyObject *);
@@ -4950,7 +4975,7 @@ slot_tp_str(PyObject *self)
         res = slot_tp_repr(self);
         if (!res)
             return NULL;
-        ress = _PyUnicode_AsDefaultEncodedString(res, NULL);
+        ress = _PyUnicode_AsDefaultEncodedString(res);
         Py_DECREF(res);
         return ress;
     }

@@ -6,6 +6,9 @@
 .. moduleauthor:: Marc-Andre Lemburg <mal@egenix.com>
 .. sectionauthor:: Bjorn Pettersen <bpettersen@corp.fairisaac.com>
 
+**Source code:** :source:`Lib/platform.py`
+
+--------------
 
 .. note::
 
@@ -210,6 +213,10 @@ Win95/98 specific
    Portable :func:`popen` interface.  Find a working popen implementation
    preferring :func:`win32pipe.popen`.  On Windows NT, :func:`win32pipe.popen`
    should work; on Windows 9x it hangs due to bugs in the MS C library.
+
+   .. deprecated:: 3.3
+      This function is obsolete.  Use the :mod:`subprocess` module.  Check
+      especially the :ref:`subprocess-replacements` section.
 
 
 Mac OS Platform

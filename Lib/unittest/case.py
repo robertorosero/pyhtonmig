@@ -938,77 +938,6 @@ class TestCase(object):
             standardMsg = self._truncateMessage(standardMsg, diff)
             self.fail(self._formatMessage(msg, standardMsg))
 
-    def assertDictContainsSubset(self, subset, dictionary, msg=None):
-        """Checks whether dictionary is a superset of subset."""
-        warnings.warn('assertDictContainsSubset is deprecated',
-                      DeprecationWarning)
-        missing = []
-        mismatched = []
-        for key, value in subset.items():
-            if key not in dictionary:
-                missing.append(key)
-            elif value != dictionary[key]:
-                mismatched.append('%s, expected: %s, actual: %s' %
-                                  (safe_repr(key), safe_repr(value),
-                                   safe_repr(dictionary[key])))
-
-        if not (missing or mismatched):
-            return
-
-        standardMsg = ''
-        if missing:
-            standardMsg = 'Missing: %s' % ','.join(safe_repr(m) for m in
-                                                    missing)
-        if mismatched:
-            if standardMsg:
-                standardMsg += '; '
-            standardMsg += 'Mismatched values: %s' % ','.join(mismatched)
-
-        self.fail(self._formatMessage(msg, standardMsg))
-
-    def assertSameElements(self, expected_seq, actual_seq, msg=None):
-        """An unordered sequence specific comparison.
-
-        Raises with an error message listing which elements of expected_seq
-        are missing from actual_seq and vice versa if any.
-
-        Duplicate elements are ignored when comparing *expected_seq* and
-        *actual_seq*. It is the equivalent of ``assertEqual(set(expected),
-        set(actual))`` but it works with sequences of unhashable objects as
-        well.
-        """
-        warnings.warn('assertSameElements is deprecated',
-                      DeprecationWarning)
-        try:
-            expected = set(expected_seq)
-            actual = set(actual_seq)
-            missing = sorted(expected.difference(actual))
-            unexpected = sorted(actual.difference(expected))
-        except TypeError:
-            # Fall back to slower list-compare if any of the objects are
-            # not hashable.
-            expected = list(expected_seq)
-            actual = list(actual_seq)
-            try:
-                expected.sort()
-                actual.sort()
-            except TypeError:
-                missing, unexpected = unorderable_list_difference(expected,
-                                                                  actual)
-            else:
-                missing, unexpected = sorted_list_difference(expected, actual)
-        errors = []
-        if missing:
-            errors.append('Expected, but missing:\n    %s' %
-                          safe_repr(missing))
-        if unexpected:
-            errors.append('Unexpected, but present:\n    %s' %
-                          safe_repr(unexpected))
-        if errors:
-            standardMsg = '\n'.join(errors)
-            self.fail(self._formatMessage(msg, standardMsg))
-
-
     def assertCountEqual(self, first, second, msg=None):
         """An unordered sequence comparison asserting that the same elements,
         regardless of order.  If the same element occurs more than once,
@@ -1022,17 +951,17 @@ class TestCase(object):
             - [0, 0, 1] and [0, 1] compare unequal.
 
         """
-        actual_seq, expected_seq = list(first), list(second)
+        first_seq, second_seq = list(first), list(second)
         try:
-            actual = collections.Counter(actual_seq)
-            expected = collections.Counter(expected_seq)
+            first = collections.Counter(first_seq)
+            second = collections.Counter(second_seq)
         except TypeError:
             # Handle case with unhashable elements
-            differences = _count_diff_all_purpose(actual_seq, expected_seq)
+            differences = _count_diff_all_purpose(first_seq, second_seq)
         else:
-            if actual == expected:
+            if first == second:
                 return
-            differences = _count_diff_hashable(actual_seq, expected_seq)
+            differences = _count_diff_hashable(first_seq, second_seq)
 
         if differences:
             standardMsg = 'Element counts were not equal:\n'
@@ -1183,13 +1112,11 @@ class TestCase(object):
 
     # The fail* methods can be removed in 3.3, the 5 assert* methods will
     # have to stay around for a few more versions.  See #9424.
-    failUnlessEqual = assertEquals = _deprecate(assertEqual)
-    failIfEqual = assertNotEquals = _deprecate(assertNotEqual)
-    failUnlessAlmostEqual = assertAlmostEquals = _deprecate(assertAlmostEqual)
-    failIfAlmostEqual = assertNotAlmostEquals = _deprecate(assertNotAlmostEqual)
-    failUnless = assert_ = _deprecate(assertTrue)
-    failUnlessRaises = _deprecate(assertRaises)
-    failIf = _deprecate(assertFalse)
+    assertEquals = _deprecate(assertEqual)
+    assertNotEquals = _deprecate(assertNotEqual)
+    assertAlmostEquals = _deprecate(assertAlmostEqual)
+    assertNotAlmostEquals = _deprecate(assertNotAlmostEqual)
+    assert_ = _deprecate(assertTrue)
     assertRaisesRegexp = _deprecate(assertRaisesRegex)
     assertRegexpMatches = _deprecate(assertRegex)
 

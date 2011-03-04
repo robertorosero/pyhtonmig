@@ -34,10 +34,12 @@ Parser/pgen$
 Parser/pgen.stamp$
 ^core
 ^python-gdb.py
+^python.exe-gdb.py
 ^pybuilddir.txt
 
 syntax: glob
 libpython*.a
+*.swp
 *.o
 *.pyc
 *.pyo

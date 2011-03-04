@@ -35,11 +35,11 @@ def compile_dir(dir, maxlevels=10, ddir=None, force=False, rx=None,
     optimize:  optimization level or -1 for level of the interpreter
     """
     if not quiet:
-        print('Listing', dir, '...')
+        print('Listing {!r}...'.format(dir))
     try:
         names = os.listdir(dir)
     except os.error:
-        print("Can't list", dir)
+        print("Can't list {!r}".format(dir))
         names = []
     names.sort()
     success = 1
@@ -58,7 +58,7 @@ def compile_dir(dir, maxlevels=10, ddir=None, force=False, rx=None,
         elif (maxlevels > 0 and name != os.curdir and name != os.pardir and
               os.path.isdir(fullname) and not os.path.islink(fullname)):
             if not compile_dir(fullname, maxlevels - 1, dfile, force, rx,
-                               quiet, legacy):
+                               quiet, legacy, optimize):
                 success = 0
     return success
 
@@ -109,13 +109,13 @@ def compile_file(fullname, ddir=None, force=False, rx=None, quiet=False,
                 except IOError:
                     pass
             if not quiet:
-                print('Compiling', fullname, '...')
+                print('Compiling {!r}...'.format(fullname))
             try:
                 ok = py_compile.compile(fullname, cfile, dfile, True,
                                         optimize=optimize)
             except py_compile.PyCompileError as err:
                 if quiet:
-                    print('*** Error compiling', fullname, '...')
+                    print('*** Error compiling {!r}...'.format(fullname))
                 else:
                     print('*** ', end='')
                 # escape non-printable characters in msg
@@ -126,7 +126,7 @@ def compile_file(fullname, ddir=None, force=False, rx=None, quiet=False,
                 success = 0
             except (SyntaxError, UnicodeError, IOError) as e:
                 if quiet:
-                    print('*** Error compiling', fullname, '...')
+                    print('*** Error compiling {!r}...'.format(fullname))
                 else:
                     print('*** ', end='')
                 print(e.__class__.__name__ + ':', e)

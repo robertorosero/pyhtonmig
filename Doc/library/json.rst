@@ -6,7 +6,7 @@
 .. moduleauthor:: Bob Ippolito <bob@redivi.com>
 .. sectionauthor:: Bob Ippolito <bob@redivi.com>
 
-JSON (JavaScript Object Notation) <http://json.org> is a subset of JavaScript
+`JSON (JavaScript Object Notation) <http://json.org>`_ is a subset of JavaScript
 syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 
 :mod:`json` exposes an API familiar to users of the standard library
@@ -118,9 +118,8 @@ Basic Usage
    file-like object).
 
    If *skipkeys* is ``True`` (default: ``False``), then dict keys that are not
-   of a basic type (:class:`bytes`, :class:`str`, :class:`int`,
-   :class:`float`, :class:`bool`, ``None``) will be skipped instead of raising a
-   :exc:`TypeError`.
+   of a basic type (:class:`str`, :class:`int`, :class:`float`, :class:`bool`,
+   ``None``) will be skipped instead of raising a :exc:`TypeError`.
 
    The :mod:`json` module always produces :class:`str` objects, not
    :class:`bytes` objects. Therefore, ``fp.write()`` must support :class:`str`
@@ -203,15 +202,11 @@ Basic Usage
 
 .. function:: loads(s, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
 
-   Deserialize *s* (a :class:`bytes` or :class:`str` instance containing a JSON
-   document) to a Python object.
+   Deserialize *s* (a :class:`str` instance containing a JSON document) to a
+   Python object.
 
-   If *s* is a :class:`bytes` instance and is encoded with an ASCII based encoding
-   other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
-   specified.  Encodings that are not ASCII based (such as UCS-2) are not
-   allowed and should be decoded to :class:`str` first.
-
-   The other arguments have the same meaning as in :func:`load`.
+   The other arguments have the same meaning as in :func:`load`, except
+   *encoding* which is ignored and deprecated.
 
 
 Encoders and decoders

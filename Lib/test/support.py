@@ -15,7 +15,7 @@ import shutil
 import warnings
 import unittest
 import importlib
-import collections
+import collections.abc
 import re
 import subprocess
 import imp
@@ -33,7 +33,7 @@ __all__ = [
     "verbose", "use_resources", "max_memuse", "record_original_stdout",
     "get_original_stdout", "unload", "unlink", "rmtree", "forget",
     "is_resource_enabled", "requires", "find_unused_port", "bind_port",
-    "fcmp", "is_jython", "TESTFN", "HOST", "FUZZ", "SAVEDCWD", "temp_cwd",
+    "is_jython", "TESTFN", "HOST", "SAVEDCWD", "temp_cwd",
     "findfile", "sortdict", "check_syntax_error", "open_urlresource",
     "check_warnings", "CleanImport", "EnvironmentVarGuard",
     "TransientResource", "captured_output", "captured_stdout",
@@ -233,6 +233,36 @@ def forget(modname):
         unlink(imp.cache_from_source(source, debug_override=True))
         unlink(imp.cache_from_source(source, debug_override=False))
 
+# On some platforms, should not run gui test even if it is allowed
+# in `use_resources'.
+if sys.platform.startswith('win'):
+    import ctypes
+    import ctypes.wintypes
+    def _is_gui_available():
+        UOI_FLAGS = 1
+        WSF_VISIBLE = 0x0001
+        class USEROBJECTFLAGS(ctypes.Structure):
+            _fields_ = [("fInherit", ctypes.wintypes.BOOL),
+                        ("fReserved", ctypes.wintypes.BOOL),
+                        ("dwFlags", ctypes.wintypes.DWORD)]
+        dll = ctypes.windll.user32
+        h = dll.GetProcessWindowStation()
+        if not h:
+            raise ctypes.WinError()
+        uof = USEROBJECTFLAGS()
+        needed = ctypes.wintypes.DWORD()
+        res = dll.GetUserObjectInformationW(h,
+            UOI_FLAGS,
+            ctypes.byref(uof),
+            ctypes.sizeof(uof),
+            ctypes.byref(needed))
+        if not res:
+            raise ctypes.WinError()
+        return bool(uof.dwFlags & WSF_VISIBLE)
+else:
+    def _is_gui_available():
+        return True
+
 def is_resource_enabled(resource):
     """Test whether a resource is enabled.  Known resources are set by
     regrtest.py."""
@@ -245,6 +275,8 @@ def requires(resource, msg=None):
     possibility of False being returned occurs when regrtest.py is
     executing.
     """
+    if resource == 'gui' and not _is_gui_available():
+        raise unittest.SkipTest("Cannot use the 'gui' resource")
     # see if the caller's module is __main__ - if so, treat as if
     # the resource was set
     if sys._getframe(1).f_globals.get("__name__") == "__main__":
@@ -348,24 +380,6 @@ def bind_port(sock, host=HOST):
     sock.bind((host, 0))
     port = sock.getsockname()[1]
     return port
-
-FUZZ = 1e-6
-
-def fcmp(x, y): # fuzzy comparison function
-    if isinstance(x, float) or isinstance(y, float):
-        try:
-            fuzz = (abs(x) + abs(y)) * FUZZ
-            if abs(x-y) <= fuzz:
-                return 0
-        except:
-            pass
-    elif type(x) == type(y) and isinstance(x, (tuple, list)):
-        for i in range(min(len(x), len(y))):
-            outcome = fcmp(x[i], y[i])
-            if outcome != 0:
-                return outcome
-        return (len(x) > len(y)) - (len(x) < len(y))
-    return (x > y) - (x < y)
 
 # decorator for skipping tests on non-IEEE 754 platforms
 requires_IEEE_754 = unittest.skipUnless(
@@ -682,7 +696,7 @@ class CleanImport(object):
         sys.modules.update(self.original_modules)
 
 
-class EnvironmentVarGuard(collections.MutableMapping):
+class EnvironmentVarGuard(collections.abc.MutableMapping):
 
     """Class to help protect the environment variable properly.  Can be used as
     a context manager."""
@@ -978,13 +992,12 @@ def set_memlimit(limit):
         raise ValueError('Memory limit %r too low to be useful' % (limit,))
     max_memuse = memlimit
 
-def bigmemtest(minsize, memuse, overhead=5*_1M):
+def bigmemtest(minsize, memuse):
     """Decorator for bigmem tests.
 
     'minsize' is the minimum useful size for the test (in arbitrary,
     test-interpreted units.) 'memuse' is the number of 'bytes per size' for
-    the test, or a good estimate of it. 'overhead' specifies fixed overhead,
-    independent of the testsize, and defaults to 5Mb.
+    the test, or a good estimate of it.
 
     The decorator tries to guess a good value for 'size' and passes it to
     the decorated test function. If minsize * memuse is more than the
@@ -996,52 +1009,43 @@ def bigmemtest(minsize, memuse, overhead=5*_1M):
             # Retrieve values in case someone decided to adjust them
             minsize = wrapper.minsize
             memuse = wrapper.memuse
-            overhead = wrapper.overhead
             if not max_memuse:
                 # If max_memuse is 0 (the default),
                 # we still want to run the tests with size set to a few kb,
                 # to make sure they work. We still want to avoid using
                 # too much memory, though, but we do that noisily.
                 maxsize = 5147
-                self.assertFalse(maxsize * memuse + overhead > 20 * _1M)
+                self.assertFalse(maxsize * memuse > 20 * _1M)
             else:
-                maxsize = int((max_memuse - overhead) / memuse)
+                maxsize = int(max_memuse / memuse)
                 if maxsize < minsize:
-                    # Really ought to print 'test skipped' or something
-                    if verbose:
-                        sys.stderr.write("Skipping %s because of memory "
-                                         "constraint\n" % (f.__name__,))
-                    return
-                # Try to keep some breathing room in memory use
-                maxsize = max(maxsize - 50 * _1M, minsize)
+                    raise unittest.SkipTest(
+                        "not enough memory: %.1fG minimum needed"
+                        % (minsize * memuse / (1024 ** 3)))
             return f(self, maxsize)
         wrapper.minsize = minsize
         wrapper.memuse = memuse
-        wrapper.overhead = overhead
         return wrapper
     return decorator
 
-def precisionbigmemtest(size, memuse, overhead=5*_1M):
+def precisionbigmemtest(size, memuse):
     def decorator(f):
         def wrapper(self):
             size = wrapper.size
             memuse = wrapper.memuse
-            overhead = wrapper.overhead
             if not real_max_memuse:
                 maxsize = 5147
             else:
                 maxsize = size
 
                 if real_max_memuse and real_max_memuse < maxsize * memuse:
-                    if verbose:
-                        sys.stderr.write("Skipping %s because of memory "
-                                         "constraint\n" % (f.__name__,))
-                    return
+                    raise unittest.SkipTest(
+                        "not enough memory: %.1fG minimum needed"
+                        % (size * memuse / (1024 ** 3)))
 
             return f(self, maxsize)
         wrapper.size = size
         wrapper.memuse = memuse
-        wrapper.overhead = overhead
         return wrapper
     return decorator
 
@@ -1049,9 +1053,13 @@ def bigaddrspacetest(f):
     """Decorator for tests that fill the address space."""
     def wrapper(self):
         if max_memuse < MAX_Py_ssize_t:
-            if verbose:
-                sys.stderr.write("Skipping %s because of memory "
-                                 "constraint\n" % (f.__name__,))
+            if MAX_Py_ssize_t >= 2**63 - 1 and max_memuse >= 2**31:
+                raise unittest.SkipTest(
+                    "not enough memory: try a 32-bit build instead")
+            else:
+                raise unittest.SkipTest(
+                    "not enough memory: %.1fG minimum needed"
+                    % (MAX_Py_ssize_t / (1024 ** 3)))
         else:
             return f(self)
     return wrapper
@@ -1069,6 +1077,8 @@ def _id(obj):
     return obj
 
 def requires_resource(resource):
+    if resource == 'gui' and not _is_gui_available():
+        return unittest.skip("resource 'gui' is not available")
     if is_resource_enabled(resource):
         return _id
     else:
@@ -1113,6 +1123,32 @@ def check_impl_detail(**guards):
     guards, default = _parse_guards(guards)
     return guards.get(platform.python_implementation().lower(), default)
 
+
+def no_tracing(func):
+    """Decorator to temporarily turn off tracing for the duration of a test."""
+    if not hasattr(sys, 'gettrace'):
+        return func
+    else:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            original_trace = sys.gettrace()
+            try:
+                sys.settrace(None)
+                return func(*args, **kwargs)
+            finally:
+                sys.settrace(original_trace)
+        return wrapper
+
+
+def refcount_test(test):
+    """Decorator for tests which involve reference counting.
+
+    To start, the decorator does not run the test if is not run by CPython.
+    After that, any trace function is unset during the test to prevent
+    unexpected refcounts caused by the trace function.
+
+    """
+    return no_tracing(cpython_only(test))
 
 
 def _run_suite(suite):

@@ -564,8 +564,11 @@ class StrTest(unittest.TestCase, BaseStrTest):
         if expectedsize is None:
             expectedsize = size
 
-        s = c * size
-        self.assertEqual(len(s.encode(enc)), expectedsize)
+        try:
+            s = c * size
+            self.assertEqual(len(s.encode(enc)), expectedsize)
+        finally:
+            s = None
 
     def setUp(self):
         # HACK: adjust memory use of tests inherited from BaseStrTest
@@ -586,7 +589,8 @@ class StrTest(unittest.TestCase, BaseStrTest):
         for name, memuse in self._adjusted.items():
             getattr(type(self), name).memuse = memuse
 
-    @bigmemtest(minsize=_2G + 2, memuse=character_size + 1)
+    # the utf8 encoder preallocates big time (4x the number of characters)
+    @bigmemtest(minsize=_2G + 2, memuse=character_size + 4)
     def test_encode(self, size):
         return self.basic_encode_test(size, 'utf-8')
 
@@ -703,7 +707,7 @@ class StrTest(unittest.TestCase, BaseStrTest):
 class BytesTest(unittest.TestCase, BaseStrTest):
 
     def from_latin1(self, s):
-        return s.encode("latin1")
+        return s.encode("latin-1")
 
     @bigmemtest(minsize=_2G + 2, memuse=1 + character_size)
     def test_decode(self, size):
@@ -714,7 +718,7 @@ class BytesTest(unittest.TestCase, BaseStrTest):
 class BytearrayTest(unittest.TestCase, BaseStrTest):
 
     def from_latin1(self, s):
-        return bytearray(s.encode("latin1"))
+        return bytearray(s.encode("latin-1"))
 
     @bigmemtest(minsize=_2G + 2, memuse=1 + character_size)
     def test_decode(self, size):

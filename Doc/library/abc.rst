@@ -7,6 +7,10 @@
 .. sectionauthor:: Georg Brandl
 .. much of the content adapted from docstrings
 
+**Source code:** :source:`Lib/abc.py`
+
+--------------
+
 This module provides the infrastructure for defining an :term:`abstract base
 class` (ABCs) in Python, as outlined in :pep:`3119`; see the PEP for why this
 was added to Python. (See also :pep:`3141` and the :mod:`numbers` module
@@ -50,6 +54,9 @@ This module provides the following class:
 
         assert issubclass(tuple, MyABC)
         assert isinstance((), MyABC)
+
+      .. versionchanged:: 3.3
+         Returns the registered subclass, to allow usage as a class decorator.
 
    You can also override this method in an abstract base class:
 

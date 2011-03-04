@@ -116,7 +116,7 @@ or on combining URL components into a URL string.
       Added IPv6 URL parsing capabilities.
 
 
-.. function:: parse_qs(qs, keep_blank_values=False, strict_parsing=False)
+.. function:: parse_qs(qs, keep_blank_values=False, strict_parsing=False, encoding='utf-8', errors='replace')
 
    Parse a query string given as a string argument (data of type
    :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a
@@ -133,11 +133,19 @@ or on combining URL components into a URL string.
    parsing errors.  If false (the default), errors are silently ignored.  If true,
    errors raise a :exc:`ValueError` exception.
 
+   The optional *encoding* and *errors* parameters specify how to decode
+   percent-encoded sequences into Unicode characters, as accepted by the
+   :meth:`bytes.decode` method.
+
    Use the :func:`urllib.parse.urlencode` function to convert such
    dictionaries into query strings.
 
 
-.. function:: parse_qsl(qs, keep_blank_values=False, strict_parsing=False)
+   .. versionchanged:: 3.2
+      Add *encoding* and *errors* parameters.
+
+
+.. function:: parse_qsl(qs, keep_blank_values=False, strict_parsing=False, encoding='utf-8', errors='replace')
 
    Parse a query string given as a string argument (data of type
    :mimetype:`application/x-www-form-urlencoded`).  Data are returned as a list of
@@ -153,8 +161,15 @@ or on combining URL components into a URL string.
    parsing errors.  If false (the default), errors are silently ignored.  If true,
    errors raise a :exc:`ValueError` exception.
 
+   The optional *encoding* and *errors* parameters specify how to decode
+   percent-encoded sequences into Unicode characters, as accepted by the
+   :meth:`bytes.decode` method.
+
    Use the :func:`urllib.parse.urlencode` function to convert such lists of pairs into
    query strings.
+
+   .. versionchanged:: 3.2
+      Add *encoding* and *errors* parameters.
 
 
 .. function:: urlunparse(parts)
@@ -265,8 +280,9 @@ or on combining URL components into a URL string.
    object.
 
    .. versionchanged:: 3.2
-      Result is a structured object rather than a simple 2-tuple
+      Result is a structured object rather than a simple 2-tuple.
 
+.. _parsing-ascii-encoded-bytes:
 
 Parsing ASCII Encoded Bytes
 ---------------------------
@@ -491,9 +507,10 @@ task isn't already covered by the URL parsing functions above.
 .. function:: urlencode(query, doseq=False, safe='', encoding=None, errors=None)
 
    Convert a mapping object or a sequence of two-element tuples, which may
-   either be a :class:`str` or a :class:`bytes`,  to a "percent-encoded" string,
-   suitable to pass to :func:`urlopen` above as the optional *data* argument.
-   This is useful to pass a dictionary of form fields to a ``POST`` request.
+   either be a :class:`str` or a :class:`bytes`,  to a "percent-encoded"
+   string.  The resultant string must be converted to bytes using the
+   user-specified encoding before it is sent to :func:`urlopen` as the optional
+   *data* argument.
    The resulting string is a series of ``key=value`` pairs separated by ``'&'``
    characters, where both *key* and *value* are quoted using :func:`quote_plus`
    above. When a sequence of two-element tuples is used as the *query*
@@ -509,6 +526,9 @@ task isn't already covered by the URL parsing functions above.
 
    To reverse this encoding process, :func:`parse_qs` and :func:`parse_qsl` are
    provided in this module to parse query strings into Python data structures.
+
+   Refer to :ref:`urllib examples <urllib-examples>` to find out how urlencode
+   method can be used for generating query string for a URL or data for POST.
 
    .. versionchanged:: 3.2
       Query parameter supports bytes and string objects.

@@ -577,7 +577,6 @@ Py_Main(int argc, wchar_t **argv)
     if ((p = Py_GETENV("PYTHONEXECUTABLE")) && *p != '\0') {
         wchar_t* buffer;
         size_t len = strlen(p);
-        size_t r;
 
         buffer = malloc(len * sizeof(wchar_t));
         if (buffer == NULL) {
@@ -585,7 +584,7 @@ Py_Main(int argc, wchar_t **argv)
                "not enough memory to copy PYTHONEXECUTABLE");
         }
 
-        r = mbstowcs(buffer, p, len);
+        mbstowcs(buffer, p, len);
         Py_SetProgramName(buffer);
         /* buffer is now handed off - do not free */
     } else {
@@ -720,7 +719,6 @@ Py_Main(int argc, wchar_t **argv)
      * trade off slower shutdown for less distraction in the memory
      * reports.  -baw
      */
-    _Py_ReleaseInternedStrings();
     _Py_ReleaseInternedUnicodeStrings();
 #endif /* __INSURE__ */
 

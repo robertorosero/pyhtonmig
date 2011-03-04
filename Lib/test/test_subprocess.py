@@ -1059,6 +1059,11 @@ class POSIXProcessTestCase(BaseTestCase):
         exitcode = subprocess.call([abs_program, "-c", "pass"])
         self.assertEqual(exitcode, 0)
 
+        # absolute bytes path as a string
+        cmd = b"'" + abs_program + b"' -c pass"
+        exitcode = subprocess.call(cmd, shell=True)
+        self.assertEqual(exitcode, 0)
+
         # bytes program, unicode PATH
         env = os.environ.copy()
         env["PATH"] = path
@@ -1156,9 +1161,6 @@ class POSIXProcessTestCase(BaseTestCase):
 
         open_fds = set()
 
-        if support.verbose:
-            print(" -- maxfd =", subprocess.MAXFD)
-
         for x in range(5):
             fds = os.pipe()
             self.addCleanup(os.close, fds[0])
@@ -1173,10 +1175,6 @@ class POSIXProcessTestCase(BaseTestCase):
 
             remaining_fds = set(map(int, output.split(b',')))
             to_be_closed = open_fds - {fd}
-            # Temporary debug output for intermittent failures
-            if support.verbose:
-                print(" -- fds that should have been closed:", to_be_closed)
-                print(" -- fds that remained open:", remaining_fds)
 
             self.assertIn(fd, remaining_fds, "fd to be passed not passed")
             self.assertFalse(remaining_fds & to_be_closed,
@@ -1198,7 +1196,7 @@ class POSIXProcessTestCase(BaseTestCase):
         stdout, stderr = p.communicate()
         self.assertEqual(0, p.returncode, "sigchild_ignore.py exited"
                          " non-zero with this error:\n%s" %
-                         stderr.decode('utf8'))
+                         stderr.decode('utf-8'))
 
 
 @unittest.skipUnless(mswindows, "Windows specific tests")

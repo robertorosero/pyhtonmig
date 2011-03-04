@@ -46,7 +46,7 @@ except ImportError:
 
 def _default_chunk_size():
     """Get the default TextIOWrapper chunk size"""
-    with open(__file__, "r", encoding="latin1") as f:
+    with open(__file__, "r", encoding="latin-1") as f:
         return f._CHUNK_SIZE
 
 
@@ -1684,11 +1684,11 @@ class TextIOWrapperTest(unittest.TestCase):
         r = self.BytesIO(b"\xc3\xa9\n\n")
         b = self.BufferedReader(r, 1000)
         t = self.TextIOWrapper(b)
-        t.__init__(b, encoding="latin1", newline="\r\n")
-        self.assertEqual(t.encoding, "latin1")
+        t.__init__(b, encoding="latin-1", newline="\r\n")
+        self.assertEqual(t.encoding, "latin-1")
         self.assertEqual(t.line_buffering, False)
-        t.__init__(b, encoding="utf8", line_buffering=True)
-        self.assertEqual(t.encoding, "utf8")
+        t.__init__(b, encoding="utf-8", line_buffering=True)
+        self.assertEqual(t.encoding, "utf-8")
         self.assertEqual(t.line_buffering, True)
         self.assertEqual("\xe9\n", t.readline())
         self.assertRaises(TypeError, t.__init__, b, newline=42)
@@ -1738,8 +1738,8 @@ class TextIOWrapperTest(unittest.TestCase):
     def test_encoding(self):
         # Check the encoding attribute is always set, and valid
         b = self.BytesIO()
-        t = self.TextIOWrapper(b, encoding="utf8")
-        self.assertEqual(t.encoding, "utf8")
+        t = self.TextIOWrapper(b, encoding="utf-8")
+        self.assertEqual(t.encoding, "utf-8")
         t = self.TextIOWrapper(b)
         self.assertTrue(t.encoding is not None)
         codecs.lookup(t.encoding)
@@ -1918,7 +1918,7 @@ class TextIOWrapperTest(unittest.TestCase):
 
     def test_basic_io(self):
         for chunksize in (1, 2, 3, 4, 5, 15, 16, 17, 31, 32, 33, 63, 64, 65):
-            for enc in "ascii", "latin1", "utf8" :# , "utf-16-be", "utf-16-le":
+            for enc in "ascii", "latin-1", "utf-8" :# , "utf-16-be", "utf-16-le":
                 f = self.open(support.TESTFN, "w+", encoding=enc)
                 f._CHUNK_SIZE = chunksize
                 self.assertEqual(f.write("abc"), 3)
@@ -1968,7 +1968,7 @@ class TextIOWrapperTest(unittest.TestCase):
         self.assertEqual(rlines, wlines)
 
     def test_telling(self):
-        f = self.open(support.TESTFN, "w+", encoding="utf8")
+        f = self.open(support.TESTFN, "w+", encoding="utf-8")
         p0 = f.tell()
         f.write("\xff\n")
         p1 = f.tell()
@@ -2214,6 +2214,7 @@ class TextIOWrapperTest(unittest.TestCase):
         with self.open(support.TESTFN, "w", errors="replace") as f:
             self.assertEqual(f.errors, "replace")
 
+    @support.no_tracing
     @unittest.skipUnless(threading, 'Threading required for this test.')
     def test_threads_write(self):
         # Issue6750: concurrent writes could duplicate data
@@ -2622,7 +2623,8 @@ class SignalsTest(unittest.TestCase):
     @unittest.skipUnless(threading, 'Threading required for this test.')
     def check_interrupted_write(self, item, bytes, **fdopen_kwargs):
         """Check that a partial write, when it gets interrupted, properly
-        invokes the signal handler."""
+        invokes the signal handler, and bubbles up the exception raised
+        in the latter."""
         read_results = []
         def _read():
             s = os.read(r, 1)
@@ -2669,6 +2671,7 @@ class SignalsTest(unittest.TestCase):
     def test_interrupted_write_text(self):
         self.check_interrupted_write("xy", b"xy", mode="w", encoding="ascii")
 
+    @support.no_tracing
     def check_reentrant_write(self, data, **fdopen_kwargs):
         def on_alarm(*args):
             # Will be called reentrantly from the same thread
@@ -2700,6 +2703,98 @@ class SignalsTest(unittest.TestCase):
 
     def test_reentrant_write_text(self):
         self.check_reentrant_write("xy", mode="w", encoding="ascii")
+
+    def check_interrupted_read_retry(self, decode, **fdopen_kwargs):
+        """Check that a buffered read, when it gets interrupted (either
+        returning a partial result or EINTR), properly invokes the signal
+        handler and retries if the latter returned successfully."""
+        r, w = os.pipe()
+        fdopen_kwargs["closefd"] = False
+        def alarm_handler(sig, frame):
+            os.write(w, b"bar")
+        signal.signal(signal.SIGALRM, alarm_handler)
+        try:
+            rio = self.io.open(r, **fdopen_kwargs)
+            os.write(w, b"foo")
+            signal.alarm(1)
+            # Expected behaviour:
+            # - first raw read() returns partial b"foo"
+            # - second raw read() returns EINTR
+            # - third raw read() returns b"bar"
+            self.assertEqual(decode(rio.read(6)), "foobar")
+        finally:
+            rio.close()
+            os.close(w)
+            os.close(r)
+
+    def test_interrupterd_read_retry_buffered(self):
+        self.check_interrupted_read_retry(lambda x: x.decode('latin1'),
+                                          mode="rb")
+
+    def test_interrupterd_read_retry_text(self):
+        self.check_interrupted_read_retry(lambda x: x,
+                                          mode="r")
+
+    @unittest.skipUnless(threading, 'Threading required for this test.')
+    def check_interrupted_write_retry(self, item, **fdopen_kwargs):
+        """Check that a buffered write, when it gets interrupted (either
+        returning a partial result or EINTR), properly invokes the signal
+        handler and retries if the latter returned successfully."""
+        select = support.import_module("select")
+        # A quantity that exceeds the buffer size of an anonymous pipe's
+        # write end.
+        N = 1024 * 1024
+        r, w = os.pipe()
+        fdopen_kwargs["closefd"] = False
+        # We need a separate thread to read from the pipe and allow the
+        # write() to finish.  This thread is started after the SIGALRM is
+        # received (forcing a first EINTR in write()).
+        read_results = []
+        write_finished = False
+        def _read():
+            while not write_finished:
+                while r in select.select([r], [], [], 1.0)[0]:
+                    s = os.read(r, 1024)
+                    read_results.append(s)
+        t = threading.Thread(target=_read)
+        t.daemon = True
+        def alarm1(sig, frame):
+            signal.signal(signal.SIGALRM, alarm2)
+            signal.alarm(1)
+        def alarm2(sig, frame):
+            t.start()
+        signal.signal(signal.SIGALRM, alarm1)
+        try:
+            wio = self.io.open(w, **fdopen_kwargs)
+            signal.alarm(1)
+            # Expected behaviour:
+            # - first raw write() is partial (because of the limited pipe buffer
+            #   and the first alarm)
+            # - second raw write() returns EINTR (because of the second alarm)
+            # - subsequent write()s are successful (either partial or complete)
+            self.assertEqual(N, wio.write(item * N))
+            wio.flush()
+            write_finished = True
+            t.join()
+            self.assertEqual(N, sum(len(x) for x in read_results))
+        finally:
+            write_finished = True
+            os.close(w)
+            os.close(r)
+            # This is deliberate. If we didn't close the file descriptor
+            # before closing wio, wio would try to flush its internal
+            # buffer, and could block (in case of failure).
+            try:
+                wio.close()
+            except IOError as e:
+                if e.errno != errno.EBADF:
+                    raise
+
+    def test_interrupterd_write_retry_buffered(self):
+        self.check_interrupted_write_retry(b"x", mode="wb")
+
+    def test_interrupterd_write_retry_text(self):
+        self.check_interrupted_write_retry("x", mode="w", encoding="latin1")
 
 
 class CSignalsTest(SignalsTest):

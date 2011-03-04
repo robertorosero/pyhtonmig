@@ -11,6 +11,7 @@ import sys
 import unittest
 import warnings
 from test import support, string_tests
+import _string
 
 # Error handling (bad decoder return)
 def search_function(encoding):
@@ -1181,10 +1182,13 @@ class UnicodeTest(string_tests.CommonTest,
         self.assertEqual('hello'.encode('ascii'), b'hello')
         self.assertEqual('hello'.encode('utf-7'), b'hello')
         self.assertEqual('hello'.encode('utf-8'), b'hello')
-        self.assertEqual('hello'.encode('utf8'), b'hello')
+        self.assertEqual('hello'.encode('utf-8'), b'hello')
         self.assertEqual('hello'.encode('utf-16-le'), b'h\000e\000l\000l\000o\000')
         self.assertEqual('hello'.encode('utf-16-be'), b'\000h\000e\000l\000l\000o')
         self.assertEqual('hello'.encode('latin-1'), b'hello')
+
+        # Default encoding is utf-8
+        self.assertEqual('\u2603'.encode(), b'\xe2\x98\x83')
 
         # Roundtrip safety for BMP (just the first 1024 chars)
         for c in range(1024):
@@ -1426,7 +1430,9 @@ class UnicodeTest(string_tests.CommonTest,
     # Test PyUnicode_FromFormat()
     def test_from_format(self):
         support.import_module('ctypes')
-        from ctypes import pythonapi, py_object
+        from ctypes import (pythonapi, py_object,
+            c_int, c_long, c_longlong, c_ssize_t,
+            c_uint, c_ulong, c_ulonglong, c_size_t)
         if sys.maxunicode == 65535:
             name = "PyUnicodeUCS2_FromFormat"
         else:
@@ -1451,9 +1457,59 @@ class UnicodeTest(string_tests.CommonTest,
             'string, got a non-ASCII byte: 0xe9$',
             PyUnicode_FromFormat, b'unicode\xe9=%s', 'ascii')
 
-        # other tests
+        # test "%c"
+        self.assertEqual(PyUnicode_FromFormat(b'%c', c_int(0xabcd)), '\uabcd')
+        self.assertEqual(PyUnicode_FromFormat(b'%c', c_int(0x10ffff)), '\U0010ffff')
+
+        # test "%"
+        self.assertEqual(PyUnicode_FromFormat(b'%'), '%')
+        self.assertEqual(PyUnicode_FromFormat(b'%%'), '%')
+        self.assertEqual(PyUnicode_FromFormat(b'%%s'), '%s')
+        self.assertEqual(PyUnicode_FromFormat(b'[%%]'), '[%]')
+        self.assertEqual(PyUnicode_FromFormat(b'%%%s', b'abc'), '%abc')
+
+        # test integer formats (%i, %d, %u)
+        self.assertEqual(PyUnicode_FromFormat(b'%03i', c_int(10)), '010')
+        self.assertEqual(PyUnicode_FromFormat(b'%0.4i', c_int(10)), '0010')
+        self.assertEqual(PyUnicode_FromFormat(b'%i', c_int(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%li', c_long(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%lli', c_longlong(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%zi', c_ssize_t(-123)), '-123')
+
+        self.assertEqual(PyUnicode_FromFormat(b'%d', c_int(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%ld', c_long(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%lld', c_longlong(-123)), '-123')
+        self.assertEqual(PyUnicode_FromFormat(b'%zd', c_ssize_t(-123)), '-123')
+
+        self.assertEqual(PyUnicode_FromFormat(b'%u', c_uint(123)), '123')
+        self.assertEqual(PyUnicode_FromFormat(b'%lu', c_ulong(123)), '123')
+        self.assertEqual(PyUnicode_FromFormat(b'%llu', c_ulonglong(123)), '123')
+        self.assertEqual(PyUnicode_FromFormat(b'%zu', c_size_t(123)), '123')
+
+        # test %A
         text = PyUnicode_FromFormat(b'%%A:%A', 'abc\xe9\uabcd\U0010ffff')
         self.assertEqual(text, r"%A:'abc\xe9\uabcd\U0010ffff'")
+
+        # test %V
+        text = PyUnicode_FromFormat(b'repr=%V', 'abc', b'xyz')
+        self.assertEqual(text, 'repr=abc')
+
+        # Test string decode from parameter of %s using utf-8.
+        # b'\xe4\xba\xba\xe6\xb0\x91' is utf-8 encoded byte sequence of
+        # '\u4eba\u6c11'
+        text = PyUnicode_FromFormat(b'repr=%V', None, b'\xe4\xba\xba\xe6\xb0\x91')
+        self.assertEqual(text, 'repr=\u4eba\u6c11')
+
+        #Test replace error handler.
+        text = PyUnicode_FromFormat(b'repr=%V', None, b'abc\xff')
+        self.assertEqual(text, 'repr=abc\ufffd')
+
+        # not supported: copy the raw format string. these tests are just here
+        # to check for crashs and should not be considered as specifications
+        self.assertEqual(PyUnicode_FromFormat(b'%1%s', b'abc'), '%s')
+        self.assertEqual(PyUnicode_FromFormat(b'%1abc'), '%1abc')
+        self.assertEqual(PyUnicode_FromFormat(b'%+i', c_int(10)), '%+i')
+        self.assertEqual(PyUnicode_FromFormat(b'%.%s', b'abc'), '%.%s')
 
     # Test PyUnicode_AsWideChar()
     def test_aswidechar(self):
@@ -1514,6 +1570,57 @@ class UnicodeTest(string_tests.CommonTest,
         wchar, size = unicode_aswidecharstring(nonbmp)
         self.assertEqual(size, nchar)
         self.assertEqual(wchar, nonbmp + '\0')
+
+
+class StringModuleTest(unittest.TestCase):
+    def test_formatter_parser(self):
+        def parse(format):
+            return list(_string.formatter_parser(format))
+
+        formatter = parse("prefix {2!s}xxx{0:^+10.3f}{obj.attr!s} {z[0]!s:10}")
+        self.assertEqual(formatter, [
+            ('prefix ', '2', '', 's'),
+            ('xxx', '0', '^+10.3f', None),
+            ('', 'obj.attr', '', 's'),
+            (' ', 'z[0]', '10', 's'),
+        ])
+
+        formatter = parse("prefix {} suffix")
+        self.assertEqual(formatter, [
+            ('prefix ', '', '', None),
+            (' suffix', None, None, None),
+        ])
+
+        formatter = parse("str")
+        self.assertEqual(formatter, [
+            ('str', None, None, None),
+        ])
+
+        formatter = parse("")
+        self.assertEqual(formatter, [])
+
+        formatter = parse("{0}")
+        self.assertEqual(formatter, [
+            ('', '0', '', None),
+        ])
+
+        self.assertRaises(TypeError, _string.formatter_parser, 1)
+
+    def test_formatter_field_name_split(self):
+        def split(name):
+            items = list(_string.formatter_field_name_split(name))
+            items[1] = list(items[1])
+            return items
+        self.assertEqual(split("obj"), ["obj", []])
+        self.assertEqual(split("obj.arg"), ["obj", [(True, 'arg')]])
+        self.assertEqual(split("obj[key]"), ["obj", [(False, 'key')]])
+        self.assertEqual(split("obj.arg[key1][key2]"), [
+            "obj",
+            [(True, 'arg'),
+             (False, 'key1'),
+             (False, 'key2'),
+            ]])
+        self.assertRaises(TypeError, _string.formatter_field_name_split, 1)
 
 
 def test_main():

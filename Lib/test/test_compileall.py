@@ -24,6 +24,10 @@ class CompileallTests(unittest.TestCase):
         self.source_path2 = os.path.join(self.directory, '_test2.py')
         self.bc_path2 = imp.cache_from_source(self.source_path2)
         shutil.copyfile(self.source_path, self.source_path2)
+        self.subdirectory = os.path.join(self.directory, '_subdir')
+        os.mkdir(self.subdirectory)
+        self.source_path3 = os.path.join(self.subdirectory, '_test3.py')
+        shutil.copyfile(self.source_path, self.source_path3)
 
     def tearDown(self):
         shutil.rmtree(self.directory)
@@ -96,6 +100,12 @@ class CompileallTests(unittest.TestCase):
         cached = imp.cache_from_source(self.source_path,
                                        debug_override=not optimize)
         self.assertTrue(os.path.isfile(cached))
+        cached2 = imp.cache_from_source(self.source_path2,
+                                       debug_override=not optimize)
+        self.assertTrue(os.path.isfile(cached2))
+        cached3 = imp.cache_from_source(self.source_path3,
+                                       debug_override=not optimize)
+        self.assertTrue(os.path.isfile(cached3))
 
 
 class EncodingTest(unittest.TestCase):
@@ -335,7 +345,7 @@ class CommandLineTests(unittest.TestCase):
 
     def test_invalid_arg_produces_message(self):
         out = self.assertRunOK('badfilename')
-        self.assertRegex(out, b"Can't list badfilename")
+        self.assertRegex(out, b"Can't list 'badfilename'")
 
 
 def test_main():

@@ -4,9 +4,13 @@
 .. module:: argparse
    :synopsis: Command-line option and argument parsing library.
 .. moduleauthor:: Steven Bethard <steven.bethard@gmail.com>
-.. versionadded:: 3.2
 .. sectionauthor:: Steven Bethard <steven.bethard@gmail.com>
 
+**Source code:** :source:`Lib/argparse.py`
+
+.. versionadded:: 3.2
+
+--------------
 
 The :mod:`argparse` module makes it easy to write user friendly command line
 interfaces. The program defines what arguments it requires, and :mod:`argparse`
@@ -925,7 +929,7 @@ The choices_ keyword argument may be more convenient for type checkers that
 simply check against a range of values::
 
    >>> parser = argparse.ArgumentParser(prog='PROG')
-   >>> parser.add_argument('foo', type=int, choices=xrange(5, 10))
+   >>> parser.add_argument('foo', type=int, choices=range(5, 10))
    >>> parser.parse_args('7'.split())
    Namespace(foo=7)
    >>> parser.parse_args('11'.split())
@@ -1299,7 +1303,7 @@ of :data:`sys.argv`.  This can be accomplished by passing a list of strings to
 
    >>> parser = argparse.ArgumentParser()
    >>> parser.add_argument(
-   ...     'integers', metavar='int', type=int, choices=xrange(10),
+   ...     'integers', metavar='int', type=int, choices=range(10),
    ...  nargs='+', help='an integer in the range 0..9')
    >>> parser.add_argument(
    ...     '--sum', dest='accumulate', action='store_const', const=sum,

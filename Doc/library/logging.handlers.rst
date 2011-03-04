@@ -326,10 +326,33 @@ sends logging output to a network socket. The base class uses a TCP socket.
       them on the receiving end, or alternatively you can disable unpickling of
       global objects on the receiving end.
 
+
    .. method:: send(packet)
 
       Send a pickled string *packet* to the socket. This function allows for
       partial sends which can happen when the network is busy.
+
+
+   .. method:: createSocket()
+
+      Tries to create a socket; on failure, uses an exponential back-off
+      algorithm.  On intial failure, the handler will drop the message it was
+      trying to send.  When subsequent messages are handled by the same
+      instance, it will not try connecting until some time has passed.  The
+      default parameters are such that the initial delay is one second, and if
+      after that delay the connection still can't be made, the handler will
+      double the delay each time up to a maximum of 30 seconds.
+
+      This behaviour is controlled by the following handler attributes:
+
+      * ``retryStart`` (initial delay, defaulting to 1.0 seconds).
+      * ``retryFactor`` (multiplier, defaulting to 2.0).
+      * ``retryMax`` (maximum delay, defaulting to 30.0 seconds).
+
+      This means that if the remote listener starts up *after* the handler has
+      been used, you could lose messages (since the handler won't even attempt
+      a connection until the delay has elapsed, but just silently drop messages
+      during the delay period).
 
 
 .. _datagram-handler:
@@ -814,6 +837,15 @@ possible, while any potentially slow operations (such as sending an email via
       This asks the thread to terminate, and then waits for it to do so.
       Note that if you don't call this before your application exits, there
       may be some records still left on the queue, which won't be processed.
+
+   .. method:: enqueue_sentinel()
+
+      Writes a sentinel to the queue to tell the listener to quit. This
+      implementation uses ``put_nowait()``.  You may want to override this
+      method if you want to use timeouts or work with custom queue
+      implementations.
+
+      .. versionadded:: 3.3
 
 
 .. seealso::

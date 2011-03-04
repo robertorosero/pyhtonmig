@@ -4,6 +4,7 @@ import codecs
 import inspect
 import os
 import shutil
+import stat
 import sys
 import textwrap
 import tempfile
@@ -45,14 +46,13 @@ class TempDirMixin(object):
 
     def tearDown(self):
         os.chdir(self.old_dir)
-        while True:
-            try:
-                shutil.rmtree(self.temp_dir)
-            except WindowsError:
-                continue
-            else:
-                break
+        shutil.rmtree(self.temp_dir, True)
 
+    def create_readonly_file(self, filename):
+        file_path = os.path.join(self.temp_dir, filename)
+        with open(file_path, 'w') as file:
+            file.write(filename)
+        os.chmod(file_path, stat.S_IREAD)
 
 class Sig(object):
 
@@ -1446,17 +1446,19 @@ class TestFileTypeR(TempDirMixin, ParserTestCase):
             file = open(os.path.join(self.temp_dir, file_name), 'w')
             file.write(file_name)
             file.close()
+        self.create_readonly_file('readonly')
 
     argument_signatures = [
         Sig('-x', type=argparse.FileType()),
         Sig('spam', type=argparse.FileType('r')),
     ]
-    failures = ['-x', '']
+    failures = ['-x', '', 'non-existent-file.txt']
     successes = [
         ('foo', NS(x=None, spam=RFile('foo'))),
         ('-x foo bar', NS(x=RFile('foo'), spam=RFile('bar'))),
         ('bar -x foo', NS(x=RFile('foo'), spam=RFile('bar'))),
         ('-x - -', NS(x=sys.stdin, spam=sys.stdin)),
+        ('readonly', NS(x=None, spam=RFile('readonly'))),
     ]
 
 
@@ -1503,11 +1505,15 @@ class WFile(object):
 class TestFileTypeW(TempDirMixin, ParserTestCase):
     """Test the FileType option/argument type for writing files"""
 
+    def setUp(self):
+        super(TestFileTypeW, self).setUp()
+        self.create_readonly_file('readonly')
+
     argument_signatures = [
         Sig('-x', type=argparse.FileType('w')),
         Sig('spam', type=argparse.FileType('w')),
     ]
-    failures = ['-x', '']
+    failures = ['-x', '', 'readonly']
     successes = [
         ('foo', NS(x=None, spam=WFile('foo'))),
         ('-x foo bar', NS(x=WFile('foo'), spam=WFile('bar'))),
@@ -2531,6 +2537,46 @@ class TestMutuallyExclusiveOptionalsMixed(MEMixin, TestCase):
           -b          b help
           -y          y help
           -c          c help
+        '''
+
+
+class TestMutuallyExclusiveInGroup(MEMixin, TestCase):
+
+    def get_parser(self, required=None):
+        parser = ErrorRaisingArgumentParser(prog='PROG')
+        titled_group = parser.add_argument_group(
+            title='Titled group', description='Group description')
+        mutex_group = \
+            titled_group.add_mutually_exclusive_group(required=required)
+        mutex_group.add_argument('--bar', help='bar help')
+        mutex_group.add_argument('--baz', help='baz help')
+        return parser
+
+    failures = ['--bar X --baz Y', '--baz X --bar Y']
+    successes = [
+        ('--bar X', NS(bar='X', baz=None)),
+        ('--baz Y', NS(bar=None, baz='Y')),
+    ]
+    successes_when_not_required = [
+        ('', NS(bar=None, baz=None)),
+    ]
+
+    usage_when_not_required = '''\
+        usage: PROG [-h] [--bar BAR | --baz BAZ]
+        '''
+    usage_when_required = '''\
+        usage: PROG [-h] (--bar BAR | --baz BAZ)
+        '''
+    help = '''\
+
+        optional arguments:
+          -h, --help  show this help message and exit
+
+        Titled group:
+          Group description
+
+          --bar BAR   bar help
+          --baz BAZ   baz help
         '''
 
 
@@ -4282,7 +4328,7 @@ class TestEncoding(TestCase):
     def _test_module_encoding(self, path):
         path, _ = os.path.splitext(path)
         path += ".py"
-        with codecs.open(path, 'r', 'utf8') as f:
+        with codecs.open(path, 'r', 'utf-8') as f:
             f.read()
 
     def test_argparse_module_encoding(self):

@@ -3,9 +3,7 @@
 
 """Abstract Base Classes (ABCs) for collections, according to PEP 3119.
 
-DON'T USE THIS MODULE DIRECTLY!  The classes here should be imported
-via collections; they are defined here only to alleviate certain
-bootstrapping issues.  Unit tests are in test_collections.
+Unit tests are in test_collections.
 """
 
 from abc import ABCMeta, abstractmethod
@@ -311,17 +309,17 @@ class MutableSet(Set):
         except KeyError:
             pass
 
-    def __ior__(self, it: Iterable):
+    def __ior__(self, it):
         for value in it:
             self.add(value)
         return self
 
-    def __iand__(self, it: Iterable):
+    def __iand__(self, it):
         for value in (self - it):
             self.discard(value)
         return self
 
-    def __ixor__(self, it: Iterable):
+    def __ixor__(self, it):
         if it is self:
             self.clear()
         else:
@@ -334,7 +332,7 @@ class MutableSet(Set):
                     self.add(value)
         return self
 
-    def __isub__(self, it: Iterable):
+    def __isub__(self, it):
         if it is self:
             self.clear()
         else:
@@ -597,6 +595,13 @@ class MutableSequence(Sequence):
 
     def append(self, value):
         self.insert(len(self), value)
+
+    def clear(self):
+        try:
+            while True:
+                self.pop()
+        except IndexError:
+            pass
 
     def reverse(self):
         n = len(self)

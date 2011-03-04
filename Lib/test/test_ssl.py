@@ -394,6 +394,9 @@ class ContextTests(unittest.TestCase):
         ctx.load_verify_locations(CERTFILE, CAPATH)
         ctx.load_verify_locations(CERTFILE, capath=BYTES_CAPATH)
 
+        # Issue #10989: crash if the second argument type is invalid
+        self.assertRaises(TypeError, ctx.load_verify_locations, None, True)
+
     @skip_if_broken_ubuntu_ssl
     def test_session_stats(self):
         for proto in PROTOCOLS:
@@ -444,6 +447,50 @@ class NetworkedTests(unittest.TestCase):
                                 ca_certs=SVN_PYTHON_ORG_ROOT_CERT)
             try:
                 s.connect(("svn.python.org", 443))
+                self.assertTrue(s.getpeercert())
+            finally:
+                s.close()
+
+    def test_connect_ex(self):
+        # Issue #11326: check connect_ex() implementation
+        with support.transient_internet("svn.python.org"):
+            s = ssl.wrap_socket(socket.socket(socket.AF_INET),
+                                cert_reqs=ssl.CERT_REQUIRED,
+                                ca_certs=SVN_PYTHON_ORG_ROOT_CERT)
+            try:
+                self.assertEqual(0, s.connect_ex(("svn.python.org", 443)))
+                self.assertTrue(s.getpeercert())
+            finally:
+                s.close()
+
+    def test_non_blocking_connect_ex(self):
+        # Issue #11326: non-blocking connect_ex() should allow handshake
+        # to proceed after the socket gets ready.
+        with support.transient_internet("svn.python.org"):
+            s = ssl.wrap_socket(socket.socket(socket.AF_INET),
+                                cert_reqs=ssl.CERT_REQUIRED,
+                                ca_certs=SVN_PYTHON_ORG_ROOT_CERT,
+                                do_handshake_on_connect=False)
+            try:
+                s.setblocking(False)
+                rc = s.connect_ex(('svn.python.org', 443))
+                # EWOULDBLOCK under Windows, EINPROGRESS elsewhere
+                self.assertIn(rc, (0, errno.EINPROGRESS, errno.EWOULDBLOCK))
+                # Wait for connect to finish
+                select.select([], [s], [], 5.0)
+                # Non-blocking handshake
+                while True:
+                    try:
+                        s.do_handshake()
+                        break
+                    except ssl.SSLError as err:
+                        if err.args[0] == ssl.SSL_ERROR_WANT_READ:
+                            select.select([s], [], [], 5.0)
+                        elif err.args[0] == ssl.SSL_ERROR_WANT_WRITE:
+                            select.select([], [s], [], 5.0)
+                        else:
+                            raise
+                # SSL established
                 self.assertTrue(s.getpeercert())
             finally:
                 s.close()

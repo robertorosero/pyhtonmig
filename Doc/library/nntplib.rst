@@ -10,6 +10,10 @@
    pair: NNTP; protocol
    single: Network News Transfer Protocol
 
+**Source code:** :source:`Lib/nntplib.py`
+
+--------------
+
 This module defines the class :class:`NNTP` which implements the client side of
 the Network News Transfer Protocol.  It can be used to implement a news reader
 or poster, or automated news processors.  It is compatible with :rfc:`3977`
@@ -66,10 +70,23 @@ The module itself defines the following classes:
    connecting to an NNTP server on the local machine and intend to call
    reader-specific commands, such as ``group``.  If you get unexpected
    :exc:`NNTPPermanentError`\ s, you might need to set *readermode*.
+   :class:`NNTP` class supports the :keyword:`with` statement to
+   unconditionally consume :exc:`socket.error` exceptions and to close the NNTP
+   connection when done. Here is a sample on how using it:
+
+    >>> from nntplib import NNTP
+    >>> with nntplib.NNTP('news.gmane.org') as n:
+    ...     n.group('gmane.comp.python.committers')
+    ...
+    ('211 1454 1 1454 gmane.comp.python.committers', '1454', '1', '1454', 'gmane.comp.python.committers')
+    >>>
+
 
    .. versionchanged:: 3.2
       *usenetrc* is now False by default.
 
+   .. versionchanged:: 3.3
+      Support for the :keyword:`with` statement was added.
 
 .. class:: NNTP_SSL(host, port=563, user=None, password=None, ssl_context=None, readermode=None, usenetrc=False, [timeout])
 

@@ -5,7 +5,7 @@ import pickletools
 import copyreg
 from http.cookies import SimpleCookie
 
-from test.support import TestFailed, TESTFN, run_with_locale
+from test.support import TestFailed, TESTFN, run_with_locale, no_tracing
 
 from pickle import bytes_types
 
@@ -1002,6 +1002,7 @@ class AbstractPickleTests(unittest.TestCase):
             y = self.loads(s)
             self.assertEqual(y._reduce_called, 1)
 
+    @no_tracing
     def test_bad_getattr(self):
         x = BadGetattr()
         for proto in 0, 1:
@@ -1093,6 +1094,10 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(len(loaded), len(data))
             self.assertEqual(loaded, data)
 
+    def test_empty_bytestring(self):
+        # issue 11286
+        empty = self.loads(b'\x80\x03U\x00q\x00.', encoding='koi8-r')
+        self.assertEqual(empty, '')
 
 # Test classes for reduce_ex
 
